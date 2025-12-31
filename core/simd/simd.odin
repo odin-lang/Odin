@@ -272,7 +272,7 @@ Returns:
 - A vector that is the sum of two input vectors.
 
 Operation:
-	
+
 	for i in 0 ..< len(res) {
 		res[i] = a[i] + b[i]
 	}
@@ -1346,9 +1346,9 @@ The first and the third positions came from the `ptrs` array, and the other
 2 lanes of from the default vector. The graphic below shows how the values of
 the result are decided based on the mask:
 
-	      +-------------------------------+ 
-	mask: |   1   |   0   |   1   |   0   | 
-	      +-------------------------------+ 
+	      +-------------------------------+
+	mask: |   1   |   0   |   1   |   0   |
+	      +-------------------------------+
 	        |         |       |       `----------------------------.
 	        |         |       |                                    |
 	        |          `----  |  ------------------------.         |
@@ -1419,7 +1419,7 @@ Output:
 
 The graphic below shows how the data gets written into memory.
 
-	
+
 	      +-------------------+
 	mask: | 1  | 0  | 1  | 0  |
 	      +-------------------+
@@ -1491,9 +1491,9 @@ Output:
 
 The graphic below demonstrates the flow of lanes.
 
-	      +-------------------------------+ 
-	mask: |   1   |   0   |   1   |   0   | 
-	      +-------------------------------+ 
+	      +-------------------------------+
+	mask: |   1   |   0   |   1   |   0   |
+	      +-------------------------------+
 	        |         |       |       `----------------------------.
 	        |         |       |                                    |
 	        |          `----  |  ------------------------.         |
@@ -2414,7 +2414,7 @@ Example:
 	}
 
 Output:
-	
+
 	<1, 6, 3, 8>
 
 Graphically, the operation looks as follows. The `t` and `f` represent the

@@ -1259,5 +1259,3 @@ OpticalFlowSessionNV          :: distinct NonDispatchableHandle
 ShaderEXT                     :: distinct NonDispatchableHandle
 IndirectExecutionSetEXT       :: distinct NonDispatchableHandle
 IndirectCommandsLayoutEXT     :: distinct NonDispatchableHandle
-
-

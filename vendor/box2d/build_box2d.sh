@@ -15,7 +15,7 @@ FLAGS="-DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=OFF -DBOX2D_VALIDATE=OFF -DBOX
 
 case "$(uname -s)" in
 Darwin)
-	export MACOSX_DEPLOYMENT_TARGET="11" 
+	export MACOSX_DEPLOYMENT_TARGET="11"
 
 	case "$(uname -m)" in
 	"x86_64" | "amd64")

@@ -35,4 +35,3 @@ For more information about the thread sanitizer see: https://clang.llvm.org/docs
 
 */
 package sanitizer
-

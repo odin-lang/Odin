@@ -47,7 +47,7 @@ when ODIN_OS == .NetBSD {
 }
 
 when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
-	
+
 	fsblkcnt_t :: distinct c.uint
 
 	statvfs_t :: struct {
@@ -68,7 +68,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	ST_NOSUID :: 0x00000002
 
 } else when ODIN_OS == .FreeBSD {
-	
+
 	fsblkcnt_t :: distinct c.uint64_t
 
 	statvfs_t :: struct {
@@ -89,7 +89,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	ST_NOSUID :: 0x00000002
 
 } else when ODIN_OS == .NetBSD {
-	
+
 	fsblkcnt_t :: distinct c.uint64_t
 
 	@(private)

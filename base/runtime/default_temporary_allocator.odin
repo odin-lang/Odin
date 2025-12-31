@@ -6,11 +6,11 @@ NO_DEFAULT_TEMP_ALLOCATOR: bool : ODIN_OS == .Freestanding || ODIN_DEFAULT_TO_NI
 when NO_DEFAULT_TEMP_ALLOCATOR {
 	// `Default_Temp_Allocator` is a `nil_allocator` when `NO_DEFAULT_TEMP_ALLOCATOR` is `true`.
 	Default_Temp_Allocator :: struct {}
-	
+
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {}
-	
+
 	default_temp_allocator_destroy :: proc "contextless" (s: ^Default_Temp_Allocator) {}
-	
+
 	default_temp_allocator_proc :: nil_allocator_proc
 
 	@(require_results)
@@ -29,7 +29,7 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 	Default_Temp_Allocator :: struct {
 		arena: Arena,
 	}
-	
+
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {
 		_ = arena_init(&s.arena, uint(size), backing_allocator)
 	}

@@ -4690,4 +4690,3 @@ load_proc_addresses :: proc{
 	load_proc_addresses_device_vtable,
 	load_proc_addresses_custom,
 }
-

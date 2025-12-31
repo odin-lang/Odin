@@ -299,7 +299,7 @@ Sorts a slice while maintaining the relative order of elements with the same key
 Example:
 	import "core:slice"
 	import "core:fmt"
-	
+
 	main :: proc() {
 		arr := []Example {
 			{2, "name"},
@@ -310,14 +310,14 @@ Example:
 		slice.stable_sort_by(arr, proc(i, j: Example) -> bool {
 			return i.n < j.n
 		})
-		
+
 		for e in arr do  fmt.printf("%s ", e.s)
 	}
-	
+
 	Example :: struct { n: int, s: string }
 
 Output:
-	My name is Bill 
+	My name is Bill
 */
 stable_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
@@ -334,7 +334,7 @@ Sorts a slice while maintaining the relative order of elements with the same key
 Example:
 	import "core:slice"
 	import "core:fmt"
-	
+
 	main :: proc() {
 		arr := []Example {
 			{2, "name"},
@@ -345,13 +345,13 @@ Example:
 		slice.stable_sort_by_cmp(arr, proc(i, j: Example) -> slice.Ordering {
 			return slice.cmp(i.n, j.n)
 		})
-		
+
 		for e in arr do  fmt.printf("%s ", e.s)
 	}
-	
+
 	Example :: struct { n: int, s: string }
 Output:
-	My name is Bill 
+	My name is Bill
 */
 stable_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {

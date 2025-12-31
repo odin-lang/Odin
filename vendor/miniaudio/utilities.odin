@@ -134,7 +134,7 @@ data_source_vtable :: struct {
 	onGetLength:     proc "c" (pDataSource: ^data_source, pLength: ^u64) -> result,
 	onSetLooping:    proc "c" (pDataSource: ^data_source, isLooping: b32) -> result,
 	flags:           data_source_flags,
-} 
+}
 
 data_source_get_next_proc :: proc "c" (pDataSource: ^data_source) -> ^data_source
 
@@ -157,7 +157,7 @@ data_source_base :: struct {
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
 	data_source_config_init :: proc() -> data_source_config ---
-	
+
 	data_source_init                         :: proc(pConfig: ^data_source_config, pDataSource: ^data_source) -> result ---
 	data_source_uninit                       :: proc(pDataSource: ^data_source) ---
 	data_source_read_pcm_frames              :: proc(pDataSource: ^data_source, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result ---   /* Must support pFramesOut = NULL in which case a forward seek should be performed. */

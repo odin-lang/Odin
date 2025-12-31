@@ -41,4 +41,3 @@ foreign CoreVideo {
 	DisplayLinkRelease :: proc "c" (displayLink: DisplayLinkRef) ---
 	DisplayLinkRetain :: proc "c" (displayLink: DisplayLinkRef) -> DisplayLinkRef ---
 }
-

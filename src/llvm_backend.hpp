@@ -156,8 +156,8 @@ struct lbModule {
 
 	std::atomic<u32> global_array_index;
 
-	PtrMap<Entity *, lbValue> values;           
-	PtrMap<Entity *, lbAddr>  soa_values;       
+	PtrMap<Entity *, lbValue> values;
+	PtrMap<Entity *, lbAddr>  soa_values;
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
@@ -186,7 +186,7 @@ struct lbModule {
 	LLVMMetadataRef debug_compile_unit;
 
 	RecursiveMutex debug_values_mutex;
-	PtrMap<void *, LLVMMetadataRef> debug_values; 
+	PtrMap<void *, LLVMMetadataRef> debug_values;
 
 
 	StringMap<lbAddr> objc_classes;
@@ -223,7 +223,7 @@ struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
-	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
+	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx;
 	lbModule default_module;
 
 	lbModule *equal_module;

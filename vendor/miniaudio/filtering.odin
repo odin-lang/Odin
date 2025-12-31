@@ -12,7 +12,7 @@ Biquad Filtering
 biquad_coefficient :: struct #raw_union {
 	f32: f32,
 	s32: i32,
-} 
+}
 
 biquad_config :: struct {
 	format:   format,
@@ -39,7 +39,7 @@ biquad :: struct {
 	/* Memory management. */
 	_pHeap: 	 rawptr,
 	_ownsHeap: b32,
-} 
+}
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
@@ -67,7 +67,7 @@ lpf1_config :: struct {
 	sampleRate:      u32,
 	cutoffFrequency: f64,
 	q:               f64,
-} 
+}
 lpf2_config :: lpf1_config
 
 lpf1 :: struct {
@@ -155,7 +155,7 @@ hpf1_config :: struct {
 	sampleRate:      u32,
 	cutoffFrequency: f64,
 	q:               f64,
-} 
+}
 hpf2_config :: hpf1_config
 
 hpf1 :: struct {
@@ -366,7 +366,7 @@ loshelf_config :: struct {
 	gainDB:     f64,
 	shelfSlope: f64,
 	frequency:  f64,
-} 
+}
 loshelf2_config :: loshelf_config
 
 loshelf2 :: struct {
@@ -399,7 +399,7 @@ hishelf_config :: struct {
 	gainDB:     f64,
 	shelfSlope: f64,
 	frequency:  f64,
-} 
+}
 hishelf2_config :: hishelf_config
 
 hishelf2 :: struct {

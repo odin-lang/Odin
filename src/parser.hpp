@@ -862,12 +862,12 @@ struct Ast {
 	AST_KINDS
 #undef AST_KIND
 	};
-	
-	
-	// NOTE(bill): I know I dislike methods but this is hopefully a temporary thing 
+
+
+	// NOTE(bill): I know I dislike methods but this is hopefully a temporary thing
 	// for refactoring purposes
 	gb_inline AstFile *file() const {
-		// NOTE(bill): This doesn't need to call get_ast_file_from_id which 
+		// NOTE(bill): This doesn't need to call get_ast_file_from_id which
 		return global_files[this->file_id];
 	}
 	gb_inline AstFile *thread_safe_file() const {

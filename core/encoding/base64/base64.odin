@@ -92,7 +92,7 @@ encode_into :: proc(w: io.Writer, data: []byte, ENC_TBL := ENC_TABLE) -> io.Erro
 			if i + 2 < length { c2 = int(data[i + 2]) }
 
 			block = (c0 << 16) | (max(c1, 0) << 8) | max(c2, 0)
-			
+
 			out[0] = ENC_TBL[block >> 18 & 63]
 			out[1] = ENC_TBL[block >> 12 & 63]
 			out[2] = c1 == -1 ? PADDING : ENC_TBL[block >> 6 & 63]

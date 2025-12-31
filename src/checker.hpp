@@ -366,7 +366,7 @@ struct UntypedExprInfo {
 	ExprInfo *info;
 };
 
-typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
+typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap;
 
 enum ObjcMsgKind : u32 {
 	ObjcMsg_normal,

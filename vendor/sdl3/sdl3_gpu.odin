@@ -895,5 +895,3 @@ foreign lib {
 	GDKSuspendGPU :: proc(device: ^GPUDevice) ---
 	GDKResumeGPU  :: proc(device: ^GPUDevice) ---
 }
-
-

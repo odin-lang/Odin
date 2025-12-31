@@ -90,7 +90,7 @@ noise_3d_improve_xz :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	yy := coord.y * ROOT_3_OVER_3
 
 	r := Vec3{coord.x + s2 + yy, xz * -ROOT_3_OVER_3 + yy, coord.z + s2 + yy}
-	
+
 	// Evaluate both lattices to form a BCC lattice.
 	return _internal_noise_3d_unrotated_base(seed, r)
 }

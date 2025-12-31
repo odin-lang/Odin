@@ -684,7 +684,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (handle: Han
 	flags := flags
 	if isDir {
 		/*
-			@INFO(Platin): To make it impossible to use the wrong flag for dir's 
+			@INFO(Platin): To make it impossible to use the wrong flag for dir's
 			               as you can't write to a dir only read which makes it fail to open
 		*/
 		flags = O_RDONLY

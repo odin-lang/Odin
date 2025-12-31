@@ -85,7 +85,7 @@ Value :: union {
 	Negative_U16,
 	Negative_U32,
 	Negative_U64,
-	
+
 	// Pointers so the size of the Value union stays small.
 	^Bytes,
 	^Text,
@@ -381,7 +381,7 @@ to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> i
 	case Negative_U32: io.write_int(w, int(negative_to_int(v))) or_return
 	case Negative_U64: io.write_i128(w, i128(negative_to_int(v))) or_return
 
-	// NOTE: not using io.write_float because it removes the sign, 
+	// NOTE: not using io.write_float because it removes the sign,
 	// which we want for the diagnostic format.
 	case f16:
 		buf: [64]byte

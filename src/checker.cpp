@@ -1193,7 +1193,7 @@ gb_internal void init_universal(void) {
 	}
 
 	add_global_string_constant("ODIN_MICROARCH_STRING", get_final_microarchitecture());
-	
+
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
 			{"Executable", BuildMode_Executable},

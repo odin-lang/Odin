@@ -589,4 +589,3 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 	GB_PANIC("TODO(bill): builtin procs %d %.*s", id, LIT(builtin_name));
 	return {};
 }
-

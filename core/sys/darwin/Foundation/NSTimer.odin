@@ -12,4 +12,3 @@ Timer_scheduledTimerWithTimeIntervalRepeatsBlock :: proc(interval: TimeInterval,
 Timer_scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeat :: proc(interval: TimeInterval, aTarget: id, aSelector: SEL, userInfo: id, repeats: BOOL) -> ^Timer {
 	return msgSend(^Timer, Timer, "scheduledTimerWithTimeInterval:target:selector:userInfo:repeats:", interval, aTarget, aSelector, userInfo, repeats)
 }
-

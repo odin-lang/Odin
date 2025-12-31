@@ -16,7 +16,7 @@ reldiff :: proc(lhs, rhs: $T) -> f64  {
 
 isclose :: proc(t: ^testing.T, lhs, rhs: $T, rtol:f64 = 1e-12, atol:f64 = 1e-12) -> bool {
 	adiff := f64(abs(lhs - rhs))
-	if adiff < atol { 
+	if adiff < atol {
 		return true
 	}
 	rdiff := reldiff(lhs, rhs)
@@ -44,7 +44,7 @@ test_libc_complex :: proc(t: ^testing.T) {
 	test_libc_pow_binding(t, libc.complex_float, f32, libc_powf, 1e-12, 1e-5)
 }
 
-test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, pow: proc(LIBC_COMPLEX, LIBC_COMPLEX) -> LIBC_COMPLEX, 
+test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, pow: proc(LIBC_COMPLEX, LIBC_COMPLEX) -> LIBC_COMPLEX,
                               rtol: f64, atol: f64) {
 	// Tests that c/libc/pow(f) functions have two arguments and that the function works as expected for simple inputs
 	{
@@ -54,7 +54,7 @@ test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, po
 		complex_base := LIBC_COMPLEX(complex(F(2.), F(0.)))
 		for n in -4..=4 {
 			complex_power := LIBC_COMPLEX(complex(F(n), F(0.)))
-			result := pow(complex_base, complex_power) 
+			result := pow(complex_base, complex_power)
 			testing.expectf(t, isclose(t, expected_real, F(real(result)), rtol, atol), "ftype:%T, n:%v reldiff(%v, re(%v)) is greater than specified rtol:%e", F{}, n, expected_real, result, rtol)
 			testing.expectf(t, isclose(t, expected_imag, F(imag(result)), rtol, atol), "ftype:%T, n:%v reldiff(%v, im(%v)) is greater than specified rtol:%e", F{}, n, expected_imag, result, rtol)
 			expected_real *= 2
@@ -67,7 +67,7 @@ test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, po
 		complex_base := LIBC_COMPLEX(complex(F(0.), F(2.)))
 		for n in -4..=4 {
 			complex_power := LIBC_COMPLEX(complex(F(n), F(0.)))
-			result := pow(complex_base, complex_power) 
+			result := pow(complex_base, complex_power)
 			switch n%%4 {
 			case 0:
 				expected_real = value

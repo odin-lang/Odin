@@ -2972,4 +2972,3 @@ polar_from_euclidean :: proc{
 	polar_from_euclidean_f32,
 	polar_from_euclidean_f64,
 }
-

@@ -1448,7 +1448,7 @@ EPoll_Data :: struct #raw_union {
 
 /*
 	Linux kernel only packs this struct on x86_64.
-	include/uapi/linux/eventpoll.h:	
+	include/uapi/linux/eventpoll.h:
 		#ifdef __x86_64__
 		#define EPOLL_PACKED __attribute__((packed))
 		#else

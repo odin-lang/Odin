@@ -84,7 +84,7 @@ Error :: enum {
 	Expected_String_For_Object_Key,
 	Duplicate_Object_Key,
 	Expected_Colon_After_Key,
-	
+
 	// Allocating Errors
 	Invalid_Allocator,
 	Out_Of_Memory,

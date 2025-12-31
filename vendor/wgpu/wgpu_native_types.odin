@@ -244,4 +244,3 @@ ConvertLogLevel :: proc {
 	ConvertOdinToWGPULogLevel,
 	ConvertWGPUToOdinLogLevel,
 }
-

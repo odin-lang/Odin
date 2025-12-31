@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 21 * * *"
-    
+
 permissions:
   issues: write
   pull-requests: write
@@ -17,7 +17,7 @@ jobs:
         with:
 #          stale-issue-message: |
 #            Hello!
-#            
+#
 #            I am marking this issue as stale as it has not received any engagement from the community or maintainers 120 days. That does not imply that the issue has no merit! If you feel strongly about this issue
 #            - open a PR referencing and resolving the issue;
 #            - leave a comment on it and discuss ideas how you could contribute towards resolving it;
@@ -28,7 +28,7 @@ jobs:
 #
 #          stale-pr-message: |
 #            Hello!
-#            
+#
 #            I am marking this PR as stale as it has not received any engagement from the community or maintainers 120 days. That does not imply that the issue has no merit! If you feel strongly about this issue
 #            - leave a comment on it and discuss ideas how you could contribute towards resolving it;
 #            - leave a comment and describe in detail why this issue is critical for your use case;

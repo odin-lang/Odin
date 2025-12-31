@@ -52,7 +52,7 @@ OS_Stat :: struct {
 	size: off_t,			// file size, in bytes
 	rdev: dev_t,			// device type (not used)
 	block_size:	blksize_t,	// optimal blocksize for I/O
-	
+
 	last_access: Unix_File_Time,	// time of last access
 	modified: Unix_File_Time,	// time of last data modification
 	status_change: Unix_File_Time,	// time of last file status change
@@ -430,7 +430,7 @@ _readlink :: proc(path: string) -> (string, Error) {
 			buf = make([]byte, bufsz)
 		} else {
 			return strings.string_from_ptr(&buf[0], rc), nil
-		}	
+		}
 	}
 }
 

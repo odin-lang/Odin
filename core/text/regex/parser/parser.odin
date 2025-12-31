@@ -365,7 +365,7 @@ null_denotation :: proc(p: ^Parser, token: Token) -> (result: Node, err: Error) 
 		node := new(Node_Rune)
 		node ^= { ')' }
 		return node, nil
-		
+
 	case .Anchor_Start:
 		node := new(Node_Anchor)
 		node.start = true

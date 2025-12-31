@@ -21,7 +21,7 @@ enum TargetOsKind : u16 {
 	TargetOs_openbsd,
 	TargetOs_netbsd,
 	TargetOs_haiku,
-	
+
 	TargetOs_wasi,
 	TargetOs_js,
 	TargetOs_orca,
@@ -174,7 +174,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
-	
+
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
 };
@@ -217,7 +217,7 @@ enum CommandKind : u64 {
 	Command_doc             = 1<<3,
 	Command_version         = 1<<4,
 	Command_test            = 1<<5,
-	
+
 	Command_strip_semicolon = 1<<6,
 	Command_bug_report      = 1<<7,
 
@@ -938,7 +938,7 @@ gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtar
 
 			if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
 				*subtarget_ = Subtarget_Default;
-				
+
 			} else {
 				for (isize i = 1; i < Subtarget_COUNT; i++) {
 					if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
@@ -2385,8 +2385,8 @@ gb_internal bool init_build_paths(String init_filename) {
 				output_path.name = copy_string(ha, output_path.name);
 				// The old basename is wrong. Delete it
 				gb_free(ha, old_basename.text);
-				
-				
+
+
 			}
 
 			// Replace extension.
@@ -2520,4 +2520,3 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	return true;
 }
-

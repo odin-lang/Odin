@@ -331,4 +331,3 @@ SYS_setxattrat                   :: uintptr(463)
 SYS_getxattrat                   :: uintptr(464)
 SYS_listxattrat                  :: uintptr(465)
 SYS_removexattrat                :: uintptr(466)
-

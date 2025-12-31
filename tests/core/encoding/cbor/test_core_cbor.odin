@@ -110,7 +110,7 @@ test_marshalling :: proc(t: ^testing.T) {
 			big.destroy(&f.biggest)
 			big.destroy(&f.smallest)
 		}
-		
+
 		data, err := cbor.marshal(f, cbor.ENCODE_FULLY_DETERMINISTIC)
 		testing.expect_value(t, err, nil)
 		defer delete(data)
@@ -233,7 +233,7 @@ test_marshalling :: proc(t: ^testing.T) {
 			big.destroy(&backf.biggest)
 			big.destroy(&backf.smallest)
 		}
-		
+
 		testing.expect_value(t, backf.str, f.str)
 		testing.expect_value(t, backf.cstr, f.cstr)
 
@@ -277,7 +277,7 @@ test_marshalling :: proc(t: ^testing.T) {
 		testing.expect_value(t, backf.onetwenty, f.onetwenty)
 		testing.expect_value(t, backf.small_onetwenty, f.small_onetwenty)
 		testing.expect_value(t, backf.ignore_this, nil)
-		
+
 		s_equals, s_err := big.equals(&backf.smallest, &f.smallest)
 		testing.expect_value(t, s_err, nil)
 		if !s_equals {
@@ -305,7 +305,7 @@ test_marshalling_maybe :: proc(t: ^testing.T) {
 	diag := cbor.to_diagnostic_format(val)
 	testing.expect_value(t, diag, "1")
 	delete(diag)
-	
+
 	maybe_dest: Maybe(int)
 	uerr := cbor.unmarshal(string(data), &maybe_dest)
 	testing.expect_value(t, uerr, nil)
@@ -325,7 +325,7 @@ test_marshalling_nil_maybe :: proc(t: ^testing.T) {
 	diag := cbor.to_diagnostic_format(val)
 	testing.expect_value(t, diag, "null")
 	delete(diag)
-	
+
 	maybe_dest: Maybe(int)
 	uerr := cbor.unmarshal(string(data), &maybe_dest)
 	testing.expect_value(t, uerr, nil)
@@ -588,7 +588,7 @@ test_decode_bytes :: proc(t: ^testing.T) {
 	expect_decoding(t, "\x44\x01\x02\x03\x04", "h'01020304'", ^cbor.Bytes)
 
 	// Indefinite lengths
-	
+
 	expect_decoding(t, "\x5f\x42\x01\x02\x43\x03\x04\x05\xff", "h'0102030405'", ^cbor.Bytes)
 }
 
@@ -598,7 +598,7 @@ test_encode_bytes :: proc(t: ^testing.T) {
 	expect_encoding(t, &cbor.Bytes{1, 2, 3, 4}, "\x44\x01\x02\x03\x04")
 
 	// Indefinite lengths
-	
+
 	expect_streamed_encoding(t, "\x5f\x42\x01\x02\x43\x03\x04\x05\xff", &cbor.Bytes{1, 2}, &cbor.Bytes{3, 4, 5})
 }
 
@@ -613,7 +613,7 @@ test_decode_strings :: proc(t: ^testing.T) {
 	expect_decoding(t, "\x64\xf0\x90\x85\x91", `"𐅑"`, ^cbor.Text)
 
 	// Indefinite lengths
-	
+
 	expect_decoding(t, "\x7f\x65\x73\x74\x72\x65\x61\x64\x6d\x69\x6e\x67\xff", `"streaming"`, ^cbor.Text)
 }
 
@@ -623,16 +623,16 @@ test_encode_strings :: proc(t: ^testing.T) {
 
 	a := "a"
 	expect_encoding(t, &a, "\x61\x61")
-	
+
 	b := "IETF"
 	expect_encoding(t, &b, "\x64\x49\x45\x54\x46")
-	
+
 	c := "\"\\"
 	expect_encoding(t, &c, "\x62\x22\x5c")
-	
+
 	d := "ü"
 	expect_encoding(t, &d, "\x62\xc3\xbc")
-	
+
 	e := "水"
 	expect_encoding(t, &e, "\x63\xe6\xb0\xb4")
 
@@ -640,7 +640,7 @@ test_encode_strings :: proc(t: ^testing.T) {
 	expect_encoding(t, &f, "\x64\xf0\x90\x85\x91")
 
 	// Indefinite lengths
-	
+
 	sa := "strea"
 	sb := "ming"
 	expect_streamed_encoding(t, "\x7f\x65\x73\x74\x72\x65\x61\x64\x6d\x69\x6e\x67\xff", &sa, &sb)
@@ -655,7 +655,7 @@ test_decode_lists :: proc(t: ^testing.T) {
 	expect_decoding(t, "\x82\x61\x61\xa1\x61\x62\x61\x63", `["a", {"b": "c"}]`, ^cbor.Array)
 
 	// Indefinite lengths
-	
+
 	expect_decoding(t, "\x9f\xff", "[]", ^cbor.Array)
 	expect_decoding(t, "\x9f\x01\x82\x02\x03\x9f\x04\x05\xff\xff", "[1, [2, 3], [4, 5]]", ^cbor.Array)
 	expect_decoding(t, "\x9f\x01\x82\x02\x03\x82\x04\x05\xff", "[1, [2, 3], [4, 5]]", ^cbor.Array)
@@ -671,7 +671,7 @@ test_encode_lists :: proc(t: ^testing.T) {
 	expect_encoding(t, &cbor.Array{u8(1), u8(2), u8(3)}, "\x83\x01\x02\x03")
 	expect_encoding(t, &cbor.Array{u8(1), &cbor.Array{u8(2), u8(3)}, &cbor.Array{u8(4), u8(5)}}, "\x83\x01\x82\x02\x03\x82\x04\x05")
 	expect_encoding(t, &cbor.Array{u8(1), u8(2), u8(3), u8(4), u8(5), u8(6), u8(7), u8(8), u8(9), u8(10), u8(11), u8(12), u8(13), u8(14), u8(15), u8(16), u8(17), u8(18), u8(19), u8(20), u8(21), u8(22), u8(23), u8(24), u8(25)}, "\x98\x19\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x18\x18\x19")
-	
+
 	{
 		a := "a"
 		b := "b"
@@ -680,7 +680,7 @@ test_encode_lists :: proc(t: ^testing.T) {
 	}
 
 	// Indefinite lengths
-	
+
 	expect_streamed_encoding(t, "\x9f\xff", &cbor.Array{})
 
 	{
@@ -689,7 +689,7 @@ test_encode_lists :: proc(t: ^testing.T) {
 		defer bytes.buffer_destroy(&buf)
 		stream  := bytes.buffer_to_stream(&buf)
 		encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
-		
+
 		err: cbor.Encode_Error
 		err = cbor.encode_stream_begin(stream, .Array)
 		testing.expect_value(t, err, nil)
@@ -718,29 +718,29 @@ test_encode_lists :: proc(t: ^testing.T) {
 
 		err = cbor.encode_stream_end(stream)
 		testing.expect_value(t, err, nil)
-		
+
 		testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)string("\x9f\x01\x82\x02\x03\x9f\x04\x05\xff\xff")))
 	}
-	
+
 	{
 		buf: bytes.Buffer
 		bytes.buffer_init_allocator(&buf, 0, 0)
 		defer bytes.buffer_destroy(&buf)
 		stream  := bytes.buffer_to_stream(&buf)
 		encoder := cbor.Encoder{cbor.ENCODE_FULLY_DETERMINISTIC, stream, {}}
-	
+
 		err: cbor.Encode_Error
 		err = cbor._encode_u8(stream, 2, .Array)
 		testing.expect_value(t, err, nil)
-		
+
 		a := "a"
 		err = cbor.encode(encoder, &a)
 		testing.expect_value(t, err, nil)
-		
+
 		{
 			err = cbor.encode_stream_begin(stream, .Map)
 			testing.expect_value(t, err, nil)
-			
+
 			b := "b"
 			c := "c"
 			err = cbor.encode_stream_map_entry(encoder, &b, &c)
@@ -749,7 +749,7 @@ test_encode_lists :: proc(t: ^testing.T) {
 			err = cbor.encode_stream_end(stream)
 			testing.expect_value(t, err, nil)
 		}
-		
+
 		testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)string("\x82\x61\x61\xbf\x61\x62\x61\x63\xff")))
 	}
 }
@@ -776,7 +776,7 @@ test_encode_maps :: proc(t: ^testing.T) {
 	b := "b"
 	// NOTE: also tests the deterministic nature because it has to swap/sort the entries.
 	expect_encoding(t, &cbor.Map{{&b, &cbor.Array{u8(2), u8(3)}}, {&a, u8(1)}}, "\xa2\x61\x61\x01\x61\x62\x82\x02\x03")
-	
+
 	fun := "Fun"
 	amt := "Amt"
 	expect_streamed_encoding(t, "\xbf\x63\x46\x75\x6e\xf5\x63\x41\x6d\x74\x21\xff", &cbor.Map{{&fun, true}, {&amt, cbor.Negative_U8(1)}})
@@ -822,7 +822,7 @@ expect_tag :: proc(t: ^testing.T, encoded: string, nr: cbor.Tag_Number, value_de
 	defer cbor.destroy(res)
 
 	testing.expect_value(t, err, nil, loc)
-	
+
 	if tag, is_tag := res.(^cbor.Tag); is_tag {
 		testing.expect_value(t, tag.number, nr, loc)
 
@@ -887,7 +887,7 @@ expect_streamed_encoding :: proc(t: ^testing.T, encoded: string, values: ..cbor.
 			if i == 0 { err = cbor.encode_stream_begin(stream, .Array) }
 			for item in v {
 				err2 = cbor.encode_stream_array_item(encoder, item)
-				if err2 != nil { break } 
+				if err2 != nil { break }
 			}
 		case ^cbor.Map:
 			err = cbor.encode_stream_begin(stream, .Map)

@@ -36,7 +36,7 @@ _futex_wait :: proc "contextless" (futex: ^Futex, expected: u32) -> bool {
 			return true
 		case:
 			panic_contextless("futex_wait failure")
-		}	
+		}
 	}
 	return true
 }

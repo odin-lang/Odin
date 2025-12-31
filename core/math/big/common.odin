@@ -27,7 +27,7 @@ when #config(MATH_BIG_EXE, true) {
 	MUL_KARATSUBA_CUTOFF := _DEFAULT_MUL_KARATSUBA_CUTOFF
 	SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF
 	MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF
-	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF	
+	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF
 }
 
 /*
@@ -77,7 +77,7 @@ USE_MILLER_RABIN_ONLY       := false
 
 /*
 	How many times we'll call `internal_int_random` during random prime generation before we bail out.
-	Set to 0 or less to try indefinitely.	
+	Set to 0 or less to try indefinitely.
 */
 MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000
 
@@ -244,7 +244,7 @@ _WORD_BITS       :: 2 * _DIGIT_BITS
 
 _MASK            :: (DIGIT(1) << DIGIT(_DIGIT_BITS)) - DIGIT(1)
 _DIGIT_MAX       :: _MASK
-_MAX_COMBA       :: 1 <<  (_WORD_TYPE_BITS - (2 * _DIGIT_BITS))     
+_MAX_COMBA       :: 1 <<  (_WORD_TYPE_BITS - (2 * _DIGIT_BITS))
 _WARRAY          :: 1 << ((_WORD_TYPE_BITS - (2 * _DIGIT_BITS)) + 1)
 
 Order :: enum i8 {

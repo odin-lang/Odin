@@ -577,7 +577,7 @@ gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 		} else if (build_context.metrics.arch == TargetArch_i386) {
 			result->windows_sdk_bin_path = mc_concat(bin, str_lit("x86\\"));
 			sdk_bin_found = true;
-		} 
+		}
 	}
 
 	// NOTE(WalterPlinge): If any combination is found, let's just assume they are correct
@@ -768,7 +768,7 @@ gb_internal Find_Result find_visual_studio_and_windows_sdk() {
 		r.windows_sdk_um_library_path.len   &&
 		r.windows_sdk_ucrt_library_path.len ;
 
-	bool vs_found = 
+	bool vs_found =
 		r.vs_exe_path.len                   &&
 		r.vs_library_path.len               ;
 

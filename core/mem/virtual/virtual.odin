@@ -88,11 +88,11 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	committed = align_formula(committed, page_size)
 	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
-	
+
 	total_size     := reserved + alignment + size_of(Platform_Memory_Block)
 	base_offset    := mem.align_forward_uintptr(size_of(Platform_Memory_Block), max(uintptr(alignment), align_of(Platform_Memory_Block)))
 	protect_offset := uintptr(0)
-	
+
 	do_protection := false
 	if .Overflow_Protection in flags { // overflow protection
 		rounded_size   := reserved
@@ -101,23 +101,23 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 		protect_offset = uintptr(page_size + rounded_size)
 		do_protection  = true
 	}
-	
+
 	pmblock := platform_memory_alloc(0, total_size) or_return
-	
+
 	pmblock.block.base = ([^]byte)(pmblock)[base_offset:]
 	platform_memory_commit(pmblock, uint(base_offset) + committed) or_return
 
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
-	assert(pmblock.block.prev == nil)	
+	assert(pmblock.block.prev == nil)
 	if do_protection {
 		protect(([^]byte)(pmblock)[protect_offset:], page_size, Protect_No_Access)
 	}
-	
+
 	pmblock.block.committed = committed
 	pmblock.block.reserved  = reserved
 
-	
+
 	return &pmblock.block, nil
 }
 
@@ -132,7 +132,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 			alignment_offset = uint(alignment - (ptr & mask))
 		}
 		return alignment_offset
-		
+
 	}
 	@(no_sanitize_address)
 	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint, default_commit_size: uint) -> (err: Allocator_Error) {

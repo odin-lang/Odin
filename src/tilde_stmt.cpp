@@ -2886,4 +2886,3 @@ gb_internal void cg_build_when_stmt(cgProcedure *p, AstWhenStmt *ws) {
 		}
 	}
 }
-

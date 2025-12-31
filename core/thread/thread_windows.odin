@@ -151,4 +151,3 @@ _terminate :: proc(thread: ^Thread, exit_code: int) {
 _yield :: proc() {
 	win32.SwitchToThread()
 }
-

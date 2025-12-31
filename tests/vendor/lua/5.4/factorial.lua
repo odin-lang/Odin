@@ -6,5 +6,5 @@ function fact (n)
     return n * fact(n-1)
   end
 end
-    
+
 return fact(10)

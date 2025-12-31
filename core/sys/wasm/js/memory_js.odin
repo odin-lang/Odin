@@ -41,4 +41,3 @@ page_allocator :: proc() -> mem.Allocator {
 		data = nil,
 	}
 }
-

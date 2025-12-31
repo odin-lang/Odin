@@ -51,18 +51,18 @@ ptr_swap_overlapping :: proc "contextless" (x, y: rawptr, len: int) {
 	if x == y {
 		return
 	}
-	
+
 	N :: 512
 	buffer: [N]byte = ---
-	
+
 	a, b := ([^]byte)(x), ([^]byte)(y)
-	
+
 	for n := len; n > 0; n -= N {
 		m := builtin.min(n, N)
 		runtime.mem_copy(&buffer, a, m)
 		runtime.mem_copy(a, b, m)
 		runtime.mem_copy(b, &buffer, m)
-		
+
 		a, b = a[N:], b[N:]
 	}
 }

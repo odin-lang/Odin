@@ -116,7 +116,7 @@ test_infinity :: proc(t: ^testing.T) {
 			testing.expect_value(t, math.classify(f), math.Float_Class.Zero)
 		}
 	}
-	
+
 	s = "+infinity"
 	for i in 0 ..< len(s) + 1 {
 		ss := s[:i]

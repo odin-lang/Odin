@@ -22,7 +22,7 @@ foreign libc {
 }
 
 when ODIN_OS == .Windows {
-	SIG_ERR :: rawptr(~uintptr(0)) 
+	SIG_ERR :: rawptr(~uintptr(0))
 	SIG_DFL :: rawptr(uintptr(0))
 	SIG_IGN :: rawptr(uintptr(1))
 
@@ -37,7 +37,7 @@ when ODIN_OS == .Windows {
 when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Darwin {
 	SIG_ERR  :: rawptr(~uintptr(0))
 	SIG_DFL  :: rawptr(uintptr(0))
-	SIG_IGN  :: rawptr(uintptr(1)) 
+	SIG_IGN  :: rawptr(uintptr(1))
 
 	SIGABRT  :: 6
 	SIGFPE   :: 8

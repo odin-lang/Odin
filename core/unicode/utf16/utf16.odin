@@ -89,19 +89,19 @@ decode :: proc(d: []rune, s: []u16) -> (n: int) {
 		if n >= len(d) {
 			return
 		}
-		
+
 		r := rune(REPLACEMENT_CHAR)
-		
+
 		switch c := s[i]; {
 		case c < _surr1, _surr3 <= c:
 			r = rune(c)
-		case _surr1 <= c && c < _surr2 && i+1 < len(s) && 
+		case _surr1 <= c && c < _surr2 && i+1 < len(s) &&
 			_surr2 <= s[i+1] && s[i+1] < _surr3:
 			r = decode_surrogate_pair(rune(c), rune(s[i+1]))
 			i += 1
 		}
 		d[n] = r
-		
+
 		n += 1
 	}
 	return
@@ -160,7 +160,7 @@ rune_count_in_string :: proc(s: string16) -> (n: int) {
 rune_count_in_slice :: proc(s: []u16) -> (n: int) {
 	for i := 0; i < len(s); i += 1 {
 		c := s[i]
-		if _surr1 <= c && c < _surr2 && i+1 < len(s) && 
+		if _surr1 <= c && c < _surr2 && i+1 < len(s) &&
 			_surr2 <= s[i+1] && s[i+1] < _surr3 {
 			i += 1
 		}
@@ -176,16 +176,16 @@ decode_to_utf8 :: proc(d: []byte, s: []u16) -> (n: int) {
 			return
 		}
 		r := rune(REPLACEMENT_CHAR)
-		
+
 		switch c := s[i]; {
 		case c < _surr1, _surr3 <= c:
 			r = rune(c)
-		case _surr1 <= c && c < _surr2 && i+1 < len(s) && 
+		case _surr1 <= c && c < _surr2 && i+1 < len(s) &&
 			_surr2 <= s[i+1] && s[i+1] < _surr3:
 			r = decode_surrogate_pair(rune(c), rune(s[i+1]))
 			i += 1
 		}
-		
+
 		b, w := utf8.encode_rune(rune(r))
 		n += copy(d[n:], b[:w])
 	}

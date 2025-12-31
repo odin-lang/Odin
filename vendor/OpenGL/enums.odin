@@ -1,8 +1,8 @@
 package vendor_gl
 
 GL_Enum :: enum u64 {
-	FALSE = 0, 
-	TRUE = 1, 
+	FALSE = 0,
+	TRUE = 1,
 
 	DEPTH_BUFFER_BIT = DEPTH_BUFFER_BIT,
 	STENCIL_BUFFER_BIT = STENCIL_BUFFER_BIT,

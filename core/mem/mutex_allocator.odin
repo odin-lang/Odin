@@ -49,4 +49,3 @@ mutex_allocator_proc :: proc(
 	sync.mutex_guard(&m.mutex)
 	return m.backing.procedure(m.backing.data, mode, size, alignment, old_memory, old_size, loc)
 }
-

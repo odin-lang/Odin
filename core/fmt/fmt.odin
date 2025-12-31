@@ -125,7 +125,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 // 	- sep: An optional separator string (default is a single space).
 // 	- allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string. 
+// 	Returns: A formatted string.
 //
 @(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {

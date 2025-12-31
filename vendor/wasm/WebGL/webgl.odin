@@ -45,12 +45,12 @@ foreign webgl {
 
 	DrawingBufferWidth  :: proc() -> i32 ---
 	DrawingBufferHeight :: proc() -> i32 ---
-	
+
 	GetWebGLVersion :: proc(major, minor: ^i32) ---
 	GetESVersion :: proc(major, minor: ^i32) ---
-	
+
 	GetError :: proc() -> Enum ---
-	
+
 	IsExtensionSupported :: proc(name: string) -> bool ---
 
 	ActiveTexture         :: proc(x: Enum) ---
@@ -65,7 +65,7 @@ foreign webgl {
 	BlendEquationSeparate :: proc(modeRGB: Enum, modeAlpha: Enum) ---
 	BlendFunc             :: proc(sfactor, dfactor: Enum) ---
 	BlendFuncSeparate     :: proc(srcRGB, dstRGB, srcAlpha, dstAlpha: Enum) ---
-	
+
 	BufferData    :: proc(target: Enum, size: int, data: rawptr, usage: Enum) ---
 	BufferSubData :: proc(target: Enum, offset: uintptr, size: int, data: rawptr) ---
 
@@ -75,12 +75,12 @@ foreign webgl {
 	ClearStencil  :: proc(x: i32) ---
 	ColorMask     :: proc(r, g, b, a: bool) ---
 	CompileShader :: proc(shader: Shader) ---
-	
+
 	CompressedTexImage2D    :: proc(target: Enum, level: i32, internalformat: Enum, width, height: i32, border: i32, imageSize: int, data: rawptr) ---
 	CompressedTexSubImage2D :: proc(target: Enum, level: i32, xoffset, yoffset, width, height: i32, format: Enum, imageSize: int, data: rawptr) ---
 	CopyTexImage2D          :: proc(target: Enum, level: i32, internalformat: Enum, x, y, width, height: i32, border: i32) ---
 	CopyTexSubImage2D       :: proc(target: Enum, level: i32, xoffset, yoffset, x, y: i32, width, height: i32) ---
-	
+
 
 	CreateBuffer       :: proc() -> Buffer ---
 	CreateFramebuffer  :: proc() -> Framebuffer ---
@@ -88,16 +88,16 @@ foreign webgl {
 	CreateRenderbuffer :: proc() -> Renderbuffer ---
 	CreateShader       :: proc(shaderType: Enum) -> Shader ---
 	CreateTexture      :: proc() -> Texture ---
-	
+
 	CullFace :: proc(mode: Enum) ---
-	
+
 	DeleteBuffer       :: proc(buffer: Buffer) ---
 	DeleteFramebuffer  :: proc(framebuffer: Framebuffer) ---
 	DeleteProgram      :: proc(program: Program) ---
 	DeleteRenderbuffer :: proc(renderbuffer: Renderbuffer) ---
 	DeleteShader       :: proc(shader: Shader) ---
 	DeleteTexture      :: proc(texture: Texture) ---
-	
+
 	DepthFunc                :: proc(func: Enum) ---
 	DepthMask                :: proc(flag: bool) ---
 	DepthRange               :: proc(zNear, zFar: f32) ---
@@ -106,7 +106,7 @@ foreign webgl {
 	DisableVertexAttribArray :: proc(index: i32) ---
 	DrawArrays               :: proc(mode: Enum, first, count: int) ---
 	DrawElements             :: proc(mode: Enum, count: int, type: Enum, indices: rawptr) ---
-	
+
 	Enable                  :: proc(cap: Enum) ---
 	EnableVertexAttribArray :: proc(index: i32) ---
 	Finish                  :: proc() ---
@@ -115,9 +115,9 @@ foreign webgl {
 	FramebufferTexture2D    :: proc(target, attachment, textarget: Enum, texture: Texture, level: i32) ---
 	CheckFramebufferStatus  :: proc(target: Enum) -> Enum ---
 	FrontFace               :: proc(mode: Enum) ---
-	
+
 	GenerateMipmap :: proc(target: Enum) ---
-	
+
 	GetAttribLocation     :: proc(program: Program, name: string) -> i32 ---
 	GetUniformLocation    :: proc(program: Program, name: string) -> i32 ---
 	GetVertexAttribOffset :: proc(index: i32, pname: Enum) -> uintptr ---
@@ -126,7 +126,7 @@ foreign webgl {
 	GetParameter4i        :: proc(pname: Enum, v0, v1, v2, v4: ^i32) ---
 
 	Hint :: proc(target: Enum, mode: Enum) ---
-	
+
 	IsBuffer       :: proc(buffer: Buffer) -> bool ---
 	IsEnabled      :: proc(cap: Enum) -> bool ---
 	IsFramebuffer  :: proc(framebuffer: Framebuffer) -> bool ---
@@ -134,50 +134,50 @@ foreign webgl {
 	IsRenderbuffer :: proc(renderbuffer: Renderbuffer) -> bool ---
 	IsShader       :: proc(shader: Shader) -> bool ---
 	IsTexture      :: proc(texture: Texture) -> bool ---
-	
+
 	LineWidth     :: proc(width: f32) ---
 	LinkProgram   :: proc(program: Program) ---
 	PixelStorei   :: proc(pname: Enum, param: i32) ---
 	PolygonOffset :: proc(factor: f32, units: f32) ---
-	
+
 	ReadnPixels         :: proc(x, y, width, height: i32, format: Enum, type: Enum, bufSize: int, data: rawptr) ---
 	RenderbufferStorage :: proc(target: Enum, internalformat: Enum, width, height: i32) ---
 	SampleCoverage      :: proc(value: f32, invert: bool) ---
 	Scissor             :: proc(x, y, width, height: i32) ---
 	ShaderSource        :: proc(shader: Shader, strings: []string) ---
-	
+
 	StencilFunc         :: proc(func: Enum, ref: i32, mask: u32) ---
 	StencilFuncSeparate :: proc(face, func: Enum, ref: i32, mask: u32) ---
 	StencilMask         :: proc(mask: u32) ---
 	StencilMaskSeparate :: proc(face: Enum, mask: u32) ---
 	StencilOp           :: proc(fail, zfail, zpass: Enum) ---
 	StencilOpSeparate   :: proc(face, fail, zfail, zpass: Enum)	 ---
-	
+
 	TexImage2D    :: proc(target: Enum, level: i32, internalformat: Enum, width, height: i32, border: i32, format, type: Enum, size: int, data: rawptr) ---
 	TexSubImage2D :: proc(target: Enum, level: i32, xoffset, yoffset, width, height: i32, format, type: Enum, size: int, data: rawptr) ---
-	
+
 	TexParameterf :: proc(target, pname: Enum, param: f32) ---
 	TexParameteri :: proc(target, pname: Enum, param: i32) ---
-	
+
 	Uniform1f :: proc(location: i32, v0: f32) ---
 	Uniform2f :: proc(location: i32, v0, v1: f32) ---
 	Uniform3f :: proc(location: i32, v0, v1, v2: f32) ---
 	Uniform4f :: proc(location: i32, v0, v1, v2, v3: f32) ---
-	
+
 	Uniform1i :: proc(location: i32, v0: i32) ---
 	Uniform2i :: proc(location: i32, v0, v1: i32) ---
 	Uniform3i :: proc(location: i32, v0, v1, v2: i32) ---
 	Uniform4i :: proc(location: i32, v0, v1, v2, v3: i32) ---
-	
+
 	UseProgram      :: proc(program: Program) ---
 	ValidateProgram :: proc(program: Program) ---
-		
+
 	VertexAttrib1f      :: proc(index: i32, x: f32) ---
 	VertexAttrib2f      :: proc(index: i32, x, y: f32) ---
 	VertexAttrib3f      :: proc(index: i32, x, y, z: f32) ---
 	VertexAttrib4f      :: proc(index: i32, x, y, z, w: f32) ---
 	VertexAttribPointer :: proc(index: i32, size: int, type: Enum, normalized: bool, stride: int, ptr: uintptr) ---
-	
+
 	Viewport :: proc(x, y, w, h: i32) ---
 }
 
@@ -356,7 +356,7 @@ GetProgramInfoLog :: proc "contextless" (program: Program, buf: []byte) -> strin
 		@(link_name="GetProgramInfoLog")
 		_GetProgramInfoLog :: proc "contextless" (program: Program, buf: []byte, length: ^int) ---
 	}
-	
+
 	length: int
 	_GetProgramInfoLog(program, buf, &length)
 	return string(buf[:length])
@@ -367,7 +367,7 @@ GetShaderInfoLog :: proc "contextless" (shader: Shader, buf: []byte) -> string {
 		@(link_name="GetShaderInfoLog")
 		_GetShaderInfoLog :: proc "contextless" (shader: Shader, buf: []byte, length: ^int) ---
 	}
-	
+
 	length: int
 	_GetShaderInfoLog(shader, buf, &length)
 	return string(buf[:length])

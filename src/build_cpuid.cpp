@@ -9,7 +9,7 @@ gb_internal void odin_cpuid(int leaf, int result[]) {
 		return;
 
 	#elif defined(GB_CPU_X86)
-	
+
 		#if defined(GB_COMPILER_MSVC)
 			__cpuid(result, leaf);
 		#else

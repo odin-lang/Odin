@@ -71,7 +71,7 @@ NOTE: for full portability, usage should look something like:
 
 	page_size: uint
 	when #defined(posix.PAGESIZE) {
-		page_size = posix.PAGESIZE	
+		page_size = posix.PAGESIZE
 	} else {
 		page_size = posix.sysconf(._PAGESIZE)
 	}
@@ -122,7 +122,7 @@ when ODIN_OS == .Darwin {
 	// one pathname to another.
 	// For example, file systems or directories may have different characteristics.
 	//
-	// A definition of one of the symbolic constants in the following list shall be omitted from the 
+	// A definition of one of the symbolic constants in the following list shall be omitted from the
 	// <limits.h> header on specific implementations where the corresponding value is equal to or
 	// greater than the stated minimum, but where the value can vary depending on the file to which
 	// it is applied.
@@ -163,7 +163,7 @@ when ODIN_OS == .Darwin {
 	RE_DUP_MAX          :: 255
 
 	// Other limits.
-	
+
 	NL_ARGMAX  :: 9
 	NL_LANGMAX :: 14
 	NL_MSGMAX  :: 32767
@@ -216,7 +216,7 @@ when ODIN_OS == .Darwin {
 	// one pathname to another.
 	// For example, file systems or directories may have different characteristics.
 	//
-	// A definition of one of the symbolic constants in the following list shall be omitted from the 
+	// A definition of one of the symbolic constants in the following list shall be omitted from the
 	// <limits.h> header on specific implementations where the corresponding value is equal to or
 	// greater than the stated minimum, but where the value can vary depending on the file to which
 	// it is applied.
@@ -257,7 +257,7 @@ when ODIN_OS == .Darwin {
 	RE_DUP_MAX          :: 255
 
 	// Other limits.
-	
+
 	NL_ARGMAX  :: 4096
 	NL_LANGMAX :: 31
 	NL_MSGMAX  :: 32767
@@ -311,7 +311,7 @@ when ODIN_OS == .Darwin {
 	// one pathname to another.
 	// For example, file systems or directories may have different characteristics.
 	//
-	// A definition of one of the symbolic constants in the following list shall be omitted from the 
+	// A definition of one of the symbolic constants in the following list shall be omitted from the
 	// <limits.h> header on specific implementations where the corresponding value is equal to or
 	// greater than the stated minimum, but where the value can vary depending on the file to which
 	// it is applied.
@@ -352,7 +352,7 @@ when ODIN_OS == .Darwin {
 	RE_DUP_MAX          :: 255
 
 	// Other limits.
-	
+
 	NL_ARGMAX  :: 9
 	NL_LANGMAX :: 14
 	NL_MSGMAX  :: 32767
@@ -406,7 +406,7 @@ when ODIN_OS == .Darwin {
 	// one pathname to another.
 	// For example, file systems or directories may have different characteristics.
 	//
-	// A definition of one of the symbolic constants in the following list shall be omitted from the 
+	// A definition of one of the symbolic constants in the following list shall be omitted from the
 	// <limits.h> header on specific implementations where the corresponding value is equal to or
 	// greater than the stated minimum, but where the value can vary depending on the file to which
 	// it is applied.
@@ -447,7 +447,7 @@ when ODIN_OS == .Darwin {
 	RE_DUP_MAX          :: 255
 
 	// Other limits.
-	
+
 	NL_ARGMAX  :: 9
 	NL_LANGMAX :: 14
 	NL_MSGMAX  :: 32767
@@ -501,7 +501,7 @@ when ODIN_OS == .Darwin {
 	// one pathname to another.
 	// For example, file systems or directories may have different characteristics.
 	//
-	// A definition of one of the symbolic constants in the following list shall be omitted from the 
+	// A definition of one of the symbolic constants in the following list shall be omitted from the
 	// <limits.h> header on specific implementations where the corresponding value is equal to or
 	// greater than the stated minimum, but where the value can vary depending on the file to which
 	// it is applied.

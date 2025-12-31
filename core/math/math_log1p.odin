@@ -101,7 +101,7 @@ log1p :: proc {
 
 @(require_results)
 log1p_f64 :: proc "contextless" (x: f64) -> f64 {
-	SQRT2_M1      :: 0h3fda827999fcef34 // sqrt(2)-1 
+	SQRT2_M1      :: 0h3fda827999fcef34 // sqrt(2)-1
 	SQRT2_HALF_M1 :: 0hbfd2bec333018866 // sqrt(2)/2-1
 	SMALL         :: 0h3e20000000000000 // 2**-29
 	TINY          :: 0h3c90000000000000 // 2**-54
@@ -115,7 +115,7 @@ log1p_f64 :: proc "contextless" (x: f64) -> f64 {
 	LP5           :: 0h3FC7466496CB03DE
 	LP6           :: 0h3FC39A09D078C69F
 	LP7           :: 0h3FC2F112DF3E5244
-	
+
 	switch {
 	case x < -1 || is_nan(x):
 		return nan_f64()
@@ -125,7 +125,7 @@ log1p_f64 :: proc "contextless" (x: f64) -> f64 {
 		return inf_f64(+1)
 	}
 	absx := abs(x)
-	
+
 	f: f64
 	iu: u64
 	k := 1

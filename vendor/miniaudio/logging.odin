@@ -48,7 +48,7 @@ log :: struct {
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
 	log_callback_init :: proc(onLog: log_callback_proc, pUserData: rawptr) -> log_callback ---
-	
+
 	log_init                :: proc(pAllocationCallbacks: ^allocation_callbacks, pLog: ^log) -> result ---
 	log_uninit              :: proc(pLog: ^log) ---
 	log_register_callback   :: proc(pLog: ^log, callback: log_callback) -> result ---

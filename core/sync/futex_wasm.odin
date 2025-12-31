@@ -41,4 +41,3 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 		_ = intrinsics.wasm_memory_atomic_notify32((^u32)(f), max(u32))
 	}
 }
-

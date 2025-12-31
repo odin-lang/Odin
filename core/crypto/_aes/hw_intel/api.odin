@@ -40,4 +40,3 @@ Context :: struct {
 init :: proc(ctx: ^Context, key: []byte) {
 	keysched(ctx, key)
 }
-

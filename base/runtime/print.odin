@@ -492,7 +492,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_u64(u64(info.count))
 		print_byte(']')
 		print_type(info.elem)
-		
+
 	case Type_Info_Matrix:
 		print_string("matrix[")
 		print_u64(u64(info.row_count))

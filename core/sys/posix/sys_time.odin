@@ -42,7 +42,7 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/utimes.html ]]
 	*/
 	@(link_name=LUTIMES)
-	utimes :: proc(path: cstring, times: ^[2]timeval) -> result ---	
+	utimes :: proc(path: cstring, times: ^[2]timeval) -> result ---
 }
 
 ITimer :: enum c.int {
@@ -50,7 +50,7 @@ ITimer :: enum c.int {
 	REAL    = ITIMER_REAL,
 	// Decrements in process virtual time, only when the process is executing.
 	VIRTUAL = ITIMER_VIRTUAL,
-	// Decrements both in process virtual time and when the system is running on 
+	// Decrements both in process virtual time and when the system is running on
 	// behalf of the process.
 	PROF    = ITIMER_PROF,
 }

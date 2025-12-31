@@ -146,7 +146,7 @@ XXH3_rrmxmx :: #force_inline proc(h64, length: xxh_u64) -> (res: xxh_u64) {
 	res = h64
 	res ~= XXH_rotl64(res, 49) ~ XXH_rotl64(res, 24)
 	res *= 0x9FB21C651E98DF25
-	res ~= (res >> 35) + length 
+	res ~= (res >> 35) + length
 	res *= 0x9FB21C651E98DF25
 	return XXH_xorshift_64(res, 28)
 }
@@ -188,7 +188,7 @@ XXH3_len_1to3_128b :: #force_inline proc(input: []u8, secret: []u8, seed: xxh_u6
 		bitfliph  := u64(XXH32_read32(secret[8:]) ~ XXH32_read32(secret[12:])) - seed
 		keyed_lo  := u64(combinedl) ~ bitflipl
 		keyed_hi  := u64(combinedh) ~ bitfliph
-		
+
 		return xxh_u128(XXH64_avalanche(keyed_lo)) | xxh_u128(XXH64_avalanche(keyed_hi)) << 64
 	}
 }

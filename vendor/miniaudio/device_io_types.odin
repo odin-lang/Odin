@@ -371,7 +371,7 @@ device_info :: struct {
 		channels:   u32,               /* If set to 0, all channels are supported. */
 		sampleRate: u32,               /* If set to 0, all sample rates are supported. */
 		flags:      data_format_flags, /* A combination of MA_DATA_FORMAT_FLAG_* flags. */
-	},  
+	},
 }
 
 device_config :: struct {
@@ -652,7 +652,7 @@ context_type :: struct {
 			hMMDevapi:                       handle,
 			ActivateAudioInterfaceAsync:     proc "system" (),
 		} when SUPPORT_WASAPI else struct {}),
-		
+
 		dsound: (struct {
 			hWnd:                         handle, /* Can be null. */
 			hDSoundDLL:                   handle,
@@ -661,7 +661,7 @@ context_type :: struct {
 			DirectSoundCaptureCreate:     proc "system" (),
 			DirectSoundCaptureEnumerateA: proc "system" (),
 		} when SUPPORT_DSOUND else struct {}),
-		
+
 		winmm: (struct {
 			hWinMM:                 handle,
 			waveOutGetNumDevs:      proc "system" (),
@@ -824,7 +824,7 @@ context_type :: struct {
 			pApplicationName:               cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
 			pServerName:                    cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
 		} when SUPPORT_PULSEAUDIO else struct {}),
-		
+
 		jack: (struct {
 			jackSO:                        handle,
 			jack_client_open:              proc "system" (),
@@ -876,7 +876,7 @@ context_type :: struct {
 			/*AudioComponent*/ component: rawptr,
 			noAudioSessionDeactivate:     b32, /* For tracking whether or not the iOS audio session should be explicitly deactivated. Set from the config in ma_context_init__coreaudio(). */
 		} when SUPPORT_COREAUDIO else struct {}),
-		
+
 		sndio: (struct {
 			sndioSO:     handle,
 			sio_open:    proc "system" (),
@@ -952,11 +952,11 @@ context_type :: struct {
 			SL_IID_ANDROIDCONFIGURATION:      handle,
 			slCreateEngine:                   proc "system" (),
 		} when SUPPORT_OPENSL else struct {}),
-		
+
 		webaudio: (struct {
 			_unused: c.int,
 		} when SUPPORT_WEBAUDIO else struct {}),
-		
+
 		null_backend: (struct {
 			_unused: c.int,
 		} when SUPPORT_NULL else struct {}),
@@ -983,11 +983,11 @@ context_type :: struct {
 
 			/*HRESULT*/ CoInitializeResult: c.long,
 		} when ODIN_OS == .Windows else struct {}),
-		
+
 		posix: (struct {
 			_unused: c.int,
 		} when ODIN_OS != .Windows else struct {}),
-		
+
 		_unused: c.int,
 	},
 }
@@ -1108,7 +1108,7 @@ device :: struct {
 			hAvrtHandle: rawptr,
 			rerouteLock: mutex,
 		} when SUPPORT_WASAPI else struct {}),
-		
+
 		dsound: (struct {
 			/*LPDIRECTSOUND*/ pPlayback: rawptr,
 			/*LPDIRECTSOUNDBUFFER*/ pPlaybackPrimaryBuffer: rawptr,
@@ -1116,7 +1116,7 @@ device :: struct {
 			/*LPDIRECTSOUNDCAPTURE*/ pCapture: rawptr,
 			/*LPDIRECTSOUNDCAPTUREBUFFER*/ pCaptureBuffer: rawptr,
 		} when SUPPORT_DSOUND else struct {}),
-		
+
 		winmm: (struct {
 			/*HWAVEOUT*/ hDevicePlayback: handle,
 			/*HWAVEIN*/ hDeviceCapture: handle,
@@ -1133,7 +1133,7 @@ device :: struct {
 			pIntermediaryBufferCapture: [^]u8,
 			_pHeapData: [^]u8,                      /* Used internally and is used for the heap allocated data for the intermediary buffer and the WAVEHDR structures. */
 		} when SUPPORT_WINMM else struct {}),
-		
+
 		alsa: (struct {
 			/*snd_pcm_t**/ pPCMPlayback: rawptr,
 			/*snd_pcm_t**/ pPCMCapture: rawptr,
@@ -1153,7 +1153,7 @@ device :: struct {
 			/*pa_stream**/ pStreamPlayback: rawptr,
 			/*pa_stream**/ pStreamCapture: rawptr,
 		} when SUPPORT_PULSEAUDIO else struct {}),
-		
+
 		jack: (struct {
 			/*jack_client_t**/ pClient: rawptr,
 			/*jack_port_t**/ pPortsPlayback: [^]rawptr,
@@ -1197,7 +1197,7 @@ device :: struct {
 			fdPlayback: c.int,
 			fdCapture: c.int,
 		} when SUPPORT_OSS else struct {}),
-		
+
 		aaudio: (struct {
 			/*AAudioStream**/ pStreamPlayback: rawptr,
 			/*AAudioStream**/ pStreamCapture: rawptr,
@@ -1253,5 +1253,3 @@ device :: struct {
 		} when SUPPORT_NULL else struct {}),
 	},
 }
-
-

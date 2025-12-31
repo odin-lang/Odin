@@ -188,7 +188,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	// TODO(bill): Clean up this logic
 	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[calling_convention];
-	} 
+	}
 	// if (build_context.metrics.arch == TargetArch_amd64) {
 	// 	if (build_context.metrics.os == TargetOs_windows) {
 	// 		if (cc_kind == lbCallingConvention_C) {
@@ -199,7 +199,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	// 			cc_kind = lbCallingConvention_X86_64_SysV;
 	// 		}
 	// 	}
-	// } 
+	// }
 	LLVMSetFunctionCallConv(fn, cc_kind);
 	if (calling_convention == ProcCC_Odin) {
 		unsigned context_index = arg_index;
@@ -388,7 +388,7 @@ namespace lbAbi386 {
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
@@ -470,7 +470,7 @@ namespace lbAbiAmd64Win64 {
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
@@ -616,7 +616,7 @@ namespace lbAbiAmd64SysV {
 	}
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
@@ -1127,7 +1127,7 @@ namespace lbAbiArm64 {
 	gb_internal bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
@@ -1281,7 +1281,7 @@ namespace lbAbiArm64 {
 			return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 		}
 	}
-    
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
@@ -1348,7 +1348,7 @@ namespace lbAbiWasm {
 	enum {MAX_DIRECT_STRUCT_SIZE = 32};
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
@@ -1377,7 +1377,7 @@ namespace lbAbiWasm {
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
-	
+
 	gb_internal bool is_basic_register_type(LLVMTypeRef type) {
 		switch (LLVMGetTypeKind(type)) {
 		case LLVMHalfTypeKind:
@@ -1387,7 +1387,7 @@ namespace lbAbiWasm {
 			return true;
 		case LLVMIntegerTypeKind:
 			return lb_sizeof(type) <= 16;
-		}	
+		}
 		return false;
 	}
 
@@ -1445,7 +1445,7 @@ namespace lbAbiWasm {
 	gb_internal lbArgType is_struct(LLVMContextRef c, LLVMTypeRef type, Type *original_type, ProcCallingConvention calling_convention) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		GB_ASSERT(kind == LLVMArrayTypeKind || kind == LLVMStructTypeKind);
-		
+
 		i64 sz = lb_sizeof(type);
 		if (sz == 0) {
 			return lb_arg_type_ignore(type);
@@ -1455,7 +1455,7 @@ namespace lbAbiWasm {
 		}
 		return lb_arg_type_indirect(type, nullptr);
 	}
-	
+
 	gb_internal lbArgType pseudo_slice(LLVMContextRef c, LLVMTypeRef type, Type *original_type, ProcCallingConvention calling_convention) {
 		if (build_context.metrics.ptr_size < build_context.metrics.int_size &&
 		    type_can_be_direct(type, original_type, calling_convention)) {
@@ -1557,7 +1557,7 @@ namespace lbAbiArm32 {
 	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);

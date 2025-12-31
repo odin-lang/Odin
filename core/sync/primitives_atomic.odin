@@ -45,7 +45,7 @@ atomic_mutex_lock :: proc "contextless" (m: ^Atomic_Mutex) {
 			if atomic_exchange_explicit(&m.state, .Waiting, .Acquire) == .Unlocked {
 				return
 			}
-			
+
 			futex_wait((^Futex)(&m.state), u32(new_state))
 			cpu_relax()
 		}

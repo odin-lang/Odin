@@ -70,7 +70,7 @@ foreign lib {
 	gainer_set_gain           :: proc(pGainer: ^gainer, newGain: f32) -> result ---
 	gainer_set_gains          :: proc(pGainer: ^gainer, pNewGains: [^]f32) -> result ---
 	gainer_set_master_volume  :: proc(pGainer: ^gainer, volume: f32) -> result ---
-	gainer_get_master_volume  :: proc(pGainer: ^gainer, volume: ^f32) -> result --- 
+	gainer_get_master_volume  :: proc(pGainer: ^gainer, volume: ^f32) -> result ---
 }
 
 

@@ -465,7 +465,7 @@ address_locate_address :: proc "contextless" (addr: rawptr, data: []byte) -> Add
 		out_addr: rawptr
 		out_size: uint
 		str := __asan_locate_address(addr, raw_data(data), len(data), &out_addr, &out_size)
-		return { string(str), string(cstring(raw_data(data))), (cast([^]byte)out_addr)[:out_size] }, 
+		return { string(str), string(cstring(raw_data(data))), (cast([^]byte)out_addr)[:out_size] },
 	} else {
 		return { "", "", {} }
 	}
@@ -598,4 +598,3 @@ address_update_allocation_context :: proc "contextless" (addr: rawptr) -> bool {
 		return false
 	}
 }
-

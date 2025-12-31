@@ -71,7 +71,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	if errno != .NONE {
 		return _get_platform_error(errno)
 	}
-	
+
 	has_created: bool
 	mkdirat(dfd, path_bytes, perm, &has_created) or_return
 	return nil if has_created else .Exist

@@ -128,7 +128,7 @@ type_info_base :: runtime.type_info_base
 // type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
 // returns the backing integer type of an enum or bit_set `^Type_Info`.
 // This is also aliased as `type_info_base_without_enum`
-type_info_core :: runtime.type_info_core 
+type_info_core :: runtime.type_info_core
 
 
 // type_info_base_without_enum returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
@@ -1128,7 +1128,7 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 			intrinsics.mem_copy(dst.data, value.data, ti.size)
 			return true
 		}
-		
+
 		if type_info_union_is_pure_maybe(info) {
 			if variant := info.variants[0]; variant.id == value.id {
 				intrinsics.mem_copy(dst.data, value.data, variant.size)
@@ -1157,7 +1157,7 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 @(require_results)
 bit_set_is_big_endian :: proc(value: any, loc := #caller_location) -> bool {
 	if value == nil { return ODIN_ENDIAN == .Big }
-	
+
 	ti := runtime.type_info_base(type_info_of(value.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
 		if info.underlying == nil { return ODIN_ENDIAN == .Big }
@@ -1806,11 +1806,11 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	if a.data == b.data {
 		return true
 	}
-	
+
 	including_indirect_array_recursion := including_indirect_array_recursion
 	if recursion_level >= DEFAULT_EQUAL_MAX_RECURSION_LEVEL {
 		including_indirect_array_recursion = false
-	} 
+	}
 
 	t := type_info_of(a.id)
 	if .Comparable not_in t.flags && !including_indirect_array_recursion {
@@ -1824,7 +1824,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	if .Simple_Compare in t.flags {
 		return runtime.memory_compare(a.data, b.data, t.size) == 0
 	}
-	
+
 	t = runtime.type_info_core(t)
 
 	switch v in t.variant {
@@ -1838,7 +1838,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		}
 		va := (^any)(a.data)
 		vb := (^any)(b.data)
-		return equal(va, vb, including_indirect_array_recursion, recursion_level+1) 
+		return equal(va, vb, including_indirect_array_recursion, recursion_level+1)
 	case Type_Info_Map:
 		return false
 	case Type_Info_Float:
@@ -1871,9 +1871,9 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			return x == y
 		}
 		return false
-	case 
+	case
 		Type_Info_Boolean,
-		Type_Info_Integer, 
+		Type_Info_Integer,
 		Type_Info_Rune,
 		Type_Info_Type_Id,
 		Type_Info_Pointer,
@@ -1885,7 +1885,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
 		return runtime.memory_compare(a.data, b.data, t.size) == 0
-		
+
 	case Type_Info_String:
 		switch v.encoding {
 		case .UTF_8:
@@ -1964,7 +1964,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			y := rawptr(uintptr(array_b.data) + uintptr(v.elem_size*i))
 			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level+1) {
 				return false
-			}	
+			}
 		}
 		return true
 	case Type_Info_Dynamic_Array:
@@ -1982,13 +1982,13 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if .Simple_Compare in v.elem.flags {
 			return runtime.memory_compare((^byte)(array_a.data), (^byte)(array_b.data), array_a.len * v.elem.size) == 0
 		}
-		
+
 		for i in 0..<array_a.len {
 			x := rawptr(uintptr(array_a.data) + uintptr(v.elem_size*i))
 			y := rawptr(uintptr(array_b.data) + uintptr(v.elem_size*i))
 			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level+1) {
 				return false
-			}	
+			}
 		}
 		return true
 
@@ -1999,7 +1999,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		return equal(x, y, including_indirect_array_recursion, recursion_level+0)
 
 	}
-	
+
 	runtime.print_typeid(a.id)
 	runtime.print_string("\n")
 	return true

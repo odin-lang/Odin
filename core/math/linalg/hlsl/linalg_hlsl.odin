@@ -87,7 +87,7 @@ bool2 :: [2]bool
 bool3 :: [3]bool
 bool4 :: [4]bool
 
-// Double Precision (double) Floating Point Types 
+// Double Precision (double) Floating Point Types
 
 double1x1 :: matrix[1, 1]double
 double2x2 :: matrix[2, 2]double
@@ -989,19 +989,19 @@ degrees :: proc{
 
 min :: proc{
 	min_half,
-	min_int,  
-	min_uint,  
-	min_float,  
+	min_int,
+	min_uint,
+	min_float,
 	min_double,
 	min_half2,
 	min_half3,
 	min_half4,
-	min_float2, 
-	min_float3, 
-	min_float4, 
-	min_double2, 
-	min_double3, 
-	min_double4, 
+	min_float2,
+	min_float3,
+	min_float4,
+	min_double2,
+	min_double3,
+	min_double4,
 	min_int2,
 	min_int3,
 	min_int4,
@@ -1032,20 +1032,20 @@ min :: proc{
 
 
 max :: proc{
-	max_int,  
+	max_int,
 	max_uint,
 	max_half,
-	max_float,  
+	max_float,
 	max_double,
 	max_half2,
 	max_half3,
 	max_half4,
-	max_float2, 
-	max_float3, 
-	max_float4, 
-	max_double2, 
-	max_double3, 
-	max_double4, 
+	max_float2,
+	max_float3,
+	max_float4,
+	max_double2,
+	max_double3,
+	max_double4,
 	max_int2,
 	max_int3,
 	max_int4,
@@ -1077,20 +1077,20 @@ max :: proc{
 
 
 clamp :: proc{
-	clamp_int, 
-	clamp_uint, 
+	clamp_int,
+	clamp_uint,
 	clamp_half,
 	clamp_float,
 	clamp_double,
 	clamp_half2,
 	clamp_half3,
 	clamp_half4,
-	clamp_float2, 
-	clamp_float3, 
-	clamp_float4, 
-	clamp_double2, 
-	clamp_double3, 
-	clamp_double4, 
+	clamp_float2,
+	clamp_float3,
+	clamp_float4,
+	clamp_double2,
+	clamp_double3,
+	clamp_double4,
 	clamp_int2,
 	clamp_int3,
 	clamp_int4,
@@ -1629,7 +1629,7 @@ vectorTripleProduct :: proc {
 	vectorTripleProduct_half3,
 	vectorTripleProduct_float3,
 	vectorTripleProduct_double3,
-	vectorTripleProduct_int3,	
+	vectorTripleProduct_int3,
 }
 @(require_results) vectorTripleProduct_half3 :: proc "c" (a, b, c: half3) -> half3 { return cross(a, cross(b, c)) }
 @(require_results) vectorTripleProduct_float3 :: proc "c" (a, b, c: float3) -> float3 { return cross(a, cross(b, c)) }

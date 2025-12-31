@@ -630,7 +630,7 @@ class WebGLInterface {
 
 			GetActiveAttrib: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
 				const info = this.ctx.getActiveAttrib(this.programs[program], index);
-				
+
 				if (size_ptr) {
 					this.mem.storeInt(size_ptr, info.size);
 				}
@@ -651,7 +651,7 @@ class WebGLInterface {
 
 			GetActiveUniform: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
 				let info = this.ctx.getActiveUniform(this.programs[program], index);
-				
+
 				if (size_ptr) {
 					this.mem.storeInt(size_ptr, info.size);
 				}
@@ -1327,7 +1327,7 @@ class WebGLInterface {
 				this.assertWebGL2();
 				let res = this.ctx.getActiveUniformBlockParameter(this.programs[program], uniformBlockIndex, pname);
 
-				if (res instanceof Uint32Array) { // for pname GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES 
+				if (res instanceof Uint32Array) { // for pname GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES
 					this.mem.loadU32Array(params_ptr, res.length).set(res)
 				} else {
 					this.mem.storeI32(params_ptr, res)
@@ -1375,17 +1375,17 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 	currentLine[false] = "";
 	currentLine[true] = "";
 	let prevIsError = false;
-	
+
 	let event_temp = {};
 
 	const onEventReceived = (event_data, data, callback) => {
 		event_temp.data = event_data;
-		
+
 		const exports = wasmMemoryInterface.exports;
 		const odin_ctx = exports.default_context_ptr();
-		
+
 		exports.odin_dom_do_event_callback(data, callback, odin_ctx);
-		
+
 		event_temp.data = null;
 	};
 

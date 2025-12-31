@@ -9,8 +9,8 @@ when ODIN_OS == .Windows {
 	when GLFW_SHARED {
 		foreign import glfw {
 			"../lib/glfw3dll.lib",
-			"system:user32.lib", 
-			"system:gdi32.lib", 
+			"system:user32.lib",
+			"system:gdi32.lib",
 			"system:shell32.lib",
 		}
 	} else {
@@ -30,7 +30,7 @@ when ODIN_OS == .Windows {
 			"system:OpenGL.framework",
 		}
 	} else {
-		foreign import glfw { 
+		foreign import glfw {
 			"../lib/darwin/libglfw3.a",
 			"system:Cocoa.framework",
 			"system:IOKit.framework",
@@ -58,7 +58,7 @@ when ODIN_OS == .Windows {
 foreign glfw {
 	Init      :: proc() -> b32 ---
 	Terminate :: proc() ---
-	
+
 	InitHint  :: proc(hint, value: c.int) ---
 
 	InitAllocator :: proc(#by_ptr allocator: Allocator) ---
@@ -168,7 +168,7 @@ foreign glfw {
 	GetGamepadState        :: proc(jid: c.int, state: ^GamepadState) -> b32 ---
 
 	SetClipboardString :: proc(window: WindowHandle, str: cstring) ---
-	
+
 	SetTime           :: proc(time: f64) ---
 	GetTime           :: proc() -> f64 ---
 	GetTimerValue     :: proc() -> u64 ---
@@ -184,7 +184,7 @@ foreign glfw {
 	GetInstanceProcAddress               :: proc(instance: vk.Instance, procname: cstring) -> rawptr ---
 	GetPhysicalDevicePresentationSupport :: proc(instance: vk.Instance, device: vk.PhysicalDevice, queuefamily: u32) -> b32 ---
 	CreateWindowSurface                  :: proc(instance: vk.Instance, window: WindowHandle, allocator: ^vk.AllocationCallbacks, surface: ^vk.SurfaceKHR) -> vk.Result ---
-	
+
 	SetWindowIconifyCallback      :: proc(window: WindowHandle, cbfun: WindowIconifyProc)      -> WindowIconifyProc ---
 	SetWindowRefreshCallback      :: proc(window: WindowHandle, cbfun: WindowRefreshProc)      -> WindowRefreshProc ---
 	SetWindowFocusCallback        :: proc(window: WindowHandle, cbfun: WindowFocusProc)        -> WindowFocusProc ---
@@ -217,4 +217,3 @@ foreign glfw {
 	@(linkage="strong" when ODIN_OS == .Windows else "weak")
 	PlatformSupported :: proc(platform: c.int) -> b32 ---
 }
-

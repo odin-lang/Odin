@@ -44,4 +44,3 @@ _heap_free :: proc "contextless" (ptr: rawptr) {
 	}
 	HeapFree(GetProcessHeap(), 0, ptr)
 }
-

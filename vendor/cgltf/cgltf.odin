@@ -761,10 +761,9 @@ foreign lib {
 	animation_sampler_index :: proc(animation: ^/*const*/animation, object: ^/*const*/animation_sampler) -> uint ---
 	@(require_results)
 	animation_channel_index :: proc(animation: ^/*const*/animation, object: ^/*const*/animation_channel) -> uint ---
-	
+
 	@(require_results)
 	write_file :: proc(#by_ptr options: options, path:   cstring,             data: ^data) -> result ---
 	@(require_results)
 	write      :: proc(#by_ptr options: options, buffer: [^]byte, size: uint, data: ^data) -> uint ---
 }
-

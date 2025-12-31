@@ -38,7 +38,7 @@ foreign lib {
 	// [[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/inet_ntop.html ]]
 	inet_ntop :: proc(
 		af:   AF,        // INET or INET6
-		src:  rawptr,    // either ^in_addr or ^in_addr6 
+		src:  rawptr,    // either ^in_addr or ^in_addr6
 		dst:  [^]byte,   // use `INET_ADDRSTRLEN` or `INET6_ADDRSTRLEN` for minimum lengths
 		size: socklen_t,
 	) -> cstring ---

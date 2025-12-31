@@ -218,7 +218,7 @@ scan :: proc(t: ^Tokenizer) -> (token: Token) {
 	if t.held_token != {} {
 		popped := t.held_token
 		t.held_token = {}
-		
+
 		return popped
 	}
 

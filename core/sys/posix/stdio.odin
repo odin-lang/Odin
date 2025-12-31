@@ -59,7 +59,7 @@ foreign lib {
 
 	/*
 	Tries to lock a file.
-	
+
 	Returns: 0 if it could be locked, non-zero if it couldn't
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/flockfile.html ]]

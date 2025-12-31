@@ -6,7 +6,7 @@ import "base:runtime"
 
 Priority_Queue :: struct($T: typeid) {
 	queue: [dynamic]T,
-	
+
 	less:  proc(a, b: T) -> bool,
 	swap:  proc(q: []T, i, j: int),
 }
@@ -62,10 +62,10 @@ _shift_down :: proc(pq: ^$Q/Priority_Queue($T), i0, n: int) -> bool {
 	if 0 > i0 || i0 > n {
 		return false
 	}
-	
+
 	i := i0
 	queue := pq.queue[:]
-	
+
 	for {
 		j1 := 2*i + 1
 		if j1 < 0 || j1 >= n {
@@ -78,7 +78,7 @@ _shift_down :: proc(pq: ^$Q/Priority_Queue($T), i0, n: int) -> bool {
 		if !pq.less(queue[j], queue[i]) {
 			break
 		}
-		
+
 		pq.swap(queue, i, j)
 		i = j
 	}
@@ -114,7 +114,7 @@ push :: proc(pq: ^$Q/Priority_Queue($T), value: T) -> (err: runtime.Allocator_Er
 
 pop :: proc(pq: ^$Q/Priority_Queue($T), loc := #caller_location) -> (value: T) {
 	assert(condition=builtin.len(pq.queue)>0, loc=loc)
-	
+
 	n := builtin.len(pq.queue)-1
 	pq.swap(pq.queue[:], 0, n)
 	_shift_down(pq, 0, n)

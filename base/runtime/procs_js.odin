@@ -12,4 +12,3 @@ init_default_context :: proc "contextless" () {
 default_context_ptr :: proc "contextless" () -> ^Context {
 	return &init_default_context_for_js
 }
-

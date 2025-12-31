@@ -34,7 +34,7 @@ _MAXVAL :: max(Coord)
 Rect :: struct {
 	// reserved for your use:
 	id: c.int,
-	
+
 	// input:
 	w, h: Coord,
 

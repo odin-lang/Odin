@@ -2,14 +2,14 @@ package runtime
 
 when ODIN_NO_CRT && ODIN_OS == .Windows {
 	foreign import lib "system:NtDll.lib"
-	
+
 	@(private="file")
 	@(default_calling_convention="system")
 	foreign lib {
 		RtlMoveMemory :: proc(dst, s: rawptr, length: int) ---
 		RtlFillMemory :: proc(dst: rawptr, length: int, fill: i32) ---
 	}
-	
+
 	@(link_name="memset", linkage="strong", require)
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 		RtlFillMemory(ptr, len, val)
@@ -85,7 +85,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 			}
 		}
 		return d
-		
+
 	}
 } else {
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {

@@ -471,4 +471,3 @@ void write_cached_build(Checker *c, Array<String> const &args) {
 		}
 	}
 }
-

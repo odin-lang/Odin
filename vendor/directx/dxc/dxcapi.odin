@@ -194,7 +194,7 @@ ICompiler :: struct #raw_union {
 ICompiler_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	Compile: proc "system" (
-		this: ^ICompiler, 
+		this: ^ICompiler,
 		pSource: ^IBlob,
 		pSourceName: wstring,
 		pEntryPoint: wstring,
@@ -206,7 +206,7 @@ ICompiler_VTable :: struct {
 		pIncludeHandler: ^IIncludeHandler,
 		ppResult: ^^IOperationResult) -> HRESULT,
 	Preprocess: proc "system" (
-		this: ^ICompiler, 
+		this: ^ICompiler,
 		pSource: ^IBlob,
 		pSourceName: wstring,
 		pArguments: [^]wstring,

@@ -65,7 +65,7 @@ phys :: proc(c: image.PNG_Chunk) -> (res: pHYs, ok: bool) {
 		return {}, false
 	}
 
-	return (^pHYs)(raw_data(c.data))^, true 
+	return (^pHYs)(raw_data(c.data))^, true
 }
 
 phys_to_dpi :: proc(p: pHYs) -> (x_dpi, y_dpi: f32) {

@@ -13,7 +13,7 @@ package math_big
 
 /*
 	Determines if an Integer is divisible by one of the _PRIME_TABLE primes.
-	Returns true if it is, false if not. 
+	Returns true if it is, false if not.
 */
 internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
 	assert_if_nil(a)
@@ -339,7 +339,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		return
 	}
 
-	// `N` is not a perfect square: floor(sqrt(`N`))^2 != `N` 
+	// `N` is not a perfect square: floor(sqrt(`N`))^2 != `N`
 	if internal_int_is_square(a) or_return { return }
 
 	// Is the input equal to one of the primes in the table?

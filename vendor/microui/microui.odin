@@ -144,34 +144,34 @@ Command_Variant :: union {
 	^Command_Text,
 	^Command_Icon,
 }
-Command :: struct { 
+Command :: struct {
 	variant: Command_Variant,
-	size:    i32, 
+	size:    i32,
 }
-Command_Jump :: struct { 
-	using command: Command, 
+Command_Jump :: struct {
+	using command: Command,
 	dst: rawptr,
 }
-Command_Clip :: struct { 
-	using command: Command, 
+Command_Clip :: struct {
+	using command: Command,
 	rect: Rect,
 }
-Command_Rect :: struct { 
-	using command: Command, 
-	rect:  Rect, 
+Command_Rect :: struct {
+	using command: Command,
+	rect:  Rect,
 	color: Color,
 }
-Command_Text :: struct { 
-	using command: Command, 
-	font:  Font, 
-	pos:   Vec2, 
-	color: Color, 
-	str:   string, /* + string data (VLA) */ 
+Command_Text :: struct {
+	using command: Command,
+	font:  Font,
+	pos:   Vec2,
+	color: Color,
+	str:   string, /* + string data (VLA) */
 }
-Command_Icon :: struct { 
-	using command: Command, 
-	rect:  Rect, 
-	id:    Icon, 
+Command_Icon :: struct {
+	using command: Command,
+	rect:  Rect,
+	id:    Icon,
 	color: Color,
 }
 
@@ -255,14 +255,14 @@ Stack :: struct($T: typeid, $N: int) {
 	idx:   i32,
 	items: [N]T,
 }
-push :: #force_inline proc(stk: ^$T/Stack($V,$N), val: V) { 
+push :: #force_inline proc(stk: ^$T/Stack($V,$N), val: V) {
 	assert(stk.idx < len(stk.items))
-	stk.items[stk.idx] = val 
-	stk.idx += 1 
+	stk.items[stk.idx] = val
+	stk.idx += 1
 }
-pop  :: #force_inline proc(stk: ^$T/Stack($V,$N)) { 
-	assert(stk.idx > 0) 
-	stk.idx -= 1 
+pop  :: #force_inline proc(stk: ^$T/Stack($V,$N)) {
+	assert(stk.idx > 0)
+	stk.idx -= 1
 }
 
 unclipped_rect := Rect{0, 0, 0x1000000, 0x1000000}
@@ -309,7 +309,7 @@ rect_overlaps_vec2 :: proc(r: Rect, p: Vec2) -> bool {
 	return p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h
 }
 
-@private 
+@private
 default_draw_frame :: proc(ctx: ^Context, rect: Rect, colorid: Color_Type) {
 	draw_rect(ctx, rect, ctx.style.colors[colorid])
 	if colorid == .SCROLL_BASE || colorid == .SCROLL_THUMB || colorid == .TITLE_BG {
@@ -419,9 +419,9 @@ set_focus :: proc(ctx: ^Context, id: Id) {
 get_id         :: proc{get_id_string, get_id_bytes, get_id_rawptr, get_id_uintptr}
 get_id_string  :: #force_inline proc(ctx: ^Context, str: string)             -> Id { return get_id_bytes(ctx, transmute([]byte) str) }
 get_id_rawptr  :: #force_inline proc(ctx: ^Context, data: rawptr, size: int) -> Id { return get_id_bytes(ctx, ([^]u8)(data)[:size])  }
-get_id_uintptr :: #force_inline proc(ctx: ^Context, ptr: uintptr) -> Id { 
+get_id_uintptr :: #force_inline proc(ctx: ^Context, ptr: uintptr) -> Id {
 	ptr := ptr
-	return get_id_bytes(ctx, ([^]u8)(&ptr)[:size_of(ptr)])  
+	return get_id_bytes(ctx, ([^]u8)(&ptr)[:size_of(ptr)])
 }
 get_id_bytes   :: proc(ctx: ^Context, bytes: []byte) -> Id {
 	/* 32bit fnv-1a hash */
@@ -434,7 +434,7 @@ get_id_bytes   :: proc(ctx: ^Context, bytes: []byte) -> Id {
 			cptr = cptr[1:]
 		}
 	}
-	
+
 	idx := ctx.id_stack.idx
 	res := ctx.id_stack.items[idx - 1] if idx > 0 else HASH_INITIAL
 	hash(&res, bytes)
@@ -469,12 +469,12 @@ get_clip_rect :: proc(ctx: ^Context) -> Rect {
 check_clip :: proc(ctx: ^Context, r: Rect) -> Clip {
 	cr := get_clip_rect(ctx)
 	if r.x > cr.x + cr.w || r.x + r.w < cr.x ||
-	   r.y > cr.y + cr.h || r.y + r.h < cr.y { 
-		return .ALL 
+	   r.y > cr.y + cr.h || r.y + r.h < cr.y {
+		return .ALL
 	}
 	if r.x >= cr.x && r.x + r.w <= cr.x + cr.w &&
-	   r.y >= cr.y && r.y + r.h <= cr.y + cr.h { 
-		return .NONE 
+	   r.y >= cr.y && r.y + r.h <= cr.y + cr.h {
+		return .NONE
 	}
 	return .PART
 }
@@ -483,7 +483,7 @@ get_layout :: proc(ctx: ^Context) -> ^Layout {
 	return &ctx.layout_stack.items[ctx.layout_stack.idx - 1]
 }
 
-@private 
+@private
 push_layout :: proc(ctx: ^Context, body: Rect, scroll: Vec2) {
 	layout: Layout
 	layout.body = Rect{body.x - scroll.x, body.y - scroll.y, body.w, body.h}
@@ -492,7 +492,7 @@ push_layout :: proc(ctx: ^Context, body: Rect, scroll: Vec2) {
 	layout_row(ctx, {0})
 }
 
-@private 
+@private
 pop_container :: proc(ctx: ^Context) {
 	cnt := get_current_container(ctx)
 	layout := get_layout(ctx)
@@ -626,8 +626,8 @@ push_command :: proc(ctx: ^Context, $Type: typeid, extra_size := 0) -> ^Type {
 next_command :: proc "contextless" (ctx: ^Context, pcmd: ^^Command) -> bool {
 	cmd := pcmd^
 	defer pcmd^ = cmd
-	if cmd != nil { 
-		cmd = (^Command)(uintptr(cmd) + uintptr(cmd.size)) 
+	if cmd != nil {
+		cmd = (^Command)(uintptr(cmd) + uintptr(cmd.size))
 	} else {
 		cmd = (^Command)(&ctx.command_list.items[0])
 	}
@@ -833,7 +833,7 @@ layout_next :: proc(ctx: ^Context) -> (res: Rect) {
 ** controls
 **============================================================================*/
 
-@private 
+@private
 in_hover_root :: proc(ctx: ^Context) -> bool {
 	for i := ctx.container_stack.idx - 1; i >= 0; i -= 1 {
 		if ctx.container_stack.items[i] == ctx.hover_root {
@@ -1136,12 +1136,12 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 	return
 }
 
-@private 
+@private
 parse_real :: #force_inline proc(s: string) -> (Real, bool) {
 	f, ok := strconv.parse_f64(s)
 	return Real(f), ok
 }
- 
+
 number_textbox :: proc(ctx: ^Context, value: ^Real, r: Rect, id: Id, fmt_string: string) -> bool {
 	if ctx.mouse_pressed_bits == {.LEFT} && .SHIFT in ctx.key_down_bits && ctx.hover_id == id {
 		ctx.number_edit_id = id
@@ -1238,7 +1238,7 @@ number :: proc(ctx: ^Context, value: ^Real, step: Real, fmt_string: string = SLI
 	return
 }
 
-@private 
+@private
 _header :: proc(ctx: ^Context, label: string, is_treenode: bool, opt := Options{}) -> Result_Set {
 	id := get_id(ctx, label)
 	idx, active := pool_get(ctx, ctx.treenode_pool[:], id)
@@ -1308,7 +1308,7 @@ treenode :: proc(ctx: ^Context, label: string, opt := Options{}) -> Result_Set {
 }
 
 
-@private 
+@private
 scrollbar :: proc(ctx: ^Context, cnt: ^Container, _b: ^Rect, cs: Vec2, id_string: string, i: int) {
 	b := (^struct{ pos, size: [2]i32 })(_b)
 	#assert(size_of(b^) == size_of(_b^))
@@ -1349,7 +1349,7 @@ scrollbar :: proc(ctx: ^Context, cnt: ^Container, _b: ^Rect, cs: Vec2, id_string
 	}
 }
 
-@private 
+@private
 scrollbars :: proc(ctx: ^Context, cnt: ^Container, body: ^Rect) {
 	sz := ctx.style.scrollbar_size
 	cs := cnt.content_size
@@ -1366,7 +1366,7 @@ scrollbars :: proc(ctx: ^Context, cnt: ^Container, body: ^Rect) {
 	pop_clip_rect(ctx)
 }
 
-@private 
+@private
 push_container_body :: proc(ctx: ^Context, cnt: ^Container, body: Rect, opt := Options{}) {
 	body := body
 	if .NO_SCROLL not_in opt {
@@ -1376,7 +1376,7 @@ push_container_body :: proc(ctx: ^Context, cnt: ^Container, body: Rect, opt := O
 	cnt.body = body
 }
 
-@private 
+@private
 begin_root_container :: proc(ctx: ^Context, cnt: ^Container) {
 	push(&ctx.container_stack, cnt)
 	/* push container to roots list and push head command */
@@ -1394,7 +1394,7 @@ begin_root_container :: proc(ctx: ^Context, cnt: ^Container) {
 	push(&ctx.clip_stack, unclipped_rect)
 }
 
-@private 
+@private
 end_root_container :: proc(ctx: ^Context) {
 	/* push tail 'goto' jump command and set head 'skip' command. the final steps
 	** on initing these are done in end() */
@@ -1506,7 +1506,7 @@ window :: proc(ctx: ^Context, title: string, rect: Rect, opt := Options{}) -> bo
 
 scoped_end_window :: proc(ctx: ^Context, _: string, _: Rect, _: Options, ok: bool) {
 	if ok {
-		end_window(ctx)	
+		end_window(ctx)
 	}
 }
 

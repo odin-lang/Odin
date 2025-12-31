@@ -54,4 +54,3 @@ foreign lib {
 	SDL_GetModState :: proc() -> c.int ---
 	SDL_SetModState :: proc(modstate: c.int) ---
 }
-

@@ -31,7 +31,7 @@ foreign stbiw {
 	write_tga_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr)                             -> c.int ---
 	write_hdr_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: [^]f32)                             -> c.int ---
 	write_jpg_to_func :: proc(func: write_func, ctx: rawptr, x, y, comp: c.int, data: rawptr, quality: c.int /*0..=100*/) -> c.int ---
-	
+
 	flip_vertically_on_write :: proc(flip_boolean: b32) ---
 }
 

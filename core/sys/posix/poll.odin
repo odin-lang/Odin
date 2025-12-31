@@ -92,7 +92,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		POLLERR    :: 0x0008
 		POLLHUP    :: 0x0010
 		POLLNVAL   :: 0x0020
-		
+
 	}
 
 

@@ -88,4 +88,3 @@ iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 	}
 	return
 }
-

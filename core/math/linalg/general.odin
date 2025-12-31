@@ -173,7 +173,7 @@ clamp_length :: proc "contextless" (v: $T/[$N]$E, a: E) -> T where IS_FLOAT(E) {
 	if a <= 0 {
 		return 0
 	}
-	
+
 	m2 := length2(v)
 	return v if (m2 <= a*a) else (v / sqrt(m2) * a) // returns original when m2 is 0
 }

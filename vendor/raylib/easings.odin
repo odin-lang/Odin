@@ -13,14 +13,14 @@ EaseSineOut   :: proc(t, b, c, d: f32) -> f32 { return (c*math.sin(t/d*(PI/2.0))
 EaseSineInOut :: proc(t, b, c, d: f32) -> f32 { return (-c/2.0*(math.cos(PI*t/d) - 1.0) + b) }
 
 // Circular Easing functions
-EaseCircIn  :: proc(t, b, c, d: f32) -> f32 { 
+EaseCircIn  :: proc(t, b, c, d: f32) -> f32 {
 	t := t
-	t /= d 
+	t /= d
 	return -c*(math.sqrt(1.0 - t*t) - 1.0) + b
 }
-EaseCircOut :: proc(t, b, c, d: f32) -> f32 { 
+EaseCircOut :: proc(t, b, c, d: f32) -> f32 {
 	t := t
-	t = t/d - 1.0 
+	t = t/d - 1.0
 	return c*math.sqrt(1.0 - t*t) + b
 }
 EaseCircInOut :: proc(t, b, c, d: f32) -> f32  {
@@ -34,12 +34,12 @@ EaseCircInOut :: proc(t, b, c, d: f32) -> f32  {
 }
 
 // Cubic Easing functions
-EaseCubicIn :: proc(t, b, c, d: f32) -> f32 { 
+EaseCubicIn :: proc(t, b, c, d: f32) -> f32 {
 	t := t
 	t /= d
 	return c*t*t*t + b
 }
-EaseCubicOut :: proc(t, b, c, d: f32) -> f32 { 
+EaseCubicOut :: proc(t, b, c, d: f32) -> f32 {
 	t := t
 	t = t/d - 1.0
 	return c*(t*t*t + 1.0) + b
@@ -55,12 +55,12 @@ EaseCubicInOut :: proc(t, b, c, d: f32) -> f32 {
 }
 
 // Quadratic Easing functions
-EaseQuadIn :: proc(t, b, c, d: f32) -> f32 { 
+EaseQuadIn :: proc(t, b, c, d: f32) -> f32 {
 	t := t
 	t /= d
 	return c*t*t + b
 }
-EaseQuadOut :: proc(t, b, c, d: f32) -> f32 { 
+EaseQuadOut :: proc(t, b, c, d: f32) -> f32 {
 	t := t
 	t /= d
 	return -c*t*(t - 2.0) + b
@@ -75,10 +75,10 @@ EaseQuadInOut :: proc(t, b, c, d: f32) -> f32 {
 }
 
 // Exponential Easing functions
-EaseExpoIn :: proc(t, b, c, d: f32) -> f32 { 
+EaseExpoIn :: proc(t, b, c, d: f32) -> f32 {
 	return (t == 0.0) ? b : (c*math.pow(2.0, 10.0*(t/d - 1.0)) + b)
 }
-EaseExpoOut :: proc(t, b, c, d: f32) -> f32 { 
+EaseExpoOut :: proc(t, b, c, d: f32) -> f32 {
 	return (t == d) ? (b + c) : (c*(-math.pow(2.0, -10.0*t/d) + 1.0) + b)
 }
 EaseExpoInOut :: proc(t, b, c, d: f32) -> f32 {
@@ -150,8 +150,8 @@ EaseBounceOut :: proc(t, b, c, d: f32) -> f32 {
 	}
 }
 
-EaseBounceIn :: proc(t, b, c, d: f32) -> f32 { 
-	return c - EaseBounceOut(d - t, 0.0, c, d) + b 
+EaseBounceIn :: proc(t, b, c, d: f32) -> f32 {
+	return c - EaseBounceOut(d - t, 0.0, c, d) + b
 }
 EaseBounceInOut :: proc(t, b, c, d: f32) -> f32 {
 	if t < d/2.0 {

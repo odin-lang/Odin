@@ -57,7 +57,7 @@ _fini_terminal :: proc "contextless" () {
 		if handle == windows.INVALID_HANDLE || handle == nil {
 			return
 		}
-		
+
 		windows.SetConsoleMode(handle, v.mode)
 	}
 }

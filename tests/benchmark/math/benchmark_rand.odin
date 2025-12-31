@@ -39,7 +39,7 @@ benchmark_rng :: proc(t: ^testing.T) {
 	context.random_generator = rand.pcg_random_generator()
 	_benchmark_u64(t, &tbl, "pcg64")
 	_benchmark_large(t, &tbl, "pcg64")
-	
+
 	table.row(&tbl)
 
 	context.random_generator = rand.xoshiro256_random_generator()

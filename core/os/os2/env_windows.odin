@@ -138,5 +138,3 @@ _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error
 	environ = r[:]
 	return
 }
-
-

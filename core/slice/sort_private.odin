@@ -25,7 +25,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 			#panic("unhandled Sort_Kind")
 		}
 	}
-	
+
 	// insertion sort
 	// TODO(bill): use a different algorithm as insertion sort is O(n^2)
 	n := len(data)

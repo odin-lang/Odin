@@ -2991,7 +2991,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	CheckerInfo *info = gen->info;
 
 	switch (build_context.metrics.arch) {
-	case TargetArch_amd64: 
+	case TargetArch_amd64:
 	case TargetArch_i386:
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
@@ -3038,7 +3038,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		break;
 	}
 
-	
+
 	if (build_context.microarch == "native") {
 		LLVMInitializeNativeTarget();
 	}
@@ -3090,7 +3090,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		llvm_features = gb_string_append_length(llvm_features, str.text, str.len);
 	}
 
-	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
+	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
@@ -3711,7 +3711,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		label_object_generation = gb_string_append_fmt(label_object_generation, " (%td used modules)", gen->used_module_count);
 	}
 	TIME_SECTION_WITH_LEN(label_object_generation, gb_string_length(label_object_generation));
-	
+
 	if (build_context.ignore_llvm_build) {
 		gb_printf_err("LLVM object generation has been ignored!\n");
 		return false;

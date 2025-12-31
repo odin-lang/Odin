@@ -170,7 +170,7 @@ parse_posix_tz_offset :: proc(str: string) -> (out_sec: i64, idx: int, ok: bool)
 			got_more_time = true
 			break
 		}
-		
+
 		break
 	}
 
@@ -197,7 +197,7 @@ parse_posix_tz_offset :: proc(str: string) -> (out_sec: i64, idx: int, ok: bool)
 			got_more_time = true
 			break
 		}
-		
+
 		break
 	}
 
@@ -371,7 +371,7 @@ parse_posix_tz :: proc(posix_tz: string, allocator := context.allocator) -> (out
 
 	std_name, idx := parse_posix_tz_shortname(str) or_return
 	str = str[idx:]
-	
+
 	std_offset, idx2 := parse_posix_tz_offset(str) or_return
 	std_offset *= -1
 	str = str[idx2:]
@@ -587,7 +587,7 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 		for name in ltt_names {
 			delete(name, allocator)
 		}
-		delete(ltt_names) 
+		delete(ltt_names)
 	}
 
 	for ltt in local_time_types {

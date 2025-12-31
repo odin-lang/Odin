@@ -72,7 +72,7 @@ fwrite :: proc "c" (buffer: [^]byte, size: uint, count: uint, file: FILE) -> uin
 putchar :: proc "c" (char: c.int) -> c.int {
 	context = g_ctx
 
-	n, err := os.write_byte(os.stdout, byte(char))	
+	n, err := os.write_byte(os.stdout, byte(char))
 	if n == 0 || err != nil {
 		return EOF
 	}

@@ -145,7 +145,7 @@ when ODIN_OS == .Windows {
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
-	} 
+	}
 } else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	foreign import lib {
 		RAYLIB_WASM_LIB,
@@ -164,7 +164,7 @@ GRAPHICS_API_OPENGL_ES3 :: false
 when GRAPHICS_API_OPENGL_ES3 {
 	GRAPHICS_API_OPENGL_ES2 :: true
 }
- 
+
 when !GRAPHICS_API_OPENGL_ES2 {
 	// This is the maximum amount of elements (quads) per batch
 	// NOTE: Be careful with text, every letter maps to a quad

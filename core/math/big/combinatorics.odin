@@ -47,7 +47,7 @@ combinations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)
 	tmp_a, tmp_b := &Int{}, &Int{}
 	defer internal_destroy(tmp_a, tmp_b)
 
-	//      n! 
+	//      n!
 	// ------------
 	// r!  (n - r)!
 	factorial(dest, n)       or_return

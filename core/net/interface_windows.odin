@@ -53,7 +53,7 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 			break gaa
 		case:
 			set_last_platform_error(i32(res))
-			return {}, .Unknown 
+			return {}, .Unknown
 		}
 	}
 

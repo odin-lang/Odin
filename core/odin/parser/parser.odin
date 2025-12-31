@@ -180,14 +180,14 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		error(p, t.pos, "Expected a package declaration at the start of the file")
 		return false
 	}
-	
+
 	p.file.pkg_token = expect_token(p, .Package)
-	
+
 	if ippt, ok := invalid_pre_package_token.?; ok {
 		error(p, ippt.pos, "Expected only comments or lines starting with '#+' before the package declaration")
 		return false
 	}
-	
+
 	pkg_name := expect_token_after(p, .Ident, "package")
 	if pkg_name.kind == .Ident {
 		switch name := pkg_name.text; {
@@ -460,7 +460,7 @@ expect_closing_token_of_field_list :: proc(p: ^Parser, closing_kind: tokenizer.T
 			advance_token(p)
 		}
 		return p.curr_tok
-	} 
+	}
 
 	return expect_closing
 }
@@ -838,7 +838,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 			else_stmt = ast.new(ast.Bad_Stmt, p.curr_tok.pos, end_pos(p.curr_tok))
 		}
 	}
-	
+
 	end: tokenizer.Pos
 	if body != nil {
 		end = body.end
@@ -2904,7 +2904,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		bst.underlying = underlying
 		bst.close = close.pos
 		return bst
-		
+
 	case .Matrix:
 		tok := expect_token(p, .Matrix)
 		expect_token(p, .Open_Bracket)
@@ -2920,7 +2920,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		mt.column_count = column_count
 		mt.elem = elem
 		return mt
-	
+
 	case .Bit_Field:
 		tok := expect_token(p, .Bit_Field)
 
@@ -3472,7 +3472,7 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	     .And:
 		op := advance_token(p)
 		expr := parse_unary_expr(p, lhs)
-		
+
 		ue := ast.new(ast.Unary_Expr, op.pos, expr)
 		ue.op   = op
 		ue.expr = expr

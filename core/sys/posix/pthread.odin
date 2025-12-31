@@ -583,7 +583,7 @@ when ODIN_OS == .Darwin {
 	pthread_t       :: distinct rawptr
 	pthread_attr_t  :: distinct rawptr
 	pthread_key_t   :: distinct c.int
-	
+
 	pthread_mutex_t :: struct {
 		flags:       u32,
 		lock:        i32,
@@ -591,7 +591,7 @@ when ODIN_OS == .Darwin {
 		owner:       i32,
 		owner_count: i32,
 	}
-	
+
 	pthread_cond_t :: struct {
 		flags:        u32,
 		unused:       i32,

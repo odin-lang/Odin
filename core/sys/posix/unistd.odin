@@ -78,7 +78,7 @@ foreign lib {
 	lchown :: proc(path: cstring, owner: uid_t, group: gid_t) -> result ---
 
 	/*
-	Deallocates the file descriptor indicated by fildes. 
+	Deallocates the file descriptor indicated by fildes.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/close.html ]]
 	*/
@@ -162,7 +162,7 @@ foreign lib {
 		posix.dup(file)
 		posix.close(file)
 
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html ]] 
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html ]]
 	*/
 	dup :: proc(fildes: FD) -> FD ---
 
@@ -176,7 +176,7 @@ foreign lib {
 		// Redirecting stderr to stdout:
 		posix.dup2(1, 2)
 
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html ]] 
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/dup.html ]]
 	*/
 	dup2 :: proc(fildes, fildes2: FD) -> FD ---
 

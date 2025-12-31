@@ -117,7 +117,7 @@ sound_config :: struct {
 
 	endCallback:          sound_end_proc, /* Fired when the sound reaches the end. Will be fired from the audio thread. Do not restart, uninitialize or otherwise change the state of the sound from here. Instead fire an event or set a variable to indicate to a different thread to change the start of the sound. Will not be fired in response to a scheduled stop with ma_sound_set_stop_time_*(). */
 	pEndCallbackUserData: rawptr,
-	
+
 	initNotifications: resource_manager_pipeline_notifications,
 
 	pDoneFence: ^fence, /* Deprecated. Use initNotifications instead. Released when the resource manager has finished decoding the entire sound. Not used with streams. */
@@ -375,9 +375,9 @@ foreign lib {
 
 	engine_get_time_in_pcm_frames   :: proc(pEngine: ^engine) -> u64 ---
 	engine_get_time_in_milliseconds :: proc(pEngine: ^engine) -> u64 ---
-	engine_set_time_in_pcm_frames   :: proc(pEngine: ^engine, globalTime: u64) -> result --- 
-	engine_set_time_in_milliseconds :: proc(pEngine: ^engine, globalTime: u64) -> result --- 
-	
+	engine_set_time_in_pcm_frames   :: proc(pEngine: ^engine, globalTime: u64) -> result ---
+	engine_set_time_in_milliseconds :: proc(pEngine: ^engine, globalTime: u64) -> result ---
+
 	@(deprecated="Use engine_get_time_in_pcm_frames(). Will be removed in 0.12.")
 	engine_get_time :: proc(pEngine: ^engine) -> u64 ---
 	@(deprecated="Use engine_set_time_in_pcm_frames(). Will be removed in 0.12.")
@@ -385,14 +385,14 @@ foreign lib {
 
 	engine_get_channels         :: proc(pEngine: ^engine) -> u32 ---
 	engine_get_sample_rate      :: proc(pEngine: ^engine) -> u32 ---
-	
+
 	engine_start       :: proc(pEngine: ^engine) -> result ---
 	engine_stop        :: proc(pEngine: ^engine) -> result ---
 	engine_set_volume  :: proc(pEngine: ^engine, volume: f32) -> result ---
 	engine_get_volume  :: proc(pEngine: ^engine) -> f32 ---
 	engine_set_gain_db :: proc(pEngine: ^engine, gainDB: f32) -> result ---
 	engine_get_gain_db :: proc(pEngine: ^engine) -> f32 ---
-	
+
 	engine_get_listener_count     :: proc(pEngine: ^engine) -> u32 ---
 	engine_find_closest_listener  :: proc(pEngine: ^engine, absolutePosX, absolutePosY, absolutePosZ: f32) -> u32 ---
 	engine_listener_set_position  :: proc(pEngine: ^engine, listenerIndex: u32, x, y, z: f32) ---
@@ -407,7 +407,7 @@ foreign lib {
 	engine_listener_get_world_up  :: proc(pEngine: ^engine, listenerIndex: u32) -> vec3f ---
 	engine_listener_set_enabled   :: proc(pEngine: ^engine, listenerIndex: u32, isEnabled: b32) ---
 	engine_listener_is_enabled    :: proc(pEngine: ^engine, listenerIndex: u32) -> b32 ---
-	
+
 	engine_play_sound_ex :: proc(pEngine: ^engine, pFilePath: cstring, pNode: ^node, nodeInputBusIndex: u32) -> result ---
 	engine_play_sound    :: proc(pEngine: ^engine, pFilePath: cstring, pGroup: ^sound_group) -> result ---   /* Fire and forget. */
 }

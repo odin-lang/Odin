@@ -119,7 +119,7 @@ gb_internal String directory_from_path(String const &s) {
 		}
 	}
 	if (i >= 0) {
-		return substring(s, 0, i);	
+		return substring(s, 0, i);
 	}
 	return substring(s, 0, 0);
 }
@@ -189,9 +189,9 @@ gb_internal String path_to_string(gbAllocator a, Path path) {
 
 	isize i = 0;
 	gb_memmove(str+i, path.basename.text, path.basename.len); i += path.basename.len;
-	
+
 	gb_memmove(str+i, "/", 1);                                i += 1;
-	
+
 	gb_memmove(str+i, path.name.text,     path.name.len);     i += path.name.len;
 	if (path.ext.len > 0) {
 		gb_memmove(str+i, ".", 1);                            i += 1;
@@ -229,7 +229,7 @@ gb_internal Path path_from_string(gbAllocator a, String const &path) {
 	String fullpath = path_to_full_path(a, path);
 	defer (gb_free(heap_allocator(), fullpath.text));
 
-	res.basename = directory_from_path(fullpath);	
+	res.basename = directory_from_path(fullpath);
 	res.basename = copy_string(a, res.basename);
 
 	if (path_is_directory(fullpath)) {

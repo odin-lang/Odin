@@ -27,7 +27,7 @@ where
 syscall2 :: #force_inline proc "contextless" (nr: uintptr,p1: $T1, p2: $T2) -> int
 where
 	size_of(p1) <= size_of(uintptr),
-	size_of(p2) <= size_of(uintptr) 
+	size_of(p2) <= size_of(uintptr)
 {
 	return int(intrinsics.syscall(nr, uintptr(p1), uintptr(p2)))
 }
@@ -151,4 +151,3 @@ when size_of(int) == 4 {
 		return uint(a)
 	}
 }
-

@@ -67,13 +67,13 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	defer if err != nil {
 		strings.builder_destroy(&b)
 	}
-	
+
 	// temp guard in case we are sorting map keys, which will use temp allocations
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
 	opt := opt
 	marshal_to_builder(&b, v, &opt) or_return
-	
+
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
@@ -196,7 +196,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Simd_Vector:
 		return .Unsupported_Type
-		
+
 	case runtime.Type_Info_Matrix:
 		return .Unsupported_Type
 
@@ -211,7 +211,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
-		
+
 	case runtime.Type_Info_Enumerated_Array:
 		index_type := reflect.type_info_base(info.index)
 		enum_type := index_type.variant.(reflect.Type_Info_Enum)
@@ -230,7 +230,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, '}') or_return
-		
+
 	case runtime.Type_Info_Dynamic_Array:
 		opt_write_start(w, opt, '[') or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
@@ -291,7 +291,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 							buf: [40]byte
 							u := cast_any_int_to_u128(ka)
 							name = strconv.write_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
-							
+
 							opt_write_key(w, opt, name) or_return
 						case: return .Unsupported_Type
 						}
@@ -437,7 +437,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			}
 			return
 		}
-		
+
 		opt_write_start(w, opt, '{') or_return
 		marshal_struct_fields(w, v, opt) or_return
 		opt_write_end(w, opt, '}') or_return
@@ -578,7 +578,7 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 		} else {
 			io.write_string(w, ": " if opt.pretty else ":") or_return
 		}
-	}	
+	}
 
 	return
 }

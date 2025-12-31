@@ -584,7 +584,7 @@ class Bitfield:
             self.name = name
             self.type = type_
             self.bitsize = bitsize
-            
+
     def __init__(self, type_):
         self.bitsize = bitfield_type_to_size(type_)
         self.type = bitfield_size_to_type(self.bitsize)
@@ -594,14 +594,14 @@ class Bitfield:
     def add_field(self, name, type_, bitsize):
         self.fields.append(Bitfield.Field(name, type_, bitsize))
         self.fields_bitsize += bitsize
-        
+
     def write(self, f, name=None, indent=0, justify=True):
         max_name = 1 if not justify else max([len(f.name) for f in self.fields], default=0)
         max_type = 1 if not justify else max([len(f.type) for f in self.fields], default=0)
         is_bit_set = all([f.bitsize == 1 or f.name == "reserved" for f in self.fields])
         if is_bit_set and name is None:
             raise BitfieldError(f"bit_set can not be anonymous")
-            
+
         if is_bit_set:
             if not name.endswith("Flags"):
                 raise BitfieldError(f"bit_set name should end with 'Flags': {name}")
@@ -612,7 +612,7 @@ class Bitfield:
                 if field.name != "reserved":
                     f.write("{}{},\n".format('\t' * (indent + 1), field.name))
             f.write(('\t' * indent) + "}\n")
-                
+
         else:
             f.write("{}{} bit_field {} {{\n".format('\t' * indent, name + ' ::' if name else 'using _:', self.type))
             for field in self.fields:

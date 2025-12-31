@@ -12,28 +12,28 @@ BitmapImageRep_alloc :: proc "c" () -> ^BitmapImageRep {
 
 @(objc_type=BitmapImageRep, objc_name="initWithBitmapDataPlanes")
 BitmapImageRep_initWithBitmapDataPlanes :: proc "c" (
-	self: ^BitmapImageRep, 
+	self: ^BitmapImageRep,
 	bitmapDataPlanes: ^^u8,
-	pixelsWide: Integer, 
+	pixelsWide: Integer,
 	pixelsHigh: Integer,
 	bitsPerSample: Integer,
 	samplesPerPixel: Integer,
-	hasAlpha: bool, 
+	hasAlpha: bool,
 	isPlanar: bool,
 	colorSpaceName: ^String,
 	bytesPerRow: Integer,
 	bitsPerPixel: Integer) -> ^BitmapImageRep {
 
-	return msgSend(^BitmapImageRep, 
-		self, 
+	return msgSend(^BitmapImageRep,
+		self,
 		"initWithBitmapDataPlanes:pixelsWide:pixelsHigh:bitsPerSample:samplesPerPixel:hasAlpha:isPlanar:colorSpaceName:bytesPerRow:bitsPerPixel:",
 		bitmapDataPlanes,
-		pixelsWide, 
+		pixelsWide,
 		pixelsHigh,
 		bitsPerSample,
 		samplesPerPixel,
 		hasAlpha,
-		isPlanar, 
+		isPlanar,
 		colorSpaceName,
 		bytesPerRow,
 		bitsPerPixel)
@@ -41,10 +41,10 @@ BitmapImageRep_initWithBitmapDataPlanes :: proc "c" (
 
 @(objc_type=BitmapImageRep, objc_name="bitmapData")
 BitmapImageRep_bitmapData :: proc "c" (self: ^BitmapImageRep) -> rawptr {
-	return msgSend(rawptr, self, "bitmapData") 
+	return msgSend(rawptr, self, "bitmapData")
 }
 
 @(objc_type=BitmapImageRep, objc_name="CGImage")
 BitmapImageRep_CGImage :: proc "c" (self: ^BitmapImageRep) -> rawptr {
-	return msgSend(rawptr, self, "CGImage") 
+	return msgSend(rawptr, self, "CGImage")
 }

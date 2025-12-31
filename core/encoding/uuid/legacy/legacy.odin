@@ -142,4 +142,3 @@ generate_v5 :: proc {
 	generate_v5_bytes,
 	generate_v5_string,
 }
-

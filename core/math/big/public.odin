@@ -16,7 +16,7 @@ import "base:intrinsics"
 
 /*
 	===========================
-		User-level routines    
+		User-level routines
 	===========================
 */
 
@@ -154,9 +154,9 @@ int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> 
 	return #force_inline internal_int_mul(dest, src, multiplier)
 }
 
-mul :: proc { 
-	int_mul, 
-	int_mul_digit, 
+mul :: proc {
+	int_mul,
+	int_mul_digit,
 	rat_mul_rat,
 	rat_mul_int,
 	int_mul_rat,
@@ -211,9 +211,9 @@ int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT, allocator :
 	_ = #force_inline internal_divmod(quotient, numerator, denominator) or_return
 	return
 }
-div :: proc { 
-	int_div, 
-	int_div_digit, 
+div :: proc {
+	int_div,
+	int_div_digit,
 	rat_div_rat,
 	rat_div_int,
 	int_div_rat,

@@ -134,11 +134,11 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	case {.Execute, .Read}:         pflags = PAGE_EXECUTE_READ
 	case {.Execute, .Read, .Write}: pflags = PAGE_EXECUTE_READWRITE
 	case {.Execute, .Write}:        pflags = PAGE_EXECUTE_WRITECOPY
-	case: 
+	case:
 		return false
 	}
-	
-	
+
+
 	old_protect: u32
 	ok := VirtualProtect(data, size, pflags, &old_protect)
 	return bool(ok)
@@ -150,7 +150,7 @@ _platform_memory_init :: proc "contextless" () {
 	sys_info: SYSTEM_INFO
 	GetSystemInfo(&sys_info)
 	DEFAULT_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, uint(sys_info.dwPageSize))
-	
+
 	// is power of two
 	assert_contextless(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }

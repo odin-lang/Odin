@@ -271,7 +271,7 @@ foreign Dbghelp {
 		UserStreamParam: ^MINIDUMP_USER_STREAM_INFORMATION,
 		CallbackPara:    ^MINIDUMP_CALLBACK_INFORMATION,
 	) -> BOOL ---
-	
+
 	MiniDumpReadDumpStream :: proc(
 		BaseOfDump:    PVOID,
 		StreamNumber:  ULONG,

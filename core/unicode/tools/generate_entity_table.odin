@@ -235,7 +235,7 @@ GENERATED :: `/*
 
 TABLE_FILE_PROLOG :: `/*
 	This file is generated from "https://github.com/w3c/xml-entities/blob/gh-pages/unicode.xml".
-	
+
 	UPDATE:
 		- Ensure the XML file was downloaded using "tests\core\download_assets.py".
 		- Run "core/unicode/tools/generate_entity_table.odin"

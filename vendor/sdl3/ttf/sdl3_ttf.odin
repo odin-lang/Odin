@@ -60,7 +60,7 @@ FontStyle :: enum u32 {
 
 FontStyleFlags :: distinct bit_set[FontStyle; u32]
 
-// NOTE: This is called TTF_HintingFlags but its not a bit_set so 
+// NOTE: This is called TTF_HintingFlags but its not a bit_set so
 // the "flags" doesn't really make sense, its just the hinting.
 Hinting :: enum c.int {
 	INVALID = -1,

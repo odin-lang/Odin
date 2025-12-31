@@ -13,7 +13,7 @@ when ODIN_OS == .Darwin {
 
 foreign lib {
 	/*
-	The glob() function is a pathname generator that shall implement the rules defined in 
+	The glob() function is a pathname generator that shall implement the rules defined in
 	[[ XCU Pattern Matching Notation; https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13 ]],
 	with optional support for rule 3 in XCU [[ Patterns Used for Filename Expansion; https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_03 ]].
 

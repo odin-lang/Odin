@@ -309,7 +309,7 @@ struct Tokenizer {
 	i32 error_count;
 
 	bool insert_semicolon;
-	
+
 	LoadedFile loaded_file;
 };
 
@@ -402,11 +402,11 @@ gb_global TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT
 
 gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
 	LoadedFileError file_err = load_file_32(
-		alloc_cstring(temporary_allocator(), fullpath), 
+		alloc_cstring(temporary_allocator(), fullpath),
 		&t->loaded_file,
 		copy_file_contents
 	);
-	
+
 	TokenizerInitError err = loaded_file_error_map_to_tokenizer[file_err];
 	switch (file_err) {
 	case LoadedFile_None:
@@ -417,7 +417,7 @@ gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String
 		t->fullpath = fullpath;
 		t->line_count = 1;
 		break;
-	}	
+	}
 	return err;
 }
 
@@ -942,7 +942,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				tokenizer_skip_line(t);
 			} else if (t->curr_rune == '+') {
 				token->kind = Token_FileTag;
-				
+
 				// Skip until end of line or until we hit what is probably a comment.
 				// The parsing of tags happens in `parse_file`.
 				while (t->curr_rune != GB_RUNE_EOF) {
@@ -951,7 +951,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 					}
 					if (t->curr_rune == '/') {
 						break;
-					} 
+					}
 					advance_to_next_rune(t);
 				}
 			}

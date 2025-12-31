@@ -544,4 +544,3 @@ _file_stream_buffered_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, 
 	}
 	return 0, .Unsupported
 }
-

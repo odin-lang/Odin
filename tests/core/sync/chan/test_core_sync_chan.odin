@@ -672,5 +672,3 @@ test_send_close_read :: proc(t: ^testing.T) {
 	thread.destroy(receiver)
 	thread.destroy(closer)
 }
-
-

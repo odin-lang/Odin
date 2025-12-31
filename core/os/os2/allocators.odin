@@ -29,7 +29,7 @@ Temp_Allocator :: struct {
 	tmp: runtime.Arena_Temp,
 	loc: runtime.Source_Code_Location,
 }
-	
+
 TEMP_ALLOCATOR_GUARD_END :: proc(temp: Temp_Allocator) {
 	runtime.arena_temp_end(temp.tmp, temp.loc)
 }

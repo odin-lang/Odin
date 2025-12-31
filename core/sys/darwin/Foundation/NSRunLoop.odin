@@ -24,4 +24,3 @@ RunLoop_mainRunLoop :: proc() -> ^RunLoop {
 RunLoop_addTimerForMode :: proc(self: ^RunLoop, timer: ^Timer, forMode: RunLoopMode) {
 	msgSend(nil, self, "addTimer:forMode:", timer, forMode)
 }
-

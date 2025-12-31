@@ -54,7 +54,7 @@ when GL_DEBUG {
 	check_error :: proc(
 		id: u32, type: Shader_Type, status: u32,
 		iv_func: proc "c" (u32, u32, [^]i32, runtime.Source_Code_Location),
-		log_func: proc "c" (u32, i32, ^i32, [^]u8, runtime.Source_Code_Location), 
+		log_func: proc "c" (u32, i32, ^i32, [^]u8, runtime.Source_Code_Location),
 		loc := #caller_location,
 	) -> (success: bool) {
 		result, info_log_length: i32
@@ -167,7 +167,7 @@ load_compute_source :: proc(cs_data: string, binary_retrievable := false) -> (pr
 load_shaders_file :: proc(vs_filename, fs_filename: string, binary_retrievable := false) -> (program_id: u32, ok: bool) {
 	vs_data := os.read_entire_file(vs_filename) or_return
 	defer delete(vs_data)
-	
+
 	fs_data := os.read_entire_file(fs_filename) or_return
 	defer delete(fs_data)
 
@@ -190,12 +190,12 @@ load_shaders :: proc{load_shaders_file}
 
 when ODIN_OS == .Windows {
 	update_shader_if_changed :: proc(
-		vertex_name, fragment_name: string, 
-		program: u32, 
+		vertex_name, fragment_name: string,
+		program: u32,
 		last_vertex_time, last_fragment_time: os.File_Time,
 	) -> (
-		old_program: u32, 
-		current_vertex_time, current_fragment_time: os.File_Time, 
+		old_program: u32,
+		current_vertex_time, current_fragment_time: os.File_Time,
 		updated: bool,
 	) {
 		current_vertex_time, _ = os.last_write_time_by_name(vertex_name)
@@ -218,12 +218,12 @@ when ODIN_OS == .Windows {
 	}
 
 	update_shader_if_changed_compute :: proc(
-		compute_name: string, 
-		program: u32, 
+		compute_name: string,
+		program: u32,
 		last_compute_time: os.File_Time,
 	) -> (
-		old_program: u32, 
-		current_compute_time: os.File_Time, 
+		old_program: u32,
+		current_compute_time: os.File_Time,
 		updated: bool,
 	) {
 		current_compute_time, _ = os.last_write_time_by_name(compute_name)

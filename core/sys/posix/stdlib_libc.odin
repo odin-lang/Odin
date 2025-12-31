@@ -67,7 +67,7 @@ free :: #force_inline proc "c" (ptr: $T) where intrinsics.type_is_pointer(T) || 
 foreign lib {
 
 	/*
-	Uses the string argument to set environment variable values. 
+	Uses the string argument to set environment variable values.
 
 	Returns: 0 on success, non-zero (setting errno) on failure
 

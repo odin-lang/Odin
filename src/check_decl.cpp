@@ -1491,13 +1491,13 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	// NOTE(harold): See export/linkage note above(where is_export is assigned) regarding Objective-C method implementations
 	bool is_foreign = e->Procedure.is_foreign;
 	bool is_export  = e->Procedure.is_export;
-	
+
 	if (ac.linkage.len != 0) {
 		     if (ac.linkage == "internal")  { e->flags |= EntityFlag_CustomLinkage_Internal; }
 		else if (ac.linkage == "strong")    { e->flags |= EntityFlag_CustomLinkage_Strong;   }
 		else if (ac.linkage == "weak")      { e->flags |= EntityFlag_CustomLinkage_Weak;     }
 		else if (ac.linkage == "link_once") { e->flags |= EntityFlag_CustomLinkage_LinkOnce; }
-		
+
 		if (is_foreign && (e->flags & EntityFlag_CustomLinkage_Internal)) {
 			error(e->token, "A foreign procedure may not have an \"internal\" linkage");
 		}
@@ -1640,7 +1640,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 			mutex_unlock(&ctx->info->foreign_mutex);
 		}
 	}
-	
+
 	if (e->Procedure.link_name.len > 0 ) {
 		e->flags |= EntityFlag_CustomLinkName;
 	}
@@ -1751,7 +1751,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast 
 			string_map_set(fp, key, e);
 		}
 	}
-	
+
 	if (e->Variable.link_name.len > 0) {
 		e->flags |= EntityFlag_CustomLinkName;
 	}

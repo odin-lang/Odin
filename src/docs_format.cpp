@@ -289,4 +289,3 @@ struct OdinDocHeader {
 	OdinDocArray<OdinDocEntity> entities;
 	OdinDocArray<OdinDocType>   types;
 };
-

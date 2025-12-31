@@ -847,4 +847,3 @@ _process_close :: proc(process: Process) -> Error {
 _process_kill :: proc(process: Process) -> Error {
 	return _get_platform_error(linux.kill(linux.Pid(process.pid), .SIGKILL))
 }
-

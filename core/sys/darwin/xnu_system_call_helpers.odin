@@ -47,19 +47,19 @@ Permission_Enum :: enum u8 {
 	PERMISSION_OWNER_WRITE, /* W for owner */
 	PERMISSION_OWNER_EXECUTE, /* X for owner */
 	//IRWXU, /* RWX mask for owner */
-	
+
 	/* For group */
 	PERMISSION_GROUP_READ, /* R for group */
 	PERMISSION_GROUP_WRITE, /* W for group */
 	PERMISSION_GROUP_EXECUTE, /* X for group */
 	//IRWXG, /* RWX mask for group */
-	
+
 	/* For other */
 	PERMISSION_OTHER_READ, /* R for other */
 	PERMISSION_OTHER_WRITE, /* W for other */
 	PERMISSION_OTHER_EXECUTE, /* X for other */
 	//IRWXO, /* RWX mask for other */
-	
+
 	/* Special */
 	PERMISSION_SET_USER_ON_EXECUTION, /* set user id on execution */
 	PERMISSION_SET_GROUP_ON_EXECUTION, /* set group id on execution */
@@ -125,7 +125,7 @@ clone_to_cstring :: proc(s: string, allocator: runtime.Allocator, loc := #caller
 
 sys_open :: proc(path: string, oflag: Open_Flags, mode: Permission) -> (c.int, bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	
+
 	cmode: u32 = 0
 	cflags: u32 = 0
 	cpath: cstring = clone_to_cstring(path, context.temp_allocator)
@@ -133,7 +133,7 @@ sys_open :: proc(path: string, oflag: Open_Flags, mode: Permission) -> (c.int, b
 	cflags = _sys_permission_mode(mode)
 
 	cmode = _sys_open_mode(oflag)
-	
+
 	result := syscall_open(cpath, cmode, cflags)
 	state  := result != -1
 

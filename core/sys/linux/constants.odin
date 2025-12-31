@@ -75,7 +75,7 @@ S_ISFIFO :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFIFO 
 */
 S_ISCHR  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFCHR  == (m & S_IFMT))}
 
-/*	
+/*
 	Check the Mode bits to see if the file is a directory.
 */
 S_ISDIR  :: #force_inline proc "contextless" (m: Mode) -> bool {return (S_IFDIR  == (m & S_IFMT))}

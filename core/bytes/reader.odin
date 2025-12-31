@@ -162,4 +162,3 @@ _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	}
 	return 0, .Unsupported
 }
-

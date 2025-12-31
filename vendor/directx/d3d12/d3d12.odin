@@ -1235,7 +1235,7 @@ TRI_STATE :: enum i32 {
 	UNKNOWN	= -1,
 	FALSE   = 0,
 	TRUE    = 1,
-}		
+}
 
 FEATURE_DATA_OPTIONS12 :: struct {
 	MSPrimitivesPipelineStatisticIncludesCulledPrimitives: TRI_STATE,
@@ -2596,7 +2596,7 @@ IDescriptorHeap_VTable :: struct {
 	GetDesc:                            proc "system" (this: ^IDescriptorHeap, desc: ^DESCRIPTOR_HEAP_DESC),
 	GetCPUDescriptorHandleForHeapStart: proc "system" (this: ^IDescriptorHeap, handle: ^CPU_DESCRIPTOR_HANDLE),
 	GetGPUDescriptorHandleForHeapStart: proc "system" (this: ^IDescriptorHeap, handle: ^GPU_DESCRIPTOR_HANDLE),
-} 
+}
 
 IQueryHeap_UUID_STRING :: "0d9658ae-ed45-469e-a61d-970ec583cab4"
 IQueryHeap_UUID := &IID{0x0d9658ae, 0xed45, 0x469e, {0xa6, 0x1d, 0x97, 0x0e, 0xc5, 0x83, 0xca, 0xb4}}
@@ -5327,7 +5327,7 @@ IGraphicsCommandList6_VTable :: struct {
 SHADER_VERSION_TYPE :: enum u32 {
 	PIXEL_SHADER          = 0,
 	VERTEX_SHADER         = 1,
-	GEOMETRY_SHADER       = 2,    
+	GEOMETRY_SHADER       = 2,
 
 	HULL_SHADER           = 3,
 	DOMAIN_SHADER         = 4,

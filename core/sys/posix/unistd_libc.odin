@@ -16,7 +16,7 @@ when ODIN_OS == .Windows {
 foreign lib {
 	/*
 	Checks the file named by the pathname pointed to by the path argument for
-	accessibility according to the bit pattern contained in amode. 
+	accessibility according to the bit pattern contained in amode.
 
 	Example:
 		if (posix.access("/tmp/myfile", posix.F_OK) != .OK) {

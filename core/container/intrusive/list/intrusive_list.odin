@@ -263,7 +263,7 @@ iterator_from_node :: proc "contextless" (node: ^Node, $T: typeid, $field_name: 
 /*
 Retrieves the next element in a list and advances the iterator.
 
-**Inputs**  
+**Inputs**
 - it: The iterator
 
 **Returns**
@@ -313,7 +313,7 @@ iterate_next :: proc "contextless" (it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
 /*
 Retrieves the previous element in a list and recede the iterator.
 
-**Inputs**  
+**Inputs**
 - it: The iterator
 
 **Returns**

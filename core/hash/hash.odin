@@ -57,14 +57,14 @@ djb2 :: proc "contextless" (data: []byte, seed := u32(5381)) -> u32 {
 
 djbx33a :: proc "contextless" (data: []byte, seed := u32(5381)) -> (result: [16]byte) #no_bounds_check {
 	state := [4]u32{seed, seed, seed, seed}
-	
+
 	s: u32 = 0
 	for p in data {
 		state[s] = (state[s] << 5) + state[s] + u32(p) // hash * 33 + u32(b)
 		s = (s + 1) & 3
 	}
-	
-	
+
+
 	(^u32le)(&result[0])^  = u32le(state[0])
 	(^u32le)(&result[4])^  = u32le(state[1])
 	(^u32le)(&result[8])^  = u32le(state[2])
@@ -160,7 +160,7 @@ murmur32 :: proc "contextless" (data: []byte, seed := u32(0x9747b28c)) -> u32 {
 	case 1:
 		k1 ~= u32(tail[0])
 		k1 *= c1_32
-		k1 = (k1 << 15) | (k1 >> 17) 
+		k1 = (k1 << 15) | (k1 >> 17)
 		k1 *= c2_32
 		h1 ~= k1
 	}

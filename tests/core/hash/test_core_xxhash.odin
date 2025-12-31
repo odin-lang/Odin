@@ -142,7 +142,7 @@ XXHASH_Test_Vectors :: struct #packed {
 	*/
 	xxh_32:   u32,
 	xxh_64:   u64,
-	
+
 	/*
 		XXH3 hashes
 	*/

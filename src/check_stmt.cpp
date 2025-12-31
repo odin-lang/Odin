@@ -756,7 +756,7 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 	}
 
 	add_entity_use(ctx, expr, e);
-	
+
 	ERROR_BLOCK();
 
 	switch (e->kind) {

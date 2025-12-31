@@ -42,19 +42,19 @@ int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, allocator :
 	return #force_inline internal_int_set_from_integer(dest, src, minimize)
 }
 
-set :: proc { 
-	int_set_from_integer, 
-	int_copy, 
-	int_atoi, 
+set :: proc {
+	int_set_from_integer,
+	int_copy,
+	int_atoi,
 
-	rat_set_f64, 
-	rat_set_f32, 
-	rat_set_f16, 
-	rat_set_u64, 
+	rat_set_f64,
+	rat_set_f32,
+	rat_set_f16,
+	rat_set_u64,
 	rat_set_i64,
-	rat_set_int, 
-	rat_set_digit, 
-	rat_set_rat, 
+	rat_set_int,
+	rat_set_digit,
+	rat_set_rat,
 }
 
 /*
@@ -77,8 +77,8 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 
 	return #force_inline internal_int_copy(dest, src, minimize)
 }
-copy :: proc { 
-	int_copy, 
+copy :: proc {
+	int_copy,
 	rat_copy,
 }
 
@@ -477,7 +477,7 @@ clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 
 
 /*
-	Size binary representation	
+	Size binary representation
 */
 int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
 	assert_if_nil(a)
@@ -616,7 +616,7 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 
 	sign: Sign
 	size_in_bits := l * 8
-	if signed { 
+	if signed {
 		/*
 			First byte denotes the sign.
 		*/
@@ -653,7 +653,7 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 
 	sign: Sign
 	size_in_bits := l * 8
-	if signed { 
+	if signed {
 		/*
 			First byte denotes the sign.
 		*/
@@ -672,7 +672,7 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 	#no_bounds_check for v in buf {
 		internal_shl(a, a, 8) or_return
 		if signed && sign == .Negative {
-			a.digit[0] |= DIGIT(255 - v)	
+			a.digit[0] |= DIGIT(255 - v)
 		} else {
 			a.digit[0] |= DIGIT(v)
 		}
@@ -699,7 +699,7 @@ int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := 
 
 	sign: Sign
 	size_in_bits   := l * 8
-	if signed { 
+	if signed {
 		/*
 			First byte denotes the sign.
 		*/
@@ -737,7 +737,7 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 
 	sign: Sign
 	size_in_bits := l * 8
-	if signed { 
+	if signed {
 		/*
 			First byte denotes the sign.
 		*/

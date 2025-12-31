@@ -138,7 +138,7 @@ trans_date_to_seconds :: proc(year: i64, td: datetime.TZ_Transition_Date) -> (se
 
 	return
 }
- 
+
 @private
 process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime.TZ_Record, success: bool) {
 	if !rrule.has_dst {

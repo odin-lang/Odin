@@ -4,7 +4,7 @@ import "core:unicode/utf8"
 
 /*
 Ascii_Set is designed to store ASCII characters efficiently as a bit-array
-Each bit in the array corresponds to a specific ASCII character, where the value of the bit (0 or 1) 
+Each bit in the array corresponds to a specific ASCII character, where the value of the bit (0 or 1)
 indicates if the character is present in the set or not.
 */
 Ascii_Set :: distinct [8]u32

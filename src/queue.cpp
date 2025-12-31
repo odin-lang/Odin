@@ -239,4 +239,3 @@ gb_internal bool mpmc_dequeue(MPMCQueue<T> *q, T *data_) {
 		}
 	}
 }
-

@@ -121,4 +121,3 @@ Block_createInternalWithParam :: proc (is_global: bool, user_data: rawptr, user_
 	}
 	return internal_block_literal_make(is_global, user_data, auto_cast user_proc, auto_cast invoke, allocator)
 }
-

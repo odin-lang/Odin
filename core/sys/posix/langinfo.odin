@@ -239,7 +239,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku {
 	ABDAY_4 :: 16
 	ABDAY_5 :: 17
 	ABDAY_6 :: 18
-	ABDAY_7 :: 19	
+	ABDAY_7 :: 19
 
 	MON_1  :: 20
 	MON_2  :: 21
@@ -279,7 +279,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku {
 	YESEXPR :: 47
 	NOEXPR  :: 49
 
-	CRNCYSTR :: 50	
+	CRNCYSTR :: 50
 
 } else when ODIN_OS == .Linux {
 

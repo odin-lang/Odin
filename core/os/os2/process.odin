@@ -414,7 +414,7 @@ process_exec :: proc(
 		stderr_b.allocator = allocator
 
 		buf: [1024]u8 = ---
-		
+
 		stdout_done, stderr_done, has_data: bool
 		for err == nil && (!stdout_done || !stderr_done) {
 			n := 0

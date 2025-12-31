@@ -100,7 +100,7 @@ foreign stbi {
 
 	hdr_to_ldr_gamma :: proc(gamma: f32) ---
 	hdr_to_ldr_scale :: proc(scale: f32) ---
-	
+
 	ldr_to_hdr_gamma :: proc(gamma: f32) ---
 	ldr_to_hdr_scale :: proc(scale: f32) ---
 
@@ -117,7 +117,7 @@ foreign stbi {
 	// get image dimensions & components without fully decoding
 	info_from_memory    :: proc(buffer: [^]byte, len: c.int,       x, y, comp: ^c.int) -> c.int ---
 	info_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr, x, y, comp: ^c.int) -> c.int ---
-	
+
 	is_16_bit_from_memory :: proc(buffer: [^]byte, len: c.int) -> c.int ---
 
 	// for image formats that explicitly notate that they have premultiplied alpha,
@@ -131,7 +131,7 @@ foreign stbi {
 
 	// flip the image vertically, so the first pixel in the output array is the bottom left
 	set_flip_vertically_on_load :: proc(flag_true_if_should_flip: c.int) ---
-	
+
 	// as above, but only applies to images loaded on the thread that calls the function
 	// this function is only available if your compiler supports thread-local variables;
 	// calling it will fail to link if your compiler doesn't

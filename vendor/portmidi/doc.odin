@@ -30,20 +30,20 @@ package portmidi
  */
 
 /*
- * The text above constitutes the entire PortMidi license; however, 
+ * The text above constitutes the entire PortMidi license; however,
  * the PortMusic community also makes the following non-binding requests:
  *
  * Any person wishing to distribute modifications to the Software is
  * requested to send the modifications to the original developer so that
  * they can be incorporated into the canonical version. It is also
- * requested that these non-binding requests be included along with the 
+ * requested that these non-binding requests be included along with the
  * license above.
  */
 
 /* CHANGELOG FOR PORTMIDI
  *     (see ../CHANGELOG.txt)
  *
- * NOTES ON HOST ERROR REPORTING: 
+ * NOTES ON HOST ERROR REPORTING:
  *
  *    PortMidi errors (of type PmError) are generic, system-independent errors.
  *    When an error does not map to one of the more specific PmErrors, the
@@ -51,27 +51,27 @@ package portmidi
  *    retained a more specific system-dependent error code. The caller can
  *    get more information by calling Pm_HasHostError() to test if there is
  *    a pending host error, and Pm_GetHostErrorText() to get a text string
- *    describing the error. Host errors are reported on a per-device basis 
- *    because only after you open a device does PortMidi have a place to 
- *    record the host error code. I.e. only 
- *    those routines that receive a (PortMidiStream *) argument check and 
- *    report errors. One exception to this is that Pm_OpenInput() and 
+ *    describing the error. Host errors are reported on a per-device basis
+ *    because only after you open a device does PortMidi have a place to
+ *    record the host error code. I.e. only
+ *    those routines that receive a (PortMidiStream *) argument check and
+ *    report errors. One exception to this is that Pm_OpenInput() and
  *    Pm_OpenOutput() can report errors even though when an error occurs,
  *    there is no PortMidiStream* to hold the error. Fortunately, both
  *    of these functions return any error immediately, so we do not really
  *    need per-device error memory. Instead, any host error code is stored
- *    in a global, pmHostError is returned, and the user can call 
+ *    in a global, pmHostError is returned, and the user can call
  *    Pm_GetHostErrorText() to get the error message (and the invalid stream
- *    parameter will be ignored.) The functions 
+ *    parameter will be ignored.) The functions
  *    pm_init and pm_term do not fail or raise
  *    errors. The job of pm_init is to locate all available devices so that
  *    the caller can get information via PmDeviceInfo(). If an error occurs,
  *    the device is simply not listed as available.
  *
  *    Host errors come in two flavors:
- *      a) host error 
+ *      a) host error
  *      b) host error during callback
- *    These can occur w/midi input or output devices. (b) can only happen 
+ *    These can occur w/midi input or output devices. (b) can only happen
  *    asynchronously (during callback routines), whereas (a) only occurs while
  *    synchronously running PortMidi and any resulting system dependent calls.
  *    Both (a) and (b) are reported by the next read or write call. You can
@@ -81,7 +81,7 @@ package portmidi
  * NOTES ON COMPILE-TIME SWITCHES
  *
  *    DEBUG assumes stdio and a console. Use this if you want automatic, simple
- *        error reporting, e.g. for prototyping. If you are using MFC or some 
+ *        error reporting, e.g. for prototyping. If you are using MFC or some
  *        other graphical interface with no console, DEBUG probably should be
  *        undefined.
  *    PM_CHECK_ERRORS more-or-less takes over error checking for return values,

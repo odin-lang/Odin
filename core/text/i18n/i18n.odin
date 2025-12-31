@@ -53,7 +53,6 @@ Error :: enum {
 	TS_File_Expected_NumerusForm,
 	Bad_Str,
 	Bad_Id,
-
 }
 
 Parse_Options :: struct {

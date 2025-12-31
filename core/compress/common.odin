@@ -37,7 +37,7 @@ when size_of(uintptr) == 8 {
 	// which is GZIP and PKZIP's max payload size.
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 32))
 } else {
-	
+
 	// For 32-bit platforms, we set the default max buffer size to 512 MiB.
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29))
 }

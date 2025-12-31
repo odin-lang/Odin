@@ -82,8 +82,8 @@ _unmarshal_any_ptr :: proc(d: Decoder, v: any, hdr: Maybe(Header) = nil, allocat
 	if !reflect.is_pointer(ti) || ti.id == rawptr {
 		return .Non_Pointer_Parameter
 	}
-	
-	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}	
+
+	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}
 	return _unmarshal_value(d, data, hdr.? or_else (_decode_header(d.reader) or_return), allocator, temp_allocator, loc)
 }
 
@@ -138,7 +138,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 
 	case .Neg_U8:
 		decoded := Negative_U8(_decode_u8(r) or_return)
-		
+
 		switch &dst in v {
 		case Negative_U8:
 			dst = decoded
@@ -161,7 +161,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 
 	case .Neg_U16:
 		decoded := Negative_U16(_decode_u16(r) or_return)
-		
+
 		switch &dst in v {
 		case Negative_U16:
 			dst = decoded
@@ -181,7 +181,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 
 	case .Neg_U32:
 		decoded := Negative_U32(_decode_u32(r) or_return)
-		
+
 		switch &dst in v {
 		case Negative_U32:
 			dst = decoded
@@ -198,7 +198,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 
 	case .Neg_U64:
 		decoded := Negative_U64(_decode_u64(r) or_return)
-		
+
 		switch &dst in v {
 		case Negative_U64:
 			dst = decoded
@@ -245,7 +245,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 	case .False:
 		if !_assign_bool(v, false) { return _unsupported(v, hdr) }
 		return
-	
+
 	case .Nil, .Undefined:
 		mem.zero(v.data, ti.size)
 		return
@@ -253,7 +253,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 	case .Break:
 		return .Break
 	}
-	
+
 	maj, add := _header_split(hdr)
 	switch maj {
 	case .Unsigned:
@@ -360,12 +360,12 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		raw   := (^mem.Raw_Slice)(v.data)
 		raw^   = transmute(mem.Raw_Slice)bytes
 		return
-		
+
 	case reflect.Type_Info_Dynamic_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
-		
+
 		bytes         := err_conv(_decode_bytes(d, add, allocator=allocator, loc=loc)) or_return
 		raw           := (^mem.Raw_Dynamic_Array)(v.data)
 		raw.data       = raw_data(bytes)
@@ -383,7 +383,7 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		defer delete(bytes, context.temp_allocator)
 
 		if len(bytes) > t.count { return _unsupported(v, hdr) }
-		
+
 		// Copy into array type, delete original.
 		slice := ([^]byte)(v.data)[:len(bytes)]
 		n := copy(slice, bytes)
@@ -421,7 +421,7 @@ _unmarshal_string :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Heade
 				return
 			}
 		}
-	
+
 	case reflect.Type_Info_Rune:
 		text := err_conv(_decode_text(d, add, allocator=temp_allocator, loc=loc)) or_return
 		defer delete(text, temp_allocator, loc)
@@ -451,7 +451,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 	) -> (out_of_space: bool, err: Unmarshal_Error) {
 		for idx: uintptr = 0; length == -1 || idx < uintptr(length); idx += 1 {
 			hdr := _decode_header(d.reader) or_return
-			
+
 			// Double size if out of capacity.
 			if da.cap <= da.len {
 				// Not growable, error out.
@@ -459,11 +459,11 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 				cap := 2 * da.cap
 				ok := runtime.__dynamic_array_reserve(da, elemt.size, elemt.align, cap, loc)
- 				
+
 				// NOTE: Might be lying here, but it is at least an allocator error.
 				if !ok { return false, .Out_Of_Memory }
 			}
-			
+
 			// Set ptr after potential resizes to avoid invalidation.
 			elem_ptr := rawptr(uintptr(da.data) + idx*uintptr(elemt.size))
 			elem     := any{elem_ptr, elemt.id}
@@ -474,7 +474,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 			da.len += 1
 		}
-		
+
 		return false, nil
 	}
 
@@ -516,7 +516,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		defer if err != nil { mem.free_bytes(data, allocator=allocator, loc=loc) }
 
 		raw           := (^mem.Raw_Dynamic_Array)(v.data)
-		raw.data       = raw_data(data) 
+		raw.data       = raw_data(data)
 		raw.len        = 0
 		raw.cap        = scap
 		raw.allocator  = context.allocator
@@ -572,7 +572,7 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		out_of_space := assign_array(d, &da, info, 2, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
-	
+
 	case reflect.Type_Info_Quaternion:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > 4 {
@@ -694,7 +694,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 						use_field_idx = field_idx
 					}
 				}
-				
+
 				// Skips unused map entries.
 				if use_field_idx < 0 {
 					val := err_conv(_decode_from_decoder(d, allocator=context.temp_allocator)) or_return
@@ -767,7 +767,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			// We already reserved space for it, so this shouldn't fail.
 			assert(set_ptr != nil)
 		}
-	
+
 		if .Shrink_Excess in d.flags {
 			_, _ = runtime.map_shrink_dynamic(raw_map, t.map_info)
 		}
@@ -798,7 +798,7 @@ _unmarshal_union :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 			if n_items != 2 {
 				return .Bad_Tag_Value
 			}
-			
+
 			idhdr = _decode_header(r) or_return
 			idmaj, idadd := _header_split(idhdr)
 			if idmaj != .Text {
@@ -828,7 +828,7 @@ _unmarshal_union :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 				reflect.write_type(&builder, variant)
 				variant_name := strings.to_string(builder)
-				
+
 				if variant_name == target_name {
 					reflect.set_union_variant_raw_tag(v, tag)
 					return _unmarshal_value(d, any{v.data, variant.id}, _decode_header(r) or_return, loc=loc)
@@ -925,15 +925,15 @@ _assign_float :: proc(val: any, f: $T) -> bool {
 	case f64:     dst = f64  (f)
 	case f64le:   dst = f64le(f)
 	case f64be:   dst = f64be(f)
-	
+
 	case complex32:  dst = complex(f16(f), 0)
 	case complex64:  dst = complex(f32(f), 0)
 	case complex128: dst = complex(f64(f), 0)
-	
+
 	case quaternion64:  dst = quaternion(w=f16(f), x=0, y=0, z=0)
 	case quaternion128: dst = quaternion(w=f32(f), x=0, y=0, z=0)
 	case quaternion256: dst = quaternion(w=f64(f), x=0, y=0, z=0)
-	
+
 	case: return false
 	}
 	return true

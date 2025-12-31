@@ -196,7 +196,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if .return_metadata in options {
 		info := new(image.QOI_Info)
 		info.header  = header
-		img.metadata = info		
+		img.metadata = info
 	}
 
 	if header.channels != 3 && header.channels != 4 {
@@ -248,14 +248,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			pix.rgb = image.read_data(ctx, RGB_Pixel) or_return
 
 			#no_bounds_check {
-				seen[qoi_hash(pix)] = pix	
+				seen[qoi_hash(pix)] = pix
 			}
 
 		case .RGBA:
 			pix = image.read_data(ctx, RGBA_Pixel) or_return
 
 			#no_bounds_check {
-				seen[qoi_hash(pix)] = pix	
+				seen[qoi_hash(pix)] = pix
 			}
 
 		case:
@@ -273,7 +273,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					pix += {diff_r, diff_g, diff_b, 0}
 
 					#no_bounds_check {
-						seen[qoi_hash(pix)] = pix	
+						seen[qoi_hash(pix)] = pix
 					}
 
 				case .LUMA:
@@ -286,7 +286,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					pix += {diff_r, diff_g, diff_b, 0}
 
 					#no_bounds_check {
-						seen[qoi_hash(pix)] = pix	
+						seen[qoi_hash(pix)] = pix
 					}
 
 				case .RUN:

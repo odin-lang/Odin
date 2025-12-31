@@ -14,7 +14,7 @@ when ODIN_OS == .Darwin {
 foreign lib {
 	/*
 	Takes a pointer to a radix-64 representation, in which the first digit is the least significant,
-	and return the corresponding long value. 
+	and return the corresponding long value.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/a64l.html ]]
 	*/
@@ -251,8 +251,8 @@ foreign lib {
 	Creates a regular file with a unique name derived from template and return a file descriptor
 	for the file open for reading and writing.
 	The application shall ensure that the string provided in template is a pathname ending with
-	at least six trailing 'X' characters. 
-	
+	at least six trailing 'X' characters.
+
 	Returns: -1 (setting errno) on failure, an open file descriptor on success
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/mkdtemp.html ]]

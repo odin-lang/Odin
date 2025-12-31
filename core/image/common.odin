@@ -124,7 +124,7 @@ Image_Option:
 		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
 		unless you select `alpha_premultiply`.
 		In this case it'll premultiply the specified pixels in question only,
-		as the others are implicitly fully opaque.	
+		as the others are implicitly fully opaque.
 
 	`.alpha_premultiply`
 		If the image has an alpha channel, returns image data as follows:

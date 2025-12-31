@@ -98,7 +98,7 @@ foreign lib {
 	tempnam :: proc(dir: cstring, pfx: cstring) -> cstring ---
 
 	/*
-	Executes the command specified, creating a pipe and returning a pointer to a stream that can 
+	Executes the command specified, creating a pipe and returning a pointer to a stream that can
 	read or write from/to the pipe.
 
 	Returns: nil (setting errno) on failure or a pointer to the stream
@@ -130,7 +130,7 @@ foreign lib {
 	/*
 	Closes a pipe stream to or from a process.
 
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pclose.html ]]	
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pclose.html ]]
 	*/
 	@(link_name=LPCLOSE)
 	pclose :: proc(stream: ^FILE) -> c.int ---

@@ -109,7 +109,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case f32be: (^f32be)(ptr)^ = cast(f32be) value
 		case f64be: (^f64be)(ptr)^ = cast(f64be) value
 		}
-	
+
 	case runtime.Type_Info_Complex:
 		value := strconv.parse_complex128(str) or_return
 		switch type_info.id {
@@ -117,7 +117,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case complex64:  (^complex64) (ptr)^ = (complex64)(value)
 		case complex128: (^complex128)(ptr)^ = value
 		}
-	
+
 	case runtime.Type_Info_Quaternion:
 		value := strconv.parse_quaternion256(str) or_return
 		switch type_info.id {
@@ -412,7 +412,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		} else {
 			parse_and_set_pointer_by_named_type(ptr, str, type_info.id, arg_tag, &error)
-			
+
 			if error != nil {
 				// So far, it's none of the types that we recognize.
 				// Check to see if we can set it by base type, if allowed.

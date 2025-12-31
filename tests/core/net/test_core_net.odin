@@ -299,7 +299,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 		r.length, r.err = net.recv_tcp(client, r.data[:])
 		return
 	}
-	
+
 	thread_data := [2]Thread_Data{}
 
 	wg: sync.Wait_Group
@@ -308,7 +308,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	thread_data[0].t = t
 	thread_data[0].wg = &wg
 	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
-	
+
 	sync.wait_group_wait(&wg)
 	sync.wait_group_add(&wg, 2)
 

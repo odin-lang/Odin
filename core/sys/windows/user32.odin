@@ -315,7 +315,7 @@ foreign user32 {
 
 	GetProcessWindowStation :: proc() -> HWINSTA ---
 	GetUserObjectInformationW :: proc(hObj: HANDLE, nIndex: GetUserObjectInformationFlags, pvInfo: PVOID, nLength: DWORD, lpnLengthNeeded: LPDWORD) -> BOOL ---
-	
+
 	OpenClipboard :: proc(hWndNewOwner: HWND) -> BOOL ---
 	CloseClipboard :: proc() -> BOOL ---
 	GetClipboardData :: proc(uFormat: UINT) -> HANDLE ---

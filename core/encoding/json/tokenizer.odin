@@ -188,7 +188,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	case utf8.RUNE_EOF, '\x00':
 		token.kind = .EOF
 		err = .EOF
-		
+
 	case '\n':
 		t.insert_comma = false
 		token.text = ","
@@ -320,7 +320,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 
 
-	case ',': 
+	case ',':
 		token.kind = .Comma
 		t.insert_comma = false
 	case ':': token.kind = .Colon
@@ -328,8 +328,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	case '}': token.kind = .Close_Brace
 	case '[': token.kind = .Open_Bracket
 	case ']': token.kind = .Close_Bracket
-	
-	case '=': 
+
+	case '=':
 		if t.spec == .MJSON {
 			token.kind = .Colon
 		} else {
@@ -364,7 +364,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	}
 
 	token.text = string(t.data[token.offset : t.offset])
-	
+
 	if t.spec == .MJSON {
 		switch token.kind {
 		case .Invalid:
@@ -373,8 +373,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			t.insert_comma = false
 		case .Colon, .Comma, .Open_Brace, .Open_Bracket:
 			t.insert_comma = false
-		case .Null, .False, .True, .Infinity, .NaN, 
-		     .Ident, .Integer, .Float, .String, 
+		case .Null, .False, .True, .Infinity, .NaN,
+		     .Ident, .Integer, .Float, .String,
 		     .Close_Brace, .Close_Bracket:
 			t.insert_comma = true
 		}
@@ -404,7 +404,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 			}
 		}
 	}
-	
+
 	if spec != .JSON && len(s) >= 2 {
 		// Allow for hexadecimal strings
 		if s[:2] == "0x" || s[:2] == "0X" {
@@ -507,7 +507,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 			switch s[i] {
 			case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
 				i += 1
-				
+
 			case '\r':
 				if spec != .JSON && i+1 < len(s) && s[i+1] == '\n' {
 					i += 2

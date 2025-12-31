@@ -47,4 +47,3 @@ _tick_now :: proc "contextless" () -> Tick {
 _yield :: proc "contextless" () {
 	posix.sched_yield()
 }
-

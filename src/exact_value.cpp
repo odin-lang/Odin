@@ -58,7 +58,7 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 	defer (mutex_unlock(&hash_exact_value_mutex));
 
 	uintptr res = 0;
-	
+
 	switch (v.kind) {
 	case ExactValue_Invalid:
 		return 0;

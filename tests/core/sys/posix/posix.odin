@@ -238,7 +238,7 @@ test_pthreads :: proc(t: ^testing.T) {
 	testing.expect_value(t, counter, NTHREADS)
 
 	thread_function :: proc "c" (_: rawptr) -> rawptr {
-		sync.atomic_add(&counter, 1)		
+		sync.atomic_add(&counter, 1)
 		return nil
 	}
 }

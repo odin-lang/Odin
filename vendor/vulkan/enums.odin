@@ -5041,6 +5041,3 @@ PipelineStageFlag2 :: enum Flags64 {
 	OPTICAL_FLOW_NV                      = 29,
 	CONVERT_COOPERATIVE_VECTOR_MATRIX_NV = 44,
 }
-
-
-

@@ -31,7 +31,7 @@ mat4x4 :: mat4
 
 // IMPORTANT NOTE: These data types are "backwards" in normal mathematical terms
 // but they match how GLSL and OpenGL defines them in name
-// Odin: matrix[R, C]f32 
+// Odin: matrix[R, C]f32
 // GLSL: matCxR
 mat3x2 :: matrix[2, 3]f32
 mat4x2 :: matrix[2, 4]f32
@@ -58,7 +58,7 @@ bvec4 :: [4]bool
 
 quat :: quaternion128
 
-// Double Precision (f64) Floating Point Types 
+// Double Precision (f64) Floating Point Types
 
 dmat2 :: matrix[2, 2]f64
 dmat3 :: matrix[3, 3]f64
@@ -604,16 +604,16 @@ degrees :: proc{
 @(require_results) degrees_dvec4 :: proc "c" (radians: dvec4) -> dvec4 { return radians * 360.0 / TAU }
 
 min :: proc{
-	min_i32,  
-	min_u32,  
-	min_f32,  
+	min_i32,
+	min_u32,
+	min_f32,
 	min_f64,
-	min_vec2, 
-	min_vec3, 
-	min_vec4, 
-	min_dvec2, 
-	min_dvec3, 
-	min_dvec4, 
+	min_vec2,
+	min_vec3,
+	min_vec4,
+	min_dvec2,
+	min_dvec3,
+	min_dvec4,
 	min_ivec2,
 	min_ivec3,
 	min_ivec4,
@@ -640,16 +640,16 @@ min :: proc{
 
 
 max :: proc{
-	max_i32,  
-	max_u32,  
-	max_f32,  
+	max_i32,
+	max_u32,
+	max_f32,
 	max_f64,
-	max_vec2, 
-	max_vec3, 
-	max_vec4, 
-	max_dvec2, 
-	max_dvec3, 
-	max_dvec4, 
+	max_vec2,
+	max_vec3,
+	max_vec4,
+	max_dvec2,
+	max_dvec3,
+	max_dvec4,
 	max_ivec2,
 	max_ivec3,
 	max_ivec4,
@@ -677,16 +677,16 @@ max :: proc{
 
 
 clamp :: proc{
-	clamp_i32, 
-	clamp_u32, 
-	clamp_f32,  
+	clamp_i32,
+	clamp_u32,
+	clamp_f32,
 	clamp_f64,
-	clamp_vec2, 
-	clamp_vec3, 
-	clamp_vec4, 
-	clamp_dvec2, 
-	clamp_dvec3, 
-	clamp_dvec4, 
+	clamp_vec2,
+	clamp_vec3,
+	clamp_vec4,
+	clamp_dvec2,
+	clamp_dvec3,
+	clamp_dvec4,
 	clamp_ivec2,
 	clamp_ivec3,
 	clamp_ivec4,
@@ -1110,7 +1110,7 @@ scalarTripleProduct :: proc{
 vectorTripleProduct :: proc {
 	vectorTripleProduct_vec3,
 	vectorTripleProduct_dvec3,
-	vectorTripleProduct_ivec3,	
+	vectorTripleProduct_ivec3,
 }
 @(require_results) vectorTripleProduct_vec3 :: proc "c" (a, b, c: vec3) -> vec3 { return cross(a, cross(b, c)) }
 @(require_results) vectorTripleProduct_dvec3 :: proc "c" (a, b, c: dvec3) -> dvec3 { return cross(a, cross(b, c)) }
@@ -1411,7 +1411,7 @@ mat4LookAt :: proc "c" (eye, centre, up: vec3) -> (m: mat4) {
 	u := cross(s, f)
 
 	fe := dot(f, eye)
-	
+
 	m[0] = {+s.x, +u.x, -f.x, 0}
 	m[1] = {+s.y, +u.y, -f.y, 0}
 	m[2] = {+s.z, +u.z, -f.z, 0}
@@ -1464,10 +1464,10 @@ mat4Orientation :: proc "c" (normal, up: vec3) -> mat4 {
 	if normal == up {
 		return 1
 	}
-	
+
 	rotation_axis := cross(up, normal)
 	angle := acos(dot(normal, up))
-	
+
 	return mat4Rotate(rotation_axis, angle)
 }
 @(require_results)
@@ -1538,7 +1538,7 @@ dmat4LookAt :: proc "c" (eye, centre, up: dvec3) -> (m: dmat4) {
 	u := cross(s, f)
 
 	fe := dot(f, eye)
-	
+
 	m[0] = {+s.x, +u.x, -f.x, 0}
 	m[1] = {+s.y, +u.y, -f.y, 0}
 	m[2] = {+s.z, +u.z, -f.z, 0}
@@ -1591,10 +1591,10 @@ dmat4Orientation :: proc "c" (normal, up: dvec3) -> dmat4 {
 	if normal == up {
 		return 1
 	}
-	
+
 	rotation_axis := cross(up, normal)
 	angle := acos(dot(normal, up))
-	
+
 	return dmat4Rotate(rotation_axis, angle)
 }
 @(require_results)
@@ -2180,4 +2180,3 @@ inverse_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 	}
 	return
 }
-

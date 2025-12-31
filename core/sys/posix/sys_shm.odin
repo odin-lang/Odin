@@ -33,7 +33,7 @@ foreign lib {
 	/*
 	Detaches the shared memory segment located at the address specified.
 
-	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/shmdt.html ]] 
+	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/shmdt.html ]]
 	*/
 	shmdt :: proc(shmaddr: rawptr) -> result ---
 

@@ -30,7 +30,7 @@ The typical scope of an `AutoreleasePool` is one frame of rendering for the main
 
 You can create and manage additional `AutoreleasePool`s at smaller scopes to reduce your program's working set, and you are required to do so for any additional threads your program creates.
 
-If an object's lifecycle needs to be extended beyond the `AutoreleasePool`'s scope, you can claim ownership of it (avoiding its release beyond the pool's scope) by calling its `retain()` method before its pool is drained. In these cases, you will be responsible for making the appropriate `release()` call on the object after you no longer need it. 
+If an object's lifecycle needs to be extended beyond the `AutoreleasePool`'s scope, you can claim ownership of it (avoiding its release beyond the pool's scope) by calling its `retain()` method before its pool is drained. In these cases, you will be responsible for making the appropriate `release()` call on the object after you no longer need it.
 
 You can find a more-detailed introduction to the memory management rules here: https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html.
 

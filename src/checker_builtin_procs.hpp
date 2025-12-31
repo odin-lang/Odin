@@ -13,7 +13,7 @@ enum BuiltinProcId {
 	BuiltinProc_type_of,
 	BuiltinProc_type_info_of,
 	BuiltinProc_typeid_of,
-	
+
 
 	BuiltinProc_swizzle,
 
@@ -58,7 +58,7 @@ enum BuiltinProcId {
 	BuiltinProc_outer_product,
 	BuiltinProc_hadamard_product,
 	BuiltinProc_matrix_flatten,
-	
+
 	BuiltinProc_soa_struct,
 
 	BuiltinProc_concatenate,
@@ -97,12 +97,12 @@ enum BuiltinProcId {
 
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
-	
+
 	BuiltinProc_unaligned_store,
 	BuiltinProc_unaligned_load,
 	BuiltinProc_non_temporal_store,
 	BuiltinProc_non_temporal_load,
-	
+
 	BuiltinProc_prefetch_read_instruction,
 	BuiltinProc_prefetch_read_data,
 	BuiltinProc_prefetch_write_instruction,
@@ -225,7 +225,7 @@ BuiltinProc__simd_begin,
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
 BuiltinProc__simd_end,
-	
+
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
 	BuiltinProc_syscall_bsd,
@@ -436,7 +436,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-		
+
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
 	{STR_LIT("concatenate"), 2, true, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -476,12 +476,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("volatile_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("volatile_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	
+
 	{STR_LIT("unaligned_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("unaligned_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("non_temporal_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("non_temporal_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	
+
 	{STR_LIT("prefetch_read_instruction"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("prefetch_read_data"),         2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("prefetch_write_instruction"), 2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

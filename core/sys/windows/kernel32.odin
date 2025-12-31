@@ -356,7 +356,7 @@ foreign kernel32 {
 		nNumberOfBytesToUnlockLow: DWORD,
 		nNumberOfBytesToLockHigh: DWORD,
 		lpOverlapped: ^LPOVERLAPPED,
-	) -> BOOL --- 
+	) -> BOOL ---
 
 	GetFileTime :: proc(
 		hFile: HANDLE,
@@ -448,7 +448,7 @@ foreign kernel32 {
 	GlobalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
 	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	GlobalFree :: proc(mem: LPVOID) -> LPVOID ---
-	
+
 	GlobalLock :: proc(hMem: HGLOBAL) -> LPVOID ---
 	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---
 

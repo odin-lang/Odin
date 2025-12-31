@@ -97,7 +97,7 @@ join_non_empty :: proc(elems: []string, allocator := context.allocator) -> (join
 	context.allocator = allocator
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
-	
+
 	if len(elems[0]) == 2 && elems[0][1] == ':' {
 		i := 1
 		for ; i < len(elems); i += 1 {
@@ -115,7 +115,7 @@ join_non_empty :: proc(elems: []string, allocator := context.allocator) -> (join
 	if !is_UNC(p) {
 		return p, nil
 	}
-	
+
 	head := clean(elems[0], context.temp_allocator) or_return
 	if is_UNC(head) {
 		return p, nil

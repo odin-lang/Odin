@@ -382,7 +382,7 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := conte
 			This is the number of times the loop will iterate, essentially.
 			while (tx++ < a->used && ty-- >= 0) { ... }
 		*/
-		 
+
 		iy = min(a.used - tx, ty + 1)
 
 		/*
@@ -412,7 +412,7 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := conte
 	/*
 		Now extract the previous digit [below the carry].
 	*/
-	copy_slice(dest.digit[0:], W[:pa])	
+	copy_slice(dest.digit[0:], W[:pa])
 
 	/*
 		Clear unused digits [that existed in the old copy of dest].
@@ -690,7 +690,7 @@ _private_int_sqr :: proc(dest, src: ^Int, allocator := context.allocator) -> (er
 	So basically you set up iy like before then you min it with (ty-tx) so that it never happens.
 	You double all those you add in the inner loop. After that loop you do the squares and add them in.
 
-	Assumes `dest` and `src` not to be `nil` and `src` to have been initialized.	
+	Assumes `dest` and `src` not to be `nil` and `src` to have been initialized.
 */
 _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
@@ -785,7 +785,7 @@ _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) 
 
 /*
 	Karatsuba squaring, computes `dest` = `src` * `src` using three half-size squarings.
- 
+
 	See comments of `_private_int_mul_karatsuba` for details.
 	It is essentially the same algorithm but merely tuned to perform recursive squarings.
 */
@@ -1778,11 +1778,11 @@ _private_montgomery_reduce_comba :: proc(x, n: ^Int, rho: DIGIT, allocator := co
 
 		/*
 			`a = a + mu * m * b**i`
-		
+
 			This is computed in place and on the fly.  The multiplication
 			by b**i is handled by offseting which columns the results
 			are added to.
-		
+
 			Note the comba method normally doesn't handle carries in the
 			inner loop In this case we fix the carry from the previous
 			column since the Montgomery reduction requires digits of the
@@ -3209,7 +3209,7 @@ _private_int_shr_leg :: proc(quotient: ^Int, digits: int, allocator := context.a
 	return internal_clamp(quotient)
 }
 
-/*	
+/*
 	========================    End of private procedures    =======================
 
 	===============================  Private tables  ===============================

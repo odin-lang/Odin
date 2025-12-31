@@ -219,4 +219,3 @@ foreign lib {
 	GetChunk              :: proc(channel: c.int) -> ^Chunk ---
 	CloseAudio            :: proc() ---
 }
-

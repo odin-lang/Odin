@@ -6,13 +6,13 @@ Designed by Eskil Steenberg. @quelsolaar / eskil 'at' obsession 'dot' se / www.q
 
 Author of this Odin package: Ginger Bill
 
-Following comment is copied from the original C-implementation  
----------  
-- Does the world need another Graphics file format?  
+Following comment is copied from the original C-implementation
+---------
+- Does the world need another Graphics file format?
 Unfortunately, Yes. All existing formats are either too large and complicated to be implemented from
 scratch, or don't have some basic features needed in modern computer graphics.
 
-- Who is this format for?  
+- Who is this format for?
 For people who want a capable open Graphics format that can be implemented from scratch in
 a few hours. It is ideal for graphics researchers, game developers or other people who
 wants to build custom graphics pipelines. Given how easy it is to parse and write, it
@@ -20,21 +20,21 @@ should be easy to write utilities that process assets to preform tasks like: gen
 normals, light-maps, tangent spaces, Error detection, GPU optimization, LOD generation,
 and UV mapping.
 
-- Why store images in the format when there are so many good image formats already?  
+- Why store images in the format when there are so many good image formats already?
 Yes there are, but only for 2D RGB/RGBA images. A lot of computer graphics rendering rely
 on 1D, 3D, cube, multilayer, multi channel, floating point bitmap buffers. There almost no
 formats for this kind of data. Also 3D files that reference separate image files rely on
 file paths, and this often creates issues when the assets are moved. By including the
 texture data in the files directly the assets become self contained.
 
-- Why doesn't the format support <insert whatever>?  
+- Why doesn't the format support <insert whatever>?
 Because the entire point is to make a format that can be implemented. Features like NURBSs,
 Construction history, or BSP trees would make the format too large to serve its purpose.
 The facilities of the formats to store meta data should make the format flexible enough
 for most uses. Adding HxA support should be something anyone can do in a days work.
 
-Structure:  
-----------  
+Structure:
+----------
 HxA is designed to be extremely simple to parse, and is therefore based around conventions. It has
 a few basic structures, and depending on how they are used they mean different things. This means
 that you can implement a tool that loads the entire file, modifies the parts it cares about and
@@ -79,8 +79,8 @@ The face stack stores values per face. the length of the face stack has to match
 negative values in the index layer in the corner stack. The face stack can be used to store things
 like material index.
 
-Storage:  
--------  
+Storage:
+-------
 All data is stored in little endian byte order with no padding. The layout mirrors the structs
 defined below with a few exceptions. All names are stored as a 8-bit unsigned integer indicating
 the length of the name followed by that many characters. Termination is not stored in the file.

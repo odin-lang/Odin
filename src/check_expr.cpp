@@ -922,7 +922,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			return 4;
 		}
 	}
-	
+
 	if (is_type_complex_or_quaternion(dst)) {
 		Type *elem = base_complex_elem_type(dst);
 		if (are_types_identical(elem, base_type(src))) {
@@ -947,7 +947,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			}
 		}
 	}
-	
+
 	if (is_type_matrix(dst)) {
 		if (are_types_identical(src, dst)) {
 			return 5;
@@ -1317,7 +1317,7 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source_count) {
 	Type *gt = *gt_;
-	
+
 	GB_ASSERT(gt->kind == Type_Generic);
 	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
 	GB_ASSERT(e != nullptr);
@@ -1494,7 +1494,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			if (!is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type)) {
 				return false;
 			}
-			
+
 			// For generic types like bit_set[$T] the upper and lower of the poly type will be zeroes since
 			// it could not figure that stuff out when the poly type was created.
 			if (poly->BitSet.upper == 0 && modify_type) {
@@ -1626,7 +1626,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			}
 		}
 		return false;
-		
+
 	case Type_Matrix:
 		if (source->kind == Type_Matrix) {
 			if (poly->Matrix.generic_row_count != nullptr) {
@@ -1645,7 +1645,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			    poly->Matrix.column_count == source->Matrix.column_count) {
 				return is_polymorphic_type_assignable(c, poly->Matrix.elem, source->Matrix.elem, true, modify_type);
 			}
-		} 
+		}
 		return false;
 
 	case Type_SimdVector:
@@ -3339,7 +3339,7 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
 		return true;
 	}
-	
+
 	if (is_type_matrix(src) && is_type_matrix(dst)) {
 		GB_ASSERT(src->kind == Type_Matrix);
 		GB_ASSERT(dst->kind == Type_Matrix);
@@ -3348,13 +3348,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 		if (!check_is_castable_to(c, &op, dst->Matrix.elem)) {
 			return false;
 		}
-		
+
 		if (src->Matrix.row_count != src->Matrix.column_count) {
 			i64 src_count = src->Matrix.row_count*src->Matrix.column_count;
 			i64 dst_count = dst->Matrix.row_count*dst->Matrix.column_count;
 			return src_count == dst_count;
 		}
-		
+
 		return is_matrix_square(dst) && is_matrix_square(src);
 	}
 
@@ -3861,10 +3861,10 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 		x->mode = Addressing_Invalid;
 		return;
 	}
-		
+
 	Type *xt = base_type(x->type);
 	Type *yt = base_type(y->type);
-	
+
 	if (is_type_matrix(x->type)) {
 		GB_ASSERT(xt->kind == Type_Matrix);
 		if (op.kind == Token_Mul) {
@@ -3872,7 +3872,7 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				if (!are_types_identical(xt->Matrix.elem, yt->Matrix.elem)) {
 					goto matrix_error;
 				}
-				
+
 				if (xt->Matrix.column_count != yt->Matrix.row_count) {
 					goto matrix_error;
 				}
@@ -3899,11 +3899,11 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 				if (!are_types_identical(xt->Matrix.elem, yt->Array.elem)) {
 					goto matrix_error;
 				}
-				
+
 				if (xt->Matrix.column_count != yt->Array.count) {
 					goto matrix_error;
 				}
-				
+
 				// Treat arrays as column vectors
 				x->mode = Addressing_Value;
 				if (xt->Matrix.row_count == yt->Array.count) {
@@ -3923,18 +3923,18 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 	} else {
 		GB_ASSERT(!is_type_matrix(xt));
 		GB_ASSERT(is_type_matrix(yt));
-		
+
 		if (op.kind == Token_Mul) {
 			// NOTE(bill): no need to handle the matrix case here since it should be handled above
 			if (xt->kind == Type_Array) {
 				if (!are_types_identical(yt->Matrix.elem, xt->Array.elem)) {
 					goto matrix_error;
 				}
-				
+
 				if (xt->Array.count != yt->Matrix.row_count) {
 					goto matrix_error;
 				}
-				
+
 				// Treat arrays as row vectors
 				x->mode = Addressing_Value;
 				if (yt->Matrix.column_count == xt->Array.count) {
@@ -3959,8 +3959,8 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 matrix_success:
 	x->type = check_matrix_type_hint(x->type, type_hint);
 	return;
-	
-	
+
+
 matrix_error:
 	gbString xts = type_to_string(x->type);
 	gbString yts = type_to_string(y->type);
@@ -3972,7 +3972,7 @@ matrix_error:
 	x->type = t_invalid;
 	x->mode = Addressing_Invalid;
 	return;
-	
+
 }
 
 gb_internal void check_binary_expr_dependency(CheckerContext *c, Token op, Type *bt, bool REQUIRE) {
@@ -4532,18 +4532,18 @@ gb_internal void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type,
 			// See above note in UnaryExpr case
 			break;
 		}
-		
+
 		// NOTE(bill): This is a bit of a hack to get around the edge cases of ternary if expressions
 		// having an untyped value
 		Operand x = make_operand_from_node(te->x);
-		Operand y = make_operand_from_node(te->y);		
+		Operand y = make_operand_from_node(te->y);
 		if (x.mode != Addressing_Constant || check_is_expressible(c, &x, type)) {
 			update_untyped_expr_type(c, te->x, type, final);
 		}
 		if (y.mode != Addressing_Constant || check_is_expressible(c, &y, type)) {
 			update_untyped_expr_type(c, te->y, type, final);
 		}
-		
+
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, e);
@@ -4782,7 +4782,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 		break;
 	}
-	
+
 	case Type_SimdVector: {
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
@@ -4795,14 +4795,14 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 		break;
 	}
-	
+
 	case Type_Matrix: {
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
 			if (t->Matrix.row_count != t->Matrix.column_count) {
 				operand->mode = Addressing_Invalid;
 				ERROR_BLOCK();
-				
+
 				convert_untyped_error(c, operand, target_type, true);
 				error_line("\tNote: Only a square matrix types can be initialized with a scalar value\n");
 				return;
@@ -4816,7 +4816,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		}
 		break;
 	}
-		
+
 
 	case Type_Union:
 		// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
@@ -4959,7 +4959,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		}
 		break;
 	}
-	
+
 	if (is_type_any(target_type) && is_type_untyped(operand->type)) {
 		if (is_type_untyped_nil(operand->type) && is_type_untyped_uninit(operand->type)) {
 
@@ -6738,7 +6738,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 			} else if (!o.value.value_bool) {
 				if (print_err) {
 					ERROR_BLOCK();
-					
+
 					gbString str = expr_to_string(clause);
 					error(clause, "'where' clause evaluated to false:\n\t%s", str);
 					gb_string_free(str);
@@ -7110,7 +7110,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					if (!(pt != nullptr && is_type_proc(pt))) {
 						continue;
 					}
-					
+
 					if (pt->Proc.is_polymorphic) {
 						if (variadic_index == -1) {
 							variadic_index = pt->Proc.variadic_index;
@@ -7675,7 +7675,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 				if (fv->value == nullptr) {
 					error(fv->eq, "Expected a value");
-					err = CallArgumentError_InvalidFieldValue; 
+					err = CallArgumentError_InvalidFieldValue;
 					continue;
 				}
 				if (fv->field->kind == Ast_Ident) {
@@ -8227,12 +8227,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		ast_node(bd, BasicDirective, proc);
 		String name = bd->name.string;
 		if (
-		    name == "location" || 
+		    name == "location" ||
 		    name == "exists" ||
-		    name == "assert" || 
-		    name == "panic" || 
-		    name == "defined" || 
-		    name == "config" || 
+		    name == "assert" ||
+		    name == "panic" ||
+		    name == "defined" ||
+		    name == "config" ||
 		    name == "load" ||
 		    name == "load_directory" ||
 		    name == "load_hash" ||
@@ -8579,7 +8579,7 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		}
 		o->type = t->EnumeratedArray.elem;
 		return true;
-		
+
 	case Type_Matrix:
 		if (indirection) {
 			o->mode = Addressing_Variable;
@@ -8915,18 +8915,18 @@ gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type *
 
 gb_internal void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ast_node(ie, MatrixIndexExpr, node);
-	
+
 	check_expr(c, o, ie->expr);
 	node->viral_state_flags |= ie->expr->viral_state_flags;
 	if (o->mode == Addressing_Invalid) {
 		o->expr = node;
 		return;
 	}
-	
+
 	Type *t = base_type(type_deref(o->type));
 	bool is_ptr = is_type_pointer(o->type);
 	bool is_const = o->mode == Addressing_Constant;
-	
+
 	if (t->kind != Type_Matrix) {
 		gbString str = expr_to_string(o->expr);
 		gbString type_str = type_to_string(o->type);
@@ -8947,7 +8947,7 @@ gb_internal void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *nod
 	} else if (o->mode != Addressing_Variable) {
 		o->mode = Addressing_Value;
 	}
-	
+
 	if (ie->row_index == nullptr) {
 		gbString str = expr_to_string(o->expr);
 		error(o->expr, "Missing row index for '%s'", str);
@@ -8964,10 +8964,10 @@ gb_internal void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *nod
 		o->expr = node;
 		return;
 	}
-	
+
 	i64 row_count = t->Matrix.row_count;
 	i64 column_count = t->Matrix.column_count;
-	
+
 	i64 row_index = 0;
 	i64 column_index = 0;
 	bool row_ok = check_index_value(c, t, false, ie->row_index, row_count, &row_index, nullptr);
@@ -11819,7 +11819,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_ast_node(se, SliceExpr, node);
 		kind = check_slice_expr(c, o, node, type_hint);
 	case_end;
-	
+
 	case_ast_node(mie, MatrixIndexExpr, node);
 		check_matrix_index_expr(c, o, node, type_hint);
 		o->expr = node;
@@ -12368,7 +12368,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = write_expr_to_string(str, mie->column_index, shorthand);
 		str = gb_string_append_rune(str, ']');
 	case_end;
-	
+
 	case_ast_node(e, Ellipsis, node);
 		str = gb_string_appendc(str, "..");
 		str = write_expr_to_string(str, e->expr, shorthand);
@@ -12456,7 +12456,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_append_rune(str, ']');
 		str = write_expr_to_string(str, mt->value, shorthand);
 	case_end;
-	
+
 	case_ast_node(mt, MatrixType, node);
 		str = gb_string_appendc(str, "matrix[");
 		str = write_expr_to_string(str, mt->row_count, shorthand);

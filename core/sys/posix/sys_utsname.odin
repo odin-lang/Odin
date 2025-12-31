@@ -18,7 +18,7 @@ foreign lib {
 	Returns: non-negative on success, -1 (setting errno) on failure
 
 	NOTE: have a look at `core:sys/info` for similar/better system information.
-	
+
 	Example:
 		uname: posix.utsname
 		posix.uname(&uname)

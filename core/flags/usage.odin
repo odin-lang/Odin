@@ -228,7 +228,7 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 	}
 
 	strings.write_string(&builder, "Flags:\n")
-	
+
 	// Divide the positional/required arguments and the non-required arguments.
 	divider_index := -1
 	for flag, i in visible_flags {

@@ -1046,4 +1046,3 @@ gb_internal cgValue cg_const_string(cgProcedure *p, Type *type, String const &st
 gb_internal cgValue cg_const_union_tag(cgProcedure *p, Type *u, Type *v) {
 	return cg_const_value(p, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
 }
-

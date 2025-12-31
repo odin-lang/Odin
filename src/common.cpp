@@ -128,7 +128,7 @@ gb_internal int i32_cmp(i32 x, i32 y) {
 gb_internal u32 fnv32a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
 	u32 h = 0x811c9dc5;
-	
+
 	for (; len >= 8; len -= 8, bytes += 8) {
 		h = (h ^ bytes[0]) * 0x01000193;
 		h = (h ^ bytes[1]) * 0x01000193;
@@ -149,7 +149,7 @@ gb_internal u32 fnv32a(void const *data, isize len) {
 gb_internal u64 fnv64a(void const *data, isize len, u64 seed=0xcbf29ce484222325ull) {
 	u8 const *bytes = cast(u8 const *)data;
 	u64 h = seed;
-	
+
 	for (; len >= 8; len -= 8, bytes += 8) {
 		h = (h ^ bytes[0]) * 0x100000001b3ull;
 		h = (h ^ bytes[1]) * 0x100000001b3ull;
@@ -746,25 +746,25 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 
 struct LoadedFile {
 	void *handle;
-	
+
 	void const *data;
 	i32         size;
 };
 enum LoadedFileError {
 	LoadedFile_None,
-	
+
 	LoadedFile_Empty,
 	LoadedFile_FileTooLarge,
 	LoadedFile_Invalid,
 	LoadedFile_NotExists,
 	LoadedFile_Permission,
-	
+
 	LoadedFile_COUNT,
 };
 
 gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
 	LoadedFileError err = LoadedFile_None;
-	
+
 	if (!copy_file_contents) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		TEMPORARY_ALLOCATOR_GUARD();
@@ -779,7 +779,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		HANDLE handle = nullptr;
 		HANDLE file_mapping = nullptr;
 		void *file_data = nullptr;
-		
+
 		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			handle = nullptr;
@@ -813,19 +813,19 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		memory_mapped_file->data = file_data;
 		memory_mapped_file->size = cast(i32)file_size;
 		return err;
-	
+
 	window_handle_file_error:;
 		{
 			DWORD handle_err = GetLastError();
 			CloseHandle(handle);
 			err = LoadedFile_Invalid;
 			switch (handle_err) {
-			case ERROR_FILE_NOT_FOUND: 
-			case ERROR_PATH_NOT_FOUND: 
+			case ERROR_FILE_NOT_FOUND:
+			case ERROR_PATH_NOT_FOUND:
 			case ERROR_INVALID_DRIVE:
-				err = LoadedFile_NotExists; 
+				err = LoadedFile_NotExists;
 				break;
-			case ERROR_ACCESS_DENIED: 
+			case ERROR_ACCESS_DENIED:
 			case ERROR_INVALID_ACCESS:
 				err = LoadedFile_Permission;
 				break;
@@ -834,7 +834,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		}
 	#endif
 	}
-	
+
 	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {

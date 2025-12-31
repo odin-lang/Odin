@@ -91,7 +91,7 @@ marshal_into_encoder :: proc(e: Encoder, v: any) -> (err: Marshal_Error) {
 	if v == nil {
 		return _encode_nil(e.writer)
 	}
-	
+
 	// Check if type has a tag implementation to use.
 	if impl, ok := _tag_implementations_type[v.id]; ok {
 		return impl->marshal(e, v)
@@ -260,7 +260,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
 		}
 		return
-		
+
 	case runtime.Type_Info_Dynamic_Array:
 		if info.elem.id == byte {
 			raw := (^[dynamic]byte)(v.data)
@@ -394,7 +394,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 
 					return slice.Ordering(bytes.compare(a.key^, b.key^))
 				})
-				
+
 				for &entry in entries {
 					io.write_full(e.writer, entry.pre_key[:entry.pre_key[9]]) or_return
 					io.write_full(e.writer, entry.key^) or_return
@@ -485,7 +485,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			id := info.types[i].id
 			data := rawptr(uintptr(v.data) + info.offsets[i])
 			field_any := any{data, id}
-			
+
 			if tag := string(reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "cbor_tag")); tag != "" {
 				if impl, ok := _tag_implementations_id[tag]; ok {
 					return impl->marshal(e, field_any)
@@ -493,17 +493,17 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 
 				nr, ok := strconv.parse_u64_of_base(tag, 10)
 				if !ok { return .Invalid_CBOR_Tag }
-				
+
 				if impl, nok := _tag_implementations_nr[nr]; nok {
 					return impl->marshal(e, field_any)
 				}
-				
+
 				err_conv(_encode_u64(e, nr, .Tag)) or_return
 			}
 
 			return marshal_into(e, field_any)
 		}
-		
+
 		n: u64; {
 			for _, i in info.names[:info.field_count] {
 				if field_name(info, i) != "-" {

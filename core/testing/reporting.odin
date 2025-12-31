@@ -76,7 +76,7 @@ make_report :: proc(internal_tests: []Internal_Test) -> (report: Report, error: 
 	// This loop assumes the tests are sorted by package already.
 	for it, index in internal_tests {
 		if cur_pkg != it.pkg {
-			#no_bounds_check { 
+			#no_bounds_check {
 				append(&packages, Package_Run {
 					name = cur_pkg,
 					tests = report.all_tests[pkg_start:index],

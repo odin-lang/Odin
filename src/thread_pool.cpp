@@ -155,10 +155,10 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 	WorkerTask task = {};
 	task.do_work = proc;
 	task.data = data;
-		
+
 	thread_pool_queue_push(current_thread, task);
 	return true;
-}	
+}
 
 gb_internal void thread_pool_wait(ThreadPool *pool) {
 	WorkerTask task;
@@ -246,4 +246,3 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 
 	return 0;
 }
-

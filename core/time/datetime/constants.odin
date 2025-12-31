@@ -134,8 +134,8 @@ seconds or nanos to a moment, that are then normalized within their respective
 ranges.
 */
 Delta :: struct {
-	days:    i64, 
-	seconds: i64, 
+	days:    i64,
+	seconds: i64,
 	nanos:   i64,
 }
 

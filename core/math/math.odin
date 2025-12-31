@@ -264,7 +264,7 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 	mask  :: F64_MASK
 	shift :: F64_SHIFT
 	bias  :: F64_BIAS
-	
+
 	switch {
 	case val == 0:
 		return val
@@ -277,14 +277,14 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 	x := transmute(u64)frac
 	exp += int(x>>shift)&mask - bias
 	if exp < -1075 { // underflow
-		return copy_sign(0, frac) 
+		return copy_sign(0, frac)
 	} else if exp > 1023 { // overflow
 		if frac < 0 {
 			return inf_f64(-1)
 		}
 		return inf_f64(+1)
 	}
-	
+
 	m: f64 = 1
 	if exp < -1022 { // denormal
 		exp += 53
@@ -292,7 +292,7 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 	}
 	x &~= mask << shift
 	x |= u64(exp+bias) << shift
-	return m * transmute(f64)x	
+	return m * transmute(f64)x
 }
 @(require_results) ldexp_f16   :: proc "contextless" (val: f16, exp: int) -> f16 { return f16(ldexp_f64(f64(val), exp)) }
 @(require_results) ldexp_f32   :: proc "contextless" (val: f32, exp: int) -> f32 { return f32(ldexp_f64(f64(val), exp)) }
@@ -304,7 +304,7 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 @(require_results) ldexp_f64be :: proc "contextless" (val: f64be, exp: int) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp)) }
 // ldexp is the inverse of frexp
 // it returns val * 2**exp.
-// 
+//
 // Special cases:
 // 	ldexp(+0,   exp) = +0
 // 	ldexp(-0,   exp) = -0
@@ -681,8 +681,8 @@ trunc_f64 :: proc "contextless" (x: f64) -> f64 {
 // Removes the fractional part of the value, i.e. rounds towards zero.
 trunc :: proc{
 	trunc_f16, trunc_f16le, trunc_f16be,
-	trunc_f32, trunc_f32le, trunc_f32be, 
-	trunc_f64, trunc_f64le, trunc_f64be, 
+	trunc_f32, trunc_f32le, trunc_f32be,
+	trunc_f64, trunc_f64le, trunc_f64be,
 }
 
 @(require_results)
@@ -1249,7 +1249,7 @@ frexp_f64 :: proc "contextless" (f: f64) -> (significand: f64, exponent: int) {
 	mask  :: F64_MASK
 	shift :: F64_SHIFT
 	bias  :: F64_BIAS
-	
+
 	switch {
 	case f == 0:
 		return 0, 0
@@ -1257,7 +1257,7 @@ frexp_f64 :: proc "contextless" (f: f64) -> (significand: f64, exponent: int) {
 		return f, 0
 	}
 	f := f
-	
+
 	f, exponent = normalize_f64(f)
 	x := transmute(u64)f
 	exponent += int((x>>shift)&mask) - bias + 1
@@ -1281,7 +1281,7 @@ frexp_f64be :: proc "contextless" (x: f64be) -> (significand: f64be, exponent: i
 // It returns a significand and exponent satisfying x == significand * 2**exponent
 // with the absolute value of significand in the intervalue of [0.5, 1).
 //
-// Special cases: 
+// Special cases:
 // 	frexp(+0)   = +0,   0
 // 	frexp(-0)   = -0,   0
 // 	frexp(+inf) = +inf, 0
@@ -1290,7 +1290,7 @@ frexp_f64be :: proc "contextless" (x: f64be) -> (significand: f64be, exponent: i
 frexp :: proc{
 	frexp_f16, frexp_f16le, frexp_f16be,
 	frexp_f32, frexp_f32le, frexp_f32be,
-	frexp_f64, frexp_f64le, frexp_f64be, 
+	frexp_f64, frexp_f64le, frexp_f64be,
 }
 
 
@@ -2108,7 +2108,7 @@ tanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/s_asinh.c
-	// and came with this notice. 
+	// and came with this notice.
 	//
 	// ====================================================
 	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -2118,13 +2118,13 @@ asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// software is freely granted, provided that this notice
 	// is preserved.
 	// ====================================================
-	
+
 	LN2       :: 0h3FE62E42FEFA39EF
 	NEAR_ZERO :: 1.0 / (1 << 28)
 	LARGE     :: 1 << 28
-	
+
 	x := f64(y)
-	
+
 	if is_nan(x) || is_inf(x) {
 		return T(x)
 	}
@@ -2144,7 +2144,7 @@ asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	case:
 		temp = log1p(x + x*x/(1 + sqrt(1 + x*x)))
 	}
-	
+
 	if sign {
 		temp = -temp
 	}
@@ -2155,7 +2155,7 @@ asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/e_acosh.c
-	// and came with this notice. 
+	// and came with this notice.
 	//
 	// ====================================================
 	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -2165,7 +2165,7 @@ acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// software is freely granted, provided that this notice
 	// is preserved.
 	// ====================================================
-	
+
 	LARGE :: 1<<28
 	LN2 :: 0h3FE62E42FEFA39EF
 	x := f64(y)
@@ -2187,7 +2187,7 @@ acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 atanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/e_atanh.c
-	// and came with this notice. 
+	// and came with this notice.
 	//
 	// ====================================================
 	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.

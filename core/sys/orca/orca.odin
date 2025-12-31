@@ -9,7 +9,7 @@ char :: c.char
 
 // currently missing in the api.json
 window :: distinct u64
-    
+
 // currently missing in the api.json
 pool :: struct {
 	arena: arena,
@@ -225,13 +225,13 @@ log_level :: enum u32 {
 foreign {
 	/*
 	Abort the application, showing an error message.
-	
+
 	This function should not be called directly by user code, which should use the `OC_ABORT` macro instead, as the macro takes care of filling in the source location parameters of the function.
 	*/
 	abort_ext :: proc(file: cstring, function: cstring, line: i32, fmt: cstring, #c_vararg args: ..any) -> ! ---
 	/*
 	Tigger a failed assertion. This aborts the application, showing the failed assertion and an error message.
-	
+
 	This function should not be called directly by user code, which should use the `OC_ASSERT` macro instead. The macro checks the assert condition and calls the function if it is false. It also takes care of filling in the source location parameters of the function.
 	*/
 	assert_fail :: proc(file: cstring, function: cstring, line: i32, src: cstring, fmt: cstring, #c_vararg args: ..any) -> ! ---
@@ -239,7 +239,7 @@ foreign {
 	log_set_level :: proc(level: log_level) ---
 	/*
 	Log a message to the console.
-	
+
 	This function should not be called directly by user code, which should use the `oc_log_XXX` family of macros instead. The macros take care of filling in the message level and source location parameters of the function.
 	*/
 	log_ext :: proc(level: log_level, function: cstring, file: cstring, line: i32, fmt: cstring, #c_vararg args: ..any) ---
@@ -366,9 +366,9 @@ foreign {
 	arena_scope_end :: proc(scope: arena_scope) ---
 	/*
 	Begin a scratch scope. This creates a memory scope on a per-thread, global "scratch" arena. This allows easily creating temporary memory for scratch computations or intermediate results, in a stack-like fashion.
-	
+
 	If you must return results in an arena passed by the caller, and you also use a scratch arena to do intermediate computations, beware that the results arena could itself be a scatch arena. In this case, you have to be careful not to intermingle your scratch computations with the final result, or clear your result entirely. You can either:
-	
+
 	- Allocate memory for the result upfront and call `oc_scratch_begin` afterwards, if possible.
 	- Use `oc_scratch_begin_next()` and pass it the result arena, to get a scratch arena that does not conflict with it.
 	*/
@@ -470,7 +470,7 @@ foreign {
 	str8_list_join :: proc(arena: ^arena, list: str8_list) -> str8 ---
 	/*
 	Split a list into a string list according to separators.
-	
+
 	No string copies are made. The elements of the resulting string list refer to subsequences of the input string.
 	*/
 	str8_split :: proc(arena: ^arena, str: str8, separators: str8_list) -> str8_list ---
@@ -490,7 +490,7 @@ foreign {
 	str16_list_join :: proc(arena: ^arena, list: str16_list) -> str16 ---
 	/*
 	Split a list into a string list according to separators.
-	
+
 	No string copies are made. The elements of the resulting string list refer to subsequences of the input string.
 	*/
 	str16_split :: proc(arena: ^arena, str: str16, separators: str16_list) -> str16_list ---
@@ -510,7 +510,7 @@ foreign {
 	str32_list_join :: proc(arena: ^arena, list: str32_list) -> str32 ---
 	/*
 	Split a list into a string list according to separators.
-	
+
 	No string copies are made. The elements of the resulting string list refer to subsequences of the input string.
 	*/
 	str32_split :: proc(arena: ^arena, str: str32, separators: str32_list) -> str32_list ---
@@ -1409,9 +1409,9 @@ cap_type :: enum u32 {
 
 // A struct describing the metrics of a font.
 font_metrics :: struct {
-	// The ascent from the baseline to the top of the line (a positive value means the top line is above the baseline). 
+	// The ascent from the baseline to the top of the line (a positive value means the top line is above the baseline).
 	ascent: f32,
-	// The descent from the baseline to the bottom line (a positive value means the bottom line is below the baseline). 
+	// The descent from the baseline to the bottom line (a positive value means the bottom line is below the baseline).
 	descent: f32,
 	// The gap between two lines of text.
 	lineGap: f32,
@@ -1461,7 +1461,7 @@ foreign {
 	surface_destroy :: proc(surface: surface) ---
 	/*
 	Get a surface's size.
-	
+
 	The size is returned in device-independent "points". To get the size in pixels, multiply the size in points by the scaling factor returned by `oc_surface_contents_scaling()`.
 	*/
 	surface_get_size :: proc(surface: surface) -> vec2 ---
@@ -2142,4 +2142,3 @@ foreign {
 	ui_radio_group :: proc(key: cstring, info: ^ui_radio_group_info) -> ui_radio_group_info ---
 	ui_radio_group_str8 :: proc(key: str8, info: ^ui_radio_group_info) -> ui_radio_group_info ---
 }
-

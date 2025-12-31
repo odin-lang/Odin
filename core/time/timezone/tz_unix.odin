@@ -87,7 +87,7 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 	if tzdir_ok {
 		region_path := filepath.join({tzdir_str, reg_str}, allocator)
 		defer delete(region_path, allocator)
-		
+
 		if tz_reg, ok := load_tzif_file(region_path, reg_str, allocator); ok {
 			return tz_reg, true
 		}

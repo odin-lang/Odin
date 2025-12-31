@@ -97,7 +97,7 @@ OPEN_FLAG_WRONLY :: 0x0001 /* open for writing only */
 OPEN_FLAG_RDWR   :: 0x0002 /* open for reading and writing */
 
 /* mask for above rd/wr/rdwr flags */
-MASK_ACCMODE      :: 0x0003 
+MASK_ACCMODE      :: 0x0003
 
 OPEN_FLAG_NONBLOCK     :: 0x00000004 /* no delay */
 OPEN_FLAG_APPEND       :: 0x00000008 /* set append mode */
@@ -131,7 +131,7 @@ __darwin_suseconds_t :: i32
 time_t :: __darwin_time_t
 dev_t :: __darwin_dev_t
 mode_t :: u16
-nlink_t :: u16  
+nlink_t :: u16
 uid_t :: u16
 gid_t :: u16
 off_t :: __darwin_off_t
@@ -139,7 +139,7 @@ blkcnt_t :: __darwin_blkcnt_t
 blksize_t :: __darwin_blksize_t
 pid_t :: __darwin_pid_t
 
-stat :: __DARWIN_STRUCT_STAT64 
+stat :: __DARWIN_STRUCT_STAT64
 timeval :: _STRUCT_TIMEVAL
 
 /*--==========================================================================--*/
@@ -154,13 +154,13 @@ __DARWIN_STRUCT_STAT64 :: struct {
 	st_gid_t: gid_t,          /* [XSI] Group ID of the file */
 	st_rdev: dev_t,           /* [XSI] Device ID */
 
-	// __DARWIN_STRUCT_STAT64_TIMES 
-	st_atime: time_t,      /* [XSI] Time of last access */ 
-	st_atimensec: i32,     /* nsec of last access */ 
+	// __DARWIN_STRUCT_STAT64_TIMES
+	st_atime: time_t,      /* [XSI] Time of last access */
+	st_atimensec: i32,     /* nsec of last access */
 	st_mtime: time_t,      /* [XSI] Last data modification time */
-	st_mtimensec: i32,     /* last data modification nsec */ 
-	st_ctime: time_t,      /* [XSI] Time of last status change */ 
-	st_ctimensec: u32,     /* nsec of last status change */ 
+	st_mtimensec: i32,     /* last data modification nsec */
+	st_ctime: time_t,      /* [XSI] Time of last status change */
+	st_ctimensec: u32,     /* nsec of last status change */
 	st_birthtime: time_t,  /*  File creation time(birth)  */
 	st_birthtimensec: i32, /* nsec of File creation time */
 	// end __DARWIN_STRUCT_STAT64_TIMES
@@ -235,7 +235,7 @@ syscall_fsync :: #force_inline proc "contextless" (fildes: c.int) -> bool {
 syscall_write :: #force_inline proc "contextless" (fildes: c.int, buf: ^byte, nbyte: u64) -> bool {
 	return !(cast(bool)intrinsics.syscall(unix_offset_syscall(.write),  uintptr(fildes), uintptr(buf), uintptr(nbyte)))
 }
- 
+
 syscall_read :: #force_inline proc "contextless" (fildes: c.int, buf: ^byte, nbyte: u64) -> i64 {
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.read), uintptr(fildes), uintptr(buf), uintptr(nbyte))
 }
@@ -346,7 +346,7 @@ syscall_sysctl :: #force_inline proc "contextless" (name: [^]c.int, namelen: c.s
 
 syscall_copyfile ::  #force_inline proc "contextless" (from: cstring, to: cstring, state: rawptr, flags: u32) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.copyfile), transmute(uintptr)from, transmute(uintptr)to, uintptr(state), uintptr(flags))
-} 
+}
 
 // think about this? last arg should be more than one
 syscall_fcntl :: #force_inline proc "contextless" (fd: c.int, cmd: c.int, other: rawptr) -> c.int {
@@ -378,7 +378,7 @@ syscall_mmap :: #force_inline proc "contextless" (addr: ^u8, len: u64, port: c.i
 }
 
 syscall_flock :: #force_inline proc "contextless" (fd: c.int, operation: c.int) -> c.int {
-	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.flock), uintptr(fd), uintptr(operation)) 
+	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.flock), uintptr(fd), uintptr(operation))
 }
 
 syscall_utimes :: #force_inline proc "contextless" (path: cstring, times: ^timeval) -> c.int {
@@ -403,7 +403,7 @@ syscall_proc_info :: #force_inline proc "contextless" (num: c.int, pid: u32, fla
 
 syscall_openat :: #force_inline proc "contextless" (fd: int, path: cstring, oflag: u32, mode: u32) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.openat), uintptr(fd), transmute(uintptr)path, uintptr(oflag), uintptr(mode))
-} 
+}
 
 syscall_getentropy :: #force_inline proc "contextless" (buf: [^]u8, buflen: u64) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(buf), uintptr(buflen))

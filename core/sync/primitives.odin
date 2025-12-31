@@ -18,7 +18,7 @@ section, and thus prevent access to same piece of memory by multiple threads, at
 the same time.
 
 Mutex's zero-initializzed value represents an initial, *unlocked* state.
- 
+
 If another thread tries to acquire the lock, while it's already held (typically
 by another thread), the thread's execution will be blocked, until the lock is
 released. Code or memory that is "surrounded" by a mutex lock and unlock
@@ -578,8 +578,8 @@ futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duratio
 	}
 	if duration <= 0 {
 		return false
-	}	
-	
+	}
+
 	return _futex_wait_with_timeout(f, expected, duration)
 }
 

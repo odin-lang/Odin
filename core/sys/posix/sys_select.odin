@@ -33,7 +33,7 @@ foreign lib {
 	) -> c.int ---
 
 	/*
-	Equivalent to pselect() except a more specific timeout resolution (nanoseconds), 
+	Equivalent to pselect() except a more specific timeout resolution (nanoseconds),
 	does not have a signal mask, and may modify the timeout.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pselect.html ]]

@@ -242,5 +242,3 @@ template <typename T>
 gb_internal PtrSetIterator<T> end(PtrSet<T> &set) noexcept {
 	return PtrSetIterator<T>{&set, set.capacity};
 }*/
-
-

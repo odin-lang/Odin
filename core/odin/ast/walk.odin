@@ -430,4 +430,3 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 
 	v->visit(nil)
 }
-

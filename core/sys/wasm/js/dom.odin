@@ -44,7 +44,6 @@ get_element_key_string :: proc "contextless" (id: string, key: string, buf: []by
 	}
 	n := _get_element_key_string(id, key, buf)
 	return string(buf[:n])
-
 }
 
 

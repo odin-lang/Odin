@@ -13,18 +13,18 @@ assert_vendor() {
 }
 
 remove_windows_libraries() {
-	find . -type f -name '*.dll' | xargs rm -f 
+	find . -type f -name '*.dll' | xargs rm -f
 	find . -type f -name '*.lib' | xargs rm -f
 	find . -type d -name 'windows' | xargs rm -rf
 }
 
 remove_macos_libraries() {
-	find . -type f -name '*.dylib' | xargs rm -f 
+	find . -type f -name '*.dylib' | xargs rm -f
 	find . -type d -name '*macos*' | xargs rm -rf
 }
 
 remove_linux_libraries() {
-	find . -type f -name '*.so' | xargs rm -f 
+	find . -type f -name '*.so' | xargs rm -f
 	find . -type d -name 'linux' | xargs rm -rf
 }
 

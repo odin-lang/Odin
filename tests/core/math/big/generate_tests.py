@@ -566,7 +566,7 @@ if __name__ == '__main__':
 		print(fmt_string.format(name=test_proc.__name__, test_count=count))
 
 	for BITS, ITERATIONS in BITS_AND_ITERATIONS:
-		print()		
+		print()
 		print("---- math/big with two random {bits:,} bit numbers ----".format(bits=BITS))
 		print()
 
@@ -641,7 +641,7 @@ if __name__ == '__main__':
 
 			print(fmt_string.format(name=test_proc.__name__, test_count=count))
 
-	print()		
+	print()
 	print("---- THE END ----")
 
 	vectors.write("}")

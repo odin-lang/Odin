@@ -829,7 +829,7 @@ This procedure sleeps for the duration specified by `d`, very accurately.
 the worst case. To get the same kind of accuracy as on Linux, have your program
 call `windows.timeBeginPeriod(1)` to tell Windows to use a more accurate timer
 for your process. Additionally your program should call `windows.timeEndPeriod(1)`
-once you're done with `accurate_sleep`. 
+once you're done with `accurate_sleep`.
 */
 accurate_sleep :: proc "contextless" (d: Duration) {
 	to_sleep, estimate, mean, m2, count: Duration

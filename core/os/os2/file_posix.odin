@@ -52,7 +52,7 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 	}
 
 	sys_flags := posix.O_Flags{.NOCTTY, .CLOEXEC}
-	
+
 	if .Write in flags {
 		if .Read in flags {
 			sys_flags += {.RDWR}
@@ -127,7 +127,7 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 	}
 	defer if err != nil { posix.close(fd) }
 
-	clone = __new_file(fd, file_allocator())	
+	clone = __new_file(fd, file_allocator())
 	clone_impl := (^File_Impl)(clone.impl)
 	clone_impl.cname = clone_to_cstring(impl.name, file_allocator()) or_return
 	clone_impl.name  = string(clone_impl.cname)

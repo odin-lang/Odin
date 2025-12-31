@@ -127,7 +127,7 @@ semaphore_flag :: enum u32 {
 	CAN_INTERRUPT      = intrinsics.constant_log2(0x01), // acquisition of the semaphore can be interrupted (system use only)
 	CHECK_PERMISSION   = intrinsics.constant_log2(0x04), // ownership will be checked (system use only)
 	KILL_CAN_INTERRUPT = intrinsics.constant_log2(0x20), // acquisition of the semaphore can be interrupted by SIGKILL[THR], even if not CAN_INTERRUPT (system use only)
-	
+
 	// release_sem_etc() only flags
 	DO_NOT_RESCHEDULE       = intrinsics.constant_log2(0x02), // thread is not rescheduled
 	RELEASE_ALL             = intrinsics.constant_log2(0x08), // all waiting threads will be woken up, count will be zeroed
@@ -236,7 +236,7 @@ thread_priority :: enum i32 {
 
 FIRST_REAL_TIME_PRIORITY :: thread_priority.REAL_TIME_PRIORITY
 
-// time base for snooze_*(), compatible with the clockid_t constants defined in <time.h> 
+// time base for snooze_*(), compatible with the clockid_t constants defined in <time.h>
 SYSTEM_TIMEBASE :: 0
 
 thread_func :: #type proc "c" (rawptr) -> status_t

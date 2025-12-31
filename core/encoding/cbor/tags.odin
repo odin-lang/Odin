@@ -68,7 +68,7 @@ Tag_Unmarshal_Proc :: #type proc(self: ^Tag_Implementation, d: Decoder, tag_nr: 
 Tag_Marshal_Proc   :: #type proc(self: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_Error
 
 // When encountering a tag in the CBOR being unmarshalled, the implementation is used to unmarshal it.
-// When encountering a struct tag like `cbor_tag:"Tag_Number"`, the implementation is used to marshal it. 
+// When encountering a struct tag like `cbor_tag:"Tag_Number"`, the implementation is used to marshal it.
 _tag_implementations_nr: map[Tag_Number]Tag_Implementation
 
 // Same as the number implementations but friendlier to use as a struct tag.
@@ -113,7 +113,7 @@ tags_register_defaults :: proc "contextless" () {
 
 	// These following tags are registered at the type level and don't require an opt-in struct tag.
 	// Encoding these types on its own make no sense or no data is lost to encode it.
-	
+
 	// En/Decoding of `big.Int` fields by default.
 	tag_register_type({nil, tag_big_unmarshal, tag_big_marshal}, TAG_UNSIGNED_BIG_NR, big.Int)
 	tag_register_type({nil, tag_big_unmarshal, tag_big_marshal}, TAG_NEGATIVE_BIG_NR, big.Int)
@@ -230,7 +230,7 @@ tag_big_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_E
 
 		is_neg, err := big.is_negative(&vv, mem.panic_allocator())
 		assert(err == nil, "should only error if not initialized, which has been checked")
-		
+
 		tnr: u8 = TAG_NEGATIVE_BIG_NR if is_neg else TAG_UNSIGNED_BIG_NR
 		_encode_u8(e.writer, tnr, .Tag) or_return
 
@@ -260,7 +260,7 @@ tag_cbor_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, v:
 	case .Bytes:
 		ti := reflect.type_info_base(type_info_of(v.id))
 		return _unmarshal_bytes(d, v, ti, hdr, add)
-		
+
 	case: return .Bad_Tag_Value
 	}
 }
@@ -327,14 +327,14 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		raw  := (^[]byte)(v.data)
 		raw^  = base64.decode(bytes) or_return
 		return
-		
+
 	case reflect.Type_Info_Dynamic_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
 		decoded := base64.decode(bytes) or_return
-		
+
 		raw           := (^mem.Raw_Dynamic_Array)(v.data)
 		raw.data       = raw_data(decoded)
 		raw.len        = len(decoded)
@@ -348,7 +348,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
 		if base64.decoded_len(bytes) > t.count { return _unsupported(v, hdr) }
-		
+
 		slice := ([^]byte)(v.data)[:len(bytes)]
 		copy(slice, base64.decode(bytes) or_return)
 		return

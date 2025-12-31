@@ -7629,7 +7629,3 @@ VisibleFunctionTable_setFunctions :: #force_inline proc "c" (self: ^VisibleFunct
 VisibleFunctionTable_gpuResourceID :: #force_inline proc "c" (self: ^VisibleFunctionTable) -> ResourceID {
 	return msgSend(ResourceID, self, "gpuResourceID")
 }
-
-
-
-

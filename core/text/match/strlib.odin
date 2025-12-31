@@ -142,7 +142,7 @@ utf8_next :: proc(bytes: string, a: int) -> int {
 @(require_results)
 check_capture :: proc(ms: ^Match_State, l: rune) -> (int, Error) {
 	l := int(l - '1')
-	
+
 	if l < 0 || l >= ms.level || ms.capture[l].len == CAP_UNFINISHED {
 		return 0, .Invalid_Capture_Index
 	}
@@ -171,7 +171,7 @@ class_end :: proc(ms: ^Match_State, p: int) -> (step: int, err: Error) {
 	ch := utf8_advance(ms.pattern, &step) or_return
 
 	switch ch {
-	case L_ESC: 
+	case L_ESC:
 		if step == len(ms.pattern) {
 			err = .Malformed_Pattern
 			return
@@ -179,7 +179,7 @@ class_end :: proc(ms: ^Match_State, p: int) -> (step: int, err: Error) {
 
 		_ = utf8_advance(ms.pattern, &step) or_return
 
-	case '[': 
+	case '[':
 		// fine with step by 1
 		if step + 1 < len(ms.pattern) && ms.pattern[step] == '^' {
 			step += 1
@@ -227,7 +227,7 @@ match_bracket_class :: proc(ms: ^Match_State, c: rune, p, ec: int) -> (sig: bool
 		char := utf8_advance(ms.pattern, &p) or_return
 
 		// e.g. %a
-		if char == L_ESC { 
+		if char == L_ESC {
 			next := utf8_advance(ms.pattern, &p) or_return
 
 			if match_class(c, next) {
@@ -267,7 +267,7 @@ single_match :: proc(ms: ^Match_State, s, p, ep: int) -> (matched: bool, schar_s
 
 	switch pchar {
 	case '.': matched = true
-	case L_ESC: 
+	case L_ESC:
 		pchar_next, _ := utf8_peek(ms.pattern[p + psize:]) or_return
 		matched = match_class(schar, pchar_next)
 	case '[':
@@ -388,7 +388,7 @@ start_capture :: proc(ms: ^Match_State, s, p, what: int) -> (res: int, err: Erro
 @(require_results)
 end_capture :: proc(ms: ^Match_State, s, p: int) -> (res: int, err: Error) {
 	l := capture_to_close(ms) or_return
-	
+
 	// TODO double check, could do string as int index
 	ms.capture[l].len = s - ms.capture[l].init
 
@@ -423,26 +423,26 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 	// NOTE we can walk by ascii steps if we know the characters are ascii
 	char, _ := utf8_peek(ms.pattern[p:]) or_return
 	switch char {
-	case '(': 
+	case '(':
 		if p + 1 < len(ms.pattern) && ms.pattern[p + 1] == ')' {
 			s = start_capture(ms, s, p + 2, CAP_POSITION) or_return
 		} else {
 			s = start_capture(ms, s, p + 1, CAP_UNFINISHED) or_return
 		}
 
-	case ')': 
+	case ')':
 		s = end_capture(ms, s, p + 1) or_return
 
-	case '$': 
+	case '$':
 		if p + 1 != len(ms.pattern) {
 			return match_default(ms, s, p)
-		} 
+		}
 
 		if len(ms.src) != s {
 			s = INVALID
 		}
 
-	case L_ESC: 
+	case L_ESC:
 		// stop short patterns like "%" only
 		if p + 1 >= len(ms.pattern) {
 			err = .OOB
@@ -451,7 +451,7 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 
 		switch ms.pattern[p + 1] {
 		// balanced string
-		case 'b': 
+		case 'b':
 			s = match_balance(ms, s, p + 2) or_return
 			if s != INVALID {
 				// eg after %b()
@@ -461,7 +461,7 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 		// frontier
 		case 'f':
 			p += 2
-			
+
 			if ms.pattern[p] != '[' {
 				return INVALID, .Invalid_Pattern_Capture
 			}
@@ -500,7 +500,7 @@ match :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) {
 		case: return match_default(ms, s, p)
 	}
 
-	case: 
+	case:
 		return match_default(ms, s, p)
 	}
 
@@ -528,7 +528,7 @@ match_default :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) 
 		switch epc {
 		case '?':
 			result := match(ms, s + ssize, ep + 1) or_return
-			
+
 			if result == INVALID {
 				return match(ms, s, ep + 1)
 			}
@@ -554,7 +554,7 @@ push_onecapture :: proc(ms: ^Match_State,  i: int,  s: int, e: int, matches: []M
 			err = .Invalid_Capture_Index
 		}
 	} else {
-		init := ms.capture[i].init 
+		init := ms.capture[i].init
 		length := ms.capture[i].len
 
 		switch length {
@@ -676,8 +676,8 @@ find_aux :: proc(haystack, pattern: string, offset: int, allow_memfind: bool, ma
 			// disallow non advancing match
 			if s == res {
 				err = .Match_Invalid
-			} 
-			
+			}
+
 			// NOTE(Skytrias): first result is reserved for a full match
 			matches[0] = { s, res }
 
@@ -714,7 +714,7 @@ gmatch :: proc(haystack: ^string, pattern: string, captures: ^[MAX_CAPTURES]Matc
 			cap := captures[first]
 			res = haystack[cap.byte_start:cap.byte_end]
 		}
-	} 
+	}
 	if !ok {
 		captures^ = {}
 	}
@@ -766,7 +766,7 @@ Gsub_Proc :: proc(
 	// word match found
 	word:     string,
 	// current haystack for found captures
-	haystack: string, 
+	haystack: string,
 	// found captures - empty for no captures
 	captures: []Match,
 )
@@ -809,7 +809,7 @@ gfind :: proc(haystack: ^string, pattern: string, captures: ^[MAX_CAPTURES]Match
 			cap := captures[0]
 			res = haystack[cap.byte_start:cap.byte_end]
 		}
-	} 
+	}
 	if !ok {
 		captures^ = {}
 	}
@@ -835,7 +835,7 @@ pattern_case_insensitive_builder :: proc(builder: ^strings.Builder, pattern: str
 			strings.write_rune(builder, char)
 		}
 
-		last_percent = char == L_ESC 
+		last_percent = char == L_ESC
 		p = p[size:]
 	}
 
@@ -845,7 +845,7 @@ pattern_case_insensitive_builder :: proc(builder: ^strings.Builder, pattern: str
 @(require_results)
 pattern_case_insensitive_allocator :: proc(pattern: string, cap: int = 256, allocator := context.allocator) -> string {
 	builder := strings.builder_make(0, cap, context.temp_allocator)
-	return pattern_case_insensitive_builder(&builder, pattern)	
+	return pattern_case_insensitive_builder(&builder, pattern)
 }
 
 pattern_case_insensitive :: proc { pattern_case_insensitive_builder, pattern_case_insensitive_allocator }
@@ -880,9 +880,9 @@ matcher_init :: proc(haystack, pattern: string, offset: int = 0) -> (res: Matche
 @(require_results)
 matcher_find :: proc(matcher: ^Matcher) -> (start, end: int, ok: bool) #no_bounds_check {
 	matcher.captures_length, matcher.err = find_aux(
-		matcher.haystack, 
-		matcher.pattern, 
-		matcher.offset, 
+		matcher.haystack,
+		matcher.pattern,
+		matcher.offset,
 		allow_memfind=true,
 		matches=&matcher.captures,
 	)
@@ -897,9 +897,9 @@ matcher_find :: proc(matcher: ^Matcher) -> (start, end: int, ok: bool) #no_bound
 @(require_results)
 matcher_match :: proc(matcher: ^Matcher) -> (word: string, ok: bool) #no_bounds_check {
 	matcher.captures_length, matcher.err = find_aux(
-		matcher.haystack, 
-		matcher.pattern, 
-		matcher.offset, 
+		matcher.haystack,
+		matcher.pattern,
+		matcher.offset,
 		allow_memfind=false,
 		matches=&matcher.captures,
 	)
@@ -932,10 +932,10 @@ matcher_gmatch :: matcher_match_iter
 matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, index: int, ok: bool) {
 	if len(matcher.iter) > 0 {
 		matcher.captures_length, matcher.err = find_aux(
-			matcher.iter, 
-			matcher.pattern, 
-			matcher.offset, 
-			false, 
+			matcher.iter,
+			matcher.pattern,
+			matcher.offset,
+			false,
 			&matcher.captures,
 		)
 
@@ -943,11 +943,11 @@ matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, index: int, ok: b
 			ok = true
 			first := matcher.captures_length > 1 ? 1 : 0
 			match := matcher.captures[first]
-			
+
 			// output
 			res = matcher.iter[match.byte_start:match.byte_end]
 			index = matcher.iter_index
-			
+
 			// advance
 			matcher.iter_index += 1
 			matcher.iter = matcher.iter[match.byte_end:]

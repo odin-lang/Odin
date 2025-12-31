@@ -76,4 +76,3 @@ _cond_signal :: proc "contextless" (c: ^Cond) {
 _cond_broadcast :: proc "contextless" (c: ^Cond) {
 	win32.WakeAllConditionVariable(&c.impl.cond)
 }
-

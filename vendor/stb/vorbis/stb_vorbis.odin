@@ -196,9 +196,9 @@ foreign lib {
 	// When you're done with it, just free() the pointer returned in *output.
 	decode_filename :: proc(filename: cstring, channels, sample_rate: ^c.int, output: ^[^]c.short) -> c.int ---
 	decode_memory :: proc(mem: [^]byte, len: c.int, channels, sample_rate: ^c.int, output: ^[^]c.short) -> c.int ---
-	
-	
-	
+
+
+
 	// create an ogg vorbis decoder from an ogg vorbis stream in memory (note
 	// this must be the entire stream!). on failure, returns NULL and sets *error
 	open_memory :: proc(data: [^]byte, len: c.int,
@@ -294,7 +294,7 @@ foreign lib {
 	// samples in the file, returns 0.
 	get_samples_short_interleaved :: proc(f: ^vorbis, channels: c.int, buffer: [^]c.short,  num_shorts:  c.int) -> c.int ---
 	get_samples_short             :: proc(f: ^vorbis, channels: c.int, buffer: ^[^]c.short, num_samples: c.int) -> c.int ---
-	
+
 }
 
 Error :: enum c.int {

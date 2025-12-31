@@ -7,4 +7,3 @@
 package posix
 
 _IS_SUPPORTED :: false
-

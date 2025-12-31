@@ -293,7 +293,7 @@ def try_download_file(url, out_file):
 			shutil.copyfileobj(response, of)
 	except urllib.error.HTTPError:
 	 	print("Could not download", url)
-	 	return 1	
+	 	return 1
 
 def try_download_and_unpack_zip(suite):
 	url      = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))

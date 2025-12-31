@@ -74,9 +74,9 @@ _futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> (ok: bool) {
 	if u32(atomic_load_explicit(f, .Acquire)) == expect {
 		waitq_unlock(waitq)
 		defer waitq_lock(waitq)
-		
+
 		sig: posix.Signal
-		errno := posix.sigwait(&mask, &sig) 
+		errno := posix.sigwait(&mask, &sig)
 		ok = errno == nil
 	}
 
@@ -116,14 +116,14 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration
 	if u32(atomic_load_explicit(f, .Acquire)) == expect {
 		waitq_unlock(waitq)
 		defer waitq_lock(waitq)
-		
+
 		info: posix.siginfo_t
 		ts := posix.timespec{
 			tv_sec  = posix.time_t(i64(duration / 1e9)),
 			tv_nsec = i64(duration % 1e9),
 		}
 		haiku.sigtimedwait(&mask, &info, &ts)
-		errno := posix.errno() 
+		errno := posix.errno()
 		ok = errno == .EAGAIN || errno == nil
 	}
 

@@ -282,7 +282,7 @@ sinh       :: proc{libc_sinh, libc_sinhf, csinh, csinhf}
 tanh       :: proc{libc_tanh, libc_tanhf, ctanh, ctanhf}
 
 exp        :: proc{libc_exp, libc_expf, cexp, cexpf}
-exp2       :: proc{libc_exp2, libc_exp2f} 
+exp2       :: proc{libc_exp2, libc_exp2f}
 expm1      :: proc{libc_expm1, libc_expm1f}
 frexp      :: proc{libc_frexp, libc_frexpf}
 ilogb      :: proc{libc_ilogb, libc_ilogbf}
@@ -393,7 +393,7 @@ remquof    :: proc{libc_remquof}
 copysignf  :: proc{libc_copysignf}
 nextafterf :: proc{libc_nextafterf}
 
-fdimf      :: proc{libc_fdimf} 
+fdimf      :: proc{libc_fdimf}
 fmaxf      :: proc{libc_fmaxf}
 fminf      :: proc{libc_fminf}
 fmaf       :: proc{libc_fmaf}

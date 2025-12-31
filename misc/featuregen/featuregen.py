@@ -30,12 +30,12 @@ with tempfile.NamedTemporaryFile(suffix=".odin", delete=True) as temp_file:
 			if state == SEEKING_CPUS:
 				if line == "Available CPUs for this target:\n":
 					state = PARSING_CPUS
-			
+
 			elif state == PARSING_CPUS:
 				if line == "Available features for this target:\n":
 					state = PARSING_FEATURES
 					continue
-			
+
 				parts = line.split(" -", maxsplit=1)
 				if len(parts) < 2:
 					continue

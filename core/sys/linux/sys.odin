@@ -105,7 +105,7 @@ fstat :: proc "contextless" (fd: Fd, stat: ^Stat) -> (Errno) {
 	The information is returned in a struct pointed to by `stat` parameter.
 	The difference with stat, fstat is that if the file is a symbolic link,
 	stat and fstat will dereference the link. lstat doesn't dereference symlinks.
-	
+
 	Available since Linux 1.0.
 	For 32-bit systems a different syscall is used that became available since 2.4.
 	Not available on arm64.
@@ -694,7 +694,7 @@ where
 	intrinsics.type_is_pointer(T) ||
 	intrinsics.type_is_multi_pointer(T)
 {
-	return setsockopt_base(sock, cast(int) level, cast(int) opt, val) 
+	return setsockopt_base(sock, cast(int) level, cast(int) opt, val)
 }
 
 setsockopt_tcp :: proc "contextless" (sock: Fd, level: Socket_API_Level_TCP, opt: Socket_TCP_Option, val: $T) -> (Errno)
@@ -1959,10 +1959,10 @@ sigaltstack :: proc "contextless" (stack: ^Sig_Stack, old_stack: ^Sig_Stack) -> 
 
 /*
 	Create a special or ordinary file.
-	
+
 	`mode` parameter contains both the the file mode and the type of the node to create.
 	 ->  Add one of S_IFSOCK, S_IFBLK, S_IFFIFO, S_IFCHR to mode.
-	 
+
 	Available since Linux 1.0.
 	On ARM64 available since Linux 2.6.16.
 */
@@ -1989,7 +1989,7 @@ personality :: proc "contextless" (personality: uint) -> (uint, Errno) {
 
 /*
 	Query information about filesystem.
-	
+
 	Available since Linux 1.0.
 	For 32-bit systems a different syscall is used that became available since 2.6.
 */
@@ -2005,7 +2005,7 @@ statfs :: proc "contextless" (path: cstring, statfs: ^Stat_FS) -> (Errno) {
 
 /*
 	Query information about filesystem by file descriptor.
-	
+
 	Available since Linux 1.0.
 	For 32-bit systems a different syscall is used that became available since 2.6.
 */
@@ -2143,7 +2143,7 @@ prctl :: proc "contextless" (op: i32, args: ..uint) -> (Errno) {
 }
 
 when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
-	/* 
+	/*
 		Set architecture-specific thread state
 		Available since Linux 2.6.19
 	*/
@@ -2153,7 +2153,7 @@ when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 	}
 }
 
-/* 
+/*
 	Display or set the kernel time variables
 	Available since Linux 1.0.
 */
@@ -2189,7 +2189,7 @@ sync :: proc "contextless" () -> (Errno) {
 	return Errno(-ret)
 }
 
-/* 
+/*
 	Switch process accounting on or off
 	Available since Linux 2.3.23
 */
@@ -2207,7 +2207,7 @@ settimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
 	return Errno(-ret)
 }
 
-/* 
+/*
 	Mount filesystem
 	Available since Linux 1.0
 */
@@ -2216,7 +2216,7 @@ mount :: proc "contextless" (source: cstring, target: cstring, filesystemtype: c
 	return Errno(-ret)
 }
 
-/* 
+/*
 	Unmount filesystem
 	Available since Linux 2.1
 */
@@ -2225,7 +2225,7 @@ umount2 :: proc "contextless" (target: cstring, flags: Umount2_Flags) -> (Errno)
 	return Errno(-ret)
 }
 
-/* 
+/*
 	Start swapping to file/device
 	Available since Linux 2.0
 */
@@ -2234,7 +2234,7 @@ swapon :: proc "contextless" (path: cstring, swapflags: Swap_Flags) -> (Errno) {
 	return Errno(-ret)
 }
 
-/* 
+/*
 	Stop swapping to file/device
 	Available since Linux 2.0
 */
@@ -2243,7 +2243,7 @@ swapoff :: proc "contextless" (path: cstring) -> (Errno) {
 	return Errno(-ret)
 }
 
-/* 
+/*
 	Reboot or enable/disable Ctrl-Alt-Del
 	Available since Linux 1.0
 */
@@ -2286,16 +2286,16 @@ when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 	}
 }
 
-/* 
+/*
 	Load a kernel module
 	Available since Linux 2.2
 */
 init_module :: proc "contextless" (module_image: rawptr, size: u32, param_values: cstring) -> (Errno) {
 	ret := syscall(SYS_init_module, module_image, size, cast(rawptr) param_values)
-	return Errno(-ret)	
+	return Errno(-ret)
 }
 
-/* 
+/*
 	Unload a kernel module
 	Available since Linux 2.2
 */
@@ -2582,9 +2582,9 @@ futex :: proc{
 
 /*
 	Open an epoll file descriptor.
-	
+
 	The `size` argument is ignored but must be greater than zero.
-	
+
 	Available since Linux 2.6.
 */
 epoll_create :: proc(size: i32 = 1) -> (Fd, Errno) {
@@ -2707,9 +2707,9 @@ exit_group :: proc "contextless" (code: i32) -> ! {
 
 /*
 	Wait for an I/O event on an epoll file descriptor.
-	
+
 	`timeout` is specified in milliseconds.
-	
+
 	Available since Linux 2.6.
 */
 epoll_wait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32) -> (i32, Errno) {

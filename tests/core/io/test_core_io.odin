@@ -15,7 +15,7 @@ _test_stream :: proc(
 	t: ^testing.T,
 	stream: io.Stream,
 	buffer: []u8,
-	
+
 	reading_consumes: bool = false,
 	resets_on_empty: bool = false,
 	do_destroy: bool = true,
@@ -556,7 +556,7 @@ test_os_file_stream :: proc(t: ^testing.T) {
 	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
 		return
 	}
-	
+
 	stream := os.stream_from_handle(fd)
 
 	bytes_written, write_err := io.write(stream, buf[:])

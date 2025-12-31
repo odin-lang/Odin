@@ -1624,7 +1624,7 @@ PER_MASK        :: 0x00ff
 	entries (i.e. `IPC_` or `SHM_`) denote flags, where `IPC_` are common flags
 	for all SystemV IPC primitives, and `SHM_`, `SEM_` and `MSG_` are specific
 	to shared memory segments, semaphores and message queues respectively.
-	
+
 	These bits overlap, because they are meant to be used within the
 	context of specific procedures. Creation flags, used for `*get` procedures,
 	and usage flags used by all other IPC procedures. Do not mix creation and

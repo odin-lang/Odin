@@ -125,7 +125,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 			IPV6_MULTICAST_IF   :: 24
 			IPV6_MULTICAST_LOOP :: 26
 			IPV6_UNICAST_HOPS   :: 27
-			IPV6_V6ONLY         :: 30	
+			IPV6_V6ONLY         :: 30
 		} else {
 			IPV6_JOIN_GROUP     :: 12
 			IPV6_LEAVE_GROUP    :: 13

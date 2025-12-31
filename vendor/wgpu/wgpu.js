@@ -289,7 +289,7 @@ class WebGPUInterface {
 		this.mem.storeUint(off(this.mem.intSize), availableFeatures.length);
 		this.mem.storeI32(off(4), featuresAddr);
 
-		off = this.struct(featuresAddr);	
+		off = this.struct(featuresAddr);
 		for (let i = 0; i < availableFeatures.length; i += 1) {
 			this.mem.storeI32(off(4), availableFeatures[i]);
 		}
@@ -563,7 +563,7 @@ class WebGPUInterface {
 	RenderPassTimestampWritesPtr(ptr) {
 		return this.ComputePassTimestampWritesPtr(ptr);
 	}
-	
+
 	/**
 	 * @param {number} start
 	 * @returns {GPUOrigin3D}
@@ -1374,7 +1374,7 @@ class WebGPUInterface {
 				offset = this.unwrapBigInt(offset);
 				size   = this.unwrapBigInt(size);
 
-				const callbackInfo = this.CallbackInfo(callbackInfoPtr);	
+				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
 				buffer.buffer.mapAsync(mode, offset, size)
 					.catch((e) => {
 						const messageAddr = this.makeMessageArg(e.message);
@@ -1779,7 +1779,7 @@ class WebGPUInterface {
 						this.sizes.BindGroupEntry[0],
 					),
 				};
-			
+
 				const bindGroup = device.createBindGroup(descriptor);
 				return this.bindGroups.create(bindGroup);
 			},
@@ -2213,7 +2213,7 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} deviceIdx
-			 * @param {number} filterInt 
+			 * @param {number} filterInt
 			 */
 			wgpuDevicePushErrorScope: (deviceIdx, filterInt) => {
 				const device = this.devices.get(deviceIdx);
@@ -2288,7 +2288,7 @@ class WebGPUInterface {
 				this.mem.storeUint(off(this.mem.intSize), availableFeatures.length);
 				this.mem.storeI32(off(4), featuresAddr);
 
-				off = this.struct(featuresAddr);	
+				off = this.struct(featuresAddr);
 				for (let i = 0; i < availableFeatures.length; i += 1) {
 					this.mem.storeI32(off(4), availableFeatures[i]);
 				}
@@ -2433,7 +2433,7 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} queueIdx
-			 * @param {number} bufferIdx 
+			 * @param {number} bufferIdx
 			 * @param {BigInt} bufferOffset
 			 * @param {number} dataPtr
 			 * @param {number|BigInt} size
@@ -2790,7 +2790,7 @@ class WebGPUInterface {
 					dynamicOffsetsPtr,
 					(ptr) => this.mem.loadU32(ptr),
 					4
-				);	
+				);
 
 				renderPassEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
 			},
@@ -3117,7 +3117,7 @@ class WebGPUInterface {
 			},
 
 			/* ---------------------- Texture ---------------------- */
-			
+
 			/**
 			 * @param {number} textureIdx
 			 * @param {0|number} descriptorPtr
@@ -3302,7 +3302,7 @@ class WebGPUObjectManager {
 
 		this.objects[idx-1].references += 1;
 	}
-	
+
 	interface(withLabelSetter = false) {
 		const inter = {};
 		inter[`wgpu${this.name}AddRef`] = this.reference.bind(this);

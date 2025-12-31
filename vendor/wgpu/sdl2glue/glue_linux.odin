@@ -4,7 +4,7 @@ import "vendor:sdl2"
 import "vendor:wgpu"
 
 GetSurface :: proc(instance: wgpu.Instance, window: ^sdl2.Window) -> wgpu.Surface {
-	window_info: sdl2.SysWMinfo 
+	window_info: sdl2.SysWMinfo
 	sdl2.VERSION(&window_info.version)
 	sdl2.GetWindowWMInfo(window, &window_info)
 

@@ -3,13 +3,13 @@ package test_strlib
 import "core:text/match"
 import "core:testing"
 
-// find correct byte offsets 
+// find correct byte offsets
 @test
 test_find :: proc(t: ^testing.T) {
 	Entry :: struct {
 		s, p: string,
 		offset: int,
-		
+
 		match: struct {
 			start, end: int, // expected start/end
 			ok: bool,
@@ -55,7 +55,7 @@ test_match :: proc(t: ^testing.T) {
 	Entry :: struct {
 		s, p: string,
 		result: string, // expected start/end
-		ok: bool,	
+		ok: bool,
 	}
 
 	ENTRIES :: [?]Entry {
@@ -63,12 +63,12 @@ test_match :: proc(t: ^testing.T) {
 		{ "aaab", ".*b", "aaab", true },
 		{ "aaa", ".*a", "aaa", true },
 		{ "b", ".*b", "b", true },
-		
+
 		// plus
 		{ "aaab", ".+b", "aaab", true },
 		{ "aaa", ".+a", "aaa", true },
 		{ "b", ".+b", "", false },
-		
+
 		// question
 		{ "aaab", ".?b", "ab", true },
 		{ "aaa", ".?a", "aa", true },
@@ -94,9 +94,9 @@ test_match :: proc(t: ^testing.T) {
 		{ "ab23", "%d+", "23", true },
 
 		// %l lower characters (a-z)
-		{ "lowerCASE", "%l+", "lower", true }, 
-		{ "LOWERcase", "%l+", "case", true }, 
-		{ "LOWERcase", "%L+", "LOWER", true }, 
+		{ "lowerCASE", "%l+", "lower", true },
+		{ "LOWERcase", "%l+", "case", true },
+		{ "LOWERcase", "%L+", "LOWER", true },
 
 		// %p punctionation characters (!, ?, &, ...)
 		{ "!?&", "%p+", "!?&", true },
@@ -109,14 +109,14 @@ test_match :: proc(t: ^testing.T) {
 		{ "abc   ", "%s+", "   ", true },
 
 		// %u upper characters (A-Z)
-		{ "lowerCASE", "%u+", "CASE", true }, 
-		{ "LOWERcase", "%u+", "LOWER", true }, 
+		{ "lowerCASE", "%u+", "CASE", true },
+		{ "LOWERcase", "%u+", "LOWER", true },
 		{ "LOWERcase", "%U+", "case", true },
 
 		// %w alpha numeric (A-Z, a-z, 0-9)
 		{ "0123", "%w+", "0123", true },
 		{ "abcd", "%W+", "", false },
-		{ "ab23", "%w+", "ab23", true },		
+		{ "ab23", "%w+", "ab23", true },
 
 		// %x hexadecimal digits (0x1A, ...)
 		{ "3", "%x", "3", true },
@@ -213,11 +213,11 @@ test_captures :: proc(t: ^testing.T) {
 	temp := Temp { pattern = "(one).+" }
 	compare_captures(t, &temp, " one two", { "one two", "one" })
 	compare_captures(t, &temp, "three", {})
-	
+
 	matches(t, &temp, "one dog", true)
 	matches(t, &temp, "dog one ", true)
 	matches(t, &temp, "dog one", false)
-	
+
 	temp.pattern = "^(%a+)"
 	matches(t, &temp, "one dog", true)
 	matches(t, &temp, " one dog", false)
@@ -242,7 +242,7 @@ test_gmatch :: proc(t: ^testing.T) {
 	{
 		matcher := match.matcher_init("testing this out 123", "%w+")
 		output := [?]string { "testing", "this", "out", "123" }
-		
+
 		for match, index in match.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
 		}
@@ -251,7 +251,7 @@ test_gmatch :: proc(t: ^testing.T) {
 	{
 		matcher := match.matcher_init("#afdde6", "%x%x")
 		output := [?]string { "af", "dd", "e6" }
-		
+
 		for match, index in match.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
 		}
@@ -264,7 +264,7 @@ test_gmatch :: proc(t: ^testing.T) {
 		for match, index in match.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
 		}
-	}		
+	}
 }
 
 @test
@@ -278,7 +278,7 @@ test_gsub :: proc(t: ^testing.T) {
 @test
 test_gfind :: proc(t: ^testing.T) {
 	haystack := "test1 123 test2 123 test3"
-	pattern := "%w+" 
+	pattern := "%w+"
 	captures: [match.MAX_CAPTURES]match.Match
 	s := &haystack
 	output := [?]string { "test1", "123", "test2", "123", "test3" }
@@ -302,7 +302,7 @@ test_frontier :: proc(t: ^testing.T) {
 		index: int,
 		output: [3]string,
 	}
-	
+
 	call :: proc(data: rawptr, word: string, haystack: string, captures: []match.Match) {
 		temp := cast(^Temp) data
 
@@ -343,7 +343,7 @@ test_case_insensitive :: proc(t: ^testing.T) {
 	{
 		pattern := match.pattern_case_insensitive("test", 256, context.temp_allocator)
 		goal := "[tT][eE][sS][tT]"
-		
+
 		testing.expectf(
 			t,
 			pattern == goal,

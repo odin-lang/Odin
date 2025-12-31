@@ -36,7 +36,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 	*/
 
 	/*
-		Calculate the size of the buffer we need, and 
+		Calculate the size of the buffer we need, and
 		Exit if calculating the size returned an error.
 	*/
 	size := radix_size(a, radix, zero_terminate) or_return
@@ -551,7 +551,7 @@ internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_F
 			internal_set(t, W & type_mask)                           or_return
 			internal_shl(a, a, type_bits)                            or_return
 			internal_add(a, a, t)                                    or_return
-		}		
+		}
 	}
 
 	return internal_clamp(a)

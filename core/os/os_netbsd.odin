@@ -445,7 +445,7 @@ foreign libc {
 	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, #c_vararg args: ..any) -> c.int ---
 	@(link_name="fsync")            _unix_fsync         :: proc(fd: Handle) -> c.int ---
 	@(link_name="dup")              _unix_dup           :: proc(fd: Handle) -> Handle ---
-	
+
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
@@ -455,7 +455,7 @@ foreign libc {
 	@(link_name="calloc")           _unix_calloc        :: proc(num, size: c.size_t) -> rawptr ---
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
-	
+
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: [^]byte = nil) -> cstring ---
 	@(link_name="sysctlbyname")     _sysctlbyname       :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
@@ -740,7 +740,7 @@ _stat :: proc(path: string) -> (OS_Stat, Error) {
 _lstat :: proc(path: string) -> (OS_Stat, Error) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	
+
 	// deliberately uninitialized
 	s: OS_Stat = ---
 	res := _unix_lstat(cstr, &s)
@@ -821,7 +821,7 @@ _readlink :: proc(path: string) -> (string, Error) {
 			buf = make([]byte, bufsz)
 		} else {
 			return strings.string_from_ptr(&buf[0], rc), nil
-		}	
+		}
 	}
 
 	return "", Error{}

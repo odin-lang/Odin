@@ -16,7 +16,7 @@ ti_uint :: struct #raw_union {
 @(link_name="__ashlti3", linkage="strong")
 __ashlti3 :: proc "contextless" (a: i128, b: u32) -> i128 {
 	bits :: 64
-	
+
 	input: ti_int = ---
 	result: ti_int = ---
 	input.all = a

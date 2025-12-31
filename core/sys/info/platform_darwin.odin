@@ -20,7 +20,7 @@ init_platform :: proc "contextless" () {
 
 	version: NS.OperatingSystemVersion
 	{
-		NS.scoped_autoreleasepool() 
+		NS.scoped_autoreleasepool()
 
 		info    := NS.ProcessInfo.processInfo()
 		version  = info->operatingSystemVersion()

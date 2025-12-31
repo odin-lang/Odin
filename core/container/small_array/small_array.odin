@@ -168,7 +168,7 @@ Example:
 	get_safe_example :: proc() {
 		a: small_array.Small_Array(5, rune)
 		small_array.push_back(&a, 'A')
-		
+
 		fmt.println(small_array.get_safe(a, 0) or_else 'x')
 		fmt.println(small_array.get_safe(a, 1) or_else 'x')
 	}
@@ -350,11 +350,11 @@ Attempts to add the given element to the end.
 - `a`: A pointer to the small-array
 - `item`: The item to append
 
-**Returns** 
+**Returns**
 - true if there was enough space to fit the element, false otherwise
 
 Example:
-	
+
 	import "core:container/small_array"
 	import "core:fmt"
 
@@ -392,11 +392,11 @@ through get_ptr(_save) to reference incorrect elements.
 - `a`: A pointer to the small-array
 - `item`: The item to append
 
-**Returns** 
+**Returns**
 - true if there was enough space to fit the element, false otherwise
 
 Example:
-	
+
 	import "core:container/small_array"
 	import "core:fmt"
 
@@ -432,7 +432,7 @@ This operation assumes that the small-array is not empty.
 **Inputs**
 - `a`: A pointer to the small-array
 
-**Returns** 
+**Returns**
 - a copy of the element removed from the end of the small-array
 
 Example:
@@ -471,7 +471,7 @@ through get_ptr(_save) to reference incorrect elements.
 **Inputs**
 - `a`: A pointer to the small-array
 
-**Returns** 
+**Returns**
 - a copy of the element removed from the beginning of the small-array
 
 Example:
@@ -509,7 +509,7 @@ Unlike `pop_back`, it does not assume that the array is non-empty.
 **Inputs**
 - `a`: A pointer to the small-array
 
-**Returns** 
+**Returns**
 - a copy of the element removed from the end of the small-array
 - true if the small-array was not empty, false otherwise
 
@@ -547,7 +547,7 @@ through get_ptr(_save) to reference incorrect elements.
 **Inputs**
 - `a`: A pointer to the small-array
 
-**Returns** 
+**Returns**
 - a copy of the element removed from the beginning of the small-array
 - true if the small-array was not empty, false otherwise
 
@@ -691,7 +691,7 @@ Sets the length of the small-array to 0.
 - `a`: A pointer to the small-array
 
 Example:
-	
+
 	import "core:container/small_array"
 	import "core:fmt"
 
@@ -727,7 +727,7 @@ false if there is not enough space to fit all of them.
 - true if there was enough space to fit the element, false otherwise
 
 Example:
-	
+
 	import "core:container/small_array"
 	import "core:fmt"
 

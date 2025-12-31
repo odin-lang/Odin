@@ -35,4 +35,3 @@ _tick_now :: proc "contextless" () -> Tick {
 _yield :: proc "contextless" () {
 	linux.sched_yield()
 }
-

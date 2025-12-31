@@ -135,7 +135,7 @@ Map_Flags :: bit_set[Map_Flag_Bits; c.int]
 Lock_Flag_Bits :: enum c.int {
 	// Lock all pages currently mapped into the address space of the process.
 	CURRENT = log2(MCL_CURRENT),
-	// Lock all pages that become mapped into the address space of the process in the future, 
+	// Lock all pages that become mapped into the address space of the process in the future,
 	// when those mappings are established.
 	FUTURE  = log2(MCL_FUTURE),
 }

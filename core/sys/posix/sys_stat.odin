@@ -461,7 +461,7 @@ when ODIN_OS == .Darwin {
 } else when ODIN_OS == .Linux {
 
 	dev_t     :: distinct u64
-	_mode_t   :: distinct c.uint 
+	_mode_t   :: distinct c.uint
 	blkcnt_t  :: distinct i64
 
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {

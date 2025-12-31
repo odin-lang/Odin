@@ -406,4 +406,3 @@ _reduce_pi_f64 :: proc "contextless" (x: f64) -> f64 #no_bounds_check {
 	}
 	return math.PI * x
 }
-

@@ -2226,7 +2226,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				if (e->Variable.is_rodata) {
 					LLVMSetGlobalConstant(var_global_ref, true);
 				}
-				
+
 				if (!lb_apply_thread_local_model(var_global_ref, e->Variable.thread_local_model)) {
 					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
 				}
@@ -2376,7 +2376,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		// No return values
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
-		
+
 		// Check for terminator in the defer stmts
 		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {

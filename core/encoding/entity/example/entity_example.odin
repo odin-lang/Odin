@@ -68,5 +68,5 @@ main :: proc() {
 		for _, v in track.allocation_map {
 			fmt.printf("%v Leaked %v bytes.\n", v.location, v.size)
 		}
-	}	
+	}
 }

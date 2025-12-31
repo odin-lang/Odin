@@ -141,4 +141,3 @@ norm_float64 :: proc(gen := context.random_generator) -> f64 {
 
 	return 0 // NOTE(bill): Will never be hit but this is here for sanity's sake
 }
-

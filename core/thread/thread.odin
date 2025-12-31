@@ -392,7 +392,7 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2))t.data
 		assert(t.user_index >= 2)
-		
+
 		user_args := mem.slice_to_bytes(t.user_args[:])
 		arg1 := (^T1)(raw_data(user_args))^
 		arg2 := (^T2)(raw_data(user_args[size_of(T1):]))^

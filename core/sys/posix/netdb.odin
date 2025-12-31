@@ -384,7 +384,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		AI_NUMERICSERV :: 0x00001000
 		AI_V4MAPPED    :: 0x00000800
 		AI_ALL         :: 0x00000100
-		AI_ADDRCONFIG  :: 0x00000400 
+		AI_ADDRCONFIG  :: 0x00000400
 
 		NI_NOFQDN       :: 0x00000001
 		NI_NUMERICHOST  :: 0x00000002
@@ -401,7 +401,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		AI_NUMERICSERV :: 0x00000008
 		AI_V4MAPPED    :: 0x00000800 // NOTE: not implemented on netbsd
 		AI_ALL         :: 0x00000100 // NOTE: not implemented on netbsd
-		AI_ADDRCONFIG  :: 0x00000400 
+		AI_ADDRCONFIG  :: 0x00000400
 
 		NI_NOFQDN       :: 0x00000001
 		NI_NUMERICHOST  :: 0x00000002

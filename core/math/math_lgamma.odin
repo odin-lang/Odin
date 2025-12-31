@@ -2,7 +2,7 @@ package math
 
 // The original C code and the long comment below are
 // from FreeBSD's /usr/src/lib/msun/src/e_lgamma_r.c and
-// came with this notice. 
+// came with this notice.
 //
 // ====================================================
 // Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -122,7 +122,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		}
 		return -x
 	}
-	
+
 	@(static, rodata) lgamA := [?]f64{
 		0h3FB3C467E37DB0C8,
 		0h3FD4A34CC4A60FAD,
@@ -198,7 +198,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		0hBF5AB89D0B9E43E4,
 	}
 
-	
+
 	Y_MIN  :: 0h3ff762d86356be3f // 1.461632144968362245
 	TWO_52 :: 0h4330000000000000 // ~4.5036e+15
 	TWO_53 :: 0h4340000000000000 // ~9.0072e+15
@@ -207,7 +207,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 	Tc     :: 0h3FF762D86356BE3F
 	Tf     :: 0hBFBF19B9BCC38A42
 	Tt     :: 0hBC50C7CAA48A971F
-	
+
 	// special cases
 	sign = 1
 	switch {

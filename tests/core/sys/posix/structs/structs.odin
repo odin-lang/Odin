@@ -21,7 +21,7 @@ main :: proc() {
 	}
 
 	fmt.println("termios", size_of(posix.termios), align_of(posix.termios))
-	
+
 	fmt.println("in_addr", size_of(posix.in_addr), align_of(posix.in_addr))
 	fmt.println("in6_addr", size_of(posix.in6_addr), align_of(posix.in6_addr))
 	fmt.println("sockaddr_in", size_of(posix.sockaddr_in), align_of(posix.sockaddr_in))
@@ -48,7 +48,7 @@ main :: proc() {
 	when ODIN_OS != .Haiku {
 		fmt.println("shmid_ds", size_of(posix.shmid_ds), align_of(posix.shmid_ds))
 	}
-	
+
 	fmt.println("ipc_perm", size_of(posix.ipc_perm), align_of(posix.ipc_perm))
 	fmt.println("msqid_ds", size_of(posix.msqid_ds), align_of(posix.msqid_ds))
 
@@ -84,7 +84,7 @@ main :: proc() {
 	when ODIN_OS != .Haiku {
 		fmt.println("wordexp_t", size_of(posix.wordexp_t), align_of(posix.wordexp_t))
 	}
-	
+
 	fmt.println("time_t", size_of(posix.time_t), align_of(posix.time_t))
 	fmt.println("timespec", size_of(posix.timespec), align_of(posix.timespec))
 	fmt.println("clock_t", size_of(posix.clock_t), align_of(posix.clock_t))

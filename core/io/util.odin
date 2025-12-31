@@ -79,7 +79,7 @@ write_f32 :: proc(w: Writer, val: f32, n_written: ^int = nil) -> (n: int, err: E
 	}
 
 	return write_string(w, string(s), n_written)
-}	
+}
 write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [386]byte
 
@@ -95,7 +95,7 @@ write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: E
 	}
 
 	return write_string(w, string(s), n_written)
-}	
+}
 
 
 
@@ -128,16 +128,16 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 	case:
 		if r < 32 {
 			write_string(w, `\x`, &n) or_return
-			
+
 			buf: [2]byte
 			s := strconv.write_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
 			switch len(s) {
-			case 0: 
+			case 0:
 				write_string(w, "00", &n) or_return
-			case 1: 
+			case 1:
 				write_byte(w, '0',    &n) or_return
 				fallthrough
-			case 2: 
+			case 2:
 				write_string(w, s,    &n) or_return
 			}
 		} else {

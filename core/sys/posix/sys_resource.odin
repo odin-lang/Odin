@@ -115,7 +115,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	} else {
 		RLIM_INFINITY :: (rlim_t(1) << 63) - 1
 	}
-	
+
 	RLIM_SAVED_MAX :: RLIM_INFINITY
 	RLIM_SAVED_CUR :: RLIM_INFINITY
 
@@ -166,7 +166,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		RLIMIT_FSIZE  :: 1
 		RLIMIT_NOFILE :: 7 when ODIN_OS == .Linux else 8
 		RLIMIT_STACK  :: 3
-	
+
 		when ODIN_OS == .Linux {
 			RLIMIT_AS :: 9
 		} else when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {

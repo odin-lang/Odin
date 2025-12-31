@@ -74,7 +74,7 @@ stirling :: proc "contextless" (x: f64) -> (f64, f64) {
 		+3.47222221605458667310e-03,
 		+8.33333333333482257126e-02,
 	}
-	
+
 	if x > 200 {
 		return inf_f64(1), 1
 	}
@@ -102,7 +102,7 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 		}
 		return false
 	}
-	
+
 	@(static, rodata) gamP := [?]f64{
 		1.60119522476751861407e-04,
 		1.19135147006586384913e-03,
@@ -123,9 +123,9 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 		+1.00000000000000000320e+00,
 	}
 
-	
+
 	EULER :: 0.57721566490153286060651209008240243104215933593992 // A001620
-	
+
 	switch {
 	case is_neg_int(x) || is_inf(x, -1) || is_nan(x):
 		return nan_f64()
@@ -137,7 +137,7 @@ gamma_f64 :: proc "contextless" (x: f64) -> f64 {
 		}
 		return inf_f64(1)
 	}
-	
+
 	x := x
 	q := abs(x)
 	p := floor(q)

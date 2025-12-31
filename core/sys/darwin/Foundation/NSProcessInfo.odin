@@ -51,7 +51,7 @@ ProcessInfo_processName :: proc "c" (self: ^ProcessInfo) -> ^String {
 	return msgSend(^String, self, "processName")
 }
 
-// Accessing User Information 
+// Accessing User Information
 
 @(objc_type=ProcessInfo, objc_name="userName")
 ProcessInfo_userName :: proc "c" (self: ^ProcessInfo) -> ^String {

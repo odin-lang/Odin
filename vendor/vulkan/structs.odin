@@ -10933,5 +10933,3 @@ MemoryDecompressionMethodFlagNV                             :: Flags64
 MemoryDecompressionMethodFlagsNV                            :: Flags64
 PhysicalDevicePipelineProtectedAccessFeaturesEXT            :: PhysicalDevicePipelineProtectedAccessFeatures
 ShaderRequiredSubgroupSizeCreateInfoEXT                     :: PipelineShaderStageRequiredSubgroupSizeCreateInfo
-
-

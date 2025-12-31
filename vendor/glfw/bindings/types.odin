@@ -17,7 +17,7 @@ VidMode :: struct {
 
 GammaRamp :: struct {
 	red, green, blue: [^]c.ushort,
-	size:                c.uint, 
+	size:                c.uint,
 }
 
 Image :: struct {
@@ -44,7 +44,7 @@ WindowFocusProc        :: #type proc "c" (window: WindowHandle, focused: c.int)
 WindowCloseProc        :: #type proc "c" (window: WindowHandle)
 WindowSizeProc         :: #type proc "c" (window: WindowHandle, width, height: c.int)
 WindowPosProc          :: #type proc "c" (window: WindowHandle, xpos, ypos: c.int)
-WindowMaximizeProc     :: #type proc "c" (window: WindowHandle, iconified: c.int) 
+WindowMaximizeProc     :: #type proc "c" (window: WindowHandle, iconified: c.int)
 WindowContentScaleProc :: #type proc "c" (window: WindowHandle, xscale, yscale: f32)
 FramebufferSizeProc    :: #type proc "c" (window: WindowHandle, width, height: c.int)
 DropProc               :: #type proc "c" (window: WindowHandle, count: c.int, paths: [^]cstring)

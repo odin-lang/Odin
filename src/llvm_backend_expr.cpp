@@ -51,11 +51,11 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	incoming_blocks[done->preds.count] = p->curr_block->block;
 
 	lb_emit_jump(p, done);
-	lb_start_block(p, done);	
-	
+	lb_start_block(p, done);
+
 	LLVMTypeRef dst_type = lb_type(m, t_llvm_bool);
 	LLVMValueRef phi = nullptr;
-	
+
 	GB_ASSERT(incoming_values.count == incoming_blocks.count);
 	GB_ASSERT(incoming_values.count > 0);
 
@@ -68,7 +68,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	}
 
 	lbValue res = {};
-	
+
 	if (phi_type == nullptr) {
 		phi = LLVMBuildPhi(p->builder, dst_type, "");
 		LLVMAddIncoming(phi, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
@@ -524,16 +524,16 @@ gb_internal lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lh
 gb_internal bool lb_is_matrix_simdable(Type *t) {
 	Type *mt = base_type(t);
 	GB_ASSERT(mt->kind == Type_Matrix);
-	
+
 	Type *elem = core_type(mt->Matrix.elem);
 	if (is_type_complex(elem)) {
 		return false;
 	}
-	
+
 	if (is_type_different_to_arch_endianness(elem)) {
 		return false;
 	}
-	
+
 	switch (build_context.metrics.arch) {
 	default:
 		return false;
@@ -553,7 +553,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 		// TODO(bill): make #row_major matrices work with SIMD
 		return false;
 	}
-	
+
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
 		case Basic_f16:
@@ -572,7 +572,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 			}
 		}
 	}
-	
+
 	return true;
 }
 
@@ -3586,7 +3586,7 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 			}
 		}
 		break;
-	
+
 	case Type_SoaPointer:
 		{
 			// NOTE(bill): An SoaPointer is essentially just a pointer for nil comparison
@@ -4238,7 +4238,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(ie, IndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
-	
+
 	case_ast_node(ie, MatrixIndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
@@ -5918,7 +5918,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(ac, AutoCast, expr);
 		return lb_build_addr(p, ac->expr);
 	case_end;
-	
+
 	case_ast_node(te, TernaryIfExpr, expr);
 		LLVMValueRef incoming_values[2] = {};
 		LLVMBasicBlockRef incoming_blocks[2] = {};
@@ -5955,12 +5955,12 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 		return lb_addr(res);
 	case_end;
-	
+
 	case_ast_node(oe, OrElseExpr, expr);
 		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
 		return lb_addr(ptr);
 	case_end;
-	
+
 	case_ast_node(oe, OrReturnExpr, expr);
 		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
 		return lb_addr(ptr);
@@ -6025,5 +6025,3 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	return {};
 }
-
-

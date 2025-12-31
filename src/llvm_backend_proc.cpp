@@ -10,7 +10,7 @@ gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue sr
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
-	
+
 	char const *name = "llvm.memmove";
 	if (LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
@@ -39,7 +39,7 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
-	
+
 	char const *name = "llvm.memcpy";
 	if (LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
@@ -229,7 +229,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			if (entity->pkg != nullptr && entity->pkg->kind == Package_Runtime && p->body != nullptr) {
 				GB_ASSERT(entity->kind == Entity_Procedure);
 				String link_name = entity->Procedure.link_name;
-				if (entity->flags & EntityFlag_CustomLinkName && 
+				if (entity->flags & EntityFlag_CustomLinkName &&
 					link_name != "") {
 					if (string_starts_with(link_name, str_lit("__"))) {
 						LLVMSetLinkage(p->value, LLVMExternalLinkage);
@@ -1717,21 +1717,21 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		{
 			LLVMValueRef src = arg0.value;
 			LLVMValueRef indices = lb_build_expr(p, ce->args[1]).value;
-			
+
 			Type *vt = arg0.type;
 			GB_ASSERT(vt->kind == Type_SimdVector);
 			i64 count = vt->SimdVector.count;
 			Type *elem_type = vt->SimdVector.elem;
 			i64 elem_size = type_size_of(elem_type);
-			
+
 			// Determine strategy based on element size and target architecture
 			char const *intrinsic_name = nullptr;
 			bool use_hardware_runtime_swizzle = false;
-			
+
 			// 8-bit elements: Use dedicated table lookup instructions
 			if (elem_size == 1) {
 				use_hardware_runtime_swizzle = true;
-				
+
 				if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
 					// x86/x86-64: Use pshufb intrinsics
 					switch (count) {
@@ -1797,10 +1797,10 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					use_hardware_runtime_swizzle = false;
 				}
 			}
-			
+
 			if (use_hardware_runtime_swizzle && intrinsic_name != nullptr) {
 				// Use dedicated hardware swizzle instruction
-				
+
 				// Check if required target features are enabled
 				bool features_enabled = true;
 				if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
@@ -1812,7 +1812,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						}
 					} else if (count == 32) {
 						// AVX2 requires ssse3 + avx2 features
-						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr) || 
+						if (!check_target_feature_is_enabled(str_lit("ssse3"), nullptr) ||
 							!check_target_feature_is_enabled(str_lit("avx2"), nullptr)) {
 							features_enabled = false;
 						}
@@ -1831,7 +1831,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						features_enabled = false;
 					}
 				}
-				
+
 				if (features_enabled) {
 					// Add target features to function attributes for LLVM instruction selection
 					if (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_i386) {
@@ -1858,14 +1858,14 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						// ARM32 function attributes - enable NEON for swizzle instructions
 						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
 					}
-					
+
 					// Handle ARM's multi-swizzle intrinsics by splitting the src vector
 					if (build_context.metrics.arch == TargetArch_arm64 && count > 16) {
 						// ARM64 TBL2/TBL3/TBL4: Split src into multiple 16-byte vectors
 						int num_tables = cast(int)(count / 16);
 						GB_ASSERT_MSG(count % 16 == 0, "ARM64 src size must be multiple of 16 bytes, got %lld bytes", count);
 						GB_ASSERT_MSG(num_tables <= 4, "ARM64 NEON supports maximum 4 tables (tbl4), got %d tables for %lld-byte vector", num_tables, count);
-						
+
 						LLVMValueRef src_parts[4]; // Max 4 tables for tbl4
 						for (int i = 0; i < num_tables; i++) {
 							// Extract 16-byte slice from the larger src
@@ -1876,7 +1876,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 16);
 							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
 						}
-						
+
 						// Call appropriate ARM64 tbl intrinsic
 						if (count == 32) {
 							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
@@ -1893,7 +1893,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						int num_tables = cast(int)count / 8;
 						GB_ASSERT_MSG(count % 8 == 0, "ARM32 src size must be multiple of 8 bytes, got %lld bytes", count);
 						GB_ASSERT_MSG(num_tables <= 4, "ARM32 NEON supports maximum 4 tables (vtbl4), got %d tables for %lld-byte vector", num_tables, count);
-						
+
 						LLVMValueRef src_parts[4]; // Max 4 tables for vtbl4
 						for (int i = 0; i < num_tables; i++) {
 							// Extract 8-byte slice from the larger src
@@ -1904,7 +1904,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 8);
 							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
 						}
-						
+
 						// Call appropriate ARM32 vtbl intrinsic
 						if (count == 16) {
 							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
@@ -1927,23 +1927,23 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					use_hardware_runtime_swizzle = false;
 				}
 			}
-			
+
 			// Fallback: Emulate with extracts and inserts for all element sizes
 			GB_ASSERT(count > 0 && count <= 64); // Sanity check
-			
+
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
 			LLVMTypeRef i32_type = LLVMInt32TypeInContext(p->module->ctx);
 			LLVMTypeRef elem_llvm_type = lb_type(p->module, elem_type);
-			
+
 			// Calculate mask based on element size and vector count
 			i64 max_index = count - 1;
 			LLVMValueRef index_mask;
-			
+
 			if (elem_size == 1) {
 				// 8-bit: mask to src size (like pshufb behavior)
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			} else if (elem_size == 2) {
-				// 16-bit: mask to src size 
+				// 16-bit: mask to src size
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			} else if (elem_size == 4) {
 				// 32-bit: mask to src size
@@ -1952,14 +1952,14 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				// 64-bit: mask to src size
 				index_mask = LLVMConstInt(elem_llvm_type, max_index, false);
 			}
-			
+
 			for (i64 i = 0; i < count; i++) {
 				LLVMValueRef idx_i = LLVMConstInt(i32_type, cast(unsigned)i, false);
 				LLVMValueRef index_elem = LLVMBuildExtractElement(p->builder, indices, idx_i, "");
-				
+
 				// Mask index to valid range
 				LLVMValueRef masked_index = LLVMBuildAnd(p->builder, index_elem, index_mask, "");
-				
+
 				// Convert to i32 for extractelement
 				LLVMValueRef index_i32;
 				if (LLVMGetIntTypeWidth(LLVMTypeOf(masked_index)) < 32) {
@@ -1969,10 +1969,10 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				} else {
 					index_i32 = masked_index;
 				}
-				
+
 				values[i] = LLVMBuildExtractElement(p->builder, src, index_i32, "");
 			}
-			
+
 			// Build result vector
 			res.value = LLVMGetUndef(LLVMTypeOf(src));
 			for (i64 i = 0; i < count; i++) {
@@ -3571,7 +3571,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			default:
 				GB_PANIC("Unsupported platform");
 			}
-			
+
 			lbValue res = {};
 			res.value = LLVMBuildCall2(p->builder, func_type, inline_asm, args, arg_count, "");
 			res.type = t_uintptr;
@@ -3726,7 +3726,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			default:
 				GB_PANIC("Unsupported platform");
 			}
-			
+
  			lbValue res = {};
  			res.value = LLVMBuildCall2(p->builder, func_type, inline_asm, args, arg_count, "");
 			res.type = make_optional_ok_type(t_uintptr, true);
@@ -4404,4 +4404,3 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 
 	return lb_emit_call(p, value, call_args, ce->inlining);
 }
-

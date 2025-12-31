@@ -1748,7 +1748,7 @@ index_any :: proc(s, chars: string) -> (res: int) {
 	if chars == "" {
 		return -1
 	}
-	
+
 	if len(chars) == 1 {
 		r := rune(chars[0])
 		if r >= utf8.RUNE_SELF {
@@ -1756,7 +1756,7 @@ index_any :: proc(s, chars: string) -> (res: int) {
 		}
 		return index_rune(s, r)
 	}
-	
+
 	if len(s) > 8 {
 		if as, ok := ascii_set_make(chars); ok {
 			for i in 0..<len(s) {
@@ -1812,7 +1812,7 @@ last_index_any :: proc(s, chars: string) -> (res: int) {
 	if chars == "" {
 		return -1
 	}
-	
+
 	if len(s) == 1 {
 		r := rune(s[0])
 		if r >= utf8.RUNE_SELF {
@@ -1821,7 +1821,7 @@ last_index_any :: proc(s, chars: string) -> (res: int) {
 		i := index_rune(chars, r)
 		return i if i < 0 else 0
 	}
-	
+
 	if len(s) > 8 {
 		if as, ok := ascii_set_make(chars); ok {
 			for i := len(s)-1; i >= 0; i -= 1 {
@@ -1832,7 +1832,7 @@ last_index_any :: proc(s, chars: string) -> (res: int) {
 			return -1
 		}
 	}
-	
+
 	if len(chars) == 1 {
 		r := rune(chars[0])
 		if r >= utf8.RUNE_SELF {

@@ -252,7 +252,7 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 	/*
 		Adjust dest.used based on leading zeroes.
 	*/
-	return internal_clamp(dest)	
+	return internal_clamp(dest)
 }
 internal_add :: proc { internal_int_add_signed, internal_int_add_digit, }
 
@@ -504,7 +504,7 @@ internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
 		Adjust dest.used based on leading zeroes.
 	*/
 	dest.sign = src.sign
-	return internal_clamp(dest)	
+	return internal_clamp(dest)
 }
 
 /*
@@ -526,7 +526,7 @@ internal_int_shl1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 	shift := DIGIT(_DIGIT_BITS - 1)
 	carry := DIGIT(0)
 
-	#no_bounds_check for x:= 0; x < dest.used; x+= 1 {		
+	#no_bounds_check for x:= 0; x < dest.used; x+= 1 {
 		fwd_carry := (dest.digit[x] >> shift) & mask
 		dest.digit[x] = (dest.digit[x] << uint(1) | carry) & _MASK
 		carry = fwd_carry
@@ -1035,7 +1035,7 @@ internal_is_initialized :: proc { internal_int_is_initialized, }
 internal_int_is_zero :: #force_inline proc(a: ^Int) -> (zero: bool) {
 	return a.used == 0
 }
-internal_is_zero :: proc { 
+internal_is_zero :: proc {
 	internal_rat_is_zero,
 	internal_int_is_zero,
 }
@@ -1807,9 +1807,9 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 		*/
 	for {
 		internal_pow(t2, t1, n) or_return
-	
+
 		if internal_lt(t2, a) { break }
-		
+
 		internal_sub(t1, t1, DIGIT(1)) or_return
 
 		iterations += 1
@@ -1851,9 +1851,9 @@ internal_int_destroy :: proc(integers: ..^Int) {
 		a = &Int{}
 	}
 }
-internal_destroy :: proc{ 
-	internal_int_destroy, 
-	internal_rat_destroy, 
+internal_destroy :: proc{
+	internal_int_destroy,
+	internal_rat_destroy,
 }
 
 /*
@@ -1955,8 +1955,8 @@ internal_int_swap :: #force_inline proc(a, b: ^Int) {
 	a.sign,  b.sign  = b.sign,  a.sign
 	a.digit, b.digit = b.digit, a.digit
 }
-internal_swap :: proc { 
-	internal_int_swap, 
+internal_swap :: proc {
+	internal_int_swap,
 	internal_rat_swap,
 }
 
@@ -2316,22 +2316,22 @@ internal_get_low_u32 :: proc(a: ^Int) -> u32 #no_bounds_check {
 	if a == nil {
 		return 0
 	}
-	
+
 	if a.used == 0 {
 		return 0
 	}
-	
+
 	return u32(a.digit[0])
 }
 internal_get_low_u64 :: proc(a: ^Int) -> u64 #no_bounds_check {
 	if a == nil {
 		return 0
 	}
-	
+
 	if a.used == 0 {
 		return 0
 	}
-	
+
 	v := u64(a.digit[0])
 	when size_of(DIGIT) == 4 {
 		if a.used > 1 {
@@ -2806,7 +2806,7 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 				q >>= 4
 				if p != 0 { break }
 			}
-		}		
+		}
 	}
 	return x, nil
 }

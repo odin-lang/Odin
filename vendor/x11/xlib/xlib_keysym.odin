@@ -1678,4 +1678,3 @@ KeySym :: enum u32 {
 	XK_DongSign                   = 0x10020ab,  /* U+20AB DONG SIGN */
 	XK_EuroSign                   = 0x20ac,  /* U+20AC EURO SIGN */
 }
-

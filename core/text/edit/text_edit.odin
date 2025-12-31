@@ -285,7 +285,7 @@ is_continuation_byte :: proc(b: byte) -> bool {
 	return b >= 0x80 && b < 0xc0
 }
 
-// translates the caret position 
+// translates the caret position
 translate_position :: proc(s: ^State, t: Translation) -> int {
 	is_space :: proc(b: byte) -> bool {
 		return b == ' ' || b == '\t' || b == '\n'

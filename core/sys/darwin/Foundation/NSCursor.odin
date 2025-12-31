@@ -23,4 +23,3 @@ Cursor_arrowCursor :: proc "c" () -> ^Cursor {
 Cursor_pointingHandCursor :: proc "c" () -> ^Cursor {
 	return msgSend(^Cursor, Cursor, "pointingHandCursor")
 }
-

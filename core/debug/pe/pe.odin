@@ -219,4 +219,3 @@ IMAGE_DEBUG_TYPE :: enum u32le {
 	REPRO                 = 16, // PE determinism or reproducibility.
 	EX_DLLCHARACTERISTICS = 20, // Extended DLL characteristics bits.
 }
-

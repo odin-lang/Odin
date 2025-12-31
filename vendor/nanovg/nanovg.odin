@@ -210,7 +210,7 @@ Context :: struct {
 Params :: struct {
 	userPtr:       rawptr,
 	edgeAntiAlias: bool,
-	
+
 	// callbacks to fill out
 	renderCreate: proc(uptr: rawptr) -> bool,
 	renderDelete: proc(uptr: rawptr),
@@ -220,7 +220,7 @@ Params :: struct {
 		uptr:       rawptr,
 		type:       Texture,
 		w, h:       int,
-		imageFlags: ImageFlags, 
+		imageFlags: ImageFlags,
 		data:       []byte,
 	) -> int,
 	renderDeleteTexture: proc(uptr: rawptr, image: int) -> bool,
@@ -240,7 +240,7 @@ Params :: struct {
 	renderFill: proc(
 		uptr:               rawptr,
 		paint:              ^Paint,
-		compositeOperation: CompositeOperationState, 
+		compositeOperation: CompositeOperationState,
 		scissor:            ^ScissorT,
 		fringe:             f32,
 		bounds:             [4]f32,
@@ -249,16 +249,16 @@ Params :: struct {
 	renderStroke: proc(
 		uptr:               rawptr,
 		paint:              ^Paint,
-		compositeOperation: CompositeOperationState, 
+		compositeOperation: CompositeOperationState,
 		scissor:            ^ScissorT,
 		fringe:             f32,
 		strokeWidth:        f32,
 		paths:              []Path,
-	),	
+	),
 	renderTriangles: proc(
 		uptr:               rawptr,
 		paint:              ^Paint,
-		compositeOperation: CompositeOperationState, 
+		compositeOperation: CompositeOperationState,
 		scissor:            ^ScissorT,
 		verts:              []Vertex,
 		fringe:             f32,
@@ -309,13 +309,13 @@ CreateInternal :: proc(params: Params) -> (ctx: ^Context) {
 	fontstash.Init(&ctx.fs, w, h, .TOPLEFT)
 	assert(ctx.params.renderCreateTexture != nil)
 	ctx.fs.userData = ctx
-	
+
 	// handle to the image needs to be set to the new generated texture
 	ctx.fs.callbackResize = proc(data: rawptr, w, h: int) {
 		ctx := (^Context)(data)
 		ctx.fontImages[0] = ctx.params.renderCreateTexture(ctx.params.userPtr, .Alpha, w, h, {}, ctx.fs.textureData)
 	}
-	
+
 	// texture atlas
 	ctx.fontImages[0] = ctx.params.renderCreateTexture(ctx.params.userPtr, .Alpha, w, h, {}, nil)
 	ctx.fontImageIdx = 0
@@ -385,7 +385,7 @@ FrameScoped :: proc(
 // Cancels drawing the current frame.
 CancelFrame :: proc(ctx: ^Context) {
 	assert(ctx.params.renderCancel != nil)
-	ctx.params.renderCancel(ctx.params.userPtr)	
+	ctx.params.renderCancel(ctx.params.userPtr)
 }
 
 // Ends drawing flushing remaining render state.
@@ -478,11 +478,11 @@ HSLA :: proc(hue, saturation, lightness: f32, a: u8) -> (col: Color) {
 		if h < 0 {
 			h += 1
 		}
-		
+
 		if h > 1 {
 			h -= 1
-		} 
-		
+		}
+
 		if h < 1.0 / 6.0 {
 			return m1 + (m2 - m1) * h * 6.0
 		} else if h < 3.0 / 6.0 {
@@ -497,7 +497,7 @@ HSLA :: proc(hue, saturation, lightness: f32, a: u8) -> (col: Color) {
 	h := math.mod(hue, 1.0)
 	if h < 0.0 {
 		h += 1.0
-	} 
+	}
 	s := clamp(saturation, 0.0, 1.0)
 	l := clamp(lightness, 0.0, 1.0)
 	m2 := l <= 0.5 ? (l * (1 + s)) : (l + s - l * s)
@@ -613,12 +613,12 @@ TransformPremultiply :: proc(t: ^Matrix, s: Matrix) {
 TransformInverse :: proc(inv: ^Matrix, t: Matrix) -> bool {
 	// TODO could be bad math? due to types
 	det := f64(t[0]) * f64(t[3]) - f64(t[2]) * f64(t[1])
-	
+
 	if det > -1e-6 && det < 1e-6 {
 		TransformIdentity(inv)
 		return false
 	}
-	
+
 	invdet := 1.0 / det
 	inv[0] = f32(f64(t[3]) * invdet)
 	inv[2] = f32(f64(-t[2]) * invdet)
@@ -631,10 +631,10 @@ TransformInverse :: proc(inv: ^Matrix, t: Matrix) -> bool {
 
 // Transform a point by given transform.
 TransformPoint :: proc(
-	dx: ^f32, 
-	dy: ^f32, 
+	dx: ^f32,
+	dy: ^f32,
 	t:  Matrix,
-	sx: f32, 
+	sx: f32,
 	sy: f32,
 ) {
 	dx^ = sx * t[0] + sy * t[2] + t[4]
@@ -739,7 +739,7 @@ ShapeAntiAlias :: proc(ctx: ^Context, enabled: bool) {
 // Sets the stroke width of the stroke style.
 StrokeWidth :: proc(ctx: ^Context, width: f32) {
 	state := __getState(ctx)
-	state.strokeWidth = width		
+	state.strokeWidth = width
 }
 
 // Sets the miter limit of the stroke style.
@@ -773,7 +773,7 @@ GlobalAlpha :: proc(ctx: ^Context, alpha: f32) {
 // Sets current stroke style to a solid color.
 StrokeColor :: proc(ctx: ^Context, color: Color) {
 	state := __getState(ctx)
-	__setPaintColor(&state.stroke, color)	
+	__setPaintColor(&state.stroke, color)
 }
 
 // Sets current stroke style to a paint, which can be a one of the gradients or a pattern.
@@ -786,7 +786,7 @@ StrokePaint :: proc(ctx: ^Context, paint: Paint) {
 // Sets current fill style to a solid color.
 FillColor :: proc(ctx: ^Context, color: Color) {
 	state := __getState(ctx)
-	__setPaintColor(&state.fill, color)	
+	__setPaintColor(&state.fill, color)
 }
 
 // Sets current fill style to a paint, which can be a one of the gradients or a pattern.
@@ -895,7 +895,7 @@ CreateImagePath :: proc(ctx: ^Context, filename: cstring, imageFlags: ImageFlags
 	stbi.convert_iphone_png_to_rgb(1)
 	w, h, n: i32
 	img := stbi.load(filename, &w, &h, &n, 4)
-	
+
 	if img == nil {
 		return 0
 	}
@@ -913,7 +913,7 @@ CreateImageMem :: proc(ctx: ^Context, data: []byte, imageFlags: ImageFlags) -> i
 	stbi.convert_iphone_png_to_rgb(1)
 	w, h, n: i32
 	img := stbi.load_from_memory(raw_data(data), i32(len(data)), &w, &h, &n, 4)
-	
+
 	if img == nil {
 		return 0
 	}
@@ -943,7 +943,7 @@ CreateImageRGBA :: proc(ctx: ^Context, w, h: int, imageFlags: ImageFlags, data: 
 UpdateImage :: proc(ctx: ^Context, image: int, data: []byte) {
 	assert(ctx.params.renderGetTextureSize != nil)
 	assert(ctx.params.renderUpdateTexture != nil)
-	
+
 	w, h: int
 	found := ctx.params.renderGetTextureSize(ctx.params.userPtr, image, &w, &h)
 	if found {
@@ -1044,7 +1044,7 @@ RadialGradient :: proc(
 	p.innerColor = icol
 	p.outerColor = ocol
 
-	return 
+	return
 }
 
 /*
@@ -1073,7 +1073,7 @@ BoxGradient :: proc(
 	p.innerColor = icol
 	p.outerColor = ocol
 
-	return 
+	return
 }
 
 /*
@@ -1119,7 +1119,7 @@ Scissor :: proc(
 	state := __getState(ctx)
 	w := max(width, 0)
 	h := max(height, 0)
-	
+
 	TransformIdentity(&state.scissor.xform)
 	state.scissor.xform[4] = x + w * 0.5
 	state.scissor.xform[5] = y + h * 0.5
@@ -1173,7 +1173,7 @@ IntersectScissor :: proc(
 	TransformMultiply(&pxform, invxorm)
 	tex := ex * abs(pxform[0]) + ey * abs(pxform[2])
 	tey := ex * abs(pxform[1]) + ey * abs(pxform[3])
-	
+
 	rect: [4]f32
 	isect_rects(&rect, pxform[4] - tex, pxform[5] - tey, tex * 2, tey * 2, x,y,w,h)
 	Scissor(ctx, rect.x, rect.y, rect.z, rect.w)
@@ -1270,7 +1270,7 @@ __distPtSeg :: proc(x, y, px, py, qx, qy: f32) -> f32 {
 	dy := y - py
 	d := pqx * pqx + pqy * pqy
 	t := pqx * dx + pqy * dy
-	
+
 	if d > 0 {
 		t /= d
 	}
@@ -1401,22 +1401,22 @@ __triarea2 :: proc(ax, ay, bx, by, cx, cy: f32) -> f32 {
 
 __polyArea :: proc(points: []Point) -> f32 {
 	area := f32(0)
-	
+
 	for i := 2; i < len(points); i += 1 {
 		a := &points[0]
 		b := &points[i-1]
 		c := &points[i]
 		area += __triarea2(a.x, a.y, b.x, b.y, c.x, c.y)
 	}
-	
+
 	return area * 0.5
 }
 
 __polyReverse :: proc(points: []Point) {
 	tmp: Point
-	i := 0 
+	i := 0
 	j := len(points) - 1
-	
+
 	for i < j {
 		tmp = points[i]
 		points[i] = points[j]
@@ -1488,7 +1488,7 @@ __flattenPaths :: proc(ctx: ^Context) {
 	i := 0
 	for i < len(ctx.commands) {
 		cmd := Commands(ctx.commands[i])
-		
+
 		switch cmd {
 		case .MOVE_TO:
 			__addPath(ctx)
@@ -1544,11 +1544,11 @@ __flattenPaths :: proc(ctx: ^Context) {
 		// enforce winding
 		if path.count > 2 {
 			area := __polyArea(pts[:path.count])
-			
+
 			if path.winding == .CCW && area < 0 {
 				__polyReverse(pts[:path.count])
 			}
-			
+
 			if path.winding == .CW && area > 0 {
 				__polyReverse(pts[:path.count])
 			}
@@ -1559,13 +1559,13 @@ __flattenPaths :: proc(ctx: ^Context) {
 			p0.dx = p1.x - p0.x
 			p0.dy = p1.y - p0.y
 			p0.len = __normalize(&p0.dx, &p0.dy)
-			
+
 			// Update bounds
 			cache.bounds[0] = min(cache.bounds[0], p0.x)
 			cache.bounds[1] = min(cache.bounds[1], p0.y)
 			cache.bounds[2] = max(cache.bounds[2], p0.x)
 			cache.bounds[3] = max(cache.bounds[3], p0.y)
-			
+
 			// Advance
 			p0 = p1
 			p1 = mem.ptr_offset(p1, 1)
@@ -1623,10 +1623,10 @@ __roundJoin :: proc(
 		__chooseBevel(.INNER_BEVEL in p1.flags, p0, p1, lw, &lx0,&ly0, &lx1,&ly1)
 		a0 := math.atan2(-dly0, -dlx0)
 		a1 := math.atan2(-dly1, -dlx1)
-		
+
 		if a1 > a0 {
 			a1 -= math.PI * 2
-		} 
+		}
 
 		__vset(dst, lx0, ly0, lu, 1)
 		__vset(dst, p1.x - dlx0 * rw, p1.y - dly0 * rw, ru, 1)
@@ -1847,7 +1847,7 @@ __calculateJoins :: proc(
 
 	if w > 0 {
 		iw = 1.0 / w
-	} 
+	}
 
 	// Calculate which joins needs extra vertices to append, and gather vertex count.
 	for &path in cache.paths {
@@ -1923,7 +1923,7 @@ __expandStroke :: proc(
 	fringe:     f32,
 	lineCap:    LineCapType,
 	lineJoin:   LineCapType,
-	miterLimit: f32,	
+	miterLimit: f32,
 ) -> bool {
 	cache := &ctx.cache
 	aa := fringe
@@ -1946,8 +1946,8 @@ __expandStroke :: proc(
 	cverts := 0
 	for path in cache.paths {
 		loop := path.closed
-	
-		// TODO check if f32 calculation necessary?	
+
+		// TODO check if f32 calculation necessary?
 		if lineJoin == .ROUND {
 			cverts += (path.count + path.nbevel * int(ncap + 2) + 1) * 2 // plus one for loop
 		} else {
@@ -2024,7 +2024,7 @@ __expandStroke :: proc(
 				__vset(&dst, p1.x - (p1.dmx * w), p1.y - (p1.dmy * w), u1, 1)
 			}
 
-			p0 = p1 
+			p0 = p1
 			p1 = mem.ptr_offset(p1, 1)
 		}
 
@@ -2049,7 +2049,7 @@ __expandStroke :: proc(
 		}
 
 		// count of vertices pushed
-		dst_diff := dst_start_length - len(dst) 
+		dst_diff := dst_start_length - len(dst)
 		// set stroke to the new region
 		path.stroke = verts[dst_index:dst_index + dst_diff]
 		// move index for next iteration
@@ -2106,7 +2106,7 @@ __expandFill :: proc(
 					dly0 := -p0.dx
 					dlx1 := p1.dy
 					dly1 := -p1.dx
-					
+
 					if .LEFT in p1.flags {
 						lx := p1.x + p1.dmx * woff
 						ly := p1.y + p1.dmy * woff
@@ -2132,7 +2132,7 @@ __expandFill :: proc(
 			}
 		}
 
-		dst_diff := dst_start_length - len(dst) 
+		dst_diff := dst_start_length - len(dst)
 		path.fill = verts[dst_index:dst_index + dst_diff]
 
 		// advance
@@ -2173,7 +2173,7 @@ __expandFill :: proc(
 			__vset(&dst, verts[dst_index + 0].x, verts[dst_index + 0].y, lu, 1)
 			__vset(&dst, verts[dst_index + 1].x, verts[dst_index + 1].y, ru, 1)
 
-			dst_diff = dst_start_length - len(dst) 
+			dst_diff = dst_start_length - len(dst)
 			path.stroke = verts[dst_index:dst_index + dst_diff]
 
 			// advance
@@ -2227,7 +2227,7 @@ StrokeScoped :: proc(ctx: ^Context) {
 
 @(deferred_in=Stroke)
 FillStrokeScoped :: proc(ctx: ^Context) {
-	BeginPath(ctx)		
+	BeginPath(ctx)
 }
 
 // Starts new sub-path with specified point as first point.
@@ -2242,7 +2242,7 @@ LineTo :: proc(ctx: ^Context, x, y: f32) {
 
 // Adds cubic bezier segment from last point in the path via two control points to the specified point.
 BezierTo :: proc(
-	ctx: ^Context, 
+	ctx: ^Context,
 	c1x, c1y: f32,
 	c2x, c2y: f32,
 	x, y: f32,
@@ -2344,7 +2344,7 @@ Arc :: proc(ctx: ^Context, cx, cy, r, a0, a1: f32, dir: Winding) {
 		} else {
 			for da > 0.0 {
 				da -= math.PI*2
-			} 
+			}
 		}
 	}
 
@@ -2540,7 +2540,7 @@ Stroke :: proc(ctx: ^Context) {
 		__expandStroke(ctx, strokeWidth * 0.5, ctx.fringeWidth, state.lineCap, state.lineJoin, state.miterLimit)
 	} else {
 		__expandStroke(ctx, strokeWidth * 0.5, 0, state.lineCap, state.lineJoin, state.miterLimit)
-	}	
+	}
 
 	assert(ctx.params.renderStroke != nil)
 	ctx.params.renderStroke(
@@ -2556,18 +2556,18 @@ Stroke :: proc(ctx: ^Context) {
 	for path in ctx.cache.paths {
 		ctx.strokeTriCount += len(path.stroke) - 2
 		ctx.drawCallCount += 1
-	}	
+	}
 }
 
 DebugDumpPathCache :: proc(ctx: ^Context) {
 	fmt.printf("~~~~~~~~~~~~~Dumping %d cached paths\n", len(ctx.cache.paths))
-	
+
 	for path, i in ctx.cache.paths {
 		fmt.printf(" - Path %d\n", i)
-		
+
 		if len(path.fill) != 0 {
 			fmt.printf("   - fill: %d\n", len(path.fill))
-			
+
 			for v in path.fill {
 				fmt.printf("%f\t%f\n", v.x, v.y)
 			}
@@ -2575,7 +2575,7 @@ DebugDumpPathCache :: proc(ctx: ^Context) {
 
 		if len(path.stroke) != 0 {
 			fmt.printf("   - stroke: %d\n", len(path.stroke))
-			
+
 			for v in path.stroke {
 				fmt.printf("%f\t%f\n", v.x, v.y)
 			}
@@ -2733,7 +2733,7 @@ __flushTextTexture :: proc(ctx: ^Context) {
 
 	if fontstash.ValidateTexture(&ctx.fs, &dirty) {
 		font_image := ctx.fontImages[ctx.fontImageIdx]
-		
+
 		// Update texture
 		if font_image != 0 {
 			data := ctx.fs.textureData
@@ -2748,18 +2748,18 @@ __flushTextTexture :: proc(ctx: ^Context) {
 
 __allocTextAtlas :: proc(ctx: ^Context) -> bool {
 	__flushTextTexture(ctx)
-	
+
 	if ctx.fontImageIdx >= MAX_FONTIMAGES - 1 {
 		return false
 	}
-	
+
 	// if next fontImage already have a texture
 	iw, ih: int
 	if ctx.fontImages[ctx.fontImageIdx+1] != 0 {
 		iw, ih = ImageSize(ctx, ctx.fontImages[ctx.fontImageIdx+1])
 	} else { // calculate the new font image size and create it.
 		iw, ih = ImageSize(ctx, ctx.fontImages[ctx.fontImageIdx])
-		
+
 		if iw > ih {
 			ih *= 2
 		}	else {
@@ -2797,7 +2797,7 @@ __renderText :: proc(ctx: ^Context, verts: []Vertex) {
 	paint.outerColor.a *= state.alpha
 
 	ctx.params.renderTriangles(ctx.params.userPtr, &paint, state.compositeOperation, &state.scissor, verts, ctx.fringeWidth)
-	
+
 	ctx.drawCallCount += 1
 	ctx.textTriCount += len(verts) / 3
 }
@@ -2833,18 +2833,18 @@ TextIcon :: proc(ctx: ^Context, xpos, ypos: f32, codepoint: rune) -> f32 {
 	iblur := i16(fstate.blur)
 	glyph, _ := fontstash.__getGlyph(fs, font, codepoint, isize, iblur)
 	fscale := fontstash.__getPixelHeightScale(font, f32(isize) / 10)
-	
+
 	// transform x / y
 	x := xpos * scale
 	y := ypos * scale
 	switch fstate.ah {
 	case .LEFT: {}
-	
-	case .CENTER: 
+
+	case .CENTER:
 		width := fontstash.CodepointWidth(font, codepoint, fscale)
 		x = math.round(x - width * 0.5)
 
-	case .RIGHT: 
+	case .RIGHT:
 		width := fontstash.CodepointWidth(font, codepoint, fscale)
 		x -= width
 	}
@@ -2866,13 +2866,13 @@ TextIcon :: proc(ctx: ^Context, xpos, ypos: f32, codepoint: rune) -> f32 {
 		// single glyph only
 		verts := __allocTempVerts(ctx, 6)
 		c: [4 * 2]f32
-	
+
 		// Transform corners.
 		TransformPoint(&c[0], &c[1], state.xform, q.x0 * invscale, q.y0 * invscale)
 		TransformPoint(&c[2], &c[3], state.xform, q.x1 * invscale, q.y0 * invscale)
 		TransformPoint(&c[4], &c[5], state.xform, q.x1 * invscale, q.y1 * invscale)
 		TransformPoint(&c[6], &c[7], state.xform, q.x0 * invscale, q.y1 * invscale)
-		
+
 		// Create triangles
 		verts[0] = {c[0], c[1], q.s0, q.t0}
 		verts[1] = {c[4], c[5], q.s1, q.t1}
@@ -2916,7 +2916,7 @@ Text :: proc(ctx: ^Context, x, y: f32, text: string) -> f32 {
 	q: fontstash.Quad
 	for fontstash.TextIterNext(&ctx.fs, &iter, &q) {
 		c: [4 * 2]f32
-		
+
 		if iter.previousGlyphIndex == -1 { // can not retrieve glyph?
 			if nverts != 0 {
 				__renderText(ctx, verts[:])
@@ -2929,13 +2929,13 @@ Text :: proc(ctx: ^Context, x, y: f32, text: string) -> f32 {
 
 			iter = prev_iter
 			fontstash.TextIterNext(fs, &iter, &q) // try again
-			
+
 			if iter.previousGlyphIndex == -1 {
 				// still can not find glyph?
 				break
-			} 
+			}
 		}
-		
+
 		prev_iter = iter
 		if is_flipped {
 			q.y0, q.y1 = q.y1, q.y0
@@ -2947,7 +2947,7 @@ Text :: proc(ctx: ^Context, x, y: f32, text: string) -> f32 {
 		TransformPoint(&c[2], &c[3], state.xform, q.x1 * invscale, q.y0 * invscale)
 		TransformPoint(&c[4], &c[5], state.xform, q.x1 * invscale, q.y1 * invscale)
 		TransformPoint(&c[6], &c[7], state.xform, q.x0 * invscale, q.y1 * invscale)
-		
+
 		// Create triangles
 		if nverts + 6 <= cverts {
 			verts[nverts+0] = {c[0], c[1], q.s0, q.t0}
@@ -3065,7 +3065,7 @@ TextBox :: proc(
 
 	if state.fontId == -1 {
 		return
-	} 
+	}
 
 	_, _, lineHeight := TextMetrics(ctx)
 	old_align := state.alignHorizontal
@@ -3077,7 +3077,7 @@ TextBox :: proc(
 	input := input
 	for nrows, input_last in TextBreakLines(ctx, &input, break_row_width, &rows_mod) {
 		for row in rows[:nrows] {
-			Text(ctx, x, y, input_last[row.start:row.end])		
+			Text(ctx, x, y, input_last[row.start:row.end])
 			y += lineHeight * state.lineHeight
 		}
 	}
@@ -3144,15 +3144,15 @@ TextBreakLines :: proc(
 
 		case '\n':
 			type = .Space if pcodepoint == 13 else .Newline
-		
+
 		case '\r':
 			type = .Space if pcodepoint == 10 else .Newline
 
-		case 0x0085: 
+		case 0x0085:
 			// NEL
 			type = .Newline
 
-		case: 
+		case:
 			switch iter.codepoint {
 			case 0x4E00..=0x9FFF,
 			     0x3000..=0x30FF,
@@ -3175,7 +3175,7 @@ TextBreakLines :: proc(
 			rows[nrows].maxx  = row_max_x * invscale
 			rows[nrows].next  = iter.next
 			nrows += 1
-			
+
 			if nrows >= max_rows {
 				stopped_early = true
 				break
@@ -3311,7 +3311,7 @@ TextBreakLines :: proc(
 	// terminate the for loop on non ok
 	ok = nrows != 0
 
-	return 
+	return
 }
 
 // Measures the specified multi-text string. Parameter bounds should be a pointer to float[4],
@@ -3320,7 +3320,7 @@ TextBreakLines :: proc(
 TextBoxBounds :: proc(
 	ctx:           ^Context,
 	x, y:          f32,
-	breakRowWidth: f32, 
+	breakRowWidth: f32,
 	input:         string,
 	bounds:        ^[4]f32,
 ) {
@@ -3365,7 +3365,7 @@ TextBoxBounds :: proc(
 	for nrows in TextBreakLines(ctx, &input, breakRowWidth, &rows_mod) {
 		for row in rows[:nrows] {
 			rminx, rmaxx, dx: f32
-			
+
 			// Horizontal bounds
 			switch halign {
 			case .LEFT:   dx = 0
@@ -3435,7 +3435,7 @@ TextGlyphPositions :: proc(
 		positions[npos].minx = min(iter.x, q.x0) + x
 		positions[npos].maxx = max(iter.nextx, q.x1) + x
 		npos += 1
-		
+
 		if npos >= len(positions) {
 			break
 		}

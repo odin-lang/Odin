@@ -184,7 +184,7 @@ ln_f64 :: proc "contextless" (x: f64) -> f64 {
 	// constants. The decimal values may be used, provided that the
 	// compiler will convert from decimal to binary accurately enough
 	// to produce the hexadecimal values shown.
-	
+
 	LN2_HI :: 0h3fe62e42_fee00000 // 6.93147180369123816490e-01
 	LN2_LO :: 0h3dea39ef_35793c76 // 1.90821492927058770002e-10
 	L1     :: 0h3fe55555_55555593 // 6.666666666666735130e-01
@@ -194,7 +194,7 @@ ln_f64 :: proc "contextless" (x: f64) -> f64 {
 	L5     :: 0h3fc74664_96cb03de // 1.818357216161805012e-01
 	L6     :: 0h3fc39a09_d078c69f // 1.531383769920937332e-01
 	L7     :: 0h3fc2f112_df3e5244 // 1.479819860511658591e-01
-	
+
 	switch {
 	case is_nan(x) || is_inf(x, 1):
 		return x

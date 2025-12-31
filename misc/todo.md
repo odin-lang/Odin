@@ -15,4 +15,3 @@
 ## Command Line Tool
 * Begin!!!
 * Choose/determine architecture
-

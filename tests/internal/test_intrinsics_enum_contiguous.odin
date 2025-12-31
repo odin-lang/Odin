@@ -17,7 +17,7 @@ test_intrinsics_enum_is_contiguous :: proc(t: ^testing.T) {
 	testing.expect(t, contiguous(enum { Delta=-4 }))
 	testing.expect(t, contiguous(enum { X = 2 * len([?]u8{ 0 }) }))
 	testing.expect(t, contiguous(enum { Alpha=-2, Beta=-1, Gamma=0, Delta=-3 }))
-	
+
 	testing.expect(t, !contiguous(enum { A=1, B=3 }))
 	testing.expect(t, !contiguous(enum { B=-5, Beta=-3 }))
 	testing.expect(t, !contiguous(enum { A=0, B=-2 }))

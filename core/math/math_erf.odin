@@ -2,7 +2,7 @@ package math
 
 // The original C code and the long comment below are
 // from FreeBSD's /usr/src/lib/msun/src/s_erf.c and
-// came with this notice. 
+// came with this notice.
 //
 // ====================================================
 // Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -186,8 +186,8 @@ erf_f64 :: proc "contextless" (x: f64) -> f64 {
 	sb5 :: 0h40A3F219CEDF3BE6
 	sb6 :: 0h407DA874E79FE763
 	sb7 :: 0hC03670E242712D62
-	
-	
+
+
 	VERY_TINY :: 0h0080000000000000
 	SMALL     :: 1.0 / (1 << 28)        // 2**-28
 
@@ -338,7 +338,7 @@ erfc_f64 :: proc "contextless" (x: f64) -> f64 {
 	sb5 :: 0h40A3F219CEDF3BE6
 	sb6 :: 0h407DA874E79FE763
 	sb7 :: 0hC03670E242712D62
-	
+
 	TINY :: 1.0 / (1 << 56) // 2**-56
 	// special cases
 	switch {

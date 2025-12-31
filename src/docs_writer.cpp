@@ -753,7 +753,7 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 		doc_type.types = odin_doc_type_as_slice(w, type->SimdVector.elem);
 		// TODO(bill):
 		break;
-		
+
 	case Type_Matrix:
 		doc_type.kind = OdinDocType_Matrix;
 		doc_type.elem_count_len = 2;

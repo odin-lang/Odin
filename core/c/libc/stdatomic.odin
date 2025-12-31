@@ -179,7 +179,7 @@ atomic_exchange_explicit :: #force_inline proc(object: ^$T, desired: T, order: m
 // 	[success = acq_rel, failure = relaxed] => acqrel_failrelaxed
 atomic_compare_exchange_strong :: #force_inline proc(object, expected: ^$T, desired: T) -> bool {
 	value, ok := intrinsics.atomic_compare_exchange_strong(object, expected^, desired)
-	if !ok { expected^ = value } 
+	if !ok { expected^ = value }
 	return ok
 }
 

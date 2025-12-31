@@ -116,7 +116,7 @@ find_path_flag :: enum u32 {
 	CREATE_DIRECTORY        = intrinsics.constant_log2(0x0001),
 	CREATE_PARENT_DIRECTORY = intrinsics.constant_log2(0x0002),
 	EXISTING_ONLY           = intrinsics.constant_log2(0x0004),
-	
+
 	// find_paths() only
 	SYSTEM_ONLY             = intrinsics.constant_log2(0x0010),
 	USER_ONLY               = intrinsics.constant_log2(0x0020),

@@ -639,7 +639,7 @@ compare_f64s :: proc(a, b: f64) -> int {
 compare_strings :: proc(a, b: string) -> int {
 	x := transmute(mem.Raw_String)a
 	y := transmute(mem.Raw_String)b
-	
+
 	ret := mem.compare_byte_ptrs(x.data, y.data, min(x.len, y.len))
 	if ret == 0 && x.len != y.len {
 		return -1 if x.len < y.len else +1

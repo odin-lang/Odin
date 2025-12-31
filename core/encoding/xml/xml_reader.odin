@@ -458,7 +458,7 @@ check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Att
 			return .Duplicate_Attribute
 		}
 	}
-	return .None	
+	return .None
 }
 
 parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {

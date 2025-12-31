@@ -44,4 +44,3 @@ _terminate :: proc(using thread : ^Thread, exit_code: int) {
 _yield :: proc() {
 	unimplemented("core:thread procedure not supported on target")
 }
-

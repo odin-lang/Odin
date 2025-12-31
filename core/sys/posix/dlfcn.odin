@@ -18,7 +18,7 @@ when ODIN_OS == .Darwin {
 
 foreign lib {
 	/*
-	inform the system that the object referenced by a handle returned from a previous dlopen() 
+	inform the system that the object referenced by a handle returned from a previous dlopen()
 	invocation is no longer needed by the application.
 
 	Returns: 0 on success, non-zero on failure (use dlerror() for more information)
@@ -125,4 +125,3 @@ when ODIN_OS == .Darwin {
 	RTLD_LOCAL   :: RTLD_Flags{}
 
 }
-

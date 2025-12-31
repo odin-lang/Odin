@@ -94,5 +94,3 @@ assert :: proc "c" (condition: bool, loc := #caller_location, _message := #calle
 
 assert_release :: assert
 assert_always  :: enabled_assert
-
-

@@ -18,4 +18,3 @@ test_scalar_matrix_conversion :: proc(t: ^testing.T) {
 		}
 	}
 }
-

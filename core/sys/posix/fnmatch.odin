@@ -13,7 +13,7 @@ when ODIN_OS == .Darwin {
 
 foreign lib {
 	/*
-	Match patterns as described in XCU [[ Patterns Matching a Single Character; https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01 ]] 
+	Match patterns as described in XCU [[ Patterns Matching a Single Character; https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_01 ]]
 	// and [[ Patterns Matching Multiple Characters; https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_13_02 ]].
 	It checks the string specified by the string argument to see if it matches the pattern specified by the pattern argument.
 

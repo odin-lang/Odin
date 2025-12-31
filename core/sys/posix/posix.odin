@@ -74,4 +74,3 @@ when ODIN_OS == .Darwin && ODIN_ARCH == .amd64 {
 	@(private)
 	INODE_SUFFIX :: ""
 }
-

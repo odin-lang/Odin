@@ -1662,7 +1662,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		syntax_error(prev, "'..' for ranges are not allowed, did you mean '..<' or '..='?");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
-	
+
 	advance_token(f);
 	return prev;
 }
@@ -2673,7 +2673,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			count_expr = parse_expr(f, false);
 			f->expr_level--;
 		}
-		
+
 		expect_token(f, Token_CloseBracket);
 		return ast_array_type(f, token, count_expr, parse_type(f));
 	} break;
@@ -2691,21 +2691,21 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		return ast_map_type(f, token, key, value);
 	} break;
-	
+
 	case Token_matrix: {
 		Token token = expect_token(f, Token_matrix);
 		Ast *row_count = nullptr;
 		Ast *column_count = nullptr;
 		Ast *type = nullptr;
 		Token open, close;
-		
+
 		open  = expect_token_after(f, Token_OpenBracket, "matrix");
 		row_count = parse_expr(f, true);
 		expect_token(f, Token_Comma);
 		column_count = parse_expr(f, true);
 		close = expect_token(f, Token_CloseBracket);
 		type = parse_type(f);
-		
+
 		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
 
@@ -6912,7 +6912,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
-		
+
 
 		for (String const &path : build_context.extra_packages) {
 			String fullpath = path_to_full_path(permanent_allocator(), path); // LEAK?
@@ -6929,7 +6929,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 		}
 	}
-	
+
 	thread_pool_wait();
 
 	for (ParseFileErrorNode *node = p->file_error_head; node != nullptr; node = node->next) {
@@ -6961,4 +6961,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	return ParseFile_None;
 }
-

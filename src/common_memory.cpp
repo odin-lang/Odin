@@ -37,7 +37,7 @@ gb_internal Thread *get_current_thread(void);
 
 struct MemoryBlock {
 	MemoryBlock *prev;
-	u8 *         base; 
+	u8 *         base;
 	isize        size;
 	isize        used;
 };
@@ -92,25 +92,25 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	if (arena->curr_block == nullptr || (arena->curr_block->used + size) > arena->curr_block->size) {
 		size = align_formula_isize(min_size, alignment);
 		arena->minimum_block_size = gb_max(DEFAULT_MINIMUM_BLOCK_SIZE, arena->minimum_block_size);
-		
+
 		isize block_size = gb_max(size, arena->minimum_block_size);
-		
+
 		MemoryBlock *new_block = virtual_memory_alloc(block_size);
 		new_block->prev = arena->curr_block;
 		arena->curr_block = new_block;
 	}
-	
+
 	MemoryBlock *curr_block = arena->curr_block;
 	GB_ASSERT((curr_block->used + size) <= curr_block->size);
-	
+
 	u8 *ptr = curr_block->base + curr_block->used;
 	ptr += arena_align_forward_offset(arena, alignment);
-	
+
 	curr_block->used += size;
 	GB_ASSERT(curr_block->used <= curr_block->size);
 
-	// NOTE(bill): memory will be zeroed by default due to virtual memory 
-	return ptr;	
+	// NOTE(bill): memory will be zeroed by default due to virtual memory
+	return ptr;
 }
 
 
@@ -144,9 +144,9 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	gb_internal void platform_virtual_memory_init(void) {
-		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
+		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;
 		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
-		
+
 		SYSTEM_INFO sys_info = {};
 		GetSystemInfo(&sys_info);
 		DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sys_info.dwPageSize);
@@ -179,13 +179,13 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 	#endif
 
 	gb_internal void platform_virtual_memory_init(void) {
-		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
+		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;
 		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
-		
+
 		DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sysconf(_SC_PAGE_SIZE));
 		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
 	}
-	
+
 	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 		if (pmblock == nullptr) {
@@ -209,12 +209,12 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 #endif
 
 gb_internal MemoryBlock *virtual_memory_alloc(isize size) {
-	isize const page_size = DEFAULT_PAGE_SIZE; 
-	
+	isize const page_size = DEFAULT_PAGE_SIZE;
+
 	isize total_size     = size + gb_size_of(PlatformMemoryBlock);
 	isize base_offset    = gb_size_of(PlatformMemoryBlock);
 	isize protect_offset = 0;
-	
+
 	bool do_protection = false;
 	{ // overflow protection
 		isize rounded_size = align_formula_isize(size, page_size);
@@ -223,19 +223,19 @@ gb_internal MemoryBlock *virtual_memory_alloc(isize size) {
 		protect_offset = page_size + rounded_size;
 		do_protection  = true;
 	}
-	
+
 	PlatformMemoryBlock *pmblock = platform_virtual_memory_alloc(total_size);
 	GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
-	
+
 	pmblock->block.base = cast(u8 *)pmblock + base_offset;
 	// Should be zeroed
 	GB_ASSERT(pmblock->block.used == 0);
 	GB_ASSERT(pmblock->block.prev == nullptr);
-	
+
 	if (do_protection) {
 		platform_virtual_memory_protect(cast(u8 *)pmblock + protect_offset, page_size);
 	}
-	
+
 	pmblock->block.size = size;
 	pmblock->total_size = total_size;
 
@@ -246,7 +246,7 @@ gb_internal MemoryBlock *virtual_memory_alloc(isize size) {
 	pmblock->prev->next = pmblock;
 	pmblock->next->prev = pmblock;
 	mutex_unlock(&global_memory_block_mutex);
-	
+
 	return &pmblock->block;
 }
 
@@ -257,7 +257,7 @@ gb_internal void virtual_memory_dealloc(MemoryBlock *block_to_free) {
 		block->prev->next = block->next;
 		block->next->prev = block->prev;
 		mutex_unlock(&global_memory_block_mutex);
-			
+
 		platform_virtual_memory_free(block);
 	}
 }
@@ -602,7 +602,7 @@ gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	case gbAllocation_Alloc: {
 		int err = 0;
 		alignment = gb_max(alignment, gb_align_of(max_align_t));
-		
+
 		err = posix_memalign(&ptr, alignment, size);
 		GB_ASSERT_MSG(err == 0, "posix_memalign err: %d", err);
 		gb_zero_size(ptr, size);
@@ -620,9 +620,9 @@ gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 			free(old_memory);
 			break;
 		}
-		
+
 		alignment = gb_max(alignment, gb_align_of(max_align_t));
-		
+
 		if (old_memory == nullptr) {
 			err = posix_memalign(&ptr, alignment, size);
 			GB_ASSERT_MSG(err == 0, "posix_memalign err: %d", err);
@@ -671,4 +671,3 @@ gb_internal isize resize_array_raw(T **array, gbAllocator const &a, isize old_co
 	*array = new_data;
 	return new_count;
 }
-

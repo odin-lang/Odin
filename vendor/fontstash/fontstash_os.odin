@@ -20,4 +20,3 @@ AddFontPath :: proc(
 
 	return AddFontMem(ctx, name, data, true, fontIndex)
 }
-

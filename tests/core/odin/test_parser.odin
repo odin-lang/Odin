@@ -15,7 +15,7 @@ test_parse_demo :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "examples/demo")
-	
+
 	testing.expect(t, ok, "parser.parse_package_from_path failed")
 
 	for key, value in pkg.files {
@@ -73,7 +73,7 @@ test_parse_parser :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "core/odin/parser")
-	
+
 	testing.expect(t, ok, "parser.parse_package_from_path failed")
 
 	for key, value in pkg.files {
@@ -87,7 +87,7 @@ test_parse_stb_image :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "vendor/stb/image")
-	
+
 	testing.expect(t, ok, "parser.parse_package_from_path failed")
 
 	for key, value in pkg.files {

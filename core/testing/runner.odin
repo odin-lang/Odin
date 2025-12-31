@@ -136,7 +136,7 @@ run_test_task :: proc(task: thread.Task) {
 	chan.send(data.t.channel, Event_State_Change {
 		new_state = .Running,
 	})
-	
+
 	context.assertion_failure_proc = test_assertion_failure_proc
 
 	logger_options := Default_Test_Logger_Opts
@@ -865,7 +865,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		total_done_count,
 		"" if total_done_count == 1 else "s",
 		finished_in)
-	
+
 	if total_done_count != total_test_count {
 		not_run_count := total_test_count - total_done_count
 		message := " %i %s left undone." if global_log_colors_disabled else " " + SGR_READY + "%i" + SGR_RESET + " %s left undone."
@@ -924,7 +924,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				encoded_names := base64.encode(bytes.buffer_to_bytes(&clipboard_buffer), allocator = context.temp_allocator)
 
 				fmt.wprintf(batch_writer,
-					ansi.OSC + ansi.CLIPBOARD + ";c;%s" + ansi.ST + 
+					ansi.OSC + ansi.CLIPBOARD + ";c;%s" + ansi.ST +
 					"\nThe name%s of the failed test%s been copied to your clipboard.",
 					encoded_names,
 					"" if total_failure_count == 1 else "s",

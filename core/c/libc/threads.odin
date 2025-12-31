@@ -7,7 +7,7 @@ tss_dtor_t   :: proc "c" (rawptr)
 
 when ODIN_OS == .Windows {
 	foreign import libc {
-		"system:libucrt.lib", 
+		"system:libucrt.lib",
 		"system:msvcprt.lib",
 	}
 
@@ -46,7 +46,7 @@ when ODIN_OS == .Windows {
 		@(link_name="_Cnd_signal")    cnd_signal    :: proc(cond: ^cnd_t) -> int ---
 		@(link_name="_Cnd_timedwait") cnd_timedwait :: proc(cond: ^cnd_t, mtx: ^mtx_t, ts: ^timespec) -> int ---
 		@(link_name="_Cnd_wait")      cnd_wait      :: proc(cond: ^cnd_t, mtx: ^mtx_t) -> int ---
-		
+
 		// 7.26.4 Mutex functions
 		@(link_name="_Mtx_destroy")   mtx_destroy   :: proc(mtx: ^mtx_t) ---
 		@(link_name="_Mtx_init")      mtx_init      :: proc(mtx: ^mtx_t, type: int) -> int ---
@@ -110,7 +110,7 @@ when ODIN_OS == .Linux {
 		cnd_signal    :: proc(cond: ^cnd_t) -> int ---
 		cnd_timedwait :: proc(cond: ^cnd_t, mtx: ^mtx_t, ts: ^timespec) -> int ---
 		cnd_wait      :: proc(cond: ^cnd_t, mtx: ^mtx_t) -> int ---
-		
+
 		// 7.26.4 Mutex functions
 		mtx_destroy   :: proc(mtx: ^mtx_t) ---
 		mtx_init      :: proc(mtx: ^mtx_t, type: int) -> int ---

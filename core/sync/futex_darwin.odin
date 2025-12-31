@@ -103,7 +103,7 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 			return
 		}
 		switch s {
-		case EINTR, EFAULT: 
+		case EINTR, EFAULT:
 			continue loop
 		case ENOENT:
 			return
@@ -139,7 +139,7 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 			return
 		}
 		switch s {
-		case EINTR, EFAULT: 
+		case EINTR, EFAULT:
 			continue loop
 		case ENOENT:
 			return

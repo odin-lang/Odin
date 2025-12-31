@@ -23,7 +23,7 @@ Some useful helper procedures can be found in `helpers.odin`, for tasks such as:
 
 ## Debug mode
 
-Each `gl` call will be appended by a debug helper calling `glGetError()` if compiled with `-debug`. This can be useful to detect incorrect usage. Sample output (also outputting the NO_ERRORS case for the sake of showcasing): 
+Each `gl` call will be appended by a debug helper calling `glGetError()` if compiled with `-debug`. This can be useful to detect incorrect usage. Sample output (also outputting the NO_ERRORS case for the sake of showcasing):
 
 ```
 glGetError() returned NO_ERROR
@@ -33,7 +33,7 @@ glGetError() returned NO_ERROR
    call: glEnable(GL_DEBUG_OUTPUT=37600)
    in:   C:/<snip>/main.odin(185:6)
 glGetError() returned NO_ERROR
-   call: glGetError() -> 0 
+   call: glGetError() -> 0
    in:   C:/<snip>/main.odin(193:5)
 glGetError() returned INVALID_ENUM
    call: glEnable(INVALID_ENUM=123123123)

@@ -675,7 +675,7 @@ when ODIN_ARCH == .amd64 {
 	SYS_landlock_create_ruleset : uintptr : 444
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
-	
+
 	SIGCHLD :: 17
 } else when ODIN_ARCH == .i386 {
 	SYS_restart_syscall : uintptr : 0
@@ -2412,7 +2412,7 @@ sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
 		seconds := i64(timeout / 1_000)
 		nanoseconds := i64((timeout % 1000) * 1_000_000)
 		timeout_spec := timespec{seconds, nanoseconds}
-		
+
 		return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(&timeout_spec), uintptr(0), uintptr(8)))
 	} else {
 		return int(intrinsics.syscall(SYS_poll, uintptr(fds), uintptr(nfds), uintptr(timeout)))

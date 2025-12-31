@@ -33,7 +33,7 @@ _pipe :: proc() -> (r, w: ^File, err: Error) {
 
 	w = __new_file(fds[1], file_allocator())
 	wi := (^File_Impl)(w.impl)
-	
+
 	wname := strings.builder_make(file_allocator())
 	// TODO(laytan): is this on all the posix targets?
 	strings.write_string(&wname, "/dev/fd/")

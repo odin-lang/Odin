@@ -15,6 +15,6 @@ _main:
 	str x1, [x5, #8] ; get argv into x1
 
 	and sp, x5, #~15 ; force 16-byte alignment of the stack
-	
+
 	bl __start_odin  ; call into Odin entry point
 	ret              ; should never get here

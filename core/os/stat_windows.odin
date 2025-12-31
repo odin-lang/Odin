@@ -7,7 +7,7 @@ import win32 "core:sys/windows"
 @(private, require_results)
 full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Errno) {
 	context.allocator = allocator
-	
+
 	name := name
 	if name == "" {
 		name = "."

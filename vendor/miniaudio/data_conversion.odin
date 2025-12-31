@@ -473,20 +473,20 @@ foreign lib {
 	/*
 	Find a channel position in the given channel map. Returns MA_TRUE if the channel is found; MA_FALSE otherwise. The
 	index of the channel is output to `pChannelIndex`.
-	
+
 	The channel map buffer must have a capacity of at least `channels`.
 	*/
 	channel_map_find_channel_position :: proc(channels: u32, pChannelMap: [^]channel, channelPosition: channel, pChannelIndex: ^u32) -> b32 ---
 
 	/*
 	Generates a string representing the given channel map.
-	
+
 	This is for printing and debugging purposes, not serialization/deserialization.
-	
+
 	Returns the length of the string, not including the null terminator.
 	*/
 	channel_map_to_string :: proc(pChannelMap: [^]channel, channels: u32, pBufferOut: [^]u8, bufferCap: uint) -> uint ---
-	
+
 	/*
 	Retrieves a human readable version of a channel position.
 	*/
@@ -523,9 +523,9 @@ Ring Buffer
 ************************************************************************************************************************************************************/
 rb :: struct {
 	pBuffer:                rawptr,
-	subbufferSizeInBytes:   u32, 
-	subbufferCount:         u32, 
-	subbufferStrideInBytes: u32, 
+	subbufferSizeInBytes:   u32,
+	subbufferCount:         u32,
+	subbufferStrideInBytes: u32,
 	encodedReadOffset:      u32, /*atomic*/       /* Most significant bit is the loop flag. Lower 31 bits contains the actual offset in bytes. Must be used atomically. */
 	encodedWriteOffset:     u32, /*atomic*/       /* Most significant bit is the loop flag. Lower 31 bits contains the actual offset in bytes. Must be used atomically. */
 	ownsBuffer:             b8,                   /* Used to know whether or not miniaudio is responsible for free()-ing the buffer. */
@@ -603,4 +603,3 @@ foreign lib {
 	duplex_rb_init   :: proc(captureFormat: format, captureChannels: u32, sampleRate: u32, captureInternalSampleRate, captureInternalPeriodSizeInFrames: u32, pAllocationCallbacks: ^allocation_callbacks, pRB: ^duplex_rb) -> result ---
 	duplex_rb_uninit :: proc(pRB: ^duplex_rb) -> result ---
 }
-

@@ -14,7 +14,7 @@ foreign lib {
 	device_job_thread_next   :: proc(pJobThread: ^device_job_thread, pJob: ^job) -> result ---
 
 	device_id_equal :: proc(pA: ^device_id, pB: ^device_id) -> b32 ---
-	
+
 	/*
 	Initializes a `ma_context_config` object.
 
@@ -1676,4 +1676,3 @@ foreign lib {
 	*/
 	is_loopback_supported :: proc(backend: backend) -> b32 ---
 }
-

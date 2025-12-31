@@ -21,7 +21,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		}
 		defer posix.free(real)
 		return clone_string(string(real), allocator)
-	} 
+	}
 
 	arg := runtime.args__[0]
 	sarg := string(arg)

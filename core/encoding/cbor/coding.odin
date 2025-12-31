@@ -25,7 +25,7 @@ Encoder_Flag :: enum {
 	// Sort maps by their keys in bytewise lexicographic order of their deterministic encoding.
 	// NOTE: In order to do this, all keys of a map have to be pre-computed, sorted, and
 	// then written, this involves temporary allocations for the keys and a copy of the map itself.
-	Deterministic_Map_Sorting, 
+	Deterministic_Map_Sorting,
 }
 
 Encoder_Flags :: bit_set[Encoder_Flag]
@@ -51,7 +51,7 @@ Decoder_Flag :: enum {
 	// attackers can craft input that causes massive (`max(u64)`) byte allocations for a few bytes of
 	// CBOR.
 	Trusted_Input,
-	
+
 	// Makes the decoder shrink of excess capacity from allocated buffers/containers before returning.
 	Shrink_Excess,
 }
@@ -115,7 +115,7 @@ decode_from_reader :: proc(r: io.Reader, flags: Decoder_Flags = {}, allocator :=
 // See docs on the proc group `decode` for more information.
 decode_from_decoder :: proc(d: Decoder, allocator := context.allocator, loc := #caller_location) -> (v: Value, err: Decode_Error) {
 	context.allocator = allocator
-	
+
 	d := d
 
 	if d.max_pre_alloc <= 0 {
@@ -151,7 +151,7 @@ _decode_from_decoder :: proc(d: Decoder, hdr: Header = Header(0), allocator := c
 
 	case .True:  return true, nil
 	case .False: return false, nil
-	
+
 	case .Nil:       return Nil{}, nil
 	case .Undefined: return Undefined{}, nil
 
@@ -380,7 +380,7 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 
 	add := add
 	n, scap := _decode_len_str(d, add) or_return
-	
+
 	buf := strings.builder_make(0, scap, allocator, loc) or_return
 	defer if err != nil { strings.builder_destroy(&buf) }
 	buf_stream := strings.to_stream(&buf)
@@ -458,7 +458,7 @@ _decode_array :: proc(d: Decoder, add: Add, allocator := context.allocator, loc 
 		for entry in array { destroy(entry, allocator) }
 		delete(array, loc)
 	}
-	
+
 	for i := 0; n == -1 || i < n; i += 1 {
 		val, verr := _decode_from_decoder(d, {}, allocator, loc)
 		if n == -1 && verr == .Break {
@@ -472,7 +472,7 @@ _decode_array :: proc(d: Decoder, add: Add, allocator := context.allocator, loc 
 	}
 
 	if .Shrink_Excess in d.flags { shrink(&array) }
-	
+
 	v = array[:]
 	return
 }
@@ -497,7 +497,7 @@ _decode_map_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, lo
 _decode_map :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Map, err: Decode_Error) {
 	n, scap := _decode_len_container(d, add) or_return
 	items := make([dynamic]Map_Entry, 0, scap, allocator, loc) or_return
-	defer if err != nil { 
+	defer if err != nil {
 		for entry in items {
 			destroy(entry.key)
 			destroy(entry.value)
@@ -511,7 +511,7 @@ _decode_map :: proc(d: Decoder, add: Add, allocator := context.allocator, loc :=
 			break
 		} else if kerr != nil {
 			return nil, kerr
-		} 
+		}
 
 		value := _decode_from_decoder(d, {}, allocator, loc) or_return
 
@@ -522,7 +522,7 @@ _decode_map :: proc(d: Decoder, add: Add, allocator := context.allocator, loc :=
 	}
 
 	if .Shrink_Excess in d.flags { shrink(&items) }
-	
+
 	v = items[:]
 	return
 }
@@ -530,7 +530,7 @@ _decode_map :: proc(d: Decoder, add: Add, allocator := context.allocator, loc :=
 _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 	assert(len(m) >= 0)
 	_encode_u64(e, u64(len(m)), .Map) or_return
-	
+
 	if .Deterministic_Map_Sorting not_in e.flags {
 		for entry in m {
 			encode(e, entry.key)   or_return
@@ -556,14 +556,14 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 		entry.entry = m[i]
 
 		buf := strings.builder_make(e.temp_allocator) or_return
-		
+
 		ke := e
 		ke.writer = strings.to_stream(&buf)
 
 		encode(ke, entry.entry.key) or_return
 		entry.encoded_key = buf.buf[:]
 	}
-	
+
 	// Sort lexicographic on the bytes of the key.
 	slice.sort_by_cmp(entries, proc(a, b: Map_Entry_With_Key) -> slice.Ordering {
 		return slice.Ordering(bytes.compare(a.encoded_key, b.encoded_key))
@@ -645,7 +645,7 @@ _encode_simple :: proc(w: io.Writer, v: Simple) -> (err: Encode_Error) {
 	} else if v <= Simple(Add.Break) {
 		return .Invalid_Simple
 	}
-	
+
 	header |= u8(Add.One_Byte)
 	_, err = io.write_full(w, {header, u8(v)})
 	return
@@ -655,7 +655,7 @@ _decode_tiny_simple :: proc(add: Add) -> (Simple, Decode_Data_Error) {
 	if add < Add.False {
 		return Simple(add), nil
 	}
-	
+
 	return 0, .Bad_Argument
 }
 

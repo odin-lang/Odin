@@ -148,7 +148,7 @@ when ODIN_OS == .Haiku {
 		PARODD = log2(PARODD), /* odd parity, else even */
 		HUPCL  = log2(HUPCL),  /* hang up on last close */
 		CLOCAL = log2(CLOCAL), /* ignore modem status lines */
-	}	
+	}
 } else {
 	CControl_Flag_Bits :: enum tcflag_t {
 		// CS5    = log2(CS5), /* 5 bits (pseudo) (default) */

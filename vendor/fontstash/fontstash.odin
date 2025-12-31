@@ -21,7 +21,7 @@ import stbtt "vendor:stb/truetype"
 // Atlas can resize
 
 // Changes from the original:
-// stb truetype only 
+// stb truetype only
 // no scratch allocation -> parts use odins dynamic arrays
 // leaves GPU vertex creation & texture management up to the user
 // texture atlas expands by default
@@ -103,7 +103,7 @@ FontContext :: struct {
 	// 1 / texture_atlas_width, 1 / texture_atlas_height
 	itw, ith: f32,
 
-	// state 
+	// state
 	states:      []State,
 	state_count: int, // used states
 
@@ -116,9 +116,9 @@ FontContext :: struct {
 	userData: rawptr, // by default set to the context
 
 	// called when a texture is expanded and needs handling
-	callbackResize: proc(data: rawptr, w, h: int), 
+	callbackResize: proc(data: rawptr, w, h: int),
 	// called in state_end to update the texture region that changed
-	callbackUpdate: proc(data: rawptr, dirtyRect: [4]f32, textureData: rawptr), 
+	callbackUpdate: proc(data: rawptr, dirtyRect: [4]f32, textureData: rawptr),
 }
 
 Init :: proc(ctx: ^FontContext, w, h: int, loc: QuadLocation) {
@@ -129,7 +129,7 @@ Init :: proc(ctx: ^FontContext, w, h: int, loc: QuadLocation) {
 	ctx.itw, ctx.ith = 1.0 / f32(w), 1.0 / f32(h)
 
 	ctx.textureData = make([]byte, w * h)
-	
+
 	ctx.width  = w
 	ctx.height = h
 	ctx.nodes  = make([dynamic]AtlasNode, 0, INIT_ATLAS_NODES)
@@ -280,7 +280,7 @@ __AtlasAddRect :: proc(using ctx: ^FontContext, rw, rh: int) -> (rx, ry: int, ok
 	// Bottom left fit heuristic.
 	for i in 0..<len(nodes) {
 		y := __AtlasRectFits(ctx, i, rw, rh)
-		
+
 		if y != -1 {
 			if y + rh < besth || (y + rh == besth && int(nodes[i].width) < bestw) {
 				besti = i
@@ -297,7 +297,7 @@ __AtlasAddRect :: proc(using ctx: ^FontContext, rw, rh: int) -> (rx, ry: int, ok
 	}
 
 	// Perform the actual packing.
-	__AtlasAddSkylineLevel(ctx, besti, bestx, besty, rw, rh) 
+	__AtlasAddSkylineLevel(ctx, besti, bestx, besty, rw, rh)
 	return bestx, besty, true
 }
 
@@ -361,7 +361,7 @@ AddFont :: proc { AddFontPath, AddFontMem }
 
 AddFallbackFont :: proc(ctx: ^FontContext, base, fallback: int) -> bool {
 	base_font := __getFont(ctx, base)
-	
+
 	if base_font.nfallbacks < MAX_FALLBACKS {
 		base_font.fallbacks[base_font.nfallbacks] = fallback
 		base_font.nfallbacks += 1
@@ -445,7 +445,7 @@ __getGlyph :: proc(
 	h := __hashint(u32(codepoint)) & (HASH_LUT_SIZE - 1)
 	for i := font.lut[h]; i != -1; /**/ {
 		glyph := &font.glyphs[i]
-		
+
 		if glyph.codepoint == codepoint &&
 		   glyph.isize     == isize &&
 		   glyph.blurSize  == blur {
@@ -480,7 +480,7 @@ __getGlyph :: proc(
 	scale      := __getPixelHeightScale(render_font, pixel_size)
 	advance, _, x0, y0, x1, y1 := __buildGlyphBitmap(render_font, glyph_index, pixel_size, scale)
 	gw := (x1 - x0) + i32(padding) * 2
-	gh := (y1 - y0) + i32(padding) * 2 
+	gh := (y1 - y0) + i32(padding) * 2
 
 	// Find free spot for the rect in the atlas
 	gx, gy, rect_ok := __AtlasAddRect(ctx, int(gw), int(gh))
@@ -489,7 +489,7 @@ __getGlyph :: proc(
 		ExpandAtlas(ctx, ctx.width * 2, ctx.height * 2)
 		gx, gy = __AtlasAddRect(ctx, int(gw), int(gh)) or_return
 	}
-	
+
 	// Init glyph.
 	append(&font.glyphs, Glyph{
 		codepoint = codepoint,
@@ -515,9 +515,9 @@ __getGlyph :: proc(
 	__renderGlyphBitmap(
 		render_font,
 		dst,
-		gw - i32(padding) * 2, 
-		gh - i32(padding) * 2, 
-		i32(ctx.width), 
+		gw - i32(padding) * 2,
+		gh - i32(padding) * 2,
+		i32(ctx.width),
 		scale,
 		scale,
 		glyph_index,
@@ -790,7 +790,7 @@ __getVerticalAlign :: proc(
 		case .BOTTOM: res = font.descender * f32(pixelSize) / 10
 		}
 
-	case .BOTTOMLEFT: 
+	case .BOTTOMLEFT:
 		switch av {
 		case .TOP: res = -font.ascender * f32(pixelSize) / 10
 		case .MIDDLE: res = -(font.ascender + font.descender) / 2 * f32(pixelSize) / 10
@@ -885,7 +885,7 @@ PushState :: proc(using ctx: ^FontContext, loc := #caller_location) #no_bounds_c
 	state_count += 1
 }
 
-// pop a state 
+// pop a state
 PopState :: proc(using ctx: ^FontContext) {
 	if state_count <= 1 {
 		log.error("FONTSTASH: state underflow! to many pops were called")
@@ -944,13 +944,13 @@ SetAlignVertical :: proc(ctx: ^FontContext, av: AlignVertical) {
 __getQuad :: proc(
 	ctx:  ^FontContext,
 	font: ^Font,
-	
+
 	previousGlyphIndex: i32,
 	glyph:              ^Glyph,
 
 	scale:   f32,
 	spacing: f32,
-	
+
 	x, y: ^f32,
 	quad: ^Quad,
 ) {
@@ -972,7 +972,7 @@ __getQuad :: proc(
 	case .TOPLEFT:
 		rx = math.floor(x^ + xoff)
 		ry = math.floor(y^ + yoff)
-		
+
 		quad.x0 = rx
 		quad.y0 = ry
 		quad.x1 = rx + x1 - x0
@@ -1024,7 +1024,7 @@ TextIterInit :: proc(
 	case .CENTER:
 		width := TextBounds(ctx, text, x, y, nil)
 		x = math.round(x - width * 0.5)
-	case .RIGHT: 
+	case .RIGHT:
 		width := TextBounds(ctx, text, x, y, nil)
 		x -= width
 	}
@@ -1049,7 +1049,7 @@ TextIterInit :: proc(
 // step through each codepoint
 TextIterNext :: proc(
 	ctx:  ^FontContext,
-	iter: ^TextIter, 
+	iter: ^TextIter,
 	quad: ^Quad,
 ) -> (ok: bool) {
 	str := iter.next
@@ -1096,7 +1096,7 @@ TextBounds :: proc(
 	miny, maxy := y, y
 	start_x := x
 
-	// iterate	
+	// iterate
 	scale := __getPixelHeightScale(font, f32(isize) / 10)
 	previousGlyphIndex: Glyph_Index = -1
 	quad: Quad
@@ -1143,7 +1143,7 @@ TextBounds :: proc(
 	switch state.ah {
 	case .LEFT:
 		/**/
-	case .CENTER: 
+	case .CENTER:
 		minx -= advance * 0.5
 		maxx -= advance * 0.5
 	case .RIGHT:

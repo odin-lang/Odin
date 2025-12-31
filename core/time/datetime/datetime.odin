@@ -188,7 +188,7 @@ Add delta to datetime.
 
 This procedure adds a delta to a datetime, and returns a new datetime. The new
 datetime would have happened the time specified by `delta` after the specified
-datetime. 
+datetime.
 */
 add_delta_to_datetime :: proc "contextless" (a: DateTime, delta: Delta) -> (datetime: DateTime, err: Error) {
 	days   := date_to_ordinal(a) or_return

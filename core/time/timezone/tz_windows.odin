@@ -156,7 +156,7 @@ tz_abbrevs := [?]struct{key: string, value: TZ_Abbrev}{
 
 iana_to_windows_tz :: proc(iana_name: string, allocator := context.allocator) -> (name: string, success: bool) {
 	wintz_name_buffer: [128]u16
-	status: windows.UError 
+	status: windows.UError
 
 	iana_name_wstr := windows.utf8_to_wstring(iana_name, allocator)
 	defer free(rawptr(iana_name_wstr), allocator)

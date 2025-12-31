@@ -47,7 +47,7 @@ Dial_Error :: enum i32 {
 	Network_Unreachable,
 	// Not enough space in internal tables/buffers to create a new socket, or an unsupported protocol is given.
 	Insufficient_Resources,
-	// Invalid endpoint and/or options.	
+	// Invalid endpoint and/or options.
 	Invalid_Argument,
 	// An attempt was made to connect to a broadcast socket on a socket that doesn't support it.
 	Broadcast_Not_Supported,

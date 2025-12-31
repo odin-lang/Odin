@@ -18,4 +18,3 @@ test_compound_literal_local_reuse :: proc(t: ^testing.T) {
 	testing.expectf(t, bug.val == 123,   "expected 123, found %d", bug.val)
 	testing.expectf(t, bug.arr[0] == 42, "expected 42, found %d", bug.arr[0])
 }
-

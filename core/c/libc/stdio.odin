@@ -172,7 +172,7 @@ when ODIN_OS == .FreeBSD {
 
 when ODIN_OS == .Darwin {
 	fpos_t :: distinct i64
-	
+
 	_IOFBF        :: 0
 	_IOLBF        :: 1
 	_IONBF        :: 2
@@ -202,7 +202,7 @@ when ODIN_OS == .Darwin {
 
 when ODIN_OS == .Haiku {
 	fpos_t :: distinct i64
-	
+
 	_IOFBF        :: 0
 	_IOLBF        :: 1
 	_IONBF        :: 2
@@ -344,7 +344,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 
 			n = i64(fread(raw_data(p), size_of(byte), len(p), file))
 			if n == 0 { err = unknown_or_eof(file) }
-		
+
 		case .Write:
 			n = i64(fwrite(raw_data(p), size_of(byte), len(p), file))
 			if n == 0 { err = unknown_or_eof(file) }
@@ -372,7 +372,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 			if fseek(file, long(offset), Whence(whence)) != 0 {
 				return 0, unknown_or_eof(file)
 			}
-		
+
 		case .Size:
 			curr := ftell(file)
 			if curr == -1 {
@@ -391,7 +391,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 
 		case .Destroy:
 			return 0, .Unsupported
-		
+
 		case .Query:
 			return io.query_utility({ .Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query })
 		}

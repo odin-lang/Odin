@@ -20,7 +20,7 @@ cryptographically-secure, per RFC 9562's suggestion.
 - Version 6 without either a clock or node argument.
 - Version 7 in all cases.
 
-Example:	
+Example:
 	package main
 
 	import "core:crypto"

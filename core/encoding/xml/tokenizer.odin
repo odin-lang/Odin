@@ -221,7 +221,7 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 		if t.ch == ':' {
 			// A namespaced attr can have at most two parts, `namespace:ident`.
 			if namespaced {
-				break	
+				break
 			}
 			namespaced = true
 		}
@@ -321,7 +321,7 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 				error(t, offset, string(t.src[offset : t.offset]))
 				error(t, offset, "[scan_string] Not terminated\n")
 				err = .Invalid_Tag_Value
-				break loop	
+				break loop
 			}
 		}
 

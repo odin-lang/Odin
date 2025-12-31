@@ -147,4 +147,3 @@ transaction_commit :: proc() {
 transaction_flush :: proc() {
 	msgSend(nil, Transaction, "flush")
 }
-

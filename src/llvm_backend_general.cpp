@@ -2372,7 +2372,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					array_add(&fields, padding_type);
 				}
 			}
-			
+
 			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, false);
 		}
 		break;
@@ -2386,7 +2386,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		} else {
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
-			
+
 			unsigned field_count = cast(unsigned)(type->Tuple.variables.count);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
@@ -2417,7 +2417,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_SimdVector:
 		return LLVMVectorType(lb_type(m, type->SimdVector.elem), cast(unsigned)type->SimdVector.count);
-		
+
 	case Type_Matrix:
 		{
 			i64 size = type_size_of(type);
@@ -2425,12 +2425,12 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			GB_ASSERT(elem_size > 0);
 			i64 elem_count = size/elem_size;
 			GB_ASSERT_MSG(elem_count > 0, "%s", type_to_string(type));
-			
+
 			m->internal_type_level -= 1;
-			
+
 			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
 			LLVMTypeRef t = llvm_array_type(elem, elem_count);
-			
+
 			m->internal_type_level += 1;
 			return t;
 		}
@@ -2454,7 +2454,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_BitField:
 		return lb_type_internal(m, type->BitField.backing_type);
-        
+
 	case Type_Generic:
 		if (type->Generic.specialized) {
 			return lb_type_internal(m, type->Generic.specialized);
@@ -2804,11 +2804,11 @@ general_end:;
 	if (src_size > dst_size) {
 		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
-		
+
 		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
 		LLVMTypeRef llvm_dst_type = LLVMPointerType(dst_type, 0);
 
-		LLVMValueRef val_ptr; 
+		LLVMValueRef val_ptr;
 		if (LLVMIsALoadInst(val)) {
 			val_ptr = LLVMGetOperand(val, 0);
 		} else if (LLVMIsAAllocaInst(val)) {

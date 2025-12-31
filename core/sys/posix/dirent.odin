@@ -101,7 +101,7 @@ foreign lib {
 	/*
 	Reset the position of the directory stream to which dirp refers to the beginning of the directory.
 	It shall also cause the directory stream to refer to the current state of the corresponding directory,
-	as a call to opendir() would have done. 
+	as a call to opendir() would have done.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/rewinddir.html ]]
 	*/
