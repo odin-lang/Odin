@@ -122,9 +122,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Rune:
 		r := a.(rune)
-		io.write_byte(w, '"')                  or_return
-		io.write_escaped_rune(w, r, '"', true) or_return
-		io.write_byte(w, '"')                  or_return
+		io.write_byte(w, '"')                             or_return
+		io.write_escaped_rune(w, r, '"', for_json = true) or_return
+		io.write_byte(w, '"')                             or_return
 
 	case runtime.Type_Info_Float:
 		switch f in a {
@@ -414,6 +414,12 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 				opt_write_iteration(w, opt, first_iteration) or_return
 				first_iteration = false
+
+				if opt.pretty {
+					comment := reflect.struct_tag_get(reflect.Struct_Tag(info.tags[i]), "jsoncomment")
+					opt_write_comment(w, opt, &comment) or_return
+				}
+
 				if json_name != "" {
 					opt_write_key(w, opt, json_name) or_return
 				} else {
@@ -531,6 +537,26 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	}
 
 	return
+}
+
+// Newlines are split into multiple comment lines
+opt_write_comment :: proc(w: io.Writer, opt: ^Marshal_Options, comment: ^string) -> (err: io.Error) {
+	if comment^ == "" {
+		return nil
+	}
+
+	switch opt.spec {
+	case .JSON5, .MJSON:
+		for line in strings.split_iterator(comment, "\n") {
+			io.write_string(w, "// ") or_return
+			io.write_string(w, line) or_return
+			io.write_rune(w, '\n') or_return
+			opt_write_indentation(w, opt) or_return
+		}
+	case .JSON: return nil
+	}
+
+	return nil
 }
 
 // write key as quoted string or with optional quotes in mjson

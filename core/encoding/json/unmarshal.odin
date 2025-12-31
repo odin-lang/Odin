@@ -225,6 +225,15 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 		}
 		ok = true
 		return
+	case rune:
+		for rne, i in str {
+			if i > 0 {
+				dst = {}
+				return false, .Invalid_Rune
+			}
+			dst = rne
+		}
+		return true, nil
 	}
 	
 	#partial switch variant in ti.variant {
