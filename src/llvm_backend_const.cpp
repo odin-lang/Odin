@@ -539,7 +539,7 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	}
 
 	if (big_int_is_neg(a)) {
-		// sizeof intead of sz for sign extend to work properly
+		// sizeof instead of sz for sign extend to work properly
 		for (size_t i = 0; i < sizeof rop64; i++) {
 			rop[i] = ~rop[i];
 		}
