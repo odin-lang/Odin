@@ -1086,7 +1086,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 
 		case 12:
 			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'o', &fi.n)
+			io.write_byte(fi.writer, 'z', &fi.n)
 			start = 2
 
 		case 16:
@@ -1171,7 +1171,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 
 		case 12:
 			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'o', &fi.n)
+			io.write_byte(fi.writer, 'z', &fi.n)
 			start = 2
 
 		case 16:
