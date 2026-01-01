@@ -4771,9 +4771,21 @@ CONSOLE_CURSOR_INFO :: struct {
 	bVisible: BOOL,
 }
 
+CONSOLE_SCREEN_BUFFER_INFOEX :: struct {
+	cbSize:               ULONG,
+	dwSize:               COORD,
+	dwCursorPosition:     COORD,
+	wAttributes:          WORD,
+	srWindow:             SMALL_RECT,
+	dwMaximumWindowSize:  COORD,
+	wPopupAttributes:     WORD,
+	bFullscreenSupported: BOOL,
+	ColorTable:           [16]COLORREF,
+}
 
 PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
 PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
+PCONSOLE_SCREEN_BUFFER_INFOEX :: ^CONSOLE_SCREEN_BUFFER_INFOEX
 
 Event_Type :: enum WORD {
 	KEY_EVENT = 0x0001,
