@@ -1100,10 +1100,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	if fi.prec_set {
 		prec = fi.prec
 		if prec == 0 && u == 0 {
-			prev_zero := fi.zero
-			fi.zero = false
 			fmt_write_padding(fi, fi.width)
-			fi.zero = prev_zero
 			return
 		}
 	} else if fi.zero && fi.width_set {
@@ -1185,10 +1182,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	if fi.prec_set {
 		prec = fi.prec
 		if prec == 0 && u == 0 {
-			prev_zero := fi.zero
-			fi.zero = false
 			fmt_write_padding(fi, fi.width)
-			fi.zero = prev_zero
 			return
 		}
 	} else if fi.zero && fi.width_set {
