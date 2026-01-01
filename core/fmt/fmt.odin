@@ -1225,8 +1225,8 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	_pad(fi, s)
 }
 // Units of measurements:
-__MEMORY_LOWER := " b kib mib gib tib pib eib"
-__MEMORY_UPPER := " B KiB MiB GiB TiB PiB EiB"
+@(rodata) __MEMORY_LOWER := " b kib mib gib tib pib eib"
+@(rodata) __MEMORY_UPPER := " B KiB MiB GiB TiB PiB EiB"
 // Formats an integer value as bytes with the best representation.
 //
 // Inputs:
@@ -1284,8 +1284,8 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	_pad(fi, str)
 }
 // Hex Values:
-__DIGITS_LOWER := "0123456789abcdefx"
-__DIGITS_UPPER := "0123456789ABCDEFX"
+@(rodata) __DIGITS_LOWER := "0123456789abcdefx"
+@(rodata) __DIGITS_UPPER := "0123456789ABCDEFX"
 // Formats a rune value according to the specified formatting verb.
 //
 // Inputs:
