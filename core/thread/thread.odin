@@ -49,6 +49,9 @@ Thread :: struct {
 	// started. Should be set after the thread has been created, but before
 	// it is started.
 	data: rawptr,
+	// Thread's Name/Description that will get set during thread creation
+	// for thread's creation only : do not refer to it, use thread.get_name instead
+	name: Maybe(string),
 	// User-supplied integer, that will be available to the thread once it is
 	// started. Should be set after the thread has been created, but before
 	// it is started.
@@ -102,9 +105,13 @@ thread will be in a suspended state, until `start()` procedure is called.
 
 To start the thread, call `start()`. Also the `create_and_start()`
 procedure can be called to create and start the thread immediately.
+
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
 */
-create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
-	return _create(procedure, priority)
+
+create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal, name: Maybe(string) = nil) -> ^Thread {
+	return _create(procedure, priority, name)
 }
 
 /*
@@ -157,18 +164,34 @@ yield :: proc() {
 }
 
 /*
+Get thread's name/description.
+
+This procedure returns the name of the given thread. If `thread` is `nil`, this procedure returns the name of the calling thread.
+
+**Note(linux, bsd)**: Because the thread name is stored in as the `cmdline`, if the thread name was not set, the command that has been used to create the process as the name of the thread.
+
+allocates memory for the returned string using provided allocator.
+*/
+get_name :: proc(thread: ^Thread, allocator := context.temp_allocator, loc := #caller_location) -> (string, runtime.Allocator_Error) {
+	return _get_name(thread, allocator, loc)
+}
+
+/*
 Run a procedure on a different thread.
 
 This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
-	create_and_start(fn, init_context, priority, true)
+run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil) {
+	create_and_start(fn, init_context, priority, true, name)
 }
 
 /*
@@ -178,12 +201,15 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) {
-	create_and_start_with_data(data, fn, init_context, priority, true)
+run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil) {
+	create_and_start_with_data(data, fn, init_context, priority, true, name)
 }
 
 /*
@@ -193,13 +219,16 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-run_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
+run_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
-	create_and_start_with_poly_data(data, fn, init_context, priority, true)
+	create_and_start_with_poly_data(data, fn, init_context, priority, true, name)
 }
 
 /*
@@ -209,13 +238,16 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-run_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
+run_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
-	create_and_start_with_poly_data2(arg1, arg2, fn, init_context, priority, true)
+	create_and_start_with_poly_data2(arg1, arg2, fn, init_context, priority, true, name)
 }
 
 /*
@@ -225,13 +257,16 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
+run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
-	create_and_start_with_poly_data3(arg1, arg2, arg3, fn, init_context, priority, true)
+	create_and_start_with_poly_data3(arg1, arg2, arg3, fn, init_context, priority, true, name)
 }
 
 /*
@@ -241,13 +276,16 @@ This procedure runs the given procedure on another thread. The context
 specified by `init_context` will be used as the context in which `fn` is going
 to execute. The thread will have priority specified by the `priority` parameter.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal)
+run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
-	create_and_start_with_poly_data4(arg1, arg2, arg3, arg4, fn, init_context, priority, true)
+	create_and_start_with_poly_data4(arg1, arg2, arg3, arg4, fn, init_context, priority, true, name)
 }
 
 /*
@@ -261,6 +299,9 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
@@ -268,12 +309,12 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread) {
+create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc())t.data
 		fn()
 	}
-	if t = create(thread_proc, priority); t == nil {
+	if t = create(thread_proc, priority, name); t == nil {
 		return
 	}
 	t.data = rawptr(fn)
@@ -296,6 +337,9 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
@@ -303,14 +347,14 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread) {
+create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(rawptr))t.data
 		assert(t.user_index >= 1)
 		data := t.user_args[0]
 		fn(data)
 	}
-	if t = create(thread_proc, priority); t == nil {
+	if t = create(thread_proc, priority, name); t == nil {
 		return
 	}
 	t.data = rawptr(fn)
@@ -335,6 +379,9 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
@@ -342,7 +389,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
+create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T))t.data
@@ -350,7 +397,7 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 		data := (^T)(&t.user_args[0])^
 		fn(data)
 	}
-	if t = create(thread_proc, priority); t == nil {
+	if t = create(thread_proc, priority, name); t == nil {
 		return
 	}
 	t.data = rawptr(fn)
@@ -380,6 +427,9 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
@@ -387,7 +437,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
+create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2))t.data
@@ -399,7 +449,7 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 
 		fn(arg1, arg2)
 	}
-	if t = create(thread_proc, priority); t == nil {
+	if t = create(thread_proc, priority, name); t == nil {
 		return
 	}
 	t.data = rawptr(fn)
@@ -431,6 +481,9 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
@@ -438,7 +491,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
+create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3))t.data
@@ -451,7 +504,7 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 
 		fn(arg1, arg2, arg3)
 	}
-	if t = create(thread_proc, priority); t == nil {
+	if t = create(thread_proc, priority, name); t == nil {
 		return
 	}
 	t.data = rawptr(fn)
@@ -484,6 +537,9 @@ If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
 automatically freed.
 
+Optionally specify the thread's name/description.
+the name/description will be truncated to 15 bytes on Unix and 127 bytes on Windows.
+
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
@@ -491,7 +547,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
-create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false) -> (t: ^Thread)
+create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T1, T2, T3, T4))t.data
@@ -505,7 +561,7 @@ create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: 
 
 		fn(arg1, arg2, arg3, arg4)
 	}
-	if t = create(thread_proc, priority); t == nil {
+	if t = create(thread_proc, priority, name); t == nil {
 		return
 	}
 	t.data = rawptr(fn)
