@@ -88,8 +88,11 @@ typedef struct SDL_Rect
 
 
 /**
- * A rectangle, with the origin at the upper left (using floating point
- * values).
+ * A rectangle stored using floating point values.
+ *
+ * The origin of the coordinate space is in the top-left, with increasing
+ * values moving down and right. The properties `x` and `y` represent the
+ * coordinates of the top-left corner of the rectangle.
  *
  * \since This struct is available since SDL 3.2.0.
  *
@@ -125,10 +128,10 @@ typedef struct SDL_FRect
  */
 SDL_FORCE_INLINE void SDL_RectToFRect(const SDL_Rect *rect, SDL_FRect *frect)
 {
-    frect->x = (float)rect->x;
-    frect->y = (float)rect->y;
-    frect->w = (float)rect->w;
-    frect->h = (float)rect->h;
+    frect->x = SDL_static_cast(float, rect->x);
+    frect->y = SDL_static_cast(float, rect->y);
+    frect->w = SDL_static_cast(float, rect->w);
+    frect->h = SDL_static_cast(float, rect->h);
 }
 
 /**
@@ -324,7 +327,7 @@ SDL_FORCE_INLINE bool SDL_PointInRectFloat(const SDL_FPoint *p, const SDL_FRect 
 }
 
 /**
- * Determine whether a floating point rectangle can contain any point.
+ * Determine whether a floating point rectangle takes no space.
  *
  * A rectangle is considered "empty" for this function if `r` is NULL, or if
  * `r`'s width and/or height are < 0.0f.
