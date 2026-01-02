@@ -46,9 +46,10 @@ EventType :: enum Uint32 {
 	DISPLAY_MOVED,                 /**< Display has changed position */
 	DISPLAY_DESKTOP_MODE_CHANGED,  /**< Display has changed desktop mode */
 	DISPLAY_CURRENT_MODE_CHANGED,  /**< Display has changed current mode */
-	DISPLAY_CONTENT_SCALE_CHANGED, /**< Display has changed content scale */
+	DISPLAY_CONTENT_SCALE_CHANGED, /**< Display has changed usable bounds */
+	DISPLAY_USABLE_BOUNDS_CHANGED,
 	DISPLAY_FIRST = DISPLAY_ORIENTATION,
-	DISPLAY_LAST = DISPLAY_CONTENT_SCALE_CHANGED,
+	DISPLAY_LAST = DISPLAY_USABLE_BOUNDS_CHANGED,
 
 	/* Window events */
 	/* 0x200 was SDL_WINDOWEVENT, reserve the number for sdl2-compat */
@@ -94,6 +95,8 @@ EventType :: enum Uint32 {
 	KEYBOARD_ADDED,          /**< A new keyboard has been inserted into the system */
 	KEYBOARD_REMOVED,        /**< A keyboard has been removed */
 	TEXT_EDITING_CANDIDATES, /**< Keyboard text editing candidates */
+	SCREEN_KEYBOARD_SHOWN,   /**< The on-screen keyboard has been shown */
+	SCREEN_KEYBOARD_HIDDEN,  /**< The on-screen keyboard has been hidden */
 
 	/* Mouse events */
 	MOUSE_MOTION    = 0x400, /**< Mouse moved */
@@ -134,10 +137,15 @@ EventType :: enum Uint32 {
 	FINGER_MOTION,
 	FINGER_CANCELED,
 
+	/* Pinch events */
+	PINCH_BEGIN      = 0x710,     /**< Pinch gesture started */
+	PINCH_UPDATE,                 /**< Pinch gesture updated */
+	PINCH_END,                    /**< Pinch gesture ended */
+
 	/* 0x800, 0x801, and 0x802 were the Gesture events from SDL2. Do not reuse these values! sdl2-compat needs them! */
 
 	/* Clipboard events */
-	CLIPBOARD_UPDATE = 0x900, /**< The clipboard or primary selection changed */
+	CLIPBOARD_UPDATE = 0x900, /**< The clipboard changed */
 
 	/* Drag and drop events */
 	DROP_FILE        = 0x1000, /**< The system requests a file open */
@@ -431,6 +439,12 @@ TouchFingerEvent :: struct {
 	windowID: WindowID,  /**< The window underneath the finger, if any */
 }
 
+PinchFingerEvent :: struct {
+	using commonEvent: CommonEvent,
+	scale: f32,         /**< The scale change since the last SDL_EVENT_PINCH_UPDATE. Scale < 1 is "zoom out". Scale > 1 is "zoom in". */
+	windowID: WindowID, /**< The window underneath the finger, if any */
+}
+
 PenProximityEvent :: struct {
 	using commonEvent: CommonEvent, /**< SDL_EVENT_PEN_PROXIMITY_IN or SDL_EVENT_PEN_PROXIMITY_OUT */
 	windowID: WindowID,  /**< The window with pen focus, if any */
@@ -508,7 +522,7 @@ QuitEvent :: struct {
 }
 
 UserEvent :: struct {
-	using commonEvent: CommonEvent, /**< SDL_EVENT_USER through SDL_EVENT_LAST-1, Uint32 because these are not in the SDL_EventType enumeration */
+	using commonEvent: CommonEvent, /**< SDL_EVENT_USER through SDL_EVENT_LAST, Uint32 because these are not in the SDL_EventType enumeration */
 	windowID: WindowID,  /**< The associated window if any */
 	code:     Sint32,    /**< User defined event code */
 	data1:    rawptr,    /**< User defined data pointer */
@@ -579,6 +593,8 @@ Event :: struct #raw_union {
 	user:            UserEvent                  `raw_union_tag:"type=USER"`,
 	/**< Touch finger event data */
 	tfinger:         TouchFingerEvent           `raw_union_tag:"type=FINGER_DOWN,FINGER_UP,FINGER_MOTION,FINGER_CANCELED"`,
+	/**< Pinch event data */
+	pinch:           PinchFingerEvent           `raw_union_tag:"type=PINCH_BEGIN,PINCH_UPDATE,PINCH_END"`,
 	/**< Pen proximity event data */
 	pproximity:      PenProximityEvent          `raw_union_tag:"type=PEN_PROXIMITY_IN,PEN_PROXIMITY_OUT"`,
 	/**< Pen tip touching event data */
@@ -626,23 +642,24 @@ EventFilter :: proc "c" (userdata: rawptr, event: ^Event) -> bool
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	PumpEvents         :: proc() ---
-	PeepEvents         :: proc(events: [^]Event, numevents: c.int, action: EventAction, minType, maxType: EventType) -> int ---
-	HasEvent           :: proc(type: EventType) -> bool ---
-	HasEvents          :: proc(minType, maxType: EventType) -> bool ---
-	FlushEvent         :: proc(type: EventType) ---
-	FlushEvents        :: proc(minType, maxType: EventType) ---
-	PollEvent          :: proc(event: ^Event) -> bool ---
-	WaitEvent          :: proc(event: ^Event) -> bool ---
-	WaitEventTimeout   :: proc(event: ^Event, timeoutMS: Sint32) -> bool ---
-	PushEvent          :: proc(event: ^Event) -> bool ---
-	SetEventFilter     :: proc(filter: EventFilter, userdata: rawptr) ---
-	GetEventFilter     :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---
-	AddEventWatch      :: proc(filter: EventFilter, userdata: rawptr) -> bool ---
-	RemoveEventWatch   :: proc(filter: EventFilter, userdata: rawptr) ---
-	FilterEvents       :: proc(filter: EventFilter, userdata: rawptr) ---
-	SetEventEnabled    :: proc(type: EventType, enabled: bool) ---
-	EventEnabled       :: proc(type: EventType) -> bool ---
-	RegisterEvents     :: proc(numevents: c.int) -> Uint32 ---
-	GetWindowFromEvent :: proc(#by_ptr event: Event) -> ^Window ---
+	PumpEvents          :: proc() ---
+	PeepEvents          :: proc(events: [^]Event, numevents: c.int, action: EventAction, minType, maxType: EventType) -> int ---
+	HasEvent            :: proc(type: EventType) -> bool ---
+	HasEvents           :: proc(minType, maxType: EventType) -> bool ---
+	FlushEvent          :: proc(type: EventType) ---
+	FlushEvents         :: proc(minType, maxType: EventType) ---
+	PollEvent           :: proc(event: ^Event) -> bool ---
+	WaitEvent           :: proc(event: ^Event) -> bool ---
+	WaitEventTimeout    :: proc(event: ^Event, timeoutMS: Sint32) -> bool ---
+	PushEvent           :: proc(event: ^Event) -> bool ---
+	SetEventFilter      :: proc(filter: EventFilter, userdata: rawptr) ---
+	GetEventFilter      :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---
+	AddEventWatch       :: proc(filter: EventFilter, userdata: rawptr) -> bool ---
+	RemoveEventWatch    :: proc(filter: EventFilter, userdata: rawptr) ---
+	FilterEvents        :: proc(filter: EventFilter, userdata: rawptr) ---
+	SetEventEnabled     :: proc(type: EventType, enabled: bool) ---
+	EventEnabled        :: proc(type: EventType) -> bool ---
+	RegisterEvents      :: proc(numevents: c.int) -> Uint32 ---
+	GetWindowFromEvent  :: proc(#by_ptr event: Event) -> ^Window ---
+	GetEventDescription :: proc(#by_ptr event: Event, buf: [^]u8, buflen: c.int) -> c.int ---
 }
