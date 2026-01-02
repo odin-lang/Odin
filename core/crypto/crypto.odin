@@ -2,6 +2,7 @@
 package crypto
 
 import "base:runtime"
+import subtle "core:crypto/_subtle"
 import "core:mem"
 
 // HAS_RAND_BYTES is true iff the runtime provides a cryptographic
@@ -44,7 +45,17 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 
 	// After the loop, v == 0 iff a == b.  The subtraction will underflow
 	// iff v == 0, setting the sign-bit, which gets returned.
-	return int((u32(v)-1) >> 31)
+	return subtle.eq(0, v)
+}
+
+// is_zero_constant_time returns 1 iff b is all 0s, 0 otherwise.
+is_zero_constant_time :: proc "contextless" (b: []byte) -> int {
+	v: byte
+	for b_ in b {
+		v |= b_
+	}
+
+	return subtle.byte_eq(0, v)
 }
 
 // rand_bytes fills the dst buffer with cryptographic entropy taken from
