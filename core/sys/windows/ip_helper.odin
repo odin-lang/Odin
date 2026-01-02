@@ -223,7 +223,7 @@ foreign iphlpapi {
 		The GetAdaptersAddresses function retrieves the addresses associated with the adapters on the local computer.
 		See: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 	*/
-	@(link_name="GetAdaptersAddresses") get_adapters_addresses :: proc(
+	GetAdaptersAddresses :: proc(
 		family:            Address_Family,
 		flags:             GAA_Flags,
 		_reserved:         rawptr,
@@ -232,3 +232,5 @@ foreign iphlpapi {
 	) -> ULONG ---
 
 }
+
+get_adapters_addresses :: GetAdaptersAddresses

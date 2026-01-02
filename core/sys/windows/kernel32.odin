@@ -60,15 +60,15 @@ foreign kernel32 {
 	// https://learn.microsoft.com/en-us/windows/console/getnumberofconsoleinputevents
 	GetNumberOfConsoleInputEvents :: proc(hConsoleInput: HANDLE, lpcNumberOfEvents: LPDWORD) -> BOOL ---
 
-	GetConsoleMode :: proc(hConsoleHandle: HANDLE, lpMode: LPDWORD) -> BOOL ---
-	SetConsoleMode :: proc(hConsoleHandle: HANDLE, dwMode: DWORD) -> BOOL ---
+	GetConsoleMode           :: proc(hConsoleHandle: HANDLE, lpMode: LPDWORD) -> BOOL ---
+	SetConsoleMode           :: proc(hConsoleHandle: HANDLE, dwMode: DWORD) -> BOOL ---
 	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE, dwCursorPosition: COORD) -> BOOL ---
-	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE, wAttributes: WORD) -> BOOL ---
-	GetConsoleCP :: proc() -> CODEPAGE ---
-	SetConsoleCP :: proc(wCodePageID: CODEPAGE) -> BOOL ---
-	GetConsoleOutputCP :: proc() -> CODEPAGE ---
-	SetConsoleOutputCP :: proc(wCodePageID: CODEPAGE) -> BOOL ---
-	FlushConsoleInputBuffer :: proc(hConsoleInput: HANDLE) -> BOOL ---
+	SetConsoleTextAttribute  :: proc(hConsoleOutput: HANDLE, wAttributes: WORD) -> BOOL ---
+	GetConsoleCP             :: proc() -> CODEPAGE ---
+	SetConsoleCP             :: proc(wCodePageID: CODEPAGE) -> BOOL ---
+	GetConsoleOutputCP       :: proc() -> CODEPAGE ---
+	SetConsoleOutputCP       :: proc(wCodePageID: CODEPAGE) -> BOOL ---
+	FlushConsoleInputBuffer  :: proc(hConsoleInput: HANDLE) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 
@@ -82,11 +82,11 @@ foreign kernel32 {
 	                                   dwBufferSize:         DWORD) -> BOOL ---
 
 
-	AddVectoredExceptionHandler :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
-	AddVectoredContinueHandler  :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
+	AddVectoredExceptionHandler     :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
+	AddVectoredContinueHandler      :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	RemoveVectoredExceptionHandler  :: proc(Handle: LPVOID) -> DWORD ---
-	RemoveVectoredContinueHandler  :: proc(Handle: LPVOID) -> DWORD ---
-	RaiseException :: proc(dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
+	RemoveVectoredContinueHandler   :: proc(Handle: LPVOID) -> DWORD ---
+	RaiseException                  :: proc(dwExceptionCode, dwExceptionFlags, nNumberOfArguments: DWORD, lpArguments: ^ULONG_PTR) -> ! ---
 
 	SetUnhandledExceptionFilter :: proc(lpTopLevelExceptionFilter: LPTOP_LEVEL_EXCEPTION_FILTER) -> LPTOP_LEVEL_EXCEPTION_FILTER ---
 
@@ -103,31 +103,31 @@ foreign kernel32 {
 	                                     lpFileInformation: LPVOID,
 	                                     dwBufferSize: DWORD) -> BOOL ---
 
-	InitializeCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
+	InitializeCriticalSection             :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	InitializeCriticalSectionAndSpinCount :: proc(CriticalSection: ^CRITICAL_SECTION, dwSpinCount: DWORD) -> BOOL ---
-	EnterCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
-	TryEnterCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) -> BOOLEAN ---
-	LeaveCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
-	DeleteCriticalSection :: proc(CriticalSection: ^CRITICAL_SECTION) ---
+	EnterCriticalSection                  :: proc(CriticalSection: ^CRITICAL_SECTION) ---
+	TryEnterCriticalSection               :: proc(CriticalSection: ^CRITICAL_SECTION) -> BOOLEAN ---
+	LeaveCriticalSection                  :: proc(CriticalSection: ^CRITICAL_SECTION) ---
+	DeleteCriticalSection                 :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 
-	RemoveDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
-	SetFileAttributesW :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
-	SetLastError :: proc(dwErrCode: DWORD) ---
-	GetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
-	SetCommTimeouts :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
-	ClearCommError :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
-	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
-	SetCommMask :: proc(handle: HANDLE, dwEvtMap: DWORD) -> BOOL ---
-	GetCommMask :: proc(handle: HANDLE, lpEvtMask: LPDWORD) -> BOOL ---
-	WaitCommEvent :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
-	GetCommandLineW :: proc() -> LPCWSTR ---
-	GetTempPathW :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
-	GetTempFileNameW :: proc(lpPathName: LPCWSTR, lpPrefixString: LPCWSTR, uUnique: c_int, lpTempFileName: LPWSTR) -> c_uint ---
-	GetCurrentProcess :: proc() -> HANDLE ---
+	RemoveDirectoryW    :: proc(lpPathName: LPCWSTR) -> BOOL ---
+	SetFileAttributesW  :: proc(lpFileName: LPCWSTR, dwFileAttributes: DWORD) -> BOOL ---
+	SetLastError        :: proc(dwErrCode: DWORD) ---
+	GetCommTimeouts     :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	SetCommTimeouts     :: proc(handle: HANDLE, timeouts: ^COMMTIMEOUTS) -> BOOL ---
+	ClearCommError      :: proc(hFile: HANDLE, lpErrors: ^Com_Error, lpStat: ^COMSTAT) -> BOOL ---
+	GetCommState        :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommState        :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommMask         :: proc(handle: HANDLE, dwEvtMap: DWORD) -> BOOL ---
+	GetCommMask         :: proc(handle: HANDLE, lpEvtMask: LPDWORD) -> BOOL ---
+	WaitCommEvent       :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
+	GetCommandLineW     :: proc() -> LPCWSTR ---
+	GetTempPathW        :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
+	GetTempFileNameW    :: proc(lpPathName: LPCWSTR, lpPrefixString: LPCWSTR, uUnique: c_int, lpTempFileName: LPWSTR) -> c_uint ---
+	GetCurrentProcess   :: proc() -> HANDLE ---
 	GetCurrentProcessId :: proc() -> DWORD ---
-	GetCurrentThread :: proc() -> HANDLE ---
-	GetCurrentThreadId :: proc() -> DWORD ---
+	GetCurrentThread    :: proc() -> HANDLE ---
+	GetCurrentThreadId  :: proc() -> DWORD ---
 	GetProcessTimes :: proc(
 		hProcess: HANDLE,
 		lpCreationTime: LPFILETIME,
@@ -136,7 +136,7 @@ foreign kernel32 {
 		lpUserTime: LPFILETIME,
 	) -> BOOL ---
 	GetStdHandle :: proc(which: DWORD) -> HANDLE ---
-	ExitProcess :: proc(uExitCode: c_uint) -> ! ---
+	ExitProcess  :: proc(uExitCode: c_uint) -> ! ---
 	DeviceIoControl :: proc(
 		hDevice: HANDLE,
 		dwIoControlCode: DWORD,
@@ -164,15 +164,15 @@ foreign kernel32 {
 		dwCreationFlags: DWORD,
 		lpThreadId: LPDWORD,
 	) -> HANDLE ---
-	SwitchToThread :: proc() -> BOOL ---
-	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
-	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
-	SetThreadPriority :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
+	SwitchToThread       :: proc() -> BOOL ---
+	ResumeThread         :: proc(thread: HANDLE) -> DWORD ---
+	GetThreadPriority    :: proc(thread: HANDLE) -> c_int ---
+	SetThreadPriority    :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
 	GetThreadDescription :: proc(hThread: HANDLE, ppszThreadDescription: ^PCWSTR) -> HRESULT ---
 	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
-	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
-	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
-	SuspendThread :: proc(hThread: HANDLE) -> DWORD ---
+	GetExitCodeThread    :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
+	TerminateThread      :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
+	SuspendThread        :: proc(hThread: HANDLE) -> DWORD ---
 
 	GetProcessAffinityMask :: proc(
 		hProcess: HANDLE,
@@ -237,17 +237,17 @@ foreign kernel32 {
 		nsize: DWORD,
 		args: rawptr,
 	) -> DWORD ---
-	TlsAlloc :: proc() -> DWORD ---
-	TlsFree :: proc(dwTlsIndex: DWORD) -> BOOL ---
-	TlsGetValue :: proc(dwTlsIndex: DWORD) -> LPVOID ---
-	TlsSetValue :: proc(dwTlsIndex: DWORD, lpTlsvalue: LPVOID) -> BOOL ---
-	GetLastError :: proc() -> DWORD ---
+	TlsAlloc                  :: proc() -> DWORD ---
+	TlsFree                   :: proc(dwTlsIndex: DWORD) -> BOOL ---
+	TlsGetValue               :: proc(dwTlsIndex: DWORD) -> LPVOID ---
+	TlsSetValue               :: proc(dwTlsIndex: DWORD, lpTlsvalue: LPVOID) -> BOOL ---
+	GetLastError              :: proc() -> DWORD ---
 	QueryPerformanceFrequency :: proc(lpFrequency: ^LARGE_INTEGER) -> BOOL ---
-	QueryPerformanceCounter :: proc(lpPerformanceCount: ^LARGE_INTEGER) -> BOOL ---
-	GetExitCodeProcess :: proc(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL ---
-	TerminateProcess :: proc(hProcess: HANDLE, uExitCode: UINT) -> BOOL ---
-	OpenProcess :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE ---
-	OpenThread :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwThreadId: DWORD) -> HANDLE ---
+	QueryPerformanceCounter   :: proc(lpPerformanceCount: ^LARGE_INTEGER) -> BOOL ---
+	GetExitCodeProcess        :: proc(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL ---
+	TerminateProcess          :: proc(hProcess: HANDLE, uExitCode: UINT) -> BOOL ---
+	OpenProcess               :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwProcessId: DWORD) -> HANDLE ---
+	OpenThread                :: proc(dwDesiredAccess: DWORD, bInheritHandle: BOOL, dwThreadId: DWORD) -> HANDLE ---
 	GetThreadContext :: proc(
 		hThread: HANDLE,
 		lpContext: LPCONTEXT,
@@ -366,14 +366,14 @@ foreign kernel32 {
 	) -> BOOL ---
 	CompareFileTime :: proc(lpFileTime1: LPFILETIME, lpFileTime2: LPFILETIME) -> LONG ---
 
-	FindFirstFileW :: proc(fileName: LPCWSTR, findFileData: LPWIN32_FIND_DATAW) -> HANDLE ---
-	FindNextFileW :: proc(findFile: HANDLE, findFileData: LPWIN32_FIND_DATAW) -> BOOL ---
-	FindClose :: proc(findFile: HANDLE) -> BOOL ---
-	GetModuleHandleW :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
-	GetModuleHandleA :: proc(lpModuleName: LPCSTR) -> HMODULE ---
-	GetSystemTimeAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
-	GetSystemTimePreciseAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
-	FileTimeToSystemTime :: proc(lpFileTime: ^FILETIME, lpSystemTime: ^SYSTEMTIME) -> BOOL ---
+	FindFirstFileW                  :: proc(fileName: LPCWSTR, findFileData: LPWIN32_FIND_DATAW) -> HANDLE ---
+	FindNextFileW                   :: proc(findFile: HANDLE, findFileData: LPWIN32_FIND_DATAW) -> BOOL ---
+	FindClose                       :: proc(findFile: HANDLE) -> BOOL ---
+	GetModuleHandleW                :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
+	GetModuleHandleA                :: proc(lpModuleName: LPCSTR) -> HMODULE ---
+	GetSystemTimeAsFileTime         :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
+	GetSystemTimePreciseAsFileTime  :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
+	FileTimeToSystemTime            :: proc(lpFileTime: ^FILETIME, lpSystemTime: ^SYSTEMTIME) -> BOOL ---
 	SystemTimeToTzSpecificLocalTime :: proc(
 		lpTimeZoneInformation: ^TIME_ZONE_INFORMATION,
 		lpUniversalTime: ^SYSTEMTIME,
@@ -428,7 +428,7 @@ foreign kernel32 {
 		lpTotalBytesAvail: ^u32,
 		lpBytesLeftThisMessage: ^u32,
 	) -> BOOL ---
-	CancelIo :: proc(handle: HANDLE) -> BOOL ---
+	CancelIo   :: proc(handle: HANDLE) -> BOOL ---
 	CancelIoEx :: proc(hFile: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	GetOverlappedResult :: proc(
 		hFile: HANDLE,
@@ -437,19 +437,19 @@ foreign kernel32 {
 		bWait: BOOL,
 	) -> BOOL ---
 	GetProcessHeap :: proc() -> HANDLE ---
-	HeapAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID ---
-	HeapReAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
-	HeapFree :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
+	HeapAlloc      :: proc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID ---
+	HeapReAlloc    :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
+	HeapFree       :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
 
-	LocalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	LocalAlloc   :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
 	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
-	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
+	LocalFree    :: proc(mem: LPVOID) -> LPVOID ---
 
-	GlobalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	GlobalAlloc   :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
 	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
-	GlobalFree :: proc(mem: LPVOID) -> LPVOID ---
+	GlobalFree    :: proc(mem: LPVOID) -> LPVOID ---
 	
-	GlobalLock :: proc(hMem: HGLOBAL) -> LPVOID ---
+	GlobalLock   :: proc(hMem: HGLOBAL) -> LPVOID ---
 	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---
 
 	ReadDirectoryChangesW :: proc(
@@ -467,16 +467,16 @@ foreign kernel32 {
 		bWatchSubtree: BOOL,
 		dwNotifyFilter: DWORD,
 	) -> HANDLE ---
-	FindNextChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
+	FindNextChangeNotification  :: proc(hChangeHandle: HANDLE) -> BOOL ---
 	FindCloseChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
 	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
 	ReleaseSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
-	AcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
-	TryAcquireSRWLockShared :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
-	ReleaseSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
+	AcquireSRWLockShared       :: proc(SRWLock: ^SRWLOCK) ---
+	TryAcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
+	ReleaseSRWLockShared       :: proc(SRWLock: ^SRWLOCK) ---
 
 	InitializeConditionVariable :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
 	WakeConditionVariable       :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
@@ -485,42 +485,42 @@ foreign kernel32 {
 	SleepConditionVariableSRW   :: proc(ConditionVariable: ^CONDITION_VARIABLE, SRWLock: ^SRWLOCK, dwMilliseconds: DWORD, Flags: LONG) -> BOOL ---
 
 
-	GetFileType :: proc(file_handle: HANDLE) -> DWORD ---
-	SetFilePointer :: proc(file_handle: HANDLE, distance_to_move: LONG, distance_to_move_high: ^LONG, move_method: DWORD) -> DWORD ---
-	GetFileSizeEx :: proc(file_handle: HANDLE, file_size: ^LARGE_INTEGER) -> BOOL ---
-	GetFileAttributesW   :: proc(lpFileName: LPCWSTR) -> DWORD ---
-	GetFileAttributesExW :: proc(lpFileName: LPCWSTR, fInfoLevelId: GET_FILEEX_INFO_LEVELS, lpFileInformation: LPVOID) -> BOOL ---
-	GetSystemInfo :: proc(system_info: ^SYSTEM_INFO) ---
-	GetVersionExW :: proc(osvi: ^OSVERSIONINFOEXW) ---
-	GetSystemDirectoryW :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
-	GetWindowsDirectoryW :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
-	GetSystemDefaultLangID :: proc() -> LANGID ---
-	GetSystemDefaultLCID :: proc() -> LCID ---
+	GetFileType                :: proc(file_handle: HANDLE) -> DWORD ---
+	SetFilePointer             :: proc(file_handle: HANDLE, distance_to_move: LONG, distance_to_move_high: ^LONG, move_method: DWORD) -> DWORD ---
+	GetFileSizeEx              :: proc(file_handle: HANDLE, file_size: ^LARGE_INTEGER) -> BOOL ---
+	GetFileAttributesW         :: proc(lpFileName: LPCWSTR) -> DWORD ---
+	GetFileAttributesExW       :: proc(lpFileName: LPCWSTR, fInfoLevelId: GET_FILEEX_INFO_LEVELS, lpFileInformation: LPVOID) -> BOOL ---
+	GetSystemInfo              :: proc(system_info: ^SYSTEM_INFO) ---
+	GetVersionExW              :: proc(osvi: ^OSVERSIONINFOEXW) ---
+	GetSystemDirectoryW        :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
+	GetWindowsDirectoryW       :: proc(lpBuffer: LPWSTR, uSize: UINT) -> UINT ---
+	GetSystemDefaultLangID     :: proc() -> LANGID ---
+	GetSystemDefaultLCID       :: proc() -> LCID ---
 	GetSystemDefaultLocaleName :: proc(lpLocaleName: LPWSTR, cchLocaleName: INT) -> INT ---
-	LCIDToLocaleName :: proc(Locale: LCID, lpName: LPWSTR, cchName: INT, dwFlags: DWORD) -> INT ---
-	LocaleNameToLCID :: proc(lpName: LPCWSTR, dwFlags: DWORD) -> LCID ---
-	SetDllDirectoryW :: proc(lpPathName: LPCWSTR) -> BOOL ---
-	AddDllDirectory :: proc(NewDirectory: PCWSTR) -> rawptr ---
-	RemoveDllDirectory :: proc(Cookie: rawptr) -> BOOL ---
-	LoadLibraryW :: proc(c_str: LPCWSTR) -> HMODULE ---
-	LoadLibraryExW :: proc(c_str: LPCWSTR, hFile: HANDLE, dwFlags: LoadLibraryEx_Flags) -> HMODULE ---
-	FreeLibrary :: proc(h: HMODULE) -> BOOL ---
-	FreeLibraryAndExitThread :: proc(hLibModule: HMODULE, dwExitCode: DWORD) -> VOID ---
-	GetProcAddress :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
+	LCIDToLocaleName           :: proc(Locale: LCID, lpName: LPWSTR, cchName: INT, dwFlags: DWORD) -> INT ---
+	LocaleNameToLCID           :: proc(lpName: LPCWSTR, dwFlags: DWORD) -> LCID ---
+	SetDllDirectoryW           :: proc(lpPathName: LPCWSTR) -> BOOL ---
+	AddDllDirectory            :: proc(NewDirectory: PCWSTR) -> rawptr ---
+	RemoveDllDirectory         :: proc(Cookie: rawptr) -> BOOL ---
+	LoadLibraryW               :: proc(c_str: LPCWSTR) -> HMODULE ---
+	LoadLibraryExW             :: proc(c_str: LPCWSTR, hFile: HANDLE, dwFlags: LoadLibraryEx_Flags) -> HMODULE ---
+	FreeLibrary                :: proc(h: HMODULE) -> BOOL ---
+	FreeLibraryAndExitThread   :: proc(hLibModule: HMODULE, dwExitCode: DWORD) -> VOID ---
+	GetProcAddress             :: proc(h: HMODULE, c_str: LPCSTR) -> rawptr ---
 
-	LoadResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> HGLOBAL ---
-	FreeResource :: proc(hResData: HGLOBAL) -> BOOL ---
-	LockResource :: proc(hResData: HGLOBAL) -> LPVOID ---
-	SizeofResource :: proc(hModule: HMODULE, hResInfo: HRSRC) -> DWORD ---
-	FindResourceW :: proc(hModule: HMODULE, lpName: LPCWSTR, lpType: LPCWSTR) -> HRSRC ---
-	FindResourceExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, wLanguage: LANGID) -> HRSRC ---
-	EnumResourceNamesW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR) -> BOOL ---
-	EnumResourceNamesExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
-	EnumResourceTypesExW :: proc(hModule: HMODULE, lpEnumFunc: ENUMRESTYPEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
-	EnumResourceLanguagesExW :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, lpEnumFunc: ENUMRESLANGPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
-	LookupIconIdFromDirectory :: proc(presbits: PBYTE, fIcon: BOOL) -> INT ---
+	LoadResource                :: proc(hModule: HMODULE, hResInfo: HRSRC) -> HGLOBAL ---
+	FreeResource                :: proc(hResData: HGLOBAL) -> BOOL ---
+	LockResource                :: proc(hResData: HGLOBAL) -> LPVOID ---
+	SizeofResource              :: proc(hModule: HMODULE, hResInfo: HRSRC) -> DWORD ---
+	FindResourceW               :: proc(hModule: HMODULE, lpName: LPCWSTR, lpType: LPCWSTR) -> HRSRC ---
+	FindResourceExW             :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, wLanguage: LANGID) -> HRSRC ---
+	EnumResourceNamesW          :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR) -> BOOL ---
+	EnumResourceNamesExW        :: proc(hModule: HMODULE, lpType: LPCWSTR, lpEnumFunc: ENUMRESNAMEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	EnumResourceTypesExW        :: proc(hModule: HMODULE, lpEnumFunc: ENUMRESTYPEPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	EnumResourceLanguagesExW    :: proc(hModule: HMODULE, lpType: LPCWSTR, lpName: LPCWSTR, lpEnumFunc: ENUMRESLANGPROCW, lParam: LONG_PTR, dwFlags: DWORD, LangId: LANGID) -> BOOL ---
+	LookupIconIdFromDirectory   :: proc(presbits: PBYTE, fIcon: BOOL) -> INT ---
 	LookupIconIdFromDirectoryEx :: proc(presbits: PBYTE, fIcon: BOOL, cxDesired: INT, cyDesired: INT, Flags: UINT) -> INT ---
-	CreateIconFromResourceEx :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD, cxDesired: INT, cyDesired: INT, Flags: UINT) -> HICON ---
+	CreateIconFromResourceEx    :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD, cxDesired: INT, cyDesired: INT, Flags: UINT) -> HICON ---
 
 	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---
 	GetLongPathNameW  :: proc(short, long: LPCWSTR, len: DWORD) -> DWORD ---
@@ -533,21 +533,21 @@ foreign kernel32 {
 
 	CreatePipe :: proc(hReadPipe, hWritePipe: ^HANDLE, lpPipeAttributes: LPSECURITY_ATTRIBUTES, nSize: DWORD) -> BOOL ---
 
-	ConnectNamedPipe :: proc(hNamedPipe: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
+	ConnectNamedPipe    :: proc(hNamedPipe: HANDLE, lpOverlapped: LPOVERLAPPED) -> BOOL ---
 	DisconnectNamedPipe :: proc(hNamedPipe: HANDLE) -> BOOL ---
-	WaitNamedPipeW :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD) -> BOOL ---
+	WaitNamedPipeW      :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD) -> BOOL ---
 
-	AllocConsole :: proc() -> BOOL ---
-	AttachConsole :: proc(dwProcessId: DWORD) -> BOOL ---
-	SetConsoleCtrlHandler :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
-	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
-	FreeConsole :: proc() -> BOOL ---
-	GetConsoleWindow :: proc() -> HWND ---
+	AllocConsole               :: proc() -> BOOL ---
+	AttachConsole              :: proc(dwProcessId: DWORD) -> BOOL ---
+	SetConsoleCtrlHandler      :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
+	GenerateConsoleCtrlEvent   :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
+	FreeConsole                :: proc() -> BOOL ---
+	GetConsoleWindow           :: proc() -> HWND ---
 	GetConsoleScreenBufferInfo :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
 	SetConsoleScreenBufferSize :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
-	SetConsoleWindowInfo :: proc(hConsoleOutput: HANDLE, bAbsolute: BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
-	GetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
-	SetConsoleCursorInfo :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
+	SetConsoleWindowInfo       :: proc(hConsoleOutput: HANDLE, bAbsolute: BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
+	GetConsoleCursorInfo       :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
+	SetConsoleCursorInfo       :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 
 	GetDiskFreeSpaceExW :: proc(
 		lpDirectoryName: LPCWSTR,
@@ -561,15 +561,15 @@ foreign kernel32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
 	SetFileCompletionNotificationModes :: proc(FileHandle: HANDLE, Flags: u8) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport)
-	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
+	CreateIoCompletionPort             :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
-	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: PULONG_PTR, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
+	GetQueuedCompletionStatus          :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: PULONG_PTR, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
-	GetQueuedCompletionStatusEx :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
+	GetQueuedCompletionStatusEx        :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
-	PostQueuedCompletionStatus :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
+	PostQueuedCompletionStatus         :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
-	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
+	GetHandleInformation               :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
 	RtlCaptureStackBackTrace :: proc(FramesToSkip: ULONG, FramesToCapture: ULONG, BackTrace: [^]PVOID, BackTraceHash: PULONG) -> USHORT ---
 	RtlNtStatusToDosError :: proc(status: NTSTATUS) -> ULONG ---
@@ -625,44 +625,44 @@ THREAD_PRIORITY_IDLE          :: THREAD_BASE_PRIORITY_IDLE
 THREAD_MODE_BACKGROUND_BEGIN  :: 0x00010000
 THREAD_MODE_BACKGROUND_END    :: 0x00020000
 
-PROCESS_ALL_ACCESS :: 0x000F0000 | SYNCHRONIZE | 0xFFFF
-PROCESS_CREATE_PROCESS :: 0x0080
-PROCESS_CREATE_THREAD :: 0x0002
-PROCESS_DUP_HANDLE :: 0x0040
-PROCESS_QUERY_INFORMATION :: 0x0400
+PROCESS_ALL_ACCESS                :: 0x000F0000 | SYNCHRONIZE | 0xFFFF
+PROCESS_CREATE_PROCESS            :: 0x0080
+PROCESS_CREATE_THREAD             :: 0x0002
+PROCESS_DUP_HANDLE                :: 0x0040
+PROCESS_QUERY_INFORMATION         :: 0x0400
 PROCESS_QUERY_LIMITED_INFORMATION :: 0x1000
-PROCESS_SET_INFORMATION :: 0x0200
-PROCESS_SET_QUOTA :: 0x0100
-PROCESS_SUSPEND_RESUME :: 0x0800
-PROCESS_TERMINATE :: 0x0001
-PROCESS_VM_OPERATION :: 0x0008
-PROCESS_VM_READ :: 0x0010
-PROCESS_VM_WRITE :: 0x0020
+PROCESS_SET_INFORMATION           :: 0x0200
+PROCESS_SET_QUOTA                 :: 0x0100
+PROCESS_SUSPEND_RESUME            :: 0x0800
+PROCESS_TERMINATE                 :: 0x0001
+PROCESS_VM_OPERATION              :: 0x0008
+PROCESS_VM_READ                   :: 0x0010
+PROCESS_VM_WRITE                  :: 0x0020
 
 THREAD_ALL_ACCESS :: \
-	THREAD_DIRECT_IMPERSONATION |
-	THREAD_GET_CONTEXT |
-	THREAD_IMPERSONATE |
-	THREAD_QUERY_INFORMATION |
+	THREAD_DIRECT_IMPERSONATION      |
+	THREAD_GET_CONTEXT               |
+	THREAD_IMPERSONATE               |
+	THREAD_QUERY_INFORMATION         |
 	THREAD_QUERY_LIMITED_INFORMATION |
-	THREAD_SET_CONTEXT |
-	THREAD_SET_INFORMATION |
-	THREAD_SET_LIMITED_INFORMATION |
-	THREAD_SET_THREAD_TOKEN |
-	THREAD_SUSPEND_RESUME |
-	THREAD_TERMINATE |
+	THREAD_SET_CONTEXT               |
+	THREAD_SET_INFORMATION           |
+	THREAD_SET_LIMITED_INFORMATION   |
+	THREAD_SET_THREAD_TOKEN          |
+	THREAD_SUSPEND_RESUME            |
+	THREAD_TERMINATE                 |
 	SYNCHRONIZE
-THREAD_DIRECT_IMPERSONATION :: 0x0200
-THREAD_GET_CONTEXT :: 0x0008
-THREAD_IMPERSONATE :: 0x0100
-THREAD_QUERY_INFORMATION :: 0x0040
+THREAD_DIRECT_IMPERSONATION      :: 0x0200
+THREAD_GET_CONTEXT               :: 0x0008
+THREAD_IMPERSONATE               :: 0x0100
+THREAD_QUERY_INFORMATION         :: 0x0040
 THREAD_QUERY_LIMITED_INFORMATION :: 0x0800
-THREAD_SET_CONTEXT :: 0x0010
-THREAD_SET_INFORMATION :: 0x0020
-THREAD_SET_LIMITED_INFORMATION :: 0x0400
-THREAD_SET_THREAD_TOKEN :: 0x0080
-THREAD_SUSPEND_RESUME :: 0x0002
-THREAD_TERMINATE :: 0x0001
+THREAD_SET_CONTEXT               :: 0x0010
+THREAD_SET_INFORMATION           :: 0x0020
+THREAD_SET_LIMITED_INFORMATION   :: 0x0400
+THREAD_SET_THREAD_TOKEN          :: 0x0080
+THREAD_SUSPEND_RESUME            :: 0x0002
+THREAD_TERMINATE                 :: 0x0001
 
 COPY_FILE_FAIL_IF_EXISTS              :: 0x00000001
 COPY_FILE_RESTARTABLE                 :: 0x00000002
@@ -701,7 +701,7 @@ FILE_MAP_TARGETS_INVALID :: DWORD(0x40000000)
 FILE_MAP_LARGE_PAGES     :: DWORD(0x20000000)
 
 LOCKFILE_FAIL_IMMEDIATELY :: DWORD (0x00000001)
-LOCKFILE_EXCLUSIVE_LOCK :: DWORD(0x00000002)
+LOCKFILE_EXCLUSIVE_LOCK   :: DWORD(0x00000002)
 
 // Flags for `SetFileCompletionNotificationModes`.
 FILE_SKIP_COMPLETION_PORT_ON_SUCCESS :: 0x1
@@ -720,16 +720,16 @@ PAGE_NOCACHE           :: 0x200
 PAGE_WRITECOMBINE      :: 0x400
 
 MEMORY_BASIC_INFORMATION :: struct {
-	BaseAddress: PVOID,
-	AllocationBase: PVOID,
+	BaseAddress:       PVOID,
+	AllocationBase:    PVOID,
 	AllocationProtect: DWORD,
-	PartitionId: WORD,
-	RegionSize: SIZE_T,
-	State: DWORD,
-	Protect: DWORD,
-	Type: DWORD,
+	PartitionId:       WORD,
+	RegionSize:        SIZE_T,
+	State:             DWORD,
+	Protect:           DWORD,
+	Type:              DWORD,
 }
-PMEMORY_BASIC_INFORMATION :: ^MEMORY_BASIC_INFORMATION
+PMEMORY_BASIC_INFORMATION  :: ^MEMORY_BASIC_INFORMATION
 LPMEMORY_BASIC_INFORMATION :: ^MEMORY_BASIC_INFORMATION
 
 MEM_COMMIT      :: 0x1000
@@ -747,97 +747,97 @@ MEM_4MB_PAGES   :: 0x80000000
 @(default_calling_convention="system")
 foreign kernel32 {
 	VirtualAlloc :: proc(
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		lpAddress:        LPVOID,
+		dwSize:           SIZE_T,
 		flAllocationType: DWORD,
-		flProtect: DWORD,
+		flProtect:        DWORD,
 	) -> LPVOID ---
 	VirtualProtect :: proc(
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
-		flNewProtect: DWORD,
+		lpAddress:      LPVOID,
+		dwSize:         SIZE_T,
+		flNewProtect:   DWORD,
 		lpflOldProtect: PDWORD,
 	) -> BOOL ---
 	VirtualFree :: proc(
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		lpAddress:  LPVOID,
+		dwSize:     SIZE_T,
 		dwFreeType: DWORD,
 	) -> BOOL ---
 	VirtualQuery :: proc(
 		lpAddress: LPCVOID,
-		lpBuffer: PMEMORY_BASIC_INFORMATION,
-		dwLength: SIZE_T,
+		lpBuffer:  PMEMORY_BASIC_INFORMATION,
+		dwLength:  SIZE_T,
 	) -> SIZE_T ---
 	VirtualAllocEx :: proc(
-		hProcess: HANDLE,
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		hProcess:         HANDLE,
+		lpAddress:        LPVOID,
+		dwSize:           SIZE_T,
 		flAllocationType: DWORD,
-		flProtect: DWORD,
+		flProtect:        DWORD,
 	) -> LPVOID ---
 	VirtualFreeEx :: proc(
-		hProcess: HANDLE,
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		hProcess:   HANDLE,
+		lpAddress:  LPVOID,
+		dwSize:     SIZE_T,
 		dwFreeType: DWORD,
 	) -> BOOL ---
 	VirtualProtectEx :: proc(
-		hProcess: HANDLE,
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
-		flNewProtect: DWORD,
+		hProcess:       HANDLE,
+		lpAddress:      LPVOID,
+		dwSize:         SIZE_T,
+		flNewProtect:   DWORD,
 		lpflOldProtect: PDWORD,
 	) -> BOOL ---
 	VirtualQueryEx :: proc(
-		hProcess: HANDLE,
+		hProcess:  HANDLE,
 		lpAddress: LPCVOID,
-		lpBuffer: PMEMORY_BASIC_INFORMATION,
-		dwLength: SIZE_T,
+		lpBuffer:  PMEMORY_BASIC_INFORMATION,
+		dwLength:  SIZE_T,
 	) -> SIZE_T ---
 	ReadProcessMemory :: proc(
-		hProcess: HANDLE,
-		lpBaseAddress: LPCVOID,
-		lpBuffer: LPVOID,
-		nSize: SIZE_T,
+		hProcess:            HANDLE,
+		lpBaseAddress:       LPCVOID,
+		lpBuffer:            LPVOID,
+		nSize:               SIZE_T,
 		lpNumberOfBytesRead: ^SIZE_T,
 	) -> BOOL ---
 	WriteProcessMemory :: proc(
-		hProcess: HANDLE,
-		lpBaseAddress: LPVOID,
-		lpBuffer: LPCVOID,
-		nSize: SIZE_T,
+		hProcess:               HANDLE,
+		lpBaseAddress:          LPVOID,
+		lpBuffer:               LPCVOID,
+		nSize:                  SIZE_T,
 		lpNumberOfBytesWritten: ^SIZE_T,
 	) -> BOOL ---
 	CreateFileMappingW :: proc(
-		hFile: HANDLE,
+		hFile:                   HANDLE,
 		lpFileMappingAttributes: LPSECURITY_ATTRIBUTES,
-		flProtect: DWORD,
-		dwMaximumSizeHigh: DWORD,
-		dwMaximumSizeLow: DWORD,
-		lpName: LPCWSTR,
+		flProtect:               DWORD,
+		dwMaximumSizeHigh:       DWORD,
+		dwMaximumSizeLow:        DWORD,
+		lpName:                  LPCWSTR,
 	) -> HANDLE ---
 	OpenFileMappingW :: proc(
 		dwDesiredAccess: DWORD,
-		bInheritHandle: BOOL,
-		lpName: LPCWSTR,
+		bInheritHandle:  BOOL,
+		lpName:          LPCWSTR,
 	) -> HANDLE ---
 	MapViewOfFile :: proc(
-		hFileMappingObject: HANDLE,
-		dwDesiredAccess: DWORD,
-		dwFileOffsetHigh: DWORD,
-		dwFileOffsetLow: DWORD,
+		hFileMappingObject:   HANDLE,
+		dwDesiredAccess:      DWORD,
+		dwFileOffsetHigh:     DWORD,
+		dwFileOffsetLow:      DWORD,
 		dwNumberOfBytesToMap: SIZE_T,
 	) -> LPVOID ---
 	MapViewOfFileEx :: proc(
-		hFileMappingObject: HANDLE,
-		dwDesiredAccess: DWORD,
-		dwFileOffsetHigh: DWORD,
-		dwFileOffsetLow: DWORD,
+		hFileMappingObject:   HANDLE,
+		dwDesiredAccess:      DWORD,
+		dwFileOffsetHigh:     DWORD,
+		dwFileOffsetLow:      DWORD,
 		dwNumberOfBytesToMap: SIZE_T,
-		lpBaseAddress: LPVOID,
+		lpBaseAddress:        LPVOID,
 	) -> LPVOID ---
 	FlushViewOfFile :: proc(
-		lpBaseAddress: LPCVOID,
+		lpBaseAddress:          LPCVOID,
 		dwNumberOfBytesToFlush: SIZE_T,
 	) -> BOOL ---
 	UnmapViewOfFile :: proc(
@@ -845,36 +845,36 @@ foreign kernel32 {
 	) -> BOOL ---
 	GetLargePageMinimum :: proc() -> SIZE_T ---
 	GetProcessWorkingSetSizeEx :: proc(
-		hProcess: HANDLE,
+		hProcess:                HANDLE,
 		lpMinimumWorkingSetSize: PSIZE_T,
 		lpMaximumWorkingSetSize: PSIZE_T,
-		Flags: PDWORD,
+		Flags:                   PDWORD,
 	) -> BOOL ---
 	SetProcessWorkingSetSizeEx :: proc(
-		hProcess: HANDLE,
+		hProcess:                HANDLE,
 		dwMinimumWorkingSetSize: SIZE_T,
 		dwMaximumWorkingSetSize: SIZE_T,
-		Flags: DWORD,
+		Flags:                   DWORD,
 	) -> BOOL ---
 	VirtualLock :: proc(
 		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		dwSize:    SIZE_T,
 	) -> BOOL ---
 	VirtualUnlock :: proc(
 		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		dwSize:    SIZE_T,
 	) -> BOOL ---
 	GetWriteWatch :: proc(
-		dwFlags: DWORD,
-		lpBaseAddress: PVOID,
-		dwRegionSize: SIZE_T,
-		lpAddresses: ^PVOID,
-		lpdwCount: ^ULONG_PTR,
+		dwFlags:         DWORD,
+		lpBaseAddress:   PVOID,
+		dwRegionSize:    SIZE_T,
+		lpAddresses:     ^PVOID,
+		lpdwCount:       ^ULONG_PTR,
 		lpdwGranularity: LPDWORD,
 	) -> UINT ---
 	ResetWriteWatch :: proc(
 		lpBaseAddress: LPVOID,
-		dwRegionSize: SIZE_T,
+		dwRegionSize:  SIZE_T,
 	) -> UINT ---
 }
 
@@ -907,27 +907,27 @@ foreign kernel32 {
 	GetSystemFileCacheSize :: proc(
 		lpMinimumFileCacheSize: PSIZE_T,
 		lpMaximumFileCacheSize: PSIZE_T,
-		lpFlags: PDWORD,
+		lpFlags:                PDWORD,
 	) -> BOOL ---
 	SetSystemFileCacheSize :: proc(
 		MinimumFileCacheSize: SIZE_T,
 		MaximumFileCacheSize: SIZE_T,
-		Flags: DWORD,
+		Flags:                DWORD,
 	) -> BOOL ---
 	CreateFileMappingNumaW :: proc(
-		hFile: HANDLE,
+		hFile:                   HANDLE,
 		lpFileMappingAttributes: LPSECURITY_ATTRIBUTES,
-		flProtect: DWORD,
-		dwMaximumSizeHigh: DWORD,
-		dwMaximumSizeLow: DWORD,
-		lpName: LPCWSTR,
-		nndPreferred: DWORD,
+		flProtect:               DWORD,
+		dwMaximumSizeHigh:       DWORD,
+		dwMaximumSizeLow:        DWORD,
+		lpName:                  LPCWSTR,
+		nndPreferred:            DWORD,
 	) -> HANDLE ---
 }
 
 WIN32_MEMORY_RANGE_ENTRY :: struct {
 	VirtualAddress: PVOID,
-	NumberOfBytes: SIZE_T,
+	NumberOfBytes:  SIZE_T,
 }
 
 PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY
@@ -935,56 +935,56 @@ PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY
 @(default_calling_convention="system")
 foreign kernel32 {
 	PrefetchVirtualMemory :: proc(
-		hProcess: HANDLE,
-		NumberOfEntries: ULONG_PTR,
+		hProcess:         HANDLE,
+		NumberOfEntries:  ULONG_PTR,
 		VirtualAddresses: PWIN32_MEMORY_RANGE_ENTRY,
-		Flags: ULONG,
+		Flags:            ULONG,
 	) -> BOOL ---
 	CreateFileMappingFromApp :: proc(
-		hFile: HANDLE,
+		hFile:              HANDLE,
 		SecurityAttributes: PSECURITY_ATTRIBUTES,
-		PageProtection: ULONG,
-		MaximumSize: ULONG64,
-		Name: PCWSTR,
+		PageProtection:     ULONG,
+		MaximumSize:        ULONG64,
+		Name:               PCWSTR,
 	) -> HANDLE ---
 	MapViewOfFileFromApp :: proc(
 		hFileMappingObject: HANDLE,
-		DesiredAccess: ULONG,
-		FileOffset: ULONG64,
+		DesiredAccess:      ULONG,
+		FileOffset:         ULONG64,
 		NumberOfBytesToMap: SIZE_T,
 	) -> PVOID ---
 	UnmapViewOfFileEx :: proc(
 		BaseAddress: PVOID,
-		UnmapFlags: ULONG,
+		UnmapFlags:  ULONG,
 	) -> BOOL ---
 	AllocateUserPhysicalPages :: proc(
-		hProcess: HANDLE,
+		hProcess:      HANDLE,
 		NumberOfPages: PULONG_PTR,
-		PageArray: PULONG_PTR,
+		PageArray:     PULONG_PTR,
 	) -> BOOL ---
 	FreeUserPhysicalPages :: proc(
-		hProcess: HANDLE,
+		hProcess:      HANDLE,
 		NumberOfPages: PULONG_PTR,
-		PageArray: PULONG_PTR,
+		PageArray:     PULONG_PTR,
 	) -> BOOL ---
 	MapUserPhysicalPages :: proc(
 		VirtualAddress: PVOID,
-		NumberOfPages: ULONG_PTR,
-		PageArray: PULONG_PTR,
+		NumberOfPages:  ULONG_PTR,
+		PageArray:      PULONG_PTR,
 	) -> BOOL ---
 	AllocateUserPhysicalPagesNuma :: proc(
-		hProcess: HANDLE,
+		hProcess:      HANDLE,
 		NumberOfPages: PULONG_PTR,
-		PageArray: PULONG_PTR,
-		nndPreferred: DWORD,
+		PageArray:     PULONG_PTR,
+		nndPreferred:  DWORD,
 	) -> BOOL ---
 	VirtualAllocExNuma :: proc(
-		hProcess: HANDLE,
-		lpAddress: LPVOID,
-		dwSize: SIZE_T,
+		hProcess:         HANDLE,
+		lpAddress:        LPVOID,
+		dwSize:           SIZE_T,
 		flAllocationType: DWORD,
-		flProtect: DWORD,
-		nndPreferred: DWORD,
+		flProtect:        DWORD,
+		nndPreferred:     DWORD,
 	) -> LPVOID ---
 }
 
@@ -992,28 +992,20 @@ MEHC_PATROL_SCRUBBER_PRESENT :: ULONG(0x1)
 
 @(default_calling_convention="system")
 foreign kernel32 {
-	GetMemoryErrorHandlingCapabilities :: proc(
-		Capabilities: PULONG,
-	) -> BOOL ---
+	GetMemoryErrorHandlingCapabilities :: proc(Capabilities: PULONG) -> BOOL ---
 }
 
 @(default_calling_convention="system")
 foreign kernel32 {
-	GlobalMemoryStatusEx :: proc(
-		lpBuffer: ^MEMORYSTATUSEX,
-	) -> BOOL ---
+	GlobalMemoryStatusEx :: proc(lpBuffer: ^MEMORYSTATUSEX) -> BOOL ---
 }
 
 PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "system" ()
 
 @(default_calling_convention="system")
 foreign kernel32 {
-	RegisterBadMemoryNotification :: proc(
-		Callback: PBAD_MEMORY_CALLBACK_ROUTINE,
-	) -> PVOID ---
-	UnregisterBadMemoryNotification :: proc(
-		RegistrationHandle: PVOID,
-	) -> BOOL ---
+	RegisterBadMemoryNotification   :: proc(Callback: PBAD_MEMORY_CALLBACK_ROUTINE) -> PVOID ---
+	UnregisterBadMemoryNotification :: proc(RegistrationHandle: PVOID) -> BOOL ---
 }
 
 OFFER_PRIORITY :: enum c_int {
@@ -1031,33 +1023,33 @@ VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal
 foreign kernel32 {
 	OfferVirtualMemory :: proc(
 		VirtualAddress: PVOID,
-		Size: SIZE_T,
-		Priority: OFFER_PRIORITY,
+		Size:           SIZE_T,
+		Priority:       OFFER_PRIORITY,
 	) -> DWORD ---
 	ReclaimVirtualMemory :: proc(
 		VirtualAddress: PVOID,
-		Size: SIZE_T,
+		Size:           SIZE_T,
 	) -> DWORD ---
 	DiscardVirtualMemory :: proc(
 		VirtualAddress: PVOID,
-		Size: SIZE_T,
+		Size:           SIZE_T,
 	) -> DWORD ---
 	VirtualAllocFromApp :: proc(
-		BaseAddress: PVOID,
-		Size: SIZE_T,
+		BaseAddress:    PVOID,
+		Size:           SIZE_T,
 		AllocationType: ULONG,
-		Protection: ULONG,
+		Protection:     ULONG,
 	) -> PVOID ---
 	VirtualProtectFromApp :: proc(
-		Address: PVOID,
-		Size: SIZE_T,
+		Address:       PVOID,
+		Size:          SIZE_T,
 		NewProtection: ULONG,
 		OldProtection: PULONG,
 	) -> BOOL ---
 	OpenFileMappingFromApp :: proc(
 		DesiredAccess: ULONG,
 		InheritHandle: BOOL,
-		Name: PCWSTR,
+		Name:          PCWSTR,
 	) -> HANDLE ---
 }
 
@@ -1067,54 +1059,48 @@ WIN32_MEMORY_INFORMATION_CLASS :: enum c_int {
 MemoryRegionInfo :: WIN32_MEMORY_INFORMATION_CLASS.MemoryRegionInfo
 
 WIN32_MEMORY_REGION_INFORMATION :: struct {
-	AllocationBase: PVOID,
+	AllocationBase:    PVOID,
 	AllocationProtect: ULONG,
-	u: WIN32_MEMORY_REGION_INFORMATION_u,
+	using DUMMYUNIONNAME: struct #raw_union {
+		_:     [1]u32,
+		Flags: ULONG,
+		using DUMMYSTRUCTNAME: bit_field ULONG {
+			Private:        ULONG |  1,
+			MappedDataFile: ULONG |  1,
+			MappedImage:    ULONG |  1,
+			MappedPageFile: ULONG |  1,
+			MappedPhysical: ULONG |  1,
+			DirectMapped:   ULONG |  1,
+			Reserved:       ULONG | 26,
+		},
+	},
 	RegionSize: SIZE_T,
 	CommitSize: SIZE_T,
 }
-WIN32_MEMORY_REGION_INFORMATION_u :: struct #raw_union {
-	u: [1]u32,
-	Flags: ULONG,
-	s: WIN32_MEMORY_REGION_INFORMATION_u_s,
-}
-WIN32_MEMORY_REGION_INFORMATION_u_s :: struct {
-	Bitfield: ULONG,
-}
-WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
-/*bit_field #align(align_of(ULONG)) {
-	Private        : 1-0,
-	MappedDataFile : 2-1,
-	MappedImage    : 3-2,
-	MappedPageFile : 4-3,
-	MappedPhysical : 5-4,
-	DirectMapped   : 6-5,
-	Reserved       : 32-6,
-}*/
 
 @(default_calling_convention="system")
 foreign one_core {
 	QueryVirtualMemoryInformation :: proc(
-		Process: HANDLE,
-		VirtualAddress: PVOID,
+		Process:                HANDLE,
+		VirtualAddress:         PVOID,
 		MemoryInformationClass: WIN32_MEMORY_INFORMATION_CLASS,
-		MemoryInformation: PVOID,
-		MemoryInformationSize: SIZE_T,
-		ReturnSize: PSIZE_T,
+		MemoryInformation:      PVOID,
+		MemoryInformationSize:  SIZE_T,
+		ReturnSize:             PSIZE_T,
 	) -> BOOL ---
 	MapViewOfFileNuma2 :: proc(
 		FileMappingHandle: HANDLE,
-		ProcessHandle: HANDLE,
-		Offset: ULONG64,
-		BaseAddress: PVOID,
-		ViewSize: SIZE_T,
-		AllocationType: ULONG,
-		PageProtection: ULONG,
-		PreferredNode: ULONG,
+		ProcessHandle:     HANDLE,
+		Offset:            ULONG64,
+		BaseAddress:       PVOID,
+		ViewSize:          SIZE_T,
+		AllocationType:    ULONG,
+		PageProtection:    ULONG,
+		PreferredNode:     ULONG,
 	) -> PVOID ---
 	GetCommPorts :: proc(
-		lpPortNumbers: PULONG,
-		uPortNumbersCount: ULONG,
+		lpPortNumbers:      PULONG,
+		uPortNumbersCount:  ULONG,
 		puPortNumbersFound: PULONG,
 	) -> ULONG ---
 }
@@ -1124,12 +1110,12 @@ NUMA_NO_PREFERRED_NODE :: 0xffffffff
 
 MapViewOfFile2 :: #force_inline proc "system" (
 	FileMappingHandle: HANDLE,
-	ProcessHandle: HANDLE,
-	Offset: ULONG64,
-	BaseAddress: PVOID,
-	ViewSize: SIZE_T,
-	AllocationType: ULONG,
-	PageProtection: ULONG,
+	ProcessHandle:     HANDLE,
+	Offset:            ULONG64,
+	BaseAddress:       PVOID,
+	ViewSize:          SIZE_T,
+	AllocationType:    ULONG,
+	PageProtection:    ULONG,
 ) -> PVOID {
 	return MapViewOfFileNuma2(
 		FileMappingHandle,
@@ -1147,8 +1133,8 @@ MapViewOfFile2 :: #force_inline proc "system" (
 foreign kernel32 {
 	UnmapViewOfFile2 :: proc(
 		ProcessHandle: HANDLE,
-		BaseAddress: PVOID,
-		UnmapFlags: ULONG,
+		BaseAddress:   PVOID,
+		UnmapFlags:    ULONG,
 	) -> BOOL ---
 }
 
@@ -1159,7 +1145,7 @@ foreign kernel32 {
 		OSMinorVersion: DWORD,
 		SpMajorVersion: DWORD,
 		SpMinorVersion: DWORD,
-		product_type: ^Windows_Product_Type,
+		product_type:   ^Windows_Product_Type,
 	) -> BOOL ---
 }
 
@@ -1173,10 +1159,10 @@ LPFIBER_START_ROUTINE :: #type proc "system" (lpFiberParameter: LPVOID)
 
 @(default_calling_convention = "system")
 foreign kernel32 {
-	CreateFiber :: proc(dwStackSize: SIZE_T, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: LPVOID) -> LPVOID ---
-	DeleteFiber :: proc(lpFiber: LPVOID) ---
+	CreateFiber          :: proc(dwStackSize: SIZE_T, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: LPVOID) -> LPVOID ---
+	DeleteFiber          :: proc(lpFiber: LPVOID) ---
 	ConvertThreadToFiber :: proc(lpParameter: LPVOID) -> LPVOID ---
-	SwitchToFiber :: proc(lpFiber: LPVOID) ---
+	SwitchToFiber        :: proc(lpFiber: LPVOID) ---
 }
 
 LOGICAL_PROCESSOR_RELATIONSHIP :: enum c_int {
@@ -1199,11 +1185,11 @@ PROCESSOR_CACHE_TYPE :: enum c_int {
 }
 
 CACHE_DESCRIPTOR :: struct {
-	Level: BYTE,
+	Level:         BYTE,
 	Associativity: BYTE,
-	LineSize: WORD,
-	Size: DWORD,
-	Type: PROCESSOR_CACHE_TYPE,
+	LineSize:      WORD,
+	Size:          DWORD,
+	Type:          PROCESSOR_CACHE_TYPE,
 }
 
 ProcessorCore :: struct {
@@ -1212,17 +1198,16 @@ ProcessorCore :: struct {
 NumaNode :: struct {
 	NodeNumber: DWORD,
 }
-DUMMYUNIONNAME_u :: struct #raw_union {
-	Core: ProcessorCore,
-	Node: NumaNode,
-	Cache: CACHE_DESCRIPTOR,
-	Reserved: [2]ULONGLONG,
-}
 
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONG_PTR,
-	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
-	using DummyUnion: DUMMYUNIONNAME_u,
+	Relationship:  LOGICAL_PROCESSOR_RELATIONSHIP,
+	using DUMMYUNIONNAME: struct #raw_union {
+		ProcessorCore: ProcessorCore    `raw_union_tag:"Relationship=RelationProcessorCore"`,
+		NumaNode:      NumaNode         `raw_union_tag:"Relationship=RelationNumaNode"`,
+		Cache:         CACHE_DESCRIPTOR `raw_union_tag:"Relationship=RelationCache"`,
+		Reserved:      [2]ULONGLONG,
+	},
 }
 
 SYSTEM_POWER_STATUS :: struct {
@@ -1294,6 +1279,6 @@ ACTCTX_FLAG_HMODULE_VALID                :: 0x080
 
 @(default_calling_convention="system")
 foreign kernel32 {
-	CreateActCtxW :: proc(pActCtx: ^ACTCTXW) -> HANDLE ---
+	CreateActCtxW  :: proc(pActCtx: ^ACTCTXW) -> HANDLE ---
 	ActivateActCtx :: proc(hActCtx: HANDLE, lpCookie: ^ULONG_PTR) -> BOOL ---
 }
