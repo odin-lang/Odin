@@ -82,14 +82,14 @@ utf8_to_utf16_alloc :: proc(s: string, allocator := context.temp_allocator) -> [
 
 	b := transmute([]byte)s
 	cstr := raw_data(b)
-	n := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
+	n := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, c_int(len(s)), nil, 0)
 	if n == 0 {
 		return nil
 	}
 
 	text := make([]u16, n+1, allocator)
 
-	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, c_int(len(s)), raw_data(text), n)
 	if n1 == 0 {
 		delete(text, allocator)
 		return nil
@@ -103,14 +103,14 @@ utf8_to_utf16_alloc :: proc(s: string, allocator := context.temp_allocator) -> [
 }
 
 utf8_to_utf16_buf :: proc(buf: []u16, s: string) -> []u16 {
-	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), nil, 0)
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), c_int(len(s)), nil, 0)
 	if n1 == 0 {
 		return nil
 	} else if int(n1) > len(buf) {
 		return nil
 	}
 
-	n1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), i32(len(s)), raw_data(buf[:]), n1)
+	n1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), c_int(len(s)), raw_data(buf[:]), n1)
 	if n1 == 0 {
 		return nil
 	} else if int(n1) > len(buf) {
@@ -143,7 +143,7 @@ wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allo
 		return
 	}
 
-	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N) if N > 0 else -1, nil, 0, nil, nil)
+	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, c_int(N) if N > 0 else -1, nil, 0, nil, nil)
 	if n == 0 {
 		return
 	}
@@ -155,7 +155,7 @@ wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allo
 	// will not be null terminated.
 	text := make([]byte, n) or_return
 
-	n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(text), n, nil, nil)
+	n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, c_int(N), raw_data(text), n, nil, nil)
 	if n1 == 0 {
 		delete(text, allocator)
 		return
@@ -171,14 +171,14 @@ wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allo
 }
 
 wstring_to_utf8_buf :: proc(buf: []u8, s: wstring, N := -1) -> (res: string) {
-	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil)
+	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, c_int(N), nil, 0, nil, nil)
 	if n == 0 {
 		return
 	} else if int(n) > len(buf) {
 		return
 	}
 
-	n2 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(buf), n, nil, nil)
+	n2 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, c_int(N), raw_data(buf), n, nil, nil)
 	if n2 == 0 {
 		return
 	} else if int(n2) > len(buf) {

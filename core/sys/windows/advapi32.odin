@@ -228,7 +228,7 @@ foreign advapi32 {
 }
 
 PTOKEN_INFORMATION_CLASS :: ^TOKEN_INFORMATION_CLASS
-TOKEN_INFORMATION_CLASS :: enum i32 {
+TOKEN_INFORMATION_CLASS :: enum c_int {
 	TokenUser = 1,
 	TokenGroups,
 	TokenPrivileges,
@@ -282,7 +282,7 @@ TOKEN_INFORMATION_CLASS :: enum i32 {
 }
 
 PSID_NAME_USE :: ^SID_NAME_USE
-SID_NAME_USE :: enum i32 {
+SID_NAME_USE :: enum c_int {
 	SidTypeUser = 1,
 	SidTypeGroup,
 	SidTypeDomain,

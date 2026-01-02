@@ -157,14 +157,14 @@ ILP_DOWNLEVEL :: 1
 IMAGELISTDRAWPARAMS :: struct {
 	cbSize: DWORD,
 	himl: HIMAGELIST,
-	i: i32,
+	i: c_int,
 	hdcDst: HDC,
-	x: i32,
-	y: i32,
-	cx: i32,
-	cy: i32,
-	xBitmap: i32,
-	yBitmap: i32,
+	x: c_int,
+	y: c_int,
+	cx: c_int,
+	cy: c_int,
+	xBitmap: c_int,
+	yBitmap: c_int,
 	rgbBk: COLORREF,
 	rgbFg: COLORREF,
 	fStyle: UINT,
@@ -178,62 +178,62 @@ LPIMAGELISTDRAWPARAMS :: ^IMAGELISTDRAWPARAMS
 IMAGEINFO :: struct {
 	hbmImage: HBITMAP,
 	hbmMask: HBITMAP,
-	Unused1: i32,
-	Unused2: i32,
+	Unused1: c_int,
+	Unused2: c_int,
 	rcImage: RECT,
 }
 LPIMAGEINFO :: ^IMAGEINFO
 
 @(default_calling_convention="system")
 foreign Comctl32 {
-	ImageList_Create :: proc(cx, cy: i32, flags: UINT, cInitial, cGrow: i32) -> HIMAGELIST ---
+	ImageList_Create :: proc(cx, cy: c_int, flags: UINT, cInitial, cGrow: c_int) -> HIMAGELIST ---
 	ImageList_Destroy :: proc(himl: HIMAGELIST) -> BOOL ---
-	ImageList_GetImageCount :: proc(himl: HIMAGELIST) -> i32 ---
+	ImageList_GetImageCount :: proc(himl: HIMAGELIST) -> c_int ---
 	ImageList_SetImageCount :: proc(himl: HIMAGELIST, uNewCount: UINT) -> BOOL ---
-	ImageList_Add :: proc(himl: HIMAGELIST, hbmImage, hbmMask: HBITMAP) -> i32 ---
-	ImageList_ReplaceIcon :: proc(himl: HIMAGELIST, i: i32, hicon: HICON) -> i32 ---
+	ImageList_Add :: proc(himl: HIMAGELIST, hbmImage, hbmMask: HBITMAP) -> c_int ---
+	ImageList_ReplaceIcon :: proc(himl: HIMAGELIST, i: c_int, hicon: HICON) -> c_int ---
 	ImageList_SetBkColor :: proc(himl: HIMAGELIST, clrBk: COLORREF) -> COLORREF ---
 	ImageList_GetBkColor :: proc(himl: HIMAGELIST) -> COLORREF ---
-	ImageList_SetOverlayImage :: proc(himl: HIMAGELIST, iImage: i32, iOverlay: i32) -> BOOL ---
-	ImageList_Draw :: proc(himl: HIMAGELIST, i: i32, hdcDst: HDC, x, y: i32, fStyle: UINT) -> BOOL ---
-	ImageList_Replace :: proc(himl: HIMAGELIST, i: i32, hbmImage, hbmMask: HBITMAP) -> BOOL ---
-	ImageList_AddMasked :: proc(himl: HIMAGELIST, hbmImage: HBITMAP, crMask: COLORREF) -> i32 ---
-	ImageList_DrawEx :: proc(himl: HIMAGELIST, i: i32, hdcDst: HDC, x, y, dx, dy: i32, rgbBk, rgbFg: COLORREF, fStyle: UINT) -> BOOL ---
+	ImageList_SetOverlayImage :: proc(himl: HIMAGELIST, iImage: c_int, iOverlay: c_int) -> BOOL ---
+	ImageList_Draw :: proc(himl: HIMAGELIST, i: c_int, hdcDst: HDC, x, y: c_int, fStyle: UINT) -> BOOL ---
+	ImageList_Replace :: proc(himl: HIMAGELIST, i: c_int, hbmImage, hbmMask: HBITMAP) -> BOOL ---
+	ImageList_AddMasked :: proc(himl: HIMAGELIST, hbmImage: HBITMAP, crMask: COLORREF) -> c_int ---
+	ImageList_DrawEx :: proc(himl: HIMAGELIST, i: c_int, hdcDst: HDC, x, y, dx, dy: c_int, rgbBk, rgbFg: COLORREF, fStyle: UINT) -> BOOL ---
 	ImageList_DrawIndirect :: proc(pimldp: ^IMAGELISTDRAWPARAMS) -> BOOL ---
-	ImageList_Remove :: proc(himl: HIMAGELIST, i: i32) -> BOOL ---
-	ImageList_GetIcon :: proc(himl: HIMAGELIST, i: i32, flags: UINT) -> HICON ---
-	ImageList_LoadImageW :: proc(hi: HINSTANCE, lpbmp: LPCWSTR, cx, cgrow: i32, crMask: COLORREF, uType, uFlags: UINT) -> HIMAGELIST ---
-	ImageList_Copy :: proc(himlDst: HIMAGELIST, iDst: i32, himlSrc: HIMAGELIST, iSrc: i32, uFlags: UINT) -> BOOL ---
-	ImageList_BeginDrag :: proc(himlTrack: HIMAGELIST, iTrack, dxHotspot, dyHotspot: i32) -> BOOL ---
+	ImageList_Remove :: proc(himl: HIMAGELIST, i: c_int) -> BOOL ---
+	ImageList_GetIcon :: proc(himl: HIMAGELIST, i: c_int, flags: UINT) -> HICON ---
+	ImageList_LoadImageW :: proc(hi: HINSTANCE, lpbmp: LPCWSTR, cx, cgrow: c_int, crMask: COLORREF, uType, uFlags: UINT) -> HIMAGELIST ---
+	ImageList_Copy :: proc(himlDst: HIMAGELIST, iDst: c_int, himlSrc: HIMAGELIST, iSrc: c_int, uFlags: UINT) -> BOOL ---
+	ImageList_BeginDrag :: proc(himlTrack: HIMAGELIST, iTrack, dxHotspot, dyHotspot: c_int) -> BOOL ---
 	ImageList_EndDrag :: proc() ---
-	ImageList_DragEnter :: proc(hwndLock: HWND, x, y: i32) -> BOOL ---
+	ImageList_DragEnter :: proc(hwndLock: HWND, x, y: c_int) -> BOOL ---
 	ImageList_DragLeave :: proc(hwndLock: HWND) -> BOOL ---
-	ImageList_DragMove :: proc(x, y: i32) -> BOOL ---
-	ImageList_SetDragCursorImage :: proc(himlDrag: HIMAGELIST, iDrag, dxHotspot, dyHotspot: i32) -> BOOL ---
+	ImageList_DragMove :: proc(x, y: c_int) -> BOOL ---
+	ImageList_SetDragCursorImage :: proc(himlDrag: HIMAGELIST, iDrag, dxHotspot, dyHotspot: c_int) -> BOOL ---
 	ImageList_DragShowNolock :: proc(fShow: BOOL) -> BOOL ---
 	ImageList_GetDragImage :: proc(ppt, pptHotspot: ^POINT) -> HIMAGELIST ---
 	ImageList_Read :: proc(pstm: ^IStream) -> HIMAGELIST ---
 	ImageList_Write :: proc(himl: HIMAGELIST, pstm: ^IStream) -> BOOL ---
 	ImageList_ReadEx :: proc(dwFlags: DWORD, pstm: ^IStream, riid: REFIID, ppv: PVOID) -> HRESULT ---
 	ImageList_WriteEx :: proc(himl: HIMAGELIST, dwFlags: DWORD, pstm: ^IStream) -> HRESULT ---
-	ImageList_GetIconSize :: proc(himl: HIMAGELIST, cx, cy: ^i32) -> BOOL ---
-	ImageList_SetIconSize :: proc(himl: HIMAGELIST, cx, cy: i32) -> BOOL ---
-	ImageList_GetImageInfo :: proc(himl: HIMAGELIST, i: i32, pImageInfo: ^IMAGEINFO) -> BOOL ---
-	ImageList_Merge :: proc(himl1: HIMAGELIST, i1: i32, himl2: HIMAGELIST, i2: i32, dx, dy: i32) -> HIMAGELIST ---
+	ImageList_GetIconSize :: proc(himl: HIMAGELIST, cx, cy: ^c_int) -> BOOL ---
+	ImageList_SetIconSize :: proc(himl: HIMAGELIST, cx, cy: c_int) -> BOOL ---
+	ImageList_GetImageInfo :: proc(himl: HIMAGELIST, i: c_int, pImageInfo: ^IMAGEINFO) -> BOOL ---
+	ImageList_Merge :: proc(himl1: HIMAGELIST, i1: c_int, himl2: HIMAGELIST, i2: c_int, dx, dy: c_int) -> HIMAGELIST ---
 	ImageList_Duplicate :: proc(himl: HIMAGELIST) -> HIMAGELIST ---
 	HIMAGELIST_QueryInterface :: proc(himl: HIMAGELIST, riid: REFIID, ppv: rawptr) -> HRESULT ---
 }
 
-ImageList_AddIcon :: #force_inline proc "system" (himl: HIMAGELIST, hicon: HICON) -> i32 {
+ImageList_AddIcon :: #force_inline proc "system" (himl: HIMAGELIST, hicon: HICON) -> c_int {
 	return ImageList_ReplaceIcon(himl, -1, hicon)
 }
 ImageList_RemoveAll :: #force_inline proc "system" (himl: HIMAGELIST) -> BOOL {
 	return ImageList_Remove(himl, -1)
 }
-ImageList_ExtractIcon :: #force_inline proc "system" (hi: HINSTANCE, himl: HIMAGELIST, i: i32) -> HICON {
+ImageList_ExtractIcon :: #force_inline proc "system" (hi: HINSTANCE, himl: HIMAGELIST, i: c_int) -> HICON {
 	return ImageList_GetIcon(himl, i, 0)
 }
-ImageList_LoadBitmap :: #force_inline proc "system" (hi: HINSTANCE, lpbmp: LPCWSTR, cx, cGrow: i32, crMask: COLORREF) -> HIMAGELIST {
+ImageList_LoadBitmap :: #force_inline proc "system" (hi: HINSTANCE, lpbmp: LPCWSTR, cx, cGrow: c_int, crMask: COLORREF) -> HIMAGELIST {
 	return ImageList_LoadImageW(hi, lpbmp, cx, cGrow, crMask, IMAGE_BITMAP, 0)
 }
 

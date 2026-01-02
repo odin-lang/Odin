@@ -12,3 +12,6 @@ foreign icu {
 	ucal_getWindowsTimeZoneID :: proc(id: wstring, len: i32, winid: wstring, winidCapacity: i32, status: ^UError) -> i32 ---
 	ucal_getDefaultTimeZone :: proc(result: wstring, cap: i32, status: ^UError) -> i32 ---
 }
+
+
+// NOTE(bill): all of these types actually do use `i32` and not `c_int`

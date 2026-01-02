@@ -859,21 +859,21 @@ FKF_CLICKON       :: 0x40
 
 NONCLIENTMETRICSW :: struct {
 	cbSize: UINT,
-	iBorderWidth: i32,
-	iScrollWidth: i32,
-	iScrollHeight: i32,
-	iCaptionWidth: i32,
-	iCaptionHeight: i32,
+	iBorderWidth: c_int,
+	iScrollWidth: c_int,
+	iScrollHeight: c_int,
+	iCaptionWidth: c_int,
+	iCaptionHeight: c_int,
 	lfCaptionFont: LOGFONTW,
-	iSmCaptionWidth: i32,
-	iSmCaptionHeight: i32,
+	iSmCaptionWidth: c_int,
+	iSmCaptionHeight: c_int,
 	lfSmCaptionFont: LOGFONTW,
-	iMenuWidth: i32,
-	iMenuHeight: i32,
+	iMenuWidth: c_int,
+	iMenuHeight: c_int,
 	lfMenuFont: LOGFONTW,
 	lfStatusFont: LOGFONTW,
 	lfMessageFont: LOGFONTW,
-	iPaddedBorderWidth: i32,
+	iPaddedBorderWidth: c_int,
 }
 LPNONCLIENTMETRICSW :: ^NONCLIENTMETRICSW
 
