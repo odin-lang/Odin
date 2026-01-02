@@ -199,12 +199,12 @@ XINPUT_KEYSTROKE :: struct {
 // XInput APIs
 @(default_calling_convention = "system")
 foreign xinput {
-	XInputGetState :: proc(user: XUSER, pState: ^XINPUT_STATE) -> System_Error ---
-	XInputSetState :: proc(user: XUSER, pVibration: ^XINPUT_VIBRATION) -> System_Error ---
-	XInputGetCapabilities :: proc(user: XUSER, dwFlags: XINPUT_FLAG, pCapabilities: ^XINPUT_CAPABILITIES) -> System_Error ---
-	XInputEnable :: proc(enable: BOOL) ---
-	XInputGetAudioDeviceIds :: proc(user: XUSER, pRenderDeviceId: LPWSTR, pRenderCount: ^UINT, pCaptureDeviceId: LPWSTR, pCaptureCount: ^UINT) -> System_Error ---
-	XInputGetBatteryInformation :: proc(user: XUSER, devType: BATTERY_DEVTYPE, pBatteryInformation: ^XINPUT_BATTERY_INFORMATION) -> System_Error ---
-	XInputGetKeystroke :: proc(user: XUSER, dwReserved: DWORD, pKeystroke: ^XINPUT_KEYSTROKE) -> System_Error ---
+	XInputGetState                  :: proc(user: XUSER, pState: ^XINPUT_STATE) -> System_Error ---
+	XInputSetState                  :: proc(user: XUSER, pVibration: ^XINPUT_VIBRATION) -> System_Error ---
+	XInputGetCapabilities           :: proc(user: XUSER, dwFlags: XINPUT_FLAG, pCapabilities: ^XINPUT_CAPABILITIES) -> System_Error ---
+	XInputEnable                    :: proc(enable: BOOL) ---
+	XInputGetAudioDeviceIds         :: proc(user: XUSER, pRenderDeviceId: LPWSTR, pRenderCount: ^UINT, pCaptureDeviceId: LPWSTR, pCaptureCount: ^UINT) -> System_Error ---
+	XInputGetBatteryInformation     :: proc(user: XUSER, devType: BATTERY_DEVTYPE, pBatteryInformation: ^XINPUT_BATTERY_INFORMATION) -> System_Error ---
+	XInputGetKeystroke              :: proc(user: XUSER, dwReserved: DWORD, pKeystroke: ^XINPUT_KEYSTROKE) -> System_Error ---
 	XInputGetDSoundAudioDeviceGuids :: proc(user: XUSER, pDSoundRenderGuid: ^GUID, pDSoundCaptureGuid: ^GUID) -> System_Error ---
 }

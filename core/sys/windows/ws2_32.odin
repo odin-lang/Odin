@@ -109,62 +109,62 @@ foreign ws2_32 {
 	WSAPoll :: proc(fdArray: ^WSA_POLLFD, fds: c_ulong, timeout: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaduplicatesocketw)
 	WSADuplicateSocketW :: proc(
-		s: SOCKET,
-		dwProcessId: DWORD,
+		s:              SOCKET,
+		dwProcessId:    DWORD,
 		lpProtocolInfo: LPWSAPROTOCOL_INFO,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasend)
 	WSASend :: proc(
-		s: SOCKET,
-		lpBuffers: LPWSABUF,
-		dwBufferCount: DWORD,
+		s:                   SOCKET,
+		lpBuffers:           LPWSABUF,
+		dwBufferCount:       DWORD,
 		lpNumberOfBytesSent: LPDWORD,
-		dwFlags: DWORD,
-		lpOverlapped: LPWSAOVERLAPPED,
+		dwFlags:             DWORD,
+		lpOverlapped:        LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasendto)
 	WSASendTo :: proc(
-		s: SOCKET,
-		lpBuffers: LPWSABUF,
-		dwBufferCount: DWORD,
+		s:                   SOCKET,
+		lpBuffers:           LPWSABUF,
+		dwBufferCount:       DWORD,
 		lpNumberOfBytesSent: LPDWORD,
-		dwFlags: DWORD,
-		lpTo: ^SOCKADDR_STORAGE_LH,
-		iToLen: c_int,
-		lpOverlapped: LPWSAOVERLAPPED,
+		dwFlags:             DWORD,
+		lpTo:                ^SOCKADDR_STORAGE_LH,
+		iToLen:              c_int,
+		lpOverlapped:        LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecv)
 	WSARecv :: proc(
-		s: SOCKET,
-		lpBuffers: LPWSABUF,
-		dwBufferCount: DWORD,
+		s:                    SOCKET,
+		lpBuffers:            LPWSABUF,
+		dwBufferCount:        DWORD,
 		lpNumberOfBytesRecvd: LPDWORD,
-		lpFlags: LPDWORD,
-		lpOverlapped: LPWSAOVERLAPPED,
-		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+		lpFlags:              LPDWORD,
+		lpOverlapped:         LPWSAOVERLAPPED,
+		lpCompletionRoutine:  LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecvfrom)
 	WSARecvFrom :: proc(
-		s: SOCKET,
-		lpBuffers: LPWSABUF,
-		dwBufferCount: DWORD,
+		s:                    SOCKET,
+		lpBuffers:            LPWSABUF,
+		dwBufferCount:        DWORD,
 		lpNumberOfBytesRecvd: LPDWORD,
-		lpFlags: LPDWORD,
-		lpFrom: ^SOCKADDR_STORAGE_LH,
-		lpFromlen: ^c_int,
-		lpOverlapped: LPWSAOVERLAPPED,
-		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
+		lpFlags:              LPDWORD,
+		lpFrom:               ^SOCKADDR_STORAGE_LH,
+		lpFromlen:            ^c_int,
+		lpOverlapped:         LPWSAOVERLAPPED,
+		lpCompletionRoutine:  LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasocketw)
 	WSASocketW :: proc(
-		af: c_int,
-		kind: c_int,
-		protocol: c_int,
+		af:             c_int,
+		kind:           c_int,
+		protocol:       c_int,
 		lpProtocolInfo: LPWSAPROTOCOL_INFO,
-		g: GROUP,
-		dwFlags: DWORD,
+		g:              GROUP,
+		dwFlags:        DWORD,
 	) -> SOCKET ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaioctl)
 	WSAIoctl :: proc(s: SOCKET, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: rawptr, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> c_int ---
@@ -182,8 +182,8 @@ foreign ws2_32 {
 	WSAGetOverlappedResult :: proc(s: SOCKET, lpOverlapped: ^OVERLAPPED, lpcbTransfer: ^DWORD, fWait: BOOL, lpdwFlags: ^DWORD) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket)
 	socket :: proc(
-		af: c_int,
-		type: c_int,
+		af:       c_int,
+		type:     c_int,
 		protocol: c_int,
 	) -> SOCKET ---
 
@@ -197,20 +197,20 @@ foreign ws2_32 {
 	send :: proc(socket: SOCKET, buf: rawptr, len: c_int, flags: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-recvfrom)
 	recvfrom :: proc(
-		socket: SOCKET,
-		buf: rawptr,
-		len: c_int,
-		flags: c_int,
-		addr: ^SOCKADDR_STORAGE_LH,
+		socket:  SOCKET,
+		buf:     rawptr,
+		len:     c_int,
+		flags:   c_int,
+		addr:    ^SOCKADDR_STORAGE_LH,
 		addrlen: ^c_int,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-sendto)
 	sendto :: proc(
-		socket: SOCKET,
-		buf: rawptr,
-		len: c_int,
-		flags: c_int,
-		addr: ^SOCKADDR_STORAGE_LH,
+		socket:  SOCKET,
+		buf:     rawptr,
+		len:     c_int,
+		flags:   c_int,
+		addr:    ^SOCKADDR_STORAGE_LH,
 		addrlen: c_int,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-shutdown)
@@ -220,11 +220,11 @@ foreign ws2_32 {
 
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-setsockopt)
 	setsockopt :: proc(
-		s: SOCKET,
-		level: c_int,
+		s:       SOCKET,
+		level:   c_int,
 		optname: c_int,
-		optval: rawptr,
-		optlen: c_int,
+		optval:  rawptr,
+		optlen:  c_int,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getsockname)
 	getsockname :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
@@ -238,10 +238,10 @@ foreign ws2_32 {
 	connect :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, len: c_int) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-getaddrinfo)
 	getaddrinfo :: proc(
-		node: cstring,
+		node:    cstring,
 		service: cstring,
-		hints: ^ADDRINFOA,
-		res: ^^ADDRINFOA,
+		hints:   ^ADDRINFOA,
+		res:     ^^ADDRINFOA,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-freeaddrinfo)
 	freeaddrinfo :: proc(res: ^ADDRINFOA) ---
@@ -261,19 +261,19 @@ foreign ws2_32 {
 		lpHandle:            LPHANDLE) -> INT ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select)
 	select :: proc(
-		nfds: c_int,
-		readfds: ^fd_set,
-		writefds: ^fd_set,
-		exceptfds: ^fd_set,
-		timeout: ^timeval,
+		nfds:      c_int,
+		readfds:   [^]fd_set,
+		writefds:  [^]fd_set,
+		exceptfds: [^]fd_set,
+		timeout:   ^timeval,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getsockopt)
 	getsockopt :: proc(
-		s: SOCKET,
-		level: c_int,
+		s:       SOCKET,
+		level:   c_int,
 		optname: c_int,
-		optval: ^c_char,
-		optlen: ^c_int,
+		optval:  [^]c_char,
+		optlen:  ^c_int,
 	) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohl)
 	ntohl :: proc(netlong: c_ulong) -> c_ulong ---

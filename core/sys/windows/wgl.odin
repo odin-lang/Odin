@@ -91,7 +91,7 @@ gl_set_proc_address :: proc(p: rawptr, name: cstring) {
 	func := wglGetProcAddress(name)
 	switch uintptr(func) {
 	case 0, 1, 2, 3, ~uintptr(0):
-		module := LoadLibraryW(L("opengl32.dll"))
+		module := LoadLibraryW("opengl32.dll")
 		func = GetProcAddress(module, name)
 	}
 	(^rawptr)(p)^ = func
