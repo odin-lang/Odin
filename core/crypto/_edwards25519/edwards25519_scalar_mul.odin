@@ -1,7 +1,7 @@
 package _edwards25519
 
 import field "core:crypto/_fiat/field_scalar25519"
-import "core:math/bits"
+import subtle "core:crypto/_subtle"
 import "core:mem"
 
 // GE_BASEPOINT_TABLE is 1 * G, ... 15 * G, in precomputed format.
@@ -281,8 +281,8 @@ mul_tbl_add :: proc "contextless" (
 		{2, 0, 0, 0, 0}, // z * 2
 	}
 	for i := u64(1); i < 16; i = i + 1 {
-		_, ctrl := bits.sub_u64(0, (i ~ idx), 0)
-		ge_addend_conditional_assign(tmp_addend, &tbl[i - 1], int(~ctrl) & 1)
+		ctrl := subtle.eq(i, idx)
+		ge_addend_conditional_assign(tmp_addend, &tbl[i - 1], int(ctrl))
 	}
 	ge_add_addend(ge, ge, tmp_addend, tmp_add)
 }
