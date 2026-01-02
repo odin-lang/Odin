@@ -2234,7 +2234,7 @@ SHELLEXECUTEINFOW :: struct {
 	lpFile: LPCWSTR,            // in, either this value or lpIDList must be specified
 	lpParameters: LPCWSTR,      // in, optional
 	lpDirectory: LPCWSTR,       // in, optional
-	nShow: c.int,                  // in, required
+	nShow: c_int,                  // in, required
 	hInstApp: HINSTANCE,         // out when SEE_MASK_NOCLOSEPROCESS is specified
 	lpIDList: rawptr,             // in, valid when SEE_MASK_IDLIST is specified, PCIDLIST_ABSOLUTE, for use with SEE_MASK_IDLIST & SEE_MASK_INVOKEIDLIST
 	lpClass: LPCWSTR,           // in, valid when SEE_MASK_CLASSNAME is specified

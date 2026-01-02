@@ -1,6 +1,5 @@
 #+build windows
 package sys_windows
-import "core:c"
 
 HIDD_CONFIGURATION :: struct {
 	cookie: PVOID,
@@ -152,7 +151,7 @@ PHIDP_LINK_COLLECTION_NODE :: ^HIDP_LINK_COLLECTION_NODE
 HIDP_PREPARSED_DATA :: rawptr
 PHIDP_PREPARSED_DATA :: ^HIDP_PREPARSED_DATA
 
-HIDP_REPORT_TYPE :: enum c.int {
+HIDP_REPORT_TYPE :: enum c_int {
 	Input,
 	Output,
 	Feature,
