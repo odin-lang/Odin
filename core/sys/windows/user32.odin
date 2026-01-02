@@ -2,7 +2,6 @@
 package sys_windows
 
 import "base:intrinsics"
-import "core:c"
 foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
@@ -33,7 +32,7 @@ foreign user32 {
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
-	RegisterHotKey :: proc(hnwd: HWND, id: c.int, fsModifiers: UINT, vk: UINT) -> BOOL ---
+	RegisterHotKey :: proc(hnwd: HWND, id: c_int, fsModifiers: UINT, vk: UINT) -> BOOL ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
@@ -295,7 +294,7 @@ foreign user32 {
 	SetWindowPlacement :: proc(hwnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
 	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
-	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
+	GetSystemMetricsForDpi :: proc(nIndex: c_int, dpi: UINT) -> int ---
 
 	GetCursorInfo :: proc(pci: PCURSORINFO) -> BOOL ---
 
