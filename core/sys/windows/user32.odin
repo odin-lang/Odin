@@ -278,7 +278,7 @@ foreign user32 {
 	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
 
 	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
-	FrameRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_inct ---
+	FrameRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
 	EqualRect :: proc(lprc1, lprc2: ^RECT) -> BOOL ---
 	OffsetRect :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
 	InflateRect :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
