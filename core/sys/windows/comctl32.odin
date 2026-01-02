@@ -1609,9 +1609,9 @@ LPTV_ITEMEXW :: LPTVITEMEXW
 TVINSERTSTRUCTW :: struct {
 	hParent: HTREEITEM,
 	hInsertAfter: HTREEITEM,
-	_: struct #raw_union {
-	itemex: TVITEMEXW,
-	item: TV_ITEMW,
+	using _: struct #raw_union {
+		itemex: TVITEMEXW,
+		item:   TV_ITEMW,
 	},
 }
 TV_INSERTSTRUCTW   :: TVINSERTSTRUCTW
@@ -1703,7 +1703,7 @@ TreeView_Expand :: #force_inline proc "system" (hwnd: HWND, hitem: HTREEITEM, co
 }
 TreeView_GetItemRect :: #force_inline proc "system" (hwnd: HWND, hitem: HTREEITEM, prc: ^RECT, code: UINT) -> BOOL {
 	alias: struct #raw_union {
-		rc: ^RECT,
+		rc:    ^RECT,
 		hitem: ^HTREEITEM,
 	}
 
