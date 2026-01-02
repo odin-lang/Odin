@@ -41,32 +41,32 @@ LPUNKNOWN :: ^IUnknown
 
 @(default_calling_convention="system")
 foreign Ole32 {
-	CoInitialize :: proc(reserved: rawptr = nil) -> HRESULT ---
+	CoInitialize   :: proc(reserved: rawptr = nil) -> HRESULT ---
 	CoInitializeEx :: proc(reserved: rawptr = nil, co_init: COINIT = .APARTMENTTHREADED) -> HRESULT ---
 	CoUninitialize :: proc() ---
 
 	CoCreateInstance :: proc(
-		rclsid: REFCLSID,
-		pUnkOuter: LPUNKNOWN,
+		rclsid:       REFCLSID,
+		pUnkOuter:    LPUNKNOWN,
 		dwClsContext: DWORD,
-		riid: REFIID,
-		ppv: ^LPVOID,
+		riid:         REFIID,
+		ppv:          ^LPVOID,
 	) -> HRESULT ---
 
-	CoTaskMemAlloc :: proc(cb: SIZE_T) -> rawptr ---
+	CoTaskMemAlloc   :: proc(cb: SIZE_T) -> rawptr ---
 	CoTaskMemRealloc :: proc(pv: rawptr, cb: SIZE_T) -> rawptr ---
-	CoTaskMemFree :: proc(pv: rawptr) ---
+	CoTaskMemFree    :: proc(pv: rawptr) ---
 
-	CLSIDFromProgID :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
+	CLSIDFromProgID   :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
 	CLSIDFromProgIDEx :: proc(lpszProgID: LPCOLESTR, lpclsid: LPCLSID) -> HRESULT ---
-	CLSIDFromString :: proc(lpsz: LPOLESTR, pclsid: LPCLSID) -> HRESULT ---
-	IIDFromString :: proc(lpsz: LPOLESTR, lpiid: LPIID) -> HRESULT ---
-	ProgIDFromCLSID :: proc(clsid: REFCLSID, lplpszProgID: ^LPOLESTR) -> HRESULT ---
-	StringFromCLSID :: proc(rclsid: REFCLSID, lplpsz: ^LPOLESTR) -> HRESULT ---
-	StringFromGUID2 :: proc(rclsid: REFCLSID, lplpsz: LPOLESTR, cchMax: INT) -> INT ---
-	StringFromIID :: proc(rclsid: REFIID, lplpsz: ^LPOLESTR) -> HRESULT ---
+	CLSIDFromString   :: proc(lpsz: LPOLESTR, pclsid: LPCLSID) -> HRESULT ---
+	IIDFromString     :: proc(lpsz: LPOLESTR, lpiid: LPIID) -> HRESULT ---
+	ProgIDFromCLSID   :: proc(clsid: REFCLSID, lplpszProgID: ^LPOLESTR) -> HRESULT ---
+	StringFromCLSID   :: proc(rclsid: REFCLSID, lplpsz: ^LPOLESTR) -> HRESULT ---
+	StringFromGUID2   :: proc(rclsid: REFCLSID, lplpsz: LPOLESTR, cchMax: INT) -> INT ---
+	StringFromIID     :: proc(rclsid: REFIID, lplpsz: ^LPOLESTR) -> HRESULT ---
 
-	PropVariantClear :: proc(pvar: ^PROPVARIANT) -> HRESULT ---
-	PropVariantCopy :: proc(pvarDest: ^PROPVARIANT, pvarSrc: ^PROPVARIANT) -> HRESULT ---
+	PropVariantClear     :: proc(pvar: ^PROPVARIANT) -> HRESULT ---
+	PropVariantCopy      :: proc(pvarDest: ^PROPVARIANT, pvarSrc: ^PROPVARIANT) -> HRESULT ---
 	FreePropVariantArray :: proc(cVariants: ULONG, rgvars: ^PROPVARIANT) -> HRESULT ---
 }
