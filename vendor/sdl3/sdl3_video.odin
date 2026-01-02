@@ -135,12 +135,12 @@ FlashOperation :: enum c.int {
 }
 
 ProgressState :: enum c.int {
-	PROGRESS_STATE_INVALID = -1,    /**< An invalid progress state indicating an error; check SDL_GetError() */
-	PROGRESS_STATE_NONE,            /**< No progress bar is shown */
-	PROGRESS_STATE_INDETERMINATE,   /**< The progress bar is shown in a indeterminate state */
-	PROGRESS_STATE_NORMAL,          /**< The progress bar is shown in a normal state */
-	PROGRESS_STATE_PAUSED,          /**< The progress bar is shown in a paused state */
-	PROGRESS_STATE_ERROR,           /**< The progress bar is shown in a state indicating the application had an error */
+	INVALID = -1,    /**< An invalid progress state indicating an error; check SDL_GetError() */
+	NONE,            /**< No progress bar is shown */
+	INDETERMINATE,   /**< The progress bar is shown in a indeterminate state */
+	NORMAL,          /**< The progress bar is shown in a normal state */
+	PAUSED,          /**< The progress bar is shown in a paused state */
+	ERROR,           /**< The progress bar is shown in a state indicating the application had an error */
 }
 
 GLContextState :: struct {}
