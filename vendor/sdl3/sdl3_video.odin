@@ -140,7 +140,7 @@ ProgressState :: enum c.int {
 	PROGRESS_STATE_INDETERMINATE,   /**< The progress bar is shown in a indeterminate state */
 	PROGRESS_STATE_NORMAL,          /**< The progress bar is shown in a normal state */
 	PROGRESS_STATE_PAUSED,          /**< The progress bar is shown in a paused state */
-	PROGRESS_STATE_ERROR            /**< The progress bar is shown in a state indicating the application had an error */
+	PROGRESS_STATE_ERROR,           /**< The progress bar is shown in a state indicating the application had an error */
 }
 
 GLContextState :: struct {}

@@ -22,7 +22,7 @@ TextureAddressMode :: enum c.int {
 	TEXTURE_ADDRESS_INVALID = -1,
 	TEXTURE_ADDRESS_AUTO,   /**< Wrapping is enabled if texture coordinates are outside [0, 1], this is the default */
 	TEXTURE_ADDRESS_CLAMP,  /**< Texture coordinates are clamped to the [0, 1] range */
-	TEXTURE_ADDRESS_WRAP    /**< The texture is repeated (tiled) */
+	TEXTURE_ADDRESS_WRAP,    /**< The texture is repeated (tiled) */
 }
 
 RendererLogicalPresentation :: enum c.int {

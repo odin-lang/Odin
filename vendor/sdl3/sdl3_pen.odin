@@ -34,7 +34,7 @@ PenDeviceType :: enum c.int {
 	INVALID = -1, /**< Not a valid pen device. */
 	UNKNOWN,      /**< Don't know specifics of this pen. */
 	DIRECT,       /**< Pen touches display. */
-	INDIRECT      /**< Pen touches something that isn't the display. */
+	INDIRECT,     /**< Pen touches something that isn't the display. */
 }
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
