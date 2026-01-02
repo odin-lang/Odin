@@ -445,8 +445,8 @@ foreign lib {
 	FlashWindow                     :: proc(window: ^Window, operation: FlashOperation) -> bool ---
 	SetWindowProgressState          :: proc(window: ^Window, state: ProgressState) -> bool ---
 	GetWindowProgressState          :: proc(window: ^Window) -> ProgressState ---
-	SetWindowProgrssValue           :: proc(window: ^Window, value: f32) -> bool ---
-	GetWindowProgrssValue           :: proc(window: ^Window) -> f32 ---
+	SetWindowProgressValue           :: proc(window: ^Window, value: f32) -> bool ---
+	GetWindowProgressValue           :: proc(window: ^Window) -> f32 ---
 	DestroyWindow                   :: proc(window: ^Window) ---
 	ScreenSaverEnabled              :: proc() -> bool ---
 	EnableScreenSaver               :: proc() -> bool ---
