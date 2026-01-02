@@ -52,7 +52,7 @@ foreign gdi32 {
 
 	CreateSolidBrush :: proc(color: COLORREF) -> HBRUSH ---
 
-	GetObjectW :: proc(h: HANDLE, c: INT, pv: LPVOID) -> int ---
+	GetObjectW :: proc(h: HANDLE, c: INT, pv: LPVOID) -> c_int ---
 	CreateCompatibleBitmap :: proc(hdc: HDC, cx, cy: INT) -> HBITMAP ---
 	BitBlt :: proc(hdc: HDC, x, y, cx, cy: INT, hdcSrc: HDC, x1, y1: INT, rop: DWORD) -> BOOL ---
 	GetDIBits :: proc(hdc: HDC, hbm: HBITMAP, start, cLines: UINT, lpvBits: LPVOID, lpbmi: ^BITMAPINFO, usage: UINT) -> INT ---

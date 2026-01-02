@@ -277,8 +277,8 @@ foreign user32 {
 
 	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
 
-	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
-	FrameRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
+	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
+	FrameRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_inct ---
 	EqualRect :: proc(lprc1, lprc2: ^RECT) -> BOOL ---
 	OffsetRect :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
 	InflateRect :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
@@ -292,9 +292,9 @@ foreign user32 {
 	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
 	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
 	SetWindowPlacement :: proc(hwnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
-	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
+	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> c_int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
-	GetSystemMetricsForDpi :: proc(nIndex: c_int, dpi: UINT) -> int ---
+	GetSystemMetricsForDpi :: proc(nIndex: c_int, dpi: UINT) -> c_int ---
 
 	GetCursorInfo :: proc(pci: PCURSORINFO) -> BOOL ---
 
