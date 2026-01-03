@@ -58,6 +58,7 @@ foreign user32 {
 	IsZoomed            :: proc(hwnd: HWND) -> BOOL ---
 	BringWindowToTop    :: proc(hWnd: HWND) -> BOOL ---
 	GetTopWindow        :: proc(hWnd: HWND) -> HWND ---
+	GetWindow           :: proc(hwnd: HWND, uCmd: UINT) -> HWND ---
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
 	GetForegroundWindow :: proc() -> HWND ---
 	GetDesktopWindow    :: proc() -> HWND ---
@@ -279,6 +280,7 @@ foreign user32 {
 
 	FillRect      :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
 	FrameRect     :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> c_int ---
+	InvertRect    :: proc(hDC: HDC, lprc: ^RECT) -> BOOL ---
 	EqualRect     :: proc(lprc1, lprc2: ^RECT) -> BOOL ---
 	OffsetRect    :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
 	InflateRect   :: proc(lprc1: ^RECT, dx, dy: INT) -> BOOL ---
@@ -939,3 +941,13 @@ ESB_DISABLE_UP      :: 0x0001
 ESB_DISABLE_DOWN    :: 0x0002
 ESB_DISABLE_LTUP    :: ESB_DISABLE_LEFT
 ESB_DISABLE_RTDN    :: ESB_DISABLE_RIGHT
+
+// Command constants for GetWindow
+GW_HWNDFIRST        :: 0
+GW_HWNDLAST         :: 1
+GW_HWNDNEXT         :: 2
+GW_HWNDPREV         :: 3
+GW_OWNER            :: 4
+GW_CHILD            :: 5
+GW_ENABLEDPOPUP     :: 6
+GW_MAX              :: 6
