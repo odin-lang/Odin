@@ -455,7 +455,7 @@ make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator, loc := #c
 @(builtin, require_results)
 make_map_cap :: proc($T: typeid/map[$K]$E, #any_int capacity: int, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
 	make_map_expr_error_loc(loc, capacity)
-	context.allocator = allocator
+	m.allocator = allocator
 
 	err = reserve_map(&m, capacity, loc)
 	return
