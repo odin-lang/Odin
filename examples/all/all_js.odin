@@ -33,6 +33,7 @@ package all
 @(require) import "core:crypto/chacha20poly1305"
 @(require) import chash "core:crypto/hash"
 @(require) import "core:crypto/deoxysii"
+@(require) import "core:crypto/ecdh"
 @(require) import "core:crypto/ed25519"
 @(require) import "core:crypto/hkdf"
 @(require) import "core:crypto/hmac"
