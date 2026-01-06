@@ -75,20 +75,29 @@ DEFINE_PIXELFORMAT :: #force_inline proc "c" (type: PixelType, order: PackedOrde
 	return PixelFormat(((1 << 28) | (Uint32(type) << 24) | (Uint32(order) << 20) | (Uint32(layout) << 16) | (Uint32(bits) << 8) | (Uint32(bytes) << 0)))
 }
 
-@(require_results) PIXELFLAG   :: proc "c" (format: PixelFormat) -> Uint32         { return ((Uint32(format) >> 28) & 0x0F) }
-@(require_results) PIXELTYPE   :: proc "c" (format: PixelFormat) -> PixelType      { return PixelType((Uint32(format) >> 24) & 0x0F) }
-@(require_results) PIXELORDER  :: proc "c" (format: PixelFormat) -> PackedOrder    { return PackedOrder((Uint32(format) >> 20) & 0x0F) }
-@(require_results) PIXELLAYOUT :: proc "c" (format: PixelFormat) -> PackedLayout   { return PackedLayout((Uint32(format) >> 16) & 0x0F) }
-@(require_results) PIXELARRAYORDER :: proc "c" (format: PixelFormat) -> ArrayOrder { return ArrayOrder((Uint32(format) >> 20) & 0x0F) }
+@(require_results) PIXELFLAG   :: #force_inline proc "c" (format: PixelFormat) -> Uint32         { return ((Uint32(format) >> 28) & 0x0F) }
+@(require_results) PIXELTYPE   :: #force_inline proc "c" (format: PixelFormat) -> PixelType      { return PixelType((Uint32(format) >> 24) & 0x0F) }
+@(require_results) PIXELORDER  :: #force_inline proc "c" (format: PixelFormat) -> PackedOrder    { return PackedOrder((Uint32(format) >> 20) & 0x0F) }
+@(require_results) PIXELLAYOUT :: #force_inline proc "c" (format: PixelFormat) -> PackedLayout   { return PackedLayout((Uint32(format) >> 16) & 0x0F) }
+@(require_results) PIXELARRAYORDER :: #force_inline proc "c" (format: PixelFormat) -> ArrayOrder { return ArrayOrder((Uint32(format) >> 20) & 0x0F) }
 
 
 @(require_results)
-BITSPERPIXEL :: proc "c" (format: PixelFormat) -> Uint32 {
+BITSPERPIXEL :: #force_inline proc "c" (format: PixelFormat) -> Uint32 {
 	return ISPIXELFORMAT_FOURCC(format) ? 0 : ((Uint32(format) >> 8) & 0xFF)
 }
 
 @(require_results)
-ISPIXELFORMAT_INDEXED :: proc "c" (format: PixelFormat) -> bool {
+BYTESPERPIXEL :: #force_inline proc "c" (format: PixelFormat) -> Uint32 {
+	return ISPIXELFORMAT_FOURCC(format) ? (
+		(((format) == .YUY2) ||
+          ((format) == .UYVY) ||
+          ((format) == .YVYU) ||
+          ((format) == .P010)) ? 2 : 1) : ((Uint32(format) >> 0) & 0xFF)
+}
+
+@(require_results)
+ISPIXELFORMAT_INDEXED :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return (!ISPIXELFORMAT_FOURCC(format) &&
 	        ((PIXELTYPE(format) == .INDEX1) ||
 	         (PIXELTYPE(format) == .INDEX2) ||
@@ -98,7 +107,7 @@ ISPIXELFORMAT_INDEXED :: proc "c" (format: PixelFormat) -> bool {
 
 
 @(require_results)
-ISPIXELFORMAT_PACKED :: proc "c" (format: PixelFormat) -> bool {
+ISPIXELFORMAT_PACKED :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return (!ISPIXELFORMAT_FOURCC(format) &&
 	        ((PIXELTYPE(format) == .PACKED8) ||
 	         (PIXELTYPE(format) == .PACKED16) ||
@@ -106,7 +115,7 @@ ISPIXELFORMAT_PACKED :: proc "c" (format: PixelFormat) -> bool {
 }
 
 @(require_results)
-ISPIXELFORMAT_ARRAY :: proc "c" (format: PixelFormat) -> bool {
+ISPIXELFORMAT_ARRAY :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return (!ISPIXELFORMAT_FOURCC(format) &&
 	        ((PIXELTYPE(format) == .ARRAYU8) ||
 	         (PIXELTYPE(format) == .ARRAYU16) ||
@@ -116,21 +125,21 @@ ISPIXELFORMAT_ARRAY :: proc "c" (format: PixelFormat) -> bool {
 }
 
 @(require_results)
-ISPIXELFORMAT_10BIT :: proc "c" (format: PixelFormat) -> bool {
+ISPIXELFORMAT_10BIT :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return (!ISPIXELFORMAT_FOURCC(format) &&
 	        ((PIXELTYPE(format) == .PACKED32) &&
 	         (PIXELLAYOUT(format) == .LAYOUT_2101010)))
 }
 
 @(require_results)
-ISPIXELFORMAT_FLOAT :: proc "c" (format: PixelFormat) -> bool {
+ISPIXELFORMAT_FLOAT :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return (!ISPIXELFORMAT_FOURCC(format) &&
 	        ((PIXELTYPE(format) == .ARRAYF16) ||
 	         (PIXELTYPE(format) == .ARRAYF32)))
 }
 
 @(require_results)
-ISPIXELFORMAT_ALPHA :: proc "c" (format: PixelFormat) -> bool {
+ISPIXELFORMAT_ALPHA :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return ((ISPIXELFORMAT_PACKED(format) &&
 	         ((PIXELORDER(format) == .ARGB) ||
 	          (PIXELORDER(format) == .RGBA) ||
@@ -144,7 +153,7 @@ ISPIXELFORMAT_ALPHA :: proc "c" (format: PixelFormat) -> bool {
 }
 
 @(require_results)
-ISPIXELFORMAT_FOURCC :: proc "c" (format: PixelFormat) -> bool {
+ISPIXELFORMAT_FOURCC :: #force_inline proc "c" (format: PixelFormat) -> bool {
 	return format != nil && PIXELFLAG(format) != 1
 }
 
@@ -369,63 +378,63 @@ ChromaLocation :: enum c.int {
 
 
 @(require_results)
-DEFINE_COLORSPACE :: proc "c" (type: ColorType, range: ColorRange, primaries: ColorPrimaries, transfer: TransferCharacteristics, matrix_: MatrixCoefficients, chroma: ChromaLocation) -> Colorspace {
+DEFINE_COLORSPACE :: #force_inline proc "c" (type: ColorType, range: ColorRange, primaries: ColorPrimaries, transfer: TransferCharacteristics, matrix_: MatrixCoefficients, chroma: ChromaLocation) -> Colorspace {
 	return Colorspace((Uint32(type) << 28) | (Uint32(range) << 24) | (Uint32(chroma) << 20) |
 	                  (Uint32(primaries) << 10) | (Uint32(transfer) << 5) | (Uint32(matrix_) << 0))
 }
 
 @(require_results)
-COLORSPACETYPE :: proc "c" (cspace: Colorspace) -> ColorType {
+COLORSPACETYPE :: #force_inline proc "c" (cspace: Colorspace) -> ColorType {
 	return ColorType((Uint32(cspace) >> 28) & 0x0F)
 }
 
 @(require_results)
-COLORSPACERANGE :: proc "c" (cspace: Colorspace) -> ColorRange {
+COLORSPACERANGE :: #force_inline proc "c" (cspace: Colorspace) -> ColorRange {
 	return ColorRange((Uint32(cspace) >> 24) & 0x0F)
 }
 
 @(require_results)
-COLORSPACECHROMA :: proc "c" (cspace: Colorspace) -> ChromaLocation {
+COLORSPACECHROMA :: #force_inline proc "c" (cspace: Colorspace) -> ChromaLocation {
 	return ChromaLocation((Uint32(cspace) >> 20) & 0x0F)
 }
 
 @(require_results)
-COLORSPACEPRIMARIES :: proc "c" (cspace: Colorspace) -> ColorPrimaries {
+COLORSPACEPRIMARIES :: #force_inline proc "c" (cspace: Colorspace) -> ColorPrimaries {
 	return ColorPrimaries((Uint32(cspace) >> 10) & 0x1F)
 }
 
 @(require_results)
-COLORSPACETRANSFER :: proc "c" (cspace: Colorspace) -> TransferCharacteristics {
+COLORSPACETRANSFER :: #force_inline proc "c" (cspace: Colorspace) -> TransferCharacteristics {
 	return TransferCharacteristics((Uint32(cspace) >> 5) & 0x1F)
 }
 
 @(require_results)
-COLORSPACEMATRIX :: proc "c" (cspace: Colorspace) -> MatrixCoefficients {
+COLORSPACEMATRIX :: #force_inline proc "c" (cspace: Colorspace) -> MatrixCoefficients {
 	return MatrixCoefficients(Uint32(cspace) & 0x1F)
 }
 
 @(require_results)
-ISCOLORSPACE_MATRIX_BT601 :: proc "c" (cspace: Colorspace) -> bool {
+ISCOLORSPACE_MATRIX_BT601 :: #force_inline proc "c" (cspace: Colorspace) -> bool {
 	return COLORSPACEMATRIX(cspace) == .BT601 || COLORSPACEMATRIX(cspace) == .BT470BG
 }
 
 @(require_results)
-ISCOLORSPACE_MATRIX_BT709 :: proc "c" (cspace: Colorspace) -> bool {
+ISCOLORSPACE_MATRIX_BT709 :: #force_inline proc "c" (cspace: Colorspace) -> bool {
 	return COLORSPACEMATRIX(cspace) == .BT709
 }
 
 @(require_results)
-ISCOLORSPACE_MATRIX_BT2020_NCL :: proc "c" (cspace: Colorspace) -> bool {
+ISCOLORSPACE_MATRIX_BT2020_NCL :: #force_inline proc "c" (cspace: Colorspace) -> bool {
 	return COLORSPACEMATRIX(cspace) == .BT2020_NCL
 }
 
 @(require_results)
-ISCOLORSPACE_LIMITED_RANGE :: proc "c" (cspace: Colorspace) -> bool {
+ISCOLORSPACE_LIMITED_RANGE :: #force_inline proc "c" (cspace: Colorspace) -> bool {
 	return COLORSPACERANGE(cspace) != .FULL
 }
 
 @(require_results)
-ISCOLORSPACE_FULL_RANGE :: proc "c" (cspace: Colorspace) -> bool {
+ISCOLORSPACE_FULL_RANGE :: #force_inline proc "c" (cspace: Colorspace) -> bool {
 	return COLORSPACERANGE(cspace) == .FULL
 }
 
