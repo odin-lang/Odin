@@ -16,6 +16,7 @@ GamepadType :: enum c.int {
 	NINTENDO_SWITCH_JOYCON_LEFT,
 	NINTENDO_SWITCH_JOYCON_RIGHT,
 	NINTENDO_SWITCH_JOYCON_PAIR,
+	GAMECUBE,
 }
 
 GamepadButton :: enum c.int {
