@@ -235,7 +235,7 @@ foreign lib {
 	RenderFillRect                   :: proc(renderer: ^Renderer, rect: Maybe(^FRect)) -> bool ---
 	RenderFillRects                  :: proc(renderer: ^Renderer, rects: [^]FRect, count: c.int) -> bool ---
 	RenderTexture                    :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect)) -> bool ---
-	RenderTextureRotated             :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect), angle: f64, #by_ptr center: FPoint, flip: FlipMode) -> bool ---
+	RenderTextureRotated             :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect), angle: f64, center: ^FPoint, flip: FlipMode) -> bool ---
 	RenderTextureAffine              :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), origin, right, down: Maybe(^FPoint)) -> bool ---
 	RenderTextureTiled               :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), scale: f32, dstrect: Maybe(^FRect)) -> bool ---
 	RenderTexture9Grid               :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), left_width, right_width, top_height, bottom_height: f32, scale: f32, dstrect: Maybe(^FRect)) -> bool ---
@@ -276,5 +276,5 @@ foreign lib {
 	CreateGPURenderState              :: proc(renderer: ^Renderer, createinfo: ^GPURenderStateCreateInfo) -> ^GPURenderState ---
 	SetGPURenderStateFragmentUniforms :: proc(state: ^GPURenderState, slot_index: Uint32, data: rawptr, length: Uint32) -> bool ---
 	SetGPURenderState                 :: proc(renderer: ^Renderer, state: ^GPURenderState) -> bool ---
-	DestroyGPURenderState             :: proc(renderer: ^Renderer) ---
+	DestroyGPURenderState             :: proc(state: ^GPURenderState) ---
 }
