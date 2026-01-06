@@ -31,7 +31,7 @@ foreign lib {
 	SetTrayTooltip         :: proc(tray: ^Tray, tooltip: cstring) ---
 	CreateTrayMenu         :: proc(tray: ^Tray) -> ^TrayMenu ---
 	CreateTraySubmenu      :: proc(entry: ^TrayEntry) -> ^TrayMenu ---
-	GetTrayMenu            :: proc(tray: ^Tray) -> TrayMenu ---
+	GetTrayMenu            :: proc(tray: ^Tray) -> ^TrayMenu ---
 	GetTraySubmenu         :: proc(entry: ^TrayEntry) -> ^TrayMenu ---
 	GetTrayEntries         :: proc(menu: ^TrayMenu, size: ^c.int) -> [^]^TrayEntry ---
 	RemoveTrayEntry        :: proc(entry: ^TrayEntry) ---
