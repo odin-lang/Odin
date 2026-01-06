@@ -2,6 +2,7 @@
 package directx_d3d_compiler
 
 foreign import d3dcompiler "d3dcompiler_47.lib"
+import win32 "core:sys/windows"
 
 D3DCOMPILER_DLL_A :: "d3dcompiler_47.dll"
 COMPILER_VERSION :: 47
@@ -16,19 +17,22 @@ HRESULT         :: dxgi.HRESULT
 IUnknown        :: dxgi.IUnknown
 IUnknown_VTable :: dxgi.IUnknown_VTable
 
+LPCSTR   :: win32.LPCSTR
+LPCWSTR  :: win32.LPCWSTR
+
 @(default_calling_convention="system", link_prefix="D3D")
 foreign d3dcompiler {
-	ReadFileToBlob                 :: proc(pFileName: [^]u16, ppContents: ^^ID3DBlob) -> HRESULT ---
-	WriteBlobToFile                :: proc(pBlob: ^ID3DBlob, pFileName: [^]u16, bOverwrite: BOOL) -> HRESULT ---
-	Compile                        :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pSourceName: cstring, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, pEntrypoint: cstring, pTarget: cstring, Flags1: u32, Flags2: u32, ppCode: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
-	Compile2                       :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pSourceName: cstring, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, pEntrypoint: cstring, pTarget: cstring, Flags1: u32, Flags2: u32, SecondaryDataFlags: u32, pSecondaryData: rawptr, SecondaryDataSize: SIZE_T, ppCode: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
-	CompileFromFile                :: proc(pFileName: [^]u16, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, pEntrypoint: cstring, pTarget: cstring, Flags1: u32, Flags2: u32, ppCode: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
-	Preprocess                     :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pSourceName: cstring, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, ppCodeText: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
+	ReadFileToBlob                 :: proc(pFileName: LPCWSTR, ppContents: ^^ID3DBlob) -> HRESULT ---
+	WriteBlobToFile                :: proc(pBlob: ^ID3DBlob, pFileName: LPCWSTR, bOverwrite: BOOL) -> HRESULT ---
+	Compile                        :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pSourceName: LPCSTR, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, pEntrypoint: LPCSTR, pTarget: LPCSTR, Flags1: u32, Flags2: u32, ppCode: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
+	Compile2                       :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pSourceName: LPCSTR, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, pEntrypoint: LPCSTR, pTarget: LPCSTR, Flags1: u32, Flags2: u32, SecondaryDataFlags: u32, pSecondaryData: rawptr, SecondaryDataSize: SIZE_T, ppCode: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
+	CompileFromFile                :: proc(pFileName: LPCWSTR, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, pEntrypoint: LPCSTR, pTarget: LPCSTR, Flags1: u32, Flags2: u32, ppCode: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
+	Preprocess                     :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pSourceName: LPCSTR, pDefines: ^SHADER_MACRO, pInclude: ^ID3DInclude, ppCodeText: ^^ID3DBlob, ppErrorMsgs: ^^ID3DBlob) -> HRESULT ---
 	GetDebugInfo                   :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, ppDebugInfo: ^^ID3DBlob) -> HRESULT ---
 	Reflect                        :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, pInterface: ^IID, ppReflector: ^rawptr) -> HRESULT ---
 	ReflectLibrary                 :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, riid: ^IID, ppReflector: ^rawptr) -> HRESULT ---
-	Disassemble                    :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, szComments: cstring, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
-	DisassembleRegion              :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, szComments: cstring, StartByteOffset: SIZE_T, NumInsts: SIZE_T, pFinishByteOffset: ^SIZE_T, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
+	Disassemble                    :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, szComments: LPCSTR, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
+	DisassembleRegion              :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, szComments: LPCSTR, StartByteOffset: SIZE_T, NumInsts: SIZE_T, pFinishByteOffset: ^SIZE_T, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
 	CreateLinker                   :: proc(ppLinker: ^^ID3D11Linker) -> HRESULT ---
 	LoadModule                     :: proc(pSrcData: rawptr, cbSrcDataSize: SIZE_T, ppModule: ^^ID3D11Module) -> HRESULT ---
 	GetTraceInstructionOffsets     :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, StartInstIndex: SIZE_T, NumInsts: SIZE_T, pOffsets: ^SIZE_T, pTotalInsts: ^SIZE_T) -> HRESULT ---
@@ -113,8 +117,8 @@ GET_INST_OFFSETS_INCLUDE_NON_EXECUTABLE :: 0x00000001
 COMPRESS_SHADER_KEEP_ALL_PARTS :: 0x00000001
 
 SHADER_MACRO :: struct {
-	Name:       cstring,
-	Definition: cstring,
+	Name:       LPCSTR,
+	Definition: LPCSTR,
 }
 
 ID3D10Blob_UUID_STRING :: "8BA5FB08-5195-40E2-AC58-0D989C3A0102"
@@ -146,7 +150,7 @@ ID3DInclude :: struct {
 	vtable: ^ID3DInclude_VTable,
 }
 ID3DInclude_VTable :: struct {
-	Open:  proc "system" (this: ^ID3DInclude, IncludeType: INCLUDE_TYPE, pFileName: cstring, pParentData: rawptr, ppData: ^rawptr, pBytes: ^u32) -> HRESULT,
+	Open:  proc "system" (this: ^ID3DInclude, IncludeType: INCLUDE_TYPE, pFileName: LPCSTR, pParentData: rawptr, ppData: ^rawptr, pBytes: ^u32) -> HRESULT,
 	Close: proc "system" (this: ^ID3DInclude, pData: rawptr) -> HRESULT,
 }
 
@@ -160,7 +164,7 @@ ID3D11Module :: struct #raw_union {
 }
 ID3D11Module_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	CreateInstance: proc "system" (this: ^ID3D11Module, pNamespace: cstring, ppModuleInstance: ^^ID3D11ModuleInstance) -> HRESULT,
+	CreateInstance: proc "system" (this: ^ID3D11Module, pNamespace: LPCSTR, ppModuleInstance: ^^ID3D11ModuleInstance) -> HRESULT,
 }
 
 
@@ -171,15 +175,15 @@ ID3D11ModuleInstance :: struct #raw_union {
 ID3D11ModuleInstance_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	BindConstantBuffer:                      proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
-	BindConstantBufferByName:                proc "system" (this: ^ID3D11ModuleInstance, pName: cstring, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
+	BindConstantBufferByName:                proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
 	BindResource:                            proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindResourceByName:                      proc "system" (this: ^ID3D11ModuleInstance, pName: cstring, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindResourceByName:                      proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
 	BindSampler:                             proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindSamplerByName:                       proc "system" (this: ^ID3D11ModuleInstance, pName: cstring, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindSamplerByName:                       proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
 	BindUnorderedAccessView:                 proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindUnorderedAccessViewByName:           proc "system" (this: ^ID3D11ModuleInstance, pName: cstring, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindUnorderedAccessViewByName:           proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
 	BindResourceAsUnorderedAccessView:       proc "system" (this: ^ID3D11ModuleInstance, uSrcSrvSlot: u32, uDstUavSlot: u32, uCount: u32) -> HRESULT,
-	BindResourceAsUnorderedAccessViewByName: proc "system" (this: ^ID3D11ModuleInstance, pSrvName: cstring, uDstUavSlot: u32, uCount: u32) -> HRESULT,
+	BindResourceAsUnorderedAccessViewByName: proc "system" (this: ^ID3D11ModuleInstance, pSrvName: LPCSTR, uDstUavSlot: u32, uCount: u32) -> HRESULT,
 }
 
 
@@ -189,15 +193,15 @@ ID3D11Linker :: struct #raw_union {
 }
 ID3D11Linker_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Link:                    proc "system" (this: ^ID3D11Linker, pEntry: ^ID3D11ModuleInstance, pEntryName: cstring, pTargetName: cstring, uFlags: u32, ppShaderBlob: ^^ID3DBlob, ppErrorBuffer: ^^ID3DBlob) -> HRESULT,
+	Link:                    proc "system" (this: ^ID3D11Linker, pEntry: ^ID3D11ModuleInstance, pEntryName: LPCSTR, pTargetName: LPCSTR, uFlags: u32, ppShaderBlob: ^^ID3DBlob, ppErrorBuffer: ^^ID3DBlob) -> HRESULT,
 	UseLibrary:              proc "system" (this: ^ID3D11Linker, pLibraryMI: ^ID3D11ModuleInstance) -> HRESULT,
 	AddClipPlaneFromCBuffer: proc "system" (this: ^ID3D11Linker, uCBufferSlot: u32, uCBufferEntry: u32) -> HRESULT,
 }
 
 
-pD3DCompile     :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: cstring, a3: ^SHADER_MACRO, a4: ^ID3DInclude, a5: cstring, a6: cstring, a7: u32, a8: u32, a9: ^^ID3DBlob, a10: ^^ID3DBlob) -> HRESULT
-pD3DPreprocess  :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: cstring, a3: ^SHADER_MACRO, a4: ^ID3DInclude, a5: ^^ID3DBlob, a6: ^^ID3DBlob) -> HRESULT
-pD3DDisassemble :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: u32, a3: cstring, a4: ^^ID3DBlob) -> HRESULT
+pD3DCompile     :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: LPCSTR, a3: ^SHADER_MACRO, a4: ^ID3DInclude, a5: LPCSTR, a6: LPCSTR, a7: u32, a8: u32, a9: ^^ID3DBlob, a10: ^^ID3DBlob) -> HRESULT
+pD3DPreprocess  :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: LPCSTR, a3: ^SHADER_MACRO, a4: ^ID3DInclude, a5: ^^ID3DBlob, a6: ^^ID3DBlob) -> HRESULT
+pD3DDisassemble :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: u32, a3: LPCSTR, a4: ^^ID3DBlob) -> HRESULT
 
 D3DCOMPILER_STRIP_FLAGS :: distinct bit_set[D3DCOMPILER_STRIP_FLAG; u32]
 D3DCOMPILER_STRIP_FLAG :: enum u32 {

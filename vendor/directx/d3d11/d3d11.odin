@@ -20,6 +20,7 @@ BOOL    :: dxgi.BOOL
 UINT    :: dxgi.UINT
 INT     :: dxgi.INT
 
+LPCSTR   :: windows.LPCSTR
 LPCWSTR  :: windows.LPCWSTR
 
 RECT :: dxgi.RECT
@@ -950,7 +951,7 @@ INPUT_CLASSIFICATION :: enum i32 {
 }
 
 INPUT_ELEMENT_DESC :: struct {
-	SemanticName:         cstring,
+	SemanticName:         LPCSTR,
 	SemanticIndex:        u32,
 	Format:               dxgi.FORMAT,
 	InputSlot:            u32,
@@ -972,7 +973,7 @@ CULL_MODE :: enum i32 {
 
 SO_DECLARATION_ENTRY :: struct {
 	Stream:         u32,
-	SemanticName:   cstring,
+	SemanticName:   LPCSTR,
 	SemanticIndex:  u32,
 	StartComponent: u8,
 	ComponentCount: u8,
@@ -2172,8 +2173,8 @@ IClassLinkage :: struct #raw_union {
 }
 IClassLinkage_VTable :: struct {
 	using id3d11devicechild_vtable: IDeviceChild_VTable,
-	GetClassInstance:    proc "system" (this: ^IClassLinkage, pClassInstanceName: cstring, InstanceIndex: u32, ppInstance: ^^IClassInstance) -> HRESULT,
-	CreateClassInstance: proc "system" (this: ^IClassLinkage, pClassTypeName: cstring, ConstantBufferOffset: u32, ConstantVectorOffset: u32, TextureOffset: u32, SamplerOffset: u32, ppInstance: ^^IClassInstance) -> HRESULT,
+	GetClassInstance:    proc "system" (this: ^IClassLinkage, pClassInstanceName: LPCSTR, InstanceIndex: u32, ppInstance: ^^IClassInstance) -> HRESULT,
+	CreateClassInstance: proc "system" (this: ^IClassLinkage, pClassTypeName: LPCSTR, ConstantBufferOffset: u32, ConstantVectorOffset: u32, TextureOffset: u32, SamplerOffset: u32, ppInstance: ^^IClassInstance) -> HRESULT,
 }
 
 
@@ -3407,7 +3408,7 @@ SHADER_VERSION_TYPE :: enum i32 {
 }
 
 SIGNATURE_PARAMETER_DESC :: struct {
-	SemanticName:    cstring,
+	SemanticName:    LPCSTR,
 	SemanticIndex:   u32,
 	Register:        u32,
 	SystemValueType: NAME,
@@ -3421,7 +3422,7 @@ SIGNATURE_PARAMETER_DESC :: struct {
 }
 
 SHADER_BUFFER_DESC :: struct {
-	Name:      cstring,
+	Name:      LPCSTR,
 	Type:      CBUFFER_TYPE,
 	Variables: u32,
 	Size:      u32,
@@ -3429,7 +3430,7 @@ SHADER_BUFFER_DESC :: struct {
 }
 
 SHADER_VARIABLE_DESC :: struct {
-	Name:         cstring,
+	Name:         LPCSTR,
 	StartOffset:  u32,
 	Size:         u32,
 	uFlags:       SHADER_VARIABLE_FLAGS,
@@ -3448,12 +3449,12 @@ SHADER_TYPE_DESC :: struct {
 	Elements: u32,
 	Members:  u32,
 	Offset:   u32,
-	Name:     cstring,
+	Name:     LPCSTR,
 }
 
 SHADER_DESC :: struct {
 	Version:                     u32,
-	Creator:                     cstring,
+	Creator:                     LPCSTR,
 	Flags:                       u32,
 
 	ConstantBuffers:             u32,
@@ -3496,7 +3497,7 @@ SHADER_DESC :: struct {
 }
 
 SHADER_INPUT_BIND_DESC :: struct {
-	Name:       cstring,
+	Name:       LPCSTR,
 	Type:       SHADER_INPUT_TYPE,
 	BindPoint:  u32,
 	BindCount:  u32,
@@ -3508,14 +3509,14 @@ SHADER_INPUT_BIND_DESC :: struct {
 }
 
 LIBRARY_DESC :: struct {
-	Creator:       cstring,
+	Creator:       LPCSTR,
 	Flags:         u32,
 	FunctionCount: u32,
 }
 
 FUNCTION_DESC :: struct {
 	Version:                     u32,
-	Creator:                     cstring,
+	Creator:                     LPCSTR,
 	Flags:                       u32,
 
 	ConstantBuffers:             u32,
@@ -3545,7 +3546,7 @@ FUNCTION_DESC :: struct {
 	MinFeatureLevel:             FEATURE_LEVEL,
 	RequiredFeatureFlags:        SHADER_REQUIRES_FLAGS,
 
-	Name:                        cstring,
+	Name:                        LPCSTR,
 	FunctionParameterCount:      i32,
 	HasReturn:                   BOOL,
 	Has10Level9VertexShader:     BOOL,
@@ -3553,8 +3554,8 @@ FUNCTION_DESC :: struct {
 }
 
 PARAMETER_DESC :: struct {
-	Name:              cstring,
-	SemanticName:      cstring,
+	Name:              LPCSTR,
+	SemanticName:      LPCSTR,
 	Type:              SHADER_VARIABLE_TYPE,
 	Class:             SHADER_VARIABLE_CLASS,
 	Rows:              u32,
@@ -3576,8 +3577,8 @@ IShaderReflectionType :: struct {
 IShaderReflectionType_VTable :: struct {
 	GetDesc:              proc "system" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
 	GetMemberTypeByIndex: proc "system" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
-	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
-	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> cstring,
+	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: LPCSTR) -> ^IShaderReflectionType,
+	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> LPCSTR,
 	IsEqual:              proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
 	GetSubType:           proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
 	GetBaseClass:         proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
@@ -3607,7 +3608,7 @@ IShaderReflectionConstantBuffer :: struct {
 IShaderReflectionConstantBuffer_VTable :: struct {
 	GetDesc: proc "system" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
 	GetVariableByIndex: proc "system" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
-	GetVariableByName: proc "system" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
+	GetVariableByName: proc "system" (this: ^IShaderReflectionConstantBuffer, Name: LPCSTR) -> ^IShaderReflectionVariable,
 }
 
 
@@ -3621,13 +3622,13 @@ IShaderReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	GetDesc:                       proc "system" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
 	GetConstantBufferByIndex:      proc "system" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: LPCSTR) -> ^IShaderReflectionConstantBuffer,
 	GetResourceBindingDesc:        proc "system" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetInputParameterDesc:         proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetOutputParameterDesc:        proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetPatchConstantParameterDesc: proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: LPCSTR) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: LPCSTR, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetMovInstructionCount:        proc "system" (this: ^IShaderReflection) -> u32,
 	GetMovcInstructionCount:       proc "system" (this: ^IShaderReflection) -> u32,
 	GetConversionInstructionCount: proc "system" (this: ^IShaderReflection) -> u32,
@@ -3661,10 +3662,10 @@ IFunctionReflection :: struct {
 IFunctionReflection_VTable :: struct {
 	GetDesc:                      proc "system" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
 	GetConstantBufferByIndex:     proc "system" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: LPCSTR) -> ^IShaderReflectionConstantBuffer,
 	GetResourceBindingDesc:       proc "system" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: LPCSTR) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: LPCSTR, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetFunctionParameter:         proc "system" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
@@ -3691,7 +3692,7 @@ IFunctionLinkingGraph_VTable :: struct {
 	CreateModuleInstance: proc "system" (this: ^IFunctionLinkingGraph, ppModuleInstance: ^^IModuleInstance, ppErrorBuffer: ^^IBlob) -> HRESULT,
 	SetInputSignature:    proc "system" (this: ^IFunctionLinkingGraph, pInputParameters: [^]PARAMETER_DESC, cInputParameters: u32, ppInputNode: ^^ILinkingNode) -> HRESULT,
 	SetOutputSignature:   proc "system" (this: ^IFunctionLinkingGraph, pOutputParameters: [^]PARAMETER_DESC, cOutputParameters: u32, ppOutputNode: ^^ILinkingNode) -> HRESULT,
-	CallFunction:         proc "system" (this: ^IFunctionLinkingGraph, pModuleInstanceNamespace: cstring, pModuleWithFunctionPrototype: ^IModule, pFunctionName: cstring, ppCallNode: ^^ILinkingNode) -> HRESULT,
+	CallFunction:         proc "system" (this: ^IFunctionLinkingGraph, pModuleInstanceNamespace: LPCSTR, pModuleWithFunctionPrototype: ^IModule, pFunctionName: LPCSTR, ppCallNode: ^^ILinkingNode) -> HRESULT,
 	PassValue:            proc "system" (this: ^IFunctionLinkingGraph, pSrcNode: ^ILinkingNode, SrcParameterIndex: i32, pDstNode: ^ILinkingNode, DstParameterIndex: i32) -> HRESULT,
 	PassValueWithSwizzle: proc "system" (this: ^IFunctionLinkingGraph, pSrcNode: ^ILinkingNode, SrcParameterIndex: i32, pSrcSwizzle: ^u8, pDstNode: ^ILinkingNode, DstParameterIndex: i32, pDstSwizzle: ^u8) -> HRESULT,
 	GetLastError:         proc "system" (this: ^IFunctionLinkingGraph, ppErrorBuffer: ^^IBlob) -> HRESULT,
@@ -3814,8 +3815,8 @@ IInfoQueue_VTable :: struct {
 	PushRetrievalFilter:                          proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
 	PopRetrievalFilter:                           proc "system" (this: ^IInfoQueue),
 	GetRetrievalFilterStackSize:                  proc "system" (this: ^IInfoQueue) -> u64,
-	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
-	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
+	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: LPCSTR) -> HRESULT,
+	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: LPCSTR) -> HRESULT,
 	SetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
 	SetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
 	SetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
