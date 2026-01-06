@@ -1095,7 +1095,7 @@ card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
 
 
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if the condition is false.
 // This uses the `context.assertion_failure_procedure` to assert.
 //
 // This routine will be ignored when `ODIN_DISABLE_ASSERT` is true.
