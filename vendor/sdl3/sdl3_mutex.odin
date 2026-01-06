@@ -1,8 +1,26 @@
 package sdl3
 
+import "core:c"
+
 Mutex     :: struct {}
 RWLock    :: struct {}
 Semaphore :: struct {}
+Condition :: struct {}
+
+InitStatus :: enum c.int
+{
+    UNINITIALIZED,
+    INITIALIZING,
+    INITIALIZED,
+    UNINITIALIZING
+}
+
+InitState :: struct
+{
+	status: AtomicInt,
+    thread: ThreadID,
+    reserved: rawptr,
+}
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
@@ -27,4 +45,15 @@ foreign lib {
 	TryWaitSemaphore        :: proc(sem: ^Semaphore) -> bool ---
 	WaitSemaphore           :: proc(sem: ^Semaphore) ---
 	WaitSemaphoreTimeout    :: proc(sem: ^Semaphore, timeout_ms: Sint32) ---
+
+	CreateCondition			:: proc() -> ^Condition ---
+	DestroyCondition		:: proc(cond: ^Condition) ---
+	SignalCondition			:: proc(cond: ^Condition) ---
+	BroadcastCondition		:: proc(cond: ^Condition) ---
+	WaitCondition			:: proc(cond: ^Condition, mutex: ^Mutex) ---
+	WaitConditionTimeout	:: proc(cond: ^Condition, mutex: ^Mutex, timeout_ms: Sint32) -> bool ---
+
+	ShouldInit				:: proc(state: ^InitState) -> bool ---
+	ShouldQuit				:: proc(state: ^InitState) -> bool ---
+	SetInitialized			:: proc(state: ^InitState, initialized: bool) ---
 }
