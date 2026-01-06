@@ -824,6 +824,7 @@ foreign lib {
 	GetGPUDriver                          :: proc(index: c.int) -> cstring ---
 	GetGPUDeviceDriver                    :: proc(device: ^GPUDevice) -> cstring ---
 	GetGPUShaderFormats                   :: proc(device: ^GPUDevice) -> GPUShaderFormat ---
+	GetGPUDeviceProperties                :: proc(device: ^GPUDevice) -> PropertiesID ---
 	CreateGPUComputePipeline              :: proc(device: ^GPUDevice, #by_ptr createinfo: GPUComputePipelineCreateInfo) -> ^GPUComputePipeline ---
 	CreateGPUGraphicsPipeline             :: proc(device: ^GPUDevice, #by_ptr createinfo: GPUGraphicsPipelineCreateInfo) -> ^GPUGraphicsPipeline ---
 	CreateGPUSampler                      :: proc(device: ^GPUDevice, #by_ptr createinfo: GPUSamplerCreateInfo) -> ^GPUSampler ---
