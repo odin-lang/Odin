@@ -2084,7 +2084,156 @@ gb_internal bool check_hash_kind(CheckerContext *c, Ast *call, String const &has
 	return true;
 }
 
+gb_internal bool check_override_foreign_library_directive(CheckerContext *c, Operand *operand, Ast *call) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	GB_ASSERT(name == "override_foreign_library");
 
+	if (ce->args.count != 2) {
+		error(call, "'#override_foreign_library' expects 2 arguments, got %td", ce->args.count);
+		return false;
+	}
+	if ((c->scope->flags & ScopeFlag_File) == 0) {
+		error(call, "'#override_foreign_library' may only be used at file scope");
+		return false;
+	}
+
+	Ast *target = unparen_expr(ce->args[0]);
+	if (target == nullptr || target->kind != Ast_SelectorExpr) {
+		error(ce->args[0], "'#override_foreign_library' expects a package.library selector");
+		return false;
+	}
+
+	Ast *pkg_expr = unparen_expr(target->SelectorExpr.expr);
+	Ast *lib_expr = unparen_expr(target->SelectorExpr.selector);
+	if (pkg_expr == nullptr || pkg_expr->kind != Ast_Ident ||
+		lib_expr == nullptr || lib_expr->kind != Ast_Ident) {
+		error(ce->args[0], "'#override_foreign_library' expects a package.library selector");
+		return false;
+	}
+	
+	String pkg_name = pkg_expr->Ident.token.string;
+	String lib_name = lib_expr->Ident.token.string;
+
+	// First we determine the package
+	AstPackage *pkg = nullptr;
+	Entity *pkg_entity = scope_lookup(c->scope, pkg_name);
+	if (pkg_entity != nullptr && pkg_entity->kind == Entity_ImportName) {
+		Scope *import_scope = pkg_entity->ImportName.scope;
+		if (import_scope != nullptr) {
+			pkg = import_scope->pkg;
+		}
+	}
+	if (pkg == nullptr) {
+		error(ce->args[0], "Unknown package '%.*s' in '#override_foreign_library'", LIT(pkg_name));
+		return false;
+	}
+
+	// Now that we have the package, we find the library
+	Array<Entity *> lib_matches = array_make<Entity *>(temporary_allocator());
+	auto add_lib_match = [&](Entity *candidate) {
+	    // It is legal for there to be a proc `lib` and a foreign import `lib` in the same package
+		if (candidate == nullptr || candidate->kind != Entity_LibraryName) {
+			return;
+		}
+		for (Entity *existing : lib_matches) {
+			if (existing == candidate) {
+				return;
+			}
+		}
+		array_add(&lib_matches, candidate);
+	};
+	
+	if (pkg->scope != nullptr) {
+		add_lib_match(scope_lookup_current(pkg->scope, lib_name));
+	}
+	for_array(i, pkg->files) {
+		AstFile *file = pkg->files[i];
+		if (file == nullptr || file->scope == nullptr) {
+			continue;
+		}
+		add_lib_match(scope_lookup_current(file->scope, lib_name));
+	}
+	if (lib_matches.count == 0) {
+		error(ce->args[0], "Unknown foreign library '%.*s.%.*s'", LIT(pkg_name), LIT(lib_name));
+		return false;
+	}
+	if (lib_matches.count > 1) {
+		error(ce->args[0], "Ambiguous foreign library '%.*s.%.*s' found in multiple files", LIT(pkg_name), LIT(lib_name));
+		return false;
+	}
+	Entity *lib_entity = lib_matches[0];
+	if (lib_entity->LibraryName.is_overridden) {
+		error(ce->args[0], "Duplicate override for foreign library '%.*s.%.*s'", LIT(pkg_name), LIT(lib_name));
+		return false;
+	}
+
+	Ast *decl = lib_entity->LibraryName.decl;
+	if (decl == nullptr || decl->kind != Ast_ForeignImportDecl) {
+		error(ce->args[0], "Foreign library '%.*s.%.*s' is missing a foreign import declaration", LIT(pkg_name), LIT(lib_name));
+		return false;
+	}
+
+	Ast *path_arg = unparen_expr(ce->args[1]);
+	Array<String> fullpaths = array_make<String>(permanent_allocator());
+	String base_dir = dir_from_path(call->file()->fullpath);
+
+	auto add_path = [&](Ast *expr) {
+		Operand op = {};
+		check_expr(c, &op, expr);
+		if (op.mode != Addressing_Constant || op.value.kind != ExactValue_String) {
+			gbString s = expr_to_string(expr);
+			error(expr, "Expected a constant string value, got '%s'", s);
+			gb_string_free(s);
+			return;
+		}
+		if (!is_type_string(op.type)) {
+			gbString s = type_to_string(op.type);
+			error(expr, "Expected a constant string value, got value of type '%s'", s);
+			gb_string_free(s);
+			return;
+		}
+	
+		String file_str = string_trim_whitespace(op.value.value_string);
+		String fullpath = file_str;
+		String foreign_path = {};
+		bool ok = determine_path_from_string(nullptr, call, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
+		if (ok) {
+			fullpath = foreign_path;
+		} else {
+			return;
+		}
+		array_add(&fullpaths, fullpath);
+	};
+	
+	if (path_arg != nullptr && path_arg->kind == Ast_CompoundLit) {
+		for_array(i, path_arg->CompoundLit.elems) {
+			Ast *elem = path_arg->CompoundLit.elems[i];
+			if (elem->kind == Ast_FieldValue) {
+				error(elem, "Expected a constant string value");
+				continue;
+			}
+			add_path(elem);
+		}
+	} else if (path_arg != nullptr) {
+		add_path(path_arg);
+	}
+	
+	if (fullpaths.count == 0) {
+		error(ce->args[1], "No paths provided to '#override_foreign_library'");
+		return false;
+	}
+
+	// Now we override the paths for the foreign import declaration
+	decl->ForeignImportDecl.fullpaths = slice_from_array(fullpaths);
+	lib_entity->LibraryName.paths = decl->ForeignImportDecl.fullpaths;
+	lib_entity->LibraryName.is_overridden = true;
+	
+	operand->mode = Addressing_NoValue;
+	operand->type = t_untyped_nil;
+	return true;
+}
 
 gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
@@ -2158,6 +2307,8 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		return check_load_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
 	} else if (name == "load_directory") {
 		return check_load_directory_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
+	} else if (name == "override_foreign_library") {
+		return check_override_foreign_library_directive(c, operand, call);
 	} else if (name == "load_hash") {
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {
@@ -2510,6 +2661,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			break;
 		}
 		if (name == "config") {
+			break;
+		}
+		if (name == "override_foreign_library") {
 			break;
 		}
 		/*fallthrough*/

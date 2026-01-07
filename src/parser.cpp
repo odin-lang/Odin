@@ -5406,6 +5406,53 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
+		} else if (tag == "override_foreign_library") {
+			Ast *proc = ast_basic_directive(f, hash_token, name);
+			if (f->curr_token.kind == Token_OpenParen) {
+				Ast *stmt = ast_expr_stmt(f, parse_call_expr(f, proc));
+				expect_semicolon(f);
+				return stmt;
+			}
+
+			Ast *pkg = nullptr;
+			Ast *lib = nullptr;
+			Ast *target = nullptr;
+
+			if (f->curr_token.kind != Token_Ident) {
+				syntax_error(f->curr_token, "Expected a package identifier after #override_foreign_library");
+			} else {
+				pkg = parse_ident(f);
+				Token period = expect_token(f, Token_Period);
+				if (f->curr_token.kind != Token_Ident) {
+					syntax_error(f->curr_token, "Expected a library identifier after #override_foreign_library");
+				} else {
+					lib = parse_ident(f);
+				}
+				if (pkg != nullptr && lib != nullptr) {
+					target = ast_selector_expr(f, period, pkg, lib);
+				}
+			}
+
+			Ast *paths = nullptr;
+			if (f->curr_token.kind == Token_OpenBrace) {
+				paths = parse_value(f);
+			} else {
+				Token path_token = expect_token(f, Token_String);
+				paths = ast_basic_lit(f, path_token);
+			}
+
+			auto args = array_make<Ast *>(ast_allocator(f), 0, 2);
+			if (target != nullptr) {
+				array_add(&args, target);
+			}
+			if (paths != nullptr) {
+				array_add(&args, paths);
+			}
+
+			Ast *call = ast_call_expr(f, proc, args, hash_token, name, {});
+			Ast *stmt = ast_expr_stmt(f, call);
+			expect_semicolon(f);
+			return stmt;
 		} else if (tag == "reverse") {
 			Ast *for_stmt = parse_stmt(f);
 			if (for_stmt->kind == Ast_RangeStmt) {
@@ -5967,6 +6014,18 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
+gb_internal bool is_override_foreign_library_directive_call(Ast *node) {
+	if (node == nullptr || node->kind != Ast_CallExpr) {
+		return false;
+	}
+	Ast *proc = node->CallExpr.proc;
+	if (proc == nullptr || proc->kind != Ast_BasicDirective) {
+		return false;
+	}
+	String name = proc->BasicDirective.name.string;
+	return name == "override_foreign_library";
+}
+
 gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
 
@@ -6054,7 +6113,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		}
 
 		if (collection_name == "system") {
-			if (node->kind != Ast_ForeignImportDecl) {
+			if (node->kind != Ast_ForeignImportDecl && !is_override_foreign_library_directive_call(node)) {
 				do_error(node, "The library collection 'system' is restrict for 'foreign import'");
 				return false;
 			} else {

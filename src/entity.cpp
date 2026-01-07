@@ -288,6 +288,7 @@ struct Entity {
 			String name;
 			i64 priority_index;
 			bool ignore_duplicates;
+			bool is_overridden;
 			String extra_linker_flags;
 		} LibraryName;
 		i32 Nil;

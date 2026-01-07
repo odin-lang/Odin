@@ -295,7 +295,8 @@ gb_internal void error_operand_no_value(Operand *o) {
 			if (p->kind == Ast_BasicDirective) {
 				String tag = p->BasicDirective.name.string;
 				if (tag == "panic" ||
-				    tag == "assert") {
+				    tag == "assert" ||
+				    tag == "override_foreign_library") {
 					return;
 				}
 			}
@@ -8226,7 +8227,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    name == "load_directory" ||
 		    name == "load_hash" ||
 		    name == "hash" ||
-		    name == "caller_expression"
+		    name == "caller_expression" ||
+		    name == "override_foreign_library"
 		) {
 			operand->mode = Addressing_Builtin;
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
@@ -9170,7 +9172,8 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		    name == "load" ||
 		    name == "load_hash" ||
 		    name == "load_directory" ||
-		    name == "load_or"
+		    name == "load_or" ||
+		    name == "override_foreign_library"
 		) {
 			error(node, "'#%.*s' must be used as a call", LIT(name));
 			o->type = t_invalid;
