@@ -3,7 +3,7 @@ package sdl3
 
 import "core:c"
 
-main_func :: #type proc(argc: c.int, argv: [^]cstring)
+main_func :: #type proc "c" (argc: c.int, argv: [^]cstring) -> c.int
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
