@@ -264,7 +264,7 @@ scan_comment :: proc(t: ^Tokenizer) -> (comment: string, err: Error) {
 	expect(t, .Dash)
 	expect(t, .Gt)
 
-	return string(t.src[offset : t.offset - 1]), .None
+	return string(t.src[offset : t.offset - 3]), .None
 }
 
 // Skip CDATA
