@@ -391,7 +391,7 @@ _endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: freebsd.Socket_Address
 		}
 	case IP6_Address:
 		(cast(^freebsd.Socket_Address_Internet6)(&sockaddr))^ = {
-			len = size_of(freebsd.Socket_Address_Internet),
+			len = size_of(freebsd.Socket_Address_Internet6),
 			family = .INET6,
 			port = cast(freebsd.in_port_t)ep.port,
 			addr = transmute(freebsd.IP6_Address)addr,
