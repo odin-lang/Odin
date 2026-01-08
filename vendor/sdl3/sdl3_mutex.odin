@@ -7,19 +7,17 @@ RWLock    :: struct {}
 Semaphore :: struct {}
 Condition :: struct {}
 
-InitStatus :: enum c.int
-{
-    UNINITIALIZED,
-    INITIALIZING,
-    INITIALIZED,
-    UNINITIALIZING
+InitStatus :: enum c.int {
+	UNINITIALIZED,
+	INITIALIZING,
+	INITIALIZED,
+	UNINITIALIZING,
 }
 
-InitState :: struct
-{
+InitState :: struct {
 	status: AtomicInt,
-    thread: ThreadID,
-    reserved: rawptr,
+	thread: ThreadID,
+	reserved: rawptr,
 }
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
