@@ -44,14 +44,14 @@ foreign lib {
 	WaitSemaphore           :: proc(sem: ^Semaphore) ---
 	WaitSemaphoreTimeout    :: proc(sem: ^Semaphore, timeout_ms: Sint32) ---
 
-	CreateCondition			:: proc() -> ^Condition ---
-	DestroyCondition		:: proc(cond: ^Condition) ---
-	SignalCondition			:: proc(cond: ^Condition) ---
-	BroadcastCondition		:: proc(cond: ^Condition) ---
-	WaitCondition			:: proc(cond: ^Condition, mutex: ^Mutex) ---
-	WaitConditionTimeout	:: proc(cond: ^Condition, mutex: ^Mutex, timeout_ms: Sint32) -> bool ---
+	CreateCondition         :: proc() -> ^Condition ---
+	DestroyCondition        :: proc(cond: ^Condition) ---
+	SignalCondition         :: proc(cond: ^Condition) ---
+	BroadcastCondition      :: proc(cond: ^Condition) ---
+	WaitCondition           :: proc(cond: ^Condition, mutex: ^Mutex) ---
+	WaitConditionTimeout    :: proc(cond: ^Condition, mutex: ^Mutex, timeout_ms: Sint32) -> bool ---
 
-	ShouldInit				:: proc(state: ^InitState) -> bool ---
-	ShouldQuit				:: proc(state: ^InitState) -> bool ---
-	SetInitialized			:: proc(state: ^InitState, initialized: bool) ---
+	ShouldInit              :: proc(state: ^InitState) -> bool ---
+	ShouldQuit              :: proc(state: ^InitState) -> bool ---
+	SetInitialized          :: proc(state: ^InitState, initialized: bool) ---
 }
