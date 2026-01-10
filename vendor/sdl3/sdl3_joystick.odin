@@ -42,7 +42,7 @@ foreign lib {
 	LockJoysticks                  :: proc() ---
 	UnlockJoysticks                :: proc() ---
 	HasJoystick                    :: proc() -> bool ---
-	GetJoysticks                   :: proc(count: ^c.int) -> [^]JoystickID ---
+	GetJoysticks                   :: proc(count: Maybe(^c.int)) -> [^]JoystickID ---
 	GetJoystickNameForID           :: proc(instance_id: JoystickID) -> cstring ---
 	GetJoystickPathForID           :: proc(instance_id: JoystickID) -> cstring ---
 	GetJoystickPlayerIndexForID    :: proc(instance_id: JoystickID) -> c.int ---

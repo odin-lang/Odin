@@ -26,16 +26,16 @@ TrayCallback :: #type proc "c" (userdata: rawptr, entry: ^TrayEntry)
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	CreateTray             :: proc(icon: ^Surface, tooltip: cstring) -> ^Tray ---
-	SetTrayIcon            :: proc(tray: ^Tray, icon: ^Surface) ---
-	SetTrayTooltip         :: proc(tray: ^Tray, tooltip: cstring) ---
+	CreateTray             :: proc(icon: Maybe(^Surface), tooltip: Maybe(cstring)) -> ^Tray ---
+	SetTrayIcon            :: proc(tray: ^Tray, icon: Maybe(^Surface)) ---
+	SetTrayTooltip         :: proc(tray: ^Tray, tooltip: Maybe(cstring)) ---
 	CreateTrayMenu         :: proc(tray: ^Tray) -> ^TrayMenu ---
 	CreateTraySubmenu      :: proc(entry: ^TrayEntry) -> ^TrayMenu ---
 	GetTrayMenu            :: proc(tray: ^Tray) -> ^TrayMenu ---
 	GetTraySubmenu         :: proc(entry: ^TrayEntry) -> ^TrayMenu ---
 	GetTrayEntries         :: proc(menu: ^TrayMenu, size: ^c.int) -> [^]^TrayEntry ---
 	RemoveTrayEntry        :: proc(entry: ^TrayEntry) ---
-	InsertTrayEntryAt      :: proc(menu: ^TrayMenu, pos: c.int, label: cstring, flags: TrayEntryFlags) -> ^TrayEntry ---
+	InsertTrayEntryAt      :: proc(menu: ^TrayMenu, pos: c.int, label: Maybe(cstring), flags: TrayEntryFlags) -> ^TrayEntry ---
 	SetTrayEntryLabel      :: proc(entry: ^TrayEntry, label: cstring) ---
 	GetTrayEntryLabel      :: proc(entry: ^TrayEntry) -> cstring ---
 	SetTrayEntryChecked    :: proc(entry: ^TrayEntry, checked: bool) ---

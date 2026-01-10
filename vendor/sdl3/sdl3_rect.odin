@@ -73,6 +73,6 @@ foreign lib {
 	HasRectIntersectionFloat        :: proc(#by_ptr A, B: FRect)                                                  -> bool ---
 	GetRectIntersectionFloat        :: proc(#by_ptr A, B: FRect, result: ^FRect)                                  -> bool ---
 	GetRectUnionFloat               :: proc(#by_ptr A, B: FRect, result: ^FRect)                                  -> bool ---
-	GetRectEnclosingPointsFloat     :: proc(points: [^]FPoint, count: c.int, clip: ^FRect, result: ^FRect) -> bool ---
+	GetRectEnclosingPointsFloat     :: proc(points: [^]FPoint, count: c.int, clip: Maybe(^FRect), result: ^FRect) -> bool ---
 	GetRectAndLineIntersectionFloat :: proc(#by_ptr rect: FRect, X1, Y1, X2, Y2: ^f32)                            -> bool ---
 }

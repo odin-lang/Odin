@@ -155,9 +155,9 @@ DEBUG_TEXT_FONT_CHARACTER_SIZE :: 8
 foreign lib {
 	GetNumRenderDrivers              :: proc() -> c.int ---
 	GetRenderDriver                  :: proc(index: c.int) -> cstring ---
-	CreateRenderer                   :: proc(window: ^Window, name: cstring) -> ^Renderer ---
+	CreateRenderer                   :: proc(window: ^Window, name: Maybe(cstring)) -> ^Renderer ---
 	CreateRendererWithProperties     :: proc(props: PropertiesID) -> ^Renderer ---
-	CreateGPURenderer                :: proc(device: ^GPUDevice, window: ^Window) -> ^Renderer ---
+	CreateGPURenderer                :: proc(device: Maybe(^GPUDevice), window: Maybe(^Window)) -> ^Renderer ---
 	GetGPURendererDevice             :: proc(device: ^Renderer) -> ^GPUDevice ---
 	CreateSoftwareRenderer           :: proc(surface: ^Surface) -> ^Renderer ---
 	GetRenderer                      :: proc(window: ^Window) -> ^Renderer ---
@@ -182,7 +182,7 @@ foreign lib {
 	CreateWindowAndRenderer          :: proc(title: cstring, width, height: c.int, window_flags: WindowFlags, window: ^^Window, renderer: ^^Renderer) -> bool ---
 	GetRenderOutputSize              :: proc(renderer: ^Renderer, w, h: ^c.int) -> bool ---
 	GetCurrentRenderOutputSize       :: proc(renderer: ^Renderer, w, h: ^c.int) -> bool ---
-	GetTextureSize                   :: proc(texture: ^Texture, w, h: ^f32) -> bool ---
+	GetTextureSize                   :: proc(texture: ^Texture, w, h: Maybe(^f32)) -> bool ---
 	SetTexturePalette                :: proc(texture: ^Texture, palette: ^Palette) -> bool ---
 	GetTexturePalette                :: proc(texture: ^Texture) -> ^Palette ---
 	SetTextureColorMod               :: proc(texture: ^Texture, r, g, b: Uint8) -> bool ---
@@ -206,7 +206,7 @@ foreign lib {
 	SetRenderTarget                  :: proc(renderer: ^Renderer, texture: Maybe(^Texture)) -> bool ---
 	SetRenderLogicalPresentation     :: proc(renderer: ^Renderer, w, h: c.int, mode: RendererLogicalPresentation) -> bool ---
 	GetRenderLogicalPresentation     :: proc(renderer: ^Renderer, w, h: ^c.int, mode: ^RendererLogicalPresentation) -> bool ---
-	GetRenderLogicalPresentationRect :: proc(renderer: ^Renderer, rect: ^FRect) -> bool ---
+	GetRenderLogicalPresentationRect :: proc(renderer: ^Renderer, rect: Maybe(^FRect)) -> bool ---
 	RenderCoordinatesFromWindow      :: proc(renderer: ^Renderer, window_x, window_y: f32, x, y: ^f32) -> bool ---
 	RenderCoordinatesToWindow        :: proc(renderer: ^Renderer, x, y: f32, window_x, window_y: ^f32) -> bool ---
 	ConvertEventToRenderCoordinates  :: proc(renderer: ^Renderer, event: ^Event) -> bool ---
@@ -235,15 +235,15 @@ foreign lib {
 	RenderFillRect                   :: proc(renderer: ^Renderer, rect: Maybe(^FRect)) -> bool ---
 	RenderFillRects                  :: proc(renderer: ^Renderer, rects: [^]FRect, count: c.int) -> bool ---
 	RenderTexture                    :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect)) -> bool ---
-	RenderTextureRotated             :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect), angle: f64, center: ^FPoint, flip: FlipMode) -> bool ---
+	RenderTextureRotated             :: proc(renderer: ^Renderer, texture: ^Texture, srcrect, dstrect: Maybe(^FRect), angle: f64, center: Maybe(^FPoint), flip: FlipMode) -> bool ---
 	RenderTextureAffine              :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), origin, right, down: Maybe(^FPoint)) -> bool ---
 	RenderTextureTiled               :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), scale: f32, dstrect: Maybe(^FRect)) -> bool ---
 	RenderTexture9Grid               :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), left_width, right_width, top_height, bottom_height: f32, scale: f32, dstrect: Maybe(^FRect)) -> bool ---
 	RenderTexture9GridTiled          :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), left_width, right_width, top_height, bottom_height: f32, scale: f32, dstrect: Maybe(^FRect), tileScale: f32) -> bool ---
-	RenderGeometry                   :: proc(renderer: ^Renderer, texture: ^Texture, vertices: [^]Vertex, num_vertices: c.int, indices: [^]c.int, num_indices: c.int) -> bool ---
-	RenderGeometryRaw                :: proc(renderer: ^Renderer, texture: ^Texture, xy: [^]f32, xy_stride: c.int, color: [^]FColor, color_stride: c.int, uv: [^]f32, uv_stride: c.int, num_vertices: c.int, indices: rawptr, num_indices: c.int, size_indices: c.int) -> bool ---
+	RenderGeometry                   :: proc(renderer: ^Renderer, texture: ^Texture, vertices: [^]Vertex, num_vertices: c.int, indices: Maybe([^]c.int), num_indices: c.int) -> bool ---
+	RenderGeometryRaw                :: proc(renderer: ^Renderer, texture: ^Texture, xy: [^]f32, xy_stride: c.int, color: [^]FColor, color_stride: c.int, uv: [^]f32, uv_stride: c.int, num_vertices: c.int, indices: Maybe(rawptr), num_indices: c.int, size_indices: c.int) -> bool ---
 	SetRenderTextureAddressMode      :: proc(renderer: ^Renderer, u_mode, v_mode: TextureAddressMode) -> bool ---
-	GetRenderTextureAddressMode      :: proc(renderer: ^Renderer, u_mode, v_mode: ^TextureAddressMode) -> bool ---
+	GetRenderTextureAddressMode      :: proc(renderer: ^Renderer, u_mode, v_mode: Maybe(^TextureAddressMode)) -> bool ---
 	RenderPresent                    :: proc(renderer: ^Renderer) -> bool ---
 	DestroyTexture                   :: proc(texture: ^Texture) ---
 	DestroyRenderer                  :: proc(renderer: ^Renderer) ---
@@ -275,6 +275,6 @@ GPURenderState :: struct {}
 foreign lib {
 	CreateGPURenderState              :: proc(renderer: ^Renderer, createinfo: ^GPURenderStateCreateInfo) -> ^GPURenderState ---
 	SetGPURenderStateFragmentUniforms :: proc(state: ^GPURenderState, slot_index: Uint32, data: rawptr, length: Uint32) -> bool ---
-	SetGPURenderState                 :: proc(renderer: ^Renderer, state: ^GPURenderState) -> bool ---
+	SetGPURenderState                 :: proc(renderer: ^Renderer, state: Maybe(^GPURenderState)) -> bool ---
 	DestroyGPURenderState             :: proc(state: ^GPURenderState) ---
 }

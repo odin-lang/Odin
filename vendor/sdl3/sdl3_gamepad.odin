@@ -122,12 +122,12 @@ foreign lib {
 	AddGamepadMappingsFromIO              :: proc(src: ^IOStream, closeio: bool) -> c.int ---
 	AddGamepadMappingsFromFile            :: proc(file: cstring) -> c.int ---
 	ReloadGamepadMappings                 :: proc() -> bool ---
-	GetGamepadMappings                    :: proc(count: ^c.int) -> [^][^]byte ---
+	GetGamepadMappings                    :: proc(count: Maybe(^c.int)) -> [^][^]byte ---
 	GetGamepadMappingForGUID              :: proc(guid: GUID) -> [^]byte---
 	GetGamepadMapping                     :: proc(gamepad: ^Gamepad) -> [^]byte ---
-	SetGamepadMapping                     :: proc(instance_id: JoystickID, mapping: cstring) -> bool ---
+	SetGamepadMapping                     :: proc(instance_id: JoystickID, mapping: Maybe(cstring)) -> bool ---
 	HasGamepad                            :: proc() -> bool ---
-	GetGamepads                           :: proc(count: ^c.int) -> [^]JoystickID ---
+	GetGamepads                           :: proc(count: Maybe(^c.int)) -> [^]JoystickID ---
 	IsGamepad                             :: proc(instance_id: JoystickID) -> bool ---
 	GetGamepadNameForID                   :: proc(instance_id: JoystickID) -> cstring ---
 	GetGamepadPathForID                   :: proc(instance_id: JoystickID) -> cstring ---
@@ -157,7 +157,7 @@ foreign lib {
 	GetGamepadSerial                      :: proc(gamepad: ^Gamepad) -> cstring ---
 	GetGamepadSteamHandle                 :: proc(gamepad: ^Gamepad) -> Uint64 ---
 	GetGamepadConnectionState             :: proc(gamepad: ^Gamepad) -> JoystickConnectionState ---
-	GetGamepadPowerInfo                   :: proc(gamepad: ^Gamepad, percent: ^c.int) -> PowerState ---
+	GetGamepadPowerInfo                   :: proc(gamepad: ^Gamepad, percent: Maybe(^c.int)) -> PowerState ---
 	GamepadConnected                      :: proc(gamepad: ^Gamepad) -> bool ---
 	GetGamepadJoystick                    :: proc(gamepad: ^Gamepad) -> ^Joystick ---
 	SetGamepadEventsEnabled               :: proc(enabled: bool) ---
@@ -178,7 +178,7 @@ foreign lib {
 	GetGamepadButtonLabel                 :: proc(gamepad: ^Gamepad, button: GamepadButton) -> GamepadButtonLabel ---
 	GetNumGamepadTouchpads                :: proc(gamepad: ^Gamepad) -> c.int ---
 	GetNumGamepadTouchpadFingers          :: proc(gamepad: ^Gamepad, touchpad: c.int) -> c.int ---
-	GetGamepadTouchpadFinger              :: proc(gamepad: ^Gamepad, touchpad: c.int, finger: c.int, down: ^bool, x, y: ^f32, pressure: ^f32) -> bool ---
+	GetGamepadTouchpadFinger              :: proc(gamepad: ^Gamepad, touchpad: c.int, finger: c.int, down: Maybe(^bool), x, y: Maybe(^f32), pressure: Maybe(^f32)) -> bool ---
 	GamepadHasSensor                      :: proc(gamepad: ^Gamepad, type: SensorType) -> bool ---
 	SetGamepadSensorEnabled               :: proc(gamepad: ^Gamepad, type: SensorType, enabled: bool) -> bool ---
 	GamepadSensorEnabled                  :: proc(gamepad: ^Gamepad, type: SensorType) -> bool ---

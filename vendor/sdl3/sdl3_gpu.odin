@@ -815,9 +815,9 @@ PROP_GPU_DEVICE_DRIVER_INFO_STRING        :: "SDL.gpu.device.driver_info"
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	GPUSupportsShaderFormats              :: proc(format_flags: GPUShaderFormat, name: cstring) -> bool ---
+	GPUSupportsShaderFormats              :: proc(format_flags: GPUShaderFormat, name: Maybe(cstring)) -> bool ---
 	GPUSupportsProperties                 :: proc(props: PropertiesID) -> bool ---
-	CreateGPUDevice                       :: proc(format_flags: GPUShaderFormat, debug_mode: bool, name: cstring) -> ^GPUDevice ---
+	CreateGPUDevice                       :: proc(format_flags: GPUShaderFormat, debug_mode: bool, name: Maybe(cstring)) -> ^GPUDevice ---
 	CreateGPUDeviceWithProperties         :: proc(props: PropertiesID) -> ^GPUDevice ---
 	DestroyGPUDevice                      :: proc(device: ^GPUDevice) ---
 	GetNumGPUDrivers                      :: proc() -> c.int ---
@@ -894,9 +894,9 @@ foreign lib {
 	SetGPUSwapchainParameters             :: proc(device: ^GPUDevice, window: ^Window, swapchain_composition: GPUSwapchainComposition, present_mode: GPUPresentMode) -> bool ---
 	SetGPUAllowedFramesInFlight           :: proc(device: ^GPUDevice, allowed_frames_in_flight: Uint32) -> bool ---
 	GetGPUSwapchainTextureFormat          :: proc(device: ^GPUDevice, window: ^Window) -> GPUTextureFormat ---
-	AcquireGPUSwapchainTexture            :: proc(command_buffer: ^GPUCommandBuffer, window: ^Window, swapchain_texture: ^^GPUTexture, swapchain_texture_width, swapchain_texture_height: ^Uint32) -> bool ---
+	AcquireGPUSwapchainTexture            :: proc(command_buffer: ^GPUCommandBuffer, window: ^Window, swapchain_texture: ^^GPUTexture, swapchain_texture_width, swapchain_texture_height: Maybe(^Uint32)) -> bool ---
 	WaitForGPUSwapchain                   :: proc(device: ^GPUDevice, window: ^Window) -> bool ---
-	WaitAndAcquireGPUSwapchainTexture     :: proc(command_buffer: ^GPUCommandBuffer, window: ^Window, swapchain_texture: ^^GPUTexture, swapchain_texture_width, swapchain_texture_height: ^Uint32) -> bool ---
+	WaitAndAcquireGPUSwapchainTexture     :: proc(command_buffer: ^GPUCommandBuffer, window: ^Window, swapchain_texture: ^^GPUTexture, swapchain_texture_width, swapchain_texture_height: Maybe(^Uint32)) -> bool ---
 	SubmitGPUCommandBuffer                :: proc(command_buffer: ^GPUCommandBuffer) -> bool ---
 	SubmitGPUCommandBufferAndAcquireFence :: proc(command_buffer: ^GPUCommandBuffer) -> ^GPUFence ---
 	CancelGPUCommandBuffer                :: proc(command_buffer: ^GPUCommandBuffer) -> bool ---

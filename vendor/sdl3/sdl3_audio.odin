@@ -78,12 +78,12 @@ foreign lib {
 	GetNumAudioDrivers             :: proc() -> c.int ---
 	GetAudioDriver                 :: proc(index: c.int) -> cstring ---
 	GetCurrentAudioDriver          :: proc() -> cstring ---
-	GetAudioPlaybackDevices        :: proc(count: ^c.int) -> [^]AudioDeviceID ---
-	GetAudioRecordingDevices       :: proc(count: ^c.int) -> [^]AudioDeviceID ---
+	GetAudioPlaybackDevices        :: proc(count: Maybe(^c.int)) -> [^]AudioDeviceID ---
+	GetAudioRecordingDevices       :: proc(count: Maybe(^c.int)) -> [^]AudioDeviceID ---
 	GetAudioDeviceName             :: proc(devid: AudioDeviceID) -> cstring ---
-	GetAudioDeviceFormat           :: proc(devid: AudioDeviceID, spec: ^AudioSpec, sample_frames: ^c.int) -> bool ---
-	GetAudioDeviceChannelMap       :: proc(devid: AudioDeviceID, count: ^c.int) -> [^]c.int ---
-	OpenAudioDevice                :: proc(devid: AudioDeviceID, spec: ^AudioSpec) -> AudioDeviceID ---
+	GetAudioDeviceFormat           :: proc(devid: AudioDeviceID, spec: ^AudioSpec, sample_frames: Maybe(^c.int)) -> bool ---
+	GetAudioDeviceChannelMap       :: proc(devid: AudioDeviceID, count: Maybe(^c.int)) -> [^]c.int ---
+	OpenAudioDevice                :: proc(devid: AudioDeviceID, spec: Maybe(^AudioSpec)) -> AudioDeviceID ---
 	IsAudioDevicePhysical          :: proc(devid: AudioDeviceID) -> bool ---
 	IsAudioDevicePlayback          :: proc(devid: AudioDeviceID) -> bool ---
 	PauseAudioDevice               :: proc(devid: AudioDeviceID) -> bool ---
@@ -99,18 +99,18 @@ foreign lib {
 	GetAudioStreamDevice           :: proc(stream: ^AudioStream) -> AudioDeviceID ---
 	CreateAudioStream              :: proc(src_spec, dst_spec: ^AudioSpec) -> ^AudioStream ---
 	GetAudioStreamProperties       :: proc(stream: ^AudioStream) -> PropertiesID ---
-	GetAudioStreamFormat           :: proc(stream: ^AudioStream, src_spec, dst_spec: ^AudioSpec) -> bool ---
-	SetAudioStreamFormat           :: proc(stream: ^AudioStream, src_spec, dst_spec: ^AudioSpec) -> bool ---
+	GetAudioStreamFormat           :: proc(stream: ^AudioStream, src_spec, dst_spec: Maybe(^AudioSpec)) -> bool ---
+	SetAudioStreamFormat           :: proc(stream: ^AudioStream, src_spec, dst_spec: Maybe(^AudioSpec)) -> bool ---
 	GetAudioStreamFrequencyRatio   :: proc(stream: ^AudioStream) -> f32 ---
 	SetAudioStreamFrequencyRatio   :: proc(stream: ^AudioStream, ratio: f32) -> bool ---
 	GetAudioStreamGain             :: proc(stream: ^AudioStream) -> f32 ---
 	SetAudioStreamGain             :: proc(stream: ^AudioStream, gain: f32) -> bool ---
-	GetAudioStreamInputChannelMap  :: proc(stream: ^AudioStream, count: ^c.int) -> [^]c.int ---
-	GetAudioStreamOutputChannelMap :: proc(stream: ^AudioStream, count: ^c.int) -> [^]c.int ---
-	SetAudioStreamInputChannelMap  :: proc(stream: ^AudioStream, chmap: [^]c.int, count: c.int) -> bool ---
-	SetAudioStreamOutputChannelMap :: proc(stream: ^AudioStream, chmap: [^]c.int, count: c.int) -> bool ---
+	GetAudioStreamInputChannelMap  :: proc(stream: ^AudioStream, count: Maybe(^c.int)) -> [^]c.int ---
+	GetAudioStreamOutputChannelMap :: proc(stream: ^AudioStream, count: Maybe(^c.int)) -> [^]c.int ---
+	SetAudioStreamInputChannelMap  :: proc(stream: ^AudioStream, chmap: Maybe([^]c.int), count: c.int) -> bool ---
+	SetAudioStreamOutputChannelMap :: proc(stream: ^AudioStream, chmap: Maybe([^]c.int), count: c.int) -> bool ---
 	PutAudioStreamData             :: proc(stream: ^AudioStream, buf: rawptr, len: c.int) -> bool ---
-	PutAudioStreamDataNoCopy       :: proc(stream: ^AudioStream, buf: rawptr, len: c.int, callback: AudioStreamDataCompleteCallback, userdata: rawptr) -> bool ---
+	PutAudioStreamDataNoCopy       :: proc(stream: ^AudioStream, buf: rawptr, len: c.int, callback: Maybe(AudioStreamDataCompleteCallback), userdata: rawptr) -> bool ---
 	PutAudioStreamPlanarData       :: proc(stream: ^AudioStream, channel_buffers: [^]rawptr, num_channels, num_samples: c.int) -> bool ---
 	GetAudioStreamData             :: proc(stream: ^AudioStream, buf: rawptr, len: c.int) -> c.int ---
 	GetAudioStreamAvailable        :: proc(stream: ^AudioStream) -> c.int ---
@@ -122,11 +122,11 @@ foreign lib {
 	AudioStreamDevicePaused        :: proc(stream: ^AudioStream) -> bool ---
 	LockAudioStream                :: proc(stream: ^AudioStream) -> bool ---
 	UnlockAudioStream              :: proc(stream: ^AudioStream) -> bool ---
-	SetAudioStreamGetCallback      :: proc(stream: ^AudioStream, callback: AudioStreamCallback, userdata: rawptr) -> bool ---
-	SetAudioStreamPutCallback      :: proc(stream: ^AudioStream, callback: AudioStreamCallback, userdata: rawptr) -> bool ---
+	SetAudioStreamGetCallback      :: proc(stream: ^AudioStream, callback: Maybe(AudioStreamCallback), userdata: rawptr) -> bool ---
+	SetAudioStreamPutCallback      :: proc(stream: ^AudioStream, callback: Maybe(AudioStreamCallback), userdata: rawptr) -> bool ---
 	DestroyAudioStream             :: proc(stream: ^AudioStream) ---
-	OpenAudioDeviceStream          :: proc(devid: AudioDeviceID, spec: ^AudioSpec, callback: AudioStreamCallback, userdata: rawptr) -> ^AudioStream ---
-	SetAudioPostmixCallback        :: proc(devid: AudioDeviceID, callback: AudioPostmixCallback, userdata: rawptr) -> bool ---
+	OpenAudioDeviceStream          :: proc(devid: AudioDeviceID, spec: Maybe(^AudioSpec), callback: Maybe(AudioStreamCallback), userdata: rawptr) -> ^AudioStream ---
+	SetAudioPostmixCallback        :: proc(devid: AudioDeviceID, callback: Maybe(AudioPostmixCallback), userdata: rawptr) -> bool ---
 	LoadWAV_IO                     :: proc(src: ^IOStream, closeio: bool, spec: ^AudioSpec, audio_buf: ^[^]Uint8, audio_len: ^Uint32) -> bool ---
 	LoadWAV                        :: proc(path: cstring, spec: ^AudioSpec, audio_buf: ^[^]Uint8, audio_len: ^Uint32) -> bool ---
 	MixAudio                       :: proc(dst, src: [^]Uint8, format: AudioFormat, len: Uint32, volume: f32) -> bool ---

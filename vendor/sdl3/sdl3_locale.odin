@@ -9,5 +9,5 @@ Locale :: struct {
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	GetPreferredLocales :: proc(count: ^c.int) -> [^]^Locale ---
+	GetPreferredLocales :: proc(count: Maybe(^c.int)) -> [^]^Locale ---
 }

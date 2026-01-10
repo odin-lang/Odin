@@ -13,5 +13,5 @@ PowerState :: enum c.int {
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	GetPowerInfo :: proc(seconds: ^c.int, percent: ^c.int) -> PowerState ---
+	GetPowerInfo :: proc(seconds: Maybe(^c.int), percent: Maybe(^c.int)) -> PowerState ---
 }
