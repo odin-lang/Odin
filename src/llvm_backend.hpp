@@ -329,6 +329,10 @@ struct lbGlobalVariable {
 	bool is_initialized;
 };
 
+struct lbReturnTypeCache {
+	Type * type;
+	lbAddr addr;
+};
 
 struct lbProcedure {
 	u32 flags;
@@ -390,6 +394,8 @@ struct lbProcedure {
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
+
+	Array<lbReturnTypeCache> partial_return_type_cache;
 
 	Array<lbValue> asan_stack_locals;
 

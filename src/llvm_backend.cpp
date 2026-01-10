@@ -17,6 +17,7 @@
 
 #define LLVM_SET_INTERNAL_WEAK_LINKAGE(value) LLVMSetLinkage(value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
 
+#define LB_TUPLE_FIX_USE_PARTIAL_RETURN_CACHE true
 
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
