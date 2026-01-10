@@ -3528,7 +3528,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		if (core_type(bt)->kind == Type_Basic) {
 			return check_representable_as_constant(c, x->value, type, &x->value) ||
 			       (is_type_pointer(type) && check_is_castable_to(c, x, type));
-		} else if (!are_types_identical(elem, bt) && elem->kind == Type_Basic) {
+		} else if (!are_types_identical(elem, bt) && elem->kind == Type_Basic && x->type->kind == Type_Basic) {
 			return check_representable_as_constant(c, x->value, elem, &x->value) || 
 			       (is_type_pointer(elem) && check_is_castable_to(c, x, elem));
 		} else if (check_is_castable_to(c, x, type)) {
