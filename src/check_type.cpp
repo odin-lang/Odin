@@ -1830,11 +1830,14 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		Type *specialization = nullptr;
 
 		bool is_using = (p->flags&FieldFlag_using) != 0;
-		if ((check_vet_flags(param) & VetFlag_UsingParam) && is_using) {
-			ERROR_BLOCK();
-			error(param, "'using' on a procedure parameter is not allowed when '-vet' or '-vet-using-param' is applied");
-			error_line("\t'using' is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring\n");
 
+
+		u64 feature_flags = check_feature_flags(ctx, param);
+
+		if (is_using && (feature_flags & OptInFeatureFlag_UsingStmt) == 0) {
+			ERROR_BLOCK();
+			error(param, "'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring");
+			error_line("\tIt you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
 		}
 
 		if (type_expr == nullptr) {
