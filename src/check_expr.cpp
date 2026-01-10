@@ -1133,7 +1133,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				x.mode = Addressing_Value;
 				x.type = t;
 				if (check_is_assignable_to(c, &x, type)) {
-					add_entity_use(c, operand->expr, e);
+					if (operand->expr->kind == Ast_SelectorExpr) {
+						add_entity_use(c, operand->expr->SelectorExpr.selector, e);
+					} else {
+						add_entity_use(c, operand->expr, e);
+					}
 					good = true;
 					break;
 				}
