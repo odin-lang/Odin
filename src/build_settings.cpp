@@ -1683,7 +1683,20 @@ gb_internal void init_android_values(bool with_sdk) {
 		gb_exit(1);
 	}
 
-	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+	switch (bc->metrics.arch) {
+		case TargetArch_arm64:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("aarch64-linux-android");
+			break;
+		case TargetArch_arm32:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("arm-linux-androideabi");
+			break;
+		case TargetArch_amd64:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("x86_64-linux-android");
+			break;
+		case TargetArch_i386:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("i686-linux-android");
+			break;
+	}
 
 	char buf[32] = {};
 	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
@@ -1958,9 +1971,22 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
 		switch (metrics->arch) {
 		case TargetArch_arm64:
-			bc->metrics.target_triplet = str_lit("aarch64-none-linux-android");
+			bc->metrics.target_triplet = str_lit("aarch64-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
+		case TargetArch_arm32:
+			bc->metrics.target_triplet = str_lit("armv7a-linux-androideabi");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		case TargetArch_amd64:
+			bc->metrics.target_triplet = str_lit("x86_64-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		case TargetArch_i386:
+			bc->metrics.target_triplet = str_lit("i686-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		
 		default:
 			GB_PANIC("Unknown architecture for -subtarget:android");
 		}
