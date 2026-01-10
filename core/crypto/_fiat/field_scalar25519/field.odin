@@ -1,5 +1,6 @@
 package field_scalar25519
 
+import subtle "core:crypto/_subtle"
 import "core:encoding/endian"
 import "core:math/bits"
 import "core:mem"
@@ -121,13 +122,11 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 	tmp: Montgomery_Domain_Field_Element
 	fe_sub(&tmp, arg1, arg2)
 
-	// This will only underflow iff arg1 == arg2, and we return the borrow,
-	// which will be 1.
-	_, borrow := bits.sub_u64(fe_non_zero(&tmp), 1, 0)
+	is_eq := subtle.eq(fe_non_zero(&tmp), 0)
 
 	fe_clear(&tmp)
 
-	return int(borrow)
+	return int(is_eq)
 }
 
 fe_zero :: proc "contextless" (out1: ^Montgomery_Domain_Field_Element) {
