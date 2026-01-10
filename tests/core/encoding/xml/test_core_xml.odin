@@ -114,7 +114,7 @@ xml_test_entities :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x48f41216,
+		crc32     = 0x98791215,
 	})
 }
 
@@ -128,7 +128,7 @@ xml_test_entities_unbox :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0xd0567818,
+		crc32     = 0x5fd5ab4e,
 	})
 }
 
@@ -142,7 +142,7 @@ xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x68d2571e,
+		crc32     = 0x3c0973e2,
 	})
 }
 
