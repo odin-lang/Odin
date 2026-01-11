@@ -2207,7 +2207,7 @@ swizzle :: builtin.swizzle
 /*
 Extract the set of most-significant bits of a SIMD vector.
 
-This procedure checks the the most-significant bit (MSB) for each lane of vector
+This procedure checks the most-significant bit (MSB) for each lane of vector
 and returns the numbers of lanes with the most-significant bit set. This procedure
 can be used in conjuction with `lanes_eq` (and other similar procedures) to
 count the number of matched lanes by computing the cardinality of the resulting
@@ -2253,7 +2253,7 @@ extract_msbs :: intrinsics.simd_extract_msbs
 /*
 Extract the set of least-significant bits of a SIMD vector.
 
-This procedure checks the the least-significant bit (LSB) for each lane of vector
+This procedure checks the least-significant bit (LSB) for each lane of vector
 and returns the numbers of lanes with the least-significant bit set. This procedure
 can be used in conjuction with `lanes_eq` (and other similar procedures) to
 count the number of matched lanes by computing the cardinality of the resulting
