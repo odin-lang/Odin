@@ -1166,7 +1166,7 @@ Example:
 	import "core:sync/chan"
 	import "core:fmt"
 
-	select_raw_example :: proc() {
+	try_select_raw_example :: proc() {
 		c, err := chan.create(chan.Chan(int), 1, context.allocator)
 		assert(err == .None)
 		defer chan.destroy(c)
@@ -1198,11 +1198,11 @@ Example:
 
 Output:
 
-	SELECT:         0 true
+	SELECT:         0 Send
 	RECEIVED VALUE  0
-	SELECT:         0 true
+	SELECT:         0 Recv
 	RECEIVED VALUE  1
-	SELECT:         0 false
+	SELECT:         -1 None
 
 */
 @(require_results)
@@ -1219,7 +1219,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 		count := 0
 
 		for c, i in recvs {
-			if can_recv(c) {
+			if !c.closed && can_recv(c) {
 				candidates[count] = {
 					is_recv = true,
 					idx     = i,
@@ -1232,7 +1232,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 			if i > builtin.len(send_msgs)-1 || send_msgs[i] == nil {
 				continue
 			}
-			if can_send(c)  {
+			if !c.closed && can_send(c)  {
 				candidates[count] = {
 					is_recv = false,
 					idx     = i,
