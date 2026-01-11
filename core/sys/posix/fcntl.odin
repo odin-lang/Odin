@@ -70,7 +70,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html ]]
 	*/
-	openat :: proc(fd: FD, path: cstring, flags: O_Flags, mode: mode_t = {}) -> FD ---
+	openat :: proc(fd: FD, path: cstring, flags: O_Flags, #c_vararg mode: ..mode_t) -> FD ---
 }
 
 FCNTL_Cmd :: enum c.int {
