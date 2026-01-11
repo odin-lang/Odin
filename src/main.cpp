@@ -2971,6 +2971,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (check) {
 		if (print_flag("-target:<string>")) {
 			print_usage_line(2, "Sets the target for the executable to be built in.");
+			print_usage_line(2, "Examples:");
+				print_usage_line(3, "-target:linux_amd64");
+				print_usage_line(3, "-target:windows_amd64");
+				print_usage_line(3, "-target:\"?\" for a list");
 		}
 
 		if (print_flag("-terse-errors")) {

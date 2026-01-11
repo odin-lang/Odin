@@ -3526,28 +3526,17 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		Type *elem = core_array_type(bt);
 
 		if (core_type(bt)->kind == Type_Basic) {
-			if (check_representable_as_constant(c, x->value, type, &x->value)) {
-				return true;
-			}
-			goto check_castable;
-		} else if (!are_types_identical(elem, bt) &&
-		           elem->kind == Type_Basic &&
-		           check_representable_as_constant(c, x->value, elem, &x->value)) {
-			if (check_representable_as_constant(c, x->value, type, &x->value)) {
-				return true;
-			}
-			goto check_castable;
+			return check_representable_as_constant(c, x->value, type, &x->value) ||
+			       (is_type_pointer(type) && check_is_castable_to(c, x, type));
+		} else if (!are_types_identical(elem, bt) && elem->kind == Type_Basic && x->type->kind == Type_Basic) {
+			return check_representable_as_constant(c, x->value, elem, &x->value) || 
+			       (is_type_pointer(elem) && check_is_castable_to(c, x, elem));
 		} else if (check_is_castable_to(c, x, type)) {
 			x->value = {};
 			x->mode = Addressing_Value;
 			return true;
 		}
-
-		return false;
-	}
-
-check_castable:
-	if (check_is_castable_to(c, x, type)) {
+	} else if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
