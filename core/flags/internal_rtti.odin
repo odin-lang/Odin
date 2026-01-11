@@ -5,6 +5,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
 import "core:mem"
+import "core:net"
 import "core:os"
 import "core:reflect"
 import "core:strconv"
@@ -310,7 +311,18 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 	}
 
 	when IMPORTING_NET {
-		if try_net_parse_workaround(data_type, str, ptr, out_error) {
+		if data_type == net.Host_Or_Endpoint {
+			addr, net_error := net.parse_hostname_or_endpoint(str)
+			if net_error != nil {
+				// We pass along `net.Error` here.
+				out_error^ = Parse_Error {
+					net_error,
+					"Invalid Host/Endpoint.",
+				}
+				return
+			}
+
+			(cast(^net.Host_Or_Endpoint)ptr)^ = addr
 			return
 		}
 	}

@@ -20,45 +20,35 @@ package net
 		Feoramund:       FreeBSD platform code
 */
 
-import "core:c"
 import "core:sys/freebsd"
 import "core:time"
 
 Fd :: freebsd.Fd
 
-Socket_Option :: enum c.int {
-	// TODO: Test and implement more socket options.
-	// DEBUG
-	Reuse_Address             = cast(c.int)freebsd.Socket_Option.REUSEADDR,
-	Keep_Alive                = cast(c.int)freebsd.Socket_Option.KEEPALIVE,
-	// DONTROUTE
-	Broadcast                 = cast(c.int)freebsd.Socket_Option.BROADCAST,
-	Use_Loopback              = cast(c.int)freebsd.Socket_Option.USELOOPBACK,
-	Linger                    = cast(c.int)freebsd.Socket_Option.LINGER,
-	Out_Of_Bounds_Data_Inline = cast(c.int)freebsd.Socket_Option.OOBINLINE,
-	Reuse_Port                = cast(c.int)freebsd.Socket_Option.REUSEPORT,
-	// TIMESTAMP
-	No_SIGPIPE_From_EPIPE     = cast(c.int)freebsd.Socket_Option.NOSIGPIPE,
-	// ACCEPTFILTER
-	// BINTIME
-	// NO_OFFLOAD
-	// NO_DDP
-	Reuse_Port_Load_Balancing = cast(c.int)freebsd.Socket_Option.REUSEPORT_LB,
-	// RERROR
+_SOCKET_OPTION_BROADCAST                 :: freebsd.Socket_Option.BROADCAST
+_SOCKET_OPTION_REUSE_ADDRESS             :: freebsd.Socket_Option.REUSEADDR
+_SOCKET_OPTION_KEEP_ALIVE                :: freebsd.Socket_Option.KEEPALIVE
+_SOCKET_OPTION_OUT_OF_BOUNDS_DATA_INLINE :: freebsd.Socket_Option.OOBINLINE
+_SOCKET_OPTION_LINGER                    :: freebsd.Socket_Option.LINGER
+_SOCKET_OPTION_RECEIVE_BUFFER_SIZE       :: freebsd.Socket_Option.RCVBUF
+_SOCKET_OPTION_SEND_BUFFER_SIZE          :: freebsd.Socket_Option.SNDBUF
+_SOCKET_OPTION_RECEIVE_TIMEOUT           :: freebsd.Socket_Option.RCVTIMEO
+_SOCKET_OPTION_SEND_TIMEOUT              :: freebsd.Socket_Option.SNDTIMEO
 
-	Send_Buffer_Size          = cast(c.int)freebsd.Socket_Option.SNDBUF,
-	Receive_Buffer_Size       = cast(c.int)freebsd.Socket_Option.RCVBUF,
-	// SNDLOWAT
-	// RCVLOWAT
-	Send_Timeout              = cast(c.int)freebsd.Socket_Option.SNDTIMEO,
-	Receive_Timeout           = cast(c.int)freebsd.Socket_Option.RCVTIMEO,
-}
+_SOCKET_OPTION_TCP_NODELAY :: -1
 
-Shutdown_Manner :: enum c.int {
-	Receive = cast(c.int)freebsd.Shutdown_Method.RD,
-	Send    = cast(c.int)freebsd.Shutdown_Method.WR,
-	Both    = cast(c.int)freebsd.Shutdown_Method.RDWR,
-}
+_SOCKET_OPTION_USE_LOOPBACK              :: freebsd.Socket_Option.USELOOPBACK
+_SOCKET_OPTION_REUSE_PORT                :: freebsd.Socket_Option.REUSEPORT
+_SOCKET_OPTION_NO_SIGPIPE_FROM_EPIPE     :: freebsd.Socket_Option.NOSIGPIPE
+_SOCKET_OPTION_REUSE_PORT_LOAD_BALANCING :: freebsd.Socket_Option.REUSEPORT_LB
+
+_SOCKET_OPTION_EXCLUSIVE_ADDR_USE :: -1
+_SOCKET_OPTION_CONDITIONAL_ACCEPT :: -1
+_SOCKET_OPTION_DONT_LINGER        :: -1
+
+_SHUTDOWN_MANNER_RECEIVE :: freebsd.Shutdown_Method.RD
+_SHUTDOWN_MANNER_SEND    :: freebsd.Shutdown_Method.WR
+_SHUTDOWN_MANNER_BOTH    :: freebsd.Shutdown_Method.RDWR
 
 @(private)
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
@@ -272,7 +262,7 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 	ptr: rawptr
 	len: freebsd.socklen_t
 
-	switch option {
+	#partial switch option {
 	case
 		.Reuse_Address,
 		.Keep_Alive,
@@ -344,7 +334,7 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 			ptr = &int_value
 			len = size_of(int_value)
 	case:
-		unimplemented("set_option() option not yet implemented", loc)
+		return .Invalid_Option
 	}
 
 	real_socket := any_socket_to_socket(socket)

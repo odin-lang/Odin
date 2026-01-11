@@ -1,4 +1,3 @@
-#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -22,7 +21,6 @@ package net
 
 import "core:strconv"
 import "core:strings"
-import "core:fmt"
 
 /*
 	Expects an IPv4 address with no leading or trailing whitespace:
@@ -473,13 +471,20 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.alloc
 	addr := parse_address(addr_or_host)
 	if addr == nil {
 		// hostname
-		fmt.sbprintf(&b, "%v:%v", addr_or_host, port)
+		strings.write_string(&b, addr_or_host)
+		strings.write_string(&b, ":")
+		strings.write_int(&b, port)
 	} else {
 		switch _ in addr {
 		case IP4_Address:
-			fmt.sbprintf(&b, "%v:%v", address_to_string(addr), port)
+			strings.write_string(&b, address_to_string(addr))
+			strings.write_string(&b, ":")
+			strings.write_int(&b, port)
 		case IP6_Address:
-			fmt.sbprintf(&b, "[%v]:%v", address_to_string(addr), port)
+			strings.write_string(&b, "[")
+			strings.write_string(&b, address_to_string(addr))
+			strings.write_string(&b, "]:")
+			strings.write_int(&b, port)
 		}
 	}
 	return strings.to_string(b)
@@ -509,7 +514,13 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 	b := strings.builder_make(allocator)
 	switch v in addr {
 	case IP4_Address:
-		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
+		strings.write_uint(&b, uint(v[0]))
+		strings.write_byte(&b, '.')
+		strings.write_uint(&b, uint(v[1]))
+		strings.write_byte(&b, '.')
+		strings.write_uint(&b, uint(v[2]))
+		strings.write_byte(&b, '.')
+		strings.write_uint(&b, uint(v[3]))
 	case IP6_Address:
 		// First find the longest run of zeroes.
 		Zero_Run :: struct {
@@ -563,25 +574,33 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 		for val, i in v {
 			if best.start == i || best.end == i {
 				// For the left and right side of the best zero run, print a `:`.
-				fmt.sbprint(&b, ":")
+				strings.write_string(&b, ":")
 			} else if i < best.start {
 				/*
 					If we haven't made it to the best run yet, print the digit.
 					Make sure we only print a `:` after the digit if it's not
 					immediately followed by the run's own leftmost `:`.
 				*/
-				fmt.sbprintf(&b, "%x", val)
+
+				buf: [32]byte
+				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val), strconv.digits, {})
+				strings.write_string(&b, str)
+
 				if i < best.start - 1 {
-					fmt.sbprintf(&b, ":")
+					strings.write_string(&b, ":")
 				}
 			} else if i > best.end {
 				/*
 					If there are any digits after the zero run, print them.
 					But don't print the `:` at the end of the IP number.
 				*/
-				fmt.sbprintf(&b, "%x", val)
+
+				buf: [32]byte
+				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val), strconv.digits, {})
+				strings.write_string(&b, str)
+
 				if i != 7 {
-					fmt.sbprintf(&b, ":")
+					strings.write_string(&b, ":")
 				}
 			}
 		}
@@ -598,8 +617,14 @@ endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) ->
 		s := address_to_string(ep.address, context.temp_allocator)
 		b := strings.builder_make(allocator)
 		switch a in ep.address {
-		case IP4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
-		case IP6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
+		case IP4_Address:
+			strings.write_string(&b, s)
+			strings.write_int(&b, ep.port)
+		case IP6_Address:
+			strings.write_string(&b, "[")
+			strings.write_string(&b, s)
+			strings.write_string(&b, "]:")
+			strings.write_int(&b, ep.port)
 		}
 		return strings.to_string(b)
 	}
