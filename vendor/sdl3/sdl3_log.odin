@@ -55,7 +55,7 @@ foreign lib {
 	SetLogPriority              :: proc(category: LogCategory, priority: LogPriority) ---
 	GetLogPriority              :: proc(category: LogCategory) -> LogPriority ---
 	ResetLogPriorities          :: proc() ---
-	SetLogPriorityPrefix        :: proc(priority: LogPriority, prefix: cstring) -> bool ---
+	SetLogPriorityPrefix        :: proc(priority: LogPriority, prefix: Maybe(cstring)) -> bool ---
 	Log                         :: proc(fmt: cstring, #c_vararg args: ..any) ---
 	LogTrace                    :: proc(category: c.int, fmt: cstring, #c_vararg args: ..any) ---
 	LogVerbose                  :: proc(category: c.int, fmt: cstring, #c_vararg args: ..any) ---
