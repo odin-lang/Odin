@@ -1748,3 +1748,5 @@ Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
 Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
 
 Swap_Flags :: bit_set[Swap_Flags_Bits; u32]
+
+Eventfd_Flags :: bit_set[Eventfd_Flags_Bits; i32]

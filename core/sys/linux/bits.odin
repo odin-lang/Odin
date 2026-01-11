@@ -2269,3 +2269,9 @@ Swap_Flags_Bits :: enum {
 	PREFER  = log2(0x8000),
 	DISCARD = log2(0x10000),
 }
+
+Eventfd_Flags_Bits :: enum {
+	SEMAPHORE,
+	CLOEXEC  = auto_cast Open_Flags_Bits.CLOEXEC,
+	NONBLOCK = auto_cast Open_Flags_Bits.NONBLOCK,
+}
