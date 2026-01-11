@@ -333,8 +333,14 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Erro
 	case:
 		create_mode = win32.OPEN_EXISTING
 	}
+
+	attrs := win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS
+	if mode & (O_NONBLOCK) == O_NONBLOCK {
+		attrs |= win32.FILE_FLAG_OVERLAPPED
+	}
+
 	wide_path := win32.utf8_to_wstring(path)
-	handle := Handle(win32.CreateFileW(wide_path, access, share_mode, sa, create_mode, win32.FILE_ATTRIBUTE_NORMAL|win32.FILE_FLAG_BACKUP_SEMANTICS, nil))
+	handle := Handle(win32.CreateFileW(wide_path, access, share_mode, sa, create_mode, attrs, nil))
 	if handle != INVALID_HANDLE {
 		return handle, nil
 	}
