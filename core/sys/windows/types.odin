@@ -3139,6 +3139,7 @@ OBJECT_ATTRIBUTES :: struct {
 	SecurityDescriptor:       rawptr,
 	SecurityQualityOfService: rawptr,
 }
+POBJECT_ATTRIBUTES :: ^OBJECT_ATTRIBUTES
 
 PUNICODE_STRING :: ^UNICODE_STRING
 UNICODE_STRING :: struct {
@@ -3150,9 +3151,14 @@ UNICODE_STRING :: struct {
 OVERLAPPED :: struct {
 	Internal:     ^c_ulong,
 	InternalHigh: ^c_ulong,
-	Offset:       DWORD,
-	OffsetHigh:   DWORD,
-	hEvent:       HANDLE,
+	using _: struct #raw_union {
+		using _: struct {
+			Offset: DWORD,
+			OffsetHigh: DWORD,
+		},
+		OffsetFull: u64, // Convenience field to set Offset and OffsetHigh with one value.
+	},
+	hEvent: HANDLE,
 }
 
 OVERLAPPED_ENTRY :: struct {

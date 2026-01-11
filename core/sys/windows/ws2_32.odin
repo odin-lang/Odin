@@ -38,7 +38,7 @@ WSANETWORKEVENTS :: struct {
 
 WSAID_ACCEPTEX             :: GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
 WSAID_GETACCEPTEXSOCKADDRS :: GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
-WSAID_CONNECTX             :: GUID{0x25a207b9, 0xddf3, 0x4660, {0x8e, 0xe9, 0x76, 0xe5, 0x8c, 0x74, 0x06, 0x3e}}
+WSAID_CONNECTEX            :: GUID{0x25a207b9, 0xddf3, 0x4660, {0x8e, 0xe9, 0x76, 0xe5, 0x8c, 0x74, 0x06, 0x3e}}
 
 SIO_GET_EXTENSION_FUNCTION_POINTER :: IOC_INOUT | IOC_WS2 | 6
 SIO_UDP_CONNRESET                  :: IOC_IN | IOC_VENDOR | 12
@@ -129,7 +129,7 @@ foreign ws2_32 {
 		dwBufferCount:       DWORD,
 		lpNumberOfBytesSent: LPDWORD,
 		dwFlags:             DWORD,
-		lpTo:                ^SOCKADDR_STORAGE_LH,
+		lpTo:                ^sockaddr,
 		iToLen:              c_int,
 		lpOverlapped:        LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
@@ -151,8 +151,8 @@ foreign ws2_32 {
 		dwBufferCount:        DWORD,
 		lpNumberOfBytesRecvd: LPDWORD,
 		lpFlags:              LPDWORD,
-		lpFrom:               ^SOCKADDR_STORAGE_LH,
-		lpFromlen:            ^c_int,
+		lpFrom:               ^sockaddr,
+		lpFromlen:            LPINT,
 		lpOverlapped:         LPWSAOVERLAPPED,
 		lpCompletionRoutine:  LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---

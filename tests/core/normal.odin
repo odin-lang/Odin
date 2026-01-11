@@ -32,6 +32,7 @@ download_assets :: proc "contextless" () {
 @(require) import "math/noise"
 @(require) import "math/rand"
 @(require) import "mem"
+@(require) import "nbio"
 @(require) import "net"
 @(require) import "odin"
 @(require) import "os"
