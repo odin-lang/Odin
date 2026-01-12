@@ -9,9 +9,6 @@ import "core:c"
 char :: c.char
 
 // currently missing in the api.json
-window :: distinct u64
-    
-// currently missing in the api.json
 pool :: struct {
 	arena: arena,
 	freeList: list,
@@ -142,17 +139,6 @@ UNICODE_TAGS :: unicode_range { 0xe0000, 127 }
 UNICODE_VARIATION_SELECTORS_SUPPLEMENT :: unicode_range { 0xe0100, 239 }
 UNICODE_SUPPLEMENTARY_PRIVATE_USE_AREA_A :: unicode_range { 0xf0000, 65533 }
 UNICODE_SUPPLEMENTARY_PRIVATE_USE_AREA_B  :: unicode_range { 0x100000, 65533 }
-
-clock_kind :: enum c.int {
-	MONOTONIC,
-	UPTIME,
-	DATE,
-}
-
-@(default_calling_convention="c", link_prefix="oc_")
-foreign {
-	clock_time :: proc(clock: clock_kind) -> f64 ---
-}
 
 file_write_slice :: proc(file: file, slice: []char) -> u64 {
 	return file_write(file, u64(len(slice)), raw_data(slice))
