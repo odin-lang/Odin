@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	==========================    Low-level routines    ==========================
 
@@ -24,8 +26,6 @@
 
 	TODO: Handle +/- Infinity and NaN.
 */
-
-package math_big
 
 import "base:builtin"
 import "base:intrinsics"
@@ -746,19 +746,15 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 
 	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
 		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.")
-		err = _private_int_div_recursive(quotient, remainder, numerator, denominator)
+		return _private_int_div_recursive(quotient, remainder, numerator, denominator)
 	} else {
-		when true {
-			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
-		} else {
-			/*
-				NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
-				We'll keep it around for a bit until we're reasonably certain div_school is bug free.
-			*/
-			err = _private_int_div_small(quotient, remainder, numerator, denominator)
-		}
+		return #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
+		/*
+			NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
+			We'll keep it around for a bit until we're reasonably certain div_school is bug free.
+		*/
+		// err = _private_int_div_small(quotient, remainder, numerator, denominator)
 	}
-	return
 }
 
 /*
@@ -1203,14 +1199,14 @@ internal_cmp_mag :: internal_compare_magnitude
 	bool := a < b
 */
 internal_int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
-	return internal_cmp(a, b) == -1
+	return internal_cmp(a, b) < 0
 }
 
 /*
 	bool := a < b
 */
 internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool) {
-	return internal_cmp_digit(a, b) == -1
+	return internal_cmp_digit(a, b) < 0
 }
 
 /*
@@ -1218,7 +1214,7 @@ internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_t
     Compares the magnitudes only, ignores the sign.
 */
 internal_int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
-	return internal_cmp_mag(a, b) == -1
+	return internal_cmp_mag(a, b) < 0
 }
 
 internal_less_than :: proc {
@@ -2181,7 +2177,11 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
-		a.digit = make([dynamic]DIGIT, needed, allocator)
+		mem_err: mem.Allocator_Error
+		a.digit, mem_err = make([dynamic]DIGIT, needed, allocator)
+		if mem_err != nil {
+			return cast(Error)mem_err
+		}
 	} else if cap < needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
@@ -2791,7 +2791,8 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 		x *= _DIGIT_BITS
 		x += internal_count_lsb(q)
 	} else {
-		lnz := []int{
+		@(static, rodata)
+		lnz := [?]int{
    			4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
 		}
 
@@ -2933,7 +2934,7 @@ internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 		If we don't pass the number of previously used DIGITs, we zero all remaining ones.
 	*/
 	zero_count: int
-	if old_used == -1 {
+	if old_used < 0 {
 		zero_count = len(dest.digit) - dest.used
 	} else {
 		zero_count = old_used - dest.used

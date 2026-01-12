@@ -908,8 +908,8 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 		if (op != Token_Add) goto error;
 
 		// NOTE(bill): How do you minimize this over allocation?
-		String sx = x.value_string;
-		String sy = y.value_string;
+		String16 sx = x.value_string16;
+		String16 sy = y.value_string16;
 		isize len = sx.len+sy.len;
 		u16 *data = gb_alloc_array(permanent_allocator(), u16, len);
 		gb_memmove(data,        sx.text, sx.len*gb_size_of(u16));
@@ -946,6 +946,8 @@ gb_internal gb_inline ExactValue exact_value_increment_one(ExactValue const &x) 
 gb_internal gb_inline i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
+
+gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y, bool *do_break_);
 
 gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
@@ -1055,9 +1057,24 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		case Token_NotEq: return x.value_typeid != y.value_typeid;
 		}
 		break;
+
+	case ExactValue_Compound:
+		if (op != Token_CmpEq && op != Token_NotEq) {
+			break;
+		}
+
+		if (x.kind != y.kind) {
+			break;
+		}
+		bool do_break = false;
+		bool res = compare_exact_values_compound_lit(op, x, y, &do_break);
+		if (do_break) {
+			break;
+		}
+		return res;
 	}
 
-	GB_PANIC("Invalid comparison");
+	GB_PANIC("Invalid comparison: %d", x.kind);
 	return false;
 }
 

@@ -418,6 +418,7 @@ enum LinkerChoice : i32 {
 	Linker_Default = 0,
 	Linker_lld,
 	Linker_radlink,
+	Linker_mold,
 
 	Linker_COUNT,
 };
@@ -433,6 +434,7 @@ String linker_choices[Linker_COUNT] = {
 	str_lit("default"),
 	str_lit("lld"),
 	str_lit("radlink"),
+	str_lit("mold"),
 };
 
 enum IntegerDivisionByZeroKind : u8 {
@@ -507,6 +509,7 @@ struct BuildContext {
 	bool   show_more_timings;
 	bool   show_defineables;
 	String export_defineables_file;
+	bool   ignore_unused_defineables;
 	bool   show_system_calls;
 	bool   keep_temp_files;
 	bool   ignore_unknown_attributes;
@@ -546,6 +549,8 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
+	bool   build_diagnostics;
+
 	bool   use_single_module;
 	bool   use_separate_modules;
 	bool   module_per_file;
@@ -554,6 +559,8 @@ struct BuildContext {
 
 	bool internal_no_inline;
 	bool internal_by_value;
+	bool internal_weak_monomorphization;
+	bool internal_ignore_llvm_verification;
 
 	bool   no_threaded_checker;
 
@@ -568,6 +575,8 @@ struct BuildContext {
 	SourceCodeLocationInfo source_code_location_info;
 
 	bool   min_link_libs;
+
+	String export_linked_libs_path;
 
 	bool   print_linker_flags;
 
@@ -826,7 +835,7 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
-	str_lit("x86_64-pc-none-msvc"),
+	str_lit("x86_64-pc-windows-msvc"),
 	TargetABI_Win64,
 };
 
@@ -962,14 +971,6 @@ gb_internal bool is_excluded_target_filename(String name) {
 	if (string_starts_with(name, str_lit("."))) {
 		// Ignore .*.odin files
 		return true;
-	}
-
-	if (build_context.command_kind != Command_test) {
-		String test_suffix = str_lit("_test");
-		if (string_ends_with(name, test_suffix) && name != test_suffix) {
-			// Ignore *_test.odin files
-			return true;
-		}
 	}
 
 	String str1 = {};
@@ -1126,7 +1127,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
+	text = permanent_alloc_array<wchar_t>(len+1);
 
 	GetModuleFileNameW(nullptr, text, cast(int)len);
 	path = string16_to_string(heap_allocator(), make_string16(cast(u16 *)text, len));
@@ -1163,8 +1164,8 @@ gb_internal String internal_odin_root_dir(void) {
 		return global_module_path;
 	}
 
-	auto path_buf = array_make<char>(heap_allocator(), 300);
-	defer (array_free(&path_buf));
+	TEMPORARY_ALLOCATOR_GUARD();
+	auto path_buf = array_make<char>(temporary_allocator(), 300);
 
 	len = 0;
 	for (;;) {
@@ -1181,7 +1182,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	text = permanent_alloc_array<u8>(len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
 	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
@@ -1233,7 +1234,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	text = permanent_alloc_array<u8>(len + 1);
 	gb_memmove(text, &path_buf[0], len);
 
 	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
@@ -1394,7 +1395,7 @@ gb_internal String internal_odin_root_dir(void) {
 	mutex_lock(&string_buffer_mutex);
 	defer (mutex_unlock(&string_buffer_mutex));
 
-	text = gb_alloc_array(permanent_allocator(), u8, len + 1);
+	text = permanent_alloc_array<u8>(len + 1);
 
 	gb_memmove(text, &path_buf[0], len);
 
@@ -1429,7 +1430,7 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 
 	len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
-		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
+		wchar_t *text = permanent_alloc_array<wchar_t>(len+1);
 		GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
 		mutex_unlock(&fullpath_mutex);
 
@@ -2095,7 +2096,19 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
 		if (str == "") break;
+
 		if (!string_set_exists(&build_context.target_features_set, str)) {
+			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), str);
+
+			if (!string_set_exists(&build_context.target_features_set, plus_str)) {
+				if (not_enabled) *not_enabled = str;
+				return false;
+			}
+		}
+
+		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), str);
+
+		if (string_set_exists(&build_context.target_features_set, minus_str)) {
 			if (not_enabled) *not_enabled = str;
 			return false;
 		}

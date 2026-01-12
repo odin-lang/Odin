@@ -1,3 +1,4 @@
+// Bindings for [[ MetalKit ; https://developer.apple.com/documentation/metalkit ]].
 package objc_MetalKit
 
 import NS "core:sys/darwin/Foundation"

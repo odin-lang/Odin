@@ -1,5 +1,5 @@
 /*
-package fmt implements formatted I/O with procedures similar to C's printf and Python's format.
+Formatted `I/O` with procedures similar to `C`'s printf and `Python`'s format.
 The format 'verbs' are derived from C's but simpler.
 
 Printing

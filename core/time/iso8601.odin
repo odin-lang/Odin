@@ -27,6 +27,7 @@ is specified in the string, that timezone is applied to time.
 - Only 4-digit years are accepted.
 - Leap seconds are smeared into 23:59:59.
 */
+@(require_results)
 iso8601_to_time_utc :: proc(iso_datetime: string, is_leap: ^bool = nil) -> (res: Time, consumed: int) {
 	offset: int
 	res, offset, consumed = iso8601_to_time_and_offset(iso_datetime, is_leap)
@@ -59,6 +60,7 @@ minutes.
 - Only 4-digit years are accepted.
 - Leap seconds are smeared into 23:59:59.
 */
+@(require_results)
 iso8601_to_time_and_offset :: proc(iso_datetime: string, is_leap: ^bool = nil) -> (res: Time, utc_offset: int, consumed: int) {
 	moment, offset, leap_second, count := iso8601_to_components(iso_datetime)
 	if count == 0 {
@@ -102,6 +104,7 @@ minutes.
   e.g. it'll return hour = 25 if that's what it's given in the specified
   string.
 */
+@(require_results)
 iso8601_to_components :: proc(iso_datetime: string) -> (res: dt.DateTime, utc_offset: int, is_leap: bool, consumed: int) {
 	moment, offset, count, leap_second, ok := _iso8601_to_components(iso_datetime)
 	if !ok {

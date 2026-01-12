@@ -1,3 +1,4 @@
+// An Odin-native source port of [[ Fontstash ; https://github.com/memononen/fontstash ]].
 #+vet !using-param
 package fontstash
 
@@ -323,11 +324,15 @@ __AtlasAddWhiteRect :: proc(ctx: ^FontContext, w, h: int) -> bool {
 
 // push a font to the font stack
 // optionally init with ascii characters at a wanted size
+//
+// 'fontIndex' controls which font you want to load within a multi-font format such
+// as TTC. Leave it as zero if you are loading a single-font format such as TTF.
 AddFontMem :: proc(
 	ctx:            ^FontContext,
 	name:           string,
 	data:           []u8,
 	freeLoadedData: bool,
+	fontIndex:      int = 0,
 ) -> int {
 	append(&ctx.fonts, Font{})
 	res := &ctx.fonts[len(ctx.fonts) - 1]
@@ -335,7 +340,10 @@ AddFontMem :: proc(
 	res.freeLoadedData = freeLoadedData
 	res.name           = strings.clone(name)
 
-	stbtt.InitFont(&res.info, &res.loadedData[0], 0)
+	num_fonts := stbtt.GetNumberOfFonts(raw_data(data))
+	font_index_clamped := num_fonts > 0 ? clamp(i32(fontIndex), 0, num_fonts-1) : 0
+	font_offset := stbtt.GetFontOffsetForIndex(raw_data(data), font_index_clamped)
+	stbtt.InitFont(&res.info, raw_data(data), font_offset)
 	ascent, descent, line_gap: i32
 
 	stbtt.GetFontVMetrics(&res.info, &ascent, &descent, &line_gap)

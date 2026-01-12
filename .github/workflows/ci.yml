@@ -6,7 +6,7 @@ jobs:
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
     env:
-      PKGSRC_BRANCH: 2025Q2
+      PKGSRC_BRANCH: 2025Q4
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
@@ -74,43 +74,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # MacOS 13 runs on Intel, 14 runs on ARM
-        os: [macos-14, ubuntu-latest]
+        os: [macos-15-intel, macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-14' && 'MacOS ARM' || (matrix.os == 'macos-13' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') }} Build, Check, and Test
+    name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'macos-15-intel' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
 
       - uses: actions/checkout@v4
 
       - name: Download LLVM (MacOS Intel)
-        if: matrix.os == 'macos-13'
+        if: matrix.os == 'macos-15-intel'
         run: |
           brew update
           brew install llvm@20 lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-latest'
         run: |
           brew update
           brew install llvm@20 wasmtime lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 20
           echo "/usr/lib/llvm-20/bin" >> $GITHUB_PATH
-
       - name: Build Odin
         run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
       - name: Odin report
         run: ./odin report
+      - name: Get needed vendor libs
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: sudo apt-get install -y liblua5.4-dev
+      - name: Install libcurl (Ubuntu)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
+      - name: Install libcurl (macOS)
+        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
+        run: |
+          brew install curl mbedtls
       - name: Compile needed Vendor
         run: |
           make -C vendor/stb/src
@@ -143,7 +152,7 @@ jobs:
         run: |
           ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
           wasmtime ./demo.wasm
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-latest'
 
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
@@ -276,6 +285,10 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 18
           echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
+
+      - name: Install libcurl
+        run: |
+          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
 
       - name: Build Odin
         run: ./build_odin.sh release

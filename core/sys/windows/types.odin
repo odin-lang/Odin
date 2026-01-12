@@ -15,75 +15,75 @@ c_ushort    :: c.ushort
 size_t      :: c.size_t
 wchar_t     :: c.wchar_t
 
-DWORD :: c_ulong
-DWORDLONG :: c.ulonglong
-QWORD :: c.ulonglong
-HANDLE :: distinct LPVOID
-PHANDLE :: ^HANDLE
-HINSTANCE :: HANDLE
-HMODULE :: distinct HINSTANCE
-HRESULT :: distinct LONG
-HWND :: distinct HANDLE
-HDC :: distinct HANDLE
-HMONITOR :: distinct HANDLE
-HICON :: distinct HANDLE
-HCURSOR :: distinct HANDLE
-HMENU :: distinct HANDLE
-HBRUSH :: distinct HANDLE
-HPEN :: distinct HANDLE
-HGDIOBJ :: distinct HANDLE
-HBITMAP :: distinct HANDLE
-HPALETTE :: distinct HANDLE
-HGLOBAL :: distinct HANDLE
-HHOOK :: distinct HANDLE
-HWINEVENTHOOK :: distinct HANDLE
-HKEY :: distinct HANDLE
-HDESK :: distinct HANDLE
-HFONT :: distinct HANDLE
-HRGN :: distinct HANDLE
-HRSRC :: distinct HANDLE
-HWINSTA :: distinct HANDLE
-HACCEL :: distinct HANDLE
-BOOL :: distinct b32
-BYTE :: distinct u8
-BOOLEAN :: distinct b8
-GROUP :: distinct c_uint
-LARGE_INTEGER :: distinct c_longlong
-ULARGE_INTEGER :: distinct c_ulonglong
+DWORD           :: c_ulong
+DWORDLONG       :: c.ulonglong
+QWORD           :: c.ulonglong
+HANDLE          :: distinct LPVOID
+PHANDLE         :: ^HANDLE
+HINSTANCE       :: HANDLE
+HMODULE         :: distinct HINSTANCE
+HRESULT         :: distinct LONG
+HWND            :: distinct HANDLE
+HDC             :: distinct HANDLE
+HMONITOR        :: distinct HANDLE
+HICON           :: distinct HANDLE
+HCURSOR         :: distinct HANDLE
+HMENU           :: distinct HANDLE
+HBRUSH          :: distinct HANDLE
+HPEN            :: distinct HANDLE
+HGDIOBJ         :: distinct HANDLE
+HBITMAP         :: distinct HANDLE
+HPALETTE        :: distinct HANDLE
+HGLOBAL         :: distinct HANDLE
+HHOOK           :: distinct HANDLE
+HWINEVENTHOOK   :: distinct HANDLE
+HKEY            :: distinct HANDLE
+HDESK           :: distinct HANDLE
+HFONT           :: distinct HANDLE
+HRGN            :: distinct HANDLE
+HRSRC           :: distinct HANDLE
+HWINSTA         :: distinct HANDLE
+HACCEL          :: distinct HANDLE
+BOOL            :: distinct b32
+BYTE            :: distinct u8
+BOOLEAN         :: distinct b8
+GROUP           :: distinct c_uint
+LARGE_INTEGER   :: distinct c_longlong
+ULARGE_INTEGER  :: distinct c_ulonglong
 PULARGE_INTEGER :: ^ULARGE_INTEGER
-LONG :: c_long
-UINT :: c_uint
-INT  :: c_int
-SHORT :: c_short
-USHORT :: c_ushort
-WCHAR :: wchar_t
-SIZE_T :: uint
-PSIZE_T :: ^SIZE_T
-WORD :: u16
-CHAR :: c_char
-ULONG_PTR :: uint
-PULONG_PTR :: ^ULONG_PTR
-LPULONG_PTR :: ^ULONG_PTR
-DWORD_PTR :: ULONG_PTR
-LONG_PTR :: int
-INT_PTR :: int
-UINT_PTR :: uintptr
-ULONG :: c_ulong
-ULONGLONG :: c_ulonglong
-LONGLONG :: c_longlong
-UCHAR :: BYTE
-NTSTATUS :: c.long
-COLORREF :: DWORD
-LPCOLORREF :: ^COLORREF
-LPARAM :: LONG_PTR
-WPARAM :: UINT_PTR
-LRESULT :: LONG_PTR
-LPRECT :: ^RECT
-LPPOINT :: ^POINT
-LSTATUS :: LONG
-PHKEY :: ^HKEY
-PUSHORT :: ^USHORT
-PCHAR :: ^CHAR
+LONG            :: c_long
+UINT            :: c_uint
+INT             :: c_int
+SHORT           :: c_short
+USHORT          :: c_ushort
+WCHAR           :: wchar_t
+SIZE_T          :: uint
+PSIZE_T         :: ^SIZE_T
+WORD            :: u16
+CHAR            :: c_char
+ULONG_PTR       :: uint
+PULONG_PTR      :: ^ULONG_PTR
+LPULONG_PTR     :: ^ULONG_PTR
+DWORD_PTR       :: ULONG_PTR
+LONG_PTR        :: int
+INT_PTR         :: int
+UINT_PTR        :: uintptr
+ULONG           :: c_ulong
+ULONGLONG       :: c_ulonglong
+LONGLONG        :: c_longlong
+UCHAR           :: BYTE
+NTSTATUS        :: c.long
+COLORREF        :: DWORD
+LPCOLORREF      :: ^COLORREF
+LPARAM          :: LONG_PTR
+WPARAM          :: UINT_PTR
+LRESULT         :: LONG_PTR
+LPRECT          :: ^RECT
+LPPOINT         :: ^POINT
+LSTATUS         :: LONG
+PHKEY           :: ^HKEY
+PUSHORT         :: ^USHORT
+PCHAR           :: ^CHAR
 
 UINT8  ::  u8
 UINT16 :: u16
@@ -101,68 +101,86 @@ LONG32  :: i32
 ULONG64 :: u64
 LONG64  :: i64
 
-DWORD64 :: u64
+DWORD64  :: u64
 PDWORD64 :: ^DWORD64
 
 PDWORD_PTR :: ^DWORD_PTR
-ATOM :: distinct WORD
+ATOM       :: distinct WORD
 
 wstring :: cstring16
 PWSTR   :: cstring16
 
-PBYTE :: ^BYTE
-LPBYTE :: ^BYTE
-PBOOL :: ^BOOL
-LPBOOL :: ^BOOL
-LPCSTR :: cstring
-LPCWSTR :: wstring
-LPCTSTR :: wstring
-LPDWORD :: ^DWORD
-PCSTR :: cstring
-PCWSTR :: wstring
-PDWORD :: ^DWORD
-LPHANDLE :: ^HANDLE
-LPOVERLAPPED :: ^OVERLAPPED
+PBYTE                 :: ^BYTE
+LPBYTE                :: ^BYTE
+PBOOL                 :: ^BOOL
+LPBOOL                :: ^BOOL
+LPCSTR                :: cstring
+LPCWSTR               :: wstring
+LPCTSTR               :: wstring
+LPDWORD               :: ^DWORD
+PCSTR                 :: cstring
+PCWSTR                :: wstring
+PDWORD                :: ^DWORD
+LPHANDLE              :: ^HANDLE
+LPOVERLAPPED          :: ^OVERLAPPED
 LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
-PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
+PSECURITY_ATTRIBUTES  :: ^SECURITY_ATTRIBUTES
 LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
-LPSTARTUPINFOW :: ^STARTUPINFOW
-LPTRACKMOUSEEVENT :: ^TRACKMOUSEEVENT
-VOID :: rawptr
-PVOID :: rawptr
-LPVOID :: rawptr
-PINT :: ^INT
-LPINT :: ^INT
-PUINT :: ^UINT
-LPUINT :: ^UINT
-LPWCH :: ^WCHAR
-LPWORD :: ^WORD
-PULONG :: ^ULONG
-LPWIN32_FIND_DATAW :: ^WIN32_FIND_DATAW
-LPWSADATA :: ^WSADATA
-LPWSAPROTOCOL_INFO :: ^WSAPROTOCOL_INFO
-LPSTR :: ^CHAR
-LPWSTR :: ^WCHAR
-OLECHAR :: WCHAR
-BSTR :: ^OLECHAR
-LPOLESTR :: cstring16
-LPCOLESTR :: LPCSTR
-LPFILETIME :: ^FILETIME
-LPWSABUF :: ^WSABUF
-LPWSAOVERLAPPED :: distinct rawptr
-LPWSAOVERLAPPED_COMPLETION_ROUTINE :: distinct rawptr
-LPCVOID :: rawptr
-SCODE :: LONG
-PSCODE :: ^SCODE
+LPSTARTUPINFOW        :: ^STARTUPINFOW
+LPTRACKMOUSEEVENT     :: ^TRACKMOUSEEVENT
+VOID                  :: rawptr
+PVOID                 :: rawptr
+LPVOID                :: rawptr
+PINT                  :: ^INT
+LPINT                 :: ^INT
+PUINT                 :: ^UINT
+LPUINT                :: ^UINT
+LPWCH                 :: ^WCHAR
+LPWORD                :: ^WORD
+PULONG                :: ^ULONG
+LPWIN32_FIND_DATAW    :: ^WIN32_FIND_DATAW
+LPWSADATA             :: ^WSADATA
+LPWSAPROTOCOL_INFO    :: ^WSAPROTOCOL_INFO
+LPSTR                 :: ^CHAR
+LPWSTR                :: ^WCHAR
+OLECHAR               :: WCHAR
+BSTR                  :: ^OLECHAR
 
-PACCESS_TOKEN :: PVOID
+LPOLESTR   :: cstring16
+LPCOLESTR  :: LPCSTR
+LPFILETIME :: ^FILETIME
+LPWSABUF   :: ^WSABUF
+
+WSAEVENT :: HANDLE
+
+WSAOVERLAPPED :: struct {
+	Internal:     DWORD,
+	InternalHigh: DWORD,
+	Offset:       DWORD,
+	OffsetHigh:   DWORD,
+	hEvent:       WSAEVENT,
+}
+
+LPWSAOVERLAPPED :: ^WSAOVERLAPPED
+LPWSAOVERLAPPED_COMPLETION_ROUTINE :: #type proc "system" (
+	dwError:       DWORD,
+	cbTransferred: DWORD,
+	lpOverlapped:  LPWSAOVERLAPPED,
+	dwFlags:       DWORD,
+)
+
+LPCVOID :: rawptr
+SCODE   :: LONG
+PSCODE  :: ^SCODE
+
+PACCESS_TOKEN        :: PVOID
 PSECURITY_DESCRIPTOR :: PVOID
-PSID :: PVOID
-PCLAIMS_BLOB :: PVOID
+PSID                 :: PVOID
+PCLAIMS_BLOB         :: PVOID
 
 PCONDITION_VARIABLE :: ^CONDITION_VARIABLE
-PLARGE_INTEGER :: ^LARGE_INTEGER
-PSRWLOCK :: ^SRWLOCK
+PLARGE_INTEGER      :: ^LARGE_INTEGER
+PSRWLOCK            :: ^SRWLOCK
 
 CREATE_WAITABLE_TIMER_MANUAL_RESET    :: 0x00000001
 CREATE_WAITABLE_TIMER_HIGH_RESOLUTION :: 0x00000002
@@ -183,28 +201,28 @@ LPSIZE :: ^SIZE
 
 MAXLONG :: 0x7fffffff
 
-FILE_ATTRIBUTE_READONLY: DWORD : 0x00000001
-FILE_ATTRIBUTE_HIDDEN: DWORD : 0x00000002
-FILE_ATTRIBUTE_SYSTEM: DWORD : 0x00000004
-FILE_ATTRIBUTE_DIRECTORY: DWORD : 0x00000010
-FILE_ATTRIBUTE_ARCHIVE: DWORD : 0x00000020
-FILE_ATTRIBUTE_DEVICE: DWORD : 0x00000040
-FILE_ATTRIBUTE_NORMAL: DWORD : 0x00000080
-FILE_ATTRIBUTE_TEMPORARY: DWORD : 0x00000100
-FILE_ATTRIBUTE_SPARSE_FILE: DWORD : 0x00000200
-FILE_ATTRIBUTE_REPARSE_Point: DWORD : 0x00000400
-FILE_ATTRIBUTE_REPARSE_POINT: DWORD : 0x00000400
-FILE_ATTRIBUTE_COMPRESSED: DWORD : 0x00000800
-FILE_ATTRIBUTE_OFFLINE: DWORD : 0x00001000
-FILE_ATTRIBUTE_NOT_CONTENT_INDEXED: DWORD : 0x00002000
-FILE_ATTRIBUTE_ENCRYPTED: DWORD : 0x00004000
+FILE_ATTRIBUTE_READONLY            : DWORD : 0x00000001
+FILE_ATTRIBUTE_HIDDEN              : DWORD : 0x00000002
+FILE_ATTRIBUTE_SYSTEM              : DWORD : 0x00000004
+FILE_ATTRIBUTE_DIRECTORY           : DWORD : 0x00000010
+FILE_ATTRIBUTE_ARCHIVE             : DWORD : 0x00000020
+FILE_ATTRIBUTE_DEVICE              : DWORD : 0x00000040
+FILE_ATTRIBUTE_NORMAL              : DWORD : 0x00000080
+FILE_ATTRIBUTE_TEMPORARY           : DWORD : 0x00000100
+FILE_ATTRIBUTE_SPARSE_FILE         : DWORD : 0x00000200
+FILE_ATTRIBUTE_REPARSE_Point       : DWORD : 0x00000400
+FILE_ATTRIBUTE_REPARSE_POINT       : DWORD : 0x00000400
+FILE_ATTRIBUTE_COMPRESSED          : DWORD : 0x00000800
+FILE_ATTRIBUTE_OFFLINE             : DWORD : 0x00001000
+FILE_ATTRIBUTE_NOT_CONTENT_INDEXED : DWORD : 0x00002000
+FILE_ATTRIBUTE_ENCRYPTED           : DWORD : 0x00004000
 
-FILE_SHARE_READ: DWORD : 0x00000001
-FILE_SHARE_WRITE: DWORD : 0x00000002
-FILE_SHARE_DELETE: DWORD : 0x00000004
-FILE_GENERIC_ALL: DWORD : 0x10000000
-FILE_GENERIC_EXECUTE: DWORD : 0x20000000
-FILE_GENERIC_READ: DWORD : 0x80000000
+FILE_SHARE_READ      : DWORD : 0x00000001
+FILE_SHARE_WRITE     : DWORD : 0x00000002
+FILE_SHARE_DELETE    : DWORD : 0x00000004
+FILE_GENERIC_ALL     : DWORD : 0x10000000
+FILE_GENERIC_EXECUTE : DWORD : 0x20000000
+FILE_GENERIC_READ    : DWORD : 0x80000000
 FILE_ALL_ACCESS :: STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x1FF
 
 FILE_ACTION_ADDED            :: 0x00000001
@@ -222,11 +240,11 @@ FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x00000020
 FILE_NOTIFY_CHANGE_CREATION    :: 0x00000040
 FILE_NOTIFY_CHANGE_SECURITY    :: 0x00000100
 
-CREATE_NEW: DWORD : 1
-CREATE_ALWAYS: DWORD : 2
-OPEN_ALWAYS: DWORD : 4
-OPEN_EXISTING: DWORD : 3
-TRUNCATE_EXISTING: DWORD : 5
+CREATE_NEW        : DWORD : 1
+CREATE_ALWAYS     : DWORD : 2
+OPEN_ALWAYS       : DWORD : 4
+OPEN_EXISTING     : DWORD : 3
+TRUNCATE_EXISTING : DWORD : 5
 
 FILE_READ_DATA            : DWORD : 0x00000001
 FILE_LIST_DIRECTORY       : DWORD : 0x00000001
@@ -248,11 +266,12 @@ GENERIC_WRITE   : DWORD : 0x40000000
 GENERIC_EXECUTE : DWORD : 0x20000000
 GENERIC_ALL     : DWORD : 0x10000000
 
-FILE_GENERIC_WRITE: DWORD : STANDARD_RIGHTS_WRITE |
-	FILE_WRITE_DATA |
+FILE_GENERIC_WRITE : DWORD : \
+	STANDARD_RIGHTS_WRITE |
+	FILE_WRITE_DATA       |
 	FILE_WRITE_ATTRIBUTES |
-	FILE_WRITE_EA |
-	FILE_APPEND_DATA |
+	FILE_WRITE_EA         |
+	FILE_APPEND_DATA      |
 	SYNCHRONIZE
 
 SECURITY_SQOS_PRESENT: DWORD : 0x00100000
@@ -274,7 +293,7 @@ PROTECTED_SACL_SECURITY_INFORMATION      :: 0x40000000
 UNPROTECTED_DACL_SECURITY_INFORMATION    :: 0x20000000
 UNPROTECTED_SACL_SECURITY_INFORMATION    :: 0x10000000
 
-GET_FILEEX_INFO_LEVELS :: distinct i32
+GET_FILEEX_INFO_LEVELS :: distinct c_int
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
 
@@ -297,13 +316,13 @@ POWER_REQUEST_CONTEXT_DETAILED_STRING :: DIAGNOSTIC_REASON_DETAILED_STRING
 
 REASON_CONTEXT :: struct {
 	Version: ULONG,
-	Flags: DWORD,
+	Flags:   DWORD,
 	Reason: struct #raw_union {
 		Detailed: struct {
 			LocalizedReasonModule: HMODULE,
-			LocalizedReasonId: ULONG,
-			ReasonStringCount: ULONG,
-			ReasonStrings: ^LPWSTR,
+			LocalizedReasonId:     ULONG,
+			ReasonStringCount:     ULONG,
+			ReasonStrings:         [^]LPWSTR `fmt:"v,ReasonStringCount"`,
 		},
 		SimpleReasonString: LPWSTR,
 	},
@@ -324,9 +343,9 @@ RRF_RT_ANY           :: 0x0000ffff
 RRF_NOEXPAND         :: 0x10000000
 RRF_ZEROONFAILURE    :: 0x20000000
 
-ACCESS_MASK :: DWORD
+ACCESS_MASK  :: DWORD
 PACCESS_MASK :: ^ACCESS_MASK
-REGSAM :: ACCESS_MASK
+REGSAM       :: ACCESS_MASK
 
 // Reserved Key Handles.
 HKEY_CLASSES_ROOT                :: HKEY(uintptr(0x80000000))
@@ -368,12 +387,13 @@ KEY_WOW64_RES          :: 0x0300
 KEY_READ :: (STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_NOTIFY) & (~SYNCHRONIZE)
 KEY_WRITE :: (STANDARD_RIGHTS_WRITE | KEY_SET_VALUE | KEY_CREATE_SUB_KEY) & (~SYNCHRONIZE)
 KEY_EXECUTE :: (KEY_READ) & (~SYNCHRONIZE)
-KEY_ALL_ACCESS :: (STANDARD_RIGHTS_ALL |
-	KEY_QUERY_VALUE |
-	KEY_SET_VALUE |
-	KEY_CREATE_SUB_KEY |
+KEY_ALL_ACCESS :: (
+	STANDARD_RIGHTS_ALL    |
+	KEY_QUERY_VALUE        |
+	KEY_SET_VALUE          |
+	KEY_CREATE_SUB_KEY     |
 	KEY_ENUMERATE_SUB_KEYS |
-	KEY_NOTIFY |
+	KEY_NOTIFY             |
 	KEY_CREATE_LINK) & (~SYNCHRONIZE)
 
 // Open/Create Options
@@ -385,17 +405,19 @@ REG_OPTION_BACKUP_RESTORE  :: 0x00000004
 REG_OPTION_OPEN_LINK       :: 0x00000008
 REG_OPTION_DONT_VIRTUALIZE :: 0x00000010
 
-REG_LEGAL_OPTION :: REG_OPTION_RESERVED |
-	REG_OPTION_NON_VOLATILE |
-	REG_OPTION_VOLATILE |
-	REG_OPTION_CREATE_LINK |
+REG_LEGAL_OPTION :: \
+	REG_OPTION_RESERVED       |
+	REG_OPTION_NON_VOLATILE   |
+	REG_OPTION_VOLATILE       |
+	REG_OPTION_CREATE_LINK    |
 	REG_OPTION_BACKUP_RESTORE |
-	REG_OPTION_OPEN_LINK |
+	REG_OPTION_OPEN_LINK      |
 	REG_OPTION_DONT_VIRTUALIZE
 
-REG_OPEN_LEGAL_OPTION :: REG_OPTION_RESERVED |
+REG_OPEN_LEGAL_OPTION :: \
+	REG_OPTION_RESERVED       |
 	REG_OPTION_BACKUP_RESTORE |
-	REG_OPTION_OPEN_LINK |
+	REG_OPTION_OPEN_LINK      |
 	REG_OPTION_DONT_VIRTUALIZE
 
 // Key creation/open disposition
@@ -437,10 +459,11 @@ REG_NOTIFY_CHANGE_LAST_SET   :: 0x00000004
 REG_NOTIFY_CHANGE_SECURITY   :: 0x00000008
 REG_NOTIFY_THREAD_AGNOSTIC   :: 0x10000000
 
-REG_LEGAL_CHANGE_FILTER :: REG_NOTIFY_CHANGE_NAME |
+REG_LEGAL_CHANGE_FILTER :: \
+	REG_NOTIFY_CHANGE_NAME       |
 	REG_NOTIFY_CHANGE_ATTRIBUTES |
-	REG_NOTIFY_CHANGE_LAST_SET |
-	REG_NOTIFY_CHANGE_SECURITY |
+	REG_NOTIFY_CHANGE_LAST_SET   |
+	REG_NOTIFY_CHANGE_SECURITY   |
 	REG_NOTIFY_THREAD_AGNOSTIC
 
 // Predefined Value Types.
@@ -461,9 +484,9 @@ REG_QWORD_LITTLE_ENDIAN        :: 11
 
 BSMINFO :: struct {
 	cbSize: UINT,
-	hdesk: HDESK,
-	hwnd: HWND,
-	luid: LUID,
+	hdesk:  HDESK,
+	hwnd:   HWND,
+	luid:   LUID,
 }
 PBSMINFO :: ^BSMINFO
 
@@ -545,37 +568,37 @@ COLOR_BTNHILIGHT  :: COLOR_BTNHIGHLIGHT
 
 // Common Control Notification Code Ranges
 NM_FIRST   :: 0
-NM_LAST    :: ~DWORD(99 - 1)
-LVN_FIRST  :: ~DWORD(100 - 1)
-LVN_LAST   :: ~DWORD(199 - 1)
-HDN_FIRST  :: ~DWORD(300 - 1)
-HDN_LAST   :: ~DWORD(399 - 1)
-TVN_FIRST  :: ~DWORD(400 - 1)
-TVN_LAST   :: ~DWORD(499 - 1)
-TTN_FIRST  :: ~DWORD(520 - 1)
-TTN_LAST   :: ~DWORD(549 - 1)
-TCN_FIRST  :: ~DWORD(550 - 1)
-TCN_LAST   :: ~DWORD(580 - 1)
-CDN_FIRST  :: ~DWORD(601 - 1)
-CDN_LAST   :: ~DWORD(699 - 1)
-TBN_FIRST  :: ~DWORD(700 - 1)
-TBN_LAST   :: ~DWORD(720 - 1)
-UDN_FIRST  :: ~DWORD(721 - 1)
-UDN_LAST   :: ~DWORD(740 - 1)
-MCN_FIRST  :: ~DWORD(750 - 1)
-MCN_LAST   :: ~DWORD(759 - 1)
-DTN_FIRST  :: ~DWORD(760 - 1)
-DTN_LAST   :: ~DWORD(799 - 1)
-CBEN_FIRST :: ~DWORD(800 - 1)
-CBEN_LAST  :: ~DWORD(830 - 1)
-RBN_FIRST  :: ~DWORD(831 - 1)
-RBN_LAST   :: ~DWORD(859 - 1)
-IPN_FIRST  :: ~DWORD(860 - 1)
-IPN_LAST   :: ~DWORD(879 - 1)
-SBN_FIRST  :: ~DWORD(880 - 1)
-SBN_LAST   :: ~DWORD(899 - 1)
-PGN_FIRST  :: ~DWORD(900 - 1)
-PGN_LAST   :: ~DWORD(950 - 1)
+NM_LAST    :: ~DWORD(  99 - 1)
+LVN_FIRST  :: ~DWORD( 100 - 1)
+LVN_LAST   :: ~DWORD( 199 - 1)
+HDN_FIRST  :: ~DWORD( 300 - 1)
+HDN_LAST   :: ~DWORD( 399 - 1)
+TVN_FIRST  :: ~DWORD( 400 - 1)
+TVN_LAST   :: ~DWORD( 499 - 1)
+TTN_FIRST  :: ~DWORD( 520 - 1)
+TTN_LAST   :: ~DWORD( 549 - 1)
+TCN_FIRST  :: ~DWORD( 550 - 1)
+TCN_LAST   :: ~DWORD( 580 - 1)
+CDN_FIRST  :: ~DWORD( 601 - 1)
+CDN_LAST   :: ~DWORD( 699 - 1)
+TBN_FIRST  :: ~DWORD( 700 - 1)
+TBN_LAST   :: ~DWORD( 720 - 1)
+UDN_FIRST  :: ~DWORD( 721 - 1)
+UDN_LAST   :: ~DWORD( 740 - 1)
+MCN_FIRST  :: ~DWORD( 750 - 1)
+MCN_LAST   :: ~DWORD( 759 - 1)
+DTN_FIRST  :: ~DWORD( 760 - 1)
+DTN_LAST   :: ~DWORD( 799 - 1)
+CBEN_FIRST :: ~DWORD( 800 - 1)
+CBEN_LAST  :: ~DWORD( 830 - 1)
+RBN_FIRST  :: ~DWORD( 831 - 1)
+RBN_LAST   :: ~DWORD( 859 - 1)
+IPN_FIRST  :: ~DWORD( 860 - 1)
+IPN_LAST   :: ~DWORD( 879 - 1)
+SBN_FIRST  :: ~DWORD( 880 - 1)
+SBN_LAST   :: ~DWORD( 899 - 1)
+PGN_FIRST  :: ~DWORD( 900 - 1)
+PGN_LAST   :: ~DWORD( 950 - 1)
 WMN_FIRST  :: ~DWORD(1000 - 1)
 WMN_LAST   :: ~DWORD(1200 - 1)
 BCN_FIRST  :: ~DWORD(1250 - 1)
@@ -1255,61 +1278,61 @@ HOOKPROC :: #type proc "system" (code: c_int, wParam: WPARAM, lParam: LPARAM) ->
 
 WINEVENTPROC :: #type proc "system" (
 	hWinEventHook: HWINEVENTHOOK,
-	event: DWORD,
-	hwnd: HWND,
-	idObject, idChild: LONG,
+	event:         DWORD,
+	hwnd:          HWND,
+	idObject,      idChild: LONG,
 	idEventThread, dwmsEventTime: DWORD,
 )
 
 CWPRETSTRUCT :: struct {
 	lResult: LRESULT,
-	lParam: LPARAM,
-	wParam: WPARAM,
+	lParam:  LPARAM,
+	wParam:  WPARAM,
 	message: UINT,
-	hwnd: HWND,
+	hwnd:    HWND,
 }
 
 MSLLHOOKSTRUCT :: struct {
-	pt: POINT,
-	mouseData: DWORD,
-	flags: DWORD,
-	time: DWORD,
+	pt:          POINT,
+	mouseData:   DWORD,
+	flags:       DWORD,
+	time:        DWORD,
 	dwExtraInfo: ULONG_PTR,
 }
 
 KBDLLHOOKSTRUCT :: struct {
-	vkCode: DWORD,
-	scanCode: DWORD,
-	flags: DWORD,
-	time: DWORD,
+	vkCode:      DWORD,
+	scanCode:    DWORD,
+	flags:       DWORD,
+	time:        DWORD,
 	dwExtraInfo: ULONG_PTR,
 }
 
 MOUSEINPUT :: struct {
-	dx: LONG,
-	dy: LONG,
-	mouseData: DWORD,
-	dwFlags: DWORD,
-	time: DWORD,
+	dx:          LONG,
+	dy:          LONG,
+	mouseData:   DWORD,
+	dwFlags:     DWORD,
+	time:        DWORD,
 	dwExtraInfo: ULONG_PTR,
 }
 
 KEYBDINPUT :: struct {
-	wVk: WORD,
-	wScan: WORD,
-	dwFlags: DWORD,
-	time: DWORD,
+	wVk:         WORD,
+	wScan:       WORD,
+	dwFlags:     DWORD,
+	time:        DWORD,
 	dwExtraInfo: ULONG_PTR,
 }
 
 HARDWAREINPUT :: struct {
-	uMsg: DWORD,
+	uMsg:    DWORD,
 	wParamL: WORD,
 	wParamH: WORD,
 }
 
 INPUT_TYPE :: enum DWORD {
-	MOUSE = 0,
+	MOUSE    = 0,
 	KEYBOARD = 1,
 	HARDWARE = 2,
 }
@@ -1317,128 +1340,128 @@ INPUT_TYPE :: enum DWORD {
 INPUT :: struct {
 	type: INPUT_TYPE,
 	using _: struct #raw_union {
-		mi: MOUSEINPUT,
-		ki: KEYBDINPUT,
-		hi: HARDWAREINPUT,
+		mi: MOUSEINPUT    `raw_union_tag:"type=MOUSE"`,
+		ki: KEYBDINPUT    `raw_union_tag:"type=KEYBOARD"`,
+		hi: HARDWAREINPUT `raw_union_tag:"type=HARDWARE"`,
 	},
 }
 
-MOUSEEVENTF_MOVE :: 0x0001
-MOUSEEVENTF_LEFTDOWN :: 0x0002
-MOUSEEVENTF_LEFTUP :: 0x0004
-MOUSEEVENTF_RIGHTDOWN :: 0x0008
-MOUSEEVENTF_RIGHTUP :: 0x0010
-MOUSEEVENTF_MIDDLEDOWN :: 0x0020
-MOUSEEVENTF_MIDDLEUP :: 0x0040
-MOUSEEVENTF_XDOWN :: 0x0080
-MOUSEEVENTF_XUP :: 0x0100
-MOUSEEVENTF_WHEEL :: 0x0800
-MOUSEEVENTF_HWHEEL :: 0x1000
+MOUSEEVENTF_MOVE            :: 0x0001
+MOUSEEVENTF_LEFTDOWN        :: 0x0002
+MOUSEEVENTF_LEFTUP          :: 0x0004
+MOUSEEVENTF_RIGHTDOWN       :: 0x0008
+MOUSEEVENTF_RIGHTUP         :: 0x0010
+MOUSEEVENTF_MIDDLEDOWN      :: 0x0020
+MOUSEEVENTF_MIDDLEUP        :: 0x0040
+MOUSEEVENTF_XDOWN           :: 0x0080
+MOUSEEVENTF_XUP             :: 0x0100
+MOUSEEVENTF_WHEEL           :: 0x0800
+MOUSEEVENTF_HWHEEL          :: 0x1000
 MOUSEEVENTF_MOVE_NOCOALESCE :: 0x2000
-MOUSEEVENTF_VIRTUALDESK :: 0x4000
-MOUSEEVENTF_ABSOLUTE :: 0x8000
+MOUSEEVENTF_VIRTUALDESK     :: 0x4000
+MOUSEEVENTF_ABSOLUTE        :: 0x8000
 
 WNDCLASSA :: struct {
-	style: UINT,
-	lpfnWndProc: WNDPROC,
-	cbClsExtra: c_int,
-	cbWndExtra: c_int,
-	hInstance: HINSTANCE,
-	hIcon: HICON,
-	hCursor: HCURSOR,
+	style:         UINT,
+	lpfnWndProc:   WNDPROC,
+	cbClsExtra:    c_int,
+	cbWndExtra:    c_int,
+	hInstance:     HINSTANCE,
+	hIcon:         HICON,
+	hCursor:       HCURSOR,
 	hbrBackground: HBRUSH,
-	lpszMenuName: LPCSTR,
+	lpszMenuName:  LPCSTR,
 	lpszClassName: LPCSTR,
 }
 
 WNDCLASSW :: struct {
-	style: UINT,
-	lpfnWndProc: WNDPROC,
-	cbClsExtra: c_int,
-	cbWndExtra: c_int,
-	hInstance: HINSTANCE,
-	hIcon: HICON,
-	hCursor: HCURSOR,
+	style:         UINT,
+	lpfnWndProc:   WNDPROC,
+	cbClsExtra:    c_int,
+	cbWndExtra:    c_int,
+	hInstance:     HINSTANCE,
+	hIcon:         HICON,
+	hCursor:       HCURSOR,
 	hbrBackground: HBRUSH,
-	lpszMenuName: LPCWSTR,
+	lpszMenuName:  LPCWSTR,
 	lpszClassName: LPCWSTR,
 }
 
 WNDCLASSEXA :: struct {
-	cbSize: UINT,
-	style: UINT,
-	lpfnWndProc: WNDPROC,
-	cbClsExtra: c_int,
-	cbWndExtra: c_int,
-	hInstance: HINSTANCE,
-	hIcon: HICON,
-	hCursor: HCURSOR,
+	cbSize:        UINT,
+	style:         UINT,
+	lpfnWndProc:   WNDPROC,
+	cbClsExtra:    c_int,
+	cbWndExtra:    c_int,
+	hInstance:     HINSTANCE,
+	hIcon:         HICON,
+	hCursor:       HCURSOR,
 	hbrBackground: HBRUSH,
-	lpszMenuName: LPCSTR,
+	lpszMenuName:  LPCSTR,
 	lpszClassName: LPCSTR,
-	hIconSm: HICON,
+	hIconSm:       HICON,
 }
 
 WNDCLASSEXW :: struct {
-	cbSize: UINT,
-	style: UINT,
-	lpfnWndProc: WNDPROC,
-	cbClsExtra: c_int,
-	cbWndExtra: c_int,
-	hInstance: HINSTANCE,
-	hIcon: HICON,
-	hCursor: HCURSOR,
+	cbSize:        UINT,
+	style:         UINT,
+	lpfnWndProc:   WNDPROC,
+	cbClsExtra:    c_int,
+	cbWndExtra:    c_int,
+	hInstance:     HINSTANCE,
+	hIcon:         HICON,
+	hCursor:       HCURSOR,
 	hbrBackground: HBRUSH,
-	lpszMenuName: LPCWSTR,
+	lpszMenuName:  LPCWSTR,
 	lpszClassName: LPCWSTR,
-	hIconSm: HICON,
+	hIconSm:       HICON,
 }
 
 MSG :: struct {
-	hwnd: HWND,
+	hwnd:    HWND,
 	message: UINT,
-	wParam: WPARAM,
-	lParam: LPARAM,
-	time: DWORD,
-	pt: POINT,
+	wParam:  WPARAM,
+	lParam:  LPARAM,
+	time:    DWORD,
+	pt:      POINT,
 }
 
 LPMSG :: ^MSG
 
 NOTIFYICONDATAW :: struct {
-	cbSize: DWORD,
-	hWnd: HWND,
-	uID: UINT,
-	uFlags: UINT,
+	cbSize:           DWORD,
+	hWnd:             HWND,
+	uID:              UINT,
+	uFlags:           UINT,
 	uCallbackMessage: UINT,
-	hIcon: HICON,
-	szTip: [128]WCHAR,
-	dwState: DWORD,
-	dwStateMask: DWORD,
-	szInfo: [256]WCHAR,
+	hIcon:            HICON,
+	szTip:            [128]WCHAR,
+	dwState:          DWORD,
+	dwStateMask:      DWORD,
+	szInfo:           [256]WCHAR,
 	using _: struct #raw_union {
 		uTimeout: UINT,
 		uVersion: UINT,
 	},
-	szInfoTitle: [64]WCHAR,
-	dwInfoFlags: DWORD,
-	guidItem: GUID,
+	szInfoTitle:  [64]WCHAR,
+	dwInfoFlags:  DWORD,
+	guidItem:     GUID,
 	hBalloonIcon: HICON,
 }
 
-NIF_MESSAGE :: 0x00000001
-NIF_ICON :: 0x00000002
-NIF_TIP :: 0x00000004
-NIF_STATE :: 0x00000008
-NIF_INFO :: 0x00000010
-NIF_GUID :: 0x00000020
+NIF_MESSAGE  :: 0x00000001
+NIF_ICON     :: 0x00000002
+NIF_TIP      :: 0x00000004
+NIF_STATE    :: 0x00000008
+NIF_INFO     :: 0x00000010
+NIF_GUID     :: 0x00000020
 NIF_REALTIME :: 0x00000040
-NIF_SHOWTIP :: 0x00000080
+NIF_SHOWTIP  :: 0x00000080
 
-NIM_ADD :: 0x00000000
-NIM_MODIFY :: 0x00000001
-NIM_DELETE :: 0x00000002
-NIM_SETFOCUS :: 0x00000003
+NIM_ADD        :: 0x00000000
+NIM_MODIFY     :: 0x00000001
+NIM_DELETE     :: 0x00000002
+NIM_SETFOCUS   :: 0x00000003
 NIM_SETVERSION :: 0x00000004
 
 // Menu flags for Add/Check/EnableMenuItem()
@@ -1448,37 +1471,37 @@ MF_APPEND :: 0x00000100
 MF_DELETE :: 0x00000200
 MF_REMOVE :: 0x00001000
 
-MF_BYCOMMAND :: 0x00000000
+MF_BYCOMMAND  :: 0x00000000
 MF_BYPOSITION :: 0x00000400
 
 MF_SEPARATOR :: 0x00000800
 
-MF_ENABLED :: 0x00000000
-MF_GRAYED :: 0x00000001
+MF_ENABLED  :: 0x00000000
+MF_GRAYED   :: 0x00000001
 MF_DISABLED :: 0x00000002
 
-MF_UNCHECKED :: 0x00000000
-MF_CHECKED :: 0x00000008
+MF_UNCHECKED       :: 0x00000000
+MF_CHECKED         :: 0x00000008
 MF_USECHECKBITMAPS :: 0x00000200
 
-MF_STRING :: 0x00000000
-MF_BITMAP :: 0x00000004
+MF_STRING    :: 0x00000000
+MF_BITMAP    :: 0x00000004
 MF_OWNERDRAW :: 0x00000100
 
-MF_POPUP :: 0x00000010
+MF_POPUP        :: 0x00000010
 MF_MENUBARBREAK :: 0x00000020
-MF_MENUBREAK :: 0x00000040
+MF_MENUBREAK    :: 0x00000040
 
 MF_UNHILITE :: 0x00000000
-MF_HILITE :: 0x00000080
+MF_HILITE   :: 0x00000080
 
-MF_DEFAULT :: 0x00001000
-MF_SYSMENU :: 0x00002000
-MF_HELP :: 0x00004000
+MF_DEFAULT      :: 0x00001000
+MF_SYSMENU      :: 0x00002000
+MF_HELP         :: 0x00004000
 MF_RIGHTJUSTIFY :: 0x00004000
 
 MF_MOUSESELECT :: 0x00008000
-MF_END :: 0x00000080  // Obsolete -- only used by old RES files
+MF_END         :: 0x00000080  // Obsolete -- only used by old RES files
 
 // Menu flags for Add/Check/EnableMenuItem()
 MFS_GRAYED    :: 0x00000003
@@ -1491,27 +1514,27 @@ MFS_UNHILITE  :: MF_UNHILITE
 MFS_DEFAULT   :: MF_DEFAULT
 
 // Flags for TrackPopupMenu
-TPM_LEFTBUTTON :: 0x0000
-TPM_RIGHTBUTTON :: 0x0002
-TPM_LEFTALIGN :: 0x0000
-TPM_CENTERALIGN :: 0x0004
-TPM_RIGHTALIGN :: 0x0008
-TPM_TOPALIGN :: 0x0000
+TPM_LEFTBUTTON   :: 0x0000
+TPM_RIGHTBUTTON  :: 0x0002
+TPM_LEFTALIGN    :: 0x0000
+TPM_CENTERALIGN  :: 0x0004
+TPM_RIGHTALIGN   :: 0x0008
+TPM_TOPALIGN     :: 0x0000
 TPM_VCENTERALIGN :: 0x0010
-TPM_BOTTOMALIGN :: 0x0020
+TPM_BOTTOMALIGN  :: 0x0020
 
-TPM_HORIZONTAL :: 0x0000     /* Horz alignment matters more */
-TPM_VERTICAL :: 0x0040     /* Vert alignment matters more */
-TPM_NONOTIFY :: 0x0080     /* Don't send any notification msgs */
-TPM_RETURNCMD :: 0x0100
-TPM_RECURSE :: 0x0001
+TPM_HORIZONTAL      :: 0x0000     /* Horz alignment matters more */
+TPM_VERTICAL        :: 0x0040     /* Vert alignment matters more */
+TPM_NONOTIFY        :: 0x0080     /* Don't send any notification msgs */
+TPM_RETURNCMD       :: 0x0100
+TPM_RECURSE         :: 0x0001
 TPM_HORPOSANIMATION :: 0x0400
 TPM_HORNEGANIMATION :: 0x0800
 TPM_VERPOSANIMATION :: 0x1000
 TPM_VERNEGANIMATION :: 0x2000
-TPM_NOANIMATION :: 0x4000
-TPM_LAYOUTRTL :: 0x8000
-TPM_WORKAREA :: 0x10000
+TPM_NOANIMATION     :: 0x4000
+TPM_LAYOUTRTL       :: 0x8000
+TPM_WORKAREA        :: 0x10000
 
 // WM_NCHITTEST and MOUSEHOOKSTRUCT Mouse Position Codes
 HTERROR       :: -2
@@ -1545,42 +1568,42 @@ HTCLOSE       :: 20
 HTHELP        :: 21
 
 TEXTMETRICW :: struct {
-	tmHeight: LONG,
-	tmAscent: LONG,
-	tmDescent: LONG,
-	tmInternalLeading: LONG,
-	tmExternalLeading: LONG,
-	tmAveCharWidth: LONG,
-	tmMaxCharWidth: LONG,
-	tmWeight: LONG,
-	tmOverhang: LONG,
+	tmHeight:           LONG,
+	tmAscent:           LONG,
+	tmDescent:          LONG,
+	tmInternalLeading:  LONG,
+	tmExternalLeading:  LONG,
+	tmAveCharWidth:     LONG,
+	tmMaxCharWidth:     LONG,
+	tmWeight:           LONG,
+	tmOverhang:         LONG,
 	tmDigitizedAspectX: LONG,
 	tmDigitizedAspectY: LONG,
-	tmFirstChar: WCHAR,
-	tmLastChar: WCHAR,
-	tmDefaultChar: WCHAR,
-	tmBreakChar: WCHAR,
-	tmItalic: BYTE,
-	tmUnderlined: BYTE,
-	tmStruckOut: BYTE,
-	tmPitchAndFamily: BYTE,
-	tmCharSet: BYTE,
+	tmFirstChar:        WCHAR,
+	tmLastChar:         WCHAR,
+	tmDefaultChar:      WCHAR,
+	tmBreakChar:        WCHAR,
+	tmItalic:           BYTE,
+	tmUnderlined:       BYTE,
+	tmStruckOut:        BYTE,
+	tmPitchAndFamily:   BYTE,
+	tmCharSet:          BYTE,
 }
 LPTEXTMETRICW :: ^TEXTMETRICW
 
 PAINTSTRUCT :: struct {
-	hdc: HDC,
-	fErase: BOOL,
-	rcPaint: RECT,
-	fRestore: BOOL,
-	fIncUpdate: BOOL,
+	hdc:         HDC,
+	fErase:      BOOL,
+	rcPaint:     RECT,
+	fRestore:    BOOL,
+	fIncUpdate:  BOOL,
 	rgbReserved: [32]BYTE,
 }
 
 TRACKMOUSEEVENT :: struct {
-	cbSize: DWORD,
-	dwFlags: DWORD,
-	hwndTrack: HWND,
+	cbSize:      DWORD,
+	dwFlags:     DWORD,
+	hwndTrack:   HWND,
 	dwHoverTime: DWORD,
 }
 
@@ -1640,16 +1663,16 @@ MAX_LINKID_TEXT :: 48
 L_MAX_URL_LENGTH :: 2048 + 32 + len("://")
 
 LITEM :: struct {
-	mask: UINT,
-	iLink: c_int,
-	state: UINT,
+	mask:      UINT,
+	iLink:     c_int,
+	state:     UINT,
 	stateMask: UINT,
-	szID: [MAX_LINKID_TEXT]WCHAR,
-	szUrl: [L_MAX_URL_LENGTH]WCHAR,
+	szID:      [MAX_LINKID_TEXT]WCHAR,
+	szUrl:     [L_MAX_URL_LENGTH]WCHAR,
 }
 
 NMLINK :: struct {
-	hdr: NMHDR,
+	hdr:  NMHDR,
 	item: LITEM,
 }
 
@@ -1660,12 +1683,12 @@ NMHDR :: struct {
 }
 
 NMCUSTOMDRAW :: struct {
-	hdr: NMHDR,
+	hdr:         NMHDR,
 	dwDrawStage: DWORD,
-	hdc: HDC,
-	rc: RECT,
-	dwItemSpec: DWORD_PTR,
-	uItemState: UINT,
+	hdc:         HDC,
+	rc:          RECT,
+	dwItemSpec:  DWORD_PTR,
+	uItemState:  UINT,
 	lItemlParam: LPARAM,
 }
 
@@ -1701,14 +1724,14 @@ NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING stru
 PCZZWSTR :: cstring16
 
 SHFILEOPSTRUCTW :: struct {
-	hwnd: HWND,
-	wFunc: UINT,
-	pFrom: PCZZWSTR,
-	pTo: PCZZWSTR,
-	fFlags: FILEOP_FLAGS,
+	hwnd:                  HWND,
+	wFunc:                 UINT,
+	pFrom:                 PCZZWSTR,
+	pTo:                   PCZZWSTR,
+	fFlags:                FILEOP_FLAGS,
 	fAnyOperationsAborted: BOOL,
-	hNameMappings: LPVOID,
-	lpszProgressTitle: PCWSTR, // only used if FOF_SIMPLEPROGRESS
+	hNameMappings:         LPVOID,
+	lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
 }
 LPSHFILEOPSTRUCTW :: ^SHFILEOPSTRUCTW
 
@@ -1741,7 +1764,7 @@ FOF_NO_UI                 :: (FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | 
 FILEOP_FLAGS :: WORD
 
 DEVMODEW :: struct {
-	dmDeviceName:   [32]wchar_t,
+	dmDeviceName:    [32]wchar_t,
 	dmSpecVersion:   WORD,
 	dmDriverVersion: WORD,
 	dmSize:          WORD,
@@ -1887,7 +1910,7 @@ WS_MINIMIZE         : UINT : 0x2000_0000
 WS_MINIMIZEBOX      : UINT : 0x0002_0000
 WS_OVERLAPPED       : UINT : 0x0000_0000
 WS_OVERLAPPEDWINDOW : UINT : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
-WS_POPUP			: UINT : 0x8000_0000
+WS_POPUP            : UINT : 0x8000_0000
 WS_POPUPWINDOW      : UINT : WS_POPUP | WS_BORDER | WS_SYSMENU
 WS_SIZEBOX          : UINT : 0x0004_0000
 WS_SYSMENU          : UINT : 0x0008_0000
@@ -2227,24 +2250,24 @@ SEE_MASK_FLAG_LOG_USAGE    :: 0x04000000
 SEE_MASK_FLAG_HINST_IS_SITE :: 0x08000000
 
 SHELLEXECUTEINFOW :: struct {
-	cbSize: DWORD,               // in, required, sizeof of this structure
-	fMask: ULONG,                // in, SEE_MASK_XXX values
-	hwnd: HWND,                  // in, optional
-	lpVerb: LPCWSTR,            // in, optional when unspecified the default verb is choosen
-	lpFile: LPCWSTR,            // in, either this value or lpIDList must be specified
-	lpParameters: LPCWSTR,      // in, optional
-	lpDirectory: LPCWSTR,       // in, optional
-	nShow: c.int,                  // in, required
-	hInstApp: HINSTANCE,         // out when SEE_MASK_NOCLOSEPROCESS is specified
-	lpIDList: rawptr,             // in, valid when SEE_MASK_IDLIST is specified, PCIDLIST_ABSOLUTE, for use with SEE_MASK_IDLIST & SEE_MASK_INVOKEIDLIST
-	lpClass: LPCWSTR,           // in, valid when SEE_MASK_CLASSNAME is specified
-	hkeyClass: HKEY,             // in, valid when SEE_MASK_CLASSKEY is specified
-	dwHotKey: DWORD,             // in, valid when SEE_MASK_HOTKEY is specified
-	DUMMYUNIONNAME: struct #raw_union {
-		hIcon: HANDLE,           // not used
-		hMonitor: HANDLE,        // in, valid when SEE_MASK_HMONITOR specified
+	cbSize:       DWORD,     // in, required, sizeof of this structure
+	fMask:        ULONG,     // in, SEE_MASK_XXX values
+	hwnd:         HWND,      // in, optional
+	lpVerb:       LPCWSTR,   // in, optional when unspecified the default verb is choosen
+	lpFile:       LPCWSTR,   // in, either this value or lpIDList must be specified
+	lpParameters: LPCWSTR,   // in, optional
+	lpDirectory:  LPCWSTR,   // in, optional
+	nShow:        c_int,     // in, required
+	hInstApp:     HINSTANCE, // out when SEE_MASK_NOCLOSEPROCESS is specified
+	lpIDList:     rawptr,    // in, valid when SEE_MASK_IDLIST is specified, PCIDLIST_ABSOLUTE, for use with SEE_MASK_IDLIST & SEE_MASK_INVOKEIDLIST
+	lpClass:      LPCWSTR,   // in, valid when SEE_MASK_CLASSNAME is specified
+	hkeyClass:    HKEY,      // in, valid when SEE_MASK_CLASSKEY is specified
+	dwHotKey:     DWORD,     // in, valid when SEE_MASK_HOTKEY is specified
+	using DUMMYUNIONNAME: struct #raw_union {
+		hIcon:    HANDLE, // not used
+		hMonitor: HANDLE, // in, valid when SEE_MASK_HMONITOR specified
 	},
-	hProcess: HANDLE,            // out, valid when SEE_MASK_NOCLOSEPROCESS specified
+	hProcess: HANDLE, // out, valid when SEE_MASK_NOCLOSEPROCESS specified
 }
 LPSHELLEXECUTEINFOW :: ^SHELLEXECUTEINFOW
 
@@ -2291,9 +2314,9 @@ WA_CLICKACTIVE :: 2
 
 // Struct pointed to by WM_GETMINMAXINFO lParam
 MINMAXINFO :: struct {
-	ptReserved: POINT,
-	ptMaxSize: POINT,
-	ptMaxPosition: POINT,
+	ptReserved:     POINT,
+	ptMaxSize:      POINT,
+	ptMaxPosition:  POINT,
 	ptMinTrackSize: POINT,
 	ptMaxTrackSize: POINT,
 }
@@ -2514,53 +2537,53 @@ STOCK_LAST          :: 19
 CLR_INVALID :: 0xFFFFFFFF
 
 RGBQUAD :: struct {
-	rgbBlue: BYTE,
-	rgbGreen: BYTE,
-	rgbRed: BYTE,
+	rgbBlue:     BYTE,
+	rgbGreen:    BYTE,
+	rgbRed:      BYTE,
 	rgbReserved: BYTE,
 }
 
 PIXELFORMATDESCRIPTOR :: struct {
-	nSize: WORD,
-	nVersion: WORD,
-	dwFlags: DWORD,
-	iPixelType: BYTE,
-	cColorBits: BYTE,
-	cRedBits: BYTE,
-	cRedShift: BYTE,
-	cGreenBits: BYTE,
-	cGreenShift: BYTE,
-	cBlueBits: BYTE,
-	cBlueShift: BYTE,
-	cAlphaBits: BYTE,
-	cAlphaShift: BYTE,
-	cAccumBits: BYTE,
-	cAccumRedBits: BYTE,
+	nSize:           WORD,
+	nVersion:        WORD,
+	dwFlags:         DWORD,
+	iPixelType:      BYTE,
+	cColorBits:      BYTE,
+	cRedBits:        BYTE,
+	cRedShift:       BYTE,
+	cGreenBits:      BYTE,
+	cGreenShift:     BYTE,
+	cBlueBits:       BYTE,
+	cBlueShift:      BYTE,
+	cAlphaBits:      BYTE,
+	cAlphaShift:     BYTE,
+	cAccumBits:      BYTE,
+	cAccumRedBits:   BYTE,
 	cAccumGreenBits: BYTE,
-	cAccumBlueBits: BYTE,
+	cAccumBlueBits:  BYTE,
 	cAccumAlphaBits: BYTE,
-	cDepthBits: BYTE,
-	cStencilBits: BYTE,
-	cAuxBuffers: BYTE,
-	iLayerType: BYTE,
-	bReserved: BYTE,
-	dwLayerMask: DWORD,
-	dwVisibleMask: DWORD,
-	dwDamageMask: DWORD,
+	cDepthBits:      BYTE,
+	cStencilBits:    BYTE,
+	cAuxBuffers:     BYTE,
+	iLayerType:      BYTE,
+	bReserved:       BYTE,
+	dwLayerMask:     DWORD,
+	dwVisibleMask:   DWORD,
+	dwDamageMask:    DWORD,
 }
 
 BITMAPINFOHEADER :: struct {
-	biSize: DWORD,
-	biWidth: LONG,
-	biHeight: LONG,
-	biPlanes: WORD,
-	biBitCount: WORD,
-	biCompression: DWORD,
-	biSizeImage: DWORD,
+	biSize:          DWORD,
+	biWidth:         LONG,
+	biHeight:        LONG,
+	biPlanes:        WORD,
+	biBitCount:      WORD,
+	biCompression:   DWORD,
+	biSizeImage:     DWORD,
 	biXPelsPerMeter: LONG,
 	biYPelsPerMeter: LONG,
-	biClrUsed: DWORD,
-	biClrImportant: DWORD,
+	biClrUsed:       DWORD,
+	biClrImportant:  DWORD,
 }
 
 BITMAPINFO :: struct {
@@ -2668,64 +2691,64 @@ CONDITION_VARIABLE_INIT :: CONDITION_VARIABLE{}
 SRWLOCK_INIT :: SRWLOCK{}
 
 // Flags in STARTUPINFOW.dwFlags.
-STARTF_USESHOWWINDOW: DWORD :    0x00000001
-STARTF_USESIZE: DWORD :          0x00000002
-STARTF_USEPOSITION: DWORD :      0x00000004
-STARTF_USECOUNTCHARS: DWORD :    0x00000008
-STARTF_USEFILLATTRIBUTE: DWORD : 0x00000010
-STARTF_RUNFULLSCREEN: DWORD :    0x00000020  // ignored for non-x86 platforms
-STARTF_FORCEONFEEDBACK: DWORD :  0x00000040
-STARTF_FORCEOFFFEEDBACK: DWORD : 0x00000080
-STARTF_USESTDHANDLES: DWORD :    0x00000100
+STARTF_USESHOWWINDOW    : DWORD : 0x00000001
+STARTF_USESIZE          : DWORD : 0x00000002
+STARTF_USEPOSITION      : DWORD : 0x00000004
+STARTF_USECOUNTCHARS    : DWORD : 0x00000008
+STARTF_USEFILLATTRIBUTE : DWORD : 0x00000010
+STARTF_RUNFULLSCREEN    : DWORD : 0x00000020  // ignored for non-x86 platforms
+STARTF_FORCEONFEEDBACK  : DWORD : 0x00000040
+STARTF_FORCEOFFFEEDBACK : DWORD : 0x00000080
+STARTF_USESTDHANDLES    : DWORD : 0x00000100
 // WINVER >= 0x400
-STARTF_USEHOTKEY: DWORD :        0x00000200
-STARTF_TITLEISLINKNAME: DWORD :  0x00000800
-STARTF_TITLEISAPPID: DWORD :     0x00001000
-STARTF_PREVENTPINNING: DWORD :   0x00002000
+STARTF_USEHOTKEY        : DWORD : 0x00000200
+STARTF_TITLEISLINKNAME  : DWORD : 0x00000800
+STARTF_TITLEISAPPID     : DWORD : 0x00001000
+STARTF_PREVENTPINNING   : DWORD : 0x00002000
 // WINVER >= 0x600
-STARTF_UNTRUSTEDSOURCE: DWORD :  0x00008000
+STARTF_UNTRUSTEDSOURCE  : DWORD : 0x00008000
 
 
 VOLUME_NAME_DOS: DWORD : 0x0
 
-MOVEFILE_COPY_ALLOWED: DWORD: 0x2
-MOVEFILE_CREATE_HARDLINK: DWORD: 0x10
-MOVEFILE_DELAY_UNTIL_REBOOT: DWORD: 0x4
-MOVEFILE_FAIL_IF_NOT_TRACKABLE: DWORD: 0x20
-MOVEFILE_REPLACE_EXISTING: DWORD : 0x1
-MOVEFILE_WRITE_THROUGH: DWORD: 0x8
+MOVEFILE_COPY_ALLOWED          : DWORD : 0x2
+MOVEFILE_CREATE_HARDLINK       : DWORD : 0x10
+MOVEFILE_DELAY_UNTIL_REBOOT    : DWORD : 0x4
+MOVEFILE_FAIL_IF_NOT_TRACKABLE : DWORD : 0x20
+MOVEFILE_REPLACE_EXISTING      : DWORD : 0x1
+MOVEFILE_WRITE_THROUGH         : DWORD : 0x8
 
-FILE_BEGIN: DWORD : 0
-FILE_CURRENT: DWORD : 1
-FILE_END: DWORD : 2
+FILE_BEGIN   : DWORD : 0
+FILE_CURRENT : DWORD : 1
+FILE_END     : DWORD : 2
 
-WAIT_OBJECT_0: DWORD : 0x00000000
-WAIT_TIMEOUT: DWORD : 258
-WAIT_FAILED: DWORD : 0xFFFFFFFF
+WAIT_OBJECT_0 : DWORD : 0x00000000
+WAIT_TIMEOUT  : DWORD : 258
+WAIT_FAILED   : DWORD : 0xFFFFFFFF
 
-FILE_FLAG_WRITE_THROUGH: DWORD :       0x80000000
-FILE_FLAG_OVERLAPPED: DWORD :          0x40000000
-FILE_FLAG_NO_BUFFERING: DWORD :        0x20000000
-FILE_FLAG_RANDOM_ACCESS: DWORD :       0x10000000
-FILE_FLAG_SEQUENTIAL_SCAN: DWORD :     0x08000000
-FILE_FLAG_DELETE_ON_CLOSE: DWORD :     0x04000000
-FILE_FLAG_BACKUP_SEMANTICS: DWORD :    0x02000000
-FILE_FLAG_POSIX_SEMANTICS: DWORD :     0x01000000
-FILE_FLAG_SESSION_AWARE: DWORD :       0x00800000
-FILE_FLAG_OPEN_REPARSE_POINT: DWORD :  0x00200000
-FILE_FLAG_OPEN_NO_RECALL: DWORD :      0x00100000
-FILE_FLAG_FIRST_PIPE_INSTANCE: DWORD : 0x00080000
+FILE_FLAG_WRITE_THROUGH       : DWORD : 0x80000000
+FILE_FLAG_OVERLAPPED          : DWORD : 0x40000000
+FILE_FLAG_NO_BUFFERING        : DWORD : 0x20000000
+FILE_FLAG_RANDOM_ACCESS       : DWORD : 0x10000000
+FILE_FLAG_SEQUENTIAL_SCAN     : DWORD : 0x08000000
+FILE_FLAG_DELETE_ON_CLOSE     : DWORD : 0x04000000
+FILE_FLAG_BACKUP_SEMANTICS    : DWORD : 0x02000000
+FILE_FLAG_POSIX_SEMANTICS     : DWORD : 0x01000000
+FILE_FLAG_SESSION_AWARE       : DWORD : 0x00800000
+FILE_FLAG_OPEN_REPARSE_POINT  : DWORD : 0x00200000
+FILE_FLAG_OPEN_NO_RECALL      : DWORD : 0x00100000
+FILE_FLAG_FIRST_PIPE_INSTANCE : DWORD : 0x00080000
 
-PIPE_ACCESS_INBOUND: DWORD : 0x00000001
-PIPE_ACCESS_OUTBOUND: DWORD : 0x00000002
-PIPE_ACCESS_DUPLEX: DWORD : 0x00000003
-PIPE_WAIT: DWORD : 0x00000000
-PIPE_TYPE_BYTE: DWORD : 0x00000000
-PIPE_TYPE_MESSAGE: DWORD : 0x00000004
-PIPE_REJECT_REMOTE_CLIENTS: DWORD : 0x00000008
-PIPE_READMODE_BYTE: DWORD : 0x00000000
-PIPE_READMODE_MESSAGE: DWORD : 0x00000002
-PIPE_ACCEPT_REMOTE_CLIENTS: DWORD : 0x00000000
+PIPE_ACCESS_INBOUND        : DWORD : 0x00000001
+PIPE_ACCESS_OUTBOUND       : DWORD : 0x00000002
+PIPE_ACCESS_DUPLEX         : DWORD : 0x00000003
+PIPE_WAIT                  : DWORD : 0x00000000
+PIPE_TYPE_BYTE             : DWORD : 0x00000000
+PIPE_TYPE_MESSAGE          : DWORD : 0x00000004
+PIPE_REJECT_REMOTE_CLIENTS : DWORD : 0x00000008
+PIPE_READMODE_BYTE         : DWORD : 0x00000000
+PIPE_READMODE_MESSAGE      : DWORD : 0x00000002
+PIPE_ACCEPT_REMOTE_CLIENTS : DWORD : 0x00000000
 
 FD_SETSIZE :: 64
 
@@ -2739,10 +2762,10 @@ HANDLE_FLAG_INHERIT: DWORD : 0x00000001
 HANDLE_FLAG_PROTECT_FROM_CLOSE :: 0x00000002
 
 GENERIC_MAPPING :: struct {
-	GenericRead: ACCESS_MASK,
-	GenericWrite: ACCESS_MASK,
+	GenericRead:    ACCESS_MASK,
+	GenericWrite:   ACCESS_MASK,
 	GenericExecute: ACCESS_MASK,
-	GenericAll: ACCESS_MASK,
+	GenericAll:     ACCESS_MASK,
 }
 PGENERIC_MAPPING :: ^GENERIC_MAPPING
 
@@ -2758,14 +2781,14 @@ ANYSIZE_ARRAY :: 1
 
 PLUID_AND_ATTRIBUTES :: ^LUID_AND_ATTRIBUTES
 LUID_AND_ATTRIBUTES :: struct {
-	Luid: LUID,
+	Luid:       LUID,
 	Attributes: DWORD,
 }
 
 PRIVILEGE_SET :: struct {
 	PrivilegeCount: DWORD,
-	Control: DWORD,
-	Privilege: [ANYSIZE_ARRAY]LUID_AND_ATTRIBUTES,
+	Control:        DWORD,
+	Privilege:      [ANYSIZE_ARRAY]LUID_AND_ATTRIBUTES `fmt:"v,PrivilegeCount"`,
 }
 PPRIVILEGE_SET :: ^PRIVILEGE_SET
 
@@ -2780,7 +2803,8 @@ TOKEN_ADJUST_GROUPS     :: 0x0040
 TOKEN_ADJUST_DEFAULT    :: 0x0080
 TOKEN_ADJUST_SESSIONID  :: 0x0100
 
-TOKEN_ALL_ACCESS_P :: STANDARD_RIGHTS_REQUIRED | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY |\
+TOKEN_ALL_ACCESS_P :: \
+	STANDARD_RIGHTS_REQUIRED | TOKEN_ASSIGN_PRIMARY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE | TOKEN_QUERY |
 	TOKEN_QUERY_SOURCE | TOKEN_ADJUST_PRIVILEGES | TOKEN_ADJUST_GROUPS | TOKEN_ADJUST_DEFAULT
 
 TOKEN_ALL_ACCESS                :: TOKEN_ALL_ACCESS_P | TOKEN_ADJUST_SESSIONID
@@ -2803,8 +2827,8 @@ CP_UTF8       :: 65001 // UTF-8 translation
 LCID :: DWORD
 LANGID :: WORD
 
-LANG_NEUTRAL :: 0x00
-LANG_INVARIANT :: 0x7f
+LANG_NEUTRAL    :: 0x00
+LANG_INVARIANT  :: 0x7f
 SUBLANG_NEUTRAL :: 0x00 // language neutral
 SUBLANG_DEFAULT :: 0x01 // user default
 
@@ -2815,7 +2839,7 @@ WC_ERR_INVALID_CHARS :: 128
 MAX_PATH :: 0x00000104
 MAX_PATH_WIDE :: 0x8000
 
-INVALID_FILE_ATTRIBUTES  :: DWORD(0xffff_ffff)
+INVALID_FILE_ATTRIBUTES :: DWORD(0xffff_ffff)
 
 FILE_TYPE_DISK :: 0x0001
 FILE_TYPE_CHAR :: 0x0002
@@ -2826,33 +2850,33 @@ POINT :: struct {x, y: LONG}
 
 PWINDOWPOS :: ^WINDOWPOS
 WINDOWPOS :: struct {
-	hwnd: HWND,
+	hwnd:            HWND,
 	hwndInsertAfter: HWND,
-	x: c_int,
-	y: c_int,
-	cx: c_int,
-	cy: c_int,
+	x:     c_int,
+	y:     c_int,
+	cx:    c_int,
+	cy:    c_int,
 	flags: UINT,
 }
 
 when size_of(uintptr) == 4 {
 	WSADATA :: struct {
-		wVersion: WORD,
-		wHighVersion: WORD,
-		szDescription: [WSADESCRIPTION_LEN + 1]u8,
+		wVersion:       WORD,
+		wHighVersion:   WORD,
+		szDescription:  [WSADESCRIPTION_LEN + 1]u8,
 		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
-		iMaxSockets: u16,
-		iMaxUdpDg: u16,
-		lpVendorInfo: ^u8,
+		iMaxSockets:    u16,
+		iMaxUdpDg:      u16,
+		lpVendorInfo:   [^]u8,
 	}
 } else when size_of(uintptr) == 8 {
 	WSADATA :: struct {
-		wVersion: WORD,
-		wHighVersion: WORD,
-		iMaxSockets: u16,
-		iMaxUdpDg: u16,
-		lpVendorInfo: ^u8,
-		szDescription: [WSADESCRIPTION_LEN + 1]u8,
+		wVersion:       WORD,
+		wHighVersion:   WORD,
+		iMaxSockets:    u16,
+		iMaxUdpDg:      u16,
+		lpVendorInfo:   ^u8,
+		szDescription:  [WSADESCRIPTION_LEN + 1]u8,
 		szSystemStatus: [WSASYS_STATUS_LEN + 1]u8,
 	}
 } else {
@@ -2861,71 +2885,71 @@ when size_of(uintptr) == 4 {
 
 WSABUF :: struct {
 	len: ULONG,
-	buf: ^CHAR,
+	buf: [^]CHAR `fmt"q,len"`,
 }
 
 WSAPROTOCOL_INFO :: struct {
-	dwServiceFlags1: DWORD,
-	dwServiceFlags2: DWORD,
-	dwServiceFlags3: DWORD,
-	dwServiceFlags4: DWORD,
-	dwProviderFlags: DWORD,
-	ProviderId: GUID,
-	dwCatalogEntryId: DWORD,
-	ProtocolChain: WSAPROTOCOLCHAIN,
-	iVersion: c_int,
-	iAddressFamily: c_int,
-	iMaxSockAddr: c_int,
-	iMinSockAddr: c_int,
-	iSocketType: c_int,
-	iProtocol: c_int,
+	dwServiceFlags1:    DWORD,
+	dwServiceFlags2:    DWORD,
+	dwServiceFlags3:    DWORD,
+	dwServiceFlags4:    DWORD,
+	dwProviderFlags:    DWORD,
+	ProviderId:         GUID,
+	dwCatalogEntryId:   DWORD,
+	ProtocolChain:      WSAPROTOCOLCHAIN,
+	iVersion:           c_int,
+	iAddressFamily:     c_int,
+	iMaxSockAddr:       c_int,
+	iMinSockAddr:       c_int,
+	iSocketType:        c_int,
+	iProtocol:          c_int,
 	iProtocolMaxOffset: c_int,
-	iNetworkByteOrder: c_int,
-	iSecurityScheme: c_int,
-	dwMessageSize: DWORD,
+	iNetworkByteOrder:  c_int,
+	iSecurityScheme:    c_int,
+	dwMessageSize:      DWORD,
 	dwProviderReserved: DWORD,
-	szProtocol: [WSAPROTOCOL_LEN + 1]u16,
+	szProtocol:         [WSAPROTOCOL_LEN + 1]u16,
 }
 
 WIN32_FILE_ATTRIBUTE_DATA :: struct {
 	dwFileAttributes: DWORD,
-	ftCreationTime: FILETIME,
+	ftCreationTime:   FILETIME,
 	ftLastAccessTime: FILETIME,
-	ftLastWriteTime: FILETIME,
-	nFileSizeHigh: DWORD,
-	nFileSizeLow: DWORD,
+	ftLastWriteTime:  FILETIME,
+	nFileSizeHigh:    DWORD,
+	nFileSizeLow:     DWORD,
 }
 
 FILE_INFO_BY_HANDLE_CLASS :: enum c_int {
-	FileBasicInfo = 0,
-	FileStandardInfo = 1,
-	FileNameInfo = 2,
-	FileRenameInfo = 3,
-	FileDispositionInfo = 4,
-	FileAllocationInfo = 5,
-	FileEndOfFileInfo = 6,
-	FileStreamInfo = 7,
-	FileCompressionInfo = 8,
-	FileAttributeTagInfo = 9,
-	FileIdBothDirectoryInfo = 10,        // 0xA
+	FileBasicInfo                  = 0,
+	FileStandardInfo               = 1,
+	FileNameInfo                   = 2,
+	FileRenameInfo                 = 3,
+	FileDispositionInfo            = 4,
+	FileAllocationInfo             = 5,
+	FileEndOfFileInfo              = 6,
+	FileStreamInfo                 = 7,
+	FileCompressionInfo            = 8,
+	FileAttributeTagInfo           = 9,
+	FileIdBothDirectoryInfo        = 10, // 0xA
 	FileIdBothDirectoryRestartInfo = 11, // 0xB
-	FileIoPriorityHintInfo = 12,         // 0xC
-	FileRemoteProtocolInfo = 13,         // 0xD
-	FileFullDirectoryInfo = 14,          // 0xE
-	FileFullDirectoryRestartInfo = 15,   // 0xF
-	FileStorageInfo = 16,                // 0x10
-	FileAlignmentInfo = 17,              // 0x11
-	FileIdInfo = 18,                     // 0x12
-	FileIdExtdDirectoryInfo = 19,        // 0x13
+	FileIoPriorityHintInfo         = 12, // 0xC
+	FileRemoteProtocolInfo         = 13, // 0xD
+	FileFullDirectoryInfo          = 14, // 0xE
+	FileFullDirectoryRestartInfo   = 15, // 0xF
+	FileStorageInfo                = 16, // 0x10
+	FileAlignmentInfo              = 17, // 0x11
+	FileIdInfo                     = 18, // 0x12
+	FileIdExtdDirectoryInfo        = 19, // 0x13
 	FileIdExtdDirectoryRestartInfo = 20, // 0x14
 	MaximumFileInfoByHandlesClass,
 }
 
 FILE_BASIC_INFO :: struct {
-	CreationTime: LARGE_INTEGER,
+	CreationTime:   LARGE_INTEGER,
 	LastAccessTime: LARGE_INTEGER,
-	LastWriteTime: LARGE_INTEGER,
-	ChangeTime: LARGE_INTEGER,
+	LastWriteTime:  LARGE_INTEGER,
+	ChangeTime:     LARGE_INTEGER,
 	FileAttributes: DWORD,
 }
 
@@ -2941,39 +2965,39 @@ FILE_NOTIFY_INFORMATION :: struct {
 }
 
 REPARSE_DATA_BUFFER :: struct {
-	ReparseTag: c_uint,
+	ReparseTag:        c_uint,
 	ReparseDataLength: c_ushort,
-	Reserved: c_ushort,
-	rest: [0]byte,
+	Reserved:          c_ushort,
+	rest:              [0]byte,
 }
 
 SYMBOLIC_LINK_REPARSE_BUFFER :: struct {
 	SubstituteNameOffset: c_ushort,
 	SubstituteNameLength: c_ushort,
-	PrintNameOffset: c_ushort,
-	PrintNameLength: c_ushort,
-	Flags: c_ulong,
-	PathBuffer: WCHAR,
+	PrintNameOffset:      c_ushort,
+	PrintNameLength:      c_ushort,
+	Flags:                c_ulong,
+	PathBuffer:           WCHAR,
 }
 
 MOUNT_POINT_REPARSE_BUFFER :: struct {
 	SubstituteNameOffset: c_ushort,
 	SubstituteNameLength: c_ushort,
-	PrintNameOffset: c_ushort,
-	PrintNameLength: c_ushort,
-	PathBuffer: WCHAR,
+	PrintNameOffset:      c_ushort,
+	PrintNameLength:      c_ushort,
+	PathBuffer:           WCHAR,
 }
 
 LPPROGRESS_ROUTINE :: #type proc "system" (
-	TotalFileSize: LARGE_INTEGER,
-	TotalBytesTransferred: LARGE_INTEGER,
-	StreamSize: LARGE_INTEGER,
+	TotalFileSize:          LARGE_INTEGER,
+	TotalBytesTransferred:  LARGE_INTEGER,
+	StreamSize:             LARGE_INTEGER,
 	StreamBytesTransferred: LARGE_INTEGER,
-	dwStreamNumber: DWORD,
-	dwCallbackReason: DWORD,
-	hSourceFile: HANDLE,
-	hDestinationFile: HANDLE,
-	lpData: LPVOID,
+	dwStreamNumber:         DWORD,
+	dwCallbackReason:       DWORD,
+	hSourceFile:            HANDLE,
+	hDestinationFile:       HANDLE,
+	lpData:                 LPVOID,
 ) -> DWORD
 
 CONDITION_VARIABLE :: struct {
@@ -2984,21 +3008,21 @@ SRWLOCK :: struct {
 }
 CRITICAL_SECTION :: struct {
 	CriticalSectionDebug: LPVOID,
-	LockCount: LONG,
-	RecursionCount: LONG,
-	OwningThread: HANDLE,
-	LockSemaphore: HANDLE,
-	SpinCount: ULONG_PTR,
+	LockCount:            LONG,
+	RecursionCount:       LONG,
+	OwningThread:         HANDLE,
+	LockSemaphore:        HANDLE,
+	SpinCount:            ULONG_PTR,
 }
 
 REPARSE_MOUNTPOINT_DATA_BUFFER :: struct {
-	ReparseTag: DWORD,
-	ReparseDataLength: DWORD,
-	Reserved: WORD,
-	ReparseTargetLength: WORD,
+	ReparseTag:                 DWORD,
+	ReparseDataLength:          DWORD,
+	Reserved:                   WORD,
+	ReparseTargetLength:        WORD,
 	ReparseTargetMaximumLength: WORD,
-	Reserved1: WORD,
-	ReparseTarget: WCHAR,
+	Reserved1:                  WORD,
+	ReparseTarget:              WCHAR,
 }
 
 GUID :: struct {
@@ -3021,12 +3045,12 @@ LPGUID  :: ^GUID
 LPCGUID :: ^GUID
 REFIID  :: ^GUID
 
-REFGUID :: GUID
-IID :: GUID
-LPIID :: ^IID
-CLSID :: GUID
+REFGUID  :: GUID
+IID      :: GUID
+LPIID    :: ^IID
+CLSID    :: GUID
 REFCLSID :: ^CLSID
-LPCLSID :: ^CLSID
+LPCLSID  :: ^CLSID
 
 CLSCTX_INPROC_SERVER                  :: 0x1
 CLSCTX_INPROC_HANDLER                 :: 0x2
@@ -3059,46 +3083,46 @@ CLSCTX_PS_DLL                         :: 0x80000000
 CLSCTX_ALL                            :: CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER | CLSCTX_REMOTE_SERVER
 
 WSAPROTOCOLCHAIN :: struct {
-	ChainLen: c_int,
-	ChainEntries: [MAX_PROTOCOL_CHAIN]DWORD,
+	ChainLen:     c_int,
+	ChainEntries: [MAX_PROTOCOL_CHAIN]DWORD `fmt:"v,ChainLen"`,
 }
 
 SECURITY_ATTRIBUTES :: struct {
-	nLength: DWORD,
+	nLength:              DWORD,
 	lpSecurityDescriptor: LPVOID,
-	bInheritHandle: BOOL,
+	bInheritHandle:       BOOL,
 }
 
 PROCESS_INFORMATION :: struct {
-	hProcess: HANDLE,
-	hThread: HANDLE,
+	hProcess:    HANDLE,
+	hThread:     HANDLE,
 	dwProcessId: DWORD,
-	dwThreadId: DWORD,
+	dwThreadId:  DWORD,
 }
 
 STARTUPINFOW :: struct {
-	cb: DWORD,
-	lpReserved: LPWSTR,
-	lpDesktop: LPWSTR,
-	lpTitle: LPWSTR,
-	dwX: DWORD,
-	dwY: DWORD,
-	dwXSize: DWORD,
-	dwYSize: DWORD,
-	dwXCountChars: DWORD,
-	dwYCountChars: DWORD,
+	cb:              DWORD,
+	lpReserved:      LPWSTR,
+	lpDesktop:       LPWSTR,
+	lpTitle:         LPWSTR,
+	dwX:             DWORD,
+	dwY:             DWORD,
+	dwXSize:         DWORD,
+	dwYSize:         DWORD,
+	dwXCountChars:   DWORD,
+	dwYCountChars:   DWORD,
 	dwFillAttribute: DWORD,
-	dwFlags: DWORD,
-	wShowWindow: WORD,
-	cbReserved2: WORD,
-	lpReserved2: LPBYTE,
-	hStdInput: HANDLE,
-	hStdOutput: HANDLE,
-	hStdError: HANDLE,
+	dwFlags:         DWORD,
+	wShowWindow:     WORD,
+	cbReserved2:     WORD,
+	lpReserved2:     LPBYTE,
+	hStdInput:       HANDLE,
+	hStdOutput:      HANDLE,
+	hStdError:       HANDLE,
 }
 
 FILETIME :: struct {
-	dwLowDateTime: DWORD,
+	dwLowDateTime:  DWORD,
 	dwHighDateTime: DWORD,
 }
 
@@ -3124,11 +3148,11 @@ UNICODE_STRING :: struct {
 }
 
 OVERLAPPED :: struct {
-	Internal: ^c_ulong,
+	Internal:     ^c_ulong,
 	InternalHigh: ^c_ulong,
-	Offset: DWORD,
-	OffsetHigh: DWORD,
-	hEvent: HANDLE,
+	Offset:       DWORD,
+	OffsetHigh:   DWORD,
+	hEvent:       HANDLE,
 }
 
 OVERLAPPED_ENTRY :: struct {
@@ -3139,9 +3163,9 @@ OVERLAPPED_ENTRY :: struct {
 }
 
 LPOVERLAPPED_COMPLETION_ROUTINE :: #type proc "system" (
-	dwErrorCode: DWORD,
+	dwErrorCode:               DWORD,
 	dwNumberOfBytesTransfered: DWORD,
-	lpOverlapped: LPOVERLAPPED,
+	lpOverlapped:              LPOVERLAPPED,
 )
 
 ADDRESS_MODE :: enum c_int {
@@ -3164,7 +3188,7 @@ fd_set :: struct {
 }
 
 timeval :: struct {
-	tv_sec: c_long,
+	tv_sec:  c_long,
 	tv_usec: c_long,
 }
 
@@ -3199,145 +3223,145 @@ STATUS_PRIVILEGED_INSTRUCTION       :: 0xC0000096
 
 
 EXCEPTION_RECORD :: struct {
-	ExceptionCode: DWORD,
-	ExceptionFlags: DWORD,
-	ExceptionRecord: ^EXCEPTION_RECORD,
-	ExceptionAddress: LPVOID,
-	NumberParameters: DWORD,
-	ExceptionInformation: [EXCEPTION_MAXIMUM_PARAMETERS]LPVOID,
+	ExceptionCode:        DWORD,
+	ExceptionFlags:       DWORD,
+	ExceptionRecord:      ^EXCEPTION_RECORD,
+	ExceptionAddress:     LPVOID,
+	NumberParameters:     DWORD,
+	ExceptionInformation: [EXCEPTION_MAXIMUM_PARAMETERS]LPVOID `fmt:"v,NumberParameters"`,
 }
 
 
 CONTEXT :: struct {
-	P1Home: DWORD64,
-	P2Home: DWORD64,
-	P3Home: DWORD64,
-	P4Home: DWORD64,
-	P5Home: DWORD64,
-	P6Home: DWORD64,
+	P1Home:       DWORD64,
+	P2Home:       DWORD64,
+	P3Home:       DWORD64,
+	P4Home:       DWORD64,
+	P5Home:       DWORD64,
+	P6Home:       DWORD64,
 	ContextFlags: DWORD,
-	MxCsr: DWORD,
-	SegCs: WORD,
-	SegDs: WORD,
-	SegEs: WORD,
-	SegFs: WORD,
-	SegGs: WORD,
-	SegSs: WORD,
-	EFlags: DWORD,
-	Dr0: DWORD64,
-	Dr1: DWORD64,
-	Dr2: DWORD64,
-	Dr3: DWORD64,
-	Dr6: DWORD64,
-	Dr7: DWORD64,
-	Rax: DWORD64,
-	Rcx: DWORD64,
-	Rdx: DWORD64,
-	Rbx: DWORD64,
-	Rsp: DWORD64,
-	Rbp: DWORD64,
-	Rsi: DWORD64,
-	Rdi: DWORD64,
-	R8: DWORD64,
-	R9: DWORD64,
-	R10: DWORD64,
-	R11: DWORD64,
-	R12: DWORD64,
-	R13: DWORD64,
-	R14: DWORD64,
-	R15: DWORD64,
-	Rip: DWORD64,
-	_: struct #raw_union {
+	MxCsr:        DWORD,
+	SegCs:        WORD,
+	SegDs:        WORD,
+	SegEs:        WORD,
+	SegFs:        WORD,
+	SegGs:        WORD,
+	SegSs:        WORD,
+	EFlags:       DWORD,
+	Dr0:          DWORD64,
+	Dr1:          DWORD64,
+	Dr2:          DWORD64,
+	Dr3:          DWORD64,
+	Dr6:          DWORD64,
+	Dr7:          DWORD64,
+	Rax:          DWORD64,
+	Rcx:          DWORD64,
+	Rdx:          DWORD64,
+	Rbx:          DWORD64,
+	Rsp:          DWORD64,
+	Rbp:          DWORD64,
+	Rsi:          DWORD64,
+	Rdi:          DWORD64,
+	R8:           DWORD64,
+	R9:           DWORD64,
+	R10:          DWORD64,
+	R11:          DWORD64,
+	R12:          DWORD64,
+	R13:          DWORD64,
+	R14:          DWORD64,
+	R15:          DWORD64,
+	Rip:          DWORD64,
+	using _: struct #raw_union {
 		FltSave: XMM_SAVE_AREA32,
-		Q: [16]NEON128,
-		D: [32]ULONGLONG,
-		_: struct {
+		Q:       [16]NEON128,
+		D:       [32]ULONGLONG,
+		using _: struct {
 			Header: [2]M128A,
 			Legacy: [8]M128A,
-			Xmm0: M128A,
-			Xmm1: M128A,
-			Xmm2: M128A,
-			Xmm3: M128A,
-			Xmm4: M128A,
-			Xmm5: M128A,
-			Xmm6: M128A,
-			Xmm7: M128A,
-			Xmm8: M128A,
-			Xmm9: M128A,
-			Xmm10: M128A,
-			Xmm11: M128A,
-			Xmm12: M128A,
-			Xmm13: M128A,
-			Xmm14: M128A,
-			Xmm15: M128A,
+			Xmm0:   M128A,
+			Xmm1:   M128A,
+			Xmm2:   M128A,
+			Xmm3:   M128A,
+			Xmm4:   M128A,
+			Xmm5:   M128A,
+			Xmm6:   M128A,
+			Xmm7:   M128A,
+			Xmm8:   M128A,
+			Xmm9:   M128A,
+			Xmm10:  M128A,
+			Xmm11:  M128A,
+			Xmm12:  M128A,
+			Xmm13:  M128A,
+			Xmm14:  M128A,
+			Xmm15:  M128A,
 		},
 		S: [32]DWORD,
 	},
-	VectorRegister: [26]M128A,
-	VectorControl: DWORD64,
-	DebugControl: DWORD64,
-	LastBranchToRip: DWORD64,
-	LastBranchFromRip: DWORD64,
-	LastExceptionToRip: DWORD64,
+	VectorRegister:       [26]M128A,
+	VectorControl:        DWORD64,
+	DebugControl:         DWORD64,
+	LastBranchToRip:      DWORD64,
+	LastBranchFromRip:    DWORD64,
+	LastExceptionToRip:   DWORD64,
 	LastExceptionFromRip: DWORD64,
 }
 
-PCONTEXT :: ^CONTEXT
+PCONTEXT  :: ^CONTEXT
 LPCONTEXT :: ^CONTEXT
 
 when size_of(uintptr) == 32 {
 	XSAVE_FORMAT :: struct #align(16) {
-		ControlWord: WORD,
-		StatusWord: WORD,
-		TagWord: BYTE,
-		Reserved1: BYTE,
-		ErrorOpcode: WORD,
-		ErrorOffset: DWORD,
-		ErrorSelector: WORD,
-		Reserved2: WORD,
-		DataOffset: DWORD,
-		DataSelector: WORD,
-		Reserved3: WORD,
-		MxCsr: DWORD,
-		MxCsr_Mask: DWORD,
+		ControlWord:    WORD,
+		StatusWord:     WORD,
+		TagWord:        BYTE,
+		Reserved1:      BYTE,
+		ErrorOpcode:    WORD,
+		ErrorOffset:    DWORD,
+		ErrorSelector:  WORD,
+		Reserved2:      WORD,
+		DataOffset:     DWORD,
+		DataSelector:   WORD,
+		Reserved3:      WORD,
+		MxCsr:          DWORD,
+		MxCsr_Mask:     DWORD,
 		FloatRegisters: [8]M128A,
 		// 32-bit specific
-		XmmRegisters: [8]M128A,
-		Reserved4: [192]BYTE,
-		StackControl: [7]DWORD,
-		Cr0NpxState: DWORD,
+		XmmRegisters:   [8]M128A,
+		Reserved4:      [192]BYTE,
+		StackControl:   [7]DWORD,
+		Cr0NpxState:    DWORD,
 	}
 } else {
 	XSAVE_FORMAT :: struct #align(16) {
-		ControlWord: WORD,
-		StatusWord: WORD,
-		TagWord: BYTE,
-		Reserved1: BYTE,
-		ErrorOpcode: WORD,
-		ErrorOffset: DWORD,
-		ErrorSelector: WORD,
-		Reserved2: WORD,
-		DataOffset: DWORD,
-		DataSelector: WORD,
-		Reserved3: WORD,
-		MxCsr: DWORD,
-		MxCsr_Mask: DWORD,
+		ControlWord:    WORD,
+		StatusWord:     WORD,
+		TagWord:        BYTE,
+		Reserved1:      BYTE,
+		ErrorOpcode:    WORD,
+		ErrorOffset:    DWORD,
+		ErrorSelector:  WORD,
+		Reserved2:      WORD,
+		DataOffset:     DWORD,
+		DataSelector:   WORD,
+		Reserved3:      WORD,
+		MxCsr:          DWORD,
+		MxCsr_Mask:     DWORD,
 		FloatRegisters: [8]M128A,
 		// 64-bit specific
-		XmmRegisters: [16]M128A,
-		Reserved4: [96]BYTE,
+		XmmRegisters:   [16]M128A,
+		Reserved4:      [96]BYTE,
 	}
 }
 
 XMM_SAVE_AREA32 :: XSAVE_FORMAT
 
 M128A :: struct {
-	Low: ULONGLONG,
+	Low:  ULONGLONG,
 	High: LONGLONG,
 }
 
 NEON128 :: struct {
-	Low: ULONGLONG,
+	Low:  ULONGLONG,
 	High: LONGLONG,
 }
 
@@ -3386,17 +3410,17 @@ FILE_ATTRIBUTE_TAG_INFO :: struct {
 }
 
 // getaddrinfo flags https://learn.microsoft.com/en-us/windows/win32/api/ws2def/ns-ws2def-addrinfoa
-AI_PASSIVE 				  :: 0x01
-AI_CANONNAME 			  :: 0x02
-AI_NUMERICHOST 			  :: 0x04
-AI_ALL 					  :: 0x0100
-AI_ADDRCONFIG 			  :: 0x0400
-AI_V4MAPPED 			  :: 0x0800
-AI_NON_AUTHORITATIVE 	  :: 0x04000
-AI_SECURE 				  :: 0x08000
+AI_PASSIVE                :: 0x01
+AI_CANONNAME              :: 0x02
+AI_NUMERICHOST            :: 0x04
+AI_ALL                    :: 0x0100
+AI_ADDRCONFIG             :: 0x0400
+AI_V4MAPPED               :: 0x0800
+AI_NON_AUTHORITATIVE      :: 0x04000
+AI_SECURE                 :: 0x08000
 AI_RETURN_PREFERRED_NAMES :: 0x010000
-AI_FQDN 				  :: 0x00020000
-AI_FILESERVER 			  :: 0x00040000
+AI_FQDN                   :: 0x00020000
+AI_FILESERVER             :: 0x00040000
 
 PADDRINFOEXW :: ^ADDRINFOEXW
 LPADDRINFOEXW :: ^ADDRINFOEXW
@@ -3415,9 +3439,9 @@ ADDRINFOEXW :: struct {
 }
 
 LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "system" (
-	dwErrorCode: DWORD,
+	dwErrorCode:               DWORD,
 	dwNumberOfBytesTransfered: DWORD,
-	lpOverlapped: LPOVERLAPPED,
+	lpOverlapped:              LPOVERLAPPED,
 )
 
 
@@ -3427,18 +3451,18 @@ SYSTEM_INFO :: struct {
 		dwOemID: DWORD,
 		using _: struct #raw_union {
 			wProcessorArchitecture: WORD,
-			wReserved: WORD, // reserved
+			wReserved:              WORD, // reserved
 		},
 	},
-	dwPageSize: DWORD,
+	dwPageSize:                  DWORD,
 	lpMinimumApplicationAddress: LPVOID,
 	lpMaximumApplicationAddress: LPVOID,
-	dwActiveProcessorMask: DWORD_PTR,
-	dwNumberOfProcessors: DWORD,
-	dwProcessorType: DWORD,
-	dwAllocationGranularity: DWORD,
-	wProcessorLevel: WORD,
-	wProcessorRevision: WORD,
+	dwActiveProcessorMask:       DWORD_PTR,
+	dwNumberOfProcessors:        DWORD,
+	dwProcessorType:             DWORD,
+	dwAllocationGranularity:     DWORD,
+	wProcessorLevel:             WORD,
+	wProcessorRevision:          WORD,
 }
 
 // https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_osversioninfoexw
@@ -3475,12 +3499,12 @@ LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW
 PQUOTA_LIMITS :: struct {
-	PagedPoolLimit: SIZE_T,
-	NonPagedPoolLimit: SIZE_T,
+	PagedPoolLimit:        SIZE_T,
+	NonPagedPoolLimit:     SIZE_T,
 	MinimumWorkingSetSize: SIZE_T,
 	MaximumWorkingSetSize: SIZE_T,
-	PagefileLimit: SIZE_T,
-	TimeLimit: LARGE_INTEGER,
+	PagefileLimit:         SIZE_T,
+	TimeLimit:             LARGE_INTEGER,
 }
 
 Logon32_Type :: enum DWORD {
@@ -3505,14 +3529,14 @@ Logon32_Provider :: enum DWORD {
 // Used in LoadUserProfileW
 
 PROFILEINFOW :: struct {
-	dwSize: DWORD,
-	dwFlags: DWORD,
-	lpUserName: LPWSTR,
+	dwSize:        DWORD,
+	dwFlags:       DWORD,
+	lpUserName:    LPWSTR,
 	lpProfilePath: LPWSTR,
 	lpDefaultPath: LPWSTR,
-	lpServerName: LPWSTR,
-	lpPolicyPath: LPWSTR,
-	hProfile: HANDLE,
+	lpServerName:  LPWSTR,
+	lpPolicyPath:  LPWSTR,
+	hProfile:      HANDLE,
 }
 
 SECURITY_MAX_SID_SIZE :: 68
@@ -3569,14 +3593,14 @@ USER_INFO_FLAG :: enum DWORD {
 USER_INFO_FLAGS :: distinct bit_set[USER_INFO_FLAG]
 
 USER_INFO_1 :: struct #packed {
-	name: LPWSTR,
-	password: LPWSTR,     // Max password length is defined in LM20_PWLEN.
+	name:         LPWSTR,
+	password:     LPWSTR,     // Max password length is defined in LM20_PWLEN.
 	password_age: DWORD,
-	priv: USER_PRIV,
-	home_dir: LPWSTR,
-	comment: LPWSTR,
-	flags: USER_INFO_FLAGS,
-	script_path: LPWSTR,
+	priv:         USER_PRIV,
+	home_dir:     LPWSTR,
+	comment:      LPWSTR,
+	flags:        USER_INFO_FLAGS,
+	script_path:  LPWSTR,
 }
 // #assert(size_of(USER_INFO_1) == 50)
 
@@ -3585,320 +3609,320 @@ LOCALGROUP_MEMBERS_INFO_0 :: struct #packed {
 }
 
 NET_API_STATUS :: enum DWORD {
-	Success = 0,
-	ERROR_ACCESS_DENIED = 5,
-	MemberInAlias = 1378,
-	NetNotStarted = 2102,
-	UnknownServer = 2103,
-	ShareMem = 2104,
-	NoNetworkResource = 2105,
-	RemoteOnly = 2106,
-	DevNotRedirected = 2107,
-	ServerNotStarted = 2114,
-	ItemNotFound = 2115,
-	UnknownDevDir = 2116,
-	RedirectedPath = 2117,
-	DuplicateShare = 2118,
-	NoRoom = 2119,
-	TooManyItems = 2121,
-	InvalidMaxUsers = 2122,
-	BufTooSmall = 2123,
-	RemoteErr = 2127,
-	LanmanIniError = 2131,
-	NetworkError = 2136,
-	WkstaInconsistentState = 2137,
-	WkstaNotStarted = 2138,
-	BrowserNotStarted = 2139,
-	InternalError = 2140,
-	BadTransactConfig = 2141,
-	InvalidAPI = 2142,
-	BadEventName = 2143,
-	DupNameReboot = 2144,
-	CfgCompNotFound = 2146,
-	CfgParamNotFound = 2147,
-	LineTooLong = 2149,
-	QNotFound = 2150,
-	JobNotFound = 2151,
-	DestNotFound = 2152,
-	DestExists = 2153,
-	QExists = 2154,
-	QNoRoom = 2155,
-	JobNoRoom = 2156,
-	DestNoRoom = 2157,
-	DestIdle = 2158,
-	DestInvalidOp = 2159,
-	ProcNoRespond = 2160,
-	SpoolerNotLoaded = 2161,
-	DestInvalidState = 2162,
-	QInvalidState = 2163,
-	JobInvalidState = 2164,
-	SpoolNoMemory = 2165,
-	DriverNotFound = 2166,
-	DataTypeInvalid = 2167,
-	ProcNotFound = 2168,
-	ServiceTableLocked = 2180,
-	ServiceTableFull = 2181,
-	ServiceInstalled = 2182,
-	ServiceEntryLocked = 2183,
-	ServiceNotInstalled = 2184,
-	BadServiceName = 2185,
-	ServiceCtlTimeout = 2186,
-	ServiceCtlBusy = 2187,
-	BadServiceProgName = 2188,
-	ServiceNotCtrl = 2189,
-	ServiceKillProc = 2190,
-	ServiceCtlNotValid = 2191,
-	NotInDispatchTbl = 2192,
-	BadControlRecv = 2193,
-	ServiceNotStarting = 2194,
-	AlreadyLoggedOn = 2200,
-	NotLoggedOn = 2201,
-	BadUsername = 2202,
-	BadPassword = 2203,
-	UnableToAddName_W = 2204,
-	UnableToAddName_F = 2205,
-	UnableToDelName_W = 2206,
-	UnableToDelName_F = 2207,
-	LogonsPaused = 2209,
-	LogonServerConflict = 2210,
-	LogonNoUserPath = 2211,
-	LogonScriptError = 2212,
-	StandaloneLogon = 2214,
-	LogonServerNotFound = 2215,
-	LogonDomainExists = 2216,
-	NonValidatedLogon = 2217,
-	ACFNotFound = 2219,
-	GroupNotFound = 2220,
-	UserNotFound = 2221,
-	ResourceNotFound = 2222,
-	GroupExists = 2223,
-	UserExists = 2224,
-	ResourceExists = 2225,
-	NotPrimary = 2226,
-	ACFNotLoaded = 2227,
-	ACFNoRoom = 2228,
-	ACFFileIOFail = 2229,
-	ACFTooManyLists = 2230,
-	UserLogon = 2231,
-	ACFNoParent = 2232,
-	CanNotGrowSegment = 2233,
-	SpeGroupOp = 2234,
-	NotInCache = 2235,
-	UserInGroup = 2236,
-	UserNotInGroup = 2237,
-	AccountUndefined = 2238,
-	AccountExpired = 2239,
-	InvalidWorkstation = 2240,
-	InvalidLogonHours = 2241,
-	PasswordExpired = 2242,
-	PasswordCantChange = 2243,
-	PasswordHistConflict = 2244,
-	PasswordTooShort = 2245,
-	PasswordTooRecent = 2246,
-	InvalidDatabase = 2247,
-	DatabaseUpToDate = 2248,
-	SyncRequired = 2249,
-	UseNotFound = 2250,
-	BadAsgType = 2251,
-	DeviceIsShared = 2252,
-	SameAsComputerName = 2253,
-	NoComputerName = 2270,
-	MsgAlreadyStarted = 2271,
-	MsgInitFailed = 2272,
-	NameNotFound = 2273,
-	AlreadyForwarded = 2274,
-	AddForwarded = 2275,
-	AlreadyExists = 2276,
-	TooManyNames = 2277,
-	DelComputerName = 2278,
-	LocalForward = 2279,
-	GrpMsgProcessor = 2280,
-	PausedRemote = 2281,
-	BadReceive = 2282,
-	NameInUse = 2283,
-	MsgNotStarted = 2284,
-	NotLocalName = 2285,
-	NoForwardName = 2286,
-	RemoteFull = 2287,
-	NameNotForwarded = 2288,
-	TruncatedBroadcast = 2289,
-	InvalidDevice = 2294,
-	WriteFault = 2295,
-	DuplicateName = 2297,
-	DeleteLater = 2298,
-	IncompleteDel = 2299,
-	MultipleNets = 2300,
-	NetNameNotFound = 2310,
-	DeviceNotShared = 2311,
-	ClientNameNotFound = 2312,
-	FileIdNotFound = 2314,
-	ExecFailure = 2315,
-	TmpFile = 2316,
-	TooMuchData = 2317,
-	DeviceShareConflict = 2318,
-	BrowserTableIncomplete = 2319,
-	NotLocalDomain = 2320,
-	IsDfsShare = 2321,
-	DevInvalidOpCode = 2331,
-	DevNotFound = 2332,
-	DevNotOpen = 2333,
-	BadQueueDevString = 2334,
-	BadQueuePriority = 2335,
-	NoCommDevs = 2337,
-	QueueNotFound = 2338,
-	BadDevString = 2340,
-	BadDev = 2341,
-	InUseBySpooler = 2342,
-	CommDevInUse = 2343,
-	InvalidComputer = 2351,
-	MaxLenExceeded = 2354,
-	BadComponent = 2356,
-	CantType = 2357,
-	TooManyEntries = 2362,
-	ProfileFileTooBig = 2370,
-	ProfileOffset = 2371,
-	ProfileCleanup = 2372,
-	ProfileUnknownCmd = 2373,
-	ProfileLoadErr = 2374,
-	ProfileSaveErr = 2375,
-	LogOverflow = 2377,
-	LogFileChanged = 2378,
-	LogFileCorrupt = 2379,
-	SourceIsDir = 2380,
-	BadSource = 2381,
-	BadDest = 2382,
-	DifferentServers = 2383,
-	RunSrvPaused = 2385,
-	ErrCommRunSrv = 2389,
-	ErrorExecingGhost = 2391,
-	ShareNotFound = 2392,
-	InvalidLana = 2400,
-	OpenFiles = 2401,
-	ActiveConns = 2402,
-	BadPasswordCore = 2403,
-	DevInUse = 2404,
-	LocalDrive = 2405,
-	AlertExists = 2430,
-	TooManyAlerts = 2431,
-	NoSuchAlert = 2432,
-	BadRecipient = 2433,
-	AcctLimitExceeded = 2434,
-	InvalidLogSeek = 2440,
-	BadUasConfig = 2450,
-	InvalidUASOp = 2451,
-	LastAdmin = 2452,
-	DCNotFound = 2453,
-	LogonTrackingError = 2454,
-	NetlogonNotStarted = 2455,
-	CanNotGrowUASFile = 2456,
-	TimeDiffAtDC = 2457,
-	PasswordMismatch = 2458,
-	NoSuchServer = 2460,
-	NoSuchSession = 2461,
-	NoSuchConnection = 2462,
-	TooManyServers = 2463,
-	TooManySessions = 2464,
-	TooManyConnections = 2465,
-	TooManyFiles = 2466,
-	NoAlternateServers = 2467,
-	TryDownLevel = 2470,
-	UPSDriverNotStarted = 2480,
-	UPSInvalidConfig = 2481,
-	UPSInvalidCommPort = 2482,
-	UPSSignalAsserted = 2483,
-	UPSShutdownFailed = 2484,
-	BadDosRetCode = 2500,
-	ProgNeedsExtraMem = 2501,
-	BadDosFunction = 2502,
-	RemoteBootFailed = 2503,
-	BadFileCheckSum = 2504,
-	NoRplBootSystem = 2505,
-	RplLoadrNetBiosErr = 2506,
-	RplLoadrDiskErr = 2507,
-	ImageParamErr = 2508,
-	TooManyImageParams = 2509,
-	NonDosFloppyUsed = 2510,
-	RplBootRestart = 2511,
-	RplSrvrCallFailed = 2512,
-	CantConnectRplSrvr = 2513,
-	CantOpenImageFile = 2514,
-	CallingRplSrvr = 2515,
-	StartingRplBoot = 2516,
-	RplBootServiceTerm = 2517,
-	RplBootStartFailed = 2518,
-	RPL_CONNECTED = 2519,
-	BrowserConfiguredToNotRun = 2550,
-	RplNoAdaptersStarted = 2610,
-	RplBadRegistry = 2611,
-	RplBadDatabase = 2612,
-	RplRplfilesShare = 2613,
-	RplNotRplServer = 2614,
-	RplCannotEnum = 2615,
-	RplWkstaInfoCorrupted = 2616,
-	RplWkstaNotFound = 2617,
-	RplWkstaNameUnavailable = 2618,
-	RplProfileInfoCorrupted = 2619,
-	RplProfileNotFound = 2620,
-	RplProfileNameUnavailable = 2621,
-	RplProfileNotEmpty = 2622,
-	RplConfigInfoCorrupted = 2623,
-	RplConfigNotFound = 2624,
-	RplAdapterInfoCorrupted = 2625,
-	RplInternal = 2626,
-	RplVendorInfoCorrupted = 2627,
-	RplBootInfoCorrupted = 2628,
-	RplWkstaNeedsUserAcct = 2629,
-	RplNeedsRPLUSERAcct = 2630,
-	RplBootNotFound = 2631,
-	RplIncompatibleProfile = 2632,
-	RplAdapterNameUnavailable = 2633,
-	RplConfigNotEmpty = 2634,
-	RplBootInUse = 2635,
-	RplBackupDatabase = 2636,
-	RplAdapterNotFound = 2637,
-	RplVendorNotFound = 2638,
-	RplVendorNameUnavailable = 2639,
-	RplBootNameUnavailable = 2640,
-	RplConfigNameUnavailable = 2641,
-	DfsInternalCorruption = 2660,
-	DfsVolumeDataCorrupt = 2661,
-	DfsNoSuchVolume = 2662,
-	DfsVolumeAlreadyExists = 2663,
-	DfsAlreadyShared = 2664,
-	DfsNoSuchShare = 2665,
-	DfsNotALeafVolume = 2666,
-	DfsLeafVolume = 2667,
-	DfsVolumeHasMultipleServers = 2668,
-	DfsCantCreateJunctionPoint = 2669,
-	DfsServerNotDfsAware = 2670,
-	DfsBadRenamePath = 2671,
-	DfsVolumeIsOffline = 2672,
-	DfsNoSuchServer = 2673,
-	DfsCyclicalName = 2674,
-	DfsNotSupportedInServerDfs = 2675,
-	DfsDuplicateService = 2676,
+	Success                      = 0,
+	ERROR_ACCESS_DENIED          = 5,
+	MemberInAlias                = 1378,
+	NetNotStarted                = 2102,
+	UnknownServer                = 2103,
+	ShareMem                     = 2104,
+	NoNetworkResource            = 2105,
+	RemoteOnly                   = 2106,
+	DevNotRedirected             = 2107,
+	ServerNotStarted             = 2114,
+	ItemNotFound                 = 2115,
+	UnknownDevDir                = 2116,
+	RedirectedPath               = 2117,
+	DuplicateShare               = 2118,
+	NoRoom                       = 2119,
+	TooManyItems                 = 2121,
+	InvalidMaxUsers              = 2122,
+	BufTooSmall                  = 2123,
+	RemoteErr                    = 2127,
+	LanmanIniError               = 2131,
+	NetworkError                 = 2136,
+	WkstaInconsistentState       = 2137,
+	WkstaNotStarted              = 2138,
+	BrowserNotStarted            = 2139,
+	InternalError                = 2140,
+	BadTransactConfig            = 2141,
+	InvalidAPI                   = 2142,
+	BadEventName                 = 2143,
+	DupNameReboot                = 2144,
+	CfgCompNotFound              = 2146,
+	CfgParamNotFound             = 2147,
+	LineTooLong                  = 2149,
+	QNotFound                    = 2150,
+	JobNotFound                  = 2151,
+	DestNotFound                 = 2152,
+	DestExists                   = 2153,
+	QExists                      = 2154,
+	QNoRoom                      = 2155,
+	JobNoRoom                    = 2156,
+	DestNoRoom                   = 2157,
+	DestIdle                     = 2158,
+	DestInvalidOp                = 2159,
+	ProcNoRespond                = 2160,
+	SpoolerNotLoaded             = 2161,
+	DestInvalidState             = 2162,
+	QInvalidState                = 2163,
+	JobInvalidState              = 2164,
+	SpoolNoMemory                = 2165,
+	DriverNotFound               = 2166,
+	DataTypeInvalid              = 2167,
+	ProcNotFound                 = 2168,
+	ServiceTableLocked           = 2180,
+	ServiceTableFull             = 2181,
+	ServiceInstalled             = 2182,
+	ServiceEntryLocked           = 2183,
+	ServiceNotInstalled          = 2184,
+	BadServiceName               = 2185,
+	ServiceCtlTimeout            = 2186,
+	ServiceCtlBusy               = 2187,
+	BadServiceProgName           = 2188,
+	ServiceNotCtrl               = 2189,
+	ServiceKillProc              = 2190,
+	ServiceCtlNotValid           = 2191,
+	NotInDispatchTbl             = 2192,
+	BadControlRecv               = 2193,
+	ServiceNotStarting           = 2194,
+	AlreadyLoggedOn              = 2200,
+	NotLoggedOn                  = 2201,
+	BadUsername                  = 2202,
+	BadPassword                  = 2203,
+	UnableToAddName_W            = 2204,
+	UnableToAddName_F            = 2205,
+	UnableToDelName_W            = 2206,
+	UnableToDelName_F            = 2207,
+	LogonsPaused                 = 2209,
+	LogonServerConflict          = 2210,
+	LogonNoUserPath              = 2211,
+	LogonScriptError             = 2212,
+	StandaloneLogon              = 2214,
+	LogonServerNotFound          = 2215,
+	LogonDomainExists            = 2216,
+	NonValidatedLogon            = 2217,
+	ACFNotFound                  = 2219,
+	GroupNotFound                = 2220,
+	UserNotFound                 = 2221,
+	ResourceNotFound             = 2222,
+	GroupExists                  = 2223,
+	UserExists                   = 2224,
+	ResourceExists               = 2225,
+	NotPrimary                   = 2226,
+	ACFNotLoaded                 = 2227,
+	ACFNoRoom                    = 2228,
+	ACFFileIOFail                = 2229,
+	ACFTooManyLists              = 2230,
+	UserLogon                    = 2231,
+	ACFNoParent                  = 2232,
+	CanNotGrowSegment            = 2233,
+	SpeGroupOp                   = 2234,
+	NotInCache                   = 2235,
+	UserInGroup                  = 2236,
+	UserNotInGroup               = 2237,
+	AccountUndefined             = 2238,
+	AccountExpired               = 2239,
+	InvalidWorkstation           = 2240,
+	InvalidLogonHours            = 2241,
+	PasswordExpired              = 2242,
+	PasswordCantChange           = 2243,
+	PasswordHistConflict         = 2244,
+	PasswordTooShort             = 2245,
+	PasswordTooRecent            = 2246,
+	InvalidDatabase              = 2247,
+	DatabaseUpToDate             = 2248,
+	SyncRequired                 = 2249,
+	UseNotFound                  = 2250,
+	BadAsgType                   = 2251,
+	DeviceIsShared               = 2252,
+	SameAsComputerName           = 2253,
+	NoComputerName               = 2270,
+	MsgAlreadyStarted            = 2271,
+	MsgInitFailed                = 2272,
+	NameNotFound                 = 2273,
+	AlreadyForwarded             = 2274,
+	AddForwarded                 = 2275,
+	AlreadyExists                = 2276,
+	TooManyNames                 = 2277,
+	DelComputerName              = 2278,
+	LocalForward                 = 2279,
+	GrpMsgProcessor              = 2280,
+	PausedRemote                 = 2281,
+	BadReceive                   = 2282,
+	NameInUse                    = 2283,
+	MsgNotStarted                = 2284,
+	NotLocalName                 = 2285,
+	NoForwardName                = 2286,
+	RemoteFull                   = 2287,
+	NameNotForwarded             = 2288,
+	TruncatedBroadcast           = 2289,
+	InvalidDevice                = 2294,
+	WriteFault                   = 2295,
+	DuplicateName                = 2297,
+	DeleteLater                  = 2298,
+	IncompleteDel                = 2299,
+	MultipleNets                 = 2300,
+	NetNameNotFound              = 2310,
+	DeviceNotShared              = 2311,
+	ClientNameNotFound           = 2312,
+	FileIdNotFound               = 2314,
+	ExecFailure                  = 2315,
+	TmpFile                      = 2316,
+	TooMuchData                  = 2317,
+	DeviceShareConflict          = 2318,
+	BrowserTableIncomplete       = 2319,
+	NotLocalDomain               = 2320,
+	IsDfsShare                   = 2321,
+	DevInvalidOpCode             = 2331,
+	DevNotFound                  = 2332,
+	DevNotOpen                   = 2333,
+	BadQueueDevString            = 2334,
+	BadQueuePriority             = 2335,
+	NoCommDevs                   = 2337,
+	QueueNotFound                = 2338,
+	BadDevString                 = 2340,
+	BadDev                       = 2341,
+	InUseBySpooler               = 2342,
+	CommDevInUse                 = 2343,
+	InvalidComputer              = 2351,
+	MaxLenExceeded               = 2354,
+	BadComponent                 = 2356,
+	CantType                     = 2357,
+	TooManyEntries               = 2362,
+	ProfileFileTooBig            = 2370,
+	ProfileOffset                = 2371,
+	ProfileCleanup               = 2372,
+	ProfileUnknownCmd            = 2373,
+	ProfileLoadErr               = 2374,
+	ProfileSaveErr               = 2375,
+	LogOverflow                  = 2377,
+	LogFileChanged               = 2378,
+	LogFileCorrupt               = 2379,
+	SourceIsDir                  = 2380,
+	BadSource                    = 2381,
+	BadDest                      = 2382,
+	DifferentServers             = 2383,
+	RunSrvPaused                 = 2385,
+	ErrCommRunSrv                = 2389,
+	ErrorExecingGhost            = 2391,
+	ShareNotFound                = 2392,
+	InvalidLana                  = 2400,
+	OpenFiles                    = 2401,
+	ActiveConns                  = 2402,
+	BadPasswordCore              = 2403,
+	DevInUse                     = 2404,
+	LocalDrive                   = 2405,
+	AlertExists                  = 2430,
+	TooManyAlerts                = 2431,
+	NoSuchAlert                  = 2432,
+	BadRecipient                 = 2433,
+	AcctLimitExceeded            = 2434,
+	InvalidLogSeek               = 2440,
+	BadUasConfig                 = 2450,
+	InvalidUASOp                 = 2451,
+	LastAdmin                    = 2452,
+	DCNotFound                   = 2453,
+	LogonTrackingError           = 2454,
+	NetlogonNotStarted           = 2455,
+	CanNotGrowUASFile            = 2456,
+	TimeDiffAtDC                 = 2457,
+	PasswordMismatch             = 2458,
+	NoSuchServer                 = 2460,
+	NoSuchSession                = 2461,
+	NoSuchConnection             = 2462,
+	TooManyServers               = 2463,
+	TooManySessions              = 2464,
+	TooManyConnections           = 2465,
+	TooManyFiles                 = 2466,
+	NoAlternateServers           = 2467,
+	TryDownLevel                 = 2470,
+	UPSDriverNotStarted          = 2480,
+	UPSInvalidConfig             = 2481,
+	UPSInvalidCommPort           = 2482,
+	UPSSignalAsserted            = 2483,
+	UPSShutdownFailed            = 2484,
+	BadDosRetCode                = 2500,
+	ProgNeedsExtraMem            = 2501,
+	BadDosFunction               = 2502,
+	RemoteBootFailed             = 2503,
+	BadFileCheckSum              = 2504,
+	NoRplBootSystem              = 2505,
+	RplLoadrNetBiosErr           = 2506,
+	RplLoadrDiskErr              = 2507,
+	ImageParamErr                = 2508,
+	TooManyImageParams           = 2509,
+	NonDosFloppyUsed             = 2510,
+	RplBootRestart               = 2511,
+	RplSrvrCallFailed            = 2512,
+	CantConnectRplSrvr           = 2513,
+	CantOpenImageFile            = 2514,
+	CallingRplSrvr               = 2515,
+	StartingRplBoot              = 2516,
+	RplBootServiceTerm           = 2517,
+	RplBootStartFailed           = 2518,
+	RPL_CONNECTED                = 2519,
+	BrowserConfiguredToNotRun    = 2550,
+	RplNoAdaptersStarted         = 2610,
+	RplBadRegistry               = 2611,
+	RplBadDatabase               = 2612,
+	RplRplfilesShare             = 2613,
+	RplNotRplServer              = 2614,
+	RplCannotEnum                = 2615,
+	RplWkstaInfoCorrupted        = 2616,
+	RplWkstaNotFound             = 2617,
+	RplWkstaNameUnavailable      = 2618,
+	RplProfileInfoCorrupted      = 2619,
+	RplProfileNotFound           = 2620,
+	RplProfileNameUnavailable    = 2621,
+	RplProfileNotEmpty           = 2622,
+	RplConfigInfoCorrupted       = 2623,
+	RplConfigNotFound            = 2624,
+	RplAdapterInfoCorrupted      = 2625,
+	RplInternal                  = 2626,
+	RplVendorInfoCorrupted       = 2627,
+	RplBootInfoCorrupted         = 2628,
+	RplWkstaNeedsUserAcct        = 2629,
+	RplNeedsRPLUSERAcct          = 2630,
+	RplBootNotFound              = 2631,
+	RplIncompatibleProfile       = 2632,
+	RplAdapterNameUnavailable    = 2633,
+	RplConfigNotEmpty            = 2634,
+	RplBootInUse                 = 2635,
+	RplBackupDatabase            = 2636,
+	RplAdapterNotFound           = 2637,
+	RplVendorNotFound            = 2638,
+	RplVendorNameUnavailable     = 2639,
+	RplBootNameUnavailable       = 2640,
+	RplConfigNameUnavailable     = 2641,
+	DfsInternalCorruption        = 2660,
+	DfsVolumeDataCorrupt         = 2661,
+	DfsNoSuchVolume              = 2662,
+	DfsVolumeAlreadyExists       = 2663,
+	DfsAlreadyShared             = 2664,
+	DfsNoSuchShare               = 2665,
+	DfsNotALeafVolume            = 2666,
+	DfsLeafVolume                = 2667,
+	DfsVolumeHasMultipleServers  = 2668,
+	DfsCantCreateJunctionPoint   = 2669,
+	DfsServerNotDfsAware         = 2670,
+	DfsBadRenamePath             = 2671,
+	DfsVolumeIsOffline           = 2672,
+	DfsNoSuchServer              = 2673,
+	DfsCyclicalName              = 2674,
+	DfsNotSupportedInServerDfs   = 2675,
+	DfsDuplicateService          = 2676,
 	DfsCantRemoveLastServerShare = 2677,
-	DfsVolumeIsInterDfs = 2678,
-	DfsInconsistent = 2679,
-	DfsServerUpgraded = 2680,
-	DfsDataIsIdentical = 2681,
-	DfsCantRemoveDfsRoot = 2682,
-	DfsChildOrParentInDfs = 2683,
-	DfsInternalError = 2690,
-	SetupAlreadyJoined = 2691,
-	SetupNotJoined = 2692,
-	SetupDomainController = 2693,
-	DefaultJoinRequired = 2694,
-	InvalidWorkgroupName = 2695,
+	DfsVolumeIsInterDfs          = 2678,
+	DfsInconsistent              = 2679,
+	DfsServerUpgraded            = 2680,
+	DfsDataIsIdentical           = 2681,
+	DfsCantRemoveDfsRoot         = 2682,
+	DfsChildOrParentInDfs        = 2683,
+	DfsInternalError             = 2690,
+	SetupAlreadyJoined           = 2691,
+	SetupNotJoined               = 2692,
+	SetupDomainController        = 2693,
+	DefaultJoinRequired          = 2694,
+	InvalidWorkgroupName         = 2695,
 	NameUsesIncompatibleCodePage = 2696,
-	ComputerAccountNotFound = 2697,
-	PersonalSku = 2698,
-	SetupCheckDNSConfig = 2699,
-	PasswordMustChange = 2701,
-	AccountLockedOut = 2702,
-	PasswordTooLong = 2703,
-	PasswordNotComplexEnough = 2704,
-	PasswordFilterError = 2705,
+	ComputerAccountNotFound      = 2697,
+	PersonalSku                  = 2698,
+	SetupCheckDNSConfig          = 2699,
+	PasswordMustChange           = 2701,
+	AccountLockedOut             = 2702,
+	PasswordTooLong              = 2703,
+	PasswordNotComplexEnough     = 2704,
+	PasswordFilterError          = 2705,
 }
 
 
@@ -4053,12 +4077,12 @@ IMAGE_DEBUG_DIRECTORY :: struct {
 
 IMAGE_DEBUG_TYPE_CODEVIEW :: 2
 
-SICHINTF :: DWORD
-SHCONTF :: DWORD
-SFGAOF :: ULONG
+SICHINTF              :: DWORD
+SHCONTF               :: DWORD
+SFGAOF                :: ULONG
 FILEOPENDIALOGOPTIONS :: DWORD
-REFPROPERTYKEY :: ^PROPERTYKEY
-REFPROPVARIANT :: ^PROPVARIANT
+REFPROPERTYKEY        :: ^PROPERTYKEY
+REFPROPVARIANT        :: ^PROPVARIANT
 
 SIGDN :: enum c_int {
 	NORMALDISPLAY               = 0,
@@ -4083,57 +4107,57 @@ SIATTRIBFLAGS :: enum c_int {
 
 FDAP :: enum c_int {
 	BOTTOM = 0,
-	TOP = 1,
+	TOP    = 1,
 }
 
 FDE_SHAREVIOLATION_RESPONSE :: enum c_int {
 	DEFAULT = 0,
-	ACCEPT = 1,
-	REFUSE = 2,
+	ACCEPT  = 1,
+	REFUSE  = 2,
 }
 
 GETPROPERTYSTOREFLAGS :: enum c_int {
-	DEFAULT	= 0,
-	HANDLERPROPERTIESONLY	= 0x1,
-	READWRITE	= 0x2,
-	TEMPORARY	= 0x4,
-	FASTPROPERTIESONLY	= 0x8,
-	OPENSLOWITEM	= 0x10,
-	DELAYCREATION	= 0x20,
-	BESTEFFORT	= 0x40,
-	NO_OPLOCK	= 0x80,
-	PREFERQUERYPROPERTIES	= 0x100,
-	EXTRINSICPROPERTIES	= 0x200,
-	EXTRINSICPROPERTIESONLY	= 0x400,
-	VOLATILEPROPERTIES	= 0x800,
-	VOLATILEPROPERTIESONLY	= 0x1000,
-	MASK_VALID	= 0x1fff,
+	DEFAULT                 = 0,
+	HANDLERPROPERTIESONLY   = 0x1,
+	READWRITE               = 0x2,
+	TEMPORARY               = 0x4,
+	FASTPROPERTIESONLY      = 0x8,
+	OPENSLOWITEM            = 0x10,
+	DELAYCREATION           = 0x20,
+	BESTEFFORT              = 0x40,
+	NO_OPLOCK               = 0x80,
+	PREFERQUERYPROPERTIES   = 0x100,
+	EXTRINSICPROPERTIES     = 0x200,
+	EXTRINSICPROPERTIESONLY = 0x400,
+	VOLATILEPROPERTIES      = 0x800,
+	VOLATILEPROPERTIESONLY  = 0x1000,
+	MASK_VALID              = 0x1fff,
 }
 
 PROPERTYKEY :: struct {
 	fmtid: GUID,
-	pid: DWORD,
+	pid:   DWORD,
 }
 
 BIND_OPTS :: struct {
-	cbStruct: DWORD,
-	grfFlags: DWORD,
-	grfMode: DWORD,
+	cbStruct:            DWORD,
+	grfFlags:            DWORD,
+	grfMode:             DWORD,
 	dwTickCountDeadline: DWORD,
 }
 
 STATSTG :: struct {
-	pwcsName: LPOLESTR,
-	type: DWORD,
-	cbSize: ULARGE_INTEGER,
-	mtime: FILETIME,
-	ctime: FILETIME,
-	atime: FILETIME,
-	grfMode: DWORD,
+	pwcsName:          LPOLESTR,
+	type:              DWORD,
+	cbSize:            ULARGE_INTEGER,
+	mtime:             FILETIME,
+	ctime:             FILETIME,
+	atime:             FILETIME,
+	grfMode:           DWORD,
 	grfLocksSupported: DWORD,
-	clsid: CLSID,
-	grfStateBits: DWORD,
-	reserved: DWORD,
+	clsid:             CLSID,
+	grfStateBits:      DWORD,
+	reserved:          DWORD,
 }
 
 COMDLG_FILTERSPEC :: struct {
@@ -4142,15 +4166,15 @@ COMDLG_FILTERSPEC :: struct {
 
 DECIMAL :: struct {
 	wReserved: USHORT,
-	_: struct #raw_union {
-		_: struct {
+	using _: struct #raw_union {
+		using _: struct {
 			scale, sign: BYTE,
 		},
 		signscale: USHORT,
 	},
 	Hi32: ULONG,
-	_: struct #raw_union {
-		_: struct {
+	using _: struct #raw_union {
+		using _: struct {
 			Lo32, Mid32: ULONG,
 		},
 		Lo64: ULONGLONG,
@@ -4223,14 +4247,14 @@ LWSTDAPI :: HRESULT
 
 CLSID_FileOpenDialog := &GUID{0xDC1C5A9C, 0xE88A, 0x4DDE, {0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7}}
 CLSID_FileSaveDialog := &GUID{0xC0B4E2F3, 0xBA21, 0x4773, {0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B}}
-CLSID_TaskbarList := &GUID{0x56FDF344, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
+CLSID_TaskbarList    := &GUID{0x56FDF344, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
 
-IID_IFileDialog := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
-IID_IFileSaveDialog := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
-IID_IFileOpenDialog := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
-IID_ITaskbarList := &GUID{0x56FDF342, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
-IID_ITaskbarList2 := &GUID{0x602D4995, 0xB13A, 0x429b, {0xA6, 0x6E, 0x19, 0x35, 0xE4, 0x4F, 0x43, 0x17}}
-IID_ITaskbarList3 := &GUID{0xea1afb91, 0x9e28, 0x4b86, {0x90, 0xe9, 0x9e, 0x9f, 0x8a, 0x5e, 0xef, 0xaf}}
+IID_IFileDialog      := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
+IID_IFileSaveDialog  := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
+IID_IFileOpenDialog  := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
+IID_ITaskbarList     := &GUID{0x56FDF342, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
+IID_ITaskbarList2    := &GUID{0x602D4995, 0xB13A, 0x429b, {0xA6, 0x6E, 0x19, 0x35, 0xE4, 0x4F, 0x43, 0x17}}
+IID_ITaskbarList3    := &GUID{0xea1afb91, 0x9e28, 0x4b86, {0x90, 0xe9, 0x9e, 0x9f, 0x8a, 0x5e, 0xef, 0xaf}}
 
 IModalWindow :: struct #raw_union {
 	#subtype IUnknown: IUnknown,
@@ -4726,24 +4750,24 @@ Windows_Product_Type :: enum DWORD {
 	WEB_SERVER_CORE                     = 0x0000001D, // Web Server (core installation)
 }
 
-ENABLE_ECHO_INPUT : DWORD : 0x0004
-ENABLE_INSERT_MODE : DWORD : 0x0020
-ENABLE_LINE_INPUT : DWORD : 0x0002
-ENABLE_MOUSE_INPUT : DWORD : 0x0010
-ENABLE_PROCESSED_INPUT : DWORD : 0x0001
-ENABLE_QUICK_EDIT_MODE : DWORD : 0x0040
-ENABLE_WINDOW_INPUT : DWORD : 0x0008
-ENABLE_VIRTUAL_TERMINAL_INPUT : DWORD : 0x0200
-ENABLE_PROCESSED_OUTPUT : DWORD : 0x0001
-ENABLE_WRAP_AT_EOL_OUTPUT : DWORD : 0x0002
+ENABLE_ECHO_INPUT                  : DWORD : 0x0004
+ENABLE_INSERT_MODE                 : DWORD : 0x0020
+ENABLE_LINE_INPUT                  : DWORD : 0x0002
+ENABLE_MOUSE_INPUT                 : DWORD : 0x0010
+ENABLE_PROCESSED_INPUT             : DWORD : 0x0001
+ENABLE_QUICK_EDIT_MODE             : DWORD : 0x0040
+ENABLE_WINDOW_INPUT                : DWORD : 0x0008
+ENABLE_VIRTUAL_TERMINAL_INPUT      : DWORD : 0x0200
+ENABLE_PROCESSED_OUTPUT            : DWORD : 0x0001
+ENABLE_WRAP_AT_EOL_OUTPUT          : DWORD : 0x0002
 ENABLE_VIRTUAL_TERMINAL_PROCESSING : DWORD : 0x0004
-DISABLE_NEWLINE_AUTO_RETURN : DWORD : 0x0008
-ENABLE_LVB_GRID_WORLDWIDE : DWORD : 0x0010
+DISABLE_NEWLINE_AUTO_RETURN        : DWORD : 0x0008
+ENABLE_LVB_GRID_WORLDWIDE          : DWORD : 0x0010
 
-CTRL_C_EVENT : DWORD : 0
-CTRL_BREAK_EVENT : DWORD : 1
-CTRL_CLOSE_EVENT : DWORD : 2
-CTRL_LOGOFF_EVENT : DWORD : 5
+CTRL_C_EVENT        : DWORD : 0
+CTRL_BREAK_EVENT    : DWORD : 1
+CTRL_CLOSE_EVENT    : DWORD : 2
+CTRL_LOGOFF_EVENT   : DWORD : 5
 CTRL_SHUTDOWN_EVENT : DWORD : 6
 
 COORD :: struct {
@@ -4752,45 +4776,45 @@ COORD :: struct {
 }
 
 SMALL_RECT :: struct {
-	Left: SHORT,
-	Top: SHORT,
-	Right: SHORT,
+	Left:   SHORT,
+	Top:    SHORT,
+	Right:  SHORT,
 	Bottom: SHORT,
 }
 
 CONSOLE_SCREEN_BUFFER_INFO :: struct {
-	dwSize: COORD,
-	dwCursorPosition: COORD,
-	wAttributes: WORD,
-	srWindow: SMALL_RECT,
+	dwSize:              COORD,
+	dwCursorPosition:    COORD,
+	wAttributes:         WORD,
+	srWindow:            SMALL_RECT,
 	dwMaximumWindowSize: COORD,
 }
 
 CONSOLE_CURSOR_INFO :: struct {
-	dwSize: DWORD,
+	dwSize:   DWORD,
 	bVisible: BOOL,
 }
 
 
 PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
-PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
+PCONSOLE_CURSOR_INFO        :: ^CONSOLE_CURSOR_INFO
 
 Event_Type :: enum WORD {
-	KEY_EVENT = 0x0001,
-	MOUSE_EVENT = 0x0002,
+	KEY_EVENT                = 0x0001,
+	MOUSE_EVENT              = 0x0002,
 	WINDOW_BUFFER_SIZE_EVENT = 0x0004,
-	MENU_EVENT = 0x0008,
-	FOCUS_EVENT = 0x0010,
+	MENU_EVENT               = 0x0008,
+	FOCUS_EVENT              = 0x0010,
 }
 
 INPUT_RECORD :: struct {
 	EventType: Event_Type,
 	Event: struct #raw_union {
-		KeyEvent: KEY_EVENT_RECORD,
-		MouseEvent: MOUSE_EVENT_RECORD,
-		WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD,
-		MenuEvent: MENU_EVENT_RECORD,
-		FocusEvent: FOCUS_EVENT_RECORD,
+		KeyEvent:              KEY_EVENT_RECORD          `raw_union_tag:"EventType=KEY_EVENT"`,
+		MouseEvent:            MOUSE_EVENT_RECORD        `raw_union_tag:"EventType=MOUSE_EVENT"`,
+		WindowBufferSizeEvent: WINDOW_BUFFER_SIZE_RECORD `raw_union_tag:"EventType=WINDOW_BUFFER_SIZE_EVENT"`,
+		MenuEvent:             MENU_EVENT_RECORD         `raw_union_tag:"EventType=MENU_EVENT"`,
+		FocusEvent:            FOCUS_EVENT_RECORD        `raw_union_tag:"EventType=FOCUS_EVENT"`,
 	},
 }
 
@@ -4820,10 +4844,10 @@ KEY_EVENT_RECORD :: struct {
 }
 
 MOUSE_EVENT_RECORD :: struct {
-	dwMousePosition: COORD,
-	dwButtonState: DWORD,
+	dwMousePosition:   COORD,
+	dwButtonState:     DWORD,
 	dwControlKeyState: DWORD,
-	dwEventFlags: DWORD,
+	dwEventFlags:      DWORD,
 }
 
 WINDOW_BUFFER_SIZE_RECORD :: struct {
@@ -4949,16 +4973,16 @@ SO_SNDBUF             : c_int : 0x1001
 SO_ERROR              : c_int : 0x1007
 SO_BROADCAST          : c_int : 0x0020
 
-TCP_NODELAY: c_int : 0x0001
-IP_TTL: c_int : 4
-IPV6_V6ONLY: c_int : 27
-IP_MULTICAST_LOOP: c_int : 11
-IPV6_MULTICAST_LOOP: c_int : 11
-IP_MULTICAST_TTL: c_int : 10
-IP_ADD_MEMBERSHIP: c_int : 12
+TCP_NODELAY         : c_int : 0x0001
+IP_TTL              : c_int : 4
+IPV6_V6ONLY         : c_int : 27
+IP_MULTICAST_LOOP   : c_int : 11
+IPV6_MULTICAST_LOOP : c_int : 11
+IP_MULTICAST_TTL    : c_int : 10
+IP_ADD_MEMBERSHIP   : c_int : 12
 
-IPV6_ADD_MEMBERSHIP: c_int : 12
-IPV6_DROP_MEMBERSHIP: c_int : 13
+IPV6_ADD_MEMBERSHIP  : c_int : 12
+IPV6_DROP_MEMBERSHIP : c_int : 13
 
 MAX_PROTOCOL_CHAIN: DWORD : 7
 
@@ -4972,8 +4996,8 @@ MSG_OOB  : c_int : 1 // `send`/`recv` should process out-of-band data.
 MSG_PEEK : c_int : 2 // `recv` should not remove the data from the buffer. Only valid for non-overlapped operations.
 
 
-SOCKET :: distinct uintptr // TODO
-socklen_t :: c_int
+SOCKET         :: distinct uintptr // TODO
+socklen_t      :: c_int
 ADDRESS_FAMILY :: USHORT
 
 ip_mreq :: struct {
@@ -4999,7 +5023,7 @@ ADDRINFOA :: struct {
 	ai_socktype:  c_int,
 	ai_protocol:  c_int,
 	ai_addrlen:   size_t,
-	ai_canonname: ^c_char,
+	ai_canonname: [^]c_char `fmt:"q,ai_addrlen"`,
 	ai_addr:      ^SOCKADDR,
 	ai_next:      ^ADDRINFOA,
 }
@@ -5032,18 +5056,18 @@ in6_addr :: struct {
 }
 
 
-DNS_STATUS :: distinct DWORD // zero is success
-DNS_INFO_NO_RECORDS :: 9501
+DNS_STATUS             :: distinct DWORD // zero is success
+DNS_INFO_NO_RECORDS    :: 9501
 DNS_QUERY_NO_RECURSION :: 0x00000004
 
 DNS_RECORD :: struct { // aka DNS_RECORDA
-	pNext: ^DNS_RECORD,
-	pName: cstring,
-	wType: WORD,
+	pNext:       ^DNS_RECORD,
+	pName:       cstring,
+	wType:       WORD,
 	wDataLength: USHORT,
-	Flags: DWORD,
-	dwTtl: DWORD,
-	_: DWORD,
+	Flags:       DWORD,
+	dwTtl:       DWORD,
+	_:           DWORD,
 	Data: struct #raw_union #align(4) {
 		CNAME: DNS_PTR_DATAA,
 		A:     u32be,  // Ipv4 Address
@@ -5064,8 +5088,8 @@ DNS_PTR_DATAA :: cstring
 
 DNS_MX_DATAA :: struct {
 	pNameExchange: cstring, // the hostname
-	wPreference: WORD,      // lower values preferred
-	_: WORD,                // padding.
+	wPreference:   WORD,      // lower values preferred
+	_:             WORD,                // padding.
 }
 DNS_SRV_DATAA :: struct {
 	pNameTarget: cstring,
@@ -5110,8 +5134,8 @@ ENUMRESTYPEPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lParam: LONG_
 ENUMRESLANGPROCW :: #type proc (hModule: HMODULE, lpType: LPCWSTR, lpName: LPWSTR, wIDLanguage: LANGID, lParam: LONG_PTR)-> BOOL
 
 DTR_Control :: enum byte {
-	Disable = 0,
-	Enable = 1,
+	Disable   = 0,
+	Enable    = 1,
 	Handshake = 2,
 }
 RTS_Control :: enum byte {
@@ -5128,9 +5152,9 @@ Parity :: enum byte {
 	Space = 4,
 }
 Stop_Bits :: enum byte {
-	One = 0,
+	One            = 0,
 	One_And_A_Half = 1,
-	Two = 2,
+	Two            = 2,
 }
 
 DCB :: struct {
@@ -5166,34 +5190,34 @@ DCB :: struct {
 }
 
 COMMTIMEOUTS :: struct {
-	ReadIntervalTimeout: DWORD,
-	ReadTotalTimeoutMultiplier: DWORD,
-	ReadTotalTimeoutConstant: DWORD,
+	ReadIntervalTimeout:         DWORD,
+	ReadTotalTimeoutMultiplier:  DWORD,
+	ReadTotalTimeoutConstant:    DWORD,
 	WriteTotalTimeoutMultiplier: DWORD,
-	WriteTotalTimeoutConstant: DWORD,
+	WriteTotalTimeoutConstant:   DWORD,
 }
 
-Com_Stat_Bits :: enum {
-	fCtsHold,
-	fDsrHold,
-	fRlsdHold,
-	fXoffHold,
-	fXoffSent,
-	fEof,
-	fTxim,
-}
 COMSTAT :: struct {
-	bits: bit_set[Com_Stat_Bits; DWORD],
-	cbInQue: DWORD,
+	using _: bit_field DWORD {
+		fCtsHold:  BOOL  | 1,
+		fDsrHold:  BOOL  | 1,
+		fRlsdHol:  BOOL  | 1,
+		fXoffHol:  BOOL  | 1,
+		fXoffSen:  BOOL  | 1,
+		fEof:      BOOL  | 1,
+		fTxim:     BOOL  | 1,
+		fReserved: DWORD | 25,
+	},
+	cbInQue:  DWORD,
 	cbOutQue: DWORD,
 }
 
-Com_Error_Bits :: enum {
+Com_Error_Bits :: enum DWORD {
 	RXOVER,
 	OVERRUN,
 	RXPARITY,
 	FRAME,
 	BREAK,
 }
-Com_Error :: bit_set[Com_Error_Bits; DWORD]
+Com_Error :: distinct bit_set[Com_Error_Bits; DWORD]
 

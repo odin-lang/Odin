@@ -5,14 +5,14 @@ foreign import version "system:version.lib"
 
 @(default_calling_convention = "system")
 foreign version {
-	GetFileVersionInfoSizeW :: proc(lpwstrFilename: LPCWSTR, lpdwHandle: LPDWORD) -> DWORD ---
-	GetFileVersionInfoW :: proc(lptstrFilename: LPCWSTR, dwHandle: DWORD, dwLen: DWORD, lpData: LPVOID) -> BOOL ---
+	GetFileVersionInfoSizeW   :: proc(lpwstrFilename: LPCWSTR, lpdwHandle: LPDWORD) -> DWORD ---
+	GetFileVersionInfoW       :: proc(lptstrFilename: LPCWSTR, dwHandle: DWORD, dwLen: DWORD, lpData: LPVOID) -> BOOL ---
 
 	GetFileVersionInfoSizeExW :: proc(dwFlags: FILE_VER_GET_FLAGS, lpwstrFilename: LPCWSTR, lpdwHandle: LPDWORD) -> DWORD ---
-	GetFileVersionInfoExW :: proc(dwFlags: FILE_VER_GET_FLAGS, lpwstrFilename: LPCWSTR, dwHandle, dwLen: DWORD, lpData: LPVOID) -> DWORD ---
+	GetFileVersionInfoExW     :: proc(dwFlags: FILE_VER_GET_FLAGS, lpwstrFilename: LPCWSTR, dwHandle, dwLen: DWORD, lpData: LPVOID) -> DWORD ---
 
-	VerLanguageNameW :: proc(wLang: DWORD, szLang: LPWSTR, cchLang: DWORD) -> DWORD ---
-	VerQueryValueW :: proc(pBlock: LPCVOID, lpSubBlock: LPCWSTR, lplpBuffer: ^LPVOID, puLen: PUINT) -> BOOL ---
+	VerLanguageNameW          :: proc(wLang: DWORD, szLang: LPWSTR, cchLang: DWORD) -> DWORD ---
+	VerQueryValueW            :: proc(pBlock: LPCVOID, lpSubBlock: LPCWSTR, lplpBuffer: ^LPVOID, puLen: PUINT) -> BOOL ---
 }
 
 FILE_VER_GET :: enum DWORD {LOCALISED, NEUTRAL, PREFETCHED}

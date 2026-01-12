@@ -1,10 +1,10 @@
+package compress_shoco
+
 /*
 	This file was generated, so don't edit this by hand.
 	Transliterated from https://github.com/Ed-von-Schleck/shoco/blob/master/shoco_model.h,
 	which is an English word model.
 */
-
-package compress_shoco
 
 DEFAULT_MODEL :: Shoco_Model {
 	min_char = 39,

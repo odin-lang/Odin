@@ -15,13 +15,15 @@ foreign dom_lib {
 	get_element_value_string_length :: proc(id: string) -> int ---
 
 	set_element_key_string :: proc(id: string, key: string, value: string) ---
-	get_element_key_string_length :: proc(id: string, key: string, ) -> int ---
+	get_element_key_string_length :: proc(id: string, key: string) -> int ---
 
 	device_pixel_ratio :: proc() -> f64 ---
 
 	window_set_scroll :: proc(x, y: f64) ---
 
 	set_element_style :: proc(id: string, key: string, value: string) ---
+
+	set_document_title :: proc(title: string) ---
 }
 
 get_element_value_string :: proc "contextless" (id: string, buf: []byte) -> string {

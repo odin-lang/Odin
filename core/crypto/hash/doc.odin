@@ -1,5 +1,5 @@
 /*
-package hash provides a generic interface to the supported hash algorithms.
+A generic interface to the supported hash algorithms.
 
 A high-level convenience procedure group `hash` is provided to easily
 accomplish common tasks.

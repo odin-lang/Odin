@@ -1,7 +1,6 @@
 /*
-package uuid/legacy implements versions 3 and 5 of UUID generation, both of
-which are using hashing algorithms (MD5 and SHA1, respectively) that are known
-these days to no longer be secure.
+Versions 3 and 5 of `UUID` generation, both of which use legacy (`MD5` + `SHA1`) hashes.
+Those are known these days to no longer be secure.
 */
 package uuid_legacy
 

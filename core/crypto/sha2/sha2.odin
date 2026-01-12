@@ -1,5 +1,5 @@
 /*
-package sha2 implements the SHA2 hash algorithm family.
+`SHA2` hash algorithm family.
 
 See:
 - [[ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf ]]
@@ -9,7 +9,7 @@ package sha2
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.

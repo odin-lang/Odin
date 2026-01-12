@@ -1,3 +1,4 @@
+// A sorting interface and algorithms.
 package sort
 
 import "core:mem"

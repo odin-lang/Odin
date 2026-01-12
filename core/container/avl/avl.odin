@@ -1,8 +1,4 @@
-/*
-package avl implements an AVL tree.
-
-The implementation is non-intrusive, and non-recursive.
-*/
+// A non-intrusive and non-recursive implementation of `AVL` trees.
 package container_avl
 
 @(require) import "base:intrinsics"

@@ -624,10 +624,10 @@ GPURasterizerState :: struct {
 
 
 GPUMultisampleState :: struct {
-	sample_count: GPUSampleCount,  /**< The number of samples to be used in rasterization. */
-	sample_mask:  Uint32,          /**< Reserved for future use. Must be set to 0. */
-	enable_mask:  bool,            /**< Reserved for future use. Must be set to false. */
-	_: Uint8,
+	sample_count:             GPUSampleCount,  /**< The number of samples to be used in rasterization. */
+	sample_mask:              Uint32,          /**< Reserved for future use. Must be set to 0. */
+	enable_mask:              bool,            /**< Reserved for future use. Must be set to false. */
+	enable_alpha_to_coverage: bool,            /**< true enables the alpha-to-coverage feature. */
 	_: Uint8,
 	_: Uint8,
 }
@@ -718,8 +718,8 @@ GPUDepthStencilTargetInfo :: struct {
 	stencil_store_op: GPUStoreOp,   /**< What is done with the stencil results of the render pass. */
 	cycle:            bool,         /**< true cycles the texture if the texture is bound and any load ops are not LOAD */
 	clear_stencil:    Uint8,        /**< The value to clear the stencil component to at the beginning of the render pass. Ignored if GPU_LOADOP_CLEAR is not used. */
-	_: Uint8,
-	_: Uint8,
+	mip_level:        Uint8,        /**< The mip level to use as the depth stencil target. */
+	layer:            Uint8,        /**< The layer index to use as the depth stencil target. */
 }
 
 
@@ -765,16 +765,34 @@ GPUStorageTextureReadWriteBinding :: struct {
 }
 
 
-PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN           :: "SDL.gpu.device.create.debugmode"
-PROP_GPU_DEVICE_CREATE_PREFERLOWPOWER_BOOLEAN      :: "SDL.gpu.device.create.preferlowpower"
-PROP_GPU_DEVICE_CREATE_NAME_STRING                 :: "SDL.gpu.device.create.name"
-PROP_GPU_DEVICE_CREATE_SHADERS_PRIVATE_BOOLEAN     :: "SDL.gpu.device.create.shaders.private"
-PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN       :: "SDL.gpu.device.create.shaders.spirv"
-PROP_GPU_DEVICE_CREATE_SHADERS_DXBC_BOOLEAN        :: "SDL.gpu.device.create.shaders.dxbc"
-PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN        :: "SDL.gpu.device.create.shaders.dxil"
-PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN         :: "SDL.gpu.device.create.shaders.msl"
-PROP_GPU_DEVICE_CREATE_SHADERS_METALLIB_BOOLEAN    :: "SDL.gpu.device.create.shaders.metallib"
-PROP_GPU_DEVICE_CREATE_D3D12_SEMANTIC_NAME_STRING  :: "SDL.gpu.device.create.d3d12.semantic"
+PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN                            :: "SDL.gpu.device.create.debugmode"
+PROP_GPU_DEVICE_CREATE_PREFERLOWPOWER_BOOLEAN                       :: "SDL.gpu.device.create.preferlowpower"
+PROP_GPU_DEVICE_CREATE_VERBOSE_BOOLEAN                              :: "SDL.gpu.device.create.verbose"
+PROP_GPU_DEVICE_CREATE_NAME_STRING                                  :: "SDL.gpu.device.create.name"
+PROP_GPU_DEVICE_CREATE_FEATURE_CLIP_DISTANCE_BOOLEAN                :: "SDL.gpu.device.create.feature.clip_distance"
+PROP_GPU_DEVICE_CREATE_FEATURE_DEPTH_CLAMPING_BOOLEAN               :: "SDL.gpu.device.create.feature.depth_clamping"
+PROP_GPU_DEVICE_CREATE_FEATURE_INDIRECT_DRAW_FIRST_INSTANCE_BOOLEAN :: "SDL.gpu.device.create.feature.indirect_draw_first_instance"
+PROP_GPU_DEVICE_CREATE_FEATURE_ANISOTROPY_BOOLEAN                   :: "SDL.gpu.device.create.feature.anisotropy"
+PROP_GPU_DEVICE_CREATE_SHADERS_PRIVATE_BOOLEAN                      :: "SDL.gpu.device.create.shaders.private"
+PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN                        :: "SDL.gpu.device.create.shaders.spirv"
+PROP_GPU_DEVICE_CREATE_SHADERS_DXBC_BOOLEAN                         :: "SDL.gpu.device.create.shaders.dxbc"
+PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN                         :: "SDL.gpu.device.create.shaders.dxil"
+PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN                          :: "SDL.gpu.device.create.shaders.msl"
+PROP_GPU_DEVICE_CREATE_SHADERS_METALLIB_BOOLEAN                     :: "SDL.gpu.device.create.shaders.metallib"
+PROP_GPU_DEVICE_CREATE_D3D12_ALLOW_FEWER_RESOURCE_SLOTS_BOOLEAN     :: "SDL.gpu.device.create.d3d12.allowtier1resourcebinding"
+PROP_GPU_DEVICE_CREATE_D3D12_SEMANTIC_NAME_STRING                   :: "SDL.gpu.device.create.d3d12.semantic"
+PROP_GPU_DEVICE_CREATE_VULKAN_REQUIRE_HARDWARE_ACCELERATION_BOOLEAN :: "SDL.gpu.device.create.vulkan.requirehardwareacceleration"
+PROP_GPU_DEVICE_CREATE_VULKAN_OPTIONS_POINTER                       :: "SDL.gpu.device.create.vulkan.options"
+
+GPUVulkanOptions :: struct {
+	vulkan_api_version:                 Uint32,       /**< The Vulkan API version to request for the instance. Use Vulkan's VK_MAKE_VERSION or VK_MAKE_API_VERSION. */
+	feature_list:                       rawptr,       /**< Pointer to the first element of a chain of Vulkan feature structs. (Requires API version 1.1 or higher.)*/
+	vulkan_10_physical_device_features: rawptr,       /**< Pointer to a VkPhysicalDeviceFeatures struct to enable additional Vulkan 1.0 features. */
+	device_extension_count:             Uint32,       /**< Number of additional device extensions to require. */
+	device_extension_names:             [^]cstring,   /**< Pointer to a list of additional device extensions to require. */
+	instance_extension_count:           Uint32,       /**< Number of additional instance extensions to require. */
+	instance_extension_names:           [^]cstring,   /**< Pointer to a list of additional instance extensions to require. */
+}
 
 PROP_GPU_COMPUTEPIPELINE_CREATE_NAME_STRING        :: "SDL.gpu.computepipeline.create.name"
 PROP_GPU_GRAPHICSPIPELINE_CREATE_NAME_STRING       :: "SDL.gpu.graphicspipeline.create.name"
@@ -789,6 +807,11 @@ PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER :: "SDL.gpu.texture.create.d3
 PROP_GPU_TEXTURE_CREATE_NAME_STRING                :: "SDL.gpu.texture.create.name"
 PROP_GPU_BUFFER_CREATE_NAME_STRING                 :: "SDL.gpu.buffer.create.name"
 PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING         :: "SDL.gpu.transferbuffer.create.name"
+
+PROP_GPU_DEVICE_NAME_STRING               :: "SDL.gpu.device.name"
+PROP_GPU_DEVICE_DRIVER_NAME_STRING        :: "SDL.gpu.device.driver_name"
+PROP_GPU_DEVICE_DRIVER_VERSION_STRING     :: "SDL.gpu.device.driver_version"
+PROP_GPU_DEVICE_DRIVER_INFO_STRING        :: "SDL.gpu.device.driver_info"
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
@@ -884,6 +907,8 @@ foreign lib {
 	GPUTextureSupportsFormat              :: proc(device: ^GPUDevice, format: GPUTextureFormat, type: GPUTextureType, usage: GPUTextureUsageFlags) -> bool ---
 	GPUTextureSupportsSampleCount         :: proc(device: ^GPUDevice, format: GPUTextureFormat, sample_count: GPUSampleCount) -> bool ---
 	CalculateGPUTextureFormatSize         :: proc(format: GPUTextureFormat, width, height: Uint32, depth_or_layer_count: Uint32) -> Uint32 ---
+	GetPixelFormatFromGPUTextureFormat    :: proc(format: GPUTextureFormat) -> PixelFormat ---
+	GetGPUTextureFormatFromPixelFormat    :: proc(format: PixelFormat) -> GPUTextureFormat ---
 }
 
 

@@ -41,15 +41,16 @@ FinishTaskCallback :: #type proc "c" (userTask: rawptr, userContext: rawptr)
 // from a worker thread.
 // @warning This function should not attempt to modify Box2D state or user application state.
 // @ingroup world
-FrictionCallback :: #type proc "c" (frictionA: f32, userMaterialIdA: i32, frictionB: f32, userMaterialIdB: i32)
+FrictionCallback :: #type proc "c" (frictionA: f32, userMaterialIdA: i32, frictionB: f32, userMaterialIdB: i32) -> f32
 
 // Optional restitution mixing callback. This intentionally provides no context objects because this is called
 // from a worker thread.
 // @warning This function should not attempt to modify Box2D state or user application state.
 // @ingroup world
-RestitutionCallback :: #type proc "c" (restitutionA: f32, userMaterialIdA: i32, restitutuionB: f32, userMaterialIdB: i32)
+RestitutionCallback :: #type proc "c" (restitutionA: f32, userMaterialIdA: i32, restitutionB: f32, userMaterialIdB: i32) -> f32
 
 // Result from b2World_RayCastClosest
+// If there is initial overlap the fraction and normal will be zero while the point is an arbitrary point in the overlap region.
 // @ingroup world
 RayResult :: struct {
 	shapeId:    ShapeId,
@@ -86,12 +87,6 @@ WorldDef :: struct {
 	// puts a cap on the resolution speed. The resolution speed is increased by increasing the hertz and/or
 	// decreasing the damping ratio.
 	maxContactPushSpeed: f32,
-
-	// Joint stiffness. Cycles per second.
-	jointHertz: f32,
-
-	// Joint bounciness. Non-dimensional.
-	jointDampingRatio: f32,
 
 	// Maximum linear speed. Usually meters per second.
 	maximumLinearSpeed: f32,
@@ -660,6 +655,10 @@ PrismaticJointDef :: struct {
 	// The constrained angle between the bodies: bodyB_angle - bodyA_angle
 	referenceAngle: f32,
 
+	// The target translation for the joint in meters. The spring-damper will drive
+	// to this translation.
+	targetTranslation: f32,
+
 	// Enable a linear spring along the prismatic joint axis
 	enableSpring: bool,
 
@@ -727,6 +726,10 @@ RevoluteJointDef :: struct {
 	// This defines the zero angle for the joint limit.
 	referenceAngle: f32,
 
+	// The target angle for the joint in radians. The spring-damper will drive
+	// to this angle.
+	targetAngle: f32,
+
 	// Enable a rotational spring on the revolute hinge axis
 	enableSpring: bool,
 
@@ -739,10 +742,10 @@ RevoluteJointDef :: struct {
 	// A flag to enable joint limits
 	enableLimit: bool,
 
-	// The lower angle for the joint limit in radians. Minimum of -0.95*pi radians.
+	// The lower angle for the joint limit in radians. Minimum of -0.99*pi radians.
 	lowerAngle: f32,
 
-	// The upper angle for the joint limit in radians. Maximum of 0.95*pi radians.
+	// The upper angle for the joint limit in radians. Maximum of 0.99*pi radians.
 	upperAngle: f32,
 
 	// A flag to enable the joint motor
@@ -984,6 +987,7 @@ ContactEndTouchEvent :: struct {
 }
 
 // A hit touch event is generated when two shapes collide with a speed faster than the hit speed threshold.
+// This may be reported for speculative contacts that have a confirmed impulse.
 ContactHitEvent :: struct {
 	// Id of the first shape
 	shapeIdA: ShapeId,
@@ -991,7 +995,9 @@ ContactHitEvent :: struct {
 	// Id of the second shape
 	shapeIdB: ShapeId,
 
-	// Point where the shapes hit
+	// Point where the shapes hit at the beginning of the time step.
+	// This is a mid-point between the two surfaces. It could be at speculative
+	// point where the two shapes were not touching at the beginning of the time step.
 	point: Vec2,
 
 	// Normal vector pointing from shape A to shape B
@@ -1099,17 +1105,18 @@ PreSolveFcn :: #type proc "c" (shapeIdA, shapeIdB: ShapeId, manifold: ^Manifold,
 //	@ingroup world
 OverlapResultFcn :: #type proc "c" (shapeId: ShapeId, ctx: rawptr) -> bool
 
-// Prototype callback for ray casts.
+// Prototype callback for ray and shape casts.
 // Called for each shape found in the query. You control how the ray cast
 // proceeds by returning a f32:
 // return -1: ignore this shape and continue
 // return 0: terminate the ray cast
 // return fraction: clip the ray to this point
 // return 1: don't clip the ray and continue
+// A cast with initial overlap will return a zero fraction and a zero normal.
 // @param shapeId the shape hit by the ray
 // @param point the point of initial intersection
-// @param normal the normal vector at the point of intersection
-// @param fraction the fraction along the ray at the point of intersection
+// @param normal the normal vector at the point of intersection, zero for a shape cast with initial overlap
+// @param fraction the fraction along the ray at the point of intersection, zero for a shape cast with initial overlap
 //	@param context the user context
 // @return -1 to filter, 0 to terminate, fraction to clip the ray for closest hit, 1 to continue
 // @see b2World_CastRay

@@ -3,14 +3,14 @@ package slice
 import "base:builtin"
 import "base:runtime"
 
-ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
+ptr_add :: proc "contextless" (p: $P/^$T, x: int) -> ^T {
 	return ([^]T)(p)[x:]
 }
-ptr_sub :: proc(p: $P/^$T, x: int) -> ^T {
+ptr_sub :: proc "contextless" (p: $P/^$T, x: int) -> ^T {
 	return ([^]T)(p)[-x:]
 }
 
-ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
+ptr_swap_non_overlapping :: proc "contextless" (x, y: rawptr, len: int) {
 	if len <= 0 {
 		return
 	}
@@ -44,7 +44,7 @@ ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
 	}
 }
 
-ptr_swap_overlapping :: proc(x, y: rawptr, len: int) {
+ptr_swap_overlapping :: proc "contextless" (x, y: rawptr, len: int) {
 	if len <= 0 {
 		return
 	}
@@ -68,7 +68,7 @@ ptr_swap_overlapping :: proc(x, y: rawptr, len: int) {
 }
 
 
-ptr_rotate :: proc(left: int, mid: ^$T, right: int) {
+ptr_rotate :: proc "contextless" (left: int, mid: ^$T, right: int) {
 	when size_of(T) != 0 {
 		left, mid, right := left, mid, right
 

@@ -1,3 +1,4 @@
+// Bindings for [[ Direct3D 12 ; https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics ]].
 package directx_d3d12
 
 foreign import "system:d3d12.lib"
@@ -22,6 +23,7 @@ BOOL    :: dxgi.BOOL
 
 RECT :: dxgi.RECT
 
+LPCSTR  :: win32.LPCSTR
 LPCWSTR :: win32.LPCWSTR
 
 IModuleInstance :: d3d_compiler.ID3D11ModuleInstance
@@ -466,7 +468,7 @@ INPUT_CLASSIFICATION :: enum i32 {
 }
 
 INPUT_ELEMENT_DESC :: struct {
-	SemanticName:         cstring,
+	SemanticName:         LPCSTR,
 	SemanticIndex:        u32,
 	Format:               dxgi.FORMAT,
 	InputSlot:            u32,
@@ -488,7 +490,7 @@ CULL_MODE :: enum i32 {
 
 SO_DECLARATION_ENTRY :: struct {
 	Stream:         u32,
-	SemanticName:   cstring,
+	SemanticName:   LPCSTR,
 	SemanticIndex:  u32,
 	StartComponent: u8,
 	ComponentCount: u8,
@@ -718,7 +720,7 @@ STREAM_OUTPUT_DESC :: struct {
 }
 
 INPUT_LAYOUT_DESC :: struct {
-	pInputElementDescs: [^]INPUT_ELEMENT_DESC,
+	pInputElementDescs: [^]INPUT_ELEMENT_DESC `fmt:"v,NumElements"`,
 	NumElements:        u32,
 }
 
@@ -849,6 +851,15 @@ FEATURE :: enum i32 {
 	OPTIONS17                             = 46,
 	OPTIONS18                             = 47,
 	OPTIONS19                             = 48,
+	OPTIONS20                             = 49,
+	PREDICATION                           = 50,
+	PLACED_RESOURCE_SUPPORT_INFO	      = 51,
+	HARDWARE_COPY	                      = 52,
+	OPTIONS21	                          = 53,
+	TIGHT_ALIGNMENT	                      = 54,
+	APPLICATION_SPECIFIC_DRIVER_STATE	  = 56,
+	BYTECODE_BYPASS_HASH_SUPPORTED	      = 57,
+	SHADER_CACHE_ABI_SUPPORT	          = 61,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
@@ -959,6 +970,11 @@ VIEW_INSTANCING_TIER :: enum i32 {
 	_1            = 1,
 	_2            = 2,
 	_3            = 3,
+}
+
+WORK_GRAPHS_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1_0          = 10,
 }
 
 FEATURE_DATA_OPTIONS :: struct {
@@ -1275,6 +1291,53 @@ FEATURE_DATA_OPTIONS19 :: struct {
 	ComputeOnlyCustomHeapSupported:                 BOOL,
 }
 
+RECREATE_AT_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1            = 1,
+}
+
+FEATURE_DATA_OPTIONS20 :: struct {
+	ComputeOnlyWriteWatchSupported: BOOL,
+	RecreateAtTier:                 RECREATE_AT_TIER,
+}
+
+EXECUTE_INDIRECT_TIER :: enum i32 {
+	_1_0 = 10,
+	_1_1 = 11,
+}
+
+FEATURE_DATA_OPTIONS21 :: struct {
+	WorkGraphsTier:                    WORK_GRAPHS_TIER,
+	ExecuteIndirectTier:               EXECUTE_INDIRECT_TIER,
+	SampleCmpGradientAndBiasSupported: BOOL,
+	ExtendedCommandInfoSupported:      BOOL,
+}
+
+TIGHT_ALIGNMENT_TIER :: enum i32 {
+	NOT_SUPPORTED = 0,
+	_1            = NOT_SUPPORTED + 1,
+}
+
+FEATURE_DATA_TIGHT_ALIGNMENT :: struct {
+	SupportTier: TIGHT_ALIGNMENT_TIER,
+}
+
+FEATURE_DATA_PREDICATION :: struct {
+	Supported: BOOL,
+}
+
+FEATURE_DATA_HARDWARE_COPY :: struct {
+	Supported: BOOL,
+}
+
+FEATURE_DATA_APPLICATION_SPECIFIC_DRIVER_STATE :: struct {
+	Supported: BOOL,
+}
+
+FEATURE_DATA_BYTECODE_BYPASS_HASH_SUPPORTED :: struct {
+	Supported: BOOL,
+}
+
 WAVE_MMA_INPUT_DATATYPE :: enum i32 {
 	INVALID = 0,
 	BYTE    = 1,
@@ -1390,14 +1453,16 @@ TEXTURE_LAYOUT :: enum i32 {
 
 RESOURCE_FLAGS :: distinct bit_set[RESOURCE_FLAG; u32]
 RESOURCE_FLAG :: enum u32 {
-	ALLOW_RENDER_TARGET         = 0,
-	ALLOW_DEPTH_STENCIL         = 1,
-	ALLOW_UNORDERED_ACCESS      = 2,
-	DENY_SHADER_RESOURCE        = 3,
-	ALLOW_CROSS_ADAPTER         = 4,
-	ALLOW_SIMULTANEOUS_ACCESS   = 5,
-	VIDEO_DECODE_REFERENCE_ONLY = 6,
-	VIDEO_ENCODE_REFERENCE_ONLY = 7,
+	ALLOW_RENDER_TARGET               = 0,
+	ALLOW_DEPTH_STENCIL               = 1,
+	ALLOW_UNORDERED_ACCESS            = 2,
+	DENY_SHADER_RESOURCE              = 3,
+	ALLOW_CROSS_ADAPTER               = 4,
+	ALLOW_SIMULTANEOUS_ACCESS         = 5,
+	VIDEO_DECODE_REFERENCE_ONLY       = 6,
+	VIDEO_ENCODE_REFERENCE_ONLY       = 7,
+	RAYTRACING_ACCELERATION_STRUCTURE = 8,
+	USE_TIGHT_ALIGNMENT               = 10,
 }
 
 MIP_REGION :: struct {
@@ -1648,7 +1713,7 @@ VIEW_INSTANCING_FLAG :: enum u32 {
 
 VIEW_INSTANCING_DESC :: struct {
 	ViewInstanceCount:      u32,
-	pViewInstanceLocations: [^]VIEW_INSTANCE_LOCATION,
+	pViewInstanceLocations: [^]VIEW_INSTANCE_LOCATION `fmt:"v,ViewInstanceCount"`,
 	Flags:                  VIEW_INSTANCING_FLAGS,
 }
 
@@ -3089,13 +3154,13 @@ EXISTING_COLLECTION_DESC :: struct {
 SUBOBJECT_TO_EXPORTS_ASSOCIATION :: struct {
 	pSubobjectToAssociate: ^STATE_SUBOBJECT,
 	NumExports:            u32,
-	pExports:              [^]^i16,
+	pExports:              [^]LPCWSTR `fmt:"v,NumExports"`,
 }
 
 DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION :: struct {
-	SubobjectToAssociate: ^i16,
+	SubobjectToAssociate: LPCWSTR,
 	NumExports:           u32,
-	pExports:             [^]^i16,
+	pExports:             [^]LPCWSTR `fmt:"v,NumExports"`,
 }
 
 HIT_GROUP_TYPE :: enum i32 {
@@ -3104,11 +3169,11 @@ HIT_GROUP_TYPE :: enum i32 {
 }
 
 HIT_GROUP_DESC :: struct {
-	HitGroupExport:           ^i16,
+	HitGroupExport:           LPCWSTR,
 	Type:                     HIT_GROUP_TYPE,
-	AnyHitShaderImport:       ^i16,
-	ClosestHitShaderImport:   ^i16,
-	IntersectionShaderImport: ^i16,
+	AnyHitShaderImport:       LPCWSTR,
+	ClosestHitShaderImport:   LPCWSTR,
+	IntersectionShaderImport: LPCWSTR,
 }
 
 RAYTRACING_SHADER_CONFIG :: struct {
@@ -3265,7 +3330,8 @@ SERIALIZED_DATA_DRIVER_MATCHING_IDENTIFIER :: struct {
 }
 
 SERIALIZED_DATA_TYPE :: enum i32 {
-	SERIALIZED_DATA_RAYTRACING_ACCELERATION_STRUCTURE = 0,
+	RAYTRACING_ACCELERATION_STRUCTURE = 0,
+	APPLICATION_SPECIFIC_DRIVER_STATE = 1,
 }
 
 DRIVER_MATCHING_IDENTIFIER_STATUS :: enum i32 {
@@ -3505,14 +3571,14 @@ DRED_ALLOCATION_TYPE :: enum i32 {
 
 DRED_ALLOCATION_NODE :: struct {
 	ObjectNameA:    cstring,
-	ObjectNameW:    ^i16,
+	ObjectNameW:    cstring16,
 	AllocationType: DRED_ALLOCATION_TYPE,
 	pNext:          ^DRED_ALLOCATION_NODE,
 }
 
 DRED_ALLOCATION_NODE1 :: struct {
 	ObjectNameA:    cstring,
-	ObjectNameW:    ^i16,
+	ObjectNameW:    cstring16,
 	AllocationType: DRED_ALLOCATION_TYPE,
 	pNext:          ^DRED_ALLOCATION_NODE1,
 	pObject:        ^IUnknown,
@@ -3538,7 +3604,7 @@ DRED_PAGE_FAULT_OUTPUT1 :: struct {
 	pHeadRecentFreedAllocationNode: ^DRED_ALLOCATION_NODE1,
 }
 
-DRED_PAGE_FAULT_FLAGS :: bit_set[DRED_PAGE_FAULT_FLAG;u32]
+DRED_PAGE_FAULT_FLAGS :: distinct bit_set[DRED_PAGE_FAULT_FLAG; u32]
 DRED_PAGE_FAULT_FLAG :: enum u32 {
 }
 
@@ -3818,7 +3884,7 @@ RENDER_PASS_ENDING_ACCESS_RESOLVE_PARAMETERS :: struct {
 	pSrcResource:           ^IResource,
 	pDstResource:           ^IResource,
 	SubresourceCount:       u32,
-	pSubresourceParameters: [^]RENDER_PASS_ENDING_ACCESS_RESOLVE_SUBRESOURCE_PARAMETERS,
+	pSubresourceParameters: [^]RENDER_PASS_ENDING_ACCESS_RESOLVE_SUBRESOURCE_PARAMETERS `fmt:"v,SubresourceCount"`,
 	Format:                 dxgi.FORMAT,
 	ResolveMode:            RESOLVE_MODE,
 	PreserveResolveSource:  BOOL,
@@ -3900,7 +3966,7 @@ SHADER_CACHE_MODE :: enum i32 {
 	DISK   = 1,
 }
 
-SHADER_CACHE_FLAGS :: bit_set[SHADER_CACHE_FLAG;u32]
+SHADER_CACHE_FLAGS :: distinct bit_set[SHADER_CACHE_FLAG; u32]
 SHADER_CACHE_FLAG :: enum u32 {
 	DRIVER_VERSIONED = 0,
 	USE_WORKING_DIR  = 1,
@@ -3931,7 +3997,7 @@ IShaderCacheSession_VTable :: struct {
 }
 
 
-SHADER_CACHE_KIND_FLAGS :: bit_set[SHADER_CACHE_KIND_FLAG;u32]
+SHADER_CACHE_KIND_FLAGS :: distinct bit_set[SHADER_CACHE_KIND_FLAG; u32]
 SHADER_CACHE_KIND_FLAG :: enum u32 {
 	IMPLICIT_D3D_CACHE_FOR_DRIVER = 0,
 	IMPLICIT_D3D_CONVERSIONS      = 1,
@@ -3939,7 +4005,7 @@ SHADER_CACHE_KIND_FLAG :: enum u32 {
 	APPLICATION_MANAGED           = 3,
 }
 
-SHADER_CACHE_CONTROL_FLAGS :: bit_set[SHADER_CACHE_CONTROL_FLAG;u32]
+SHADER_CACHE_CONTROL_FLAGS :: distinct bit_set[SHADER_CACHE_CONTROL_FLAG; u32]
 SHADER_CACHE_CONTROL_FLAG :: enum u32 {
 	DISABLE = 0,
 	ENABLE  = 1,
@@ -5157,8 +5223,8 @@ IInfoQueue_VTable :: struct {
 	PushRetrievalFilter:                          proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
 	PopRetrievalFilter:                           proc "system" (this: ^IInfoQueue),
 	GetRetrievalFilterStackSize:                  proc "system" (this: ^IInfoQueue) -> u32,
-	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
-	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
+	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: LPCSTR) -> HRESULT,
+	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: LPCSTR) -> HRESULT,
 	SetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
 	SetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
 	SetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
@@ -5174,7 +5240,7 @@ MESSAGE_CALLBACK_FLAG :: enum {
 	IGNORE_FILTERS = 0,
 }
 
-PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring, pContext: rawptr)
+PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: LPCSTR, pContext: rawptr)
 
 IInfoQueue1_UUID_STRING :: "2852dd88-b484-4c0c-b6b1-67168500e600"
 IInfoQueue1_UUID := &IID{0x2852dd88, 0xb484, 0x4c0c, {0xb6, 0xb1, 0x67, 0x16, 0x85, 0x00, 0xe6, 0x00}}
@@ -5197,7 +5263,7 @@ ISDKConfiguration :: struct #raw_union {
 }
 ISDKConfiguration_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetSDKVersion: proc "system" (this: ^ISDKConfiguration, SDKVersion: u32, SDKPath: cstring) -> HRESULT,
+	SetSDKVersion: proc "system" (this: ^ISDKConfiguration, SDKVersion: u32, SDKPath: LPCSTR) -> HRESULT,
 }
 
 
@@ -5296,7 +5362,7 @@ shver_get_minor :: proc "contextless" (version: u32) -> u8 {
 }
 
 SIGNATURE_PARAMETER_DESC :: struct {
-	SemanticName:    cstring,
+	SemanticName:    LPCSTR,
 	SemanticIndex:   u32,
 	Register:        u32,
 	SystemValueType: NAME,
@@ -5310,7 +5376,7 @@ SIGNATURE_PARAMETER_DESC :: struct {
 }
 
 SHADER_BUFFER_DESC :: struct {
-	Name:      cstring,
+	Name:      LPCSTR,
 	Type:      CBUFFER_TYPE,
 	Variables: u32,
 	Size:      u32,
@@ -5318,7 +5384,7 @@ SHADER_BUFFER_DESC :: struct {
 }
 
 SHADER_VARIABLE_DESC :: struct {
-	Name:         cstring,
+	Name:         LPCSTR,
 	StartOffset:  u32,
 	Size:         u32,
 	uFlags:       u32,
@@ -5337,12 +5403,12 @@ SHADER_TYPE_DESC :: struct {
 	Elements: u32,
 	Members:  u32,
 	Offset:   u32,
-	Name:     cstring,
+	Name:     LPCSTR,
 }
 
 SHADER_DESC :: struct {
 	Version:                     u32,
-	Creator:                     cstring,
+	Creator:                     LPCSTR,
 	Flags:                       u32,
 
 	ConstantBuffers:             u32,
@@ -5385,7 +5451,7 @@ SHADER_DESC :: struct {
 }
 
 SHADER_INPUT_BIND_DESC :: struct {
-	Name:       cstring,
+	Name:       LPCSTR,
 	Type:       SHADER_INPUT_TYPE,
 	BindPoint:  u32,
 	BindCount:  u32,
@@ -5432,14 +5498,14 @@ SHADER_REQUIRES :: enum u64 {
 }
 
 LIBRARY_DESC :: struct {
-	Creator:       cstring,
+	Creator:       LPCSTR,
 	Flags:         u32,
 	FunctionCount: u32,
 }
 
 FUNCTION_DESC :: struct {
 	Version:                     u32,
-	Creator:                     cstring,
+	Creator:                     LPCSTR,
 	Flags:                       u32,
 
 	ConstantBuffers:             u32,
@@ -5469,7 +5535,7 @@ FUNCTION_DESC :: struct {
 	MinFeatureLevel:             FEATURE_LEVEL,
 	RequiredFeatureFlags:        u64,
 
-	Name:                        cstring,
+	Name:                        LPCSTR,
 	FunctionParameterCount:      i32,
 	HasReturn:                   BOOL,
 	Has10Level9VertexShader:     BOOL,
@@ -5477,8 +5543,8 @@ FUNCTION_DESC :: struct {
 }
 
 PARAMETER_DESC :: struct {
-	Name:              cstring,
-	SemanticName:      cstring,
+	Name:              LPCSTR,
+	SemanticName:      LPCSTR,
 	Type:              SHADER_VARIABLE_TYPE,
 	Class:             SHADER_VARIABLE_CLASS,
 	Rows:              u32,
@@ -5500,8 +5566,8 @@ IShaderReflectionType :: struct {
 IShaderReflectionType_VTable :: struct {
 	GetDesc:              proc "system" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
 	GetMemberTypeByIndex: proc "system" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
-	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
-	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> cstring,
+	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: LPCSTR) -> ^IShaderReflectionType,
+	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> LPCSTR,
 	IsEqual:              proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
 	GetSubType:           proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
 	GetBaseClass:         proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
@@ -5531,7 +5597,7 @@ IShaderReflectionConstantBuffer :: struct {
 IShaderReflectionConstantBuffer_VTable :: struct {
 	GetDesc:            proc "system" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
 	GetVariableByIndex: proc "system" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
-	GetVariableByName:  proc "system" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
+	GetVariableByName:  proc "system" (this: ^IShaderReflectionConstantBuffer, Name: LPCSTR) -> ^IShaderReflectionVariable,
 }
 
 IShaderReflection_UUID_STRING :: "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E"
@@ -5544,13 +5610,13 @@ IShaderReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	GetDesc:                       proc "system" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
 	GetConstantBufferByIndex:      proc "system" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: LPCSTR) -> ^IShaderReflectionConstantBuffer,
 	GetResourceBindingDesc:        proc "system" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetInputParameterDesc:         proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetOutputParameterDesc:        proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetPatchConstantParameterDesc: proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: LPCSTR) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: LPCSTR, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetMovInstructionCount:        proc "system" (this: ^IShaderReflection) -> u32,
 	GetMovcInstructionCount:       proc "system" (this: ^IShaderReflection) -> u32,
 	GetConversionInstructionCount: proc "system" (this: ^IShaderReflection) -> u32,
@@ -5583,10 +5649,10 @@ IFunctionReflection :: struct {
 IFunctionReflection_VTable :: struct {
 	GetDesc:                      proc "system" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
 	GetConstantBufferByIndex:     proc "system" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: LPCSTR) -> ^IShaderReflectionConstantBuffer,
 	GetResourceBindingDesc:       proc "system" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: LPCSTR) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: LPCSTR, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetFunctionParameter:         proc "system" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 

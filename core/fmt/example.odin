@@ -10,14 +10,14 @@ SomeType :: struct {
 My_Custom_Base_Type :: distinct u32
 
 main :: proc() {
- 	// Ensure the fmt._user_formatters map is initialized
+	// Ensure the fmt._user_formatters map is initialized
 	fmt.set_user_formatters(new(map[typeid]fmt.User_Formatter))
 
 	// Register custom formatters for my favorite types
 	err := fmt.register_user_formatter(type_info_of(SomeType).id, SomeType_Formatter)
- 	assert(err == .None)
+	assert(err == .None)
 	err  = fmt.register_user_formatter(type_info_of(My_Custom_Base_Type).id, My_Custom_Base_Formatter)
- 	assert(err == .None)
+	assert(err == .None)
 
 	// Use the custom formatters.
 	fmt.printfln("SomeType{{42}}: '%v'", SomeType{42})
@@ -54,4 +54,3 @@ My_Custom_Base_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
 	}
 	return true
 }
-

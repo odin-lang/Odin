@@ -1,15 +1,15 @@
+// `Shoco` short string compression and decompression.
+package compress_shoco
+
 /*
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
 	An implementation of [shoco](https://github.com/Ed-von-Schleck/shoco) by Christian Schramm.
 */
-
-// package shoco is an implementation of the shoco short string compressor.
-package compress_shoco
 
 import "base:intrinsics"
 import "core:compress"

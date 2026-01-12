@@ -1,6 +1,7 @@
 /*
-package aegis implements the AEGIS-128L and AEGIS-256 Authenticated
-Encryption with Additional Data algorithms.
+`AEGIS-128L` and `AEGIS-256` AEAD algorithms.
+
+Where AEAD stands for Authenticated Encryption with Additional Data.
 
 See:
 - [[ https://www.ietf.org/archive/id/draft-irtf-cfrg-aegis-aead-12.txt ]]

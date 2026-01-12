@@ -1,3 +1,4 @@
+#+build linux, darwin, openbsd, freebsd, netbsd, haiku
 package posix
 
 when ODIN_OS == .Darwin {

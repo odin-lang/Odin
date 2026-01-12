@@ -1,5 +1,5 @@
 /*
-package sha1 implements the SHA1 hash algorithm.
+`SHA1` hash algorithm.
 
 WARNING: The SHA1 algorithm is known to be insecure and should only be
 used for interoperating with legacy applications.
@@ -13,7 +13,7 @@ package sha1
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.

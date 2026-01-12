@@ -1,11 +1,7 @@
 /*
-Synchronization primitives
+Various synchronization primitives useful to mediate threads' access to shared memory.
 
-This package implements various synchronization primitives that can be used to
-synchronize threads' access to shared memory.
-
-To limit or control the threads' access to shared memory typically the
-following approaches are used:
+To limit or control the threads' access to shared memory typically the following approaches are used:
 
 - Locks
 - Lock-free

@@ -7,7 +7,7 @@
 # CC = $(shell brew --prefix llvm)/bin/clang
 # LD = $(shell brew --prefix llvm)/bin/wasm-ld
 
-VERSION   = 3.1.0
+VERSION   = 3.1.1
 SRCS      = $(wildcard box2d-$(VERSION)/src/*.c)
 OBJS_SIMD = $(SRCS:.c=_simd.o)
 OBJS      = $(SRCS:.c=.o)

@@ -23,22 +23,8 @@
 #include <llvm-c/Transforms/Vectorize.h>
 #endif
 
-#if LLVM_VERSION_MAJOR < 11
-#error "LLVM Version 11 is the minimum required"
-#elif LLVM_VERSION_MAJOR == 12 && !(LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
-#error "If LLVM Version 12.x.y is wanted, at least LLVM 12.0.1 is required"
-#endif
-
-#if LLVM_VERSION_MAJOR > 12 || (LLVM_VERSION_MAJOR == 12 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
-#define ODIN_LLVM_MINIMUM_VERSION_12 1
-#else
-#define ODIN_LLVM_MINIMUM_VERSION_12 0
-#endif
-
-#if LLVM_VERSION_MAJOR > 13 || (LLVM_VERSION_MAJOR == 13 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
-#define ODIN_LLVM_MINIMUM_VERSION_13 1
-#else
-#define ODIN_LLVM_MINIMUM_VERSION_13 0
+#if LLVM_VERSION_MAJOR < 14
+#error "LLVM Version 14 is the minimum required"
 #endif
 
 #if LLVM_VERSION_MAJOR > 14 || (LLVM_VERSION_MAJOR == 14 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
@@ -147,8 +133,12 @@ struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
 
+	Checker *checker;
+
 	struct lbGenerator *gen;
 	LLVMTargetMachineRef target_machine;
+
+	lbModule *polymorphic_module;
 
 	CheckerInfo *info;
 	AstPackage *pkg; // possibly associated
@@ -171,7 +161,8 @@ struct lbModule {
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
-	Array<lbProcedure *> missing_procedures_to_check;
+
+	MPSCQueue<lbProcedure *> missing_procedures_to_check;
 
 	StringMap<LLVMValueRef>   const_strings;
 	String16Map<LLVMValueRef> const_string16s;
@@ -180,9 +171,12 @@ struct lbModule {
 
 	StringMap<lbProcedure *> gen_procs;   // key is the canonicalized name
 
-	Array<lbProcedure *> procedures_to_generate;
+	MPSCQueue<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_to_create;
 	Array<Entity *> global_types_to_create;
+
+	BlockingMutex generated_procedures_mutex;
+	Array<lbProcedure *> generated_procedures;
 
 	lbProcedure *curr_procedure;
 
@@ -198,7 +192,7 @@ struct lbModule {
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 	StringMap<lbAddr> objc_ivars;
-	isize             objc_next_block_id;  // Used to name objective-c blocks, per module
+	isize             objc_next_block_id;  // Used to name objective-c blocks. Tracked per module.
 
 	PtrMap<u64/*type hash*/, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
@@ -232,8 +226,7 @@ struct lbGenerator : LinkerData {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	RecursiveMutex anonymous_proc_lits_mutex;
-	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
+	lbModule *equal_module;
 
 	isize used_module_count;
 
@@ -329,6 +322,14 @@ struct lbVariadicReuseSlices {
 	lbAddr slice_addr;
 };
 
+struct lbGlobalVariable {
+	lbValue var;
+	lbValue init;
+	DeclInfo *decl;
+	bool is_initialized;
+};
+
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -351,9 +352,9 @@ struct lbProcedure {
 
 	lbFunctionType *abi_function_type;
 
-	LLVMValueRef    value;
-	LLVMBuilderRef  builder;
-	bool            is_done;
+	LLVMValueRef      value;
+	LLVMBuilderRef    builder;
+	std::atomic<bool> is_done;
 
 	lbAddr           return_ptr;
 	Array<lbDefer>   defer_stmts;
@@ -391,6 +392,12 @@ struct lbProcedure {
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 
 	Array<lbValue> asan_stack_locals;
+
+	void (*generate_body)(lbModule *m, lbProcedure *p);
+	Array<lbGlobalVariable> *global_variables;
+	lbProcedure *objc_names;
+
+	Type *internal_gen_type; // map_set, map_get, etc.
 };
 
 
@@ -410,10 +417,12 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 gb_internal String lb_mangle_name(Entity *e);
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e);
 
+gb_internal LLVMAttributeRef lb_create_string_attribute(LLVMContextRef ctx, String const &key, String const &value);
 gb_internal LLVMAttributeRef lb_create_enum_attribute(LLVMContextRef ctx, char const *name, u64 value=0);
 gb_internal LLVMAttributeRef lb_create_enum_attribute_with_type(LLVMContextRef ctx, char const *name, LLVMTypeRef type);
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name, u64 value);
 gb_internal void lb_add_proc_attribute_at_index(lbProcedure *p, isize index, char const *name);
+gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize index);
 gb_internal lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_body=false);
 
 
@@ -434,7 +443,7 @@ static lbConstContext const LB_CONST_CONTEXT_DEFAULT_NO_LOCAL = {false, false, {
 
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type);
 gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc = LB_CONST_CONTEXT_DEFAULT);
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc = LB_CONST_CONTEXT_DEFAULT, Type *value_type=nullptr);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
@@ -583,7 +592,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
 
 gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_);
-gb_internal LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
+gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
 gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
 
 gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);

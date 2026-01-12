@@ -1,20 +1,8 @@
 package objc_Foundation
 
-foreign import "system:Foundation.framework"
-
 import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
-
-RunLoopMode :: ^String
-
-@(link_prefix="NS")
-foreign Foundation {
-	RunLoopCommonModes:       RunLoopMode
-	DefaultRunLoopMode:       RunLoopMode
-	EventTrackingRunLoopMode: RunLoopMode
-	ModalPanelRunLoopMode:    RunLoopMode
-}
 
 ActivationPolicy :: enum UInteger {
 	Regular    = 0,
@@ -92,6 +80,11 @@ Application_activate :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "activate")
 }
 
+@(objc_type=Application, objc_name="active")
+Application_active :: proc "c" (self: ^Application) -> BOOL {
+	return msgSend(BOOL, self, "isActive")
+}
+
 @(objc_type=Application, objc_name="setTitle")
 Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
 	msgSend(nil, self, "setTitle", title)
@@ -105,6 +98,35 @@ Application_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
 @(objc_type=Application, objc_name="setMainMenu")
 Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)
+}
+
+// This property is actually not exposed in AppKit's public API.
+// But there is basically no other way to configure the apple menu without using NIB files.
+// Therefore, an Odin binding for this non-public API was created.
+// Note: SDL also calls this non-public method.
+@(objc_type=Application, objc_name="setAppleMenu")
+Application_setAppleMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setAppleMenu:", menu)
+}
+
+@(objc_type=Application, objc_name="servicesMenu")
+Application_servicesMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "servicesMenu")
+}
+
+@(objc_type=Application, objc_name="setServicesMenu")
+Application_setServicesMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setServicesMenu:", menu)
+}
+
+@(objc_type=Application, objc_name="windowsMenu")
+Application_windowsMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "windowsMenu")
+}
+
+@(objc_type=Application, objc_name="setWindowsMenu")
+Application_setWindowsMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setWindowsMenu:", menu)
 }
 
 @(objc_type=Application, objc_name="mainWindow")
@@ -132,6 +154,11 @@ Application_finishLaunching :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "finishLaunching")
 }
 
+@(objc_type=Application, objc_name="stop")
+Application_stop :: proc "c" (self: ^Application, sender: ^Object) {
+	msgSend(nil, self, "stop:", sender)
+}
+
 @(objc_type=Application, objc_name="terminate")
 Application_terminate :: proc "c" (self: ^Application, sender: ^Object) {
 	msgSend(nil, self, "terminate:", sender)
@@ -156,10 +183,23 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
 	msgSend(nil, self, "sendEvent:", event)
 }
+
+@(objc_type=Application, objc_name="postEvent")
+Application_postEvent :: proc "c" (self: ^Application, event: ^Event, atStart: BOOL) {
+	msgSend(nil, self, "postEvent:atStart:", event, atStart)
+}
+
 @(objc_type=Application, objc_name="updateWindows")
 Application_updateWindows :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "updateWindows")
 }
+
+@(objc_type=Application, objc_name="sendAction")
+Application_sendAction :: proc "c" (self: ^Application, action: SEL, to: id, from: id) {
+	msgSend(nil, self, "sendAction:to:from:", action, to, from)
+}
+
+
 
 
 @(objc_class="NSRunningApplication")
@@ -173,6 +213,11 @@ RunningApplication_currentApplication :: proc "c" () -> ^RunningApplication {
 @(objc_type=RunningApplication, objc_name="localizedName")
 RunningApplication_localizedName :: proc "c" (self: ^RunningApplication) -> ^String {
 	return msgSend(^String, self, "localizedName")
+}
+
+@(objc_type=RunningApplication, objc_name="finishedLaunching")
+RunningApplication_finishedLaunching :: proc "c" (self: ^RunningApplication) -> BOOL {
+	return msgSend(BOOL, self, "isFinishedLaunching")
 }
 
 ApplicationDelegateTemplate :: struct {

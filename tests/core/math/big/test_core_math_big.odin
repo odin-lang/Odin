@@ -224,8 +224,29 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+bug_5931 :: proc(t: ^testing.T) {
+	numerator, divisor, quotient, remainder: big.Int
+	defer big.destroy(&numerator, &divisor, &quotient, &remainder)
+
+	big.string_to_int(&numerator, "3351951982485649274893506249551461531869841455148098344430890360930192345844485855956241793418914802713278852793799976230545127411560969441984014513833901")
+	big.string_to_int(&divisor,   "115792089237316195423570985008687907853269984665640564039457584007908834671663")
+
+	big.int_divmod(&quotient, &remainder, &numerator, &divisor)
+	quo_str, _ := big.int_itoa_string(&quotient)
+	defer delete(quo_str)
+	assert(quo_str == "28948022309329048855892746252171976963317496166410141009864396001977208667923")
+
+	rem_str, _ := big.int_itoa_string(&remainder)
+	defer delete(rem_str)
+	assert(rem_str == "28948022309329048855892746252171976963317496166410141009864396001977208667952")
+}
+
+
+// Test helpers
+
 expect_a :: proc(t: ^testing.T, format: string, a, expected, res: ^big.Int, err: big.Error, loc := #caller_location) {
-	if err != .Okay { return }
+	if err != nil { return }
 
 	equal, _ := big.equals(res, expected)
 	if !equal {
@@ -243,7 +264,7 @@ expect_a :: proc(t: ^testing.T, format: string, a, expected, res: ^big.Int, err:
 }
 
 expect_ab :: proc(t: ^testing.T, format: string, a, b, expected, res: ^big.Int, err: big.Error, loc := #caller_location) {
-	if err != .Okay { return }
+	if err != nil { return }
 
 	equal, _ := big.equals(res, expected)
 	if !equal {
@@ -264,6 +285,48 @@ expect_ab :: proc(t: ^testing.T, format: string, a, b, expected, res: ^big.Int, 
 
 atoi :: proc(t: ^testing.T, i: ^big.Int, a: string, loc := #caller_location) -> bool {
 	err := big.atoi(i, a, 16)
-	testing.expect(t, err == .Okay, loc=loc)
-	return err == .Okay
+	testing.expect(t, err == nil, loc=loc)
+	return err == nil
+}
+
+@(test)
+test_itoa :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	big.random(a, 2048)
+	defer big.destroy(a)
+
+	for radix in 2..=64 {
+		if big.is_power_of_two(radix) {
+			// Powers of two are trivial, and are handled before `_itoa_raw_*` is called.
+			continue
+		}
+
+		size, _ := big.radix_size(a, i8(radix), false)
+		buffer_old := make([]u8, size)
+		defer delete(buffer_old)
+		buffer_new := make([]u8, size)
+		defer delete(buffer_new)
+
+		written_old, _ := big._itoa_raw_old (a, i8(radix), buffer_old, false)
+		written_new, _ := big._itoa_raw_full(a, i8(radix), buffer_new, false)
+
+		str_old := string(buffer_old[:written_old])
+		str_new := string(buffer_new[:written_new])
+		testing.expect_value(t, str_new, str_old)
+	}
+
+	// Also test a number with a large number of zeroes
+	big.set(a, "2970714761494550000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000802525522395693895558562897961119110387707542077460459880227570865486047631557732177235787527971863645406120285117781450154113859156752194121206131440514109132606823127467068869589613665129498148285292867292641704871893467328665051712596763187306247339023362481")
+	size, _ := big.radix_size(a, 10, false)
+	buffer_old := make([]u8, size)
+	defer delete(buffer_old)
+	buffer_new := make([]u8, size)
+	defer delete(buffer_new)
+
+	written_old, _ := big._itoa_raw_old (a, 10, buffer_old, false)
+	written_new, _ := big._itoa_raw_full(a, 10, buffer_new, false)
+
+	str_old := string(buffer_old[:written_old])
+	str_new := string(buffer_new[:written_new])
+	testing.expect_value(t, str_new, str_old)
 }

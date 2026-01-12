@@ -4,11 +4,15 @@ package runtime
 
 foreign import libc "system:c"
 
+_HAS_RAND_BYTES :: true
+
 foreign libc {
 	@(link_name="write")
 	_unix_write :: proc(fd: i32, buf: rawptr, size: int) -> int ---
 
 	_errnop :: proc() -> ^i32 ---
+
+	arc4random_buf :: proc(buf: [^]byte, nbytes: uint) ---
 }
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
@@ -18,4 +22,12 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 		return int(ret), _OS_Errno(err^ if err != nil else 0)
 	}
 	return int(ret), 0
+}
+
+_rand_bytes :: proc "contextless" (dst: []byte) {
+	arc4random_buf(raw_data(dst), len(dst))
+}
+
+_exit :: proc "contextless" (code: int) -> ! {
+	trap()
 }

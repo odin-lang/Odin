@@ -38,5 +38,5 @@ _read_writer_procedure := proc(stream_data: rawptr, mode: io.Stream_Mode, p: []b
 	case .Query:
 		return io.query_utility({.Flush, .Read, .Write, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }

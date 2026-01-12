@@ -83,7 +83,7 @@ i32 bundle_android(String original_init_directory) {
 		return 1;
 	}
 
-	int *dir_numbers = gb_alloc_array(temporary_allocator(), int, possible_valid_dirs.count);
+	int *dir_numbers = temporary_alloc_array<int>(possible_valid_dirs.count);
 
 	char buf[1024] = {};
 	for_array(i, possible_valid_dirs) {

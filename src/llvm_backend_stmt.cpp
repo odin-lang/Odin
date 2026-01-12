@@ -3,8 +3,6 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 		return;
 	}
 
-	auto *min_dep_set = &p->module->info->minimum_dependency_set;
-
 	for (Ast *ident : vd->names) {
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
@@ -21,7 +19,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			}
 		}
 
-		if (!polymorphic_struct && !ptr_set_exists(min_dep_set, e)) {
+		if (!polymorphic_struct && e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 			continue;
 		}
 
@@ -56,7 +54,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			if (gpd) {
 				rw_mutex_shared_lock(&gpd->mutex);
 				for (Entity *e : gpd->procs) {
-					if (!ptr_set_exists(min_dep_set, e)) {
+					if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 						continue;
 					}
 					DeclInfo *d = decl_info_of_entity(e);
@@ -94,7 +92,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			value.value = nested_proc->value;
 			value.type = nested_proc->type;
 
-			array_add(&p->module->procedures_to_generate, nested_proc);
+			mpsc_enqueue(&p->module->procedures_to_generate, nested_proc);
 			array_add(&p->children, nested_proc);
 			string_map_set(&p->module->members, name, value);
 		}
@@ -1722,7 +1720,45 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
 
-		body_blocks[i] = lb_create_block(p, cc->list.count == 0 ? "switch.default.body" : "switch.case.body");
+		char const *block_name = cc->list.count == 0 ? "switch.default.body" : "switch.case.body";
+
+		if (is_trivial && cc->list.count >= 1) {
+			gbString bn = gb_string_make(heap_allocator(), "switch.case.");
+
+			Ast *first = cc->list[0];
+			if (first->tav.mode == Addressing_Type) {
+				bn = gb_string_appendc(bn, "type.");
+			} else if (is_type_rune(first->tav.type)) {
+				bn = gb_string_appendc(bn, "rune.");
+			} else {
+				bn = gb_string_appendc(bn, "value.");
+			}
+
+			for_array(i, cc->list) {
+				if (i > 0) {
+					bn = gb_string_appendc(bn, "..");
+				}
+
+				Ast *expr = cc->list[i];
+				if (expr->tav.mode == Addressing_Type) {
+					bn = write_type_to_string(bn, expr->tav.type, false);
+				} else {
+					ExactValue value = expr->tav.value;
+					if (is_type_rune(expr->tav.type) && value.kind == ExactValue_Integer) {
+						Rune r = cast(Rune)exact_value_to_i64(value);
+						u8 rune_temp[6] = {};
+						isize size = gb_utf8_encode_rune(rune_temp, r);
+						bn = gb_string_append_length(bn, rune_temp, size);
+					} else {
+						bn = write_exact_value_to_string(bn, value, 1024);
+					}
+				}
+			}
+
+			block_name = cast(char const *)bn;
+		}
+
+		body_blocks[i] = lb_create_block(p, block_name);
 		if (cc->list.count == 0) {
 			default_block = body_blocks[i];
 		}
@@ -1964,7 +2000,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		num_cases += cc->list.count;
 		if (cc->list.count == 0) {
 			GB_ASSERT(default_block == nullptr);
-			default_block = lb_create_block(p, "typeswitch.default.body");
+			default_block = lb_create_block(p, "typeswitch.case.default");
 			else_block = default_block;
 		}
 	}
@@ -2044,7 +2080,16 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			continue;
 		}
 
-		lbBlock *body = lb_create_block(p, "typeswitch.body");
+		char const *body_name = "typeswitch.case";
+
+		if (!are_types_identical(case_entity->type, parent_base_type)) {
+			gbString canonical_name = temp_canonical_string(case_entity->type);
+			gbString bn = gb_string_make(heap_allocator(), "typeswitch.case.");
+			bn = gb_string_append_length(bn, canonical_name, gb_string_length(canonical_name));
+			body_name = cast(char const *)bn;
+		}
+
+		lbBlock *body = lb_create_block(p, body_name);
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
@@ -2124,20 +2169,26 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
-		if (vd->values.count > 0) {
-			GB_ASSERT(vd->names.count == vd->values.count);
-			Ast *ast_value = vd->values[i];
-			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
-			          ast_value->tav.mode == Addressing_Invalid);
 
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
-		}
 
 		Ast *ident = vd->names[i];
 		GB_ASSERT(!is_blank_ident(ident));
 		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e->flags & EntityFlag_Static);
 		String name = e->token.string;
+
+		if (vd->values.count > 0) {
+			GB_ASSERT(vd->names.count == vd->values.count);
+			Ast *ast_value = vd->values[i];
+			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+			          ast_value->tav.mode == Addressing_Invalid);
+
+			auto cc = LB_CONST_CONTEXT_DEFAULT_NO_LOCAL;
+			if (e->Variable.is_rodata) {
+				cc.is_rodata = true;
+			}
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, cc);
+		}
 
 		String mangled_name = {};
 		{
@@ -2180,11 +2231,14 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
 				}
 
-				LLVMValueRef vals[2] = {
-					lb_emit_conv(p, var_global.addr, t_rawptr).value,
-					lb_typeid(p->module, var_type).value,
-				};
-				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals, gb_count_of(vals));
+				auto vals = array_make<LLVMValueRef>(temporary_allocator(), 0, 3);
+				array_add(&vals, lb_emit_conv(p, var_global.addr, t_rawptr).value);
+				if (build_context.metrics.ptr_size == 4) {
+					array_add(&vals, LLVMConstNull(lb_type_padding_filler(p->module, 4, 4)));
+				}
+				array_add(&vals, lb_typeid(p->module, var_type).value);
+
+				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals.data, vals.count);
 				LLVMSetInitializer(global, init);
 			} else {
 				LLVMSetInitializer(global, value.value);

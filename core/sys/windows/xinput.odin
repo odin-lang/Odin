@@ -57,9 +57,9 @@ XINPUT_GAMEPAD_BUTTON_BIT :: enum WORD {
 XINPUT_GAMEPAD_BUTTON :: distinct bit_set[XINPUT_GAMEPAD_BUTTON_BIT;WORD]
 
 // Gamepad thresholds
-XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE: SHORT : 7849
-XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE: SHORT : 8689
-XINPUT_GAMEPAD_TRIGGER_THRESHOLD: SHORT : 30
+XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE  : SHORT : 7849
+XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE : SHORT : 8689
+XINPUT_GAMEPAD_TRIGGER_THRESHOLD    : SHORT : 30
 
 // Flags to pass to XInputGetCapabilities
 // Corresponds to log2(XINPUT_FLAG_...)
@@ -199,12 +199,12 @@ XINPUT_KEYSTROKE :: struct {
 // XInput APIs
 @(default_calling_convention = "system")
 foreign xinput {
-	XInputGetState :: proc(user: XUSER, pState: ^XINPUT_STATE) -> System_Error ---
-	XInputSetState :: proc(user: XUSER, pVibration: ^XINPUT_VIBRATION) -> System_Error ---
-	XInputGetCapabilities :: proc(user: XUSER, dwFlags: XINPUT_FLAG, pCapabilities: ^XINPUT_CAPABILITIES) -> System_Error ---
-	XInputEnable :: proc(enable: BOOL) ---
-	XInputGetAudioDeviceIds :: proc(user: XUSER, pRenderDeviceId: LPWSTR, pRenderCount: ^UINT, pCaptureDeviceId: LPWSTR, pCaptureCount: ^UINT) -> System_Error ---
-	XInputGetBatteryInformation :: proc(user: XUSER, devType: BATTERY_DEVTYPE, pBatteryInformation: ^XINPUT_BATTERY_INFORMATION) -> System_Error ---
-	XInputGetKeystroke :: proc(user: XUSER, dwReserved: DWORD, pKeystroke: ^XINPUT_KEYSTROKE) -> System_Error ---
+	XInputGetState                  :: proc(user: XUSER, pState: ^XINPUT_STATE) -> System_Error ---
+	XInputSetState                  :: proc(user: XUSER, pVibration: ^XINPUT_VIBRATION) -> System_Error ---
+	XInputGetCapabilities           :: proc(user: XUSER, dwFlags: XINPUT_FLAG, pCapabilities: ^XINPUT_CAPABILITIES) -> System_Error ---
+	XInputEnable                    :: proc(enable: BOOL) ---
+	XInputGetAudioDeviceIds         :: proc(user: XUSER, pRenderDeviceId: LPWSTR, pRenderCount: ^UINT, pCaptureDeviceId: LPWSTR, pCaptureCount: ^UINT) -> System_Error ---
+	XInputGetBatteryInformation     :: proc(user: XUSER, devType: BATTERY_DEVTYPE, pBatteryInformation: ^XINPUT_BATTERY_INFORMATION) -> System_Error ---
+	XInputGetKeystroke              :: proc(user: XUSER, dwReserved: DWORD, pKeystroke: ^XINPUT_KEYSTROKE) -> System_Error ---
 	XInputGetDSoundAudioDeviceGuids :: proc(user: XUSER, pDSoundRenderGuid: ^GUID, pDSoundCaptureGuid: ^GUID) -> System_Error ---
 }
