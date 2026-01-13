@@ -2043,22 +2043,71 @@ setpriority :: proc "contextless" (which: Priority_Which, who: i32, prio: i32) -
 	return Errno(-ret)
 }
 
-// TODO(flysand): sched_setparam
-
-// TODO(flysand): sched_getparam
-
-// TODO(flysand): sched_setscheduler
-
-// TODO(flysand): sched_getscheduler
-
-// TODO(flysand): sched_get_priority_max
-
-// TODO(flysand): sched_get_priority_min
-
-// TODO(flysand): sched_rr_get_interval
+/*
+	Set scheduling parameters.
+	Available since Linux 2.0.
+*/
+sched_setparam :: proc "contextless" (pid: Pid, param: ^Sched_Param) -> (Errno) {
+	ret := syscall(SYS_sched_setparam, pid, param)
+	return Errno(-ret)
+}
 
 /*
-	Lock and memory.
+	Get scheduling parameters.
+	Available since Linux 2.0.
+*/
+sched_getparam :: proc "contextless" (pid: Pid, param: ^Sched_Param) -> (Errno) {
+	ret := syscall(SYS_sched_getparam, pid, param)
+	return Errno(-ret)
+}
+
+/*
+	Set scheduling policy/parameters.
+	Available since Linux 2.0.
+*/
+sched_setscheduler :: proc "contextless" (pid: Pid, policy: i32, param: ^Sched_Param) -> (Errno) {
+	ret := syscall(SYS_sched_setscheduler, pid, policy, param)
+	return Errno(-ret)
+}
+
+/*
+	Get scheduling policy/parameters.
+	Available since Linux 2.0.
+*/
+sched_getscheduler :: proc "contextless" (pid: Pid, policy: i32, param: ^Sched_Param) -> (i32, Errno) {
+	ret := syscall(SYS_sched_getscheduler, pid)
+	return errno_unwrap(ret, i32)
+}
+
+/*
+	Get static priority range.
+	Available since Linux 2.0.
+*/
+sched_get_priority_max :: proc "contextless" (policy: i32) -> (i32, Errno) {
+	ret := syscall(SYS_sched_get_priority_max, policy)
+	return errno_unwrap(ret, i32)
+}
+
+/*
+	Get static priority range.
+	Available since Linux 2.0.
+*/
+sched_get_priority_min :: proc "contextless" (policy: i32) -> (i32, Errno) {
+	ret := syscall(SYS_sched_get_priority_min, policy)
+	return errno_unwrap(ret, i32)
+}
+
+/*
+	get the SCHED_RR interval for the named process.
+	Available since Linux 2.0.
+*/
+sched_rr_get_interval :: proc "contextless" (pid: Pid, tp: ^Time_Spec) -> (Errno) {
+	ret := syscall(SYS_sched_rr_get_interval, pid, tp)
+	return Errno(-ret)
+}
+
+/*
+	Lock memory.
 	Available since Linux 2.0.
 	If flags specified, available since Linux 4.4.
 */
@@ -2560,9 +2609,29 @@ futex :: proc{
 	futex_wake_bitset,
 }
 
-// TODO(flysand): sched_setaffinity
+/*
+	Set a thread's CPU affinity mask.
+	Available since Linux 2.6.
+	
+	If you are running on a system with less than 128 cores you can use `linux.Cpu_Set` as the type for the mask argument.
+	Otherwise use an array of integers.
+*/
+sched_setaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (Errno) {
+	ret := syscall(SYS_sched_setaffinity, pid, cpusetsize, mask)
+	return Errno(-ret)
+}
 
-// TODO(flysand): sched_getaffinity
+/*
+	Get a thread's CPU affinity mask.
+	Available since Linux 2.6.
+	
+	If you are running on a system with less than 128 cores you can use `linux.Cpu_Set` as the type for the mask argument.
+	Otherwise use an array of integers.
+*/
+sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (Errno) {
+	ret := syscall(SYS_sched_getaffinity, pid, cpusetsize, mask)
+	return Errno(-ret)
+}
 
 // TODO(flysand): set_thread_area
 
@@ -3100,7 +3169,14 @@ sendmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg
 
 // TODO(flysand): setns
 
-// TODO(flysand): getcpu
+/*
+	Determine CPU and NUMA node on which the calling thread is running.
+	Available since Linux 2.6.19.
+*/
+getcpu :: proc "contextless" (cpu, node: ^u32) -> (Errno) {
+	ret := syscall(SYS_getcpu, cpu, node)
+	return Errno(-ret)
+}
 
 // TODO(flysand): process_vm_readv
 
@@ -3110,9 +3186,23 @@ sendmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg
 
 // TODO(flysand): finit_module
 
-// TODO(flysand): sched_setattr
+/*
+	Set scheduling policy and attributes.
+	Available since Linux 3.14.
+*/
+sched_setattr :: proc "contextless" (pid: Pid, attr: ^Sched_Attr, flags: Sched_Attr_Flags) -> (Errno) {
+	ret := syscall(SYS_sched_setattr, pid, attr, transmute(u32)flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): sched_getattr
+/*
+	Get scheduling policy and attributes.
+	Available since Linux 3.14.
+*/
+sched_getattr :: proc "contextless" (pid: Pid, attr: ^Sched_Attr, size: u32, flags: Sched_Attr_Flags) -> (Errno) {
+	ret := syscall(SYS_sched_getattr, pid, attr, transmute(u32)flags)
+	return Errno(-ret)
+}
 
 /*
 	Rename the file with names relative to the specified dirfd's with other options.
@@ -3130,7 +3220,14 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 	return errno_unwrap(ret, int)
 }
 
-// TODO(flysand): memfd_create
+/*
+	Create an anonymous file.
+	Available since Linux 3.17.
+*/
+memfd_create :: proc "contextless" (name: cstring, flags: Memfd_Create_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_memfd_create, cast(rawptr)name, transmute(u32)flags)
+	return errno_unwrap(ret, Fd)
+}
 
 // TODO(flysand): kexec_file_load
 

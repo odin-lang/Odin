@@ -1748,3 +1748,33 @@ Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
 Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
 
 Swap_Flags :: bit_set[Swap_Flags_Bits; u32]
+
+Cpu_Set :: bit_set[0 ..< 128]
+
+Sched_Param :: struct {
+	sched_priority: i32,
+}
+
+Sched_Flags :: bit_set[Sched_Flag_Bits; u32]
+
+Sched_Attr :: struct {
+	size:           u32,
+
+	sched_policy:   Sched_Policy,
+	sched_flags:    Sched_Flags,
+	sched_nice:     i32,
+	sched_priority: u32,
+
+	/* For the DEADLINE policy */
+	sched_runtime:  u64,
+	sched_deadline: u64,
+	sched_period:   u64,
+
+	/* Utilization hints */
+	sched_util_min: u32,
+	sched_util_max: u32,
+}
+
+Sched_Attr_Flags :: bit_set[Sched_Attr_Flag_Bits; u32]
+
+Memfd_Create_Flags :: bit_set[Memfd_Create_Flag_Bits; u32]
