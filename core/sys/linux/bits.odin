@@ -2275,3 +2275,34 @@ Eventfd_Flags_Bits :: enum {
 	CLOEXEC  = auto_cast Open_Flags_Bits.CLOEXEC,
 	NONBLOCK = auto_cast Open_Flags_Bits.NONBLOCK,
 }
+
+Sched_Policy :: enum u32 {
+	OTHER    = 0,
+	BATCH    = 3,
+	IDLE     = 5,
+	FIFO     = 1,
+	RR       = 2,
+	DEADLINE = 6,
+}
+
+Sched_Flag_Bits :: enum {
+	RESET_ON_FORK  = log2(0x01),
+	RECLAIM        = log2(0x02),
+	DL_OVERRUN     = log2(0x04),
+	KEEP_POLICY    = log2(0x08),
+	KEEP_PARAMS    = log2(0x10),
+	UTIL_CLAMP_MIN = log2(0x20),
+	UTIL_CLAMP_MAX = log2(0x40),
+}
+
+Sched_Attr_Flag_Bits :: enum {}
+
+/*
+	See `constants.odin` for `MFD_HUGE_16KB`, et al.
+*/
+Memfd_Create_Flag_Bits :: enum {
+	CLOEXEC       = log2(0x1),
+	ALLOW_SEALING = log2(0x2),
+	HUGETLB       = log2(0x4),
+}
+

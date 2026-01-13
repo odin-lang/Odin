@@ -11554,6 +11554,15 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
+	case_ast_node(ht, HelperType, node);
+		Type *type = check_type(c, ht->type);
+		if (type != nullptr && type != t_invalid) {
+			o->mode = Addressing_Type;
+			o->type = type;
+		}
+		return kind;
+	case_end;
+
 	case_ast_node(i, Implicit, node);
 		switch (i->kind) {
 		case Token_context:

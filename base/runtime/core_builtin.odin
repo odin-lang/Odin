@@ -433,7 +433,6 @@ _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, ali
 	array.data = raw_data(data)
 	array.len = 0 if use_zero else len
 	array.cap = 0 if use_zero else cap
-	array.allocator = allocator
 	return
 }
 
