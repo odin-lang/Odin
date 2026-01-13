@@ -42,16 +42,17 @@ MAX_USER_ARGUMENTS :: #config(NBIO_MAX_USER_ARGUMENTS, 4)
 #assert(MAX_USER_ARGUMENTS >= 4)
 
 Operation :: struct {
+	cb:              Callback,
+	user_data:       [MAX_USER_ARGUMENTS + 1]rawptr,
+	detached:        bool,
+	type:            Operation_Type,
+	using specifics: Specifics,
+
 	_impl:   _Operation `fmt:"-"`,
 	using _: struct #raw_union {
 		_pool_link: ^Operation,
 		l:          ^Event_Loop,
 	},
-	cb: Callback,
-	using _specifics: Specifics,
-	user_data: [MAX_USER_ARGUMENTS + 1]rawptr,
-	type: Operation_Type,
-	detached: bool,
 }
 
 Specifics :: struct #raw_union {
