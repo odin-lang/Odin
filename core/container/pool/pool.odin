@@ -41,26 +41,33 @@ init :: proc(p: ^Pool($T), $link_field: string, block_size: uint = DEFAULT_BLOCK
 }
 
 destroy :: proc(p: ^Pool($T)) {
-	for elem := p.free_list; elem != nil; elem = _get_next(p, elem) {
-		_unpoison_elem(p, elem)
-		free(elem, _pool_arena_allocator(&p.arena))
+	elem := sync.atomic_exchange_explicit(&p.free_list, nil, .Acquire)
+
+	sync.atomic_store_explicit(&p.num_ready, 0, .Relaxed)
+	assert(sync.atomic_load_explicit(&p.num_outstanding, .Relaxed) == 0)
+
+	when .Address in ODIN_SANITIZER_FLAGS {
+		for ; elem != nil; elem = _get_next(p, elem) {
+			_unpoison_elem(p, elem)
+		}
 	}
 
 	_pool_arena_destroy(&p.arena)
+	p.arena = {}
 }
 
 @(require_results)
 get :: proc(p: ^Pool($T)) -> (elem: ^T, err: mem.Allocator_Error) #optional_allocator_error {
-	sync.atomic_add_explicit(&p.num_outstanding, 1, .Relaxed)
+	defer sync.atomic_add_explicit(&p.num_outstanding, 1, .Relaxed)
 
 	for {
-		elem = sync.atomic_load(&p.free_list)
+		elem = sync.atomic_load_explicit(&p.free_list, .Acquire)
 		if elem == nil {
 			// NOTE: pool arena has an internal lock.
 			return new(T, _pool_arena_allocator(&p.arena))
 		}
 
-		if _, ok := sync.atomic_compare_exchange_weak(&p.free_list, elem, _get_next(p, elem)); ok {
+		if _, ok := sync.atomic_compare_exchange_weak_explicit(&p.free_list, elem, _get_next(p, elem), .Acquire, .Relaxed); ok {
 			_set_next(p, elem, nil)
 			_unpoison_elem(p, elem)
 			sync.atomic_sub_explicit(&p.num_ready, 1, .Relaxed)
@@ -77,9 +84,9 @@ put :: proc(p: ^Pool($T), elem: ^T) {
 	defer sync.atomic_add_explicit(&p.num_ready, 1, .Relaxed)
 
 	for {
-		head := sync.atomic_load(&p.free_list)
+		head := sync.atomic_load_explicit(&p.free_list, .Relaxed)
 		_set_next(p, elem, head)
-		if _, ok := sync.atomic_compare_exchange_weak(&p.free_list, head, elem); ok {
+		if _, ok := sync.atomic_compare_exchange_weak_explicit(&p.free_list, head, elem, .Release, .Relaxed); ok {
 			return
 		}
 	}
