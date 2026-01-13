@@ -37,11 +37,9 @@ MAX_RW :: mem.Gigabyte
 
 @(private="package")
 _Operation :: struct {
-	over:      win.OVERLAPPED,
-	timeout:   ^Operation,
+	over:    win.OVERLAPPED,
+	timeout: ^Operation,
 }
-#assert(offset_of(Operation, _impl) == 0, "needs to be the first field to work")
-#assert(offset_of(_Operation, over) == 0, "needs to be the first field to work")
 
 @(private="package")
 _Accept :: struct {
@@ -203,10 +201,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 		for event in events[:entries_removed] {
 			if event.lpCompletionKey == COMPLETION_KEY_WAKE_UP { continue }
 			assert(event.lpOverlapped != nil)
-
-			// This is actually pointing at the Completion.over field, but because it is the first field
-			// It is also a valid pointer to the Completion struct.
-			op := (^Operation)(event.lpOverlapped)
+			op := container_of(container_of(event.lpOverlapped, _Operation, "over"), Operation, "_impl")
 			handle_completed(op)
 		}
 
