@@ -174,7 +174,7 @@ try_cross_linking:;
 		switch (build_context.linker_choice) {
 		case Linker_Default:  break;
 		case Linker_lld:      section_name = str_lit("lld-link"); break;
-	#if defined(GB_SYSTEM_LINUX)
+	#if defined(GB_SYSTEM_UNIX)
 		case Linker_mold:     section_name = str_lit("mold-link"); break;
 	#endif
 	#if defined(GB_SYSTEM_WINDOWS)
