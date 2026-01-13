@@ -592,6 +592,11 @@ Mem_Protection_Bits :: enum {
 	GROWSUP   = 25,
 }
 
+/*
+	Bits for Map_Flags
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
+*/
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
