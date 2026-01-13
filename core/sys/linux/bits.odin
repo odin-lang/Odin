@@ -592,21 +592,6 @@ Mem_Protection_Bits :: enum {
 	GROWSUP   = 25,
 }
 
-/*
-
-Sched_Flag_Bits :: enum u32 {
-	RESET_ON_FORK  = 0,
-	RECLAIM        = 1,
-	DL_OVERRUN     = 2,
-	UTIL_CLAMP_MIN = 5,
-	UTIL_CLAMP_MAX = 6,
-}
-
-Sched_Attr_Flag_Bits :: enum {}
-	Bits for Map_Flags
-
-	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
-*/
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
