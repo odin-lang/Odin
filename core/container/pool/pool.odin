@@ -50,6 +50,8 @@ destroy :: proc(p: ^Pool($T)) {
 		for ; elem != nil; elem = _get_next(p, elem) {
 			_unpoison_elem(p, elem)
 		}
+	} else {
+		_ = elem
 	}
 
 	_pool_arena_destroy(&p.arena)
