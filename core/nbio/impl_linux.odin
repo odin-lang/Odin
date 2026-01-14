@@ -6,11 +6,11 @@ import "base:intrinsics"
 import "core:container/pool"
 import "core:container/queue"
 import "core:mem"
-import "core:nbio/uring"
 import "core:net"
 import "core:slice"
 import "core:strings"
 import "core:sys/linux"
+import "core:sys/linux/uring"
 import "core:time"
 
 @(private="package")

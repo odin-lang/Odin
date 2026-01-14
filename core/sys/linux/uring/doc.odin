@@ -11,7 +11,7 @@ Example:
 	import "core:fmt"
 	import "core:os"
 	import "core:sys/linux"
-	import "core:nbio/uring"
+	import "core:sys/linux/uring"
 
 	Request :: struct {
 		path:       cstring,
