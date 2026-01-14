@@ -44,7 +44,6 @@ destroy :: proc(p: ^Pool($T)) {
 	elem := sync.atomic_exchange_explicit(&p.free_list, nil, .Acquire)
 
 	sync.atomic_store_explicit(&p.num_ready, 0, .Relaxed)
-	assert(sync.atomic_load_explicit(&p.num_outstanding, .Relaxed) == 0)
 
 	when .Address in ODIN_SANITIZER_FLAGS {
 		for ; elem != nil; elem = _get_next(p, elem) {
