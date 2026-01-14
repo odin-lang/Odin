@@ -20,8 +20,8 @@ Task :: struct {
 	allocator:  mem.Allocator,
 }
 
-Thread_Init_Proc :: #type proc(thread_index: int, user_data: rawptr)
-Thread_Fini_Proc :: #type proc(thread_index: int, user_data: rawptr)
+Thread_Init_Proc :: #type proc(thread: ^Thread, user_data: rawptr)
+Thread_Fini_Proc :: #type proc(thread: ^Thread, user_data: rawptr)
 
 // Do not access the pool's members directly while the pool threads are running,
 // since they use different kinds of locking and mutual exclusion devices.
@@ -66,7 +66,7 @@ pool_thread_runner :: proc(t: ^Thread) {
 	pool := data.pool
 
 	if pool.thread_init_proc != nil {
-		pool.thread_init_proc(t.user_index, pool.thread_init_data)
+		pool.thread_init_proc(t, pool.thread_init_data)
 	}
 
 	for intrinsics.atomic_load(&pool.is_running) {
@@ -81,7 +81,7 @@ pool_thread_runner :: proc(t: ^Thread) {
 	}
 
 	if pool.thread_fini_proc != nil {
-		pool.thread_fini_proc(t.user_index, pool.thread_fini_data)
+		pool.thread_fini_proc(t, pool.thread_fini_data)
 	}
 
 	sync.post(&pool.sem_available, 1)
