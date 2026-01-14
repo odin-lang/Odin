@@ -2701,7 +2701,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				ERROR_BLOCK();
 
 				warning(ce->args[0], "'size_of(&x)' returns the size of a pointer, not the size of x");
-		        error_line("\tSuggestion: Use 'size_of(rawptr)' if you want the size of the pointer");
+				error_line("\tSuggestion: Use 'size_of(rawptr)' if you want the size of the pointer");
 			}
 		}
 
