@@ -17,6 +17,11 @@ Proc_Inlining :: enum u32 {
 	No_Inline = 2,
 }
 
+Proc_Tailing :: enum u32 {
+	None      = 0,
+	Must_Tail = 1,
+}
+
 Proc_Calling_Convention_Extra :: enum i32 {
 	Foreign_Block_Default,
 }
@@ -147,6 +152,7 @@ Proc_Lit :: struct {
 	body:          ^Stmt, // nil when it represents a foreign procedure
 	tags:          Proc_Tags,
 	inlining:      Proc_Inlining,
+	tailing:       Proc_Tailing,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 }
@@ -243,6 +249,7 @@ Matrix_Index_Expr :: struct {
 Call_Expr :: struct {
 	using node: Expr,
 	inlining: Proc_Inlining,
+	tailing:  Proc_Tailing,
 	expr:     ^Expr,
 	open:     tokenizer.Pos,
 	args:     []^Expr,

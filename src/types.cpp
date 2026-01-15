@@ -5210,40 +5210,12 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 	case Type_Proc:
 		str = gb_string_appendc(str, "proc");
 
-		switch (type->Proc.calling_convention) {
-		case ProcCC_Odin:
-			if (default_calling_convention() != ProcCC_Odin) {
-				str = gb_string_appendc(str, " \"odin\" ");
-			}
-			break;
-		case ProcCC_Contextless:
-			if (default_calling_convention() != ProcCC_Contextless) {
-				str = gb_string_appendc(str, " \"contextless\" ");
-			}
-			break;
-		case ProcCC_CDecl:
-			str = gb_string_appendc(str, " \"c\" ");
-			break;
-		case ProcCC_StdCall:
-			str = gb_string_appendc(str, " \"std\" ");
-			break;
-		case ProcCC_FastCall:
-			str = gb_string_appendc(str, " \"fastcall\" ");
-			break;
-			break;
-		case ProcCC_None:
-			str = gb_string_appendc(str, " \"none\" ");
-			break;
-		case ProcCC_Naked:
-			str = gb_string_appendc(str, " \"naked\" ");
-			break;
-		// case ProcCC_VectorCall:
-		// 	str = gb_string_appendc(str, " \"vectorcall\" ");
-		// 	break;
-		// case ProcCC_ClrCall:
-		// 	str = gb_string_appendc(str, " \"clrcall\" ");
-		// 	break;
+		if (type->Proc.calling_convention != default_calling_convention()) {
+			str = gb_string_appendc(str, " \"");
+			str = gb_string_appendc(str, proc_calling_convention_strings[type->Proc.calling_convention]);
+			str = gb_string_appendc(str, "\" ");
 		}
+
 		str = gb_string_appendc(str, "(");
 		if (type->Proc.params) {
 			str = write_type_to_string(str, type->Proc.params, shorthand, allow_polymorphic);

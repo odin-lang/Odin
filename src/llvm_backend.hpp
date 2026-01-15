@@ -345,6 +345,7 @@ struct lbProcedure {
 	Ast *        body;
 	u64          tags;
 	ProcInlining inlining;
+	ProcTailing  tailing;
 	bool         is_foreign;
 	bool         is_export;
 	bool         is_entry_point;
@@ -484,7 +485,7 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node);
 gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
-gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none);
+gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, ProcTailing tailing = ProcTailing_none);
 gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x);
 
@@ -670,6 +671,7 @@ enum lbCallingConventionKind : unsigned {
 	lbCallingConvention_PreserveAll = 15,
 	lbCallingConvention_Swift = 16,
 	lbCallingConvention_CXX_FAST_TLS = 17,
+	lbCallingConvention_PreserveNone = 21,
 	lbCallingConvention_FirstTargetCC = 64,
 	lbCallingConvention_X86_StdCall = 64,
 	lbCallingConvention_X86_FastCall = 65,
@@ -722,6 +724,10 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 
 	lbCallingConvention_Win64,        // ProcCC_Win64,
 	lbCallingConvention_X86_64_SysV,  // ProcCC_SysV,
+
+	lbCallingConvention_PreserveNone,  // ProcCC_PreserveNone,
+	lbCallingConvention_PreserveMost,  // ProcCC_PreserveMost,
+	lbCallingConvention_PreserveAll,   // ProcCC_PreserveAll,
 
 };
 
