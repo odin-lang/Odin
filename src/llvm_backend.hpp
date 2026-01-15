@@ -671,6 +671,7 @@ enum lbCallingConventionKind : unsigned {
 	lbCallingConvention_PreserveAll = 15,
 	lbCallingConvention_Swift = 16,
 	lbCallingConvention_CXX_FAST_TLS = 17,
+	lbCallingConvention_PreserveNone = 21,
 	lbCallingConvention_FirstTargetCC = 64,
 	lbCallingConvention_X86_StdCall = 64,
 	lbCallingConvention_X86_FastCall = 65,
@@ -723,6 +724,8 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 
 	lbCallingConvention_Win64,        // ProcCC_Win64,
 	lbCallingConvention_X86_64_SysV,  // ProcCC_SysV,
+
+	lbCallingConvention_PreserveNone,  // ProcCC_PreserveNone,
 
 };
 

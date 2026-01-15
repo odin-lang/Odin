@@ -179,12 +179,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
-	switch (p->tailing) {
-	case ProcTailing_must_tail:
-		lb_add_attribute_to_proc(m, p->value, "preserve_none");
-		break;
-	}
-
 	switch (entity->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
 		lb_add_attribute_to_proc(m, p->value, "optnone");

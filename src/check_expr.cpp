@@ -8426,11 +8426,14 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		break;
 	case ProcTailing_must_tail:
 		is_call_tailed = true;
-		if (proc != nullptr) {
-			Entity *e = entity_from_expr(proc);
-			if (e != nullptr && e->kind == Entity_Procedure) {
-				// TODO(bill): `preserve_none`
-			}
+		if (c->curr_proc_sig == nullptr || !are_types_identical(c->curr_proc_sig, pt)) {
+			ERROR_BLOCK();
+			gbString a = type_to_string(pt);
+			gbString b = type_to_string(c->curr_proc_sig);
+			error(call, "Use of '#must_tail' of a procedure must have the same type as the procedure it was called within");
+			error_line("\tCall type: %s, parent type: %s", a, b);
+			gb_string_free(b);
+			gb_string_free(a);
 		}
 		break;
 	}

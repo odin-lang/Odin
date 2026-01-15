@@ -2216,6 +2216,7 @@ gb_internal Ast *parse_inlining_or_tailing_operand(AstFile *f, Token token) {
 
 	if (pt != ProcTailing_none) {
 		if (e->kind == Ast_ProcLit) {
+			syntax_error(expr, "'#must_call' can only be applied to a procedure call, not the procedure literal");
 			e->ProcLit.tailing = pt;
 		} else if (e->kind == Ast_CallExpr) {
 			e->CallExpr.tailing = pt;
@@ -4019,6 +4020,8 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 
 	if (s == "win64")	return ProcCC_Win64;
 	if (s == "sysv")        return ProcCC_SysV;
+
+	if (s == "preserve/none") return ProcCC_PreserveNone;
 
 	if (s == "system") {
 		if (build_context.metrics.os == TargetOs_windows) {

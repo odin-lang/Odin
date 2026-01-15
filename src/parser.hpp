@@ -301,6 +301,7 @@ enum ProcCallingConvention : i32 {
 	ProcCC_Win64       = 9,
 	ProcCC_SysV        = 10,
 
+	ProcCC_PreserveNone = 11,
 
 	ProcCC_MAX,
 
@@ -320,6 +321,7 @@ gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"inlineasm",
 	"win64",
 	"sysv",
+	"preserve/none",
 };
 
 gb_internal ProcCallingConvention default_calling_convention(void) {
