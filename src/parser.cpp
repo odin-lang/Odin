@@ -2176,7 +2176,7 @@ gb_internal bool ast_on_same_line(Token const &x, Ast *yp) {
 	return x.pos.line == y.pos.line;
 }
 
-gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
+gb_internal Ast *parse_inlining_or_tailing_operand(AstFile *f, Token token) {
 	Ast *expr = parse_unary_expr(f, false);
 	Ast *e = strip_or_return_expr(expr);
 	if (e == nullptr) {
@@ -2187,11 +2187,14 @@ gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 		return ast_bad_expr(f, token, f->curr_token);
 	}
 	ProcInlining pi = ProcInlining_none;
+	ProcTailing  pt = ProcTailing_none;
 	if (token.kind == Token_Ident) {
 		if (token.string == "force_inline") {
 			pi = ProcInlining_inline;
 		} else if (token.string == "force_no_inline") {
 			pi = ProcInlining_no_inline;
+		} else if (token.string == "must_tail") {
+			pt = ProcTailing_must_tail;
 		}
 	}
 
@@ -2208,6 +2211,14 @@ gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
 				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
 			}
 			e->CallExpr.inlining = pi;
+		}
+	}
+
+	if (pt != ProcTailing_none) {
+		if (e->kind == Ast_ProcLit) {
+			e->ProcLit.tailing = pt;
+		} else if (e->kind == Ast_CallExpr) {
+			e->CallExpr.tailing = pt;
 		}
 	}
 
@@ -2507,8 +2518,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			syntax_error(tag, "#relative types have now been removed in favour of \"core:relative\"");
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "force_inline" ||
-		           name.string == "force_no_inline") {
-			return parse_force_inlining_operand(f, name);
+		           name.string == "force_no_inline" ||
+		           name.string == "must_tail") {
+			return parse_inlining_or_tailing_operand(f, name);
 		}
 		return ast_basic_directive(f, token, name);
 	}
@@ -5399,8 +5411,9 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			expect_semicolon(f);
 			return stmt;
 		} else if (name.string == "force_inline" ||
-		           name.string == "force_no_inline") {
-			Ast *expr = parse_force_inlining_operand(f, name);
+		           name.string == "force_no_inline" ||
+		           name.string == "must_tail") {
+			Ast *expr = parse_inlining_or_tailing_operand(f, name);
 			Ast *stmt =  ast_expr_stmt(f, expr);
 			expect_semicolon(f);
 			return stmt;

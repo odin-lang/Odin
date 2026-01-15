@@ -263,10 +263,15 @@ struct ForeignFileWorkerData {
 
 
 
-enum ProcInlining {
-	ProcInlining_none = 0,
-	ProcInlining_inline = 1,
+enum ProcInlining : u8 {
+	ProcInlining_none      = 0,
+	ProcInlining_inline    = 1,
 	ProcInlining_no_inline = 2,
+};
+
+enum ProcTailing : u8 {
+	ProcTailing_none      = 0,
+	ProcTailing_must_tail = 1,
 };
 
 enum ProcTag {
@@ -441,6 +446,7 @@ struct AstSplitArgs {
 		Ast *body; \
 		u64  tags; \
 		ProcInlining inlining; \
+		ProcTailing  tailing; \
 		Token where_token; \
 		Slice<Ast *> where_clauses; \
 		DeclInfo *decl; \
@@ -486,6 +492,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        close; \
 		Token        ellipsis; \
 		ProcInlining inlining; \
+		ProcTailing  tailing; \
 		bool         optional_ok_one; \
 		bool         was_selector; \
 		AstSplitArgs *split_args; \
