@@ -268,6 +268,7 @@ struct Entity {
 			bool    is_anonymous               : 1;
 			bool    no_sanitize_address        : 1;
 			bool    no_sanitize_memory         : 1;
+			bool    no_sanitize_thread         : 1;
 			bool    is_objc_impl_or_import     : 1;
 			bool    is_objc_class_method       : 1;
 		} Procedure;

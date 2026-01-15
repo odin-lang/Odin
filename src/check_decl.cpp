@@ -1473,6 +1473,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.no_sanitize_address = ac.no_sanitize_address;
 	e->Procedure.no_sanitize_memory  = ac.no_sanitize_memory;
+	e->Procedure.no_sanitize_thread  = ac.no_sanitize_thread;
 
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;

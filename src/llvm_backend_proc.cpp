@@ -347,7 +347,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		if (build_context.sanitizer_flags & SanitizerFlag_Memory && !entity->Procedure.no_sanitize_memory) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_memory");
 		}
-		if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		if (build_context.sanitizer_flags & SanitizerFlag_Thread && !entity->Procedure.no_sanitize_thread) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_thread");
 		}
 	}
