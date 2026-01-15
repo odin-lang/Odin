@@ -1528,8 +1528,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			es.expr = ce
 			return es
 
-		case "force_inline", "force_no_inline":
-			expr := parse_inlining_operand(p, true, tag)
+		case "force_inline", "force_no_inline", "must_tail":
+			expr := parse_inlining_or_tailing_operand(p, true, tag)
 			es := ast.new(ast.Expr_Stmt, expr.pos, expr)
 			es.expr = expr
 			return es
@@ -2235,10 +2235,11 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	return pt
 }
 
-parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
+parse_inlining_or_tailing_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
 	expr := parse_unary_expr(p, lhs)
 
 	pi := ast.Proc_Inlining.None
+	pt := ast.Proc_Tailing.None
 	#partial switch tok.kind {
 	case .Inline:
 		pi = .Inline
@@ -2250,6 +2251,8 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 			pi = .Inline
 		case "force_no_inline":
 			pi = .No_Inline
+		case "must_tail":
+			pt = .Must_Tail
 		}
 	}
 
@@ -2259,13 +2262,19 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 			if e.inlining != .None && e.inlining != pi {
 				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
 			}
+			if pt != .None {
+				error(p, expr.pos, "'#must_tail' can only be applied to a procedure call, not the procedure literal")
+			}
+
 			e.inlining = pi
+			e.tailing  = pt
 			return expr
 		case ^ast.Call_Expr:
 			if e.inlining != .None && e.inlining != pi {
 				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call")
 			}
 			e.inlining = pi
+			e.tailing  = pt
 			return expr
 		}
 	}
@@ -2451,7 +2460,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return rt
 
 		case "force_inline", "force_no_inline":
-			return parse_inlining_operand(p, lhs, name)
+			return parse_inlining_or_tailing_operand(p, lhs, name)
 		case:
 			expr := parse_expr(p, lhs)
 			end := expr.pos if expr != nil else end_pos(tok)
@@ -2464,7 +2473,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Inline, .No_Inline:
 		tok := advance_token(p)
-		return parse_inlining_operand(p, lhs, tok)
+		return parse_inlining_or_tailing_operand(p, lhs, tok)
 
 	case .Proc:
 		tok := expect_token(p, .Proc)
