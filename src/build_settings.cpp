@@ -582,6 +582,7 @@ struct BuildContext {
 
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
+	bool   disable_unwind;
 
 	isize max_error_count;
 
