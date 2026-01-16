@@ -30,6 +30,16 @@ EV_RXCHAR                  :: DWORD(0x0001)
 EV_RXFLAG                  :: DWORD(0x0002)
 EV_TXEMPTY                 :: DWORD(0x0004)
 
+WAITORTIMERCALLBACK :: #type proc "system" (lpParameter: PVOID, TimerOrWaitFired: BOOLEAN)
+
+WT_EXECUTEDEFAULT            :: 0x00000000
+WT_EXECUTEINIOTHREAD         :: 0x00000001
+WT_EXECUTEINPERSISTENTTHREAD :: 0x00000080
+WT_EXECUTEINWAITTHREAD       :: 0x00000004
+WT_EXECUTELONGFUNCTION       :: 0x00000010
+WT_EXECUTEONLYONCE           :: 0x00000008
+WT_TRANSFER_IMPERSONATION    :: 0x00000100
+
 @(default_calling_convention="system")
 foreign kernel32 {
 	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
@@ -567,7 +577,7 @@ foreign kernel32 {
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
 	GetQueuedCompletionStatusEx        :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
-	PostQueuedCompletionStatus         :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
+	PostQueuedCompletionStatus         :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: ULONG_PTR, lpOverlapped: ^OVERLAPPED) -> BOOL ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
 	GetHandleInformation               :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 
@@ -575,6 +585,17 @@ foreign kernel32 {
 	RtlNtStatusToDosError :: proc(status: NTSTATUS) -> ULONG ---
 
 	GetSystemPowerStatus :: proc(lpSystemPowerStatus: ^SYSTEM_POWER_STATUS) -> BOOL ---
+
+	RegisterWaitForSingleObject :: proc(
+		phNewWaitObject: PHANDLE,
+		hObject: HANDLE,
+		Callback: WAITORTIMERCALLBACK,
+		Context: PVOID,
+		dwMilliseconds: ULONG,
+		dwFlags: ULONG,
+	) -> BOOL ---
+
+	UnregisterWaitEx :: proc(WaitHandle: HANDLE, CompletionEvent: HANDLE) -> BOOL ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001

@@ -10,8 +10,6 @@
 
 	A test suite for `core:net`
 */
-#+build !netbsd
-#+build !openbsd
 #+feature dynamic-literals
 package test_core_net
 

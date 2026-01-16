@@ -36,6 +36,20 @@ foreign ntdll_lib {
 		QueryFlags:           ULONG,
 		FileName   :          PUNICODE_STRING,
 	) -> NTSTATUS ---
+
+	NtCreateFile :: proc(
+		FileHandle: PHANDLE,
+		DesiredAccess: ACCESS_MASK,
+		ObjectAttributes: POBJECT_ATTRIBUTES,
+		IoStatusBlock: PIO_STATUS_BLOCK,
+		AllocationSize: PLARGE_INTEGER,
+		FileAttributes: ULONG,
+		ShareAccess: ULONG,
+		CreateDisposition: ULONG,
+		CreateOptions: ULONG,
+		EaBuffer: PVOID,
+		EaLength: ULONG,
+	) -> NTSTATUS ---
 }
 
 
@@ -257,3 +271,12 @@ LIST_ENTRY :: struct {
 	Flink: ^LIST_ENTRY,
 	Blink: ^LIST_ENTRY,
 }
+
+FILE_SUPERSEDE    :: 0x00000000
+FILE_OPEN         :: 0x00000001
+FILE_CREATE       :: 0x00000002
+FILE_OPEN_IF      :: 0x00000003
+FILE_OVERWRITE    :: 0x00000004
+FILE_OVERWRITE_IF :: 0x00000005
+
+FILE_NON_DIRECTORY_FILE :: 0x00000040

@@ -1589,23 +1589,23 @@ IO_Uring_SQE :: struct {
 	using __ioprio: struct #raw_union {
 		ioprio:             u16,
 		sq_accept_flags:    IO_Uring_Accept_Flags,
-		sq_send_recv_flags: IO_Uring_Send_Recv_Flags,
+		sq_send_recv_flags: IO_Uring_Send_Recv_Flags `raw_union_tag:"opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV"`,
 	},
 	fd: Fd,
 	using __offset: struct #raw_union {
 		// Offset into file.
-		off:     u64,
-		addr2:   u64,
+		off:     u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.TIMEOUT, opcode=.ACCEPT, opcode=.CONNECT, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		addr2:   u64 `raw_union_tag:"opcode=.SEND, opcode=.BIND"`,
 		using _: struct {
 			cmd_op: u32,
 			__pad1: u32,
 		},
-		statx: ^Statx,
+		statx: ^Statx `raw_union_tag:"opcode=.STATX"`,
 	},
 	using __iovecs:   struct #raw_union {
 		// Pointer to buffer or iovecs.
-		addr:          u64,
-		splice_off_in: u64,
+		addr:          u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.ACCEPT, opcode=.ASYNC_CANCEL, opcode=.LINK_TIMEOUT, opcode=.CONNECT, opcode=.MADVISE, opcode=.OPENAT, opcode=.STATX, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.BIND, opcode=.LISTEN"`,
+		splice_off_in: u64 `raw_union_tag:"opcode=.SPLICE"`,
 		using _: struct {
 			level:   u32,
 			optname: u32,
@@ -1613,28 +1613,28 @@ IO_Uring_SQE :: struct {
 	},
 	using __len: struct #raw_union {
 		// Buffer size or number of iovecs.
-		len:          u32,
-		poll_flags:   IO_Uring_Poll_Add_Flags,
-		statx_mask:   Statx_Mask,
-		epoll_ctl_op: EPoll_Ctl_Opcode,
-		shutdown_how: Shutdown_How,
+		len:          u32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.LINK_TIMEOUT, opcode=.MADVISE, opcode=.OPENAT, opcode=.READ, opcode=.WRITE, opcode=.TEE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		poll_flags:   IO_Uring_Poll_Add_Flags `raw_union_tag:"opcode=.POLL_ADD, opcode=.POLL_REMOVE"`,
+		statx_mask:   Statx_Mask              `raw_union_tag:"opcode=.STATX"`,
+		epoll_ctl_op: EPoll_Ctl_Opcode        `raw_union_tag:"opcode=.EPOLL_CTL"`,
+		shutdown_how: Shutdown_How            `raw_union_tag:"opcode=.SHUTDOWN"`,
 	},
 	using __contents: struct #raw_union {
-		rw_flags:         i32,
-		fsync_flags:      IO_Uring_Fsync_Flags,
+		rw_flags:         i32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SOCKET"`,
+		fsync_flags:      IO_Uring_Fsync_Flags    `raw_union_tag:"opcode=.FSYNC"`,
 		// compatibility.
-		poll_events:      Fd_Poll_Events,
+		poll_events:      Fd_Poll_Events          `raw_union_tag:"opcode=.POLL_ADD, opcode=.POLL_REMOVE"`,
 		// word-reversed for BE.
 		poll32_events:    u32,
 		sync_range_flags: u32,
-		msg_flags:        Socket_Msg,
-		timeout_flags:    IO_Uring_Timeout_Flags,
-		accept_flags:     Socket_FD_Flags,
+		msg_flags:        Socket_Msg              `raw_union_tag:"opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV"`,
+		timeout_flags:    IO_Uring_Timeout_Flags  `raw_union_tag:"opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.LINK_TIMEOUT"`,
+		accept_flags:     Socket_FD_Flags         `raw_union_tag:"opcode=.ACCEPT"`,
 		cancel_flags:     u32,
-		open_flags:       Open_Flags,
-		statx_flags:      FD_Flags,
-		fadvise_advice:   u32,
-		splice_flags:     IO_Uring_Splice_Flags,
+		open_flags:       Open_Flags              `raw_union_tag:"opcode=.OPENAT"`,
+		statx_flags:      FD_Flags                `raw_union_tag:"opcode=.STATX"`,
+		fadvise_advice:   u32                     `raw_union_tag:"opcode=.MADVISE"`,
+		splice_flags:     IO_Uring_Splice_Flags   `raw_union_tag:"opcode=.SPLICE, opcode=.TEE"`,
 		rename_flags:     u32,
 		unlink_flags:     u32,
 		hardlink_flags:   u32,
@@ -1653,10 +1653,10 @@ IO_Uring_SQE :: struct {
 	// Personality to use, if used.
 	personality: u16,
 	using _: struct #raw_union {
-		splice_fd_in: Fd,
-		file_index:   u32,
+		splice_fd_in: Fd  `raw_union_tag:"opcode=.SPLICE, opcode=.TEE"`,
+		file_index:   u32 `raw_union_tag:"opcode=.ACCEPT, opcode=.OPENAT, opcode=.CLOSE, opcode=.SOCKET"`,
 		using _:      struct {
-			addr_len: u16,
+			addr_len: u16    `raw_union_tag:"opcode=.SEND"`,
 			__pad3:   [1]u16,
 		},
 	},
@@ -1748,6 +1748,8 @@ Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
 Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
 
 Swap_Flags :: bit_set[Swap_Flags_Bits; u32]
+
+Eventfd_Flags :: bit_set[Eventfd_Flags_Bits; i32]
 
 Cpu_Set :: bit_set[0 ..< 128]
 

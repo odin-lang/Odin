@@ -3070,7 +3070,10 @@ timerfd_create :: proc "contextless" (clock_id: Clock_Id, flags: Open_Flags) -> 
 	return errno_unwrap2(ret, Fd)
 }
 
-// TODO(flysand): eventfd
+eventfd :: proc "contextless" (initval: u32, flags: Eventfd_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_eventfd2, initval, transmute(i32)flags)
+	return errno_unwrap2(ret, Fd)
+}
 
 // TODO(flysand): fallocate
 

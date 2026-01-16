@@ -417,9 +417,10 @@ Create an iterator for traversing the exponential array.
 
 Example:
 
-	import "lib:xar"
+	import "core:container/xar"
+	import "core:fmt"
 
-	iteration_example :: proc() {
+	iterator_example :: proc() {
 		x: xar.Array(int, 4)
 		defer xar.destroy(&x)
 

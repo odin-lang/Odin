@@ -91,7 +91,7 @@ destroy :: proc(t: ^$T/Tree($Key, $Value), call_on_remove: bool = true) {
 	}
 }
 
-len :: proc "contextless" (t: ^$T/Tree($Key, $Value)) -> (node_count: int) {
+len :: proc "contextless" (t: $T/Tree($Key, $Value)) -> (node_count: int) {
 	return t._size
 }
 
@@ -108,7 +108,7 @@ last :: proc "contextless" (t: ^$T/Tree($Key, $Value)) -> ^Node(Key, Value) {
 }
 
 // find finds the key in the tree, and returns the corresponding node, or nil iff the value is not present.
-find :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (node: ^Node(Key, Value)) {
+find :: proc(t: $T/Tree($Key, $Value), key: Key) -> (node: ^Node(Key, Value)) {
 	node = t._root
 	for node != nil {
 		switch t._cmp_fn(key, node.key) {
@@ -121,7 +121,7 @@ find :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (node: ^Node(Key, Value)) {
 }
 
 // find_value finds the key in the tree, and returns the corresponding value, or nil iff the value is not present.
-find_value :: proc(t: ^$T/Tree($Key, $Value), key: Key) -> (value: Value, ok: bool) #optional_ok {
+find_value :: proc(t: $T/Tree($Key, $Value), key: Key) -> (value: Value, ok: bool) #optional_ok {
 	if n := find(t, key); n != nil {
 		return n.value, true
 	}
@@ -166,7 +166,7 @@ remove :: proc {
 // removal was successful.  While the node's key + value will be left intact,
 // the node itself will be freed via the tree's node allocator.
 remove_key :: proc(t: ^$T/Tree($Key, $Value), key: Key, call_on_remove := true) -> bool {
-	n := find(t, key)
+	n := find(t^, key)
 	if n == nil {
 		return false // Key not found, nothing to do
 	}

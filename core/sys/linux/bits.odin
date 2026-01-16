@@ -2270,6 +2270,12 @@ Swap_Flags_Bits :: enum {
 	DISCARD = log2(0x10000),
 }
 
+Eventfd_Flags_Bits :: enum {
+	SEMAPHORE,
+	CLOEXEC  = auto_cast Open_Flags_Bits.CLOEXEC,
+	NONBLOCK = auto_cast Open_Flags_Bits.NONBLOCK,
+}
+
 Sched_Policy :: enum u32 {
 	OTHER    = 0,
 	BATCH    = 3,

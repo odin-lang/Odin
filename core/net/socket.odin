@@ -1,4 +1,3 @@
-#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -19,6 +18,35 @@ package net
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 		Feoramund:       FreeBSD platform code
 */
+
+Socket_Option :: enum i32 {
+	Broadcast                 = i32(_SOCKET_OPTION_BROADCAST),
+	Reuse_Address             = i32(_SOCKET_OPTION_REUSE_ADDRESS),
+	Keep_Alive                = i32(_SOCKET_OPTION_KEEP_ALIVE),
+	Out_Of_Bounds_Data_Inline = i32(_SOCKET_OPTION_OUT_OF_BOUNDS_DATA_INLINE),
+	Linger                    = i32(_SOCKET_OPTION_LINGER),
+	Receive_Buffer_Size       = i32(_SOCKET_OPTION_RECEIVE_BUFFER_SIZE),
+	Send_Buffer_Size          = i32(_SOCKET_OPTION_SEND_BUFFER_SIZE),
+	Receive_Timeout           = i32(_SOCKET_OPTION_RECEIVE_TIMEOUT),
+	Send_Timeout              = i32(_SOCKET_OPTION_SEND_TIMEOUT),
+
+	TCP_Nodelay               = i32(_SOCKET_OPTION_TCP_NODELAY),
+
+	Use_Loopback              = i32(_SOCKET_OPTION_USE_LOOPBACK),
+	Reuse_Port                = i32(_SOCKET_OPTION_REUSE_PORT),
+	No_SIGPIPE_From_EPIPE     = i32(_SOCKET_OPTION_NO_SIGPIPE_FROM_EPIPE),
+	Reuse_Port_Load_Balancing = i32(_SOCKET_OPTION_REUSE_PORT_LOAD_BALANCING),
+
+	Exclusive_Addr_Use        = i32(_SOCKET_OPTION_EXCLUSIVE_ADDR_USE),
+	Conditional_Accept        = i32(_SOCKET_OPTION_CONDITIONAL_ACCEPT),
+	Dont_Linger               = i32(_SOCKET_OPTION_DONT_LINGER),
+}
+
+Shutdown_Manner :: enum i32 {
+	Receive = i32(_SHUTDOWN_MANNER_RECEIVE),
+	Send    = i32(_SHUTDOWN_MANNER_SEND),
+	Both    = i32(_SHUTDOWN_MANNER_BOTH),
+}
 
 any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
 	switch s in socket {

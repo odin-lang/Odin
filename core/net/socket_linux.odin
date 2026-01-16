@@ -21,28 +21,33 @@ package net
 		Feoramund:       FreeBSD platform code
 */
 
-import "core:c"
 import "core:time"
 import "core:sys/linux"
 
-Socket_Option :: enum c.int {
-	Reuse_Address             = c.int(linux.Socket_Option.REUSEADDR),
-	Keep_Alive                = c.int(linux.Socket_Option.KEEPALIVE),
-	Out_Of_Bounds_Data_Inline = c.int(linux.Socket_Option.OOBINLINE),
-	TCP_Nodelay               = c.int(linux.Socket_TCP_Option.NODELAY),
-	Linger                    = c.int(linux.Socket_Option.LINGER),
-	Receive_Buffer_Size       = c.int(linux.Socket_Option.RCVBUF),
-	Send_Buffer_Size          = c.int(linux.Socket_Option.SNDBUF),
-	Receive_Timeout           = c.int(linux.Socket_Option.RCVTIMEO),
-	Send_Timeout              = c.int(linux.Socket_Option.SNDTIMEO),
-	Broadcast                 = c.int(linux.Socket_Option.BROADCAST),
-}
+_SOCKET_OPTION_BROADCAST                 :: linux.Socket_Option.BROADCAST
+_SOCKET_OPTION_REUSE_ADDRESS             :: linux.Socket_Option.REUSEADDR
+_SOCKET_OPTION_KEEP_ALIVE                :: linux.Socket_Option.KEEPALIVE
+_SOCKET_OPTION_OUT_OF_BOUNDS_DATA_INLINE :: linux.Socket_Option.OOBINLINE
+_SOCKET_OPTION_LINGER                    :: linux.Socket_Option.LINGER
+_SOCKET_OPTION_RECEIVE_BUFFER_SIZE       :: linux.Socket_Option.RCVBUF
+_SOCKET_OPTION_SEND_BUFFER_SIZE          :: linux.Socket_Option.SNDBUF
+_SOCKET_OPTION_RECEIVE_TIMEOUT           :: linux.Socket_Option.RCVTIMEO
+_SOCKET_OPTION_SEND_TIMEOUT              :: linux.Socket_Option.SNDTIMEO
 
-Shutdown_Manner :: enum c.int {
-	Receive = c.int(linux.Shutdown_How.RD),
-	Send    = c.int(linux.Shutdown_How.WR),
-	Both    = c.int(linux.Shutdown_How.RDWR),
-}
+_SOCKET_OPTION_TCP_NODELAY :: linux.Socket_TCP_Option.NODELAY
+
+_SOCKET_OPTION_USE_LOOPBACK              :: -1
+_SOCKET_OPTION_REUSE_PORT                :: -1
+_SOCKET_OPTION_NO_SIGPIPE_FROM_EPIPE     :: -1
+_SOCKET_OPTION_REUSE_PORT_LOAD_BALANCING :: -1
+
+_SOCKET_OPTION_EXCLUSIVE_ADDR_USE :: -1
+_SOCKET_OPTION_CONDITIONAL_ACCEPT :: -1
+_SOCKET_OPTION_DONT_LINGER        :: -1
+
+_SHUTDOWN_MANNER_RECEIVE :: linux.Shutdown_How.RD
+_SHUTDOWN_MANNER_SEND    :: linux.Shutdown_How.WR
+_SHUTDOWN_MANNER_BOTH    :: linux.Shutdown_How.RDWR
 
 // Wrappers and unwrappers for system-native types
 
@@ -347,7 +352,7 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 	int_value: i32
 	timeval_value: linux.Time_Val
 	errno: linux.Errno
-	switch option {
+	#partial switch option {
 	case
 		.Reuse_Address,
 		.Keep_Alive,
@@ -400,10 +405,14 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 				panic("set_option() value must be an integer here", loc)
 			}
 			errno = linux.setsockopt(os_sock, level, int(option), &int_value)
+	case:
+		return .Invalid_Socket
 	}
+
 	if errno != .NONE {
 		return _socket_option_error(errno)
 	}
+
 	return nil
 }
 
