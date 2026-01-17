@@ -183,8 +183,12 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 		events: [QUEUE_SIZE]win.OVERLAPPED_ENTRY
 		entries_removed: win.ULONG
 		if !win.GetQueuedCompletionStatusEx(l.iocp, &events[0], len(events), &entries_removed, actual_timeout, false) {
-			if terr := win.GetLastError(); terr != win.WAIT_TIMEOUT {
-				err = General_Error(terr)
+			winerr := win.GetLastError()
+			switch winerr {
+			case win.WAIT_TIMEOUT:
+				entries_removed = 0
+			case:
+				err = General_Error(winerr)
 				return
 			}
 		}
