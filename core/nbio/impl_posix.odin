@@ -23,7 +23,6 @@ _Event_Loop :: struct {
 	// We have to keep record of what we currently have in the kqueue, and if we get an operation
 	// that would be the same (ident, filter) pair we need to bundle the operations under one kevent.
 	submitted: map[Queue_Identifier]^Operation,
-	allocator: mem.Allocator,
 	// Holds all events we want to flush. Flushing is done each tick at which point this is emptied.
 	pending:   sa.Small_Array(QUEUE_SIZE, kq.KEvent),
 	// Holds what should be in `pending` but didn't fit.
@@ -107,7 +106,6 @@ _Link_Timeout :: struct {}
 
 @(private="package")
 _init :: proc(l: ^Event_Loop, allocator: mem.Allocator) -> (rerr: General_Error) {
-	l.allocator = allocator
 	l.submitted.allocator = allocator
 	l.overflow.data.allocator = allocator
 	l.completed.data.allocator = allocator
