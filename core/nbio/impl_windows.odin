@@ -249,11 +249,20 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 				continue
 			}
 
-			expires = cexpires
-			debug("first timeout in the future is at", op.timeout._impl.expires, "after", cexpires)
-			return
+			break
 		}
 
+		// Don't merge this with the previous iteration because the `handle_completed` in that one might queue
+		// more timeouts which we want to detect here.
+		// For example: `timeout(time.Second, proc(_: ^Operation) { timeout(time.Second, ...) })`
+
+		first := avl.first(&l.timeouts)
+		if first != nil {
+			op := first.value
+			cexpires := time.diff(curr, op.timeout._impl.expires)
+			debug("first timeout in the future is at", op.timeout._impl.expires, "after", cexpires)
+			expires = cexpires
+		}
 		return
 	}
 
