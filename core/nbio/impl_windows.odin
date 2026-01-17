@@ -107,16 +107,14 @@ _Stat :: struct {}
 _init :: proc(l: ^Event_Loop, alloc: mem.Allocator) -> (err: General_Error) {
 	l.allocator = alloc
 
-	mem_err: mem.Allocator_Error
-	if mem_err = queue.init(&l.completed, allocator = alloc); mem_err != nil {
-		err = .Allocation_Failed
-		return
-	}
-	defer if err != nil { queue.destroy(&l.completed) }
+	l.completed.data.allocator = l.allocator
 
 	avl.init(&l.timeouts, timeouts_cmp, alloc)
 
 	win.ensure_winsock_initialized()
+
+	mpsc_init(&l.completed_oob, QUEUE_SIZE, l.allocator)
+	defer if err != nil { mpsc_destroy(&l.completed_oob, l.allocator) }
 
 	l.iocp = win.CreateIoCompletionPort(win.INVALID_HANDLE_VALUE, nil, 0, 1)
 	if l.iocp == nil {
@@ -145,8 +143,9 @@ _init :: proc(l: ^Event_Loop, alloc: mem.Allocator) -> (err: General_Error) {
 
 @(private="package")
 _destroy :: proc(l: ^Event_Loop) {
-	queue.destroy(&l.completed)
 	avl.destroy(&l.timeouts)
+	queue.destroy(&l.completed)
+	mpsc_destroy(&l.completed_oob, l.allocator)
 	win.CloseHandle(l.iocp)
 }
 
@@ -754,7 +753,14 @@ _wake_up :: proc(l: ^Event_Loop) {
 	)
 }
 
+@(private="package")
+_yield :: proc() {
+	win.SwitchToThread()
+}
+
 // Start file private.
+
+QUEUE_SIZE :: 128
 
 REMOVED :: rawptr(max(uintptr)-1)
 

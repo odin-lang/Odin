@@ -5,10 +5,8 @@ import "base:runtime"
 import "base:intrinsics"
 
 import "core:container/pool"
-import "core:container/queue"
 import "core:net"
 import "core:strings"
-import "core:sync"
 import "core:time"
 import "core:reflect"
 
@@ -35,7 +33,13 @@ _acquire_thread_event_loop :: proc() -> General_Error {
 			allocator := runtime.heap_allocator()
 		}
 
-		l.queue.data.allocator =  allocator
+		l.allocator = allocator
+
+		if alloc_err := mpsc_init(&l.queue, 128, l.allocator); alloc_err != nil {
+			l.err = .Allocation_Failed
+			return l.err
+		}
+		defer if l.err != nil { mpsc_destroy(&l.queue, l.allocator) }
 
 		if pool_err := pool.init(&l.operation_pool, "_pool_link"); pool_err != nil {
 			l.err = .Allocation_Failed
@@ -65,7 +69,7 @@ _release_thread_event_loop :: proc() {
 	if l.refs > 0 {
 		l.refs -= 1
 		if l.refs == 0 {
-			queue.destroy(&l.queue)
+			mpsc_destroy(&l.queue, l.allocator)
 			pool.destroy(&l.operation_pool)
 			_destroy(l)
 			l^ = {}
@@ -85,11 +89,10 @@ _current_thread_event_loop :: #force_inline proc(loc := #caller_location) -> (^E
 
 _tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 	// Receive operations queued from other threads first.
-	{
-		sync.guard(&l.queue_mu)
-		for op in queue.pop_front_safe(&l.queue) {
-			_exec(op)
-		}
+	for {
+		op := (^Operation)(mpsc_dequeue(&l.queue))
+		if op == nil { break }
+		_exec(op)
 	}
 
 	return __tick(l, timeout)

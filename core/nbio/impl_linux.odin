@@ -472,6 +472,11 @@ _wake_up :: proc(l: ^Event_Loop) {
 	assert(n == 8)
 }
 
+@(private="package")
+_yield :: proc() {
+	linux.sched_yield()
+}
+
 // Start file private.
 
 // The size of the IO Uring queues.

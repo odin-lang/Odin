@@ -215,3 +215,6 @@ _associate_socket :: proc(socket: Any_Socket, l: ^Event_Loop) -> Association_Err
 
 _wake_up :: proc(l: ^Event_Loop) {
 }
+
+_yield :: proc() {
+}

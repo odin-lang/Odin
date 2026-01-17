@@ -1,11 +1,10 @@
 package nbio
 
 import "base:intrinsics"
+import "base:runtime"
 
 import "core:container/pool"
-import "core:container/queue"
 import "core:net"
-import "core:sync"
 import "core:time"
 
 /*
@@ -23,14 +22,13 @@ Do not copy.
 */
 Event_Loop :: struct /* #no_copy */ {
 	using impl:  _Event_Loop,
+	allocator:   runtime.Allocator,
 	err:         General_Error,
 	refs:        int,
 	now:         time.Time,
 
 	// Queue that is used to queue operations from another thread to be executed on this thread.
-	// TODO: Better data-structure.
-	queue:    queue.Queue(^Operation),
-	queue_mu: sync.Mutex,
+	queue: Multi_Producer_Single_Consumer,
 
 	operation_pool: pool.Pool(Operation),
 }
@@ -408,13 +406,10 @@ exec :: proc(op: ^Operation, trigger_wake_up := true) {
 	if op.l == &_tls_event_loop {
 		_exec(op)
 	} else {
-		{
-			// TODO: Better data-structure.
-			sync.guard(&op.l.queue_mu)
-			_, err := queue.push_back(&op.l.queue, op)
-			if err != nil {
-				panic("exec: queueing operation failed due to memory allocation failure")
-			}
+		for !mpsc_enqueue(&op.l.queue, op) {
+			warn("operation queue on event loop filled up")
+			wake_up(op.l)
+			_yield()
 		}
 		if trigger_wake_up {
 			wake_up(op.l)

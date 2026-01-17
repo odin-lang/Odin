@@ -526,6 +526,11 @@ _wake_up :: proc(l: ^Event_Loop) {
 	assert(n == 0)
 }
 
+@(private="package")
+_yield :: proc() {
+	posix.sched_yield()
+}
+
 // Start file private.
 
 // Max operations that can be enqueued per tick.
