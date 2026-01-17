@@ -510,6 +510,7 @@ _associate_socket :: proc(socket: Any_Socket, l: ^Event_Loop) -> Association_Err
 
 @(private="package")
 _wake_up :: proc(l: ^Event_Loop) {
+	// TODO: only if we are sleeping (like Windows).
 	ev := [1]kq.KEvent{
 		{
 			ident  = IDENT_WAKE_UP,
