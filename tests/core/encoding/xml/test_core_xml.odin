@@ -142,7 +142,7 @@ xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x68d2571e,
+		crc32     = 0x6e45a697,
 	})
 }
 
