@@ -1055,18 +1055,14 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 // - bit_size: The bit size of the integer
 // - digits: A string containing the digits for formatting
 //
-// WARNING: May panic if the width and precision are too big, causing a buffer overrun
+// WARNING: May panic if the width is too big, causing a buffer overrun
 //
 _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, digits: string) {
-	_, neg := strconv.is_integer_negative(u, is_signed, bit_size)
 
 	BUF_SIZE :: 256
-	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3 // 3 extra bytes for sign and prefix
-		if width > BUF_SIZE {
-			// TODO(bill):????
-			panic("_fmt_int: buffer overrun. Width and precision too big")
-		}
+	if fi.width_set && fi.width > BUF_SIZE {
+		// TODO(bill):????
+		panic("_fmt_int: buffer overrun. Width too big")
 	}
 
 	buf: [BUF_SIZE]byte
@@ -1093,21 +1089,6 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 			io.write_byte(fi.writer, '0', &fi.n)
 			io.write_byte(fi.writer, 'x', &fi.n)
 			start = 2
-		}
-	}
-
-	prec := 0
-	if fi.prec_set {
-		prec = fi.prec
-		if prec == 0 && u == 0 {
-			fmt_write_padding(fi, fi.width)
-			return
-		}
-	} else if fi.zero && fi.width_set {
-		prec = fi.width
-		if neg || fi.plus {
-			// There needs to be space for the "sign"
-			prec -= 1
 		}
 	}
 
@@ -1140,15 +1121,11 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 // WARNING: Panics if the formatting options result in a buffer overrun.
 //
 _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
-	_, neg := strconv.is_integer_negative_128(u, is_signed, bit_size)
 
 	BUF_SIZE :: 256
-	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3 // 3 extra bytes for sign and prefix
-		if width > BUF_SIZE {
-			// TODO(bill):????
-			panic("_fmt_int: buffer overrun. Width and precision too big")
-		}
+	if fi.width_set && fi.width > BUF_SIZE{
+		// TODO(bill):????
+		panic("_fmt_int: buffer overrun. Width too big")
 	}
 
 	buf: [256]byte
@@ -1175,21 +1152,6 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 			io.write_byte(fi.writer, '0', &fi.n)
 			io.write_byte(fi.writer, 'x', &fi.n)
 			start = 2
-		}
-	}
-
-	prec := 0
-	if fi.prec_set {
-		prec = fi.prec
-		if prec == 0 && u == 0 {
-			fmt_write_padding(fi, fi.width)
-			return
-		}
-	} else if fi.zero && fi.width_set {
-		prec = fi.width
-		if neg || fi.plus {
-			// There needs to be space for the "sign"
-			prec -= 1
 		}
 	}
 
