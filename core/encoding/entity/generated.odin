@@ -794,7 +794,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "NotEqual":                        // NOT EQUAL TO
 			return {'\u2260', 0}, 1, true
 		case "NotEqualTilde":                   // MINUS TILDE with slash
-			return {'\u2242', '\u2242'}, 2, true
+			return {'\u2242', '\u0338'}, 2, true
 		case "NotExists":                       // THERE DOES NOT EXIST
 			return {'\u2204', 0}, 1, true
 		case "NotGreater":                      // NOT GREATER-THAN
@@ -802,23 +802,23 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "NotGreaterEqual":                 // NEITHER GREATER-THAN NOR EQUAL TO
 			return {'\u2271', 0}, 1, true
 		case "NotGreaterFullEqual":             // GREATER-THAN OVER EQUAL TO with slash
-			return {'\u2267', '\u2267'}, 2, true
+			return {'\u2267', '\u0338'}, 2, true
 		case "NotGreaterGreater":               // MUCH GREATER THAN with slash
-			return {'\u226b', '\u226b'}, 2, true
+			return {'\u226b', '\u0338'}, 2, true
 		case "NotGreaterLess":                  // NEITHER GREATER-THAN NOR LESS-THAN
 			return {'\u2279', 0}, 1, true
 		case "NotGreaterSlantEqual":            // GREATER-THAN OR SLANTED EQUAL TO with slash
-			return {'\u2a7e', '\u2a7e'}, 2, true
+			return {'\u2a7e', '\u0338'}, 2, true
 		case "NotGreaterTilde":                 // NEITHER GREATER-THAN NOR EQUIVALENT TO
 			return {'\u2275', 0}, 1, true
 		case "NotHumpDownHump":                 // GEOMETRICALLY EQUIVALENT TO with slash
-			return {'\u224e', '\u224e'}, 2, true
+			return {'\u224e', '\u0338'}, 2, true
 		case "NotHumpEqual":                    // DIFFERENCE BETWEEN with slash
-			return {'\u224f', '\u224f'}, 2, true
+			return {'\u224f', '\u0338'}, 2, true
 		case "NotLeftTriangle":                 // NOT NORMAL SUBGROUP OF
 			return {'\u22ea', 0}, 1, true
 		case "NotLeftTriangleBar":              // LEFT TRIANGLE BESIDE VERTICAL BAR with slash
-			return {'\u29cf', '\u29cf'}, 2, true
+			return {'\u29cf', '\u0338'}, 2, true
 		case "NotLeftTriangleEqual":            // NOT NORMAL SUBGROUP OF OR EQUAL TO
 			return {'\u22ec', 0}, 1, true
 		case "NotLess":                         // NOT LESS-THAN
@@ -828,19 +828,19 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "NotLessGreater":                  // NEITHER LESS-THAN NOR GREATER-THAN
 			return {'\u2278', 0}, 1, true
 		case "NotLessLess":                     // MUCH LESS THAN with slash
-			return {'\u226a', '\u226a'}, 2, true
+			return {'\u226a', '\u0338'}, 2, true
 		case "NotLessSlantEqual":               // LESS-THAN OR SLANTED EQUAL TO with slash
-			return {'\u2a7d', '\u2a7d'}, 2, true
+			return {'\u2a7d', '\u0338'}, 2, true
 		case "NotLessTilde":                    // NEITHER LESS-THAN NOR EQUIVALENT TO
 			return {'\u2274', 0}, 1, true
 		case "NotNestedGreaterGreater":         // DOUBLE NESTED GREATER-THAN with slash
-			return {'\u2aa2', '\u2aa2'}, 2, true
+			return {'\u2aa2', '\u0338'}, 2, true
 		case "NotNestedLessLess":               // DOUBLE NESTED LESS-THAN with slash
-			return {'\u2aa1', '\u2aa1'}, 2, true
+			return {'\u2aa1', '\u0338'}, 2, true
 		case "NotPrecedes":                     // DOES NOT PRECEDE
 			return {'\u2280', 0}, 1, true
 		case "NotPrecedesEqual":                // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return {'\u2aaf', '\u2aaf'}, 2, true
+			return {'\u2aaf', '\u0338'}, 2, true
 		case "NotPrecedesSlantEqual":           // DOES NOT PRECEDE OR EQUAL
 			return {'\u22e0', 0}, 1, true
 		case "NotReverseElement":               // DOES NOT CONTAIN AS MEMBER
@@ -848,31 +848,31 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "NotRightTriangle":                // DOES NOT CONTAIN AS NORMAL SUBGROUP
 			return {'\u22eb', 0}, 1, true
 		case "NotRightTriangleBar":             // VERTICAL BAR BESIDE RIGHT TRIANGLE with slash
-			return {'\u29d0', '\u29d0'}, 2, true
+			return {'\u29d0', '\u0338'}, 2, true
 		case "NotRightTriangleEqual":           // DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
 			return {'\u22ed', 0}, 1, true
 		case "NotSquareSubset":                 // SQUARE IMAGE OF with slash
-			return {'\u228f', '\u228f'}, 2, true
+			return {'\u228f', '\u0338'}, 2, true
 		case "NotSquareSubsetEqual":            // NOT SQUARE IMAGE OF OR EQUAL TO
 			return {'\u22e2', 0}, 1, true
 		case "NotSquareSuperset":               // SQUARE ORIGINAL OF with slash
-			return {'\u2290', '\u2290'}, 2, true
+			return {'\u2290', '\u0338'}, 2, true
 		case "NotSquareSupersetEqual":          // NOT SQUARE ORIGINAL OF OR EQUAL TO
 			return {'\u22e3', 0}, 1, true
 		case "NotSubset":                       // SUBSET OF with vertical line
-			return {'\u2282', '\u2282'}, 2, true
+			return {'\u2282', '\u20d2'}, 2, true
 		case "NotSubsetEqual":                  // NEITHER A SUBSET OF NOR EQUAL TO
 			return {'\u2288', 0}, 1, true
 		case "NotSucceeds":                     // DOES NOT SUCCEED
 			return {'\u2281', 0}, 1, true
 		case "NotSucceedsEqual":                // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return {'\u2ab0', '\u2ab0'}, 2, true
+			return {'\u2ab0', '\u0338'}, 2, true
 		case "NotSucceedsSlantEqual":           // DOES NOT SUCCEED OR EQUAL
 			return {'\u22e1', 0}, 1, true
 		case "NotSucceedsTilde":                // SUCCEEDS OR EQUIVALENT TO with slash
-			return {'\u227f', '\u227f'}, 2, true
+			return {'\u227f', '\u0338'}, 2, true
 		case "NotSuperset":                     // SUPERSET OF with vertical line
-			return {'\u2283', '\u2283'}, 2, true
+			return {'\u2283', '\u20d2'}, 2, true
 		case "NotSupersetEqual":                // NEITHER A SUPERSET OF NOR EQUAL TO
 			return {'\u2289', 0}, 1, true
 		case "NotTilde":                        // NOT TILDE
@@ -1224,7 +1224,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "Thetav":                          // GREEK CAPITAL THETA SYMBOL
 			return {'\u03f4', 0}, 1, true
 		case "ThickSpace":                      // space of width 5/18 em
-			return {'\u205f', '\u205f'}, 2, true
+			return {'\u205f', '\u200a'}, 2, true
 		case "ThinSpace":                       // THIN SPACE
 			return {'\u2009', 0}, 1, true
 		case "Tilde":                           // TILDE OPERATOR
@@ -1454,7 +1454,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "ac":                              // INVERTED LAZY S
 			return {'\u223e', 0}, 1, true
 		case "acE":                             // INVERTED LAZY S with double underline
-			return {'\u223e', '\u223e'}, 2, true
+			return {'\u223e', '\u0333'}, 2, true
 		case "acd":                             // SINE WAVE
 			return {'\u223f', 0}, 1, true
 		case "acirc":                           // LATIN SMALL LETTER A WITH CIRCUMFLEX
@@ -1788,9 +1788,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "bluhar":                          // LEFTWARDS HARPOON WITH BARB UP FROM BAR
 			return {'\u295a', 0}, 1, true
 		case "bne":                             // EQUALS SIGN with reverse slash
-			return {'=', '='}, 2, true
+			return {'=', '\u20e5'}, 2, true
 		case "bnequiv":                         // IDENTICAL TO with reverse slash
-			return {'\u2261', '\u2261'}, 2, true
+			return {'\u2261', '\u20e5'}, 2, true
 		case "bnot":                            // REVERSED NOT SIGN
 			return {'\u2310', 0}, 1, true
 		case "bopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL B
@@ -1952,7 +1952,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "capint":                          // INTEGRAL WITH INTERSECTION
 			return {'\u2a19', 0}, 1, true
 		case "caps":                            // INTERSECTION with serifs
-			return {'\u2229', '\u2229'}, 2, true
+			return {'\u2229', '\ufe00'}, 2, true
 		case "caret":                           // CARET INSERTION POINT
 			return {'\u2041', 0}, 1, true
 		case "caron":                           // CARON
@@ -2112,7 +2112,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "cupre":                           // PRECEDES OR EQUAL TO
 			return {'\u227c', 0}, 1, true
 		case "cups":                            // UNION with serifs
-			return {'\u222a', '\u222a'}, 2, true
+			return {'\u222a', '\ufe00'}, 2, true
 		case "curarr":                          // CLOCKWISE TOP SEMICIRCLE ARROW
 			return {'\u21b7', 0}, 1, true
 		case "curarrm":                         // TOP ARC CLOCKWISE ARROW WITH MINUS
@@ -2478,7 +2478,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "filig":                           // LATIN SMALL LIGATURE FI
 			return {'\ufb01', 0}, 1, true
 		case "fjlig":                           // fj ligature
-			return {'f', 'f'}, 2, true
+			return {'f', 'j'}, 2, true
 		case "flat":                            // MUSIC FLAT SIGN
 			return {'\u266d', 0}, 1, true
 		case "fllig":                           // LATIN SMALL LIGATURE FL
@@ -2580,7 +2580,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "gesdotol":                        // GREATER-THAN OR SLANTED EQUAL TO WITH DOT ABOVE LEFT
 			return {'\u2a84', 0}, 1, true
 		case "gesl":                            // GREATER-THAN slanted EQUAL TO OR LESS-THAN
-			return {'\u22db', '\u22db'}, 2, true
+			return {'\u22db', '\ufe00'}, 2, true
 		case "gesles":                          // GREATER-THAN ABOVE SLANTED EQUAL ABOVE LESS-THAN ABOVE SLANTED EQUAL
 			return {'\u2a94', 0}, 1, true
 		case "gfr":                             // MATHEMATICAL FRAKTUR SMALL G
@@ -2660,9 +2660,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "gtrsim":                          // GREATER-THAN OR EQUIVALENT TO
 			return {'\u2273', 0}, 1, true
 		case "gvertneqq":                       // GREATER-THAN BUT NOT EQUAL TO - with vertical stroke
-			return {'\u2269', '\u2269'}, 2, true
+			return {'\u2269', '\ufe00'}, 2, true
 		case "gvnE":                            // GREATER-THAN BUT NOT EQUAL TO - with vertical stroke
-			return {'\u2269', '\u2269'}, 2, true
+			return {'\u2269', '\ufe00'}, 2, true
 		}
 
 	case 'h':
@@ -2958,7 +2958,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "late":                            // LARGER THAN OR EQUAL TO
 			return {'\u2aad', 0}, 1, true
 		case "lates":                           // LARGER THAN OR slanted EQUAL
-			return {'\u2aad', '\u2aad'}, 2, true
+			return {'\u2aad', '\ufe00'}, 2, true
 		case "lbarr":                           // LEFTWARDS DOUBLE DASH ARROW
 			return {'\u290c', 0}, 1, true
 		case "lbbrk":                           // LIGHT LEFT TORTOISE SHELL BRACKET ORNAMENT
@@ -3042,7 +3042,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "lesdotor":                        // LESS-THAN OR SLANTED EQUAL TO WITH DOT ABOVE RIGHT
 			return {'\u2a83', 0}, 1, true
 		case "lesg":                            // LESS-THAN slanted EQUAL TO OR GREATER-THAN
-			return {'\u22da', '\u22da'}, 2, true
+			return {'\u22da', '\ufe00'}, 2, true
 		case "lesges":                          // LESS-THAN ABOVE SLANTED EQUAL ABOVE GREATER-THAN ABOVE SLANTED EQUAL
 			return {'\u2a93', 0}, 1, true
 		case "lessapprox":                      // LESS-THAN OR APPROXIMATE
@@ -3232,9 +3232,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "lurushar":                        // LEFT BARB UP RIGHT BARB UP HARPOON
 			return {'\u294e', 0}, 1, true
 		case "lvertneqq":                       // LESS-THAN BUT NOT EQUAL TO - with vertical stroke
-			return {'\u2268', '\u2268'}, 2, true
+			return {'\u2268', '\ufe00'}, 2, true
 		case "lvnE":                            // LESS-THAN BUT NOT EQUAL TO - with vertical stroke
-			return {'\u2268', '\u2268'}, 2, true
+			return {'\u2268', '\ufe00'}, 2, true
 		}
 
 	case 'm':
@@ -3320,21 +3320,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 	case 'n':
 		switch name {
 		case "nGg":                             // VERY MUCH GREATER-THAN with slash
-			return {'\u22d9', '\u22d9'}, 2, true
+			return {'\u22d9', '\u0338'}, 2, true
 		case "nGt":                             // MUCH GREATER THAN with vertical line
-			return {'\u226b', '\u226b'}, 2, true
+			return {'\u226b', '\u20d2'}, 2, true
 		case "nGtv":                            // MUCH GREATER THAN with slash
-			return {'\u226b', '\u226b'}, 2, true
+			return {'\u226b', '\u0338'}, 2, true
 		case "nLeftarrow":                      // LEFTWARDS DOUBLE ARROW WITH STROKE
 			return {'\u21cd', 0}, 1, true
 		case "nLeftrightarrow":                 // LEFT RIGHT DOUBLE ARROW WITH STROKE
 			return {'\u21ce', 0}, 1, true
 		case "nLl":                             // VERY MUCH LESS-THAN with slash
-			return {'\u22d8', '\u22d8'}, 2, true
+			return {'\u22d8', '\u0338'}, 2, true
 		case "nLt":                             // MUCH LESS THAN with vertical line
-			return {'\u226a', '\u226a'}, 2, true
+			return {'\u226a', '\u20d2'}, 2, true
 		case "nLtv":                            // MUCH LESS THAN with slash
-			return {'\u226a', '\u226a'}, 2, true
+			return {'\u226a', '\u0338'}, 2, true
 		case "nRightarrow":                     // RIGHTWARDS DOUBLE ARROW WITH STROKE
 			return {'\u21cf', 0}, 1, true
 		case "nVDash":                          // NEGATED DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE
@@ -3346,13 +3346,13 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nacute":                          // LATIN SMALL LETTER N WITH ACUTE
 			return {'\u0144', 0}, 1, true
 		case "nang":                            // ANGLE with vertical line
-			return {'\u2220', '\u2220'}, 2, true
+			return {'\u2220', '\u20d2'}, 2, true
 		case "nap":                             // NOT ALMOST EQUAL TO
 			return {'\u2249', 0}, 1, true
 		case "napE":                            // APPROXIMATELY EQUAL OR EQUAL TO with slash
-			return {'\u2a70', '\u2a70'}, 2, true
+			return {'\u2a70', '\u0338'}, 2, true
 		case "napid":                           // TRIPLE TILDE with slash
-			return {'\u224b', '\u224b'}, 2, true
+			return {'\u224b', '\u0338'}, 2, true
 		case "napos":                           // LATIN SMALL LETTER N PRECEDED BY APOSTROPHE
 			return {'\u0149', 0}, 1, true
 		case "napprox":                         // NOT ALMOST EQUAL TO
@@ -3366,9 +3366,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nbsp":                            // NO-BREAK SPACE
 			return {'\u00a0', 0}, 1, true
 		case "nbump":                           // GEOMETRICALLY EQUIVALENT TO with slash
-			return {'\u224e', '\u224e'}, 2, true
+			return {'\u224e', '\u0338'}, 2, true
 		case "nbumpe":                          // DIFFERENCE BETWEEN with slash
-			return {'\u224f', '\u224f'}, 2, true
+			return {'\u224f', '\u0338'}, 2, true
 		case "ncap":                            // INTERSECTION WITH OVERBAR
 			return {'\u2a43', 0}, 1, true
 		case "ncaron":                          // LATIN SMALL LETTER N WITH CARON
@@ -3378,7 +3378,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "ncong":                           // NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO
 			return {'\u2247', 0}, 1, true
 		case "ncongdot":                        // CONGRUENT WITH DOT ABOVE with slash
-			return {'\u2a6d', '\u2a6d'}, 2, true
+			return {'\u2a6d', '\u0338'}, 2, true
 		case "ncup":                            // UNION WITH OVERBAR
 			return {'\u2a42', 0}, 1, true
 		case "ncy":                             // CYRILLIC SMALL LETTER EN
@@ -3396,7 +3396,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nearrow":                         // NORTH EAST ARROW
 			return {'\u2197', 0}, 1, true
 		case "nedot":                           // APPROACHES THE LIMIT with slash
-			return {'\u2250', '\u2250'}, 2, true
+			return {'\u2250', '\u0338'}, 2, true
 		case "neonwarr":                        // NORTH EAST ARROW CROSSING NORTH WEST ARROW
 			return {'\u2931', 0}, 1, true
 		case "neosearr":                        // NORTH EAST ARROW CROSSING SOUTH EAST ARROW
@@ -3406,7 +3406,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nesear":                          // NORTH EAST ARROW AND SOUTH EAST ARROW
 			return {'\u2928', 0}, 1, true
 		case "nesim":                           // MINUS TILDE with slash
-			return {'\u2242', '\u2242'}, 2, true
+			return {'\u2242', '\u0338'}, 2, true
 		case "neswsarr":                        // NORTH EAST AND SOUTH WEST ARROW
 			return {'\u2922', 0}, 1, true
 		case "nexist":                          // THERE DOES NOT EXIST
@@ -3416,17 +3416,17 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nfr":                             // MATHEMATICAL FRAKTUR SMALL N
 			return {'\U0001d52b', 0}, 1, true
 		case "ngE":                             // GREATER-THAN OVER EQUAL TO with slash
-			return {'\u2267', '\u2267'}, 2, true
+			return {'\u2267', '\u0338'}, 2, true
 		case "nge":                             // NEITHER GREATER-THAN NOR EQUAL TO
 			return {'\u2271', 0}, 1, true
 		case "ngeq":                            // NEITHER GREATER-THAN NOR EQUAL TO
 			return {'\u2271', 0}, 1, true
 		case "ngeqq":                           // GREATER-THAN OVER EQUAL TO with slash
-			return {'\u2267', '\u2267'}, 2, true
+			return {'\u2267', '\u0338'}, 2, true
 		case "ngeqslant":                       // GREATER-THAN OR SLANTED EQUAL TO with slash
-			return {'\u2a7e', '\u2a7e'}, 2, true
+			return {'\u2a7e', '\u0338'}, 2, true
 		case "nges":                            // GREATER-THAN OR SLANTED EQUAL TO with slash
-			return {'\u2a7e', '\u2a7e'}, 2, true
+			return {'\u2a7e', '\u0338'}, 2, true
 		case "ngr":                             // GREEK SMALL LETTER NU
 			return {'\u03bd', 0}, 1, true
 		case "ngsim":                           // NEITHER GREATER-THAN NOR EQUIVALENT TO
@@ -3454,7 +3454,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nlArr":                           // LEFTWARDS DOUBLE ARROW WITH STROKE
 			return {'\u21cd', 0}, 1, true
 		case "nlE":                             // LESS-THAN OVER EQUAL TO with slash
-			return {'\u2266', '\u2266'}, 2, true
+			return {'\u2266', '\u0338'}, 2, true
 		case "nlarr":                           // LEFTWARDS ARROW WITH STROKE
 			return {'\u219a', 0}, 1, true
 		case "nldr":                            // TWO DOT LEADER
@@ -3468,11 +3468,11 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nleq":                            // NEITHER LESS-THAN NOR EQUAL TO
 			return {'\u2270', 0}, 1, true
 		case "nleqq":                           // LESS-THAN OVER EQUAL TO with slash
-			return {'\u2266', '\u2266'}, 2, true
+			return {'\u2266', '\u0338'}, 2, true
 		case "nleqslant":                       // LESS-THAN OR SLANTED EQUAL TO with slash
-			return {'\u2a7d', '\u2a7d'}, 2, true
+			return {'\u2a7d', '\u0338'}, 2, true
 		case "nles":                            // LESS-THAN OR SLANTED EQUAL TO with slash
-			return {'\u2a7d', '\u2a7d'}, 2, true
+			return {'\u2a7d', '\u0338'}, 2, true
 		case "nless":                           // NOT LESS-THAN
 			return {'\u226e', 0}, 1, true
 		case "nlsim":                           // NEITHER LESS-THAN NOR EQUIVALENT TO
@@ -3484,7 +3484,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nltrie":                          // NOT NORMAL SUBGROUP OF OR EQUAL TO
 			return {'\u22ec', 0}, 1, true
 		case "nltrivb":                         // LEFT TRIANGLE BESIDE VERTICAL BAR with slash
-			return {'\u29cf', '\u29cf'}, 2, true
+			return {'\u29cf', '\u0338'}, 2, true
 		case "nmid":                            // DOES NOT DIVIDE
 			return {'\u2224', 0}, 1, true
 		case "nopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL N
@@ -3494,9 +3494,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "notin":                           // NOT AN ELEMENT OF
 			return {'\u2209', 0}, 1, true
 		case "notinE":                          // ELEMENT OF WITH TWO HORIZONTAL STROKES with slash
-			return {'\u22f9', '\u22f9'}, 2, true
+			return {'\u22f9', '\u0338'}, 2, true
 		case "notindot":                        // ELEMENT OF WITH DOT ABOVE with slash
-			return {'\u22f5', '\u22f5'}, 2, true
+			return {'\u22f5', '\u0338'}, 2, true
 		case "notinva":                         // NOT AN ELEMENT OF
 			return {'\u2209', 0}, 1, true
 		case "notinvb":                         // SMALL ELEMENT OF WITH OVERBAR
@@ -3516,9 +3516,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nparallel":                       // NOT PARALLEL TO
 			return {'\u2226', 0}, 1, true
 		case "nparsl":                          // DOUBLE SOLIDUS OPERATOR with reverse slash
-			return {'\u2afd', '\u2afd'}, 2, true
+			return {'\u2afd', '\u20e5'}, 2, true
 		case "npart":                           // PARTIAL DIFFERENTIAL with slash
-			return {'\u2202', '\u2202'}, 2, true
+			return {'\u2202', '\u0338'}, 2, true
 		case "npolint":                         // LINE INTEGRATION NOT INCLUDING THE POLE
 			return {'\u2a14', 0}, 1, true
 		case "npr":                             // DOES NOT PRECEDE
@@ -3526,21 +3526,21 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nprcue":                          // DOES NOT PRECEDE OR EQUAL
 			return {'\u22e0', 0}, 1, true
 		case "npre":                            // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return {'\u2aaf', '\u2aaf'}, 2, true
+			return {'\u2aaf', '\u0338'}, 2, true
 		case "nprec":                           // DOES NOT PRECEDE
 			return {'\u2280', 0}, 1, true
 		case "npreceq":                         // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return {'\u2aaf', '\u2aaf'}, 2, true
+			return {'\u2aaf', '\u0338'}, 2, true
 		case "nprsim":                          // PRECEDES OR EQUIVALENT TO with slash
-			return {'\u227e', '\u227e'}, 2, true
+			return {'\u227e', '\u0338'}, 2, true
 		case "nrArr":                           // RIGHTWARDS DOUBLE ARROW WITH STROKE
 			return {'\u21cf', 0}, 1, true
 		case "nrarr":                           // RIGHTWARDS ARROW WITH STROKE
 			return {'\u219b', 0}, 1, true
 		case "nrarrc":                          // WAVE ARROW POINTING DIRECTLY RIGHT with slash
-			return {'\u2933', '\u2933'}, 2, true
+			return {'\u2933', '\u0338'}, 2, true
 		case "nrarrw":                          // RIGHTWARDS WAVE ARROW with slash
-			return {'\u219d', '\u219d'}, 2, true
+			return {'\u219d', '\u0338'}, 2, true
 		case "nrightarrow":                     // RIGHTWARDS ARROW WITH STROKE
 			return {'\u219b', 0}, 1, true
 		case "nrtri":                           // DOES NOT CONTAIN AS NORMAL SUBGROUP
@@ -3548,19 +3548,19 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nrtrie":                          // DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
 			return {'\u22ed', 0}, 1, true
 		case "nsGt":                            // DOUBLE NESTED GREATER-THAN with slash
-			return {'\u2aa2', '\u2aa2'}, 2, true
+			return {'\u2aa2', '\u0338'}, 2, true
 		case "nsLt":                            // DOUBLE NESTED LESS-THAN with slash
-			return {'\u2aa1', '\u2aa1'}, 2, true
+			return {'\u2aa1', '\u0338'}, 2, true
 		case "nsc":                             // DOES NOT SUCCEED
 			return {'\u2281', 0}, 1, true
 		case "nsccue":                          // DOES NOT SUCCEED OR EQUAL
 			return {'\u22e1', 0}, 1, true
 		case "nsce":                            // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return {'\u2ab0', '\u2ab0'}, 2, true
+			return {'\u2ab0', '\u0338'}, 2, true
 		case "nscr":                            // MATHEMATICAL SCRIPT SMALL N
 			return {'\U0001d4c3', 0}, 1, true
 		case "nscsim":                          // SUCCEEDS OR EQUIVALENT TO with slash
-			return {'\u227f', '\u227f'}, 2, true
+			return {'\u227f', '\u0338'}, 2, true
 		case "nshortmid":                       // DOES NOT DIVIDE
 			return {'\u2224', 0}, 1, true
 		case "nshortparallel":                  // NOT PARALLEL TO
@@ -3576,41 +3576,41 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nspar":                           // NOT PARALLEL TO
 			return {'\u2226', 0}, 1, true
 		case "nsqsub":                          // SQUARE IMAGE OF with slash
-			return {'\u228f', '\u228f'}, 2, true
+			return {'\u228f', '\u0338'}, 2, true
 		case "nsqsube":                         // NOT SQUARE IMAGE OF OR EQUAL TO
 			return {'\u22e2', 0}, 1, true
 		case "nsqsup":                          // SQUARE ORIGINAL OF with slash
-			return {'\u2290', '\u2290'}, 2, true
+			return {'\u2290', '\u0338'}, 2, true
 		case "nsqsupe":                         // NOT SQUARE ORIGINAL OF OR EQUAL TO
 			return {'\u22e3', 0}, 1, true
 		case "nsub":                            // NOT A SUBSET OF
 			return {'\u2284', 0}, 1, true
 		case "nsubE":                           // SUBSET OF ABOVE EQUALS SIGN with slash
-			return {'\u2ac5', '\u2ac5'}, 2, true
+			return {'\u2ac5', '\u0338'}, 2, true
 		case "nsube":                           // NEITHER A SUBSET OF NOR EQUAL TO
 			return {'\u2288', 0}, 1, true
 		case "nsubset":                         // SUBSET OF with vertical line
-			return {'\u2282', '\u2282'}, 2, true
+			return {'\u2282', '\u20d2'}, 2, true
 		case "nsubseteq":                       // NEITHER A SUBSET OF NOR EQUAL TO
 			return {'\u2288', 0}, 1, true
 		case "nsubseteqq":                      // SUBSET OF ABOVE EQUALS SIGN with slash
-			return {'\u2ac5', '\u2ac5'}, 2, true
+			return {'\u2ac5', '\u0338'}, 2, true
 		case "nsucc":                           // DOES NOT SUCCEED
 			return {'\u2281', 0}, 1, true
 		case "nsucceq":                         // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return {'\u2ab0', '\u2ab0'}, 2, true
+			return {'\u2ab0', '\u0338'}, 2, true
 		case "nsup":                            // NOT A SUPERSET OF
 			return {'\u2285', 0}, 1, true
 		case "nsupE":                           // SUPERSET OF ABOVE EQUALS SIGN with slash
-			return {'\u2ac6', '\u2ac6'}, 2, true
+			return {'\u2ac6', '\u0338'}, 2, true
 		case "nsupe":                           // NEITHER A SUPERSET OF NOR EQUAL TO
 			return {'\u2289', 0}, 1, true
 		case "nsupset":                         // SUPERSET OF with vertical line
-			return {'\u2283', '\u2283'}, 2, true
+			return {'\u2283', '\u20d2'}, 2, true
 		case "nsupseteq":                       // NEITHER A SUPERSET OF NOR EQUAL TO
 			return {'\u2289', 0}, 1, true
 		case "nsupseteqq":                      // SUPERSET OF ABOVE EQUALS SIGN with slash
-			return {'\u2ac6', '\u2ac6'}, 2, true
+			return {'\u2ac6', '\u0338'}, 2, true
 		case "ntgl":                            // NEITHER GREATER-THAN NOR LESS-THAN
 			return {'\u2279', 0}, 1, true
 		case "ntilde":                          // LATIN SMALL LETTER N WITH TILDE
@@ -3638,31 +3638,31 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "nvHarr":                          // LEFT RIGHT DOUBLE ARROW WITH VERTICAL STROKE
 			return {'\u2904', 0}, 1, true
 		case "nvap":                            // EQUIVALENT TO with vertical line
-			return {'\u224d', '\u224d'}, 2, true
+			return {'\u224d', '\u20d2'}, 2, true
 		case "nvbrtri":                         // VERTICAL BAR BESIDE RIGHT TRIANGLE with slash
-			return {'\u29d0', '\u29d0'}, 2, true
+			return {'\u29d0', '\u0338'}, 2, true
 		case "nvdash":                          // DOES NOT PROVE
 			return {'\u22ac', 0}, 1, true
 		case "nvge":                            // GREATER-THAN OR EQUAL TO with vertical line
-			return {'\u2265', '\u2265'}, 2, true
+			return {'\u2265', '\u20d2'}, 2, true
 		case "nvgt":                            // GREATER-THAN SIGN with vertical line
-			return {'>', '>'}, 2, true
+			return {'>', '\u20d2'}, 2, true
 		case "nvinfin":                         // INFINITY NEGATED WITH VERTICAL BAR
 			return {'\u29de', 0}, 1, true
 		case "nvlArr":                          // LEFTWARDS DOUBLE ARROW WITH VERTICAL STROKE
 			return {'\u2902', 0}, 1, true
 		case "nvle":                            // LESS-THAN OR EQUAL TO with vertical line
-			return {'\u2264', '\u2264'}, 2, true
+			return {'\u2264', '\u20d2'}, 2, true
 		case "nvlt":                            // LESS-THAN SIGN with vertical line
-			return {'<', '<'}, 2, true
+			return {'<', '\u20d2'}, 2, true
 		case "nvltrie":                         // NORMAL SUBGROUP OF OR EQUAL TO with vertical line
-			return {'\u22b4', '\u22b4'}, 2, true
+			return {'\u22b4', '\u20d2'}, 2, true
 		case "nvrArr":                          // RIGHTWARDS DOUBLE ARROW WITH VERTICAL STROKE
 			return {'\u2903', 0}, 1, true
 		case "nvrtrie":                         // CONTAINS AS NORMAL SUBGROUP OR EQUAL TO with vertical line
-			return {'\u22b5', '\u22b5'}, 2, true
+			return {'\u22b5', '\u20d2'}, 2, true
 		case "nvsim":                           // TILDE OPERATOR with vertical line
-			return {'\u223c', '\u223c'}, 2, true
+			return {'\u223c', '\u20d2'}, 2, true
 		case "nwArr":                           // NORTH WEST DOUBLE ARROW
 			return {'\u21d6', 0}, 1, true
 		case "nwarhk":                          // NORTH WEST ARROW WITH HOOK
@@ -3996,7 +3996,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "rHar":                            // RIGHTWARDS HARPOON WITH BARB UP ABOVE RIGHTWARDS HARPOON WITH BARB DOWN
 			return {'\u2964', 0}, 1, true
 		case "race":                            // REVERSED TILDE with underline
-			return {'\u223d', '\u223d'}, 2, true
+			return {'\u223d', '\u0331'}, 2, true
 		case "racute":                          // LATIN SMALL LETTER R WITH ACUTE
 			return {'\u0155', 0}, 1, true
 		case "radic":                           // SQUARE ROOT
@@ -4360,7 +4360,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "smte":                            // SMALLER THAN OR EQUAL TO
 			return {'\u2aac', 0}, 1, true
 		case "smtes":                           // SMALLER THAN OR slanted EQUAL
-			return {'\u2aac', '\u2aac'}, 2, true
+			return {'\u2aac', '\ufe00'}, 2, true
 		case "softcy":                          // CYRILLIC SMALL LETTER SOFT SIGN
 			return {'\u044c', 0}, 1, true
 		case "sol":                             // SOLIDUS
@@ -4380,11 +4380,11 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "sqcap":                           // SQUARE CAP
 			return {'\u2293', 0}, 1, true
 		case "sqcaps":                          // SQUARE CAP with serifs
-			return {'\u2293', '\u2293'}, 2, true
+			return {'\u2293', '\ufe00'}, 2, true
 		case "sqcup":                           // SQUARE CUP
 			return {'\u2294', 0}, 1, true
 		case "sqcups":                          // SQUARE CUP with serifs
-			return {'\u2294', '\u2294'}, 2, true
+			return {'\u2294', '\ufe00'}, 2, true
 		case "sqsub":                           // SQUARE IMAGE OF
 			return {'\u228f', 0}, 1, true
 		case "sqsube":                          // SQUARE IMAGE OF OR EQUAL TO
@@ -4856,13 +4856,13 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "varsigma":                        // GREEK SMALL LETTER FINAL SIGMA
 			return {'\u03c2', 0}, 1, true
 		case "varsubsetneq":                    // SUBSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u228a', '\u228a'}, 2, true
+			return {'\u228a', '\ufe00'}, 2, true
 		case "varsubsetneqq":                   // SUBSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u2acb', '\u2acb'}, 2, true
+			return {'\u2acb', '\ufe00'}, 2, true
 		case "varsupsetneq":                    // SUPERSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u228b', '\u228b'}, 2, true
+			return {'\u228b', '\ufe00'}, 2, true
 		case "varsupsetneqq":                   // SUPERSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u2acc', '\u2acc'}, 2, true
+			return {'\u2acc', '\ufe00'}, 2, true
 		case "vartheta":                        // GREEK THETA SYMBOL
 			return {'\u03d1', 0}, 1, true
 		case "vartriangleleft":                 // NORMAL SUBGROUP OF
@@ -4902,9 +4902,9 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "vltri":                           // NORMAL SUBGROUP OF
 			return {'\u22b2', 0}, 1, true
 		case "vnsub":                           // SUBSET OF with vertical line
-			return {'\u2282', '\u2282'}, 2, true
+			return {'\u2282', '\u20d2'}, 2, true
 		case "vnsup":                           // SUPERSET OF with vertical line
-			return {'\u2283', '\u2283'}, 2, true
+			return {'\u2283', '\u20d2'}, 2, true
 		case "vopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL V
 			return {'\U0001d567', 0}, 1, true
 		case "vprime":                          // PRIME
@@ -4916,13 +4916,13 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		case "vscr":                            // MATHEMATICAL SCRIPT SMALL V
 			return {'\U0001d4cb', 0}, 1, true
 		case "vsubnE":                          // SUBSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u2acb', '\u2acb'}, 2, true
+			return {'\u2acb', '\ufe00'}, 2, true
 		case "vsubne":                          // SUBSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u228a', '\u228a'}, 2, true
+			return {'\u228a', '\ufe00'}, 2, true
 		case "vsupnE":                          // SUPERSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u2acc', '\u2acc'}, 2, true
+			return {'\u2acc', '\ufe00'}, 2, true
 		case "vsupne":                          // SUPERSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return {'\u228b', '\u228b'}, 2, true
+			return {'\u228b', '\ufe00'}, 2, true
 		case "vzigzag":                         // VERTICAL ZIGZAG LINE
 			return {'\u299a', 0}, 1, true
 		}
