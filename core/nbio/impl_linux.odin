@@ -23,7 +23,6 @@ _Event_Loop :: struct {
 	unqueued:  queue.Queue(^Operation),
 	// Ready to run callbacks, mainly next tick, some other ops that error outside the kernel.
 	completed: queue.Queue(^Operation),
-	allocator: mem.Allocator,
 	wake:      ^Operation,
 }
 
@@ -128,8 +127,6 @@ _Stat :: struct {
 
 @(private="package")
 _init :: proc(l: ^Event_Loop, alloc: mem.Allocator) -> (err: General_Error) {
-	l.allocator = alloc
-
 	params := uring.DEFAULT_PARAMS
 	params.flags += {.SUBMIT_ALL, .COOP_TASKRUN, .SINGLE_ISSUER}
 
@@ -470,6 +467,11 @@ _wake_up :: proc(l: ^Event_Loop) {
 	// Shouldn't fail.
 	assert(err == nil)
 	assert(n == 8)
+}
+
+@(private="package")
+_yield :: proc() {
+	linux.sched_yield()
 }
 
 // Start file private.

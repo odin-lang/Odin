@@ -19,7 +19,6 @@ _FULLY_SUPPORTED :: false
 _Event_Loop :: struct {
 	completed: queue.Queue(^Operation),
 	timeouts:  avl.Tree(^Operation),
-	allocator: mem.Allocator,
 }
 
 _Handle :: uintptr
@@ -69,7 +68,6 @@ _Remove :: struct {}
 _Link_Timeout :: struct {}
 
 _init :: proc(l: ^Event_Loop, allocator: mem.Allocator) -> (rerr: General_Error) {
-	l.allocator = allocator
 	l.completed.data.allocator = allocator
 
 	avl.init_cmp(&l.timeouts, timeouts_cmp, allocator)
@@ -214,4 +212,7 @@ _associate_socket :: proc(socket: Any_Socket, l: ^Event_Loop) -> Association_Err
 }
 
 _wake_up :: proc(l: ^Event_Loop) {
+}
+
+_yield :: proc() {
 }

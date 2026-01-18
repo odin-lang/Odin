@@ -32,6 +32,8 @@ EV_TXEMPTY                 :: DWORD(0x0004)
 
 WAITORTIMERCALLBACK :: #type proc "system" (lpParameter: PVOID, TimerOrWaitFired: BOOLEAN)
 
+PAPCFUNC :: #type proc "system" (Parameter: ULONG_PTR)
+
 WT_EXECUTEDEFAULT            :: 0x00000000
 WT_EXECUTEINIOTHREAD         :: 0x00000001
 WT_EXECUTEINPERSISTENTTHREAD :: 0x00000080
@@ -596,6 +598,8 @@ foreign kernel32 {
 	) -> BOOL ---
 
 	UnregisterWaitEx :: proc(WaitHandle: HANDLE, CompletionEvent: HANDLE) -> BOOL ---
+
+	QueueUserAPC :: proc(pfnAPC: PAPCFUNC, hThread: HANDLE, dwData: ULONG_PTR) -> DWORD ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001
