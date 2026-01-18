@@ -300,17 +300,17 @@ escape_html :: proc(s: string, allocator := context.allocator, loc := #caller_lo
 
 	w := 0
 	for c in b {
-		s := ""
+		x := ""
 		switch c {
-		case '&':  s = "&amp;"
-		case '\'': s = "&#39;"
-		case '<':  s = "&lt;"
-		case '>':  s = "&gt;"
-		case '"':  s = "&#34;"
+		case '&':  x = "&amp;"
+		case '\'': x = "&#39;"
+		case '<':  x = "&lt;"
+		case '>':  x = "&gt;"
+		case '"':  x = "&#34;"
 		}
-		if s != "" {
-			copy(t[w:], s)
-			w += len(s)
+		if x != "" {
+			copy(t[w:], x)
+			w += len(x)
 		} else {
 			t[w] = c
 			w += 1
