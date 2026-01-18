@@ -43,5047 +43,5047 @@ XML_NAME_TO_RUNE_MAX_LENGTH :: 31
 		entity_name - a string, like "copy" that describes a user-encoded Unicode entity as used in XML.
 
 	Returns:
-		"decoded" - The decoded rune if found by name, or -1 otherwise.
-		"ok"      - true if found, false if not.
+		"decoded"    - The decoded runes if found by name, or all zero otherwise.
+		"rune_count" - The number of decoded runes
+		"ok"         - true if found, false if not.
 
 	IMPORTANT: XML processors (including browsers) treat these names as case-sensitive. So do we.
 */
-named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
+named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count: int, ok: bool) {
 	/*
 		Early out if the name is too short or too long.
 		min as a precaution in case the generated table has a bogus value.
 	*/
 	if len(name) < min(1, XML_NAME_TO_RUNE_MIN_LENGTH) || len(name) > XML_NAME_TO_RUNE_MAX_LENGTH {
-		return -1, false
+		return
 	}
 
 	switch rune(name[0]) {
-
 	case 'A':
 		switch name {
 		case "AElig":                           // LATIN CAPITAL LETTER AE
-			return rune(0xc6), true
+			return {'Æ', 0}, 1, true
 		case "AMP":                             // AMPERSAND
-			return rune(0x26), true
+			return {'&', 0}, 1, true
 		case "Aacgr":                           // GREEK CAPITAL LETTER ALPHA WITH TONOS
-			return rune(0x0386), true
+			return {'\u0386', 0}, 1, true
 		case "Aacute":                          // LATIN CAPITAL LETTER A WITH ACUTE
-			return rune(0xc1), true
+			return {'Á', 0}, 1, true
 		case "Abreve":                          // LATIN CAPITAL LETTER A WITH BREVE
-			return rune(0x0102), true
+			return {'\u0102', 0}, 1, true
 		case "Acirc":                           // LATIN CAPITAL LETTER A WITH CIRCUMFLEX
-			return rune(0xc2), true
+			return {'Â', 0}, 1, true
 		case "Acy":                             // CYRILLIC CAPITAL LETTER A
-			return rune(0x0410), true
+			return {'\u0410', 0}, 1, true
 		case "Afr":                             // MATHEMATICAL FRAKTUR CAPITAL A
-			return rune(0x01d504), true
+			return {'\U0001d504', 0}, 1, true
 		case "Agr":                             // GREEK CAPITAL LETTER ALPHA
-			return rune(0x0391), true
+			return {'\u0391', 0}, 1, true
 		case "Agrave":                          // LATIN CAPITAL LETTER A WITH GRAVE
-			return rune(0xc0), true
+			return {'À', 0}, 1, true
 		case "Alpha":                           // GREEK CAPITAL LETTER ALPHA
-			return rune(0x0391), true
+			return {'\u0391', 0}, 1, true
 		case "Amacr":                           // LATIN CAPITAL LETTER A WITH MACRON
-			return rune(0x0100), true
+			return {'\u0100', 0}, 1, true
 		case "And":                             // DOUBLE LOGICAL AND
-			return rune(0x2a53), true
+			return {'\u2a53', 0}, 1, true
 		case "Aogon":                           // LATIN CAPITAL LETTER A WITH OGONEK
-			return rune(0x0104), true
+			return {'\u0104', 0}, 1, true
 		case "Aopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL A
-			return rune(0x01d538), true
+			return {'\U0001d538', 0}, 1, true
 		case "ApplyFunction":                   // FUNCTION APPLICATION
-			return rune(0x2061), true
+			return {'\u2061', 0}, 1, true
 		case "Aring":                           // LATIN CAPITAL LETTER A WITH RING ABOVE
-			return rune(0xc5), true
+			return {'Å', 0}, 1, true
 		case "Ascr":                            // MATHEMATICAL SCRIPT CAPITAL A
-			return rune(0x01d49c), true
+			return {'\U0001d49c', 0}, 1, true
 		case "Assign":                          // COLON EQUALS
-			return rune(0x2254), true
+			return {'\u2254', 0}, 1, true
 		case "Ast":                             // TWO ASTERISKS ALIGNED VERTICALLY
-			return rune(0x2051), true
+			return {'\u2051', 0}, 1, true
 		case "Atilde":                          // LATIN CAPITAL LETTER A WITH TILDE
-			return rune(0xc3), true
+			return {'Ã', 0}, 1, true
 		case "Auml":                            // LATIN CAPITAL LETTER A WITH DIAERESIS
-			return rune(0xc4), true
+			return {'Ä', 0}, 1, true
 		}
 
 	case 'B':
 		switch name {
 		case "Backslash":                       // SET MINUS
-			return rune(0x2216), true
+			return {'\u2216', 0}, 1, true
 		case "Barint":                          // INTEGRAL WITH DOUBLE STROKE
-			return rune(0x2a0e), true
+			return {'\u2a0e', 0}, 1, true
 		case "Barv":                            // SHORT DOWN TACK WITH OVERBAR
-			return rune(0x2ae7), true
+			return {'\u2ae7', 0}, 1, true
 		case "Barwed":                          // PERSPECTIVE
-			return rune(0x2306), true
+			return {'\u2306', 0}, 1, true
 		case "Barwedl":                         // LOGICAL AND WITH DOUBLE OVERBAR
-			return rune(0x2a5e), true
+			return {'\u2a5e', 0}, 1, true
 		case "Bcy":                             // CYRILLIC CAPITAL LETTER BE
-			return rune(0x0411), true
+			return {'\u0411', 0}, 1, true
 		case "Because":                         // BECAUSE
-			return rune(0x2235), true
+			return {'\u2235', 0}, 1, true
 		case "Bernoullis":                      // SCRIPT CAPITAL B
-			return rune(0x212c), true
+			return {'\u212c', 0}, 1, true
 		case "Beta":                            // GREEK CAPITAL LETTER BETA
-			return rune(0x0392), true
+			return {'\u0392', 0}, 1, true
 		case "Bfr":                             // MATHEMATICAL FRAKTUR CAPITAL B
-			return rune(0x01d505), true
+			return {'\U0001d505', 0}, 1, true
 		case "Bgr":                             // GREEK CAPITAL LETTER BETA
-			return rune(0x0392), true
+			return {'\u0392', 0}, 1, true
 		case "Bopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL B
-			return rune(0x01d539), true
+			return {'\U0001d539', 0}, 1, true
 		case "Breve":                           // BREVE
-			return rune(0x02d8), true
+			return {'\u02d8', 0}, 1, true
 		case "Bscr":                            // SCRIPT CAPITAL B
-			return rune(0x212c), true
+			return {'\u212c', 0}, 1, true
 		case "Bumpeq":                          // GEOMETRICALLY EQUIVALENT TO
-			return rune(0x224e), true
+			return {'\u224e', 0}, 1, true
 		case "Bvert":                           // BOX DRAWINGS LIGHT TRIPLE DASH VERTICAL
-			return rune(0x2506), true
+			return {'\u2506', 0}, 1, true
 		}
 
 	case 'C':
 		switch name {
 		case "CHcy":                            // CYRILLIC CAPITAL LETTER CHE
-			return rune(0x0427), true
+			return {'\u0427', 0}, 1, true
 		case "COPY":                            // COPYRIGHT SIGN
-			return rune(0xa9), true
+			return {'©', 0}, 1, true
 		case "Cacute":                          // LATIN CAPITAL LETTER C WITH ACUTE
-			return rune(0x0106), true
+			return {'\u0106', 0}, 1, true
 		case "Cap":                             // DOUBLE INTERSECTION
-			return rune(0x22d2), true
+			return {'\u22d2', 0}, 1, true
 		case "CapitalDifferentialD":            // DOUBLE-STRUCK ITALIC CAPITAL D
-			return rune(0x2145), true
+			return {'\u2145', 0}, 1, true
 		case "Cayleys":                         // BLACK-LETTER CAPITAL C
-			return rune(0x212d), true
+			return {'\u212d', 0}, 1, true
 		case "Ccaron":                          // LATIN CAPITAL LETTER C WITH CARON
-			return rune(0x010c), true
+			return {'\u010c', 0}, 1, true
 		case "Ccedil":                          // LATIN CAPITAL LETTER C WITH CEDILLA
-			return rune(0xc7), true
+			return {'Ç', 0}, 1, true
 		case "Ccirc":                           // LATIN CAPITAL LETTER C WITH CIRCUMFLEX
-			return rune(0x0108), true
+			return {'\u0108', 0}, 1, true
 		case "Cconint":                         // VOLUME INTEGRAL
-			return rune(0x2230), true
+			return {'\u2230', 0}, 1, true
 		case "Cdot":                            // LATIN CAPITAL LETTER C WITH DOT ABOVE
-			return rune(0x010a), true
+			return {'\u010a', 0}, 1, true
 		case "Cedilla":                         // CEDILLA
-			return rune(0xb8), true
+			return {'¸', 0}, 1, true
 		case "CenterDot":                       // MIDDLE DOT
-			return rune(0xb7), true
+			return {'·', 0}, 1, true
 		case "Cfr":                             // BLACK-LETTER CAPITAL C
-			return rune(0x212d), true
+			return {'\u212d', 0}, 1, true
 		case "Chi":                             // GREEK CAPITAL LETTER CHI
-			return rune(0x03a7), true
+			return {'\u03a7', 0}, 1, true
 		case "CircleDot":                       // CIRCLED DOT OPERATOR
-			return rune(0x2299), true
+			return {'\u2299', 0}, 1, true
 		case "CircleMinus":                     // CIRCLED MINUS
-			return rune(0x2296), true
+			return {'\u2296', 0}, 1, true
 		case "CirclePlus":                      // CIRCLED PLUS
-			return rune(0x2295), true
+			return {'\u2295', 0}, 1, true
 		case "CircleTimes":                     // CIRCLED TIMES
-			return rune(0x2297), true
+			return {'\u2297', 0}, 1, true
 		case "ClockwiseContourIntegral":        // CLOCKWISE CONTOUR INTEGRAL
-			return rune(0x2232), true
+			return {'\u2232', 0}, 1, true
 		case "CloseCurlyDoubleQuote":           // RIGHT DOUBLE QUOTATION MARK
-			return rune(0x201d), true
+			return {'\u201d', 0}, 1, true
 		case "CloseCurlyQuote":                 // RIGHT SINGLE QUOTATION MARK
-			return rune(0x2019), true
+			return {'\u2019', 0}, 1, true
 		case "Colon":                           // PROPORTION
-			return rune(0x2237), true
+			return {'\u2237', 0}, 1, true
 		case "Colone":                          // DOUBLE COLON EQUAL
-			return rune(0x2a74), true
+			return {'\u2a74', 0}, 1, true
 		case "Congruent":                       // IDENTICAL TO
-			return rune(0x2261), true
+			return {'\u2261', 0}, 1, true
 		case "Conint":                          // SURFACE INTEGRAL
-			return rune(0x222f), true
+			return {'\u222f', 0}, 1, true
 		case "ContourIntegral":                 // CONTOUR INTEGRAL
-			return rune(0x222e), true
+			return {'\u222e', 0}, 1, true
 		case "Copf":                            // DOUBLE-STRUCK CAPITAL C
-			return rune(0x2102), true
+			return {'\u2102', 0}, 1, true
 		case "Coproduct":                       // N-ARY COPRODUCT
-			return rune(0x2210), true
+			return {'\u2210', 0}, 1, true
 		case "CounterClockwiseContourIntegral": // ANTICLOCKWISE CONTOUR INTEGRAL
-			return rune(0x2233), true
+			return {'\u2233', 0}, 1, true
 		case "Cross":                           // VECTOR OR CROSS PRODUCT
-			return rune(0x2a2f), true
+			return {'\u2a2f', 0}, 1, true
 		case "Cscr":                            // MATHEMATICAL SCRIPT CAPITAL C
-			return rune(0x01d49e), true
+			return {'\U0001d49e', 0}, 1, true
 		case "Cup":                             // DOUBLE UNION
-			return rune(0x22d3), true
+			return {'\u22d3', 0}, 1, true
 		case "CupCap":                          // EQUIVALENT TO
-			return rune(0x224d), true
+			return {'\u224d', 0}, 1, true
 		}
 
 	case 'D':
 		switch name {
 		case "DD":                              // DOUBLE-STRUCK ITALIC CAPITAL D
-			return rune(0x2145), true
+			return {'\u2145', 0}, 1, true
 		case "DDotrahd":                        // RIGHTWARDS ARROW WITH DOTTED STEM
-			return rune(0x2911), true
+			return {'\u2911', 0}, 1, true
 		case "DJcy":                            // CYRILLIC CAPITAL LETTER DJE
-			return rune(0x0402), true
+			return {'\u0402', 0}, 1, true
 		case "DScy":                            // CYRILLIC CAPITAL LETTER DZE
-			return rune(0x0405), true
+			return {'\u0405', 0}, 1, true
 		case "DZcy":                            // CYRILLIC CAPITAL LETTER DZHE
-			return rune(0x040f), true
+			return {'\u040f', 0}, 1, true
 		case "Dagger":                          // DOUBLE DAGGER
-			return rune(0x2021), true
+			return {'\u2021', 0}, 1, true
 		case "Darr":                            // DOWNWARDS TWO HEADED ARROW
-			return rune(0x21a1), true
+			return {'\u21a1', 0}, 1, true
 		case "Dashv":                           // VERTICAL BAR DOUBLE LEFT TURNSTILE
-			return rune(0x2ae4), true
+			return {'\u2ae4', 0}, 1, true
 		case "Dcaron":                          // LATIN CAPITAL LETTER D WITH CARON
-			return rune(0x010e), true
+			return {'\u010e', 0}, 1, true
 		case "Dcy":                             // CYRILLIC CAPITAL LETTER DE
-			return rune(0x0414), true
+			return {'\u0414', 0}, 1, true
 		case "Del":                             // NABLA
-			return rune(0x2207), true
+			return {'\u2207', 0}, 1, true
 		case "Delta":                           // GREEK CAPITAL LETTER DELTA
-			return rune(0x0394), true
+			return {'\u0394', 0}, 1, true
 		case "Dfr":                             // MATHEMATICAL FRAKTUR CAPITAL D
-			return rune(0x01d507), true
+			return {'\U0001d507', 0}, 1, true
 		case "Dgr":                             // GREEK CAPITAL LETTER DELTA
-			return rune(0x0394), true
+			return {'\u0394', 0}, 1, true
 		case "DiacriticalAcute":                // ACUTE ACCENT
-			return rune(0xb4), true
+			return {'´', 0}, 1, true
 		case "DiacriticalDot":                  // DOT ABOVE
-			return rune(0x02d9), true
+			return {'\u02d9', 0}, 1, true
 		case "DiacriticalDoubleAcute":          // DOUBLE ACUTE ACCENT
-			return rune(0x02dd), true
+			return {'\u02dd', 0}, 1, true
 		case "DiacriticalGrave":                // GRAVE ACCENT
-			return rune(0x60), true
+			return {'`', 0}, 1, true
 		case "DiacriticalTilde":                // SMALL TILDE
-			return rune(0x02dc), true
+			return {'\u02dc', 0}, 1, true
 		case "Diamond":                         // DIAMOND OPERATOR
-			return rune(0x22c4), true
+			return {'\u22c4', 0}, 1, true
 		case "DifferentialD":                   // DOUBLE-STRUCK ITALIC SMALL D
-			return rune(0x2146), true
+			return {'\u2146', 0}, 1, true
 		case "Dopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL D
-			return rune(0x01d53b), true
+			return {'\U0001d53b', 0}, 1, true
 		case "Dot":                             // DIAERESIS
-			return rune(0xa8), true
+			return {'¨', 0}, 1, true
 		case "DotDot":                          // COMBINING FOUR DOTS ABOVE
-			return rune(0x20dc), true
+			return {'\u20dc', 0}, 1, true
 		case "DotEqual":                        // APPROACHES THE LIMIT
-			return rune(0x2250), true
+			return {'\u2250', 0}, 1, true
 		case "DoubleContourIntegral":           // SURFACE INTEGRAL
-			return rune(0x222f), true
+			return {'\u222f', 0}, 1, true
 		case "DoubleDot":                       // DIAERESIS
-			return rune(0xa8), true
+			return {'¨', 0}, 1, true
 		case "DoubleDownArrow":                 // DOWNWARDS DOUBLE ARROW
-			return rune(0x21d3), true
+			return {'\u21d3', 0}, 1, true
 		case "DoubleLeftArrow":                 // LEFTWARDS DOUBLE ARROW
-			return rune(0x21d0), true
+			return {'\u21d0', 0}, 1, true
 		case "DoubleLeftRightArrow":            // LEFT RIGHT DOUBLE ARROW
-			return rune(0x21d4), true
+			return {'\u21d4', 0}, 1, true
 		case "DoubleLeftTee":                   // VERTICAL BAR DOUBLE LEFT TURNSTILE
-			return rune(0x2ae4), true
+			return {'\u2ae4', 0}, 1, true
 		case "DoubleLongLeftArrow":             // LONG LEFTWARDS DOUBLE ARROW
-			return rune(0x27f8), true
+			return {'\u27f8', 0}, 1, true
 		case "DoubleLongLeftRightArrow":        // LONG LEFT RIGHT DOUBLE ARROW
-			return rune(0x27fa), true
+			return {'\u27fa', 0}, 1, true
 		case "DoubleLongRightArrow":            // LONG RIGHTWARDS DOUBLE ARROW
-			return rune(0x27f9), true
+			return {'\u27f9', 0}, 1, true
 		case "DoubleRightArrow":                // RIGHTWARDS DOUBLE ARROW
-			return rune(0x21d2), true
+			return {'\u21d2', 0}, 1, true
 		case "DoubleRightTee":                  // TRUE
-			return rune(0x22a8), true
+			return {'\u22a8', 0}, 1, true
 		case "DoubleUpArrow":                   // UPWARDS DOUBLE ARROW
-			return rune(0x21d1), true
+			return {'\u21d1', 0}, 1, true
 		case "DoubleUpDownArrow":               // UP DOWN DOUBLE ARROW
-			return rune(0x21d5), true
+			return {'\u21d5', 0}, 1, true
 		case "DoubleVerticalBar":               // PARALLEL TO
-			return rune(0x2225), true
+			return {'\u2225', 0}, 1, true
 		case "DownArrow":                       // DOWNWARDS ARROW
-			return rune(0x2193), true
+			return {'\u2193', 0}, 1, true
 		case "DownArrowBar":                    // DOWNWARDS ARROW TO BAR
-			return rune(0x2913), true
+			return {'\u2913', 0}, 1, true
 		case "DownArrowUpArrow":                // DOWNWARDS ARROW LEFTWARDS OF UPWARDS ARROW
-			return rune(0x21f5), true
+			return {'\u21f5', 0}, 1, true
 		case "DownBreve":                       // COMBINING INVERTED BREVE
-			return rune(0x0311), true
+			return {'\u0311', 0}, 1, true
 		case "DownLeftRightVector":             // LEFT BARB DOWN RIGHT BARB DOWN HARPOON
-			return rune(0x2950), true
+			return {'\u2950', 0}, 1, true
 		case "DownLeftTeeVector":               // LEFTWARDS HARPOON WITH BARB DOWN FROM BAR
-			return rune(0x295e), true
+			return {'\u295e', 0}, 1, true
 		case "DownLeftVector":                  // LEFTWARDS HARPOON WITH BARB DOWNWARDS
-			return rune(0x21bd), true
+			return {'\u21bd', 0}, 1, true
 		case "DownLeftVectorBar":               // LEFTWARDS HARPOON WITH BARB DOWN TO BAR
-			return rune(0x2956), true
+			return {'\u2956', 0}, 1, true
 		case "DownRightTeeVector":              // RIGHTWARDS HARPOON WITH BARB DOWN FROM BAR
-			return rune(0x295f), true
+			return {'\u295f', 0}, 1, true
 		case "DownRightVector":                 // RIGHTWARDS HARPOON WITH BARB DOWNWARDS
-			return rune(0x21c1), true
+			return {'\u21c1', 0}, 1, true
 		case "DownRightVectorBar":              // RIGHTWARDS HARPOON WITH BARB DOWN TO BAR
-			return rune(0x2957), true
+			return {'\u2957', 0}, 1, true
 		case "DownTee":                         // DOWN TACK
-			return rune(0x22a4), true
+			return {'\u22a4', 0}, 1, true
 		case "DownTeeArrow":                    // DOWNWARDS ARROW FROM BAR
-			return rune(0x21a7), true
+			return {'\u21a7', 0}, 1, true
 		case "Downarrow":                       // DOWNWARDS DOUBLE ARROW
-			return rune(0x21d3), true
+			return {'\u21d3', 0}, 1, true
 		case "Dscr":                            // MATHEMATICAL SCRIPT CAPITAL D
-			return rune(0x01d49f), true
+			return {'\U0001d49f', 0}, 1, true
 		case "Dstrok":                          // LATIN CAPITAL LETTER D WITH STROKE
-			return rune(0x0110), true
+			return {'\u0110', 0}, 1, true
 		}
 
 	case 'E':
 		switch name {
 		case "EEacgr":                          // GREEK CAPITAL LETTER ETA WITH TONOS
-			return rune(0x0389), true
+			return {'\u0389', 0}, 1, true
 		case "EEgr":                            // GREEK CAPITAL LETTER ETA
-			return rune(0x0397), true
+			return {'\u0397', 0}, 1, true
 		case "ENG":                             // LATIN CAPITAL LETTER ENG
-			return rune(0x014a), true
+			return {'\u014a', 0}, 1, true
 		case "ETH":                             // LATIN CAPITAL LETTER ETH
-			return rune(0xd0), true
+			return {'Ð', 0}, 1, true
 		case "Eacgr":                           // GREEK CAPITAL LETTER EPSILON WITH TONOS
-			return rune(0x0388), true
+			return {'\u0388', 0}, 1, true
 		case "Eacute":                          // LATIN CAPITAL LETTER E WITH ACUTE
-			return rune(0xc9), true
+			return {'É', 0}, 1, true
 		case "Ecaron":                          // LATIN CAPITAL LETTER E WITH CARON
-			return rune(0x011a), true
+			return {'\u011a', 0}, 1, true
 		case "Ecirc":                           // LATIN CAPITAL LETTER E WITH CIRCUMFLEX
-			return rune(0xca), true
+			return {'Ê', 0}, 1, true
 		case "Ecy":                             // CYRILLIC CAPITAL LETTER E
-			return rune(0x042d), true
+			return {'\u042d', 0}, 1, true
 		case "Edot":                            // LATIN CAPITAL LETTER E WITH DOT ABOVE
-			return rune(0x0116), true
+			return {'\u0116', 0}, 1, true
 		case "Efr":                             // MATHEMATICAL FRAKTUR CAPITAL E
-			return rune(0x01d508), true
+			return {'\U0001d508', 0}, 1, true
 		case "Egr":                             // GREEK CAPITAL LETTER EPSILON
-			return rune(0x0395), true
+			return {'\u0395', 0}, 1, true
 		case "Egrave":                          // LATIN CAPITAL LETTER E WITH GRAVE
-			return rune(0xc8), true
+			return {'È', 0}, 1, true
 		case "Element":                         // ELEMENT OF
-			return rune(0x2208), true
+			return {'\u2208', 0}, 1, true
 		case "Emacr":                           // LATIN CAPITAL LETTER E WITH MACRON
-			return rune(0x0112), true
+			return {'\u0112', 0}, 1, true
 		case "EmptySmallSquare":                // WHITE MEDIUM SQUARE
-			return rune(0x25fb), true
+			return {'\u25fb', 0}, 1, true
 		case "EmptyVerySmallSquare":            // WHITE SMALL SQUARE
-			return rune(0x25ab), true
+			return {'\u25ab', 0}, 1, true
 		case "Eogon":                           // LATIN CAPITAL LETTER E WITH OGONEK
-			return rune(0x0118), true
+			return {'\u0118', 0}, 1, true
 		case "Eopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL E
-			return rune(0x01d53c), true
+			return {'\U0001d53c', 0}, 1, true
 		case "Epsilon":                         // GREEK CAPITAL LETTER EPSILON
-			return rune(0x0395), true
+			return {'\u0395', 0}, 1, true
 		case "Equal":                           // TWO CONSECUTIVE EQUALS SIGNS
-			return rune(0x2a75), true
+			return {'\u2a75', 0}, 1, true
 		case "EqualTilde":                      // MINUS TILDE
-			return rune(0x2242), true
+			return {'\u2242', 0}, 1, true
 		case "Equilibrium":                     // RIGHTWARDS HARPOON OVER LEFTWARDS HARPOON
-			return rune(0x21cc), true
+			return {'\u21cc', 0}, 1, true
 		case "Escr":                            // SCRIPT CAPITAL E
-			return rune(0x2130), true
+			return {'\u2130', 0}, 1, true
 		case "Esim":                            // EQUALS SIGN ABOVE TILDE OPERATOR
-			return rune(0x2a73), true
+			return {'\u2a73', 0}, 1, true
 		case "Eta":                             // GREEK CAPITAL LETTER ETA
-			return rune(0x0397), true
+			return {'\u0397', 0}, 1, true
 		case "Euml":                            // LATIN CAPITAL LETTER E WITH DIAERESIS
-			return rune(0xcb), true
+			return {'Ë', 0}, 1, true
 		case "Exists":                          // THERE EXISTS
-			return rune(0x2203), true
+			return {'\u2203', 0}, 1, true
 		case "ExponentialE":                    // DOUBLE-STRUCK ITALIC SMALL E
-			return rune(0x2147), true
+			return {'\u2147', 0}, 1, true
 		}
 
 	case 'F':
 		switch name {
 		case "Fcy":                             // CYRILLIC CAPITAL LETTER EF
-			return rune(0x0424), true
+			return {'\u0424', 0}, 1, true
 		case "Ffr":                             // MATHEMATICAL FRAKTUR CAPITAL F
-			return rune(0x01d509), true
+			return {'\U0001d509', 0}, 1, true
 		case "FilledSmallSquare":               // BLACK MEDIUM SQUARE
-			return rune(0x25fc), true
+			return {'\u25fc', 0}, 1, true
 		case "FilledVerySmallSquare":           // BLACK SMALL SQUARE
-			return rune(0x25aa), true
+			return {'\u25aa', 0}, 1, true
 		case "Fopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL F
-			return rune(0x01d53d), true
+			return {'\U0001d53d', 0}, 1, true
 		case "ForAll":                          // FOR ALL
-			return rune(0x2200), true
+			return {'\u2200', 0}, 1, true
 		case "Fouriertrf":                      // SCRIPT CAPITAL F
-			return rune(0x2131), true
+			return {'\u2131', 0}, 1, true
 		case "Fscr":                            // SCRIPT CAPITAL F
-			return rune(0x2131), true
+			return {'\u2131', 0}, 1, true
 		}
 
 	case 'G':
 		switch name {
 		case "GJcy":                            // CYRILLIC CAPITAL LETTER GJE
-			return rune(0x0403), true
+			return {'\u0403', 0}, 1, true
 		case "GT":                              // GREATER-THAN SIGN
-			return rune(0x3e), true
+			return {'>', 0}, 1, true
 		case "Game":                            // TURNED SANS-SERIF CAPITAL G
-			return rune(0x2141), true
+			return {'\u2141', 0}, 1, true
 		case "Gamma":                           // GREEK CAPITAL LETTER GAMMA
-			return rune(0x0393), true
+			return {'\u0393', 0}, 1, true
 		case "Gammad":                          // GREEK LETTER DIGAMMA
-			return rune(0x03dc), true
+			return {'\u03dc', 0}, 1, true
 		case "Gbreve":                          // LATIN CAPITAL LETTER G WITH BREVE
-			return rune(0x011e), true
+			return {'\u011e', 0}, 1, true
 		case "Gcedil":                          // LATIN CAPITAL LETTER G WITH CEDILLA
-			return rune(0x0122), true
+			return {'\u0122', 0}, 1, true
 		case "Gcirc":                           // LATIN CAPITAL LETTER G WITH CIRCUMFLEX
-			return rune(0x011c), true
+			return {'\u011c', 0}, 1, true
 		case "Gcy":                             // CYRILLIC CAPITAL LETTER GHE
-			return rune(0x0413), true
+			return {'\u0413', 0}, 1, true
 		case "Gdot":                            // LATIN CAPITAL LETTER G WITH DOT ABOVE
-			return rune(0x0120), true
+			return {'\u0120', 0}, 1, true
 		case "Gfr":                             // MATHEMATICAL FRAKTUR CAPITAL G
-			return rune(0x01d50a), true
+			return {'\U0001d50a', 0}, 1, true
 		case "Gg":                              // VERY MUCH GREATER-THAN
-			return rune(0x22d9), true
+			return {'\u22d9', 0}, 1, true
 		case "Ggr":                             // GREEK CAPITAL LETTER GAMMA
-			return rune(0x0393), true
+			return {'\u0393', 0}, 1, true
 		case "Gopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL G
-			return rune(0x01d53e), true
+			return {'\U0001d53e', 0}, 1, true
 		case "GreaterEqual":                    // GREATER-THAN OR EQUAL TO
-			return rune(0x2265), true
+			return {'\u2265', 0}, 1, true
 		case "GreaterEqualLess":                // GREATER-THAN EQUAL TO OR LESS-THAN
-			return rune(0x22db), true
+			return {'\u22db', 0}, 1, true
 		case "GreaterFullEqual":                // GREATER-THAN OVER EQUAL TO
-			return rune(0x2267), true
+			return {'\u2267', 0}, 1, true
 		case "GreaterGreater":                  // DOUBLE NESTED GREATER-THAN
-			return rune(0x2aa2), true
+			return {'\u2aa2', 0}, 1, true
 		case "GreaterLess":                     // GREATER-THAN OR LESS-THAN
-			return rune(0x2277), true
+			return {'\u2277', 0}, 1, true
 		case "GreaterSlantEqual":               // GREATER-THAN OR SLANTED EQUAL TO
-			return rune(0x2a7e), true
+			return {'\u2a7e', 0}, 1, true
 		case "GreaterTilde":                    // GREATER-THAN OR EQUIVALENT TO
-			return rune(0x2273), true
+			return {'\u2273', 0}, 1, true
 		case "Gscr":                            // MATHEMATICAL SCRIPT CAPITAL G
-			return rune(0x01d4a2), true
+			return {'\U0001d4a2', 0}, 1, true
 		case "Gt":                              // MUCH GREATER-THAN
-			return rune(0x226b), true
+			return {'\u226b', 0}, 1, true
 		}
 
 	case 'H':
 		switch name {
 		case "HARDcy":                          // CYRILLIC CAPITAL LETTER HARD SIGN
-			return rune(0x042a), true
+			return {'\u042a', 0}, 1, true
 		case "Hacek":                           // CARON
-			return rune(0x02c7), true
+			return {'\u02c7', 0}, 1, true
 		case "Hat":                             // CIRCUMFLEX ACCENT
-			return rune(0x5e), true
+			return {'^', 0}, 1, true
 		case "Hcirc":                           // LATIN CAPITAL LETTER H WITH CIRCUMFLEX
-			return rune(0x0124), true
+			return {'\u0124', 0}, 1, true
 		case "Hfr":                             // BLACK-LETTER CAPITAL H
-			return rune(0x210c), true
+			return {'\u210c', 0}, 1, true
 		case "HilbertSpace":                    // SCRIPT CAPITAL H
-			return rune(0x210b), true
+			return {'\u210b', 0}, 1, true
 		case "Hopf":                            // DOUBLE-STRUCK CAPITAL H
-			return rune(0x210d), true
+			return {'\u210d', 0}, 1, true
 		case "HorizontalLine":                  // BOX DRAWINGS LIGHT HORIZONTAL
-			return rune(0x2500), true
+			return {'\u2500', 0}, 1, true
 		case "Hscr":                            // SCRIPT CAPITAL H
-			return rune(0x210b), true
+			return {'\u210b', 0}, 1, true
 		case "Hstrok":                          // LATIN CAPITAL LETTER H WITH STROKE
-			return rune(0x0126), true
+			return {'\u0126', 0}, 1, true
 		case "HumpDownHump":                    // GEOMETRICALLY EQUIVALENT TO
-			return rune(0x224e), true
+			return {'\u224e', 0}, 1, true
 		case "HumpEqual":                       // DIFFERENCE BETWEEN
-			return rune(0x224f), true
+			return {'\u224f', 0}, 1, true
 		}
 
 	case 'I':
 		switch name {
 		case "IEcy":                            // CYRILLIC CAPITAL LETTER IE
-			return rune(0x0415), true
+			return {'\u0415', 0}, 1, true
 		case "IJlig":                           // LATIN CAPITAL LIGATURE IJ
-			return rune(0x0132), true
+			return {'\u0132', 0}, 1, true
 		case "IOcy":                            // CYRILLIC CAPITAL LETTER IO
-			return rune(0x0401), true
+			return {'\u0401', 0}, 1, true
 		case "Iacgr":                           // GREEK CAPITAL LETTER IOTA WITH TONOS
-			return rune(0x038a), true
+			return {'\u038a', 0}, 1, true
 		case "Iacute":                          // LATIN CAPITAL LETTER I WITH ACUTE
-			return rune(0xcd), true
+			return {'Í', 0}, 1, true
 		case "Icirc":                           // LATIN CAPITAL LETTER I WITH CIRCUMFLEX
-			return rune(0xce), true
+			return {'Î', 0}, 1, true
 		case "Icy":                             // CYRILLIC CAPITAL LETTER I
-			return rune(0x0418), true
+			return {'\u0418', 0}, 1, true
 		case "Idigr":                           // GREEK CAPITAL LETTER IOTA WITH DIALYTIKA
-			return rune(0x03aa), true
+			return {'\u03aa', 0}, 1, true
 		case "Idot":                            // LATIN CAPITAL LETTER I WITH DOT ABOVE
-			return rune(0x0130), true
+			return {'\u0130', 0}, 1, true
 		case "Ifr":                             // BLACK-LETTER CAPITAL I
-			return rune(0x2111), true
+			return {'\u2111', 0}, 1, true
 		case "Igr":                             // GREEK CAPITAL LETTER IOTA
-			return rune(0x0399), true
+			return {'\u0399', 0}, 1, true
 		case "Igrave":                          // LATIN CAPITAL LETTER I WITH GRAVE
-			return rune(0xcc), true
+			return {'Ì', 0}, 1, true
 		case "Im":                              // BLACK-LETTER CAPITAL I
-			return rune(0x2111), true
+			return {'\u2111', 0}, 1, true
 		case "Imacr":                           // LATIN CAPITAL LETTER I WITH MACRON
-			return rune(0x012a), true
+			return {'\u012a', 0}, 1, true
 		case "ImaginaryI":                      // DOUBLE-STRUCK ITALIC SMALL I
-			return rune(0x2148), true
+			return {'\u2148', 0}, 1, true
 		case "Implies":                         // RIGHTWARDS DOUBLE ARROW
-			return rune(0x21d2), true
+			return {'\u21d2', 0}, 1, true
 		case "Int":                             // DOUBLE INTEGRAL
-			return rune(0x222c), true
+			return {'\u222c', 0}, 1, true
 		case "Integral":                        // INTEGRAL
-			return rune(0x222b), true
+			return {'\u222b', 0}, 1, true
 		case "Intersection":                    // N-ARY INTERSECTION
-			return rune(0x22c2), true
+			return {'\u22c2', 0}, 1, true
 		case "InvisibleComma":                  // INVISIBLE SEPARATOR
-			return rune(0x2063), true
+			return {'\u2063', 0}, 1, true
 		case "InvisibleTimes":                  // INVISIBLE TIMES
-			return rune(0x2062), true
+			return {'\u2062', 0}, 1, true
 		case "Iogon":                           // LATIN CAPITAL LETTER I WITH OGONEK
-			return rune(0x012e), true
+			return {'\u012e', 0}, 1, true
 		case "Iopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL I
-			return rune(0x01d540), true
+			return {'\U0001d540', 0}, 1, true
 		case "Iota":                            // GREEK CAPITAL LETTER IOTA
-			return rune(0x0399), true
+			return {'\u0399', 0}, 1, true
 		case "Iscr":                            // SCRIPT CAPITAL I
-			return rune(0x2110), true
+			return {'\u2110', 0}, 1, true
 		case "Itilde":                          // LATIN CAPITAL LETTER I WITH TILDE
-			return rune(0x0128), true
+			return {'\u0128', 0}, 1, true
 		case "Iukcy":                           // CYRILLIC CAPITAL LETTER BYELORUSSIAN-UKRAINIAN I
-			return rune(0x0406), true
+			return {'\u0406', 0}, 1, true
 		case "Iuml":                            // LATIN CAPITAL LETTER I WITH DIAERESIS
-			return rune(0xcf), true
+			return {'Ï', 0}, 1, true
 		}
 
 	case 'J':
 		switch name {
 		case "Jcirc":                           // LATIN CAPITAL LETTER J WITH CIRCUMFLEX
-			return rune(0x0134), true
+			return {'\u0134', 0}, 1, true
 		case "Jcy":                             // CYRILLIC CAPITAL LETTER SHORT I
-			return rune(0x0419), true
+			return {'\u0419', 0}, 1, true
 		case "Jfr":                             // MATHEMATICAL FRAKTUR CAPITAL J
-			return rune(0x01d50d), true
+			return {'\U0001d50d', 0}, 1, true
 		case "Jopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL J
-			return rune(0x01d541), true
+			return {'\U0001d541', 0}, 1, true
 		case "Jscr":                            // MATHEMATICAL SCRIPT CAPITAL J
-			return rune(0x01d4a5), true
+			return {'\U0001d4a5', 0}, 1, true
 		case "Jsercy":                          // CYRILLIC CAPITAL LETTER JE
-			return rune(0x0408), true
+			return {'\u0408', 0}, 1, true
 		case "Jukcy":                           // CYRILLIC CAPITAL LETTER UKRAINIAN IE
-			return rune(0x0404), true
+			return {'\u0404', 0}, 1, true
 		}
 
 	case 'K':
 		switch name {
 		case "KHcy":                            // CYRILLIC CAPITAL LETTER HA
-			return rune(0x0425), true
+			return {'\u0425', 0}, 1, true
 		case "KHgr":                            // GREEK CAPITAL LETTER CHI
-			return rune(0x03a7), true
+			return {'\u03a7', 0}, 1, true
 		case "KJcy":                            // CYRILLIC CAPITAL LETTER KJE
-			return rune(0x040c), true
+			return {'\u040c', 0}, 1, true
 		case "Kappa":                           // GREEK CAPITAL LETTER KAPPA
-			return rune(0x039a), true
+			return {'\u039a', 0}, 1, true
 		case "Kcedil":                          // LATIN CAPITAL LETTER K WITH CEDILLA
-			return rune(0x0136), true
+			return {'\u0136', 0}, 1, true
 		case "Kcy":                             // CYRILLIC CAPITAL LETTER KA
-			return rune(0x041a), true
+			return {'\u041a', 0}, 1, true
 		case "Kfr":                             // MATHEMATICAL FRAKTUR CAPITAL K
-			return rune(0x01d50e), true
+			return {'\U0001d50e', 0}, 1, true
 		case "Kgr":                             // GREEK CAPITAL LETTER KAPPA
-			return rune(0x039a), true
+			return {'\u039a', 0}, 1, true
 		case "Kopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL K
-			return rune(0x01d542), true
+			return {'\U0001d542', 0}, 1, true
 		case "Kscr":                            // MATHEMATICAL SCRIPT CAPITAL K
-			return rune(0x01d4a6), true
+			return {'\U0001d4a6', 0}, 1, true
 		}
 
 	case 'L':
 		switch name {
 		case "LJcy":                            // CYRILLIC CAPITAL LETTER LJE
-			return rune(0x0409), true
+			return {'\u0409', 0}, 1, true
 		case "LT":                              // LESS-THAN SIGN
-			return rune(0x3c), true
+			return {'<', 0}, 1, true
 		case "Lacute":                          // LATIN CAPITAL LETTER L WITH ACUTE
-			return rune(0x0139), true
+			return {'\u0139', 0}, 1, true
 		case "Lambda":                          // GREEK CAPITAL LETTER LAMDA
-			return rune(0x039b), true
+			return {'\u039b', 0}, 1, true
 		case "Lang":                            // MATHEMATICAL LEFT DOUBLE ANGLE BRACKET
-			return rune(0x27ea), true
+			return {'\u27ea', 0}, 1, true
 		case "Laplacetrf":                      // SCRIPT CAPITAL L
-			return rune(0x2112), true
+			return {'\u2112', 0}, 1, true
 		case "Larr":                            // LEFTWARDS TWO HEADED ARROW
-			return rune(0x219e), true
+			return {'\u219e', 0}, 1, true
 		case "Lcaron":                          // LATIN CAPITAL LETTER L WITH CARON
-			return rune(0x013d), true
+			return {'\u013d', 0}, 1, true
 		case "Lcedil":                          // LATIN CAPITAL LETTER L WITH CEDILLA
-			return rune(0x013b), true
+			return {'\u013b', 0}, 1, true
 		case "Lcy":                             // CYRILLIC CAPITAL LETTER EL
-			return rune(0x041b), true
+			return {'\u041b', 0}, 1, true
 		case "LeftAngleBracket":                // MATHEMATICAL LEFT ANGLE BRACKET
-			return rune(0x27e8), true
+			return {'\u27e8', 0}, 1, true
 		case "LeftArrow":                       // LEFTWARDS ARROW
-			return rune(0x2190), true
+			return {'\u2190', 0}, 1, true
 		case "LeftArrowBar":                    // LEFTWARDS ARROW TO BAR
-			return rune(0x21e4), true
+			return {'\u21e4', 0}, 1, true
 		case "LeftArrowRightArrow":             // LEFTWARDS ARROW OVER RIGHTWARDS ARROW
-			return rune(0x21c6), true
+			return {'\u21c6', 0}, 1, true
 		case "LeftCeiling":                     // LEFT CEILING
-			return rune(0x2308), true
+			return {'\u2308', 0}, 1, true
 		case "LeftDoubleBracket":               // MATHEMATICAL LEFT WHITE SQUARE BRACKET
-			return rune(0x27e6), true
+			return {'\u27e6', 0}, 1, true
 		case "LeftDownTeeVector":               // DOWNWARDS HARPOON WITH BARB LEFT FROM BAR
-			return rune(0x2961), true
+			return {'\u2961', 0}, 1, true
 		case "LeftDownVector":                  // DOWNWARDS HARPOON WITH BARB LEFTWARDS
-			return rune(0x21c3), true
+			return {'\u21c3', 0}, 1, true
 		case "LeftDownVectorBar":               // DOWNWARDS HARPOON WITH BARB LEFT TO BAR
-			return rune(0x2959), true
+			return {'\u2959', 0}, 1, true
 		case "LeftFloor":                       // LEFT FLOOR
-			return rune(0x230a), true
+			return {'\u230a', 0}, 1, true
 		case "LeftRightArrow":                  // LEFT RIGHT ARROW
-			return rune(0x2194), true
+			return {'\u2194', 0}, 1, true
 		case "LeftRightVector":                 // LEFT BARB UP RIGHT BARB UP HARPOON
-			return rune(0x294e), true
+			return {'\u294e', 0}, 1, true
 		case "LeftTee":                         // LEFT TACK
-			return rune(0x22a3), true
+			return {'\u22a3', 0}, 1, true
 		case "LeftTeeArrow":                    // LEFTWARDS ARROW FROM BAR
-			return rune(0x21a4), true
+			return {'\u21a4', 0}, 1, true
 		case "LeftTeeVector":                   // LEFTWARDS HARPOON WITH BARB UP FROM BAR
-			return rune(0x295a), true
+			return {'\u295a', 0}, 1, true
 		case "LeftTriangle":                    // NORMAL SUBGROUP OF
-			return rune(0x22b2), true
+			return {'\u22b2', 0}, 1, true
 		case "LeftTriangleBar":                 // LEFT TRIANGLE BESIDE VERTICAL BAR
-			return rune(0x29cf), true
+			return {'\u29cf', 0}, 1, true
 		case "LeftTriangleEqual":               // NORMAL SUBGROUP OF OR EQUAL TO
-			return rune(0x22b4), true
+			return {'\u22b4', 0}, 1, true
 		case "LeftUpDownVector":                // UP BARB LEFT DOWN BARB LEFT HARPOON
-			return rune(0x2951), true
+			return {'\u2951', 0}, 1, true
 		case "LeftUpTeeVector":                 // UPWARDS HARPOON WITH BARB LEFT FROM BAR
-			return rune(0x2960), true
+			return {'\u2960', 0}, 1, true
 		case "LeftUpVector":                    // UPWARDS HARPOON WITH BARB LEFTWARDS
-			return rune(0x21bf), true
+			return {'\u21bf', 0}, 1, true
 		case "LeftUpVectorBar":                 // UPWARDS HARPOON WITH BARB LEFT TO BAR
-			return rune(0x2958), true
+			return {'\u2958', 0}, 1, true
 		case "LeftVector":                      // LEFTWARDS HARPOON WITH BARB UPWARDS
-			return rune(0x21bc), true
+			return {'\u21bc', 0}, 1, true
 		case "LeftVectorBar":                   // LEFTWARDS HARPOON WITH BARB UP TO BAR
-			return rune(0x2952), true
+			return {'\u2952', 0}, 1, true
 		case "Leftarrow":                       // LEFTWARDS DOUBLE ARROW
-			return rune(0x21d0), true
+			return {'\u21d0', 0}, 1, true
 		case "Leftrightarrow":                  // LEFT RIGHT DOUBLE ARROW
-			return rune(0x21d4), true
+			return {'\u21d4', 0}, 1, true
 		case "LessEqualGreater":                // LESS-THAN EQUAL TO OR GREATER-THAN
-			return rune(0x22da), true
+			return {'\u22da', 0}, 1, true
 		case "LessFullEqual":                   // LESS-THAN OVER EQUAL TO
-			return rune(0x2266), true
+			return {'\u2266', 0}, 1, true
 		case "LessGreater":                     // LESS-THAN OR GREATER-THAN
-			return rune(0x2276), true
+			return {'\u2276', 0}, 1, true
 		case "LessLess":                        // DOUBLE NESTED LESS-THAN
-			return rune(0x2aa1), true
+			return {'\u2aa1', 0}, 1, true
 		case "LessSlantEqual":                  // LESS-THAN OR SLANTED EQUAL TO
-			return rune(0x2a7d), true
+			return {'\u2a7d', 0}, 1, true
 		case "LessTilde":                       // LESS-THAN OR EQUIVALENT TO
-			return rune(0x2272), true
+			return {'\u2272', 0}, 1, true
 		case "Lfr":                             // MATHEMATICAL FRAKTUR CAPITAL L
-			return rune(0x01d50f), true
+			return {'\U0001d50f', 0}, 1, true
 		case "Lgr":                             // GREEK CAPITAL LETTER LAMDA
-			return rune(0x039b), true
+			return {'\u039b', 0}, 1, true
 		case "Ll":                              // VERY MUCH LESS-THAN
-			return rune(0x22d8), true
+			return {'\u22d8', 0}, 1, true
 		case "Lleftarrow":                      // LEFTWARDS TRIPLE ARROW
-			return rune(0x21da), true
+			return {'\u21da', 0}, 1, true
 		case "Lmidot":                          // LATIN CAPITAL LETTER L WITH MIDDLE DOT
-			return rune(0x013f), true
+			return {'\u013f', 0}, 1, true
 		case "LongLeftArrow":                   // LONG LEFTWARDS ARROW
-			return rune(0x27f5), true
+			return {'\u27f5', 0}, 1, true
 		case "LongLeftRightArrow":              // LONG LEFT RIGHT ARROW
-			return rune(0x27f7), true
+			return {'\u27f7', 0}, 1, true
 		case "LongRightArrow":                  // LONG RIGHTWARDS ARROW
-			return rune(0x27f6), true
+			return {'\u27f6', 0}, 1, true
 		case "Longleftarrow":                   // LONG LEFTWARDS DOUBLE ARROW
-			return rune(0x27f8), true
+			return {'\u27f8', 0}, 1, true
 		case "Longleftrightarrow":              // LONG LEFT RIGHT DOUBLE ARROW
-			return rune(0x27fa), true
+			return {'\u27fa', 0}, 1, true
 		case "Longrightarrow":                  // LONG RIGHTWARDS DOUBLE ARROW
-			return rune(0x27f9), true
+			return {'\u27f9', 0}, 1, true
 		case "Lopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL L
-			return rune(0x01d543), true
+			return {'\U0001d543', 0}, 1, true
 		case "LowerLeftArrow":                  // SOUTH WEST ARROW
-			return rune(0x2199), true
+			return {'\u2199', 0}, 1, true
 		case "LowerRightArrow":                 // SOUTH EAST ARROW
-			return rune(0x2198), true
+			return {'\u2198', 0}, 1, true
 		case "Lscr":                            // SCRIPT CAPITAL L
-			return rune(0x2112), true
+			return {'\u2112', 0}, 1, true
 		case "Lsh":                             // UPWARDS ARROW WITH TIP LEFTWARDS
-			return rune(0x21b0), true
+			return {'\u21b0', 0}, 1, true
 		case "Lstrok":                          // LATIN CAPITAL LETTER L WITH STROKE
-			return rune(0x0141), true
+			return {'\u0141', 0}, 1, true
 		case "Lt":                              // MUCH LESS-THAN
-			return rune(0x226a), true
+			return {'\u226a', 0}, 1, true
 		case "Ltbar":                           // DOUBLE NESTED LESS-THAN WITH UNDERBAR
-			return rune(0x2aa3), true
+			return {'\u2aa3', 0}, 1, true
 		}
 
 	case 'M':
 		switch name {
 		case "Map":                             // RIGHTWARDS TWO-HEADED ARROW FROM BAR
-			return rune(0x2905), true
+			return {'\u2905', 0}, 1, true
 		case "Mapfrom":                         // LEFTWARDS DOUBLE ARROW FROM BAR
-			return rune(0x2906), true
+			return {'\u2906', 0}, 1, true
 		case "Mapto":                           // RIGHTWARDS DOUBLE ARROW FROM BAR
-			return rune(0x2907), true
+			return {'\u2907', 0}, 1, true
 		case "Mcy":                             // CYRILLIC CAPITAL LETTER EM
-			return rune(0x041c), true
+			return {'\u041c', 0}, 1, true
 		case "MediumSpace":                     // MEDIUM MATHEMATICAL SPACE
-			return rune(0x205f), true
+			return {'\u205f', 0}, 1, true
 		case "Mellintrf":                       // SCRIPT CAPITAL M
-			return rune(0x2133), true
+			return {'\u2133', 0}, 1, true
 		case "Mfr":                             // MATHEMATICAL FRAKTUR CAPITAL M
-			return rune(0x01d510), true
+			return {'\U0001d510', 0}, 1, true
 		case "Mgr":                             // GREEK CAPITAL LETTER MU
-			return rune(0x039c), true
+			return {'\u039c', 0}, 1, true
 		case "MinusPlus":                       // MINUS-OR-PLUS SIGN
-			return rune(0x2213), true
+			return {'\u2213', 0}, 1, true
 		case "Mopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL M
-			return rune(0x01d544), true
+			return {'\U0001d544', 0}, 1, true
 		case "Mscr":                            // SCRIPT CAPITAL M
-			return rune(0x2133), true
+			return {'\u2133', 0}, 1, true
 		case "Mu":                              // GREEK CAPITAL LETTER MU
-			return rune(0x039c), true
+			return {'\u039c', 0}, 1, true
 		}
 
 	case 'N':
 		switch name {
 		case "NJcy":                            // CYRILLIC CAPITAL LETTER NJE
-			return rune(0x040a), true
+			return {'\u040a', 0}, 1, true
 		case "Nacute":                          // LATIN CAPITAL LETTER N WITH ACUTE
-			return rune(0x0143), true
+			return {'\u0143', 0}, 1, true
 		case "Ncaron":                          // LATIN CAPITAL LETTER N WITH CARON
-			return rune(0x0147), true
+			return {'\u0147', 0}, 1, true
 		case "Ncedil":                          // LATIN CAPITAL LETTER N WITH CEDILLA
-			return rune(0x0145), true
+			return {'\u0145', 0}, 1, true
 		case "Ncy":                             // CYRILLIC CAPITAL LETTER EN
-			return rune(0x041d), true
+			return {'\u041d', 0}, 1, true
 		case "NegativeMediumSpace":             // ZERO WIDTH SPACE
-			return rune(0x200b), true
+			return {'\u200b', 0}, 1, true
 		case "NegativeThickSpace":              // ZERO WIDTH SPACE
-			return rune(0x200b), true
+			return {'\u200b', 0}, 1, true
 		case "NegativeThinSpace":               // ZERO WIDTH SPACE
-			return rune(0x200b), true
+			return {'\u200b', 0}, 1, true
 		case "NegativeVeryThinSpace":           // ZERO WIDTH SPACE
-			return rune(0x200b), true
+			return {'\u200b', 0}, 1, true
 		case "NestedGreaterGreater":            // MUCH GREATER-THAN
-			return rune(0x226b), true
+			return {'\u226b', 0}, 1, true
 		case "NestedLessLess":                  // MUCH LESS-THAN
-			return rune(0x226a), true
+			return {'\u226a', 0}, 1, true
 		case "NewLine":                         // LINE FEED (LF)
-			return rune(0x0a), true
+			return {'\n', 0}, 1, true
 		case "Nfr":                             // MATHEMATICAL FRAKTUR CAPITAL N
-			return rune(0x01d511), true
+			return {'\U0001d511', 0}, 1, true
 		case "Ngr":                             // GREEK CAPITAL LETTER NU
-			return rune(0x039d), true
+			return {'\u039d', 0}, 1, true
 		case "NoBreak":                         // WORD JOINER
-			return rune(0x2060), true
+			return {'\u2060', 0}, 1, true
 		case "NonBreakingSpace":                // NO-BREAK SPACE
-			return rune(0xa0), true
+			return {'\u00a0', 0}, 1, true
 		case "Nopf":                            // DOUBLE-STRUCK CAPITAL N
-			return rune(0x2115), true
+			return {'\u2115', 0}, 1, true
 		case "Not":                             // DOUBLE STROKE NOT SIGN
-			return rune(0x2aec), true
+			return {'\u2aec', 0}, 1, true
 		case "NotCongruent":                    // NOT IDENTICAL TO
-			return rune(0x2262), true
+			return {'\u2262', 0}, 1, true
 		case "NotCupCap":                       // NOT EQUIVALENT TO
-			return rune(0x226d), true
+			return {'\u226d', 0}, 1, true
 		case "NotDoubleVerticalBar":            // NOT PARALLEL TO
-			return rune(0x2226), true
+			return {'\u2226', 0}, 1, true
 		case "NotElement":                      // NOT AN ELEMENT OF
-			return rune(0x2209), true
+			return {'\u2209', 0}, 1, true
 		case "NotEqual":                        // NOT EQUAL TO
-			return rune(0x2260), true
+			return {'\u2260', 0}, 1, true
 		case "NotEqualTilde":                   // MINUS TILDE with slash
-			return rune(0x2242), true
+			return {'\u2242', '\u0338'}, 2, true
 		case "NotExists":                       // THERE DOES NOT EXIST
-			return rune(0x2204), true
+			return {'\u2204', 0}, 1, true
 		case "NotGreater":                      // NOT GREATER-THAN
-			return rune(0x226f), true
+			return {'\u226f', 0}, 1, true
 		case "NotGreaterEqual":                 // NEITHER GREATER-THAN NOR EQUAL TO
-			return rune(0x2271), true
+			return {'\u2271', 0}, 1, true
 		case "NotGreaterFullEqual":             // GREATER-THAN OVER EQUAL TO with slash
-			return rune(0x2267), true
+			return {'\u2267', '\u0338'}, 2, true
 		case "NotGreaterGreater":               // MUCH GREATER THAN with slash
-			return rune(0x226b), true
+			return {'\u226b', '\u0338'}, 2, true
 		case "NotGreaterLess":                  // NEITHER GREATER-THAN NOR LESS-THAN
-			return rune(0x2279), true
+			return {'\u2279', 0}, 1, true
 		case "NotGreaterSlantEqual":            // GREATER-THAN OR SLANTED EQUAL TO with slash
-			return rune(0x2a7e), true
+			return {'\u2a7e', '\u0338'}, 2, true
 		case "NotGreaterTilde":                 // NEITHER GREATER-THAN NOR EQUIVALENT TO
-			return rune(0x2275), true
+			return {'\u2275', 0}, 1, true
 		case "NotHumpDownHump":                 // GEOMETRICALLY EQUIVALENT TO with slash
-			return rune(0x224e), true
+			return {'\u224e', '\u0338'}, 2, true
 		case "NotHumpEqual":                    // DIFFERENCE BETWEEN with slash
-			return rune(0x224f), true
+			return {'\u224f', '\u0338'}, 2, true
 		case "NotLeftTriangle":                 // NOT NORMAL SUBGROUP OF
-			return rune(0x22ea), true
+			return {'\u22ea', 0}, 1, true
 		case "NotLeftTriangleBar":              // LEFT TRIANGLE BESIDE VERTICAL BAR with slash
-			return rune(0x29cf), true
+			return {'\u29cf', '\u0338'}, 2, true
 		case "NotLeftTriangleEqual":            // NOT NORMAL SUBGROUP OF OR EQUAL TO
-			return rune(0x22ec), true
+			return {'\u22ec', 0}, 1, true
 		case "NotLess":                         // NOT LESS-THAN
-			return rune(0x226e), true
+			return {'\u226e', 0}, 1, true
 		case "NotLessEqual":                    // NEITHER LESS-THAN NOR EQUAL TO
-			return rune(0x2270), true
+			return {'\u2270', 0}, 1, true
 		case "NotLessGreater":                  // NEITHER LESS-THAN NOR GREATER-THAN
-			return rune(0x2278), true
+			return {'\u2278', 0}, 1, true
 		case "NotLessLess":                     // MUCH LESS THAN with slash
-			return rune(0x226a), true
+			return {'\u226a', '\u0338'}, 2, true
 		case "NotLessSlantEqual":               // LESS-THAN OR SLANTED EQUAL TO with slash
-			return rune(0x2a7d), true
+			return {'\u2a7d', '\u0338'}, 2, true
 		case "NotLessTilde":                    // NEITHER LESS-THAN NOR EQUIVALENT TO
-			return rune(0x2274), true
+			return {'\u2274', 0}, 1, true
 		case "NotNestedGreaterGreater":         // DOUBLE NESTED GREATER-THAN with slash
-			return rune(0x2aa2), true
+			return {'\u2aa2', '\u0338'}, 2, true
 		case "NotNestedLessLess":               // DOUBLE NESTED LESS-THAN with slash
-			return rune(0x2aa1), true
+			return {'\u2aa1', '\u0338'}, 2, true
 		case "NotPrecedes":                     // DOES NOT PRECEDE
-			return rune(0x2280), true
+			return {'\u2280', 0}, 1, true
 		case "NotPrecedesEqual":                // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return rune(0x2aaf), true
+			return {'\u2aaf', '\u0338'}, 2, true
 		case "NotPrecedesSlantEqual":           // DOES NOT PRECEDE OR EQUAL
-			return rune(0x22e0), true
+			return {'\u22e0', 0}, 1, true
 		case "NotReverseElement":               // DOES NOT CONTAIN AS MEMBER
-			return rune(0x220c), true
+			return {'\u220c', 0}, 1, true
 		case "NotRightTriangle":                // DOES NOT CONTAIN AS NORMAL SUBGROUP
-			return rune(0x22eb), true
+			return {'\u22eb', 0}, 1, true
 		case "NotRightTriangleBar":             // VERTICAL BAR BESIDE RIGHT TRIANGLE with slash
-			return rune(0x29d0), true
+			return {'\u29d0', '\u0338'}, 2, true
 		case "NotRightTriangleEqual":           // DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
-			return rune(0x22ed), true
+			return {'\u22ed', 0}, 1, true
 		case "NotSquareSubset":                 // SQUARE IMAGE OF with slash
-			return rune(0x228f), true
+			return {'\u228f', '\u0338'}, 2, true
 		case "NotSquareSubsetEqual":            // NOT SQUARE IMAGE OF OR EQUAL TO
-			return rune(0x22e2), true
+			return {'\u22e2', 0}, 1, true
 		case "NotSquareSuperset":               // SQUARE ORIGINAL OF with slash
-			return rune(0x2290), true
+			return {'\u2290', '\u0338'}, 2, true
 		case "NotSquareSupersetEqual":          // NOT SQUARE ORIGINAL OF OR EQUAL TO
-			return rune(0x22e3), true
+			return {'\u22e3', 0}, 1, true
 		case "NotSubset":                       // SUBSET OF with vertical line
-			return rune(0x2282), true
+			return {'\u2282', '\u20d2'}, 2, true
 		case "NotSubsetEqual":                  // NEITHER A SUBSET OF NOR EQUAL TO
-			return rune(0x2288), true
+			return {'\u2288', 0}, 1, true
 		case "NotSucceeds":                     // DOES NOT SUCCEED
-			return rune(0x2281), true
+			return {'\u2281', 0}, 1, true
 		case "NotSucceedsEqual":                // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return rune(0x2ab0), true
+			return {'\u2ab0', '\u0338'}, 2, true
 		case "NotSucceedsSlantEqual":           // DOES NOT SUCCEED OR EQUAL
-			return rune(0x22e1), true
+			return {'\u22e1', 0}, 1, true
 		case "NotSucceedsTilde":                // SUCCEEDS OR EQUIVALENT TO with slash
-			return rune(0x227f), true
+			return {'\u227f', '\u0338'}, 2, true
 		case "NotSuperset":                     // SUPERSET OF with vertical line
-			return rune(0x2283), true
+			return {'\u2283', '\u20d2'}, 2, true
 		case "NotSupersetEqual":                // NEITHER A SUPERSET OF NOR EQUAL TO
-			return rune(0x2289), true
+			return {'\u2289', 0}, 1, true
 		case "NotTilde":                        // NOT TILDE
-			return rune(0x2241), true
+			return {'\u2241', 0}, 1, true
 		case "NotTildeEqual":                   // NOT ASYMPTOTICALLY EQUAL TO
-			return rune(0x2244), true
+			return {'\u2244', 0}, 1, true
 		case "NotTildeFullEqual":               // NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO
-			return rune(0x2247), true
+			return {'\u2247', 0}, 1, true
 		case "NotTildeTilde":                   // NOT ALMOST EQUAL TO
-			return rune(0x2249), true
+			return {'\u2249', 0}, 1, true
 		case "NotVerticalBar":                  // DOES NOT DIVIDE
-			return rune(0x2224), true
+			return {'\u2224', 0}, 1, true
 		case "Nscr":                            // MATHEMATICAL SCRIPT CAPITAL N
-			return rune(0x01d4a9), true
+			return {'\U0001d4a9', 0}, 1, true
 		case "Ntilde":                          // LATIN CAPITAL LETTER N WITH TILDE
-			return rune(0xd1), true
+			return {'Ñ', 0}, 1, true
 		case "Nu":                              // GREEK CAPITAL LETTER NU
-			return rune(0x039d), true
+			return {'\u039d', 0}, 1, true
 		}
 
 	case 'O':
 		switch name {
 		case "OElig":                           // LATIN CAPITAL LIGATURE OE
-			return rune(0x0152), true
+			return {'\u0152', 0}, 1, true
 		case "OHacgr":                          // GREEK CAPITAL LETTER OMEGA WITH TONOS
-			return rune(0x038f), true
+			return {'\u038f', 0}, 1, true
 		case "OHgr":                            // GREEK CAPITAL LETTER OMEGA
-			return rune(0x03a9), true
+			return {'\u03a9', 0}, 1, true
 		case "Oacgr":                           // GREEK CAPITAL LETTER OMICRON WITH TONOS
-			return rune(0x038c), true
+			return {'\u038c', 0}, 1, true
 		case "Oacute":                          // LATIN CAPITAL LETTER O WITH ACUTE
-			return rune(0xd3), true
+			return {'Ó', 0}, 1, true
 		case "Ocirc":                           // LATIN CAPITAL LETTER O WITH CIRCUMFLEX
-			return rune(0xd4), true
+			return {'Ô', 0}, 1, true
 		case "Ocy":                             // CYRILLIC CAPITAL LETTER O
-			return rune(0x041e), true
+			return {'\u041e', 0}, 1, true
 		case "Odblac":                          // LATIN CAPITAL LETTER O WITH DOUBLE ACUTE
-			return rune(0x0150), true
+			return {'\u0150', 0}, 1, true
 		case "Ofr":                             // MATHEMATICAL FRAKTUR CAPITAL O
-			return rune(0x01d512), true
+			return {'\U0001d512', 0}, 1, true
 		case "Ogr":                             // GREEK CAPITAL LETTER OMICRON
-			return rune(0x039f), true
+			return {'\u039f', 0}, 1, true
 		case "Ograve":                          // LATIN CAPITAL LETTER O WITH GRAVE
-			return rune(0xd2), true
+			return {'Ò', 0}, 1, true
 		case "Omacr":                           // LATIN CAPITAL LETTER O WITH MACRON
-			return rune(0x014c), true
+			return {'\u014c', 0}, 1, true
 		case "Omega":                           // GREEK CAPITAL LETTER OMEGA
-			return rune(0x03a9), true
+			return {'\u03a9', 0}, 1, true
 		case "Omicron":                         // GREEK CAPITAL LETTER OMICRON
-			return rune(0x039f), true
+			return {'\u039f', 0}, 1, true
 		case "Oopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL O
-			return rune(0x01d546), true
+			return {'\U0001d546', 0}, 1, true
 		case "OpenCurlyDoubleQuote":            // LEFT DOUBLE QUOTATION MARK
-			return rune(0x201c), true
+			return {'\u201c', 0}, 1, true
 		case "OpenCurlyQuote":                  // LEFT SINGLE QUOTATION MARK
-			return rune(0x2018), true
+			return {'\u2018', 0}, 1, true
 		case "Or":                              // DOUBLE LOGICAL OR
-			return rune(0x2a54), true
+			return {'\u2a54', 0}, 1, true
 		case "Oscr":                            // MATHEMATICAL SCRIPT CAPITAL O
-			return rune(0x01d4aa), true
+			return {'\U0001d4aa', 0}, 1, true
 		case "Oslash":                          // LATIN CAPITAL LETTER O WITH STROKE
-			return rune(0xd8), true
+			return {'Ø', 0}, 1, true
 		case "Otilde":                          // LATIN CAPITAL LETTER O WITH TILDE
-			return rune(0xd5), true
+			return {'Õ', 0}, 1, true
 		case "Otimes":                          // MULTIPLICATION SIGN IN DOUBLE CIRCLE
-			return rune(0x2a37), true
+			return {'\u2a37', 0}, 1, true
 		case "Ouml":                            // LATIN CAPITAL LETTER O WITH DIAERESIS
-			return rune(0xd6), true
+			return {'Ö', 0}, 1, true
 		case "OverBar":                         // OVERLINE
-			return rune(0x203e), true
+			return {'\u203e', 0}, 1, true
 		case "OverBrace":                       // TOP CURLY BRACKET
-			return rune(0x23de), true
+			return {'\u23de', 0}, 1, true
 		case "OverBracket":                     // TOP SQUARE BRACKET
-			return rune(0x23b4), true
+			return {'\u23b4', 0}, 1, true
 		case "OverParenthesis":                 // TOP PARENTHESIS
-			return rune(0x23dc), true
+			return {'\u23dc', 0}, 1, true
 		}
 
 	case 'P':
 		switch name {
 		case "PHgr":                            // GREEK CAPITAL LETTER PHI
-			return rune(0x03a6), true
+			return {'\u03a6', 0}, 1, true
 		case "PSgr":                            // GREEK CAPITAL LETTER PSI
-			return rune(0x03a8), true
+			return {'\u03a8', 0}, 1, true
 		case "PartialD":                        // PARTIAL DIFFERENTIAL
-			return rune(0x2202), true
+			return {'\u2202', 0}, 1, true
 		case "Pcy":                             // CYRILLIC CAPITAL LETTER PE
-			return rune(0x041f), true
+			return {'\u041f', 0}, 1, true
 		case "Pfr":                             // MATHEMATICAL FRAKTUR CAPITAL P
-			return rune(0x01d513), true
+			return {'\U0001d513', 0}, 1, true
 		case "Pgr":                             // GREEK CAPITAL LETTER PI
-			return rune(0x03a0), true
+			return {'\u03a0', 0}, 1, true
 		case "Phi":                             // GREEK CAPITAL LETTER PHI
-			return rune(0x03a6), true
+			return {'\u03a6', 0}, 1, true
 		case "Pi":                              // GREEK CAPITAL LETTER PI
-			return rune(0x03a0), true
+			return {'\u03a0', 0}, 1, true
 		case "PlusMinus":                       // PLUS-MINUS SIGN
-			return rune(0xb1), true
+			return {'±', 0}, 1, true
 		case "Poincareplane":                   // BLACK-LETTER CAPITAL H
-			return rune(0x210c), true
+			return {'\u210c', 0}, 1, true
 		case "Popf":                            // DOUBLE-STRUCK CAPITAL P
-			return rune(0x2119), true
+			return {'\u2119', 0}, 1, true
 		case "Pr":                              // DOUBLE PRECEDES
-			return rune(0x2abb), true
+			return {'\u2abb', 0}, 1, true
 		case "Precedes":                        // PRECEDES
-			return rune(0x227a), true
+			return {'\u227a', 0}, 1, true
 		case "PrecedesEqual":                   // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
-			return rune(0x2aaf), true
+			return {'\u2aaf', 0}, 1, true
 		case "PrecedesSlantEqual":              // PRECEDES OR EQUAL TO
-			return rune(0x227c), true
+			return {'\u227c', 0}, 1, true
 		case "PrecedesTilde":                   // PRECEDES OR EQUIVALENT TO
-			return rune(0x227e), true
+			return {'\u227e', 0}, 1, true
 		case "Prime":                           // DOUBLE PRIME
-			return rune(0x2033), true
+			return {'\u2033', 0}, 1, true
 		case "Product":                         // N-ARY PRODUCT
-			return rune(0x220f), true
+			return {'\u220f', 0}, 1, true
 		case "Proportion":                      // PROPORTION
-			return rune(0x2237), true
+			return {'\u2237', 0}, 1, true
 		case "Proportional":                    // PROPORTIONAL TO
-			return rune(0x221d), true
+			return {'\u221d', 0}, 1, true
 		case "Pscr":                            // MATHEMATICAL SCRIPT CAPITAL P
-			return rune(0x01d4ab), true
+			return {'\U0001d4ab', 0}, 1, true
 		case "Psi":                             // GREEK CAPITAL LETTER PSI
-			return rune(0x03a8), true
+			return {'\u03a8', 0}, 1, true
 		}
 
 	case 'Q':
 		switch name {
 		case "QUOT":                            // QUOTATION MARK
-			return rune(0x22), true
+			return {'"', 0}, 1, true
 		case "Qfr":                             // MATHEMATICAL FRAKTUR CAPITAL Q
-			return rune(0x01d514), true
+			return {'\U0001d514', 0}, 1, true
 		case "Qopf":                            // DOUBLE-STRUCK CAPITAL Q
-			return rune(0x211a), true
+			return {'\u211a', 0}, 1, true
 		case "Qscr":                            // MATHEMATICAL SCRIPT CAPITAL Q
-			return rune(0x01d4ac), true
+			return {'\U0001d4ac', 0}, 1, true
 		}
 
 	case 'R':
 		switch name {
 		case "RBarr":                           // RIGHTWARDS TWO-HEADED TRIPLE DASH ARROW
-			return rune(0x2910), true
+			return {'\u2910', 0}, 1, true
 		case "REG":                             // REGISTERED SIGN
-			return rune(0xae), true
+			return {'®', 0}, 1, true
 		case "Racute":                          // LATIN CAPITAL LETTER R WITH ACUTE
-			return rune(0x0154), true
+			return {'\u0154', 0}, 1, true
 		case "Rang":                            // MATHEMATICAL RIGHT DOUBLE ANGLE BRACKET
-			return rune(0x27eb), true
+			return {'\u27eb', 0}, 1, true
 		case "Rarr":                            // RIGHTWARDS TWO HEADED ARROW
-			return rune(0x21a0), true
+			return {'\u21a0', 0}, 1, true
 		case "Rarrtl":                          // RIGHTWARDS TWO-HEADED ARROW WITH TAIL
-			return rune(0x2916), true
+			return {'\u2916', 0}, 1, true
 		case "Rcaron":                          // LATIN CAPITAL LETTER R WITH CARON
-			return rune(0x0158), true
+			return {'\u0158', 0}, 1, true
 		case "Rcedil":                          // LATIN CAPITAL LETTER R WITH CEDILLA
-			return rune(0x0156), true
+			return {'\u0156', 0}, 1, true
 		case "Rcy":                             // CYRILLIC CAPITAL LETTER ER
-			return rune(0x0420), true
+			return {'\u0420', 0}, 1, true
 		case "Re":                              // BLACK-LETTER CAPITAL R
-			return rune(0x211c), true
+			return {'\u211c', 0}, 1, true
 		case "ReverseElement":                  // CONTAINS AS MEMBER
-			return rune(0x220b), true
+			return {'\u220b', 0}, 1, true
 		case "ReverseEquilibrium":              // LEFTWARDS HARPOON OVER RIGHTWARDS HARPOON
-			return rune(0x21cb), true
+			return {'\u21cb', 0}, 1, true
 		case "ReverseUpEquilibrium":            // DOWNWARDS HARPOON WITH BARB LEFT BESIDE UPWARDS HARPOON WITH BARB RIGHT
-			return rune(0x296f), true
+			return {'\u296f', 0}, 1, true
 		case "Rfr":                             // BLACK-LETTER CAPITAL R
-			return rune(0x211c), true
+			return {'\u211c', 0}, 1, true
 		case "Rgr":                             // GREEK CAPITAL LETTER RHO
-			return rune(0x03a1), true
+			return {'\u03a1', 0}, 1, true
 		case "Rho":                             // GREEK CAPITAL LETTER RHO
-			return rune(0x03a1), true
+			return {'\u03a1', 0}, 1, true
 		case "RightAngleBracket":               // MATHEMATICAL RIGHT ANGLE BRACKET
-			return rune(0x27e9), true
+			return {'\u27e9', 0}, 1, true
 		case "RightArrow":                      // RIGHTWARDS ARROW
-			return rune(0x2192), true
+			return {'\u2192', 0}, 1, true
 		case "RightArrowBar":                   // RIGHTWARDS ARROW TO BAR
-			return rune(0x21e5), true
+			return {'\u21e5', 0}, 1, true
 		case "RightArrowLeftArrow":             // RIGHTWARDS ARROW OVER LEFTWARDS ARROW
-			return rune(0x21c4), true
+			return {'\u21c4', 0}, 1, true
 		case "RightCeiling":                    // RIGHT CEILING
-			return rune(0x2309), true
+			return {'\u2309', 0}, 1, true
 		case "RightDoubleBracket":              // MATHEMATICAL RIGHT WHITE SQUARE BRACKET
-			return rune(0x27e7), true
+			return {'\u27e7', 0}, 1, true
 		case "RightDownTeeVector":              // DOWNWARDS HARPOON WITH BARB RIGHT FROM BAR
-			return rune(0x295d), true
+			return {'\u295d', 0}, 1, true
 		case "RightDownVector":                 // DOWNWARDS HARPOON WITH BARB RIGHTWARDS
-			return rune(0x21c2), true
+			return {'\u21c2', 0}, 1, true
 		case "RightDownVectorBar":              // DOWNWARDS HARPOON WITH BARB RIGHT TO BAR
-			return rune(0x2955), true
+			return {'\u2955', 0}, 1, true
 		case "RightFloor":                      // RIGHT FLOOR
-			return rune(0x230b), true
+			return {'\u230b', 0}, 1, true
 		case "RightTee":                        // RIGHT TACK
-			return rune(0x22a2), true
+			return {'\u22a2', 0}, 1, true
 		case "RightTeeArrow":                   // RIGHTWARDS ARROW FROM BAR
-			return rune(0x21a6), true
+			return {'\u21a6', 0}, 1, true
 		case "RightTeeVector":                  // RIGHTWARDS HARPOON WITH BARB UP FROM BAR
-			return rune(0x295b), true
+			return {'\u295b', 0}, 1, true
 		case "RightTriangle":                   // CONTAINS AS NORMAL SUBGROUP
-			return rune(0x22b3), true
+			return {'\u22b3', 0}, 1, true
 		case "RightTriangleBar":                // VERTICAL BAR BESIDE RIGHT TRIANGLE
-			return rune(0x29d0), true
+			return {'\u29d0', 0}, 1, true
 		case "RightTriangleEqual":              // CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
-			return rune(0x22b5), true
+			return {'\u22b5', 0}, 1, true
 		case "RightUpDownVector":               // UP BARB RIGHT DOWN BARB RIGHT HARPOON
-			return rune(0x294f), true
+			return {'\u294f', 0}, 1, true
 		case "RightUpTeeVector":                // UPWARDS HARPOON WITH BARB RIGHT FROM BAR
-			return rune(0x295c), true
+			return {'\u295c', 0}, 1, true
 		case "RightUpVector":                   // UPWARDS HARPOON WITH BARB RIGHTWARDS
-			return rune(0x21be), true
+			return {'\u21be', 0}, 1, true
 		case "RightUpVectorBar":                // UPWARDS HARPOON WITH BARB RIGHT TO BAR
-			return rune(0x2954), true
+			return {'\u2954', 0}, 1, true
 		case "RightVector":                     // RIGHTWARDS HARPOON WITH BARB UPWARDS
-			return rune(0x21c0), true
+			return {'\u21c0', 0}, 1, true
 		case "RightVectorBar":                  // RIGHTWARDS HARPOON WITH BARB UP TO BAR
-			return rune(0x2953), true
+			return {'\u2953', 0}, 1, true
 		case "Rightarrow":                      // RIGHTWARDS DOUBLE ARROW
-			return rune(0x21d2), true
+			return {'\u21d2', 0}, 1, true
 		case "Ropf":                            // DOUBLE-STRUCK CAPITAL R
-			return rune(0x211d), true
+			return {'\u211d', 0}, 1, true
 		case "RoundImplies":                    // RIGHT DOUBLE ARROW WITH ROUNDED HEAD
-			return rune(0x2970), true
+			return {'\u2970', 0}, 1, true
 		case "Rrightarrow":                     // RIGHTWARDS TRIPLE ARROW
-			return rune(0x21db), true
+			return {'\u21db', 0}, 1, true
 		case "Rscr":                            // SCRIPT CAPITAL R
-			return rune(0x211b), true
+			return {'\u211b', 0}, 1, true
 		case "Rsh":                             // UPWARDS ARROW WITH TIP RIGHTWARDS
-			return rune(0x21b1), true
+			return {'\u21b1', 0}, 1, true
 		case "RuleDelayed":                     // RULE-DELAYED
-			return rune(0x29f4), true
+			return {'\u29f4', 0}, 1, true
 		}
 
 	case 'S':
 		switch name {
 		case "SHCHcy":                          // CYRILLIC CAPITAL LETTER SHCHA
-			return rune(0x0429), true
+			return {'\u0429', 0}, 1, true
 		case "SHcy":                            // CYRILLIC CAPITAL LETTER SHA
-			return rune(0x0428), true
+			return {'\u0428', 0}, 1, true
 		case "SOFTcy":                          // CYRILLIC CAPITAL LETTER SOFT SIGN
-			return rune(0x042c), true
+			return {'\u042c', 0}, 1, true
 		case "Sacute":                          // LATIN CAPITAL LETTER S WITH ACUTE
-			return rune(0x015a), true
+			return {'\u015a', 0}, 1, true
 		case "Sc":                              // DOUBLE SUCCEEDS
-			return rune(0x2abc), true
+			return {'\u2abc', 0}, 1, true
 		case "Scaron":                          // LATIN CAPITAL LETTER S WITH CARON
-			return rune(0x0160), true
+			return {'\u0160', 0}, 1, true
 		case "Scedil":                          // LATIN CAPITAL LETTER S WITH CEDILLA
-			return rune(0x015e), true
+			return {'\u015e', 0}, 1, true
 		case "Scirc":                           // LATIN CAPITAL LETTER S WITH CIRCUMFLEX
-			return rune(0x015c), true
+			return {'\u015c', 0}, 1, true
 		case "Scy":                             // CYRILLIC CAPITAL LETTER ES
-			return rune(0x0421), true
+			return {'\u0421', 0}, 1, true
 		case "Sfr":                             // MATHEMATICAL FRAKTUR CAPITAL S
-			return rune(0x01d516), true
+			return {'\U0001d516', 0}, 1, true
 		case "Sgr":                             // GREEK CAPITAL LETTER SIGMA
-			return rune(0x03a3), true
+			return {'\u03a3', 0}, 1, true
 		case "ShortDownArrow":                  // DOWNWARDS ARROW
-			return rune(0x2193), true
+			return {'\u2193', 0}, 1, true
 		case "ShortLeftArrow":                  // LEFTWARDS ARROW
-			return rune(0x2190), true
+			return {'\u2190', 0}, 1, true
 		case "ShortRightArrow":                 // RIGHTWARDS ARROW
-			return rune(0x2192), true
+			return {'\u2192', 0}, 1, true
 		case "ShortUpArrow":                    // UPWARDS ARROW
-			return rune(0x2191), true
+			return {'\u2191', 0}, 1, true
 		case "Sigma":                           // GREEK CAPITAL LETTER SIGMA
-			return rune(0x03a3), true
+			return {'\u03a3', 0}, 1, true
 		case "SmallCircle":                     // RING OPERATOR
-			return rune(0x2218), true
+			return {'\u2218', 0}, 1, true
 		case "Sopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL S
-			return rune(0x01d54a), true
+			return {'\U0001d54a', 0}, 1, true
 		case "Sqrt":                            // SQUARE ROOT
-			return rune(0x221a), true
+			return {'\u221a', 0}, 1, true
 		case "Square":                          // WHITE SQUARE
-			return rune(0x25a1), true
+			return {'\u25a1', 0}, 1, true
 		case "SquareIntersection":              // SQUARE CAP
-			return rune(0x2293), true
+			return {'\u2293', 0}, 1, true
 		case "SquareSubset":                    // SQUARE IMAGE OF
-			return rune(0x228f), true
+			return {'\u228f', 0}, 1, true
 		case "SquareSubsetEqual":               // SQUARE IMAGE OF OR EQUAL TO
-			return rune(0x2291), true
+			return {'\u2291', 0}, 1, true
 		case "SquareSuperset":                  // SQUARE ORIGINAL OF
-			return rune(0x2290), true
+			return {'\u2290', 0}, 1, true
 		case "SquareSupersetEqual":             // SQUARE ORIGINAL OF OR EQUAL TO
-			return rune(0x2292), true
+			return {'\u2292', 0}, 1, true
 		case "SquareUnion":                     // SQUARE CUP
-			return rune(0x2294), true
+			return {'\u2294', 0}, 1, true
 		case "Sscr":                            // MATHEMATICAL SCRIPT CAPITAL S
-			return rune(0x01d4ae), true
+			return {'\U0001d4ae', 0}, 1, true
 		case "Star":                            // STAR OPERATOR
-			return rune(0x22c6), true
+			return {'\u22c6', 0}, 1, true
 		case "Sub":                             // DOUBLE SUBSET
-			return rune(0x22d0), true
+			return {'\u22d0', 0}, 1, true
 		case "Subset":                          // DOUBLE SUBSET
-			return rune(0x22d0), true
+			return {'\u22d0', 0}, 1, true
 		case "SubsetEqual":                     // SUBSET OF OR EQUAL TO
-			return rune(0x2286), true
+			return {'\u2286', 0}, 1, true
 		case "Succeeds":                        // SUCCEEDS
-			return rune(0x227b), true
+			return {'\u227b', 0}, 1, true
 		case "SucceedsEqual":                   // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN
-			return rune(0x2ab0), true
+			return {'\u2ab0', 0}, 1, true
 		case "SucceedsSlantEqual":              // SUCCEEDS OR EQUAL TO
-			return rune(0x227d), true
+			return {'\u227d', 0}, 1, true
 		case "SucceedsTilde":                   // SUCCEEDS OR EQUIVALENT TO
-			return rune(0x227f), true
+			return {'\u227f', 0}, 1, true
 		case "SuchThat":                        // CONTAINS AS MEMBER
-			return rune(0x220b), true
+			return {'\u220b', 0}, 1, true
 		case "Sum":                             // N-ARY SUMMATION
-			return rune(0x2211), true
+			return {'\u2211', 0}, 1, true
 		case "Sup":                             // DOUBLE SUPERSET
-			return rune(0x22d1), true
+			return {'\u22d1', 0}, 1, true
 		case "Superset":                        // SUPERSET OF
-			return rune(0x2283), true
+			return {'\u2283', 0}, 1, true
 		case "SupersetEqual":                   // SUPERSET OF OR EQUAL TO
-			return rune(0x2287), true
+			return {'\u2287', 0}, 1, true
 		case "Supset":                          // DOUBLE SUPERSET
-			return rune(0x22d1), true
+			return {'\u22d1', 0}, 1, true
 		}
 
 	case 'T':
 		switch name {
 		case "THORN":                           // LATIN CAPITAL LETTER THORN
-			return rune(0xde), true
+			return {'Þ', 0}, 1, true
 		case "THgr":                            // GREEK CAPITAL LETTER THETA
-			return rune(0x0398), true
+			return {'\u0398', 0}, 1, true
 		case "TRADE":                           // TRADE MARK SIGN
-			return rune(0x2122), true
+			return {'\u2122', 0}, 1, true
 		case "TSHcy":                           // CYRILLIC CAPITAL LETTER TSHE
-			return rune(0x040b), true
+			return {'\u040b', 0}, 1, true
 		case "TScy":                            // CYRILLIC CAPITAL LETTER TSE
-			return rune(0x0426), true
+			return {'\u0426', 0}, 1, true
 		case "Tab":                             // CHARACTER TABULATION
-			return rune(0x09), true
+			return {'\t', 0}, 1, true
 		case "Tau":                             // GREEK CAPITAL LETTER TAU
-			return rune(0x03a4), true
+			return {'\u03a4', 0}, 1, true
 		case "Tcaron":                          // LATIN CAPITAL LETTER T WITH CARON
-			return rune(0x0164), true
+			return {'\u0164', 0}, 1, true
 		case "Tcedil":                          // LATIN CAPITAL LETTER T WITH CEDILLA
-			return rune(0x0162), true
+			return {'\u0162', 0}, 1, true
 		case "Tcy":                             // CYRILLIC CAPITAL LETTER TE
-			return rune(0x0422), true
+			return {'\u0422', 0}, 1, true
 		case "Tfr":                             // MATHEMATICAL FRAKTUR CAPITAL T
-			return rune(0x01d517), true
+			return {'\U0001d517', 0}, 1, true
 		case "Tgr":                             // GREEK CAPITAL LETTER TAU
-			return rune(0x03a4), true
+			return {'\u03a4', 0}, 1, true
 		case "Therefore":                       // THEREFORE
-			return rune(0x2234), true
+			return {'\u2234', 0}, 1, true
 		case "Theta":                           // GREEK CAPITAL LETTER THETA
-			return rune(0x0398), true
+			return {'\u0398', 0}, 1, true
 		case "Thetav":                          // GREEK CAPITAL THETA SYMBOL
-			return rune(0x03f4), true
+			return {'\u03f4', 0}, 1, true
 		case "ThickSpace":                      // space of width 5/18 em
-			return rune(0x205f), true
+			return {'\u205f', '\u200a'}, 2, true
 		case "ThinSpace":                       // THIN SPACE
-			return rune(0x2009), true
+			return {'\u2009', 0}, 1, true
 		case "Tilde":                           // TILDE OPERATOR
-			return rune(0x223c), true
+			return {'\u223c', 0}, 1, true
 		case "TildeEqual":                      // ASYMPTOTICALLY EQUAL TO
-			return rune(0x2243), true
+			return {'\u2243', 0}, 1, true
 		case "TildeFullEqual":                  // APPROXIMATELY EQUAL TO
-			return rune(0x2245), true
+			return {'\u2245', 0}, 1, true
 		case "TildeTilde":                      // ALMOST EQUAL TO
-			return rune(0x2248), true
+			return {'\u2248', 0}, 1, true
 		case "Topf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL T
-			return rune(0x01d54b), true
+			return {'\U0001d54b', 0}, 1, true
 		case "TripleDot":                       // COMBINING THREE DOTS ABOVE
-			return rune(0x20db), true
+			return {'\u20db', 0}, 1, true
 		case "Tscr":                            // MATHEMATICAL SCRIPT CAPITAL T
-			return rune(0x01d4af), true
+			return {'\U0001d4af', 0}, 1, true
 		case "Tstrok":                          // LATIN CAPITAL LETTER T WITH STROKE
-			return rune(0x0166), true
+			return {'\u0166', 0}, 1, true
 		}
 
 	case 'U':
 		switch name {
 		case "Uacgr":                           // GREEK CAPITAL LETTER UPSILON WITH TONOS
-			return rune(0x038e), true
+			return {'\u038e', 0}, 1, true
 		case "Uacute":                          // LATIN CAPITAL LETTER U WITH ACUTE
-			return rune(0xda), true
+			return {'Ú', 0}, 1, true
 		case "Uarr":                            // UPWARDS TWO HEADED ARROW
-			return rune(0x219f), true
+			return {'\u219f', 0}, 1, true
 		case "Uarrocir":                        // UPWARDS TWO-HEADED ARROW FROM SMALL CIRCLE
-			return rune(0x2949), true
+			return {'\u2949', 0}, 1, true
 		case "Ubrcy":                           // CYRILLIC CAPITAL LETTER SHORT U
-			return rune(0x040e), true
+			return {'\u040e', 0}, 1, true
 		case "Ubreve":                          // LATIN CAPITAL LETTER U WITH BREVE
-			return rune(0x016c), true
+			return {'\u016c', 0}, 1, true
 		case "Ucirc":                           // LATIN CAPITAL LETTER U WITH CIRCUMFLEX
-			return rune(0xdb), true
+			return {'Û', 0}, 1, true
 		case "Ucy":                             // CYRILLIC CAPITAL LETTER U
-			return rune(0x0423), true
+			return {'\u0423', 0}, 1, true
 		case "Udblac":                          // LATIN CAPITAL LETTER U WITH DOUBLE ACUTE
-			return rune(0x0170), true
+			return {'\u0170', 0}, 1, true
 		case "Udigr":                           // GREEK CAPITAL LETTER UPSILON WITH DIALYTIKA
-			return rune(0x03ab), true
+			return {'\u03ab', 0}, 1, true
 		case "Ufr":                             // MATHEMATICAL FRAKTUR CAPITAL U
-			return rune(0x01d518), true
+			return {'\U0001d518', 0}, 1, true
 		case "Ugr":                             // GREEK CAPITAL LETTER UPSILON
-			return rune(0x03a5), true
+			return {'\u03a5', 0}, 1, true
 		case "Ugrave":                          // LATIN CAPITAL LETTER U WITH GRAVE
-			return rune(0xd9), true
+			return {'Ù', 0}, 1, true
 		case "Umacr":                           // LATIN CAPITAL LETTER U WITH MACRON
-			return rune(0x016a), true
+			return {'\u016a', 0}, 1, true
 		case "UnderBar":                        // LOW LINE
-			return rune(0x5f), true
+			return {'_', 0}, 1, true
 		case "UnderBrace":                      // BOTTOM CURLY BRACKET
-			return rune(0x23df), true
+			return {'\u23df', 0}, 1, true
 		case "UnderBracket":                    // BOTTOM SQUARE BRACKET
-			return rune(0x23b5), true
+			return {'\u23b5', 0}, 1, true
 		case "UnderParenthesis":                // BOTTOM PARENTHESIS
-			return rune(0x23dd), true
+			return {'\u23dd', 0}, 1, true
 		case "Union":                           // N-ARY UNION
-			return rune(0x22c3), true
+			return {'\u22c3', 0}, 1, true
 		case "UnionPlus":                       // MULTISET UNION
-			return rune(0x228e), true
+			return {'\u228e', 0}, 1, true
 		case "Uogon":                           // LATIN CAPITAL LETTER U WITH OGONEK
-			return rune(0x0172), true
+			return {'\u0172', 0}, 1, true
 		case "Uopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL U
-			return rune(0x01d54c), true
+			return {'\U0001d54c', 0}, 1, true
 		case "UpArrow":                         // UPWARDS ARROW
-			return rune(0x2191), true
+			return {'\u2191', 0}, 1, true
 		case "UpArrowBar":                      // UPWARDS ARROW TO BAR
-			return rune(0x2912), true
+			return {'\u2912', 0}, 1, true
 		case "UpArrowDownArrow":                // UPWARDS ARROW LEFTWARDS OF DOWNWARDS ARROW
-			return rune(0x21c5), true
+			return {'\u21c5', 0}, 1, true
 		case "UpDownArrow":                     // UP DOWN ARROW
-			return rune(0x2195), true
+			return {'\u2195', 0}, 1, true
 		case "UpEquilibrium":                   // UPWARDS HARPOON WITH BARB LEFT BESIDE DOWNWARDS HARPOON WITH BARB RIGHT
-			return rune(0x296e), true
+			return {'\u296e', 0}, 1, true
 		case "UpTee":                           // UP TACK
-			return rune(0x22a5), true
+			return {'\u22a5', 0}, 1, true
 		case "UpTeeArrow":                      // UPWARDS ARROW FROM BAR
-			return rune(0x21a5), true
+			return {'\u21a5', 0}, 1, true
 		case "Uparrow":                         // UPWARDS DOUBLE ARROW
-			return rune(0x21d1), true
+			return {'\u21d1', 0}, 1, true
 		case "Updownarrow":                     // UP DOWN DOUBLE ARROW
-			return rune(0x21d5), true
+			return {'\u21d5', 0}, 1, true
 		case "UpperLeftArrow":                  // NORTH WEST ARROW
-			return rune(0x2196), true
+			return {'\u2196', 0}, 1, true
 		case "UpperRightArrow":                 // NORTH EAST ARROW
-			return rune(0x2197), true
+			return {'\u2197', 0}, 1, true
 		case "Upsi":                            // GREEK UPSILON WITH HOOK SYMBOL
-			return rune(0x03d2), true
+			return {'\u03d2', 0}, 1, true
 		case "Upsilon":                         // GREEK CAPITAL LETTER UPSILON
-			return rune(0x03a5), true
+			return {'\u03a5', 0}, 1, true
 		case "Uring":                           // LATIN CAPITAL LETTER U WITH RING ABOVE
-			return rune(0x016e), true
+			return {'\u016e', 0}, 1, true
 		case "Uscr":                            // MATHEMATICAL SCRIPT CAPITAL U
-			return rune(0x01d4b0), true
+			return {'\U0001d4b0', 0}, 1, true
 		case "Utilde":                          // LATIN CAPITAL LETTER U WITH TILDE
-			return rune(0x0168), true
+			return {'\u0168', 0}, 1, true
 		case "Uuml":                            // LATIN CAPITAL LETTER U WITH DIAERESIS
-			return rune(0xdc), true
+			return {'Ü', 0}, 1, true
 		}
 
 	case 'V':
 		switch name {
 		case "VDash":                           // DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE
-			return rune(0x22ab), true
+			return {'\u22ab', 0}, 1, true
 		case "Vbar":                            // DOUBLE UP TACK
-			return rune(0x2aeb), true
+			return {'\u2aeb', 0}, 1, true
 		case "Vcy":                             // CYRILLIC CAPITAL LETTER VE
-			return rune(0x0412), true
+			return {'\u0412', 0}, 1, true
 		case "Vdash":                           // FORCES
-			return rune(0x22a9), true
+			return {'\u22a9', 0}, 1, true
 		case "Vdashl":                          // LONG DASH FROM LEFT MEMBER OF DOUBLE VERTICAL
-			return rune(0x2ae6), true
+			return {'\u2ae6', 0}, 1, true
 		case "Vee":                             // N-ARY LOGICAL OR
-			return rune(0x22c1), true
+			return {'\u22c1', 0}, 1, true
 		case "Verbar":                          // DOUBLE VERTICAL LINE
-			return rune(0x2016), true
+			return {'\u2016', 0}, 1, true
 		case "Vert":                            // DOUBLE VERTICAL LINE
-			return rune(0x2016), true
+			return {'\u2016', 0}, 1, true
 		case "VerticalBar":                     // DIVIDES
-			return rune(0x2223), true
+			return {'\u2223', 0}, 1, true
 		case "VerticalLine":                    // VERTICAL LINE
-			return rune(0x7c), true
+			return {'|', 0}, 1, true
 		case "VerticalSeparator":               // LIGHT VERTICAL BAR
-			return rune(0x2758), true
+			return {'\u2758', 0}, 1, true
 		case "VerticalTilde":                   // WREATH PRODUCT
-			return rune(0x2240), true
+			return {'\u2240', 0}, 1, true
 		case "VeryThinSpace":                   // HAIR SPACE
-			return rune(0x200a), true
+			return {'\u200a', 0}, 1, true
 		case "Vfr":                             // MATHEMATICAL FRAKTUR CAPITAL V
-			return rune(0x01d519), true
+			return {'\U0001d519', 0}, 1, true
 		case "Vopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL V
-			return rune(0x01d54d), true
+			return {'\U0001d54d', 0}, 1, true
 		case "Vscr":                            // MATHEMATICAL SCRIPT CAPITAL V
-			return rune(0x01d4b1), true
+			return {'\U0001d4b1', 0}, 1, true
 		case "Vvdash":                          // TRIPLE VERTICAL BAR RIGHT TURNSTILE
-			return rune(0x22aa), true
+			return {'\u22aa', 0}, 1, true
 		}
 
 	case 'W':
 		switch name {
 		case "Wcirc":                           // LATIN CAPITAL LETTER W WITH CIRCUMFLEX
-			return rune(0x0174), true
+			return {'\u0174', 0}, 1, true
 		case "Wedge":                           // N-ARY LOGICAL AND
-			return rune(0x22c0), true
+			return {'\u22c0', 0}, 1, true
 		case "Wfr":                             // MATHEMATICAL FRAKTUR CAPITAL W
-			return rune(0x01d51a), true
+			return {'\U0001d51a', 0}, 1, true
 		case "Wopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL W
-			return rune(0x01d54e), true
+			return {'\U0001d54e', 0}, 1, true
 		case "Wscr":                            // MATHEMATICAL SCRIPT CAPITAL W
-			return rune(0x01d4b2), true
+			return {'\U0001d4b2', 0}, 1, true
 		}
 
 	case 'X':
 		switch name {
 		case "Xfr":                             // MATHEMATICAL FRAKTUR CAPITAL X
-			return rune(0x01d51b), true
+			return {'\U0001d51b', 0}, 1, true
 		case "Xgr":                             // GREEK CAPITAL LETTER XI
-			return rune(0x039e), true
+			return {'\u039e', 0}, 1, true
 		case "Xi":                              // GREEK CAPITAL LETTER XI
-			return rune(0x039e), true
+			return {'\u039e', 0}, 1, true
 		case "Xopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL X
-			return rune(0x01d54f), true
+			return {'\U0001d54f', 0}, 1, true
 		case "Xscr":                            // MATHEMATICAL SCRIPT CAPITAL X
-			return rune(0x01d4b3), true
+			return {'\U0001d4b3', 0}, 1, true
 		}
 
 	case 'Y':
 		switch name {
 		case "YAcy":                            // CYRILLIC CAPITAL LETTER YA
-			return rune(0x042f), true
+			return {'\u042f', 0}, 1, true
 		case "YIcy":                            // CYRILLIC CAPITAL LETTER YI
-			return rune(0x0407), true
+			return {'\u0407', 0}, 1, true
 		case "YUcy":                            // CYRILLIC CAPITAL LETTER YU
-			return rune(0x042e), true
+			return {'\u042e', 0}, 1, true
 		case "Yacute":                          // LATIN CAPITAL LETTER Y WITH ACUTE
-			return rune(0xdd), true
+			return {'Ý', 0}, 1, true
 		case "Ycirc":                           // LATIN CAPITAL LETTER Y WITH CIRCUMFLEX
-			return rune(0x0176), true
+			return {'\u0176', 0}, 1, true
 		case "Ycy":                             // CYRILLIC CAPITAL LETTER YERU
-			return rune(0x042b), true
+			return {'\u042b', 0}, 1, true
 		case "Yfr":                             // MATHEMATICAL FRAKTUR CAPITAL Y
-			return rune(0x01d51c), true
+			return {'\U0001d51c', 0}, 1, true
 		case "Yopf":                            // MATHEMATICAL DOUBLE-STRUCK CAPITAL Y
-			return rune(0x01d550), true
+			return {'\U0001d550', 0}, 1, true
 		case "Yscr":                            // MATHEMATICAL SCRIPT CAPITAL Y
-			return rune(0x01d4b4), true
+			return {'\U0001d4b4', 0}, 1, true
 		case "Yuml":                            // LATIN CAPITAL LETTER Y WITH DIAERESIS
-			return rune(0x0178), true
+			return {'\u0178', 0}, 1, true
 		}
 
 	case 'Z':
 		switch name {
 		case "ZHcy":                            // CYRILLIC CAPITAL LETTER ZHE
-			return rune(0x0416), true
+			return {'\u0416', 0}, 1, true
 		case "Zacute":                          // LATIN CAPITAL LETTER Z WITH ACUTE
-			return rune(0x0179), true
+			return {'\u0179', 0}, 1, true
 		case "Zcaron":                          // LATIN CAPITAL LETTER Z WITH CARON
-			return rune(0x017d), true
+			return {'\u017d', 0}, 1, true
 		case "Zcy":                             // CYRILLIC CAPITAL LETTER ZE
-			return rune(0x0417), true
+			return {'\u0417', 0}, 1, true
 		case "Zdot":                            // LATIN CAPITAL LETTER Z WITH DOT ABOVE
-			return rune(0x017b), true
+			return {'\u017b', 0}, 1, true
 		case "ZeroWidthSpace":                  // ZERO WIDTH SPACE
-			return rune(0x200b), true
+			return {'\u200b', 0}, 1, true
 		case "Zeta":                            // GREEK CAPITAL LETTER ZETA
-			return rune(0x0396), true
+			return {'\u0396', 0}, 1, true
 		case "Zfr":                             // BLACK-LETTER CAPITAL Z
-			return rune(0x2128), true
+			return {'\u2128', 0}, 1, true
 		case "Zgr":                             // GREEK CAPITAL LETTER ZETA
-			return rune(0x0396), true
+			return {'\u0396', 0}, 1, true
 		case "Zopf":                            // DOUBLE-STRUCK CAPITAL Z
-			return rune(0x2124), true
+			return {'\u2124', 0}, 1, true
 		case "Zscr":                            // MATHEMATICAL SCRIPT CAPITAL Z
-			return rune(0x01d4b5), true
+			return {'\U0001d4b5', 0}, 1, true
 		}
 
 	case 'a':
 		switch name {
 		case "aacgr":                           // GREEK SMALL LETTER ALPHA WITH TONOS
-			return rune(0x03ac), true
+			return {'\u03ac', 0}, 1, true
 		case "aacute":                          // LATIN SMALL LETTER A WITH ACUTE
-			return rune(0xe1), true
+			return {'á', 0}, 1, true
 		case "abreve":                          // LATIN SMALL LETTER A WITH BREVE
-			return rune(0x0103), true
+			return {'\u0103', 0}, 1, true
 		case "ac":                              // INVERTED LAZY S
-			return rune(0x223e), true
+			return {'\u223e', 0}, 1, true
 		case "acE":                             // INVERTED LAZY S with double underline
-			return rune(0x223e), true
+			return {'\u223e', '\u0333'}, 2, true
 		case "acd":                             // SINE WAVE
-			return rune(0x223f), true
+			return {'\u223f', 0}, 1, true
 		case "acirc":                           // LATIN SMALL LETTER A WITH CIRCUMFLEX
-			return rune(0xe2), true
+			return {'â', 0}, 1, true
 		case "actuary":                         // COMBINING ANNUITY SYMBOL
-			return rune(0x20e7), true
+			return {'\u20e7', 0}, 1, true
 		case "acute":                           // ACUTE ACCENT
-			return rune(0xb4), true
+			return {'´', 0}, 1, true
 		case "acy":                             // CYRILLIC SMALL LETTER A
-			return rune(0x0430), true
+			return {'\u0430', 0}, 1, true
 		case "aelig":                           // LATIN SMALL LETTER AE
-			return rune(0xe6), true
+			return {'æ', 0}, 1, true
 		case "af":                              // FUNCTION APPLICATION
-			return rune(0x2061), true
+			return {'\u2061', 0}, 1, true
 		case "afr":                             // MATHEMATICAL FRAKTUR SMALL A
-			return rune(0x01d51e), true
+			return {'\U0001d51e', 0}, 1, true
 		case "agr":                             // GREEK SMALL LETTER ALPHA
-			return rune(0x03b1), true
+			return {'\u03b1', 0}, 1, true
 		case "agrave":                          // LATIN SMALL LETTER A WITH GRAVE
-			return rune(0xe0), true
+			return {'à', 0}, 1, true
 		case "alefsym":                         // ALEF SYMBOL
-			return rune(0x2135), true
+			return {'\u2135', 0}, 1, true
 		case "aleph":                           // ALEF SYMBOL
-			return rune(0x2135), true
+			return {'\u2135', 0}, 1, true
 		case "alpha":                           // GREEK SMALL LETTER ALPHA
-			return rune(0x03b1), true
+			return {'\u03b1', 0}, 1, true
 		case "amacr":                           // LATIN SMALL LETTER A WITH MACRON
-			return rune(0x0101), true
+			return {'\u0101', 0}, 1, true
 		case "amalg":                           // AMALGAMATION OR COPRODUCT
-			return rune(0x2a3f), true
+			return {'\u2a3f', 0}, 1, true
 		case "amp":                             // AMPERSAND
-			return rune(0x26), true
+			return {'&', 0}, 1, true
 		case "and":                             // LOGICAL AND
-			return rune(0x2227), true
+			return {'\u2227', 0}, 1, true
 		case "andand":                          // TWO INTERSECTING LOGICAL AND
-			return rune(0x2a55), true
+			return {'\u2a55', 0}, 1, true
 		case "andd":                            // LOGICAL AND WITH HORIZONTAL DASH
-			return rune(0x2a5c), true
+			return {'\u2a5c', 0}, 1, true
 		case "andslope":                        // SLOPING LARGE AND
-			return rune(0x2a58), true
+			return {'\u2a58', 0}, 1, true
 		case "andv":                            // LOGICAL AND WITH MIDDLE STEM
-			return rune(0x2a5a), true
+			return {'\u2a5a', 0}, 1, true
 		case "ang":                             // ANGLE
-			return rune(0x2220), true
+			return {'\u2220', 0}, 1, true
 		case "ang90":                           // RIGHT ANGLE
-			return rune(0x221f), true
+			return {'\u221f', 0}, 1, true
 		case "angdnl":                          // TURNED ANGLE
-			return rune(0x29a2), true
+			return {'\u29a2', 0}, 1, true
 		case "angdnr":                          // ACUTE ANGLE
-			return rune(0x299f), true
+			return {'\u299f', 0}, 1, true
 		case "ange":                            // ANGLE WITH UNDERBAR
-			return rune(0x29a4), true
+			return {'\u29a4', 0}, 1, true
 		case "angle":                           // ANGLE
-			return rune(0x2220), true
+			return {'\u2220', 0}, 1, true
 		case "angles":                          // ANGLE WITH S INSIDE
-			return rune(0x299e), true
+			return {'\u299e', 0}, 1, true
 		case "angmsd":                          // MEASURED ANGLE
-			return rune(0x2221), true
+			return {'\u2221', 0}, 1, true
 		case "angmsdaa":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING UP AND RIGHT
-			return rune(0x29a8), true
+			return {'\u29a8', 0}, 1, true
 		case "angmsdab":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING UP AND LEFT
-			return rune(0x29a9), true
+			return {'\u29a9', 0}, 1, true
 		case "angmsdac":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING DOWN AND RIGHT
-			return rune(0x29aa), true
+			return {'\u29aa', 0}, 1, true
 		case "angmsdad":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING DOWN AND LEFT
-			return rune(0x29ab), true
+			return {'\u29ab', 0}, 1, true
 		case "angmsdae":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING RIGHT AND UP
-			return rune(0x29ac), true
+			return {'\u29ac', 0}, 1, true
 		case "angmsdaf":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING LEFT AND UP
-			return rune(0x29ad), true
+			return {'\u29ad', 0}, 1, true
 		case "angmsdag":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING RIGHT AND DOWN
-			return rune(0x29ae), true
+			return {'\u29ae', 0}, 1, true
 		case "angmsdah":                        // MEASURED ANGLE WITH OPEN ARM ENDING IN ARROW POINTING LEFT AND DOWN
-			return rune(0x29af), true
+			return {'\u29af', 0}, 1, true
 		case "angrt":                           // RIGHT ANGLE
-			return rune(0x221f), true
+			return {'\u221f', 0}, 1, true
 		case "angrtvb":                         // RIGHT ANGLE WITH ARC
-			return rune(0x22be), true
+			return {'\u22be', 0}, 1, true
 		case "angrtvbd":                        // MEASURED RIGHT ANGLE WITH DOT
-			return rune(0x299d), true
+			return {'\u299d', 0}, 1, true
 		case "angsph":                          // SPHERICAL ANGLE
-			return rune(0x2222), true
+			return {'\u2222', 0}, 1, true
 		case "angst":                           // LATIN CAPITAL LETTER A WITH RING ABOVE
-			return rune(0xc5), true
+			return {'Å', 0}, 1, true
 		case "angupl":                          // REVERSED ANGLE
-			return rune(0x29a3), true
+			return {'\u29a3', 0}, 1, true
 		case "angzarr":                         // RIGHT ANGLE WITH DOWNWARDS ZIGZAG ARROW
-			return rune(0x237c), true
+			return {'\u237c', 0}, 1, true
 		case "aogon":                           // LATIN SMALL LETTER A WITH OGONEK
-			return rune(0x0105), true
+			return {'\u0105', 0}, 1, true
 		case "aopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL A
-			return rune(0x01d552), true
+			return {'\U0001d552', 0}, 1, true
 		case "ap":                              // ALMOST EQUAL TO
-			return rune(0x2248), true
+			return {'\u2248', 0}, 1, true
 		case "apE":                             // APPROXIMATELY EQUAL OR EQUAL TO
-			return rune(0x2a70), true
+			return {'\u2a70', 0}, 1, true
 		case "apacir":                          // ALMOST EQUAL TO WITH CIRCUMFLEX ACCENT
-			return rune(0x2a6f), true
+			return {'\u2a6f', 0}, 1, true
 		case "ape":                             // ALMOST EQUAL OR EQUAL TO
-			return rune(0x224a), true
+			return {'\u224a', 0}, 1, true
 		case "apid":                            // TRIPLE TILDE
-			return rune(0x224b), true
+			return {'\u224b', 0}, 1, true
 		case "apos":                            // APOSTROPHE
-			return rune(0x27), true
+			return {'\'', 0}, 1, true
 		case "approx":                          // ALMOST EQUAL TO
-			return rune(0x2248), true
+			return {'\u2248', 0}, 1, true
 		case "approxeq":                        // ALMOST EQUAL OR EQUAL TO
-			return rune(0x224a), true
+			return {'\u224a', 0}, 1, true
 		case "aring":                           // LATIN SMALL LETTER A WITH RING ABOVE
-			return rune(0xe5), true
+			return {'å', 0}, 1, true
 		case "arrllsr":                         // LEFTWARDS ARROW ABOVE SHORT RIGHTWARDS ARROW
-			return rune(0x2943), true
+			return {'\u2943', 0}, 1, true
 		case "arrlrsl":                         // RIGHTWARDS ARROW ABOVE SHORT LEFTWARDS ARROW
-			return rune(0x2942), true
+			return {'\u2942', 0}, 1, true
 		case "arrsrll":                         // SHORT RIGHTWARDS ARROW ABOVE LEFTWARDS ARROW
-			return rune(0x2944), true
+			return {'\u2944', 0}, 1, true
 		case "ascr":                            // MATHEMATICAL SCRIPT SMALL A
-			return rune(0x01d4b6), true
+			return {'\U0001d4b6', 0}, 1, true
 		case "ast":                             // ASTERISK
-			return rune(0x2a), true
+			return {'*', 0}, 1, true
 		case "astb":                            // SQUARED ASTERISK
-			return rune(0x29c6), true
+			return {'\u29c6', 0}, 1, true
 		case "asymp":                           // ALMOST EQUAL TO
-			return rune(0x2248), true
+			return {'\u2248', 0}, 1, true
 		case "asympeq":                         // EQUIVALENT TO
-			return rune(0x224d), true
+			return {'\u224d', 0}, 1, true
 		case "atilde":                          // LATIN SMALL LETTER A WITH TILDE
-			return rune(0xe3), true
+			return {'ã', 0}, 1, true
 		case "auml":                            // LATIN SMALL LETTER A WITH DIAERESIS
-			return rune(0xe4), true
+			return {'ä', 0}, 1, true
 		case "awconint":                        // ANTICLOCKWISE CONTOUR INTEGRAL
-			return rune(0x2233), true
+			return {'\u2233', 0}, 1, true
 		case "awint":                           // ANTICLOCKWISE INTEGRATION
-			return rune(0x2a11), true
+			return {'\u2a11', 0}, 1, true
 		}
 
 	case 'b':
 		switch name {
 		case "b.Delta":                         // MATHEMATICAL BOLD CAPITAL DELTA
-			return rune(0x01d6ab), true
+			return {'\U0001d6ab', 0}, 1, true
 		case "b.Gamma":                         // MATHEMATICAL BOLD CAPITAL GAMMA
-			return rune(0x01d6aa), true
+			return {'\U0001d6aa', 0}, 1, true
 		case "b.Gammad":                        // MATHEMATICAL BOLD CAPITAL DIGAMMA
-			return rune(0x01d7ca), true
+			return {'\U0001d7ca', 0}, 1, true
 		case "b.Lambda":                        // MATHEMATICAL BOLD CAPITAL LAMDA
-			return rune(0x01d6b2), true
+			return {'\U0001d6b2', 0}, 1, true
 		case "b.Omega":                         // MATHEMATICAL BOLD CAPITAL OMEGA
-			return rune(0x01d6c0), true
+			return {'\U0001d6c0', 0}, 1, true
 		case "b.Phi":                           // MATHEMATICAL BOLD CAPITAL PHI
-			return rune(0x01d6bd), true
+			return {'\U0001d6bd', 0}, 1, true
 		case "b.Pi":                            // MATHEMATICAL BOLD CAPITAL PI
-			return rune(0x01d6b7), true
+			return {'\U0001d6b7', 0}, 1, true
 		case "b.Psi":                           // MATHEMATICAL BOLD CAPITAL PSI
-			return rune(0x01d6bf), true
+			return {'\U0001d6bf', 0}, 1, true
 		case "b.Sigma":                         // MATHEMATICAL BOLD CAPITAL SIGMA
-			return rune(0x01d6ba), true
+			return {'\U0001d6ba', 0}, 1, true
 		case "b.Theta":                         // MATHEMATICAL BOLD CAPITAL THETA
-			return rune(0x01d6af), true
+			return {'\U0001d6af', 0}, 1, true
 		case "b.Upsi":                          // MATHEMATICAL BOLD CAPITAL UPSILON
-			return rune(0x01d6bc), true
+			return {'\U0001d6bc', 0}, 1, true
 		case "b.Xi":                            // MATHEMATICAL BOLD CAPITAL XI
-			return rune(0x01d6b5), true
+			return {'\U0001d6b5', 0}, 1, true
 		case "b.alpha":                         // MATHEMATICAL BOLD SMALL ALPHA
-			return rune(0x01d6c2), true
+			return {'\U0001d6c2', 0}, 1, true
 		case "b.beta":                          // MATHEMATICAL BOLD SMALL BETA
-			return rune(0x01d6c3), true
+			return {'\U0001d6c3', 0}, 1, true
 		case "b.chi":                           // MATHEMATICAL BOLD SMALL CHI
-			return rune(0x01d6d8), true
+			return {'\U0001d6d8', 0}, 1, true
 		case "b.delta":                         // MATHEMATICAL BOLD SMALL DELTA
-			return rune(0x01d6c5), true
+			return {'\U0001d6c5', 0}, 1, true
 		case "b.epsi":                          // MATHEMATICAL BOLD SMALL EPSILON
-			return rune(0x01d6c6), true
+			return {'\U0001d6c6', 0}, 1, true
 		case "b.epsiv":                         // MATHEMATICAL BOLD EPSILON SYMBOL
-			return rune(0x01d6dc), true
+			return {'\U0001d6dc', 0}, 1, true
 		case "b.eta":                           // MATHEMATICAL BOLD SMALL ETA
-			return rune(0x01d6c8), true
+			return {'\U0001d6c8', 0}, 1, true
 		case "b.gamma":                         // MATHEMATICAL BOLD SMALL GAMMA
-			return rune(0x01d6c4), true
+			return {'\U0001d6c4', 0}, 1, true
 		case "b.gammad":                        // MATHEMATICAL BOLD SMALL DIGAMMA
-			return rune(0x01d7cb), true
+			return {'\U0001d7cb', 0}, 1, true
 		case "b.iota":                          // MATHEMATICAL BOLD SMALL IOTA
-			return rune(0x01d6ca), true
+			return {'\U0001d6ca', 0}, 1, true
 		case "b.kappa":                         // MATHEMATICAL BOLD SMALL KAPPA
-			return rune(0x01d6cb), true
+			return {'\U0001d6cb', 0}, 1, true
 		case "b.kappav":                        // MATHEMATICAL BOLD KAPPA SYMBOL
-			return rune(0x01d6de), true
+			return {'\U0001d6de', 0}, 1, true
 		case "b.lambda":                        // MATHEMATICAL BOLD SMALL LAMDA
-			return rune(0x01d6cc), true
+			return {'\U0001d6cc', 0}, 1, true
 		case "b.mu":                            // MATHEMATICAL BOLD SMALL MU
-			return rune(0x01d6cd), true
+			return {'\U0001d6cd', 0}, 1, true
 		case "b.nu":                            // MATHEMATICAL BOLD SMALL NU
-			return rune(0x01d6ce), true
+			return {'\U0001d6ce', 0}, 1, true
 		case "b.omega":                         // MATHEMATICAL BOLD SMALL OMEGA
-			return rune(0x01d6da), true
+			return {'\U0001d6da', 0}, 1, true
 		case "b.phi":                           // MATHEMATICAL BOLD SMALL PHI
-			return rune(0x01d6d7), true
+			return {'\U0001d6d7', 0}, 1, true
 		case "b.phiv":                          // MATHEMATICAL BOLD PHI SYMBOL
-			return rune(0x01d6df), true
+			return {'\U0001d6df', 0}, 1, true
 		case "b.pi":                            // MATHEMATICAL BOLD SMALL PI
-			return rune(0x01d6d1), true
+			return {'\U0001d6d1', 0}, 1, true
 		case "b.piv":                           // MATHEMATICAL BOLD PI SYMBOL
-			return rune(0x01d6e1), true
+			return {'\U0001d6e1', 0}, 1, true
 		case "b.psi":                           // MATHEMATICAL BOLD SMALL PSI
-			return rune(0x01d6d9), true
+			return {'\U0001d6d9', 0}, 1, true
 		case "b.rho":                           // MATHEMATICAL BOLD SMALL RHO
-			return rune(0x01d6d2), true
+			return {'\U0001d6d2', 0}, 1, true
 		case "b.rhov":                          // MATHEMATICAL BOLD RHO SYMBOL
-			return rune(0x01d6e0), true
+			return {'\U0001d6e0', 0}, 1, true
 		case "b.sigma":                         // MATHEMATICAL BOLD SMALL SIGMA
-			return rune(0x01d6d4), true
+			return {'\U0001d6d4', 0}, 1, true
 		case "b.sigmav":                        // MATHEMATICAL BOLD SMALL FINAL SIGMA
-			return rune(0x01d6d3), true
+			return {'\U0001d6d3', 0}, 1, true
 		case "b.tau":                           // MATHEMATICAL BOLD SMALL TAU
-			return rune(0x01d6d5), true
+			return {'\U0001d6d5', 0}, 1, true
 		case "b.thetas":                        // MATHEMATICAL BOLD SMALL THETA
-			return rune(0x01d6c9), true
+			return {'\U0001d6c9', 0}, 1, true
 		case "b.thetav":                        // MATHEMATICAL BOLD THETA SYMBOL
-			return rune(0x01d6dd), true
+			return {'\U0001d6dd', 0}, 1, true
 		case "b.upsi":                          // MATHEMATICAL BOLD SMALL UPSILON
-			return rune(0x01d6d6), true
+			return {'\U0001d6d6', 0}, 1, true
 		case "b.xi":                            // MATHEMATICAL BOLD SMALL XI
-			return rune(0x01d6cf), true
+			return {'\U0001d6cf', 0}, 1, true
 		case "b.zeta":                          // MATHEMATICAL BOLD SMALL ZETA
-			return rune(0x01d6c7), true
+			return {'\U0001d6c7', 0}, 1, true
 		case "bNot":                            // REVERSED DOUBLE STROKE NOT SIGN
-			return rune(0x2aed), true
+			return {'\u2aed', 0}, 1, true
 		case "backcong":                        // ALL EQUAL TO
-			return rune(0x224c), true
+			return {'\u224c', 0}, 1, true
 		case "backepsilon":                     // GREEK REVERSED LUNATE EPSILON SYMBOL
-			return rune(0x03f6), true
+			return {'\u03f6', 0}, 1, true
 		case "backprime":                       // REVERSED PRIME
-			return rune(0x2035), true
+			return {'\u2035', 0}, 1, true
 		case "backsim":                         // REVERSED TILDE
-			return rune(0x223d), true
+			return {'\u223d', 0}, 1, true
 		case "backsimeq":                       // REVERSED TILDE EQUALS
-			return rune(0x22cd), true
+			return {'\u22cd', 0}, 1, true
 		case "barV":                            // DOUBLE DOWN TACK
-			return rune(0x2aea), true
+			return {'\u2aea', 0}, 1, true
 		case "barvee":                          // NOR
-			return rune(0x22bd), true
+			return {'\u22bd', 0}, 1, true
 		case "barwed":                          // PROJECTIVE
-			return rune(0x2305), true
+			return {'\u2305', 0}, 1, true
 		case "barwedge":                        // PROJECTIVE
-			return rune(0x2305), true
+			return {'\u2305', 0}, 1, true
 		case "bbrk":                            // BOTTOM SQUARE BRACKET
-			return rune(0x23b5), true
+			return {'\u23b5', 0}, 1, true
 		case "bbrktbrk":                        // BOTTOM SQUARE BRACKET OVER TOP SQUARE BRACKET
-			return rune(0x23b6), true
+			return {'\u23b6', 0}, 1, true
 		case "bcong":                           // ALL EQUAL TO
-			return rune(0x224c), true
+			return {'\u224c', 0}, 1, true
 		case "bcy":                             // CYRILLIC SMALL LETTER BE
-			return rune(0x0431), true
+			return {'\u0431', 0}, 1, true
 		case "bdlhar":                          // DOWNWARDS HARPOON WITH BARB LEFT FROM BAR
-			return rune(0x2961), true
+			return {'\u2961', 0}, 1, true
 		case "bdquo":                           // DOUBLE LOW-9 QUOTATION MARK
-			return rune(0x201e), true
+			return {'\u201e', 0}, 1, true
 		case "bdrhar":                          // DOWNWARDS HARPOON WITH BARB RIGHT FROM BAR
-			return rune(0x295d), true
+			return {'\u295d', 0}, 1, true
 		case "becaus":                          // BECAUSE
-			return rune(0x2235), true
+			return {'\u2235', 0}, 1, true
 		case "because":                         // BECAUSE
-			return rune(0x2235), true
+			return {'\u2235', 0}, 1, true
 		case "bemptyv":                         // REVERSED EMPTY SET
-			return rune(0x29b0), true
+			return {'\u29b0', 0}, 1, true
 		case "bepsi":                           // GREEK REVERSED LUNATE EPSILON SYMBOL
-			return rune(0x03f6), true
+			return {'\u03f6', 0}, 1, true
 		case "bernou":                          // SCRIPT CAPITAL B
-			return rune(0x212c), true
+			return {'\u212c', 0}, 1, true
 		case "beta":                            // GREEK SMALL LETTER BETA
-			return rune(0x03b2), true
+			return {'\u03b2', 0}, 1, true
 		case "beth":                            // BET SYMBOL
-			return rune(0x2136), true
+			return {'\u2136', 0}, 1, true
 		case "between":                         // BETWEEN
-			return rune(0x226c), true
+			return {'\u226c', 0}, 1, true
 		case "bfr":                             // MATHEMATICAL FRAKTUR SMALL B
-			return rune(0x01d51f), true
+			return {'\U0001d51f', 0}, 1, true
 		case "bgr":                             // GREEK SMALL LETTER BETA
-			return rune(0x03b2), true
+			return {'\u03b2', 0}, 1, true
 		case "bigcap":                          // N-ARY INTERSECTION
-			return rune(0x22c2), true
+			return {'\u22c2', 0}, 1, true
 		case "bigcirc":                         // LARGE CIRCLE
-			return rune(0x25ef), true
+			return {'\u25ef', 0}, 1, true
 		case "bigcup":                          // N-ARY UNION
-			return rune(0x22c3), true
+			return {'\u22c3', 0}, 1, true
 		case "bigodot":                         // N-ARY CIRCLED DOT OPERATOR
-			return rune(0x2a00), true
+			return {'\u2a00', 0}, 1, true
 		case "bigoplus":                        // N-ARY CIRCLED PLUS OPERATOR
-			return rune(0x2a01), true
+			return {'\u2a01', 0}, 1, true
 		case "bigotimes":                       // N-ARY CIRCLED TIMES OPERATOR
-			return rune(0x2a02), true
+			return {'\u2a02', 0}, 1, true
 		case "bigsqcup":                        // N-ARY SQUARE UNION OPERATOR
-			return rune(0x2a06), true
+			return {'\u2a06', 0}, 1, true
 		case "bigstar":                         // BLACK STAR
-			return rune(0x2605), true
+			return {'\u2605', 0}, 1, true
 		case "bigtriangledown":                 // WHITE DOWN-POINTING TRIANGLE
-			return rune(0x25bd), true
+			return {'\u25bd', 0}, 1, true
 		case "bigtriangleup":                   // WHITE UP-POINTING TRIANGLE
-			return rune(0x25b3), true
+			return {'\u25b3', 0}, 1, true
 		case "biguplus":                        // N-ARY UNION OPERATOR WITH PLUS
-			return rune(0x2a04), true
+			return {'\u2a04', 0}, 1, true
 		case "bigvee":                          // N-ARY LOGICAL OR
-			return rune(0x22c1), true
+			return {'\u22c1', 0}, 1, true
 		case "bigwedge":                        // N-ARY LOGICAL AND
-			return rune(0x22c0), true
+			return {'\u22c0', 0}, 1, true
 		case "bkarow":                          // RIGHTWARDS DOUBLE DASH ARROW
-			return rune(0x290d), true
+			return {'\u290d', 0}, 1, true
 		case "blacklozenge":                    // BLACK LOZENGE
-			return rune(0x29eb), true
+			return {'\u29eb', 0}, 1, true
 		case "blacksquare":                     // BLACK SMALL SQUARE
-			return rune(0x25aa), true
+			return {'\u25aa', 0}, 1, true
 		case "blacktriangle":                   // BLACK UP-POINTING SMALL TRIANGLE
-			return rune(0x25b4), true
+			return {'\u25b4', 0}, 1, true
 		case "blacktriangledown":               // BLACK DOWN-POINTING SMALL TRIANGLE
-			return rune(0x25be), true
+			return {'\u25be', 0}, 1, true
 		case "blacktriangleleft":               // BLACK LEFT-POINTING SMALL TRIANGLE
-			return rune(0x25c2), true
+			return {'\u25c2', 0}, 1, true
 		case "blacktriangleright":              // BLACK RIGHT-POINTING SMALL TRIANGLE
-			return rune(0x25b8), true
+			return {'\u25b8', 0}, 1, true
 		case "blank":                           // BLANK SYMBOL
-			return rune(0x2422), true
+			return {'\u2422', 0}, 1, true
 		case "bldhar":                          // LEFTWARDS HARPOON WITH BARB DOWN FROM BAR
-			return rune(0x295e), true
+			return {'\u295e', 0}, 1, true
 		case "blk12":                           // MEDIUM SHADE
-			return rune(0x2592), true
+			return {'\u2592', 0}, 1, true
 		case "blk14":                           // LIGHT SHADE
-			return rune(0x2591), true
+			return {'\u2591', 0}, 1, true
 		case "blk34":                           // DARK SHADE
-			return rune(0x2593), true
+			return {'\u2593', 0}, 1, true
 		case "block":                           // FULL BLOCK
-			return rune(0x2588), true
+			return {'\u2588', 0}, 1, true
 		case "bluhar":                          // LEFTWARDS HARPOON WITH BARB UP FROM BAR
-			return rune(0x295a), true
+			return {'\u295a', 0}, 1, true
 		case "bne":                             // EQUALS SIGN with reverse slash
-			return rune(0x3d), true
+			return {'=', '\u20e5'}, 2, true
 		case "bnequiv":                         // IDENTICAL TO with reverse slash
-			return rune(0x2261), true
+			return {'\u2261', '\u20e5'}, 2, true
 		case "bnot":                            // REVERSED NOT SIGN
-			return rune(0x2310), true
+			return {'\u2310', 0}, 1, true
 		case "bopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL B
-			return rune(0x01d553), true
+			return {'\U0001d553', 0}, 1, true
 		case "bot":                             // UP TACK
-			return rune(0x22a5), true
+			return {'\u22a5', 0}, 1, true
 		case "bottom":                          // UP TACK
-			return rune(0x22a5), true
+			return {'\u22a5', 0}, 1, true
 		case "bowtie":                          // BOWTIE
-			return rune(0x22c8), true
+			return {'\u22c8', 0}, 1, true
 		case "boxDL":                           // BOX DRAWINGS DOUBLE DOWN AND LEFT
-			return rune(0x2557), true
+			return {'\u2557', 0}, 1, true
 		case "boxDR":                           // BOX DRAWINGS DOUBLE DOWN AND RIGHT
-			return rune(0x2554), true
+			return {'\u2554', 0}, 1, true
 		case "boxDl":                           // BOX DRAWINGS DOWN DOUBLE AND LEFT SINGLE
-			return rune(0x2556), true
+			return {'\u2556', 0}, 1, true
 		case "boxDr":                           // BOX DRAWINGS DOWN DOUBLE AND RIGHT SINGLE
-			return rune(0x2553), true
+			return {'\u2553', 0}, 1, true
 		case "boxH":                            // BOX DRAWINGS DOUBLE HORIZONTAL
-			return rune(0x2550), true
+			return {'\u2550', 0}, 1, true
 		case "boxHD":                           // BOX DRAWINGS DOUBLE DOWN AND HORIZONTAL
-			return rune(0x2566), true
+			return {'\u2566', 0}, 1, true
 		case "boxHU":                           // BOX DRAWINGS DOUBLE UP AND HORIZONTAL
-			return rune(0x2569), true
+			return {'\u2569', 0}, 1, true
 		case "boxHd":                           // BOX DRAWINGS DOWN SINGLE AND HORIZONTAL DOUBLE
-			return rune(0x2564), true
+			return {'\u2564', 0}, 1, true
 		case "boxHu":                           // BOX DRAWINGS UP SINGLE AND HORIZONTAL DOUBLE
-			return rune(0x2567), true
+			return {'\u2567', 0}, 1, true
 		case "boxUL":                           // BOX DRAWINGS DOUBLE UP AND LEFT
-			return rune(0x255d), true
+			return {'\u255d', 0}, 1, true
 		case "boxUR":                           // BOX DRAWINGS DOUBLE UP AND RIGHT
-			return rune(0x255a), true
+			return {'\u255a', 0}, 1, true
 		case "boxUl":                           // BOX DRAWINGS UP DOUBLE AND LEFT SINGLE
-			return rune(0x255c), true
+			return {'\u255c', 0}, 1, true
 		case "boxUr":                           // BOX DRAWINGS UP DOUBLE AND RIGHT SINGLE
-			return rune(0x2559), true
+			return {'\u2559', 0}, 1, true
 		case "boxV":                            // BOX DRAWINGS DOUBLE VERTICAL
-			return rune(0x2551), true
+			return {'\u2551', 0}, 1, true
 		case "boxVH":                           // BOX DRAWINGS DOUBLE VERTICAL AND HORIZONTAL
-			return rune(0x256c), true
+			return {'\u256c', 0}, 1, true
 		case "boxVL":                           // BOX DRAWINGS DOUBLE VERTICAL AND LEFT
-			return rune(0x2563), true
+			return {'\u2563', 0}, 1, true
 		case "boxVR":                           // BOX DRAWINGS DOUBLE VERTICAL AND RIGHT
-			return rune(0x2560), true
+			return {'\u2560', 0}, 1, true
 		case "boxVh":                           // BOX DRAWINGS VERTICAL DOUBLE AND HORIZONTAL SINGLE
-			return rune(0x256b), true
+			return {'\u256b', 0}, 1, true
 		case "boxVl":                           // BOX DRAWINGS VERTICAL DOUBLE AND LEFT SINGLE
-			return rune(0x2562), true
+			return {'\u2562', 0}, 1, true
 		case "boxVr":                           // BOX DRAWINGS VERTICAL DOUBLE AND RIGHT SINGLE
-			return rune(0x255f), true
+			return {'\u255f', 0}, 1, true
 		case "boxbox":                          // TWO JOINED SQUARES
-			return rune(0x29c9), true
+			return {'\u29c9', 0}, 1, true
 		case "boxdL":                           // BOX DRAWINGS DOWN SINGLE AND LEFT DOUBLE
-			return rune(0x2555), true
+			return {'\u2555', 0}, 1, true
 		case "boxdR":                           // BOX DRAWINGS DOWN SINGLE AND RIGHT DOUBLE
-			return rune(0x2552), true
+			return {'\u2552', 0}, 1, true
 		case "boxdl":                           // BOX DRAWINGS LIGHT DOWN AND LEFT
-			return rune(0x2510), true
+			return {'\u2510', 0}, 1, true
 		case "boxdr":                           // BOX DRAWINGS LIGHT DOWN AND RIGHT
-			return rune(0x250c), true
+			return {'\u250c', 0}, 1, true
 		case "boxh":                            // BOX DRAWINGS LIGHT HORIZONTAL
-			return rune(0x2500), true
+			return {'\u2500', 0}, 1, true
 		case "boxhD":                           // BOX DRAWINGS DOWN DOUBLE AND HORIZONTAL SINGLE
-			return rune(0x2565), true
+			return {'\u2565', 0}, 1, true
 		case "boxhU":                           // BOX DRAWINGS UP DOUBLE AND HORIZONTAL SINGLE
-			return rune(0x2568), true
+			return {'\u2568', 0}, 1, true
 		case "boxhd":                           // BOX DRAWINGS LIGHT DOWN AND HORIZONTAL
-			return rune(0x252c), true
+			return {'\u252c', 0}, 1, true
 		case "boxhu":                           // BOX DRAWINGS LIGHT UP AND HORIZONTAL
-			return rune(0x2534), true
+			return {'\u2534', 0}, 1, true
 		case "boxminus":                        // SQUARED MINUS
-			return rune(0x229f), true
+			return {'\u229f', 0}, 1, true
 		case "boxplus":                         // SQUARED PLUS
-			return rune(0x229e), true
+			return {'\u229e', 0}, 1, true
 		case "boxtimes":                        // SQUARED TIMES
-			return rune(0x22a0), true
+			return {'\u22a0', 0}, 1, true
 		case "boxuL":                           // BOX DRAWINGS UP SINGLE AND LEFT DOUBLE
-			return rune(0x255b), true
+			return {'\u255b', 0}, 1, true
 		case "boxuR":                           // BOX DRAWINGS UP SINGLE AND RIGHT DOUBLE
-			return rune(0x2558), true
+			return {'\u2558', 0}, 1, true
 		case "boxul":                           // BOX DRAWINGS LIGHT UP AND LEFT
-			return rune(0x2518), true
+			return {'\u2518', 0}, 1, true
 		case "boxur":                           // BOX DRAWINGS LIGHT UP AND RIGHT
-			return rune(0x2514), true
+			return {'\u2514', 0}, 1, true
 		case "boxv":                            // BOX DRAWINGS LIGHT VERTICAL
-			return rune(0x2502), true
+			return {'\u2502', 0}, 1, true
 		case "boxvH":                           // BOX DRAWINGS VERTICAL SINGLE AND HORIZONTAL DOUBLE
-			return rune(0x256a), true
+			return {'\u256a', 0}, 1, true
 		case "boxvL":                           // BOX DRAWINGS VERTICAL SINGLE AND LEFT DOUBLE
-			return rune(0x2561), true
+			return {'\u2561', 0}, 1, true
 		case "boxvR":                           // BOX DRAWINGS VERTICAL SINGLE AND RIGHT DOUBLE
-			return rune(0x255e), true
+			return {'\u255e', 0}, 1, true
 		case "boxvh":                           // BOX DRAWINGS LIGHT VERTICAL AND HORIZONTAL
-			return rune(0x253c), true
+			return {'\u253c', 0}, 1, true
 		case "boxvl":                           // BOX DRAWINGS LIGHT VERTICAL AND LEFT
-			return rune(0x2524), true
+			return {'\u2524', 0}, 1, true
 		case "boxvr":                           // BOX DRAWINGS LIGHT VERTICAL AND RIGHT
-			return rune(0x251c), true
+			return {'\u251c', 0}, 1, true
 		case "bprime":                          // REVERSED PRIME
-			return rune(0x2035), true
+			return {'\u2035', 0}, 1, true
 		case "brdhar":                          // RIGHTWARDS HARPOON WITH BARB DOWN FROM BAR
-			return rune(0x295f), true
+			return {'\u295f', 0}, 1, true
 		case "breve":                           // BREVE
-			return rune(0x02d8), true
+			return {'\u02d8', 0}, 1, true
 		case "bruhar":                          // RIGHTWARDS HARPOON WITH BARB UP FROM BAR
-			return rune(0x295b), true
+			return {'\u295b', 0}, 1, true
 		case "brvbar":                          // BROKEN BAR
-			return rune(0xa6), true
+			return {'¦', 0}, 1, true
 		case "bscr":                            // MATHEMATICAL SCRIPT SMALL B
-			return rune(0x01d4b7), true
+			return {'\U0001d4b7', 0}, 1, true
 		case "bsemi":                           // REVERSED SEMICOLON
-			return rune(0x204f), true
+			return {'\u204f', 0}, 1, true
 		case "bsim":                            // REVERSED TILDE
-			return rune(0x223d), true
+			return {'\u223d', 0}, 1, true
 		case "bsime":                           // REVERSED TILDE EQUALS
-			return rune(0x22cd), true
+			return {'\u22cd', 0}, 1, true
 		case "bsol":                            // REVERSE SOLIDUS
-			return rune(0x5c), true
+			return {'\\', 0}, 1, true
 		case "bsolb":                           // SQUARED FALLING DIAGONAL SLASH
-			return rune(0x29c5), true
+			return {'\u29c5', 0}, 1, true
 		case "bsolhsub":                        // REVERSE SOLIDUS PRECEDING SUBSET
-			return rune(0x27c8), true
+			return {'\u27c8', 0}, 1, true
 		case "btimes":                          // SEMIDIRECT PRODUCT WITH BOTTOM CLOSED
-			return rune(0x2a32), true
+			return {'\u2a32', 0}, 1, true
 		case "bulhar":                          // UPWARDS HARPOON WITH BARB LEFT FROM BAR
-			return rune(0x2960), true
+			return {'\u2960', 0}, 1, true
 		case "bull":                            // BULLET
-			return rune(0x2022), true
+			return {'\u2022', 0}, 1, true
 		case "bullet":                          // BULLET
-			return rune(0x2022), true
+			return {'\u2022', 0}, 1, true
 		case "bump":                            // GEOMETRICALLY EQUIVALENT TO
-			return rune(0x224e), true
+			return {'\u224e', 0}, 1, true
 		case "bumpE":                           // EQUALS SIGN WITH BUMPY ABOVE
-			return rune(0x2aae), true
+			return {'\u2aae', 0}, 1, true
 		case "bumpe":                           // DIFFERENCE BETWEEN
-			return rune(0x224f), true
+			return {'\u224f', 0}, 1, true
 		case "bumpeq":                          // DIFFERENCE BETWEEN
-			return rune(0x224f), true
+			return {'\u224f', 0}, 1, true
 		case "burhar":                          // UPWARDS HARPOON WITH BARB RIGHT FROM BAR
-			return rune(0x295c), true
+			return {'\u295c', 0}, 1, true
 		}
 
 	case 'c':
 		switch name {
 		case "cacute":                          // LATIN SMALL LETTER C WITH ACUTE
-			return rune(0x0107), true
+			return {'\u0107', 0}, 1, true
 		case "cap":                             // INTERSECTION
-			return rune(0x2229), true
+			return {'\u2229', 0}, 1, true
 		case "capand":                          // INTERSECTION WITH LOGICAL AND
-			return rune(0x2a44), true
+			return {'\u2a44', 0}, 1, true
 		case "capbrcup":                        // INTERSECTION ABOVE BAR ABOVE UNION
-			return rune(0x2a49), true
+			return {'\u2a49', 0}, 1, true
 		case "capcap":                          // INTERSECTION BESIDE AND JOINED WITH INTERSECTION
-			return rune(0x2a4b), true
+			return {'\u2a4b', 0}, 1, true
 		case "capcup":                          // INTERSECTION ABOVE UNION
-			return rune(0x2a47), true
+			return {'\u2a47', 0}, 1, true
 		case "capdot":                          // INTERSECTION WITH DOT
-			return rune(0x2a40), true
+			return {'\u2a40', 0}, 1, true
 		case "capint":                          // INTEGRAL WITH INTERSECTION
-			return rune(0x2a19), true
+			return {'\u2a19', 0}, 1, true
 		case "caps":                            // INTERSECTION with serifs
-			return rune(0x2229), true
+			return {'\u2229', '\ufe00'}, 2, true
 		case "caret":                           // CARET INSERTION POINT
-			return rune(0x2041), true
+			return {'\u2041', 0}, 1, true
 		case "caron":                           // CARON
-			return rune(0x02c7), true
+			return {'\u02c7', 0}, 1, true
 		case "ccaps":                           // CLOSED INTERSECTION WITH SERIFS
-			return rune(0x2a4d), true
+			return {'\u2a4d', 0}, 1, true
 		case "ccaron":                          // LATIN SMALL LETTER C WITH CARON
-			return rune(0x010d), true
+			return {'\u010d', 0}, 1, true
 		case "ccedil":                          // LATIN SMALL LETTER C WITH CEDILLA
-			return rune(0xe7), true
+			return {'ç', 0}, 1, true
 		case "ccirc":                           // LATIN SMALL LETTER C WITH CIRCUMFLEX
-			return rune(0x0109), true
+			return {'\u0109', 0}, 1, true
 		case "ccups":                           // CLOSED UNION WITH SERIFS
-			return rune(0x2a4c), true
+			return {'\u2a4c', 0}, 1, true
 		case "ccupssm":                         // CLOSED UNION WITH SERIFS AND SMASH PRODUCT
-			return rune(0x2a50), true
+			return {'\u2a50', 0}, 1, true
 		case "cdot":                            // LATIN SMALL LETTER C WITH DOT ABOVE
-			return rune(0x010b), true
+			return {'\u010b', 0}, 1, true
 		case "cedil":                           // CEDILLA
-			return rune(0xb8), true
+			return {'¸', 0}, 1, true
 		case "cemptyv":                         // EMPTY SET WITH SMALL CIRCLE ABOVE
-			return rune(0x29b2), true
+			return {'\u29b2', 0}, 1, true
 		case "cent":                            // CENT SIGN
-			return rune(0xa2), true
+			return {'¢', 0}, 1, true
 		case "centerdot":                       // MIDDLE DOT
-			return rune(0xb7), true
+			return {'·', 0}, 1, true
 		case "cfr":                             // MATHEMATICAL FRAKTUR SMALL C
-			return rune(0x01d520), true
+			return {'\U0001d520', 0}, 1, true
 		case "chcy":                            // CYRILLIC SMALL LETTER CHE
-			return rune(0x0447), true
+			return {'\u0447', 0}, 1, true
 		case "check":                           // CHECK MARK
-			return rune(0x2713), true
+			return {'\u2713', 0}, 1, true
 		case "checkmark":                       // CHECK MARK
-			return rune(0x2713), true
+			return {'\u2713', 0}, 1, true
 		case "chi":                             // GREEK SMALL LETTER CHI
-			return rune(0x03c7), true
+			return {'\u03c7', 0}, 1, true
 		case "cir":                             // WHITE CIRCLE
-			return rune(0x25cb), true
+			return {'\u25cb', 0}, 1, true
 		case "cirE":                            // CIRCLE WITH TWO HORIZONTAL STROKES TO THE RIGHT
-			return rune(0x29c3), true
+			return {'\u29c3', 0}, 1, true
 		case "cirb":                            // SQUARED SMALL CIRCLE
-			return rune(0x29c7), true
+			return {'\u29c7', 0}, 1, true
 		case "circ":                            // MODIFIER LETTER CIRCUMFLEX ACCENT
-			return rune(0x02c6), true
+			return {'\u02c6', 0}, 1, true
 		case "circeq":                          // RING EQUAL TO
-			return rune(0x2257), true
+			return {'\u2257', 0}, 1, true
 		case "circlearrowleft":                 // ANTICLOCKWISE OPEN CIRCLE ARROW
-			return rune(0x21ba), true
+			return {'\u21ba', 0}, 1, true
 		case "circlearrowright":                // CLOCKWISE OPEN CIRCLE ARROW
-			return rune(0x21bb), true
+			return {'\u21bb', 0}, 1, true
 		case "circledR":                        // REGISTERED SIGN
-			return rune(0xae), true
+			return {'®', 0}, 1, true
 		case "circledS":                        // CIRCLED LATIN CAPITAL LETTER S
-			return rune(0x24c8), true
+			return {'\u24c8', 0}, 1, true
 		case "circledast":                      // CIRCLED ASTERISK OPERATOR
-			return rune(0x229b), true
+			return {'\u229b', 0}, 1, true
 		case "circledcirc":                     // CIRCLED RING OPERATOR
-			return rune(0x229a), true
+			return {'\u229a', 0}, 1, true
 		case "circleddash":                     // CIRCLED DASH
-			return rune(0x229d), true
+			return {'\u229d', 0}, 1, true
 		case "cirdarr":                         // WHITE CIRCLE WITH DOWN ARROW
-			return rune(0x29ec), true
+			return {'\u29ec', 0}, 1, true
 		case "cire":                            // RING EQUAL TO
-			return rune(0x2257), true
+			return {'\u2257', 0}, 1, true
 		case "cirerr":                          // ERROR-BARRED WHITE CIRCLE
-			return rune(0x29f2), true
+			return {'\u29f2', 0}, 1, true
 		case "cirfdarr":                        // BLACK CIRCLE WITH DOWN ARROW
-			return rune(0x29ed), true
+			return {'\u29ed', 0}, 1, true
 		case "cirferr":                         // ERROR-BARRED BLACK CIRCLE
-			return rune(0x29f3), true
+			return {'\u29f3', 0}, 1, true
 		case "cirfnint":                        // CIRCULATION FUNCTION
-			return rune(0x2a10), true
+			return {'\u2a10', 0}, 1, true
 		case "cirmid":                          // VERTICAL LINE WITH CIRCLE ABOVE
-			return rune(0x2aef), true
+			return {'\u2aef', 0}, 1, true
 		case "cirscir":                         // CIRCLE WITH SMALL CIRCLE TO THE RIGHT
-			return rune(0x29c2), true
+			return {'\u29c2', 0}, 1, true
 		case "closur":                          // CLOSE UP
-			return rune(0x2050), true
+			return {'\u2050', 0}, 1, true
 		case "clubs":                           // BLACK CLUB SUIT
-			return rune(0x2663), true
+			return {'\u2663', 0}, 1, true
 		case "clubsuit":                        // BLACK CLUB SUIT
-			return rune(0x2663), true
+			return {'\u2663', 0}, 1, true
 		case "colon":                           // COLON
-			return rune(0x3a), true
+			return {':', 0}, 1, true
 		case "colone":                          // COLON EQUALS
-			return rune(0x2254), true
+			return {'\u2254', 0}, 1, true
 		case "coloneq":                         // COLON EQUALS
-			return rune(0x2254), true
+			return {'\u2254', 0}, 1, true
 		case "comma":                           // COMMA
-			return rune(0x2c), true
+			return {',', 0}, 1, true
 		case "commat":                          // COMMERCIAL AT
-			return rune(0x40), true
+			return {'@', 0}, 1, true
 		case "comp":                            // COMPLEMENT
-			return rune(0x2201), true
+			return {'\u2201', 0}, 1, true
 		case "compfn":                          // RING OPERATOR
-			return rune(0x2218), true
+			return {'\u2218', 0}, 1, true
 		case "complement":                      // COMPLEMENT
-			return rune(0x2201), true
+			return {'\u2201', 0}, 1, true
 		case "complexes":                       // DOUBLE-STRUCK CAPITAL C
-			return rune(0x2102), true
+			return {'\u2102', 0}, 1, true
 		case "cong":                            // APPROXIMATELY EQUAL TO
-			return rune(0x2245), true
+			return {'\u2245', 0}, 1, true
 		case "congdot":                         // CONGRUENT WITH DOT ABOVE
-			return rune(0x2a6d), true
+			return {'\u2a6d', 0}, 1, true
 		case "conint":                          // CONTOUR INTEGRAL
-			return rune(0x222e), true
+			return {'\u222e', 0}, 1, true
 		case "copf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL C
-			return rune(0x01d554), true
+			return {'\U0001d554', 0}, 1, true
 		case "coprod":                          // N-ARY COPRODUCT
-			return rune(0x2210), true
+			return {'\u2210', 0}, 1, true
 		case "copy":                            // COPYRIGHT SIGN
-			return rune(0xa9), true
+			return {'©', 0}, 1, true
 		case "copysr":                          // SOUND RECORDING COPYRIGHT
-			return rune(0x2117), true
+			return {'\u2117', 0}, 1, true
 		case "crarr":                           // DOWNWARDS ARROW WITH CORNER LEFTWARDS
-			return rune(0x21b5), true
+			return {'\u21b5', 0}, 1, true
 		case "cross":                           // BALLOT X
-			return rune(0x2717), true
+			return {'\u2717', 0}, 1, true
 		case "cscr":                            // MATHEMATICAL SCRIPT SMALL C
-			return rune(0x01d4b8), true
+			return {'\U0001d4b8', 0}, 1, true
 		case "csub":                            // CLOSED SUBSET
-			return rune(0x2acf), true
+			return {'\u2acf', 0}, 1, true
 		case "csube":                           // CLOSED SUBSET OR EQUAL TO
-			return rune(0x2ad1), true
+			return {'\u2ad1', 0}, 1, true
 		case "csup":                            // CLOSED SUPERSET
-			return rune(0x2ad0), true
+			return {'\u2ad0', 0}, 1, true
 		case "csupe":                           // CLOSED SUPERSET OR EQUAL TO
-			return rune(0x2ad2), true
+			return {'\u2ad2', 0}, 1, true
 		case "ctdot":                           // MIDLINE HORIZONTAL ELLIPSIS
-			return rune(0x22ef), true
+			return {'\u22ef', 0}, 1, true
 		case "cudarrl":                         // RIGHT-SIDE ARC CLOCKWISE ARROW
-			return rune(0x2938), true
+			return {'\u2938', 0}, 1, true
 		case "cudarrr":                         // ARROW POINTING RIGHTWARDS THEN CURVING DOWNWARDS
-			return rune(0x2935), true
+			return {'\u2935', 0}, 1, true
 		case "cuepr":                           // EQUAL TO OR PRECEDES
-			return rune(0x22de), true
+			return {'\u22de', 0}, 1, true
 		case "cuesc":                           // EQUAL TO OR SUCCEEDS
-			return rune(0x22df), true
+			return {'\u22df', 0}, 1, true
 		case "cularr":                          // ANTICLOCKWISE TOP SEMICIRCLE ARROW
-			return rune(0x21b6), true
+			return {'\u21b6', 0}, 1, true
 		case "cularrp":                         // TOP ARC ANTICLOCKWISE ARROW WITH PLUS
-			return rune(0x293d), true
+			return {'\u293d', 0}, 1, true
 		case "cup":                             // UNION
-			return rune(0x222a), true
+			return {'\u222a', 0}, 1, true
 		case "cupbrcap":                        // UNION ABOVE BAR ABOVE INTERSECTION
-			return rune(0x2a48), true
+			return {'\u2a48', 0}, 1, true
 		case "cupcap":                          // UNION ABOVE INTERSECTION
-			return rune(0x2a46), true
+			return {'\u2a46', 0}, 1, true
 		case "cupcup":                          // UNION BESIDE AND JOINED WITH UNION
-			return rune(0x2a4a), true
+			return {'\u2a4a', 0}, 1, true
 		case "cupdot":                          // MULTISET MULTIPLICATION
-			return rune(0x228d), true
+			return {'\u228d', 0}, 1, true
 		case "cupint":                          // INTEGRAL WITH UNION
-			return rune(0x2a1a), true
+			return {'\u2a1a', 0}, 1, true
 		case "cupor":                           // UNION WITH LOGICAL OR
-			return rune(0x2a45), true
+			return {'\u2a45', 0}, 1, true
 		case "cupre":                           // PRECEDES OR EQUAL TO
-			return rune(0x227c), true
+			return {'\u227c', 0}, 1, true
 		case "cups":                            // UNION with serifs
-			return rune(0x222a), true
+			return {'\u222a', '\ufe00'}, 2, true
 		case "curarr":                          // CLOCKWISE TOP SEMICIRCLE ARROW
-			return rune(0x21b7), true
+			return {'\u21b7', 0}, 1, true
 		case "curarrm":                         // TOP ARC CLOCKWISE ARROW WITH MINUS
-			return rune(0x293c), true
+			return {'\u293c', 0}, 1, true
 		case "curlyeqprec":                     // EQUAL TO OR PRECEDES
-			return rune(0x22de), true
+			return {'\u22de', 0}, 1, true
 		case "curlyeqsucc":                     // EQUAL TO OR SUCCEEDS
-			return rune(0x22df), true
+			return {'\u22df', 0}, 1, true
 		case "curlyvee":                        // CURLY LOGICAL OR
-			return rune(0x22ce), true
+			return {'\u22ce', 0}, 1, true
 		case "curlywedge":                      // CURLY LOGICAL AND
-			return rune(0x22cf), true
+			return {'\u22cf', 0}, 1, true
 		case "curren":                          // CURRENCY SIGN
-			return rune(0xa4), true
+			return {'¤', 0}, 1, true
 		case "curvearrowleft":                  // ANTICLOCKWISE TOP SEMICIRCLE ARROW
-			return rune(0x21b6), true
+			return {'\u21b6', 0}, 1, true
 		case "curvearrowright":                 // CLOCKWISE TOP SEMICIRCLE ARROW
-			return rune(0x21b7), true
+			return {'\u21b7', 0}, 1, true
 		case "cuvee":                           // CURLY LOGICAL OR
-			return rune(0x22ce), true
+			return {'\u22ce', 0}, 1, true
 		case "cuwed":                           // CURLY LOGICAL AND
-			return rune(0x22cf), true
+			return {'\u22cf', 0}, 1, true
 		case "cwconint":                        // CLOCKWISE CONTOUR INTEGRAL
-			return rune(0x2232), true
+			return {'\u2232', 0}, 1, true
 		case "cwint":                           // CLOCKWISE INTEGRAL
-			return rune(0x2231), true
+			return {'\u2231', 0}, 1, true
 		case "cylcty":                          // CYLINDRICITY
-			return rune(0x232d), true
+			return {'\u232d', 0}, 1, true
 		}
 
 	case 'd':
 		switch name {
 		case "dAarr":                           // DOWNWARDS TRIPLE ARROW
-			return rune(0x290b), true
+			return {'\u290b', 0}, 1, true
 		case "dArr":                            // DOWNWARDS DOUBLE ARROW
-			return rune(0x21d3), true
+			return {'\u21d3', 0}, 1, true
 		case "dHar":                            // DOWNWARDS HARPOON WITH BARB LEFT BESIDE DOWNWARDS HARPOON WITH BARB RIGHT
-			return rune(0x2965), true
+			return {'\u2965', 0}, 1, true
 		case "dagger":                          // DAGGER
-			return rune(0x2020), true
+			return {'\u2020', 0}, 1, true
 		case "dalembrt":                        // SQUARE WITH CONTOURED OUTLINE
-			return rune(0x29e0), true
+			return {'\u29e0', 0}, 1, true
 		case "daleth":                          // DALET SYMBOL
-			return rune(0x2138), true
+			return {'\u2138', 0}, 1, true
 		case "darr":                            // DOWNWARDS ARROW
-			return rune(0x2193), true
+			return {'\u2193', 0}, 1, true
 		case "darr2":                           // DOWNWARDS PAIRED ARROWS
-			return rune(0x21ca), true
+			return {'\u21ca', 0}, 1, true
 		case "darrb":                           // DOWNWARDS ARROW TO BAR
-			return rune(0x2913), true
+			return {'\u2913', 0}, 1, true
 		case "darrln":                          // DOWNWARDS ARROW WITH HORIZONTAL STROKE
-			return rune(0x2908), true
+			return {'\u2908', 0}, 1, true
 		case "dash":                            // HYPHEN
-			return rune(0x2010), true
+			return {'\u2010', 0}, 1, true
 		case "dashV":                           // DOUBLE VERTICAL BAR LEFT TURNSTILE
-			return rune(0x2ae3), true
+			return {'\u2ae3', 0}, 1, true
 		case "dashv":                           // LEFT TACK
-			return rune(0x22a3), true
+			return {'\u22a3', 0}, 1, true
 		case "dbkarow":                         // RIGHTWARDS TRIPLE DASH ARROW
-			return rune(0x290f), true
+			return {'\u290f', 0}, 1, true
 		case "dblac":                           // DOUBLE ACUTE ACCENT
-			return rune(0x02dd), true
+			return {'\u02dd', 0}, 1, true
 		case "dcaron":                          // LATIN SMALL LETTER D WITH CARON
-			return rune(0x010f), true
+			return {'\u010f', 0}, 1, true
 		case "dcy":                             // CYRILLIC SMALL LETTER DE
-			return rune(0x0434), true
+			return {'\u0434', 0}, 1, true
 		case "dd":                              // DOUBLE-STRUCK ITALIC SMALL D
-			return rune(0x2146), true
+			return {'\u2146', 0}, 1, true
 		case "ddagger":                         // DOUBLE DAGGER
-			return rune(0x2021), true
+			return {'\u2021', 0}, 1, true
 		case "ddarr":                           // DOWNWARDS PAIRED ARROWS
-			return rune(0x21ca), true
+			return {'\u21ca', 0}, 1, true
 		case "ddotseq":                         // EQUALS SIGN WITH TWO DOTS ABOVE AND TWO DOTS BELOW
-			return rune(0x2a77), true
+			return {'\u2a77', 0}, 1, true
 		case "deg":                             // DEGREE SIGN
-			return rune(0xb0), true
+			return {'°', 0}, 1, true
 		case "delta":                           // GREEK SMALL LETTER DELTA
-			return rune(0x03b4), true
+			return {'\u03b4', 0}, 1, true
 		case "demptyv":                         // EMPTY SET WITH OVERBAR
-			return rune(0x29b1), true
+			return {'\u29b1', 0}, 1, true
 		case "dfisht":                          // DOWN FISH TAIL
-			return rune(0x297f), true
+			return {'\u297f', 0}, 1, true
 		case "dfr":                             // MATHEMATICAL FRAKTUR SMALL D
-			return rune(0x01d521), true
+			return {'\U0001d521', 0}, 1, true
 		case "dgr":                             // GREEK SMALL LETTER DELTA
-			return rune(0x03b4), true
+			return {'\u03b4', 0}, 1, true
 		case "dharl":                           // DOWNWARDS HARPOON WITH BARB LEFTWARDS
-			return rune(0x21c3), true
+			return {'\u21c3', 0}, 1, true
 		case "dharr":                           // DOWNWARDS HARPOON WITH BARB RIGHTWARDS
-			return rune(0x21c2), true
+			return {'\u21c2', 0}, 1, true
 		case "diam":                            // DIAMOND OPERATOR
-			return rune(0x22c4), true
+			return {'\u22c4', 0}, 1, true
 		case "diamdarr":                        // BLACK DIAMOND WITH DOWN ARROW
-			return rune(0x29ea), true
+			return {'\u29ea', 0}, 1, true
 		case "diamerr":                         // ERROR-BARRED WHITE DIAMOND
-			return rune(0x29f0), true
+			return {'\u29f0', 0}, 1, true
 		case "diamerrf":                        // ERROR-BARRED BLACK DIAMOND
-			return rune(0x29f1), true
+			return {'\u29f1', 0}, 1, true
 		case "diamond":                         // DIAMOND OPERATOR
-			return rune(0x22c4), true
+			return {'\u22c4', 0}, 1, true
 		case "diamondsuit":                     // BLACK DIAMOND SUIT
-			return rune(0x2666), true
+			return {'\u2666', 0}, 1, true
 		case "diams":                           // BLACK DIAMOND SUIT
-			return rune(0x2666), true
+			return {'\u2666', 0}, 1, true
 		case "die":                             // DIAERESIS
-			return rune(0xa8), true
+			return {'¨', 0}, 1, true
 		case "digamma":                         // GREEK SMALL LETTER DIGAMMA
-			return rune(0x03dd), true
+			return {'\u03dd', 0}, 1, true
 		case "disin":                           // ELEMENT OF WITH LONG HORIZONTAL STROKE
-			return rune(0x22f2), true
+			return {'\u22f2', 0}, 1, true
 		case "div":                             // DIVISION SIGN
-			return rune(0xf7), true
+			return {'÷', 0}, 1, true
 		case "divide":                          // DIVISION SIGN
-			return rune(0xf7), true
+			return {'÷', 0}, 1, true
 		case "divideontimes":                   // DIVISION TIMES
-			return rune(0x22c7), true
+			return {'\u22c7', 0}, 1, true
 		case "divonx":                          // DIVISION TIMES
-			return rune(0x22c7), true
+			return {'\u22c7', 0}, 1, true
 		case "djcy":                            // CYRILLIC SMALL LETTER DJE
-			return rune(0x0452), true
+			return {'\u0452', 0}, 1, true
 		case "dlarr":                           // SOUTH WEST ARROW
-			return rune(0x2199), true
+			return {'\u2199', 0}, 1, true
 		case "dlcorn":                          // BOTTOM LEFT CORNER
-			return rune(0x231e), true
+			return {'\u231e', 0}, 1, true
 		case "dlcrop":                          // BOTTOM LEFT CROP
-			return rune(0x230d), true
+			return {'\u230d', 0}, 1, true
 		case "dlharb":                          // DOWNWARDS HARPOON WITH BARB LEFT TO BAR
-			return rune(0x2959), true
+			return {'\u2959', 0}, 1, true
 		case "dollar":                          // DOLLAR SIGN
-			return rune(0x24), true
+			return {'$', 0}, 1, true
 		case "dopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL D
-			return rune(0x01d555), true
+			return {'\U0001d555', 0}, 1, true
 		case "dot":                             // DOT ABOVE
-			return rune(0x02d9), true
+			return {'\u02d9', 0}, 1, true
 		case "doteq":                           // APPROACHES THE LIMIT
-			return rune(0x2250), true
+			return {'\u2250', 0}, 1, true
 		case "doteqdot":                        // GEOMETRICALLY EQUAL TO
-			return rune(0x2251), true
+			return {'\u2251', 0}, 1, true
 		case "dotminus":                        // DOT MINUS
-			return rune(0x2238), true
+			return {'\u2238', 0}, 1, true
 		case "dotplus":                         // DOT PLUS
-			return rune(0x2214), true
+			return {'\u2214', 0}, 1, true
 		case "dotsquare":                       // SQUARED DOT OPERATOR
-			return rune(0x22a1), true
+			return {'\u22a1', 0}, 1, true
 		case "doublebarwedge":                  // PERSPECTIVE
-			return rune(0x2306), true
+			return {'\u2306', 0}, 1, true
 		case "downarrow":                       // DOWNWARDS ARROW
-			return rune(0x2193), true
+			return {'\u2193', 0}, 1, true
 		case "downdownarrows":                  // DOWNWARDS PAIRED ARROWS
-			return rune(0x21ca), true
+			return {'\u21ca', 0}, 1, true
 		case "downharpoonleft":                 // DOWNWARDS HARPOON WITH BARB LEFTWARDS
-			return rune(0x21c3), true
+			return {'\u21c3', 0}, 1, true
 		case "downharpoonright":                // DOWNWARDS HARPOON WITH BARB RIGHTWARDS
-			return rune(0x21c2), true
+			return {'\u21c2', 0}, 1, true
 		case "drarr":                           // SOUTH EAST ARROW
-			return rune(0x2198), true
+			return {'\u2198', 0}, 1, true
 		case "drbkarow":                        // RIGHTWARDS TWO-HEADED TRIPLE DASH ARROW
-			return rune(0x2910), true
+			return {'\u2910', 0}, 1, true
 		case "drcorn":                          // BOTTOM RIGHT CORNER
-			return rune(0x231f), true
+			return {'\u231f', 0}, 1, true
 		case "drcrop":                          // BOTTOM RIGHT CROP
-			return rune(0x230c), true
+			return {'\u230c', 0}, 1, true
 		case "drharb":                          // DOWNWARDS HARPOON WITH BARB RIGHT TO BAR
-			return rune(0x2955), true
+			return {'\u2955', 0}, 1, true
 		case "dscr":                            // MATHEMATICAL SCRIPT SMALL D
-			return rune(0x01d4b9), true
+			return {'\U0001d4b9', 0}, 1, true
 		case "dscy":                            // CYRILLIC SMALL LETTER DZE
-			return rune(0x0455), true
+			return {'\u0455', 0}, 1, true
 		case "dsol":                            // SOLIDUS WITH OVERBAR
-			return rune(0x29f6), true
+			return {'\u29f6', 0}, 1, true
 		case "dstrok":                          // LATIN SMALL LETTER D WITH STROKE
-			return rune(0x0111), true
+			return {'\u0111', 0}, 1, true
 		case "dtdot":                           // DOWN RIGHT DIAGONAL ELLIPSIS
-			return rune(0x22f1), true
+			return {'\u22f1', 0}, 1, true
 		case "dtri":                            // WHITE DOWN-POINTING SMALL TRIANGLE
-			return rune(0x25bf), true
+			return {'\u25bf', 0}, 1, true
 		case "dtrif":                           // BLACK DOWN-POINTING SMALL TRIANGLE
-			return rune(0x25be), true
+			return {'\u25be', 0}, 1, true
 		case "dtrilf":                          // DOWN-POINTING TRIANGLE WITH LEFT HALF BLACK
-			return rune(0x29e8), true
+			return {'\u29e8', 0}, 1, true
 		case "dtrirf":                          // DOWN-POINTING TRIANGLE WITH RIGHT HALF BLACK
-			return rune(0x29e9), true
+			return {'\u29e9', 0}, 1, true
 		case "duarr":                           // DOWNWARDS ARROW LEFTWARDS OF UPWARDS ARROW
-			return rune(0x21f5), true
+			return {'\u21f5', 0}, 1, true
 		case "duhar":                           // DOWNWARDS HARPOON WITH BARB LEFT BESIDE UPWARDS HARPOON WITH BARB RIGHT
-			return rune(0x296f), true
+			return {'\u296f', 0}, 1, true
 		case "dumap":                           // DOUBLE-ENDED MULTIMAP
-			return rune(0x29df), true
+			return {'\u29df', 0}, 1, true
 		case "dwangle":                         // OBLIQUE ANGLE OPENING UP
-			return rune(0x29a6), true
+			return {'\u29a6', 0}, 1, true
 		case "dzcy":                            // CYRILLIC SMALL LETTER DZHE
-			return rune(0x045f), true
+			return {'\u045f', 0}, 1, true
 		case "dzigrarr":                        // LONG RIGHTWARDS SQUIGGLE ARROW
-			return rune(0x27ff), true
+			return {'\u27ff', 0}, 1, true
 		}
 
 	case 'e':
 		switch name {
 		case "eDDot":                           // EQUALS SIGN WITH TWO DOTS ABOVE AND TWO DOTS BELOW
-			return rune(0x2a77), true
+			return {'\u2a77', 0}, 1, true
 		case "eDot":                            // GEOMETRICALLY EQUAL TO
-			return rune(0x2251), true
+			return {'\u2251', 0}, 1, true
 		case "eacgr":                           // GREEK SMALL LETTER EPSILON WITH TONOS
-			return rune(0x03ad), true
+			return {'\u03ad', 0}, 1, true
 		case "eacute":                          // LATIN SMALL LETTER E WITH ACUTE
-			return rune(0xe9), true
+			return {'é', 0}, 1, true
 		case "easter":                          // EQUALS WITH ASTERISK
-			return rune(0x2a6e), true
+			return {'\u2a6e', 0}, 1, true
 		case "ecaron":                          // LATIN SMALL LETTER E WITH CARON
-			return rune(0x011b), true
+			return {'\u011b', 0}, 1, true
 		case "ecir":                            // RING IN EQUAL TO
-			return rune(0x2256), true
+			return {'\u2256', 0}, 1, true
 		case "ecirc":                           // LATIN SMALL LETTER E WITH CIRCUMFLEX
-			return rune(0xea), true
+			return {'ê', 0}, 1, true
 		case "ecolon":                          // EQUALS COLON
-			return rune(0x2255), true
+			return {'\u2255', 0}, 1, true
 		case "ecy":                             // CYRILLIC SMALL LETTER E
-			return rune(0x044d), true
+			return {'\u044d', 0}, 1, true
 		case "edot":                            // LATIN SMALL LETTER E WITH DOT ABOVE
-			return rune(0x0117), true
+			return {'\u0117', 0}, 1, true
 		case "ee":                              // DOUBLE-STRUCK ITALIC SMALL E
-			return rune(0x2147), true
+			return {'\u2147', 0}, 1, true
 		case "eeacgr":                          // GREEK SMALL LETTER ETA WITH TONOS
-			return rune(0x03ae), true
+			return {'\u03ae', 0}, 1, true
 		case "eegr":                            // GREEK SMALL LETTER ETA
-			return rune(0x03b7), true
+			return {'\u03b7', 0}, 1, true
 		case "efDot":                           // APPROXIMATELY EQUAL TO OR THE IMAGE OF
-			return rune(0x2252), true
+			return {'\u2252', 0}, 1, true
 		case "efr":                             // MATHEMATICAL FRAKTUR SMALL E
-			return rune(0x01d522), true
+			return {'\U0001d522', 0}, 1, true
 		case "eg":                              // DOUBLE-LINE EQUAL TO OR GREATER-THAN
-			return rune(0x2a9a), true
+			return {'\u2a9a', 0}, 1, true
 		case "egr":                             // GREEK SMALL LETTER EPSILON
-			return rune(0x03b5), true
+			return {'\u03b5', 0}, 1, true
 		case "egrave":                          // LATIN SMALL LETTER E WITH GRAVE
-			return rune(0xe8), true
+			return {'è', 0}, 1, true
 		case "egs":                             // SLANTED EQUAL TO OR GREATER-THAN
-			return rune(0x2a96), true
+			return {'\u2a96', 0}, 1, true
 		case "egsdot":                          // SLANTED EQUAL TO OR GREATER-THAN WITH DOT INSIDE
-			return rune(0x2a98), true
+			return {'\u2a98', 0}, 1, true
 		case "el":                              // DOUBLE-LINE EQUAL TO OR LESS-THAN
-			return rune(0x2a99), true
+			return {'\u2a99', 0}, 1, true
 		case "elinters":                        // ELECTRICAL INTERSECTION
-			return rune(0x23e7), true
+			return {'\u23e7', 0}, 1, true
 		case "ell":                             // SCRIPT SMALL L
-			return rune(0x2113), true
+			return {'\u2113', 0}, 1, true
 		case "els":                             // SLANTED EQUAL TO OR LESS-THAN
-			return rune(0x2a95), true
+			return {'\u2a95', 0}, 1, true
 		case "elsdot":                          // SLANTED EQUAL TO OR LESS-THAN WITH DOT INSIDE
-			return rune(0x2a97), true
+			return {'\u2a97', 0}, 1, true
 		case "emacr":                           // LATIN SMALL LETTER E WITH MACRON
-			return rune(0x0113), true
+			return {'\u0113', 0}, 1, true
 		case "empty":                           // EMPTY SET
-			return rune(0x2205), true
+			return {'\u2205', 0}, 1, true
 		case "emptyset":                        // EMPTY SET
-			return rune(0x2205), true
+			return {'\u2205', 0}, 1, true
 		case "emptyv":                          // EMPTY SET
-			return rune(0x2205), true
+			return {'\u2205', 0}, 1, true
 		case "emsp":                            // EM SPACE
-			return rune(0x2003), true
+			return {'\u2003', 0}, 1, true
 		case "emsp13":                          // THREE-PER-EM SPACE
-			return rune(0x2004), true
+			return {'\u2004', 0}, 1, true
 		case "emsp14":                          // FOUR-PER-EM SPACE
-			return rune(0x2005), true
+			return {'\u2005', 0}, 1, true
 		case "eng":                             // LATIN SMALL LETTER ENG
-			return rune(0x014b), true
+			return {'\u014b', 0}, 1, true
 		case "ensp":                            // EN SPACE
-			return rune(0x2002), true
+			return {'\u2002', 0}, 1, true
 		case "eogon":                           // LATIN SMALL LETTER E WITH OGONEK
-			return rune(0x0119), true
+			return {'\u0119', 0}, 1, true
 		case "eopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL E
-			return rune(0x01d556), true
+			return {'\U0001d556', 0}, 1, true
 		case "epar":                            // EQUAL AND PARALLEL TO
-			return rune(0x22d5), true
+			return {'\u22d5', 0}, 1, true
 		case "eparsl":                          // EQUALS SIGN AND SLANTED PARALLEL
-			return rune(0x29e3), true
+			return {'\u29e3', 0}, 1, true
 		case "eplus":                           // EQUALS SIGN ABOVE PLUS SIGN
-			return rune(0x2a71), true
+			return {'\u2a71', 0}, 1, true
 		case "epsi":                            // GREEK SMALL LETTER EPSILON
-			return rune(0x03b5), true
+			return {'\u03b5', 0}, 1, true
 		case "epsilon":                         // GREEK SMALL LETTER EPSILON
-			return rune(0x03b5), true
+			return {'\u03b5', 0}, 1, true
 		case "epsis":                           // GREEK LUNATE EPSILON SYMBOL
-			return rune(0x03f5), true
+			return {'\u03f5', 0}, 1, true
 		case "epsiv":                           // GREEK LUNATE EPSILON SYMBOL
-			return rune(0x03f5), true
+			return {'\u03f5', 0}, 1, true
 		case "eqcirc":                          // RING IN EQUAL TO
-			return rune(0x2256), true
+			return {'\u2256', 0}, 1, true
 		case "eqcolon":                         // EQUALS COLON
-			return rune(0x2255), true
+			return {'\u2255', 0}, 1, true
 		case "eqeq":                            // TWO CONSECUTIVE EQUALS SIGNS
-			return rune(0x2a75), true
+			return {'\u2a75', 0}, 1, true
 		case "eqsim":                           // MINUS TILDE
-			return rune(0x2242), true
+			return {'\u2242', 0}, 1, true
 		case "eqslantgtr":                      // SLANTED EQUAL TO OR GREATER-THAN
-			return rune(0x2a96), true
+			return {'\u2a96', 0}, 1, true
 		case "eqslantless":                     // SLANTED EQUAL TO OR LESS-THAN
-			return rune(0x2a95), true
+			return {'\u2a95', 0}, 1, true
 		case "equals":                          // EQUALS SIGN
-			return rune(0x3d), true
+			return {'=', 0}, 1, true
 		case "equest":                          // QUESTIONED EQUAL TO
-			return rune(0x225f), true
+			return {'\u225f', 0}, 1, true
 		case "equiv":                           // IDENTICAL TO
-			return rune(0x2261), true
+			return {'\u2261', 0}, 1, true
 		case "equivDD":                         // EQUIVALENT WITH FOUR DOTS ABOVE
-			return rune(0x2a78), true
+			return {'\u2a78', 0}, 1, true
 		case "eqvparsl":                        // IDENTICAL TO AND SLANTED PARALLEL
-			return rune(0x29e5), true
+			return {'\u29e5', 0}, 1, true
 		case "erDot":                           // IMAGE OF OR APPROXIMATELY EQUAL TO
-			return rune(0x2253), true
+			return {'\u2253', 0}, 1, true
 		case "erarr":                           // EQUALS SIGN ABOVE RIGHTWARDS ARROW
-			return rune(0x2971), true
+			return {'\u2971', 0}, 1, true
 		case "escr":                            // SCRIPT SMALL E
-			return rune(0x212f), true
+			return {'\u212f', 0}, 1, true
 		case "esdot":                           // APPROACHES THE LIMIT
-			return rune(0x2250), true
+			return {'\u2250', 0}, 1, true
 		case "esim":                            // MINUS TILDE
-			return rune(0x2242), true
+			return {'\u2242', 0}, 1, true
 		case "eta":                             // GREEK SMALL LETTER ETA
-			return rune(0x03b7), true
+			return {'\u03b7', 0}, 1, true
 		case "eth":                             // LATIN SMALL LETTER ETH
-			return rune(0xf0), true
+			return {'ð', 0}, 1, true
 		case "euml":                            // LATIN SMALL LETTER E WITH DIAERESIS
-			return rune(0xeb), true
+			return {'ë', 0}, 1, true
 		case "euro":                            // EURO SIGN
-			return rune(0x20ac), true
+			return {'\u20ac', 0}, 1, true
 		case "excl":                            // EXCLAMATION MARK
-			return rune(0x21), true
+			return {'!', 0}, 1, true
 		case "exist":                           // THERE EXISTS
-			return rune(0x2203), true
+			return {'\u2203', 0}, 1, true
 		case "expectation":                     // SCRIPT CAPITAL E
-			return rune(0x2130), true
+			return {'\u2130', 0}, 1, true
 		case "exponentiale":                    // DOUBLE-STRUCK ITALIC SMALL E
-			return rune(0x2147), true
+			return {'\u2147', 0}, 1, true
 		}
 
 	case 'f':
 		switch name {
 		case "fallingdotseq":                   // APPROXIMATELY EQUAL TO OR THE IMAGE OF
-			return rune(0x2252), true
+			return {'\u2252', 0}, 1, true
 		case "fbowtie":                         // BLACK BOWTIE
-			return rune(0x29d3), true
+			return {'\u29d3', 0}, 1, true
 		case "fcy":                             // CYRILLIC SMALL LETTER EF
-			return rune(0x0444), true
+			return {'\u0444', 0}, 1, true
 		case "fdiag":                           // BOX DRAWINGS LIGHT DIAGONAL UPPER LEFT TO LOWER RIGHT
-			return rune(0x2572), true
+			return {'\u2572', 0}, 1, true
 		case "fdiordi":                         // FALLING DIAGONAL CROSSING RISING DIAGONAL
-			return rune(0x292c), true
+			return {'\u292c', 0}, 1, true
 		case "fdonearr":                        // FALLING DIAGONAL CROSSING NORTH EAST ARROW
-			return rune(0x292f), true
+			return {'\u292f', 0}, 1, true
 		case "female":                          // FEMALE SIGN
-			return rune(0x2640), true
+			return {'\u2640', 0}, 1, true
 		case "ffilig":                          // LATIN SMALL LIGATURE FFI
-			return rune(0xfb03), true
+			return {'\ufb03', 0}, 1, true
 		case "fflig":                           // LATIN SMALL LIGATURE FF
-			return rune(0xfb00), true
+			return {'\ufb00', 0}, 1, true
 		case "ffllig":                          // LATIN SMALL LIGATURE FFL
-			return rune(0xfb04), true
+			return {'\ufb04', 0}, 1, true
 		case "ffr":                             // MATHEMATICAL FRAKTUR SMALL F
-			return rune(0x01d523), true
+			return {'\U0001d523', 0}, 1, true
 		case "fhrglass":                        // BLACK HOURGLASS
-			return rune(0x29d7), true
+			return {'\u29d7', 0}, 1, true
 		case "filig":                           // LATIN SMALL LIGATURE FI
-			return rune(0xfb01), true
+			return {'\ufb01', 0}, 1, true
 		case "fjlig":                           // fj ligature
-			return rune(0x66), true
+			return {'f', 'j'}, 2, true
 		case "flat":                            // MUSIC FLAT SIGN
-			return rune(0x266d), true
+			return {'\u266d', 0}, 1, true
 		case "fllig":                           // LATIN SMALL LIGATURE FL
-			return rune(0xfb02), true
+			return {'\ufb02', 0}, 1, true
 		case "fltns":                           // WHITE PARALLELOGRAM
-			return rune(0x25b1), true
+			return {'\u25b1', 0}, 1, true
 		case "fnof":                            // LATIN SMALL LETTER F WITH HOOK
-			return rune(0x0192), true
+			return {'\u0192', 0}, 1, true
 		case "fopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL F
-			return rune(0x01d557), true
+			return {'\U0001d557', 0}, 1, true
 		case "forall":                          // FOR ALL
-			return rune(0x2200), true
+			return {'\u2200', 0}, 1, true
 		case "fork":                            // PITCHFORK
-			return rune(0x22d4), true
+			return {'\u22d4', 0}, 1, true
 		case "forkv":                           // ELEMENT OF OPENING DOWNWARDS
-			return rune(0x2ad9), true
+			return {'\u2ad9', 0}, 1, true
 		case "fpartint":                        // FINITE PART INTEGRAL
-			return rune(0x2a0d), true
+			return {'\u2a0d', 0}, 1, true
 		case "frac12":                          // VULGAR FRACTION ONE HALF
-			return rune(0xbd), true
+			return {'½', 0}, 1, true
 		case "frac13":                          // VULGAR FRACTION ONE THIRD
-			return rune(0x2153), true
+			return {'\u2153', 0}, 1, true
 		case "frac14":                          // VULGAR FRACTION ONE QUARTER
-			return rune(0xbc), true
+			return {'¼', 0}, 1, true
 		case "frac15":                          // VULGAR FRACTION ONE FIFTH
-			return rune(0x2155), true
+			return {'\u2155', 0}, 1, true
 		case "frac16":                          // VULGAR FRACTION ONE SIXTH
-			return rune(0x2159), true
+			return {'\u2159', 0}, 1, true
 		case "frac18":                          // VULGAR FRACTION ONE EIGHTH
-			return rune(0x215b), true
+			return {'\u215b', 0}, 1, true
 		case "frac23":                          // VULGAR FRACTION TWO THIRDS
-			return rune(0x2154), true
+			return {'\u2154', 0}, 1, true
 		case "frac25":                          // VULGAR FRACTION TWO FIFTHS
-			return rune(0x2156), true
+			return {'\u2156', 0}, 1, true
 		case "frac34":                          // VULGAR FRACTION THREE QUARTERS
-			return rune(0xbe), true
+			return {'¾', 0}, 1, true
 		case "frac35":                          // VULGAR FRACTION THREE FIFTHS
-			return rune(0x2157), true
+			return {'\u2157', 0}, 1, true
 		case "frac38":                          // VULGAR FRACTION THREE EIGHTHS
-			return rune(0x215c), true
+			return {'\u215c', 0}, 1, true
 		case "frac45":                          // VULGAR FRACTION FOUR FIFTHS
-			return rune(0x2158), true
+			return {'\u2158', 0}, 1, true
 		case "frac56":                          // VULGAR FRACTION FIVE SIXTHS
-			return rune(0x215a), true
+			return {'\u215a', 0}, 1, true
 		case "frac58":                          // VULGAR FRACTION FIVE EIGHTHS
-			return rune(0x215d), true
+			return {'\u215d', 0}, 1, true
 		case "frac78":                          // VULGAR FRACTION SEVEN EIGHTHS
-			return rune(0x215e), true
+			return {'\u215e', 0}, 1, true
 		case "frasl":                           // FRACTION SLASH
-			return rune(0x2044), true
+			return {'\u2044', 0}, 1, true
 		case "frown":                           // FROWN
-			return rune(0x2322), true
+			return {'\u2322', 0}, 1, true
 		case "fscr":                            // MATHEMATICAL SCRIPT SMALL F
-			return rune(0x01d4bb), true
+			return {'\U0001d4bb', 0}, 1, true
 		}
 
 	case 'g':
 		switch name {
 		case "gE":                              // GREATER-THAN OVER EQUAL TO
-			return rune(0x2267), true
+			return {'\u2267', 0}, 1, true
 		case "gEl":                             // GREATER-THAN ABOVE DOUBLE-LINE EQUAL ABOVE LESS-THAN
-			return rune(0x2a8c), true
+			return {'\u2a8c', 0}, 1, true
 		case "gacute":                          // LATIN SMALL LETTER G WITH ACUTE
-			return rune(0x01f5), true
+			return {'\u01f5', 0}, 1, true
 		case "gamma":                           // GREEK SMALL LETTER GAMMA
-			return rune(0x03b3), true
+			return {'\u03b3', 0}, 1, true
 		case "gammad":                          // GREEK SMALL LETTER DIGAMMA
-			return rune(0x03dd), true
+			return {'\u03dd', 0}, 1, true
 		case "gap":                             // GREATER-THAN OR APPROXIMATE
-			return rune(0x2a86), true
+			return {'\u2a86', 0}, 1, true
 		case "gbreve":                          // LATIN SMALL LETTER G WITH BREVE
-			return rune(0x011f), true
+			return {'\u011f', 0}, 1, true
 		case "gcedil":                          // LATIN SMALL LETTER G WITH CEDILLA
-			return rune(0x0123), true
+			return {'\u0123', 0}, 1, true
 		case "gcirc":                           // LATIN SMALL LETTER G WITH CIRCUMFLEX
-			return rune(0x011d), true
+			return {'\u011d', 0}, 1, true
 		case "gcy":                             // CYRILLIC SMALL LETTER GHE
-			return rune(0x0433), true
+			return {'\u0433', 0}, 1, true
 		case "gdot":                            // LATIN SMALL LETTER G WITH DOT ABOVE
-			return rune(0x0121), true
+			return {'\u0121', 0}, 1, true
 		case "ge":                              // GREATER-THAN OR EQUAL TO
-			return rune(0x2265), true
+			return {'\u2265', 0}, 1, true
 		case "gel":                             // GREATER-THAN EQUAL TO OR LESS-THAN
-			return rune(0x22db), true
+			return {'\u22db', 0}, 1, true
 		case "geq":                             // GREATER-THAN OR EQUAL TO
-			return rune(0x2265), true
+			return {'\u2265', 0}, 1, true
 		case "geqq":                            // GREATER-THAN OVER EQUAL TO
-			return rune(0x2267), true
+			return {'\u2267', 0}, 1, true
 		case "geqslant":                        // GREATER-THAN OR SLANTED EQUAL TO
-			return rune(0x2a7e), true
+			return {'\u2a7e', 0}, 1, true
 		case "ges":                             // GREATER-THAN OR SLANTED EQUAL TO
-			return rune(0x2a7e), true
+			return {'\u2a7e', 0}, 1, true
 		case "gescc":                           // GREATER-THAN CLOSED BY CURVE ABOVE SLANTED EQUAL
-			return rune(0x2aa9), true
+			return {'\u2aa9', 0}, 1, true
 		case "gesdot":                          // GREATER-THAN OR SLANTED EQUAL TO WITH DOT INSIDE
-			return rune(0x2a80), true
+			return {'\u2a80', 0}, 1, true
 		case "gesdoto":                         // GREATER-THAN OR SLANTED EQUAL TO WITH DOT ABOVE
-			return rune(0x2a82), true
+			return {'\u2a82', 0}, 1, true
 		case "gesdotol":                        // GREATER-THAN OR SLANTED EQUAL TO WITH DOT ABOVE LEFT
-			return rune(0x2a84), true
+			return {'\u2a84', 0}, 1, true
 		case "gesl":                            // GREATER-THAN slanted EQUAL TO OR LESS-THAN
-			return rune(0x22db), true
+			return {'\u22db', '\ufe00'}, 2, true
 		case "gesles":                          // GREATER-THAN ABOVE SLANTED EQUAL ABOVE LESS-THAN ABOVE SLANTED EQUAL
-			return rune(0x2a94), true
+			return {'\u2a94', 0}, 1, true
 		case "gfr":                             // MATHEMATICAL FRAKTUR SMALL G
-			return rune(0x01d524), true
+			return {'\U0001d524', 0}, 1, true
 		case "gg":                              // MUCH GREATER-THAN
-			return rune(0x226b), true
+			return {'\u226b', 0}, 1, true
 		case "ggg":                             // VERY MUCH GREATER-THAN
-			return rune(0x22d9), true
+			return {'\u22d9', 0}, 1, true
 		case "ggr":                             // GREEK SMALL LETTER GAMMA
-			return rune(0x03b3), true
+			return {'\u03b3', 0}, 1, true
 		case "gimel":                           // GIMEL SYMBOL
-			return rune(0x2137), true
+			return {'\u2137', 0}, 1, true
 		case "gjcy":                            // CYRILLIC SMALL LETTER GJE
-			return rune(0x0453), true
+			return {'\u0453', 0}, 1, true
 		case "gl":                              // GREATER-THAN OR LESS-THAN
-			return rune(0x2277), true
+			return {'\u2277', 0}, 1, true
 		case "glE":                             // GREATER-THAN ABOVE LESS-THAN ABOVE DOUBLE-LINE EQUAL
-			return rune(0x2a92), true
+			return {'\u2a92', 0}, 1, true
 		case "gla":                             // GREATER-THAN BESIDE LESS-THAN
-			return rune(0x2aa5), true
+			return {'\u2aa5', 0}, 1, true
 		case "glj":                             // GREATER-THAN OVERLAPPING LESS-THAN
-			return rune(0x2aa4), true
+			return {'\u2aa4', 0}, 1, true
 		case "gnE":                             // GREATER-THAN BUT NOT EQUAL TO
-			return rune(0x2269), true
+			return {'\u2269', 0}, 1, true
 		case "gnap":                            // GREATER-THAN AND NOT APPROXIMATE
-			return rune(0x2a8a), true
+			return {'\u2a8a', 0}, 1, true
 		case "gnapprox":                        // GREATER-THAN AND NOT APPROXIMATE
-			return rune(0x2a8a), true
+			return {'\u2a8a', 0}, 1, true
 		case "gne":                             // GREATER-THAN AND SINGLE-LINE NOT EQUAL TO
-			return rune(0x2a88), true
+			return {'\u2a88', 0}, 1, true
 		case "gneq":                            // GREATER-THAN AND SINGLE-LINE NOT EQUAL TO
-			return rune(0x2a88), true
+			return {'\u2a88', 0}, 1, true
 		case "gneqq":                           // GREATER-THAN BUT NOT EQUAL TO
-			return rune(0x2269), true
+			return {'\u2269', 0}, 1, true
 		case "gnsim":                           // GREATER-THAN BUT NOT EQUIVALENT TO
-			return rune(0x22e7), true
+			return {'\u22e7', 0}, 1, true
 		case "gopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL G
-			return rune(0x01d558), true
+			return {'\U0001d558', 0}, 1, true
 		case "grave":                           // GRAVE ACCENT
-			return rune(0x60), true
+			return {'`', 0}, 1, true
 		case "gscr":                            // SCRIPT SMALL G
-			return rune(0x210a), true
+			return {'\u210a', 0}, 1, true
 		case "gsdot":                           // GREATER-THAN WITH DOT
-			return rune(0x22d7), true
+			return {'\u22d7', 0}, 1, true
 		case "gsim":                            // GREATER-THAN OR EQUIVALENT TO
-			return rune(0x2273), true
+			return {'\u2273', 0}, 1, true
 		case "gsime":                           // GREATER-THAN ABOVE SIMILAR OR EQUAL
-			return rune(0x2a8e), true
+			return {'\u2a8e', 0}, 1, true
 		case "gsiml":                           // GREATER-THAN ABOVE SIMILAR ABOVE LESS-THAN
-			return rune(0x2a90), true
+			return {'\u2a90', 0}, 1, true
 		case "gt":                              // GREATER-THAN SIGN
-			return rune(0x3e), true
+			return {'>', 0}, 1, true
 		case "gtcc":                            // GREATER-THAN CLOSED BY CURVE
-			return rune(0x2aa7), true
+			return {'\u2aa7', 0}, 1, true
 		case "gtcir":                           // GREATER-THAN WITH CIRCLE INSIDE
-			return rune(0x2a7a), true
+			return {'\u2a7a', 0}, 1, true
 		case "gtdot":                           // GREATER-THAN WITH DOT
-			return rune(0x22d7), true
+			return {'\u22d7', 0}, 1, true
 		case "gtlPar":                          // DOUBLE LEFT ARC GREATER-THAN BRACKET
-			return rune(0x2995), true
+			return {'\u2995', 0}, 1, true
 		case "gtquest":                         // GREATER-THAN WITH QUESTION MARK ABOVE
-			return rune(0x2a7c), true
+			return {'\u2a7c', 0}, 1, true
 		case "gtrapprox":                       // GREATER-THAN OR APPROXIMATE
-			return rune(0x2a86), true
+			return {'\u2a86', 0}, 1, true
 		case "gtrarr":                          // GREATER-THAN ABOVE RIGHTWARDS ARROW
-			return rune(0x2978), true
+			return {'\u2978', 0}, 1, true
 		case "gtrdot":                          // GREATER-THAN WITH DOT
-			return rune(0x22d7), true
+			return {'\u22d7', 0}, 1, true
 		case "gtreqless":                       // GREATER-THAN EQUAL TO OR LESS-THAN
-			return rune(0x22db), true
+			return {'\u22db', 0}, 1, true
 		case "gtreqqless":                      // GREATER-THAN ABOVE DOUBLE-LINE EQUAL ABOVE LESS-THAN
-			return rune(0x2a8c), true
+			return {'\u2a8c', 0}, 1, true
 		case "gtrless":                         // GREATER-THAN OR LESS-THAN
-			return rune(0x2277), true
+			return {'\u2277', 0}, 1, true
 		case "gtrpar":                          // SPHERICAL ANGLE OPENING LEFT
-			return rune(0x29a0), true
+			return {'\u29a0', 0}, 1, true
 		case "gtrsim":                          // GREATER-THAN OR EQUIVALENT TO
-			return rune(0x2273), true
+			return {'\u2273', 0}, 1, true
 		case "gvertneqq":                       // GREATER-THAN BUT NOT EQUAL TO - with vertical stroke
-			return rune(0x2269), true
+			return {'\u2269', '\ufe00'}, 2, true
 		case "gvnE":                            // GREATER-THAN BUT NOT EQUAL TO - with vertical stroke
-			return rune(0x2269), true
+			return {'\u2269', '\ufe00'}, 2, true
 		}
 
 	case 'h':
 		switch name {
 		case "hArr":                            // LEFT RIGHT DOUBLE ARROW
-			return rune(0x21d4), true
+			return {'\u21d4', 0}, 1, true
 		case "hairsp":                          // HAIR SPACE
-			return rune(0x200a), true
+			return {'\u200a', 0}, 1, true
 		case "half":                            // VULGAR FRACTION ONE HALF
-			return rune(0xbd), true
+			return {'½', 0}, 1, true
 		case "hamilt":                          // SCRIPT CAPITAL H
-			return rune(0x210b), true
+			return {'\u210b', 0}, 1, true
 		case "hardcy":                          // CYRILLIC SMALL LETTER HARD SIGN
-			return rune(0x044a), true
+			return {'\u044a', 0}, 1, true
 		case "harr":                            // LEFT RIGHT ARROW
-			return rune(0x2194), true
+			return {'\u2194', 0}, 1, true
 		case "harrcir":                         // LEFT RIGHT ARROW THROUGH SMALL CIRCLE
-			return rune(0x2948), true
+			return {'\u2948', 0}, 1, true
 		case "harrw":                           // LEFT RIGHT WAVE ARROW
-			return rune(0x21ad), true
+			return {'\u21ad', 0}, 1, true
 		case "hbar":                            // PLANCK CONSTANT OVER TWO PI
-			return rune(0x210f), true
+			return {'\u210f', 0}, 1, true
 		case "hcirc":                           // LATIN SMALL LETTER H WITH CIRCUMFLEX
-			return rune(0x0125), true
+			return {'\u0125', 0}, 1, true
 		case "hearts":                          // BLACK HEART SUIT
-			return rune(0x2665), true
+			return {'\u2665', 0}, 1, true
 		case "heartsuit":                       // BLACK HEART SUIT
-			return rune(0x2665), true
+			return {'\u2665', 0}, 1, true
 		case "hellip":                          // HORIZONTAL ELLIPSIS
-			return rune(0x2026), true
+			return {'\u2026', 0}, 1, true
 		case "hercon":                          // HERMITIAN CONJUGATE MATRIX
-			return rune(0x22b9), true
+			return {'\u22b9', 0}, 1, true
 		case "hfr":                             // MATHEMATICAL FRAKTUR SMALL H
-			return rune(0x01d525), true
+			return {'\U0001d525', 0}, 1, true
 		case "hksearow":                        // SOUTH EAST ARROW WITH HOOK
-			return rune(0x2925), true
+			return {'\u2925', 0}, 1, true
 		case "hkswarow":                        // SOUTH WEST ARROW WITH HOOK
-			return rune(0x2926), true
+			return {'\u2926', 0}, 1, true
 		case "hoarr":                           // LEFT RIGHT OPEN-HEADED ARROW
-			return rune(0x21ff), true
+			return {'\u21ff', 0}, 1, true
 		case "homtht":                          // HOMOTHETIC
-			return rune(0x223b), true
+			return {'\u223b', 0}, 1, true
 		case "hookleftarrow":                   // LEFTWARDS ARROW WITH HOOK
-			return rune(0x21a9), true
+			return {'\u21a9', 0}, 1, true
 		case "hookrightarrow":                  // RIGHTWARDS ARROW WITH HOOK
-			return rune(0x21aa), true
+			return {'\u21aa', 0}, 1, true
 		case "hopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL H
-			return rune(0x01d559), true
+			return {'\U0001d559', 0}, 1, true
 		case "horbar":                          // HORIZONTAL BAR
-			return rune(0x2015), true
+			return {'\u2015', 0}, 1, true
 		case "hrglass":                         // WHITE HOURGLASS
-			return rune(0x29d6), true
+			return {'\u29d6', 0}, 1, true
 		case "hscr":                            // MATHEMATICAL SCRIPT SMALL H
-			return rune(0x01d4bd), true
+			return {'\U0001d4bd', 0}, 1, true
 		case "hslash":                          // PLANCK CONSTANT OVER TWO PI
-			return rune(0x210f), true
+			return {'\u210f', 0}, 1, true
 		case "hstrok":                          // LATIN SMALL LETTER H WITH STROKE
-			return rune(0x0127), true
+			return {'\u0127', 0}, 1, true
 		case "htimes":                          // VECTOR OR CROSS PRODUCT
-			return rune(0x2a2f), true
+			return {'\u2a2f', 0}, 1, true
 		case "hybull":                          // HYPHEN BULLET
-			return rune(0x2043), true
+			return {'\u2043', 0}, 1, true
 		case "hyphen":                          // HYPHEN
-			return rune(0x2010), true
+			return {'\u2010', 0}, 1, true
 		}
 
 	case 'i':
 		switch name {
 		case "iacgr":                           // GREEK SMALL LETTER IOTA WITH TONOS
-			return rune(0x03af), true
+			return {'\u03af', 0}, 1, true
 		case "iacute":                          // LATIN SMALL LETTER I WITH ACUTE
-			return rune(0xed), true
+			return {'í', 0}, 1, true
 		case "ic":                              // INVISIBLE SEPARATOR
-			return rune(0x2063), true
+			return {'\u2063', 0}, 1, true
 		case "icirc":                           // LATIN SMALL LETTER I WITH CIRCUMFLEX
-			return rune(0xee), true
+			return {'î', 0}, 1, true
 		case "icy":                             // CYRILLIC SMALL LETTER I
-			return rune(0x0438), true
+			return {'\u0438', 0}, 1, true
 		case "idiagr":                          // GREEK SMALL LETTER IOTA WITH DIALYTIKA AND TONOS
-			return rune(0x0390), true
+			return {'\u0390', 0}, 1, true
 		case "idigr":                           // GREEK SMALL LETTER IOTA WITH DIALYTIKA
-			return rune(0x03ca), true
+			return {'\u03ca', 0}, 1, true
 		case "iecy":                            // CYRILLIC SMALL LETTER IE
-			return rune(0x0435), true
+			return {'\u0435', 0}, 1, true
 		case "iexcl":                           // INVERTED EXCLAMATION MARK
-			return rune(0xa1), true
+			return {'¡', 0}, 1, true
 		case "iff":                             // LEFT RIGHT DOUBLE ARROW
-			return rune(0x21d4), true
+			return {'\u21d4', 0}, 1, true
 		case "ifr":                             // MATHEMATICAL FRAKTUR SMALL I
-			return rune(0x01d526), true
+			return {'\U0001d526', 0}, 1, true
 		case "igr":                             // GREEK SMALL LETTER IOTA
-			return rune(0x03b9), true
+			return {'\u03b9', 0}, 1, true
 		case "igrave":                          // LATIN SMALL LETTER I WITH GRAVE
-			return rune(0xec), true
+			return {'ì', 0}, 1, true
 		case "ii":                              // DOUBLE-STRUCK ITALIC SMALL I
-			return rune(0x2148), true
+			return {'\u2148', 0}, 1, true
 		case "iiiint":                          // QUADRUPLE INTEGRAL OPERATOR
-			return rune(0x2a0c), true
+			return {'\u2a0c', 0}, 1, true
 		case "iiint":                           // TRIPLE INTEGRAL
-			return rune(0x222d), true
+			return {'\u222d', 0}, 1, true
 		case "iinfin":                          // INCOMPLETE INFINITY
-			return rune(0x29dc), true
+			return {'\u29dc', 0}, 1, true
 		case "iiota":                           // TURNED GREEK SMALL LETTER IOTA
-			return rune(0x2129), true
+			return {'\u2129', 0}, 1, true
 		case "ijlig":                           // LATIN SMALL LIGATURE IJ
-			return rune(0x0133), true
+			return {'\u0133', 0}, 1, true
 		case "imacr":                           // LATIN SMALL LETTER I WITH MACRON
-			return rune(0x012b), true
+			return {'\u012b', 0}, 1, true
 		case "image":                           // BLACK-LETTER CAPITAL I
-			return rune(0x2111), true
+			return {'\u2111', 0}, 1, true
 		case "imagline":                        // SCRIPT CAPITAL I
-			return rune(0x2110), true
+			return {'\u2110', 0}, 1, true
 		case "imagpart":                        // BLACK-LETTER CAPITAL I
-			return rune(0x2111), true
+			return {'\u2111', 0}, 1, true
 		case "imath":                           // LATIN SMALL LETTER DOTLESS I
-			return rune(0x0131), true
+			return {'\u0131', 0}, 1, true
 		case "imof":                            // IMAGE OF
-			return rune(0x22b7), true
+			return {'\u22b7', 0}, 1, true
 		case "imped":                           // LATIN CAPITAL LETTER Z WITH STROKE
-			return rune(0x01b5), true
+			return {'\u01b5', 0}, 1, true
 		case "in":                              // ELEMENT OF
-			return rune(0x2208), true
+			return {'\u2208', 0}, 1, true
 		case "incare":                          // CARE OF
-			return rune(0x2105), true
+			return {'\u2105', 0}, 1, true
 		case "infin":                           // INFINITY
-			return rune(0x221e), true
+			return {'\u221e', 0}, 1, true
 		case "infintie":                        // TIE OVER INFINITY
-			return rune(0x29dd), true
+			return {'\u29dd', 0}, 1, true
 		case "inodot":                          // LATIN SMALL LETTER DOTLESS I
-			return rune(0x0131), true
+			return {'\u0131', 0}, 1, true
 		case "int":                             // INTEGRAL
-			return rune(0x222b), true
+			return {'\u222b', 0}, 1, true
 		case "intcal":                          // INTERCALATE
-			return rune(0x22ba), true
+			return {'\u22ba', 0}, 1, true
 		case "integers":                        // DOUBLE-STRUCK CAPITAL Z
-			return rune(0x2124), true
+			return {'\u2124', 0}, 1, true
 		case "intercal":                        // INTERCALATE
-			return rune(0x22ba), true
+			return {'\u22ba', 0}, 1, true
 		case "intlarhk":                        // INTEGRAL WITH LEFTWARDS ARROW WITH HOOK
-			return rune(0x2a17), true
+			return {'\u2a17', 0}, 1, true
 		case "intprod":                         // INTERIOR PRODUCT
-			return rune(0x2a3c), true
+			return {'\u2a3c', 0}, 1, true
 		case "iocy":                            // CYRILLIC SMALL LETTER IO
-			return rune(0x0451), true
+			return {'\u0451', 0}, 1, true
 		case "iogon":                           // LATIN SMALL LETTER I WITH OGONEK
-			return rune(0x012f), true
+			return {'\u012f', 0}, 1, true
 		case "iopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL I
-			return rune(0x01d55a), true
+			return {'\U0001d55a', 0}, 1, true
 		case "iota":                            // GREEK SMALL LETTER IOTA
-			return rune(0x03b9), true
+			return {'\u03b9', 0}, 1, true
 		case "iprod":                           // INTERIOR PRODUCT
-			return rune(0x2a3c), true
+			return {'\u2a3c', 0}, 1, true
 		case "iprodr":                          // RIGHTHAND INTERIOR PRODUCT
-			return rune(0x2a3d), true
+			return {'\u2a3d', 0}, 1, true
 		case "iquest":                          // INVERTED QUESTION MARK
-			return rune(0xbf), true
+			return {'¿', 0}, 1, true
 		case "iscr":                            // MATHEMATICAL SCRIPT SMALL I
-			return rune(0x01d4be), true
+			return {'\U0001d4be', 0}, 1, true
 		case "isin":                            // ELEMENT OF
-			return rune(0x2208), true
+			return {'\u2208', 0}, 1, true
 		case "isinE":                           // ELEMENT OF WITH TWO HORIZONTAL STROKES
-			return rune(0x22f9), true
+			return {'\u22f9', 0}, 1, true
 		case "isindot":                         // ELEMENT OF WITH DOT ABOVE
-			return rune(0x22f5), true
+			return {'\u22f5', 0}, 1, true
 		case "isins":                           // SMALL ELEMENT OF WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
-			return rune(0x22f4), true
+			return {'\u22f4', 0}, 1, true
 		case "isinsv":                          // ELEMENT OF WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
-			return rune(0x22f3), true
+			return {'\u22f3', 0}, 1, true
 		case "isinv":                           // ELEMENT OF
-			return rune(0x2208), true
+			return {'\u2208', 0}, 1, true
 		case "isinvb":                          // ELEMENT OF WITH UNDERBAR
-			return rune(0x22f8), true
+			return {'\u22f8', 0}, 1, true
 		case "it":                              // INVISIBLE TIMES
-			return rune(0x2062), true
+			return {'\u2062', 0}, 1, true
 		case "itilde":                          // LATIN SMALL LETTER I WITH TILDE
-			return rune(0x0129), true
+			return {'\u0129', 0}, 1, true
 		case "iukcy":                           // CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I
-			return rune(0x0456), true
+			return {'\u0456', 0}, 1, true
 		case "iuml":                            // LATIN SMALL LETTER I WITH DIAERESIS
-			return rune(0xef), true
+			return {'ï', 0}, 1, true
 		}
 
 	case 'j':
 		switch name {
 		case "jcirc":                           // LATIN SMALL LETTER J WITH CIRCUMFLEX
-			return rune(0x0135), true
+			return {'\u0135', 0}, 1, true
 		case "jcy":                             // CYRILLIC SMALL LETTER SHORT I
-			return rune(0x0439), true
+			return {'\u0439', 0}, 1, true
 		case "jfr":                             // MATHEMATICAL FRAKTUR SMALL J
-			return rune(0x01d527), true
+			return {'\U0001d527', 0}, 1, true
 		case "jmath":                           // LATIN SMALL LETTER DOTLESS J
-			return rune(0x0237), true
+			return {'\u0237', 0}, 1, true
 		case "jnodot":                          // LATIN SMALL LETTER DOTLESS J
-			return rune(0x0237), true
+			return {'\u0237', 0}, 1, true
 		case "jopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL J
-			return rune(0x01d55b), true
+			return {'\U0001d55b', 0}, 1, true
 		case "jscr":                            // MATHEMATICAL SCRIPT SMALL J
-			return rune(0x01d4bf), true
+			return {'\U0001d4bf', 0}, 1, true
 		case "jsercy":                          // CYRILLIC SMALL LETTER JE
-			return rune(0x0458), true
+			return {'\u0458', 0}, 1, true
 		case "jukcy":                           // CYRILLIC SMALL LETTER UKRAINIAN IE
-			return rune(0x0454), true
+			return {'\u0454', 0}, 1, true
 		}
 
 	case 'k':
 		switch name {
 		case "kappa":                           // GREEK SMALL LETTER KAPPA
-			return rune(0x03ba), true
+			return {'\u03ba', 0}, 1, true
 		case "kappav":                          // GREEK KAPPA SYMBOL
-			return rune(0x03f0), true
+			return {'\u03f0', 0}, 1, true
 		case "kcedil":                          // LATIN SMALL LETTER K WITH CEDILLA
-			return rune(0x0137), true
+			return {'\u0137', 0}, 1, true
 		case "kcy":                             // CYRILLIC SMALL LETTER KA
-			return rune(0x043a), true
+			return {'\u043a', 0}, 1, true
 		case "kfr":                             // MATHEMATICAL FRAKTUR SMALL K
-			return rune(0x01d528), true
+			return {'\U0001d528', 0}, 1, true
 		case "kgr":                             // GREEK SMALL LETTER KAPPA
-			return rune(0x03ba), true
+			return {'\u03ba', 0}, 1, true
 		case "kgreen":                          // LATIN SMALL LETTER KRA
-			return rune(0x0138), true
+			return {'\u0138', 0}, 1, true
 		case "khcy":                            // CYRILLIC SMALL LETTER HA
-			return rune(0x0445), true
+			return {'\u0445', 0}, 1, true
 		case "khgr":                            // GREEK SMALL LETTER CHI
-			return rune(0x03c7), true
+			return {'\u03c7', 0}, 1, true
 		case "kjcy":                            // CYRILLIC SMALL LETTER KJE
-			return rune(0x045c), true
+			return {'\u045c', 0}, 1, true
 		case "kopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL K
-			return rune(0x01d55c), true
+			return {'\U0001d55c', 0}, 1, true
 		case "koppa":                           // GREEK LETTER KOPPA
-			return rune(0x03de), true
+			return {'\u03de', 0}, 1, true
 		case "kscr":                            // MATHEMATICAL SCRIPT SMALL K
-			return rune(0x01d4c0), true
+			return {'\U0001d4c0', 0}, 1, true
 		}
 
 	case 'l':
 		switch name {
 		case "lAarr":                           // LEFTWARDS TRIPLE ARROW
-			return rune(0x21da), true
+			return {'\u21da', 0}, 1, true
 		case "lArr":                            // LEFTWARDS DOUBLE ARROW
-			return rune(0x21d0), true
+			return {'\u21d0', 0}, 1, true
 		case "lAtail":                          // LEFTWARDS DOUBLE ARROW-TAIL
-			return rune(0x291b), true
+			return {'\u291b', 0}, 1, true
 		case "lBarr":                           // LEFTWARDS TRIPLE DASH ARROW
-			return rune(0x290e), true
+			return {'\u290e', 0}, 1, true
 		case "lE":                              // LESS-THAN OVER EQUAL TO
-			return rune(0x2266), true
+			return {'\u2266', 0}, 1, true
 		case "lEg":                             // LESS-THAN ABOVE DOUBLE-LINE EQUAL ABOVE GREATER-THAN
-			return rune(0x2a8b), true
+			return {'\u2a8b', 0}, 1, true
 		case "lHar":                            // LEFTWARDS HARPOON WITH BARB UP ABOVE LEFTWARDS HARPOON WITH BARB DOWN
-			return rune(0x2962), true
+			return {'\u2962', 0}, 1, true
 		case "lacute":                          // LATIN SMALL LETTER L WITH ACUTE
-			return rune(0x013a), true
+			return {'\u013a', 0}, 1, true
 		case "laemptyv":                        // EMPTY SET WITH LEFT ARROW ABOVE
-			return rune(0x29b4), true
+			return {'\u29b4', 0}, 1, true
 		case "lagran":                          // SCRIPT CAPITAL L
-			return rune(0x2112), true
+			return {'\u2112', 0}, 1, true
 		case "lambda":                          // GREEK SMALL LETTER LAMDA
-			return rune(0x03bb), true
+			return {'\u03bb', 0}, 1, true
 		case "lang":                            // MATHEMATICAL LEFT ANGLE BRACKET
-			return rune(0x27e8), true
+			return {'\u27e8', 0}, 1, true
 		case "langd":                           // LEFT ANGLE BRACKET WITH DOT
-			return rune(0x2991), true
+			return {'\u2991', 0}, 1, true
 		case "langle":                          // MATHEMATICAL LEFT ANGLE BRACKET
-			return rune(0x27e8), true
+			return {'\u27e8', 0}, 1, true
 		case "lap":                             // LESS-THAN OR APPROXIMATE
-			return rune(0x2a85), true
+			return {'\u2a85', 0}, 1, true
 		case "laquo":                           // LEFT-POINTING DOUBLE ANGLE QUOTATION MARK
-			return rune(0xab), true
+			return {'«', 0}, 1, true
 		case "larr":                            // LEFTWARDS ARROW
-			return rune(0x2190), true
+			return {'\u2190', 0}, 1, true
 		case "larr2":                           // LEFTWARDS PAIRED ARROWS
-			return rune(0x21c7), true
+			return {'\u21c7', 0}, 1, true
 		case "larrb":                           // LEFTWARDS ARROW TO BAR
-			return rune(0x21e4), true
+			return {'\u21e4', 0}, 1, true
 		case "larrbfs":                         // LEFTWARDS ARROW FROM BAR TO BLACK DIAMOND
-			return rune(0x291f), true
+			return {'\u291f', 0}, 1, true
 		case "larrfs":                          // LEFTWARDS ARROW TO BLACK DIAMOND
-			return rune(0x291d), true
+			return {'\u291d', 0}, 1, true
 		case "larrhk":                          // LEFTWARDS ARROW WITH HOOK
-			return rune(0x21a9), true
+			return {'\u21a9', 0}, 1, true
 		case "larrlp":                          // LEFTWARDS ARROW WITH LOOP
-			return rune(0x21ab), true
+			return {'\u21ab', 0}, 1, true
 		case "larrpl":                          // LEFT-SIDE ARC ANTICLOCKWISE ARROW
-			return rune(0x2939), true
+			return {'\u2939', 0}, 1, true
 		case "larrsim":                         // LEFTWARDS ARROW ABOVE TILDE OPERATOR
-			return rune(0x2973), true
+			return {'\u2973', 0}, 1, true
 		case "larrtl":                          // LEFTWARDS ARROW WITH TAIL
-			return rune(0x21a2), true
+			return {'\u21a2', 0}, 1, true
 		case "lat":                             // LARGER THAN
-			return rune(0x2aab), true
+			return {'\u2aab', 0}, 1, true
 		case "latail":                          // LEFTWARDS ARROW-TAIL
-			return rune(0x2919), true
+			return {'\u2919', 0}, 1, true
 		case "late":                            // LARGER THAN OR EQUAL TO
-			return rune(0x2aad), true
+			return {'\u2aad', 0}, 1, true
 		case "lates":                           // LARGER THAN OR slanted EQUAL
-			return rune(0x2aad), true
+			return {'\u2aad', '\ufe00'}, 2, true
 		case "lbarr":                           // LEFTWARDS DOUBLE DASH ARROW
-			return rune(0x290c), true
+			return {'\u290c', 0}, 1, true
 		case "lbbrk":                           // LIGHT LEFT TORTOISE SHELL BRACKET ORNAMENT
-			return rune(0x2772), true
+			return {'\u2772', 0}, 1, true
 		case "lbrace":                          // LEFT CURLY BRACKET
-			return rune(0x7b), true
+			return {'{', 0}, 1, true
 		case "lbrack":                          // LEFT SQUARE BRACKET
-			return rune(0x5b), true
+			return {'[', 0}, 1, true
 		case "lbrke":                           // LEFT SQUARE BRACKET WITH UNDERBAR
-			return rune(0x298b), true
+			return {'\u298b', 0}, 1, true
 		case "lbrksld":                         // LEFT SQUARE BRACKET WITH TICK IN BOTTOM CORNER
-			return rune(0x298f), true
+			return {'\u298f', 0}, 1, true
 		case "lbrkslu":                         // LEFT SQUARE BRACKET WITH TICK IN TOP CORNER
-			return rune(0x298d), true
+			return {'\u298d', 0}, 1, true
 		case "lcaron":                          // LATIN SMALL LETTER L WITH CARON
-			return rune(0x013e), true
+			return {'\u013e', 0}, 1, true
 		case "lcedil":                          // LATIN SMALL LETTER L WITH CEDILLA
-			return rune(0x013c), true
+			return {'\u013c', 0}, 1, true
 		case "lceil":                           // LEFT CEILING
-			return rune(0x2308), true
+			return {'\u2308', 0}, 1, true
 		case "lcub":                            // LEFT CURLY BRACKET
-			return rune(0x7b), true
+			return {'{', 0}, 1, true
 		case "lcy":                             // CYRILLIC SMALL LETTER EL
-			return rune(0x043b), true
+			return {'\u043b', 0}, 1, true
 		case "ldca":                            // ARROW POINTING DOWNWARDS THEN CURVING LEFTWARDS
-			return rune(0x2936), true
+			return {'\u2936', 0}, 1, true
 		case "ldharb":                          // LEFTWARDS HARPOON WITH BARB DOWN TO BAR
-			return rune(0x2956), true
+			return {'\u2956', 0}, 1, true
 		case "ldot":                            // LESS-THAN WITH DOT
-			return rune(0x22d6), true
+			return {'\u22d6', 0}, 1, true
 		case "ldquo":                           // LEFT DOUBLE QUOTATION MARK
-			return rune(0x201c), true
+			return {'\u201c', 0}, 1, true
 		case "ldquor":                          // DOUBLE LOW-9 QUOTATION MARK
-			return rune(0x201e), true
+			return {'\u201e', 0}, 1, true
 		case "ldrdhar":                         // LEFTWARDS HARPOON WITH BARB DOWN ABOVE RIGHTWARDS HARPOON WITH BARB DOWN
-			return rune(0x2967), true
+			return {'\u2967', 0}, 1, true
 		case "ldrdshar":                        // LEFT BARB DOWN RIGHT BARB DOWN HARPOON
-			return rune(0x2950), true
+			return {'\u2950', 0}, 1, true
 		case "ldrushar":                        // LEFT BARB DOWN RIGHT BARB UP HARPOON
-			return rune(0x294b), true
+			return {'\u294b', 0}, 1, true
 		case "ldsh":                            // DOWNWARDS ARROW WITH TIP LEFTWARDS
-			return rune(0x21b2), true
+			return {'\u21b2', 0}, 1, true
 		case "le":                              // LESS-THAN OR EQUAL TO
-			return rune(0x2264), true
+			return {'\u2264', 0}, 1, true
 		case "leftarrow":                       // LEFTWARDS ARROW
-			return rune(0x2190), true
+			return {'\u2190', 0}, 1, true
 		case "leftarrowtail":                   // LEFTWARDS ARROW WITH TAIL
-			return rune(0x21a2), true
+			return {'\u21a2', 0}, 1, true
 		case "leftharpoondown":                 // LEFTWARDS HARPOON WITH BARB DOWNWARDS
-			return rune(0x21bd), true
+			return {'\u21bd', 0}, 1, true
 		case "leftharpoonup":                   // LEFTWARDS HARPOON WITH BARB UPWARDS
-			return rune(0x21bc), true
+			return {'\u21bc', 0}, 1, true
 		case "leftleftarrows":                  // LEFTWARDS PAIRED ARROWS
-			return rune(0x21c7), true
+			return {'\u21c7', 0}, 1, true
 		case "leftrightarrow":                  // LEFT RIGHT ARROW
-			return rune(0x2194), true
+			return {'\u2194', 0}, 1, true
 		case "leftrightarrows":                 // LEFTWARDS ARROW OVER RIGHTWARDS ARROW
-			return rune(0x21c6), true
+			return {'\u21c6', 0}, 1, true
 		case "leftrightharpoons":               // LEFTWARDS HARPOON OVER RIGHTWARDS HARPOON
-			return rune(0x21cb), true
+			return {'\u21cb', 0}, 1, true
 		case "leftrightsquigarrow":             // LEFT RIGHT WAVE ARROW
-			return rune(0x21ad), true
+			return {'\u21ad', 0}, 1, true
 		case "leftthreetimes":                  // LEFT SEMIDIRECT PRODUCT
-			return rune(0x22cb), true
+			return {'\u22cb', 0}, 1, true
 		case "leg":                             // LESS-THAN EQUAL TO OR GREATER-THAN
-			return rune(0x22da), true
+			return {'\u22da', 0}, 1, true
 		case "leq":                             // LESS-THAN OR EQUAL TO
-			return rune(0x2264), true
+			return {'\u2264', 0}, 1, true
 		case "leqq":                            // LESS-THAN OVER EQUAL TO
-			return rune(0x2266), true
+			return {'\u2266', 0}, 1, true
 		case "leqslant":                        // LESS-THAN OR SLANTED EQUAL TO
-			return rune(0x2a7d), true
+			return {'\u2a7d', 0}, 1, true
 		case "les":                             // LESS-THAN OR SLANTED EQUAL TO
-			return rune(0x2a7d), true
+			return {'\u2a7d', 0}, 1, true
 		case "lescc":                           // LESS-THAN CLOSED BY CURVE ABOVE SLANTED EQUAL
-			return rune(0x2aa8), true
+			return {'\u2aa8', 0}, 1, true
 		case "lesdot":                          // LESS-THAN OR SLANTED EQUAL TO WITH DOT INSIDE
-			return rune(0x2a7f), true
+			return {'\u2a7f', 0}, 1, true
 		case "lesdoto":                         // LESS-THAN OR SLANTED EQUAL TO WITH DOT ABOVE
-			return rune(0x2a81), true
+			return {'\u2a81', 0}, 1, true
 		case "lesdotor":                        // LESS-THAN OR SLANTED EQUAL TO WITH DOT ABOVE RIGHT
-			return rune(0x2a83), true
+			return {'\u2a83', 0}, 1, true
 		case "lesg":                            // LESS-THAN slanted EQUAL TO OR GREATER-THAN
-			return rune(0x22da), true
+			return {'\u22da', '\ufe00'}, 2, true
 		case "lesges":                          // LESS-THAN ABOVE SLANTED EQUAL ABOVE GREATER-THAN ABOVE SLANTED EQUAL
-			return rune(0x2a93), true
+			return {'\u2a93', 0}, 1, true
 		case "lessapprox":                      // LESS-THAN OR APPROXIMATE
-			return rune(0x2a85), true
+			return {'\u2a85', 0}, 1, true
 		case "lessdot":                         // LESS-THAN WITH DOT
-			return rune(0x22d6), true
+			return {'\u22d6', 0}, 1, true
 		case "lesseqgtr":                       // LESS-THAN EQUAL TO OR GREATER-THAN
-			return rune(0x22da), true
+			return {'\u22da', 0}, 1, true
 		case "lesseqqgtr":                      // LESS-THAN ABOVE DOUBLE-LINE EQUAL ABOVE GREATER-THAN
-			return rune(0x2a8b), true
+			return {'\u2a8b', 0}, 1, true
 		case "lessgtr":                         // LESS-THAN OR GREATER-THAN
-			return rune(0x2276), true
+			return {'\u2276', 0}, 1, true
 		case "lesssim":                         // LESS-THAN OR EQUIVALENT TO
-			return rune(0x2272), true
+			return {'\u2272', 0}, 1, true
 		case "lfbowtie":                        // BOWTIE WITH LEFT HALF BLACK
-			return rune(0x29d1), true
+			return {'\u29d1', 0}, 1, true
 		case "lfisht":                          // LEFT FISH TAIL
-			return rune(0x297c), true
+			return {'\u297c', 0}, 1, true
 		case "lfloor":                          // LEFT FLOOR
-			return rune(0x230a), true
+			return {'\u230a', 0}, 1, true
 		case "lfr":                             // MATHEMATICAL FRAKTUR SMALL L
-			return rune(0x01d529), true
+			return {'\U0001d529', 0}, 1, true
 		case "lftimes":                         // TIMES WITH LEFT HALF BLACK
-			return rune(0x29d4), true
+			return {'\u29d4', 0}, 1, true
 		case "lg":                              // LESS-THAN OR GREATER-THAN
-			return rune(0x2276), true
+			return {'\u2276', 0}, 1, true
 		case "lgE":                             // LESS-THAN ABOVE GREATER-THAN ABOVE DOUBLE-LINE EQUAL
-			return rune(0x2a91), true
+			return {'\u2a91', 0}, 1, true
 		case "lgr":                             // GREEK SMALL LETTER LAMDA
-			return rune(0x03bb), true
+			return {'\u03bb', 0}, 1, true
 		case "lhard":                           // LEFTWARDS HARPOON WITH BARB DOWNWARDS
-			return rune(0x21bd), true
+			return {'\u21bd', 0}, 1, true
 		case "lharu":                           // LEFTWARDS HARPOON WITH BARB UPWARDS
-			return rune(0x21bc), true
+			return {'\u21bc', 0}, 1, true
 		case "lharul":                          // LEFTWARDS HARPOON WITH BARB UP ABOVE LONG DASH
-			return rune(0x296a), true
+			return {'\u296a', 0}, 1, true
 		case "lhblk":                           // LOWER HALF BLOCK
-			return rune(0x2584), true
+			return {'\u2584', 0}, 1, true
 		case "ljcy":                            // CYRILLIC SMALL LETTER LJE
-			return rune(0x0459), true
+			return {'\u0459', 0}, 1, true
 		case "ll":                              // MUCH LESS-THAN
-			return rune(0x226a), true
+			return {'\u226a', 0}, 1, true
 		case "llarr":                           // LEFTWARDS PAIRED ARROWS
-			return rune(0x21c7), true
+			return {'\u21c7', 0}, 1, true
 		case "llcorner":                        // BOTTOM LEFT CORNER
-			return rune(0x231e), true
+			return {'\u231e', 0}, 1, true
 		case "llhard":                          // LEFTWARDS HARPOON WITH BARB DOWN BELOW LONG DASH
-			return rune(0x296b), true
+			return {'\u296b', 0}, 1, true
 		case "lltri":                           // LOWER LEFT TRIANGLE
-			return rune(0x25fa), true
+			return {'\u25fa', 0}, 1, true
 		case "lltrif":                          // BLACK LOWER LEFT TRIANGLE
-			return rune(0x25e3), true
+			return {'\u25e3', 0}, 1, true
 		case "lmidot":                          // LATIN SMALL LETTER L WITH MIDDLE DOT
-			return rune(0x0140), true
+			return {'\u0140', 0}, 1, true
 		case "lmoust":                          // UPPER LEFT OR LOWER RIGHT CURLY BRACKET SECTION
-			return rune(0x23b0), true
+			return {'\u23b0', 0}, 1, true
 		case "lmoustache":                      // UPPER LEFT OR LOWER RIGHT CURLY BRACKET SECTION
-			return rune(0x23b0), true
+			return {'\u23b0', 0}, 1, true
 		case "lnE":                             // LESS-THAN BUT NOT EQUAL TO
-			return rune(0x2268), true
+			return {'\u2268', 0}, 1, true
 		case "lnap":                            // LESS-THAN AND NOT APPROXIMATE
-			return rune(0x2a89), true
+			return {'\u2a89', 0}, 1, true
 		case "lnapprox":                        // LESS-THAN AND NOT APPROXIMATE
-			return rune(0x2a89), true
+			return {'\u2a89', 0}, 1, true
 		case "lne":                             // LESS-THAN AND SINGLE-LINE NOT EQUAL TO
-			return rune(0x2a87), true
+			return {'\u2a87', 0}, 1, true
 		case "lneq":                            // LESS-THAN AND SINGLE-LINE NOT EQUAL TO
-			return rune(0x2a87), true
+			return {'\u2a87', 0}, 1, true
 		case "lneqq":                           // LESS-THAN BUT NOT EQUAL TO
-			return rune(0x2268), true
+			return {'\u2268', 0}, 1, true
 		case "lnsim":                           // LESS-THAN BUT NOT EQUIVALENT TO
-			return rune(0x22e6), true
+			return {'\u22e6', 0}, 1, true
 		case "loang":                           // MATHEMATICAL LEFT WHITE TORTOISE SHELL BRACKET
-			return rune(0x27ec), true
+			return {'\u27ec', 0}, 1, true
 		case "loarr":                           // LEFTWARDS OPEN-HEADED ARROW
-			return rune(0x21fd), true
+			return {'\u21fd', 0}, 1, true
 		case "lobrk":                           // MATHEMATICAL LEFT WHITE SQUARE BRACKET
-			return rune(0x27e6), true
+			return {'\u27e6', 0}, 1, true
 		case "locub":                           // LEFT WHITE CURLY BRACKET
-			return rune(0x2983), true
+			return {'\u2983', 0}, 1, true
 		case "longleftarrow":                   // LONG LEFTWARDS ARROW
-			return rune(0x27f5), true
+			return {'\u27f5', 0}, 1, true
 		case "longleftrightarrow":              // LONG LEFT RIGHT ARROW
-			return rune(0x27f7), true
+			return {'\u27f7', 0}, 1, true
 		case "longmapsto":                      // LONG RIGHTWARDS ARROW FROM BAR
-			return rune(0x27fc), true
+			return {'\u27fc', 0}, 1, true
 		case "longrightarrow":                  // LONG RIGHTWARDS ARROW
-			return rune(0x27f6), true
+			return {'\u27f6', 0}, 1, true
 		case "looparrowleft":                   // LEFTWARDS ARROW WITH LOOP
-			return rune(0x21ab), true
+			return {'\u21ab', 0}, 1, true
 		case "looparrowright":                  // RIGHTWARDS ARROW WITH LOOP
-			return rune(0x21ac), true
+			return {'\u21ac', 0}, 1, true
 		case "lopar":                           // LEFT WHITE PARENTHESIS
-			return rune(0x2985), true
+			return {'\u2985', 0}, 1, true
 		case "lopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL L
-			return rune(0x01d55d), true
+			return {'\U0001d55d', 0}, 1, true
 		case "loplus":                          // PLUS SIGN IN LEFT HALF CIRCLE
-			return rune(0x2a2d), true
+			return {'\u2a2d', 0}, 1, true
 		case "lotimes":                         // MULTIPLICATION SIGN IN LEFT HALF CIRCLE
-			return rune(0x2a34), true
+			return {'\u2a34', 0}, 1, true
 		case "lowast":                          // LOW ASTERISK
-			return rune(0x204e), true
+			return {'\u204e', 0}, 1, true
 		case "lowbar":                          // LOW LINE
-			return rune(0x5f), true
+			return {'_', 0}, 1, true
 		case "lowint":                          // INTEGRAL WITH UNDERBAR
-			return rune(0x2a1c), true
+			return {'\u2a1c', 0}, 1, true
 		case "loz":                             // LOZENGE
-			return rune(0x25ca), true
+			return {'\u25ca', 0}, 1, true
 		case "lozenge":                         // LOZENGE
-			return rune(0x25ca), true
+			return {'\u25ca', 0}, 1, true
 		case "lozf":                            // BLACK LOZENGE
-			return rune(0x29eb), true
+			return {'\u29eb', 0}, 1, true
 		case "lpar":                            // LEFT PARENTHESIS
-			return rune(0x28), true
+			return {'(', 0}, 1, true
 		case "lpargt":                          // SPHERICAL ANGLE OPENING LEFT
-			return rune(0x29a0), true
+			return {'\u29a0', 0}, 1, true
 		case "lparlt":                          // LEFT ARC LESS-THAN BRACKET
-			return rune(0x2993), true
+			return {'\u2993', 0}, 1, true
 		case "lrarr":                           // LEFTWARDS ARROW OVER RIGHTWARDS ARROW
-			return rune(0x21c6), true
+			return {'\u21c6', 0}, 1, true
 		case "lrarr2":                          // LEFTWARDS ARROW OVER RIGHTWARDS ARROW
-			return rune(0x21c6), true
+			return {'\u21c6', 0}, 1, true
 		case "lrcorner":                        // BOTTOM RIGHT CORNER
-			return rune(0x231f), true
+			return {'\u231f', 0}, 1, true
 		case "lrhar":                           // LEFTWARDS HARPOON OVER RIGHTWARDS HARPOON
-			return rune(0x21cb), true
+			return {'\u21cb', 0}, 1, true
 		case "lrhar2":                          // LEFTWARDS HARPOON OVER RIGHTWARDS HARPOON
-			return rune(0x21cb), true
+			return {'\u21cb', 0}, 1, true
 		case "lrhard":                          // RIGHTWARDS HARPOON WITH BARB DOWN BELOW LONG DASH
-			return rune(0x296d), true
+			return {'\u296d', 0}, 1, true
 		case "lrm":                             // LEFT-TO-RIGHT MARK
-			return rune(0x200e), true
+			return {'\u200e', 0}, 1, true
 		case "lrtri":                           // RIGHT TRIANGLE
-			return rune(0x22bf), true
+			return {'\u22bf', 0}, 1, true
 		case "lsaquo":                          // SINGLE LEFT-POINTING ANGLE QUOTATION MARK
-			return rune(0x2039), true
+			return {'\u2039', 0}, 1, true
 		case "lscr":                            // MATHEMATICAL SCRIPT SMALL L
-			return rune(0x01d4c1), true
+			return {'\U0001d4c1', 0}, 1, true
 		case "lsh":                             // UPWARDS ARROW WITH TIP LEFTWARDS
-			return rune(0x21b0), true
+			return {'\u21b0', 0}, 1, true
 		case "lsim":                            // LESS-THAN OR EQUIVALENT TO
-			return rune(0x2272), true
+			return {'\u2272', 0}, 1, true
 		case "lsime":                           // LESS-THAN ABOVE SIMILAR OR EQUAL
-			return rune(0x2a8d), true
+			return {'\u2a8d', 0}, 1, true
 		case "lsimg":                           // LESS-THAN ABOVE SIMILAR ABOVE GREATER-THAN
-			return rune(0x2a8f), true
+			return {'\u2a8f', 0}, 1, true
 		case "lsqb":                            // LEFT SQUARE BRACKET
-			return rune(0x5b), true
+			return {'[', 0}, 1, true
 		case "lsquo":                           // LEFT SINGLE QUOTATION MARK
-			return rune(0x2018), true
+			return {'\u2018', 0}, 1, true
 		case "lsquor":                          // SINGLE LOW-9 QUOTATION MARK
-			return rune(0x201a), true
+			return {'\u201a', 0}, 1, true
 		case "lstrok":                          // LATIN SMALL LETTER L WITH STROKE
-			return rune(0x0142), true
+			return {'\u0142', 0}, 1, true
 		case "lt":                              // LESS-THAN SIGN
-			return rune(0x3c), true
+			return {'<', 0}, 1, true
 		case "ltcc":                            // LESS-THAN CLOSED BY CURVE
-			return rune(0x2aa6), true
+			return {'\u2aa6', 0}, 1, true
 		case "ltcir":                           // LESS-THAN WITH CIRCLE INSIDE
-			return rune(0x2a79), true
+			return {'\u2a79', 0}, 1, true
 		case "ltdot":                           // LESS-THAN WITH DOT
-			return rune(0x22d6), true
+			return {'\u22d6', 0}, 1, true
 		case "lthree":                          // LEFT SEMIDIRECT PRODUCT
-			return rune(0x22cb), true
+			return {'\u22cb', 0}, 1, true
 		case "ltimes":                          // LEFT NORMAL FACTOR SEMIDIRECT PRODUCT
-			return rune(0x22c9), true
+			return {'\u22c9', 0}, 1, true
 		case "ltlarr":                          // LESS-THAN ABOVE LEFTWARDS ARROW
-			return rune(0x2976), true
+			return {'\u2976', 0}, 1, true
 		case "ltquest":                         // LESS-THAN WITH QUESTION MARK ABOVE
-			return rune(0x2a7b), true
+			return {'\u2a7b', 0}, 1, true
 		case "ltrPar":                          // DOUBLE RIGHT ARC LESS-THAN BRACKET
-			return rune(0x2996), true
+			return {'\u2996', 0}, 1, true
 		case "ltri":                            // WHITE LEFT-POINTING SMALL TRIANGLE
-			return rune(0x25c3), true
+			return {'\u25c3', 0}, 1, true
 		case "ltrie":                           // NORMAL SUBGROUP OF OR EQUAL TO
-			return rune(0x22b4), true
+			return {'\u22b4', 0}, 1, true
 		case "ltrif":                           // BLACK LEFT-POINTING SMALL TRIANGLE
-			return rune(0x25c2), true
+			return {'\u25c2', 0}, 1, true
 		case "ltrivb":                          // LEFT TRIANGLE BESIDE VERTICAL BAR
-			return rune(0x29cf), true
+			return {'\u29cf', 0}, 1, true
 		case "luharb":                          // LEFTWARDS HARPOON WITH BARB UP TO BAR
-			return rune(0x2952), true
+			return {'\u2952', 0}, 1, true
 		case "lurdshar":                        // LEFT BARB UP RIGHT BARB DOWN HARPOON
-			return rune(0x294a), true
+			return {'\u294a', 0}, 1, true
 		case "luruhar":                         // LEFTWARDS HARPOON WITH BARB UP ABOVE RIGHTWARDS HARPOON WITH BARB UP
-			return rune(0x2966), true
+			return {'\u2966', 0}, 1, true
 		case "lurushar":                        // LEFT BARB UP RIGHT BARB UP HARPOON
-			return rune(0x294e), true
+			return {'\u294e', 0}, 1, true
 		case "lvertneqq":                       // LESS-THAN BUT NOT EQUAL TO - with vertical stroke
-			return rune(0x2268), true
+			return {'\u2268', '\ufe00'}, 2, true
 		case "lvnE":                            // LESS-THAN BUT NOT EQUAL TO - with vertical stroke
-			return rune(0x2268), true
+			return {'\u2268', '\ufe00'}, 2, true
 		}
 
 	case 'm':
 		switch name {
 		case "mDDot":                           // GEOMETRIC PROPORTION
-			return rune(0x223a), true
+			return {'\u223a', 0}, 1, true
 		case "macr":                            // MACRON
-			return rune(0xaf), true
+			return {'¯', 0}, 1, true
 		case "male":                            // MALE SIGN
-			return rune(0x2642), true
+			return {'\u2642', 0}, 1, true
 		case "malt":                            // MALTESE CROSS
-			return rune(0x2720), true
+			return {'\u2720', 0}, 1, true
 		case "maltese":                         // MALTESE CROSS
-			return rune(0x2720), true
+			return {'\u2720', 0}, 1, true
 		case "map":                             // RIGHTWARDS ARROW FROM BAR
-			return rune(0x21a6), true
+			return {'\u21a6', 0}, 1, true
 		case "mapsto":                          // RIGHTWARDS ARROW FROM BAR
-			return rune(0x21a6), true
+			return {'\u21a6', 0}, 1, true
 		case "mapstodown":                      // DOWNWARDS ARROW FROM BAR
-			return rune(0x21a7), true
+			return {'\u21a7', 0}, 1, true
 		case "mapstoleft":                      // LEFTWARDS ARROW FROM BAR
-			return rune(0x21a4), true
+			return {'\u21a4', 0}, 1, true
 		case "mapstoup":                        // UPWARDS ARROW FROM BAR
-			return rune(0x21a5), true
+			return {'\u21a5', 0}, 1, true
 		case "marker":                          // BLACK VERTICAL RECTANGLE
-			return rune(0x25ae), true
+			return {'\u25ae', 0}, 1, true
 		case "mcomma":                          // MINUS SIGN WITH COMMA ABOVE
-			return rune(0x2a29), true
+			return {'\u2a29', 0}, 1, true
 		case "mcy":                             // CYRILLIC SMALL LETTER EM
-			return rune(0x043c), true
+			return {'\u043c', 0}, 1, true
 		case "mdash":                           // EM DASH
-			return rune(0x2014), true
+			return {'\u2014', 0}, 1, true
 		case "measuredangle":                   // MEASURED ANGLE
-			return rune(0x2221), true
+			return {'\u2221', 0}, 1, true
 		case "mfr":                             // MATHEMATICAL FRAKTUR SMALL M
-			return rune(0x01d52a), true
+			return {'\U0001d52a', 0}, 1, true
 		case "mgr":                             // GREEK SMALL LETTER MU
-			return rune(0x03bc), true
+			return {'\u03bc', 0}, 1, true
 		case "mho":                             // INVERTED OHM SIGN
-			return rune(0x2127), true
+			return {'\u2127', 0}, 1, true
 		case "micro":                           // MICRO SIGN
-			return rune(0xb5), true
+			return {'µ', 0}, 1, true
 		case "mid":                             // DIVIDES
-			return rune(0x2223), true
+			return {'\u2223', 0}, 1, true
 		case "midast":                          // ASTERISK
-			return rune(0x2a), true
+			return {'*', 0}, 1, true
 		case "midcir":                          // VERTICAL LINE WITH CIRCLE BELOW
-			return rune(0x2af0), true
+			return {'\u2af0', 0}, 1, true
 		case "middot":                          // MIDDLE DOT
-			return rune(0xb7), true
+			return {'·', 0}, 1, true
 		case "minus":                           // MINUS SIGN
-			return rune(0x2212), true
+			return {'\u2212', 0}, 1, true
 		case "minusb":                          // SQUARED MINUS
-			return rune(0x229f), true
+			return {'\u229f', 0}, 1, true
 		case "minusd":                          // DOT MINUS
-			return rune(0x2238), true
+			return {'\u2238', 0}, 1, true
 		case "minusdu":                         // MINUS SIGN WITH DOT BELOW
-			return rune(0x2a2a), true
+			return {'\u2a2a', 0}, 1, true
 		case "mlcp":                            // TRANSVERSAL INTERSECTION
-			return rune(0x2adb), true
+			return {'\u2adb', 0}, 1, true
 		case "mldr":                            // HORIZONTAL ELLIPSIS
-			return rune(0x2026), true
+			return {'\u2026', 0}, 1, true
 		case "mnplus":                          // MINUS-OR-PLUS SIGN
-			return rune(0x2213), true
+			return {'\u2213', 0}, 1, true
 		case "models":                          // MODELS
-			return rune(0x22a7), true
+			return {'\u22a7', 0}, 1, true
 		case "mopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL M
-			return rune(0x01d55e), true
+			return {'\U0001d55e', 0}, 1, true
 		case "mp":                              // MINUS-OR-PLUS SIGN
-			return rune(0x2213), true
+			return {'\u2213', 0}, 1, true
 		case "mscr":                            // MATHEMATICAL SCRIPT SMALL M
-			return rune(0x01d4c2), true
+			return {'\U0001d4c2', 0}, 1, true
 		case "mstpos":                          // INVERTED LAZY S
-			return rune(0x223e), true
+			return {'\u223e', 0}, 1, true
 		case "mu":                              // GREEK SMALL LETTER MU
-			return rune(0x03bc), true
+			return {'\u03bc', 0}, 1, true
 		case "multimap":                        // MULTIMAP
-			return rune(0x22b8), true
+			return {'\u22b8', 0}, 1, true
 		case "mumap":                           // MULTIMAP
-			return rune(0x22b8), true
+			return {'\u22b8', 0}, 1, true
 		}
 
 	case 'n':
 		switch name {
 		case "nGg":                             // VERY MUCH GREATER-THAN with slash
-			return rune(0x22d9), true
+			return {'\u22d9', '\u0338'}, 2, true
 		case "nGt":                             // MUCH GREATER THAN with vertical line
-			return rune(0x226b), true
+			return {'\u226b', '\u20d2'}, 2, true
 		case "nGtv":                            // MUCH GREATER THAN with slash
-			return rune(0x226b), true
+			return {'\u226b', '\u0338'}, 2, true
 		case "nLeftarrow":                      // LEFTWARDS DOUBLE ARROW WITH STROKE
-			return rune(0x21cd), true
+			return {'\u21cd', 0}, 1, true
 		case "nLeftrightarrow":                 // LEFT RIGHT DOUBLE ARROW WITH STROKE
-			return rune(0x21ce), true
+			return {'\u21ce', 0}, 1, true
 		case "nLl":                             // VERY MUCH LESS-THAN with slash
-			return rune(0x22d8), true
+			return {'\u22d8', '\u0338'}, 2, true
 		case "nLt":                             // MUCH LESS THAN with vertical line
-			return rune(0x226a), true
+			return {'\u226a', '\u20d2'}, 2, true
 		case "nLtv":                            // MUCH LESS THAN with slash
-			return rune(0x226a), true
+			return {'\u226a', '\u0338'}, 2, true
 		case "nRightarrow":                     // RIGHTWARDS DOUBLE ARROW WITH STROKE
-			return rune(0x21cf), true
+			return {'\u21cf', 0}, 1, true
 		case "nVDash":                          // NEGATED DOUBLE VERTICAL BAR DOUBLE RIGHT TURNSTILE
-			return rune(0x22af), true
+			return {'\u22af', 0}, 1, true
 		case "nVdash":                          // DOES NOT FORCE
-			return rune(0x22ae), true
+			return {'\u22ae', 0}, 1, true
 		case "nabla":                           // NABLA
-			return rune(0x2207), true
+			return {'\u2207', 0}, 1, true
 		case "nacute":                          // LATIN SMALL LETTER N WITH ACUTE
-			return rune(0x0144), true
+			return {'\u0144', 0}, 1, true
 		case "nang":                            // ANGLE with vertical line
-			return rune(0x2220), true
+			return {'\u2220', '\u20d2'}, 2, true
 		case "nap":                             // NOT ALMOST EQUAL TO
-			return rune(0x2249), true
+			return {'\u2249', 0}, 1, true
 		case "napE":                            // APPROXIMATELY EQUAL OR EQUAL TO with slash
-			return rune(0x2a70), true
+			return {'\u2a70', '\u0338'}, 2, true
 		case "napid":                           // TRIPLE TILDE with slash
-			return rune(0x224b), true
+			return {'\u224b', '\u0338'}, 2, true
 		case "napos":                           // LATIN SMALL LETTER N PRECEDED BY APOSTROPHE
-			return rune(0x0149), true
+			return {'\u0149', 0}, 1, true
 		case "napprox":                         // NOT ALMOST EQUAL TO
-			return rune(0x2249), true
+			return {'\u2249', 0}, 1, true
 		case "natur":                           // MUSIC NATURAL SIGN
-			return rune(0x266e), true
+			return {'\u266e', 0}, 1, true
 		case "natural":                         // MUSIC NATURAL SIGN
-			return rune(0x266e), true
+			return {'\u266e', 0}, 1, true
 		case "naturals":                        // DOUBLE-STRUCK CAPITAL N
-			return rune(0x2115), true
+			return {'\u2115', 0}, 1, true
 		case "nbsp":                            // NO-BREAK SPACE
-			return rune(0xa0), true
+			return {'\u00a0', 0}, 1, true
 		case "nbump":                           // GEOMETRICALLY EQUIVALENT TO with slash
-			return rune(0x224e), true
+			return {'\u224e', '\u0338'}, 2, true
 		case "nbumpe":                          // DIFFERENCE BETWEEN with slash
-			return rune(0x224f), true
+			return {'\u224f', '\u0338'}, 2, true
 		case "ncap":                            // INTERSECTION WITH OVERBAR
-			return rune(0x2a43), true
+			return {'\u2a43', 0}, 1, true
 		case "ncaron":                          // LATIN SMALL LETTER N WITH CARON
-			return rune(0x0148), true
+			return {'\u0148', 0}, 1, true
 		case "ncedil":                          // LATIN SMALL LETTER N WITH CEDILLA
-			return rune(0x0146), true
+			return {'\u0146', 0}, 1, true
 		case "ncong":                           // NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO
-			return rune(0x2247), true
+			return {'\u2247', 0}, 1, true
 		case "ncongdot":                        // CONGRUENT WITH DOT ABOVE with slash
-			return rune(0x2a6d), true
+			return {'\u2a6d', '\u0338'}, 2, true
 		case "ncup":                            // UNION WITH OVERBAR
-			return rune(0x2a42), true
+			return {'\u2a42', 0}, 1, true
 		case "ncy":                             // CYRILLIC SMALL LETTER EN
-			return rune(0x043d), true
+			return {'\u043d', 0}, 1, true
 		case "ndash":                           // EN DASH
-			return rune(0x2013), true
+			return {'\u2013', 0}, 1, true
 		case "ne":                              // NOT EQUAL TO
-			return rune(0x2260), true
+			return {'\u2260', 0}, 1, true
 		case "neArr":                           // NORTH EAST DOUBLE ARROW
-			return rune(0x21d7), true
+			return {'\u21d7', 0}, 1, true
 		case "nearhk":                          // NORTH EAST ARROW WITH HOOK
-			return rune(0x2924), true
+			return {'\u2924', 0}, 1, true
 		case "nearr":                           // NORTH EAST ARROW
-			return rune(0x2197), true
+			return {'\u2197', 0}, 1, true
 		case "nearrow":                         // NORTH EAST ARROW
-			return rune(0x2197), true
+			return {'\u2197', 0}, 1, true
 		case "nedot":                           // APPROACHES THE LIMIT with slash
-			return rune(0x2250), true
+			return {'\u2250', '\u0338'}, 2, true
 		case "neonwarr":                        // NORTH EAST ARROW CROSSING NORTH WEST ARROW
-			return rune(0x2931), true
+			return {'\u2931', 0}, 1, true
 		case "neosearr":                        // NORTH EAST ARROW CROSSING SOUTH EAST ARROW
-			return rune(0x292e), true
+			return {'\u292e', 0}, 1, true
 		case "nequiv":                          // NOT IDENTICAL TO
-			return rune(0x2262), true
+			return {'\u2262', 0}, 1, true
 		case "nesear":                          // NORTH EAST ARROW AND SOUTH EAST ARROW
-			return rune(0x2928), true
+			return {'\u2928', 0}, 1, true
 		case "nesim":                           // MINUS TILDE with slash
-			return rune(0x2242), true
+			return {'\u2242', '\u0338'}, 2, true
 		case "neswsarr":                        // NORTH EAST AND SOUTH WEST ARROW
-			return rune(0x2922), true
+			return {'\u2922', 0}, 1, true
 		case "nexist":                          // THERE DOES NOT EXIST
-			return rune(0x2204), true
+			return {'\u2204', 0}, 1, true
 		case "nexists":                         // THERE DOES NOT EXIST
-			return rune(0x2204), true
+			return {'\u2204', 0}, 1, true
 		case "nfr":                             // MATHEMATICAL FRAKTUR SMALL N
-			return rune(0x01d52b), true
+			return {'\U0001d52b', 0}, 1, true
 		case "ngE":                             // GREATER-THAN OVER EQUAL TO with slash
-			return rune(0x2267), true
+			return {'\u2267', '\u0338'}, 2, true
 		case "nge":                             // NEITHER GREATER-THAN NOR EQUAL TO
-			return rune(0x2271), true
+			return {'\u2271', 0}, 1, true
 		case "ngeq":                            // NEITHER GREATER-THAN NOR EQUAL TO
-			return rune(0x2271), true
+			return {'\u2271', 0}, 1, true
 		case "ngeqq":                           // GREATER-THAN OVER EQUAL TO with slash
-			return rune(0x2267), true
+			return {'\u2267', '\u0338'}, 2, true
 		case "ngeqslant":                       // GREATER-THAN OR SLANTED EQUAL TO with slash
-			return rune(0x2a7e), true
+			return {'\u2a7e', '\u0338'}, 2, true
 		case "nges":                            // GREATER-THAN OR SLANTED EQUAL TO with slash
-			return rune(0x2a7e), true
+			return {'\u2a7e', '\u0338'}, 2, true
 		case "ngr":                             // GREEK SMALL LETTER NU
-			return rune(0x03bd), true
+			return {'\u03bd', 0}, 1, true
 		case "ngsim":                           // NEITHER GREATER-THAN NOR EQUIVALENT TO
-			return rune(0x2275), true
+			return {'\u2275', 0}, 1, true
 		case "ngt":                             // NOT GREATER-THAN
-			return rune(0x226f), true
+			return {'\u226f', 0}, 1, true
 		case "ngtr":                            // NOT GREATER-THAN
-			return rune(0x226f), true
+			return {'\u226f', 0}, 1, true
 		case "nhArr":                           // LEFT RIGHT DOUBLE ARROW WITH STROKE
-			return rune(0x21ce), true
+			return {'\u21ce', 0}, 1, true
 		case "nharr":                           // LEFT RIGHT ARROW WITH STROKE
-			return rune(0x21ae), true
+			return {'\u21ae', 0}, 1, true
 		case "nhpar":                           // PARALLEL WITH HORIZONTAL STROKE
-			return rune(0x2af2), true
+			return {'\u2af2', 0}, 1, true
 		case "ni":                              // CONTAINS AS MEMBER
-			return rune(0x220b), true
+			return {'\u220b', 0}, 1, true
 		case "nis":                             // SMALL CONTAINS WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
-			return rune(0x22fc), true
+			return {'\u22fc', 0}, 1, true
 		case "nisd":                            // CONTAINS WITH LONG HORIZONTAL STROKE
-			return rune(0x22fa), true
+			return {'\u22fa', 0}, 1, true
 		case "niv":                             // CONTAINS AS MEMBER
-			return rune(0x220b), true
+			return {'\u220b', 0}, 1, true
 		case "njcy":                            // CYRILLIC SMALL LETTER NJE
-			return rune(0x045a), true
+			return {'\u045a', 0}, 1, true
 		case "nlArr":                           // LEFTWARDS DOUBLE ARROW WITH STROKE
-			return rune(0x21cd), true
+			return {'\u21cd', 0}, 1, true
 		case "nlE":                             // LESS-THAN OVER EQUAL TO with slash
-			return rune(0x2266), true
+			return {'\u2266', '\u0338'}, 2, true
 		case "nlarr":                           // LEFTWARDS ARROW WITH STROKE
-			return rune(0x219a), true
+			return {'\u219a', 0}, 1, true
 		case "nldr":                            // TWO DOT LEADER
-			return rune(0x2025), true
+			return {'\u2025', 0}, 1, true
 		case "nle":                             // NEITHER LESS-THAN NOR EQUAL TO
-			return rune(0x2270), true
+			return {'\u2270', 0}, 1, true
 		case "nleftarrow":                      // LEFTWARDS ARROW WITH STROKE
-			return rune(0x219a), true
+			return {'\u219a', 0}, 1, true
 		case "nleftrightarrow":                 // LEFT RIGHT ARROW WITH STROKE
-			return rune(0x21ae), true
+			return {'\u21ae', 0}, 1, true
 		case "nleq":                            // NEITHER LESS-THAN NOR EQUAL TO
-			return rune(0x2270), true
+			return {'\u2270', 0}, 1, true
 		case "nleqq":                           // LESS-THAN OVER EQUAL TO with slash
-			return rune(0x2266), true
+			return {'\u2266', '\u0338'}, 2, true
 		case "nleqslant":                       // LESS-THAN OR SLANTED EQUAL TO with slash
-			return rune(0x2a7d), true
+			return {'\u2a7d', '\u0338'}, 2, true
 		case "nles":                            // LESS-THAN OR SLANTED EQUAL TO with slash
-			return rune(0x2a7d), true
+			return {'\u2a7d', '\u0338'}, 2, true
 		case "nless":                           // NOT LESS-THAN
-			return rune(0x226e), true
+			return {'\u226e', 0}, 1, true
 		case "nlsim":                           // NEITHER LESS-THAN NOR EQUIVALENT TO
-			return rune(0x2274), true
+			return {'\u2274', 0}, 1, true
 		case "nlt":                             // NOT LESS-THAN
-			return rune(0x226e), true
+			return {'\u226e', 0}, 1, true
 		case "nltri":                           // NOT NORMAL SUBGROUP OF
-			return rune(0x22ea), true
+			return {'\u22ea', 0}, 1, true
 		case "nltrie":                          // NOT NORMAL SUBGROUP OF OR EQUAL TO
-			return rune(0x22ec), true
+			return {'\u22ec', 0}, 1, true
 		case "nltrivb":                         // LEFT TRIANGLE BESIDE VERTICAL BAR with slash
-			return rune(0x29cf), true
+			return {'\u29cf', '\u0338'}, 2, true
 		case "nmid":                            // DOES NOT DIVIDE
-			return rune(0x2224), true
+			return {'\u2224', 0}, 1, true
 		case "nopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL N
-			return rune(0x01d55f), true
+			return {'\U0001d55f', 0}, 1, true
 		case "not":                             // NOT SIGN
-			return rune(0xac), true
+			return {'¬', 0}, 1, true
 		case "notin":                           // NOT AN ELEMENT OF
-			return rune(0x2209), true
+			return {'\u2209', 0}, 1, true
 		case "notinE":                          // ELEMENT OF WITH TWO HORIZONTAL STROKES with slash
-			return rune(0x22f9), true
+			return {'\u22f9', '\u0338'}, 2, true
 		case "notindot":                        // ELEMENT OF WITH DOT ABOVE with slash
-			return rune(0x22f5), true
+			return {'\u22f5', '\u0338'}, 2, true
 		case "notinva":                         // NOT AN ELEMENT OF
-			return rune(0x2209), true
+			return {'\u2209', 0}, 1, true
 		case "notinvb":                         // SMALL ELEMENT OF WITH OVERBAR
-			return rune(0x22f7), true
+			return {'\u22f7', 0}, 1, true
 		case "notinvc":                         // ELEMENT OF WITH OVERBAR
-			return rune(0x22f6), true
+			return {'\u22f6', 0}, 1, true
 		case "notni":                           // DOES NOT CONTAIN AS MEMBER
-			return rune(0x220c), true
+			return {'\u220c', 0}, 1, true
 		case "notniva":                         // DOES NOT CONTAIN AS MEMBER
-			return rune(0x220c), true
+			return {'\u220c', 0}, 1, true
 		case "notnivb":                         // SMALL CONTAINS WITH OVERBAR
-			return rune(0x22fe), true
+			return {'\u22fe', 0}, 1, true
 		case "notnivc":                         // CONTAINS WITH OVERBAR
-			return rune(0x22fd), true
+			return {'\u22fd', 0}, 1, true
 		case "npar":                            // NOT PARALLEL TO
-			return rune(0x2226), true
+			return {'\u2226', 0}, 1, true
 		case "nparallel":                       // NOT PARALLEL TO
-			return rune(0x2226), true
+			return {'\u2226', 0}, 1, true
 		case "nparsl":                          // DOUBLE SOLIDUS OPERATOR with reverse slash
-			return rune(0x2afd), true
+			return {'\u2afd', '\u20e5'}, 2, true
 		case "npart":                           // PARTIAL DIFFERENTIAL with slash
-			return rune(0x2202), true
+			return {'\u2202', '\u0338'}, 2, true
 		case "npolint":                         // LINE INTEGRATION NOT INCLUDING THE POLE
-			return rune(0x2a14), true
+			return {'\u2a14', 0}, 1, true
 		case "npr":                             // DOES NOT PRECEDE
-			return rune(0x2280), true
+			return {'\u2280', 0}, 1, true
 		case "nprcue":                          // DOES NOT PRECEDE OR EQUAL
-			return rune(0x22e0), true
+			return {'\u22e0', 0}, 1, true
 		case "npre":                            // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return rune(0x2aaf), true
+			return {'\u2aaf', '\u0338'}, 2, true
 		case "nprec":                           // DOES NOT PRECEDE
-			return rune(0x2280), true
+			return {'\u2280', 0}, 1, true
 		case "npreceq":                         // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return rune(0x2aaf), true
+			return {'\u2aaf', '\u0338'}, 2, true
 		case "nprsim":                          // PRECEDES OR EQUIVALENT TO with slash
-			return rune(0x227e), true
+			return {'\u227e', '\u0338'}, 2, true
 		case "nrArr":                           // RIGHTWARDS DOUBLE ARROW WITH STROKE
-			return rune(0x21cf), true
+			return {'\u21cf', 0}, 1, true
 		case "nrarr":                           // RIGHTWARDS ARROW WITH STROKE
-			return rune(0x219b), true
+			return {'\u219b', 0}, 1, true
 		case "nrarrc":                          // WAVE ARROW POINTING DIRECTLY RIGHT with slash
-			return rune(0x2933), true
+			return {'\u2933', '\u0338'}, 2, true
 		case "nrarrw":                          // RIGHTWARDS WAVE ARROW with slash
-			return rune(0x219d), true
+			return {'\u219d', '\u0338'}, 2, true
 		case "nrightarrow":                     // RIGHTWARDS ARROW WITH STROKE
-			return rune(0x219b), true
+			return {'\u219b', 0}, 1, true
 		case "nrtri":                           // DOES NOT CONTAIN AS NORMAL SUBGROUP
-			return rune(0x22eb), true
+			return {'\u22eb', 0}, 1, true
 		case "nrtrie":                          // DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
-			return rune(0x22ed), true
+			return {'\u22ed', 0}, 1, true
 		case "nsGt":                            // DOUBLE NESTED GREATER-THAN with slash
-			return rune(0x2aa2), true
+			return {'\u2aa2', '\u0338'}, 2, true
 		case "nsLt":                            // DOUBLE NESTED LESS-THAN with slash
-			return rune(0x2aa1), true
+			return {'\u2aa1', '\u0338'}, 2, true
 		case "nsc":                             // DOES NOT SUCCEED
-			return rune(0x2281), true
+			return {'\u2281', 0}, 1, true
 		case "nsccue":                          // DOES NOT SUCCEED OR EQUAL
-			return rune(0x22e1), true
+			return {'\u22e1', 0}, 1, true
 		case "nsce":                            // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return rune(0x2ab0), true
+			return {'\u2ab0', '\u0338'}, 2, true
 		case "nscr":                            // MATHEMATICAL SCRIPT SMALL N
-			return rune(0x01d4c3), true
+			return {'\U0001d4c3', 0}, 1, true
 		case "nscsim":                          // SUCCEEDS OR EQUIVALENT TO with slash
-			return rune(0x227f), true
+			return {'\u227f', '\u0338'}, 2, true
 		case "nshortmid":                       // DOES NOT DIVIDE
-			return rune(0x2224), true
+			return {'\u2224', 0}, 1, true
 		case "nshortparallel":                  // NOT PARALLEL TO
-			return rune(0x2226), true
+			return {'\u2226', 0}, 1, true
 		case "nsim":                            // NOT TILDE
-			return rune(0x2241), true
+			return {'\u2241', 0}, 1, true
 		case "nsime":                           // NOT ASYMPTOTICALLY EQUAL TO
-			return rune(0x2244), true
+			return {'\u2244', 0}, 1, true
 		case "nsimeq":                          // NOT ASYMPTOTICALLY EQUAL TO
-			return rune(0x2244), true
+			return {'\u2244', 0}, 1, true
 		case "nsmid":                           // DOES NOT DIVIDE
-			return rune(0x2224), true
+			return {'\u2224', 0}, 1, true
 		case "nspar":                           // NOT PARALLEL TO
-			return rune(0x2226), true
+			return {'\u2226', 0}, 1, true
 		case "nsqsub":                          // SQUARE IMAGE OF with slash
-			return rune(0x228f), true
+			return {'\u228f', '\u0338'}, 2, true
 		case "nsqsube":                         // NOT SQUARE IMAGE OF OR EQUAL TO
-			return rune(0x22e2), true
+			return {'\u22e2', 0}, 1, true
 		case "nsqsup":                          // SQUARE ORIGINAL OF with slash
-			return rune(0x2290), true
+			return {'\u2290', '\u0338'}, 2, true
 		case "nsqsupe":                         // NOT SQUARE ORIGINAL OF OR EQUAL TO
-			return rune(0x22e3), true
+			return {'\u22e3', 0}, 1, true
 		case "nsub":                            // NOT A SUBSET OF
-			return rune(0x2284), true
+			return {'\u2284', 0}, 1, true
 		case "nsubE":                           // SUBSET OF ABOVE EQUALS SIGN with slash
-			return rune(0x2ac5), true
+			return {'\u2ac5', '\u0338'}, 2, true
 		case "nsube":                           // NEITHER A SUBSET OF NOR EQUAL TO
-			return rune(0x2288), true
+			return {'\u2288', 0}, 1, true
 		case "nsubset":                         // SUBSET OF with vertical line
-			return rune(0x2282), true
+			return {'\u2282', '\u20d2'}, 2, true
 		case "nsubseteq":                       // NEITHER A SUBSET OF NOR EQUAL TO
-			return rune(0x2288), true
+			return {'\u2288', 0}, 1, true
 		case "nsubseteqq":                      // SUBSET OF ABOVE EQUALS SIGN with slash
-			return rune(0x2ac5), true
+			return {'\u2ac5', '\u0338'}, 2, true
 		case "nsucc":                           // DOES NOT SUCCEED
-			return rune(0x2281), true
+			return {'\u2281', 0}, 1, true
 		case "nsucceq":                         // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN with slash
-			return rune(0x2ab0), true
+			return {'\u2ab0', '\u0338'}, 2, true
 		case "nsup":                            // NOT A SUPERSET OF
-			return rune(0x2285), true
+			return {'\u2285', 0}, 1, true
 		case "nsupE":                           // SUPERSET OF ABOVE EQUALS SIGN with slash
-			return rune(0x2ac6), true
+			return {'\u2ac6', '\u0338'}, 2, true
 		case "nsupe":                           // NEITHER A SUPERSET OF NOR EQUAL TO
-			return rune(0x2289), true
+			return {'\u2289', 0}, 1, true
 		case "nsupset":                         // SUPERSET OF with vertical line
-			return rune(0x2283), true
+			return {'\u2283', '\u20d2'}, 2, true
 		case "nsupseteq":                       // NEITHER A SUPERSET OF NOR EQUAL TO
-			return rune(0x2289), true
+			return {'\u2289', 0}, 1, true
 		case "nsupseteqq":                      // SUPERSET OF ABOVE EQUALS SIGN with slash
-			return rune(0x2ac6), true
+			return {'\u2ac6', '\u0338'}, 2, true
 		case "ntgl":                            // NEITHER GREATER-THAN NOR LESS-THAN
-			return rune(0x2279), true
+			return {'\u2279', 0}, 1, true
 		case "ntilde":                          // LATIN SMALL LETTER N WITH TILDE
-			return rune(0xf1), true
+			return {'ñ', 0}, 1, true
 		case "ntlg":                            // NEITHER LESS-THAN NOR GREATER-THAN
-			return rune(0x2278), true
+			return {'\u2278', 0}, 1, true
 		case "ntriangleleft":                   // NOT NORMAL SUBGROUP OF
-			return rune(0x22ea), true
+			return {'\u22ea', 0}, 1, true
 		case "ntrianglelefteq":                 // NOT NORMAL SUBGROUP OF OR EQUAL TO
-			return rune(0x22ec), true
+			return {'\u22ec', 0}, 1, true
 		case "ntriangleright":                  // DOES NOT CONTAIN AS NORMAL SUBGROUP
-			return rune(0x22eb), true
+			return {'\u22eb', 0}, 1, true
 		case "ntrianglerighteq":                // DOES NOT CONTAIN AS NORMAL SUBGROUP OR EQUAL
-			return rune(0x22ed), true
+			return {'\u22ed', 0}, 1, true
 		case "nu":                              // GREEK SMALL LETTER NU
-			return rune(0x03bd), true
+			return {'\u03bd', 0}, 1, true
 		case "num":                             // NUMBER SIGN
-			return rune(0x23), true
+			return {'#', 0}, 1, true
 		case "numero":                          // NUMERO SIGN
-			return rune(0x2116), true
+			return {'\u2116', 0}, 1, true
 		case "numsp":                           // FIGURE SPACE
-			return rune(0x2007), true
+			return {'\u2007', 0}, 1, true
 		case "nvDash":                          // NOT TRUE
-			return rune(0x22ad), true
+			return {'\u22ad', 0}, 1, true
 		case "nvHarr":                          // LEFT RIGHT DOUBLE ARROW WITH VERTICAL STROKE
-			return rune(0x2904), true
+			return {'\u2904', 0}, 1, true
 		case "nvap":                            // EQUIVALENT TO with vertical line
-			return rune(0x224d), true
+			return {'\u224d', '\u20d2'}, 2, true
 		case "nvbrtri":                         // VERTICAL BAR BESIDE RIGHT TRIANGLE with slash
-			return rune(0x29d0), true
+			return {'\u29d0', '\u0338'}, 2, true
 		case "nvdash":                          // DOES NOT PROVE
-			return rune(0x22ac), true
+			return {'\u22ac', 0}, 1, true
 		case "nvge":                            // GREATER-THAN OR EQUAL TO with vertical line
-			return rune(0x2265), true
+			return {'\u2265', '\u20d2'}, 2, true
 		case "nvgt":                            // GREATER-THAN SIGN with vertical line
-			return rune(0x3e), true
+			return {'>', '\u20d2'}, 2, true
 		case "nvinfin":                         // INFINITY NEGATED WITH VERTICAL BAR
-			return rune(0x29de), true
+			return {'\u29de', 0}, 1, true
 		case "nvlArr":                          // LEFTWARDS DOUBLE ARROW WITH VERTICAL STROKE
-			return rune(0x2902), true
+			return {'\u2902', 0}, 1, true
 		case "nvle":                            // LESS-THAN OR EQUAL TO with vertical line
-			return rune(0x2264), true
+			return {'\u2264', '\u20d2'}, 2, true
 		case "nvlt":                            // LESS-THAN SIGN with vertical line
-			return rune(0x3c), true
+			return {'<', '\u20d2'}, 2, true
 		case "nvltrie":                         // NORMAL SUBGROUP OF OR EQUAL TO with vertical line
-			return rune(0x22b4), true
+			return {'\u22b4', '\u20d2'}, 2, true
 		case "nvrArr":                          // RIGHTWARDS DOUBLE ARROW WITH VERTICAL STROKE
-			return rune(0x2903), true
+			return {'\u2903', 0}, 1, true
 		case "nvrtrie":                         // CONTAINS AS NORMAL SUBGROUP OR EQUAL TO with vertical line
-			return rune(0x22b5), true
+			return {'\u22b5', '\u20d2'}, 2, true
 		case "nvsim":                           // TILDE OPERATOR with vertical line
-			return rune(0x223c), true
+			return {'\u223c', '\u20d2'}, 2, true
 		case "nwArr":                           // NORTH WEST DOUBLE ARROW
-			return rune(0x21d6), true
+			return {'\u21d6', 0}, 1, true
 		case "nwarhk":                          // NORTH WEST ARROW WITH HOOK
-			return rune(0x2923), true
+			return {'\u2923', 0}, 1, true
 		case "nwarr":                           // NORTH WEST ARROW
-			return rune(0x2196), true
+			return {'\u2196', 0}, 1, true
 		case "nwarrow":                         // NORTH WEST ARROW
-			return rune(0x2196), true
+			return {'\u2196', 0}, 1, true
 		case "nwnear":                          // NORTH WEST ARROW AND NORTH EAST ARROW
-			return rune(0x2927), true
+			return {'\u2927', 0}, 1, true
 		case "nwonearr":                        // NORTH WEST ARROW CROSSING NORTH EAST ARROW
-			return rune(0x2932), true
+			return {'\u2932', 0}, 1, true
 		case "nwsesarr":                        // NORTH WEST AND SOUTH EAST ARROW
-			return rune(0x2921), true
+			return {'\u2921', 0}, 1, true
 		}
 
 	case 'o':
 		switch name {
 		case "oS":                              // CIRCLED LATIN CAPITAL LETTER S
-			return rune(0x24c8), true
+			return {'\u24c8', 0}, 1, true
 		case "oacgr":                           // GREEK SMALL LETTER OMICRON WITH TONOS
-			return rune(0x03cc), true
+			return {'\u03cc', 0}, 1, true
 		case "oacute":                          // LATIN SMALL LETTER O WITH ACUTE
-			return rune(0xf3), true
+			return {'ó', 0}, 1, true
 		case "oast":                            // CIRCLED ASTERISK OPERATOR
-			return rune(0x229b), true
+			return {'\u229b', 0}, 1, true
 		case "obsol":                           // CIRCLED REVERSE SOLIDUS
-			return rune(0x29b8), true
+			return {'\u29b8', 0}, 1, true
 		case "ocir":                            // CIRCLED RING OPERATOR
-			return rune(0x229a), true
+			return {'\u229a', 0}, 1, true
 		case "ocirc":                           // LATIN SMALL LETTER O WITH CIRCUMFLEX
-			return rune(0xf4), true
+			return {'ô', 0}, 1, true
 		case "ocy":                             // CYRILLIC SMALL LETTER O
-			return rune(0x043e), true
+			return {'\u043e', 0}, 1, true
 		case "odash":                           // CIRCLED DASH
-			return rune(0x229d), true
+			return {'\u229d', 0}, 1, true
 		case "odblac":                          // LATIN SMALL LETTER O WITH DOUBLE ACUTE
-			return rune(0x0151), true
+			return {'\u0151', 0}, 1, true
 		case "odiv":                            // CIRCLED DIVISION SIGN
-			return rune(0x2a38), true
+			return {'\u2a38', 0}, 1, true
 		case "odot":                            // CIRCLED DOT OPERATOR
-			return rune(0x2299), true
+			return {'\u2299', 0}, 1, true
 		case "odsold":                          // CIRCLED ANTICLOCKWISE-ROTATED DIVISION SIGN
-			return rune(0x29bc), true
+			return {'\u29bc', 0}, 1, true
 		case "oelig":                           // LATIN SMALL LIGATURE OE
-			return rune(0x0153), true
+			return {'\u0153', 0}, 1, true
 		case "ofcir":                           // CIRCLED BULLET
-			return rune(0x29bf), true
+			return {'\u29bf', 0}, 1, true
 		case "ofr":                             // MATHEMATICAL FRAKTUR SMALL O
-			return rune(0x01d52c), true
+			return {'\U0001d52c', 0}, 1, true
 		case "ogon":                            // OGONEK
-			return rune(0x02db), true
+			return {'\u02db', 0}, 1, true
 		case "ogr":                             // GREEK SMALL LETTER OMICRON
-			return rune(0x03bf), true
+			return {'\u03bf', 0}, 1, true
 		case "ograve":                          // LATIN SMALL LETTER O WITH GRAVE
-			return rune(0xf2), true
+			return {'ò', 0}, 1, true
 		case "ogt":                             // CIRCLED GREATER-THAN
-			return rune(0x29c1), true
+			return {'\u29c1', 0}, 1, true
 		case "ohacgr":                          // GREEK SMALL LETTER OMEGA WITH TONOS
-			return rune(0x03ce), true
+			return {'\u03ce', 0}, 1, true
 		case "ohbar":                           // CIRCLE WITH HORIZONTAL BAR
-			return rune(0x29b5), true
+			return {'\u29b5', 0}, 1, true
 		case "ohgr":                            // GREEK SMALL LETTER OMEGA
-			return rune(0x03c9), true
+			return {'\u03c9', 0}, 1, true
 		case "ohm":                             // GREEK CAPITAL LETTER OMEGA
-			return rune(0x03a9), true
+			return {'\u03a9', 0}, 1, true
 		case "oint":                            // CONTOUR INTEGRAL
-			return rune(0x222e), true
+			return {'\u222e', 0}, 1, true
 		case "olarr":                           // ANTICLOCKWISE OPEN CIRCLE ARROW
-			return rune(0x21ba), true
+			return {'\u21ba', 0}, 1, true
 		case "olcir":                           // CIRCLED WHITE BULLET
-			return rune(0x29be), true
+			return {'\u29be', 0}, 1, true
 		case "olcross":                         // CIRCLE WITH SUPERIMPOSED X
-			return rune(0x29bb), true
+			return {'\u29bb', 0}, 1, true
 		case "oline":                           // OVERLINE
-			return rune(0x203e), true
+			return {'\u203e', 0}, 1, true
 		case "olt":                             // CIRCLED LESS-THAN
-			return rune(0x29c0), true
+			return {'\u29c0', 0}, 1, true
 		case "omacr":                           // LATIN SMALL LETTER O WITH MACRON
-			return rune(0x014d), true
+			return {'\u014d', 0}, 1, true
 		case "omega":                           // GREEK SMALL LETTER OMEGA
-			return rune(0x03c9), true
+			return {'\u03c9', 0}, 1, true
 		case "omicron":                         // GREEK SMALL LETTER OMICRON
-			return rune(0x03bf), true
+			return {'\u03bf', 0}, 1, true
 		case "omid":                            // CIRCLED VERTICAL BAR
-			return rune(0x29b6), true
+			return {'\u29b6', 0}, 1, true
 		case "ominus":                          // CIRCLED MINUS
-			return rune(0x2296), true
+			return {'\u2296', 0}, 1, true
 		case "oopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL O
-			return rune(0x01d560), true
+			return {'\U0001d560', 0}, 1, true
 		case "opar":                            // CIRCLED PARALLEL
-			return rune(0x29b7), true
+			return {'\u29b7', 0}, 1, true
 		case "operp":                           // CIRCLED PERPENDICULAR
-			return rune(0x29b9), true
+			return {'\u29b9', 0}, 1, true
 		case "opfgamma":                        // DOUBLE-STRUCK SMALL GAMMA
-			return rune(0x213d), true
+			return {'\u213d', 0}, 1, true
 		case "opfpi":                           // DOUBLE-STRUCK CAPITAL PI
-			return rune(0x213f), true
+			return {'\u213f', 0}, 1, true
 		case "opfsum":                          // DOUBLE-STRUCK N-ARY SUMMATION
-			return rune(0x2140), true
+			return {'\u2140', 0}, 1, true
 		case "oplus":                           // CIRCLED PLUS
-			return rune(0x2295), true
+			return {'\u2295', 0}, 1, true
 		case "or":                              // LOGICAL OR
-			return rune(0x2228), true
+			return {'\u2228', 0}, 1, true
 		case "orarr":                           // CLOCKWISE OPEN CIRCLE ARROW
-			return rune(0x21bb), true
+			return {'\u21bb', 0}, 1, true
 		case "ord":                             // LOGICAL OR WITH HORIZONTAL DASH
-			return rune(0x2a5d), true
+			return {'\u2a5d', 0}, 1, true
 		case "order":                           // SCRIPT SMALL O
-			return rune(0x2134), true
+			return {'\u2134', 0}, 1, true
 		case "orderof":                         // SCRIPT SMALL O
-			return rune(0x2134), true
+			return {'\u2134', 0}, 1, true
 		case "ordf":                            // FEMININE ORDINAL INDICATOR
-			return rune(0xaa), true
+			return {'ª', 0}, 1, true
 		case "ordm":                            // MASCULINE ORDINAL INDICATOR
-			return rune(0xba), true
+			return {'º', 0}, 1, true
 		case "origof":                          // ORIGINAL OF
-			return rune(0x22b6), true
+			return {'\u22b6', 0}, 1, true
 		case "oror":                            // TWO INTERSECTING LOGICAL OR
-			return rune(0x2a56), true
+			return {'\u2a56', 0}, 1, true
 		case "orslope":                         // SLOPING LARGE OR
-			return rune(0x2a57), true
+			return {'\u2a57', 0}, 1, true
 		case "orv":                             // LOGICAL OR WITH MIDDLE STEM
-			return rune(0x2a5b), true
+			return {'\u2a5b', 0}, 1, true
 		case "oscr":                            // SCRIPT SMALL O
-			return rune(0x2134), true
+			return {'\u2134', 0}, 1, true
 		case "oslash":                          // LATIN SMALL LETTER O WITH STROKE
-			return rune(0xf8), true
+			return {'ø', 0}, 1, true
 		case "osol":                            // CIRCLED DIVISION SLASH
-			return rune(0x2298), true
+			return {'\u2298', 0}, 1, true
 		case "otilde":                          // LATIN SMALL LETTER O WITH TILDE
-			return rune(0xf5), true
+			return {'õ', 0}, 1, true
 		case "otimes":                          // CIRCLED TIMES
-			return rune(0x2297), true
+			return {'\u2297', 0}, 1, true
 		case "otimesas":                        // CIRCLED MULTIPLICATION SIGN WITH CIRCUMFLEX ACCENT
-			return rune(0x2a36), true
+			return {'\u2a36', 0}, 1, true
 		case "ouml":                            // LATIN SMALL LETTER O WITH DIAERESIS
-			return rune(0xf6), true
+			return {'ö', 0}, 1, true
 		case "ovbar":                           // APL FUNCTIONAL SYMBOL CIRCLE STILE
-			return rune(0x233d), true
+			return {'\u233d', 0}, 1, true
 		case "ovrbrk":                          // TOP SQUARE BRACKET
-			return rune(0x23b4), true
+			return {'\u23b4', 0}, 1, true
 		case "ovrcub":                          // TOP CURLY BRACKET
-			return rune(0x23de), true
+			return {'\u23de', 0}, 1, true
 		case "ovrpar":                          // TOP PARENTHESIS
-			return rune(0x23dc), true
+			return {'\u23dc', 0}, 1, true
 		case "oxuarr":                          // UP ARROW THROUGH CIRCLE
-			return rune(0x29bd), true
+			return {'\u29bd', 0}, 1, true
 		}
 
 	case 'p':
 		switch name {
 		case "par":                             // PARALLEL TO
-			return rune(0x2225), true
+			return {'\u2225', 0}, 1, true
 		case "para":                            // PILCROW SIGN
-			return rune(0xb6), true
+			return {'¶', 0}, 1, true
 		case "parallel":                        // PARALLEL TO
-			return rune(0x2225), true
+			return {'\u2225', 0}, 1, true
 		case "parsim":                          // PARALLEL WITH TILDE OPERATOR
-			return rune(0x2af3), true
+			return {'\u2af3', 0}, 1, true
 		case "parsl":                           // DOUBLE SOLIDUS OPERATOR
-			return rune(0x2afd), true
+			return {'\u2afd', 0}, 1, true
 		case "part":                            // PARTIAL DIFFERENTIAL
-			return rune(0x2202), true
+			return {'\u2202', 0}, 1, true
 		case "pcy":                             // CYRILLIC SMALL LETTER PE
-			return rune(0x043f), true
+			return {'\u043f', 0}, 1, true
 		case "percnt":                          // PERCENT SIGN
-			return rune(0x25), true
+			return {'%', 0}, 1, true
 		case "period":                          // FULL STOP
-			return rune(0x2e), true
+			return {'.', 0}, 1, true
 		case "permil":                          // PER MILLE SIGN
-			return rune(0x2030), true
+			return {'\u2030', 0}, 1, true
 		case "perp":                            // UP TACK
-			return rune(0x22a5), true
+			return {'\u22a5', 0}, 1, true
 		case "pertenk":                         // PER TEN THOUSAND SIGN
-			return rune(0x2031), true
+			return {'\u2031', 0}, 1, true
 		case "pfr":                             // MATHEMATICAL FRAKTUR SMALL P
-			return rune(0x01d52d), true
+			return {'\U0001d52d', 0}, 1, true
 		case "pgr":                             // GREEK SMALL LETTER PI
-			return rune(0x03c0), true
+			return {'\u03c0', 0}, 1, true
 		case "phgr":                            // GREEK SMALL LETTER PHI
-			return rune(0x03c6), true
+			return {'\u03c6', 0}, 1, true
 		case "phi":                             // GREEK SMALL LETTER PHI
-			return rune(0x03c6), true
+			return {'\u03c6', 0}, 1, true
 		case "phis":                            // GREEK PHI SYMBOL
-			return rune(0x03d5), true
+			return {'\u03d5', 0}, 1, true
 		case "phiv":                            // GREEK PHI SYMBOL
-			return rune(0x03d5), true
+			return {'\u03d5', 0}, 1, true
 		case "phmmat":                          // SCRIPT CAPITAL M
-			return rune(0x2133), true
+			return {'\u2133', 0}, 1, true
 		case "phone":                           // BLACK TELEPHONE
-			return rune(0x260e), true
+			return {'\u260e', 0}, 1, true
 		case "pi":                              // GREEK SMALL LETTER PI
-			return rune(0x03c0), true
+			return {'\u03c0', 0}, 1, true
 		case "pitchfork":                       // PITCHFORK
-			return rune(0x22d4), true
+			return {'\u22d4', 0}, 1, true
 		case "piv":                             // GREEK PI SYMBOL
-			return rune(0x03d6), true
+			return {'\u03d6', 0}, 1, true
 		case "planck":                          // PLANCK CONSTANT OVER TWO PI
-			return rune(0x210f), true
+			return {'\u210f', 0}, 1, true
 		case "planckh":                         // PLANCK CONSTANT
-			return rune(0x210e), true
+			return {'\u210e', 0}, 1, true
 		case "plankv":                          // PLANCK CONSTANT OVER TWO PI
-			return rune(0x210f), true
+			return {'\u210f', 0}, 1, true
 		case "plus":                            // PLUS SIGN
-			return rune(0x2b), true
+			return {'+', 0}, 1, true
 		case "plusacir":                        // PLUS SIGN WITH CIRCUMFLEX ACCENT ABOVE
-			return rune(0x2a23), true
+			return {'\u2a23', 0}, 1, true
 		case "plusb":                           // SQUARED PLUS
-			return rune(0x229e), true
+			return {'\u229e', 0}, 1, true
 		case "pluscir":                         // PLUS SIGN WITH SMALL CIRCLE ABOVE
-			return rune(0x2a22), true
+			return {'\u2a22', 0}, 1, true
 		case "plusdo":                          // DOT PLUS
-			return rune(0x2214), true
+			return {'\u2214', 0}, 1, true
 		case "plusdu":                          // PLUS SIGN WITH DOT BELOW
-			return rune(0x2a25), true
+			return {'\u2a25', 0}, 1, true
 		case "pluse":                           // PLUS SIGN ABOVE EQUALS SIGN
-			return rune(0x2a72), true
+			return {'\u2a72', 0}, 1, true
 		case "plusmn":                          // PLUS-MINUS SIGN
-			return rune(0xb1), true
+			return {'±', 0}, 1, true
 		case "plussim":                         // PLUS SIGN WITH TILDE BELOW
-			return rune(0x2a26), true
+			return {'\u2a26', 0}, 1, true
 		case "plustrif":                        // PLUS SIGN WITH BLACK TRIANGLE
-			return rune(0x2a28), true
+			return {'\u2a28', 0}, 1, true
 		case "plustwo":                         // PLUS SIGN WITH SUBSCRIPT TWO
-			return rune(0x2a27), true
+			return {'\u2a27', 0}, 1, true
 		case "pm":                              // PLUS-MINUS SIGN
-			return rune(0xb1), true
+			return {'±', 0}, 1, true
 		case "pointint":                        // INTEGRAL AROUND A POINT OPERATOR
-			return rune(0x2a15), true
+			return {'\u2a15', 0}, 1, true
 		case "popf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL P
-			return rune(0x01d561), true
+			return {'\U0001d561', 0}, 1, true
 		case "pound":                           // POUND SIGN
-			return rune(0xa3), true
+			return {'£', 0}, 1, true
 		case "pr":                              // PRECEDES
-			return rune(0x227a), true
+			return {'\u227a', 0}, 1, true
 		case "prE":                             // PRECEDES ABOVE EQUALS SIGN
-			return rune(0x2ab3), true
+			return {'\u2ab3', 0}, 1, true
 		case "prap":                            // PRECEDES ABOVE ALMOST EQUAL TO
-			return rune(0x2ab7), true
+			return {'\u2ab7', 0}, 1, true
 		case "prcue":                           // PRECEDES OR EQUAL TO
-			return rune(0x227c), true
+			return {'\u227c', 0}, 1, true
 		case "pre":                             // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
-			return rune(0x2aaf), true
+			return {'\u2aaf', 0}, 1, true
 		case "prec":                            // PRECEDES
-			return rune(0x227a), true
+			return {'\u227a', 0}, 1, true
 		case "precapprox":                      // PRECEDES ABOVE ALMOST EQUAL TO
-			return rune(0x2ab7), true
+			return {'\u2ab7', 0}, 1, true
 		case "preccurlyeq":                     // PRECEDES OR EQUAL TO
-			return rune(0x227c), true
+			return {'\u227c', 0}, 1, true
 		case "preceq":                          // PRECEDES ABOVE SINGLE-LINE EQUALS SIGN
-			return rune(0x2aaf), true
+			return {'\u2aaf', 0}, 1, true
 		case "precnapprox":                     // PRECEDES ABOVE NOT ALMOST EQUAL TO
-			return rune(0x2ab9), true
+			return {'\u2ab9', 0}, 1, true
 		case "precneqq":                        // PRECEDES ABOVE NOT EQUAL TO
-			return rune(0x2ab5), true
+			return {'\u2ab5', 0}, 1, true
 		case "precnsim":                        // PRECEDES BUT NOT EQUIVALENT TO
-			return rune(0x22e8), true
+			return {'\u22e8', 0}, 1, true
 		case "precsim":                         // PRECEDES OR EQUIVALENT TO
-			return rune(0x227e), true
+			return {'\u227e', 0}, 1, true
 		case "prime":                           // PRIME
-			return rune(0x2032), true
+			return {'\u2032', 0}, 1, true
 		case "primes":                          // DOUBLE-STRUCK CAPITAL P
-			return rune(0x2119), true
+			return {'\u2119', 0}, 1, true
 		case "prnE":                            // PRECEDES ABOVE NOT EQUAL TO
-			return rune(0x2ab5), true
+			return {'\u2ab5', 0}, 1, true
 		case "prnap":                           // PRECEDES ABOVE NOT ALMOST EQUAL TO
-			return rune(0x2ab9), true
+			return {'\u2ab9', 0}, 1, true
 		case "prnsim":                          // PRECEDES BUT NOT EQUIVALENT TO
-			return rune(0x22e8), true
+			return {'\u22e8', 0}, 1, true
 		case "prod":                            // N-ARY PRODUCT
-			return rune(0x220f), true
+			return {'\u220f', 0}, 1, true
 		case "profalar":                        // ALL AROUND-PROFILE
-			return rune(0x232e), true
+			return {'\u232e', 0}, 1, true
 		case "profline":                        // ARC
-			return rune(0x2312), true
+			return {'\u2312', 0}, 1, true
 		case "profsurf":                        // SEGMENT
-			return rune(0x2313), true
+			return {'\u2313', 0}, 1, true
 		case "prop":                            // PROPORTIONAL TO
-			return rune(0x221d), true
+			return {'\u221d', 0}, 1, true
 		case "propto":                          // PROPORTIONAL TO
-			return rune(0x221d), true
+			return {'\u221d', 0}, 1, true
 		case "prsim":                           // PRECEDES OR EQUIVALENT TO
-			return rune(0x227e), true
+			return {'\u227e', 0}, 1, true
 		case "prurel":                          // PRECEDES UNDER RELATION
-			return rune(0x22b0), true
+			return {'\u22b0', 0}, 1, true
 		case "pscr":                            // MATHEMATICAL SCRIPT SMALL P
-			return rune(0x01d4c5), true
+			return {'\U0001d4c5', 0}, 1, true
 		case "psgr":                            // GREEK SMALL LETTER PSI
-			return rune(0x03c8), true
+			return {'\u03c8', 0}, 1, true
 		case "psi":                             // GREEK SMALL LETTER PSI
-			return rune(0x03c8), true
+			return {'\u03c8', 0}, 1, true
 		case "puncsp":                          // PUNCTUATION SPACE
-			return rune(0x2008), true
+			return {'\u2008', 0}, 1, true
 		}
 
 	case 'q':
 		switch name {
 		case "qfr":                             // MATHEMATICAL FRAKTUR SMALL Q
-			return rune(0x01d52e), true
+			return {'\U0001d52e', 0}, 1, true
 		case "qint":                            // QUADRUPLE INTEGRAL OPERATOR
-			return rune(0x2a0c), true
+			return {'\u2a0c', 0}, 1, true
 		case "qopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL Q
-			return rune(0x01d562), true
+			return {'\U0001d562', 0}, 1, true
 		case "qprime":                          // QUADRUPLE PRIME
-			return rune(0x2057), true
+			return {'\u2057', 0}, 1, true
 		case "qscr":                            // MATHEMATICAL SCRIPT SMALL Q
-			return rune(0x01d4c6), true
+			return {'\U0001d4c6', 0}, 1, true
 		case "quaternions":                     // DOUBLE-STRUCK CAPITAL H
-			return rune(0x210d), true
+			return {'\u210d', 0}, 1, true
 		case "quatint":                         // QUATERNION INTEGRAL OPERATOR
-			return rune(0x2a16), true
+			return {'\u2a16', 0}, 1, true
 		case "quest":                           // QUESTION MARK
-			return rune(0x3f), true
+			return {'?', 0}, 1, true
 		case "questeq":                         // QUESTIONED EQUAL TO
-			return rune(0x225f), true
+			return {'\u225f', 0}, 1, true
 		case "quot":                            // QUOTATION MARK
-			return rune(0x22), true
+			return {'"', 0}, 1, true
 		}
 
 	case 'r':
 		switch name {
 		case "rAarr":                           // RIGHTWARDS TRIPLE ARROW
-			return rune(0x21db), true
+			return {'\u21db', 0}, 1, true
 		case "rArr":                            // RIGHTWARDS DOUBLE ARROW
-			return rune(0x21d2), true
+			return {'\u21d2', 0}, 1, true
 		case "rAtail":                          // RIGHTWARDS DOUBLE ARROW-TAIL
-			return rune(0x291c), true
+			return {'\u291c', 0}, 1, true
 		case "rBarr":                           // RIGHTWARDS TRIPLE DASH ARROW
-			return rune(0x290f), true
+			return {'\u290f', 0}, 1, true
 		case "rHar":                            // RIGHTWARDS HARPOON WITH BARB UP ABOVE RIGHTWARDS HARPOON WITH BARB DOWN
-			return rune(0x2964), true
+			return {'\u2964', 0}, 1, true
 		case "race":                            // REVERSED TILDE with underline
-			return rune(0x223d), true
+			return {'\u223d', '\u0331'}, 2, true
 		case "racute":                          // LATIN SMALL LETTER R WITH ACUTE
-			return rune(0x0155), true
+			return {'\u0155', 0}, 1, true
 		case "radic":                           // SQUARE ROOT
-			return rune(0x221a), true
+			return {'\u221a', 0}, 1, true
 		case "raemptyv":                        // EMPTY SET WITH RIGHT ARROW ABOVE
-			return rune(0x29b3), true
+			return {'\u29b3', 0}, 1, true
 		case "rang":                            // MATHEMATICAL RIGHT ANGLE BRACKET
-			return rune(0x27e9), true
+			return {'\u27e9', 0}, 1, true
 		case "rangd":                           // RIGHT ANGLE BRACKET WITH DOT
-			return rune(0x2992), true
+			return {'\u2992', 0}, 1, true
 		case "range":                           // REVERSED ANGLE WITH UNDERBAR
-			return rune(0x29a5), true
+			return {'\u29a5', 0}, 1, true
 		case "rangle":                          // MATHEMATICAL RIGHT ANGLE BRACKET
-			return rune(0x27e9), true
+			return {'\u27e9', 0}, 1, true
 		case "raquo":                           // RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
-			return rune(0xbb), true
+			return {'»', 0}, 1, true
 		case "rarr":                            // RIGHTWARDS ARROW
-			return rune(0x2192), true
+			return {'\u2192', 0}, 1, true
 		case "rarr2":                           // RIGHTWARDS PAIRED ARROWS
-			return rune(0x21c9), true
+			return {'\u21c9', 0}, 1, true
 		case "rarr3":                           // THREE RIGHTWARDS ARROWS
-			return rune(0x21f6), true
+			return {'\u21f6', 0}, 1, true
 		case "rarrap":                          // RIGHTWARDS ARROW ABOVE ALMOST EQUAL TO
-			return rune(0x2975), true
+			return {'\u2975', 0}, 1, true
 		case "rarrb":                           // RIGHTWARDS ARROW TO BAR
-			return rune(0x21e5), true
+			return {'\u21e5', 0}, 1, true
 		case "rarrbfs":                         // RIGHTWARDS ARROW FROM BAR TO BLACK DIAMOND
-			return rune(0x2920), true
+			return {'\u2920', 0}, 1, true
 		case "rarrc":                           // WAVE ARROW POINTING DIRECTLY RIGHT
-			return rune(0x2933), true
+			return {'\u2933', 0}, 1, true
 		case "rarrfs":                          // RIGHTWARDS ARROW TO BLACK DIAMOND
-			return rune(0x291e), true
+			return {'\u291e', 0}, 1, true
 		case "rarrhk":                          // RIGHTWARDS ARROW WITH HOOK
-			return rune(0x21aa), true
+			return {'\u21aa', 0}, 1, true
 		case "rarrlp":                          // RIGHTWARDS ARROW WITH LOOP
-			return rune(0x21ac), true
+			return {'\u21ac', 0}, 1, true
 		case "rarrpl":                          // RIGHTWARDS ARROW WITH PLUS BELOW
-			return rune(0x2945), true
+			return {'\u2945', 0}, 1, true
 		case "rarrsim":                         // RIGHTWARDS ARROW ABOVE TILDE OPERATOR
-			return rune(0x2974), true
+			return {'\u2974', 0}, 1, true
 		case "rarrtl":                          // RIGHTWARDS ARROW WITH TAIL
-			return rune(0x21a3), true
+			return {'\u21a3', 0}, 1, true
 		case "rarrw":                           // RIGHTWARDS WAVE ARROW
-			return rune(0x219d), true
+			return {'\u219d', 0}, 1, true
 		case "rarrx":                           // RIGHTWARDS ARROW THROUGH X
-			return rune(0x2947), true
+			return {'\u2947', 0}, 1, true
 		case "ratail":                          // RIGHTWARDS ARROW-TAIL
-			return rune(0x291a), true
+			return {'\u291a', 0}, 1, true
 		case "ratio":                           // RATIO
-			return rune(0x2236), true
+			return {'\u2236', 0}, 1, true
 		case "rationals":                       // DOUBLE-STRUCK CAPITAL Q
-			return rune(0x211a), true
+			return {'\u211a', 0}, 1, true
 		case "rbarr":                           // RIGHTWARDS DOUBLE DASH ARROW
-			return rune(0x290d), true
+			return {'\u290d', 0}, 1, true
 		case "rbbrk":                           // LIGHT RIGHT TORTOISE SHELL BRACKET ORNAMENT
-			return rune(0x2773), true
+			return {'\u2773', 0}, 1, true
 		case "rbrace":                          // RIGHT CURLY BRACKET
-			return rune(0x7d), true
+			return {'}', 0}, 1, true
 		case "rbrack":                          // RIGHT SQUARE BRACKET
-			return rune(0x5d), true
+			return {']', 0}, 1, true
 		case "rbrke":                           // RIGHT SQUARE BRACKET WITH UNDERBAR
-			return rune(0x298c), true
+			return {'\u298c', 0}, 1, true
 		case "rbrksld":                         // RIGHT SQUARE BRACKET WITH TICK IN BOTTOM CORNER
-			return rune(0x298e), true
+			return {'\u298e', 0}, 1, true
 		case "rbrkslu":                         // RIGHT SQUARE BRACKET WITH TICK IN TOP CORNER
-			return rune(0x2990), true
+			return {'\u2990', 0}, 1, true
 		case "rcaron":                          // LATIN SMALL LETTER R WITH CARON
-			return rune(0x0159), true
+			return {'\u0159', 0}, 1, true
 		case "rcedil":                          // LATIN SMALL LETTER R WITH CEDILLA
-			return rune(0x0157), true
+			return {'\u0157', 0}, 1, true
 		case "rceil":                           // RIGHT CEILING
-			return rune(0x2309), true
+			return {'\u2309', 0}, 1, true
 		case "rcub":                            // RIGHT CURLY BRACKET
-			return rune(0x7d), true
+			return {'}', 0}, 1, true
 		case "rcy":                             // CYRILLIC SMALL LETTER ER
-			return rune(0x0440), true
+			return {'\u0440', 0}, 1, true
 		case "rdca":                            // ARROW POINTING DOWNWARDS THEN CURVING RIGHTWARDS
-			return rune(0x2937), true
+			return {'\u2937', 0}, 1, true
 		case "rdharb":                          // RIGHTWARDS HARPOON WITH BARB DOWN TO BAR
-			return rune(0x2957), true
+			return {'\u2957', 0}, 1, true
 		case "rdiag":                           // BOX DRAWINGS LIGHT DIAGONAL UPPER RIGHT TO LOWER LEFT
-			return rune(0x2571), true
+			return {'\u2571', 0}, 1, true
 		case "rdiofdi":                         // RISING DIAGONAL CROSSING FALLING DIAGONAL
-			return rune(0x292b), true
+			return {'\u292b', 0}, 1, true
 		case "rdldhar":                         // RIGHTWARDS HARPOON WITH BARB DOWN ABOVE LEFTWARDS HARPOON WITH BARB DOWN
-			return rune(0x2969), true
+			return {'\u2969', 0}, 1, true
 		case "rdosearr":                        // RISING DIAGONAL CROSSING SOUTH EAST ARROW
-			return rune(0x2930), true
+			return {'\u2930', 0}, 1, true
 		case "rdquo":                           // RIGHT DOUBLE QUOTATION MARK
-			return rune(0x201d), true
+			return {'\u201d', 0}, 1, true
 		case "rdquor":                          // RIGHT DOUBLE QUOTATION MARK
-			return rune(0x201d), true
+			return {'\u201d', 0}, 1, true
 		case "rdsh":                            // DOWNWARDS ARROW WITH TIP RIGHTWARDS
-			return rune(0x21b3), true
+			return {'\u21b3', 0}, 1, true
 		case "real":                            // BLACK-LETTER CAPITAL R
-			return rune(0x211c), true
+			return {'\u211c', 0}, 1, true
 		case "realine":                         // SCRIPT CAPITAL R
-			return rune(0x211b), true
+			return {'\u211b', 0}, 1, true
 		case "realpart":                        // BLACK-LETTER CAPITAL R
-			return rune(0x211c), true
+			return {'\u211c', 0}, 1, true
 		case "reals":                           // DOUBLE-STRUCK CAPITAL R
-			return rune(0x211d), true
+			return {'\u211d', 0}, 1, true
 		case "rect":                            // WHITE RECTANGLE
-			return rune(0x25ad), true
+			return {'\u25ad', 0}, 1, true
 		case "reg":                             // REGISTERED SIGN
-			return rune(0xae), true
+			return {'®', 0}, 1, true
 		case "rfbowtie":                        // BOWTIE WITH RIGHT HALF BLACK
-			return rune(0x29d2), true
+			return {'\u29d2', 0}, 1, true
 		case "rfisht":                          // RIGHT FISH TAIL
-			return rune(0x297d), true
+			return {'\u297d', 0}, 1, true
 		case "rfloor":                          // RIGHT FLOOR
-			return rune(0x230b), true
+			return {'\u230b', 0}, 1, true
 		case "rfr":                             // MATHEMATICAL FRAKTUR SMALL R
-			return rune(0x01d52f), true
+			return {'\U0001d52f', 0}, 1, true
 		case "rftimes":                         // TIMES WITH RIGHT HALF BLACK
-			return rune(0x29d5), true
+			return {'\u29d5', 0}, 1, true
 		case "rgr":                             // GREEK SMALL LETTER RHO
-			return rune(0x03c1), true
+			return {'\u03c1', 0}, 1, true
 		case "rhard":                           // RIGHTWARDS HARPOON WITH BARB DOWNWARDS
-			return rune(0x21c1), true
+			return {'\u21c1', 0}, 1, true
 		case "rharu":                           // RIGHTWARDS HARPOON WITH BARB UPWARDS
-			return rune(0x21c0), true
+			return {'\u21c0', 0}, 1, true
 		case "rharul":                          // RIGHTWARDS HARPOON WITH BARB UP ABOVE LONG DASH
-			return rune(0x296c), true
+			return {'\u296c', 0}, 1, true
 		case "rho":                             // GREEK SMALL LETTER RHO
-			return rune(0x03c1), true
+			return {'\u03c1', 0}, 1, true
 		case "rhov":                            // GREEK RHO SYMBOL
-			return rune(0x03f1), true
+			return {'\u03f1', 0}, 1, true
 		case "rightarrow":                      // RIGHTWARDS ARROW
-			return rune(0x2192), true
+			return {'\u2192', 0}, 1, true
 		case "rightarrowtail":                  // RIGHTWARDS ARROW WITH TAIL
-			return rune(0x21a3), true
+			return {'\u21a3', 0}, 1, true
 		case "rightharpoondown":                // RIGHTWARDS HARPOON WITH BARB DOWNWARDS
-			return rune(0x21c1), true
+			return {'\u21c1', 0}, 1, true
 		case "rightharpoonup":                  // RIGHTWARDS HARPOON WITH BARB UPWARDS
-			return rune(0x21c0), true
+			return {'\u21c0', 0}, 1, true
 		case "rightleftarrows":                 // RIGHTWARDS ARROW OVER LEFTWARDS ARROW
-			return rune(0x21c4), true
+			return {'\u21c4', 0}, 1, true
 		case "rightleftharpoons":               // RIGHTWARDS HARPOON OVER LEFTWARDS HARPOON
-			return rune(0x21cc), true
+			return {'\u21cc', 0}, 1, true
 		case "rightrightarrows":                // RIGHTWARDS PAIRED ARROWS
-			return rune(0x21c9), true
+			return {'\u21c9', 0}, 1, true
 		case "rightsquigarrow":                 // RIGHTWARDS WAVE ARROW
-			return rune(0x219d), true
+			return {'\u219d', 0}, 1, true
 		case "rightthreetimes":                 // RIGHT SEMIDIRECT PRODUCT
-			return rune(0x22cc), true
+			return {'\u22cc', 0}, 1, true
 		case "rimply":                          // RIGHT DOUBLE ARROW WITH ROUNDED HEAD
-			return rune(0x2970), true
+			return {'\u2970', 0}, 1, true
 		case "ring":                            // RING ABOVE
-			return rune(0x02da), true
+			return {'\u02da', 0}, 1, true
 		case "risingdotseq":                    // IMAGE OF OR APPROXIMATELY EQUAL TO
-			return rune(0x2253), true
+			return {'\u2253', 0}, 1, true
 		case "rlarr":                           // RIGHTWARDS ARROW OVER LEFTWARDS ARROW
-			return rune(0x21c4), true
+			return {'\u21c4', 0}, 1, true
 		case "rlarr2":                          // RIGHTWARDS ARROW OVER LEFTWARDS ARROW
-			return rune(0x21c4), true
+			return {'\u21c4', 0}, 1, true
 		case "rlhar":                           // RIGHTWARDS HARPOON OVER LEFTWARDS HARPOON
-			return rune(0x21cc), true
+			return {'\u21cc', 0}, 1, true
 		case "rlhar2":                          // RIGHTWARDS HARPOON OVER LEFTWARDS HARPOON
-			return rune(0x21cc), true
+			return {'\u21cc', 0}, 1, true
 		case "rlm":                             // RIGHT-TO-LEFT MARK
-			return rune(0x200f), true
+			return {'\u200f', 0}, 1, true
 		case "rmoust":                          // UPPER RIGHT OR LOWER LEFT CURLY BRACKET SECTION
-			return rune(0x23b1), true
+			return {'\u23b1', 0}, 1, true
 		case "rmoustache":                      // UPPER RIGHT OR LOWER LEFT CURLY BRACKET SECTION
-			return rune(0x23b1), true
+			return {'\u23b1', 0}, 1, true
 		case "rnmid":                           // DOES NOT DIVIDE WITH REVERSED NEGATION SLASH
-			return rune(0x2aee), true
+			return {'\u2aee', 0}, 1, true
 		case "roang":                           // MATHEMATICAL RIGHT WHITE TORTOISE SHELL BRACKET
-			return rune(0x27ed), true
+			return {'\u27ed', 0}, 1, true
 		case "roarr":                           // RIGHTWARDS OPEN-HEADED ARROW
-			return rune(0x21fe), true
+			return {'\u21fe', 0}, 1, true
 		case "robrk":                           // MATHEMATICAL RIGHT WHITE SQUARE BRACKET
-			return rune(0x27e7), true
+			return {'\u27e7', 0}, 1, true
 		case "rocub":                           // RIGHT WHITE CURLY BRACKET
-			return rune(0x2984), true
+			return {'\u2984', 0}, 1, true
 		case "ropar":                           // RIGHT WHITE PARENTHESIS
-			return rune(0x2986), true
+			return {'\u2986', 0}, 1, true
 		case "ropf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL R
-			return rune(0x01d563), true
+			return {'\U0001d563', 0}, 1, true
 		case "roplus":                          // PLUS SIGN IN RIGHT HALF CIRCLE
-			return rune(0x2a2e), true
+			return {'\u2a2e', 0}, 1, true
 		case "rotimes":                         // MULTIPLICATION SIGN IN RIGHT HALF CIRCLE
-			return rune(0x2a35), true
+			return {'\u2a35', 0}, 1, true
 		case "rpar":                            // RIGHT PARENTHESIS
-			return rune(0x29), true
+			return {')', 0}, 1, true
 		case "rpargt":                          // RIGHT ARC GREATER-THAN BRACKET
-			return rune(0x2994), true
+			return {'\u2994', 0}, 1, true
 		case "rppolint":                        // LINE INTEGRATION WITH RECTANGULAR PATH AROUND POLE
-			return rune(0x2a12), true
+			return {'\u2a12', 0}, 1, true
 		case "rrarr":                           // RIGHTWARDS PAIRED ARROWS
-			return rune(0x21c9), true
+			return {'\u21c9', 0}, 1, true
 		case "rsaquo":                          // SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
-			return rune(0x203a), true
+			return {'\u203a', 0}, 1, true
 		case "rscr":                            // MATHEMATICAL SCRIPT SMALL R
-			return rune(0x01d4c7), true
+			return {'\U0001d4c7', 0}, 1, true
 		case "rsh":                             // UPWARDS ARROW WITH TIP RIGHTWARDS
-			return rune(0x21b1), true
+			return {'\u21b1', 0}, 1, true
 		case "rsolbar":                         // REVERSE SOLIDUS WITH HORIZONTAL STROKE
-			return rune(0x29f7), true
+			return {'\u29f7', 0}, 1, true
 		case "rsqb":                            // RIGHT SQUARE BRACKET
-			return rune(0x5d), true
+			return {']', 0}, 1, true
 		case "rsquo":                           // RIGHT SINGLE QUOTATION MARK
-			return rune(0x2019), true
+			return {'\u2019', 0}, 1, true
 		case "rsquor":                          // RIGHT SINGLE QUOTATION MARK
-			return rune(0x2019), true
+			return {'\u2019', 0}, 1, true
 		case "rthree":                          // RIGHT SEMIDIRECT PRODUCT
-			return rune(0x22cc), true
+			return {'\u22cc', 0}, 1, true
 		case "rtimes":                          // RIGHT NORMAL FACTOR SEMIDIRECT PRODUCT
-			return rune(0x22ca), true
+			return {'\u22ca', 0}, 1, true
 		case "rtri":                            // WHITE RIGHT-POINTING SMALL TRIANGLE
-			return rune(0x25b9), true
+			return {'\u25b9', 0}, 1, true
 		case "rtrie":                           // CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
-			return rune(0x22b5), true
+			return {'\u22b5', 0}, 1, true
 		case "rtrif":                           // BLACK RIGHT-POINTING SMALL TRIANGLE
-			return rune(0x25b8), true
+			return {'\u25b8', 0}, 1, true
 		case "rtriltri":                        // RIGHT TRIANGLE ABOVE LEFT TRIANGLE
-			return rune(0x29ce), true
+			return {'\u29ce', 0}, 1, true
 		case "ruharb":                          // RIGHTWARDS HARPOON WITH BARB UP TO BAR
-			return rune(0x2953), true
+			return {'\u2953', 0}, 1, true
 		case "ruluhar":                         // RIGHTWARDS HARPOON WITH BARB UP ABOVE LEFTWARDS HARPOON WITH BARB UP
-			return rune(0x2968), true
+			return {'\u2968', 0}, 1, true
 		case "rx":                              // PRESCRIPTION TAKE
-			return rune(0x211e), true
+			return {'\u211e', 0}, 1, true
 		}
 
 	case 's':
 		switch name {
 		case "sacute":                          // LATIN SMALL LETTER S WITH ACUTE
-			return rune(0x015b), true
+			return {'\u015b', 0}, 1, true
 		case "samalg":                          // N-ARY COPRODUCT
-			return rune(0x2210), true
+			return {'\u2210', 0}, 1, true
 		case "sampi":                           // GREEK LETTER SAMPI
-			return rune(0x03e0), true
+			return {'\u03e0', 0}, 1, true
 		case "sbquo":                           // SINGLE LOW-9 QUOTATION MARK
-			return rune(0x201a), true
+			return {'\u201a', 0}, 1, true
 		case "sbsol":                           // SMALL REVERSE SOLIDUS
-			return rune(0xfe68), true
+			return {'\ufe68', 0}, 1, true
 		case "sc":                              // SUCCEEDS
-			return rune(0x227b), true
+			return {'\u227b', 0}, 1, true
 		case "scE":                             // SUCCEEDS ABOVE EQUALS SIGN
-			return rune(0x2ab4), true
+			return {'\u2ab4', 0}, 1, true
 		case "scap":                            // SUCCEEDS ABOVE ALMOST EQUAL TO
-			return rune(0x2ab8), true
+			return {'\u2ab8', 0}, 1, true
 		case "scaron":                          // LATIN SMALL LETTER S WITH CARON
-			return rune(0x0161), true
+			return {'\u0161', 0}, 1, true
 		case "sccue":                           // SUCCEEDS OR EQUAL TO
-			return rune(0x227d), true
+			return {'\u227d', 0}, 1, true
 		case "sce":                             // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN
-			return rune(0x2ab0), true
+			return {'\u2ab0', 0}, 1, true
 		case "scedil":                          // LATIN SMALL LETTER S WITH CEDILLA
-			return rune(0x015f), true
+			return {'\u015f', 0}, 1, true
 		case "scirc":                           // LATIN SMALL LETTER S WITH CIRCUMFLEX
-			return rune(0x015d), true
+			return {'\u015d', 0}, 1, true
 		case "scnE":                            // SUCCEEDS ABOVE NOT EQUAL TO
-			return rune(0x2ab6), true
+			return {'\u2ab6', 0}, 1, true
 		case "scnap":                           // SUCCEEDS ABOVE NOT ALMOST EQUAL TO
-			return rune(0x2aba), true
+			return {'\u2aba', 0}, 1, true
 		case "scnsim":                          // SUCCEEDS BUT NOT EQUIVALENT TO
-			return rune(0x22e9), true
+			return {'\u22e9', 0}, 1, true
 		case "scpolint":                        // LINE INTEGRATION WITH SEMICIRCULAR PATH AROUND POLE
-			return rune(0x2a13), true
+			return {'\u2a13', 0}, 1, true
 		case "scsim":                           // SUCCEEDS OR EQUIVALENT TO
-			return rune(0x227f), true
+			return {'\u227f', 0}, 1, true
 		case "scy":                             // CYRILLIC SMALL LETTER ES
-			return rune(0x0441), true
+			return {'\u0441', 0}, 1, true
 		case "sdot":                            // DOT OPERATOR
-			return rune(0x22c5), true
+			return {'\u22c5', 0}, 1, true
 		case "sdotb":                           // SQUARED DOT OPERATOR
-			return rune(0x22a1), true
+			return {'\u22a1', 0}, 1, true
 		case "sdote":                           // EQUALS SIGN WITH DOT BELOW
-			return rune(0x2a66), true
+			return {'\u2a66', 0}, 1, true
 		case "seArr":                           // SOUTH EAST DOUBLE ARROW
-			return rune(0x21d8), true
+			return {'\u21d8', 0}, 1, true
 		case "searhk":                          // SOUTH EAST ARROW WITH HOOK
-			return rune(0x2925), true
+			return {'\u2925', 0}, 1, true
 		case "searr":                           // SOUTH EAST ARROW
-			return rune(0x2198), true
+			return {'\u2198', 0}, 1, true
 		case "searrow":                         // SOUTH EAST ARROW
-			return rune(0x2198), true
+			return {'\u2198', 0}, 1, true
 		case "sect":                            // SECTION SIGN
-			return rune(0xa7), true
+			return {'§', 0}, 1, true
 		case "semi":                            // SEMICOLON
-			return rune(0x3b), true
+			return {';', 0}, 1, true
 		case "seonearr":                        // SOUTH EAST ARROW CROSSING NORTH EAST ARROW
-			return rune(0x292d), true
+			return {'\u292d', 0}, 1, true
 		case "seswar":                          // SOUTH EAST ARROW AND SOUTH WEST ARROW
-			return rune(0x2929), true
+			return {'\u2929', 0}, 1, true
 		case "setminus":                        // SET MINUS
-			return rune(0x2216), true
+			return {'\u2216', 0}, 1, true
 		case "setmn":                           // SET MINUS
-			return rune(0x2216), true
+			return {'\u2216', 0}, 1, true
 		case "sext":                            // SIX POINTED BLACK STAR
-			return rune(0x2736), true
+			return {'\u2736', 0}, 1, true
 		case "sfgr":                            // GREEK SMALL LETTER FINAL SIGMA
-			return rune(0x03c2), true
+			return {'\u03c2', 0}, 1, true
 		case "sfr":                             // MATHEMATICAL FRAKTUR SMALL S
-			return rune(0x01d530), true
+			return {'\U0001d530', 0}, 1, true
 		case "sfrown":                          // FROWN
-			return rune(0x2322), true
+			return {'\u2322', 0}, 1, true
 		case "sgr":                             // GREEK SMALL LETTER SIGMA
-			return rune(0x03c3), true
+			return {'\u03c3', 0}, 1, true
 		case "sharp":                           // MUSIC SHARP SIGN
-			return rune(0x266f), true
+			return {'\u266f', 0}, 1, true
 		case "shchcy":                          // CYRILLIC SMALL LETTER SHCHA
-			return rune(0x0449), true
+			return {'\u0449', 0}, 1, true
 		case "shcy":                            // CYRILLIC SMALL LETTER SHA
-			return rune(0x0448), true
+			return {'\u0448', 0}, 1, true
 		case "shortmid":                        // DIVIDES
-			return rune(0x2223), true
+			return {'\u2223', 0}, 1, true
 		case "shortparallel":                   // PARALLEL TO
-			return rune(0x2225), true
+			return {'\u2225', 0}, 1, true
 		case "shuffle":                         // SHUFFLE PRODUCT
-			return rune(0x29e2), true
+			return {'\u29e2', 0}, 1, true
 		case "shy":                             // SOFT HYPHEN
-			return rune(0xad), true
+			return {'\u00ad', 0}, 1, true
 		case "sigma":                           // GREEK SMALL LETTER SIGMA
-			return rune(0x03c3), true
+			return {'\u03c3', 0}, 1, true
 		case "sigmaf":                          // GREEK SMALL LETTER FINAL SIGMA
-			return rune(0x03c2), true
+			return {'\u03c2', 0}, 1, true
 		case "sigmav":                          // GREEK SMALL LETTER FINAL SIGMA
-			return rune(0x03c2), true
+			return {'\u03c2', 0}, 1, true
 		case "sim":                             // TILDE OPERATOR
-			return rune(0x223c), true
+			return {'\u223c', 0}, 1, true
 		case "simdot":                          // TILDE OPERATOR WITH DOT ABOVE
-			return rune(0x2a6a), true
+			return {'\u2a6a', 0}, 1, true
 		case "sime":                            // ASYMPTOTICALLY EQUAL TO
-			return rune(0x2243), true
+			return {'\u2243', 0}, 1, true
 		case "simeq":                           // ASYMPTOTICALLY EQUAL TO
-			return rune(0x2243), true
+			return {'\u2243', 0}, 1, true
 		case "simg":                            // SIMILAR OR GREATER-THAN
-			return rune(0x2a9e), true
+			return {'\u2a9e', 0}, 1, true
 		case "simgE":                           // SIMILAR ABOVE GREATER-THAN ABOVE EQUALS SIGN
-			return rune(0x2aa0), true
+			return {'\u2aa0', 0}, 1, true
 		case "siml":                            // SIMILAR OR LESS-THAN
-			return rune(0x2a9d), true
+			return {'\u2a9d', 0}, 1, true
 		case "simlE":                           // SIMILAR ABOVE LESS-THAN ABOVE EQUALS SIGN
-			return rune(0x2a9f), true
+			return {'\u2a9f', 0}, 1, true
 		case "simne":                           // APPROXIMATELY BUT NOT ACTUALLY EQUAL TO
-			return rune(0x2246), true
+			return {'\u2246', 0}, 1, true
 		case "simplus":                         // PLUS SIGN WITH TILDE ABOVE
-			return rune(0x2a24), true
+			return {'\u2a24', 0}, 1, true
 		case "simrarr":                         // TILDE OPERATOR ABOVE RIGHTWARDS ARROW
-			return rune(0x2972), true
+			return {'\u2972', 0}, 1, true
 		case "slarr":                           // LEFTWARDS ARROW
-			return rune(0x2190), true
+			return {'\u2190', 0}, 1, true
 		case "slint":                           // INTEGRAL AVERAGE WITH SLASH
-			return rune(0x2a0f), true
+			return {'\u2a0f', 0}, 1, true
 		case "smallsetminus":                   // SET MINUS
-			return rune(0x2216), true
+			return {'\u2216', 0}, 1, true
 		case "smashp":                          // SMASH PRODUCT
-			return rune(0x2a33), true
+			return {'\u2a33', 0}, 1, true
 		case "smeparsl":                        // EQUALS SIGN AND SLANTED PARALLEL WITH TILDE ABOVE
-			return rune(0x29e4), true
+			return {'\u29e4', 0}, 1, true
 		case "smid":                            // DIVIDES
-			return rune(0x2223), true
+			return {'\u2223', 0}, 1, true
 		case "smile":                           // SMILE
-			return rune(0x2323), true
+			return {'\u2323', 0}, 1, true
 		case "smt":                             // SMALLER THAN
-			return rune(0x2aaa), true
+			return {'\u2aaa', 0}, 1, true
 		case "smte":                            // SMALLER THAN OR EQUAL TO
-			return rune(0x2aac), true
+			return {'\u2aac', 0}, 1, true
 		case "smtes":                           // SMALLER THAN OR slanted EQUAL
-			return rune(0x2aac), true
+			return {'\u2aac', '\ufe00'}, 2, true
 		case "softcy":                          // CYRILLIC SMALL LETTER SOFT SIGN
-			return rune(0x044c), true
+			return {'\u044c', 0}, 1, true
 		case "sol":                             // SOLIDUS
-			return rune(0x2f), true
+			return {'/', 0}, 1, true
 		case "solb":                            // SQUARED RISING DIAGONAL SLASH
-			return rune(0x29c4), true
+			return {'\u29c4', 0}, 1, true
 		case "solbar":                          // APL FUNCTIONAL SYMBOL SLASH BAR
-			return rune(0x233f), true
+			return {'\u233f', 0}, 1, true
 		case "sopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL S
-			return rune(0x01d564), true
+			return {'\U0001d564', 0}, 1, true
 		case "spades":                          // BLACK SPADE SUIT
-			return rune(0x2660), true
+			return {'\u2660', 0}, 1, true
 		case "spadesuit":                       // BLACK SPADE SUIT
-			return rune(0x2660), true
+			return {'\u2660', 0}, 1, true
 		case "spar":                            // PARALLEL TO
-			return rune(0x2225), true
+			return {'\u2225', 0}, 1, true
 		case "sqcap":                           // SQUARE CAP
-			return rune(0x2293), true
+			return {'\u2293', 0}, 1, true
 		case "sqcaps":                          // SQUARE CAP with serifs
-			return rune(0x2293), true
+			return {'\u2293', '\ufe00'}, 2, true
 		case "sqcup":                           // SQUARE CUP
-			return rune(0x2294), true
+			return {'\u2294', 0}, 1, true
 		case "sqcups":                          // SQUARE CUP with serifs
-			return rune(0x2294), true
+			return {'\u2294', '\ufe00'}, 2, true
 		case "sqsub":                           // SQUARE IMAGE OF
-			return rune(0x228f), true
+			return {'\u228f', 0}, 1, true
 		case "sqsube":                          // SQUARE IMAGE OF OR EQUAL TO
-			return rune(0x2291), true
+			return {'\u2291', 0}, 1, true
 		case "sqsubset":                        // SQUARE IMAGE OF
-			return rune(0x228f), true
+			return {'\u228f', 0}, 1, true
 		case "sqsubseteq":                      // SQUARE IMAGE OF OR EQUAL TO
-			return rune(0x2291), true
+			return {'\u2291', 0}, 1, true
 		case "sqsup":                           // SQUARE ORIGINAL OF
-			return rune(0x2290), true
+			return {'\u2290', 0}, 1, true
 		case "sqsupe":                          // SQUARE ORIGINAL OF OR EQUAL TO
-			return rune(0x2292), true
+			return {'\u2292', 0}, 1, true
 		case "sqsupset":                        // SQUARE ORIGINAL OF
-			return rune(0x2290), true
+			return {'\u2290', 0}, 1, true
 		case "sqsupseteq":                      // SQUARE ORIGINAL OF OR EQUAL TO
-			return rune(0x2292), true
+			return {'\u2292', 0}, 1, true
 		case "squ":                             // WHITE SQUARE
-			return rune(0x25a1), true
+			return {'\u25a1', 0}, 1, true
 		case "square":                          // WHITE SQUARE
-			return rune(0x25a1), true
+			return {'\u25a1', 0}, 1, true
 		case "squarf":                          // BLACK SMALL SQUARE
-			return rune(0x25aa), true
+			return {'\u25aa', 0}, 1, true
 		case "squb":                            // SQUARED SQUARE
-			return rune(0x29c8), true
+			return {'\u29c8', 0}, 1, true
 		case "squerr":                          // ERROR-BARRED WHITE SQUARE
-			return rune(0x29ee), true
+			return {'\u29ee', 0}, 1, true
 		case "squf":                            // BLACK SMALL SQUARE
-			return rune(0x25aa), true
+			return {'\u25aa', 0}, 1, true
 		case "squferr":                         // ERROR-BARRED BLACK SQUARE
-			return rune(0x29ef), true
+			return {'\u29ef', 0}, 1, true
 		case "srarr":                           // RIGHTWARDS ARROW
-			return rune(0x2192), true
+			return {'\u2192', 0}, 1, true
 		case "sscr":                            // MATHEMATICAL SCRIPT SMALL S
-			return rune(0x01d4c8), true
+			return {'\U0001d4c8', 0}, 1, true
 		case "ssetmn":                          // SET MINUS
-			return rune(0x2216), true
+			return {'\u2216', 0}, 1, true
 		case "ssmile":                          // SMILE
-			return rune(0x2323), true
+			return {'\u2323', 0}, 1, true
 		case "sstarf":                          // STAR OPERATOR
-			return rune(0x22c6), true
+			return {'\u22c6', 0}, 1, true
 		case "star":                            // WHITE STAR
-			return rune(0x2606), true
+			return {'\u2606', 0}, 1, true
 		case "starf":                           // BLACK STAR
-			return rune(0x2605), true
+			return {'\u2605', 0}, 1, true
 		case "stigma":                          // GREEK LETTER STIGMA
-			return rune(0x03da), true
+			return {'\u03da', 0}, 1, true
 		case "straightepsilon":                 // GREEK LUNATE EPSILON SYMBOL
-			return rune(0x03f5), true
+			return {'\u03f5', 0}, 1, true
 		case "straightphi":                     // GREEK PHI SYMBOL
-			return rune(0x03d5), true
+			return {'\u03d5', 0}, 1, true
 		case "strns":                           // MACRON
-			return rune(0xaf), true
+			return {'¯', 0}, 1, true
 		case "sub":                             // SUBSET OF
-			return rune(0x2282), true
+			return {'\u2282', 0}, 1, true
 		case "subE":                            // SUBSET OF ABOVE EQUALS SIGN
-			return rune(0x2ac5), true
+			return {'\u2ac5', 0}, 1, true
 		case "subdot":                          // SUBSET WITH DOT
-			return rune(0x2abd), true
+			return {'\u2abd', 0}, 1, true
 		case "sube":                            // SUBSET OF OR EQUAL TO
-			return rune(0x2286), true
+			return {'\u2286', 0}, 1, true
 		case "subedot":                         // SUBSET OF OR EQUAL TO WITH DOT ABOVE
-			return rune(0x2ac3), true
+			return {'\u2ac3', 0}, 1, true
 		case "submult":                         // SUBSET WITH MULTIPLICATION SIGN BELOW
-			return rune(0x2ac1), true
+			return {'\u2ac1', 0}, 1, true
 		case "subnE":                           // SUBSET OF ABOVE NOT EQUAL TO
-			return rune(0x2acb), true
+			return {'\u2acb', 0}, 1, true
 		case "subne":                           // SUBSET OF WITH NOT EQUAL TO
-			return rune(0x228a), true
+			return {'\u228a', 0}, 1, true
 		case "subplus":                         // SUBSET WITH PLUS SIGN BELOW
-			return rune(0x2abf), true
+			return {'\u2abf', 0}, 1, true
 		case "subrarr":                         // SUBSET ABOVE RIGHTWARDS ARROW
-			return rune(0x2979), true
+			return {'\u2979', 0}, 1, true
 		case "subset":                          // SUBSET OF
-			return rune(0x2282), true
+			return {'\u2282', 0}, 1, true
 		case "subseteq":                        // SUBSET OF OR EQUAL TO
-			return rune(0x2286), true
+			return {'\u2286', 0}, 1, true
 		case "subseteqq":                       // SUBSET OF ABOVE EQUALS SIGN
-			return rune(0x2ac5), true
+			return {'\u2ac5', 0}, 1, true
 		case "subsetneq":                       // SUBSET OF WITH NOT EQUAL TO
-			return rune(0x228a), true
+			return {'\u228a', 0}, 1, true
 		case "subsetneqq":                      // SUBSET OF ABOVE NOT EQUAL TO
-			return rune(0x2acb), true
+			return {'\u2acb', 0}, 1, true
 		case "subsim":                          // SUBSET OF ABOVE TILDE OPERATOR
-			return rune(0x2ac7), true
+			return {'\u2ac7', 0}, 1, true
 		case "subsub":                          // SUBSET ABOVE SUBSET
-			return rune(0x2ad5), true
+			return {'\u2ad5', 0}, 1, true
 		case "subsup":                          // SUBSET ABOVE SUPERSET
-			return rune(0x2ad3), true
+			return {'\u2ad3', 0}, 1, true
 		case "succ":                            // SUCCEEDS
-			return rune(0x227b), true
+			return {'\u227b', 0}, 1, true
 		case "succapprox":                      // SUCCEEDS ABOVE ALMOST EQUAL TO
-			return rune(0x2ab8), true
+			return {'\u2ab8', 0}, 1, true
 		case "succcurlyeq":                     // SUCCEEDS OR EQUAL TO
-			return rune(0x227d), true
+			return {'\u227d', 0}, 1, true
 		case "succeq":                          // SUCCEEDS ABOVE SINGLE-LINE EQUALS SIGN
-			return rune(0x2ab0), true
+			return {'\u2ab0', 0}, 1, true
 		case "succnapprox":                     // SUCCEEDS ABOVE NOT ALMOST EQUAL TO
-			return rune(0x2aba), true
+			return {'\u2aba', 0}, 1, true
 		case "succneqq":                        // SUCCEEDS ABOVE NOT EQUAL TO
-			return rune(0x2ab6), true
+			return {'\u2ab6', 0}, 1, true
 		case "succnsim":                        // SUCCEEDS BUT NOT EQUIVALENT TO
-			return rune(0x22e9), true
+			return {'\u22e9', 0}, 1, true
 		case "succsim":                         // SUCCEEDS OR EQUIVALENT TO
-			return rune(0x227f), true
+			return {'\u227f', 0}, 1, true
 		case "sum":                             // N-ARY SUMMATION
-			return rune(0x2211), true
+			return {'\u2211', 0}, 1, true
 		case "sumint":                          // SUMMATION WITH INTEGRAL
-			return rune(0x2a0b), true
+			return {'\u2a0b', 0}, 1, true
 		case "sung":                            // EIGHTH NOTE
-			return rune(0x266a), true
+			return {'\u266a', 0}, 1, true
 		case "sup":                             // SUPERSET OF
-			return rune(0x2283), true
+			return {'\u2283', 0}, 1, true
 		case "sup1":                            // SUPERSCRIPT ONE
-			return rune(0xb9), true
+			return {'¹', 0}, 1, true
 		case "sup2":                            // SUPERSCRIPT TWO
-			return rune(0xb2), true
+			return {'²', 0}, 1, true
 		case "sup3":                            // SUPERSCRIPT THREE
-			return rune(0xb3), true
+			return {'³', 0}, 1, true
 		case "supE":                            // SUPERSET OF ABOVE EQUALS SIGN
-			return rune(0x2ac6), true
+			return {'\u2ac6', 0}, 1, true
 		case "supdot":                          // SUPERSET WITH DOT
-			return rune(0x2abe), true
+			return {'\u2abe', 0}, 1, true
 		case "supdsub":                         // SUPERSET BESIDE AND JOINED BY DASH WITH SUBSET
-			return rune(0x2ad8), true
+			return {'\u2ad8', 0}, 1, true
 		case "supe":                            // SUPERSET OF OR EQUAL TO
-			return rune(0x2287), true
+			return {'\u2287', 0}, 1, true
 		case "supedot":                         // SUPERSET OF OR EQUAL TO WITH DOT ABOVE
-			return rune(0x2ac4), true
+			return {'\u2ac4', 0}, 1, true
 		case "suphsol":                         // SUPERSET PRECEDING SOLIDUS
-			return rune(0x27c9), true
+			return {'\u27c9', 0}, 1, true
 		case "suphsub":                         // SUPERSET BESIDE SUBSET
-			return rune(0x2ad7), true
+			return {'\u2ad7', 0}, 1, true
 		case "suplarr":                         // SUPERSET ABOVE LEFTWARDS ARROW
-			return rune(0x297b), true
+			return {'\u297b', 0}, 1, true
 		case "supmult":                         // SUPERSET WITH MULTIPLICATION SIGN BELOW
-			return rune(0x2ac2), true
+			return {'\u2ac2', 0}, 1, true
 		case "supnE":                           // SUPERSET OF ABOVE NOT EQUAL TO
-			return rune(0x2acc), true
+			return {'\u2acc', 0}, 1, true
 		case "supne":                           // SUPERSET OF WITH NOT EQUAL TO
-			return rune(0x228b), true
+			return {'\u228b', 0}, 1, true
 		case "supplus":                         // SUPERSET WITH PLUS SIGN BELOW
-			return rune(0x2ac0), true
+			return {'\u2ac0', 0}, 1, true
 		case "supset":                          // SUPERSET OF
-			return rune(0x2283), true
+			return {'\u2283', 0}, 1, true
 		case "supseteq":                        // SUPERSET OF OR EQUAL TO
-			return rune(0x2287), true
+			return {'\u2287', 0}, 1, true
 		case "supseteqq":                       // SUPERSET OF ABOVE EQUALS SIGN
-			return rune(0x2ac6), true
+			return {'\u2ac6', 0}, 1, true
 		case "supsetneq":                       // SUPERSET OF WITH NOT EQUAL TO
-			return rune(0x228b), true
+			return {'\u228b', 0}, 1, true
 		case "supsetneqq":                      // SUPERSET OF ABOVE NOT EQUAL TO
-			return rune(0x2acc), true
+			return {'\u2acc', 0}, 1, true
 		case "supsim":                          // SUPERSET OF ABOVE TILDE OPERATOR
-			return rune(0x2ac8), true
+			return {'\u2ac8', 0}, 1, true
 		case "supsub":                          // SUPERSET ABOVE SUBSET
-			return rune(0x2ad4), true
+			return {'\u2ad4', 0}, 1, true
 		case "supsup":                          // SUPERSET ABOVE SUPERSET
-			return rune(0x2ad6), true
+			return {'\u2ad6', 0}, 1, true
 		case "swArr":                           // SOUTH WEST DOUBLE ARROW
-			return rune(0x21d9), true
+			return {'\u21d9', 0}, 1, true
 		case "swarhk":                          // SOUTH WEST ARROW WITH HOOK
-			return rune(0x2926), true
+			return {'\u2926', 0}, 1, true
 		case "swarr":                           // SOUTH WEST ARROW
-			return rune(0x2199), true
+			return {'\u2199', 0}, 1, true
 		case "swarrow":                         // SOUTH WEST ARROW
-			return rune(0x2199), true
+			return {'\u2199', 0}, 1, true
 		case "swnwar":                          // SOUTH WEST ARROW AND NORTH WEST ARROW
-			return rune(0x292a), true
+			return {'\u292a', 0}, 1, true
 		case "szlig":                           // LATIN SMALL LETTER SHARP S
-			return rune(0xdf), true
+			return {'ß', 0}, 1, true
 		}
 
 	case 't':
 		switch name {
 		case "target":                          // POSITION INDICATOR
-			return rune(0x2316), true
+			return {'\u2316', 0}, 1, true
 		case "tau":                             // GREEK SMALL LETTER TAU
-			return rune(0x03c4), true
+			return {'\u03c4', 0}, 1, true
 		case "tbrk":                            // TOP SQUARE BRACKET
-			return rune(0x23b4), true
+			return {'\u23b4', 0}, 1, true
 		case "tcaron":                          // LATIN SMALL LETTER T WITH CARON
-			return rune(0x0165), true
+			return {'\u0165', 0}, 1, true
 		case "tcedil":                          // LATIN SMALL LETTER T WITH CEDILLA
-			return rune(0x0163), true
+			return {'\u0163', 0}, 1, true
 		case "tcy":                             // CYRILLIC SMALL LETTER TE
-			return rune(0x0442), true
+			return {'\u0442', 0}, 1, true
 		case "tdot":                            // COMBINING THREE DOTS ABOVE
-			return rune(0x20db), true
+			return {'\u20db', 0}, 1, true
 		case "telrec":                          // TELEPHONE RECORDER
-			return rune(0x2315), true
+			return {'\u2315', 0}, 1, true
 		case "tfr":                             // MATHEMATICAL FRAKTUR SMALL T
-			return rune(0x01d531), true
+			return {'\U0001d531', 0}, 1, true
 		case "tgr":                             // GREEK SMALL LETTER TAU
-			return rune(0x03c4), true
+			return {'\u03c4', 0}, 1, true
 		case "there4":                          // THEREFORE
-			return rune(0x2234), true
+			return {'\u2234', 0}, 1, true
 		case "therefore":                       // THEREFORE
-			return rune(0x2234), true
+			return {'\u2234', 0}, 1, true
 		case "thermod":                         // THERMODYNAMIC
-			return rune(0x29e7), true
+			return {'\u29e7', 0}, 1, true
 		case "theta":                           // GREEK SMALL LETTER THETA
-			return rune(0x03b8), true
+			return {'\u03b8', 0}, 1, true
 		case "thetas":                          // GREEK SMALL LETTER THETA
-			return rune(0x03b8), true
+			return {'\u03b8', 0}, 1, true
 		case "thetasym":                        // GREEK THETA SYMBOL
-			return rune(0x03d1), true
+			return {'\u03d1', 0}, 1, true
 		case "thetav":                          // GREEK THETA SYMBOL
-			return rune(0x03d1), true
+			return {'\u03d1', 0}, 1, true
 		case "thgr":                            // GREEK SMALL LETTER THETA
-			return rune(0x03b8), true
+			return {'\u03b8', 0}, 1, true
 		case "thickapprox":                     // ALMOST EQUAL TO
-			return rune(0x2248), true
+			return {'\u2248', 0}, 1, true
 		case "thicksim":                        // TILDE OPERATOR
-			return rune(0x223c), true
+			return {'\u223c', 0}, 1, true
 		case "thinsp":                          // THIN SPACE
-			return rune(0x2009), true
+			return {'\u2009', 0}, 1, true
 		case "thkap":                           // ALMOST EQUAL TO
-			return rune(0x2248), true
+			return {'\u2248', 0}, 1, true
 		case "thksim":                          // TILDE OPERATOR
-			return rune(0x223c), true
+			return {'\u223c', 0}, 1, true
 		case "thorn":                           // LATIN SMALL LETTER THORN
-			return rune(0xfe), true
+			return {'þ', 0}, 1, true
 		case "tilde":                           // SMALL TILDE
-			return rune(0x02dc), true
+			return {'\u02dc', 0}, 1, true
 		case "timeint":                         // INTEGRAL WITH TIMES SIGN
-			return rune(0x2a18), true
+			return {'\u2a18', 0}, 1, true
 		case "times":                           // MULTIPLICATION SIGN
-			return rune(0xd7), true
+			return {'×', 0}, 1, true
 		case "timesb":                          // SQUARED TIMES
-			return rune(0x22a0), true
+			return {'\u22a0', 0}, 1, true
 		case "timesbar":                        // MULTIPLICATION SIGN WITH UNDERBAR
-			return rune(0x2a31), true
+			return {'\u2a31', 0}, 1, true
 		case "timesd":                          // MULTIPLICATION SIGN WITH DOT ABOVE
-			return rune(0x2a30), true
+			return {'\u2a30', 0}, 1, true
 		case "tint":                            // TRIPLE INTEGRAL
-			return rune(0x222d), true
+			return {'\u222d', 0}, 1, true
 		case "toea":                            // NORTH EAST ARROW AND SOUTH EAST ARROW
-			return rune(0x2928), true
+			return {'\u2928', 0}, 1, true
 		case "top":                             // DOWN TACK
-			return rune(0x22a4), true
+			return {'\u22a4', 0}, 1, true
 		case "topbot":                          // APL FUNCTIONAL SYMBOL I-BEAM
-			return rune(0x2336), true
+			return {'\u2336', 0}, 1, true
 		case "topcir":                          // DOWN TACK WITH CIRCLE BELOW
-			return rune(0x2af1), true
+			return {'\u2af1', 0}, 1, true
 		case "topf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL T
-			return rune(0x01d565), true
+			return {'\U0001d565', 0}, 1, true
 		case "topfork":                         // PITCHFORK WITH TEE TOP
-			return rune(0x2ada), true
+			return {'\u2ada', 0}, 1, true
 		case "tosa":                            // SOUTH EAST ARROW AND SOUTH WEST ARROW
-			return rune(0x2929), true
+			return {'\u2929', 0}, 1, true
 		case "tprime":                          // TRIPLE PRIME
-			return rune(0x2034), true
+			return {'\u2034', 0}, 1, true
 		case "trade":                           // TRADE MARK SIGN
-			return rune(0x2122), true
+			return {'\u2122', 0}, 1, true
 		case "triS":                            // S IN TRIANGLE
-			return rune(0x29cc), true
+			return {'\u29cc', 0}, 1, true
 		case "triangle":                        // WHITE UP-POINTING SMALL TRIANGLE
-			return rune(0x25b5), true
+			return {'\u25b5', 0}, 1, true
 		case "triangledown":                    // WHITE DOWN-POINTING SMALL TRIANGLE
-			return rune(0x25bf), true
+			return {'\u25bf', 0}, 1, true
 		case "triangleleft":                    // WHITE LEFT-POINTING SMALL TRIANGLE
-			return rune(0x25c3), true
+			return {'\u25c3', 0}, 1, true
 		case "trianglelefteq":                  // NORMAL SUBGROUP OF OR EQUAL TO
-			return rune(0x22b4), true
+			return {'\u22b4', 0}, 1, true
 		case "triangleq":                       // DELTA EQUAL TO
-			return rune(0x225c), true
+			return {'\u225c', 0}, 1, true
 		case "triangleright":                   // WHITE RIGHT-POINTING SMALL TRIANGLE
-			return rune(0x25b9), true
+			return {'\u25b9', 0}, 1, true
 		case "trianglerighteq":                 // CONTAINS AS NORMAL SUBGROUP OR EQUAL TO
-			return rune(0x22b5), true
+			return {'\u22b5', 0}, 1, true
 		case "tribar":                          // TRIANGLE WITH UNDERBAR
-			return rune(0x29cb), true
+			return {'\u29cb', 0}, 1, true
 		case "tridot":                          // WHITE UP-POINTING TRIANGLE WITH DOT
-			return rune(0x25ec), true
+			return {'\u25ec', 0}, 1, true
 		case "tridoto":                         // TRIANGLE WITH DOT ABOVE
-			return rune(0x29ca), true
+			return {'\u29ca', 0}, 1, true
 		case "trie":                            // DELTA EQUAL TO
-			return rune(0x225c), true
+			return {'\u225c', 0}, 1, true
 		case "triminus":                        // MINUS SIGN IN TRIANGLE
-			return rune(0x2a3a), true
+			return {'\u2a3a', 0}, 1, true
 		case "triplus":                         // PLUS SIGN IN TRIANGLE
-			return rune(0x2a39), true
+			return {'\u2a39', 0}, 1, true
 		case "trisb":                           // TRIANGLE WITH SERIFS AT BOTTOM
-			return rune(0x29cd), true
+			return {'\u29cd', 0}, 1, true
 		case "tritime":                         // MULTIPLICATION SIGN IN TRIANGLE
-			return rune(0x2a3b), true
+			return {'\u2a3b', 0}, 1, true
 		case "trpezium":                        // WHITE TRAPEZIUM
-			return rune(0x23e2), true
+			return {'\u23e2', 0}, 1, true
 		case "tscr":                            // MATHEMATICAL SCRIPT SMALL T
-			return rune(0x01d4c9), true
+			return {'\U0001d4c9', 0}, 1, true
 		case "tscy":                            // CYRILLIC SMALL LETTER TSE
-			return rune(0x0446), true
+			return {'\u0446', 0}, 1, true
 		case "tshcy":                           // CYRILLIC SMALL LETTER TSHE
-			return rune(0x045b), true
+			return {'\u045b', 0}, 1, true
 		case "tstrok":                          // LATIN SMALL LETTER T WITH STROKE
-			return rune(0x0167), true
+			return {'\u0167', 0}, 1, true
 		case "tverbar":                         // TRIPLE VERTICAL BAR DELIMITER
-			return rune(0x2980), true
+			return {'\u2980', 0}, 1, true
 		case "twixt":                           // BETWEEN
-			return rune(0x226c), true
+			return {'\u226c', 0}, 1, true
 		case "twoheadleftarrow":                // LEFTWARDS TWO HEADED ARROW
-			return rune(0x219e), true
+			return {'\u219e', 0}, 1, true
 		case "twoheadrightarrow":               // RIGHTWARDS TWO HEADED ARROW
-			return rune(0x21a0), true
+			return {'\u21a0', 0}, 1, true
 		}
 
 	case 'u':
 		switch name {
 		case "uAarr":                           // UPWARDS TRIPLE ARROW
-			return rune(0x290a), true
+			return {'\u290a', 0}, 1, true
 		case "uArr":                            // UPWARDS DOUBLE ARROW
-			return rune(0x21d1), true
+			return {'\u21d1', 0}, 1, true
 		case "uHar":                            // UPWARDS HARPOON WITH BARB LEFT BESIDE UPWARDS HARPOON WITH BARB RIGHT
-			return rune(0x2963), true
+			return {'\u2963', 0}, 1, true
 		case "uacgr":                           // GREEK SMALL LETTER UPSILON WITH TONOS
-			return rune(0x03cd), true
+			return {'\u03cd', 0}, 1, true
 		case "uacute":                          // LATIN SMALL LETTER U WITH ACUTE
-			return rune(0xfa), true
+			return {'ú', 0}, 1, true
 		case "uarr":                            // UPWARDS ARROW
-			return rune(0x2191), true
+			return {'\u2191', 0}, 1, true
 		case "uarr2":                           // UPWARDS PAIRED ARROWS
-			return rune(0x21c8), true
+			return {'\u21c8', 0}, 1, true
 		case "uarrb":                           // UPWARDS ARROW TO BAR
-			return rune(0x2912), true
+			return {'\u2912', 0}, 1, true
 		case "uarrln":                          // UPWARDS ARROW WITH HORIZONTAL STROKE
-			return rune(0x2909), true
+			return {'\u2909', 0}, 1, true
 		case "ubrcy":                           // CYRILLIC SMALL LETTER SHORT U
-			return rune(0x045e), true
+			return {'\u045e', 0}, 1, true
 		case "ubreve":                          // LATIN SMALL LETTER U WITH BREVE
-			return rune(0x016d), true
+			return {'\u016d', 0}, 1, true
 		case "ucirc":                           // LATIN SMALL LETTER U WITH CIRCUMFLEX
-			return rune(0xfb), true
+			return {'û', 0}, 1, true
 		case "ucy":                             // CYRILLIC SMALL LETTER U
-			return rune(0x0443), true
+			return {'\u0443', 0}, 1, true
 		case "udarr":                           // UPWARDS ARROW LEFTWARDS OF DOWNWARDS ARROW
-			return rune(0x21c5), true
+			return {'\u21c5', 0}, 1, true
 		case "udblac":                          // LATIN SMALL LETTER U WITH DOUBLE ACUTE
-			return rune(0x0171), true
+			return {'\u0171', 0}, 1, true
 		case "udhar":                           // UPWARDS HARPOON WITH BARB LEFT BESIDE DOWNWARDS HARPOON WITH BARB RIGHT
-			return rune(0x296e), true
+			return {'\u296e', 0}, 1, true
 		case "udiagr":                          // GREEK SMALL LETTER UPSILON WITH DIALYTIKA AND TONOS
-			return rune(0x03b0), true
+			return {'\u03b0', 0}, 1, true
 		case "udigr":                           // GREEK SMALL LETTER UPSILON WITH DIALYTIKA
-			return rune(0x03cb), true
+			return {'\u03cb', 0}, 1, true
 		case "udrbrk":                          // BOTTOM SQUARE BRACKET
-			return rune(0x23b5), true
+			return {'\u23b5', 0}, 1, true
 		case "udrcub":                          // BOTTOM CURLY BRACKET
-			return rune(0x23df), true
+			return {'\u23df', 0}, 1, true
 		case "udrpar":                          // BOTTOM PARENTHESIS
-			return rune(0x23dd), true
+			return {'\u23dd', 0}, 1, true
 		case "ufisht":                          // UP FISH TAIL
-			return rune(0x297e), true
+			return {'\u297e', 0}, 1, true
 		case "ufr":                             // MATHEMATICAL FRAKTUR SMALL U
-			return rune(0x01d532), true
+			return {'\U0001d532', 0}, 1, true
 		case "ugr":                             // GREEK SMALL LETTER UPSILON
-			return rune(0x03c5), true
+			return {'\u03c5', 0}, 1, true
 		case "ugrave":                          // LATIN SMALL LETTER U WITH GRAVE
-			return rune(0xf9), true
+			return {'ù', 0}, 1, true
 		case "uharl":                           // UPWARDS HARPOON WITH BARB LEFTWARDS
-			return rune(0x21bf), true
+			return {'\u21bf', 0}, 1, true
 		case "uharr":                           // UPWARDS HARPOON WITH BARB RIGHTWARDS
-			return rune(0x21be), true
+			return {'\u21be', 0}, 1, true
 		case "uhblk":                           // UPPER HALF BLOCK
-			return rune(0x2580), true
+			return {'\u2580', 0}, 1, true
 		case "ulcorn":                          // TOP LEFT CORNER
-			return rune(0x231c), true
+			return {'\u231c', 0}, 1, true
 		case "ulcorner":                        // TOP LEFT CORNER
-			return rune(0x231c), true
+			return {'\u231c', 0}, 1, true
 		case "ulcrop":                          // TOP LEFT CROP
-			return rune(0x230f), true
+			return {'\u230f', 0}, 1, true
 		case "uldlshar":                        // UP BARB LEFT DOWN BARB LEFT HARPOON
-			return rune(0x2951), true
+			return {'\u2951', 0}, 1, true
 		case "ulharb":                          // UPWARDS HARPOON WITH BARB LEFT TO BAR
-			return rune(0x2958), true
+			return {'\u2958', 0}, 1, true
 		case "ultri":                           // UPPER LEFT TRIANGLE
-			return rune(0x25f8), true
+			return {'\u25f8', 0}, 1, true
 		case "umacr":                           // LATIN SMALL LETTER U WITH MACRON
-			return rune(0x016b), true
+			return {'\u016b', 0}, 1, true
 		case "uml":                             // DIAERESIS
-			return rune(0xa8), true
+			return {'¨', 0}, 1, true
 		case "uogon":                           // LATIN SMALL LETTER U WITH OGONEK
-			return rune(0x0173), true
+			return {'\u0173', 0}, 1, true
 		case "uopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL U
-			return rune(0x01d566), true
+			return {'\U0001d566', 0}, 1, true
 		case "uparrow":                         // UPWARDS ARROW
-			return rune(0x2191), true
+			return {'\u2191', 0}, 1, true
 		case "updownarrow":                     // UP DOWN ARROW
-			return rune(0x2195), true
+			return {'\u2195', 0}, 1, true
 		case "upharpoonleft":                   // UPWARDS HARPOON WITH BARB LEFTWARDS
-			return rune(0x21bf), true
+			return {'\u21bf', 0}, 1, true
 		case "upharpoonright":                  // UPWARDS HARPOON WITH BARB RIGHTWARDS
-			return rune(0x21be), true
+			return {'\u21be', 0}, 1, true
 		case "upint":                           // INTEGRAL WITH OVERBAR
-			return rune(0x2a1b), true
+			return {'\u2a1b', 0}, 1, true
 		case "uplus":                           // MULTISET UNION
-			return rune(0x228e), true
+			return {'\u228e', 0}, 1, true
 		case "upsi":                            // GREEK SMALL LETTER UPSILON
-			return rune(0x03c5), true
+			return {'\u03c5', 0}, 1, true
 		case "upsih":                           // GREEK UPSILON WITH HOOK SYMBOL
-			return rune(0x03d2), true
+			return {'\u03d2', 0}, 1, true
 		case "upsilon":                         // GREEK SMALL LETTER UPSILON
-			return rune(0x03c5), true
+			return {'\u03c5', 0}, 1, true
 		case "upuparrows":                      // UPWARDS PAIRED ARROWS
-			return rune(0x21c8), true
+			return {'\u21c8', 0}, 1, true
 		case "urcorn":                          // TOP RIGHT CORNER
-			return rune(0x231d), true
+			return {'\u231d', 0}, 1, true
 		case "urcorner":                        // TOP RIGHT CORNER
-			return rune(0x231d), true
+			return {'\u231d', 0}, 1, true
 		case "urcrop":                          // TOP RIGHT CROP
-			return rune(0x230e), true
+			return {'\u230e', 0}, 1, true
 		case "urdrshar":                        // UP BARB RIGHT DOWN BARB RIGHT HARPOON
-			return rune(0x294f), true
+			return {'\u294f', 0}, 1, true
 		case "urharb":                          // UPWARDS HARPOON WITH BARB RIGHT TO BAR
-			return rune(0x2954), true
+			return {'\u2954', 0}, 1, true
 		case "uring":                           // LATIN SMALL LETTER U WITH RING ABOVE
-			return rune(0x016f), true
+			return {'\u016f', 0}, 1, true
 		case "urtri":                           // UPPER RIGHT TRIANGLE
-			return rune(0x25f9), true
+			return {'\u25f9', 0}, 1, true
 		case "urtrif":                          // BLACK UPPER RIGHT TRIANGLE
-			return rune(0x25e5), true
+			return {'\u25e5', 0}, 1, true
 		case "uscr":                            // MATHEMATICAL SCRIPT SMALL U
-			return rune(0x01d4ca), true
+			return {'\U0001d4ca', 0}, 1, true
 		case "utdot":                           // UP RIGHT DIAGONAL ELLIPSIS
-			return rune(0x22f0), true
+			return {'\u22f0', 0}, 1, true
 		case "utilde":                          // LATIN SMALL LETTER U WITH TILDE
-			return rune(0x0169), true
+			return {'\u0169', 0}, 1, true
 		case "utri":                            // WHITE UP-POINTING SMALL TRIANGLE
-			return rune(0x25b5), true
+			return {'\u25b5', 0}, 1, true
 		case "utrif":                           // BLACK UP-POINTING SMALL TRIANGLE
-			return rune(0x25b4), true
+			return {'\u25b4', 0}, 1, true
 		case "uuarr":                           // UPWARDS PAIRED ARROWS
-			return rune(0x21c8), true
+			return {'\u21c8', 0}, 1, true
 		case "uuml":                            // LATIN SMALL LETTER U WITH DIAERESIS
-			return rune(0xfc), true
+			return {'ü', 0}, 1, true
 		case "uwangle":                         // OBLIQUE ANGLE OPENING DOWN
-			return rune(0x29a7), true
+			return {'\u29a7', 0}, 1, true
 		}
 
 	case 'v':
 		switch name {
 		case "vArr":                            // UP DOWN DOUBLE ARROW
-			return rune(0x21d5), true
+			return {'\u21d5', 0}, 1, true
 		case "vBar":                            // SHORT UP TACK WITH UNDERBAR
-			return rune(0x2ae8), true
+			return {'\u2ae8', 0}, 1, true
 		case "vBarv":                           // SHORT UP TACK ABOVE SHORT DOWN TACK
-			return rune(0x2ae9), true
+			return {'\u2ae9', 0}, 1, true
 		case "vDash":                           // TRUE
-			return rune(0x22a8), true
+			return {'\u22a8', 0}, 1, true
 		case "vDdash":                          // VERTICAL BAR TRIPLE RIGHT TURNSTILE
-			return rune(0x2ae2), true
+			return {'\u2ae2', 0}, 1, true
 		case "vangrt":                          // RIGHT ANGLE VARIANT WITH SQUARE
-			return rune(0x299c), true
+			return {'\u299c', 0}, 1, true
 		case "varepsilon":                      // GREEK LUNATE EPSILON SYMBOL
-			return rune(0x03f5), true
+			return {'\u03f5', 0}, 1, true
 		case "varkappa":                        // GREEK KAPPA SYMBOL
-			return rune(0x03f0), true
+			return {'\u03f0', 0}, 1, true
 		case "varnothing":                      // EMPTY SET
-			return rune(0x2205), true
+			return {'\u2205', 0}, 1, true
 		case "varphi":                          // GREEK PHI SYMBOL
-			return rune(0x03d5), true
+			return {'\u03d5', 0}, 1, true
 		case "varpi":                           // GREEK PI SYMBOL
-			return rune(0x03d6), true
+			return {'\u03d6', 0}, 1, true
 		case "varpropto":                       // PROPORTIONAL TO
-			return rune(0x221d), true
+			return {'\u221d', 0}, 1, true
 		case "varr":                            // UP DOWN ARROW
-			return rune(0x2195), true
+			return {'\u2195', 0}, 1, true
 		case "varrho":                          // GREEK RHO SYMBOL
-			return rune(0x03f1), true
+			return {'\u03f1', 0}, 1, true
 		case "varsigma":                        // GREEK SMALL LETTER FINAL SIGMA
-			return rune(0x03c2), true
+			return {'\u03c2', 0}, 1, true
 		case "varsubsetneq":                    // SUBSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x228a), true
+			return {'\u228a', '\ufe00'}, 2, true
 		case "varsubsetneqq":                   // SUBSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x2acb), true
+			return {'\u2acb', '\ufe00'}, 2, true
 		case "varsupsetneq":                    // SUPERSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x228b), true
+			return {'\u228b', '\ufe00'}, 2, true
 		case "varsupsetneqq":                   // SUPERSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x2acc), true
+			return {'\u2acc', '\ufe00'}, 2, true
 		case "vartheta":                        // GREEK THETA SYMBOL
-			return rune(0x03d1), true
+			return {'\u03d1', 0}, 1, true
 		case "vartriangleleft":                 // NORMAL SUBGROUP OF
-			return rune(0x22b2), true
+			return {'\u22b2', 0}, 1, true
 		case "vartriangleright":                // CONTAINS AS NORMAL SUBGROUP
-			return rune(0x22b3), true
+			return {'\u22b3', 0}, 1, true
 		case "vbrtri":                          // VERTICAL BAR BESIDE RIGHT TRIANGLE
-			return rune(0x29d0), true
+			return {'\u29d0', 0}, 1, true
 		case "vcy":                             // CYRILLIC SMALL LETTER VE
-			return rune(0x0432), true
+			return {'\u0432', 0}, 1, true
 		case "vdash":                           // RIGHT TACK
-			return rune(0x22a2), true
+			return {'\u22a2', 0}, 1, true
 		case "vee":                             // LOGICAL OR
-			return rune(0x2228), true
+			return {'\u2228', 0}, 1, true
 		case "veeBar":                          // LOGICAL OR WITH DOUBLE UNDERBAR
-			return rune(0x2a63), true
+			return {'\u2a63', 0}, 1, true
 		case "veebar":                          // XOR
-			return rune(0x22bb), true
+			return {'\u22bb', 0}, 1, true
 		case "veeeq":                           // EQUIANGULAR TO
-			return rune(0x225a), true
+			return {'\u225a', 0}, 1, true
 		case "vellip":                          // VERTICAL ELLIPSIS
-			return rune(0x22ee), true
+			return {'\u22ee', 0}, 1, true
 		case "vellip4":                         // DOTTED FENCE
-			return rune(0x2999), true
+			return {'\u2999', 0}, 1, true
 		case "vellipv":                         // TRIPLE COLON OPERATOR
-			return rune(0x2af6), true
+			return {'\u2af6', 0}, 1, true
 		case "verbar":                          // VERTICAL LINE
-			return rune(0x7c), true
+			return {'|', 0}, 1, true
 		case "vert":                            // VERTICAL LINE
-			return rune(0x7c), true
+			return {'|', 0}, 1, true
 		case "vert3":                           // TRIPLE VERTICAL BAR BINARY RELATION
-			return rune(0x2af4), true
+			return {'\u2af4', 0}, 1, true
 		case "vfr":                             // MATHEMATICAL FRAKTUR SMALL V
-			return rune(0x01d533), true
+			return {'\U0001d533', 0}, 1, true
 		case "vldash":                          // LEFT SQUARE BRACKET LOWER CORNER
-			return rune(0x23a3), true
+			return {'\u23a3', 0}, 1, true
 		case "vltri":                           // NORMAL SUBGROUP OF
-			return rune(0x22b2), true
+			return {'\u22b2', 0}, 1, true
 		case "vnsub":                           // SUBSET OF with vertical line
-			return rune(0x2282), true
+			return {'\u2282', '\u20d2'}, 2, true
 		case "vnsup":                           // SUPERSET OF with vertical line
-			return rune(0x2283), true
+			return {'\u2283', '\u20d2'}, 2, true
 		case "vopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL V
-			return rune(0x01d567), true
+			return {'\U0001d567', 0}, 1, true
 		case "vprime":                          // PRIME
-			return rune(0x2032), true
+			return {'\u2032', 0}, 1, true
 		case "vprop":                           // PROPORTIONAL TO
-			return rune(0x221d), true
+			return {'\u221d', 0}, 1, true
 		case "vrtri":                           // CONTAINS AS NORMAL SUBGROUP
-			return rune(0x22b3), true
+			return {'\u22b3', 0}, 1, true
 		case "vscr":                            // MATHEMATICAL SCRIPT SMALL V
-			return rune(0x01d4cb), true
+			return {'\U0001d4cb', 0}, 1, true
 		case "vsubnE":                          // SUBSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x2acb), true
+			return {'\u2acb', '\ufe00'}, 2, true
 		case "vsubne":                          // SUBSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x228a), true
+			return {'\u228a', '\ufe00'}, 2, true
 		case "vsupnE":                          // SUPERSET OF ABOVE NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x2acc), true
+			return {'\u2acc', '\ufe00'}, 2, true
 		case "vsupne":                          // SUPERSET OF WITH NOT EQUAL TO - variant with stroke through bottom members
-			return rune(0x228b), true
+			return {'\u228b', '\ufe00'}, 2, true
 		case "vzigzag":                         // VERTICAL ZIGZAG LINE
-			return rune(0x299a), true
+			return {'\u299a', 0}, 1, true
 		}
 
 	case 'w':
 		switch name {
 		case "wcirc":                           // LATIN SMALL LETTER W WITH CIRCUMFLEX
-			return rune(0x0175), true
+			return {'\u0175', 0}, 1, true
 		case "wedbar":                          // LOGICAL AND WITH UNDERBAR
-			return rune(0x2a5f), true
+			return {'\u2a5f', 0}, 1, true
 		case "wedge":                           // LOGICAL AND
-			return rune(0x2227), true
+			return {'\u2227', 0}, 1, true
 		case "wedgeq":                          // ESTIMATES
-			return rune(0x2259), true
+			return {'\u2259', 0}, 1, true
 		case "weierp":                          // SCRIPT CAPITAL P
-			return rune(0x2118), true
+			return {'\u2118', 0}, 1, true
 		case "wfr":                             // MATHEMATICAL FRAKTUR SMALL W
-			return rune(0x01d534), true
+			return {'\U0001d534', 0}, 1, true
 		case "wopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL W
-			return rune(0x01d568), true
+			return {'\U0001d568', 0}, 1, true
 		case "wp":                              // SCRIPT CAPITAL P
-			return rune(0x2118), true
+			return {'\u2118', 0}, 1, true
 		case "wr":                              // WREATH PRODUCT
-			return rune(0x2240), true
+			return {'\u2240', 0}, 1, true
 		case "wreath":                          // WREATH PRODUCT
-			return rune(0x2240), true
+			return {'\u2240', 0}, 1, true
 		case "wscr":                            // MATHEMATICAL SCRIPT SMALL W
-			return rune(0x01d4cc), true
+			return {'\U0001d4cc', 0}, 1, true
 		}
 
 	case 'x':
 		switch name {
 		case "xandand":                         // TWO LOGICAL AND OPERATOR
-			return rune(0x2a07), true
+			return {'\u2a07', 0}, 1, true
 		case "xbsol":                           // BOX DRAWINGS LIGHT DIAGONAL UPPER RIGHT TO LOWER LEFT
-			return rune(0x2571), true
+			return {'\u2571', 0}, 1, true
 		case "xcap":                            // N-ARY INTERSECTION
-			return rune(0x22c2), true
+			return {'\u22c2', 0}, 1, true
 		case "xcirc":                           // LARGE CIRCLE
-			return rune(0x25ef), true
+			return {'\u25ef', 0}, 1, true
 		case "xcup":                            // N-ARY UNION
-			return rune(0x22c3), true
+			return {'\u22c3', 0}, 1, true
 		case "xcupdot":                         // N-ARY UNION OPERATOR WITH DOT
-			return rune(0x2a03), true
+			return {'\u2a03', 0}, 1, true
 		case "xdtri":                           // WHITE DOWN-POINTING TRIANGLE
-			return rune(0x25bd), true
+			return {'\u25bd', 0}, 1, true
 		case "xfr":                             // MATHEMATICAL FRAKTUR SMALL X
-			return rune(0x01d535), true
+			return {'\U0001d535', 0}, 1, true
 		case "xgr":                             // GREEK SMALL LETTER XI
-			return rune(0x03be), true
+			return {'\u03be', 0}, 1, true
 		case "xhArr":                           // LONG LEFT RIGHT DOUBLE ARROW
-			return rune(0x27fa), true
+			return {'\u27fa', 0}, 1, true
 		case "xharr":                           // LONG LEFT RIGHT ARROW
-			return rune(0x27f7), true
+			return {'\u27f7', 0}, 1, true
 		case "xi":                              // GREEK SMALL LETTER XI
-			return rune(0x03be), true
+			return {'\u03be', 0}, 1, true
 		case "xlArr":                           // LONG LEFTWARDS DOUBLE ARROW
-			return rune(0x27f8), true
+			return {'\u27f8', 0}, 1, true
 		case "xlarr":                           // LONG LEFTWARDS ARROW
-			return rune(0x27f5), true
+			return {'\u27f5', 0}, 1, true
 		case "xmap":                            // LONG RIGHTWARDS ARROW FROM BAR
-			return rune(0x27fc), true
+			return {'\u27fc', 0}, 1, true
 		case "xnis":                            // CONTAINS WITH VERTICAL BAR AT END OF HORIZONTAL STROKE
-			return rune(0x22fb), true
+			return {'\u22fb', 0}, 1, true
 		case "xodot":                           // N-ARY CIRCLED DOT OPERATOR
-			return rune(0x2a00), true
+			return {'\u2a00', 0}, 1, true
 		case "xopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL X
-			return rune(0x01d569), true
+			return {'\U0001d569', 0}, 1, true
 		case "xoplus":                          // N-ARY CIRCLED PLUS OPERATOR
-			return rune(0x2a01), true
+			return {'\u2a01', 0}, 1, true
 		case "xoror":                           // TWO LOGICAL OR OPERATOR
-			return rune(0x2a08), true
+			return {'\u2a08', 0}, 1, true
 		case "xotime":                          // N-ARY CIRCLED TIMES OPERATOR
-			return rune(0x2a02), true
+			return {'\u2a02', 0}, 1, true
 		case "xrArr":                           // LONG RIGHTWARDS DOUBLE ARROW
-			return rune(0x27f9), true
+			return {'\u27f9', 0}, 1, true
 		case "xrarr":                           // LONG RIGHTWARDS ARROW
-			return rune(0x27f6), true
+			return {'\u27f6', 0}, 1, true
 		case "xscr":                            // MATHEMATICAL SCRIPT SMALL X
-			return rune(0x01d4cd), true
+			return {'\U0001d4cd', 0}, 1, true
 		case "xsol":                            // BOX DRAWINGS LIGHT DIAGONAL UPPER LEFT TO LOWER RIGHT
-			return rune(0x2572), true
+			return {'\u2572', 0}, 1, true
 		case "xsqcap":                          // N-ARY SQUARE INTERSECTION OPERATOR
-			return rune(0x2a05), true
+			return {'\u2a05', 0}, 1, true
 		case "xsqcup":                          // N-ARY SQUARE UNION OPERATOR
-			return rune(0x2a06), true
+			return {'\u2a06', 0}, 1, true
 		case "xsqu":                            // WHITE MEDIUM SQUARE
-			return rune(0x25fb), true
+			return {'\u25fb', 0}, 1, true
 		case "xsquf":                           // BLACK MEDIUM SQUARE
-			return rune(0x25fc), true
+			return {'\u25fc', 0}, 1, true
 		case "xtimes":                          // N-ARY TIMES OPERATOR
-			return rune(0x2a09), true
+			return {'\u2a09', 0}, 1, true
 		case "xuplus":                          // N-ARY UNION OPERATOR WITH PLUS
-			return rune(0x2a04), true
+			return {'\u2a04', 0}, 1, true
 		case "xutri":                           // WHITE UP-POINTING TRIANGLE
-			return rune(0x25b3), true
+			return {'\u25b3', 0}, 1, true
 		case "xvee":                            // N-ARY LOGICAL OR
-			return rune(0x22c1), true
+			return {'\u22c1', 0}, 1, true
 		case "xwedge":                          // N-ARY LOGICAL AND
-			return rune(0x22c0), true
+			return {'\u22c0', 0}, 1, true
 		}
 
 	case 'y':
 		switch name {
 		case "yacute":                          // LATIN SMALL LETTER Y WITH ACUTE
-			return rune(0xfd), true
+			return {'ý', 0}, 1, true
 		case "yacy":                            // CYRILLIC SMALL LETTER YA
-			return rune(0x044f), true
+			return {'\u044f', 0}, 1, true
 		case "ycirc":                           // LATIN SMALL LETTER Y WITH CIRCUMFLEX
-			return rune(0x0177), true
+			return {'\u0177', 0}, 1, true
 		case "ycy":                             // CYRILLIC SMALL LETTER YERU
-			return rune(0x044b), true
+			return {'\u044b', 0}, 1, true
 		case "yen":                             // YEN SIGN
-			return rune(0xa5), true
+			return {'¥', 0}, 1, true
 		case "yfr":                             // MATHEMATICAL FRAKTUR SMALL Y
-			return rune(0x01d536), true
+			return {'\U0001d536', 0}, 1, true
 		case "yicy":                            // CYRILLIC SMALL LETTER YI
-			return rune(0x0457), true
+			return {'\u0457', 0}, 1, true
 		case "yopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL Y
-			return rune(0x01d56a), true
+			return {'\U0001d56a', 0}, 1, true
 		case "yscr":                            // MATHEMATICAL SCRIPT SMALL Y
-			return rune(0x01d4ce), true
+			return {'\U0001d4ce', 0}, 1, true
 		case "yucy":                            // CYRILLIC SMALL LETTER YU
-			return rune(0x044e), true
+			return {'\u044e', 0}, 1, true
 		case "yuml":                            // LATIN SMALL LETTER Y WITH DIAERESIS
-			return rune(0xff), true
+			return {'ÿ', 0}, 1, true
 		}
 
 	case 'z':
 		switch name {
 		case "zacute":                          // LATIN SMALL LETTER Z WITH ACUTE
-			return rune(0x017a), true
+			return {'\u017a', 0}, 1, true
 		case "zcaron":                          // LATIN SMALL LETTER Z WITH CARON
-			return rune(0x017e), true
+			return {'\u017e', 0}, 1, true
 		case "zcy":                             // CYRILLIC SMALL LETTER ZE
-			return rune(0x0437), true
+			return {'\u0437', 0}, 1, true
 		case "zdot":                            // LATIN SMALL LETTER Z WITH DOT ABOVE
-			return rune(0x017c), true
+			return {'\u017c', 0}, 1, true
 		case "zeetrf":                          // BLACK-LETTER CAPITAL Z
-			return rune(0x2128), true
+			return {'\u2128', 0}, 1, true
 		case "zeta":                            // GREEK SMALL LETTER ZETA
-			return rune(0x03b6), true
+			return {'\u03b6', 0}, 1, true
 		case "zfr":                             // MATHEMATICAL FRAKTUR SMALL Z
-			return rune(0x01d537), true
+			return {'\U0001d537', 0}, 1, true
 		case "zgr":                             // GREEK SMALL LETTER ZETA
-			return rune(0x03b6), true
+			return {'\u03b6', 0}, 1, true
 		case "zhcy":                            // CYRILLIC SMALL LETTER ZHE
-			return rune(0x0436), true
+			return {'\u0436', 0}, 1, true
 		case "zigrarr":                         // RIGHTWARDS SQUIGGLE ARROW
-			return rune(0x21dd), true
+			return {'\u21dd', 0}, 1, true
 		case "zopf":                            // MATHEMATICAL DOUBLE-STRUCK SMALL Z
-			return rune(0x01d56b), true
+			return {'\U0001d56b', 0}, 1, true
 		case "zscr":                            // MATHEMATICAL SCRIPT SMALL Z
-			return rune(0x01d4cf), true
+			return {'\U0001d4cf', 0}, 1, true
 		case "zwj":                             // ZERO WIDTH JOINER
-			return rune(0x200d), true
+			return {'\u200d', 0}, 1, true
 		case "zwnj":                            // ZERO WIDTH NON-JOINER
-			return rune(0x200c), true
+			return {'\u200c', 0}, 1, true
 		}
 	}
-	return -1, false
+	return
 }
 
 /*

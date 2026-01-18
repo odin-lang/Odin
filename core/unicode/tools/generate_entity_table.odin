@@ -18,7 +18,7 @@ OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "un
 
 Entity :: struct {
 	name:        string,
-	codepoint:   rune,
+	codepoints:  [2]rune,
 	description: string,
 }
 
@@ -57,7 +57,10 @@ generate_encoding_entity_table :: proc() {
 	fmt.printf("Found `<charlist>` with %v children.\n", len(charlist.value))
 
 	entity_map: map[string]Entity
+	defer delete(entity_map)
+
 	names: [dynamic]string
+	defer delete(names)
 
 	min_name_length := max(int)
 	max_name_length := min(int)
@@ -78,7 +81,13 @@ generate_encoding_entity_table :: proc() {
 			fmt.eprintln("`<character id=\"...\">` attribute not found.")
 			os.exit(1)
 		} else {
-			codepoint := strconv.atoi(codepoint_string)
+			r1, _, r2 := strings.partition(codepoint_string, "-")
+
+			codepoint, codepoint2: int
+			codepoint, _ = strconv.parse_int(r1)
+			if r2 != "" {
+				codepoint2, _ = strconv.parse_int(r2)
+			}
 
 			desc, desc_ok := xml.find_child_by_ident(doc, id, "description")
 			description := ""
@@ -115,7 +124,7 @@ generate_encoding_entity_table :: proc() {
 
 				e := Entity{
 					name        = name,
-					codepoint   = rune(codepoint),
+					codepoints  = {rune(codepoint), rune(codepoint2)},
 					description = description,
 				}
 
@@ -162,22 +171,22 @@ generate_encoding_entity_table :: proc() {
 		entity_name - a string, like "copy" that describes a user-encoded Unicode entity as used in XML.
 
 	Returns:
-		"decoded" - The decoded rune if found by name, or -1 otherwise.
-		"ok"      - true if found, false if not.
+		"decoded"    - The decoded runes if found by name, or all zero otherwise.
+		"rune_count" - The number of decoded runes
+		"ok"         - true if found, false if not.
 
 	IMPORTANT: XML processors (including browsers) treat these names as case-sensitive. So do we.
 */
-named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
+named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count: int, ok: bool) {
 	/*
 		Early out if the name is too short or too long.
 		min as a precaution in case the generated table has a bogus value.
 	*/
 	if len(name) < min(1, XML_NAME_TO_RUNE_MIN_LENGTH) || len(name) > XML_NAME_TO_RUNE_MAX_LENGTH {
-		return -1, false
+		return
 	}
 
-	switch rune(name[0]) {
-`)
+	switch rune(name[0]) {`)
 
 	prefix := '?'
 	should_close := false
@@ -200,13 +209,17 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 			fmt.wprintf(w, " ")
 		}
 		fmt.wprintf(w, " // %v\n", e.description)
-		fmt.wprintf(w, "\t\t\treturn %v, true\n", rune_to_string(e.codepoint))
+		if e.codepoints[1] != 0 {
+			fmt.wprintf(w, "\t\t\treturn {{%q, %q}}, 2, true\n", e.codepoints[0], e.codepoints[1])
+		} else {
+			fmt.wprintf(w, "\t\t\treturn {{%q, 0}}, 1, true\n", e.codepoints[0])
+		}
 
 		should_close = true
 	}
 	fmt.wprintln(w, "\t\t}")
 	fmt.wprintln(w, "\t}")
-	fmt.wprintln(w, "\treturn -1, false")
+	fmt.wprintln(w, "\treturn")
 	fmt.wprintln(w, "}\n")
 	fmt.wprintln(w, GENERATED)
 
@@ -220,12 +233,6 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 		fmt.printf("Successfully written generated \"%v\".\n", generated_filename)
 	} else {
 		fmt.printf("Failed to write generated \"%v\".\n", generated_filename)
-	}
-
-	delete(entity_map)
-	delete(names)
-	for &name in names {
-		free(&name)
 	}
 }
 
@@ -261,14 +268,6 @@ TABLE_FILE_PROLOG :: `/*
 	See also: LICENSE_table.md
 */
 `
-
-rune_to_string :: proc(r: rune) -> (res: string) {
-	res = fmt.tprintf("%08x", int(r))
-	for len(res) > 2 && res[:2] == "00" {
-		res = res[2:]
-	}
-	return fmt.tprintf("rune(0x%v)", res)
-}
 
 is_dotted_name :: proc(name: string) -> (dotted: bool) {
 	for r in name {
