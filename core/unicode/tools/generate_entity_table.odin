@@ -86,7 +86,7 @@ generate_encoding_entity_table :: proc() {
 			codepoint, codepoint2: int
 			codepoint, _ = strconv.parse_int(r1)
 			if r2 != "" {
-				codepoint2, _ = strconv.parse_int(r1)
+				codepoint2, _ = strconv.parse_int(r2)
 			}
 
 			desc, desc_ok := xml.find_child_by_ident(doc, id, "description")
