@@ -7,22 +7,22 @@ import "base:intrinsics"
 
 Rect :: CG.Rect
 MaxX :: proc(aRect: Rect) -> Float {
-	return aRect.origin.x + aRect.size.width;
+	return aRect.origin.x + aRect.size.width
 }
 MaxY :: proc(aRect: Rect) -> Float {
-	return aRect.origin.y + aRect.size.height;
+	return aRect.origin.y + aRect.size.height
 }
 MidX :: proc(aRect: Rect) -> Float {
-	return aRect.origin.x + aRect.size.width*0.5;
+	return aRect.origin.x + aRect.size.width*0.5
 }
 MidY :: proc(aRect: Rect) -> Float {
-	return aRect.origin.y + aRect.size.height*0.5;
+	return aRect.origin.y + aRect.size.height*0.5
 }
 MinX :: proc(aRect: Rect) -> Float {
-	return aRect.origin.x;
+	return aRect.origin.x
 }
 MinY :: proc(aRect: Rect) -> Float {
-	return aRect.origin.y;
+	return aRect.origin.y
 }
 
 Depth :: enum UInteger {
