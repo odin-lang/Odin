@@ -278,7 +278,7 @@ escape_html :: proc(s: string, allocator := context.allocator, loc := #caller_lo
 
 	extra_bytes_needed := 0
 
-	for c, i in b {
+	for c in b {
 		switch c {
 		case '&':  extra_bytes_needed += 4
 		case '\'': extra_bytes_needed += 4
