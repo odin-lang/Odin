@@ -263,7 +263,7 @@ xml_decode_entity :: proc(entity: string) -> (decoded: [2]rune, rune_count: int,
 
 
 // escape_html escapes special characters like '&' to become '&amp;'.
-// It escapes only 5 different characters: & ' < > and ".
+// It escapes only 6 different characters: & ' < > " and non-breaking space.
 @(require_results)
 escape_html :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
 	/*
@@ -272,6 +272,7 @@ escape_html :: proc(s: string, allocator := context.allocator, loc := #caller_lo
 		< -> &lt;
 		> -> &gt;
 		" -> &#34; // &#34; is shorter than &quot;
+		0x6a -> &nbsp;
 	*/
 
 	b := transmute([]byte)s
@@ -285,6 +286,7 @@ escape_html :: proc(s: string, allocator := context.allocator, loc := #caller_lo
 		case '<':  extra_bytes_needed += 3
 		case '>':  extra_bytes_needed += 3
 		case '"':  extra_bytes_needed += 4
+		case 0xa0: extra_bytes_needed += 5
 		}
 	}
 
@@ -307,6 +309,7 @@ escape_html :: proc(s: string, allocator := context.allocator, loc := #caller_lo
 		case '<':  x = "&lt;"
 		case '>':  x = "&gt;"
 		case '"':  x = "&#34;"
+		case 0xa0: x = "&nbsp;"
 		}
 		if x != "" {
 			copy(t[w:], x)
