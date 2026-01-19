@@ -946,7 +946,7 @@ accept_callback :: proc(op: ^Operation) {
 		return
 	}
 
-	_, err := get_result(op._impl.over)
+	_, err := wsa_get_result(win.SOCKET(op.accept.socket), op._impl.over)
 	#partial switch err {
 	case .SUCCESS:
 		local_addr: ^win.sockaddr
@@ -979,7 +979,6 @@ accept_callback :: proc(op: ^Operation) {
 		fallthrough
 
 	case:
-		win.SetLastError(win.DWORD(err))
 		op.accept.err = net._accept_error()
 	}
 }
@@ -1048,7 +1047,7 @@ dial_callback :: proc(op: ^Operation) {
 		return
 	}
 
-	_, err := get_result(op._impl.over)
+	_, err := wsa_get_result(win.SOCKET(op.dial.socket), op._impl.over)
 	#partial switch err {
 	case .SUCCESS:
 		// enables getsockopt, setsockopt, getsockname, getpeername, etc.
@@ -1058,7 +1057,6 @@ dial_callback :: proc(op: ^Operation) {
 		op.dial.err = Dial_Error.Timeout
 
 	case:
-		win.SetLastError(win.DWORD(err))
 		op.dial.err = net._dial_error()
 	}
 }
@@ -1274,7 +1272,7 @@ recv_callback :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	n, err := get_result(op._impl.over)
+	n, err := wsa_get_result(win.SOCKET((^net.Socket)(&op.recv.socket)^), op._impl.over)
 	#partial switch err {
 	case .SUCCESS:
 	case .OPERATION_ABORTED:
@@ -1288,7 +1286,6 @@ recv_callback :: proc(op: ^Operation) -> Op_Result {
 		}
 		fallthrough
 	case:
-		win.SetLastError(win.DWORD(err))
 		switch _ in op.recv.socket {
 		case TCP_Socket: op.recv.err = net._tcp_recv_error()
 		case UDP_Socket: op.recv.err = net._udp_recv_error()
@@ -1395,7 +1392,7 @@ send_callback :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	n, err := get_result(op._impl.over)
+	n, err := wsa_get_result(win.SOCKET((^net.Socket)(&op.send.socket)^), op._impl.over)
 	#partial switch err {
 	case .SUCCESS:
 	case .OPERATION_ABORTED:
@@ -1409,7 +1406,6 @@ send_callback :: proc(op: ^Operation) -> Op_Result {
 		}
 		fallthrough
 	case:
-		win.SetLastError(win.DWORD(err))
 		switch _ in op.send.socket {
 		case TCP_Socket: op.send.err = net._tcp_send_error()
 		case UDP_Socket: op.send.err = net._udp_send_error()
@@ -1485,7 +1481,7 @@ sendfile_callback :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	n, err := get_result(op._impl.over)
+	n, err := wsa_get_result(win.SOCKET(op.sendfile.socket), op._impl.over)
 	#partial switch err {
 	case .SUCCESS:
 	case .OPERATION_ABORTED:
@@ -1496,7 +1492,6 @@ sendfile_callback :: proc(op: ^Operation) -> Op_Result {
 		}
 		fallthrough
 	case:
-		win.SetLastError(win.DWORD(err))
 		op.sendfile.err = net._tcp_send_error()
 		return .Done
 	}
@@ -1745,6 +1740,27 @@ get_result :: proc(over: win.OVERLAPPED) -> (n: int, err: win.System_Error) {
 		err = win.System_Error(win.RtlNtStatusToDosError(win.NTSTATUS(uintptr(over.Internal))))
 		assert(!is_incomplete(err))
 	}
+	return
+}
+
+// `get_result` above translates NT status codes to errors through RtlNtStatsToDosError,
+// this is context free and can cause weird mappings, thus for sockets we want to call `WSAGetOverlappedResult`
+// which does context based mapping of error codes.
+// See https://stackoverflow.com/questions/28925003/calling-wsagetlasterror-from-an-iocp-thread-return-incorrect-result
+wsa_get_result :: proc(socket: win.SOCKET, over: win.OVERLAPPED) -> (n: int, err: win.System_Error) {
+	over := over
+	assert(!is_pending(over))
+
+	if over.Internal != nil {
+		flags: win.DWORD
+		_n: win.DWORD
+		res := win.WSAGetOverlappedResult(socket, &over, &_n, false, &flags)
+		assert(!res)
+		n = int(_n) // NOTE: It is possible that an amount of bytes is present when the operation was cancelled.
+		err = win.System_Error(win.WSAGetLastError())
+	}
+
+	n = int(uintptr(over.InternalHigh))
 	return
 }
 
