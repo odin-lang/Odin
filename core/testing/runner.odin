@@ -196,6 +196,57 @@ run_test_task :: proc(task: thread.Task) {
 	})
 }
 
+Options :: struct {
+	// Equivalent to the TEST_NAMES compile-time definition, but used dynamically at runtime.
+	test_names: string,
+}
+
+parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Writer) {
+	argv:=argv[1:]
+	test_names: strings.Builder
+
+	for i := 0; i < len(argv); i+=1 {
+		arg := argv[i]
+		if strings.starts_with(arg, "-tests:") {
+			tests := arg[strings.index(arg, ":")+1:]
+			if len(tests) < 1 {
+				fmt.wprintln(stderr, "No test names specified for '-tests:'")
+				os.exit(-1)
+			}
+
+			if len(test_names.buf) > 0 {
+				strings.write_byte(&test_names, ',')
+			}
+			strings.write_bytes(&test_names, transmute([]u8)tests)
+		}
+		else if arg == "-help" {
+			exe_name := "test"
+			if path, err := os2.get_executable_path(context.temp_allocator); err == nil {
+				exe_name = slashpath.base(path)
+			}
+
+			fmt.wprintfln(stdout, "Usage: %v [OPTIONS]", exe_name)
+			fmt.wprintfln(stdout, "OPTIONS:")
+			fmt.wprintfln(stdout, "        -help:")
+			fmt.wprintfln(stdout, "            Display this help text and exit.")
+			fmt.wprintln(stdout)
+			fmt.wprintfln(stdout, "        -tests:<test_name[,...]>")
+			fmt.wprintfln(stdout, "            Specify a specific set of tests to run by name.\n" +
+			                      "            Each test is separated by a comma and may optionally include the package name.\n" +
+			                      "            This may be useful when running tests on multiple packages with `-all-packages`.\n" +
+			                      "            The format is: `package.test_name,test_name_only,...`")
+			fmt.wprintln(stdout)
+			os.exit(0)
+		}
+		else {
+			fmt.wprintfln(stderr, "Unknown argument encountered '%v'", arg)
+			os.exit(-1)
+		}
+	}
+
+	opts.test_names = string(test_names.buf[:])
+}
+
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	BATCH_BUFFER_SIZE     :: 32 * mem.Kilobyte
 	POOL_BLOCK_SIZE       :: 16 * mem.Kilobyte
@@ -229,16 +280,25 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	should_show_animations := FANCY_OUTPUT && terminal.color_enabled && !global_ansi_disabled
 
+	// -- Parse CLI options
+	opts: Options
+	parse_cli_options(os.args, &opts, stdout, stderr)
+
+	test_names: string = TEST_NAMES
+	if len(opts.test_names) > 0 {
+		test_names = opts.test_names
+	}
+
 	// -- Prepare test data.
 
 	alloc_error: mem.Allocator_Error
 
-	when TEST_NAMES != "" {
+	if test_names != "" {
 		select_internal_tests: [dynamic]Internal_Test
 		defer delete(select_internal_tests)
 
 		{
-			index_list := TEST_NAMES
+			index_list := test_names
 			for selector in strings.split_iterator(&index_list, ",") {
 				// Temp allocator is fine since we just need to identify which test it's referring to.
 				split_selector := strings.split(selector, ".", context.temp_allocator)
