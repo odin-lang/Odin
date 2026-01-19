@@ -202,7 +202,6 @@ Options :: struct {
 }
 
 parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Writer) {
-	argv:=argv[1:]
 	test_names: strings.Builder
 
 	for i := 0; i < len(argv); i+=1 {
@@ -270,6 +269,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
+
+	// `-vet` needs parameters to be shadowed by themselves first as an
+	// explicit declaration, to allow the next line to work.
+	// NOTE(@harold): Moved out of scope below as it's no longer under a `when` block, but under `if`.
+	internal_tests := internal_tests
+
 	stdout := os.to_stream(os.stdout)
 	stderr := os.to_stream(os.stderr)
 
@@ -282,7 +287,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- Parse CLI options
 	opts: Options
-	parse_cli_options(os.args, &opts, stdout, stderr)
+	parse_cli_options(os.args[1:], &opts, stdout, stderr)
 
 	test_names: string = TEST_NAMES
 	if len(opts.test_names) > 0 {
@@ -293,50 +298,45 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	alloc_error: mem.Allocator_Error
 
+	select_internal_tests: [dynamic]Internal_Test
+	defer delete(select_internal_tests)
+
 	if test_names != "" {
-		select_internal_tests: [dynamic]Internal_Test
-		defer delete(select_internal_tests)
+		index_list := test_names
+		for selector in strings.split_iterator(&index_list, ",") {
+			// Temp allocator is fine since we just need to identify which test it's referring to.
+			split_selector := strings.split(selector, ".", context.temp_allocator)
 
-		{
-			index_list := test_names
-			for selector in strings.split_iterator(&index_list, ",") {
-				// Temp allocator is fine since we just need to identify which test it's referring to.
-				split_selector := strings.split(selector, ".", context.temp_allocator)
-
-				found := false
-				switch len(split_selector) {
-				case 1:
-					// Only the test name?
-					#no_bounds_check name := split_selector[0]
-					find_test_by_name: for it in internal_tests {
-						if it.name == name {
-							found = true
-							_, alloc_error = append(&select_internal_tests, it)
-							fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
-							break find_test_by_name
-						}
-					}
-				case 2:
-					#no_bounds_check pkg  := split_selector[0]
-					#no_bounds_check name := split_selector[1]
-					find_test_by_pkg_and_name: for it in internal_tests {
-						if it.pkg == pkg && it.name == name {
-							found = true
-							_, alloc_error = append(&select_internal_tests, it)
-							fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
-							break find_test_by_pkg_and_name
-						}
+			found := false
+			switch len(split_selector) {
+			case 1:
+				// Only the test name?
+				#no_bounds_check name := split_selector[0]
+				find_test_by_name: for it in internal_tests {
+					if it.name == name {
+						found = true
+						_, alloc_error = append(&select_internal_tests, it)
+						fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
+						break find_test_by_name
 					}
 				}
-				if !found {
-					fmt.wprintfln(stderr, "No test found for the name: %q", selector)
+			case 2:
+				#no_bounds_check pkg  := split_selector[0]
+				#no_bounds_check name := split_selector[1]
+				find_test_by_pkg_and_name: for it in internal_tests {
+					if it.pkg == pkg && it.name == name {
+						found = true
+						_, alloc_error = append(&select_internal_tests, it)
+						fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
+						break find_test_by_pkg_and_name
+					}
 				}
+			}
+			if !found {
+				fmt.wprintfln(stderr, "No test found for the name: %q", selector)
 			}
 		}
 
-		// `-vet` needs parameters to be shadowed by themselves first as an
-		// explicit declaration, to allow the next line to work.
-		internal_tests := internal_tests
 		// Intentional shadow with user-specified tests.
 		internal_tests = select_internal_tests[:]
 	}
