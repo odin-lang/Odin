@@ -619,6 +619,7 @@ endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) ->
 		switch a in ep.address {
 		case IP4_Address:
 			strings.write_string(&b, s)
+			strings.write_string(&b, ":")
 			strings.write_int(&b, ep.port)
 		case IP6_Address:
 			strings.write_string(&b, "[")
