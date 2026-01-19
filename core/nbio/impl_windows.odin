@@ -1756,7 +1756,7 @@ wsa_get_result :: proc(socket: win.SOCKET, over: win.OVERLAPPED) -> (n: int, err
 		_n: win.DWORD
 		res := win.WSAGetOverlappedResult(socket, &over, &_n, false, &flags)
 		assert(!res)
-		assert(_n == 0)
+		n = int(_n) // NOTE: It is possible that an amount of bytes is present when the operation was cancelled.
 		err = win.System_Error(win.WSAGetLastError())
 	}
 
