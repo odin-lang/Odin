@@ -241,7 +241,7 @@ foreign xlib {
 		window:    Window,
 		pixel:     uint,
 		) ---
-	SetWindowBackgroundMap :: proc(
+	SetWindowBackgroundPixmap :: proc(
 		display:   ^Display,
 		window:    Window,
 		pixmap:    Pixmap,
