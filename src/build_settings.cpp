@@ -840,6 +840,15 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetABI_Win64,
 };
 
+gb_global TargetMetrics target_freestanding_amd64_mingw = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
+	str_lit("x86_64-pc-windows-gnu"),
+	TargetABI_Win64,
+};
+
+
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
@@ -902,6 +911,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 
 	{ str_lit("freestanding_amd64_sysv"),  &target_freestanding_amd64_sysv },
 	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
+	{ str_lit("freestanding_amd64_mingw"), &target_freestanding_amd64_mingw },
 
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },
