@@ -8768,6 +8768,14 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 	if (is_operand_nil(*o)) {
 		return true;
 	}
+	if (is_type_any(field_type)) {
+		return false;
+	}
+	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
+		add_type_info_type(c, o->type);
+		return true;
+	}
+
 	Ast *expr = unparen_expr(o->expr);
 	if (expr != nullptr) {
 		Entity *e = strip_entity_wrapping(entity_from_expr(expr));
@@ -8778,13 +8786,12 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
 			return true;
 		}
-	}
-	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
-		add_type_info_type(c, o->type);
-		return true;
-	}
-	if (is_type_any(field_type)) {
-		return false;
+
+		if (e != nullptr && e->kind == Entity_Variable && e->Variable.is_rodata) {
+			// DeclInfo *d = e->decl_info;
+			// TODO(bill): rodata inlining for non-indirect values
+			// e.g. **NOT** []T{...}
+		}
 	}
 	return o->mode == Addressing_Constant;
 }
