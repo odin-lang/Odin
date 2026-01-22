@@ -968,3 +968,23 @@ Window_setTabbingMode :: proc "c" (self: ^Window, mode: WindowTabbingMode) {
 Window_toggleFullScreen :: proc "c" (self: ^Window, sender: id) {
 	msgSend(nil, self, "toggleFullScreen:", sender)
 }
+@(objc_type = Window, objc_name = "contentRectForFrameRect", objc_is_class_method=true)
+Window_contentRectForFrameRectType :: proc "c" (frameRect: Rect, styleMask: WindowStyleMask) -> Rect {
+	return msgSend(Rect, Window, "contentRectForFrameRect:styleMask:", frameRect, styleMask)
+}
+@(objc_type = Window, objc_name = "frameRectForContentRect", objc_is_class_method=true)
+Window_frameRectForContentRectType :: proc "c" (contentRect: Rect, styleMask: WindowStyleMask) -> Rect {
+	return msgSend(Rect, Window, "frameRectForContentRect:styleMask:", contentRect, styleMask)
+}
+@(objc_type = Window, objc_name = "minFrameWidthWithTitle", objc_is_class_method=true)
+Window_minFrameWidthWithTitle :: proc "c" (title: ^String, styleMask: WindowStyleMask) -> Float {
+	return msgSend(Float, Window, "minFrameWidthWithTitle:styleMask:", title, styleMask)
+}
+@(objc_type = Window, objc_name = "contentRectForFrameRect")
+Window_contentRectForFrameRectInstance :: proc "c" (self: ^Window, frameRect: Rect) -> Rect {
+	return msgSend(Rect, self, "contentRectForFrameRect:", frameRect)
+}
+@(objc_type = Window, objc_name = "frameRectForContentRect")
+Window_frameRectForContentRectInstance :: proc "c" (self: ^Window, contentRect: Rect) -> Rect {
+	return msgSend(Rect, self, "frameRectForContentRect:", contentRect)
+}

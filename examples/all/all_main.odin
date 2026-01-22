@@ -17,6 +17,7 @@ package all
 
 @(require) import "core:container/avl"
 @(require) import "core:container/bit_array"
+@(require) import "core:container/pool"
 @(require) import "core:container/priority_queue"
 @(require) import "core:container/queue"
 @(require) import "core:container/small_array"
@@ -103,6 +104,8 @@ package all
 @(require) import "core:mem"
 @(require) import "core:mem/tlsf"
 @(require) import "core:mem/virtual"
+
+@(require) import "core:nbio"
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"

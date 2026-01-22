@@ -1,4 +1,4 @@
-#+build darwin
+#+build darwin, netbsd, openbsd
 package net
 
 /*
@@ -20,28 +20,33 @@ package net
 		Feoramund:       FreeBSD platform code
 */
 
-import "core:c"
 import "core:sys/posix"
 import "core:time"
 
-Socket_Option :: enum c.int {
-	Broadcast                 = c.int(posix.Sock_Option.BROADCAST),
-	Reuse_Address             = c.int(posix.Sock_Option.REUSEADDR),
-	Keep_Alive                = c.int(posix.Sock_Option.KEEPALIVE),
-	Out_Of_Bounds_Data_Inline = c.int(posix.Sock_Option.OOBINLINE),
-	TCP_Nodelay               = c.int(posix.TCP_NODELAY),
-	Linger                    = c.int(posix.Sock_Option.LINGER),
-	Receive_Buffer_Size       = c.int(posix.Sock_Option.RCVBUF),
-	Send_Buffer_Size          = c.int(posix.Sock_Option.SNDBUF),
-	Receive_Timeout           = c.int(posix.Sock_Option.RCVTIMEO),
-	Send_Timeout              = c.int(posix.Sock_Option.SNDTIMEO),
-}
+_SOCKET_OPTION_BROADCAST                 :: posix.Sock_Option.BROADCAST
+_SOCKET_OPTION_REUSE_ADDRESS             :: posix.Sock_Option.REUSEADDR
+_SOCKET_OPTION_KEEP_ALIVE                :: posix.Sock_Option.KEEPALIVE
+_SOCKET_OPTION_OUT_OF_BOUNDS_DATA_INLINE :: posix.Sock_Option.OOBINLINE
+_SOCKET_OPTION_LINGER                    :: posix.Sock_Option.LINGER
+_SOCKET_OPTION_RECEIVE_BUFFER_SIZE       :: posix.Sock_Option.RCVBUF
+_SOCKET_OPTION_SEND_BUFFER_SIZE          :: posix.Sock_Option.SNDBUF
+_SOCKET_OPTION_RECEIVE_TIMEOUT           :: posix.Sock_Option.RCVTIMEO
+_SOCKET_OPTION_SEND_TIMEOUT              :: posix.Sock_Option.SNDTIMEO
 
-Shutdown_Manner :: enum c.int {
-	Receive = c.int(posix.SHUT_RD),
-	Send    = c.int(posix.SHUT_WR),
-	Both    = c.int(posix.SHUT_RDWR),
-}
+_SOCKET_OPTION_TCP_NODELAY :: posix.TCP_NODELAY
+
+_SOCKET_OPTION_USE_LOOPBACK              :: -1
+_SOCKET_OPTION_REUSE_PORT                :: -1
+_SOCKET_OPTION_NO_SIGPIPE_FROM_EPIPE     :: -1
+_SOCKET_OPTION_REUSE_PORT_LOAD_BALANCING :: -1
+
+_SOCKET_OPTION_EXCLUSIVE_ADDR_USE :: -1
+_SOCKET_OPTION_CONDITIONAL_ACCEPT :: -1
+_SOCKET_OPTION_DONT_LINGER        :: -1
+
+_SHUTDOWN_MANNER_RECEIVE :: posix.SHUT_RD
+_SHUTDOWN_MANNER_SEND    :: posix.SHUT_WR
+_SHUTDOWN_MANNER_BOTH    :: posix.SHUT_RDWR
 
 @(private)
 _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
@@ -273,7 +278,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	ptr: rawptr
 	len: posix.socklen_t
 
-	switch option {
+	#partial switch option {
 	case
 		.Broadcast,
 		.Reuse_Address,
@@ -327,6 +332,8 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			}
 			ptr = &int_value
 			len = size_of(int_value)
+	case:
+		return .Invalid_Option
 	}
 
 	skt := any_socket_to_socket(s)

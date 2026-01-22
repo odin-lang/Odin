@@ -2726,6 +2726,8 @@ WAIT_OBJECT_0 : DWORD : 0x00000000
 WAIT_TIMEOUT  : DWORD : 258
 WAIT_FAILED   : DWORD : 0xFFFFFFFF
 
+WAIT_IO_COMPLETION: DWORD : 0x000000C0
+
 FILE_FLAG_WRITE_THROUGH       : DWORD : 0x80000000
 FILE_FLAG_OVERLAPPED          : DWORD : 0x40000000
 FILE_FLAG_NO_BUFFERING        : DWORD : 0x20000000
@@ -3139,6 +3141,7 @@ OBJECT_ATTRIBUTES :: struct {
 	SecurityDescriptor:       rawptr,
 	SecurityQualityOfService: rawptr,
 }
+POBJECT_ATTRIBUTES :: ^OBJECT_ATTRIBUTES
 
 PUNICODE_STRING :: ^UNICODE_STRING
 UNICODE_STRING :: struct {
@@ -3150,9 +3153,14 @@ UNICODE_STRING :: struct {
 OVERLAPPED :: struct {
 	Internal:     ^c_ulong,
 	InternalHigh: ^c_ulong,
-	Offset:       DWORD,
-	OffsetHigh:   DWORD,
-	hEvent:       HANDLE,
+	using _: struct #raw_union {
+		using _: struct {
+			Offset: DWORD,
+			OffsetHigh: DWORD,
+		},
+		OffsetFull: u64, // Convenience field to set Offset and OffsetHigh with one value.
+	},
+	hEvent: HANDLE,
 }
 
 OVERLAPPED_ENTRY :: struct {

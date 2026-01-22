@@ -1,4 +1,3 @@
-#+build windows, linux, darwin, freebsd
 package net
 
 /*
@@ -22,13 +21,18 @@ package net
 		Haesbaert:       Security fixes
 */
 
-@(require) import "base:runtime"
+@(require)
+import "base:runtime"
+
+import "core:bufio"
+import "core:io"
+import "core:math/rand"
 import "core:mem"
 import "core:strings"
 import "core:time"
-import "core:os"
-import "core:math/rand"
-@(require) import "core:sync"
+
+@(require)
+import "core:sync"
 
 dns_config_initialized: sync.Once
 when ODIN_OS == .Windows {
@@ -42,20 +46,12 @@ when ODIN_OS == .Windows {
 		hosts_file  = "/etc/hosts",
 	}
 } else {
-	#panic("Please add a configuration for this OS.")
+	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{}
 }
 
-/*
-	Replaces environment placeholders in `dns_configuration`. Only necessary on Windows.
-	Is automatically called, once, by `get_dns_records_*`.
-*/
-@(private)
 init_dns_configuration :: proc() {
 	when ODIN_OS == .Windows {
-		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-		val := os.replace_environment_placeholders(dns_configuration.hosts_file, context.temp_allocator)
-		copy(dns_configuration.hosts_file_buf[:], val)
-		dns_configuration.hosts_file = string(dns_configuration.hosts_file_buf[:len(val)])
+		_init_dns_configuration()
 	}
 }
 
@@ -178,9 +174,7 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	See `destroy_records`.
 */
 get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
-	when ODIN_OS == .Windows {
-		sync.once_do(&dns_config_initialized, init_dns_configuration)
-	}
+	init_dns_configuration()
 	return _get_dns_records_os(hostname, type, allocator)
 }
 
@@ -196,51 +190,14 @@ get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocat
 	See `destroy_records`.
 */
 get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
-	when ODIN_OS == .Windows {
-		sync.once_do(&dns_config_initialized, init_dns_configuration)
-	}
+	init_dns_configuration()
 	context.allocator = allocator
 
-	if type != .SRV {
-		// NOTE(tetra): 'hostname' can contain underscores when querying SRV records
-		ok := validate_hostname(hostname)
-		if !ok {
-			return nil, .Invalid_Hostname_Error
-		}
-	}
+	id := u16be(rand.uint32())
+	dns_packet_buf: [DNS_PACKET_MIN_LEN]byte = ---
+	dns_packet := make_dns_packet(dns_packet_buf[:], id, hostname, type) or_return
 
-	hdr := DNS_Header{
-		id = u16be(rand.uint32()),
-		is_response = false,
-		opcode = 0,
-		is_authoritative = false,
-		is_truncated = false,
-		is_recursion_desired = true,
-		is_recursion_available = false,
-		response_code = DNS_Response_Code.No_Error,
-	}
-
-	id, bits := pack_dns_header(hdr)
-	dns_hdr := [6]u16be{}
-	dns_hdr[0] = id
-	dns_hdr[1] = bits
-	dns_hdr[2] = 1
-
-	dns_query := [2]u16be{ u16be(type), 1 }
-
-	output := [(size_of(u16be) * 6) + NAME_MAX + (size_of(u16be) * 2)]u8{}
-	b := strings.builder_from_slice(output[:])
-
-	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
-	ok := encode_hostname(&b, hostname)
-	if !ok {
-		return nil, .Invalid_Hostname_Error
-	}
-	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
-
-	dns_packet := output[:strings.builder_len(b)]
-
-	dns_response_buf := [4096]u8{}
+	dns_response_buf: [4096]u8 = ---
 	dns_response: []u8
 	for name_server in name_servers {
 		conn, sock_err := make_unbound_udp_socket(family_from_endpoint(name_server))
@@ -281,6 +238,42 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	}
 
 	return
+}
+
+DNS_PACKET_MIN_LEN :: (size_of(u16be) * 6) + NAME_MAX + (size_of(u16be) * 2)
+
+make_dns_packet :: proc(buf: []byte, id: u16be, hostname: string, type: DNS_Record_Type) -> (packet: []byte, err: DNS_Error) {
+	assert(len(buf) >= DNS_PACKET_MIN_LEN)
+
+	hdr := DNS_Header{
+		id = id,
+		is_response = false,
+		opcode = 0,
+		is_authoritative = false,
+		is_truncated = false,
+		is_recursion_desired = true,
+		is_recursion_available = false,
+		response_code = DNS_Response_Code.No_Error,
+	}
+
+	_, bits := pack_dns_header(hdr)
+	dns_hdr := [6]u16be{}
+	dns_hdr[0] = id
+	dns_hdr[1] = bits
+	dns_hdr[2] = 1
+
+	dns_query := [2]u16be{ u16be(type), 1 }
+
+	b := strings.builder_from_slice(buf[:])
+
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_hdr[:]))
+	ok := encode_hostname(&b, hostname)
+	if !ok {
+		return nil, .Invalid_Hostname_Error
+	}
+	strings.write_bytes(&b, mem.slice_data_cast([]u8, dns_query[:]))
+
+	return buf[:strings.builder_len(b)], nil
 }
 
 // `records` slice is also destroyed.
@@ -364,13 +357,8 @@ unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: DNS_Header) {
 	return hdr
 }
 
-load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocator) -> (name_servers: []Endpoint, ok: bool) {
-	context.allocator = allocator
-
-	res := os.read_entire_file_from_filename(resolv_conf_path) or_return
-	defer delete(res)
-	resolv_str := string(res)
-
+parse_resolv_conf :: proc(resolv_str: string, allocator := context.allocator) -> (name_servers: []Endpoint) {
+	resolv_str := resolv_str
 	id_str := "nameserver"
 	id_len := len(id_str)
 
@@ -401,41 +389,51 @@ load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocato
 		append(&_name_servers, endpoint)
 	}
 
-	return _name_servers[:], true
+	return _name_servers[:]
 }
 
-load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (hosts: []DNS_Host_Entry, ok: bool) {
-	context.allocator = allocator
+parse_hosts :: proc(stream: io.Stream, allocator := context.allocator) -> (hosts: []DNS_Host_Entry, ok: bool) {
+	s := bufio.scanner_init(&{}, stream, allocator)
+	defer bufio.scanner_destroy(s)
 
-	res := os.read_entire_file_from_filename(hosts_file_path, allocator) or_return
-	defer delete(res)
+	resize(&s.buf, 256)
 
-	_hosts := make([dynamic]DNS_Host_Entry, 0, allocator)
-	hosts_str := string(res)
-	for line in strings.split_lines_iterator(&hosts_str) {
-		if len(line) == 0 || line[0] == '#' {
-			continue
+	_hosts: [dynamic]DNS_Host_Entry
+	_hosts.allocator = allocator
+	defer if !ok {
+		for host in _hosts {
+			delete(host.name, allocator)
 		}
+		delete(_hosts)
+	}
 
-		splits := strings.fields(line)
-		defer delete(splits)
+	for bufio.scanner_scan(s) {
+		line := bufio.scanner_text(s)
 
-		(len(splits) >= 2) or_continue
+		line, _, _ = strings.partition(line, "#")
+		(len(line) > 0) or_continue
 
-		ip_str := splits[0]
+		ip_str := strings.fields_iterator(&line) or_continue
+
 		addr := parse_address(ip_str)
-		if addr == nil {
-			continue
-		}
+		(addr != nil) or_continue
 
-		for hostname in splits[1:] {
-			if len(hostname) != 0 {
-				append(&_hosts, DNS_Host_Entry{hostname, addr})
-			}
+		for hostname in strings.fields_iterator(&line) {
+			(len(hostname) > 0) or_continue
+
+			clone, alloc_err := strings.clone(hostname, allocator)
+			if alloc_err != nil { return }
+
+			_, alloc_err = append(&_hosts, DNS_Host_Entry{clone, addr})
+			if alloc_err != nil { return }
 		}
 	}
 
-	return _hosts[:], true
+	if bufio.scanner_error(s) != nil { return }
+
+	hosts = _hosts[:]
+	ok    = true
+	return
 }
 
 // www.google.com -> 3www6google3com0
@@ -594,7 +592,7 @@ decode_hostname :: proc(packet: []u8, start_idx: int, allocator := context.alloc
 
 // Uses RFC 952 & RFC 1123
 validate_hostname :: proc(hostname: string) -> (ok: bool) {
-	if len(hostname) > 255 || len(hostname) == 0 {
+	if len(hostname) > NAME_MAX || len(hostname) == 0 {
 		return
 	}
 
@@ -604,7 +602,7 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 
 	_hostname := hostname
 	for label in strings.split_iterator(&_hostname, ".") {
-		if len(label) > 63 || len(label) == 0 {
+		if len(label) > LABEL_MAX || len(label) == 0 {
 			return
 		}
 

@@ -61,12 +61,13 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 		}
 	}
 
-	if .Append      in flags { sys_flags += {.APPEND} }
-	if .Create      in flags { sys_flags += {.CREAT} }
-	if .Excl        in flags { sys_flags += {.EXCL} }
-	if .Sync        in flags { sys_flags += {.DSYNC} }
-	if .Trunc       in flags { sys_flags += {.TRUNC} }
-	if .Inheritable in flags { sys_flags -= {.CLOEXEC} }
+	if .Append       in flags { sys_flags += {.APPEND} }
+	if .Create       in flags { sys_flags += {.CREAT} }
+	if .Excl         in flags { sys_flags += {.EXCL} }
+	if .Sync         in flags { sys_flags += {.DSYNC} }
+	if .Trunc        in flags { sys_flags += {.TRUNC} }
+	if .Non_Blocking in flags { sys_flags += {.NONBLOCK} }
+	if .Inheritable  in flags { sys_flags -= {.CLOEXEC} }
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return

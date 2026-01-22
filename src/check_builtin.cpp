@@ -2695,6 +2695,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type or expr) -> untyped int
+		if (ce->args[0]->kind == Ast_UnaryExpr) {
+			ast_node(arg, UnaryExpr, ce->args[0]);
+			if (arg->op.kind == Token_And) {
+				ERROR_BLOCK();
+
+				warning(ce->args[0], "'size_of(&x)' returns the size of a pointer, not the size of x");
+				error_line("\tSuggestion: Use 'size_of(rawptr)' if you want the size of the pointer");
+			}
+		}
+
 		Operand o = {};
 		check_expr_or_type(c, &o, ce->args[0]);
 		if (o.mode == Addressing_Invalid) {

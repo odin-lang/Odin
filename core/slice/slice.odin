@@ -924,3 +924,39 @@ bitset_to_enum_slice_with_make :: proc(bs: $T, $E: typeid, allocator := context.
 }
 
 bitset_to_enum_slice :: proc{bitset_to_enum_slice_with_make, bitset_to_enum_slice_with_buffer}
+
+/*
+Removes the first n elements (`elems`) from a slice of slices, spanning inner slices and dropping empty ones.
+
+If `elems` is out of bounds (more than the total) this will trigger a bounds check.
+
+Example:
+	import "core:fmt"
+	import "core:slice"
+	
+	advance_slices_example :: proc() {
+		slices := [][]byte {
+			{1, 2, 3, 4},
+			{5, 6, 7},
+		}
+
+		fmt.println(slice.advance_slices(slices, 4))
+	}
+
+Output:
+	[[5, 6, 7]]
+*/
+advance_slices :: proc(slices: $S/[][]$T, elems: int) -> S {
+	slices, elems := slices, elems
+	for elems > 0 {
+		slice := &slices[0]
+		take  := builtin.min(elems, len(slice))
+		slice^ = slice[take:]
+		if len(slice) == 0 {
+			slices = slices[1:]
+		}
+		elems -= take
+	}
+
+	return slices
+}

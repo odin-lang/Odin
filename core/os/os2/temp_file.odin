@@ -14,7 +14,7 @@ MAX_ATTEMPTS :: 1<<13 // Should be enough for everyone, right?
 //
 // The caller must `close` the file once finished with.
 @(require_results)
-create_temp_file :: proc(dir, pattern: string) -> (f: ^File, err: Error) {
+create_temp_file :: proc(dir, pattern: string, additional_flags: File_Flags = {}) -> (f: ^File, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	dir := dir if dir != "" else temp_directory(temp_allocator) or_return
 	prefix, suffix := _prefix_and_suffix(pattern) or_return
@@ -26,7 +26,7 @@ create_temp_file :: proc(dir, pattern: string) -> (f: ^File, err: Error) {
 	attempts := 0
 	for {
 		name := concatenate_strings_from_buffer(name_buf[:], prefix, random_string(rand_buf[:]), suffix)
-		f, err = open(name, {.Read, .Write, .Create, .Excl}, Permissions_Read_Write_All)
+		f, err = open(name, {.Read, .Write, .Create, .Excl} + additional_flags, Permissions_Read_Write_All)
 		if err == .Exist {
 			close(f)
 			attempts += 1

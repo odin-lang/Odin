@@ -117,6 +117,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->type_expr      = decl->type_expr;
 	p->body           = pl->body;
 	p->inlining       = pl->inlining;
+	p->tailing        = pl->tailing;
 	p->is_foreign     = entity->Procedure.is_foreign;
 	p->is_export      = entity->Procedure.is_export;
 	p->is_entry_point = false;
@@ -151,6 +152,10 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
+
+	if (build_context.disable_unwind) {
+		lb_add_attribute_to_proc(m, p->value, "nounwind");
+	}
 
 	if (pt->Proc.diverging) {
 		lb_add_attribute_to_proc(m, p->value, "noreturn");
@@ -346,7 +351,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		if (build_context.sanitizer_flags & SanitizerFlag_Memory && !entity->Procedure.no_sanitize_memory) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_memory");
 		}
-		if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+		if (build_context.sanitizer_flags & SanitizerFlag_Thread && !entity->Procedure.no_sanitize_thread) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_thread");
 		}
 	}
@@ -387,6 +392,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->body           = nullptr;
 	p->tags           = 0;
 	p->inlining       = ProcInlining_none;
+	p->tailing        = ProcTailing_none;
 	p->is_foreign     = false;
 	p->is_export      = false;
 	p->is_entry_point = false;
@@ -855,7 +861,7 @@ gb_internal Array<lbValue> lb_value_to_array(lbProcedure *p, gbAllocator const &
 
 
 
-gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr, Array<lbValue> const &processed_args, Type *abi_rt, lbAddr context_ptr, ProcInlining inlining) {
+gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr, Array<lbValue> const &processed_args, Type *abi_rt, lbAddr context_ptr, ProcInlining inlining, ProcTailing tailing) {
 	GB_ASSERT(p->module->ctx == LLVMGetTypeContext(LLVMTypeOf(value.value)));
 
 	unsigned arg_count = cast(unsigned)processed_args.count;
@@ -972,6 +978,15 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			break;
 		}
 
+		switch (tailing) {
+		case ProcTailing_none:
+			break;
+		case ProcTailing_must_tail:
+			LLVMSetTailCall(ret, true);
+			LLVMSetTailCallKind(ret, LLVMTailCallKindMustTail);
+			break;
+		}
+
 		lbValue res = {};
 		res.value = ret;
 		res.type = abi_rt;
@@ -1045,7 +1060,7 @@ gb_internal lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 	return lb_emit_load(p, res);
 }
 
-gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining) {
+gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, ProcTailing tailing) {
 	lbModule *m = p->module;
 
 	Type *pt = base_type(value.type);
@@ -1168,10 +1183,10 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 		if (return_by_pointer) {
 			lbValue return_ptr = lb_add_local_generated(p, rt, true).addr;
-			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining);
+			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining, tailing);
 			result = lb_emit_load(p, return_ptr);
 		} else if (rt != nullptr) {
-			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining);
+			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
 			if (ft->ret.cast_type) {
 				result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.cast_type);
 			}
@@ -1184,7 +1199,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				result = lb_emit_conv(p, result, rt);
 			}
 		} else {
-			lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining);
+			lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining, tailing);
 		}
 
 		if (original_rt != rt) {
@@ -4402,6 +4417,25 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		return lb_handle_objc_auto_send(p, expr, slice(call_args, 0, call_args.count));
 	}
 
-	return lb_emit_call(p, value, call_args, ce->inlining);
+
+	ProcInlining inlining = ce->inlining;
+	ProcTailing tailing = ce->tailing;
+
+	if (tailing == ProcTailing_none &&
+	    proc_entity && proc_entity->kind == Entity_Procedure &&
+	    proc_entity->decl_info &&
+	    proc_entity->decl_info->proc_lit) {
+		ast_node(pl, ProcLit, proc_entity->decl_info->proc_lit);
+
+		if (pl->inlining != ProcInlining_none) {
+			inlining = pl->inlining;
+		}
+
+		if (pl->tailing != ProcTailing_none) {
+			tailing = pl->tailing;
+		}
+	}
+
+	return lb_emit_call(p, value, call_args, inlining, tailing);
 }
 

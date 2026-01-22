@@ -185,8 +185,9 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 	if .Trunc  in flags { oflags += {.TRUNC} }
 
 	fdflags: wasi.fdflags_t
-	if .Append in flags { fdflags += {.APPEND} }
-	if .Sync   in flags { fdflags += {.SYNC} }
+	if .Append       in flags { fdflags += {.APPEND} }
+	if .Sync         in flags { fdflags += {.SYNC} }
+	if .Non_Blocking in flags { fdflags += {.NONBLOCK} }
 
 	// NOTE: rights are adjusted to what this package's functions might want to call.
 	rights: wasi.rights_t

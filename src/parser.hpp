@@ -263,10 +263,15 @@ struct ForeignFileWorkerData {
 
 
 
-enum ProcInlining {
-	ProcInlining_none = 0,
-	ProcInlining_inline = 1,
+enum ProcInlining : u8 {
+	ProcInlining_none      = 0,
+	ProcInlining_inline    = 1,
 	ProcInlining_no_inline = 2,
+};
+
+enum ProcTailing : u8 {
+	ProcTailing_none      = 0,
+	ProcTailing_must_tail = 1,
 };
 
 enum ProcTag {
@@ -296,6 +301,9 @@ enum ProcCallingConvention : i32 {
 	ProcCC_Win64       = 9,
 	ProcCC_SysV        = 10,
 
+	ProcCC_PreserveNone = 11,
+	ProcCC_PreserveMost = 12,
+	ProcCC_PreserveAll  = 13,
 
 	ProcCC_MAX,
 
@@ -315,6 +323,9 @@ gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"inlineasm",
 	"win64",
 	"sysv",
+	"preserve/none",
+	"preserve/most",
+	"preserve/all",
 };
 
 gb_internal ProcCallingConvention default_calling_convention(void) {
@@ -441,6 +452,7 @@ struct AstSplitArgs {
 		Ast *body; \
 		u64  tags; \
 		ProcInlining inlining; \
+		ProcTailing  tailing; \
 		Token where_token; \
 		Slice<Ast *> where_clauses; \
 		DeclInfo *decl; \
@@ -486,6 +498,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        close; \
 		Token        ellipsis; \
 		ProcInlining inlining; \
+		ProcTailing  tailing; \
 		bool         optional_ok_one; \
 		bool         was_selector; \
 		AstSplitArgs *split_args; \

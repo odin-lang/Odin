@@ -139,6 +139,11 @@ Accept_Error :: enum i32 {
 	Unknown,
 }
 
+Recv_Error :: union #shared_nil {
+	TCP_Recv_Error,
+	UDP_Recv_Error,
+}
+
 TCP_Recv_Error :: enum i32 {
 	None,
 	// No network connection, or the network stack is not initialized.
@@ -185,6 +190,11 @@ UDP_Recv_Error :: enum i32 {
 
 	// An error unable to be categorized in above categories, `last_platform_error` may have more info.
 	Unknown,
+}
+
+Send_Error :: union #shared_nil {
+	TCP_Send_Error,
+	UDP_Send_Error,
 }
 
 TCP_Send_Error :: enum i32 {

@@ -1133,7 +1133,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				x.mode = Addressing_Value;
 				x.type = t;
 				if (check_is_assignable_to(c, &x, type)) {
-					add_entity_use(c, operand->expr, e);
+					if (operand->expr->kind == Ast_SelectorExpr) {
+						add_entity_use(c, operand->expr->SelectorExpr.selector, e);
+					} else {
+						add_entity_use(c, operand->expr, e);
+					}
 					good = true;
 					break;
 				}
@@ -3528,7 +3532,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		if (core_type(bt)->kind == Type_Basic) {
 			return check_representable_as_constant(c, x->value, type, &x->value) ||
 			       (is_type_pointer(type) && check_is_castable_to(c, x, type));
-		} else if (!are_types_identical(elem, bt) && elem->kind == Type_Basic) {
+		} else if (!are_types_identical(elem, bt) && elem->kind == Type_Basic && x->type->kind == Type_Basic) {
 			return check_representable_as_constant(c, x->value, elem, &x->value) || 
 			       (is_type_pointer(elem) && check_is_castable_to(c, x, elem));
 		} else if (check_is_castable_to(c, x, type)) {
@@ -8210,7 +8214,7 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 	add_objc_proc_type(c, call, return_type, param_types);
 }
 
-gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
+gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, ProcTailing tailing, Type *type_hint) {
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
@@ -8241,7 +8245,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			return Expr_Expr;
 		}
 		if (inlining != ProcInlining_none) {
-			error(call, "Inlining operators are not allowed on built-in procedures");
+			error(call, "Inlining directives are not allowed on built-in procedures");
+		}
+		if (tailing != ProcTailing_none) {
+			error(call, "Tailing directives are not allowed on built-in procedures");
 		}
 	} else {
 		if (proc != nullptr) {
@@ -8383,6 +8390,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 
 	bool is_call_inlined = false;
+	bool is_call_tailed = true;
 
 	switch (inlining) {
 	case ProcInlining_inline:
@@ -8415,6 +8423,23 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				}
 			}
 		}
+	}
+
+	switch (tailing) {
+	case ProcTailing_none:
+		break;
+	case ProcTailing_must_tail:
+		is_call_tailed = true;
+		if (c->curr_proc_sig == nullptr || !are_types_identical(c->curr_proc_sig, pt)) {
+			ERROR_BLOCK();
+			gbString a = type_to_string(pt);
+			gbString b = type_to_string(c->curr_proc_sig);
+			error(call, "Use of '#must_tail' of a procedure must have the same type as the procedure it was called within");
+			error_line("\tCall type: %s, parent type: %s", a, b);
+			gb_string_free(b);
+			gb_string_free(a);
+		}
+		break;
 	}
 
 	{
@@ -11554,6 +11579,15 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
+	case_ast_node(ht, HelperType, node);
+		Type *type = check_type(c, ht->type);
+		if (type != nullptr && type != t_invalid) {
+			o->mode = Addressing_Type;
+			o->type = type;
+		}
+		return kind;
+	case_end;
+
 	case_ast_node(i, Implicit, node);
 		switch (i->kind) {
 		case Token_context:
@@ -11816,7 +11850,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
-		return check_call_expr(c, o, node, ce->proc, ce->args, ce->inlining, type_hint);
+		return check_call_expr(c, o, node, ce->proc, ce->args, ce->inlining, ce->tailing, type_hint);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
@@ -12557,6 +12591,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
+		switch (ce->tailing) {
+		case ProcTailing_must_tail:
+			str = gb_string_appendc(str, "#must_tail ");
+			break;
+		}
+
 		switch (ce->inlining) {
 		case ProcInlining_inline:
 			str = gb_string_appendc(str, "#force_inline ");
