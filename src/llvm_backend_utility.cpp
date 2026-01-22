@@ -89,7 +89,7 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 	bool is_inlinable = false;
 
 	i64 const_len = 0;
-	if (LLVMIsConstant(len)) {
+	if (!p->is_startup && LLVMIsConstant(len)) {
 		const_len = cast(i64)LLVMConstIntGetSExtValue(len);
 		// TODO(bill): Determine when it is better to do the `*.inline` versions
 		if (const_len <= lb_max_zero_init_size()) {

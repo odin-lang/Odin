@@ -12,9 +12,9 @@ gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue sr
 	len = lb_emit_conv(p, len, t_int);
 	
 	char const *name = "llvm.memmove";
-	if (LLVMIsConstant(len.value)) {
+	if (!p->is_startup && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
-		if (const_len <= 4*build_context.int_size) {
+		if (const_len <= lb_max_zero_init_size()) {
 			name = "llvm.memmove.inline";
 		}
 	}
@@ -41,9 +41,9 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 	len = lb_emit_conv(p, len, t_int);
 	
 	char const *name = "llvm.memcpy";
-	if (LLVMIsConstant(len.value)) {
+	if (!p->is_startup && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
-		if (const_len <= 4*build_context.int_size) {
+		if (const_len <= lb_max_zero_init_size()) {
 			name = "llvm.memcpy.inline";
 		}
 	}
