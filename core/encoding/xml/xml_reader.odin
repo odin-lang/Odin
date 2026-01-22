@@ -294,7 +294,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						if len(doc.elements) == 0 {
+						if doc.element_count == 0 {
 							append(&doc.comments, comment)
 						} else {
 							el := new_element(doc)
