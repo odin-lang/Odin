@@ -2045,6 +2045,11 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 			lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
 			lb_emit_store(p, ti,   lb_typeid(p->module, var_type));
 		} else {
+			i64 sz = type_size_of(e->type);
+			if (sz >= 4 * 1024) {
+				warning(init_expr, "[Possible Code Generation Issue] Non-constant initialization is large (%lld bytes), and might cause problems with LLVM", cast(long long)sz);
+			}
+
 			LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 			lbValue src0 = lb_emit_conv(p, var.init, t);
 			LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);

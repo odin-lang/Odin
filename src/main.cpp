@@ -4046,6 +4046,14 @@ int main(int arg_count, char const **arg_ptr) {
 		remove_temp_files(gen);
 	}
 
+	if (any_errors()) {
+		print_all_errors();
+		return 1;
+	}
+	if (any_warnings()) {
+		print_all_errors();
+	}
+
 end_of_code_gen:;
 
 	if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
