@@ -5071,6 +5071,10 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
+	if (file_path.string == "\".\"") {
+		syntax_error(import_name, "Cannot cyclicly import packages");
+	}
+
 	expect_semicolon(f);
 	return s;
 }
