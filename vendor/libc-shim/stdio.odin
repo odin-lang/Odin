@@ -17,7 +17,7 @@ EOF :: -1
 @(require, linkage="strong", link_name="fopen")
 fopen :: proc "c" (path: cstring, mode: cstring) -> FILE {
 	context = g_ctx
-	unimplemented("vendor/libc: fopen")
+	unimplemented("vendor/libc-shim: fopen")
 }
 
 @(require, linkage="strong", link_name="fseek")
@@ -366,7 +366,7 @@ _sscanf :: proc "c" (str, fmt: [^]byte, orig_ptrs: [^]rawptr) -> i32 {
 			i = 0
 			k = t == 'c' ? width + 1 : 31
 			if size == .l {
-				unimplemented("vendor/libc: sscanf wide character support")
+				unimplemented("vendor/libc-shim: sscanf wide character support")
 			} else if alloc {
 				s = make([^]byte, k)
 				if s == nil {
