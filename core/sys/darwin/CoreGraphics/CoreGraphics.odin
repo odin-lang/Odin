@@ -1,6 +1,7 @@
 package CoreGraphics
 
-import "core:c"
+import    "core:c"
+import CF "core:sys/darwin/CoreFoundation"
 
 @(require)
 foreign import "system:CoreGraphics.framework"
@@ -43,23 +44,14 @@ EventSourceStateID :: enum c.int32_t {
 	HIDSystemState       = 1,
 }
 
-Float :: distinct (f32 when size_of(uint) == 4 else f64)
+Float :: CF.CGFloat
 
 KeyCode :: c.uint16_t
 
 OpenGLDisplayMask :: c.uint32_t
 
-Point :: struct {
-	x: Float,
-	y: Float,
-}
+Point :: CF.CGPoint
 
-Rect :: struct {
-	using origin: Point,
-	using size:   Size,
-}
+Rect :: CF.CGRect
 
-Size :: struct {
-	width:  Float,
-	height: Float,
-}
+Size :: CF.CGSize

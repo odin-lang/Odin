@@ -1,11 +1,11 @@
 package objc_Foundation
 
 import "core:strings"
-import CG "core:sys/darwin/CoreGraphics"
+import CF "core:sys/darwin/CoreFoundation"
 import "base:runtime"
 import "base:intrinsics"
 
-Rect :: CG.Rect
+Rect :: CF.CGRect
 MaxX :: proc(aRect: Rect) -> Float {
 	return aRect.origin.x + aRect.size.width
 }

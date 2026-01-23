@@ -1,7 +1,7 @@
 package objc_Foundation
 
 import "base:intrinsics"
-import CG "core:sys/darwin/CoreGraphics"
+import CF "core:sys/darwin/CoreFoundation"
 
 @(private) msgSend :: intrinsics.objc_send
 
@@ -35,11 +35,11 @@ ComparisonResult :: enum Integer {
 
 NotFound :: IntegerMax
 
-Float :: CG.Float
+Float :: CF.CGFloat
 
-Point :: CG.Point
+Point :: CF.CGPoint
 
-Size :: CG.Size
+Size :: CF.CGSize
 
 when size_of(UInteger) == 8 {
 	_UINTEGER_ENCODING :: "Q"
