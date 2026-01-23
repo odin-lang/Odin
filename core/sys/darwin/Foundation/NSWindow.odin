@@ -1,12 +1,28 @@
 package objc_Foundation
 
 import "core:strings"
+import CF "core:sys/darwin/CoreFoundation"
 import "base:runtime"
 import "base:intrinsics"
 
-Rect :: struct {
-	using origin: Point,
-	using size: Size,
+Rect :: CF.CGRect
+MaxX :: proc(aRect: Rect) -> Float {
+	return aRect.origin.x + aRect.size.width
+}
+MaxY :: proc(aRect: Rect) -> Float {
+	return aRect.origin.y + aRect.size.height
+}
+MidX :: proc(aRect: Rect) -> Float {
+	return aRect.origin.x + aRect.size.width*0.5
+}
+MidY :: proc(aRect: Rect) -> Float {
+	return aRect.origin.y + aRect.size.height*0.5
+}
+MinX :: proc(aRect: Rect) -> Float {
+	return aRect.origin.x
+}
+MinY :: proc(aRect: Rect) -> Float {
+	return aRect.origin.y
 }
 
 Depth :: enum UInteger {
@@ -987,4 +1003,8 @@ Window_contentRectForFrameRectInstance :: proc "c" (self: ^Window, frameRect: Re
 @(objc_type = Window, objc_name = "frameRectForContentRect")
 Window_frameRectForContentRectInstance :: proc "c" (self: ^Window, contentRect: Rect) -> Rect {
 	return msgSend(Rect, self, "frameRectForContentRect:", contentRect)
+}
+@(objc_type = Window, objc_name = "screen")
+Window_screen :: proc "c" (self: ^Window) -> ^Screen {
+	return msgSend(^Screen, self, "screen")
 }

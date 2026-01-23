@@ -3,6 +3,19 @@ package objc_Foundation
 @(objc_class="NSCursor")
 Cursor :: struct {using _: Object}
 
+@(objc_type=Cursor, objc_name="hide", objc_is_class_method=true)
+Cursor_hide :: proc() {
+	msgSend(nil, Cursor, "hide")
+}
+@(objc_type=Cursor, objc_name="unhide", objc_is_class_method=true)
+Cursor_unhide :: proc() {
+	msgSend(nil, Cursor, "unhide")
+}
+@(objc_type=Cursor, objc_name="setHiddenUntilMouseMoves", objc_is_class_method=true)
+Cursor_setHiddenUntilMouseMoves :: proc(flag: BOOL) {
+	msgSend(nil, Cursor, "setHiddenUntilMouseMoves:", flag)
+}
+
 @(objc_type=Cursor, objc_name="set")
 Cursor_set :: proc(self: ^Cursor) {
 	msgSend(EventType, self, "set")
