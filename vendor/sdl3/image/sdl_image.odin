@@ -21,6 +21,51 @@ Animation :: struct {
 	delays: [^]c.int,
 }
 
+AnimationEncoder :: struct {}
+
+PROP_ANIMATION_ENCODER_CREATE_FILENAME_STRING             :: "SDL_image.animation_encoder.create.filename"
+PROP_ANIMATION_ENCODER_CREATE_IOSTREAM_POINTER            :: "SDL_image.animation_encoder.create.iostream"
+PROP_ANIMATION_ENCODER_CREATE_IOSTREAM_AUTOCLOSE_BOOLEAN  :: "SDL_image.animation_encoder.create.iostream.autoclose"
+PROP_ANIMATION_ENCODER_CREATE_TYPE_STRING                 :: "SDL_image.animation_encoder.create.type"
+PROP_ANIMATION_ENCODER_CREATE_QUALITY_NUMBER              :: "SDL_image.animation_encoder.create.quality"
+PROP_ANIMATION_ENCODER_CREATE_TIMEBASE_NUMERATOR_NUMBER   :: "SDL_image.animation_encoder.create.timebase.numerator"
+PROP_ANIMATION_ENCODER_CREATE_TIMEBASE_DENOMINATOR_NUMBER :: "SDL_image.animation_encoder.create.timebase.denominator"
+
+PROP_ANIMATION_ENCODER_CREATE_AVIF_MAX_THREADS_NUMBER       :: "SDL_image.animation_encoder.create.avif.max_threads"
+PROP_ANIMATION_ENCODER_CREATE_AVIF_KEYFRAME_INTERVAL_NUMBER :: "SDL_image.animation_encoder.create.avif.keyframe_interval"
+PROP_ANIMATION_ENCODER_CREATE_GIF_USE_LUT_BOOLEAN           :: "SDL_image.animation_encoder.create.gif.use_lut"
+
+AnimationDecoderStatus :: enum c.int {
+	INVALID = -1,
+	OK,
+	FAILED,
+	COMPLETE,
+}
+
+AnimationDecoder :: struct {}
+
+PROP_ANIMATION_DECODER_CREATE_FILENAME_STRING             :: "SDL_image.animation_decoder.create.filename"
+PROP_ANIMATION_DECODER_CREATE_IOSTREAM_POINTER            :: "SDL_image.animation_decoder.create.iostream"
+PROP_ANIMATION_DECODER_CREATE_IOSTREAM_AUTOCLOSE_BOOLEAN  :: "SDL_image.animation_decoder.create.iostream.autoclose"
+PROP_ANIMATION_DECODER_CREATE_TYPE_STRING                 :: "SDL_image.animation_decoder.create.type"
+PROP_ANIMATION_DECODER_CREATE_TIMEBASE_NUMERATOR_NUMBER   :: "SDL_image.animation_decoder.create.timebase.numerator"
+PROP_ANIMATION_DECODER_CREATE_TIMEBASE_DENOMINATOR_NUMBER :: "SDL_image.animation_decoder.create.timebase.denominator"
+
+PROP_ANIMATION_DECODER_CREATE_AVIF_MAX_THREADS_NUMBER            :: "SDL_image.animation_decoder.create.avif.max_threads"
+PROP_ANIMATION_DECODER_CREATE_AVIF_ALLOW_INCREMENTAL_BOOLEAN     :: "SDL_image.animation_decoder.create.avif.allow_incremental"
+PROP_ANIMATION_DECODER_CREATE_AVIF_ALLOW_PROGRESSIVE_BOOLEAN     :: "SDL_image.animation_decoder.create.avif.allow_progressive"
+PROP_ANIMATION_DECODER_CREATE_GIF_TRANSPARENT_COLOR_INDEX_NUMBER :: "SDL_image.animation_encoder.create.gif.transparent_color_index"
+PROP_ANIMATION_DECODER_CREATE_GIF_NUM_COLORS_NUMBER              :: "SDL_image.animation_encoder.create.gif.num_colors"
+
+PROP_METADATA_IGNORE_PROPS_BOOLEAN :: "SDL_image.metadata.ignore_props"
+PROP_METADATA_DESCRIPTION_STRING   :: "SDL_image.metadata.description"
+PROP_METADATA_COPYRIGHT_STRING     :: "SDL_image.metadata.copyright"
+PROP_METADATA_TITLE_STRING         :: "SDL_image.metadata.title"
+PROP_METADATA_AUTHOR_STRING        :: "SDL_image.metadata.author"
+PROP_METADATA_CREATION_TIME_STRING :: "SDL_image.metadata.creation_time"
+PROP_METADATA_FRAME_COUNT_NUMBER   :: "SDL_image.metadata.frame_count"
+PROP_METADATA_LOOP_COUNT_NUMBER    :: "SDL_image.metadata.loop_count"
+
 @(default_calling_convention="c", link_prefix="IMG_")
 foreign lib {
 	Version :: proc() -> c.int ---
@@ -123,10 +168,39 @@ foreign lib {
 	LoadAnimation         :: proc(file: cstring) -> ^Animation ---
 	LoadAnimation_IO      :: proc(src: ^SDL.IOStream, closeio: bool) -> ^Animation ---
 	LoadAnimationTyped_IO :: proc(src: ^SDL.IOStream, closeio: bool, type: cstring) -> ^Animation ---
+	SaveAnimation         :: proc(anim: ^Animation, file: cstring) -> c.bool ---
+	SaveAnimationTyped_IO :: proc(anim: ^Animation, dst: ^SDL.IOStream, closeio: bool, type: cstring) -> c.bool ---
 	CreateAnimatedCursor  :: proc(anim: ^Animation, hot_x: c.int, hot_y: c.int) -> ^SDL.Cursor ---
 	FreeAnimation         :: proc(anim: ^Animation) ---
 
+	/* Animation encoder functions */
+	CreateAnimationEncoder               :: proc(file: cstring) -> ^AnimationEncoder ---
+	CreateAnimationEncoder_IO            :: proc(dst: ^SDL.IOStream, closeio: bool, type: cstring) -> ^AnimationEncoder ---
+	CreateAnimationEncoderWithProperties :: proc(props: SDL.PropertiesID) -> ^AnimationEncoder ---
+	AddAnimationEncoderFrame             :: proc(encoder: ^AnimationEncoder, surface: ^SDL.Surface, duration: u64) -> c.bool ---
+	CloseAnimationEncoder                :: proc(encoder: ^AnimationEncoder) -> c.bool ---
+
+	/* Animation decoder functions */
+	CreateAnimationDecoder               :: proc(file: cstring) -> ^AnimationDecoder ---
+	CreateAnimationDecoder_IO            :: proc(src: ^SDL.IOStream, closeio: bool, type: cstring) -> ^AnimationDecoder ---
+	CreateAnimationDecoderWithProperties :: proc(props: SDL.PropertiesID) -> ^AnimationDecoder ---
+	GetAnimationDecoderProperties        :: proc(decoder: ^AnimationDecoder) -> SDL.PropertiesID ---
+	GetAnimationDecoderFrame             :: proc(decoder: ^AnimationDecoder, frame: ^^SDL.Surface, duration: ^u64) -> c.bool ---
+	GetAnimationDecoderStatus            :: proc(decoder: ^AnimationDecoder) -> AnimationDecoderStatus ---
+	ResetAnimationDecoder                :: proc(decoder: ^AnimationDecoder) -> c.bool ---
+	CloseAnimationDecoder                :: proc(decoder: ^AnimationDecoder) -> c.bool ---
+
 	/* Individual loading functions */
+	LoadANIAnimation_IO   :: proc(src: ^SDL.IOStream) -> ^Animation ---
+	LoadAPNGAnimation_IO  :: proc(src: ^SDL.IOStream) -> ^Animation ---
+	LoadAVIFAnimation_IO  :: proc(src: ^SDL.IOStream) -> ^Animation ---
 	LoadGIFAnimation_IO :: proc(src: ^SDL.IOStream) -> ^Animation ---
 	LoadWEBPAnimation_IO :: proc(src: ^SDL.IOStream) -> ^Animation ---
+
+	/* Individual saving functions */
+	SaveANIAnimation_IO   :: proc(anim: ^Animation, dst: ^SDL.IOStream, closeio: bool) -> c.bool ---
+	SaveAPNGAnimation_IO  :: proc(anim: ^Animation, dst: ^SDL.IOStream, closeio: bool) -> c.bool ---
+	SaveAVIFAnimation_IO  :: proc(anim: ^Animation, dst: ^SDL.IOStream, closeio: bool, quality: c.int) -> c.bool ---
+	SaveGIFAnimation_IO   :: proc(anim: ^Animation, dst: ^SDL.IOStream, closeio: bool) -> c.bool ---
+	SaveWEBPAnimation_IO  :: proc(anim: ^Animation, dst: ^SDL.IOStream, closeio: bool, quality: c.int) -> c.bool ---
 }
