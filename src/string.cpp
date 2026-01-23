@@ -635,26 +635,107 @@ gb_internal String normalize_path(gbAllocator a, String const &path, String cons
 #elif defined(GB_SYSTEM_UNIX) || defined(GB_SYSTEM_OSX)
 	#include <wchar.h>
 
+	gb_internal void utf16_encode_surrogate_pair(Rune r, u16 *r1, u16 *r2) {
+		static Rune const _surr_self = 0x10000;
+		static Rune const _surr1 = 0xd800;
+		static Rune const _surr2 = 0xdc00;
+		Rune r_ = r - _surr_self;
+		*r1 = _surr1 + ((r_ >> 10) & 0x3ff);
+		*r2 = _surr2 + (r_ & 0x3ff);
+	}
+
+	gb_internal isize utf16_decode(u16 const *s, isize n, Rune *r) {
+		static Rune const _surr1     = 0xd800;
+		static Rune const _surr2     = 0xdc00;
+		static Rune const _surr3     = 0xe000;
+		static Rune const _surr_self = 0x10000;
+		if (n < 1) {
+			*r = GB_RUNE_INVALID;
+			return 0;
+		}
+		u16 c = s[0];
+		if (c < 0xd800 || c > 0xdfff) {
+			*r = cast(Rune)c;
+			return 1;
+		}
+		if (c >= 0xdc00) {
+			*r = GB_RUNE_INVALID;
+			return 1;
+		}
+		if (n < 2) {
+			*r = GB_RUNE_INVALID;
+			return 1;
+		}
+		u16 c2 = s[1];
+		if (c2 < 0xdc00 || c2 > 0xdfff) {
+			*r = GB_RUNE_INVALID;
+			return 1;
+		}
+		*r = (((c-_surr1)<<10) | (c2 - _surr2)) + _surr_self;
+		return 2;
+	}
+
 	gb_internal int convert_multibyte_to_widechar(char const *multibyte_input, usize input_length, wchar_t *output, usize output_size) {
-		String	string = copy_string(heap_allocator(), make_string(cast(u8 const*)multibyte_input, input_length)); /* Guarantee NULL terminator */
-		u8*		input = string.text;
+		u16 *out = cast(u16 *)output;
+		String s = make_string(cast(u8 const *)multibyte_input, input_length);
+		isize i = 0;
+		isize output_len = 0;
+		while (i < s.len) {
+			Rune r = 0;
+			isize width = utf8_decode(s.text + i, s.len - i, &r);
+			if (r == GB_RUNE_INVALID) {
+				return -1;
+			}
+			i += width;
+			if (r < 0x10000) {
+				if (out) {
+					if (cast(usize)output_len+1 > output_size) {
+						return -1;
+					}
+					out[output_len] = cast(u16)r;
+				}
+				output_len += 1;
+			} else {
+				if (out) {
+					if (cast(usize)output_len+2 > output_size) {
+						return -1;
+					}
+					u16 r1, r2;
+					utf16_encode_surrogate_pair(r, &r1, &r2);
+					out[output_len+0] = r1;
+					out[output_len+1] = r2;
+				}
+				output_len += 2;
+			}
+		}
 
-		mbstate_t	ps = { 0 };
-		size_t	result = mbsrtowcs(output, cast(const char**)&input, output_size, &ps);
-
-		gb_free(heap_allocator(), string.text);
-		return (result == (size_t)-1) ? -1 : (int)result;
+		return cast(int)output_len;
 	}
 
 	gb_internal int convert_widechar_to_multibyte(wchar_t const *widechar_input, usize input_length, char* output, usize output_size) {
-		String	string = copy_string(heap_allocator(), make_string(cast(u8 const*)widechar_input, input_length)); /* Guarantee NULL terminator */
-		u8*		input = string.text;
+		u16 const *in = cast(u16 const *)widechar_input;
+		isize i = 0;
+		isize output_len = 0;
+		while (i < input_length) {
+			Rune r;
+			isize width = utf16_decode(in + i, input_length - i, &r);
+			if (r == GB_RUNE_INVALID) {
+				return -1;
+			}
+			i += width;
 
-		mbstate_t	ps = { 0 };
-		size_t	result = wcsrtombs(output, cast(const wchar_t**)&input, output_size, &ps);
+			u8 buf[4];
+			isize char_len = gb_utf8_encode_rune(buf, r);
 
-		gb_free(heap_allocator(), string.text);
-		return (result == (size_t)-1) ? -1 : (int)result;
+			if(output) {
+				if (cast(usize)output_len+cast(usize)char_len > output_size) {
+					return -1;
+				}
+				gb_memmove(output + output_len, buf, char_len);
+			}
+			output_len += char_len;
+		}
+		return cast(int)output_len;
 	}
 #else
 #error Implement system
