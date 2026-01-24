@@ -416,7 +416,7 @@ reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	sort_by_cmp_with_data(data, proc(i, j: E, user_data: rawptr) -> Ordering {
 		k := (proc(i, j: E) -> Ordering)(user_data)
 		return k(j, i)
-	}, rawptr(data))
+	}, rawptr(cmp))
 }
 
 
