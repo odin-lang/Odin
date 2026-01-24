@@ -6369,13 +6369,11 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
+	u64 vet_flags = build_context.vet_flags;
+
 	if (s.len == 0) {
-		return VetFlag_All;
+		vet_flags |= VetFlag_All;
 	}
-
-
-	u64 vet_flags = 0;
-	u64 vet_not_flags = 0;
 
 	while (s.len > 0) {
 		String p = string_trim_whitespace(vet_tag_get_token(s, &s, /*allow_colon*/false));
@@ -6389,16 +6387,16 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			p = substring(p, 1, p.len);
 			if (p.len == 0) {
 				syntax_error(token_for_pos, "Expected a vet flag name after '!'");
-				return build_context.vet_flags;
+				return vet_flags;
 			}
 		}
 
 		u64 flag = get_vet_flag_from_name(p);
 		if (flag != VetFlag_NONE) {
 			if (is_notted) {
-				vet_not_flags |= flag;
+				vet_flags = vet_flags &~ flag;
 			} else {
-				vet_flags     |= flag;
+				vet_flags |= flag;
 			}
 		} else {
 			ERROR_BLOCK();
@@ -6416,21 +6414,11 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			error_line("\tcast\n");
 			error_line("\ttabs\n");
 			error_line("\texplicit-allocators\n");
-			return build_context.vet_flags;
+			return vet_flags;
 		}
 	}
 
-	if (vet_flags == 0 && vet_not_flags == 0) {
-		return build_context.vet_flags;
-	}
-	if (vet_flags == 0 && vet_not_flags != 0) {
-		return build_context.vet_flags &~ vet_not_flags;
-	}
-	if (vet_flags != 0 && vet_not_flags == 0) {
-		return vet_flags;
-	}
-	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
-	return vet_flags &~ vet_not_flags;
+	return vet_flags;
 }
 
 gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
