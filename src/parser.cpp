@@ -6023,6 +6023,12 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 				has_windows_drive = true;
 			}
 		}
+
+		for (isize i = 0; i < original_string.len; i++) {
+			if (original_string.text[i] == '\\') {
+				original_string.text[i] = '/';
+			}
+		}
 	}
 #endif
 
