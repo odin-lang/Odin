@@ -4125,15 +4125,19 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 				i64 upper = yt->BitSet.upper;
 
 				if (lower <= key && key <= upper) {
-					i64 bit = 1ll<<key;
-					i64 bits = big_int_to_i64(&v.value_integer);
+					BigInt idx = big_int_make_i64(key - lower);
+					BigInt bit = big_int_make_i64(1);
+					big_int_shl_eq(&bit, &idx);
+
+					BigInt mask = {};
+					big_int_and(&mask, &bit, &v.value_integer);
 
 					x->mode = Addressing_Constant;
 					x->type = t_untyped_bool;
 					if (op.kind == Token_in) {
-						x->value = exact_value_bool((bit & bits) != 0);
+						x->value = exact_value_bool(!big_int_is_zero(&mask));
 					} else {
-						x->value = exact_value_bool((bit & bits) == 0);
+						x->value = exact_value_bool(big_int_is_zero(&mask));
 					}
 					x->expr = node;
 					return;
