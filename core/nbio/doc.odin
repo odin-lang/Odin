@@ -143,13 +143,13 @@ associated with an event loop or configured for non-blocking/asynchronous
 operation.
 
 On some platforms (notably Windows), this requires a specific flag at open
-time (`.Non_Blocking` for `core:os`) and association may fail if the handle was not created
-correctly.
+time (`.Non_Blocking` for `core:os`) and association may fail if the handle was
+not created correctly.
 
 For this reason, prefer `open` and `create_socket` from this package instead.
 
-`associate_handle`, `associate_file`, and `associate_socket` can be used for externally opened
-files/sockets.
+`associate_handle`, `associate_file`, and `associate_socket` can be used for
+externally opened files/sockets.
 
 
 **Offsets and positional I/O**:
@@ -172,7 +172,8 @@ operation.
 Instead, the callback receives the context that was active when the event
 loop function (`tick`, `run`, etc.) was called.
 
-This is because otherwise the context would have to be copied and held onto for each operation.
+This is because otherwise the context would have to be copied and held onto for
+each operation.
 
 If the submitting context is required inside the callback, it must be copied
 into the operation’s user data explicitly.
@@ -187,9 +188,26 @@ Example:
 **Callback scheduling guarantees**:
 
 Callbacks are guaranteed to be invoked in a later tick, never synchronously.
-This means that the operation returned from a procedure is at least valid till the end of the
-current tick, because an operation is freed after it's callback is called.
-Thus you can set user data after an execution is queued, or call `remove`, removing subtle "race"
-conditions and simplifying control flow.
+This means that the operation returned from a procedure is at least valid till
+the end of the current tick, because an operation is freed after it's callback
+is called. Thus you can set user data after an execution is queued, or call
+`remove`, removing subtle "race" conditions and simplifying control flow.
+
+**Why does the design of this package use callbacks?**
+
+Callbacks are the simplest interface an event loop can reasonably expose: "Run
+this when the operation completes". This means the loop itself doesn’t need to
+know how the result is consumed (You could give control of the entire loop to
+the user, but that comes with all the problems in that).
+
+Other mechanisms can be built on top of this, such as coroutines or even a queue
+you comsume at your own time.
+
+The choice of one `Operation` type and one callback type for all the operations
+is partly so it is easy to bind into Lua-like or native coroutines.
+
+Callbacks also allow multiple independent users to share the same event loop.
+A package can register its own operations, and application code can register
+others, without either seeing or handling the other’s completions.
 */
 package nbio
