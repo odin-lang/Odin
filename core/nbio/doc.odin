@@ -3,7 +3,7 @@ package nbio implements a non-blocking I/O and event loop abstraction layer
 over several platform-specific asynchronous I/O APIs.
 
 More examples can be found in Odin's examples repository
-at [[ examples/nbio ; https://github.com/odin-lang/examples/nbio ]].
+at [[ examples/nbio ; https://github.com/odin-lang/examples/tree/master/nbio ]].
 
 **Event Loop**:
 
