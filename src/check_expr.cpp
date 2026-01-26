@@ -5192,6 +5192,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 						}
 					} else {
 						TypeAndValue index_tav = fv->field->tav;
+						if (index_tav.mode != Addressing_Constant) {
+							if (success_) *success_ = false;
+							if (finish_) *finish_ = true;
+							return empty_exact_value;
+						}
 						GB_ASSERT(index_tav.mode == Addressing_Constant);
 						ExactValue index_value = index_tav.value;
 						if (is_type_enumerated_array(node->tav.type)) {
