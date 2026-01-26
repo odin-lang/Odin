@@ -170,11 +170,14 @@ when ODIN_NO_RTTI {
 			return
 		}
 		@(cold, no_instrumentation)
-		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
-			print_caller_location(Source_Code_Location{file, line, column, ""})
-			print_string(" Invalid type assertion\n")
-			type_assertion_trap()
+		handle_error :: proc "odin" (file: string, line, column: i32) -> ! {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = default_assertion_failure_proc
+			}
+			p("type assertion", "Invalid type assertion", Source_Code_Location{file, line, column, ""})
 		}
+
 		handle_error(file, line, column)
 	}
 
@@ -183,12 +186,10 @@ when ODIN_NO_RTTI {
 			return
 		}
 		@(cold, no_instrumentation)
-		handle_error :: proc "odin" (file: string, line, column: i32) -> ! {
-			p := context.assertion_failure_proc
-			if p == nil {
-				p = default_assertion_failure_proc
-			}
-			p("type assertion", "Invalid type assertion", Source_Code_Location{file, line, column, ""})
+		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
+			print_caller_location(Source_Code_Location{file, line, column, ""})
+			print_string(" Invalid type assertion\n")
+			type_assertion_trap()
 		}
 		handle_error(file, line, column)
 	}
