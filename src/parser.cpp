@@ -6238,9 +6238,28 @@ gb_internal String build_tag_get_token(String s, String *out) {
 	return s;
 }
 
+// returns true on failure
+gb_internal bool build_require_space_after(String s, String prefix) {
+	GB_ASSERT(string_starts_with(s, prefix));
+
+	if (s.len == prefix.len) {
+		return false;
+	}
+	String stripped = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s[prefix.len] != ' ' && stripped.len != 0) {
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("build");
 	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return true;
+	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
 	if (s.len == 0) {
@@ -6367,6 +6386,10 @@ gb_internal String vet_tag_get_token(String s, String *out, bool allow_colon) {
 gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("vet");
 	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return true;
+	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
 	u64 vet_flags = build_context.vet_flags;
@@ -6424,6 +6447,10 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("feature");
 	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return true;
+	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
 	if (s.len == 0) {
