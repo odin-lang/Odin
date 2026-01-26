@@ -386,7 +386,8 @@ load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handl
 	return parse_bytes(data, options, filename, error_handler, allocator)
 }
 
-destroy :: proc(doc: ^Document) {
+destroy :: proc(doc: ^Document, allocator := context.allocator) {
+	context.allocator = allocator
 	if doc == nil { return }
 
 	for el in doc.elements {
