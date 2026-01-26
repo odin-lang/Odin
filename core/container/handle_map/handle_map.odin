@@ -65,8 +65,7 @@ Handle_Map :: struct($N: uint, $T: typeid, $Handle_Type: typeid)
 		N < uint(max(intrinsics.type_field_type(Handle_Type, "idx"))),
 
 		intrinsics.type_has_field (T, "handle"),
-		intrinsics.type_field_type(T, "handle") == Handle_Type
-{
+		intrinsics.type_field_type(T, "handle") == Handle_Type {
 
 	// The zero element represent a zero-value sentinel (dummy value), allowing for `idx == 0` to mean a no-handle.
 	// This means the capacity is actually N-1 items.
