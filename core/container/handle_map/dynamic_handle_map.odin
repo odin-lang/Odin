@@ -35,7 +35,7 @@ dynamic_destroy :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) {
 dynamic_add :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), item: T, loc := #caller_location) -> (handle: Handle_Type, err: runtime.Allocator_Error) {
 	if xar.len(m.unused_items) > 0 {
 		i := xar.pop(&m.unused_items)
-		ptr := xar.get_ptr(&m.items, i, loc)
+		ptr := xar.get_ptr_unsafe(&m.items, i)
 		prev_gen := ptr.handle.gen
 		ptr^ = item
 
@@ -51,7 +51,7 @@ dynamic_add :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), item: T, loc :=
 
 	i := xar.append(&m.items, item, loc) or_return
 
-	ptr := xar.get_ptr(&m.items, i, loc)
+	ptr := xar.get_ptr_unsafe(&m.items, i)
 	ptr^ = item
 
 	ptr.handle.idx = auto_cast i
@@ -60,11 +60,11 @@ dynamic_add :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), item: T, loc :=
 }
 
 @(require_results)
-dynamic_get :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), h: Handle_Type) -> (^T, bool) #optional_ok {
+dynamic_get :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), h: Handle_Type) -> (^T, bool) #optional_ok {
 	if h.idx <= 0 || int(u32(h.idx)) >= xar.len(m.items) {
 		return nil, false
 	}
-	if e := xar.get_ptr(&m.items, h.idx); e.handle == h {
+	if e := xar.get_ptr_unsafe(&m.items, h.idx); e.handle == h {
 		return e, true
 	}
 	return nil, false
@@ -85,24 +85,24 @@ dynamic_remove :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), h: Handle_Ty
 }
 
 @(require_results)
-dynamic_is_valid :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), h: Handle_Type, loc := #caller_location) -> bool {
-	return h.idx > 0 && int(u32(h.idx)) < xar.len(m.items) && xar.get(&m.items, h.idx, loc).handle == h
+dynamic_is_valid :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), h: Handle_Type) -> bool {
+	return h.idx > 0 && int(u32(h.idx)) < xar.len(m.items) && xar.get_ptr_unsafe(&m.items, h.idx).handle == h
 }
 
 // Returns the number of possibly valid items in the handle map.
 @(require_results)
-dynamic_len :: proc(m: $D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
+dynamic_len :: proc "contextless" (m: $D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
 	n := xar.len(m.items) - xar.len(m.unused_items)
 	return uint(n-1 if n > 0 else 0)
 }
 
 @(require_results)
-dynamic_cap :: proc(m: $D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
+dynamic_cap :: proc "contextless" (m: $D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
 	n := xar.cap(m.items)
 	return uint(n-1 if n > 0 else 0)
 }
 
-dynamic_clear :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) {
+dynamic_clear :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) {
 	xar.clear(&m.items)
 	xar.clear(&m.unused_items)
 }
@@ -116,7 +116,7 @@ Dynamic_Handle_Map_Iterator :: struct($D: typeid) {
 
 // Makes an iterator from a handle map.
 @(require_results)
-dynamic_iterator_make :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) -> Dynamic_Handle_Map_Iterator(D) {
+dynamic_iterator_make :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) -> Dynamic_Handle_Map_Iterator(D) {
 	return {m, 1}
 }
 
@@ -129,9 +129,9 @@ dynamic_iterator_make :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) -> Dy
 		}
 */
 @(require_results)
-dynamic_iterate :: proc(it: ^$DHI/Dynamic_Handle_Map_Iterator($D/Dynamic_Handle_Map($T, $Handle_Type))) -> (val: ^T, h: Handle_Type, ok: bool) {
+dynamic_iterate :: proc "contextless" (it: ^$DHI/Dynamic_Handle_Map_Iterator($D/Dynamic_Handle_Map($T, $Handle_Type))) -> (val: ^T, h: Handle_Type, ok: bool) {
 	for _ in it.index..<xar.len(it.m.items) {
-		e := xar.get_ptr(&it.m.items, it.index)
+		e := xar.get_ptr_unsafe(&it.m.items, it.index)
 		it.index += 1
 
 		if e.handle.idx != 0 {
