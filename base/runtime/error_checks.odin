@@ -12,7 +12,7 @@ bounds_trap :: proc "contextless" () -> ! {
 }
 
 @(no_instrumentation)
-type_assertion_trap :: proc "contextless" () -> ! {
+type_assertion_trap_contextless :: proc "contextless" () -> ! {
 	when ODIN_OS == .Windows {
 		windows_trap_type_assertion()
 	} else when ODIN_OS == .Orca {
@@ -160,7 +160,7 @@ when ODIN_NO_RTTI {
 		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion\n")
-			type_assertion_trap()
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column)
 	}
@@ -189,7 +189,7 @@ when ODIN_NO_RTTI {
 		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion\n")
-			type_assertion_trap()
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column)
 	}
@@ -236,7 +236,7 @@ when ODIN_NO_RTTI {
 			print_string(" to ")
 			print_typeid(to)
 			print_byte('\n')
-			type_assertion_trap()
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column, from, to)
 	}
@@ -331,7 +331,7 @@ when ODIN_NO_RTTI {
 				print_typeid(actual)
 			}
 			print_byte('\n')
-			type_assertion_trap()
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column, from, to, from_data)
 	}
