@@ -282,10 +282,16 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 
 	return res;
 }
-gb_internal u64 lb_get_file_feature_flags(lbProcedure *p) {
+gb_internal u64 lb_get_file_feature_flags(lbProcedure *p, Ast *expr = nullptr) {
 	AstFile *file = nullptr;
 
-	if (p->body && p->body->file()) {
+	if (expr != nullptr) {
+		file = expr->file();
+	}
+
+	if (file != nullptr) {
+		// it is now set
+	} else if (p->body && p->body->file()) {
 		file = p->body->file();
 	} else if (p->type_expr && p->type_expr->file()) {
 		file = p->type_expr->file();
@@ -3812,7 +3818,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 
 			bool do_type_check = true;
 			if (build_context.no_type_assert) {
-				u64 feature_flags = lb_get_file_feature_flags(p);
+				u64 feature_flags = lb_get_file_feature_flags(p, ue_expr);
 				if ((feature_flags & OptInFeatureFlag_ForceTypeAssert) == 0) {
 					do_type_check = false;
 				}
