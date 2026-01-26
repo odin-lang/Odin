@@ -21,7 +21,7 @@ Handle64 :: struct {
 	gen: u32,
 }
 
-Handle_Map :: struct($N: uint, $T: typeid, $Handle_Type: typeid)
+Static_Handle_Map :: struct($N: uint, $T: typeid, $Handle_Type: typeid)
 	where
 		0 < N, N < uint(1<<31 - 1),
 
@@ -49,7 +49,7 @@ Handle_Map :: struct($N: uint, $T: typeid, $Handle_Type: typeid)
 
 // `add` a value of type `T` to the handle map. This will return a pointer to the item and an optional boolean to check for validity.
 @(require_results)
-add :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type), item: T) -> (handle: Handle_Type, ok: bool) #optional_ok {
+static_add :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type), item: T) -> (handle: Handle_Type, ok: bool) #optional_ok {
 	if i := m.next_unused; i != 0 {
 		ptr := &m.items[i]
 
@@ -86,7 +86,7 @@ add :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type), item: T) -> 
 
 // `get` a stable pointer of type `^T` by resolving the handle `h`. If the handle is not valid, then `nil, false` is returned.
 @(require_results)
-get :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> (^T, bool) #optional_ok {
+static_get :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> (^T, bool) #optional_ok {
 	if h.idx <= 0 || u32(h.idx) >= m.used_len {
 		return nil, false
 	}
@@ -97,7 +97,7 @@ get :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type), h: Handle_Ty
 }
 
 // `remove` an item from the handle map from the handle `h`.
-remove :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> bool {
+static_remove :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> bool {
 	if h.idx <= 0 || u32(h.idx) >= m.used_len {
 		return false
 	}
@@ -115,13 +115,13 @@ remove :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type), h: Handle
 
 // Returns true when the handle `h` is valid relating to the handle map.
 @(require_results)
-is_valid :: proc "contextless" (m: $H/Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> bool {
+static_is_valid :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> bool {
 	return h.idx > 0 && u32(h.idx) < m.used_len && m.items[h.idx].handle == h
 }
 
 // Returns the number of possibly valid items in the handle map.
 @(require_results)
-len :: proc "contextless" (m: $H/Handle_Map($N, $T, $Handle_Type)) -> uint {
+static_len :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type)) -> uint {
 	n := uint(m.used_len) - uint(m.unused_len)
 	return n-1 if n > 0 else 0
 }
@@ -129,26 +129,26 @@ len :: proc "contextless" (m: $H/Handle_Map($N, $T, $Handle_Type)) -> uint {
 // Returns the capacity of the items in a handle map.
 // This is equivalent to `N-1` as the zero value is reserved for the zero-value sentinel.
 @(require_results)
-cap :: proc "contextless" (m: $H/Handle_Map($N, $T, $Handle_Type)) -> uint {
+static_cap :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type)) -> uint {
 	// We could just return `N` but I am doing this for clarity
 	return builtin.len(m.items)-1
 }
 
 // `clear` the handle map by zeroing all of the memory.
 // Internally this does not do `m^ = {}` but rather uses `intrinsics.mem_zero` explicitly improve performance.
-clear :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type)) {
+static_clear :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type)) {
 	intrinsics.mem_zero(m, size_of(m^))
 }
 
 // An iterator for a handle map.
-Handle_Map_Iterator :: struct($H: typeid) {
+Static_Handle_Map_Iterator :: struct($H: typeid) {
 	m:     ^H,
 	index: u32,
 }
 
 // Makes an iterator from a handle map.
 @(require_results)
-iterator_make :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type)) -> Handle_Map_Iterator(H) {
+static_iterator_make :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type)) -> Static_Handle_Map_Iterator(H) {
 	return {m, 1}
 }
 
@@ -161,7 +161,7 @@ iterator_make :: proc "contextless" (m: ^$H/Handle_Map($N, $T, $Handle_Type)) ->
 		}
 */
 @(require_results)
-iterate :: proc "contextless" (it: ^$HI/Handle_Map_Iterator($H/Handle_Map($N, $T, $Handle_Type))) -> (val: ^T, h: Handle_Type, ok: bool) {
+static_iterate :: proc "contextless" (it: ^$HI/Static_Handle_Map_Iterator($H/Static_Handle_Map($N, $T, $Handle_Type))) -> (val: ^T, h: Handle_Type, ok: bool) {
 	for _ in it.index..<it.m.used_len {
 		e := &it.m.items[it.index]
 		it.index += 1
@@ -171,4 +171,51 @@ iterate :: proc "contextless" (it: ^$HI/Handle_Map_Iterator($H/Handle_Map($N, $T
 		}
 	}
 	return
+}
+
+
+
+add :: proc{
+	static_add,
+	dynamic_add,
+}
+
+get :: proc{
+	static_get,
+	dynamic_get,
+}
+
+remove :: proc{
+	static_remove,
+	dynamic_remove,
+}
+
+is_valid :: proc{
+	static_is_valid,
+	dynamic_is_valid,
+}
+
+len :: proc{
+	static_len,
+	dynamic_len,
+}
+
+cap :: proc{
+	static_cap,
+	dynamic_cap,
+}
+
+clear :: proc{
+	static_clear,
+	dynamic_clear,
+}
+
+iterator_make :: proc{
+	static_iterator_make,
+	dynamic_iterator_make,
+}
+
+iterate :: proc{
+	static_iterate,
+	dynamic_iterate,
 }
