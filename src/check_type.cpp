@@ -3750,6 +3750,20 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
+
+	default: {
+		Operand	o = {};
+		check_expr_base(ctx, &o, e, nullptr);
+
+		if (o.mode == Addressing_Constant &&
+		    o.value.kind == ExactValue_Typeid) {
+			Type *t = o.value.value_typeid;
+			if (t != nullptr && t != t_invalid) {
+				*type = t;
+				return true;
+			}
+		}
+	}
 	}
 
 	*type = t_invalid;
