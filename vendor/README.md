@@ -36,6 +36,12 @@ Includes full bindings and Windows `.lib`.
 
 See also LICENSE in the `ENet` directory itself.
 
+## expat
+
+[expat](https://libexpat.github.io/) is a stream-oriented XML parser library.
+
+This package is available under the MIT license. See `LICENSE.txt` for more details.
+
 ## fontstash (Port)
 
 [Font stash](https://github.com/memononen/fontstash) is a light-weight online font texture atlas builder. It uses stb_truetype to render fonts on demand to a texture atlas.
