@@ -282,8 +282,7 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 
 	return res;
 }
-
-gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_behaviour(lbProcedure *p) {
+gb_internal u64 lb_get_file_feature_flags(lbProcedure *p) {
 	AstFile *file = nullptr;
 
 	if (p->body && p->body->file()) {
@@ -295,20 +294,29 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 	}
 
 	if (file != nullptr && file->feature_flags_set) {
-		u64 flags = file->feature_flags;
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Trap) {
-			return IntegerDivisionByZero_Trap;
-		}
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) {
-			return IntegerDivisionByZero_Zero;
-		}
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Self) {
-			return IntegerDivisionByZero_Self;
-		}
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_AllBits) {
-			return IntegerDivisionByZero_AllBits;
-		}
+		return file->feature_flags;
 	}
+	return 0;
+}
+
+
+
+gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_behaviour(lbProcedure *p) {
+	u64 flags = lb_get_file_feature_flags(p);
+
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_Trap) {
+		return IntegerDivisionByZero_Trap;
+	}
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) {
+		return IntegerDivisionByZero_Zero;
+	}
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_Self) {
+		return IntegerDivisionByZero_Self;
+	}
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_AllBits) {
+		return IntegerDivisionByZero_AllBits;
+	}
+
 	return build_context.integer_division_by_zero_behaviour;
 }
 
@@ -3802,6 +3810,17 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 			Type *type = type_of_expr(ue_expr);
 			GB_ASSERT(!is_type_tuple(type));
 
+			bool do_type_check = true;
+			if (build_context.no_type_assert) {
+				u64 feature_flags = lb_get_file_feature_flags(p);
+				if ((feature_flags & OptInFeatureFlag_ForceTypeAssert) == 0) {
+					do_type_check = false;
+				}
+
+			} else if ((p->state_flags & StateFlag_no_type_assert) != 0) {
+				do_type_check = false;
+			}
+
 			lbValue e = lb_build_expr(p, ta->expr);
 			Type *t = type_deref(e.type);
 			if (is_type_union(t)) {
@@ -3813,7 +3832,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				Type *dst_type = type;
 
 
-				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (do_type_check) {
 					lbValue src_tag = {};
 					lbValue dst_tag = {};
 					if (is_type_union_maybe_pointer(src_type)) {
@@ -3851,7 +3870,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					v = lb_emit_load(p, v);
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
-				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (do_type_check) {
 					GB_ASSERT(!build_context.no_rtti);
 
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
@@ -5313,7 +5332,8 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
+		u64 feature_flags = lb_get_file_feature_flags(p);
+		GB_ASSERT(feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
 
 		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
 		gb_unused(err);
@@ -5402,7 +5422,8 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		if (cl->elems.count == 0) {
 			break;
 		}
-		GB_ASSERT(expr->file()->feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
+		u64 feature_flags = lb_get_file_feature_flags(p);
+		GB_ASSERT(feature_flags & OptInFeatureFlag_DynamicLiterals || build_context.dynamic_literals);
 
 		Type *et = bt->DynamicArray.elem;
 		lbValue size  = lb_const_int(p->module, t_int, type_size_of(et));
