@@ -11,22 +11,46 @@ Example:
 		pos:    [2]f32,
 	}
 
-	entities: hm.Handle_Map(1024, Entity, Handle)
+	{ // static map
+		entities: hm.Static_Handle_Map(1024, Entity, Handle)
 
-	h1 := hm.add(&entities, Entity{pos = {1,  4}})
-	h2 := hm.add(&entities, Entity{pos = {9, 16}})
+		h1 := hm.add(&entities, Entity{pos = {1,  4}})
+		h2 := hm.add(&entities, Entity{pos = {9, 16}})
 
-	if e, ok := hm.get(&entities, h2); ok {
-		e.pos.x += 32
+		if e, ok := hm.get(&entities, h2); ok {
+			e.pos.x += 32
+		}
+
+		hm.remove(&entities, h1)
+
+		h3 := hm.add(&entities, Entity{pos = {6, 7}})
+
+		it := hm.iterator_make(&entities)
+		for e, h in hm.iterate(&it) {
+			e.pos += {1, 2}
+		}
 	}
 
-	hm.remove(&entities, h1)
+	{ // dynamic map
+		entities: hm.Dynamic_Handle_Map(Entity, Handle)
+		hm.dynamic_init(&entities, context.allocator)
+		defer hm.dynamic_destroy(&entities)
 
-	h3 := hm.add(&entities, Entity{pos = {6, 7}})
+		h1 := hm.add(&entities, Entity{pos = {1,  4}})
+		h2 := hm.add(&entities, Entity{pos = {9, 16}})
 
-	it := hm.iterator_make(&entities)
-	for e, h in hm.iterate(&it) {
-		e.pos += {1, 2}
+		if e, ok := hm.get(&entities, h2); ok {
+			e.pos.x += 32
+		}
+
+		hm.remove(&entities, h1)
+
+		h3 := hm.add(&entities, Entity{pos = {6, 7}})
+
+		it := hm.iterator_make(&entities)
+		for e, h in hm.iterate(&it) {
+			e.pos += {1, 2}
+		}
 	}
 */
 package container_handle_map
