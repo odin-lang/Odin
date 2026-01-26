@@ -803,7 +803,12 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 				args[5] = lb_typeid(m, dst_type);
 				args[6] = lb_emit_conv(p, value_, t_rawptr);
 			}
-			lb_emit_runtime_call(p, "type_assertion_check2", args);
+
+			char const *name = "type_assertion_check2_contextless";
+			if (p->context_stack.count > 0) {
+				name = "type_assertion_check2_with_context";
+			}
+			lb_emit_runtime_call(p, name, args);
 		}
 
 		return lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 0));
@@ -877,7 +882,11 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 				args[5] = dst_typeid;
 				args[6] = lb_emit_struct_ev(p, value, 0);
 			}
-			lb_emit_runtime_call(p, "type_assertion_check2", args);
+			char const *name = "type_assertion_check2_contextless";
+			if (p->context_stack.count > 0) {
+				name = "type_assertion_check2_with_context";
+			}
+			lb_emit_runtime_call(p, name, args);
 		}
 
 		return lb_addr(lb_emit_struct_ep(p, v.addr, 0));

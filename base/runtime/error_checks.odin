@@ -12,7 +12,7 @@ bounds_trap :: proc "contextless" () -> ! {
 }
 
 @(no_instrumentation)
-type_assertion_trap :: proc "contextless" () -> ! {
+type_assertion_trap_contextless :: proc "contextless" () -> ! {
 	when ODIN_OS == .Windows {
 		windows_trap_type_assertion()
 	} else when ODIN_OS == .Orca {
@@ -137,20 +137,22 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 
 
 when ODIN_NO_RTTI {
-	type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32) {
+	type_assertion_check_with_context :: proc "odin" (ok: bool, file: string, line, column: i32) {
 		if ok {
 			return
 		}
 		@(cold, no_instrumentation)
-		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
-			print_caller_location(Source_Code_Location{file, line, column, ""})
-			print_string(" Invalid type assertion\n")
-			type_assertion_trap()
+		handle_error :: proc "odin" (file: string, line, column: i32) -> ! {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = default_assertion_failure_proc
+			}
+			p("type assertion", "Invalid type assertion", Source_Code_Location{file, line, column, ""})
 		}
 		handle_error(file, line, column)
 	}
 
-	type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: i32) {
+	type_assertion_check_contextless :: proc "contextless" (ok: bool, file: string, line, column: i32) {
 		if ok {
 			return
 		}
@@ -158,12 +160,71 @@ when ODIN_NO_RTTI {
 		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion\n")
-			type_assertion_trap()
+			type_assertion_trap_contextless()
+		}
+		handle_error(file, line, column)
+	}
+
+	type_assertion_check2_with_context :: proc "odin" (ok: bool, file: string, line, column: i32) {
+		if ok {
+			return
+		}
+		@(cold, no_instrumentation)
+		handle_error :: proc "odin" (file: string, line, column: i32) -> ! {
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = default_assertion_failure_proc
+			}
+			p("type assertion", "Invalid type assertion", Source_Code_Location{file, line, column, ""})
+		}
+
+		handle_error(file, line, column)
+	}
+
+	type_assertion_check2_contextless :: proc "contextless" (ok: bool, file: string, line, column: i32) {
+		if ok {
+			return
+		}
+		@(cold, no_instrumentation)
+		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
+			print_caller_location(Source_Code_Location{file, line, column, ""})
+			print_string(" Invalid type assertion\n")
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column)
 	}
 } else {
-	type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid) {
+	@(private="file")
+	TYPE_ASSERTION_BUFFER_SIZE :: 1024
+
+	type_assertion_check_with_context :: proc "odin" (ok: bool, file: string, line, column: i32, from, to: typeid) {
+		if ok {
+			return
+		}
+		@(cold, no_instrumentation)
+		handle_error :: proc "odin" (file: string, line, column: i32, from, to: typeid) -> ! {
+			do_msg :: proc "contextless" (i: ^int, buf: []byte, file: string, line, column: i32, from, to: typeid) -> bool {
+				try_copy_string(i, buf, "Invalid type assertion from ") or_return
+				try_copy_typeid(i, buf, from)                           or_return
+				try_copy_string(i, buf, " to ")                         or_return
+				try_copy_typeid(i, buf, to)                             or_return
+				return true
+			}
+
+			buf: [TYPE_ASSERTION_BUFFER_SIZE]byte
+			i := 0
+			_ = do_msg(&i, buf[:], file, line, column, from, to)
+
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = default_assertion_failure_proc
+			}
+			p("type assertion", string(buf[:i]), Source_Code_Location{file, line, column, ""})
+		}
+		handle_error(file, line, column, from, to)
+	}
+
+	type_assertion_check_contextless :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid) {
 		if ok {
 			return
 		}
@@ -175,47 +236,90 @@ when ODIN_NO_RTTI {
 			print_string(" to ")
 			print_typeid(to)
 			print_byte('\n')
-			type_assertion_trap()
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column, from, to)
 	}
 
-	type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
+	@(private="file")
+	type_assertion_variant_type :: proc "contextless" (id: typeid, data: rawptr) -> typeid {
+		if id == nil || data == nil {
+			return id
+		}
+		ti := type_info_base(type_info_of(id))
+		#partial switch v in ti.variant {
+		case Type_Info_Any:
+			return (^any)(data).id
+		case Type_Info_Union:
+			if v.tag_type == nil {
+				if (^rawptr)(data)^ == nil {
+					return nil
+				}
+				return v.variants[0].id
+
+			}
+
+			tag_ptr := uintptr(data) + v.tag_offset
+			idx := 0
+			switch v.tag_type.size {
+			case 1:  idx = int(  (^u8)(tag_ptr)^); if !v.no_nil { idx -= 1 }
+			case 2:  idx = int( (^u16)(tag_ptr)^); if !v.no_nil { idx -= 1 }
+			case 4:  idx = int( (^u32)(tag_ptr)^); if !v.no_nil { idx -= 1 }
+			case 8:  idx = int( (^u64)(tag_ptr)^); if !v.no_nil { idx -= 1 }
+			case 16: idx = int((^u128)(tag_ptr)^); if !v.no_nil { idx -= 1 }
+			}
+			if idx < 0 {
+				return nil
+			} else if idx < len(v.variants) {
+				return v.variants[idx].id
+			}
+		}
+		return id
+	}
+
+	type_assertion_check2_with_context :: proc "odin" (ok: bool, file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
 		if ok {
 			return
 		}
 
-		variant_type :: proc "contextless" (id: typeid, data: rawptr) -> typeid {
-			if id == nil || data == nil {
-				return id
-			}
-			ti := type_info_base(type_info_of(id))
-			#partial switch v in ti.variant {
-			case Type_Info_Any:
-				return (^any)(data).id
-			case Type_Info_Union:
-				tag_ptr := uintptr(data) + v.tag_offset
-				idx := 0
-				switch v.tag_type.size {
-				case 1:  idx = int((^u8)(tag_ptr)^)   - 1
-				case 2:  idx = int((^u16)(tag_ptr)^)  - 1
-				case 4:  idx = int((^u32)(tag_ptr)^)  - 1
-				case 8:  idx = int((^u64)(tag_ptr)^)  - 1
-				case 16: idx = int((^u128)(tag_ptr)^) - 1
+		@(cold, no_instrumentation)
+		handle_error :: proc "odin" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) -> ! {
+			do_msg :: proc "contextless" (i: ^int, buf: []byte, file: string, line, column: i32, from, to, actual: typeid) -> bool {
+				try_copy_string(i, buf, "Invalid type assertion from ") or_return
+				try_copy_typeid(i, buf, from)                           or_return
+				try_copy_string(i, buf, " to ")                         or_return
+				try_copy_typeid(i, buf, to)                             or_return
+				if actual != from {
+					try_copy_string(i, buf, ", actual type: ") or_return
+					try_copy_typeid(i, buf, actual)            or_return
 				}
-				if idx < 0 {
-					return nil
-				} else if idx < len(v.variants) {
-					return v.variants[idx].id
-				}
+				return true
 			}
-			return id
+
+			actual := type_assertion_variant_type(from, from_data)
+
+			buf: [TYPE_ASSERTION_BUFFER_SIZE]byte
+			i := 0
+			_ = do_msg(&i, buf[:], file, line, column, from, to, actual)
+
+			p := context.assertion_failure_proc
+			if p == nil {
+				p = default_assertion_failure_proc
+			}
+			p("type assertion", string(buf[:i]), Source_Code_Location{file, line, column, ""})
+		}
+		handle_error(file, line, column, from, to, from_data)
+	}
+
+	type_assertion_check2_contextless :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
+		if ok {
+			return
 		}
 
 		@(cold, no_instrumentation)
 		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) -> ! {
 
-			actual := variant_type(from, from_data)
+			actual := type_assertion_variant_type(from, from_data)
 
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion from ")
@@ -227,7 +331,7 @@ when ODIN_NO_RTTI {
 				print_typeid(actual)
 			}
 			print_byte('\n')
-			type_assertion_trap()
+			type_assertion_trap_contextless()
 		}
 		handle_error(file, line, column, from, to, from_data)
 	}
