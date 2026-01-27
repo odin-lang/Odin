@@ -3176,6 +3176,13 @@ LPOVERLAPPED_COMPLETION_ROUTINE :: #type proc "system" (
 	lpOverlapped:              LPOVERLAPPED,
 )
 
+READ_DIRECTORY_NOTIFY_INFORMATION_CLASS :: enum c_int {
+	ReadDirectoryNotifyInformation = 1,
+	ReadDirectoryNotifyExtendedInformation,
+	ReadDirectoryNotifyFullInformation,
+	ReadDirectoryNotifyMaximumInformation,
+}
+
 ADDRESS_MODE :: enum c_int {
 	AddrMode1616,
 	AddrMode1632,
