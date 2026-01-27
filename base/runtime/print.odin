@@ -492,7 +492,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_u64(u64(info.count))
 		print_byte(']')
 		print_type(info.elem)
-		
+
 	case Type_Info_Matrix:
 		print_string("matrix[")
 		print_u64(u64(info.row_count))
@@ -562,7 +562,7 @@ try_copy_caller_location :: #force_no_inline proc "contextless" (i: ^int, buf: [
 		try_copy_byte(i, buf, ':') or_return
 		try_copy_u64(i, buf, u64(loc.line)) or_return
 		if loc.column != 0 {
-			try_copy_try_copy_bytetring(i, buf, ':') or_return
+			try_copy_byte(i, buf, ':') or_return
 			try_copy_u64(i, buf, u64(loc.column)) or_return
 		}
 		try_copy_byte(i, buf, ':') or_return
