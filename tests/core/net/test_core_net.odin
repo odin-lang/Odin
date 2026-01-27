@@ -665,7 +665,7 @@ address_to_binstr :: proc(address: net.Address) -> (binstr: string) {
 		return fmt.tprintf("%08x", b)
 	case net.IP6_Address:
 		b := transmute(u128be)t
-		return fmt.tprintf("%32x", b)
+		return fmt.tprintf("%032x", b)
 	case:
 		return ""
 	}
