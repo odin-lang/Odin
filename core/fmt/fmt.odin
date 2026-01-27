@@ -1069,6 +1069,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	start := 0
 
 	if fi.hash && !is_signed {
+		fi.zero = true
 		switch base {
 		case 2:
 			io.write_byte(fi.writer, '0', &fi.n)
@@ -1593,9 +1594,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	u := u64(uintptr(p))
 	switch verb {
 	case 'p', 'v', 'w':
-		if !fi.hash {
-			io.write_string(fi.writer, "0x", &fi.n)
-		}
+		fi.hash = !fi.hash
 		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
 
 	case 'b': _fmt_int(fi, u,  2, false, 8*size_of(rawptr), __DIGITS_UPPER)
