@@ -449,7 +449,7 @@ FLock_Type :: enum i16 {
 /*
 	Bits for FD_Notifications
 */
-FD_Notifications_Bits :: enum {
+FD_Notifications_Bits :: enum i32 {
 	ACCESS    = 0,
 	MODIFY    = 1,
 	CREATE    = 2,
@@ -1690,17 +1690,17 @@ IPC_Cmd :: enum i16 {
 /*
 	File locking operation bits
 */
-FLock_Op_Bits :: enum {
-	SH = 1,
-	EX = 2,
-	NB = 4,
-	UN = 8,
+FLock_Op_Bits :: enum i32 {
+	SH = 0,
+	EX = 1,
+	NB = 2,
+	UN = 3,
 }
 
 /*
 	ptrace requests
 */
-PTrace_Request :: enum {
+PTrace_Request :: enum i32 {
 	TRACEME                = 0,
 	PEEKTEXT               = 1,
 	PEEKDATA               = 2,
@@ -1747,7 +1747,7 @@ PTrace_Request :: enum {
 /*
 	ptrace options
 */
-PTrace_Options_Bits :: enum {
+PTrace_Options_Bits :: enum i32 {
 	TRACESYSGOOD    = 0,
 	TRACEFORK       = 1,
 	TRACEVFORK      = 2,
