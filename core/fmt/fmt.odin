@@ -1068,6 +1068,9 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	buf: [BUF_SIZE]byte
 	start := 0
 
+	prev_zero := fi.zero
+	defer fi.zero = prev_zero
+
 	if fi.hash && !is_signed {
 		fi.zero = true
 		switch base {
@@ -1592,6 +1595,10 @@ fmt_cstring16 :: proc(fi: ^Info, s: cstring16, verb: rune) {
 //
 fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	u := u64(uintptr(p))
+
+	prev_hash := fi.hash
+	defer fi.hash = prev_hash
+
 	switch verb {
 	case 'p', 'v', 'w':
 		fi.hash = !fi.hash
