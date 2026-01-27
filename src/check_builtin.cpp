@@ -5383,6 +5383,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					return false;
 				}
 			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for '%.*s', got %s vs %s", LIT(builtin_name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
 
 			operand->mode = Addressing_Value;
 			operand->type = make_optional_ok_type(default_type(x.type));
@@ -5425,6 +5433,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					gb_string_free(xts);
 					return false;
 				}
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for '%.*s', got %s vs %s", LIT(builtin_name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
 			}
 
 			operand->mode = Addressing_Value;
