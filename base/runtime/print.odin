@@ -280,11 +280,22 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 			print_byte('i' if info.signed else 'u')
 			print_u64(u64(8*ti.size))
 		}
+		switch info.endianness {
+		case .Platform: // nothing
+		case .Little:   print_string("le")
+		case .Big:      print_string("be")
+		}
+
 	case Type_Info_Rune:
 		print_string("rune")
 	case Type_Info_Float:
 		print_byte('f')
 		print_u64(u64(8*ti.size))
+		switch info.endianness {
+		case .Platform: // nothing
+		case .Little:   print_string("le")
+		case .Big:      print_string("be")
+		}
 	case Type_Info_Complex:
 		print_string("complex")
 		print_u64(u64(8*ti.size))
@@ -494,6 +505,9 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_type(info.elem)
 		
 	case Type_Info_Matrix:
+		if info.layout == .Row_Major {
+			print_string("#row_major ")
+		}
 		print_string("matrix[")
 		print_u64(u64(info.row_count))
 		print_string(", ")
@@ -544,25 +558,48 @@ try_copy_u64 :: proc "contextless" (j: ^int, dst: []byte, x: u64) -> bool {
 	return false
 }
 
+@(require_results)
+try_copy_i64 :: proc "contextless" (j: ^int, dst: []byte, x: i64) -> bool {
+	if j^ < len(dst) {
+		b :: u64(10)
+		u := u64(abs(x))
+		neg := x < 0
+
+		a: [129]byte
+		i := len(a)
+		for u >= b {
+			i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
+			u /= b
+		}
+		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
+		if neg {
+			i -= 1; a[i] = '-'
+		}
+
+		return try_copy_string(j, dst, string(a[i:]))
+	}
+	return false
+}
+
 
 @(require_results)
 try_copy_caller_location :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, loc: Source_Code_Location) -> bool {
 	try_copy_string(i, buf, loc.file_path) or_return
 
 	when ODIN_ERROR_POS_STYLE == .Default {
-		try_copy_byte(i, buf, '(') or_return
-		try_copy_u64(i, buf, u64(loc.line)) or_return
+		try_copy_byte(i, buf, '(')           or_return
+		try_copy_u64 (i, buf, u64(loc.line)) or_return
 		if loc.column != 0 {
-			try_copy_byte(i, buf, ':') or_return
-			try_copy_u64(i, buf, u64(loc.column)) or_return
+			try_copy_byte(i, buf, ':')             or_return
+			try_copy_u64 (i, buf, u64(loc.column)) or_return
 		}
 		try_copy_byte(i, buf, ')') or_return
 		return true
 	} else when ODIN_ERROR_POS_STYLE == .Unix {
-		try_copy_byte(i, buf, ':') or_return
-		try_copy_u64(i, buf, u64(loc.line)) or_return
+		try_copy_byte(i, buf, ':')           or_return
+		try_copy_u64 (i, buf, u64(loc.line)) or_return
 		if loc.column != 0 {
-			try_copy_byte(i, buf, ':') or_return
+			try_copy_byte(i, buf, ':')             or_return
 			try_copy_u64 (i, buf, u64(loc.column)) or_return
 		}
 		try_copy_byte(i, buf, ':') or_return
@@ -591,6 +628,52 @@ try_copy_typeid :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, id
 	return true
 }
 
+
+@(require_results)
+try_copy_rune :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, r: rune) -> (written: int, ok: bool) #no_bounds_check {
+	RUNE_SELF :: 0x80
+
+	if r < RUNE_SELF {
+		try_copy_byte(i, buf,byte(r)) or_return
+		return 1, true
+	}
+
+	b, n := encode_rune(r)
+	prev := i^
+	try_copy_string(i, buf, string(b[:n])) or_return
+	return i^ - prev, true
+}
+
+@(require_results)
+try_copy_encoded_rune :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, r: rune) -> bool {
+	try_copy_byte(i, buf, '\'') or_return
+
+	switch r {
+	case '\a': try_copy_string(i, buf, "\\a") or_return
+	case '\b': try_copy_string(i, buf, "\\b") or_return
+	case '\e': try_copy_string(i, buf, "\\e") or_return
+	case '\f': try_copy_string(i, buf, "\\f") or_return
+	case '\n': try_copy_string(i, buf, "\\n") or_return
+	case '\r': try_copy_string(i, buf, "\\r") or_return
+	case '\t': try_copy_string(i, buf, "\\t") or_return
+	case '\v': try_copy_string(i, buf, "\\v") or_return
+	case:
+		if r <= 0 {
+			try_copy_string(i, buf, "\\x00") or_return
+		} else if r < 32 {
+			n0, n1 := u8(r) >> 4, u8(r) & 0xf
+			try_copy_string(i, buf, "\\x")                   or_return
+			try_copy_byte  (i, buf, _INTEGER_DIGITS_VAR[n0]) or_return
+			try_copy_byte  (i, buf, _INTEGER_DIGITS_VAR[n1]) or_return
+		} else {
+			_ = try_copy_rune(i, buf, r) or_return
+		}
+	}
+
+	try_copy_byte(i, buf, '\'') or_return
+	return true
+}
+
 @(optimization_mode="favor_size")
 try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, ti: ^Type_Info) -> bool {
 	if ti == nil {
@@ -603,24 +686,36 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 		try_copy_string(i, buf, info.name) or_return
 	case Type_Info_Integer:
 		switch ti.id {
-		case int:     try_copy_string(i, buf, "int") or_return
-		case uint:    try_copy_string(i, buf, "uint") or_return
+		case int:     try_copy_string(i, buf, "int")     or_return
+		case uint:    try_copy_string(i, buf, "uint")    or_return
 		case uintptr: try_copy_string(i, buf, "uintptr") or_return
 		case:
 			try_copy_byte(i, buf, 'i' if info.signed else 'u') or_return
-			try_copy_u64(i, buf, u64(8*ti.size)) or_return
+			try_copy_u64 (i, buf, u64(8*ti.size))              or_return
 		}
+		switch info.endianness {
+		case .Platform: // nothing
+		case .Little:   try_copy_string(i, buf, "le") or_return
+		case .Big:      try_copy_string(i, buf, "be") or_return
+		}
+
 	case Type_Info_Rune:
 		try_copy_string(i, buf, "rune") or_return
 	case Type_Info_Float:
 		try_copy_byte(i, buf, 'f') or_return
 		try_copy_u64(i, buf, u64(8*ti.size)) or_return
+		switch info.endianness {
+		case .Platform: // nothing
+		case .Little:   try_copy_string(i, buf, "le") or_return
+		case .Big:      try_copy_string(i, buf, "be") or_return
+		}
+
 	case Type_Info_Complex:
-		try_copy_string(i, buf, "complex") or_return
-		try_copy_u64(i, buf, u64(8*ti.size)) or_return
+		try_copy_string(i, buf, "complex")      or_return
+		try_copy_u64   (i, buf, u64(8*ti.size)) or_return
 	case Type_Info_Quaternion:
-		try_copy_string(i, buf, "quaternion") or_return
-		try_copy_u64(i, buf, u64(8*ti.size)) or_return
+		try_copy_string(i, buf, "quaternion")   or_return
+		try_copy_u64   (i, buf, u64(8*ti.size)) or_return
 	case Type_Info_String:
 		if info.is_cstring {
 			try_copy_byte(i, buf, 'c') or_return
@@ -634,8 +729,8 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 		switch ti.id {
 		case bool: try_copy_string(i, buf, "bool") or_return
 		case:
-			try_copy_byte(i, buf, 'b') or_return
-			try_copy_u64(i, buf, u64(8*ti.size)) or_return
+			try_copy_byte(i, buf, 'b')            or_return
+			try_copy_u64 (i, buf, u64(8*ti.size)) or_return
 		}
 	case Type_Info_Any:
 		try_copy_string(i, buf, "any") or_return
@@ -646,14 +741,14 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 		if info.elem == nil {
 			try_copy_string(i, buf, "rawptr") or_return
 		} else {
-			try_copy_string(i, buf, "^") or_return
+			try_copy_string    (i, buf, "^")       or_return
 			try_copy_write_type(i, buf, info.elem) or_return
 		}
 	case Type_Info_Multi_Pointer:
-		try_copy_string(i, buf, "[^]") or_return
+		try_copy_string    (i, buf, "[^]")     or_return
 		try_copy_write_type(i, buf, info.elem) or_return
 	case Type_Info_Soa_Pointer:
-		try_copy_string(i, buf, "#soa ^") or_return
+		try_copy_string    (i, buf, "#soa ^")  or_return
 		try_copy_write_type(i, buf, info.elem) or_return
 	case Type_Info_Procedure:
 		try_copy_string(i, buf, "proc") or_return
@@ -669,7 +764,7 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 			try_copy_string(i, buf, ")") or_return
 		}
 		if info.results != nil {
-			try_copy_string(i, buf, " -> ") or_return
+			try_copy_string    (i, buf, " -> ")       or_return
 			try_copy_write_type(i, buf, info.results) or_return
 		}
 	case Type_Info_Parameters:
@@ -689,67 +784,67 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 		if count != 1 { try_copy_string(i, buf, ")") or_return }
 
 	case Type_Info_Array:
-		try_copy_byte(i, buf, '[') or_return
-		try_copy_u64(i, buf, u64(info.count)) or_return
-		try_copy_byte(i, buf, ']') or_return
-		try_copy_write_type(i, buf, info.elem) or_return
+		try_copy_byte      (i, buf, '[')             or_return
+		try_copy_u64       (i, buf, u64(info.count)) or_return
+		try_copy_byte      (i, buf, ']')             or_return
+		try_copy_write_type(i, buf, info.elem)       or_return
 
 	case Type_Info_Enumerated_Array:
 		if info.is_sparse {
 			try_copy_string(i, buf, "#sparse") or_return
 		}
-		try_copy_byte(i, buf, '[') or_return
+		try_copy_byte      (i, buf, '[')        or_return
 		try_copy_write_type(i, buf, info.index) or_return
-		try_copy_byte(i, buf, ']') or_return
-		try_copy_write_type(i, buf, info.elem) or_return
+		try_copy_byte      (i, buf, ']')        or_return
+		try_copy_write_type(i, buf, info.elem)  or_return
 
 
 	case Type_Info_Dynamic_Array:
-		try_copy_string(i, buf, "[dynamic]") or_return
-		try_copy_write_type(i, buf, info.elem) or_return
+		try_copy_string    (i, buf, "[dynamic]") or_return
+		try_copy_write_type(i, buf, info.elem)   or_return
 	case Type_Info_Slice:
-		try_copy_string(i, buf, "[]") or_return
+		try_copy_string    (i, buf, "[]")      or_return
 		try_copy_write_type(i, buf, info.elem) or_return
 
 	case Type_Info_Map:
-		try_copy_string(i, buf, "map[") or_return
-		try_copy_write_type(i, buf, info.key) or_return
-		try_copy_byte(i, buf, ']') or_return
+		try_copy_string    (i, buf, "map[")     or_return
+		try_copy_write_type(i, buf, info.key)   or_return
+		try_copy_byte      (i, buf, ']')        or_return
 		try_copy_write_type(i, buf, info.value) or_return
 
 	case Type_Info_Struct:
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
-			try_copy_string(i, buf, "#soa[") or_return
-			try_copy_u64(i, buf, u64(info.soa_len)) or_return
-			try_copy_byte(i, buf, ']') or_return
+			try_copy_string    (i, buf, "#soa[")            or_return
+			try_copy_u64       (i, buf, u64(info.soa_len))  or_return
+			try_copy_byte      (i, buf, ']')                or_return
 			try_copy_write_type(i, buf, info.soa_base_type) or_return
 			return true
 		case .Slice:
-			try_copy_string(i, buf, "#soa[]") or_return
+			try_copy_string    (i, buf, "#soa[]")           or_return
 			try_copy_write_type(i, buf, info.soa_base_type) or_return
 			return true
 		case .Dynamic:
-			try_copy_string(i, buf, "#soa[dynamic]") or_return
+			try_copy_string    (i, buf, "#soa[dynamic]")    or_return
 			try_copy_write_type(i, buf, info.soa_base_type) or_return
 			return true
 		}
 
 		try_copy_string(i, buf, "struct ") or_return
-		if .packed      in info.flags { try_copy_string(i, buf, "#packed ") or_return }
-		if .raw_union   in info.flags { try_copy_string(i, buf, "#raw_union ") or_return }
+		if .packed      in info.flags { try_copy_string(i, buf, "#packed ")      or_return }
+		if .raw_union   in info.flags { try_copy_string(i, buf, "#raw_union ")   or_return }
 		if .all_or_none in info.flags { try_copy_string(i, buf, "#all_or_none ") or_return }
 		if .align in info.flags {
-			try_copy_string(i, buf, "#align(") or_return
-			try_copy_u64(i, buf, u64(ti.align)) or_return
-			try_copy_string(i, buf, ") ") or_return
+			try_copy_string(i, buf, "#align(")     or_return
+			try_copy_u64(i,    buf, u64(ti.align)) or_return
+			try_copy_string(i, buf, ") ")          or_return
 		}
 		try_copy_byte(i, buf, '{') or_return
 		for name, j in info.names[:info.field_count] {
 			if j > 0 { try_copy_string(i, buf, ", ") or_return }
-			try_copy_string(i, buf, name) or_return
-			try_copy_string(i, buf, ": ") or_return
+			try_copy_string    (i, buf, name)          or_return
+			try_copy_string    (i, buf, ": ")          or_return
 			try_copy_write_type(i, buf, info.types[j]) or_return
 		}
 		try_copy_byte(i, buf, '}') or_return
@@ -757,9 +852,9 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 	case Type_Info_Union:
 		try_copy_string(i, buf, "union ") or_return
 		if info.custom_align {
-			try_copy_string(i, buf, "#align(") or_return
-			try_copy_u64(i, buf, u64(ti.align)) or_return
-			try_copy_string(i, buf, ") ") or_return
+			try_copy_string(i, buf, "#align(")     or_return
+			try_copy_u64   (i, buf, u64(ti.align)) or_return
+			try_copy_string(i, buf, ") ")          or_return
 		}
 		if info.no_nil {
 			try_copy_string(i, buf, "#no_nil ") or_return
@@ -772,9 +867,9 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 		try_copy_string(i, buf, "}") or_return
 
 	case Type_Info_Enum:
-		try_copy_string(i, buf, "enum ") or_return
+		try_copy_string    (i, buf, "enum ")   or_return
 		try_copy_write_type(i, buf, info.base) or_return
-		try_copy_string(i, buf, " {") or_return
+		try_copy_string    (i, buf, " {")      or_return
 		for name, j in info.names {
 			if j > 0 { try_copy_string(i, buf, ", ") or_return }
 			try_copy_string(i, buf, name) or_return
@@ -788,48 +883,51 @@ try_copy_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte
 		case Type_Info_Enum:
 			try_copy_write_type(i, buf, info.elem) or_return
 		case Type_Info_Rune:
-			print_encoded_rune(rune(info.lower))
-			try_copy_string(i, buf, "..") or_return
-			print_encoded_rune(rune(info.upper))
+			try_copy_encoded_rune(i, buf, rune(info.lower)) or_return
+			try_copy_string      (i, buf, "..")             or_return
+			try_copy_encoded_rune(i, buf, rune(info.upper)) or_return
 		case:
-			print_i64(info.lower)
-			try_copy_string(i, buf, "..") or_return
-			print_i64(info.upper)
+			try_copy_i64   (i, buf, info.lower) or_return
+			try_copy_string(i, buf, "..")       or_return
+			try_copy_i64   (i, buf, info.upper) or_return
 		}
 		if info.underlying != nil {
-			try_copy_string(i, buf, "; ") or_return
+			try_copy_string    (i, buf, "; ")            or_return
 			try_copy_write_type(i, buf, info.underlying) or_return
 		}
 		try_copy_byte(i, buf, ']') or_return
 
 	case Type_Info_Bit_Field:
-		try_copy_string(i, buf, "bit_field ") or_return
+		try_copy_string    (i, buf, "bit_field ")      or_return
 		try_copy_write_type(i, buf, info.backing_type) or_return
-		try_copy_string(i, buf, " {") or_return
+		try_copy_string    (i, buf, " {")              or_return
 		for name, j in info.names[:info.field_count] {
 			if j > 0 { try_copy_string(i, buf, ", ") or_return }
-			try_copy_string(i, buf, name) or_return
-			try_copy_string(i, buf, ": ") or_return
-			try_copy_write_type(i, buf, info.types[j]) or_return
-			try_copy_string(i, buf, " | ") or_return
-			try_copy_u64(i, buf, u64(info.bit_sizes[j])) or_return
+			try_copy_string    (i, buf, name)                   or_return
+			try_copy_string    (i, buf, ": ")                   or_return
+			try_copy_write_type(i, buf, info.types[j])          or_return
+			try_copy_string    (i, buf, " | ")                  or_return
+			try_copy_u64       (i, buf, u64(info.bit_sizes[j])) or_return
 		}
 		try_copy_byte(i, buf, '}') or_return
 
 
 	case Type_Info_Simd_Vector:
-		try_copy_string(i, buf, "#simd[") or_return
-		try_copy_u64(i, buf, u64(info.count)) or_return
-		try_copy_byte(i, buf, ']') or_return
-		try_copy_write_type(i, buf, info.elem) or_return
+		try_copy_string    (i, buf, "#simd[")        or_return
+		try_copy_u64       (i, buf, u64(info.count)) or_return
+		try_copy_byte      (i, buf, ']')             or_return
+		try_copy_write_type(i, buf, info.elem)       or_return
 
 	case Type_Info_Matrix:
-		try_copy_string(i, buf, "matrix[") or_return
-		try_copy_u64(i, buf, u64(info.row_count)) or_return
-		try_copy_string(i, buf, ", ") or_return
-		try_copy_u64(i, buf, u64(info.column_count)) or_return
-		try_copy_string(i, buf, "]") or_return
-		try_copy_write_type(i, buf, info.elem) or_return
+		if info.layout == .Row_Major {
+			try_copy_string(i, buf, "#row_major ") or_return
+		}
+		try_copy_string    (i, buf, "matrix[")              or_return
+		try_copy_u64       (i, buf, u64(info.row_count))    or_return
+		try_copy_string    (i, buf, ", ")                   or_return
+		try_copy_u64       (i, buf, u64(info.column_count)) or_return
+		try_copy_string    (i, buf, "]")                    or_return
+		try_copy_write_type(i, buf, info.elem)              or_return
 	}
 	return true
 }
