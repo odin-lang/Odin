@@ -6383,7 +6383,7 @@ gb_internal String vet_tag_get_token(String s, String *out, bool allow_colon) {
 }
 
 
-gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
+gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags) {
 	String const prefix = str_lit("vet");
 	GB_ASSERT(string_starts_with(s, prefix));
 	if (build_require_space_after(s, prefix)) {
@@ -6392,7 +6392,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
-	u64 vet_flags = build_context.vet_flags;
+	u64 vet_flags = base_vet_flags;
 
 	if (s.len == 0) {
 		vet_flags |= VetFlag_All;
@@ -6624,7 +6624,7 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 			return false;
 		}
 	} else if (string_starts_with(lc, str_lit("vet"))) {
-		f->vet_flags = parse_vet_tag(tok, lc);
+		f->vet_flags = parse_vet_tag(tok, lc, ast_file_vet_flags(f));
 		f->vet_flags_set = true;
 	} else if (string_starts_with(lc, str_lit("test"))) {
 		if ((build_context.command_kind & Command_test) == 0) {
