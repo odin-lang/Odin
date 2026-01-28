@@ -474,6 +474,17 @@ foreign kernel32 {
 		lpOverlapped: LPOVERLAPPED,
 		lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
 	) -> BOOL ---
+	ReadDirectoryChangesExW :: proc(
+		hDirectory: HANDLE,
+		lpBuffer: LPVOID,
+		nBufferLength: DWORD,
+		bWatchSubtree: BOOL,
+		dwNotifyFilter: DWORD,
+		lpBytesReturned: LPDWORD,
+		lpOverlapped: LPOVERLAPPED,
+		lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
+		ReadDirectoryNotifyInformationClass: READ_DIRECTORY_NOTIFY_INFORMATION_CLASS,
+	) -> BOOL ---
 	FindFirstChangeNotificationW :: proc(
 		lpPathName: LPWSTR,
 		bWatchSubtree: BOOL,
