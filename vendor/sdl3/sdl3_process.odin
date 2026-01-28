@@ -35,10 +35,10 @@ foreign lib {
 	CreateProcess               :: proc(args: [^]cstring, pipe_stdio: bool) -> ^Process ---
 	CreateProcessWithProperties :: proc(props: PropertiesID) -> ^Process ---
 	GetProcessProperties        :: proc(process: ^Process) -> PropertiesID ---
-	ReadProcess                 :: proc(process: ^Process, datasize: ^uint, exitcode: ^c.int) -> rawptr ---
+	ReadProcess                 :: proc(process: ^Process, datasize: Maybe(^uint), exitcode: Maybe(^c.int)) -> rawptr ---
 	GetProcessInput             :: proc(process: ^Process) -> ^IOStream ---
 	GetProcessOutput            :: proc(process: ^Process) -> ^IOStream ---
 	KillProcess                 :: proc(process: ^Process, force: bool) -> bool ---
-	WaitProcess                 :: proc(process: ^Process, block: bool, exitcode: ^c.int) -> bool ---
+	WaitProcess                 :: proc(process: ^Process, block: bool, exitcode: Maybe(^c.int)) -> bool ---
 	DestroyProcess              :: proc(process: ^Process) ---
 }

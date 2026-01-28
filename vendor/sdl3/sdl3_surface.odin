@@ -58,7 +58,7 @@ PROP_SURFACE_ROTATION_FLOAT          :: "SDL.surface.rotation"
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	CreateSurface                :: proc(width, height: c.int, format: PixelFormat) -> ^Surface ---
-	CreateSurfaceFrom            :: proc(width, height: c.int, format: PixelFormat, pixels: rawptr, pitch: c.int) -> ^Surface ---
+	CreateSurfaceFrom            :: proc(width, height: c.int, format: PixelFormat, pixels: Maybe(rawptr), pitch: c.int) -> ^Surface ---
 	DestroySurface               :: proc(surface: ^Surface) ---
 	GetSurfaceProperties         :: proc(surface: ^Surface) -> PropertiesID ---
 	SetSurfaceColorspace         :: proc(surface: ^Surface, colorspace: Colorspace) -> bool ---
@@ -68,7 +68,7 @@ foreign lib {
 	GetSurfacePalette            :: proc(surface: ^Surface) -> ^Palette ---
 	AddSurfaceAlternateImage     :: proc(surface: ^Surface, image: ^Surface) -> bool ---
 	SurfaceHasAlternateImages    :: proc(surface: ^Surface) -> bool ---
-	GetSurfaceImages             :: proc(surface: ^Surface, count: ^c.int) -> [^]^Surface ---
+	GetSurfaceImages             :: proc(surface: ^Surface, count: Maybe(^c.int)) -> [^]^Surface ---
 	RemoveSurfaceAlternateImages :: proc(surface: ^Surface) ---
 	LockSurface                  :: proc(surface: ^Surface) -> bool ---
 	UnlockSurface                :: proc(surface: ^Surface) ---
@@ -100,7 +100,7 @@ foreign lib {
 	DuplicateSurface             :: proc(surface: ^Surface) -> ^Surface ---
 	ScaleSurface                 :: proc(surface: ^Surface, width, height: c.int, scaleMode: ScaleMode) -> ^Surface ---
 	ConvertSurface               :: proc(surface: ^Surface, format: PixelFormat) -> ^Surface ---
-	ConvertSurfaceAndColorspace  :: proc(surface: ^Surface, format: PixelFormat, palette: ^Palette, colorspace: Colorspace, props: PropertiesID) -> ^Surface ---
+	ConvertSurfaceAndColorspace  :: proc(surface: ^Surface, format: PixelFormat, palette: Maybe(^Palette), colorspace: Colorspace, props: PropertiesID) -> ^Surface ---
 	ConvertPixels                :: proc(width, height: c.int, src_format: PixelFormat, src: rawptr, src_pitch: c.int, dst_format: PixelFormat, dst: rawptr, dst_pitch: c.int) -> bool ---
 	ConvertPixelsAndColorspace   :: proc(width, height: c.int, src_format: PixelFormat, src_colorspace: Colorspace, src_properties: PropertiesID, src: rawptr, src_pitch: c.int, dst_format: PixelFormat, dst_colorspace: Colorspace, dst_properties: PropertiesID, dst: rawptr, dst_pitch: c.int) -> bool ---
 	PremultiplyAlpha             :: proc(width, height: c.int, src_format: PixelFormat, src: rawptr, src_pitch: c.int, dst_format: PixelFormat, dst: rawptr, dst_pitch: c.int, linear: bool) -> bool ---
@@ -118,8 +118,8 @@ foreign lib {
 	BlitSurface9Grid             :: proc(src: ^Surface, srcrect: Maybe(^Rect), left_width, right_width, top_height, bottom_height: c.int, scale: f32, scaleMode: ScaleMode, dst: ^Surface, dstrect: Maybe(^Rect)) -> bool ---
 	MapSurfaceRGB                :: proc(surface: ^Surface, r, g, b: Uint8) -> Uint32 ---
 	MapSurfaceRGBA               :: proc(surface: ^Surface, r, g, b, a: Uint8) -> Uint32 ---
-	ReadSurfacePixel             :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: ^Uint8) -> bool ---
-	ReadSurfacePixelFloat        :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: ^f32) -> bool ---
+	ReadSurfacePixel             :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: Maybe(^Uint8)) -> bool ---
+	ReadSurfacePixelFloat        :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: Maybe(^f32)) -> bool ---
 	WriteSurfacePixel            :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: Uint8) -> bool ---
 	WriteSurfacePixelFloat       :: proc(surface: ^Surface, x, y: c.int, r, g, b, a: f32) -> bool ---
 }

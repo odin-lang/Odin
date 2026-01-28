@@ -84,7 +84,7 @@ foreign lib {
 	hid_device_change_count      :: proc() -> Uint32 ---
 	hid_enumerate                :: proc(vendor_id, product_id: c.ushort) -> ^hid_device_info ---
 	hid_free_enumeration         :: proc(devs: ^hid_device_info) ---
-	hid_open                     :: proc(vendor_id, product_id: c.ushort, serial_number: [^]c.wchar_t) -> ^hid_device ---
+	hid_open                     :: proc(vendor_id, product_id: c.ushort, serial_number: Maybe([^]c.wchar_t)) -> ^hid_device ---
 	hid_open_path                :: proc(path: cstring) -> ^hid_device ---
 	hid_get_properties           :: proc(dev: ^hid_device) -> PropertiesID ---
 	hid_write                    :: proc(dev: ^hid_device, data: [^]byte, length: uint) -> c.int ---

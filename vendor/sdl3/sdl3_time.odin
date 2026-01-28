@@ -28,7 +28,7 @@ TimeFormat :: enum c.int {
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	GetDateTimeLocalePreferences :: proc(dateFormat: ^DateFormat, timeFormat: ^TimeFormat) -> bool ---
+	GetDateTimeLocalePreferences :: proc(dateFormat: Maybe(^DateFormat), timeFormat: Maybe(^TimeFormat)) -> bool ---
 	GetCurrentTime               :: proc(ticks: ^Time) -> bool ---
 	TimeToDateTime               :: proc(ticks: Time, dt: ^DateTime, localTime: bool) -> bool ---
 	DateTimeToTime               :: proc(#by_ptr dt: DateTime, ticks: ^Time) -> bool ---
