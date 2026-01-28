@@ -17,7 +17,8 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "3KiB",      "%.0M",  mem.Kilobyte * 3)
 	check(t, "3.000 mib", "%#.3m", mem.Megabyte * 3)
 	check(t, "3.50 gib",  "%#m",   u32(mem.Gigabyte * 3.5))
-	check(t, "01tib",     "%5.0m", mem.Terabyte)
+	check(t, " 1tib",     "%5.0m", mem.Terabyte)
+	check(t, "01tib",     "%05.0m", mem.Terabyte)
 	check(t, "-1tib",     "%5.0m", -mem.Terabyte)
 	check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
 	check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
@@ -93,13 +94,17 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 test_fmt_doc_examples :: proc(t: ^testing.T) {
 	// C-like syntax
 	check(t, "37 13",  "%[1]d %[0]d",    13,   37)
-	check(t, "017.00", "%*[2].*[1][0]f", 17.0, 2, 6)
-	check(t, "017.00", "%6.2f",          17.0)
+	check(t, " 17.00", "%*[2].*[1][0]f", 17.0, 2, 6)
+	check(t, " 17.00", "%6.2f",          17.0)
+	check(t, "017.00", "%0*[2].*[1][0]f", 17.0, 2, 6)
+	check(t, "017.00", "%06.2f",          17.0)
 
 	 // Python-like syntax
 	check(t, "37 13",  "{1:d} {0:d}",    13,   37)
-	check(t, "017.00", "{0:*[2].*[1]f}", 17.0, 2, 6)
-	check(t, "017.00", "{:6.2f}",        17.0)
+	check(t, " 17.00", "{0:*[2].*[1]f}", 17.0, 2, 6)
+	check(t, " 17.00", "{:6.2f}",        17.0)
+	check(t, "017.00", "{0:0*[2].*[1]f}", 17.0, 2, 6)
+	check(t, "017.00", "{:06.2f}",        17.0)
 }
 
 @(test)
@@ -110,7 +115,8 @@ test_fmt_escaping_prefixes :: proc(t: ^testing.T) {
 	// Prefixes
 	check(t, "+3.000", "%+f",   3.0 )
 	check(t, "0003",   "%04i",  3 )
-	check(t, "3   ",   "% -4i", 3 )
+	check(t, " 3  ",   "% -4i", 3 )
+	check(t, "3   ",   "%-4i", 3 )
 	check(t, "+3",     "%+i",   3 )
 	check(t, "0b11",   "%#b",   3 )
 	check(t, "0xA",    "%#X",   10 )
@@ -134,7 +140,8 @@ test_fmt_width_precision :: proc(t: ^testing.T) {
 	check(t, "3.140",  "%f",  3.14)
 	check(t, "3.140",  "%4f", 3.14)
 	check(t, "3.140",  "%5f", 3.14)
-	check(t, "03.140", "%6f", 3.14)
+	check(t, " 3.140", "%6f", 3.14)
+	check(t, "03.140", "%06f", 3.14)
 
 	// Precision
 	check(t, "3",       "%.f",  3.14)
@@ -235,17 +242,17 @@ test_pointers :: proc(t: ^testing.T) {
 	check(t, "0x0", "%p", c)
 	check(t, "0xFFFF", "%p", d)
 
-	check(t, "0x0", "%#p", a)
-	check(t, "0x0", "%#p", b)
-	check(t, "0x0", "%#p", c)
-	check(t, "0xFFFF", "%#p", d)
+	check(t, "0", "%#p", a)
+	check(t, "0", "%#p", b)
+	check(t, "0", "%#p", c)
+	check(t, "FFFF", "%#p", d)
 
 	check(t, "0x0",   "%v", a)
 	check(t, "0x0",   "%v", b)
 	check(t, "<nil>", "%v", c)
 
-	check(t, "0x0",   "%#v", a)
-	check(t, "0x0",   "%#v", b)
+	check(t, "0",   "%#v", a)
+	check(t, "0",   "%#v", b)
 	check(t, "<nil>", "%#v", c)
 
 	check(t, "0x0000", "%4p", a)
@@ -253,10 +260,10 @@ test_pointers :: proc(t: ^testing.T) {
 	check(t, "0x0000", "%4p", c)
 	check(t, "0xFFFF", "%4p", d)
 
-	check(t, "0x0000", "%#4p", a)
-	check(t, "0x0000", "%#4p", b)
-	check(t, "0x0000", "%#4p", c)
-	check(t, "0xFFFF", "%#4p", d)
+	check(t, "   0", "%#4p", a)
+	check(t, "   0", "%#4p", b)
+	check(t, "   0", "%#4p", c)
+	check(t, "FFFF", "%#4p", d)
 }
 
 @(test)
