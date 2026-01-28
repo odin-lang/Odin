@@ -399,8 +399,8 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		return strings.clone(".", allocator), .None
 	}
 
-	base_vol   := volume_name(base_path)
-	target_vol := volume_name(target_path)
+	base_vol   := volume_name(base_clean)
+	target_vol := volume_name(target_clean)
 	base   := base_clean  [len(base_vol):]
 	target := target_clean[len(target_vol):]
 	if base == "." {
