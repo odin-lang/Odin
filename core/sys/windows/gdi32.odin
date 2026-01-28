@@ -34,7 +34,6 @@ foreign gdi32 {
 	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 	GetDCBrushColor :: proc(hdc: HDC) -> COLORREF ---
 	PatBlt          :: proc(hdc: HDC, x, y, w, h: INT, rop: DWORD) -> BOOL ---
-	Rectangle       :: proc(hdc: HDC, left, top, right, bottom: INT) -> BOOL ---
 
 	CreateFontW           :: proc(cHeight, cWidth, cEscapement, cOrientation, cWeight: INT, bItalic, bUnderline, bStrikeOut, iCharSet, iOutPrecision: DWORD, iClipPrecision, iQuality, iPitchAndFamily: DWORD, pszFaceName: LPCWSTR) -> HFONT ---
 	CreateFontIndirectW   :: proc(lplf: ^LOGFONTW) -> HFONT ---
@@ -70,12 +69,20 @@ foreign gdi32 {
 	RealizePalette :: proc(hdc: HDC) -> UINT ---
 
 	SetTextColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
-	RoundRect    :: proc(hdc: HDC, left: INT, top: INT, right: INT, bottom: INT, width: INT, height: INT) -> BOOL ---
 	SetPixel     :: proc(hdc: HDC, x: INT, y: INT, color: COLORREF) -> COLORREF ---
 
 	GdiTransparentBlt :: proc(hdcDest: HDC, xoriginDest, yoriginDest, wDest, hDest: INT, hdcSrc: HDC, xoriginSrc, yoriginSrc, wSrc, hSrc: INT, crTransparent: UINT) -> BOOL ---
 	GdiGradientFill   :: proc(hdc: HDC, pVertex: PTRIVERTEX, nVertex: ULONG, pMesh: PVOID, nCount: ULONG, ulMode: ULONG) -> BOOL ---
 	GdiAlphaBlend     :: proc(hdcDest: HDC, xoriginDest, yoriginDest, wDest, hDest: INT, hdcSrc: HDC, xoriginSrc, yoriginSrc, wSrc, hSrc: INT, ftn: BLENDFUNCTION) -> BOOL ---
+
+	// Filled Shape Functions
+	Rectangle   :: proc(hdc: HDC, left, top, right, bottom: c_int) -> BOOL ---
+	Ellipse     :: proc(hdc: HDC, left, top, right, bottom: c_int) -> BOOL ---
+	RoundRect   :: proc(hdc: HDC, left, top, right, bottom, width, height: c_int) -> BOOL ---
+	Pie         :: proc(hdc: HDC, left, right, top, bottom, xr1, yr1, xr2, yr2: c_int) -> BOOL ---
+	Chord       :: proc(hdc: HDC, x1, y1, x2, y2, x3, y3, x4, y4: c_int) -> BOOL ---
+	Polygon     :: proc(hdc: HDC, apt: [^]POINT, cpt: c_int) -> BOOL ---
+	PolyPolygon :: proc(hdc: HDC, apt: [^]POINT, asz: [^]c_int, csz: c_int) -> BOOL ---
 }
 
 @(require_results)
