@@ -17,13 +17,14 @@ package all
 
 @(require) import "core:container/avl"
 @(require) import "core:container/bit_array"
+@(require) import "core:container/handle_map"
+@(require) import "core:container/intrusive/list"
+@(require) import "core:container/lru"
 @(require) import "core:container/pool"
 @(require) import "core:container/priority_queue"
 @(require) import "core:container/queue"
-@(require) import "core:container/small_array"
-@(require) import "core:container/lru"
-@(require) import "core:container/intrusive/list"
 @(require) import "core:container/rbtree"
+@(require) import "core:container/small_array"
 @(require) import "core:container/topological_sort"
 @(require) import "core:container/xar"
 

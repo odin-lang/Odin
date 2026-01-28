@@ -109,19 +109,19 @@ destroy :: proc(x: ^$X/Array($T, $SHIFT)) {
 Resets the array's length to zero without freeing memory.
 Allocated chunks are retained for reuse.
 */
-clear :: proc(x: ^$X/Array($T, $SHIFT)) {
+clear :: proc "contextless" (x: ^$X/Array($T, $SHIFT)) {
 	x.len = 0
 }
 
 // Returns the length of the exponential-array
 @(require_results)
-len :: proc(x: $X/Array($T, $SHIFT)) -> int {
+len :: proc "contextless" (x: $X/Array($T, $SHIFT)) -> int {
 	return x.len
 }
 
 // Returns the number of allocated elements
 @(require_results)
-cap :: proc(x: $X/Array($T, $SHIFT)) -> int {
+cap :: proc "contextless" (x: $X/Array($T, $SHIFT)) -> int {
 	#reverse for c, i in x.chunks {
 		if c != nil {
 			return 1 << (SHIFT + uint(i if i > 0 else 1))
@@ -132,7 +132,7 @@ cap :: proc(x: $X/Array($T, $SHIFT)) -> int {
 
 // Internal: computes chunk index, element index within chunk, and chunk capacity for a given index.
 @(require_results)
-_meta_get :: #force_inline proc($SHIFT: uint, index: uint) -> (chunk_idx, elem_idx, chunk_cap: uint) {
+_meta_get :: #force_inline proc "contextless" ($SHIFT: uint, index: uint) -> (chunk_idx, elem_idx, chunk_cap: uint) {
 	elem_idx = index
 	chunk_cap = uint(1) << SHIFT
 	chunk_idx = 0
@@ -202,6 +202,13 @@ Example:
 @(require_results)
 get_ptr :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: ^T) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
+	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
+	return &x.chunks[chunk_idx][elem_idx]
+}
+
+// No bounds checking
+@(require_results)
+get_ptr_unsafe :: proc "contextless" (x: ^$X/Array($T, $SHIFT), #any_int index: int) -> (val: ^T) #no_bounds_check {
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	return &x.chunks[chunk_idx][elem_idx]
 }
