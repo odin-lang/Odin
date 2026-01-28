@@ -1027,7 +1027,9 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
 			gb_string_free(t);
 			gb_string_free(s);
-		} else if (operand.mode != Addressing_Constant && unroll_count <= 0) {
+		} else if (operand.mode != Addressing_Constant && (
+				unroll_count <= 0 &&
+				compare_exact_values(Token_CmpEq, inline_for_depth, exact_value_i64(0)))) {
 			error(operand.expr, "An '#unroll for' expression must be known at compile time");
 		}
 	}
