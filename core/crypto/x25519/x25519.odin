@@ -6,6 +6,8 @@ See:
 */
 package x25519
 
+import "core:crypto"
+import ed "core:crypto/_edwards25519"
 import field "core:crypto/_fiat/field_curve25519"
 import "core:mem"
 
@@ -14,8 +16,10 @@ SCALAR_SIZE :: 32
 // POINT_SIZE is the size of a X25519 point (public key/shared secret) in bytes.
 POINT_SIZE :: 32
 
-@(private, rodata)
-_BASE_POINT: [32]byte = {9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+when crypto.COMPACT_IMPLS == true {
+	@(private,rodata)
+	_BASE_POINT: [32]byte = {9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+}
 
 @(private)
 _scalar_bit :: #force_inline proc "contextless" (s: ^[32]byte, i: int) -> u8 {
@@ -111,19 +115,44 @@ scalarmult :: proc(dst, scalar, point: []byte) {
 	e[31] &= 127
 	e[31] |= 64
 
-	p: [32]byte = ---
-	copy_slice(p[:], point)
-
-	d: [32]byte = ---
-	_scalarmult(&d, &e, &p)
-	copy_slice(dst, d[:])
+	p := (^[32]byte)(raw_data(point))
+	d := (^[32]byte)(raw_data(dst))
+	_scalarmult(d, &e, p)
 
 	mem.zero_explicit(&e, size_of(e))
-	mem.zero_explicit(&d, size_of(d))
 }
 
 // scalarmult_basepoint "multiplies" the provided scalar with the X25519
 // base point and writes the resulting point to dst.
 scalarmult_basepoint :: proc(dst, scalar: []byte) {
-	scalarmult(dst, scalar, _BASE_POINT[:])
+	when crypto.COMPACT_IMPLS == true {
+		scalarmult(dst, scalar, _BASE_POINT[:])
+	} else {
+		ensure(len(scalar) == SCALAR_SIZE, "crypto/x25519: invalid scalar size")
+		ensure(len(dst) == POINT_SIZE, "crypto/x25519: invalid destination point size")
+
+		sc: ed.Scalar = ---
+		ed.sc_set_bytes_rfc8032(&sc, scalar)
+
+		ge: ed.Group_Element = ---
+		ed.ge_scalarmult_basepoint(&ge, &sc)
+
+		// u = (y + z)/(z - y)
+		y_plus_z: field.Loose_Field_Element = ---
+		z_minus_y: field.Loose_Field_Element = ---
+		u: field.Tight_Field_Element = ---
+
+		field.fe_add(&y_plus_z, &ge.y, &ge.z)
+		field.fe_sub(&z_minus_y, &ge.z, &ge.y)
+		field.fe_carry_inv(&u, &z_minus_y)
+		field.fe_carry_mul(&u, &y_plus_z, field.fe_relax_cast(&u))
+
+		dst_ := (^[32]byte)(raw_data(dst))
+		field.fe_to_bytes(dst_, &u)
+
+		field.fe_clear_vec([]^field.Loose_Field_Element{&y_plus_z, &z_minus_y})
+		field.fe_clear(&u)
+		ed.sc_clear(&sc)
+		ed.ge_clear(&ge)
+	}
 }

@@ -170,7 +170,7 @@ public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> 
 
 // public_key_set_priv sets pub_key to the public component of priv_key.
 public_key_set_priv :: proc(pub_key: ^Public_Key, priv_key: ^Private_Key) {
-	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized public key")
+	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
 
 	src := &priv_key._pub_key
 	copy(pub_key._b[:], src._b[:])
