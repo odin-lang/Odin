@@ -20,6 +20,8 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, " 1tib",     "%5.0m", mem.Terabyte)
 	check(t, "01tib",     "%05.0m", mem.Terabyte)
 	check(t, "-1tib",     "%5.0m", -mem.Terabyte)
+	check(t, " -1tib",     "%6.0m", -mem.Terabyte)
+	check(t, "-01tib",     "%06.0m", -mem.Terabyte)
 	check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
 	check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
 	check(t, "255 B",     "%#M",   u8(255))
@@ -167,6 +169,12 @@ test_fmt_width_precision :: proc(t: ^testing.T) {
 	check(t, "3.06e+01",     "%.2e", 30.56)
 	check(t, "3.056e+01",    "%.3e", 30.56)
 
+	check(t, "  3.056e+01",    "%11.3e",   30.56)
+	check(t, " -3.056e+01",    "%11.3e",  -30.56)
+	check(t, "003.056e+01",    "%011.3e",  30.56)
+	check(t, "-03.056e+01",    "%011.3e", -30.56)
+	check(t, "3.056e+01  ",    "%-11.3e",  30.56)
+
 	// Width and precision
 	check(t, "3.140", "%5.3f",          3.14)
 	check(t, "3.140", "%*[1].3f",       3.14, 5)
@@ -264,6 +272,77 @@ test_pointers :: proc(t: ^testing.T) {
 	check(t, "   0", "%#4p", b)
 	check(t, "   0", "%#4p", c)
 	check(t, "FFFF", "%#4p", d)
+}
+
+@(test)
+test_fmt_inf :: proc(t: ^testing.T) {
+	check(t, "+Inf", "%.3f", math.inf_f64(1))
+	check(t, "-Inf", "%.3f", math.inf_f64(-1))
+
+	check(t, "  +Inf", "%6.3f", math.inf_f64(1))
+	check(t, "  -Inf", "%6.3f", math.inf_f64(-1))
+
+	check(t, "  +Inf", "%06.3f", math.inf_f64(1))
+	check(t, "  -Inf", "%06.3f", math.inf_f64(-1))
+
+	check(t, "+Inf  ", "%-6.3f", math.inf_f64(1))
+	check(t, "-Inf  ", "%-6.3f", math.inf_f64(-1))
+}
+
+@(test)
+test_fmt_nan :: proc(t: ^testing.T) {
+	check(t, "NaN", "%.3f", math.nan_f64())
+	check(t, "   NaN", "%6.3f", math.nan_f64())
+	check(t, "   NaN", "%06.3f", math.nan_f64())
+	check(t, "NaN   ", "%-6.3f", math.nan_f64())
+}
+
+@(test)
+test_fmt_hex :: proc(t: ^testing.T) {
+	check(t, "0x000a", "%#06x", 10)
+	check(t, "-0x00a", "%#06x", -10)
+
+	check(t, "+0x00a", "%#+06x", 10)
+	check(t, "-0x00a", "%#+06x", -10)
+
+	check(t, "0xa   ", "%#-06x", 10)
+	check(t, "-0xa  ", "%#-06x", -10)
+
+	check(t, "0xa   ", "%#-6x", 10)
+	check(t, "-0xa  ", "%#-6x", -10)
+
+	check(t, " 0x00a", "%# 06x", 10)
+	check(t, "-0x00a", "%# 06x", -10)
+
+	check(t, "+0x00a", "%# +06x", 10)
+	check(t, "-0x00a", "%# +06x", -10)
+
+	check(t, " 0xa  ", "%# -06x", 10)
+	check(t, "-0xa  ", "%# -06x", -10)
+}
+
+@(test)
+test_fmt_hex_128 :: proc(t: ^testing.T) {
+	check(t, "0x000a", "%#06x", i128(10))
+	check(t, "-0x00a", "%#06x", i128(-10))
+
+	check(t, "+0x00a", "%#+06x", i128(10))
+	check(t, "-0x00a", "%#+06x", i128(-10))
+
+	check(t, "0xa   ", "%#-06x", i128(10))
+	check(t, "-0xa  ", "%#-06x", i128(-10))
+
+	check(t, "0xa   ", "%#-6x", i128(10))
+	check(t, "-0xa  ", "%#-6x", i128(-10))
+
+	check(t, " 0x00a", "%# 06x", i128(10))
+	check(t, "-0x00a", "%# 06x", i128(-10))
+
+	check(t, "+0x00a", "%# +06x", i128(10))
+	check(t, "-0x00a", "%# +06x", i128(-10))
+
+	check(t, " 0xa  ", "%# -06x", i128(10))
+	check(t, "-0xa  ", "%# -06x", i128(-10))
 }
 
 @(test)
