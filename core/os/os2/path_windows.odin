@@ -283,6 +283,10 @@ _is_absolute_path :: proc(path: string) -> bool {
 	if _is_reserved_name(path) {
 		return true
 	}
+	if len(path) > 0 && _is_path_separator(path[0]) {
+		return true
+	}
+
 	l := _volume_name_len(path)
 	if l == 0 {
 		return false

@@ -204,10 +204,10 @@ when ODIN_NO_RTTI {
 		@(cold, no_instrumentation)
 		handle_error :: proc "odin" (file: string, line, column: i32, from, to: typeid) -> ! {
 			do_msg :: proc "contextless" (i: ^int, buf: []byte, file: string, line, column: i32, from, to: typeid) -> bool {
-				try_copy_string(i, buf, "Invalid type assertion from ") or_return
-				try_copy_typeid(i, buf, from)                           or_return
-				try_copy_string(i, buf, " to ")                         or_return
-				try_copy_typeid(i, buf, to)                             or_return
+				write_string(i, buf, "Invalid type assertion from ") or_return
+				write_typeid(i, buf, from)                           or_return
+				write_string(i, buf, " to ")                         or_return
+				write_typeid(i, buf, to)                             or_return
 				return true
 			}
 
@@ -285,13 +285,13 @@ when ODIN_NO_RTTI {
 		@(cold, no_instrumentation)
 		handle_error :: proc "odin" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) -> ! {
 			do_msg :: proc "contextless" (i: ^int, buf: []byte, file: string, line, column: i32, from, to, actual: typeid) -> bool {
-				try_copy_string(i, buf, "Invalid type assertion from ") or_return
-				try_copy_typeid(i, buf, from)                           or_return
-				try_copy_string(i, buf, " to ")                         or_return
-				try_copy_typeid(i, buf, to)                             or_return
+				write_string(i, buf, "Invalid type assertion from ") or_return
+				write_typeid(i, buf, from)                           or_return
+				write_string(i, buf, " to ")                         or_return
+				write_typeid(i, buf, to)                             or_return
 				if actual != from {
-					try_copy_string(i, buf, ", actual type: ") or_return
-					try_copy_typeid(i, buf, actual)            or_return
+					write_string(i, buf, ", actual type: ") or_return
+					write_typeid(i, buf, actual)            or_return
 				}
 				return true
 			}

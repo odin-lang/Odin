@@ -49,35 +49,66 @@ volume_name_len :: proc(path: string) -> int {
 		if len(path) < 2 {
 			return 0
 		}
-		c := path[0]
+
 		if path[1] == ':' {
-			switch c {
+			switch path[0] {
 			case 'a'..='z', 'A'..='Z':
 				return 2
 			}
 		}
 
-		// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-		if l := len(path); l >= 5 && is_slash(path[0]) && is_slash(path[1]) &&
-			!is_slash(path[2]) && path[2] != '.' {
-			for n := 3; n < l-1; n += 1 {
-				if is_slash(path[n]) {
-					n += 1
-					if !is_slash(path[n]) {
-						if path[n] == '.' {
-							break
-						}
-					}
-					for ; n < l; n += 1 {
-						if is_slash(path[n]) {
-							break
-						}
-					}
-					return n
+		/*
+			See: URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+			Further allowed paths can be of the form of:
+			- \\server\share or \\server\share\more\path
+			- \\?\C:\...
+			- \\.\PhysicalDriveX
+		*/
+		// Any remaining kind of path has to start with two slashes.
+		if !is_separator(path[0]) || !is_separator(path[1]) {
+			return 0
+		}
+
+		// Device path. The volume name is the whole string
+		if len(path) >= 5 && path[2] == '.' && is_separator(path[3]) {
+			return len(path)
+		}
+
+		// We're a UNC share `\\host\share`, file namespace `\\?\C:` or UNC in file namespace `\\?\\host\share`
+		prefix := 2
+
+		// File namespace.
+		if len(path) >= 5 && path[2] == '?' && is_separator(path[3]) {
+			if is_separator(path[4]) {
+				// `\\?\\` UNC path in file namespace
+				prefix = 5
+			}
+
+			if len(path) >= 6 && path[5] == ':' {
+				switch path[4] {
+				case 'a'..='z', 'A'..='Z':
+					return 6
+				case:
+					return 0
 				}
-				break
 			}
 		}
+
+		// UNC path, minimum version of the volume is `\\h\s` for host, share.
+		// Can also contain an IP address in the host position.
+		slash_count := 0
+		for i in prefix..<len(path) {
+			// Host needs to be at least 1 character
+			if is_separator(path[i]) && i > 0 {
+				slash_count += 1
+
+				if slash_count == 2 {
+					return i
+				}
+			}
+		}
+
+		return len(path)
 	}
 	return 0
 }
@@ -368,8 +399,8 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 		return strings.clone(".", allocator), .None
 	}
 
-	base_vol   := volume_name(base_path)
-	target_vol := volume_name(target_path)
+	base_vol   := volume_name(base_clean)
+	target_vol := volume_name(target_clean)
 	base   := base_clean  [len(base_vol):]
 	target := target_clean[len(target_vol):]
 	if base == "." {

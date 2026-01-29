@@ -1434,12 +1434,13 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 
 		if (unroll_count_ev.kind == ExactValue_Invalid) {
-			GB_ASSERT(expr->tav.mode == Addressing_Constant);
 
 			Type *t = base_type(expr->tav.type);
 
 			switch (t->kind) {
 			case Type_Basic:
+				GB_ASSERT(expr->tav.mode == Addressing_Constant);
+
 				GB_ASSERT(is_type_string(t));
 				{
 					ExactValue value = expr->tav.value;

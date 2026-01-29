@@ -195,7 +195,6 @@ ge_generator :: proc "contextless" (ge: ^Group_Element) {
 	ge_set(ge, &GE_BASEPOINT)
 }
 
-@(private)
 Addend_Group_Element :: struct {
 	y2_minus_x2:  field.Loose_Field_Element, // t1
 	y2_plus_x2:   field.Loose_Field_Element, // t3
@@ -203,7 +202,6 @@ Addend_Group_Element :: struct {
 	two_times_z2: field.Loose_Field_Element, // t5
 }
 
-@(private)
 ge_addend_set :: proc "contextless" (ge_a: ^Addend_Group_Element, ge: ^Group_Element) {
 	field.fe_sub(&ge_a.y2_minus_x2, &ge.y, &ge.x)
 	field.fe_add(&ge_a.y2_plus_x2, &ge.y, &ge.x)
@@ -420,6 +418,6 @@ ge_in_prime_order_subgroup_vartime :: proc "contextless" (ge: ^Group_Element) ->
 	// that is a ~50% speedup, and a lot of added complexity for something
 	// that is better solved by "just use ristretto255".
 	tmp: Group_Element = ---
-	_ge_scalarmult(&tmp, ge, &SC_ELL, true)
+	ge_scalarmult_raw(&tmp, ge, &SC_ELL, true)
 	return ge_equal(&tmp, &GE_IDENTITY) == 1
 }

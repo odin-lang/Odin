@@ -163,6 +163,7 @@ struct TypeStruct {
 	bool            is_packed                   : 1;
 	bool            is_raw_union                : 1;
 	bool            is_all_or_none              : 1;
+	bool            is_simple                   : 1;
 	bool            is_poly_specialized         : 1;
 
 	std::atomic<bool> are_offsets_being_processed;
@@ -2701,12 +2702,16 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_SoaPointer:
 	case Type_Proc:
 	case Type_BitSet:
+	case Type_BitField:
 		return true;
 
 	case Type_Matrix:
 		return is_type_simple_compare(t->Matrix.elem);
 
 	case Type_Struct:
+		if (t->Struct.is_simple) {
+			return true;
+		}
 		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			if (!is_type_simple_compare(f->type)) {
@@ -2728,6 +2733,16 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_SimdVector:
 		return is_type_simple_compare(t->SimdVector.elem);
 
+	case Type_Tuple:
+		if (t->Tuple.variables.count == 1) {
+			return is_type_simple_compare(t->Tuple.variables[0]->type);
+		}
+		break;
+
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
+		return false;
 	}
 
 	return false;
@@ -2757,12 +2772,16 @@ gb_internal bool is_type_nearly_simple_compare(Type *t) {
 	case Type_SoaPointer:
 	case Type_Proc:
 	case Type_BitSet:
+	case Type_BitField:
 		return true;
 
 	case Type_Matrix:
 		return is_type_nearly_simple_compare(t->Matrix.elem);
 
 	case Type_Struct:
+		if (t->Struct.is_simple) {
+			return true;
+		}
 		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			if (!is_type_nearly_simple_compare(f->type)) {
@@ -2783,6 +2802,17 @@ gb_internal bool is_type_nearly_simple_compare(Type *t) {
 
 	case Type_SimdVector:
 		return is_type_nearly_simple_compare(t->SimdVector.elem);
+
+	case Type_Tuple:
+		if (t->Tuple.variables.count == 1) {
+			return is_type_nearly_simple_compare(t->Tuple.variables[0]->type);
+		}
+		break;
+
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
+		return false;
 
 	}
 
@@ -5099,9 +5129,11 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 			str = gb_string_appendc(str, ")");
 		}
 
-		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
-		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
+		if (type->Struct.is_packed)         str = gb_string_appendc(str, " #packed");
+		if (type->Struct.is_raw_union)      str = gb_string_appendc(str, " #raw_union");
 		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
+		if (type->Struct.is_all_or_none)    str = gb_string_appendc(str, " #all_or_none");
+		if (type->Struct.is_simple)         str = gb_string_appendc(str, " #simple");
 
 		str = gb_string_appendc(str, " {");
 

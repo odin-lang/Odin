@@ -60,6 +60,7 @@ accept_sizes :=  [256]u8{
 	0xf5..=0xff = 0xf1, // ascii,    size 1
 }
 
+@(require_results)
 encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	r := c
 
@@ -101,9 +102,11 @@ decode_rune :: proc{
 	decode_rune_in_string,
 	decode_rune_in_bytes,
 }
+@(require_results)
 decode_rune_in_string :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	return decode_rune_in_bytes(transmute([]u8)s)
 }
+@(require_results)
 decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	n := len(s)
 	if n < 1 {
@@ -141,6 +144,7 @@ decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
 
+@(require_results)
 string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (runes: []rune) {
 	n := rune_count_in_string(s)
 
@@ -153,6 +157,7 @@ string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (r
 	return
 }
 
+@(require_results)
 runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -> string {
 	byte_count := 0
 	for r in runes {
@@ -177,9 +182,11 @@ decode_last_rune :: proc{
 	decode_last_rune_in_bytes,
 }
 
+@(require_results)
 decode_last_rune_in_string :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	return decode_last_rune_in_bytes(transmute([]u8)s)
 }
+@(require_results)
 decode_last_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	r: rune
 	size: int
@@ -212,6 +219,7 @@ decode_last_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 	return r, size
 }
 
+@(require_results)
 rune_at_pos :: proc "contextless" (s: string, pos: int) -> rune {
 	if pos < 0 {
 		return RUNE_ERROR
@@ -227,6 +235,7 @@ rune_at_pos :: proc "contextless" (s: string, pos: int) -> rune {
 	return RUNE_ERROR
 }
 
+@(require_results)
 rune_string_at_pos :: proc "contextless" (s: string, pos: int) -> string {
 	if pos < 0 {
 		return ""
@@ -243,6 +252,7 @@ rune_string_at_pos :: proc "contextless" (s: string, pos: int) -> string {
 	return ""
 }
 
+@(require_results)
 rune_at :: proc "contextless" (s: string, byte_index: int) -> rune {
 	r, _ := decode_rune_in_string(s[byte_index:])
 	return r
@@ -250,6 +260,7 @@ rune_at :: proc "contextless" (s: string, byte_index: int) -> rune {
 
 // Returns the byte position of rune at position pos in s with an optional start byte position.
 // Returns -1 if it runs out of the string.
+@(require_results)
 rune_offset :: proc "contextless" (s: string, pos: int, start: int = 0) -> int {
 	if pos < 0 {
 		return -1
@@ -265,6 +276,7 @@ rune_offset :: proc "contextless" (s: string, pos: int, start: int = 0) -> int {
 	return -1
 }
 
+@(require_results)
 valid_rune :: proc "contextless" (r: rune) -> bool {
 	if r < 0 {
 		return false
@@ -276,6 +288,7 @@ valid_rune :: proc "contextless" (r: rune) -> bool {
 	return true
 }
 
+@(require_results)
 valid_string :: proc "contextless" (s: string) -> bool {
 	n := len(s)
 	for i := 0; i < n; {
@@ -309,6 +322,7 @@ valid_string :: proc "contextless" (s: string) -> bool {
 	return true
 }
 
+@(require_results)
 rune_start :: #force_inline proc "contextless" (b: u8) -> bool {
 	return b&0xc0 != 0x80
 }
@@ -318,9 +332,11 @@ rune_count :: proc{
 	rune_count_in_bytes,
 }
 
+@(require_results)
 rune_count_in_string :: #force_inline proc(s: string) -> int {
 	return rune_count_in_bytes(transmute([]u8)s)
 }
+@(require_results)
 rune_count_in_bytes :: proc "contextless" (s: []u8) -> int {
 	count := 0
 	n := len(s)
@@ -360,6 +376,7 @@ rune_count_in_bytes :: proc "contextless" (s: []u8) -> int {
 }
 
 
+@(require_results)
 rune_size :: proc "contextless" (r: rune) -> int {
 	switch {
 	case r < 0:          return -1
@@ -381,6 +398,7 @@ full_rune :: proc{
 
 // full_rune_in_bytes reports if the bytes in b begin with a full utf-8 encoding of a rune or not
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
+@(require_results)
 full_rune_in_bytes :: proc "contextless" (b: []byte) -> bool {
 	n := len(b)
 	if n == 0 {
@@ -401,6 +419,7 @@ full_rune_in_bytes :: proc "contextless" (b: []byte) -> bool {
 
 // full_rune_in_string reports if the bytes in s begin with a full utf-8 encoding of a rune or not
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
+@(require_results)
 full_rune_in_string :: proc "contextless" (s: string) -> bool {
 	return full_rune_in_bytes(transmute([]byte)s)
 }
