@@ -780,6 +780,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		bool is_raw_union;          \
 		bool is_no_copy;            \
 		bool is_all_or_none;        \
+		bool is_simple;             \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
 		Scope *scope; \
