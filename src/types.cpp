@@ -2701,6 +2701,7 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_SoaPointer:
 	case Type_Proc:
 	case Type_BitSet:
+	case Type_BitField:
 		return true;
 
 	case Type_Matrix:
@@ -2728,6 +2729,16 @@ gb_internal bool is_type_simple_compare(Type *t) {
 	case Type_SimdVector:
 		return is_type_simple_compare(t->SimdVector.elem);
 
+	case Type_Tuple:
+		if (t->Tuple.variables.count == 1) {
+			return is_type_simple_compare(t->Tuple.variables[0]->type);
+		}
+		break;
+
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
+		return false;
 	}
 
 	return false;
