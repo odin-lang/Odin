@@ -122,6 +122,7 @@ Type_Info_Struct_Flag :: enum u8 {
 	raw_union   = 1,
 	all_or_none = 2,
 	align       = 3,
+	simple      = 4,
 }
 
 Type_Info_Struct :: struct {

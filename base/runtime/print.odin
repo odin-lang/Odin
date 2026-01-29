@@ -421,6 +421,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		if .packed      in info.flags { print_string("#packed ") }
 		if .raw_union   in info.flags { print_string("#raw_union ") }
 		if .all_or_none in info.flags { print_string("#all_or_none ") }
+		if .simple      in info.flags { print_string("#simple ") }
 		if .align in info.flags {
 			print_string("#align(")
 			print_u64(u64(ti.align))
@@ -835,6 +836,7 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		if .packed      in info.flags { write_string(i, buf, "#packed ")      or_return }
 		if .raw_union   in info.flags { write_string(i, buf, "#raw_union ")   or_return }
 		if .all_or_none in info.flags { write_string(i, buf, "#all_or_none ") or_return }
+		if .simple      in info.flags { write_string(i, buf, "#simple ")      or_return }
 		if .align in info.flags {
 			write_string(i, buf, "#align(")     or_return
 			write_u64(i,    buf, u64(ti.align)) or_return

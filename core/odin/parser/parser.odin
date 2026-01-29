@@ -2667,6 +2667,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		is_raw_union:    bool
 		is_no_copy:      bool
 		is_all_or_none:  bool
+		is_simple:       bool
 		fields:          ^ast.Field_List
 		name_count:      int
 
@@ -2695,6 +2696,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				is_all_or_none = true
+			case "simple":
+				if is_simple {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				is_simple = true
 			case "align":
 				if align != nil {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2769,6 +2775,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		st.is_raw_union      = is_raw_union
 		st.is_no_copy        = is_no_copy
 		st.is_all_or_none    = is_all_or_none
+		st.is_simple         = is_simple
 		st.fields            = fields
 		st.name_count        = name_count
 		st.where_token       = where_token

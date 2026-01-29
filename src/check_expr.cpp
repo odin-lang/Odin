@@ -12692,8 +12692,10 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
 			str = gb_string_appendc(str, ") ");
 		}
-		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
-		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
+		if (st->is_packed)      str = gb_string_appendc(str, "#packed ");
+		if (st->is_raw_union)   str = gb_string_appendc(str, "#raw_union ");
+		if (st->is_all_or_none) str = gb_string_appendc(str, "#all_or_none ");
+		if (st->is_simple)      str = gb_string_appendc(str, "#simple ");
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
 			str = write_expr_to_string(str, st->align, shorthand);
