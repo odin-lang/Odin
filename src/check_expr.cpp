@@ -4704,12 +4704,14 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
-			check_is_expressible(c, operand, t);
+			check_is_expressible(c, operand, target_type);
 			if (operand->mode == Addressing_Invalid) {
 				return;
 			}
 			update_untyped_expr_value(c, operand->expr, operand->value);
-		} else {
+		}
+
+		{
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
 				if (!is_type_boolean(target_type)) {
