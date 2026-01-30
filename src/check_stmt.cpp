@@ -2945,10 +2945,12 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			error(us->token, "Empty 'using' list");
 			return;
 		}
-		if (check_vet_flags(node) & VetFlag_UsingStmt) {
+
+		u64 feature_flags = check_feature_flags(ctx, node);
+		if ((feature_flags & OptInFeatureFlag_UsingStmt) == 0) {
 			ERROR_BLOCK();
-			error(node, "'using' as a statement is not allowed when '-vet' or '-vet-using' is applied");
-			error_line("\t'using' is considered bad practice to use as a statement outside of immediate refactoring\n");
+			error(node, "'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring");
+			error_line("\tIt you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
 		}
 
 		for (Ast *expr : us->list) {

@@ -1,4 +1,4 @@
-#+vet !using-param
+#+feature using-stmt
 package compress_zlib
 
 /*
