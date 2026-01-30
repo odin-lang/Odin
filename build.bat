@@ -130,22 +130,20 @@ set linker_settings=%libs% %odin_res% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-rem rc %rc_flags% %odin_rc%
+rc %rc_flags% %odin_rc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
-rem mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
-rem if %errorlevel% neq 0 goto end_of_build
+mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
+if %errorlevel% neq 0 goto end_of_build
 
-rem call build_vendor.bat
-rem if %errorlevel% neq 0 goto end_of_build
+call build_vendor.bat
+if %errorlevel% neq 0 goto end_of_build
 
 rem If the demo doesn't run for you and your CPU is more than a decade old, try -microarch:native
-rem if %release_mode% EQU 0 odin run examples/demo -vet -strict-style -resource:examples/demo/demo.rc -- Hellope World
-
-W:\Odin\odin run examples/bug
+if %release_mode% EQU 0 odin run examples/demo -vet -strict-style -resource:examples/demo/demo.rc -- Hellope World
 
 rem Many non-compiler devs seem to run debug build but don't realize.
-rem if %release_mode% EQU 0 echo: & echo Debug compiler built. Note: run "build.bat release" if you want a faster, release mode compiler.
+if %release_mode% EQU 0 echo: & echo Debug compiler built. Note: run "build.bat release" if you want a faster, release mode compiler.
 
 del *.obj > NUL 2> NUL
 
