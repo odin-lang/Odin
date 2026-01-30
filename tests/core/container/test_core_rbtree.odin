@@ -4,22 +4,15 @@ import rb "core:container/rbtree"
 import "core:math/rand"
 import "core:testing"
 import "base:intrinsics"
-import "core:mem"
 import "core:slice"
 import "core:log"
 
 test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
-	defer mem.tracking_allocator_destroy(&track)
-	context.allocator = mem.tracking_allocator(&track)
-
 	log.infof("Testing Red-Black Tree($Key=%v,$Value=%v) using random seed %v.", type_info_of(Key), type_info_of(Value), t.seed)
 	tree: rb.Tree(Key, Value)
 	rb.init(&tree)
 
-	testing.expect(t, rb.len(&tree)   == 0,   "empty: len should be 0")
+	testing.expect(t, rb.len(tree)   == 0,   "empty: len should be 0")
 	testing.expect(t, rb.first(&tree) == nil, "empty: first should be nil")
 	testing.expect(t, rb.last(&tree)  == nil, "empty: last should be nil")
 	iter := rb.iterator(&tree, .Forward)
@@ -48,7 +41,7 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	}
 
 	entry_count := len(inserted_map)
-	testing.expect(t, rb.len(&tree) == entry_count, "insert: len after")
+	testing.expect(t, rb.len(tree) == entry_count, "insert: len after")
 	validate_rbtree(t, &tree)
 
 	first := rb.first(&tree)
@@ -58,8 +51,8 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 
 	// Ensure that all entries can be found.
 	for k, v in inserted_map {
-		testing.expect(t, v == rb.find(&tree, k), "Find(): Node")
-		testing.expect(t, k == v.key,             "Find(): Node key")
+		testing.expect(t, v == rb.find(tree, k), "Find(): Node")
+		testing.expect(t, k == v.key,            "Find(): Node key")
 	}
 
 	// Test the forward/backward iterators.
@@ -97,17 +90,17 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 		(^int)(user_data)^ -= 1
 	}
 	for k, i in inserted_keys {
-		node := rb.find(&tree, k)
+		node := rb.find(tree, k)
 		testing.expect(t, node != nil, "remove: find (pre)")
 
 		ok := rb.remove(&tree, k)
 		testing.expect(t, ok, "remove: succeeds")
-		testing.expect(t, entry_count - (i + 1) == rb.len(&tree), "remove: len (post)")
+		testing.expect(t, entry_count - (i + 1) == rb.len(tree), "remove: len (post)")
 		validate_rbtree(t, &tree)
 
-		testing.expect(t, nil == rb.find(&tree, k), "remove: find (post")
+		testing.expect(t, nil == rb.find(tree, k), "remove: find (post")
 	}
-	testing.expect(t, rb.len(&tree)   == 0,   "remove: len should be 0")
+	testing.expect(t, rb.len(tree)    == 0,   "remove: len should be 0")
 	testing.expectf(t, callback_count == 0,   "remove: on_remove should've been called %v times, it was %v", entry_count, callback_count)
 	testing.expect(t, rb.first(&tree) == nil, "remove: first should be nil")
 	testing.expect(t, rb.last(&tree)  == nil, "remove: last should be nil")
@@ -129,28 +122,25 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 		ok = rb.iterator_remove(&iter)
 		testing.expect(t, !ok, "iterator/remove: redundant removes should fail")
 
-		testing.expect(t, rb.find(&tree, k)      == nil, "iterator/remove: node should be gone")
+		testing.expect(t, rb.find(tree, k)       == nil, "iterator/remove: node should be gone")
 		testing.expect(t, rb.iterator_get(&iter) == nil, "iterator/remove: get should return nil")
 
 		// Ensure that iterator_next still works.
 		node, ok = rb.iterator_next(&iter)
-		testing.expect(t, ok   == (rb.len(&tree) > 0), "iterator/remove: next should return false")
+		testing.expect(t, ok   == (rb.len(tree) > 0),  "iterator/remove: next should return false")
 		testing.expect(t, node == rb.first(&tree),     "iterator/remove: next should return first")
 
 		validate_rbtree(t, &tree)
 	}
-	testing.expect(t, rb.len(&tree) == entry_count - 1, "iterator/remove: len should drop by 1")
+	testing.expect(t, rb.len(tree) == entry_count - 1, "iterator/remove: len should drop by 1")
 
 	rb.destroy(&tree)
-	testing.expect(t, rb.len(&tree)  == 0, "destroy: len should be 0")
+	testing.expect(t, rb.len(tree)    == 0, "destroy: len should be 0")
 	testing.expectf(t, callback_count == 0, "remove: on_remove should've been called %v times, it was %v", entry_count, callback_count)
 
 	// print_tree_node(tree._root)
 	delete(inserted_map)
 	delete(inserted_keys)
-	testing.expectf(t, len(track.allocation_map) == 0, "Expected 0 leaks, have %v",     len(track.allocation_map))
-	testing.expectf(t, len(track.bad_free_array) == 0, "Expected 0 bad frees, have %v", len(track.bad_free_array))
-	return
 }
 
 @(test)

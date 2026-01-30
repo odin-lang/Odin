@@ -1133,7 +1133,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				x.mode = Addressing_Value;
 				x.type = t;
 				if (check_is_assignable_to(c, &x, type)) {
-					add_entity_use(c, operand->expr, e);
+					if (operand->expr->kind == Ast_SelectorExpr) {
+						add_entity_use(c, operand->expr->SelectorExpr.selector, e);
+					} else {
+						add_entity_use(c, operand->expr, e);
+					}
 					good = true;
 					break;
 				}
@@ -3526,28 +3530,17 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 		Type *elem = core_array_type(bt);
 
 		if (core_type(bt)->kind == Type_Basic) {
-			if (check_representable_as_constant(c, x->value, type, &x->value)) {
-				return true;
-			}
-			goto check_castable;
-		} else if (!are_types_identical(elem, bt) &&
-		           elem->kind == Type_Basic &&
-		           check_representable_as_constant(c, x->value, elem, &x->value)) {
-			if (check_representable_as_constant(c, x->value, type, &x->value)) {
-				return true;
-			}
-			goto check_castable;
+			return check_representable_as_constant(c, x->value, type, &x->value) ||
+			       (is_type_pointer(type) && check_is_castable_to(c, x, type));
+		} else if (!are_types_identical(elem, bt) && elem->kind == Type_Basic && x->type->kind == Type_Basic) {
+			return check_representable_as_constant(c, x->value, elem, &x->value) || 
+			       (is_type_pointer(elem) && check_is_castable_to(c, x, elem));
 		} else if (check_is_castable_to(c, x, type)) {
 			x->value = {};
 			x->mode = Addressing_Value;
 			return true;
 		}
-
-		return false;
-	}
-
-check_castable:
-	if (check_is_castable_to(c, x, type)) {
+	} else if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
 		} else if (is_type_slice(type) && is_type_string(x->type)) {
@@ -4132,15 +4125,19 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 				i64 upper = yt->BitSet.upper;
 
 				if (lower <= key && key <= upper) {
-					i64 bit = 1ll<<key;
-					i64 bits = big_int_to_i64(&v.value_integer);
+					BigInt idx = big_int_make_i64(key - lower);
+					BigInt bit = big_int_make_i64(1);
+					big_int_shl_eq(&bit, &idx);
+
+					BigInt mask = {};
+					big_int_and(&mask, &bit, &v.value_integer);
 
 					x->mode = Addressing_Constant;
 					x->type = t_untyped_bool;
 					if (op.kind == Token_in) {
-						x->value = exact_value_bool((bit & bits) != 0);
+						x->value = exact_value_bool(!big_int_is_zero(&mask));
 					} else {
-						x->value = exact_value_bool((bit & bits) == 0);
+						x->value = exact_value_bool(big_int_is_zero(&mask));
 					}
 					x->expr = node;
 					return;
@@ -4707,12 +4704,14 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	switch (t->kind) {
 	case Type_Basic:
 		if (operand->mode == Addressing_Constant) {
-			check_is_expressible(c, operand, t);
+			check_is_expressible(c, operand, target_type);
 			if (operand->mode == Addressing_Invalid) {
 				return;
 			}
 			update_untyped_expr_value(c, operand->expr, operand->value);
-		} else {
+		}
+
+		{
 			switch (operand->type->Basic.kind) {
 			case Basic_UntypedBool:
 				if (!is_type_boolean(target_type)) {
@@ -5195,6 +5194,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 						}
 					} else {
 						TypeAndValue index_tav = fv->field->tav;
+						if (index_tav.mode != Addressing_Constant) {
+							if (success_) *success_ = false;
+							if (finish_) *finish_ = true;
+							return empty_exact_value;
+						}
 						GB_ASSERT(index_tav.mode == Addressing_Constant);
 						ExactValue index_value = index_tav.value;
 						if (is_type_enumerated_array(node->tav.type)) {
@@ -8172,13 +8176,7 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 	Type *return_type = proc.result_count == 0 ? nullptr : proc.results->Tuple.variables[0]->type;
 	bool is_return_instancetype = return_type != nullptr && return_type == t_objc_instancetype;
 
-	if (params.count == 0 || !is_type_objc_ptr_to_object(params[0]->type)) {
-		if (!proc_entity->Procedure.is_objc_class_method) {
-			// Not a class method, invalid call
-			error(call, "Invalid Objective-C call: The Objective-C method is not a class method but this first parameter is not an Objective-C object pointer.");
-			return;
-		}
-
+	if (proc_entity->Procedure.is_objc_class_method) {
 		if (is_return_instancetype) {
 			if (ce->proc->kind == Ast_SelectorExpr) {
 				ast_node(se, SelectorExpr, ce->proc);
@@ -8194,7 +8192,8 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 
 		self_type    = t_objc_Class;
 		params_start = 0;
-	} else if (ce->args.count > 0) {
+	} else {
+		GB_ASSERT(ce->args.count > 0);
 		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
 
 		if (ce->args[0]->tav.objc_super_target) {
@@ -8226,7 +8225,7 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 	add_objc_proc_type(c, call, return_type, param_types);
 }
 
-gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
+gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, ProcTailing tailing, Type *type_hint) {
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
@@ -8257,7 +8256,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			return Expr_Expr;
 		}
 		if (inlining != ProcInlining_none) {
-			error(call, "Inlining operators are not allowed on built-in procedures");
+			error(call, "Inlining directives are not allowed on built-in procedures");
+		}
+		if (tailing != ProcTailing_none) {
+			error(call, "Tailing directives are not allowed on built-in procedures");
 		}
 	} else {
 		if (proc != nullptr) {
@@ -8399,6 +8401,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 
 	bool is_call_inlined = false;
+	bool is_call_tailed = true;
 
 	switch (inlining) {
 	case ProcInlining_inline:
@@ -8431,6 +8434,23 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				}
 			}
 		}
+	}
+
+	switch (tailing) {
+	case ProcTailing_none:
+		break;
+	case ProcTailing_must_tail:
+		is_call_tailed = true;
+		if (c->curr_proc_sig == nullptr || !are_types_identical(c->curr_proc_sig, pt)) {
+			ERROR_BLOCK();
+			gbString a = type_to_string(pt);
+			gbString b = type_to_string(c->curr_proc_sig);
+			error(call, "Use of '#must_tail' of a procedure must have the same type as the procedure it was called within");
+			error_line("\tCall type: %s, parent type: %s", a, b);
+			gb_string_free(b);
+			gb_string_free(a);
+		}
+		break;
 	}
 
 	{
@@ -8759,6 +8779,14 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 	if (is_operand_nil(*o)) {
 		return true;
 	}
+	if (is_type_any(field_type)) {
+		return false;
+	}
+	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
+		add_type_info_type(c, o->type);
+		return true;
+	}
+
 	Ast *expr = unparen_expr(o->expr);
 	if (expr != nullptr) {
 		Entity *e = strip_entity_wrapping(entity_from_expr(expr));
@@ -8769,13 +8797,12 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
 			return true;
 		}
-	}
-	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
-		add_type_info_type(c, o->type);
-		return true;
-	}
-	if (is_type_any(field_type)) {
-		return false;
+
+		if (e != nullptr && e->kind == Entity_Variable && e->Variable.is_rodata) {
+			// DeclInfo *d = e->decl_info;
+			// TODO(bill): rodata inlining for non-indirect values
+			// e.g. **NOT** []T{...}
+		}
 	}
 	return o->mode == Addressing_Constant;
 }
@@ -11044,8 +11071,20 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 end:;
 
 	if ((c->state_flags & StateFlag_no_type_assert) == 0) {
-		add_package_dependency(c, "runtime", "type_assertion_check");
-		add_package_dependency(c, "runtime", "type_assertion_check2");
+		bool has_context = true;
+		if (c->proc_name.len == 0 && c->curr_proc_sig == nullptr) {
+			has_context = false;
+		} else if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
+			has_context = false;
+		}
+
+		if (has_context) {
+			add_package_dependency(c, "runtime", "type_assertion_check_with_context");
+			add_package_dependency(c, "runtime", "type_assertion_check2_with_context");
+		} else {
+			add_package_dependency(c, "runtime", "type_assertion_check_contextless");
+			add_package_dependency(c, "runtime", "type_assertion_check2_contextless");
+		}
 	}
 	return kind;
 }
@@ -11570,6 +11609,15 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
+	case_ast_node(ht, HelperType, node);
+		Type *type = check_type(c, ht->type);
+		if (type != nullptr && type != t_invalid) {
+			o->mode = Addressing_Type;
+			o->type = type;
+		}
+		return kind;
+	case_end;
+
 	case_ast_node(i, Implicit, node);
 		switch (i->kind) {
 		case Token_context:
@@ -11832,7 +11880,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
-		return check_call_expr(c, o, node, ce->proc, ce->args, ce->inlining, type_hint);
+		return check_call_expr(c, o, node, ce->proc, ce->args, ce->inlining, ce->tailing, type_hint);
 	case_end;
 
 	case_ast_node(de, DerefExpr, node);
@@ -12103,12 +12151,12 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 
 
 
-gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y, bool *do_break_) {
+gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y) {
 	ast_node(x_cl, CompoundLit, x.value_compound);
 	ast_node(y_cl, CompoundLit, y.value_compound);
 
 	if (x_cl->elems.count != y_cl->elems.count) {
-		if (do_break_) *do_break_ = true;
+		return false;
 	}
 
 	bool test = op == Token_CmpEq;
@@ -12573,6 +12621,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(ce, CallExpr, node);
+		switch (ce->tailing) {
+		case ProcTailing_must_tail:
+			str = gb_string_appendc(str, "#must_tail ");
+			break;
+		}
+
 		switch (ce->inlining) {
 		case ProcInlining_inline:
 			str = gb_string_appendc(str, "#force_inline ");
@@ -12640,8 +12694,10 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
 			str = gb_string_appendc(str, ") ");
 		}
-		if (st->is_packed)    str = gb_string_appendc(str, "#packed ");
-		if (st->is_raw_union) str = gb_string_appendc(str, "#raw_union ");
+		if (st->is_packed)      str = gb_string_appendc(str, "#packed ");
+		if (st->is_raw_union)   str = gb_string_appendc(str, "#raw_union ");
+		if (st->is_all_or_none) str = gb_string_appendc(str, "#all_or_none ");
+		if (st->is_simple)      str = gb_string_appendc(str, "#simple ");
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
 			str = write_expr_to_string(str, st->align, shorthand);

@@ -107,7 +107,11 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	high := posix.sched_get_priority_max(policy)
 	switch priority {
 	case .Normal: // Okay
-	case .Low:  params.sched_priority = low + 1
+	case .Low:
+		params.sched_priority = low + 1
+		if params.sched_priority >= high {
+			params.sched_priority = low
+		}
 	case .High: params.sched_priority = high
 	}
 	res = posix.pthread_attr_setschedparam(&attrs, &params)

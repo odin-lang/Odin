@@ -360,7 +360,7 @@ extern SDL_DECLSPEC void SDLCALL SDL_LockMutex(SDL_Mutex *mutex) SDL_ACQUIRE(mut
  * \sa SDL_LockMutex
  * \sa SDL_UnlockMutex
  */
-extern SDL_DECLSPEC bool SDLCALL SDL_TryLockMutex(SDL_Mutex *mutex) SDL_TRY_ACQUIRE(0, mutex);
+extern SDL_DECLSPEC bool SDLCALL SDL_TryLockMutex(SDL_Mutex *mutex) SDL_TRY_ACQUIRE(true, mutex);
 
 /**
  * Unlock the mutex.
@@ -559,7 +559,7 @@ extern SDL_DECLSPEC void SDLCALL SDL_LockRWLockForWriting(SDL_RWLock *rwlock) SD
  * \sa SDL_TryLockRWLockForWriting
  * \sa SDL_UnlockRWLock
  */
-extern SDL_DECLSPEC bool SDLCALL SDL_TryLockRWLockForReading(SDL_RWLock *rwlock) SDL_TRY_ACQUIRE_SHARED(0, rwlock);
+extern SDL_DECLSPEC bool SDLCALL SDL_TryLockRWLockForReading(SDL_RWLock *rwlock) SDL_TRY_ACQUIRE_SHARED(true, rwlock);
 
 /**
  * Try to lock a read/write lock _for writing_ without blocking.
@@ -589,7 +589,7 @@ extern SDL_DECLSPEC bool SDLCALL SDL_TryLockRWLockForReading(SDL_RWLock *rwlock)
  * \sa SDL_TryLockRWLockForReading
  * \sa SDL_UnlockRWLock
  */
-extern SDL_DECLSPEC bool SDLCALL SDL_TryLockRWLockForWriting(SDL_RWLock *rwlock) SDL_TRY_ACQUIRE(0, rwlock);
+extern SDL_DECLSPEC bool SDLCALL SDL_TryLockRWLockForWriting(SDL_RWLock *rwlock) SDL_TRY_ACQUIRE(true, rwlock);
 
 /**
  * Unlock the read/write lock.
@@ -942,7 +942,7 @@ typedef enum SDL_InitStatus
  * Here is an example of using this:
  *
  * ```c
- *    static SDL_AtomicInitState init;
+ *    static SDL_InitState init;
  *
  *    bool InitSystem(void)
  *    {

@@ -1,22 +1,22 @@
 /*
- Simple DirectMedia Layer
- Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Simple DirectMedia Layer
+  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
 
- This software is provided 'as-is', without any express or implied
- warranty.  In no event will the authors be held liable for any damages
- arising from the use of this software.
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
 
- Permission is granted to anyone to use this software for any purpose,
- including commercial applications, and to alter it and redistribute it
- freely, subject to the following restrictions:
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
 
- 1. The origin of this software must not be misrepresented; you must not
-    claim that you wrote the original software. If you use this software
-    in a product, an acknowledgment in the product documentation would be
-    appreciated but is not required.
- 2. Altered source versions must be plainly marked as such, and must not be
-    misrepresented as being the original software.
- 3. This notice may not be removed or altered from any source distribution.
+  1. The origin of this software must not be misrepresented; you must not
+  claim that you wrote the original software. If you use this software
+  in a product, an acknowledgment in the product documentation would be
+  appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+  misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
 */
 
 /* WIKI CATEGORY: Version */
@@ -44,13 +44,16 @@
  * clue in debugging forensics and not something the app will parse in any
  * way.
  *
- * \since This macro is available since SDL 3.0.0.
+ * SDL_revision.h must be included in your program explicitly if you want
+ * access to the SDL_REVISION constant.
+ *
+ * \since This macro is available since SDL 3.2.0.
  */
 #define SDL_REVISION "Some arbitrary string decided at SDL build time"
 #elif defined(SDL_VENDOR_INFO)
-#define SDL_REVISION "release-3.2.16-0-gc9a6709bd (" SDL_VENDOR_INFO ")"
+#define SDL_REVISION SDL_VENDOR_INFO
 #else
-#define SDL_REVISION "release-3.2.16-0-gc9a6709bd"
+#define SDL_REVISION ""
 #endif
 
 #endif /* SDL_revision_h_ */

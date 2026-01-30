@@ -239,9 +239,9 @@ gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx
 
 gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type) {
 	gbString str = gb_string_make(permanent_allocator(), prefix);
-	u64 hash = type_hash_canonical_type(type);
-	str = gb_string_appendc(str, "-");
-	str = gb_string_append_fmt(str, "%llu", cast(unsigned long long)hash);
+	str = gb_string_appendc(str, "$$");
+	gbString ct = temp_canonical_string(type);
+	str = gb_string_append_length(str, ct, gb_string_length(ct));
 	String proc_name = make_string(cast(u8 const *)str, gb_string_length(str));
 	return proc_name;
 }
@@ -2045,6 +2045,11 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 			lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
 			lb_emit_store(p, ti,   lb_typeid(p->module, var_type));
 		} else {
+			i64 sz = type_size_of(e->type);
+			if (sz >= 4 * 1024) {
+				warning(init_expr, "[Possible Code Generation Issue] Non-constant initialization is large (%lld bytes), and might cause problems with LLVM", cast(long long)sz);
+			}
+
 			LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 			lbValue src0 = lb_emit_conv(p, var.init, t);
 			LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
@@ -2111,7 +2116,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 
 	for (Entity *e : info->init_procedures) {
 		lbValue value = lb_find_procedure_value_from_entity(m, e);
-		lb_emit_call(p, value, {}, ProcInlining_none);
+		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
 	}
 
 
@@ -2157,7 +2162,7 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	for (Entity *e : info->fini_procedures) {
 		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
-		lb_emit_call(p, value, {}, ProcInlining_none);
+		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
 	}
 
 	lb_end_procedure_body(p);
@@ -2850,7 +2855,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	}
 
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
-	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none);
+	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none, ProcTailing_none);
 
 	if (build_context.command_kind == Command_test) {
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
@@ -2917,16 +2922,16 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 		auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
 		exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
-		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none);
+		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none, ProcTailing_none);
 	} else {
 		if (m->info->entry_point != nullptr) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
-			lb_emit_call(p, entry_point, {}, ProcInlining_no_inline);
+			lb_emit_call(p, entry_point, {}, ProcInlining_no_inline, ProcTailing_none);
 		}
 
 		if (call_cleanup) {
 			lbValue cleanup_runtime_value = {cleanup_runtime->value, cleanup_runtime->type};
-			lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none);
+			lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, ProcTailing_none);
 		}
 
 		if (is_dll_main) {

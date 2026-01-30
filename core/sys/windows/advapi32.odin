@@ -228,7 +228,7 @@ foreign advapi32 {
 }
 
 PTOKEN_INFORMATION_CLASS :: ^TOKEN_INFORMATION_CLASS
-TOKEN_INFORMATION_CLASS :: enum i32 {
+TOKEN_INFORMATION_CLASS :: enum c_int {
 	TokenUser = 1,
 	TokenGroups,
 	TokenPrivileges,
@@ -282,7 +282,7 @@ TOKEN_INFORMATION_CLASS :: enum i32 {
 }
 
 PSID_NAME_USE :: ^SID_NAME_USE
-SID_NAME_USE :: enum i32 {
+SID_NAME_USE :: enum c_int {
 	SidTypeUser = 1,
 	SidTypeGroup,
 	SidTypeDomain,
@@ -303,35 +303,35 @@ TOKEN_USER :: struct {
 
 PSID_AND_ATTRIBUTES :: ^SID_AND_ATTRIBUTES
 SID_AND_ATTRIBUTES :: struct {
-	Sid: rawptr,
+	Sid:        rawptr,
 	Attributes: ULONG,
 }
 
 PTOKEN_TYPE :: ^TOKEN_TYPE
 TOKEN_TYPE :: enum {
-	TokenPrimary = 1,
+	TokenPrimary       = 1,
 	TokenImpersonation = 2,
 }
 
 PTOKEN_STATISTICS :: ^TOKEN_STATISTICS
 TOKEN_STATISTICS :: struct {
-	TokenId: LUID,
-	AuthenticationId: LUID,
-	ExpirationTime: LARGE_INTEGER,
-	TokenType: TOKEN_TYPE,
+	TokenId:            LUID,
+	AuthenticationId:   LUID,
+	ExpirationTime:     LARGE_INTEGER,
+	TokenType:          TOKEN_TYPE,
 	ImpersonationLevel: SECURITY_IMPERSONATION_LEVEL,
-	DynamicCharged: DWORD,
-	DynamicAvailable: DWORD,
-	GroupCount: DWORD,
-	PrivilegeCount: DWORD,
-	ModifiedId: LUID,
+	DynamicCharged:     DWORD,
+	DynamicAvailable:   DWORD,
+	GroupCount:         DWORD,
+	PrivilegeCount:     DWORD,
+	ModifiedId:         LUID,
 }
 
 
 TOKEN_SOURCE_LENGTH :: 8
 PTOKEN_SOURCE :: ^TOKEN_SOURCE
 TOKEN_SOURCE :: struct {
-	SourceName: [TOKEN_SOURCE_LENGTH]CHAR,
+	SourceName:       [TOKEN_SOURCE_LENGTH]CHAR,
 	SourceIdentifier: LUID,
 }
 
@@ -339,7 +339,7 @@ TOKEN_SOURCE :: struct {
 PTOKEN_PRIVILEGES :: ^TOKEN_PRIVILEGES
 TOKEN_PRIVILEGES :: struct {
 	PrivilegeCount: DWORD,
-	Privileges: [0]LUID_AND_ATTRIBUTES,
+	Privileges:     [0]LUID_AND_ATTRIBUTES,
 }
 
 PTOKEN_PRIMARY_GROUP :: ^TOKEN_PRIMARY_GROUP
@@ -354,16 +354,16 @@ TOKEN_OWNER :: struct {
 
 PTOKEN_GROUPS_AND_PRIVILEGES :: ^TOKEN_GROUPS_AND_PRIVILEGES
 TOKEN_GROUPS_AND_PRIVILEGES :: struct {
-	SidCount: DWORD,
-	SidLength: DWORD,
-	Sids: PSID_AND_ATTRIBUTES,
-	RestrictedSidCount: DWORD,
+	SidCount:            DWORD,
+	SidLength:           DWORD,
+	Sids:                PSID_AND_ATTRIBUTES,
+	RestrictedSidCount:  DWORD,
 	RestrictedSidLength: DWORD,
-	RestrictedSids: PSID_AND_ATTRIBUTES,
-	PrivilegeCount: DWORD,
-	PrivilegeLength: DWORD,
-	Privileges: PLUID_AND_ATTRIBUTES,
-	AuthenticationId: LUID,
+	RestrictedSids:      PSID_AND_ATTRIBUTES,
+	PrivilegeCount:      DWORD,
+	PrivilegeLength:     DWORD,
+	Privileges:          PLUID_AND_ATTRIBUTES,
+	AuthenticationId:    LUID,
 }
 
 PTOKEN_DEFAULT_DACL :: ^TOKEN_DEFAULT_DACL
@@ -374,8 +374,8 @@ TOKEN_DEFAULT_DACL :: struct {
 PACL :: ^ACL
 ACL :: struct {
 	AclRevision: BYTE,
-	Sbz1: BYTE,
-	AclSize: WORD,
-	AceCount: WORD,
-	Sbz2: WORD,
+	Sbz1:        BYTE,
+	AclSize:     WORD,
+	AceCount:    WORD,
+	Sbz2:        WORD,
 }

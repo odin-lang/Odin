@@ -395,6 +395,20 @@ MAP_HUGE_1GB        :: transmute(Map_Flags)(u32(30) << MAP_HUGE_SHIFT)
 MAP_HUGE_2GB        :: transmute(Map_Flags)(u32(31) << MAP_HUGE_SHIFT)
 MAP_HUGE_16GB       :: transmute(Map_Flags)(u32(34) << MAP_HUGE_SHIFT)
 
+MFD_HUGE_16KB       :: transmute(Memfd_Create_Flags)(u32(14) << MAP_HUGE_SHIFT)
+MFD_HUGE_64KB       :: transmute(Memfd_Create_Flags)(u32(16) << MAP_HUGE_SHIFT)
+MFD_HUGE_512KB      :: transmute(Memfd_Create_Flags)(u32(19) << MAP_HUGE_SHIFT)
+MFD_HUGE_1MB        :: transmute(Memfd_Create_Flags)(u32(20) << MAP_HUGE_SHIFT)
+MFD_HUGE_2MB        :: transmute(Memfd_Create_Flags)(u32(21) << MAP_HUGE_SHIFT)
+MFD_HUGE_8MB        :: transmute(Memfd_Create_Flags)(u32(23) << MAP_HUGE_SHIFT)
+MFD_HUGE_16MB       :: transmute(Memfd_Create_Flags)(u32(24) << MAP_HUGE_SHIFT)
+MFD_HUGE_32MB       :: transmute(Memfd_Create_Flags)(u32(25) << MAP_HUGE_SHIFT)
+MFD_HUGE_256MB      :: transmute(Memfd_Create_Flags)(u32(28) << MAP_HUGE_SHIFT)
+MFD_HUGE_512MB      :: transmute(Memfd_Create_Flags)(u32(29) << MAP_HUGE_SHIFT)
+MFD_HUGE_1GB        :: transmute(Memfd_Create_Flags)(u32(30) << MAP_HUGE_SHIFT)
+MFD_HUGE_2GB        :: transmute(Memfd_Create_Flags)(u32(31) << MAP_HUGE_SHIFT)
+MFD_HUGE_16GB       :: transmute(Memfd_Create_Flags)(u32(34) << MAP_HUGE_SHIFT)
+
 /* Get window size */
 TIOCGWINSZ :: 0x5413
 

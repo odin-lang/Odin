@@ -1,4 +1,4 @@
-#+build darwin
+#+build darwin, openbsd, netbsd
 package net
 
 /*
@@ -117,32 +117,47 @@ IF_Flag :: enum u32 {
 	BROADCAST,
 	DEBUG,
 	LOOPBACK,
-	POINTTOPOINT,
-	NOTRAILERS,
-	RUNNING,
-	NOARP,
-	PROMISC,
-	ALLMULTI,
-	OACTIVE,
-	SIMPLEX,
-	LINK0,
-	LINK1,
-	LINK2,
-	MULTICAST,
+	// NOTE: different order on other BSDs but we don't even need these.
+	// POINTTOPOINT,
+	// NOTRAILERS,
+	// RUNNING,
+	// NOARP,
+	// PROMISC,
+	// ALLMULTI,
+	// OACTIVE,
+	// SIMPLEX,
+	// LINK0,
+	// LINK1,
+	// LINK2,
+	// MULTICAST,
 }
 
 @(private)
 IF_Flags :: bit_set[IF_Flag; u32]
 
-@(private)
-ifaddrs :: struct {
-	next:    ^ifaddrs,
-	name:    cstring,
-	flags:   IF_Flags,
-	addr:    ^posix.sockaddr,
-	netmask: ^posix.sockaddr,
-	dstaddr: ^posix.sockaddr,
-	data:    rawptr,
+when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
+	@(private)
+	ifaddrs :: struct {
+		next:    ^ifaddrs,
+		name:    cstring,
+		flags:   IF_Flags,
+		addr:    ^posix.sockaddr,
+		netmask: ^posix.sockaddr,
+		dstaddr: ^posix.sockaddr,
+		data:    rawptr,
+	}
+} else when ODIN_OS == .NetBSD {
+	@(private)
+	ifaddrs :: struct {
+		next:      ^ifaddrs,
+		name:      cstring,
+		flags:     IF_Flags,
+		addr:      ^posix.sockaddr,
+		netmask:   ^posix.sockaddr,
+		dstaddr:   ^posix.sockaddr,
+		data:      rawptr,
+		addrflags: u32,
+	}
 }
 
 @(private)

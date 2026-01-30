@@ -2628,6 +2628,8 @@ gb_internal bool lb_apply_thread_local_model(LLVMValueRef value, String model) {
 		LLVMThreadLocalMode mode = LLVMGeneralDynamicTLSModel;
 		if (model == "default") {
 			mode = LLVMGeneralDynamicTLSModel;
+		} else if (model == "globaldynamic") {
+			mode = LLVMGeneralDynamicTLSModel;
 		} else if (model == "localdynamic") {
 			mode = LLVMLocalDynamicTLSModel;
 		} else if (model == "initialexec") {

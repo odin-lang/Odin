@@ -2004,3 +2004,15 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	runtime.print_string("\n")
 	return true
 }
+
+
+@(require_results)
+default_map_hash_by_ptr :: proc(ptr: ^$T, seed: uintptr = 0) -> uintptr where intrinsics.type_is_comparable(T) {
+	assert(ptr != nil)
+	info := intrinsics.type_map_info(map[T]struct{})
+
+	h := u64(seed) + runtime.INITIAL_HASH_SEED
+	actual_seed := uintptr(h) | uintptr(uintptr(h) == 0)
+
+	return info.key_hasher(ptr, actual_seed)
+}

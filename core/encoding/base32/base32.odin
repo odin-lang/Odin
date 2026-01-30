@@ -153,15 +153,15 @@ decode :: proc(
 		padding_count += 1
 	}
 
+	// Verify no padding in the middle
+	for i := 0; i < data_len - padding_count; i += 1 {
+		if data[i] == byte(PADDING) {
+			return nil, .Malformed_Input
+		}
+	}
+
 	// Check for proper padding and length combinations
 	if padding_count > 0 {
-		// Verify no padding in the middle
-		for i := 0; i < data_len - padding_count; i += 1 {
-			if data[i] == byte(PADDING) {
-				return nil, .Malformed_Input
-			}
-		}
-
 		content_len := data_len - padding_count
 		mod8 := content_len % 8
 		required_padding: int

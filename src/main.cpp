@@ -324,8 +324,6 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
-	BuildFlag_UseLLD,
-	BuildFlag_UseRADLink,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
@@ -362,6 +360,8 @@ enum BuildFlagKind {
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
+
+	BuildFlag_DisableUnwind,
 
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
@@ -554,8 +554,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
-	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
@@ -591,6 +589,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_DisableUnwind,           str_lit("disable-unwind"),          BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
@@ -1252,14 +1252,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
 							break;
-						case BuildFlag_UseLLD:
-							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:lld\n");
-							build_context.linker_choice = Linker_lld;
-							break;
-						case BuildFlag_UseRADLink:
-							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:radlink\n");
-							build_context.linker_choice = Linker_radlink;
-							break;
 						case BuildFlag_Linker:
 							{
 								GB_ASSERT(value.kind == ExactValue_String);
@@ -1424,6 +1416,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisableRedZone:
 							build_context.disable_red_zone = true;
 							break;
+						case BuildFlag_DisableUnwind:
+							build_context.disable_unwind = true;
+							break;
+
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
@@ -2971,6 +2967,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (check) {
 		if (print_flag("-target:<string>")) {
 			print_usage_line(2, "Sets the target for the executable to be built in.");
+			print_usage_line(2, "Examples:");
+				print_usage_line(3, "-target:linux_amd64");
+				print_usage_line(3, "-target:windows_amd64");
+				print_usage_line(3, "-target:\"?\" for a list");
 		}
 
 		if (print_flag("-terse-errors")) {
@@ -4032,6 +4032,14 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		remove_temp_files(gen);
+	}
+
+	if (any_errors()) {
+		print_all_errors();
+		return 1;
+	}
+	if (any_warnings()) {
+		print_all_errors();
 	}
 
 end_of_code_gen:;

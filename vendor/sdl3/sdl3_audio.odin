@@ -67,8 +67,11 @@ AUDIO_FRAMESIZE :: proc "c" (x: AudioSpec) -> c.int {
 
 AudioStream :: struct {}
 
-AudioStreamCallback  :: #type proc "c" (userdata: rawptr, stream: ^AudioStream, additional_amount, total_amount: c.int)
-AudioPostmixCallback :: #type proc "c" (userdata: rawptr, spec: ^AudioSpec, buffer: [^]f32, buflen: c.int)
+AudioStreamCallback             :: #type proc "c" (userdata: rawptr, stream: ^AudioStream, additional_amount, total_amount: c.int)
+AudioStreamDataCompleteCallback :: #type proc "c" (userdata: rawptr, buf: rawptr, buflen: c.int)
+AudioPostmixCallback            :: #type proc "c" (userdata: rawptr, spec: ^AudioSpec, buffer: [^]f32, buflen: c.int)
+
+AUDIOSTREAM_AUTO_CLEANUP_BOOLEAN :: "SDL.audiostream.auto_cleanup"
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -107,6 +110,8 @@ foreign lib {
 	SetAudioStreamInputChannelMap  :: proc(stream: ^AudioStream, chmap: [^]c.int, count: c.int) -> bool ---
 	SetAudioStreamOutputChannelMap :: proc(stream: ^AudioStream, chmap: [^]c.int, count: c.int) -> bool ---
 	PutAudioStreamData             :: proc(stream: ^AudioStream, buf: rawptr, len: c.int) -> bool ---
+	PutAudioStreamDataNoCopy       :: proc(stream: ^AudioStream, buf: rawptr, len: c.int, callback: AudioStreamDataCompleteCallback, userdata: rawptr) -> bool ---
+	PutAudioStreamPlanarData       :: proc(stream: ^AudioStream, channel_buffers: [^]rawptr, num_channels, num_samples: c.int) -> bool ---
 	GetAudioStreamData             :: proc(stream: ^AudioStream, buf: rawptr, len: c.int) -> c.int ---
 	GetAudioStreamAvailable        :: proc(stream: ^AudioStream) -> c.int ---
 	GetAudioStreamQueued           :: proc(stream: ^AudioStream) -> c.int ---

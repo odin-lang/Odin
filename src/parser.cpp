@@ -1230,7 +1230,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 }
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
-                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_all_or_none,
+                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_all_or_none, bool is_simple,
                      Ast *align, Ast *min_field_align, Ast *max_field_align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
@@ -1241,6 +1241,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.is_packed          = is_packed;
 	result->StructType.is_raw_union       = is_raw_union;
 	result->StructType.is_all_or_none     = is_all_or_none;
+	result->StructType.is_simple          = is_simple;
 	result->StructType.align              = align;
 	result->StructType.min_field_align    = min_field_align;
 	result->StructType.max_field_align    = max_field_align;
@@ -2176,38 +2177,50 @@ gb_internal bool ast_on_same_line(Token const &x, Ast *yp) {
 	return x.pos.line == y.pos.line;
 }
 
-gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {
+gb_internal Ast *parse_inlining_or_tailing_operand(AstFile *f, Token token) {
 	Ast *expr = parse_unary_expr(f, false);
 	Ast *e = strip_or_return_expr(expr);
 	if (e == nullptr) {
 		return expr;
 	}
 	if (e->kind != Ast_ProcLit && e->kind != Ast_CallExpr) {
-		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[expr->kind]));
+		syntax_error(expr, "%.*s must be followed by a procedure literal or call, got %.*s", LIT(token.string), LIT(ast_strings[e->kind]));
 		return ast_bad_expr(f, token, f->curr_token);
 	}
 	ProcInlining pi = ProcInlining_none;
+	ProcTailing  pt = ProcTailing_none;
 	if (token.kind == Token_Ident) {
 		if (token.string == "force_inline") {
 			pi = ProcInlining_inline;
 		} else if (token.string == "force_no_inline") {
 			pi = ProcInlining_no_inline;
+		} else if (token.string == "must_tail") {
+			pt = ProcTailing_must_tail;
 		}
 	}
 
 	if (pi != ProcInlining_none) {
 		if (e->kind == Ast_ProcLit) {
-			if (expr->ProcLit.inlining != ProcInlining_none &&
-			    expr->ProcLit.inlining != pi) {
+			if (e->ProcLit.inlining != ProcInlining_none &&
+			    e->ProcLit.inlining != pi) {
 				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure literal");
 			}
-			expr->ProcLit.inlining = pi;
+			e->ProcLit.inlining = pi;
 		} else if (e->kind == Ast_CallExpr) {
-			if (expr->CallExpr.inlining != ProcInlining_none &&
-			    expr->CallExpr.inlining != pi) {
+			if (e->CallExpr.inlining != ProcInlining_none &&
+			    e->CallExpr.inlining != pi) {
 				syntax_error(expr, "Cannot apply both '#force_inline' and '#force_no_inline' to a procedure call");
 			}
-			expr->CallExpr.inlining = pi;
+			e->CallExpr.inlining = pi;
+		}
+	}
+
+	if (pt != ProcTailing_none) {
+		if (e->kind == Ast_ProcLit) {
+			syntax_error(expr, "'#must_call' can only be applied to a procedure call, not the procedure literal");
+			e->ProcLit.tailing = pt;
+		} else if (e->kind == Ast_CallExpr) {
+			e->CallExpr.tailing = pt;
 		}
 	}
 
@@ -2507,8 +2520,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			syntax_error(tag, "#relative types have now been removed in favour of \"core:relative\"");
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "force_inline" ||
-		           name.string == "force_no_inline") {
-			return parse_force_inlining_operand(f, name);
+		           name.string == "force_no_inline" ||
+		           name.string == "must_tail") {
+			return parse_inlining_or_tailing_operand(f, name);
 		}
 		return ast_basic_directive(f, token, name);
 	}
@@ -2775,6 +2789,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		bool is_packed          = false;
 		bool is_all_or_none     = false;
 		bool is_raw_union       = false;
+		bool is_simple          = false;
 		Ast *align              = nullptr;
 		Ast *min_field_align    = nullptr;
 		Ast *max_field_align    = nullptr;
@@ -2803,7 +2818,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				}
 				is_packed = true;
 			} else if (tag.string == "all_or_none") {
-				if (is_packed) {
+				if (is_all_or_none) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_all_or_none = true;
@@ -2856,11 +2871,16 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					error_line("\tSuggestion: #max_field_align(%s)", s);
 					gb_string_free(s);
 				}
-			}else if (tag.string == "raw_union") {
+			} else if (tag.string == "raw_union") {
 				if (is_raw_union) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_raw_union = true;
+			} else if (tag.string == "simple") {
+				if (is_simple) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				is_simple = true;
 			} else {
 				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
 			}
@@ -2906,7 +2926,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		parser_check_polymorphic_record_parameters(f, polymorphic_params);
 
 		return ast_struct_type(f, token, decls, name_count,
-		                       polymorphic_params, is_packed, is_raw_union, is_all_or_none,
+		                       polymorphic_params, is_packed, is_raw_union, is_all_or_none, is_simple,
 		                       align, min_field_align, max_field_align,
 		                       where_token, where_clauses);
 	} break;
@@ -4008,6 +4028,10 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	if (s == "win64")	return ProcCC_Win64;
 	if (s == "sysv")        return ProcCC_SysV;
 
+	if (s == "preserve/none") return ProcCC_PreserveNone;
+	if (s == "preserve/most") return ProcCC_PreserveMost;
+	if (s == "preserve/all")  return ProcCC_PreserveAll;
+
 	if (s == "system") {
 		if (build_context.metrics.os == TargetOs_windows) {
 			return ProcCC_StdCall;
@@ -5054,6 +5078,10 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
+	if (file_path.string == "\".\"") {
+		syntax_error(import_name, "Cannot cyclicly import packages");
+	}
+
 	expect_semicolon(f);
 	return s;
 }
@@ -5399,8 +5427,9 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			expect_semicolon(f);
 			return stmt;
 		} else if (name.string == "force_inline" ||
-		           name.string == "force_no_inline") {
-			Ast *expr = parse_force_inlining_operand(f, name);
+		           name.string == "force_no_inline" ||
+		           name.string == "must_tail") {
+			Ast *expr = parse_inlining_or_tailing_operand(f, name);
 			Ast *stmt =  ast_expr_stmt(f, expr);
 			expect_semicolon(f);
 			return stmt;
@@ -5818,6 +5847,11 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	}
 
+	if (string_ends_with(path, str_lit(".odin"))) {
+		error(pos, "'import' declarations cannot import directories with a .odin extension/suffix");
+		return nullptr;
+	}
+
 	isize files_with_ext = 0;
 	isize files_to_reserve = 1; // always reserve 1
 	for (FileInfo fi : list) {
@@ -5994,6 +6028,12 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 			if (original_string[2] == '/' || original_string[2] == '\\') {
 				colon_pos = -1;
 				has_windows_drive = true;
+			}
+		}
+
+		for (isize i = 0; i < original_string.len; i++) {
+			if (original_string.text[i] == '\\') {
+				original_string.text[i] = '/';
 			}
 		}
 	}
@@ -6205,9 +6245,28 @@ gb_internal String build_tag_get_token(String s, String *out) {
 	return s;
 }
 
+// returns true on failure
+gb_internal bool build_require_space_after(String s, String prefix) {
+	GB_ASSERT(string_starts_with(s, prefix));
+
+	if (s.len == prefix.len) {
+		return false;
+	}
+	String stripped = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s[prefix.len] != ' ' && stripped.len != 0) {
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("build");
 	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return true;
+	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
 	if (s.len == 0) {
@@ -6331,18 +6390,20 @@ gb_internal String vet_tag_get_token(String s, String *out, bool allow_colon) {
 }
 
 
-gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
+gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags) {
 	String const prefix = str_lit("vet");
 	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return true;
+	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
+	u64 vet_flags = base_vet_flags;
+
 	if (s.len == 0) {
-		return VetFlag_All;
+		vet_flags |= VetFlag_All;
 	}
-
-
-	u64 vet_flags = 0;
-	u64 vet_not_flags = 0;
 
 	while (s.len > 0) {
 		String p = string_trim_whitespace(vet_tag_get_token(s, &s, /*allow_colon*/false));
@@ -6356,16 +6417,16 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			p = substring(p, 1, p.len);
 			if (p.len == 0) {
 				syntax_error(token_for_pos, "Expected a vet flag name after '!'");
-				return build_context.vet_flags;
+				return vet_flags;
 			}
 		}
 
 		u64 flag = get_vet_flag_from_name(p);
 		if (flag != VetFlag_NONE) {
 			if (is_notted) {
-				vet_not_flags |= flag;
+				vet_flags = vet_flags &~ flag;
 			} else {
-				vet_flags     |= flag;
+				vet_flags |= flag;
 			}
 		} else {
 			ERROR_BLOCK();
@@ -6383,26 +6444,20 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			error_line("\tcast\n");
 			error_line("\ttabs\n");
 			error_line("\texplicit-allocators\n");
-			return build_context.vet_flags;
+			return vet_flags;
 		}
 	}
 
-	if (vet_flags == 0 && vet_not_flags == 0) {
-		return build_context.vet_flags;
-	}
-	if (vet_flags == 0 && vet_not_flags != 0) {
-		return build_context.vet_flags &~ vet_not_flags;
-	}
-	if (vet_flags != 0 && vet_not_flags == 0) {
-		return vet_flags;
-	}
-	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
-	return vet_flags &~ vet_not_flags;
+	return vet_flags;
 }
 
 gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("feature");
 	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return true;
+	}
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
 
 	if (s.len == 0) {
@@ -6578,7 +6633,7 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 			return false;
 		}
 	} else if (string_starts_with(lc, str_lit("vet"))) {
-		f->vet_flags = parse_vet_tag(tok, lc);
+		f->vet_flags = parse_vet_tag(tok, lc, ast_file_vet_flags(f));
 		f->vet_flags_set = true;
 	} else if (string_starts_with(lc, str_lit("test"))) {
 		if ((build_context.command_kind & Command_test) == 0) {

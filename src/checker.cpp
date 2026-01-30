@@ -1530,17 +1530,16 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->load_directory_map);
 }
 
-gb_internal CheckerContext make_checker_context(Checker *c) {
-	CheckerContext ctx = {};
-	ctx.checker   = c;
-	ctx.info      = &c->info;
-	ctx.scope     = builtin_pkg->scope;
-	ctx.pkg       = builtin_pkg;
+gb_internal void init_checker_context(CheckerContext *ctx, Checker *c) {
+	ctx->checker   = c;
+	ctx->info      = &c->info;
+	ctx->scope     = builtin_pkg->scope;
+	ctx->pkg       = builtin_pkg;
 
-	ctx.type_path = new_checker_type_path(heap_allocator());
-	ctx.type_level = 0;
-	return ctx;
+	ctx->type_path = new_checker_type_path(heap_allocator());
+	ctx->type_level = 0;
 }
+
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_type_path(ctx->type_path, heap_allocator());
 }
@@ -1605,7 +1604,7 @@ gb_internal void init_checker(Checker *c) {
 	mpsc_init(&c->global_untyped_queue, a); // , 1<<20);
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
 
-	c->builtin_ctx = make_checker_context(c);
+	init_checker_context(&c->builtin_ctx, c);
 }
 
 gb_internal void destroy_checker(Checker *c) {
@@ -3581,7 +3580,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "test") {
 		if (value != nullptr) {
-			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->test = true;
 		return true;
@@ -3629,13 +3628,13 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		return true;
 	} else if (name == "init") {
 		if (value != nullptr) {
-			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->init = true;
 		return true;
 	} else if (name == "fini") {
 		if (value != nullptr) {
-			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
 		ac->fini = true;
 		return true;
@@ -3991,6 +3990,12 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		ac->no_sanitize_memory = true;
 		return true;
+	}  else if (name == "no_sanitize_thread") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->no_sanitize_thread = true;
+		return true;
 	}
 	return false;
 }
@@ -4027,6 +4032,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		} else if (ev.kind == ExactValue_String) {
 			String model = ev.value_string;
 			if (model == "default" ||
+			    model == "globaldynamic" ||
 			    model == "localdynamic" ||
 			    model == "initialexec" ||
 			    model == "localexec") {
@@ -4035,6 +4041,7 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 				ERROR_BLOCK();
 				error(elem, "Invalid thread local model '%.*s'. Valid models:", LIT(model));
 				error_line("\tdefault\n");
+				error_line("\tglobaldynamic\n");
 				error_line("\tlocaldynamic\n");
 				error_line("\tinitialexec\n");
 				error_line("\tlocalexec\n");
@@ -4962,7 +4969,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 
 gb_internal CheckerContext *create_checker_context(Checker *c) {
 	CheckerContext *ctx = gb_alloc_item(permanent_allocator(), CheckerContext);
-	*ctx = make_checker_context(c);
+	init_checker_context(ctx, c);
 	return ctx;
 }
 
@@ -5407,7 +5414,8 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 }
 
 gb_internal void check_foreign_import_fullpaths(Checker *c) {
-	CheckerContext ctx = make_checker_context(c);
+	CheckerContext ctx = {};
+	init_checker_context(&ctx, c);
 
 	UntypedExprInfoMap untyped = {};
 	defer (map_destroy(&untyped));
@@ -5790,7 +5798,7 @@ gb_internal void check_collect_entities_all(Checker *c) {
 	for (isize i = 0; i < thread_count; i++) {
 		auto *wd = &collect_entity_worker_data[i];
 		wd->c = c;
-		wd->ctx = make_checker_context(c);
+		init_checker_context(&wd->ctx, c);
 		map_init(&wd->untyped);
 	}
 
@@ -5831,7 +5839,7 @@ gb_internal void check_export_entities(Checker *c) {
 	for (isize i = 0; i < thread_count; i++) {
 		auto *wd = &collect_entity_worker_data[i];
 		map_clear(&wd->untyped);
-		wd->ctx = make_checker_context(c);
+		init_checker_context(&wd->ctx, c);
 	}
 
 	for (auto const &entry : c->info.packages) {
@@ -5898,7 +5906,8 @@ gb_internal void check_import_entities(Checker *c) {
 	}
 
 	TIME_SECTION("check_import_entities - collect file decls");
-	CheckerContext ctx = make_checker_context(c);
+	CheckerContext ctx = {};
+	init_checker_context(&ctx, c);
 
 	UntypedExprInfoMap untyped = {};
 	defer (map_destroy(&untyped));
@@ -6247,7 +6256,8 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		}
 	}
 
-	CheckerContext ctx = make_checker_context(c);
+	CheckerContext ctx = {};
+	init_checker_context(&ctx, c);
 	defer (destroy_checker_context(&ctx));
 	reset_checker_context(&ctx, pi->file, untyped);
 	ctx.decl = pi->decl;

@@ -947,7 +947,7 @@ gb_internal gb_inline i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
 
-gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y, bool *do_break_);
+gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y);
 
 gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
@@ -1060,18 +1060,13 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 
 	case ExactValue_Compound:
 		if (op != Token_CmpEq && op != Token_NotEq) {
-			break;
+			return false;
 		}
 
 		if (x.kind != y.kind) {
-			break;
+			return false;
 		}
-		bool do_break = false;
-		bool res = compare_exact_values_compound_lit(op, x, y, &do_break);
-		if (do_break) {
-			break;
-		}
-		return res;
+		return compare_exact_values_compound_lit(op, x, y);
 	}
 
 	GB_PANIC("Invalid comparison: %d", x.kind);

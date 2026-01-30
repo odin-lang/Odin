@@ -67,7 +67,7 @@ File_Flag :: enum {
 	Trunc,
 	Sparse,
 	Inheritable,
-
+	Non_Blocking,
 	Unbuffered_IO,
 }
 

@@ -449,7 +449,7 @@ FLock_Type :: enum i16 {
 /*
 	Bits for FD_Notifications
 */
-FD_Notifications_Bits :: enum {
+FD_Notifications_Bits :: enum i32 {
 	ACCESS    = 0,
 	MODIFY    = 1,
 	CREATE    = 2,
@@ -1690,17 +1690,17 @@ IPC_Cmd :: enum i16 {
 /*
 	File locking operation bits
 */
-FLock_Op_Bits :: enum {
-	SH = 1,
-	EX = 2,
-	NB = 4,
-	UN = 8,
+FLock_Op_Bits :: enum i32 {
+	SH = 0,
+	EX = 1,
+	NB = 2,
+	UN = 3,
 }
 
 /*
 	ptrace requests
 */
-PTrace_Request :: enum {
+PTrace_Request :: enum i32 {
 	TRACEME                = 0,
 	PEEKTEXT               = 1,
 	PEEKDATA               = 2,
@@ -1747,7 +1747,7 @@ PTrace_Request :: enum {
 /*
 	ptrace options
 */
-PTrace_Options_Bits :: enum {
+PTrace_Options_Bits :: enum i32 {
 	TRACESYSGOOD    = 0,
 	TRACEFORK       = 1,
 	TRACEVFORK      = 2,
@@ -2269,3 +2269,40 @@ Swap_Flags_Bits :: enum {
 	PREFER  = log2(0x8000),
 	DISCARD = log2(0x10000),
 }
+
+Eventfd_Flags_Bits :: enum {
+	SEMAPHORE,
+	CLOEXEC  = auto_cast Open_Flags_Bits.CLOEXEC,
+	NONBLOCK = auto_cast Open_Flags_Bits.NONBLOCK,
+}
+
+Sched_Policy :: enum u32 {
+	OTHER    = 0,
+	BATCH    = 3,
+	IDLE     = 5,
+	FIFO     = 1,
+	RR       = 2,
+	DEADLINE = 6,
+}
+
+Sched_Flag_Bits :: enum {
+	RESET_ON_FORK  = log2(0x01),
+	RECLAIM        = log2(0x02),
+	DL_OVERRUN     = log2(0x04),
+	KEEP_POLICY    = log2(0x08),
+	KEEP_PARAMS    = log2(0x10),
+	UTIL_CLAMP_MIN = log2(0x20),
+	UTIL_CLAMP_MAX = log2(0x40),
+}
+
+Sched_Attr_Flag_Bits :: enum {}
+
+/*
+	See `constants.odin` for `MFD_HUGE_16KB`, et al.
+*/
+Memfd_Create_Flag_Bits :: enum {
+	CLOEXEC       = log2(0x1),
+	ALLOW_SEALING = log2(0x2),
+	HUGETLB       = log2(0x4),
+}
+

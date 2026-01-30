@@ -26,6 +26,80 @@ Unmarshal_Error :: union {
 	Unsupported_Type_Error,
 }
 
+User_Unmarshaler :: #type proc(p: ^Parser, v: any) -> Unmarshal_Error
+
+Register_User_Unmarshaler_Error :: enum {
+	None,
+	No_User_Unmarshaler,
+	Unmarshaler_Previously_Found,
+}
+
+// Example User Unmarshaler:
+// Custom Unmarshaler for `int`
+// Some_Unmarshaler :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
+// 	token := p.curr_token.text
+// 	i, ok := strconv.parse_i64_of_base(token, 2)
+// 	if !ok {
+//		return .Invalid_Data
+//
+//	}
+//	(^int)(v.data)^ = int(i)
+//	return .None
+// }
+//
+// _main :: proc() {
+//	// Ensure the json._user_unmarshaler map is initialized
+//	json.set_user_unmarshalers(new(map[typeid]json.User_Unmarshaler))
+//	reg_err := json.register_user_unmarshaler(type_info_of(int).id, Some_Unmarshaler)
+//	assert(reg_err == .None)
+//
+//	data := `{"value":101010}`
+//	SomeType :: struct {
+//		value: int,
+//	}
+//	y: SomeType
+//
+//	unmarshal_err := json.unmarshal(transmute([]byte)data, &y)
+//	fmt.println(y, unmarshal_err)
+// }
+
+// NOTE(Jeroen): This is a pointer to prevent accidental additions
+// it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
+_user_unmarshalers: ^map[typeid]User_Unmarshaler
+
+// Sets user-defined unmarshalers for custom json unmarshaling of specific types
+//
+// Inputs:
+// - m: A pointer to a map of typeids to User_Unmarshaler procs.
+//
+// NOTE: Must be called before using register_user_unmarshaler.
+//
+set_user_unmarshalers :: proc(m: ^map[typeid]User_Unmarshaler) {
+	assert(_user_unmarshalers == nil, "set_user_unmarshalers must not be called more than once.")
+	_user_unmarshalers = m
+}
+
+// Registers a user-defined unmarshaler for a specific typeid
+//
+// Inputs:
+// - id: The typeid of the custom type.
+// - unmarshaler: The User_Unmarshaler function for the custom type.
+//
+// Returns: A Register_User_Unmarshaler_Error value indicating the success or failure of the operation.
+//
+// WARNING: set_user_unmarshalers must be called before using this procedure.
+//
+register_user_unmarshaler :: proc(id: typeid, unmarshaler: User_Unmarshaler) -> Register_User_Unmarshaler_Error {
+	if _user_unmarshalers == nil {
+		return .No_User_Unmarshaler
+	}
+	if prev, found := _user_unmarshalers[id]; found && prev != nil {
+		return .Unmarshaler_Previously_Found
+	}
+	_user_unmarshalers[id] = unmarshaler
+	return .None
+}
+
 unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, allocator := context.allocator) -> Unmarshal_Error {
 	v := v
 	if v == nil || v.id == nil {
@@ -37,8 +111,10 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 		return .Non_Pointer_Parameter
 	}
 	PARSE_INTEGERS :: true
-	
-	if !is_valid(data, spec, PARSE_INTEGERS) {
+
+	// If we have custom unmarshalers, we skip validation in case the custom data is not quite up to spec.
+	have_custom := _user_unmarshalers != nil && len(_user_unmarshalers) > 0
+	if !have_custom && !is_valid(data, spec, PARSE_INTEGERS) {
 		return .Invalid_Data
 	}
 	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
@@ -225,6 +301,15 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 		}
 		ok = true
 		return
+	case rune:
+		for rne, i in str {
+			if i > 0 {
+				dst = {}
+				return false, .Invalid_Rune
+			}
+			dst = rne
+		}
+		return true, nil
 	}
 	
 	#partial switch variant in ti.variant {
@@ -265,11 +350,17 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 	return false, nil
 }
 
-
 @(private)
 unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token
+
+	if _user_unmarshalers != nil {
+		unmarshaler := _user_unmarshalers[v.id]
+		if unmarshaler != nil {
+			return unmarshaler(p, v)
+		}
+	}
 
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))

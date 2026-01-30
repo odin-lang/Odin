@@ -360,14 +360,13 @@ enum OptInFeatureFlags : u64 {
 	OptInFeatureFlag_IntegerDivisionByZero_Self    = 1u<<4,
 	OptInFeatureFlag_IntegerDivisionByZero_AllBits = 1u<<5,
 
-	OptInFeatureFlag_UsingStmt = 1u<<6,
-
-
 	OptInFeatureFlag_IntegerDivisionByZero_ALL = OptInFeatureFlag_IntegerDivisionByZero_Trap|
 	                                             OptInFeatureFlag_IntegerDivisionByZero_Zero|
 	                                             OptInFeatureFlag_IntegerDivisionByZero_Self|
 	                                             OptInFeatureFlag_IntegerDivisionByZero_AllBits,
 
+	OptInFeatureFlag_ForceTypeAssert = 1u<<6,
+  OptInFeatureFlag_UsingStmt       = 1u<<7,
 };
 
 u64 get_feature_flag_from_name(String const &name) {
@@ -388,6 +387,9 @@ u64 get_feature_flag_from_name(String const &name) {
 	}
 	if (name == "using-stmt") {
 		return OptInFeatureFlag_UsingStmt;
+  }
+	if (name == "force-type-assert") {
+		return OptInFeatureFlag_ForceTypeAssert;
 	}
 
 
@@ -587,6 +589,7 @@ struct BuildContext {
 
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
+	bool   disable_unwind;
 
 	isize max_error_count;
 
@@ -844,6 +847,15 @@ gb_global TargetMetrics target_freestanding_amd64_win64 = {
 	TargetABI_Win64,
 };
 
+gb_global TargetMetrics target_freestanding_amd64_mingw = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8, 8, AMD64_MAX_ALIGNMENT, 32,
+	str_lit("x86_64-pc-windows-gnu"),
+	TargetABI_Win64,
+};
+
+
 gb_global TargetMetrics target_freestanding_arm64 = {
 	TargetOs_freestanding,
 	TargetArch_arm64,
@@ -906,6 +918,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 
 	{ str_lit("freestanding_amd64_sysv"),  &target_freestanding_amd64_sysv },
 	{ str_lit("freestanding_amd64_win64"), &target_freestanding_amd64_win64 },
+	{ str_lit("freestanding_amd64_mingw"), &target_freestanding_amd64_mingw },
 
 	{ str_lit("freestanding_arm64"), &target_freestanding_arm64 },
 	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },

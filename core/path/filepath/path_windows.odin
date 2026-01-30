@@ -36,6 +36,9 @@ is_abs :: proc(path: string) -> bool {
 	if is_reserved_name(path) {
 		return true
 	}
+	if len(path) > 0 && is_slash(path[0]) {
+		return true
+	}
 	l := volume_name_len(path)
 	if l == 0 {
 		return false

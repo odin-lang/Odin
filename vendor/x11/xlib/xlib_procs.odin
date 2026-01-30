@@ -241,7 +241,7 @@ foreign xlib {
 		window:    Window,
 		pixel:     uint,
 		) ---
-	SetWindowBackgroundMap :: proc(
+	SetWindowBackgroundPixmap :: proc(
 		display:   ^Display,
 		window:    Window,
 		pixmap:    Pixmap,
@@ -2068,7 +2068,7 @@ foreign xlib {
 	Xutf8LookupString :: proc(
 		ic: XIC,
 		event: ^XKeyPressedEvent,
-		buffer_return: ^cstring,
+		buffer_return: cstring,
 		bytes_buffer: i32,
 		keysym_return: ^KeySym,
 		status_return: ^LookupStringStatus,

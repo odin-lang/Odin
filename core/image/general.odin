@@ -86,7 +86,7 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 			return v
 		}
 		get16le :: #force_inline  proc(s: ^string) -> u16 {
-			v := u16(s[0]) | u16(s[1])<<16
+			v := u16(s[0]) | u16(s[1])<<8
 			s^ = s[2:]
 			return v
 		}

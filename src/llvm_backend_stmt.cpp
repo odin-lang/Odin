@@ -1434,12 +1434,13 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 
 		if (unroll_count_ev.kind == ExactValue_Invalid) {
-			GB_ASSERT(expr->tav.mode == Addressing_Constant);
 
 			Type *t = base_type(expr->tav.type);
 
 			switch (t->kind) {
 			case Type_Basic:
+				GB_ASSERT(expr->tav.mode == Addressing_Constant);
+
 				GB_ASSERT(is_type_string(t));
 				{
 					ExactValue value = expr->tav.value;
@@ -1720,7 +1721,45 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
 
-		body_blocks[i] = lb_create_block(p, cc->list.count == 0 ? "switch.default.body" : "switch.case.body");
+		char const *block_name = cc->list.count == 0 ? "switch.default.body" : "switch.case.body";
+
+		if (is_trivial && cc->list.count >= 1) {
+			gbString bn = gb_string_make(heap_allocator(), "switch.case.");
+
+			Ast *first = cc->list[0];
+			if (first->tav.mode == Addressing_Type) {
+				bn = gb_string_appendc(bn, "type.");
+			} else if (is_type_rune(first->tav.type)) {
+				bn = gb_string_appendc(bn, "rune.");
+			} else {
+				bn = gb_string_appendc(bn, "value.");
+			}
+
+			for_array(i, cc->list) {
+				if (i > 0) {
+					bn = gb_string_appendc(bn, "..");
+				}
+
+				Ast *expr = cc->list[i];
+				if (expr->tav.mode == Addressing_Type) {
+					bn = write_type_to_string(bn, expr->tav.type, false);
+				} else {
+					ExactValue value = expr->tav.value;
+					if (is_type_rune(expr->tav.type) && value.kind == ExactValue_Integer) {
+						Rune r = cast(Rune)exact_value_to_i64(value);
+						u8 rune_temp[6] = {};
+						isize size = gb_utf8_encode_rune(rune_temp, r);
+						bn = gb_string_append_length(bn, rune_temp, size);
+					} else {
+						bn = write_exact_value_to_string(bn, value, 1024);
+					}
+				}
+			}
+
+			block_name = cast(char const *)bn;
+		}
+
+		body_blocks[i] = lb_create_block(p, block_name);
 		if (cc->list.count == 0) {
 			default_block = body_blocks[i];
 		}
@@ -1962,7 +2001,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		num_cases += cc->list.count;
 		if (cc->list.count == 0) {
 			GB_ASSERT(default_block == nullptr);
-			default_block = lb_create_block(p, "typeswitch.default.body");
+			default_block = lb_create_block(p, "typeswitch.case.default");
 			else_block = default_block;
 		}
 	}
@@ -2042,7 +2081,16 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			continue;
 		}
 
-		lbBlock *body = lb_create_block(p, "typeswitch.body");
+		char const *body_name = "typeswitch.case";
+
+		if (!are_types_identical(case_entity->type, parent_base_type)) {
+			gbString canonical_name = temp_canonical_string(case_entity->type);
+			gbString bn = gb_string_make(heap_allocator(), "typeswitch.case.");
+			bn = gb_string_append_length(bn, canonical_name, gb_string_length(canonical_name));
+			body_name = cast(char const *)bn;
+		}
+
+		lbBlock *body = lb_create_block(p, body_name);
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
@@ -2122,20 +2170,26 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
-		if (vd->values.count > 0) {
-			GB_ASSERT(vd->names.count == vd->values.count);
-			Ast *ast_value = vd->values[i];
-			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
-			          ast_value->tav.mode == Addressing_Invalid);
 
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
-		}
 
 		Ast *ident = vd->names[i];
 		GB_ASSERT(!is_blank_ident(ident));
 		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e->flags & EntityFlag_Static);
 		String name = e->token.string;
+
+		if (vd->values.count > 0) {
+			GB_ASSERT(vd->names.count == vd->values.count);
+			Ast *ast_value = vd->values[i];
+			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+			          ast_value->tav.mode == Addressing_Invalid);
+
+			auto cc = LB_CONST_CONTEXT_DEFAULT_NO_LOCAL;
+			if (e->Variable.is_rodata) {
+				cc.is_rodata = true;
+			}
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, cc);
+		}
 
 		String mangled_name = {};
 		{

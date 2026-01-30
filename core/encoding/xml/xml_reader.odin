@@ -294,7 +294,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						if len(doc.elements) == 0 {
+						if doc.element_count == 0 {
 							append(&doc.comments, comment)
 						} else {
 							el := new_element(doc)
@@ -308,6 +308,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				case .Open_Bracket:
 					// This could be a CDATA tag part of a tag's body. Unread the `<![`
 					t.offset -= 3
+					t.read_offset = t.offset
 
 					// Instead of calling `parse_body` here, we could also `continue loop`
 					// and fall through to the `case:` at the bottom of the outer loop.
@@ -385,7 +386,8 @@ load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handl
 	return parse_bytes(data, options, filename, error_handler, allocator)
 }
 
-destroy :: proc(doc: ^Document) {
+destroy :: proc(doc: ^Document, allocator := context.allocator) {
+	context.allocator = allocator
 	if doc == nil { return }
 
 	for el in doc.elements {

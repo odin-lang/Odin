@@ -10,8 +10,6 @@
 
 	A test suite for `core:net`
 */
-#+build !netbsd
-#+build !openbsd
 #+feature dynamic-literals
 package test_core_net
 
@@ -622,6 +620,41 @@ test_nonblocking_option :: proc(t: ^testing.T) {
 	if !testing.expect_value(t, accept_err, net.Accept_Error.Would_Block) {
 		return
 	}
+}
+
+// Test that when the server closes it's connection, the client's next receive is `0, nil` to indicate a correct close.
+@(test)
+test_connection_close :: proc(t: ^testing.T) {
+	server, listen_err := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
+	testing.expect_value(t, listen_err, nil)
+	defer net.close(server)
+
+	server_ep, bound_endpoint_err := net.bound_endpoint(server)
+	testing.expect_value(t, bound_endpoint_err, nil)
+
+	client, dial_err := net.dial_tcp(server_ep)
+	testing.expect_value(t, dial_err, nil)
+	defer net.close(client)
+
+	server_client, _, accept_err := net.accept_tcp(server)
+	testing.expect_value(t, accept_err, nil)
+
+	send_buf: [512]byte = 1
+	sent, send_err := net.send(server_client, send_buf[:])
+	testing.expect_value(t, sent, 512)
+	testing.expect_value(t, send_err, nil)
+	net.close(server_client)
+
+	recv_buf: [512]byte = ---
+	received, recv_err := net.recv(client, recv_buf[:])
+	testing.expect_value(t, received, 512)
+	testing.expect_value(t, recv_err, nil)
+
+	testing.expect_value(t, recv_buf, send_buf)
+
+	received, recv_err = net.recv(client, recv_buf[:])
+	testing.expect_value(t, received, 0)
+	testing.expect_value(t, recv_err, nil)
 }
 
 @(private)

@@ -36,6 +36,7 @@ foreign lib {
 	CompareAndSwapAtomicU32     :: proc(a: ^AtomicU32, oldval, newval: Uint32) -> bool ---
 	SetAtomicU32                :: proc(a: ^AtomicU32, v: Uint32) -> Uint32 ---
 	GetAtomicU32                :: proc(a: ^AtomicU32) -> Uint32 ---
+	AddAtomicU32                :: proc(a: ^AtomicU32) -> Uint32 ---
 	CompareAndSwapAtomicPointer :: proc(a: ^rawptr, oldval, newval: rawptr) -> bool ---
 	SetAtomicPointer            :: proc(a: ^rawptr, v: rawptr) -> rawptr ---
 	GetAtomicPointer            :: proc(a: ^rawptr) -> rawptr ---

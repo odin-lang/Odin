@@ -22,29 +22,29 @@ foreign shell32 {
 	) -> c_int ---
 	SHFileOperationW :: proc(lpFileOp: LPSHFILEOPSTRUCTW) -> c_int ---
 	SHGetFolderPathW :: proc(hwnd: HWND, csidl: c_int, hToken: HANDLE, dwFlags: DWORD, pszPath: LPWSTR) -> HRESULT ---
-	SHAppBarMessage :: proc(dwMessage: DWORD, pData: PAPPBARDATA) -> UINT_PTR ---
+	SHAppBarMessage  :: proc(dwMessage: DWORD, pData: PAPPBARDATA) -> UINT_PTR ---
 
 	Shell_NotifyIconW :: proc(dwMessage: DWORD, lpData: ^NOTIFYICONDATAW) -> BOOL ---
-	SHChangeNotify :: proc(wEventId: LONG, uFlags: UINT, dwItem1: LPCVOID, dwItem2: LPCVOID) ---
+	SHChangeNotify    :: proc(wEventId: LONG, uFlags: UINT, dwItem1: LPCVOID, dwItem2: LPCVOID) ---
 
 	SHGetKnownFolderIDList :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppidl: rawptr) -> HRESULT ---
-	SHSetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, pszPath: PCWSTR ) -> HRESULT ---
-	SHGetKnownFolderPath :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppszPath: ^LPWSTR) -> HRESULT ---
+	SHSetKnownFolderPath   :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, pszPath: PCWSTR ) -> HRESULT ---
+	SHGetKnownFolderPath   :: proc(rfid: REFKNOWNFOLDERID, dwFlags: /* KNOWN_FOLDER_FLAG */ DWORD, hToken: HANDLE, ppszPath: ^LPWSTR) -> HRESULT ---
 
-	ExtractIconExW :: proc(pszFile: LPCWSTR, nIconIndex: INT, phiconLarge: ^HICON, phiconSmall: ^HICON, nIcons: UINT) -> UINT ---
+	ExtractIconExW  :: proc(pszFile: LPCWSTR, nIconIndex: INT, phiconLarge: ^HICON, phiconSmall: ^HICON, nIcons: UINT) -> UINT ---
 	DragAcceptFiles :: proc(hWnd: HWND, fAccept: BOOL) ---
-	DragQueryPoint :: proc(hDrop: HDROP, ppt: ^POINT) -> BOOL ---
-	DragQueryFileW :: proc(hDrop: HDROP, iFile: UINT, lpszFile: LPWSTR, cch: UINT) -> UINT ---
-	DragFinish :: proc(hDrop: HDROP) --- // @New
+	DragQueryPoint  :: proc(hDrop: HDROP, ppt: ^POINT) -> BOOL ---
+	DragQueryFileW  :: proc(hDrop: HDROP, iFile: UINT, lpszFile: LPWSTR, cch: UINT) -> UINT ---
+	DragFinish      :: proc(hDrop: HDROP) --- // @New
 }
 
 APPBARDATA :: struct {
-	cbSize: DWORD,
-	hWnd: HWND,
+	cbSize:           DWORD,
+	hWnd:             HWND,
 	uCallbackMessage: UINT,
-	uEdge: UINT,
-	rc: RECT,
-	lParam: LPARAM,
+	uEdge:            UINT,
+	rc:               RECT,
+	lParam:           LPARAM,
 }
 PAPPBARDATA :: ^APPBARDATA
 

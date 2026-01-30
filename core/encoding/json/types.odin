@@ -76,6 +76,7 @@ Error :: enum {
 	Invalid_Number,
 	String_Not_Terminated,
 	Invalid_String,
+	Invalid_Rune,
 
 
 	// Parsing Errors

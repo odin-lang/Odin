@@ -2695,6 +2695,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_size_of: {
 		// size_of :: proc(Type or expr) -> untyped int
+		if (ce->args[0]->kind == Ast_UnaryExpr) {
+			ast_node(arg, UnaryExpr, ce->args[0]);
+			if (arg->op.kind == Token_And) {
+				ERROR_BLOCK();
+
+				warning(ce->args[0], "'size_of(&x)' returns the size of a pointer, not the size of x");
+				error_line("\tSuggestion: Use 'size_of(rawptr)' if you want the size of the pointer");
+			}
+		}
+
 		Operand o = {};
 		check_expr_or_type(c, &o, ce->args[0]);
 		if (o.mode == Addressing_Invalid) {
@@ -5373,6 +5383,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					return false;
 				}
 			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for '%.*s', got %s vs %s", LIT(builtin_name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
 
 			operand->mode = Addressing_Value;
 			operand->type = make_optional_ok_type(default_type(x.type));
@@ -5415,6 +5433,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					gb_string_free(xts);
 					return false;
 				}
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for '%.*s', got %s vs %s", LIT(builtin_name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
 			}
 
 			operand->mode = Addressing_Value;

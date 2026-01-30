@@ -152,7 +152,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// Intentionally blank
 	case .Uncompressed_Black_White:
 		black_white  = true
-		dest_depth   = 24
+		dest_depth   = 8 if .do_not_expand_grayscale in options else 24
 	case .Uncompressed_Color_Mapped:
 		color_mapped = true
 	case .Compressed_Color_Mapped:
@@ -161,7 +161,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	case .Compressed_Black_White:
 		black_white  = true
 		rle_encoding = true
-		dest_depth   = 24
+		dest_depth   = 8 if .do_not_expand_grayscale in options else 24
 
 	case:
 		return nil, .Unsupported_Format
@@ -180,6 +180,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	switch dest_depth {
+	case 8: // R8
+		src_channels = 1
+		dest_channels = 1
 	case 15: // B5G5R5
 		src_channels  = 2
 		dest_channels = 3

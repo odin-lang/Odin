@@ -282,11 +282,16 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 
 	return res;
 }
-
-gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_behaviour(lbProcedure *p) {
+gb_internal u64 lb_get_file_feature_flags(lbProcedure *p, Ast *expr = nullptr) {
 	AstFile *file = nullptr;
 
-	if (p->body && p->body->file()) {
+	if (expr != nullptr) {
+		file = expr->file();
+	}
+
+	if (file != nullptr) {
+		// it is now set
+	} else if (p->body && p->body->file()) {
 		file = p->body->file();
 	} else if (p->type_expr && p->type_expr->file()) {
 		file = p->type_expr->file();
@@ -295,20 +300,29 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 	}
 
 	if (file != nullptr && file->feature_flags_set) {
-		u64 flags = file->feature_flags;
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Trap) {
-			return IntegerDivisionByZero_Trap;
-		}
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) {
-			return IntegerDivisionByZero_Zero;
-		}
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_Self) {
-			return IntegerDivisionByZero_Self;
-		}
-		if (flags & OptInFeatureFlag_IntegerDivisionByZero_AllBits) {
-			return IntegerDivisionByZero_AllBits;
-		}
+		return file->feature_flags;
 	}
+	return 0;
+}
+
+
+
+gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_behaviour(lbProcedure *p) {
+	u64 flags = lb_get_file_feature_flags(p);
+
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_Trap) {
+		return IntegerDivisionByZero_Trap;
+	}
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_Zero) {
+		return IntegerDivisionByZero_Zero;
+	}
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_Self) {
+		return IntegerDivisionByZero_Self;
+	}
+	if (flags & OptInFeatureFlag_IntegerDivisionByZero_AllBits) {
+		return IntegerDivisionByZero_AllBits;
+	}
+
 	return build_context.integer_division_by_zero_behaviour;
 }
 
@@ -3802,6 +3816,17 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 			Type *type = type_of_expr(ue_expr);
 			GB_ASSERT(!is_type_tuple(type));
 
+			bool do_type_check = true;
+			if (build_context.no_type_assert) {
+				u64 feature_flags = lb_get_file_feature_flags(p, ue_expr);
+				if ((feature_flags & OptInFeatureFlag_ForceTypeAssert) == 0) {
+					do_type_check = false;
+				}
+
+			} else if ((p->state_flags & StateFlag_no_type_assert) != 0) {
+				do_type_check = false;
+			}
+
 			lbValue e = lb_build_expr(p, ta->expr);
 			Type *t = type_deref(e.type);
 			if (is_type_union(t)) {
@@ -3813,7 +3838,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				Type *dst_type = type;
 
 
-				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (do_type_check) {
 					lbValue src_tag = {};
 					lbValue dst_tag = {};
 					if (is_type_union_maybe_pointer(src_type)) {
@@ -3840,7 +3865,12 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 						args[4] = lb_typeid(p->module, src_type);
 						args[5] = lb_typeid(p->module, dst_type);
 					}
-					lb_emit_runtime_call(p, "type_assertion_check", args);
+
+					char const *name = "type_assertion_check_contextless";
+					if (p->context_stack.count > 0) {
+						name = "type_assertion_check_with_context";
+					}
+					lb_emit_runtime_call(p, name, args);
 				}
 
 				lbValue data_ptr = v;
@@ -3851,21 +3881,33 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					v = lb_emit_load(p, v);
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
-				if (!build_context.no_type_assert && (p->state_flags & StateFlag_no_type_assert) == 0) {
+				if (do_type_check) {
 					GB_ASSERT(!build_context.no_rtti);
 
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
 
+					isize arg_count = 6;
+					if (build_context.no_rtti) {
+						arg_count = 4;
+					}
+
 					lbValue id = lb_typeid(p->module, type);
 					lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
-					auto args = array_make<lbValue>(permanent_allocator(), 6);
+					auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 					args[0] = ok;
 
 					lb_set_file_line_col(p, array_slice(args, 1, args.count), pos);
 
-					args[4] = any_id;
-					args[5] = id;
-					lb_emit_runtime_call(p, "type_assertion_check", args);
+					if (!build_context.no_rtti) {
+						args[4] = any_id;
+						args[5] = id;
+					}
+
+					char const *name = "type_assertion_check_contextless";
+					if (p->context_stack.count > 0) {
+						name = "type_assertion_check_with_context";
+					}
+					lb_emit_runtime_call(p, name, args);
 				}
 
 				return lb_emit_conv(p, data_ptr, tv.type);

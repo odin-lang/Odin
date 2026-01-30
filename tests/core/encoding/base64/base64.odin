@@ -51,3 +51,18 @@ test_roundtrip :: proc(t: ^testing.T) {
 		testing.expect_value(t, v, values[i])
 	}
 }
+
+@(test)
+test_base64url :: proc(t: ^testing.T) {
+	plain := ">>>"
+	url := "Pj4-"
+
+	encoded := base64.encode(transmute([]byte)plain, base64.ENC_URL_TABLE)
+	defer delete(encoded)
+	testing.expect_value(t, encoded, url)
+
+	decoded := string(base64.decode(url, base64.DEC_URL_TABLE))
+	defer delete(decoded)
+	testing.expect_value(t, decoded, plain)
+
+}

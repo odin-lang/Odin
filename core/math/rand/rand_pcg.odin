@@ -55,16 +55,20 @@ pcg_random_generator_proc :: proc(data: rawptr, mode: runtime.Random_Generator_M
 			intrinsics.unaligned_store((^u64)(raw_data(p)), read_u64(r))
 		case:
 			// All other cases.
-			pos := i8(0)
-			val := u64(0)
-			for &v in p {
-				if pos == 0 {
-					val = read_u64(r)
-					pos = 8
+			n := len(p) / size_of(u64)
+			buff := ([^]u64)(raw_data(p))[:n]
+			for &e in buff {
+				intrinsics.unaligned_store(&e, read_u64(r))
+			}
+			// Handle remaining bytes
+			rem := len(p) % size_of(u64)
+			if rem > 0 {
+				val := read_u64(r)
+				tail := p[len(p) - rem:]
+				for &b in tail {
+					b = byte(val)
+					val >>= 8
 				}
-				v = byte(val)
-				val >>= 8
-				pos -= 1
 			}
 		}
 

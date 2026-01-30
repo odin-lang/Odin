@@ -141,7 +141,7 @@ IP_ADAPTER_DNS_SERVER_ADDRESS_XP :: struct {
 	Address:   SOCKET_ADDRESS,
 }
 
-IF_OPER_STATUS :: enum i32 {
+IF_OPER_STATUS :: enum c_int {
 	Up             = 1,
 	Down           = 2,
 	Testing        = 3,
@@ -160,17 +160,17 @@ NET_LUID_LH :: struct #raw_union {
 
 SOCKET_ADDRESS :: struct {
 	lpSockaddr:      ^SOCKADDR,
-	iSockaddrLength: i32,
+	iSockaddrLength: INT,
 }
 
-NET_IF_CONNECTION_TYPE :: enum i32 {
+NET_IF_CONNECTION_TYPE :: enum c_int {
 	NET_IF_CONNECTION_DEDICATED = 1,
 	NET_IF_CONNECTION_PASSIVE   = 2,
 	NET_IF_CONNECTION_DEMAND    = 3,
 	NET_IF_CONNECTION_MAXIMUM   = 4,
 }
 
-TUNNEL_TYPE :: enum i32 {
+TUNNEL_TYPE :: enum c_int {
 	TUNNEL_TYPE_NONE    = 0,
 	TUNNEL_TYPE_OTHER   = 1,
 	TUNNEL_TYPE_DIRECT  = 2,
@@ -179,7 +179,7 @@ TUNNEL_TYPE :: enum i32 {
 	TUNNEL_TYPE_TEREDO  = 14,
 	TUNNEL_TYPE_IPHTTPS = 15,
 }
-NL_PREFIX_ORIGIN :: enum i32 {
+NL_PREFIX_ORIGIN :: enum c_int {
 	IpPrefixOriginOther               = 0,
 	IpPrefixOriginManual              = 1,
 	IpPrefixOriginWellKnown           = 2,
@@ -188,7 +188,7 @@ NL_PREFIX_ORIGIN :: enum i32 {
 	IpPrefixOriginUnchanged           = 16,
 }
 
-NL_SUFFIX_ORIGIN :: enum i32 {
+NL_SUFFIX_ORIGIN :: enum c_int {
 	NlsoOther                      = 0,
 	NlsoManual                     = 1,
 	NlsoWellKnown                  = 2,
@@ -204,7 +204,7 @@ NL_SUFFIX_ORIGIN :: enum i32 {
 	IpSuffixOriginUnchanged        = 16,
 }
 
-NL_DAD_STATE :: enum i32 {
+NL_DAD_STATE :: enum c_int {
 	NldsInvalid          = 0,
 	NldsTentative        = 1,
 	NldsDuplicate        = 2,
@@ -223,7 +223,7 @@ foreign iphlpapi {
 		The GetAdaptersAddresses function retrieves the addresses associated with the adapters on the local computer.
 		See: https://docs.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 	*/
-	@(link_name="GetAdaptersAddresses") get_adapters_addresses :: proc(
+	GetAdaptersAddresses :: proc(
 		family:            Address_Family,
 		flags:             GAA_Flags,
 		_reserved:         rawptr,
@@ -232,3 +232,5 @@ foreign iphlpapi {
 	) -> ULONG ---
 
 }
+
+get_adapters_addresses :: GetAdaptersAddresses

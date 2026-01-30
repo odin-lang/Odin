@@ -82,6 +82,7 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 	if .Excl in flags          { sys_flags += {.EXCL} }
 	if .Sync in flags          { sys_flags += {.DSYNC} }
 	if .Trunc in flags         { sys_flags += {.TRUNC} }
+	if .Non_Blocking in flags  { sys_flags += {.NONBLOCK} }
 	if .Inheritable in flags   { sys_flags -= {.CLOEXEC} }
 
 	fd, errno := linux.open(name_cstr, sys_flags, transmute(linux.Mode)transmute(u32)perm)

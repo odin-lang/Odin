@@ -8,12 +8,12 @@ endif
 
 wasm:
 	mkdir -p ../lib
-	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc stb_image.c        -o ../lib/stb_image_wasm.o        -DSTBI_NO_STDIO
-	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc stb_image_write.c  -o ../lib/stb_image_write_wasm.o  -DSTBI_WRITE_NO_STDIO 
-	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc stb_image_resize.c -o ../lib/stb_image_resize_wasm.o
-	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc stb_truetype.c     -o ../lib/stb_truetype_wasm.o
-	# $(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc stb_vorbis.c       -o ../lib/stb_vorbis_wasm.o       -DSTB_VORBIS_NO_STDIO
-	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc stb_rect_pack.c    -o ../lib/stb_rect_pack_wasm.o
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_image.c        -o ../lib/stb_image_wasm.o        -DSTBI_NO_STDIO
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_image_write.c  -o ../lib/stb_image_write_wasm.o  -DSTBI_WRITE_NO_STDIO 
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_image_resize.c -o ../lib/stb_image_resize_wasm.o
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_truetype.c     -o ../lib/stb_truetype_wasm.o
+	# $(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_vorbis.c       -o ../lib/stb_vorbis_wasm.o       -DSTB_VORBIS_NO_STDIO
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_rect_pack.c    -o ../lib/stb_rect_pack_wasm.o
 	$(CC) -c -Os --target=wasm32                                          stb_sprintf.c      -o ../lib/stb_sprintf_wasm.o
 
 unix:

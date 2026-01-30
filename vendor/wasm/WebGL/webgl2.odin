@@ -3,6 +3,7 @@ package webgl
 foreign import "webgl2"
 
 import "base:intrinsics"
+import "base:runtime"
 import glm "core:math/linalg/glsl"
 
 Query             :: distinct u32
@@ -103,14 +104,21 @@ foreign webgl2 {
 	GetUniformBlockIndex      :: proc(program: Program, uniformBlockName: string) -> i32 ---
 	UniformBlockBinding       :: proc(program: Program, uniformBlockIndex: i32, uniformBlockBinding: i32) ---
 	
+	// if `pname` is `UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES` then an array will be written at
+	// `params`, in that case the length `params` need to have is given first querying using `pname`
+	// `UNIFORM_BLOCK_ACTIVE_UNIFORMS`. 
+	GetActiveUniformBlockParameter :: proc(program: Program, uniformBlockIndex: i32, pname: Enum, params: [^]i32) ---
+	GetActiveUniforms :: proc(program: Program, uniformIndices: []u32, pname: Enum, res: [^]i32) ---
+
 	CreateVertexArray :: proc() -> VertexArrayObject ---
 	DeleteVertexArray :: proc(vertexArray: VertexArrayObject) ---
 	IsVertexArray     :: proc(vertexArray: VertexArrayObject) -> bool ---
 	BindVertexArray   :: proc(vertexArray: VertexArrayObject) ---	
 }
 
-GetActiveUniformBlockName :: proc(program: Program, uniformBlockIndex: i32, buf: []byte) -> string {
+GetActiveUniformBlockNameBuf :: proc(program: Program, uniformBlockIndex: i32, buf: []byte) -> string {
 	foreign webgl2 {
+		@(link_name="GetActiveUniformBlockName")
 		_GetActiveUniformBlockName :: proc "contextless" (program: Program, uniformBlockIndex: i32, buf: []byte, length: ^int) ---
 	}
 	n: int
@@ -118,6 +126,28 @@ GetActiveUniformBlockName :: proc(program: Program, uniformBlockIndex: i32, buf:
 	return string(buf[:n])	
 }
 
+GetActiveUniformBlockNameAlloc :: proc(program: Program, uniformBlockIndex: i32, allocator: runtime.Allocator, loc := #caller_location) -> string {
+	foreign webgl2 {
+		@(link_name="GetActiveUniformBlockName")
+		_GetActiveUniformBlockName :: proc "contextless" (program: Program, uniformBlockIndex: i32, buf: []byte, length: ^int) ---
+	}
+	n: int
+	_GetActiveUniformBlockName(program, uniformBlockIndex, {}, &n)
+
+	if n > 0 {
+		buf := make([]byte, n, allocator, loc)
+		_GetActiveUniformBlockName(program, uniformBlockIndex, buf, &n)
+		assert(n == len(buf))
+		return string(buf[:n])
+	}
+
+	return ""
+}
+
+GetActiveUniformBlockName :: proc {
+	GetActiveUniformBlockNameBuf,
+	GetActiveUniformBlockNameAlloc,
+}
 
 Uniform1uiv :: proc "contextless" (location: i32, v: u32) {
 	Uniform1ui(location, v)
@@ -134,6 +164,7 @@ Uniform4uiv :: proc "contextless" (location: i32, v: glm.uvec4) {
 
 UniformMatrix3x2fv :: proc "contextless" (location: i32, m: glm.mat3x2) {
 	foreign webgl2 {
+		@(link_name="UniformMatrix3x2fv")
 		_UniformMatrix3x2fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := intrinsics.matrix_flatten(m)
@@ -141,6 +172,7 @@ UniformMatrix3x2fv :: proc "contextless" (location: i32, m: glm.mat3x2) {
 }
 UniformMatrix4x2fv :: proc "contextless" (location: i32, m: glm.mat4x2) {
 	foreign webgl2 {
+		@(link_name="UniformMatrix4x2fv")
 		_UniformMatrix4x2fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := intrinsics.matrix_flatten(m)
@@ -148,6 +180,7 @@ UniformMatrix4x2fv :: proc "contextless" (location: i32, m: glm.mat4x2) {
 }
 UniformMatrix2x3fv :: proc "contextless" (location: i32, m: glm.mat2x3) {
 	foreign webgl2 {
+		@(link_name="UniformMatrix2x3fv")
 		_UniformMatrix2x3fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := intrinsics.matrix_flatten(m)
@@ -155,6 +188,7 @@ UniformMatrix2x3fv :: proc "contextless" (location: i32, m: glm.mat2x3) {
 }
 UniformMatrix4x3fv :: proc "contextless" (location: i32, m: glm.mat4x3) {
 	foreign webgl2 {
+		@(link_name="UniformMatrix4x3fv")
 		_UniformMatrix4x3fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := intrinsics.matrix_flatten(m)
@@ -162,6 +196,7 @@ UniformMatrix4x3fv :: proc "contextless" (location: i32, m: glm.mat4x3) {
 }
 UniformMatrix2x4fv :: proc "contextless" (location: i32, m: glm.mat2x4) {
 	foreign webgl2 {
+		@(link_name="UniformMatrix2x4fv")
 		_UniformMatrix2x4fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := intrinsics.matrix_flatten(m)
@@ -169,6 +204,7 @@ UniformMatrix2x4fv :: proc "contextless" (location: i32, m: glm.mat2x4) {
 }
 UniformMatrix3x4fv :: proc "contextless" (location: i32, m: glm.mat3x4) {
 	foreign webgl2 {
+		@(link_name="UniformMatrix3x4fv")
 		_UniformMatrix3x4fv :: proc "contextless" (location: i32, addr: [^]f32) ---
 	}
 	array := intrinsics.matrix_flatten(m)
