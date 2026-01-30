@@ -398,3 +398,75 @@ sendfile :: proc(t: ^testing.T) {
 		ev(t, nbio.run(), nil)
 	}
 }
+
+@(test)
+vectored :: proc(t: ^testing.T) {
+	if event_loop_guard(t) {
+		testing.set_fail_timeout(t, time.Minute)
+
+		sock, ep := open_next_available_local_port(t)
+
+		to_send := [?][]byte{
+			{'H', 'e', 'l', 'l'},
+			{'o', 'p', 'e'},
+			{'!'},
+		}
+
+		to_recv := [?][]byte{
+			{0, 0, 0, 0},
+			{0, 0, 0},
+			{0},
+		}
+
+		// Server
+		{
+			nbio.accept_poly2(sock, t, &to_send, on_accept)
+
+			on_accept :: proc(op: ^nbio.Operation, t: ^testing.T, to_send: ^[3][]byte) {
+				ev(t, op.accept.err, nil)
+				e(t, op.accept.client != 0)
+				to_send_copy := to_send^[:]
+				nbio.send_poly3(op.accept.client, to_send_copy, t, op.accept.socket, to_send, on_send)
+			}
+
+			on_send :: proc(op: ^nbio.Operation, t: ^testing.T, server: net.TCP_Socket, to_send: ^[3][]byte) {
+				ev(t, op.send.err, nil)
+				ev(t, op.send.sent, 8)
+
+				expected := to_send^
+				for buf, i in expected {
+					ev(t, string(op.send.bufs[i]), string(buf))
+				}
+
+				nbio.close(op.send.socket.(net.TCP_Socket))
+				nbio.close(server)
+			}
+		}
+
+		// Client
+		{
+			nbio.dial_poly3(ep, t, &to_recv, &to_send, on_dial)
+
+			on_dial :: proc(op: ^nbio.Operation, t: ^testing.T, to_recv: ^[3][]byte, expected: ^[3][]byte) {
+				ev(t, op.dial.err, nil)
+
+				to_recv_copy := to_recv^[:]
+				nbio.recv_poly2(op.dial.socket, to_recv_copy, t, expected, on_recv, all=true)
+			}
+
+			on_recv :: proc(op: ^nbio.Operation, t: ^testing.T, expected: ^[3][]byte) {
+				ev(t, op.recv.err, nil)
+				ev(t, op.recv.received, 8)
+
+				expected := expected^[:]
+				for buf, i in expected {
+					ev(t, string(op.recv.bufs[i]), string(buf))
+				}
+
+				nbio.close(op.recv.socket.(net.TCP_Socket))
+			}
+		}
+
+		ev(t, nbio.run(), nil)
+	}
+}

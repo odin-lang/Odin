@@ -7,7 +7,6 @@ import    "core:container/pool"
 import    "core:container/queue"
 import    "core:mem"
 import    "core:net"
-import    "core:slice"
 import    "core:strings"
 import    "core:sys/posix"
 import    "core:time"
@@ -64,12 +63,12 @@ _Dial :: struct {}
 
 @(private="package")
 _Recv :: struct {
-	small_bufs: [1][]byte,
+	bufs: Bufs,
 }
 
 @(private="package")
 _Send :: struct {
-	small_bufs: [1][]byte,
+	bufs: Bufs,
 }
 
 @(private="package")
@@ -575,14 +574,14 @@ handle_completed :: proc(op: ^Operation) {
 	case .Send:
 		if send_exec(op) == .Done {
 			maybe_callback(op)
-			bufs_destroy(op.send.bufs, op.l.allocator)
+			bufs_delete(&op.send._impl.bufs, op.send.bufs, op.l.allocator)
 			cleanup(op)
 		}
 		return
 	case .Recv:
 		if recv_exec(op) == .Done {
 			maybe_callback(op)
-			bufs_destroy(op.recv.bufs, op.l.allocator)
+			bufs_delete(&op.recv._impl.bufs, op.recv.bufs, op.l.allocator)
 			cleanup(op)
 		}
 		return
@@ -778,10 +777,7 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	total: int
-	bufs := slice.advance_slices(op.send.bufs, op.send.sent)
-	bufs, total = constraint_bufs_to_max_rw(op.send.bufs)
-
+	bufs, total := bufs_to_process(&op.send._impl.bufs, op.send.bufs, op.send.sent)
 	sock, n := sendv(op.send.socket, bufs, op.send.endpoint)
 	if n < 0 {
 		if posix.errno() == .EWOULDBLOCK {
@@ -840,10 +836,7 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	total: int
-	bufs := slice.advance_slices(op.recv.bufs, op.recv.received)
-	bufs, total = constraint_bufs_to_max_rw(op.recv.bufs)
-
+	bufs, total := bufs_to_process(&op.recv._impl.bufs, op.recv.bufs, op.recv.received)
 	_, is_tcp := op.recv.socket.(net.TCP_Socket)
 
 	sock, n := recvv(op.recv.socket, bufs, &op.recv.source)

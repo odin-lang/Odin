@@ -7,7 +7,6 @@ import "core:container/pool"
 import "core:container/queue"
 import "core:mem"
 import "core:net"
-import "core:slice"
 import "core:strings"
 import "core:sys/linux"
 import "core:sys/linux/uring"
@@ -62,18 +61,27 @@ _Read :: struct {}
 @(private="package")
 _Write :: struct {}
 
+Sock_Addr_Ip :: struct #raw_union {
+	using _: struct {
+		family: linux.Address_Family,
+		port:   u16be,
+	},
+	using ipv4: linux.Sock_Addr_In,
+	using ipv6: linux.Sock_Addr_In6,
+}
+
 @(private="package")
 _Send :: struct {
-	endpoint:   linux.Sock_Addr_Any,
-	msghdr:     linux.Msg_Hdr,
-	small_bufs: [1][]byte,
+	endpoint: Sock_Addr_Ip,
+	msghdr:   linux.Msg_Hdr,
+	bufs:     Bufs,
 }
 
 @(private="package")
 _Recv :: struct {
-	addr_out:   linux.Sock_Addr_Any,
-	msghdr:     linux.Msg_Hdr,
-	small_bufs: [1][]byte,
+	addr_out: Sock_Addr_Ip,
+	msghdr:   linux.Msg_Hdr,
+	bufs:     Bufs,
 }
 
 @(private="package")
@@ -506,13 +514,13 @@ handle_completed :: proc(op: ^Operation, res: i32) {
 	case .Send:
 		if !send_callback(op, res) { return }
 		maybe_callback(op)
-		if len(op.send.bufs) > 1 { delete(op.send.bufs, op.l.allocator) }
+		bufs_delete(&op.send._impl.bufs, op.send.bufs, op.l.allocator)
 		cleanup(op)
 		return
 	case .Recv:
 		if !recv_callback(op, res) { return }
 		maybe_callback(op)
-		if len(op.recv.bufs) > 1 { delete(op.recv.bufs, op.l.allocator) }
+		bufs_delete(&op.recv._impl.bufs, op.recv.bufs, op.l.allocator)
 		cleanup(op)
 		return
 	case .Open:
@@ -678,7 +686,7 @@ accept_callback :: proc(op: ^Operation, res: i32) {
 
 	op.accept.client = TCP_Socket(res)
 	// net.set_blocking(net.TCP_Socket(op.accept.client), false)
-	op.accept.client_endpoint = sockaddr_storage_to_endpoint(&op.accept._impl.sockaddr)
+	op.accept.client_endpoint = sockaddr_storage_to_endpoint_any(&op.accept._impl.sockaddr)
 }
 
 dial_exec :: proc(op: ^Operation) {
@@ -698,7 +706,7 @@ dial_exec :: proc(op: ^Operation) {
 		}
 
 		op.dial.socket = sock.(TCP_Socket)
-		op.dial._impl.sockaddr = endpoint_to_sockaddr(op.dial.endpoint)
+		op.dial._impl.sockaddr = endpoint_to_sockaddr_any(op.dial.endpoint)
 	}
 
 	enqueue(op, uring.connect(
@@ -786,8 +794,7 @@ recv_exec :: proc(op: ^Operation) {
 		return
 	}
 
-	bufs    := slice.advance_slices(op.recv.bufs, op.recv.received)
-	bufs, _  = constraint_bufs_to_max_rw(bufs)
+	bufs, _ := bufs_to_process(&op.recv._impl.bufs, op.recv.bufs, op.recv.received)
 	op.recv._impl.msghdr.iov = transmute([]linux.IO_Vec)bufs
 
 	sock: linux.Fd
@@ -858,7 +865,7 @@ recv_callback :: proc(op: ^Operation, res: i32) -> bool {
 		}
 
 	case UDP_Socket:
-		op.recv.source = sockaddr_storage_to_endpoint(&op.recv._impl.addr_out)
+		op.recv.source = sockaddr_storage_to_endpoint_ip(&op.recv._impl.addr_out)
 	}
 
 	return true
@@ -872,8 +879,7 @@ send_exec :: proc(op: ^Operation) {
 		return
 	}
 
-	bufs    := slice.advance_slices(op.send.bufs, op.send.sent)
-	bufs, _  = constraint_bufs_to_max_rw(bufs)
+	bufs, _ := bufs_to_process(&op.send._impl.bufs, op.send.bufs, op.send.sent)
 	op.send._impl.msghdr.iov = transmute([]linux.IO_Vec)bufs
 
 	sock: linux.Fd
@@ -882,7 +888,7 @@ send_exec :: proc(op: ^Operation) {
 		sock = linux.Fd(socket)
 	case UDP_Socket:
 		sock = linux.Fd(socket)
-		op.send._impl.endpoint       = endpoint_to_sockaddr(op.send.endpoint)
+		op.send._impl.endpoint       = endpoint_to_sockaddr_ip(op.send.endpoint)
 		op.send._impl.msghdr.name    = &op.send._impl.endpoint
 		op.send._impl.msghdr.namelen = size_of(op.send._impl.endpoint)
 	}
@@ -1378,7 +1384,7 @@ stat_callback :: proc(op: ^Operation, res: i32) {
 }
 
 @(require_results)
-sockaddr_storage_to_endpoint :: proc(addr: ^linux.Sock_Addr_Any) -> (ep: Endpoint) {
+sockaddr_storage_to_endpoint_ip :: proc(addr: ^Sock_Addr_Ip) -> (ep: Endpoint) {
 	#partial switch addr.family {
 	case .INET:
 		return Endpoint {
@@ -1396,7 +1402,43 @@ sockaddr_storage_to_endpoint :: proc(addr: ^linux.Sock_Addr_Any) -> (ep: Endpoin
 }
 
 @(require_results)
-endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: linux.Sock_Addr_Any) {
+sockaddr_storage_to_endpoint_any :: proc(addr: ^linux.Sock_Addr_Any) -> (ep: Endpoint) {
+	#partial switch addr.family {
+	case .INET:
+		return Endpoint {
+			address = IP4_Address(addr.sin_addr),
+			port    = int(addr.sin_port),
+		}
+	case .INET6:
+		return Endpoint {
+			address = IP6_Address(transmute([8]u16be)addr.sin6_addr),
+			port    = int(addr.sin6_port),
+		}
+	case:
+		return {}
+	}
+}
+
+@(require_results)
+endpoint_to_sockaddr_ip :: proc(ep: Endpoint) -> (sockaddr: Sock_Addr_Ip) {
+	switch a in ep.address {
+	case IP4_Address:
+		sockaddr.sin_family = .INET
+		sockaddr.sin_port = u16be(ep.port)
+		sockaddr.sin_addr = cast([4]u8)a
+		return
+	case IP6_Address:
+		sockaddr.sin6_family = .INET6
+		sockaddr.sin6_port = u16be(ep.port)
+		sockaddr.sin6_addr = transmute([16]u8)a
+		return
+	}
+
+	unreachable()
+}
+
+@(require_results)
+endpoint_to_sockaddr_any :: proc(ep: Endpoint) -> (sockaddr: linux.Sock_Addr_Any) {
 	switch a in ep.address {
 	case IP4_Address:
 		sockaddr.sin_family = .INET

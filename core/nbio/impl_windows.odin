@@ -69,15 +69,15 @@ _Write :: struct {}
 
 @(private="package")
 _Send :: struct {
-	small_bufs: [1][]byte,
+	bufs: Bufs,
 }
 
 @(private="package")
 _Recv :: struct {
 	source:     win.SOCKADDR_STORAGE_LH,
 	source_len: win.INT,
-	small_bufs: [1][]byte,
 	flags:      win.DWORD,
+	bufs:       Bufs,
 }
 
 @(private="package")
@@ -320,9 +320,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 			result = recv_callback(op)
 			if result == .Done {
 				maybe_callback(op)
-				if len(op.recv.bufs) > 1 {
-					delete(op.recv.bufs, op.l.allocator)
-				}
+				bufs_delete(&op.recv._impl.bufs, op.recv.bufs, op.l.allocator)
 				cleanup(op)
 				return
 			}
@@ -332,9 +330,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 			result = send_callback(op)
 			if result == .Done {
 				maybe_callback(op)
-				if len(op.send.bufs) > 1 {
-					delete(op.send.bufs, op.l.allocator)
-				}
+				bufs_delete(&op.send._impl.bufs, op.send.bufs, op.l.allocator)
 				cleanup(op)
 				return
 			}
@@ -1213,9 +1209,7 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	bufs    := slice.advance_slices(op.recv.bufs, op.recv.received)
-	bufs, _  = constraint_bufs_to_max_rw(op.recv.bufs)
-
+	bufs, _  := bufs_to_process(&op.recv._impl.bufs, op.recv.bufs, op.recv.received)
 	win_bufs := ([^]win.WSABUF)(intrinsics.alloca(size_of(win.WSABUF) * len(bufs), align_of(win.WSABUF)))
 	for buf, i in bufs {
 		assert(i64(len(buf)) < i64(max(u32)))
@@ -1333,9 +1327,7 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
-	bufs    := slice.advance_slices(op.send.bufs, op.send.sent)
-	bufs, _  = constraint_bufs_to_max_rw(op.send.bufs)
-
+	bufs, _  := bufs_to_process(&op.send._impl.bufs, op.send.bufs, op.send.sent)
 	win_bufs := ([^]win.WSABUF)(intrinsics.alloca(size_of(win.WSABUF) * len(bufs), align_of(win.WSABUF)))
 	for buf, i in bufs {
 		assert(i64(len(buf)) < i64(max(u32)))
