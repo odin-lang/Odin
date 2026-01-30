@@ -5,7 +5,6 @@ import "base:intrinsics"
 import "core:container/pool"
 import "core:time"
 import "core:slice"
-import "core:mem"
 
 NO_TIMEOUT: time.Duration: -1 
 
@@ -480,7 +479,7 @@ Recv :: struct {
 	// The socket to receive from.
 	socket:   Any_Socket,
 	// The buffers to receive data into.
-	// The outer slice is copied internally, but the backing arrays must remain alive.
+	// The outer slice is copied internally, but the backing data must remain alive.
 	// It is safe to access `bufs` during the callback.
 	bufs:     [][]byte,
 	// If true, the operation waits until all buffers are filled (TCP only).
@@ -546,17 +545,11 @@ prep_recv :: #force_inline proc(
 		op.recv.expires = time.time_add(now(), timeout)
 	}
 
-	if len(op.recv.bufs) == 1 {
-		op.recv._impl.small_bufs = {op.recv.bufs[0]}
-		op.recv.bufs = op.recv._impl.small_bufs[:]
-	} else {
-		err: mem.Allocator_Error
-		if op.recv.bufs, err = slice.clone(op.recv.bufs, op.l.allocator); err != nil {
-			switch _ in op.recv.socket {
-			case TCP_Socket: op.recv.err = TCP_Recv_Error.Insufficient_Resources
-			case UDP_Socket: op.recv.err = UDP_Recv_Error.Insufficient_Resources
-			case:            unreachable()
-			}
+	if err := bufs_init(&op.recv._impl.bufs, &op.recv.bufs, op.l.allocator); err != nil {
+		switch _ in op.recv.socket {
+		case TCP_Socket: op.recv.err = TCP_Recv_Error.Insufficient_Resources
+		case UDP_Socket: op.recv.err = UDP_Recv_Error.Insufficient_Resources
+		case:            unreachable()
 		}
 	}
 
@@ -714,7 +707,8 @@ Send :: struct {
 	// The socket to send to.
 	socket:   Any_Socket,
 	// The buffers to send.
-	// The outer slice is copied internally, but the backing arrays must remain alive.
+	// The outer slice is copied internally, but the backing data must remain alive.
+	// It is safe to access `bufs` during the callback.
 	bufs:     [][]byte `fmt:"-"`,
 	// The destination endpoint to send to (UDP only).
 	endpoint: Endpoint,
@@ -773,17 +767,11 @@ prep_send :: proc(
 		op.send.expires = time.time_add(now(), timeout)
 	}
 
-	if len(op.send.bufs) == 1 {
-		op.send._impl.small_bufs = {op.send.bufs[0]}
-		op.send.bufs = op.send._impl.small_bufs[:]
-	} else {
-		err: mem.Allocator_Error
-		if op.send.bufs, err = slice.clone(op.send.bufs, op.l.allocator); err != nil {
-			switch _ in op.send.socket {
-			case TCP_Socket: op.send.err = TCP_Send_Error.Insufficient_Resources
-			case UDP_Socket: op.send.err = UDP_Send_Error.Insufficient_Resources
-			case:            unreachable()
-			}
+	if err := bufs_init(&op.send._impl.bufs, &op.send.bufs, op.l.allocator); err != nil {
+		switch _ in op.send.socket {
+		case TCP_Socket: op.send.err = TCP_Send_Error.Insufficient_Resources
+		case UDP_Socket: op.send.err = UDP_Send_Error.Insufficient_Resources
+		case:            unreachable()
 		}
 	}
 
