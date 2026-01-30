@@ -6504,6 +6504,8 @@ gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
 			syntax_error(token_for_pos, "Invalid feature flag name: %.*s", LIT(p));
 			error_line("\tExpected one of the following\n");
 			error_line("\tdynamic-literals\n");
+			error_line("\tglobal-context\n");
+			error_line("\tusing-stmt\n");
 			error_line("\tinteger-division-by-zero:trap\n");
 			error_line("\tinteger-division-by-zero:zero\n");
 			error_line("\tinteger-division-by-zero:self\n");

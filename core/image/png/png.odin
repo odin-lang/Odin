@@ -1,4 +1,4 @@
-#+vet !using-stmt
+#+feature using-stmt
 package png
 
 /*

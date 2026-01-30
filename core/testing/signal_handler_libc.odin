@@ -1,5 +1,5 @@
 #+private
-#+build windows, linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd, haiku
 package testing
 
 /*
@@ -8,6 +8,7 @@ package testing
 
 	List of contributors:
 		Feoramund:   Total rewrite.
+		blob1807:    Windows Win32 API rewrite.
 */
 
 import "base:intrinsics"
@@ -24,18 +25,12 @@ import "core:terminal/ansi"
 @(private="file") stop_test_passed: libc.sig_atomic_t
 @(private="file") stop_test_alert:  libc.sig_atomic_t
 
-when ODIN_ARCH == .i386 && ODIN_OS == .Windows {
-	// Thread-local storage is problematic on Windows i386
-	@(private="file")
-	local_test_index: libc.sig_atomic_t
-	@(private="file")
-	local_test_index_set: bool
-} else {
-	@(private="file", thread_local)
-	local_test_index: libc.sig_atomic_t
-	@(private="file", thread_local)
-	local_test_index_set: bool
-}
+
+@(private="file", thread_local)
+local_test_index: libc.sig_atomic_t
+@(private="file", thread_local)
+local_test_index_set: bool
+
 
 // Windows does not appear to have a SIGTRAP, so this is defined here, instead
 // of in the libc package, just so there's no confusion about it being

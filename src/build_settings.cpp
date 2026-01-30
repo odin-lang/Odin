@@ -366,9 +366,7 @@ enum OptInFeatureFlags : u64 {
 	                                             OptInFeatureFlag_IntegerDivisionByZero_AllBits,
 
 	OptInFeatureFlag_ForceTypeAssert = 1u<<6,
-
-
-
+  OptInFeatureFlag_UsingStmt       = 1u<<7,
 };
 
 u64 get_feature_flag_from_name(String const &name) {
@@ -387,6 +385,9 @@ u64 get_feature_flag_from_name(String const &name) {
 	if (name == "integer-division-by-zero:all-bits") {
 		return OptInFeatureFlag_IntegerDivisionByZero_AllBits;
 	}
+	if (name == "using-stmt") {
+		return OptInFeatureFlag_UsingStmt;
+  }
 	if (name == "force-type-assert") {
 		return OptInFeatureFlag_ForceTypeAssert;
 	}
