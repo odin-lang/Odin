@@ -963,6 +963,7 @@ lookup_env_buffer :: proc(buf: []u8, key: string) -> (value: string, err: Error)
 		return "", .Buffer_Full
 	} else {
 		copy(buf, key)
+		buf[len(key)] = 0
 	}
 
 	if value = string(_unix_getenv(cstring(raw_data(buf)))); value == "" {

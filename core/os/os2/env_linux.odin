@@ -282,6 +282,7 @@ when ODIN_NO_CRT {
 			return "", .Buffer_Full
 		} else {
 			copy(buf, key)
+			buf[len(key)] = 0
 		}
 
 		cval := posix.getenv(cstring(raw_data(buf)))
