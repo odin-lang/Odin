@@ -200,7 +200,7 @@ HapticID :: distinct Uint32
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	GetHaptics                 :: proc(count: ^c.int) -> ^HapticID ---
+	GetHaptics                 :: proc(count: Maybe(^c.int)) -> ^HapticID ---
 	GetHapticNameForID         :: proc(instance_id: HapticID) -> cstring ---
 	OpenHaptic                 :: proc(instance_id: HapticID) -> ^Haptic ---
 	GetHapticFromID            :: proc(instance_id: HapticID) -> ^Haptic ---

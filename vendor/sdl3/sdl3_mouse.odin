@@ -65,15 +65,15 @@ MouseMotionTransformCallback :: #type proc "c" (userdata: rawptr, timestamp: Uin
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	HasMouse                   :: proc() -> bool ---
-	GetMice                    :: proc(count: ^c.int) -> [^]MouseID ---
+	GetMice                    :: proc(count: Maybe(^c.int)) -> [^]MouseID ---
 	GetMouseNameForID          :: proc(instance_id: MouseID) -> cstring ---
 	GetMouseFocus              :: proc() -> ^Window ---
-	GetMouseState              :: proc(x, y: ^f32) -> MouseButtonFlags ---
-	GetGlobalMouseState        :: proc(x, y: ^f32) -> MouseButtonFlags ---
-	GetRelativeMouseState      :: proc(x, y: ^f32) -> MouseButtonFlags ---
-	WarpMouseInWindow          :: proc(window: ^Window, x, y: f32) ---
+	GetMouseState              :: proc(x, y: Maybe(^f32)) -> MouseButtonFlags ---
+	GetGlobalMouseState        :: proc(x, y: Maybe(^f32)) -> MouseButtonFlags ---
+	GetRelativeMouseState      :: proc(x, y: Maybe(^f32)) -> MouseButtonFlags ---
+	WarpMouseInWindow          :: proc(window: Maybe(^Window), x, y: f32) ---
 	WarpMouseGlobal            :: proc(x, y: f32) -> bool ---
-	SetRelativeMouseTransform  :: proc(callback: MouseMotionTransformCallback, userdata: rawptr) -> bool ---
+	SetRelativeMouseTransform  :: proc(callback: Maybe(MouseMotionTransformCallback), userdata: rawptr) -> bool ---
 	SetWindowRelativeMouseMode :: proc(window: ^Window, enabled: bool) -> bool ---
 	GetWindowRelativeMouseMode :: proc(window: ^Window) -> bool ---
 	CaptureMouse               :: proc(enabled: bool) -> bool ---
@@ -81,7 +81,7 @@ foreign lib {
 	CreateColorCursor          :: proc(surface: ^Surface, hot_x, hot_y: c.int) -> ^Cursor ---
 	CreateAnimatedCursor       :: proc(frames: [^]CursorFrameInfo, frame_count, hot_x, hot_y: c.int) -> ^Cursor ---
 	CreateSystemCursor         :: proc(id: SystemCursor) -> ^Cursor ---
-	SetCursor                  :: proc(cursor: ^Cursor) -> bool ---
+	SetCursor                  :: proc(cursor: Maybe(^Cursor)) -> bool ---
 	GetCursor                  :: proc() -> ^Cursor ---
 	GetDefaultCursor           :: proc() -> ^Cursor ---
 	DestroyCursor              :: proc(cursor: ^Cursor) ---

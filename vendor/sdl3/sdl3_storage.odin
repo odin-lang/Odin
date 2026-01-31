@@ -52,7 +52,7 @@ Storage :: struct {}
 foreign lib {
 	OpenTitleStorage          :: proc(override: cstring, props: PropertiesID) -> ^Storage ---
 	OpenUserStorage           :: proc(org, app: cstring, props: PropertiesID) -> ^Storage ---
-	OpenFileStorage           :: proc(path: cstring) -> ^Storage ---
+	OpenFileStorage           :: proc(path: Maybe(cstring)) -> ^Storage ---
 	OpenStorage               :: proc(iface: ^StorageInterface, userdata: rawptr) -> ^Storage ---
 	CloseStorage              :: proc(storage: ^Storage) -> bool ---
 	StorageReady              :: proc(storage: ^Storage) -> bool ---
@@ -60,7 +60,7 @@ foreign lib {
 
 	CreateStorageDirectory    :: proc(storage: ^Storage, path: cstring) -> bool ---
 	GetStorageSpaceRemaining  :: proc(storage: ^Storage) -> Uint64 ---
-	GlobStorageDirectory      :: proc(storage: ^Storage, path: cstring, pattern: cstring, flags: GlobFlags, count: ^c.int) -> [^][^]c.char ---
+	GlobStorageDirectory      :: proc(storage: ^Storage, path: Maybe(cstring), pattern: Maybe(cstring), flags: GlobFlags, count: Maybe(^c.int)) -> [^][^]c.char ---
 }
 
 @(default_calling_convention="c", link_prefix="SDL_")
@@ -68,9 +68,9 @@ foreign lib {
 	ReadStorageFile           :: proc(storage: ^Storage, path: cstring, destination: rawptr, length: Uint64) -> bool ---
 	WriteStorageFile          :: proc(storage: ^Storage, path: cstring, source:      rawptr, length: Uint64) -> bool ---
 
-	EnumerateStorageDirectory :: proc(storage: ^Storage, path: cstring, callback: EnumerateDirectoryCallback, userdata: rawptr) -> bool ---
+	EnumerateStorageDirectory :: proc(storage: ^Storage, path: Maybe(cstring), callback: EnumerateDirectoryCallback, userdata: rawptr) -> bool ---
 	RemoveStoragePath         :: proc(storage: ^Storage, path: cstring) -> bool ---
 	RenameStoragePath         :: proc(storage: ^Storage, oldpath, newpath: cstring) -> bool ---
 	CopyStorageFile           :: proc(storage: ^Storage, oldpath, newpath: cstring) -> bool ---
-	GetStoragePathInfo        :: proc(storage: ^Storage, path: cstring, info: ^PathInfo) -> bool ---
+	GetStoragePathInfo        :: proc(storage: ^Storage, path: cstring, info: Maybe(^PathInfo)) -> bool ---
 }
