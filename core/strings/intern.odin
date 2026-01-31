@@ -30,6 +30,7 @@ Inputs:
 - m: A pointer to the Intern struct to be initialized
 - allocator: The allocator for the Intern_Entry strings (Default: context.allocator)
 - map_allocator: The allocator for the map of entries (Default: context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - err: An allocator error if one occured, `nil` otherwise
@@ -78,6 +79,7 @@ Returns an interned copy of the given text as a cstring, adding it to the map if
 Inputs:
 - m: A pointer to the Intern struct
 - text: The string to be interned
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 NOTE: The returned cstring lives as long as the map entry lives
 
@@ -85,8 +87,8 @@ Returns:
 - str: The interned cstring
 - err: An allocator error if one occured, `nil` otherwise
 */
-intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runtime.Allocator_Error) {
-	entry := _intern_get_entry(m, text) or_return
+intern_get_cstring :: proc(m: ^Intern, text: string, loc := #caller_location) -> (str: cstring, err: runtime.Allocator_Error) {
+	entry := _intern_get_entry(m, text, loc) or_return
 	return cstring(&entry.str[0]), nil
 }
 
@@ -99,12 +101,13 @@ Sets and allocates the entry if it wasn't set yet
 Inputs:
 - m: A pointer to the Intern struct
 - text: The string to be looked up or interned
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - new_entry: The interned cstring
 - err: An allocator error if one occured, `nil` otherwise
 */
-_intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry, err: runtime.Allocator_Error) #no_bounds_check {
+_intern_get_entry :: proc(m: ^Intern, text: string, loc := #caller_location) -> (new_entry: ^Intern_Entry, err: runtime.Allocator_Error) #no_bounds_check {
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
 	}
@@ -115,7 +118,7 @@ _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry
 	}
 
 	entry_size := int(offset_of(Intern_Entry, str)) + len(text) + 1
-	bytes := runtime.mem_alloc(entry_size, align_of(Intern_Entry), m.allocator) or_return
+	bytes := runtime.mem_alloc(entry_size, align_of(Intern_Entry), m.allocator, loc) or_return
 	new_entry = (^Intern_Entry)(raw_data(bytes))
 
 	new_entry.len = len(text)
