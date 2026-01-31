@@ -14,6 +14,8 @@ SEC_PREFIX_UNCOMPRESSED    :: 0x04
 pt_set_sec_bytes :: proc "contextless" (p: ^$T, b: []byte) -> bool {
 	when T == Point_p256r1 {
 		FE_SZ :: FE_SIZE_P256R1
+	} else when T == Point_p384r1 {
+		FE_SZ :: FE_SIZE_P384R1
 	} else {
 		#panic("weierstrass: invalid curve")
 	}
@@ -51,6 +53,8 @@ pt_set_sec_bytes :: proc "contextless" (p: ^$T, b: []byte) -> bool {
 pt_sec_bytes :: proc "contextless" (b: []byte, p: ^$T, compressed: bool) -> bool {
 	when T == Point_p256r1 {
 		FE_SZ :: FE_SIZE_P256R1
+	} else when T == Point_p384r1 {
+		FE_SZ :: FE_SIZE_P384R1
 	} else {
 		#panic("weierstrass: invalid curve")
 	}
