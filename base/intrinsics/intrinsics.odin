@@ -355,7 +355,7 @@ has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is
 
 
 // Utility Calls
-concatentate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
+concatenate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
 
 // Returns the value of the procedure where `x` must be a call expression
 procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
