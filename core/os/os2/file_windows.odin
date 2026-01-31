@@ -377,7 +377,7 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 
 	if sync.guard(&f.p_mutex) {
-		to_read := min(win32.DWORD(length), MAX_RW)
+		to_read := win32.DWORD(min(length, MAX_RW))
 		switch f.kind {
 		case .Console:
 			// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
