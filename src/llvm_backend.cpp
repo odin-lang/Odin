@@ -255,8 +255,10 @@ gb_internal void lb_equal_proc_generate_body(lbModule *m, lbProcedure *p) {
 	lb_begin_procedure_body(p);
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
-	// lb_add_attribute_to_proc(m, p->value, "readonly");
+	lb_add_attribute_to_proc_with_string(m, p->value, str_lit("memory"), str_lit("read"));
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	lb_add_attribute_to_proc(m, p->value, "willreturn");
+	lb_add_attribute_to_proc(m, p->value, "mustprogress");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
@@ -439,8 +441,10 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	defer (lb_end_procedure_body(p));
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
-	// lb_add_attribute_to_proc(m, p->value, "readonly");
+	lb_add_attribute_to_proc_with_string(m, p->value, str_lit("memory"), str_lit("read"));
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	lb_add_attribute_to_proc(m, p->value, "willreturn");
+	lb_add_attribute_to_proc(m, p->value, "mustprogress");
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
@@ -448,7 +452,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lbValue seed = {y, t_uintptr};
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
-	// lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	if (is_type_simple_compare(type)) {
 		lbValue res = lb_simple_compare_hash(p, type, data, seed);
@@ -653,6 +657,7 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	lb_add_attribute_to_proc(m, p->value, "mustprogress");
 	if (build_context.ODIN_DEBUG) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
 	}
@@ -828,6 +833,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	lb_add_attribute_to_proc(m, p->value, "mustprogress");
 	if (build_context.ODIN_DEBUG) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
 	}

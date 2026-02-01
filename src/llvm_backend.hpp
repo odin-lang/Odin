@@ -186,8 +186,14 @@ struct lbModule {
 	LLVMMetadataRef debug_compile_unit;
 
 	RecursiveMutex debug_values_mutex;
-	PtrMap<void *, LLVMMetadataRef> debug_values; 
+	PtrMap<void *, LLVMMetadataRef> debug_values;
 
+	// TBAA metadata
+	LLVMMetadataRef tbaa_root;
+	LLVMMetadataRef tbaa_omnipotent;
+	unsigned        tbaa_kind_id;
+	RecursiveMutex  tbaa_mutex;
+	PtrMap<Type *, LLVMMetadataRef> tbaa_access_tags;
 
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;

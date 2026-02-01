@@ -193,6 +193,11 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		break;
 	}
 
+	// mustprogress — tells LLVM the function makes forward progress (enables loop optimizations)
+	if (!pt->Proc.diverging && build_context.optimization_level > 0) {
+		lb_add_attribute_to_proc(m, p->value, "mustprogress");
+	}
+
 	if (pt->Proc.enable_target_feature.len != 0) {
 		gbString feature_str = gb_string_make(temporary_allocator(), "");
 
@@ -251,10 +256,17 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	}
 
 
-	// NOTE(bill): offset==0 is the return value
+	// NOTE(bill): offset==0 is the return value, offset==1 is the first param.
+	// If the ABI returns indirectly (sret), the sret pointer occupies the first
+	// param slot, so user params start at offset 2.
 	isize offset = 1;
-	if (pt->Proc.return_by_pointer) {
-		offset = 2;
+	{
+		lbFunctionType *ft = p->abi_function_type;
+		if (ft != nullptr && ft->ret.kind == lbArg_Indirect) {
+			offset = 2;
+		} else if (pt->Proc.return_by_pointer) {
+			offset = 2;
+		}
 	}
 
 	isize parameter_index = 0;
@@ -278,6 +290,19 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 					lb_add_nocapture_proc_attribute_at_index(p, offset+parameter_index);
 				}
 			}
+			// readonly on non-pointer types passed indirectly by ABI
+			if (!is_type_pointer(e->type) && !is_type_multi_pointer(e->type) && !is_type_rawptr(e->type) &&
+			    !is_type_proc(e->type) && !is_type_soa_pointer(e->type)) {
+				lbFunctionType *ft = p->abi_function_type;
+				if (ft != nullptr && parameter_index < ft->args.count && ft->args[parameter_index].kind == lbArg_Indirect) {
+					unsigned llvm_param_idx = cast(unsigned)(offset + parameter_index - 1);
+					LLVMTypeRef param_type = LLVMTypeOf(LLVMGetParam(p->value, llvm_param_idx));
+					if (LLVMGetTypeKind(param_type) == LLVMPointerTypeKind) {
+						lb_add_proc_attribute_at_index(p, offset+parameter_index, "readonly");
+					}
+				}
+			}
+
 			parameter_index += 1;
 		}
 	}

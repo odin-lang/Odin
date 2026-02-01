@@ -122,6 +122,18 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	array_init(&m->pad_types, heap_allocator());
 
+	// TBAA metadata initialization
+	{
+		LLVMMetadataRef root_str = LLVMMDStringInContext2(m->ctx, "Odin TBAA", 9);
+		m->tbaa_root = LLVMMDNodeInContext2(m->ctx, &root_str, 1);
+
+		LLVMMetadataRef omni_str = LLVMMDStringInContext2(m->ctx, "omnipotent char", 15);
+		LLVMMetadataRef omni_ops[3] = { omni_str, m->tbaa_root, LLVMValueAsMetadata(LLVMConstInt(LLVMInt64TypeInContext(m->ctx), 0, false)) };
+		m->tbaa_omnipotent = LLVMMDNodeInContext2(m->ctx, omni_ops, 3);
+
+		m->tbaa_kind_id = LLVMGetMDKindIDInContext(m->ctx, "tbaa", 4);
+		map_init(&m->tbaa_access_tags);
+	}
 
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
 
@@ -1089,6 +1101,113 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	lb_emit_store(p, addr.addr, value);
 }
 
+gb_internal LLVMMetadataRef lb_get_tbaa_type_node(lbModule *m, char const *name, isize name_len) {
+	LLVMMetadataRef name_md = LLVMMDStringInContext2(m->ctx, name, name_len);
+	LLVMMetadataRef ops[3] = { name_md, m->tbaa_root, LLVMValueAsMetadata(LLVMConstInt(LLVMInt64TypeInContext(m->ctx), 0, false)) };
+	return LLVMMDNodeInContext2(m->ctx, ops, 3);
+}
+
+gb_internal LLVMMetadataRef lb_make_tbaa_access_tag(lbModule *m, LLVMMetadataRef type_node) {
+	LLVMMetadataRef ops[3] = { type_node, type_node, LLVMValueAsMetadata(LLVMConstInt(LLVMInt64TypeInContext(m->ctx), 0, false)) };
+	return LLVMMDNodeInContext2(m->ctx, ops, 3);
+}
+
+gb_internal LLVMMetadataRef lb_get_tbaa_access_tag(lbModule *m, Type *type) {
+	if (type == nullptr) {
+		return nullptr;
+	}
+
+	type = base_type(type);
+
+	// No TBAA for types that can alias anything
+	if (is_type_rawptr(type) || is_type_any(type) || is_type_proc(type)) {
+		return nullptr;
+	}
+	if (type->kind == Type_Union) {
+		return nullptr;
+	}
+
+	MUTEX_GUARD(&m->tbaa_mutex);
+
+	LLVMMetadataRef *found = map_get(&m->tbaa_access_tags, type);
+	if (found) {
+		return *found;
+	}
+
+	LLVMMetadataRef type_node = nullptr;
+
+	if (type->kind == Type_Basic) {
+		BasicKind kind = type->Basic.kind;
+		u32 flags = type->Basic.flags;
+
+		if (flags & BasicFlag_Untyped) {
+			return nullptr;
+		}
+
+		// Byte types (u8, i8, byte) may alias anything, like C's char
+		if (kind == Basic_u8 || kind == Basic_i8) {
+			return nullptr;
+		}
+
+		// Endian variants share TBAA with their base type
+		if (flags & (BasicFlag_EndianLittle | BasicFlag_EndianBig)) {
+			// Map to base type name
+			switch (kind) {
+			case Basic_i16le: case Basic_i16be: type_node = lb_get_tbaa_type_node(m, "i16", 3); break;
+			case Basic_u16le: case Basic_u16be: type_node = lb_get_tbaa_type_node(m, "u16", 3); break;
+			case Basic_i32le: case Basic_i32be: type_node = lb_get_tbaa_type_node(m, "i32", 3); break;
+			case Basic_u32le: case Basic_u32be: type_node = lb_get_tbaa_type_node(m, "u32", 3); break;
+			case Basic_i64le: case Basic_i64be: type_node = lb_get_tbaa_type_node(m, "i64", 3); break;
+			case Basic_u64le: case Basic_u64be: type_node = lb_get_tbaa_type_node(m, "u64", 3); break;
+			case Basic_i128le: case Basic_i128be: type_node = lb_get_tbaa_type_node(m, "i128", 4); break;
+			case Basic_u128le: case Basic_u128be: type_node = lb_get_tbaa_type_node(m, "u128", 4); break;
+			case Basic_f16le: case Basic_f16be: type_node = lb_get_tbaa_type_node(m, "f16", 3); break;
+			case Basic_f32le: case Basic_f32be: type_node = lb_get_tbaa_type_node(m, "f32", 3); break;
+			case Basic_f64le: case Basic_f64be: type_node = lb_get_tbaa_type_node(m, "f64", 3); break;
+			default:
+				return nullptr;
+			}
+		} else {
+			char const *name = cast(char const *)type->Basic.name.text;
+			isize name_len = type->Basic.name.len;
+			type_node = lb_get_tbaa_type_node(m, name, name_len);
+		}
+	} else if (type->kind == Type_Pointer || type->kind == Type_MultiPointer) {
+		type_node = lb_get_tbaa_type_node(m, "pointer", 7);
+	} else if (type->kind == Type_Enum) {
+		type_node = lb_get_tbaa_type_node(m, "enum", 4);
+	} else if (type->kind == Type_Slice) {
+		type_node = lb_get_tbaa_type_node(m, "slice", 5);
+	} else if (type->kind == Type_DynamicArray) {
+		type_node = lb_get_tbaa_type_node(m, "dynamic_array", 13);
+	} else if (type->kind == Type_Map) {
+		type_node = lb_get_tbaa_type_node(m, "map", 3);
+	} else if (type->kind == Type_Array || type->kind == Type_EnumeratedArray) {
+		type_node = lb_get_tbaa_type_node(m, "array", 5);
+	} else if (type->kind == Type_Struct) {
+		if (type->Struct.is_raw_union) {
+			return nullptr;
+		}
+		type_node = lb_get_tbaa_type_node(m, "aggregate", 9);
+	} else if (type->kind == Type_BitSet) {
+		type_node = lb_get_tbaa_type_node(m, "bitset", 6);
+	} else if (type->kind == Type_SimdVector) {
+		type_node = lb_get_tbaa_type_node(m, "simd_vector", 11);
+	} else if (type->kind == Type_Matrix) {
+		type_node = lb_get_tbaa_type_node(m, "matrix", 6);
+	} else if (type->kind == Type_BitField) {
+		type_node = lb_get_tbaa_type_node(m, "bitfield", 8);
+	} else if (type->kind == Type_SoaPointer) {
+		type_node = lb_get_tbaa_type_node(m, "pointer", 7);
+	} else {
+		return nullptr;
+	}
+
+	LLVMMetadataRef tag = lb_make_tbaa_access_tag(m, type_node);
+	map_set(&m->tbaa_access_tags, type, tag);
+	return tag;
+}
+
 gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	for (;;) {
 		if (t == nullptr) {
@@ -1190,7 +1309,12 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
-	// LLVMSetVolatile(instr, p->in_multi_assignment);
+	if (instr != nullptr) {
+		Type *store_type = type_deref(ptr.type, true);
+		if (LLVMMetadataRef tag = lb_get_tbaa_access_tag(p->module, store_type)) {
+			LLVMSetMetadata(instr, p->module->tbaa_kind_id, LLVMMetadataAsValue(p->module->ctx, tag));
+		}
+	}
 }
 
 gb_internal LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val) {
@@ -1204,6 +1328,9 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		GB_ASSERT(vt->kind == Type_MultiPointer);
 		Type *t = vt->MultiPointer.elem;
 		LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
+		if (LLVMMetadataRef tag = lb_get_tbaa_access_tag(p->module, t)) {
+			LLVMSetMetadata(v, p->module->tbaa_kind_id, LLVMMetadataAsValue(p->module->ctx, tag));
+		}
 		return lbValue{v, t};
 	} else if (is_type_soa_pointer(value.type)) {
 		lbValue ptr = lb_emit_struct_ev(p, value, 0);
@@ -1215,6 +1342,9 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
+	if (LLVMMetadataRef tag = lb_get_tbaa_access_tag(p->module, t)) {
+		LLVMSetMetadata(v, p->module->tbaa_kind_id, LLVMMetadataAsValue(p->module->ctx, tag));
+	}
 
 	return lbValue{v, t};
 }
