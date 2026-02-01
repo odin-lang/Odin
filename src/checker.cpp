@@ -495,15 +495,18 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 		goto end;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
+		rw_mutex_shared_lock(&s->parent->mutex);
 		found = string_map_get(&s->parent->elements, key);
 		if (found) {
 			if ((*found)->flags & EntityFlag_Result) {
 				if (entity != *found) {
 					result = *found;
 				}
+				rw_mutex_shared_unlock(&s->parent->mutex);
 				goto end;
 			}
 		}
+		rw_mutex_shared_unlock(&s->parent->mutex);
 	}
 
 	string_map_set(&s->elements, key, entity);
@@ -727,6 +730,8 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	return false;
 }
 
+// NOTE(threading): check_scope_usage runs after all checking is complete (vet phase),
+// so no concurrent modifications to scopes occur during iteration.
 gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_flags, bool per_entity) {
 	u64 original_vet_flags = vet_flags;
 
@@ -7223,6 +7228,8 @@ gb_internal WORKER_TASK_PROC(check_walk_all_dependencies_worker_proc) {
 	}
 	DeclInfo *decl = cast(DeclInfo *)data;
 
+	// NOTE(threading): next_child/next_sibling are safe to read without next_mutex here
+	// because this runs after all procedure bodies are checked, so the linked list is frozen.
 	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
 		thread_pool_add_task(check_walk_all_dependencies_worker_proc, child);
 		check_walk_all_dependencies(child);

@@ -22,28 +22,28 @@ struct ErrorCollector {
 
 	Array<ErrorValue> error_values;
 	ErrorValue        curr_error_value;
-	std::atomic<bool> curr_error_value_set;
+	bool curr_error_value_set;
 };
 
 gb_global ErrorCollector global_error_collector;
 
 
 gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = ErrorValue_Error) {
-	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == false, "Possible race condition in error handling system, please report this with an issue");
+	GB_ASSERT_MSG(global_error_collector.curr_error_value_set == false, "curr_error_value already set (caller must hold global_error_collector.mutex)");
 	ErrorValue ev = {kind, pos};
 	ev.msg.allocator = heap_allocator();
 
 	global_error_collector.curr_error_value = ev;
-	global_error_collector.curr_error_value_set.store(true);
+	global_error_collector.curr_error_value_set = true;
 }
 
 gb_internal void pop_error_value(void) {
 	mutex_lock(&global_error_collector.mutex);
-	if (global_error_collector.curr_error_value_set.load()) {
+	if (global_error_collector.curr_error_value_set) {
 		array_add(&global_error_collector.error_values, global_error_collector.curr_error_value);
 
 		global_error_collector.curr_error_value = {};
-		global_error_collector.curr_error_value_set.store(false);
+		global_error_collector.curr_error_value_set = false;
 	}
 	mutex_unlock(&global_error_collector.mutex);
 }
@@ -56,7 +56,7 @@ gb_internal void try_pop_error_value(void) {
 }
 
 gb_internal ErrorValue *get_error_value(void) {
-	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == true, "Possible race condition in error handling system, please report this with an issue");
+	GB_ASSERT_MSG(global_error_collector.curr_error_value_set == true, "curr_error_value not set (caller must hold global_error_collector.mutex)");
 	return &global_error_collector.curr_error_value;
 }
 
