@@ -171,7 +171,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 		LLVMValueRef other_global = nullptr;
 		if (ec.e->kind == Entity_Variable) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
-			if (other_global) {
+			if (other_global && (LLVMGetInitializer(other_global) != nullptr || LLVMIsExternallyInitialized(other_global))) {
 				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
 				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
@@ -179,7 +179,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 			}
 		} else if (ec.e->kind == Entity_Procedure) {
 			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
-			if (other_global) {
+			if (other_global && LLVMCountBasicBlocks(other_global) != 0) {
 				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
 				if (!ec.e->Procedure.is_export && !ec.e->Procedure.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
@@ -2332,7 +2332,12 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 
 	auto wd = cast(lbLLVMEmitWorker *)data;
 
-	if (LLVMTargetMachineEmitToFile(wd->target_machine, wd->m->mod, cast(char *)wd->filepath_obj.text, wd->code_gen_file_type, &llvm_error)) {
+	if (build_context.lto_kind != LTO_None) {
+		if (LLVMWriteBitcodeToFile(wd->m->mod, cast(char *)wd->filepath_obj.text)) {
+			gb_printf_err("Failed to write bitcode file: %.*s\n", LIT(wd->filepath_obj));
+			exit_with_errors();
+		}
+	} else if (LLVMTargetMachineEmitToFile(wd->target_machine, wd->m->mod, cast(char *)wd->filepath_obj.text, wd->code_gen_file_type, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
 		exit_with_errors();
 	}
@@ -2701,7 +2706,9 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 	String ext = {};
 
-	if (build_context.build_mode == BuildMode_Assembly) {
+	if (build_context.lto_kind != LTO_None) {
+		ext = STR_LIT("bc");
+	} else if (build_context.build_mode == BuildMode_Assembly) {
 		ext = STR_LIT("S");
 	} else if (build_context.build_mode == BuildMode_Object) {
 		// Allow a user override for the object extension.
@@ -2776,7 +2783,13 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 			TIME_SECTION_WITH_LEN(section_name, gb_string_length(section_name));
 
-			if (LLVMTargetMachineEmitToFile(m->target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
+			if (build_context.lto_kind != LTO_None) {
+				if (LLVMWriteBitcodeToFile(m->mod, cast(char *)filepath_obj.text)) {
+					gb_printf_err("Failed to write bitcode file: %.*s\n", LIT(filepath_obj));
+					exit_with_errors();
+					return false;
+				}
+			} else if (LLVMTargetMachineEmitToFile(m->target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 				exit_with_errors();
 				return false;

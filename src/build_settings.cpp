@@ -420,6 +420,12 @@ struct BuildCacheData {
 };
 
 
+enum LTOKind : i32 {
+	LTO_None,
+	LTO_Thin,
+	LTO_Thin_Files,
+};
+
 enum LinkerChoice : i32 {
 	Linker_Invalid = -1,
 	Linker_Default = 0,
@@ -560,6 +566,7 @@ struct BuildContext {
 
 	bool   use_single_module;
 	bool   use_separate_modules;
+	LTOKind lto_kind;
 	bool   module_per_file;
 	bool   cached;
 	BuildCacheData build_cache_data;
@@ -2030,6 +2037,29 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->use_separate_modules = false;
 	}
 
+	if (bc->lto_kind == LTO_Thin || bc->lto_kind == LTO_Thin_Files) {
+#if LLVM_VERSION_MAJOR < 17
+		gb_printf_err("-lto:thin requires LLVM 17 or later\n");
+		gb_exit(1);
+#endif
+		if (bc->build_mode == BuildMode_Assembly || bc->build_mode == BuildMode_LLVM_IR) {
+			gb_printf_err("-lto:thin is incompatible with -build-mode:asm and -build-mode:llvm-ir\n");
+			gb_exit(1);
+		}
+#if defined(GB_SYSTEM_WINDOWS)
+		if (bc->linker_choice != Linker_lld) {
+			gb_printf_err("-lto:thin on Windows requires -linker:lld\n");
+			gb_exit(1);
+		}
+#endif
+		if (bc->use_single_module) {
+			gb_printf_err("Warning: -lto:thin overrides -use-single-module; separate modules will be used\n");
+		}
+		bc->use_separate_modules = true;
+		if (bc->lto_kind == LTO_Thin_Files) {
+			bc->module_per_file = true;
+		}
+	}
 
 	bc->ODIN_VALGRIND_SUPPORT = false;
 	if (build_context.metrics.os != TargetOs_windows) {
