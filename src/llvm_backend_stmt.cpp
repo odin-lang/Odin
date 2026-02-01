@@ -847,6 +847,10 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 		lb_close_scope(p, lbDeferExit_Default, nullptr, node->left);
 		lb_pop_target_list(p);
 
+		if (p->debug_info != nullptr) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+		}
+
 		if (check != nullptr) {
 			lb_emit_jump(p, check);
 			lb_start_block(p, check);
@@ -979,6 +983,9 @@ gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *s
 
 	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 	lb_pop_target_list(p);
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	}
 	lb_emit_jump(p, loop);
 	lb_start_block(p, done);
 }
@@ -1108,6 +1115,9 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 	lb_pop_target_list(p);
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	}
 	lb_emit_jump(p, loop);
 	lb_start_block(p, done);
 
@@ -1330,6 +1340,9 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 	lb_close_scope(p, lbDeferExit_Default, nullptr, rs->body);
 	lb_pop_target_list(p);
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, rs->body));
+	}
 	lb_emit_jump(p, loop);
 	lb_start_block(p, done);
 }
@@ -1807,6 +1820,9 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		}
 
 		lbBlock *next_cond = nullptr;
+		if (p->debug_info != nullptr) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
+		}
 		for (Ast *expr : cc->list) {
 			expr = unparen_expr(expr);
 
@@ -3164,6 +3180,9 @@ gb_internal void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	if (d.kind == lbDefer_Node) {
 		lb_build_stmt(p, d.stmt);
 	} else if (d.kind == lbDefer_Proc) {
+		if (p->debug_info != nullptr && d.pos.line > 0) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_token_pos(p, d.pos));
+		}
 		lb_emit_call(p, d.proc.deferred, d.proc.result_as_args);
 	}
 }
@@ -3240,10 +3259,11 @@ gb_internal void lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt)
 	d->scope_index = scope_index;
 	d->context_stack_count = p->context_stack.count;
 	d->block = p->curr_block;
+	d->pos = ast_token(stmt).pos;
 	d->stmt = stmt;
 }
 
-gb_internal void lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue deferred, Array<lbValue> const &result_as_args) {
+gb_internal void lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue deferred, Array<lbValue> const &result_as_args, TokenPos pos) {
 	Type *pt = base_type(p->type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
@@ -3255,6 +3275,7 @@ gb_internal void lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue de
 	d->scope_index = p->scope_index;
 	d->block = p->curr_block;
 	d->context_stack_count = p->context_stack.count;
+	d->pos = pos;
 	d->proc.deferred = deferred;
 	d->proc.result_as_args = result_as_args;
 }

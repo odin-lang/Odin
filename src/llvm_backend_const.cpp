@@ -736,13 +736,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				}
 				LLVMValueRef tag = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);
 				LLVMValueRef padding = nullptr;
-				LLVMValueRef values[3] = {cv.value, tag, padding};
-
 				isize value_count = 2;
 				if (LLVMCountStructElementTypes(llvm_type) > 2) {
 					value_count = 3;
 					padding = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
 				}
+				LLVMValueRef values[3] = {cv.value, tag, padding};
 				res.value = llvm_const_named_struct_internal(m, llvm_type, values, value_count);
 				res.type = original_type;
 				return res;

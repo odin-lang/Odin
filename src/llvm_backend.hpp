@@ -186,7 +186,7 @@ struct lbModule {
 	LLVMMetadataRef debug_compile_unit;
 
 	RecursiveMutex debug_values_mutex;
-	PtrMap<void *, LLVMMetadataRef> debug_values; 
+	PtrMap<void *, LLVMMetadataRef> debug_values;
 
 
 	StringMap<lbAddr> objc_classes;
@@ -290,6 +290,7 @@ struct lbDefer {
 	isize       scope_index;
 	isize       context_stack_count;
 	lbBlock *   block;
+	TokenPos    pos;
 	union {
 		Ast *stmt;
 		struct {

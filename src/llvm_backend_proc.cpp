@@ -703,8 +703,6 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 								lbValue ptr = {};
 								ptr.value = LLVMGetParam(p->value, cast(unsigned)the_offset);
 								ptr.type = alloc_type_pointer(e->type);
-
-
 							}
 						} else if (has_return_ptr) {
 							lbValue ptr = p->return_ptr.addr;
@@ -1288,7 +1286,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				}
 			}
 
-			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args);
+			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args, e->token.pos);
 		}
 	}
 

@@ -729,22 +729,22 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_i128be: return lb_debug_type_basic_type(m, str_lit("i128be"), 128, LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagBigEndian);
 		case Basic_u128be: return lb_debug_type_basic_type(m, str_lit("u128be"), 128, LLVMDWARFTypeEncoding_Unsigned, LLVMDIFlagBigEndian);
 
-		case Basic_f16be: return lb_debug_type_basic_type(m,  str_lit("f16be"),   16, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
-		case Basic_f32be: return lb_debug_type_basic_type(m,  str_lit("f32be"),   32, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
-		case Basic_f64be: return lb_debug_type_basic_type(m,  str_lit("f64be"),   64, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagLittleEndian);
+		case Basic_f16be: return lb_debug_type_basic_type(m,  str_lit("f16be"),   16, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagBigEndian);
+		case Basic_f32be: return lb_debug_type_basic_type(m,  str_lit("f32be"),   32, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagBigEndian);
+		case Basic_f64be: return lb_debug_type_basic_type(m,  str_lit("f64be"),   64, LLVMDWARFTypeEncoding_Float,    LLVMDIFlagBigEndian);
 
 		case Basic_complex32:
 			{
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f16, 0*16);
 				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f16, 1*16);
-				return lb_debug_basic_struct(m, str_lit("complex32"), 64, 32, elements, gb_count_of(elements));
+				return lb_debug_basic_struct(m, str_lit("complex32"), 32, 16, elements, gb_count_of(elements));
 			}
 		case Basic_complex64:
 			{
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("real"), t_f32, 0*32);
-				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 2*32);
+				elements[1] = lb_debug_struct_field(m, str_lit("imag"), t_f32, 1*32);
 				return lb_debug_basic_struct(m, str_lit("complex64"), 64, 32, elements, gb_count_of(elements));
 			}
 		case Basic_complex128:
@@ -762,7 +762,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f16, 1*16);
 				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f16, 2*16);
 				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f16, 3*16);
-				return lb_debug_basic_struct(m, str_lit("quaternion64"), 128, 32, elements, gb_count_of(elements));
+				return lb_debug_basic_struct(m, str_lit("quaternion64"), 64, 16, elements, gb_count_of(elements));
 			}
 		case Basic_quaternion128:
 			{
@@ -780,7 +780,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 				elements[1] = lb_debug_struct_field(m, str_lit("jmag"), t_f64, 1*64);
 				elements[2] = lb_debug_struct_field(m, str_lit("kmag"), t_f64, 2*64);
 				elements[3] = lb_debug_struct_field(m, str_lit("real"), t_f64, 3*64);
-				return lb_debug_basic_struct(m, str_lit("quaternion256"), 256, 32, elements, gb_count_of(elements));
+				return lb_debug_basic_struct(m, str_lit("quaternion256"), 256, 64, elements, gb_count_of(elements));
 			}
 
 
@@ -794,8 +794,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			{
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u8_ptr, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, int_bits);
-				return lb_debug_basic_struct(m, str_lit("string"), 2*int_bits, int_bits, elements, gb_count_of(elements));
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, ptr_bits);
+				return lb_debug_basic_struct(m, str_lit("string"), ptr_bits+int_bits, int_bits, elements, gb_count_of(elements));
 			}
 		case Basic_cstring:
 			{
@@ -807,8 +807,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			{
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u16_ptr, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, int_bits);
-				return lb_debug_basic_struct(m, str_lit("string16"), 2*int_bits, int_bits, elements, gb_count_of(elements));
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, ptr_bits);
+				return lb_debug_basic_struct(m, str_lit("string16"), ptr_bits+int_bits, int_bits, elements, gb_count_of(elements));
 			}
 		case Basic_cstring16:
 			{
@@ -818,10 +818,12 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 		case Basic_any:
 			{
+				unsigned typeid_bits = 8*cast(unsigned)type_size_of(t_typeid);
+				unsigned any_align = cast(unsigned)gb_max(ptr_bits, typeid_bits);
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("id"),   t_typeid, 64);
-				return lb_debug_basic_struct(m, str_lit("any"), 128, 64, elements, gb_count_of(elements));
+				elements[1] = lb_debug_struct_field(m, str_lit("id"),   t_typeid, ptr_bits);
+				return lb_debug_basic_struct(m, str_lit("any"), ptr_bits+typeid_bits, any_align, elements, gb_count_of(elements));
 			}
 
 		// Untyped types
@@ -843,7 +845,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		GB_PANIC("Type_Named should be handled in lb_debug_type separately");
 
 	case Type_SoaPointer:
-		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->SoaPointer.elem), int_bits, int_bits, 0, nullptr, 0);
+		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->SoaPointer.elem), ptr_bits, ptr_bits, 0, nullptr, 0);
 	case Type_Pointer:
 		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->Pointer.elem), ptr_bits, ptr_bits, 0, nullptr, 0);
 	case Type_MultiPointer:

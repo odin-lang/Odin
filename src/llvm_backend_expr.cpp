@@ -1377,6 +1377,8 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 	if (LLVMIsConstant(rhs)) {
 		if (LLVMIsNull(rhs)) {
 			switch (behaviour) {
+			case IntegerDivisionByZero_Trap:
+				break; // fall through to runtime path which emits trap
 			case IntegerDivisionByZero_Self:
 				return zero;
 			case IntegerDivisionByZero_Zero:
