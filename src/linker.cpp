@@ -328,6 +328,12 @@ try_cross_linking:;
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
+			gbString lld_lto_flags = gb_string_make(heap_allocator(), "");
+			defer (gb_string_free(lld_lto_flags));
+			if (build_context.lto_kind != LTO_None) {
+				lld_lto_flags = gb_string_append_fmt(lld_lto_flags, "/lldltojobs:%d ", build_context.thread_count);
+			}
+
 			switch (build_context.linker_choice) {
 			case Linker_lld:
 				result = system_exec_command_line_app("msvc-lld-link",
@@ -336,13 +342,15 @@ try_cross_linking:;
 					"%.*s "
 					"%.*s "
 					"%s "
+					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
 					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
-					lib_str
+					lib_str,
+					lld_lto_flags
 				);
 
 				if (result) {
@@ -966,6 +974,12 @@ try_cross_linking:;
 				link_command_line = gb_string_appendc(link_command_line, clang_path);
 			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
+
+			if (build_context.lto_kind != LTO_None) {
+				link_command_line = gb_string_appendc(link_command_line, " -flto=thin");
+				link_command_line = gb_string_append_fmt(link_command_line, " -flto-jobs=%d ", build_context.thread_count);
+			}
+
 			link_command_line = gb_string_appendc(link_command_line, object_files);
 			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
