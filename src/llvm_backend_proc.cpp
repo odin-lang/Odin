@@ -102,8 +102,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
 
 	p->module = m;
-	entity->code_gen_module = m;
-	entity->code_gen_procedure = p;
+	reinterpret_cast<std::atomic<lbModule*>*>(&entity->code_gen_module)->store(m, std::memory_order_relaxed);
+	reinterpret_cast<std::atomic<lbProcedure*>*>(&entity->code_gen_procedure)->store(p, std::memory_order_relaxed);
 	p->entity = entity;
 	p->name = link_name;
 
@@ -676,7 +676,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 					lbAddr res = {};
 					if (p->entity && p->entity->decl_info &&
-					    p->entity->decl_info->defer_use_checked &&
+					    p->entity->decl_info->defer_use_checked.load(std::memory_order_relaxed) &&
 					    p->entity->decl_info->defer_used == 0) {
 
 						// NOTE(bill): this is a bodge to get around the issue of the problem BELOW

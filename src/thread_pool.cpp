@@ -1,5 +1,14 @@
 // thread_pool.cpp
 
+#if defined(__SANITIZE_THREAD__) || (defined(__has_feature) && __has_feature(thread_sanitizer))
+#include <sanitizer/tsan_interface.h>
+#define TSAN_RELEASE(addr) __tsan_release(addr)
+#define TSAN_ACQUIRE(addr) __tsan_acquire(addr)
+#else
+#define TSAN_RELEASE(addr)
+#define TSAN_ACQUIRE(addr)
+#endif
+
 struct WorkerTask;
 struct ThreadPool;
 
@@ -88,6 +97,7 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 	}
 
 	cur_ring->buffer[bot % cur_ring->size] = task;
+	TSAN_RELEASE(&cur_ring->buffer[bot % cur_ring->size]);
 	std::atomic_thread_fence(std::memory_order_release);
 	thread->queue.bottom.store(bot + 1, std::memory_order_relaxed);
 
@@ -108,6 +118,7 @@ GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
 	if (top <= bot) {
 
 		// Queue is not empty
+		TSAN_ACQUIRE(&cur_ring->buffer[bot % cur_ring->size]);
 		*task = cur_ring->buffer[bot % cur_ring->size];
 		if (top == bot) {
 			// Only one entry left in queue
@@ -139,6 +150,7 @@ GrabState thread_pool_queue_steal(Thread *thread, WorkerTask *task) {
 	if (top < bot) {
 		// Queue is not empty
 		TaskRingBuffer *cur_ring = thread->queue.ring.load(std::memory_order_consume);
+		TSAN_ACQUIRE(&cur_ring->buffer[top % cur_ring->size]);
 		*task = cur_ring->buffer[top % cur_ring->size];
 
 		if (!thread->queue.top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {

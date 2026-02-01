@@ -31,7 +31,7 @@ gb_internal bool is_diverging_stmt(Ast *stmt) {
 }
 
 gb_internal bool contains_deferred_call(Ast *node) {
-	if (node->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+	if (ast_viral_flags_load(node) & ViralStateFlag_ContainsDeferredProcedure) {
 		return true;
 	}
 	switch (node->kind) {
@@ -170,7 +170,7 @@ gb_internal bool check_has_break_list(Slice<Ast *> const &stmts, String const &l
 }
 
 gb_internal bool check_has_break_expr(Ast * expr, String const &label) {
-	if (expr && expr->viral_state_flags & ViralStateFlag_ContainsOrBreak) {
+	if (expr && ast_viral_flags_load(expr) & ViralStateFlag_ContainsOrBreak) {
 		return true;
 	}
 	return false;
@@ -260,7 +260,7 @@ gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) 
 		break;
 
 	case Ast_ExprStmt:
-		if (stmt->ExprStmt.expr->viral_state_flags & ViralStateFlag_ContainsOrBreak) {
+		if (ast_viral_flags_load(stmt->ExprStmt.expr) & ViralStateFlag_ContainsOrBreak) {
 			return true;
 		}
 		break;
@@ -1057,7 +1057,7 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			}
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
-				entity->flags |= EntityFlag_Value;
+				entity->flags.fetch_or(EntityFlag_Value, std::memory_order_relaxed);
 				add_entity_definition(&ctx->checker->info, name, entity);
 			} else {
 				TokenPos pos = found->token.pos;
@@ -1078,7 +1078,7 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 
 		if (type == nullptr) {
 			entity->type = t_invalid;
-			entity->flags |= EntityFlag_Used;
+			entity->flags.fetch_or(EntityFlag_Used, std::memory_order_relaxed);
 		}
 	}
 
@@ -1996,15 +1996,15 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 				if (!is_range) {
-					entity->flags |= EntityFlag_ForValue;
+					entity->flags.fetch_or(EntityFlag_ForValue, std::memory_order_relaxed);
 				}
-				entity->flags |= EntityFlag_Value;
+				entity->flags.fetch_or(EntityFlag_Value, std::memory_order_relaxed);
 				entity->identifier = name;
 				entity->Variable.for_loop_parent_type = type_of_expr(expr);
 
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
-						entity->flags &= ~EntityFlag_Value;
+						entity->flags.fetch_and(~cast(u64)EntityFlag_Value, std::memory_order_relaxed);
 					} else {
 						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
@@ -2012,7 +2012,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				}
 				if (is_soa) {
 					if (i == 0) {
-						entity->flags |= EntityFlag_SoaPtrField;
+						entity->flags.fetch_or(EntityFlag_SoaPtrField, std::memory_order_relaxed);
 					}
 				}
 
@@ -2038,7 +2038,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 		if (type == nullptr) {
 			entity->type = t_invalid;
-			entity->flags |= EntityFlag_Used;
+			entity->flags.fetch_or(EntityFlag_Used, std::memory_order_relaxed);
 		}
 	}
 
@@ -2062,7 +2062,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		// NOTE(bill): Check `_` declarations
 		for (Ast *name : vd->names) {
 			if (is_blank_ident(name)) {
-				Entity *e = name->Ident.entity;
+				Entity *e = ident_entity_load(name);
 				DeclInfo *d = decl_info_of_entity(e);
 				if (d != nullptr) {
 					check_entity_decl(ctx, e, d, nullptr);
@@ -2113,7 +2113,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		entity->parent_proc_decl = ctx->curr_proc_decl;
 		entities[entity_count++] = entity;
 		if (name->kind == Ast_Ident) {
-			name->Ident.entity = entity;
+			ident_entity_store(name, entity);
 		}
 	}
 

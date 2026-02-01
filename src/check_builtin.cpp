@@ -2124,7 +2124,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 				if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
 					error(arg, "'#caller_expression' expected a valid earlier parameter name");
 				}
-				arg->Ident.entity = e;
+				ident_entity_store(arg, e);
 			}
 		}
 
@@ -6947,7 +6947,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
-			operand->value = exact_value_i64(u->Union.variant_block_size);
+			operand->value = exact_value_i64(reinterpret_cast<std::atomic<i64>*>(&u->Union.variant_block_size)->load(std::memory_order_relaxed));
 		}
 		break;
 

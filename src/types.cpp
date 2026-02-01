@@ -3332,8 +3332,9 @@ gb_internal i64 union_variant_index(Type *u, Type *v) {
 gb_internal i64 union_tag_size(Type *u) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
-	if (u->Union.tag_size > 0) {
-		return u->Union.tag_size;
+	i16 cached_tag_size = reinterpret_cast<std::atomic<i16>*>(&u->Union.tag_size)->load(std::memory_order_relaxed);
+	if (cached_tag_size > 0) {
+		return cached_tag_size;
 	}
 
 	u64 n = cast(u64)u->Union.variants.count;
@@ -3365,8 +3366,9 @@ gb_internal i64 union_tag_size(Type *u) {
 		}
 	}
 
-	u->Union.tag_size = cast(i16)gb_min3(max_align, build_context.max_align, 8);
-	return u->Union.tag_size;
+	i16 result = cast(i16)gb_min3(max_align, build_context.max_align, 8);
+	reinterpret_cast<std::atomic<i16>*>(&u->Union.tag_size)->store(result, std::memory_order_relaxed);
+	return result;
 }
 
 gb_internal Type *union_tag_type(Type *u) {
@@ -4467,15 +4469,15 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 		if (is_type_union_maybe_pointer(t)) {
 			size = max;
-			t->Union.tag_size = 0;
-			t->Union.variant_block_size = size;
+			reinterpret_cast<std::atomic<i16>*>(&t->Union.tag_size)->store(cast(i16)0, std::memory_order_relaxed);
+			reinterpret_cast<std::atomic<i64>*>(&t->Union.variant_block_size)->store(size, std::memory_order_relaxed);
 		} else {
 			// NOTE(bill): Align to tag
 			i64 tag_size = union_tag_size(t);
 			size = align_formula(max, tag_size);
 			// NOTE(bill): Calculate the padding between the common fields and the tag
-			t->Union.tag_size = cast(i16)tag_size;
-			t->Union.variant_block_size = size;
+			reinterpret_cast<std::atomic<i16>*>(&t->Union.tag_size)->store(cast(i16)tag_size, std::memory_order_relaxed);
+			reinterpret_cast<std::atomic<i64>*>(&t->Union.variant_block_size)->store(size, std::memory_order_relaxed);
 
 			size += tag_size;
 		}
@@ -4650,7 +4652,7 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 			case -1:
 				if (field_type_) *field_type_ = union_tag_type(t);
 				union_tag_size(t);
-				return t->Union.variant_block_size;
+				return reinterpret_cast<std::atomic<i64>*>(&t->Union.variant_block_size)->load(std::memory_order_relaxed);
 			}
 		}
 		break;

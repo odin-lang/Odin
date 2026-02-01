@@ -624,7 +624,7 @@ gb_internal bool check_vet_shadowing_assignment(Checker *c, Entity *shadowed, As
 	if (init->kind == Ast_Ident) {
 		// TODO(bill): Which logic is better? Same name or same entity
 		// bool ignore = init->Ident.token.string == name;
-		bool ignore = init->Ident.entity == shadowed;
+		bool ignore = ident_entity_load(init) == shadowed;
 		if (ignore) {
 			return true;
 		}
@@ -1654,7 +1654,7 @@ retry:;
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(ident, Ident, expr);
-		Entity *e = ident->entity;
+		Entity *e = ident_entity_load(expr);
 		if (e && e->flags & EntityFlag_Overridden) {
 			// GB_PANIC("use of an overriden entity: %.*s", LIT(e->token.string));
 		}
@@ -1792,7 +1792,16 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value, bool use_mutex) {
+enum { TAV_STRIPE_COUNT = 64 };
+static struct alignas(64) { BlockingMutex mu; } tav_stripes[TAV_STRIPE_COUNT];
+
+static BlockingMutex *tav_mutex_for_node(Ast *node) {
+	uintptr_t h = (uintptr_t)node;
+	h ^= h >> 6; // mix out alignment bits
+	return &tav_stripes[h % TAV_STRIPE_COUNT].mu;
+}
+
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1803,14 +1812,8 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		return;
 	}
 
-	BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
-	if (ctx->decl) {
-		mutex = &ctx->decl->type_and_value_mutex;
-	} else if (ctx->pkg) {
-		mutex = &ctx->pkg->type_and_value_mutex;
-	}
-
-	if (use_mutex) mutex_lock(mutex);
+	BlockingMutex *mutex = tav_mutex_for_node(expr);
+	mutex_lock(mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -1835,7 +1838,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 			break;
 		};
 	}
-	if (use_mutex) mutex_unlock(mutex);
+	mutex_unlock(mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -1843,12 +1846,12 @@ gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *
 	if (identifier->kind != Ast_Ident) {
 		return;
 	}
-	if (identifier->Ident.entity != nullptr) {
+	if (ident_entity_load(identifier) != nullptr) {
 		// NOTE(bill): Identifier has already been handled
 		return;
 	}
 	GB_ASSERT(entity != nullptr);
-	identifier->Ident.entity = entity;
+	ident_entity_store(identifier, entity);
 	entity->identifier = identifier;
 	mpsc_enqueue(&i->definition_queue, entity);
 }
@@ -1958,7 +1961,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 		return;
 	}
 	add_declaration_dependency(c, entity);
-	entity->flags |= EntityFlag_Used;
+	entity->flags.fetch_or(EntityFlag_Used, std::memory_order_relaxed);
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
 		if (deferred != entity) {
@@ -1970,7 +1973,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	}
 	entity->identifier.store(identifier);
 
-	identifier->Ident.entity = entity;
+	ident_entity_store(identifier, entity);
 
 	String dmsg = entity->deprecated_message;
 	if (dmsg.len > 0) {
@@ -6161,7 +6164,7 @@ gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char c
 		GB_ASSERT(e->aliased_of != nullptr);
 		GB_ASSERT(e->aliased_of->kind == Entity_Procedure);
 		if ((e->aliased_of->flags & EntityFlag_ProcBodyChecked) != 0) {
-			e->flags |= EntityFlag_ProcBodyChecked;
+			e->flags.fetch_or(EntityFlag_ProcBodyChecked, std::memory_order_relaxed);
 			return;
 		}
 		// NOTE (zen3ger) A proc alias *does not* have a body and tags!
@@ -6291,7 +6294,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
 			if (e != nullptr) {
-				e->flags |= EntityFlag_ProcBodyChecked;
+				e->flags.fetch_or(EntityFlag_ProcBodyChecked, std::memory_order_relaxed);
 			}
 		}
 	} else {
@@ -6299,7 +6302,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
 			if (e != nullptr) {
-				e->flags &= ~EntityFlag_ProcBodyChecked;
+				e->flags.fetch_and(~cast(u64)EntityFlag_ProcBodyChecked, std::memory_order_relaxed);
 			}
 		}
 	}

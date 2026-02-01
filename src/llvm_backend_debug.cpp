@@ -446,7 +446,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 
 	if (index_offset > 0) {
 		Type *tag_type = union_tag_type(bt);
-		u64 offset_in_bits = 8*cast(u64)bt->Union.variant_block_size;
+		u64 offset_in_bits = 8*cast(u64)reinterpret_cast<std::atomic<i64>*>(&bt->Union.variant_block_size)->load(std::memory_order_relaxed);
 
 		elements[0] = LLVMDIBuilderCreateMemberType(
 			m->debug_builder, member_scope,

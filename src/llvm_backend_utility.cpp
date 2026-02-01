@@ -2419,7 +2419,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	Ast *proc_lit = unparen_expr(ce->args[capture_arg_count]);
 	if (proc_lit->kind == Ast_Ident) {
-		proc_lit = proc_lit->Ident.entity->decl_info->proc_lit;
+		proc_lit = ident_entity_load(proc_lit)->decl_info->proc_lit;
 	}
 	GB_ASSERT(proc_lit->kind == Ast_ProcLit);
 

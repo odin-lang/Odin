@@ -174,7 +174,7 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	string_map_set(&found_scope->elements, original_name, new_entity);
 	rw_mutex_unlock(&found_scope->mutex);
 
-	original_entity->flags |= EntityFlag_Overridden;
+	original_entity->flags.fetch_or(EntityFlag_Overridden, std::memory_order_relaxed);
 	original_entity->type = new_entity->type;
 	original_entity->kind = new_entity->kind;
 	original_entity->decl_info = new_entity->decl_info;
@@ -184,7 +184,7 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 
 	if (original_entity->identifier.load() != nullptr &&
 	    original_entity->identifier.load()->kind == Ast_Ident) {
-		original_entity->identifier.load()->Ident.entity = new_entity;
+		ident_entity_store(original_entity->identifier.load(), new_entity);
 	}
 
 	// IMPORTANT NOTE(bill, 2021-04-10): copy only the variants
@@ -2071,7 +2071,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
 	if (decl->parent && decl->entity.load() && decl->parent->entity) {
-		decl->entity.load()->parent_proc_decl = decl->parent;
+		reinterpret_cast<std::atomic<DeclInfo*>*>(&decl->entity.load()->parent_proc_decl)->store(decl->parent, std::memory_order_relaxed);
 	}
 
 	if (ctx->pkg->name != "runtime") {
@@ -2155,7 +2155,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	rw_mutex_unlock(&ctx->scope->mutex);
 
 
-	bool where_clause_ok = evaluate_where_clauses(ctx, nullptr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !decl->where_clauses_evaluated);
+	bool where_clause_ok = evaluate_where_clauses(ctx, nullptr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !decl->where_clauses_evaluated.load(std::memory_order_relaxed));
 	if (!where_clause_ok) {
 		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
 		return false;
@@ -2173,15 +2173,15 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		}
 
 		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
-		if (decl->defer_use_checked) {
+		if (decl->defer_use_checked.load(std::memory_order_relaxed)) {
 			GB_ASSERT(is_type_polymorphic(type, true));
 			error(token, "Defer Use Checked: %.*s", LIT(decl->entity.load()->token.string));
-			GB_ASSERT(decl->defer_use_checked == false);
+			GB_ASSERT(decl->defer_use_checked.load(std::memory_order_relaxed) == false);
 		}
 
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
 
-		decl->defer_use_checked = true;
+		decl->defer_use_checked.store(true, std::memory_order_relaxed);
 
 		for (Ast *stmt : bs->stmts) {
 			if (stmt->kind == Ast_ValueDecl) {
@@ -2189,7 +2189,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				for (Ast *name : vd->names) {
 					if (!is_blank_ident(name)) {
 						if (name->kind == Ast_Ident) {
-							GB_ASSERT(name->Ident.entity != nullptr);
+							GB_ASSERT(ident_entity_load(name) != nullptr);
 						}
 					}
 				}

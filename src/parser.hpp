@@ -889,6 +889,20 @@ struct Ast {
 	}
 };
 
+static inline Entity *ident_entity_load(Ast *node) {
+	return reinterpret_cast<std::atomic<Entity*>*>(&node->Ident.entity)->load(std::memory_order_relaxed);
+}
+static inline void ident_entity_store(Ast *node, Entity *e) {
+	reinterpret_cast<std::atomic<Entity*>*>(&node->Ident.entity)->store(e, std::memory_order_relaxed);
+}
+
+static inline u8 ast_viral_flags_load(Ast *node) {
+	return reinterpret_cast<std::atomic<u8>*>(&node->viral_state_flags)->load(std::memory_order_relaxed);
+}
+static inline void ast_viral_flags_or(Ast *node, u8 val) {
+	reinterpret_cast<std::atomic<u8>*>(&node->viral_state_flags)->fetch_or(val, std::memory_order_relaxed);
+}
+
 
 #define ast_node(n_, Kind_, node_) GB_JOIN2(Ast, Kind_) *n_ = &(node_)->Kind_; gb_unused(n_); GB_ASSERT_MSG((node_)->kind == GB_JOIN2(Ast_, Kind_), \
 	"expected '%.*s' got '%.*s'", \
