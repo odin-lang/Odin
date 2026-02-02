@@ -4317,8 +4317,8 @@ gb_internal bool type_set_offsets(Type *t) {
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
 			t->Struct.are_offsets_being_processed.store(false);
 			t->Struct.are_offsets_set = true;
-			return true;
 		}
+		return true;
 	} else if (is_type_tuple(t)) {
 		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
@@ -4326,8 +4326,8 @@ gb_internal bool type_set_offsets(Type *t) {
 			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false, 1, 0);
 			t->Tuple.are_offsets_being_processed.store(false);
 			t->Tuple.are_offsets_set = true;
-			return true;
 		}
+		return true;
 	} else {
 		GB_PANIC("Invalid type for setting offsets");
 	}
