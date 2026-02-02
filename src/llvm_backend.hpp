@@ -290,6 +290,7 @@ struct lbDefer {
 	isize       scope_index;
 	isize       context_stack_count;
 	lbBlock *   block;
+	TokenPos    pos;
 	union {
 		Ast *stmt;
 		struct {
