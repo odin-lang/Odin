@@ -412,11 +412,13 @@ MAKEINTRESOURCEW :: #force_inline proc "contextless" (#any_int i: int) -> LPWSTR
 	return cast(LPWSTR)uintptr(WORD(i))
 }
 
-RAWINPUT_ALIGN :: proc(x: uintptr) -> uintptr {
+@(require_results)
+RAWINPUT_ALIGN :: proc "contextless" (x: uintptr) -> uintptr {
 	return (x + size_of(uintptr) - 1) & ~uintptr(size_of(uintptr) - 1)
 }
 
-NEXTRAWINPUTBLOCK :: proc(ptr: ^RAWINPUT) -> ^RAWINPUT {
+@(require_results)
+NEXTRAWINPUTBLOCK :: proc "contextless" (ptr: ^RAWINPUT) -> ^RAWINPUT {
 	return cast(^RAWINPUT)RAWINPUT_ALIGN(uintptr(ptr) + uintptr(ptr.header.dwSize))
 }
 
