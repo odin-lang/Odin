@@ -25,6 +25,7 @@ foreign user32 {
 		idProcess, idThread: DWORD,
 		dwFlags:             WinEventFlags,
 	) -> HWINEVENTHOOK ---
+	UnhookWinEvent :: proc(winEventHook: HWINEVENTHOOK) -> BOOL ---
 
 	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
 
