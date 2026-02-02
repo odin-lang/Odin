@@ -978,6 +978,10 @@ try_cross_linking:;
 			if (build_context.lto_kind != LTO_None) {
 				link_command_line = gb_string_appendc(link_command_line, " -flto=thin");
 				link_command_line = gb_string_append_fmt(link_command_line, " -flto-jobs=%d ", build_context.thread_count);
+
+				if (is_osx && !build_context.minimum_os_version_string_given) {
+					link_command_line = gb_string_appendc(link_command_line, " -Wno-override-module ");
+				}
 			}
 
 			link_command_line = gb_string_appendc(link_command_line, object_files);
