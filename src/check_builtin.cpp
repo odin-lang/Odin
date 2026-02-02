@@ -534,12 +534,12 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 				return false;
 			}
 
-			if (ident.entity->kind != Entity_Procedure) {
+			if (ident.entity.load()->kind != Entity_Procedure) {
 				gbString e = expr_to_string(handler_node);
 
 				ERROR_BLOCK();
 				error(handler.expr, "'%.*s' expected a direct reference to a procedure", LIT(builtin_name));
-				if(ident.entity->kind == Entity_Variable) {
+				if(ident.entity.load()->kind == Entity_Variable) {
 					error_line("\tSuggestion: Variables referencing a procedure are not allowed, they are not a direct procedure reference.");
 				} else {
 					error_line("\tSuggestion: Ensure '%s' is not a runtime-evaluated expression.", e); // NOTE(harold): Is this case possible to hit?

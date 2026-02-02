@@ -170,21 +170,21 @@ struct TypeStruct {
 };
 
 struct TypeUnion {
-	Slice<Type *> variants;
+	Slice<Type *>    variants;
 
-	Ast *         node;
-	Scope *       scope;
+	Ast *            node;
+	Scope *          scope;
 
-	i64           variant_block_size;
-	i64           custom_align;
-	Type *        polymorphic_params; // Type_Tuple
-	Type *        polymorphic_parent;
-	Wait_Signal   polymorphic_wait_signal;
+	std::atomic<i64> variant_block_size;
+	i64              custom_align;
+	Type *           polymorphic_params; // Type_Tuple
+	Type *           polymorphic_parent;
+	Wait_Signal      polymorphic_wait_signal;
 
-	i16           tag_size;
-	bool          is_polymorphic;
-	bool          is_poly_specialized;
-	UnionTypeKind kind;
+	std::atomic<i16> tag_size;
+	bool             is_polymorphic;
+	bool             is_poly_specialized;
+	UnionTypeKind    kind;
 };
 
 struct TypeProc {

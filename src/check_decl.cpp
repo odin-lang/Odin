@@ -2155,7 +2155,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	rw_mutex_unlock(&ctx->scope->mutex);
 
 
-	bool where_clause_ok = evaluate_where_clauses(ctx, nullptr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !decl->where_clauses_evaluated);
+	bool where_clause_ok = evaluate_where_clauses(ctx, nullptr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !decl->where_clauses_evaluated.load(std::memory_order_relaxed));
 	if (!where_clause_ok) {
 		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
 		return false;
@@ -2173,15 +2173,15 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		}
 
 		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
-		if (decl->defer_use_checked) {
+		if (decl->defer_use_checked.load(std::memory_order_relaxed)) {
 			GB_ASSERT(is_type_polymorphic(type, true));
 			error(token, "Defer Use Checked: %.*s", LIT(decl->entity.load()->token.string));
-			GB_ASSERT(decl->defer_use_checked == false);
+			GB_ASSERT(decl->defer_use_checked.load(std::memory_order_relaxed) == false);
 		}
 
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
 
-		decl->defer_use_checked = true;
+		decl->defer_use_checked.store(true, std::memory_order_relaxed);
 
 		for (Ast *stmt : bs->stmts) {
 			if (stmt->kind == Ast_ValueDecl) {

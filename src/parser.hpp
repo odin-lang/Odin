@@ -425,7 +425,7 @@ struct AstSplitArgs {
 #define AST_KINDS \
 	AST_KIND(Ident,          "identifier",      struct { \
 		Token   token;  \
-		Entity *entity; \
+		std::atomic<Entity *> entity; \
 		u32     hash;   \
 	}) \
 	AST_KIND(Implicit,       "implicit",        Token) \
@@ -856,19 +856,19 @@ gb_global isize const ast_variant_sizes[] = {
 };
 
 struct AstCommonStuff {
-	AstKind      kind; // u16
-	u8           state_flags;
-	u8           viral_state_flags;
-	i32          file_id;
-	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
+	AstKind         kind; // u16
+	u8              state_flags;
+	std::atomic<u8> viral_state_flags;
+	i32             file_id;
+	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
 };
 
 struct Ast {
-	AstKind      kind; // u16
-	u8           state_flags;
-	u8           viral_state_flags;
-	i32          file_id;
-	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
+	AstKind         kind; // u16
+	u8              state_flags;
+	std::atomic<u8> viral_state_flags;
+	i32             file_id;
+	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
