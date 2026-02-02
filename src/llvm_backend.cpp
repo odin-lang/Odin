@@ -2454,14 +2454,21 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	// tsan - Linux, Darwin
 	// ubsan - Linux, Darwin, Windows (NOT SUPPORTED WITH LLVM C-API)
 
-	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
-		array_add(&passes, "asan");
-	}
-	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
-		array_add(&passes, "msan");
-	}
-	if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
-		array_add(&passes, "tsan");
+	// With LTO, sanitizer passes run at link time (via -fsanitize= linker flags)
+	// where the linker has whole-program visibility. Running them here too would
+	// double-instrument every module, producing "Redundant instrumentation" warnings.
+	// Per-function sanitize attributes in the bitcode are preserved and respected
+	// by the linker's sanitizer pass.
+	if (build_context.lto_kind == LTO_None) {
+		if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+			array_add(&passes, "asan");
+		}
+		if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
+			array_add(&passes, "msan");
+		}
+		if (build_context.sanitizer_flags & SanitizerFlag_Thread) {
+			array_add(&passes, "tsan");
+		}
 	}
 
 	if (passes.count == 0) {
