@@ -2215,8 +2215,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				Entity *e = entity_of_node(ident);
 				GB_ASSERT(e != nullptr);
 
-				if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-					procedure = e->parent_proc_decl->entity.load()->token.string;
+				DeclInfo *ppd = e->parent_proc_decl.load(std::memory_order_relaxed);
+				if (ppd != nullptr && ppd->entity != nullptr) {
+					procedure = ppd->entity.load()->token.string;
 				} else {
 					procedure = str_lit("");
 				}

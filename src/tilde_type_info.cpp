@@ -489,8 +489,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			}
 
 			String proc_name = {};
-			if (t->Named.type_name->parent_proc_decl) {
-				DeclInfo *decl = t->Named.type_name->parent_proc_decl;
+			if (DeclInfo *decl = t->Named.type_name->parent_proc_decl.load(std::memory_order_relaxed)) {
 				if (decl->entity && decl->entity->kind == Entity_Procedure) {
 					i64 name_offset = type_offset_of(tag_type, 0);
 					proc_name = decl->entity->token.string;

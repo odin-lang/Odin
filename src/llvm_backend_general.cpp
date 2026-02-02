@@ -1573,7 +1573,7 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 	} else {
 		if (type_size_of(variant_type) == 0) {
 			unsigned alignment = 1;
-			lb_mem_zero_ptr_internal(p, parent.value, reinterpret_cast<std::atomic<i64>*>(&pt->Union.variant_block_size)->load(std::memory_order_relaxed), alignment, false);
+			lb_mem_zero_ptr_internal(p, parent.value, pt->Union.variant_block_size.load(std::memory_order_relaxed), alignment, false);
 		} else {
 			lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
 			lb_emit_store(p, underlying, variant);
@@ -1760,7 +1760,7 @@ gb_internal LLVMTypeRef lb_type_internal_union_block_type(lbModule *m, Type *typ
 
 	i64 align = type_align_of(type);
 
-	unsigned block_size = cast(unsigned)reinterpret_cast<std::atomic<i64>*>(&type->Union.variant_block_size)->load(std::memory_order_relaxed);
+	unsigned block_size = cast(unsigned)type->Union.variant_block_size.load(std::memory_order_relaxed);
 	if (block_size == 0) {
 		return lb_type_padding_filler(m, block_size, align);
 	}

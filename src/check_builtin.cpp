@@ -6947,7 +6947,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_integer;
-			operand->value = exact_value_i64(reinterpret_cast<std::atomic<i64>*>(&u->Union.variant_block_size)->load(std::memory_order_relaxed));
+			operand->value = exact_value_i64(u->Union.variant_block_size.load(std::memory_order_relaxed));
 		}
 		break;
 

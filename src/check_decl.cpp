@@ -2071,7 +2071,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
 	if (decl->parent && decl->entity.load() && decl->parent->entity) {
-		reinterpret_cast<std::atomic<DeclInfo*>*>(&decl->entity.load()->parent_proc_decl)->store(decl->parent, std::memory_order_relaxed);
+		decl->entity.load()->parent_proc_decl.store(decl->parent, std::memory_order_relaxed);
 	}
 
 	if (ctx->pkg->name != "runtime") {

@@ -763,7 +763,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 			GB_ASSERT_MSG(value_type != nullptr, "%s :: %s", type_to_string(original_type), exact_value_to_string(value));
 
-			i64 block_size = reinterpret_cast<std::atomic<i64>*>(&bt->Union.variant_block_size)->load(std::memory_order_relaxed);
+			i64 block_size = bt->Union.variant_block_size.load(std::memory_order_relaxed);
 
 			if (are_types_identical(value_type, original_type)) {
 				if (value.kind == ExactValue_Compound) {

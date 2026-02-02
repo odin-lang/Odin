@@ -189,7 +189,7 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 	GB_ASSERT(Typeid__COUNT == ut->Union.variants.count);
 	modified_types[0] = element_types[0];
 
-	i64 tag_offset = reinterpret_cast<std::atomic<i64>*>(&ut->Union.variant_block_size)->load(std::memory_order_relaxed);
+	i64 tag_offset = ut->Union.variant_block_size.load(std::memory_order_relaxed);
 	LLVMTypeRef tag = lb_type(m, union_tag_type(ut));
 
 	for_array(i, ut->Union.variants) {
@@ -379,8 +379,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			}
 
 			String proc_name = {};
-			if (t->Named.type_name->parent_proc_decl) {
-				DeclInfo *decl = t->Named.type_name->parent_proc_decl;
+			if (DeclInfo *decl = t->Named.type_name->parent_proc_decl.load(std::memory_order_relaxed)) {
 				Entity *e = decl->entity.load();
 				if (e && e->kind == Entity_Procedure) {
 					proc_name = e->token.string;
@@ -782,7 +781,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 				i64 tag_size = union_tag_size(t);
 				if (tag_size > 0) {
-					i64 tag_offset = align_formula(reinterpret_cast<std::atomic<i64>*>(&t->Union.variant_block_size)->load(std::memory_order_relaxed), tag_size);
+					i64 tag_offset = align_formula(t->Union.variant_block_size.load(std::memory_order_relaxed), tag_size);
 					vals[1] = lb_const_int(m, t_uintptr, tag_offset).value;
 					vals[2] = get_type_info_ptr(m, union_tag_type(t));
 				} else {

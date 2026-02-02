@@ -1771,7 +1771,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 
 	GB_ASSERT((e->flags & EntityFlag_Overridden) == 0);
 
-	DeclInfo *parent_decl = reinterpret_cast<std::atomic<DeclInfo*>*>(&e->parent_proc_decl)->load(std::memory_order_relaxed);
+	DeclInfo *parent_decl = e->parent_proc_decl.load(std::memory_order_relaxed);
 	if (parent_decl != nullptr &&
 	    parent_decl != c->curr_proc_decl) {
 		if (e->kind == Entity_Variable) {

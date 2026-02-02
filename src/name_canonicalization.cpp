@@ -559,8 +559,8 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			// no prefix
 			return;
 		}
-		if (e->parent_proc_decl) {
-			Entity *p = e->parent_proc_decl->entity;
+		if (DeclInfo *ppd = e->parent_proc_decl.load(std::memory_order_relaxed)) {
+			Entity *p = ppd->entity;
 			write_canonical_parent_prefix(w, p);
 			type_writer_append(w, p->token.string.text, p->token.string.len);
 			if (is_type_polymorphic(p->type)) {

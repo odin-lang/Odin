@@ -345,8 +345,9 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			Entity *e = entity_of_node(ident);
 			GB_ASSERT(e != nullptr);
 
-			if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-				procedure = e->parent_proc_decl->entity->token.string;
+			DeclInfo *ppd = e->parent_proc_decl.load(std::memory_order_relaxed);
+			if (ppd != nullptr && ppd->entity != nullptr) {
+				procedure = ppd->entity->token.string;
 			} else {
 				procedure = str_lit("");
 			}
