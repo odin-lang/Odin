@@ -6,9 +6,6 @@ import "core:strings"
 import "core:strconv"
 import "base:runtime"
 
-@(private)
-version_string_buf: [1024]u8
-
 @(init, private)
 init_os_version :: proc "contextless" () {
 	context = runtime.default_context()
