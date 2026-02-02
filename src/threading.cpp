@@ -369,7 +369,7 @@ gb_internal void semaphore_wait(Semaphore *s) {
 		ANNOTATE_LOCK_PRE(m, 0);
 		i32 expected = Internal_Mutex_State_Unlocked;
 		if (m->state().compare_exchange_strong(expected, Internal_Mutex_State_Locked, std::memory_order_acquire)) {
-			mutex_lock_slow(m, v);
+			mutex_lock_slow(m, expected);
 		}
 		ANNOTATE_LOCK_POST(m);
 	}
