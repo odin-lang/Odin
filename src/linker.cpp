@@ -181,7 +181,7 @@ try_cross_linking:;
 		case Linker_radlink:  section_name = str_lit("rad-link"); break;
 	#endif
 		default:
-			gb_printf_err("'%.*s' linker is not support for this platform\n", LIT(linker_choices[build_context.linker_choice]));
+			gb_printf_err("'%.*s' linker is not supported on this platform\n", LIT(linker_choices[build_context.linker_choice]));
 			return 1;
 		}
 
