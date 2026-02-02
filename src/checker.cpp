@@ -495,15 +495,18 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 		goto end;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
+		rw_mutex_shared_lock(&s->parent->mutex);
 		found = string_map_get(&s->parent->elements, key);
 		if (found) {
 			if ((*found)->flags & EntityFlag_Result) {
 				if (entity != *found) {
 					result = *found;
 				}
+				rw_mutex_shared_unlock(&s->parent->mutex);
 				goto end;
 			}
 		}
+		rw_mutex_shared_unlock(&s->parent->mutex);
 	}
 
 	string_map_set(&s->elements, key, entity);
