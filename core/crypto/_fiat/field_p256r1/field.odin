@@ -209,7 +209,7 @@ fe_sqrt :: proc "contextless" (out1, arg1: ^Montgomery_Domain_Field_Element) -> 
 	// Square root candidate can be derived via exponentiation by `(p + 1) / 4`
 	// From sage: 28948022302589062190674361737351893382521535853822578548883407827216774463488
 	//
-	// 	// Inversion computation is derived from the addition chain:
+	// 	Inversion computation is derived from the addition chain:
 	//
 	//	_10       = 2*1
 	//	_11       = 1 + _10
@@ -283,7 +283,6 @@ fe_sqrt :: proc "contextless" (out1, arg1: ^Montgomery_Domain_Field_Element) -> 
 	fe_clear_vec([]^Montgomery_Domain_Field_Element{&t0, &xx, &check})
 
 	return is_valid
-
 }
 
 fe_zero :: proc "contextless" (out1: ^Montgomery_Domain_Field_Element) {
