@@ -412,6 +412,14 @@ MAKEINTRESOURCEW :: #force_inline proc "contextless" (#any_int i: int) -> LPWSTR
 	return cast(LPWSTR)uintptr(WORD(i))
 }
 
+RAWINPUT_ALIGN :: proc(x: uintptr) -> uintptr {
+	return (x + size_of(uintptr) - 1) & ~uintptr(size_of(uintptr) - 1)
+}
+
+NEXTRAWINPUTBLOCK :: proc(ptr: ^RAWINPUT) -> ^RAWINPUT {
+	return cast(^RAWINPUT)RAWINPUT_ALIGN(uintptr(ptr) + uintptr(ptr.header.dwSize))
+}
+
 Monitor_From_Flags :: enum DWORD {
 	MONITOR_DEFAULTTONULL    = 0x00000000, // Returns NULL
 	MONITOR_DEFAULTTOPRIMARY = 0x00000001, // Returns a handle to the primary display monitor

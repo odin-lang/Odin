@@ -225,6 +225,16 @@ foreign kernel32 {
 	) -> BOOL ---
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
+	EnterSynchronizationBarrier :: proc(
+		lpBarrier: ^SYNCHRONIZATION_BARRIER,
+		dwFlags: SYNCHRONIZATION_BARRIER_FLAGS,
+	) -> BOOL ---
+	InitializeSynchronizationBarrier :: proc(
+		lpBarrier: ^SYNCHRONIZATION_BARRIER,
+		lTotalThreads: LONG,
+		lSpinCount: LONG,
+	) -> BOOL ---
+	DeleteSynchronizationBarrier :: proc(lpBarrier: ^SYNCHRONIZATION_BARRIER) -> BOOL ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
 	CopyFileW :: proc(
