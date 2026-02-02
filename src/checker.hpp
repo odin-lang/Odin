@@ -221,14 +221,14 @@ struct DeclInfo {
 
 	Entity *     para_poly_original;
 
-	bool          is_using;
-	bool          where_clauses_evaluated;
-	bool          foreign_require_results;
+	bool                          is_using;
+	bool                          foreign_require_results;
+	std::atomic<bool>             where_clauses_evaluated;
 	std::atomic<ProcCheckedState> proc_checked_state;
 
-	BlockingMutex proc_checked_mutex;
-	isize         defer_used;
-	bool          defer_use_checked;
+	BlockingMutex     proc_checked_mutex;
+	isize             defer_used;
+	std::atomic<bool> defer_use_checked;
 
 	CommentGroup *comment;
 	CommentGroup *docs;
