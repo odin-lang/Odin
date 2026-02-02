@@ -2850,6 +2850,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_count_leading_zeros:
 		return lb_emit_count_leading_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 
+	case BuiltinProc_count_trailing_ones:
+		return lb_emit_count_trailing_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_leading_ones:
+		return lb_emit_count_leading_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+
+
 	case BuiltinProc_count_ones:
 		return lb_emit_count_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
 	case BuiltinProc_count_zeros:

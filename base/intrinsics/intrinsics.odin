@@ -38,6 +38,8 @@ count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_sim
 count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_trailing_ones  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_leading_ones   :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 

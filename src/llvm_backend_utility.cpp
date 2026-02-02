@@ -648,6 +648,18 @@ gb_internal lbValue lb_emit_count_leading_zeros(lbProcedure *p, lbValue x, Type 
 	return res;
 }
 
+gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type);
+
+gb_internal lbValue lb_emit_count_trailing_ones(lbProcedure *p, lbValue x, Type *type) {
+	lbValue z = lb_emit_unary_arith(p, Token_Xor, x, type);
+	return lb_emit_count_trailing_zeros(p, z, type);
+}
+
+gb_internal lbValue lb_emit_count_leading_ones(lbProcedure *p, lbValue x, Type *type) {
+	lbValue z = lb_emit_unary_arith(p, Token_Xor, x, type);
+	return lb_emit_count_leading_zeros(p, z, type);
+}
+
 
 
 gb_internal lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type) {
