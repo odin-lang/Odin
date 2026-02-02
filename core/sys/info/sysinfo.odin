@@ -48,3 +48,32 @@ GPU :: struct {
 	model_name:  string,
 	total_ram:   int,
 }
+
+@(private)
+version_string_buf: [1024]u8
+
+@(private)
+MAX_GPUS :: 16
+
+@(private)
+_gpus: [MAX_GPUS]GPU
+
+@(private)
+_gpu_string_buf: [MAX_GPUS * 256 * 2]u8 // Reserve up to 256 bytes for each GPU's vendor and model name
+
+@(private)
+_gpu_string_offset: int
+
+@(private)
+intern_gpu_string :: proc "contextless" (str: string) -> (res: string, ok: bool) {
+	if _gpu_string_offset + len(str) + 1 > size_of(_gpu_string_buf) {
+		return "", false
+	}
+
+	n := copy(_gpu_string_buf[_gpu_string_offset:], str)
+	_gpu_string_buf[_gpu_string_offset + len(str)] = 0
+	res = string(_gpu_string_buf[_gpu_string_offset:][:len(str)])
+	_gpu_string_offset += n + 1
+
+	return res, true
+}
