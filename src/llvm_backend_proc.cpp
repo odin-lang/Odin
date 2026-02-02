@@ -1290,7 +1290,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				}
 			}
 
-			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args);
+			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args, e->token.pos);
 		}
 	}
 
