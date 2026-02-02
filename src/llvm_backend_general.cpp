@@ -163,7 +163,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
 
 	if (USE_SEPARATE_MODULES) {
-		bool module_per_file = build_context.module_per_file && build_context.optimization_level <= 0;
+		bool module_per_file = build_context.module_per_file && (build_context.optimization_level <= 0 || build_context.lto_kind != LTO_None);
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);

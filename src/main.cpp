@@ -413,6 +413,7 @@ enum BuildFlagKind {
 	BuildFlag_Tilde,
 
 	BuildFlag_Sanitize,
+	BuildFlag_LTO,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -643,6 +644,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 #endif
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
+	add_flag(&build_flags, BuildFlag_LTO,                     str_lit("lto"),                       BuildFlagParam_String,  Command__does_build);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1632,6 +1634,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.sanitizer_flags |= SanitizerFlag_Thread;
 							} else {
 								gb_printf_err("-sanitize:<string> options are 'address', 'memory', and 'thread'\n");
+								bad_flags = true;
+							}
+							break;
+
+						case BuildFlag_LTO:
+							GB_ASSERT(value.kind == ExactValue_String);
+							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
+								build_context.lto_kind = LTO_Thin;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("thin-files"))) {
+								build_context.lto_kind = LTO_Thin_Files;
+							} else {
+								gb_printf_err("-lto:<string> options are 'thin' and 'thin-files'\n");
 								bad_flags = true;
 							}
 							break;
