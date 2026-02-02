@@ -1792,7 +1792,7 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-struct TypeAndValueMutexStripes alignas(GB_CACHE_LINE_SIZE) {
+struct alignas(GB_CACHE_LINE_SIZE) TypeAndValueMutexStripes {
 	BlockingMutex mutex;
 	u8 padding[GB_CACHE_LINE_SIZE - gb_size_of(BlockingMutex)];
 };
