@@ -983,7 +983,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			break;
 		case ProcTailing_must_tail:
 			LLVMSetTailCall(ret, true);
+		#if LLVM_VERSION_MAJOR > 14
 			LLVMSetTailCallKind(ret, LLVMTailCallKindMustTail);
+		#endif
 			break;
 		}
 
