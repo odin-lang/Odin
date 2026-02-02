@@ -181,11 +181,11 @@ struct Entity {
 	Entity *    aliased_of;
 
 	union {
-		struct lbModule *code_gen_module;
+		std::atomic<struct lbModule *> code_gen_module;
 		struct cgModule *cg_module;
 	};
 	union {
-		struct lbProcedure *code_gen_procedure;
+		std::atomic<struct lbProcedure *> code_gen_procedure;
 		struct cgProcedure *cg_procedure;
 	};
 
