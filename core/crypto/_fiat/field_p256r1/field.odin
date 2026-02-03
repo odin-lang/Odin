@@ -52,7 +52,7 @@ fe_from_bytes :: proc "contextless" (
 fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_Element) {
 	ensure_contextless(len(out1) == 32, "p256r1: invalid fe output buffer")
 
-	tmp: Non_Montgomery_Domain_Field_Element
+	tmp: Non_Montgomery_Domain_Field_Element = ---
 	fe_from_montgomery(&tmp, arg1)
 
 	// Note: Likewise, output in big-endian.
@@ -66,7 +66,7 @@ fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_
 
 @(require_results)
 fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) -> int {
-	tmp: Montgomery_Domain_Field_Element
+	tmp: Montgomery_Domain_Field_Element = ---
 	fe_sub(&tmp, arg1, arg2)
 
 	// This will only underflow iff arg1 == arg2, and we return the borrow,
@@ -80,7 +80,7 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 
 @(require_results)
 fe_is_odd :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) -> int {
-	tmp: Non_Montgomery_Domain_Field_Element
+	tmp: Non_Montgomery_Domain_Field_Element = ---
 	defer mem.zero_explicit(&tmp, size_of(tmp))
 
 	fe_from_montgomery(&tmp, arg1)
@@ -209,7 +209,7 @@ fe_sqrt :: proc "contextless" (out1, arg1: ^Montgomery_Domain_Field_Element) -> 
 	// Square root candidate can be derived via exponentiation by `(p + 1) / 4`
 	// From sage: 28948022302589062190674361737351893382521535853822578548883407827216774463488
 	//
-	// 	// Inversion computation is derived from the addition chain:
+	// 	Inversion computation is derived from the addition chain:
 	//
 	//	_10       = 2*1
 	//	_11       = 1 + _10
@@ -283,7 +283,6 @@ fe_sqrt :: proc "contextless" (out1, arg1: ^Montgomery_Domain_Field_Element) -> 
 	fe_clear_vec([]^Montgomery_Domain_Field_Element{&t0, &xx, &check})
 
 	return is_valid
-
 }
 
 fe_zero :: proc "contextless" (out1: ^Montgomery_Domain_Field_Element) {

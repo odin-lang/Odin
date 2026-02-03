@@ -1,8 +1,8 @@
 package _weierstrass
 
 import "core:crypto"
-import subtle "core:crypto/_subtle"
-import "core:mem"
+@(require) import subtle "core:crypto/_subtle"
+@(require) import "core:mem"
 
 pt_scalar_mul :: proc "contextless" (
 	p, a: ^$T,
@@ -11,6 +11,8 @@ pt_scalar_mul :: proc "contextless" (
 ) {
 	when T == Point_p256r1 && S == Scalar_p256r1 {
 		SC_SZ :: SC_SIZE_P256R1
+	} else when T == Point_p384r1 && S == Scalar_p384r1 {
+		SC_SZ :: SC_SIZE_P384R1
 	} else {
 		#panic("weierstrass: invalid curve")
 	}
@@ -34,6 +36,10 @@ pt_scalar_mul_bytes :: proc "contextless" (
 		p_tbl: Multiply_Table_p256r1 = ---
 		q, tmp: Point_p256r1 = ---, ---
 		SC_SZ :: SC_SIZE_P256R1
+	} else when T == Point_p384r1 {
+		p_tbl: Multiply_Table_p384r1 = ---
+		q, tmp: Point_p384r1 = ---, ---
+		SC_SZ :: SC_SIZE_P384R1
 	} else {
 		#panic("weierstrass: invalid curve")
 	}
@@ -90,6 +96,11 @@ when crypto.COMPACT_IMPLS == true {
 			p_tbl_lo := &Gen_Multiply_Table_p256r1_lo
 			tmp: Point_p256r1 = ---
 			SC_SZ :: SC_SIZE_P256R1
+		} else when T == Point_p384r1 && S == Scalar_p384r1 {
+			p_tbl_hi := &Gen_Multiply_Table_p384r1_hi
+			p_tbl_lo := &Gen_Multiply_Table_p384r1_lo
+			tmp: Point_p384r1 = ---
+			SC_SZ :: SC_SIZE_P384R1
 		} else {
 			#panic("weierstrass: invalid curve")
 		}
@@ -113,6 +124,8 @@ when crypto.COMPACT_IMPLS == true {
 
 @(private="file")
 Multiply_Table_p256r1 :: [15]Point_p256r1
+@(private="file")
+Multiply_Table_p384r1 :: [15]Point_p384r1
 
 @(private="file")
 mul_tbl_set :: proc "contextless"(
@@ -122,11 +135,13 @@ mul_tbl_set :: proc "contextless"(
 ) {
 	when T == Multiply_Table_p256r1 && U == Point_p256r1{
 		tmp: Point_p256r1
-		pt_set(&tmp, point)
+	} else when T == Multiply_Table_p384r1 && U == Point_p384r1{
+		tmp: Point_p384r1
 	} else {
 		#panic("weierstrass: invalid curve")
 	}
 
+	pt_set(&tmp, point)
 	pt_set(&tbl[0], &tmp)
 	for i in 1 ..<15 {
 		pt_add(&tmp, &tmp, point)
@@ -168,6 +183,12 @@ when crypto.COMPACT_IMPLS == false {
 	Affine_Point_p256r1 :: struct {
 		x: Field_Element_p256r1,
 		y: Field_Element_p256r1,
+	}
+
+	@(private)
+	Affine_Point_p384r1 :: struct {
+		x: Field_Element_p384r1,
+		y: Field_Element_p384r1,
 	}
 
 	@(private="file")
