@@ -52,7 +52,7 @@ fe_from_bytes :: proc "contextless" (
 fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_Element) {
 	ensure_contextless(len(out1) == 32, "p256r1: invalid fe output buffer")
 
-	tmp: Non_Montgomery_Domain_Field_Element
+	tmp: Non_Montgomery_Domain_Field_Element = ---
 	fe_from_montgomery(&tmp, arg1)
 
 	// Note: Likewise, output in big-endian.
@@ -66,7 +66,7 @@ fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_
 
 @(require_results)
 fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) -> int {
-	tmp: Montgomery_Domain_Field_Element
+	tmp: Montgomery_Domain_Field_Element = ---
 	fe_sub(&tmp, arg1, arg2)
 
 	// This will only underflow iff arg1 == arg2, and we return the borrow,
@@ -80,7 +80,7 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 
 @(require_results)
 fe_is_odd :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) -> int {
-	tmp: Non_Montgomery_Domain_Field_Element
+	tmp: Non_Montgomery_Domain_Field_Element = ---
 	defer mem.zero_explicit(&tmp, size_of(tmp))
 
 	fe_from_montgomery(&tmp, arg1)
