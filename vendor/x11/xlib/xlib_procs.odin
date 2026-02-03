@@ -1112,15 +1112,15 @@ foreign xlib {
 	SetAfterFunction :: proc(
 		display:   ^Display,
 		procedure: #type proc "c" (display: ^Display) -> i32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display) -> i32 ---
 	Synchronize :: proc(
 		display: ^Display,
 		onoff: b32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display) -> i32 ---
 	// Error handling
 	SetErrorHandler :: proc(
 		handler: #type proc "c" (display: ^Display, event: ^XErrorEvent) -> i32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display, event: ^XErrorEvent) -> i32 ---
 	GetErrorText :: proc(
 		display: ^Display,
 		code: i32,
@@ -1138,7 +1138,7 @@ foreign xlib {
 	DisplayName :: proc(string: cstring) -> cstring ---
 	SetIOErrorHandler :: proc(
 		handler: #type proc "c" (display: ^Display) -> i32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display) -> i32 ---
 	// Pointer grabbing
 	GrabPointer :: proc(
 		display:       ^Display,
