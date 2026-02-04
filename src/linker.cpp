@@ -331,7 +331,7 @@ try_cross_linking:;
 			gbString lld_lto_flags = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(lld_lto_flags));
 			if (build_context.lto_kind != LTO_None) {
-				lld_lto_flags = gb_string_append_fmt(lld_lto_flags, "/lldltojobs:%d ", build_context.thread_count);
+				lld_lto_flags = gb_string_append_fmt(lld_lto_flags, "/opt:lldltojobs=%d ", build_context.thread_count);
 			}
 
 			switch (build_context.linker_choice) {
