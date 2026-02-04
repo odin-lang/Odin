@@ -181,7 +181,7 @@ try_cross_linking:;
 		case Linker_radlink:  section_name = str_lit("rad-link"); break;
 	#endif
 		default:
-			gb_printf_err("'%.*s' linker is not support for this platform\n", LIT(linker_choices[build_context.linker_choice]));
+			gb_printf_err("'%.*s' linker is not supported on this platform\n", LIT(linker_choices[build_context.linker_choice]));
 			return 1;
 		}
 
@@ -978,6 +978,10 @@ try_cross_linking:;
 			if (build_context.lto_kind != LTO_None) {
 				link_command_line = gb_string_appendc(link_command_line, " -flto=thin");
 				link_command_line = gb_string_append_fmt(link_command_line, " -flto-jobs=%d ", build_context.thread_count);
+
+				if (is_osx && !build_context.minimum_os_version_string_given) {
+					link_command_line = gb_string_appendc(link_command_line, " -Wno-override-module ");
+				}
 			}
 
 			link_command_line = gb_string_appendc(link_command_line, object_files);

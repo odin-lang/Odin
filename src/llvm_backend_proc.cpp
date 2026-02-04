@@ -689,7 +689,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 					lbAddr res = {};
 					if (p->entity && p->entity->decl_info &&
-					    p->entity->decl_info->defer_use_checked &&
+					    p->entity->decl_info->defer_use_checked.load(std::memory_order_relaxed) &&
 					    p->entity->decl_info->defer_used == 0) {
 
 						// NOTE(bill): this is a bodge to get around the issue of the problem BELOW
@@ -996,7 +996,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			break;
 		case ProcTailing_must_tail:
 			LLVMSetTailCall(ret, true);
+		#if LLVM_VERSION_MAJOR > 14
 			LLVMSetTailCallKind(ret, LLVMTailCallKindMustTail);
+		#endif
 			break;
 		}
 
@@ -1301,7 +1303,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				}
 			}
 
-			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args);
+			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args, e->token.pos);
 		}
 	}
 
@@ -2228,8 +2230,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				Entity *e = entity_of_node(ident);
 				GB_ASSERT(e != nullptr);
 
-				if (e->parent_proc_decl != nullptr && e->parent_proc_decl->entity != nullptr) {
-					procedure = e->parent_proc_decl->entity.load()->token.string;
+				DeclInfo *parent_proc_decl = e->parent_proc_decl.load(std::memory_order_relaxed);
+				if (parent_proc_decl != nullptr &&
+				    parent_proc_decl->entity != nullptr) {
+					procedure = parent_proc_decl->entity.load()->token.string;
 				} else {
 					procedure = str_lit("");
 				}
@@ -2858,6 +2862,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		return lb_emit_count_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 	case BuiltinProc_count_leading_zeros:
 		return lb_emit_count_leading_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
+
+	case BuiltinProc_count_trailing_ones:
+		return lb_emit_count_trailing_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_count_leading_ones:
+		return lb_emit_count_leading_ones(p, lb_build_expr(p, ce->args[0]), tv.type);
+
 
 	case BuiltinProc_count_ones:
 		return lb_emit_count_ones(p, lb_build_expr(p, ce->args[0]), tv.type);

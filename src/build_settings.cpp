@@ -1728,6 +1728,29 @@ gb_internal char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
+gb_internal String normalize_minimum_os_version_string(String version) {
+	GB_ASSERT(version.len > 0);
+
+	gbString normalized = gb_string_make(permanent_allocator(), "");
+
+	int granularity = 0;
+	String_Iterator it = {version, 0};
+	for (;; granularity++) {
+		String str = string_split_iterator(&it, '.');
+		if (str == "") break;
+		if (granularity > 0) {
+			normalized = gb_string_appendc(normalized, ".");
+		}
+		normalized = gb_string_append_length(normalized, str.text, str.len);
+	}
+
+	for (; granularity < 3; granularity++) {
+		normalized = gb_string_appendc(normalized, ".0");
+	}
+
+	return make_string_c(normalized);
+}
+
 gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
 	BuildContext *bc = &build_context;
 
@@ -1861,7 +1884,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->disable_red_zone) {
 		if (is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
-			gb_printf_err("-disable-red-zone is not support for this target");
+			gb_printf_err("-disable-red-zone is not supported on this target");
 			gb_exit(1);
 		}
 	}
@@ -1997,9 +2020,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			} else if (subtarget == Subtarget_iPhone || subtarget == Subtarget_iPhoneSimulator) {
 				// NOTE(harold): We default to 17.4 on iOS because that's when os_sync_wait_on_address was added and
 				//               we'd like to avoid any potential App Store issues by using the private ulock_* there.
-				bc->minimum_os_version_string = str_lit("17.4");
+				bc->minimum_os_version_string = str_lit("17.4.0");
 			}
 		}
+
+		bc->minimum_os_version_string = normalize_minimum_os_version_string(bc->minimum_os_version_string);
 
 		if (subtarget == Subtarget_iPhoneSimulator) {
 			// For the iPhoneSimulator subtarget, the version must be between 'ios' and '-simulator'.

@@ -25,6 +25,7 @@ foreign user32 {
 		idProcess, idThread: DWORD,
 		dwFlags:             WinEventFlags,
 	) -> HWINEVENTHOOK ---
+	UnhookWinEvent :: proc(winEventHook: HWINEVENTHOOK) -> BOOL ---
 
 	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
 
@@ -410,6 +411,16 @@ GET_RAWINPUT_CODE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) ->
 @(require_results)
 MAKEINTRESOURCEW :: #force_inline proc "contextless" (#any_int i: int) -> LPWSTR {
 	return cast(LPWSTR)uintptr(WORD(i))
+}
+
+@(require_results)
+RAWINPUT_ALIGN :: proc "contextless" (x: uintptr) -> uintptr {
+	return (x + size_of(uintptr) - 1) & ~uintptr(size_of(uintptr) - 1)
+}
+
+@(require_results)
+NEXTRAWINPUTBLOCK :: proc "contextless" (ptr: ^RAWINPUT) -> ^RAWINPUT {
+	return cast(^RAWINPUT)RAWINPUT_ALIGN(uintptr(ptr) + uintptr(ptr.header.dwSize))
 }
 
 Monitor_From_Flags :: enum DWORD {

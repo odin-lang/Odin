@@ -534,12 +534,12 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 				return false;
 			}
 
-			if (ident.entity->kind != Entity_Procedure) {
+			if (ident.entity.load()->kind != Entity_Procedure) {
 				gbString e = expr_to_string(handler_node);
 
 				ERROR_BLOCK();
 				error(handler.expr, "'%.*s' expected a direct reference to a procedure", LIT(builtin_name));
-				if(ident.entity->kind == Entity_Variable) {
+				if(ident.entity.load()->kind == Entity_Variable) {
 					error_line("\tSuggestion: Variables referencing a procedure are not allowed, they are not a direct procedure reference.");
 				} else {
 					error_line("\tSuggestion: Ensure '%s' is not a runtime-evaluated expression.", e); // NOTE(harold): Is this case possible to hit?
@@ -5204,6 +5204,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_count_zeros:
 	case BuiltinProc_count_trailing_zeros:
 	case BuiltinProc_count_leading_zeros:
+	case BuiltinProc_count_trailing_ones:
+	case BuiltinProc_count_leading_ones:
 	case BuiltinProc_reverse_bits:
 		{
 			Operand x = {};
@@ -5296,6 +5298,27 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 							u8 b = cast(u8)(i & 7);
 							u8 j = cast(u8)(i >> 3);
 							if (rop[j] & (1 << b)) {
+								break;
+							}
+							v += 1;
+						}
+						break;
+
+					case BuiltinProc_count_trailing_ones:
+						for (u64 i = 0; i < bit_size; i++) {
+							u8 b = cast(u8)(i & 7);
+							u8 j = cast(u8)(i >> 3);
+							if ((rop[j] & (1 << b)) == 0) {
+								break;
+							}
+							v += 1;
+						}
+						break;
+					case BuiltinProc_count_leading_ones:
+						for (u64 i = bit_size-1; i < bit_size; i--) {
+							u8 b = cast(u8)(i & 7);
+							u8 j = cast(u8)(i >> 3);
+							if ((rop[j] & (1 << b)) == 0) {
 								break;
 							}
 							v += 1;
