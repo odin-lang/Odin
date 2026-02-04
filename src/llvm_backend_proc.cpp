@@ -289,11 +289,11 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	lb_set_linkage_from_entity_flags(p->module, p->value, entity->flags);
 
-	// With LTO on Windows, required procedures with external linkage need to be added to
+	// With LTO on all platforms, required procedures with external linkage need to be added to
 	// llvm.used to survive linker-level dead code elimination. This is necessary because
 	// LLVM may generate implicit calls to runtime builtins (e.g., __extendhfsf2 for f16
 	// conversions) during instruction lowering, after the IR is finalized.
-	if (build_context.lto_kind != LTO_None && build_context.metrics.os == TargetOs_windows) {
+	if (build_context.lto_kind != LTO_None) {
 		if (entity->flags & EntityFlag_Require) {
 			LLVMLinkage linkage = LLVMGetLinkage(p->value);
 			if (linkage != LLVMInternalLinkage) {
