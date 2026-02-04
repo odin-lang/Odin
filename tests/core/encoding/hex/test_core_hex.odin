@@ -23,6 +23,19 @@ hex_encode :: proc(t: ^testing.T) {
 			test[1],
 		)
 	}
+
+	input  := "Hello"
+	output := "48656C6C6F"
+	encoded := string(hex.encode(transmute([]byte)input, uppercase=true))
+	defer delete(encoded)
+	testing.expectf(
+		t,
+		encoded == output,
+		"encode: %q -> %q (should be: %q)",
+		input,
+		encoded,
+		output,
+	)
 }
 
 @(test)
