@@ -1642,8 +1642,28 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
 								build_context.lto_kind = LTO_Thin;
+								if (build_context.linker_choice == Linker_Invalid) {
+									build_context.linker_choice = Linker_lld;
+								}
+								if (!build_context.use_separate_modules) {
+									build_context.use_separate_modules = true;
+									if (build_context.use_single_module) {
+										gb_printf_err("-linker:<string> cannot be used with -use-single-module\n");
+										bad_flags = true;
+									}
+								}
 							} else if (str_eq_ignore_case(value.value_string, str_lit("thin-files"))) {
 								build_context.lto_kind = LTO_Thin_Files;
+								if (build_context.linker_choice == Linker_Invalid) {
+									build_context.linker_choice = Linker_lld;
+								}
+								if (!build_context.use_separate_modules) {
+									build_context.use_separate_modules = true;
+									if (build_context.use_single_module) {
+										gb_printf_err("-linker:<string> cannot be used with -use-single-module\n");
+										bad_flags = true;
+									}
+								}
 							} else {
 								gb_printf_err("-lto:<string> options are 'thin' and 'thin-files'\n");
 								bad_flags = true;
@@ -2729,8 +2749,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			}
 		}
 
-		if (print_flag("-lld")) {
-			print_usage_line(2, "Uses the LLD linker rather than the default.");
+		if (print_flag("-lto:<string>")) {
+			print_usage_line(2, "States that the project is to be build with link-time optimizations.");
+			print_usage_line(2, "This also enables '-use-separate-modules' (if not already set) and `-linker:lld");
+			print_usage_line(2, "Choices:");
+			print_usage_line(3, "thin");
+			print_usage_line(3, "thin-files");
 		}
 	}
 
@@ -2858,10 +2882,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
-		if (print_flag("-radlink")) {
-			print_usage_line(2, "Uses the RAD linker rather than the default.");
-		}
-
 		if (print_flag("-reloc-mode:<string>")) {
 			print_usage_line(2, "Specifies the reloc mode.");
 			print_usage_line(2, "Available options:");
