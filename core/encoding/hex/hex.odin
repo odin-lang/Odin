@@ -4,21 +4,23 @@ package encoding_hex
 import "core:io"
 import "core:strings"
 
-encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> []byte #no_bounds_check {
+encode :: proc(src: []byte, uppercase := false, allocator := context.allocator, loc := #caller_location) -> []byte #no_bounds_check {
 	dst := make([]byte, len(src) * 2, allocator, loc)
+	hextable := uppercase ? HEXTABLE_UPPERCASE : HEXTABLE_LOWERCASE
 	for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
-		dst[j]   = HEXTABLE[v>>4]
-		dst[j+1] = HEXTABLE[v&0x0f]
+		dst[j]   = hextable[v>>4]
+		dst[j+1] = hextable[v&0x0f]
 		j += 2
 	}
 
 	return dst
 }
 
-encode_into_writer :: proc(dst: io.Writer, src: []byte) -> io.Error {
+encode_into_writer :: proc(dst: io.Writer, src: []byte, uppercase := false) -> io.Error {
+	hextable := uppercase ? HEXTABLE_UPPERCASE : HEXTABLE_LOWERCASE
 	for v in src {
-		io.write(dst, {HEXTABLE[v>>4], HEXTABLE[v&0x0f]}) or_return
+		io.write(dst, {hextable[v>>4], hextable[v&0x0f]}) or_return
 	}
 	return nil
 }
@@ -62,11 +64,18 @@ decode_sequence :: proc(str: string) -> (res: byte, ok: bool) {
 }
 
 @(private)
-HEXTABLE := [16]byte {
+HEXTABLE_LOWERCASE := [16]byte {
 	'0', '1', '2', '3',
 	'4', '5', '6', '7',
 	'8', '9', 'a', 'b',
 	'c', 'd', 'e', 'f',
+}
+@(private)
+HEXTABLE_UPPERCASE := [16]byte {
+	'0', '1', '2', '3',
+	'4', '5', '6', '7',
+	'8', '9', 'A', 'B',
+	'C', 'D', 'E', 'F',
 }
 
 @(private)
