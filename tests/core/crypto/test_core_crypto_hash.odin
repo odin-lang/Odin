@@ -488,7 +488,7 @@ test_hash :: proc(t: ^testing.T) {
 		hash.update(&ctx, data)
 		hash.final(&ctx, dst)
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -538,8 +538,8 @@ test_hash :: proc(t: ^testing.T) {
 		digest_a, _ := hash.hash_stream(algo, st, context.temp_allocator)
 		digest_b := hash.hash_string(algo, data_1_000_000_a, context.temp_allocator)
 
-		a_str := string(hex.encode(digest_a, context.temp_allocator))
-		b_str := string(hex.encode(digest_b, context.temp_allocator))
+		a_str := string(hex.encode(digest_a, allocator=context.temp_allocator))
+		b_str := string(hex.encode(digest_b, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -582,9 +582,9 @@ test_hash :: proc(t: ^testing.T) {
 		digest_c := make([]byte, hash.digest_size(&ctx_clone), context.temp_allocator)
 		hash.final(&ctx_clone, digest_c)
 
-		a_str = string(hex.encode(digest_a, context.temp_allocator))
-		b_str = string(hex.encode(digest_b, context.temp_allocator))
-		c_str := string(hex.encode(digest_c, context.temp_allocator))
+		a_str = string(hex.encode(digest_a, allocator=context.temp_allocator))
+		b_str = string(hex.encode(digest_b, allocator=context.temp_allocator))
+		c_str := string(hex.encode(digest_c, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,

@@ -54,7 +54,7 @@ test_hkdf :: proc(t: ^testing.T) {
 
 		hkdf.extract_and_expand(v.algo, salt, ikm, info, dst)
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -156,7 +156,7 @@ test_pbkdf2 :: proc(t: ^testing.T) {
 
 		pbkdf2.derive(v.algo, password, salt, v.iterations, dst)
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,

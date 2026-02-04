@@ -84,7 +84,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		0xb4, 0x0b, 0x8e, 0xed, 0xf2, 0x78, 0x5e, 0x42,
 		0x87, 0x4d,
 	}
-	ciphertext_str := string(hex.encode(ciphertext[:], context.temp_allocator))
+	ciphertext_str := string(hex.encode(ciphertext[:], allocator=context.temp_allocator))
 
 	derived_ciphertext: [114]byte
 	ctx: chacha20.Context = ---
@@ -92,7 +92,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 	chacha20.seek(&ctx, 1) // The test vectors start the counter at 1.
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
-	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], context.temp_allocator))
+	derived_ciphertext_str := string(hex.encode(derived_ciphertext[:], allocator=context.temp_allocator))
 	testing.expectf(
 		t,
 		derived_ciphertext_str == ciphertext_str,
@@ -132,13 +132,13 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		0x76, 0x88, 0x12, 0xf6, 0x15, 0xc6, 0x8b, 0x13,
 		0xb5, 0x2e,
 	}
-	xciphertext_str := string(hex.encode(xciphertext[:], context.temp_allocator))
+	xciphertext_str := string(hex.encode(xciphertext[:], allocator=context.temp_allocator))
 
 	chacha20.init(&ctx, xkey[:], xiv[:], impl)
 	chacha20.seek(&ctx, 1)
 	chacha20.xor_bytes(&ctx, derived_ciphertext[:], plaintext[:])
 
-	derived_ciphertext_str = string(hex.encode(derived_ciphertext[:], context.temp_allocator))
+	derived_ciphertext_str = string(hex.encode(derived_ciphertext[:], allocator=context.temp_allocator))
 	testing.expectf(
 		t,
 		derived_ciphertext_str == xciphertext_str,
@@ -169,7 +169,7 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 
 	digest: [32]byte
 	sha2.final(&h_ctx, digest[:])
-	digest_str := string(hex.encode(digest[:], context.temp_allocator))
+	digest_str := string(hex.encode(digest[:], allocator=context.temp_allocator))
 
 	expected_digest_str := "cfd6e949225b854fe04946491e6935ff05ff983d1554bc885bca0ec8082dd5b8"
 	testing.expectf(

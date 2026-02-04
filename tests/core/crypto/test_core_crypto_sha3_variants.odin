@@ -50,7 +50,7 @@ test_shake :: proc(t: ^testing.T) {
 		shake.write(&ctx, transmute([]byte)(v.str))
 		shake.read(&ctx, dst)
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -138,7 +138,7 @@ test_cshake :: proc(t: ^testing.T) {
 		shake.write(&ctx, data)
 		shake.read(&ctx, dst)
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -327,7 +327,7 @@ test_tuplehash :: proc(t: ^testing.T) {
 			tuplehash.final(&ctx, dst)
 		}
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -420,7 +420,7 @@ test_kmac :: proc(t:^testing.T) {
 		kmac.update(&ctx, data)
 		kmac.final(&ctx, dst)
 
-		dst_str := string(hex.encode(dst, context.temp_allocator))
+		dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,

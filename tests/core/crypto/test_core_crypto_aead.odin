@@ -225,7 +225,7 @@ test_aead :: proc(t: ^testing.T) {
 			"808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
 			"070000004041424344454647",
 			"50515253c0c1c2c3c4c5c6c7",
-			string(hex.encode(transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR), context.temp_allocator)),
+			string(hex.encode(transmute([]byte)(_PLAINTEXT_SUNSCREEN_STR), allocator=context.temp_allocator)),
 			"d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116",
 			"1ae10b594f09e26a7e902ecbd0600691",
 		},
@@ -516,8 +516,8 @@ test_aead :: proc(t: ^testing.T) {
 			aead.init(&ctx, v.algo, key, impl)
 
 			aead.seal(&ctx, dst, tag_, iv, aad, plaintext)
-			dst_str := string(hex.encode(dst, context.temp_allocator))
-			tag_str := string(hex.encode(tag_, context.temp_allocator))
+			dst_str := string(hex.encode(dst, allocator=context.temp_allocator))
+			tag_str := string(hex.encode(tag_, allocator=context.temp_allocator))
 			testing.expectf(
 				t,
 				dst_str == v.ciphertext && tag_str == v.tag,
@@ -535,8 +535,8 @@ test_aead :: proc(t: ^testing.T) {
 			)
 
 			aead.seal(v.algo, dst, tag_, key, iv, aad, plaintext, impl)
-			dst_str = string(hex.encode(dst, context.temp_allocator))
-			tag_str = string(hex.encode(tag_, context.temp_allocator))
+			dst_str = string(hex.encode(dst, allocator=context.temp_allocator))
+			tag_str = string(hex.encode(tag_, allocator=context.temp_allocator))
 			testing.expectf(
 				t,
 				dst_str == v.ciphertext && tag_str == v.tag,
@@ -554,7 +554,7 @@ test_aead :: proc(t: ^testing.T) {
 			)
 
 			ok := aead.open(&ctx, dst, iv, aad, ciphertext, tag)
-			dst_str = string(hex.encode(dst, context.temp_allocator))
+			dst_str = string(hex.encode(dst, allocator=context.temp_allocator))
 			testing.expectf(
 				t,
 				ok && dst_str == v.plaintext,
@@ -572,7 +572,7 @@ test_aead :: proc(t: ^testing.T) {
 			)
 
 			ok = aead.open(v.algo, dst, key, iv, aad, ciphertext, tag, impl)
-			dst_str = string(hex.encode(dst, context.temp_allocator))
+			dst_str = string(hex.encode(dst, allocator=context.temp_allocator))
 			testing.expectf(
 				t,
 				ok && dst_str == v.plaintext,

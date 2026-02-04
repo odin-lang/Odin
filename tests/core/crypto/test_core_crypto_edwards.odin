@@ -375,7 +375,7 @@ test_ed25519 :: proc(t: ^testing.T) {
 			ok,
 			"Expected private key %s round-trip, got %s",
 			v.priv_key,
-			string(hex.encode(key_bytes[:], context.temp_allocator)),
+			string(hex.encode(key_bytes[:], allocator=context.temp_allocator)),
 		)
 
 		pub_key: ed25519.Public_Key
@@ -385,7 +385,7 @@ test_ed25519 :: proc(t: ^testing.T) {
 			ok,
 			"Expected %s to be a valid public key (priv->pub: %s)",
 			v.pub_key,
-			string(hex.encode(priv_key._pub_key._b[:], context.temp_allocator)),
+			string(hex.encode(priv_key._pub_key._b[:], allocator=context.temp_allocator)),
 		)
 
 		ed25519.public_key_bytes(&pub_key, key_bytes[:])
@@ -394,12 +394,12 @@ test_ed25519 :: proc(t: ^testing.T) {
 			ok,
 			"Expected public key %s round-trip, got %s",
 			v.pub_key,
-			string(hex.encode(key_bytes[:], context.temp_allocator)),
+			string(hex.encode(key_bytes[:], allocator=context.temp_allocator)),
 		)
 
 		sig: [ed25519.SIGNATURE_SIZE]byte
 		ed25519.sign(&priv_key, msg_bytes, sig[:])
-		x := string(hex.encode(sig[:], context.temp_allocator))
+		x := string(hex.encode(sig[:], allocator=context.temp_allocator))
 		testing.expectf(
 			t,
 			x == v.sig,
@@ -627,12 +627,12 @@ test_ed25519 :: proc(t: ^testing.T) {
 ge_str :: proc(ge: ^ristretto255.Group_Element) -> string {
 	b: [ristretto255.ELEMENT_SIZE]byte
 	ristretto255.ge_bytes(ge, b[:])
-	return string(hex.encode(b[:], context.temp_allocator))
+	return string(hex.encode(b[:], allocator=context.temp_allocator))
 }
 
 @(private="file")
 fe_str :: proc(fe: ^field.Tight_Field_Element) -> string {
 	b: [32]byte
 	field.fe_to_bytes(&b, fe)
-	return string(hex.encode(b[:], context.temp_allocator))
+	return string(hex.encode(b[:], allocator=context.temp_allocator))
 }

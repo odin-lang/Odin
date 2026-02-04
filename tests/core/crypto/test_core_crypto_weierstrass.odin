@@ -28,7 +28,7 @@ test_p256_a :: proc(t: ^testing.T) {
 	b: [32]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 
 	testing.expect(t, s == a_str)
 
@@ -49,7 +49,7 @@ test_p384_a :: proc(t: ^testing.T) {
 	b: [48]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 
 	testing.expect(t, s == a_str)
 
@@ -71,7 +71,7 @@ test_p256_b :: proc(t: ^testing.T) {
 	b: [32]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 
 	testing.expect(t, s == b_str)
 
@@ -92,7 +92,7 @@ test_p384_b :: proc(t: ^testing.T) {
 	b: [48]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 
 	testing.expect(t, s == b_str)
 
@@ -112,7 +112,7 @@ test_p256_g_x :: proc(t: ^testing.T) {
 	b: [32]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 	testing.expect(t, s == P256_G_X)
 
 	b_, _ := hex.decode(transmute([]byte)(P256_G_X), context.temp_allocator)
@@ -131,7 +131,7 @@ test_p384_g_x :: proc(t: ^testing.T) {
 	b: [48]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 	testing.expect(t, s == P384_G_X)
 
 	b_, _ := hex.decode(transmute([]byte)(P384_G_X), context.temp_allocator)
@@ -150,7 +150,7 @@ test_p256_g_y :: proc(t: ^testing.T) {
 	b: [32]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 	testing.expect(t, s == P256_G_Y)
 
 	b_, _ := hex.decode(transmute([]byte)(P256_G_Y), context.temp_allocator)
@@ -169,7 +169,7 @@ test_p384_g_y :: proc(t: ^testing.T) {
 	b: [48]byte
 	ec.fe_bytes(b[:], &fe)
 
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 	testing.expect(t, s == P384_G_Y)
 
 	b_, _ := hex.decode(transmute([]byte)(P384_G_Y), context.temp_allocator)
@@ -220,7 +220,7 @@ test_p256_scalar_reduce :: proc(t: ^testing.T) {
 
 		b: [ec.SC_SIZE_P256R1]byte
 		ec.sc_bytes(b[:], &sc)
-		s := (string)(hex.encode(b[:], context.temp_allocator))
+		s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 
 		testing.expectf(t, v.reduced == s, "sc: raw %s reduced: %s, expected: %s", v.raw, s, v.reduced)
 	}
@@ -262,7 +262,7 @@ test_p384_scalar_reduce :: proc(t: ^testing.T) {
 
 		b: [ec.SC_SIZE_P384R1]byte
 		ec.sc_bytes(b[:], &sc)
-		s := (string)(hex.encode(b[:], context.temp_allocator))
+		s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 
 		testing.expectf(t, v.reduced == s, "sc: raw %s reduced: %s (%v), expected: %s", v.raw, s, &sc, v.reduced)
 	}
@@ -910,7 +910,7 @@ test_p256_s11n_sec_generator ::proc(t: ^testing.T) {
 	b: [65]byte
 	ok := ec.pt_sec_bytes(b[:], &g, false)
 	testing.expect(t, ok)
-	s := (string)(hex.encode(b[:], context.temp_allocator))
+	s := (string)(hex.encode(b[:], allocator=context.temp_allocator))
 	testing.expectf(t, s == P256_G_UNCOMPRESSED, "g: %v bytes: %v, %v", g, P256_G_UNCOMPRESSED, s)
 
 	ok = ec.pt_set_sec_bytes(&p, b[:])

@@ -84,7 +84,7 @@ test_ecdh :: proc(t: ^testing.T) {
 		ok = ecdh.ecdh(&priv_key, &pub_key, shared_secret)
 		testing.expectf(t, ok, "ecdh failed: %v %v %v", v.curve, &priv_key, &pub_key)
 
-		ss_str := string(hex.encode(shared_secret, context.temp_allocator))
+		ss_str := string(hex.encode(shared_secret, allocator=context.temp_allocator))
 		testing.expectf(
 			t,
 			ss_str == v.product,
@@ -153,7 +153,7 @@ test_ecdh_scalar_basemult :: proc(t: ^testing.T) {
 		b := make([]byte, ecdh.key_size(&pub_key), context.temp_allocator)
 		ecdh.public_key_bytes(&pub_key, b)
 
-		pub_str := string(hex.encode(b, context.temp_allocator))
+		pub_str := string(hex.encode(b, allocator=context.temp_allocator))
 		testing.expectf(
 			t,
 			pub_str == v.point,

@@ -110,7 +110,7 @@ test_aes_ecb :: proc(t: ^testing.T, impl: aes.Implementation) {
 		aes.init_ecb(&ctx, key, impl)
 
 		aes.encrypt_ecb(&ctx, dst[:], plaintext)
-		dst_str := string(hex.encode(dst[:], context.temp_allocator))
+		dst_str := string(hex.encode(dst[:], allocator=context.temp_allocator))
 		testing.expectf(
 			t,
 			dst_str == v.ciphertext,
@@ -123,7 +123,7 @@ test_aes_ecb :: proc(t: ^testing.T, impl: aes.Implementation) {
 		)
 
 		aes.decrypt_ecb(&ctx, dst[:], ciphertext)
-		dst_str = string(hex.encode(dst[:], context.temp_allocator))
+		dst_str = string(hex.encode(dst[:], allocator=context.temp_allocator))
 		testing.expectf(
 			t,
 			dst_str == v.plaintext,
@@ -179,7 +179,7 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 
 		aes.xor_bytes_ctr(&ctx, dst, plaintext)
 
-		dst_str := string(hex.encode(dst[:], context.temp_allocator))
+		dst_str := string(hex.encode(dst[:], allocator=context.temp_allocator))
 		testing.expectf(
 			t,
 			dst_str == v.ciphertext,
@@ -214,7 +214,7 @@ test_aes_ctr :: proc(t: ^testing.T, impl: aes.Implementation) {
 
 	digest: [32]byte
 	sha2.final(&h_ctx, digest[:])
-	digest_str := string(hex.encode(digest[:], context.temp_allocator))
+	digest_str := string(hex.encode(digest[:], allocator=context.temp_allocator))
 
 	expected_digest_str := "b5ba4e7d6e3d1ff2bb54387fc1528573a6b351610ce7bcc80b00da089f4b1bf0"
 	testing.expectf(

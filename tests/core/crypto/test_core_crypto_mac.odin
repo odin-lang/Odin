@@ -69,9 +69,9 @@ test_hmac :: proc(t: ^testing.T) {
 		expected_str := tags_sha256[i]
 		tag_len := len(expected_str) / 2
 
-		key_str := string(hex.encode(key, context.temp_allocator))
-		msg_str := string(hex.encode(msg, context.temp_allocator))
-		dst_str := string(hex.encode(dst[:tag_len], context.temp_allocator))
+		key_str := string(hex.encode(key, allocator=context.temp_allocator))
+		msg_str := string(hex.encode(msg, allocator=context.temp_allocator))
+		dst_str := string(hex.encode(dst[:tag_len], allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -85,7 +85,7 @@ test_hmac :: proc(t: ^testing.T) {
 		)
 
 		hmac.sum(algo, dst, msg, key)
-		oneshot_str := string(hex.encode(dst[:tag_len], context.temp_allocator))
+		oneshot_str := string(hex.encode(dst[:tag_len], allocator=context.temp_allocator))
 
 		testing.expectf(
 			t,
@@ -136,7 +136,7 @@ test_poly1305 :: proc(t: ^testing.T) {
 		0xf3, 0xff, 0xc7, 0x70, 0x3f, 0x94, 0x00, 0xe5,
 		0x2a, 0x7d, 0xfb, 0x4b, 0x3d, 0x33, 0x05, 0xd9,
 	}
-	tag_str := string(hex.encode(tag[:], context.temp_allocator))
+	tag_str := string(hex.encode(tag[:], allocator=context.temp_allocator))
 
 	// Verify - oneshot + compare
 	ok := poly1305.verify(tag[:], msg[:], key[:])
@@ -145,7 +145,7 @@ test_poly1305 :: proc(t: ^testing.T) {
 	// Sum - oneshot
 	derived_tag: [poly1305.TAG_SIZE]byte
 	poly1305.sum(derived_tag[:], msg[:], key[:])
-	derived_tag_str := string(hex.encode(derived_tag[:], context.temp_allocator))
+	derived_tag_str := string(hex.encode(derived_tag[:], allocator=context.temp_allocator))
 	testing.expectf(
 		t,
 		derived_tag_str == tag_str,
@@ -165,7 +165,7 @@ test_poly1305 :: proc(t: ^testing.T) {
 		off = off + read_length
 	}
 	poly1305.final(&ctx, derived_tag[:])
-	derived_tag_str = string(hex.encode(derived_tag[:], context.temp_allocator))
+	derived_tag_str = string(hex.encode(derived_tag[:], allocator=context.temp_allocator))
 	testing.expectf(
 		t,
 		derived_tag_str == tag_str,
