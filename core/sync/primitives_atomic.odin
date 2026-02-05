@@ -8,11 +8,51 @@ Atomic_Mutex_State :: enum Futex {
 	Waiting  = 2,
 }
 
+/*
+Atomic mutual exclusion lock.
 
-// An Atomic_Mutex is a mutual exclusion lock
-// The zero value for a Atomic_Mutex is an unlocked mutex
-//
-// An Atomic_Mutex must not be copied after first use
+`Atomic_Mutex` is a mutual exclusion lock implemented entirely using atomic
+operations and futexes. Unlike the standard `Mutex`, which may use OS-specific
+primitives (such as `SRWLOCK` on Windows), `Atomic_Mutex` provides a portable,
+lightweight implementation with consistent behavior across all platforms.
+
+**Differences from `Mutex`:**
+
+- **Implementation**: `Atomic_Mutex` uses atomic operations with spin-locking
+  and futex-based waiting. On Windows, `Mutex` uses the native `SRWLOCK`. On
+  other platforms, `Mutex` actually wraps `Atomic_Mutex` internally.
+
+- **Memory footprint**: `Atomic_Mutex` is just a single `Futex` (a `u32`),
+  making it more compact than OS-specific mutex types.
+
+- **Portability**: `Atomic_Mutex` guarantees identical behavior across all
+  supported platforms, which can be important for cross-platform applications
+  that need deterministic synchronization semantics.
+
+- **Performance characteristics**: `Atomic_Mutex` performs a brief spin-lock
+  phase before falling back to a futex wait, which can reduce context switches
+  in low-contention scenarios.
+
+**When to use `Atomic_Mutex`:**
+
+- When you need guaranteed cross-platform behavior.
+- When memory footprint is a concern (e.g., many mutexes in an array).
+- When using other `Atomic_` primitives (e.g., `Atomic_Cond`, `Atomic_Sema`),
+  as they are designed to work together.
+
+**When to use `Mutex`:**
+
+- When you want the OS-optimized implementation on platforms that provide one.
+- When integrating with OS-level debugging or profiling tools that understand
+  native synchronization primitives.
+
+The zero value for an `Atomic_Mutex` is an unlocked mutex.
+
+**Note**: An `Atomic_Mutex` must not be copied after first use. This is because,
+in order to coordinate with other threads, all threads must watch the same
+memory address. Trying to use a copy at a different memory address will result
+in broken and unsafe behavior.
+*/
 Atomic_Mutex :: struct {
 	state: Atomic_Mutex_State,
 }
@@ -100,11 +140,41 @@ Atomic_RW_Mutex_State_Reader      :: Atomic_RW_Mutex_State(1)
 Atomic_RW_Mutex_State_Reader_Mask :: ~Atomic_RW_Mutex_State_Is_Writing
 
 
-// An Atomic_RW_Mutex is a reader/writer mutual exclusion lock.
-// The lock can be held by any arbitrary number of readers or a single writer.
-// The zero value for an Atomic_RW_Mutex is an unlocked mutex.
-//
-// An Atomic_RW_Mutex must not be copied after first use.
+/*
+Atomic read-write mutual exclusion lock.
+
+`Atomic_RW_Mutex` is a reader/writer mutual exclusion lock implemented using
+atomic operations and futexes. The lock can be held by any number of readers
+or a single writer.
+
+**Differences from `RW_Mutex`:**
+
+- **Implementation**: `Atomic_RW_Mutex` uses atomic operations with an
+  `Atomic_Mutex` and `Atomic_Sema` internally. On Windows, `RW_Mutex` uses the
+  native `SRWLOCK`. On other platforms, `RW_Mutex` wraps `Atomic_RW_Mutex`.
+
+- **Memory footprint**: `Atomic_RW_Mutex` uses an `Atomic_Mutex` and
+  `Atomic_Sema` (two `Futex` values plus state), which may be more compact than
+  OS-specific read-write lock types.
+
+- **Portability**: `Atomic_RW_Mutex` guarantees identical behavior across all
+  supported platforms.
+
+**When to use `Atomic_RW_Mutex`:**
+
+- When you need guaranteed cross-platform behavior.
+- When using other `Atomic_` primitives for consistency.
+- When memory footprint matters and you have many read-write locks.
+
+**When to use `RW_Mutex`:**
+
+- When you want OS-optimized implementations where available.
+- For general use when cross-platform consistency is not critical.
+
+The zero value for an `Atomic_RW_Mutex` is an unlocked mutex.
+
+**Note**: An `Atomic_RW_Mutex` must not be copied after first use.
+*/
 Atomic_RW_Mutex :: struct {
 	state: Atomic_RW_Mutex_State,
 	mutex: Atomic_Mutex,
@@ -242,10 +312,35 @@ atomic_rw_mutex_shared_guard :: proc "contextless" (m: ^Atomic_RW_Mutex) -> bool
 
 
 
-// An Atomic_Recursive_Mutex is a recursive mutual exclusion lock
-// The zero value for a Recursive_Mutex is an unlocked mutex
-//
-// An Atomic_Recursive_Mutex must not be copied after first use
+/*
+Atomic recursive mutual exclusion lock.
+
+`Atomic_Recursive_Mutex` is a recursive mutex that allows the same thread to
+acquire the lock multiple times without deadlocking. The mutex must be unlocked
+the same number of times it was locked before other threads can acquire it.
+
+**Differences from `Recursive_Mutex`:**
+
+- **Implementation**: Both use similar futex-based implementations internally.
+  `Atomic_Recursive_Mutex` uses the standard `Mutex` internally (which itself
+  may use `Atomic_Mutex` on non-Windows platforms).
+
+- **Naming consistency**: `Atomic_Recursive_Mutex` follows the `Atomic_` naming
+  convention for use alongside other atomic primitives.
+
+**When to use `Atomic_Recursive_Mutex`:**
+
+- When using other `Atomic_` primitives for API consistency.
+- When you need recursive locking capability with the atomic primitive family.
+
+**When to use `Recursive_Mutex`:**
+
+- For most recursive mutex use cases, `Recursive_Mutex` is the standard choice.
+
+The zero value for an `Atomic_Recursive_Mutex` is an unlocked mutex.
+
+**Note**: An `Atomic_Recursive_Mutex` must not be copied after first use.
+*/
 Atomic_Recursive_Mutex :: struct {
 	owner:     int,
 	recursion: int,
@@ -305,10 +400,40 @@ atomic_recursive_mutex_guard :: proc "contextless" (m: ^Atomic_Recursive_Mutex) 
 
 
 
-// Atomic_Cond implements a condition variable, a rendezvous point for threads
-// waiting for signalling the occurence of an event
-//
-// An Atomic_Cond must not be copied after first use
+/*
+Atomic condition variable.
+
+`Atomic_Cond` implements a condition variable using atomic operations and
+futexes. It provides a rendezvous point for threads waiting for or signalling
+the occurrence of an event.
+
+**Differences from `Cond`:**
+
+- **Implementation**: `Atomic_Cond` uses a futex directly for waiting and
+  signalling. On Windows, `Cond` uses the native `CONDITION_VARIABLE`. On
+  other platforms, `Cond` wraps `Atomic_Cond`.
+
+- **Mutex compatibility**: `Atomic_Cond` is designed to work with `Atomic_Mutex`.
+  Do not mix `Atomic_Cond` with the standard `Mutex`, as the internal unlocking
+  mechanisms are not compatible.
+
+- **Memory footprint**: `Atomic_Cond` is just a single `Futex` (a `u32`).
+
+**When to use `Atomic_Cond`:**
+
+- When using `Atomic_Mutex` for the associated lock.
+- When you need guaranteed cross-platform behavior.
+- When memory footprint is a concern.
+
+**When to use `Cond`:**
+
+- When using the standard `Mutex`.
+- When you want OS-optimized implementations where available.
+
+The zero value for an `Atomic_Cond` is a valid, initialized condition variable.
+
+**Note**: An `Atomic_Cond` must not be copied after first use.
+*/
 Atomic_Cond :: struct {
 	state: Futex,
 }
@@ -340,10 +465,41 @@ atomic_cond_broadcast :: proc "contextless" (c: ^Atomic_Cond) {
 	futex_broadcast(&c.state)
 }
 
-// When waited upon, blocks until the internal count is greater than zero, then subtracts one.
-// Posting to the semaphore increases the count by one, or the provided amount.
-//
-// An Atomic_Sema must not be copied after first use
+/*
+Atomic semaphore.
+
+`Atomic_Sema` is a counting semaphore implemented using atomic operations and
+futexes. When waited upon, it blocks until the internal count is greater than
+zero, then decrements the count by one. Posting to the semaphore increases the
+count by one (or the specified amount).
+
+**Differences from `Sema`:**
+
+- **Implementation**: Both `Sema` and `Atomic_Sema` are implemented using atomic
+  operations and futexes. The standard `Sema` is a thin wrapper around
+  `Atomic_Sema` on all platforms, so they are functionally equivalent.
+
+- **Direct access**: `Atomic_Sema` provides direct access to the underlying
+  futex-based implementation without the wrapper layer.
+
+**When to use `Atomic_Sema`:**
+
+- When using other `Atomic_` primitives, for API consistency.
+- When you need direct access to the atomic implementation.
+
+**When to use `Sema`:**
+
+- For most use cases, `Sema` is preferred as it provides the standard API and
+  may include additional platform-specific optimizations or debugging support
+  in the future.
+
+The zero value for an `Atomic_Sema` is a semaphore with count zero.
+
+**Note**: An `Atomic_Sema` must not be copied after first use. This is because,
+in order to coordinate with other threads, all threads must watch the same
+memory address. Trying to use a copy at a different memory address will result
+in broken and unsafe behavior.
+*/
 Atomic_Sema :: struct {
 	count: Futex,
 }
