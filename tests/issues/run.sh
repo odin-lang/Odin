@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -eu
 
-mkdir -p build
-pushd build
-ODIN=../../../odin
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+ODIN="${ODIN:-$ROOT_DIR/odin}"
+
+mkdir -p "$SCRIPT_DIR/build"
+pushd "$SCRIPT_DIR/build"
 COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 set -x
@@ -39,4 +42,4 @@ $ODIN test ../test_issue_6165.odin $COMMON
 set +x
 
 popd
-rm -rf build
+rm -rf "$SCRIPT_DIR/build"

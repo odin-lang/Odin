@@ -281,6 +281,8 @@ odin
 demo.bin
 libLLVM*.so*
 *.a
+!vendor/boringssl/lib/*.a
+!vendor/boringssl/lib/**/*.a
 
 # shared collection
 shared/

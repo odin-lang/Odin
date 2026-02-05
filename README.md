@@ -97,3 +97,115 @@ The official blog of the Odin programming language, featuring announcements, new
 ## Warnings
 
 * The Odin compiler is still in development.
+
+## Bifrost (HTTP/TLS)
+
+Bifrost is an event-driven HTTP/1.1 + HTTP/2 client/server stack for Odin, built on `core:nbio`.
+TLS is provided via a vendored BoringSSL build. Linux only for now.
+
+### Layout
+
+* `vendor/bifrost/http` — HTTP/1.1 + HTTP/2 implementation
+* `vendor/bifrost/tls` — BoringSSL wrapper + generated bindings
+* `vendor/boringssl` — vendored headers + static libs (Linux)
+
+### Handler Example (nbio-first)
+
+```odin
+package main
+
+import "core:nbio"
+import http "vendor:bifrost/http"
+
+main :: proc() {
+	nbio.acquire_thread_event_loop()
+	defer nbio.release_thread_event_loop()
+
+	srv := http.Server{
+		Loop = nbio.current_thread_event_loop(),
+		Handler = proc(req: ^http.Request, res: ^http.ResponseWriter) {
+			res.Status = 200
+			http.response_write_string(res, "hello")
+			http.response_end(res)
+		},
+	}
+
+	_, _ = http.listen(&srv, {nbio.IP4_Any, 8080})
+nbio.run()
+}
+```
+
+### Streaming Request Bodies
+
+When using `Server.Body_Handler`, you can opt into a pull-style reader:
+
+```odin
+srv := http.Server{
+	Loop = nbio.current_thread_event_loop(),
+	Handler = proc(req: ^http.Request, res: ^http.ResponseWriter) {
+		// Call early (before Body_Handler consumes data).
+		_ = http.request_body_stream_enable(req)
+	},
+	Body_Handler = proc(req: ^http.Request, res: ^http.ResponseWriter, data: []u8, done: bool) {
+		buf: [1024]u8
+		for {
+			n, body_done, ok := http.request_body_read(req, buf[:])
+			if !ok {
+				break
+			}
+			// process buf[:n]
+			if body_done {
+				res.Status = 200
+				http.response_end(res)
+				return
+			}
+		}
+	},
+}
+```
+
+### Request User Context
+
+`Request.User` is reserved for user state (useful in client callbacks).
+
+### HTTP/2 Notes
+
+* Prior knowledge (cleartext): set `Request.Proto = "HTTP/2.0"`.
+* h2c upgrade (cleartext): set `Request.Proto = "HTTP/2.0"` and `Upgrade: h2c` in the request header; Bifrost will add `HTTP2-Settings` and `Connection: Upgrade, HTTP2-Settings` automatically.
+* HTTP/2 client streaming uploads are supported via `Request.Body_Stream`.
+
+### BoringSSL Vendor Build (Linux)
+
+This repo vendors only the headers and static libs needed for linking, not the full BoringSSL source.
+
+Expected layout:
+
+* `vendor/boringssl/include/openssl/`
+* `vendor/boringssl/lib/libssl.a`
+* `vendor/boringssl/lib/libcrypto.a`
+
+Build from a sibling checkout at `../boringssl`:
+
+```sh
+./vendor/boringssl/build_boringssl.sh
+```
+
+Manual build (if you prefer):
+
+```sh
+cmake -S ../boringssl -B ../boringssl/build -DCMAKE_BUILD_TYPE=Release
+cmake --build ../boringssl/build --target ssl crypto
+
+mkdir -p vendor/boringssl/include/openssl vendor/boringssl/lib
+rsync -a ../boringssl/include/openssl/ vendor/boringssl/include/openssl/
+cp -a ../boringssl/build/libssl.a ../boringssl/build/libcrypto.a vendor/boringssl/lib/
+```
+
+Bindings are generated with `odin-c-bindgen` using `vendor/bifrost/tls/bindgen.sjson`.
+
+### Port Plan (Go Source Pointers)
+
+1. Stage 1: HTTP/1.1 parsing + wire format. Go source: `src/net/http/request.go`, `src/net/http/response.go`, `src/net/http/header.go`, `src/net/http/transfer.go`.
+2. Stage 2: HTTP/1.1 server core. Go source: `src/net/http/server.go`, `src/net/http/pattern.go`, `src/net/http/servemux121.go`.
+3. Stage 3: HTTP/1.1 client + transport. Go source: `src/net/http/client.go`, `src/net/http/roundtrip.go`, `src/net/http/transport.go`.
+4. Stage 4: HTTP/2 (TLS ALPN and h2c). Go source: `src/net/http/h2_bundle.go`, `src/net/http/h2_error.go`. Omit deprecated priority and server push behavior (modern client alignment).

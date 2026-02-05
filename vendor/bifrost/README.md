@@ -2,6 +2,7 @@
 
 Bifrost is an event-driven HTTP/1.1 + HTTP/2 client/server stack for Odin, built on `core:nbio`.
 TLS is provided by a vendored BoringSSL build and wrapped in `vendor:bifrost/tls`.
+HTTP/2 client streaming uploads are supported via `Request.Body_Stream`.
 
 ## Layout
 
@@ -32,9 +33,42 @@ main :: proc() {
 	}
 
 	// TODO(bifrost): http.Listen(srv, {nbio.IP4_Any, 8080})
-	nbio.run()
+nbio.run()
 }
 ```
+
+## Streaming Request Bodies
+
+When `Server.Body_Handler` is set, you can opt into a pull-style body reader:
+
+```odin
+srv := http.Server{
+	Loop = nbio.thread_event_loop(),
+	Handler = proc(req: ^http.Request, res: ^http.ResponseWriter) {
+		// Call early (before Body_Handler consumes data).
+		_ = http.request_body_stream_enable(req)
+	},
+	Body_Handler = proc(req: ^http.Request, res: ^http.ResponseWriter, data: []u8, done: bool) {
+		buf: [1024]u8
+		for {
+			n, body_done, ok := http.request_body_read(req, buf[:])
+			if !ok {
+				break
+			}
+			// process buf[:n]
+			if body_done {
+				res.Status = 200
+				http.response_end(res)
+				return
+			}
+		}
+	},
+}
+```
+
+## Request User Context
+
+`Request.User` is reserved for user state (useful in client callbacks).
 
 ## Porting Plan (Go Source Pointers)
 
