@@ -2083,7 +2083,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 
 		Entity *e = var.decl->entity;
 		GB_ASSERT(e->kind == Entity_Variable);
-		e->code_gen_module = entity_module;
+		e->code_gen_module.store(entity_module, std::memory_order_relaxed);
 		Ast *init_expr = var.decl->init_expr;
 
 		if (init_expr == nullptr && var.init.value == nullptr) {

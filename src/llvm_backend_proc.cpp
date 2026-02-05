@@ -102,8 +102,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
 
 	p->module = m;
-	reinterpret_cast<std::atomic<lbModule*>*>(&entity->code_gen_module)->store(m, std::memory_order_relaxed);
-	reinterpret_cast<std::atomic<lbProcedure*>*>(&entity->code_gen_procedure)->store(p, std::memory_order_relaxed);
+	entity->code_gen_module.store(m, std::memory_order_relaxed);
+	entity->code_gen_procedure.store(p, std::memory_order_relaxed);
 	p->entity = entity;
 	p->name = link_name;
 
@@ -831,7 +831,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 		// This is an unspecialized polymorphic procedure, skip codegen
 		return;
 	}
-	e->code_gen_procedure = nested_proc;
+	e->code_gen_procedure.store(nested_proc, std::memory_order_relaxed);
 
 	lbValue value = {};
 	value.value = nested_proc->value;

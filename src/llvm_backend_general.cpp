@@ -500,8 +500,8 @@ gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, 
 
 	if (e->kind == Entity_Procedure &&
 	    e->decl_info &&
-	    e->decl_info->code_gen_module) {
-		return e->decl_info->code_gen_module;
+	    e->decl_info->code_gen_module.load(std::memory_order_relaxed)) {
+		return e->decl_info->code_gen_module.load(std::memory_order_relaxed);
 	}
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
@@ -3238,7 +3238,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	pl->decl->code_gen_module = target_module;
+	pl->decl->code_gen_module.store(target_module, std::memory_order_relaxed);
 	e->decl_info = pl->decl;
 	e->parent_proc_decl = pl->decl->parent;
 	e->Procedure.is_anonymous = true;
@@ -3372,8 +3372,9 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 
 		bool is_external = other_module != m;
 		if (!is_external) {
-			if (e->code_gen_module != nullptr) {
-				other_module = e->code_gen_module;
+			lbModule *entity_module = cast(lbModule *)e->code_gen_module.load(std::memory_order_relaxed);
+			if (entity_module != nullptr) {
+				other_module = entity_module;
 			} else {
 				other_module = &m->gen->default_module;
 			}

@@ -473,7 +473,7 @@ gb_internal void cg_build_nested_proc(cgProcedure *p, AstProcLit *pd, Entity *e)
 	e->Procedure.link_name = name;
 
 	cgProcedure *nested_proc = cg_procedure_create(p->module, e);
-	e->cg_procedure = nested_proc;
+	e->code_gen_procedure.store(nested_proc, std::memory_order_relaxed);
 
 	cgValue value = nested_proc->value;
 
