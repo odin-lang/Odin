@@ -1175,28 +1175,45 @@ gb_internal LLVMMetadataRef lb_get_tbaa_access_tag(lbModule *m, Type *type) {
 	} else if (type->kind == Type_Pointer || type->kind == Type_MultiPointer) {
 		type_node = lb_get_tbaa_type_node(m, "pointer", 7);
 	} else if (type->kind == Type_Enum) {
-		type_node = lb_get_tbaa_type_node(m, "enum", 4);
+		// NOTE(bill): Enums are backed by integer types (e.g. u32). Code can access
+		// the same memory as both the enum type and its backing integer type via
+		// pointer casts. An "enum" TBAA tag would conflict with the backing type's
+		// tag (e.g. "u32") since they are siblings in the TBAA tree.
+		return nullptr;
 	} else if (type->kind == Type_Slice) {
-		type_node = lb_get_tbaa_type_node(m, "slice", 5);
+		// NOTE(bill): Compound types must not have TBAA tags that conflict with
+		// their field types. See array comment below.
+		return nullptr;
 	} else if (type->kind == Type_DynamicArray) {
-		type_node = lb_get_tbaa_type_node(m, "dynamic_array", 13);
+		return nullptr;
 	} else if (type->kind == Type_Map) {
-		type_node = lb_get_tbaa_type_node(m, "map", 3);
+		return nullptr;
 	} else if (type->kind == Type_Array || type->kind == Type_EnumeratedArray) {
-		type_node = lb_get_tbaa_type_node(m, "array", 5);
+		// NOTE(bill): Arrays must not have a TBAA tag that conflicts with their
+		// element type. A store to an array (tagged "array") must be visible through
+		// element-type loads (tagged e.g. "u32"). Since "array" and "u32" are siblings
+		// in the TBAA tree, LLVM would incorrectly conclude they cannot alias,
+		// causing element loads to return undef after array stores.
+		return nullptr;
 	} else if (type->kind == Type_Struct) {
 		if (type->Struct.is_raw_union) {
 			return nullptr;
 		}
-		type_node = lb_get_tbaa_type_node(m, "aggregate", 9);
+		// NOTE(bill): Same issue as arrays: struct stores must be visible through
+		// field-type loads. A "aggregate" TBAA tag conflicts with element type tags.
+		return nullptr;
 	} else if (type->kind == Type_BitSet) {
-		type_node = lb_get_tbaa_type_node(m, "bitset", 6);
+		// NOTE(bill): BitSets are backed by integer types; a "bitset" TBAA tag
+		// would conflict with the underlying integer type's tag.
+		return nullptr;
 	} else if (type->kind == Type_SimdVector) {
 		type_node = lb_get_tbaa_type_node(m, "simd_vector", 11);
 	} else if (type->kind == Type_Matrix) {
-		type_node = lb_get_tbaa_type_node(m, "matrix", 6);
+		// NOTE(bill): Matrices contain elements accessed by element type.
+		return nullptr;
 	} else if (type->kind == Type_BitField) {
-		type_node = lb_get_tbaa_type_node(m, "bitfield", 8);
+		// NOTE(bill): BitFields contain fields of various types.
+		return nullptr;
 	} else if (type->kind == Type_SoaPointer) {
 		type_node = lb_get_tbaa_type_node(m, "pointer", 7);
 	} else {
