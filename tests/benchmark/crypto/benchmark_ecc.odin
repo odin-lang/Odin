@@ -9,12 +9,16 @@ import "core:time"
 
 import "core:crypto"
 import "core:crypto/ecdh"
+import "core:crypto/ecdsa"
 import "core:crypto/ed25519"
+import "core:crypto/hash"
 
 @(private = "file")
 ECDH_ITERS :: 10000
 @(private = "file")
 DSA_ITERS :: 10000
+@(private = "file")
+MSG : string : "Got a job for you, 621."
 
 @(test)
 benchmark_crypto_ecc :: proc(t: ^testing.T) {
@@ -24,7 +28,7 @@ benchmark_crypto_ecc :: proc(t: ^testing.T) {
 	bench_dsa()
 }
 
-@(private = "file")
+@(private="file")
 bench_ecdh :: proc() {
 	if !crypto.HAS_RAND_BYTES {
 		log.warnf("ECDH benchmarks skipped, no system entropy source")
@@ -78,7 +82,7 @@ bench_ecdh :: proc() {
 	log_table(&tbl)
 }
 
-@(private = "file")
+@(private="file")
 bench_dsa :: proc() {
 	tbl: table.Table
 	table.init(&tbl)
@@ -102,6 +106,20 @@ bench_dsa :: proc() {
 	append_tbl(&tbl, "ed25519", "sign", sig)
 	append_tbl(&tbl, "ed25519", "verify", verif)
 
+	table.row(&tbl)
+
+	sk, sig, verif = bench_ecdsa(.SECP256R1, .SHA256)
+	append_tbl(&tbl, "secp256r1/SHA256/RFC6979", "private_key_set_bytes", sk)
+	append_tbl(&tbl, "secp256r1/SHA256/RFC6979", "sign", sig)
+	append_tbl(&tbl, "secp256r1/SHA256/RFC6979", "verify", verif)
+
+	table.row(&tbl)
+
+	sk, sig, verif = bench_ecdsa(.SECP384R1, .SHA384)
+	append_tbl(&tbl, "secp384r1/SHA384/RFC6979", "private_key_set_bytes", sk)
+	append_tbl(&tbl, "secp384r1/SHA384/RFC6979", "sign", sig)
+	append_tbl(&tbl, "secp384r1/SHA384/RFC6979", "verify", verif)
+
 	log_table(&tbl)
 }
 
@@ -122,9 +140,8 @@ bench_ed25519 :: proc() -> (sk, sig, verif: time.Duration) {
 	ok := ed25519.public_key_set_bytes(&pub_key, pub_bytes[:])
 	assert(ok, "public key should deserialize")
 
-	msg := "Got a job for you, 621."
 	sig_bytes: [ed25519.SIGNATURE_SIZE]byte
-	msg_bytes := transmute([]byte)(msg)
+	msg_bytes := transmute([]byte)(MSG)
 	start = time.tick_now()
 	for _ in  0 ..< DSA_ITERS {
 		ed25519.sign(&priv_key, msg_bytes, sig_bytes[:])
@@ -134,6 +151,40 @@ bench_ed25519 :: proc() -> (sk, sig, verif: time.Duration) {
 	start = time.tick_now()
 	for _ in  0 ..< DSA_ITERS {
 		ok = ed25519.verify(&pub_key, msg_bytes, sig_bytes[:])
+		assert(ok, "signature should validate")
+	}
+	verif = time.tick_since(start) / DSA_ITERS
+
+	return
+}
+
+@(private="file")
+bench_ecdsa :: proc(curve: ecdsa.Curve, hash: hash.Algorithm) -> (sk, sig, verif: time.Duration) {
+	priv_bytes := make([]byte, ecdsa.PRIVATE_KEY_SIZES[curve], context.temp_allocator)
+	crypto.set(raw_data(priv_bytes), 0x69, len(priv_bytes))
+	priv_key: ecdsa.Private_Key
+	start := time.tick_now()
+	for _ in  0 ..< DSA_ITERS {
+		ok := ecdsa.private_key_set_bytes(&priv_key, curve, priv_bytes)
+		assert(ok, "private key should deserialize")
+	}
+	sk = time.tick_since(start) / DSA_ITERS
+
+	pub_key: ecdsa.Public_Key
+	ecdsa.public_key_set_priv(&pub_key, &priv_key)
+
+	sig_bytes := make([]byte, ecdsa.RAW_SIGNATURE_SIZES[curve], context.temp_allocator)
+	msg_bytes := transmute([]byte)(MSG)
+	start = time.tick_now()
+	for _ in  0 ..< DSA_ITERS {
+		ok := ecdsa.sign_raw(&priv_key, hash, msg_bytes, sig_bytes, true)
+		assert(ok, "signing should succeed")
+	}
+	sig = time.tick_since(start) / DSA_ITERS
+
+	start = time.tick_now()
+	for _ in  0 ..< DSA_ITERS {
+		ok := ecdsa.verify_raw(&pub_key, hash, msg_bytes, sig_bytes)
 		assert(ok, "signature should validate")
 	}
 	verif = time.tick_since(start) / DSA_ITERS

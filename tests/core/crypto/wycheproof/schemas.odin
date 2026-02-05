@@ -173,6 +173,24 @@ Eddsa_Jwk :: struct {
 	x:   string `json:"x"`,
 }
 
+Ecdsa_Key :: struct {
+	type:         string    `json:"type"`,
+	curve:        string    `json:"curve"`,
+	key_size:     int       `json:"keySize"`,
+	uncompressed: Hex_Bytes `json:"uncompressed"`,
+	wx:           Hex_Bytes `json:"wx"`,
+	wy:           Hex_Bytes `json:"wy"`,
+}
+
+Ecdsa_Test_Group :: struct {
+	public_key:     Ecdsa_Key         `json:"publicKey"`,
+	public_key_der: Hex_Bytes         `json:"publicKeyDer"`,
+	public_key_pem: string            `json:"publicKeyPem"`,
+	type:           string            `json:"type"`,
+	sha:            string            `json:"sha"`,
+	tests:          []Dsa_Test_Vector `json:"tests"`,
+}
+
 Dsa_Test_Vector :: struct {
 	tc_id:   int       `json:"tcId"`,
 	comment: string    `json:"comment"`,
