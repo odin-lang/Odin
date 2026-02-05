@@ -1,0 +1,18 @@
+{
+  inputs = [
+    "../../boringssl/include/openssl/ssl.h",
+    "../../boringssl/include/openssl/err.h",
+    "../../boringssl/include/openssl/x509.h",
+    "../../boringssl/include/openssl/pem.h",
+    "../../boringssl/include/openssl/evp.h",
+    "../../boringssl/include/openssl/bio.h",
+    "../../boringssl/include/openssl/stack.h",
+    "../../boringssl/include/openssl/safestack.h",
+  ]
+  output_folder = "bindings"
+  package_name = "bifrost_tls"
+  imports_file = "imports.odin"
+  clang_include_paths = [
+    "vendor/boringssl/include",
+  ]
+}
