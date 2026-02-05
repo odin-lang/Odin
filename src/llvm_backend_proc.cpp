@@ -194,7 +194,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	}
 
 	// mustprogress — tells LLVM the function makes forward progress (enables loop optimizations)
-	if (!pt->Proc.diverging && build_context.optimization_level > 0) {
+	if (!pt->Proc.diverging) {
 		lb_add_attribute_to_proc(m, p->value, "mustprogress");
 	}
 
@@ -290,7 +290,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 					lb_add_nocapture_proc_attribute_at_index(p, offset+parameter_index);
 				}
 			}
-			// readonly on non-pointer types passed indirectly by ABI
+			// readonly and dereferenceable on non-pointer types passed indirectly by ABI
 			if (!is_type_pointer(e->type) && !is_type_multi_pointer(e->type) && !is_type_rawptr(e->type) &&
 			    !is_type_proc(e->type) && !is_type_soa_pointer(e->type)) {
 				lbFunctionType *ft = p->abi_function_type;
@@ -299,6 +299,10 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 					LLVMTypeRef param_type = LLVMTypeOf(LLVMGetParam(p->value, llvm_param_idx));
 					if (LLVMGetTypeKind(param_type) == LLVMPointerTypeKind) {
 						lb_add_proc_attribute_at_index(p, offset+parameter_index, "readonly");
+						i64 size = type_size_of(e->type);
+						if (size > 0) {
+							lb_add_proc_attribute_at_index(p, offset+parameter_index, "dereferenceable", cast(u64)size);
+						}
 					}
 				}
 			}

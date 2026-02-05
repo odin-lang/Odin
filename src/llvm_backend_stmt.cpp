@@ -2597,6 +2597,29 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	} else {
 		lb_start_block(p, then);
 
+		// Emit @llvm.assume for simple nil checks at O1+ to inform the optimizer
+		// that the pointer is non-null within the true branch.
+		// Only for simple identifier expressions to avoid re-evaluating expressions
+		// with side effects (function calls, etc.).
+		if (build_context.optimization_level > 0 && is->cond->kind == Ast_BinaryExpr) {
+			ast_node(be, BinaryExpr, is->cond);
+			Ast *ptr_expr = nullptr;
+			if (be->op.kind == Token_NotEq && is_type_untyped_nil(be->right->tav.type)) {
+				ptr_expr = be->left;
+			} else if (be->op.kind == Token_NotEq && is_type_untyped_nil(be->left->tav.type)) {
+				ptr_expr = be->right;
+			}
+			if (ptr_expr != nullptr && ptr_expr->kind == Ast_Ident) {
+				Type *pt = ptr_expr->tav.type;
+				if (is_type_pointer(pt) || is_type_multi_pointer(pt) || is_type_rawptr(pt) || is_type_proc(pt)) {
+					lbValue assume_ptr = lb_build_expr(p, ptr_expr);
+					LLVMValueRef not_null = LLVMBuildIsNotNull(p->builder, assume_ptr.value, "");
+					LLVMValueRef assume_args[1] = { not_null };
+					lb_call_intrinsic(p, "llvm.assume", assume_args, 1, nullptr, 0);
+				}
+			}
+		}
+
 		lb_build_stmt(p, is->body);
 
 		lb_emit_jump(p, done);

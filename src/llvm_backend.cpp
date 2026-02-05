@@ -2135,8 +2135,10 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
-	lb_add_attribute_to_proc(p->module, p->value, "optnone");
-	lb_add_attribute_to_proc(p->module, p->value, "noinline");
+	if (build_context.optimization_level <= 0) {
+		lb_add_attribute_to_proc(p->module, p->value, "optnone");
+		lb_add_attribute_to_proc(p->module, p->value, "noinline");
+	}
 
 	// Make sure shared libraries call their own runtime startup on Linux.
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
@@ -2155,8 +2157,10 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
-	lb_add_attribute_to_proc(p->module, p->value, "optnone");
-	lb_add_attribute_to_proc(p->module, p->value, "noinline");
+	if (build_context.optimization_level <= 0) {
+		lb_add_attribute_to_proc(p->module, p->value, "optnone");
+		lb_add_attribute_to_proc(p->module, p->value, "noinline");
+	}
 
 	// Make sure shared libraries call their own runtime cleanup on Linux.
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
