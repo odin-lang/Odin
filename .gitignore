@@ -10,6 +10,9 @@
 # For macOS
 .DS_Store
 
+# LLM
+.serena
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
