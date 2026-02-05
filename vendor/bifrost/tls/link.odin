@@ -17,3 +17,5 @@ foreign import ssl {
 foreign import crypto {
 	LIBCRYPTO_PATH,
 }
+
+foreign import stdcpp "system:stdc++"

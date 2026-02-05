@@ -6,6 +6,7 @@ TLS_Stream_On_Handshake :: proc(s: ^TLS_Stream)
 TLS_Stream_On_Data :: proc(s: ^TLS_Stream, data: []u8)
 TLS_Stream_On_Close :: proc(s: ^TLS_Stream)
 TLS_Stream_On_Error :: proc(s: ^TLS_Stream, status: TLS_Status, message: string)
+TLS_Stream_On_Flush :: proc(s: ^TLS_Stream)
 
 TLS_Stream :: struct {
 	loop:   ^nbio.Event_Loop,
@@ -17,7 +18,9 @@ TLS_Stream :: struct {
 	send_buf: []u8,
 	out_chunk: int,
 	send_in_flight: bool,
+	recv_in_flight: bool,
 	closing: bool,
+	free_pending: bool,
 
 	handshake_notified: bool,
 
@@ -25,6 +28,7 @@ TLS_Stream :: struct {
 	on_data:      TLS_Stream_On_Data,
 	on_close:     TLS_Stream_On_Close,
 	on_error:     TLS_Stream_On_Error,
+	on_flush:     TLS_Stream_On_Flush,
 
 	user: rawptr,
 }
@@ -57,14 +61,17 @@ stream_init :: proc(
 	s.conn = conn
 	s.recv_buf = make([]u8, recv_buf_size)
 	s.app_buf = make([]u8, app_buf_size)
-	if out_chunk_size <= 0 {
-		out_chunk_size = TLS_DEFAULT_OUT_CHUNK
+	chunk_size := out_chunk_size
+	if chunk_size <= 0 {
+		chunk_size = TLS_DEFAULT_OUT_CHUNK
 	}
-	s.send_buf = make([]u8, out_chunk_size)
-	s.out_chunk = out_chunk_size
+	s.send_buf = make([]u8, chunk_size)
+	s.out_chunk = chunk_size
 	s.send_in_flight = false
+	s.recv_in_flight = false
 	s.closing = false
 	s.handshake_notified = false
+	s.free_pending = false
 
 	return true
 }
@@ -87,6 +94,13 @@ stream_write :: proc(s: ^TLS_Stream, data: []u8) -> (n: int, status: TLS_Status)
 	return n, status
 }
 
+stream_flush :: proc(s: ^TLS_Stream) {
+	if s == nil {
+		return
+	}
+	stream_flush_outgoing(s)
+}
+
 stream_close :: proc(s: ^TLS_Stream) {
 	if s == nil || s.conn == nil {
 		return
@@ -99,15 +113,68 @@ stream_close :: proc(s: ^TLS_Stream) {
 	}
 }
 
-stream_recv :: proc(s: ^TLS_Stream) {
+stream_free_now :: proc(s: ^TLS_Stream) {
 	if s == nil {
 		return
 	}
+	if s.conn != nil {
+		connection_free(s.conn)
+		s.conn = nil
+	}
+	if s.recv_buf != nil {
+		delete(s.recv_buf)
+		s.recv_buf = nil
+	}
+	if s.app_buf != nil {
+		delete(s.app_buf)
+		s.app_buf = nil
+	}
+	if s.send_buf != nil {
+		delete(s.send_buf)
+		s.send_buf = nil
+	}
+	s.free_pending = false
+}
+
+stream_free :: proc(s: ^TLS_Stream) {
+	if s == nil {
+		return
+	}
+	s.free_pending = true
+	s.on_handshake = nil
+	s.on_data = nil
+	s.on_close = nil
+	s.on_error = nil
+	s.on_flush = nil
+	s.user = nil
+	if !s.recv_in_flight && !s.send_in_flight {
+		stream_free_now(s)
+	}
+}
+
+stream_recv :: proc(s: ^TLS_Stream) {
+	if s == nil || s.conn == nil || s.free_pending {
+		return
+	}
+	s.recv_in_flight = true
 	nbio.recv_poly(s.socket, {s.recv_buf}, s, stream_on_recv, l=s.loop)
 }
 
 stream_on_recv :: proc(op: ^nbio.Operation, s: ^TLS_Stream) {
 	if s == nil {
+		return
+	}
+	s.recv_in_flight = false
+	if s.free_pending {
+		if !s.send_in_flight {
+			stream_free_now(s)
+		}
+		return
+	}
+	if s.conn == nil {
+		if s.free_pending && !s.send_in_flight {
+			stream_free_now(s)
+		}
 		return
 	}
 	if op.recv.err != nil {
@@ -126,11 +193,26 @@ stream_on_recv :: proc(op: ^nbio.Operation, s: ^TLS_Stream) {
 	}
 
 	stream_drive(s)
+	if s.conn == nil {
+		if s.free_pending && !s.send_in_flight {
+			stream_free_now(s)
+		}
+		return
+	}
+	if s.free_pending {
+		if !s.send_in_flight {
+			stream_free_now(s)
+		}
+		return
+	}
 	stream_recv(s)
 }
 
 stream_drive :: proc(s: ^TLS_Stream) {
 	if s == nil || s.conn == nil {
+		return
+	}
+	if s.free_pending {
 		return
 	}
 
@@ -162,12 +244,15 @@ stream_drive :: proc(s: ^TLS_Stream) {
 		read_n, read_status := read_app(s.conn, s.app_buf)
 		stream_flush_outgoing(s)
 
-		if read_status == .Ok && read_n > 0 {
-			if s.on_data != nil {
-				s.on_data(s, s.app_buf[:read_n])
+			if read_status == .Ok && read_n > 0 {
+				if s.on_data != nil {
+					s.on_data(s, s.app_buf[:read_n])
+				}
+				if s.conn == nil {
+					return
+				}
+				continue
 			}
-			continue
-		}
 
 		switch read_status {
 		case .Ok, .Want_Read, .Want_Write:
@@ -183,7 +268,7 @@ stream_drive :: proc(s: ^TLS_Stream) {
 }
 
 stream_flush_outgoing :: proc(s: ^TLS_Stream) {
-	if s == nil || s.conn == nil {
+	if s == nil || s.conn == nil || s.free_pending {
 		return
 	}
 
@@ -218,12 +303,26 @@ stream_on_send_done :: proc(op: ^nbio.Operation, s: ^TLS_Stream) {
 	if s == nil {
 		return
 	}
+	if s.conn == nil {
+		if s.free_pending && !s.recv_in_flight {
+			stream_free_now(s)
+		}
+		return
+	}
 	s.send_in_flight = false
 	if op.send.err != nil {
 		stream_error(s, .Error)
 		return
 	}
 	stream_flush_outgoing(s)
+	if !s.send_in_flight && pending_outgoing(s.conn) == 0 {
+		if s.on_flush != nil {
+			s.on_flush(s)
+		}
+	}
+	if s.free_pending && !s.recv_in_flight && !s.send_in_flight {
+		stream_free_now(s)
+	}
 	if s.closing && !s.send_in_flight && pending_outgoing(s.conn) == 0 {
 		nbio.close(s.socket)
 	}

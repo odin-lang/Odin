@@ -1,3 +1,4 @@
+
 // Copyright 2014 The BoringSSL Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,9 +12,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bifrost_tls
+package bifrost_tls_bindings
+foreign import lib {
+	LIBSSL_PATH,
+	LIBCRYPTO_PATH,
+	"system:stdc++",
+	"system:gcc_s",
+}
 
 // Intentionally empty. Linking is handled in link.odin to avoid duplicate
 // declarations across generated binding files.
+
+
 
 

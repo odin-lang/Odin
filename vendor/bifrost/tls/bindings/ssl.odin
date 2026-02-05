@@ -13,9 +13,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package bifrost_tls
+package bifrost_tls_bindings
+foreign import lib {
+	LIBSSL_PATH,
+	LIBCRYPTO_PATH,
+	"system:stdc++",
+	"system:gcc_s",
+}
 
 import "core:c"
+
 
 // Intentionally empty. Linking is handled in link.odin to avoid duplicate
 // declarations across generated binding files.
@@ -4198,14 +4205,14 @@ foreign lib {
 
 	// SSL_CTX_get_info_callback returns the callback set by
 	// |SSL_CTX_set_info_callback|.
-	SSL_CTX_get_info_callback :: proc(ssl: ^SSL, type: i32, value: i32, ctx: ^SSL_CTX) -> proc "c" (^SSL, i32, i32) ---
+	SSL_CTX_get_info_callback :: proc(ctx: ^SSL_CTX) -> proc "c" (^SSL, i32, i32) ---
 
 	// SSL_set_info_callback configures a callback to be run at various events
 	// during a connection's lifetime. See |SSL_CTX_set_info_callback|.
 	SSL_set_info_callback :: proc(ssl: ^SSL, cb: proc "c" (ssl: ^SSL, type: i32, value: i32)) ---
 
 	// SSL_get_info_callback returns the callback set by |SSL_set_info_callback|.
-	SSL_get_info_callback :: proc(ssl: ^SSL, type: i32, value: i32, ssl: ^SSL) -> proc "c" (^SSL, i32, i32) ---
+	SSL_get_info_callback :: proc(ssl: ^SSL) -> proc "c" (^SSL, i32, i32) ---
 
 	// SSL_state_string_long returns the current state of the handshake state
 	// machine as a string. This may be useful for debugging and logging.
@@ -5295,4 +5302,3 @@ SSL_R_TLSV1_ALERT_CERTIFICATE_REQUIRED               :: 1116
 SSL_R_TLSV1_ALERT_NO_APPLICATION_PROTOCOL            :: 1120
 SSL_R_TLSV1_ALERT_ECH_REQUIRED                       :: 1121
 SSL_R_PAKE_AND_KEY_SHARE_NOT_ALLOWED                 :: 1122
-
