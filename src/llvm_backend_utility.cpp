@@ -158,7 +158,7 @@ gb_internal lbValue lb_emit_min(lbProcedure *p, Type *t, lbValue x, lbValue y) {
 		LLVMValueRef args[2] = {x.value, y.value};
 		LLVMTypeRef types[1] = {lb_type(p->module, t)};
 
-		// NOTE(bill): f either operand is a NaN, returns NaN. Otherwise returns the lesser of the two arguments.
+		// NOTE(bill): If either operand is a NaN, returns NaN. Otherwise returns the lesser of the two arguments.
 		// -0.0 is considered to be less than +0.0 for this intrinsic.
 		// These semantics are specified by IEEE 754-2008.
 		LLVMValueRef v = lb_call_intrinsic(p, "llvm.minnum", args, gb_count_of(args), types, gb_count_of(types));

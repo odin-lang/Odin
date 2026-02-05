@@ -127,10 +127,6 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 		LLVMMetadataRef root_str = LLVMMDStringInContext2(m->ctx, "Odin TBAA", 9);
 		m->tbaa_root = LLVMMDNodeInContext2(m->ctx, &root_str, 1);
 
-		LLVMMetadataRef omni_str = LLVMMDStringInContext2(m->ctx, "omnipotent char", 15);
-		LLVMMetadataRef omni_ops[3] = { omni_str, m->tbaa_root, LLVMValueAsMetadata(LLVMConstInt(LLVMInt64TypeInContext(m->ctx), 0, false)) };
-		m->tbaa_omnipotent = LLVMMDNodeInContext2(m->ctx, omni_ops, 3);
-
 		m->tbaa_kind_id = LLVMGetMDKindIDInContext(m->ctx, "tbaa", 4);
 		map_init(&m->tbaa_access_tags);
 	}
