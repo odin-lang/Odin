@@ -1062,23 +1062,23 @@ gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Slice<Ast
 	return result;
 }
 
-gb_internal Ast *ast_switch_stmt(AstFile *f, Token token, Ast *init, Ast *tag, Ast *body) {
+gb_internal Ast *ast_switch_stmt(AstFile *f, Token token, Ast *init, Ast *tag, Ast *body, bool partial) {
 	Ast *result = alloc_ast_node(f, Ast_SwitchStmt);
 	result->SwitchStmt.token = token;
 	result->SwitchStmt.init  = init;
 	result->SwitchStmt.tag   = tag;
 	result->SwitchStmt.body  = body;
-	result->SwitchStmt.partial = false;
+	result->SwitchStmt.partial = partial;
 	return result;
 }
 
 
-gb_internal Ast *ast_type_switch_stmt(AstFile *f, Token token, Ast *tag, Ast *body) {
+gb_internal Ast *ast_type_switch_stmt(AstFile *f, Token token, Ast *tag, Ast *body, bool partial) {
 	Ast *result = alloc_ast_node(f, Ast_TypeSwitchStmt);
 	result->TypeSwitchStmt.token = token;
 	result->TypeSwitchStmt.tag   = tag;
 	result->TypeSwitchStmt.body  = body;
-	result->TypeSwitchStmt.partial = false;
+	result->TypeSwitchStmt.partial = partial;
 	return result;
 }
 
@@ -4962,8 +4962,19 @@ gb_internal Ast *parse_switch_stmt(AstFile *f) {
 	Ast *body = nullptr;
 	Token open, close;
 	bool is_type_switch = false;
+	bool is_partial = false;
 	auto list = array_make<Ast *>(ast_allocator(f));
-
+	if (f->curr_token.kind == Token_String) {
+		String s = string_value_from_token(f, f->curr_token);
+		if (s == str_lit("partial")) {
+			Token partial_token = f->curr_token;
+			Token next = peek_token(f);
+			if (next.kind != Token_OpenBrace) {
+				advance_token(f);
+				is_partial = true;
+			}
+		}
+	}
 	if (f->curr_token.kind != Token_OpenBrace) {
 		isize prev_level = f->expr_level;
 		f->expr_level = -1;
@@ -5009,10 +5020,10 @@ gb_internal Ast *parse_switch_stmt(AstFile *f) {
 	body = ast_block_stmt(f, list, open, close);
 
 	if (is_type_switch) {
-		return ast_type_switch_stmt(f, token, tag, body);
+		return ast_type_switch_stmt(f, token, tag, body, is_partial);
 	}
 	tag = convert_stmt_to_expr(f, tag, str_lit("switch expression"));
-	return ast_switch_stmt(f, token, init, tag, body);
+	return ast_switch_stmt(f, token, init, tag, body, is_partial);
 }
 
 gb_internal Ast *parse_defer_stmt(AstFile *f) {
