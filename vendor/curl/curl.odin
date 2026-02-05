@@ -27,9 +27,6 @@ when ODIN_OS == .Windows {
 	@(export)
 	foreign import lib {
 		"system:curl",
-		"system:mbedtls",
-		"system:mbedx509",
-		"system:mbedcrypto",
 		"system:z",
 	}
 }
