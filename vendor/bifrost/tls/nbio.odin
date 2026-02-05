@@ -17,6 +17,7 @@ TLS_Stream :: struct {
 	send_buf: []u8,
 	out_chunk: int,
 	send_in_flight: bool,
+	closing: bool,
 
 	handshake_notified: bool,
 
@@ -62,6 +63,7 @@ stream_init :: proc(
 	s.send_buf = make([]u8, out_chunk_size)
 	s.out_chunk = out_chunk_size
 	s.send_in_flight = false
+	s.closing = false
 	s.handshake_notified = false
 
 	return true
@@ -91,7 +93,10 @@ stream_close :: proc(s: ^TLS_Stream) {
 	}
 	_ = shutdown(s.conn)
 	stream_flush_outgoing(s)
-	nbio.close(s.socket)
+	s.closing = true
+	if !s.send_in_flight && pending_outgoing(s.conn) == 0 {
+		nbio.close(s.socket)
+	}
 }
 
 stream_recv :: proc(s: ^TLS_Stream) {
@@ -219,6 +224,9 @@ stream_on_send_done :: proc(op: ^nbio.Operation, s: ^TLS_Stream) {
 		return
 	}
 	stream_flush_outgoing(s)
+	if s.closing && !s.send_in_flight && pending_outgoing(s.conn) == 0 {
+		nbio.close(s.socket)
+	}
 }
 
 stream_error :: proc(s: ^TLS_Stream, status: TLS_Status) {

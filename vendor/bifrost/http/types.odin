@@ -12,6 +12,7 @@ Request :: struct {
 
 	Header: Header,
 	Body_Len: i64,
+	Body: []u8,
 
 	// TODO(bifrost): streaming body reader/state
 	_body: rawptr,
@@ -34,6 +35,8 @@ Server :: struct {
 
 	Max_Header_Bytes: int,
 	Max_Body_Bytes:   i64,
+
+	_tls_ctx: ^tls.Context,
 }
 
 Client :: struct {
