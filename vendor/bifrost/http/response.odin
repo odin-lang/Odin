@@ -1,7 +1,6 @@
 package bifrost_http
 
 import "core:bytes"
-import "core:strings"
 import "core:nbio"
 import "core:strconv"
 import tls "vendor:bifrost/tls"
@@ -54,8 +53,20 @@ response_end :: proc(res: ^ResponseWriter) {
 		var buf: [32]u8
 		header_set(&res.Header, "content-length", strconv.append_int(buf[:], i64(len(body)), 10))
 	}
+	close_after := !conn.keep_alive
+	if header_has_token(res.Header, "connection", "close") {
+		close_after = true
+	}
+	if header_has_token(res.Header, "connection", "keep-alive") && conn.keep_alive {
+		close_after = false
+	}
+	conn.close_after_response = close_after
 	if _, ok := header_get(res.Header, "connection"); !ok {
-		header_set(&res.Header, "connection", "close")
+		if close_after {
+			header_set(&res.Header, "connection", "close")
+		} else if conn.http10 {
+			header_set(&res.Header, "connection", "keep-alive")
+		}
 	}
 
 	resp := bytes.Buffer{}
@@ -83,9 +94,16 @@ response_end :: proc(res: ^ResponseWriter) {
 
 	if conn.use_tls {
 		_, status := tls.stream_write(&conn.tls_stream, out)
-		_ = status
 		bytes.buffer_destroy(&resp)
-		tls.stream_close(&conn.tls_stream)
+		if status == .Error || status == .Closed {
+			conn_close(conn)
+			return
+		}
+		if conn.close_after_response {
+			tls.stream_close(&conn.tls_stream)
+			return
+		}
+		conn_after_response(conn)
 		return
 	}
 
@@ -107,8 +125,11 @@ on_send_done :: proc(op: ^nbio.Operation, conn: ^Conn, resp: ^bytes.Buffer) {
 		conn_close(conn)
 		return
 	}
-	nbio.close(conn.socket)
-	conn_close(conn)
+	if conn.close_after_response {
+		conn_close(conn)
+		return
+	}
+	conn_after_response(conn)
 }
 
 status_phrase :: proc(code: int) -> string {
@@ -128,8 +149,10 @@ status_phrase :: proc(code: int) -> string {
 	case 426: return "Upgrade Required"
 	case 431: return "Request Header Fields Too Large"
 	case 500: return "Internal Server Error"
+	case 501: return "Not Implemented"
 	case 502: return "Bad Gateway"
 	case 503: return "Service Unavailable"
+	case 505: return "HTTP Version Not Supported"
 	case: return "OK"
 	}
 }

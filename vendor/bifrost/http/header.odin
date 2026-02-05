@@ -1,6 +1,7 @@
 package bifrost_http
 
 import "core:mem"
+import "core:strings"
 
 header_add :: proc(h: ^Header, name, value: string) {
 	if h == nil {
@@ -65,6 +66,23 @@ header_has_value :: proc(h: Header, name, value: string) -> bool {
 	for v in vals {
 		if mem.compare([]u8(v), []u8(value)) == 0 {
 			return true
+		}
+	}
+	return false
+}
+
+header_has_token :: proc(h: Header, name, token: string) -> bool {
+	key := header_key(name)
+	vals, ok := h[key]
+	if !ok {
+		return false
+	}
+	for v in vals {
+		parts, _ := strings.split(v, ",", context.temp_allocator)
+		for p in parts {
+			if strings.equal_fold(strings.trim_space(p), token) {
+				return true
+			}
 		}
 	}
 	return false
