@@ -217,8 +217,7 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 				strings.write_byte(&test_names, ',')
 			}
 			strings.write_bytes(&test_names, transmute([]u8)tests)
-		}
-		else if arg == "-help" {
+		} else if arg == "-help" {
 			exe_name := "test"
 			if path, err := os2.get_executable_path(context.temp_allocator); err == nil {
 				exe_name = slashpath.base(path)
@@ -236,8 +235,7 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 			                      "            The format is: `package.test_name,test_name_only,...`")
 			fmt.wprintln(stdout)
 			os.exit(0)
-		}
-		else {
+		} else {
 			fmt.wprintfln(stderr, "Unknown argument encountered '%v'", arg)
 			os.exit(-1)
 		}
