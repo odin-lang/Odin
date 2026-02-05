@@ -491,6 +491,21 @@ client_send_request :: proc(conn: ^Client_Conn) {
 		}
 	}
 
+	for name, vals in conn.req.Header {
+		if !header_valid_field_name(name) {
+			client_finish_error(conn, .Send, "invalid header field name")
+			_ = client_finalize(conn)
+			return
+		}
+		for v in vals {
+			if !header_valid_field_value(v) {
+				client_finish_error(conn, .Send, "invalid header field value")
+				_ = client_finalize(conn)
+				return
+			}
+		}
+	}
+
 	_, _ = bytes.buffer_write_string(&conn.send_buf, method)
 	_, _ = bytes.buffer_write_string(&conn.send_buf, " ")
 	_, _ = bytes.buffer_write_string(&conn.send_buf, target)
@@ -498,14 +513,7 @@ client_send_request :: proc(conn: ^Client_Conn) {
 	_, _ = bytes.buffer_write_string(&conn.send_buf, proto)
 	_, _ = bytes.buffer_write_string(&conn.send_buf, "\r\n")
 
-	for name, vals in conn.req.Header {
-		for v in vals {
-			_, _ = bytes.buffer_write_string(&conn.send_buf, name)
-			_, _ = bytes.buffer_write_string(&conn.send_buf, ": ")
-			_, _ = bytes.buffer_write_string(&conn.send_buf, v)
-			_, _ = bytes.buffer_write_string(&conn.send_buf, "\r\n")
-		}
-	}
+	header_write_subset(&conn.send_buf, conn.req.Header, nil)
 	_, _ = bytes.buffer_write_string(&conn.send_buf, "\r\n")
 	if !conn.upload_chunked && len(body) > 0 {
 		_, _ = bytes.buffer_write(&conn.send_buf, body)
@@ -971,11 +979,14 @@ client_parse_headers :: proc(conn: ^Client_Conn) -> (status: int, text: string) 
 	}
 
 	if vals, ok := header_values(conn.response.Header, "content-length"); ok {
-		n, ok_cl, _ := parse_content_length_values(vals)
+		n, ok_cl, _, canonical := parse_content_length_values(vals)
 		if !ok_cl {
 			return Status_Bad_Request, "invalid content-length"
 		}
 		conn.content_length = n
+		if canonical != "" {
+			header_set(&conn.response.Header, "content-length", canonical)
+		}
 	}
 
 	if vals, ok := header_values(conn.response.Header, "transfer-encoding"); ok {

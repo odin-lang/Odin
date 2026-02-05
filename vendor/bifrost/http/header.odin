@@ -1,6 +1,8 @@
 package bifrost_http
 
+import "core:bytes"
 import "core:mem"
+import "core:sort"
 import "core:strings"
 
 header_add :: proc(h: ^Header, name, value: string) {
@@ -84,6 +86,36 @@ header_key :: proc(name: string) -> string {
 		return ""
 	}
 	buf := make([]u8, len(name))
+	valid := true
+	for i in 0..<len(name) {
+		if !header_is_token_char(name[i]) {
+			valid = false
+			break
+		}
+	}
+	if !valid {
+		copy(buf, transmute([]u8)name)
+		return string(buf)
+	}
+	upper := true
+	for i in 0..<len(name) {
+		b := name[i]
+		if upper && b >= 'a' && b <= 'z' {
+			b -= 32
+		} else if !upper && b >= 'A' && b <= 'Z' {
+			b += 32
+		}
+		buf[i] = b
+		upper = b == '-'
+	}
+	return string(buf)
+}
+
+header_key_lower :: proc(name: string) -> string {
+	if len(name) == 0 {
+		return ""
+	}
+	buf := make([]u8, len(name))
 	for i in 0..<len(name) {
 		b := name[i]
 		if b >= 'A' && b <= 'Z' {
@@ -92,6 +124,125 @@ header_key :: proc(name: string) -> string {
 		buf[i] = b
 	}
 	return string(buf)
+}
+
+header_is_token_char :: proc(c: u8) -> bool {
+	if c >= '0' && c <= '9' {
+		return true
+	}
+	if c >= 'A' && c <= 'Z' {
+		return true
+	}
+	if c >= 'a' && c <= 'z' {
+		return true
+	}
+	switch c {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	}
+	return false
+}
+
+header_valid_field_name :: proc(name: string) -> bool {
+	if len(name) == 0 {
+		return false
+	}
+	for i in 0..<len(name) {
+		if !header_is_token_char(name[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+header_valid_field_value :: proc(value: string) -> bool {
+	for i in 0..<len(value) {
+		b := value[i]
+		if b == 0x7f {
+			return false
+		}
+		if b < 0x20 && b != '\t' && b != ' ' {
+			return false
+		}
+	}
+	return true
+}
+
+header_write_subset :: proc(out: ^bytes.Buffer, h: Header, exclude: map[string]bool = nil) {
+	if out == nil || h == nil {
+		return
+	}
+	keys := make([dynamic]string, 0, len(h))
+	for k in h {
+		if exclude != nil && exclude[k] {
+			continue
+		}
+		append(&keys, k)
+	}
+	if len(keys) > 1 {
+		sort.quick_sort(keys[:])
+	}
+
+	for k in keys {
+		vals, ok := h[k]
+		if !ok || vals == nil || len(vals) == 0 {
+			continue
+		}
+		if !header_valid_field_name(k) {
+			continue
+		}
+		for v in vals {
+			if len(v) == 0 {
+				_, _ = bytes.buffer_write_string(out, k)
+				_, _ = bytes.buffer_write_string(out, ": \r\n")
+				continue
+			}
+
+			start := 0
+			end := len(v)
+			for start < end {
+				b := v[start]
+				if b == ' ' || b == '\t' || b == '\r' || b == '\n' {
+					start += 1
+				} else {
+					break
+				}
+			}
+			for end > start {
+				b := v[end-1]
+				if b == ' ' || b == '\t' || b == '\r' || b == '\n' {
+					end -= 1
+				} else {
+					break
+				}
+			}
+			view := v[start:end]
+			needs_copy := false
+			for i in 0..<len(view) {
+				if view[i] == '\r' || view[i] == '\n' {
+					needs_copy = true
+					break
+				}
+			}
+			if needs_copy {
+				buf := make([]u8, len(view), allocator=context.temp_allocator)
+				for i in 0..<len(view) {
+					b := view[i]
+					if b == '\r' || b == '\n' {
+						b = ' '
+					}
+					buf[i] = b
+				}
+				view = string(buf)
+			}
+
+			_, _ = bytes.buffer_write_string(out, k)
+			_, _ = bytes.buffer_write_string(out, ": ")
+			_, _ = bytes.buffer_write_string(out, view)
+			_, _ = bytes.buffer_write_string(out, "\r\n")
+		}
+	}
+	delete(keys)
 }
 
 header_has_value :: proc(h: Header, name, value: string) -> bool {

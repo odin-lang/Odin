@@ -443,7 +443,7 @@ h2_client_build_initial :: proc(conn: ^Client_Conn, end_stream: bool, include_bo
 
 	lower_names := make([dynamic]string, 0, 8)
 	for name, vals in conn.req.Header {
-		lower, _ := strings.to_lower(name)
+		lower := header_key_lower(name)
 		append(&lower_names, lower)
 		if lower == "connection" || lower == "transfer-encoding" || lower == "upgrade" ||
 			lower == "keep-alive" || lower == "proxy-connection" || lower == "http2-settings" ||

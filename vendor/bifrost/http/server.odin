@@ -219,12 +219,12 @@ conn_process_buffer :: proc(conn: ^Conn) {
 				idx := find_header_end(conn.in_buf[:])
 				if idx < 0 {
 				if len(conn.in_buf) > conn.server.Max_Header_Bytes {
-					conn_send_error(conn, Status_Request_Header_Fields_Too_Large, Status_Text_Request_Header_Fields_Too_Large)
+					conn_send_error(conn, Status_Request_Header_Fields_Too_Large)
 				}
 				return
 			}
 			if idx+4 > conn.server.Max_Header_Bytes {
-				conn_send_error(conn, Status_Request_Header_Fields_Too_Large, Status_Text_Request_Header_Fields_Too_Large)
+				conn_send_error(conn, Status_Request_Header_Fields_Too_Large)
 				return
 			}
 
@@ -233,9 +233,9 @@ conn_process_buffer :: proc(conn: ^Conn) {
 			conn.body_start = idx + 4
 			conn.parse_pos = conn.body_start
 
-			status, text := conn_parse_headers(conn)
+			status := conn_parse_headers(conn)
 			if status != 0 {
-				conn_send_error(conn, status, text)
+				conn_send_error(conn, status)
 				return
 			}
 			if conn.chunked {
@@ -264,7 +264,7 @@ conn_process_buffer :: proc(conn: ^Conn) {
 			}
 			if conn.h2_upgrade {
 				if conn.chunked || conn.content_length > 0 {
-					conn_send_error(conn, Status_Bad_Request, Status_Text_Bad_Request)
+					conn_send_error(conn, Status_Bad_Request)
 					return
 				}
 				conn_send_h2_upgrade(conn)
@@ -279,9 +279,9 @@ conn_process_buffer :: proc(conn: ^Conn) {
 			done, status := conn_parse_chunked_body(conn)
 			if status != 0 {
 				if status == Status_Payload_Too_Large {
-					conn_send_error(conn, Status_Payload_Too_Large, Status_Text_Payload_Too_Large)
+					conn_send_error(conn, Status_Payload_Too_Large)
 				} else {
-					conn_send_error(conn, Status_Bad_Request, Status_Text_Bad_Request)
+					conn_send_error(conn, Status_Bad_Request)
 				}
 				return
 			}
@@ -368,23 +368,23 @@ conn_process_buffer :: proc(conn: ^Conn) {
 	}
 }
 
-conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
+conn_parse_headers :: proc(conn: ^Conn) -> (status: int) {
 	if conn == nil {
-		return Status_Bad_Request, Status_Text_Bad_Request
+		return Status_Bad_Request
 	}
 
 	raw := string(conn.in_buf[:conn.body_start])
 	lines, _ := strings.split(raw, "\r\n", context.temp_allocator)
 	if len(lines) < 1 {
-		return Status_Bad_Request, Status_Text_Bad_Request
+		return Status_Bad_Request
 	}
 
 	parts, _ := strings.split(lines[0], " ", context.temp_allocator)
 	if len(parts) < 3 {
-		return Status_Bad_Request, Status_Text_Bad_Request
+		return Status_Bad_Request
 	}
 	if len(parts) > 3 {
-		return Status_Bad_Request, Status_Text_Bad_Request
+		return Status_Bad_Request
 	}
 
 	method := parts[0]
@@ -396,12 +396,12 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 	} else if strings.equal_fold(proto, "HTTP/1.1") {
 		conn.http10 = false
 	} else {
-		return Status_HTTP_Version_Not_Supported, Status_Text_HTTP_Version_Not_Supported
+		return Status_HTTP_Version_Not_Supported
 	}
 
 	parsed_target, ok_target := parse_request_target(method, target)
 	if !ok_target {
-		return Status_Bad_Request, Status_Text_Bad_Request
+		return Status_Bad_Request
 	}
 
 	method, _ = strings.clone(method)
@@ -430,17 +430,26 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 		if idx < 0 {
 			continue
 		}
-		name := strings.trim_space(line[:idx])
+		name := line[:idx]
 		value := strings.trim_space(line[idx+1:])
+		if !header_valid_field_name(name) {
+			return Status_Bad_Request
+		}
+		if !header_valid_field_value(value) {
+			return Status_Bad_Request
+		}
 		header_add(&conn_req.Header, name, value)
 	}
 
 	if vals, ok := header_values(conn_req.Header, "content-length"); ok {
-		n, ok_cl, _ := parse_content_length_values(vals)
+		n, ok_cl, _, canonical := parse_content_length_values(vals)
 		if !ok_cl {
-			return Status_Bad_Request, Status_Text_Bad_Request
+			return Status_Bad_Request
 		}
 		conn.content_length = n
+		if canonical != "" {
+			header_set(&conn_req.Header, "content-length", canonical)
+		}
 	}
 
 	conn.expect_continue = false
@@ -462,13 +471,13 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 			}
 		}
 		if unsupported {
-			return Status_Expectation_Failed, Status_Text_Expectation_Failed
+			return Status_Expectation_Failed
 		}
 		if has_continue && !conn.http10 {
 			conn.expect_continue = true
 		}
 		if has_continue && conn.http10 {
-			return Status_Expectation_Failed, Status_Text_Expectation_Failed
+			return Status_Expectation_Failed
 		}
 	}
 
@@ -476,7 +485,7 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 	if vals, ok := header_values(conn_req.Header, "transfer-encoding"); ok {
 		chunked, ok_te, present := parse_transfer_encoding(vals)
 		if present && !ok_te {
-			return Status_Not_Implemented, Status_Text_Not_Implemented
+			return Status_Not_Implemented
 		}
 		if chunked {
 			conn.chunked = true
@@ -497,7 +506,7 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 		header_has_token(conn_req.Header, "upgrade", "h2c") &&
 		header_has_token(conn_req.Header, "connection", "upgrade") {
 		if _, ok := header_get(conn_req.Header, "http2-settings"); !ok {
-			return Status_Bad_Request, Status_Text_Bad_Request
+			return Status_Bad_Request
 		}
 		conn.h2_upgrade = true
 	}
@@ -505,20 +514,20 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 	host_vals, has_host := header_values(conn_req.Header, "host")
 	if !conn.http10 {
 		if !has_host && !strings.equal_fold(conn_req.Method, "CONNECT") {
-			return Status_Bad_Request, Status_Text_Bad_Request
+			return Status_Bad_Request
 		}
 	}
 	if has_host {
 		if len(host_vals) != 1 {
-			return Status_Bad_Request, Status_Text_Bad_Request
+			return Status_Bad_Request
 		}
 		if !valid_host_header(host_vals[0]) {
-			return Status_Bad_Request, Status_Text_Bad_Request
+			return Status_Bad_Request
 		}
 	}
 
 	if !conn.chunked && conn.server.Max_Body_Bytes > 0 && conn.content_length > int(conn.server.Max_Body_Bytes) {
-		return Status_Payload_Too_Large, Status_Text_Payload_Too_Large
+		return Status_Payload_Too_Large
 	}
 
 	conn.stream_body = conn.server.Body_Handler != nil
@@ -528,7 +537,7 @@ conn_parse_headers :: proc(conn: ^Conn) -> (status: int, text: string) {
 	conn.req_cache = conn_req
 	ok = true
 
-	return 0, ""
+	return 0
 }
 
 conn_dispatch_request :: proc(conn: ^Conn) {
@@ -548,11 +557,12 @@ conn_dispatch_request :: proc(conn: ^Conn) {
 	}
 }
 
-conn_send_error :: proc(conn: ^Conn, status: int, text: string) {
+conn_send_error :: proc(conn: ^Conn, status: int) {
 	if conn == nil {
 		return
 	}
 	conn.keep_alive = false
+	text := status_phrase(status)
 	res := ResponseWriter{
 		Status = status,
 		Header = make(Header),
@@ -605,7 +615,7 @@ conn_send_h2_upgrade :: proc(conn: ^Conn) {
 		return
 	}
 	if conn.use_tls {
-		conn_send_error(conn, Status_Bad_Request, Status_Text_Bad_Request)
+		conn_send_error(conn, Status_Bad_Request)
 		return
 	}
 

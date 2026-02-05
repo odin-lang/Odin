@@ -132,14 +132,7 @@ response_end_http1 :: proc(res: ^ResponseWriter) {
 	_, _ = bytes.buffer_write_string(resp, status_text)
 	_, _ = bytes.buffer_write_string(resp, "\r\n")
 
-	for name, vals in res.Header {
-		for v in vals {
-			_, _ = bytes.buffer_write_string(resp, name)
-			_, _ = bytes.buffer_write_string(resp, ": ")
-			_, _ = bytes.buffer_write_string(resp, v)
-			_, _ = bytes.buffer_write_string(resp, "\r\n")
-		}
-	}
+	header_write_subset(resp, res.Header, nil)
 	_, _ = bytes.buffer_write_string(resp, "\r\n")
 	_, _ = bytes.buffer_write(resp, body)
 
@@ -448,14 +441,7 @@ response_stream_headers :: proc(res: ^ResponseWriter, conn: ^Conn, resp: ^bytes.
 	_, _ = bytes.buffer_write_string(resp, status_text)
 	_, _ = bytes.buffer_write_string(resp, "\r\n")
 
-	for name, vals in res.Header {
-		for v in vals {
-			_, _ = bytes.buffer_write_string(resp, name)
-			_, _ = bytes.buffer_write_string(resp, ": ")
-			_, _ = bytes.buffer_write_string(resp, v)
-			_, _ = bytes.buffer_write_string(resp, "\r\n")
-		}
-	}
+	header_write_subset(resp, res.Header, nil)
 	_, _ = bytes.buffer_write_string(resp, "\r\n")
 	conn.stream_headers_sent = true
 }

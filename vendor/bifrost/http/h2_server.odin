@@ -648,7 +648,7 @@ h2_response_end :: proc(res: ^ResponseWriter) {
 	}
 
 	for name, vals in res.Header {
-		lower, _ := strings.to_lower(name)
+		lower := header_key_lower(name)
 		append(&lower_names, lower)
 		if lower == "connection" || lower == "transfer-encoding" || lower == "upgrade" || lower == "keep-alive" || lower == "proxy-connection" {
 			continue
@@ -704,7 +704,7 @@ h2_response_stream_start :: proc(res: ^ResponseWriter) -> bool {
 	append(&fields, H2_Hpack_Field{Name = ":status", Value = status_str})
 
 	for name, vals in res.Header {
-		lower, _ := strings.to_lower(name)
+		lower := header_key_lower(name)
 		append(&lower_names, lower)
 		if lower == "connection" || lower == "transfer-encoding" || lower == "upgrade" || lower == "keep-alive" || lower == "proxy-connection" {
 			continue
