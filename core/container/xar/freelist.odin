@@ -5,8 +5,7 @@ package container_xar
 Freelist_Array :: struct($T: typeid, $SHIFT: uint) where
 	0 < SHIFT,
 	SHIFT <= MAX_SHIFT,
-	size_of(T) >= size_of(^T)
-{
+	size_of(T) >= size_of(^T) {
 	array:    Array(T, SHIFT),
 	freelist: ^T,
 }
@@ -137,7 +136,7 @@ freelist_iterate_by_ptr :: proc(it: ^Freelist_Iterator($T, $SHIFT)) -> (val: ^T,
 		}
 		it.idx += 1
 	}
-	return nil, -1, false
+	return
 }
 
 @(require_results)
@@ -151,5 +150,5 @@ freelist_iterate_by_val :: proc(it: ^Freelist_Iterator($T, $SHIFT)) -> (val: T, 
 		}
 		it.idx += 1
 	}
-	return {}, -1, false
+	return
 }
