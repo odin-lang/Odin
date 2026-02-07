@@ -5326,7 +5326,7 @@ IGraphicsCommandList6_VTable :: struct {
 }
 
 
-BARRIER_LAYOUT :: enum i64 {
+BARRIER_LAYOUT :: enum u32 {
 	UNDEFINED                                          = 0xffffffff,
 	COMMON                                             = 0,
 	PRESENT                                            = 0,
@@ -5362,7 +5362,7 @@ BARRIER_LAYOUT :: enum i64 {
 	DIRECT_QUEUE_GENERIC_READ_COMPUTE_QUEUE_ACCESSIBLE = 31,
 }
 
-BARRIER_SYNC_FLAG :: enum i64 {
+BARRIER_SYNC_FLAG :: enum u32 {
 	ALL                                                   = 0, // 0x1
 	DRAW                                                  = 1, // 0x2
 	INDEX_INPUT                                           = 2, // 0x4
@@ -5388,9 +5388,9 @@ BARRIER_SYNC_FLAG :: enum i64 {
 	SPLIT                                                 = 31, // 0x80000000
 }
 
-BARRIER_SYNC_FLAGS :: bit_set[BARRIER_SYNC_FLAG; i64]
+BARRIER_SYNC_FLAGS :: bit_set[BARRIER_SYNC_FLAG; u32]
 
-BARRIER_ACCESS_FLAG :: enum i64 {
+BARRIER_ACCESS_FLAG :: enum u32 {
 	VERTEX_BUFFER                           = 0, // 0x1
 	CONSTANT_BUFFER                         = 1, // 0x2
 	INDEX_BUFFER                            = 2, // 0x4
@@ -5418,7 +5418,7 @@ BARRIER_ACCESS_FLAG :: enum i64 {
 	NO_ACCESS                               = 31, // 0x80000000
 }
 
-BARRIER_ACCESS_FLAGS :: bit_set[BARRIER_ACCESS_FLAG; i64]
+BARRIER_ACCESS_FLAGS :: bit_set[BARRIER_ACCESS_FLAG; u32]
 
 BARRIER_TYPE :: enum i32 {
 	GLOBAL,
@@ -5456,6 +5456,7 @@ TEXTURE_BARRIER :: struct {
 	LayoutAfter:  BARRIER_LAYOUT,
 	pResource:    ^IResource,
 	Subresources: BARRIER_SUBRESOURCE_RANGE,
+	Flags: TEXTURE_BARRIER_FLAGS,
 }
 
 BUFFER_BARRIER :: struct {
