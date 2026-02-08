@@ -301,7 +301,7 @@ _spawn_pipe_reader :: proc() {
 			read_to_null_byte := 0
 			finished_reading := false
 			for ! finished_reading {
-				just_read, err := io.read(_read_pipe.stream, _out_buffer[n_read:], &n_read); if err != .None {
+				just_read, err := io.read(os.to_stream(_read_pipe), _out_buffer[n_read:], &n_read); if err != .None {
 					panic("We got an IO error!")
 				}
 				for b in _out_buffer[n_read - just_read: n_read] {
@@ -450,13 +450,13 @@ main :: proc() {
 			continue
 		}
 		defer os.close(test_file_handle)
-		fmt.wprintf(test_file_handle.stream, "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
+		fmt.wprintf(os.to_stream(test_file_handle), "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
 		fmt.println("Done")
 	}
 
 	strings.write_string(&test_runner,
 `
-	fmt.wprintfln(_old_stdout.stream, "Passes: %v. Fails: %v", _good_count, _bad_count)
+	fmt.wprintfln(os.to_stream(_old_stdout), "Passes: %v. Fails: %v", _good_count, _bad_count)
 	if _bad_count > 0 {
 		fmt.eprintln("One or more tests failed")
 		os.exit(1)
