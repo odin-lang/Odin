@@ -111,3 +111,7 @@ modification_time_by_path :: proc(path: string) -> (time.Time, Error) {
 	fi, err := stat(path, temp_allocator)
 	return fi.modification_time, err
 }
+
+is_reserved_name :: proc(path: string) -> bool {
+	return _is_reserved_name(path)
+}

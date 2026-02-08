@@ -328,9 +328,9 @@ split_path :: proc(path: string) -> (dir, filename: string) {
 Gets the file name and extension from a path.
 
 e.g.
-  'path/to/name.tar.gz' -> 'name.tar.gz'
-  'path/to/name.txt'    -> 'name.txt'
-  'path/to/name'        -> 'name'
+	'path/to/name.tar.gz' -> 'name.tar.gz'
+	'path/to/name.txt'    -> 'name.txt'
+	'path/to/name'        -> 'name'
 
 Returns "." if the path is an empty string.
 */
@@ -352,8 +352,8 @@ Only the last dot is considered when splitting the file extension.
 See `short_stem`.
 
 e.g.
-  'name.tar.gz' -> 'name.tar'
-  'name.txt'    -> 'name'
+	'name.tar.gz' -> 'name.tar'
+	'name.txt'    -> 'name'
 
 Returns an empty string if there is no stem. e.g: '.gitignore'.
 Returns an empty string if there's a trailing path separator.
@@ -389,8 +389,8 @@ where `long_ext` is the extension returned by `split_filename_all`.
 The first dot is used to split off the file extension, unlike `stem` which uses the last dot.
 
 e.g.
-  'name.tar.gz' -> 'name'
-  'name.txt'    -> 'name'
+	'name.tar.gz' -> 'name'
+	'name.txt'    -> 'name'
 
 Returns an empty string if there is no stem. e.g: '.gitignore'.
 Returns an empty string if there's a trailing path separator.
@@ -412,8 +412,8 @@ Only the last dot is considered when splitting the file extension.
 See `long_ext`.
 
 e.g.
-  'name.tar.gz' -> '.gz'
-  'name.txt'    -> '.txt'
+	'name.tar.gz' -> '.gz'
+	'name.txt'    -> '.txt'
 
 Returns an empty string if there is no dot.
 Returns an empty string if there is a trailing path separator.
@@ -435,8 +435,8 @@ The long file extension is such that `short_stem(path)` + `long_ext(path)` = `ba
 The first dot is used to split off the file extension, unlike `ext` which uses the last dot.
 
 e.g.
-  'name.tar.gz' -> '.tar.gz'
-  'name.txt'    -> '.txt'
+	'name.tar.gz' -> '.tar.gz'
+	'name.txt'    -> '.txt'
 
 Returns an empty string if there is no dot.
 Returns an empty string if there is a trailing path separator.
@@ -616,7 +616,7 @@ Pattern syntax is:
 		'*'	        matches any sequence of non-/ characters
 		'?'             matches any single non-/ character
 		'[' ['^']  { character-range } ']'
-		                character classification (cannot be empty)
+										character classification (cannot be empty)
 		c               matches character c (c != '*', '?', '\\', '[')
 		'\\' c          matches character c
 
@@ -728,8 +728,8 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	Returns leading volume name.
 
 	e.g.
-	  "C:\foo\bar\baz" will return "C:" on Windows.
-	  Everything else will be "".
+		"C:\foo\bar\baz" will return "C:" on Windows.
+		Everything else will be "".
 */
 volume_name :: proc(path: string) -> string {
 	when ODIN_OS == .Windows {

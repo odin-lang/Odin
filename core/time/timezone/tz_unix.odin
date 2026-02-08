@@ -4,7 +4,6 @@ package timezone
 
 import os "core:os/os2"
 import    "core:strings"
-import    "core:path/filepath"
 import    "core:time/datetime"
 
 local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
@@ -36,12 +35,12 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 		}
 
 		// Looking for tz path (ex fmt: "UTC", "Etc/UTC" or "America/Los_Angeles")
-		path_dir, path_file := filepath.split(path)
+		path_dir, path_file := os.split_path(path)
 
 		if path_dir == "" {
 			return
 		}
-		upper_path_dir, upper_path_chunk := filepath.split(path_dir[:len(path_dir)])
+		upper_path_dir, upper_path_chunk := os.split_path(path_dir[:len(path_dir)])
 		if upper_path_dir == "" {
 			return
 		}
@@ -51,8 +50,8 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 			if err != nil { return }
 			return region_str, true
 		} else {
-			region_str, err := filepath.join({upper_path_chunk, path_file}, allocator = allocator)
-			if err != nil { return }
+			region_str, region_str_err := os.join_path({upper_path_chunk, path_file}, allocator = allocator)
+			if region_str_err != nil { return }
 			return region_str, true
 		}
 	}
@@ -80,6 +79,7 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 			delete(local_name, allocator)
 			return nil, true
 		}
+
 		reg_str = local_name
 	}
 	defer if _reg_str == "local" { delete(reg_str, allocator) }
