@@ -5,6 +5,7 @@ package timezone
 import os "core:os/os2"
 import    "core:strings"
 import    "core:time/datetime"
+import    "core:path/filepath"
 
 local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
 	local_str, ok := os.lookup_env("TZ", allocator)
@@ -88,7 +89,8 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 	defer if tzdir_ok { delete(tzdir_str, allocator) }
 
 	if tzdir_ok {
-		region_path := filepath.join({tzdir_str, reg_str}, allocator)
+		region_path, err := filepath.join({tzdir_str, reg_str}, allocator)
+		if err != nil { return nil, false }
 		defer delete(region_path, allocator)
 
 		if tz_reg, ok := load_tzif_file(region_path, reg_str, allocator); ok {
@@ -98,7 +100,8 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 
 	db_paths := []string{"/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"}
 	for db_path in db_paths {
-		region_path := filepath.join({db_path, reg_str}, allocator)
+		region_path, err := filepath.join({db_path, reg_str}, allocator)
+		if err != nil { return nil, false}
 		defer delete(region_path, allocator)
 
 		if tz_reg, ok := load_tzif_file(region_path, reg_str, allocator); ok {
