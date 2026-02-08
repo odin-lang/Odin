@@ -1,12 +1,12 @@
 package odin_parser
 
-import "core:odin/tokenizer"
-import "core:odin/ast"
-import "core:path/filepath"
-import "core:fmt"
-import "core:os"
-import "core:slice"
-import "core:strings"
+import    "core:odin/tokenizer"
+import    "core:odin/ast"
+import    "core:path/filepath"
+import    "core:fmt"
+import os "core:os/os2"
+import    "core:slice"
+import    "core:strings"
 
 collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	NO_POS :: tokenizer.Pos{}
@@ -28,14 +28,13 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	pkg.fullpath = pkg_path
 
 	for match in matches {
-		src: []byte
 		fullpath, ok := filepath.abs(match)
 		if !ok {
 			return
 		}
 
-		src, ok = os.read_entire_file(fullpath)
-		if !ok {
+		src, src_err := os.read_entire_file(fullpath, context.allocator)
+		if src_err != nil {
 			delete(fullpath)
 			return
 		}
