@@ -23,7 +23,7 @@ package net
 
 @(require)
 import "base:runtime"
-
+import os "core:os/os2"
 import "core:bufio"
 import "core:io"
 import "core:math/rand"

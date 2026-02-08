@@ -219,8 +219,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
-	stdout := os.stdout.stream
-	stderr := os.stderr.stream
+	stdout := os.to_stream(os.stdout)
+	stderr := os.to_stream(os.stderr)
 
 	// The animations are only ever shown through STDOUT;
 	// STDERR is used exclusively for logging regardless of error level.

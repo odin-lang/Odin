@@ -16,7 +16,7 @@ hash_file_by_handle :: proc(
 	io.Error,
 ) {
 	if !load_at_once {
-		return hash_stream(algorithm, handle.stream, allocator)
+		return hash_stream(algorithm, os.to_stream(handle), allocator)
 	}
 
 	buf, err := os.read_entire_file(handle, allocator)
