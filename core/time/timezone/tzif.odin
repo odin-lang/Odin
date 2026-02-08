@@ -3,7 +3,6 @@ package timezone
 import    "base:intrinsics"
 import    "core:slice"
 import    "core:strings"
-import os "core:os/os2"
 import    "core:strconv"
 import    "core:time/datetime"
 
@@ -65,16 +64,6 @@ tzif_data_block_size :: proc(hdr: ^TZif_Header, version: TZif_Version) -> (block
 		   (int(hdr.leapcnt) * (time_size + 4))        +
 		   int(hdr.isstdcnt)                           +
 		   int(hdr.isutcnt), true
-}
-
-
-load_tzif_file :: proc(filename: string, region_name: string, allocator := context.allocator) -> (out: ^datetime.TZ_Region, ok: bool) {
-	tzif_data, tzif_err := os.read_entire_file(filename, allocator)
-	if tzif_err != nil {
-		return nil, false
-	}
-	defer delete(tzif_data, allocator)
-	return parse_tzif(tzif_data, region_name, allocator)
 }
 
 @private

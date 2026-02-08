@@ -14,7 +14,7 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 		path, err := os.get_absolute_path(orig_localtime_path, allocator)
 		if err != nil {
 			// If we can't find /etc/localtime, fallback to UTC
-			if err == .ENOENT {
+			if err == .Not_Exist {
 				str, err2 := strings.clone("UTC", allocator)
 				if err2 != nil { return }
 				return str, true

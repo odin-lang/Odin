@@ -1,27 +1,11 @@
 package encoding_hxa
 
-import os "core:os/os2"
 import    "core:mem"
 
 Write_Error :: enum {
 	None,
 	Buffer_Too_Small,
 	Failed_File_Write,
-}
-
-write_to_file :: proc(filepath: string, file: File) -> (err: Write_Error) {
-	required := required_write_size(file)
-	buf, alloc_err := make([]byte, required)
-	if alloc_err == .Out_Of_Memory {
-		return .Failed_File_Write
-	}
-	defer delete(buf)
-
-	write_internal(&Writer{data = buf}, file)
-	if os.write_entire_file(filepath, buf) != nil {
-		err =.Failed_File_Write
-	}
-	return
 }
 
 write :: proc(buf: []byte, file: File) -> (n: int, err: Write_Error) {

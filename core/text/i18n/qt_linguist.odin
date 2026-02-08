@@ -154,9 +154,3 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 	return
 }
 
-parse_qt_linguist_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
-	data := read_file(filename, allocator) or_return
-	return parse_qt_linguist_from_bytes(data, options, pluralizer, allocator)
-}
-
-parse_qt :: proc { parse_qt_linguist_file, parse_qt_linguist_from_bytes }

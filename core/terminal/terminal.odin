@@ -1,8 +1,6 @@
 // Interaction with the command line interface (`CLI`) of the system.
 package terminal
 
-import os "core:os/os2"
-
 /*
 This describes the range of colors that a terminal is capable of supporting.
 */
@@ -21,7 +19,7 @@ This is normally true for `os.stdout` and `os.stderr` unless they are
 redirected to a file.
 */
 @(require_results)
-is_terminal :: proc(f: ^os.File) -> bool {
+is_terminal :: proc(f: $T) -> bool {
 	return _is_terminal(f)
 }
 

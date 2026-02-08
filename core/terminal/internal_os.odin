@@ -1,3 +1,5 @@
+#+build !freestanding
+#+build !js
 #+private
 package terminal
 

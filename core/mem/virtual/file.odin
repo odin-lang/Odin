@@ -1,21 +1,8 @@
+#+build !freestanding
+#+build !js
 package mem_virtual
 
 import os "core:os/os2"
-
-Map_File_Error :: enum {
-	None,
-	Open_Failure,
-	Stat_Failure,
-	Negative_Size,
-	Too_Large_Size,
-	Map_Failure,
-}
-
-Map_File_Flag :: enum u32 {
-	Read,
-	Write,
-}
-Map_File_Flags :: distinct bit_set[Map_File_Flag; u32]
 
 map_file :: proc{
 	map_file_from_path,

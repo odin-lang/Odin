@@ -125,14 +125,6 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 	return
 }
 
-parse_mo_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
-	data := read_file(filename, allocator) or_return
-	defer delete(data)
-	return parse_mo_from_bytes(data, options, pluralizer, allocator)
-}
-
-parse_mo :: proc { parse_mo_file, parse_mo_from_bytes }
-
 @(private)
 read_u32 :: proc(data: []u8, native_endian := true) -> (res: u32, err: Error) {
 	if len(data) < size_of(u32) { return 0, .Premature_EOF }

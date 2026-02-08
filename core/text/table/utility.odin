@@ -1,3 +1,5 @@
+#+build !freestanding
+#+build !js
 package text_table
 
 import    "core:io"

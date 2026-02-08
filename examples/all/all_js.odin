@@ -10,7 +10,7 @@ package all
 
 @(require) import "core:compress"
 @(require) import "core:compress/shoco"
-@(require) import "core:compress/gzip"
+// @(require) import "core:compress/gzip"
 @(require) import "core:compress/zlib"
 
 @(require) import "core:container/avl"
@@ -99,13 +99,13 @@ package all
 
 @(require) import "core:mem"
 @(require) import "core:mem/tlsf"
-@(require) import "core:mem/virtual"
+// Not supported on JS
+// @(require) import "core:mem/virtual"
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
 
 @(require) import "core:odin/tokenizer"
-@(require) import "core:os"
 @(require) import "core:path/slashpath"
 
 @(require) import "core:relative"
@@ -130,6 +130,7 @@ package all
 @(require) import "core:text/match"
 @(require) import "core:text/regex"
 @(require) import "core:text/scanner"
+// Not supported on JS, uses `core:mem/virtual`.
 @(require) import "core:text/table"
 
 @(require) import "core:thread"

@@ -1,4 +1,5 @@
 #+build !freestanding
+#+build !js
 package crypto_hash
 
 import "core:io"
