@@ -41,7 +41,6 @@ init_std_files :: proc "contextless" () {
 			data = impl,
 			procedure = _file_stream_proc,
 		}
-		impl.file.fstat = _fstat
 		return &impl.file
 	}
 
@@ -222,7 +221,6 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 		data = impl,
 		procedure = _file_stream_proc,
 	}
-	impl.file.fstat = _fstat
 
 	return &impl.file, nil
 }
@@ -434,7 +432,7 @@ _exists :: proc(path: string) -> bool {
 	return true
 }
 
-_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+_file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From, allocator: runtime.Allocator) -> (n: i64, err: Error) {
 	f  := (^File_Impl)(stream_data)
 	fd := f.fd
 
@@ -561,6 +559,10 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 
 	case .Query:
 		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+
+	case .Fstat:
+		err = file_stream_fstat_utility(f, p, allocator)
+		return
 
 	case:
 		return 0, .Unsupported
