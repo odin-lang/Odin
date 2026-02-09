@@ -1,6 +1,6 @@
 #+private
 #+build netbsd
-package os2
+package os
 
 import "core:c"
 foreign import libc "system:c"

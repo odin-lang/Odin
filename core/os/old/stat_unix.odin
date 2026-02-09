@@ -1,5 +1,5 @@
 #+build linux, darwin, freebsd, openbsd, netbsd, haiku
-package os
+package os_old
 
 import "core:time"
 

@@ -1,5 +1,5 @@
 #+private
-package os2
+package os
 
 import "base:runtime"
 import win32 "core:sys/windows"

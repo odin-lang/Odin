@@ -1,4 +1,4 @@
-package os2
+package os
 
 import "core:io"
 import "core:time"

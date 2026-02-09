@@ -1,4 +1,4 @@
-package os
+package os_old
 
 import "base:intrinsics"
 import "base:runtime"

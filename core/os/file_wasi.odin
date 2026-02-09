@@ -1,6 +1,6 @@
 #+feature global-context
 #+private
-package os2
+package os
 
 import "base:runtime"
 

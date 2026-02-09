@@ -1,4 +1,4 @@
-package os
+package os_old
 
 import win32 "core:sys/windows"
 import "core:strings"

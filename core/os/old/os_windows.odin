@@ -1,5 +1,5 @@
 #+build windows
-package os
+package os_old
 
 import win32 "core:sys/windows"
 import "base:runtime"

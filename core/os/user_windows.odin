@@ -1,4 +1,4 @@
-package os2
+package os
 
 import "base:runtime"
 @(require) import win32 "core:sys/windows"

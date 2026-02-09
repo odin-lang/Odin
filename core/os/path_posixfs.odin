@@ -1,6 +1,6 @@
 #+private
 #+build linux, darwin, netbsd, freebsd, openbsd, wasi
-package os2
+package os
 
 // This implementation is for all systems that have POSIX-compliant filesystem paths.
 

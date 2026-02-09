@@ -1,4 +1,4 @@
-package os
+package os_old
 
 foreign import lib "system:c"
 

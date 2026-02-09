@@ -1,5 +1,5 @@
 #+build darwin, linux, netbsd, freebsd, openbsd, haiku
-package os
+package os_old_old
 
 import "core:strings"
 

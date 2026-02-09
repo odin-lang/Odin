@@ -1,5 +1,5 @@
 #+private
-package os2
+package os
 
 _pipe :: proc() -> (r, w: ^File, err: Error) {
 	err = .Unsupported

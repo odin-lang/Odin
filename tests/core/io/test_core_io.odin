@@ -539,7 +539,7 @@ test_string_builder_stream :: proc(t: ^testing.T) {
 }
 
 @test
-test_os2_file_stream :: proc(t: ^testing.T) {
+test_os_file_stream :: proc(t: ^testing.T) {
 	defer if !testing.failed(t) {
 		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), nil)
 	}
@@ -549,7 +549,7 @@ test_os2_file_stream :: proc(t: ^testing.T) {
 		buf[i] = 'A' + i
 	}
 
-	TEMPORARY_FILENAME :: "test_core_io_os2_file_stream"
+	TEMPORARY_FILENAME :: "test_core_io_os_file_stream"
 
 	fd, open_err := os.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
 	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
@@ -570,7 +570,7 @@ test_os2_file_stream :: proc(t: ^testing.T) {
 		return
 	}
 
-	// os2 file stream proc close and destroy are the same.
+	// os file stream proc close and destroy are the same.
 	results, _ := _test_stream(t, stream, buf[:], do_destroy = false)
 
 	log.debugf("%#v", results)
@@ -638,7 +638,7 @@ test_bufio_buffered_reader :: proc(t: ^testing.T) {
 
 @test
 test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
-	// Using an os2.File as the backing stream for both reader & writer.
+	// Using an os.File as the backing stream for both reader & writer.
 
 	defer if !testing.failed(t) {
 		testing.expect_value(t, os.remove(TEMPORARY_FILENAME), nil)
@@ -649,7 +649,7 @@ test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
 		buf[i] = 'A' + i
 	}
 
-	TEMPORARY_FILENAME :: "test_core_io_bufio_read_writer_os2_file_stream"
+	TEMPORARY_FILENAME :: "test_core_io_bufio_read_writer_os_file_stream"
 
 	fd, open_err := os.open(TEMPORARY_FILENAME, {.Read, .Write, .Create, .Trunc})
 	if !testing.expectf(t, open_err == nil, "error on opening %q: %v", TEMPORARY_FILENAME, open_err) {
@@ -671,7 +671,7 @@ test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
 		return
 	}
 
-	// bufio.Read_Writer isn't capable of seeking, so we have to reset the os2
+	// bufio.Read_Writer isn't capable of seeking, so we have to reset the os
 	// stream back to the start here.
 	pos, seek_err := io.seek(stream, 0, .Start)
 	if !testing.expectf(t, pos == 0 && seek_err == nil,

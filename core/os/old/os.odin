@@ -1,5 +1,5 @@
 // Cross-platform `OS` interactions like file `I/O`.
-package os
+package os_old
 
 import "base:intrinsics"
 import "base:runtime"

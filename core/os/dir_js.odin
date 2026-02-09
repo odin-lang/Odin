@@ -1,6 +1,6 @@
 #+build js wasm32, js wasm64p32
 #+private
-package os2
+package os
 
 import "base:intrinsics"
 

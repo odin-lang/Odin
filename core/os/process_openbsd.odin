@@ -1,6 +1,6 @@
 #+private
 #+build openbsd
-package os2
+package os
 
 import "core:c"
 

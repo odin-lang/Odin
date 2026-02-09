@@ -258,7 +258,7 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 			// NOTE(Feoramund): os.Error is system-dependent, and there's
 			// currently no good way to translate them all into strings.
 			//
-			// The upcoming `os2` package will hopefully solve this.
+			// The upcoming `core:os` package will hopefully solve this.
 			//
 			// We can at least provide the number for now, so the user can look
 			// it up.

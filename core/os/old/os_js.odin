@@ -1,5 +1,5 @@
 #+build js
-package os
+package os_old
 
 foreign import "odin_env"
 

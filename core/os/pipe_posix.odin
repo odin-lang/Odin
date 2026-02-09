@@ -1,6 +1,6 @@
 #+private
 #+build darwin, netbsd, freebsd, openbsd
-package os2
+package os
 
 import "core:sys/posix"
 import "core:strings"

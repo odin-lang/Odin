@@ -1,5 +1,5 @@
 #+private file
-package os2
+package os
 
 import "base:intrinsics"
 import "base:runtime"

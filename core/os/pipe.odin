@@ -1,4 +1,4 @@
-package os2
+package os
 
 /*
 Create an anonymous pipe.
@@ -15,7 +15,7 @@ process, that end of the pipe needs to be closed by the parent, before any data
 is attempted to be read.
 
 Although pipes look like files and is compatible with most file APIs in package
-os2, the way it's meant to be read is different. Due to asynchronous nature of
+os, the way it's meant to be read is different. Due to asynchronous nature of
 the communication channel, the data may not be present at the time of a read
 request. The other scenario is when a pipe has no data because the other end
 of the pipe was closed by the child process.

@@ -1,4 +1,4 @@
 #+build freestanding
-package os
+package os_old
 
-#panic("package os does not support a freestanding target")
+#panic("package os_old does not support a freestanding target")
