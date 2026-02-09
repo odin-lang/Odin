@@ -2,10 +2,10 @@
 #+private
 package timezone
 
-import os "core:os/os2"
-import    "core:strings"
-import    "core:time/datetime"
-import    "core:path/filepath"
+import "core:os"
+import "core:strings"
+import "core:time/datetime"
+import "core:path/filepath"
 
 local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
 	local_str, ok := os.lookup_env("TZ", allocator)

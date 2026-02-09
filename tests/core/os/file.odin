@@ -1,7 +1,7 @@
-package tests_core_os_os2
+package tests_core_os
 
-import os "core:os/os2"
-import    "core:testing"
+import "core:os"
+import "core:testing"
 
 @(test)
 test_clone :: proc(t: ^testing.T) {

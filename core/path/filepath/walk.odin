@@ -2,7 +2,7 @@
 #+build !js
 package filepath
 
-import os "core:os/os2"
+import "core:os"
 
 Walker :: os.Walker
 
@@ -43,9 +43,9 @@ If an error occurred opening a directory, you may get zero'd info struct and
 Example:
 	package main
 
-	import    "core:fmt"
-	import    "core:strings"
-	import os "core:os/os2"
+	import "core:fmt"
+	import "core:strings"
+	import "core:os"
 
 	main :: proc() {
 		w := os.walker_create("core")

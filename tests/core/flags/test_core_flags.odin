@@ -1,16 +1,16 @@
 package test_core_flags
 
-import "base:runtime"
-import "core:bytes"
-import "core:flags"
-import "core:fmt"
-@require import "core:log"
-import "core:math"
-@require import "core:net"
-import os "core:os/os2"
-import "core:strings"
-import "core:testing"
-import "core:time/datetime"
+import            "base:runtime"
+import            "core:bytes"
+import            "core:flags"
+import            "core:fmt"
+@(require) import "core:log"
+import            "core:math"
+@(require) import "core:net"
+import            "core:os"
+import            "core:strings"
+import            "core:testing"
+import            "core:time/datetime"
 
 Custom_Data :: struct {
 	a: int,

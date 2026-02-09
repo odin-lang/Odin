@@ -3,7 +3,7 @@
 package crypto_hash
 
 import "core:io"
-import os "core:os/os2"
+import "core:os"
 
 // `hash_file` will read the file provided by the given handle and return the
 // computed digest in a newly allocated slice.

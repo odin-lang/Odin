@@ -1,8 +1,8 @@
 #+build !js
 package fontstash
 
-import    "core:log"
-import os "core:os/os2"
+import "core:log"
+import "core:os"
 
 // 'fontIndex' controls which font you want to load within a multi-font format such
 // as TTC. Leave it as zero if you are loading a single-font format such as TTF.

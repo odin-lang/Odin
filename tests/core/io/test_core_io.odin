@@ -1,12 +1,12 @@
 package test_core_io
 
-import    "core:bufio"
-import    "core:bytes"
-import    "core:io"
-import    "core:log"
-import os "core:os/os2"
-import    "core:strings"
-import    "core:testing"
+import "core:bufio"
+import "core:bytes"
+import "core:io"
+import "core:log"
+import "core:os"
+import "core:strings"
+import "core:testing"
 
 Passed_Tests :: distinct io.Stream_Mode_Set
 

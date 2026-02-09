@@ -3,7 +3,7 @@ package vendor_gl
 
 // Helper for loading shaders into a program
 
-import os "core:os/os2"
+import    "core:os"
 import    "core:fmt"
 import    "core:strings"
 @(require) import "core:time"

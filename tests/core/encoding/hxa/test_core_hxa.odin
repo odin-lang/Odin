@@ -6,7 +6,7 @@ import "core:testing"
 
 TEAPOT_PATH :: ODIN_ROOT + "tests/core/assets/HXA/teapot.hxa"
 
-import os "core:os/os2"
+import "core:os"
 
 @test
 test_read :: proc(t: ^testing.T) {

@@ -1,11 +1,11 @@
-package tests_core_os_os2
+package tests_core_os
 
-import    "core:fmt"
-import os "core:os/os2"
-import    "core:log"
-import    "core:testing"
-import    "core:slice"
-import    "core:strings"
+import "core:fmt"
+import "core:os"
+import "core:log"
+import "core:testing"
+import "core:slice"
+import "core:strings"
 
 @(test)
 test_executable :: proc(t: ^testing.T) {
@@ -351,12 +351,12 @@ glob_tests := []Glob_Test{
 		err     = {},
 	},
 	{
-		pattern = ODIN_ROOT + "tests/core/os/os2/*.odin",
+		pattern = ODIN_ROOT + "tests/core/os/*.odin",
 		matches = {
-			ODIN_ROOT + "tests/core/os/os2/dir.odin",
-			ODIN_ROOT + "tests/core/os/os2/file.odin",
-			ODIN_ROOT + "tests/core/os/os2/path.odin",
-			ODIN_ROOT + "tests/core/os/os2/process.odin",
+			ODIN_ROOT + "tests/core/os/dir.odin",
+			ODIN_ROOT + "tests/core/os/file.odin",
+			ODIN_ROOT + "tests/core/os/path.odin",
+			ODIN_ROOT + "tests/core/os/process.odin",
 		},
 		err     = {},
 	},

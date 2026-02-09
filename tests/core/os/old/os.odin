@@ -1,8 +1,8 @@
-package test_core_os
+package test_core_os_old
 
 import "core:c/libc"
 import win32 "core:sys/windows"
-import "core:os"
+import os "core:os/old"
 import "core:slice"
 import "core:testing"
 import "core:log"

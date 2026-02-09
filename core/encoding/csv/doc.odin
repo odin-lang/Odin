@@ -6,7 +6,7 @@ Example:
 
 	import "core:fmt"
 	import "core:encoding/csv"
-	import os "core:os/os2"
+	import "core:os"
 
 	// Requires keeping the entire CSV file in memory at once
 	iterate_csv_from_string :: proc(filename: string) {

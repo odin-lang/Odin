@@ -1,14 +1,14 @@
-package tests_core_os_os2
+package tests_core_os
 
-import os "core:os/os2"
-import    "core:log"
-import    "core:slice"
-import    "core:testing"
-import    "core:strings"
+import "core:os"
+import "core:log"
+import "core:slice"
+import "core:testing"
+import "core:strings"
 
 @(test)
 test_read_dir :: proc(t: ^testing.T) {
-	path, err_join := os.join_path({#directory, "../dir"}, context.allocator)
+	path, err_join := os.join_path({#directory, "dir"}, context.allocator)
 	defer delete(path)
 
 	fis, err_read := os.read_all_directory_by_path(path, context.allocator)
@@ -17,7 +17,7 @@ test_read_dir :: proc(t: ^testing.T) {
 	slice.sort_by_key(fis, proc(fi: os.File_Info) -> string { return fi.name })
 
 	if err_read == .Unsupported {
-		log.warn("os2 directory functionality is unsupported, skipping test")
+		log.warn("core:os directory functionality is unsupported, skipping test")
 		return
 	}
 
@@ -34,7 +34,7 @@ test_read_dir :: proc(t: ^testing.T) {
 
 @(test)
 test_walker :: proc(t: ^testing.T) {
-	path, err := os.join_path({#directory, "../dir"}, context.allocator)
+	path, err := os.join_path({#directory, "dir"}, context.allocator)
 	defer delete(path)
 	testing.expect_value(t, err, nil)
 
@@ -46,7 +46,7 @@ test_walker :: proc(t: ^testing.T) {
 
 @(test)
 test_walker_file :: proc(t: ^testing.T) {
-	path, err_join := os.join_path({#directory, "../dir"}, context.allocator)
+	path, err_join := os.join_path({#directory, "dir"}, context.allocator)
 	defer delete(path)
 	testing.expect_value(t, err_join, nil)
 
@@ -95,7 +95,7 @@ test_walker_internal :: proc(t: ^testing.T, w: ^os.Walker) {
 	}
 
 	if _, err := os.walker_error(w); err == .Unsupported {
-		log.warn("os2 directory functionality is unsupported, skipping test")
+		log.warn("core:os directory functionality is unsupported, skipping test")
 		return
 	}
 

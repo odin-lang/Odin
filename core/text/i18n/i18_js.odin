@@ -10,8 +10,6 @@ package i18n
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-import os "core:os/os2"
-
 @(private)
 parse_qt :: proc { parse_qt_linguist_from_bytes }
 

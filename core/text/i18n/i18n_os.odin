@@ -11,7 +11,7 @@ package i18n
 		Jeroen van Rijn: Initial implementation.
 */
 import "base:runtime"
-import os "core:os/os2"
+import "core:os"
 
 @(private)
 read_file :: proc(filename: string, allocator: runtime.Allocator) -> (data: []u8, err: Error) {

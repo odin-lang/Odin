@@ -1,7 +1,7 @@
 package xml_example
 
 import      "core:encoding/xml"
-import os   "core:os/os2"
+import      "core:os"
 import path "core:path/filepath"
 import      "core:strings"
 import      "core:strconv"

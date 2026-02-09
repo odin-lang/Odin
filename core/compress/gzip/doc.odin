@@ -2,11 +2,11 @@
 A small `GZIP` unpacker.
 
 Example:
-	import    "core:bytes"
-	import os "core:os/os2"
-	import    "core:compress"
-	import    "core:compress/gzip"
-	import    "core:fmt"
+	import "core:bytes"
+	import "core:os"
+	import "core:compress"
+	import "core:compress/gzip"
+	import "core:fmt"
 
 	// Small GZIP file with fextra, fname and fcomment present.
 	@private

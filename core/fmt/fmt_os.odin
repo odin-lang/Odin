@@ -3,10 +3,10 @@
 #+build !orca
 package fmt
 
-import    "base:runtime"
-import os "core:os/os2"
-import    "core:io"
-import    "core:bufio"
+import "base:runtime"
+import "core:os"
+import "core:io"
+import "core:bufio"
 
 // NOTE(Jeroen): The other option is to deprecate `fprint*` and make it an alias for `wprint*`, using File.stream directly.
 

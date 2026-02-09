@@ -10,7 +10,7 @@ package regex_common
 		Feoramund: Initial implementation.
 */
 
-@require import os "core:os/os2"
+@require import "core:os"
 
 when ODIN_DEBUG_REGEX {
 	debug_stream := os.stderr.stream

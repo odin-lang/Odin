@@ -1,9 +1,9 @@
 package flags
 
-import "core:fmt"
-@require import os "core:os/os2"
+import          "core:fmt"
+@require import "core:os"
 @require import "core:path/filepath"
-import "core:strings"
+import          "core:strings"
 
 /*
 Parse any arguments into an annotated struct or exit if there was an error.

@@ -1,6 +1,6 @@
 package documentation_tester
 
-import os  "core:os/os2"
+import     "core:os"
 import     "core:fmt"
 import     "core:strings"
 import     "core:odin/ast"
@@ -267,7 +267,7 @@ write_test_suite :: proc(example_tests: []Example_Test) {
 `#+private
 package documentation_verification
 
-import os "core:os/os2"
+import "core:os"
 import "core:mem"
 import "core:io"
 import "core:fmt"

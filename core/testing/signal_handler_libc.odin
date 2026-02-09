@@ -11,11 +11,11 @@ package testing
 		blob1807:    Windows Win32 API rewrite.
 */
 
-import    "base:intrinsics"
-import    "core:c/libc"
-import os "core:os/os2"
-import    "core:sync"
-import    "core:terminal/ansi"
+import "base:intrinsics"
+import "core:c/libc"
+import "core:os"
+import "core:sync"
+import "core:terminal/ansi"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 

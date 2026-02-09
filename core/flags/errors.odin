@@ -2,7 +2,7 @@ package flags
 
 import "base:runtime"
 import "core:net"
-import os "core:os/os2"
+import "core:os"
 
 Parse_Error_Reason :: enum {
 	None,

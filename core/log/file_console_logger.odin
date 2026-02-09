@@ -3,13 +3,13 @@
 #+build !js
 package log
 
-import    "base:runtime"
-import    "core:fmt"
-import    "core:strings"
-import os "core:os/os2"
-import    "core:terminal"
-import    "core:terminal/ansi"
-import    "core:time"
+import "base:runtime"
+import "core:fmt"
+import "core:strings"
+import "core:os"
+import "core:terminal"
+import "core:terminal/ansi"
+import "core:time"
 
 Level_Headers := [?]string{
 	 0..<10 = "[DEBUG] --- ",

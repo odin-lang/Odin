@@ -2,7 +2,7 @@
 #+build !js
 package encoding_hxa
 
-import os "core:os/os2"
+import "core:os"
 
 read_from_file :: proc(filename: string, print_error := false, allocator := context.allocator, loc := #caller_location) -> (file: File, err: Read_Error) {
 	context.allocator = allocator

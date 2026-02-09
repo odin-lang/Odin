@@ -1,9 +1,9 @@
 #+private
 package terminal
 
-import    "base:runtime"
-import os "core:os/os2"
-import    "core:sys/windows"
+import "base:runtime"
+import "core:os"
+import "core:sys/windows"
 
 _is_terminal :: proc "contextless" (f: ^os.File) -> bool {
 	return os.is_tty(f)

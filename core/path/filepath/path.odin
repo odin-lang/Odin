@@ -2,8 +2,8 @@
 // To process paths such as URLs that depend on forward slashes regardless of the OS, use the slashpath package.
 package filepath
 
-import os "core:os/os2"
-import    "core:strings"
+import "core:os"
+import "core:strings"
 
 SEPARATOR_CHARS :: `/\`
 

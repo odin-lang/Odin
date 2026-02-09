@@ -5,8 +5,8 @@ virtual.Arena usage
 
 Example:
 	// Source: https://github.com/odin-lang/examples/blob/master/arena_allocator/arena_allocator.odin
-	import    "core:fmt"
-	import os "core:os/os2"
+	import "core:fmt"
+	import "core:os"
 
 	// virtual package implements a multi-purpose arena allocator. If you are on a
 	// platform that does not support virtual memory, then there is also a similar

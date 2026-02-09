@@ -189,7 +189,7 @@ Example:
 
 	import "core:fmt"
 	import "core:io"
-	import os "core:os/os2"
+	import "core:os"
 	import "core:text/table"
 
 	scripts :: proc(w: io.Writer) {
@@ -265,10 +265,10 @@ corners and dividers.
 Example:
 	package main
 
-	import    "core:fmt"
-	import    "core:io"
-	import os "core:os/os2"
-	import    "core:text/table"
+	import "core:fmt"
+	import "core:io"
+	import "core:os"
+	import "core:text/table"
 
 	box_drawing :: proc(w: io.Writer) {
 		t: table.Table

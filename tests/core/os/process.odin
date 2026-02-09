@@ -1,9 +1,9 @@
 #+build !windows
-package tests_core_os_os2
+package tests_core_os
 
-import os "core:os/os2"
-import    "core:log"
-import    "core:testing"
+import "core:os"
+import "core:log"
+import "core:testing"
 
 @(test)
 test_process_exec :: proc(t: ^testing.T) {

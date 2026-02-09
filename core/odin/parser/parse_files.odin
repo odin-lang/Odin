@@ -1,12 +1,12 @@
 package odin_parser
 
-import    "core:odin/tokenizer"
-import    "core:odin/ast"
-import    "core:path/filepath"
-import    "core:fmt"
-import os "core:os/os2"
-import    "core:slice"
-import    "core:strings"
+import "core:odin/tokenizer"
+import "core:odin/ast"
+import "core:path/filepath"
+import "core:fmt"
+import "core:os"
+import "core:slice"
+import "core:strings"
 
 collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 	NO_POS :: tokenizer.Pos{}

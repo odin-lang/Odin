@@ -2,7 +2,7 @@
 #+private
 package net
 
-import os "core:os/os2"
+import "core:os"
 
 load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocator) -> (name_servers: []Endpoint, ok: bool) {
 	context.allocator = allocator

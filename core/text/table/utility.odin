@@ -2,9 +2,9 @@
 #+build !js
 package text_table
 
-import    "core:io"
-import os "core:os/os2"
-import    "core:strings"
+import "core:io"
+import "core:os"
+import "core:strings"
 
 stdio_writer :: proc() -> io.Writer {
 	return os.to_stream(os.stdout)

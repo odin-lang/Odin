@@ -1,18 +1,18 @@
 #+private
 package flags
 
-import "base:intrinsics"
-import "base:runtime"
-import "core:fmt"
-import "core:mem"
-import "core:net"
-@(require) import os "core:os/os2"
-import "core:reflect"
-import "core:strconv"
-import "core:strings"
-@require import "core:time"
-@require import "core:time/datetime"
-import "core:unicode/utf8"
+import            "base:intrinsics"
+import            "base:runtime"
+import            "core:fmt"
+import            "core:mem"
+import            "core:net"
+@(require) import "core:os"
+import            "core:reflect"
+import            "core:strconv"
+import            "core:strings"
+@(require) import "core:time"
+@(require) import "core:time/datetime"
+import            "core:unicode/utf8"
 
 @(optimization_mode="favor_size")
 parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info) -> bool {
