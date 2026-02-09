@@ -60,7 +60,7 @@ _get_current_thread_id :: proc "contextless" () -> int {
 _get_processor_core_count :: proc() -> (core_count: int) {
 	cpu_set: [128]u64
 
-	if err := linux.sched_getaffinity(0, size_of(cpu_set), &cpu_set); err != nil {
+	if _, err := linux.sched_getaffinity(0, size_of(cpu_set), &cpu_set); err == nil {
 		for set in cpu_set {
 			core_count += int(intrinsics.count_ones(set))
 		}
