@@ -1,8 +1,6 @@
 #+build windows
 package sys_windows
 
-import "core:math/fixed"
-
 foreign import gdi32 "system:Gdi32.lib"
 
 @(default_calling_convention="system")
@@ -100,7 +98,7 @@ PALETTEINDEX :: #force_inline proc "contextless" (#any_int i: int) -> COLORREF {
 	return COLORREF(DWORD(0x01000000) | DWORD(WORD(i)))
 }
 
-FXPT2DOT30 :: distinct fixed.Fixed(i32, 30)
+FXPT2DOT30 :: distinct i32 // fixed.Fixed(i32, 30)
 
 CIEXYZ :: struct {
 	ciexyzX, ciexyzY, ciexyzZ: FXPT2DOT30,

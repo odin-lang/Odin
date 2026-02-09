@@ -3,12 +3,10 @@ package slice
 
 import "base:intrinsics"
 import "base:builtin"
-import "core:math/bits"
 import "base:runtime"
 
 _ :: intrinsics
 _ :: builtin
-_ :: bits
 _ :: runtime
 
 /*
@@ -933,7 +931,7 @@ If `elems` is out of bounds (more than the total) this will trigger a bounds che
 Example:
 	import "core:fmt"
 	import "core:slice"
-	
+
 	advance_slices_example :: proc() {
 		slices := [][]byte {
 			{1, 2, 3, 4},
