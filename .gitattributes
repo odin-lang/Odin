@@ -1,6 +1,7 @@
 *.odin linguist-language=Odin
 * text=auto
-
 # These files must always have *nix line-endings
 Makefile text eol=lf
 *.sh text eol=lf
+vendor/box2d/lib/box2d_windows_amd64_avx2.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/box2d_windows_amd64_sse2.lib filter=lfs diff=lfs merge=lfs -text
