@@ -57,8 +57,15 @@ _get_current_thread_id :: proc "contextless" () -> int {
 }
 
 @(private="package")
-_get_processor_core_count :: proc() -> int {
-	return int(_unix_get_nprocs())
+_get_processor_core_count :: proc() -> (core_count: int) {
+	cpu_set: [128]u64
+
+	if err := linux.sched_getaffinity(0, size_of(cpu_set), &cpu_set); err != linux.Errno(-1) {
+		for set in cpu_set {
+			core_count += int(intrinsics.count_ones(set))
+		}
+	}
+	return
 }
 
 @(private="package")
