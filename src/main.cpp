@@ -2071,6 +2071,73 @@ gb_internal void show_defineables(Checker *c) {
 	}
 }
 
+gb_internal void show_dot_import_grpah(Checker *c) {
+	Parser *p = c->parser;
+
+	gb_printf_err("\nDOT Import graph:\n\n");
+	gb_printf_err("digraph odin_import_graph {\n\tnode [shape=box];\n");
+
+	int cluster_counter = 0;
+	for (LibraryCollections coll : library_collections) {
+		gb_printf_err("\tsubgraph cluster_%i {\n", cluster_counter);
+		gb_printf_err("\t\tlabel = \"%.*s\";\n", LIT(coll.name));
+		gb_printf_err("\t\tnode [style=filled, fillcolor=white];\n");
+		if (0 == string_compare(coll.name, STR_LIT("core"))) {
+			gb_printf_err("\t\tbgcolor = lightsalmon;\n");
+		} else if (0 == string_compare(coll.name, STR_LIT("vendor"))) {
+			gb_printf_err("\t\tbgcolor = lightblue;\n");
+		} else if (0 == string_compare(coll.name, STR_LIT("base"))) {
+			gb_printf_err("\t\tbgcolor = lightcoral;\n");
+			gb_printf_err("\t\tintrinsics;\n");
+			gb_printf_err("\t\tbuiltin;\n");
+		}
+		for (AstPackage *pkg : p->packages) {
+			if (string_starts_with(pkg->fullpath, coll.path)) {
+				gb_printf_err("\t\t\"%.*s\";\n", LIT(pkg->fullpath));
+			}
+		}
+		gb_printf_err("\t}\n");
+		cluster_counter += 1;
+	}
+
+	for (AstPackage *pkg : p->packages) {
+		for (int i = 0; i < pkg->files.count; i++) {
+			AstFile *file = pkg->files[i];
+			for(Ast *imp : file->imports) {
+				GB_ASSERT(imp->kind == Ast_ImportDecl);
+
+				bool exists = false;
+				for (int j = i + 1; j < pkg->files.count; j++) {
+					AstFile *other_file = pkg->files[j];
+					for(Ast *other_imp : other_file->imports) {
+						GB_ASSERT(other_imp->kind == Ast_ImportDecl);
+						if (0 == string_compare(imp->ImportDecl.fullpath, other_imp->ImportDecl.fullpath)) {
+							exists = true;
+							break;
+						}
+					}
+					if (exists) {
+						break;
+					}
+				}
+
+				if (exists) {
+					continue;
+				}
+
+				String path = imp->ImportDecl.fullpath;
+				if (imp->ImportDecl.package != nullptr) {
+					path = imp->ImportDecl.package->fullpath;
+				}
+
+				gb_printf_err("\t\"%.*s\" -> \"%.*s\";\n", LIT(pkg->fullpath), LIT(path));
+			}
+		}
+	}
+
+	gb_printf_err("}\n\n");
+}
+
 gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
@@ -3749,7 +3816,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
-	
+
 	// Warn about Windows i386 thread-local storage limitations
 	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
 		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
@@ -3933,6 +4000,10 @@ int main(int arg_count, char const **arg_ptr) {
 		if (try_cached_build(checker, args)) {
 			goto end_of_code_gen;
 		}
+	}
+
+	if (build_context.show_debug_messages) {
+		show_dot_import_grpah(checker);
 	}
 
 	MAIN_TIME_SECTION("type check");
