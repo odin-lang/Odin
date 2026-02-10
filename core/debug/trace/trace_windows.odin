@@ -6,7 +6,6 @@ import "base:intrinsics"
 import "base:runtime"
 
 import win32 "core:sys/windows"
-import "core:strconv"
 
 _Context :: struct {
 	hProcess: win32.HANDLE,
