@@ -5,7 +5,6 @@ package debug_trace
 import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
-import "core:fmt"
 import "core:c"
 
 // NOTE: Relies on C++23 which adds <stacktrace> and becomes ABI and that can be used
