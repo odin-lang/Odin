@@ -538,6 +538,7 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+	bool   show_import_graph;
 
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 

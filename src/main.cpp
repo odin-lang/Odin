@@ -302,6 +302,7 @@ enum BuildFlagKind {
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
 	BuildFlag_ShowMoreTimings,
+	BuildFlag_ShowImportGraph,
 	BuildFlag_ExportTimings,
 	BuildFlag_ExportTimingsFile,
 	BuildFlag_ExportDependencies,
@@ -530,6 +531,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowImportGraph,         str_lit("show-import-graph"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimings,           str_lit("export-timings"),            BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimingsFile,       str_lit("export-timings-file"),       BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDependencies,      str_lit("export-dependencies"),       BuildFlagParam_String,  Command__does_build);
@@ -869,6 +871,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
+							break;
+						case BuildFlag_ShowImportGraph:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_import_graph = true;
 							break;
 						case BuildFlag_ExportTimings: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -2071,6 +2077,73 @@ gb_internal void show_defineables(Checker *c) {
 	}
 }
 
+gb_internal void show_import_graph(Checker *c) {
+	Parser *p = c->parser;
+
+	gb_printf("\nDOT Import graph:\n\n");
+	gb_printf("digraph odin_import_graph {\n\tnode [shape=box];\n");
+
+	int cluster_counter = 0;
+	for (LibraryCollections coll : library_collections) {
+		gb_printf("\tsubgraph cluster_%i {\n", cluster_counter);
+		gb_printf("\t\tlabel = \"%.*s\";\n", LIT(coll.name));
+		gb_printf("\t\tnode [style=filled, fillcolor=white];\n");
+		if (coll.name =="core") {
+			gb_printf("\t\tbgcolor = lightsalmon;\n");
+		} else if (coll.name =="vendor") {
+			gb_printf("\t\tbgcolor = lightblue;\n");
+		} else if (coll.name =="base") {
+			gb_printf("\t\tbgcolor = lightcoral;\n");
+			gb_printf("\t\tintrinsics;\n");
+			gb_printf("\t\tbuiltin;\n");
+		}
+		for (AstPackage *pkg : p->packages) {
+			if (string_starts_with(pkg->fullpath, coll.path)) {
+				gb_printf("\t\t\"%.*s\";\n", LIT(pkg->fullpath));
+			}
+		}
+		gb_printf("\t}\n");
+		cluster_counter += 1;
+	}
+
+	for (AstPackage *pkg : p->packages) {
+		for (int i = 0; i < pkg->files.count; i++) {
+			AstFile *file = pkg->files[i];
+			for(Ast *imp : file->imports) {
+				GB_ASSERT(imp->kind == Ast_ImportDecl);
+
+				bool exists = false;
+				for (int j = i + 1; j < pkg->files.count; j++) {
+					AstFile *other_file = pkg->files[j];
+					for(Ast *other_imp : other_file->imports) {
+						GB_ASSERT(other_imp->kind == Ast_ImportDecl);
+						if (0 == string_compare(imp->ImportDecl.fullpath, other_imp->ImportDecl.fullpath)) {
+							exists = true;
+							break;
+						}
+					}
+					if (exists) {
+						break;
+					}
+				}
+
+				if (exists) {
+					continue;
+				}
+
+				String path = imp->ImportDecl.fullpath;
+				if (imp->ImportDecl.package != nullptr) {
+					path = imp->ImportDecl.package->fullpath;
+				}
+
+				gb_printf("\t\"%.*s\" -> \"%.*s\";\n", LIT(pkg->fullpath), LIT(path));
+			}
+		}
+	}
+
+	gb_printf("}\n\n");
+}
+
 gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
@@ -2926,6 +2999,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 		if (print_flag("-show-system-calls")) {
 			print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
+		}
+
+		if (print_flag("-show-import-graph")) {
+			print_usage_line(2, "Shows dot graph text format of the import graph of a project.");
 		}
 
 		if (print_flag("-show-timings")) {
@@ -3976,6 +4053,9 @@ int main(int arg_count, char const **arg_ptr) {
 		if (build_context.show_timings) {
 			show_timings(checker, &global_timings);
 		}
+		if (build_context.show_import_graph) {
+			show_import_graph(checker);
+		}
 		return 0;
 	}
 
@@ -3986,6 +4066,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 		if (build_context.show_timings) {
 			show_timings(checker, &global_timings);
+		}
+		if (build_context.show_import_graph) {
+			show_import_graph(checker);
 		}
 
 		if (global_error_collector.count != 0) {
@@ -4020,6 +4103,9 @@ int main(int arg_count, char const **arg_ptr) {
 				if (build_context.show_timings) {
 					show_timings(checker, &global_timings);
 				}
+				if (build_context.show_import_graph) {
+					show_import_graph(checker);
+				}
 
 				if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
 					export_dependencies(checker);
@@ -4050,6 +4136,9 @@ int main(int arg_count, char const **arg_ptr) {
 				if (result) {
 					if (build_context.show_timings) {
 						show_timings(checker, &global_timings);
+					}
+					if (build_context.show_import_graph) {
+						show_import_graph(checker);
 					}
 
 					if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
@@ -4095,6 +4184,9 @@ end_of_code_gen:;
 
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
+	}
+	if (build_context.show_import_graph) {
+		show_import_graph(checker);
 	}
 
 	if (run_output) {
