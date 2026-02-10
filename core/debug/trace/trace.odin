@@ -49,15 +49,15 @@ in_resolve :: proc "contextless" (ctx: ^Context) -> bool {
 _format_hex :: proc(buf: []byte, val: uintptr, allocator: runtime.Allocator) -> int {
 	_digits := "0123456789abcdef"
 
-    shift := (size_of(uintptr) * 8) - 4
+	shift := (size_of(uintptr) * 8) - 4
 	offs := 0
 
-    for shift >= 0 {
-        d := (val >> uint(shift)) & 0xf
+	for shift >= 0 {
+		d := (val >> uint(shift)) & 0xf
 		buf[offs] = _digits[d]
-        shift -= 4
+		shift -= 4
 		offs += 1
-    }
+	}
 
 	return offs
 }
