@@ -164,7 +164,7 @@ _resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> F
 			} else if info: Dl_info; dladdr(rawptr(address), &info) != 0 && info.dli_sname != "" {
 				frame.procedure = strings.clone_from_cstring(info.dli_sname, btc.allocator)
 			} else {
-				frame.procedure = fmt.aprintf("(procedure: 0x%x)", allocator=btc.allocator)
+				fl.procedure = _format_missing_proc(address, allocator)
 			}
 			frame.line = i32(line)
 			return 0
