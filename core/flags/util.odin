@@ -72,12 +72,37 @@ print_errors :: proc(data_type: typeid, error: Error, program: string, style: Pa
 	case Parse_Error:
 		fmt.wprintfln(stderr, "[%T.%v] %s", specific_error, specific_error.reason, specific_error.message)
 	case Open_File_Error:
-		fmt.wprintfln(stderr, "[%T#%i] Unable to open file with perms 0o%o and flags %v: %s",
-			specific_error,
-			specific_error.errno,
-			specific_error.perms,
-			specific_error.flags,
-			specific_error.filename)
+		if os.exists(specific_error.filename) {
+			flags: string
+			if specific_error.flags == {.Read} {
+				flags = "read-only"
+			} else if specific_error.flags == {.Write} {
+				flags = "write-only"
+			} else if specific_error.flags == {.Read, .Write} {
+				flags = "read/write"
+			}
+
+			if flags != "" {
+				fmt.wprintfln(stderr, "[%T#%i] Unable to open %q with perms 0o%o as %s",
+					specific_error,
+					specific_error.errno,
+					specific_error.filename,
+					u16(transmute(u32)specific_error.perms),
+					flags)
+			} else {
+				fmt.wprintfln(stderr, "[%T#%i] Unable to open %q with perms 0o%o and flags %v",
+					specific_error,
+					specific_error.errno,
+					specific_error.filename,
+					u16(transmute(u32)specific_error.perms),
+					specific_error.flags)
+			}
+		} else {
+			fmt.wprintfln(stderr, "[%T#%i] Unable to open %q. File not found",
+				specific_error,
+				specific_error.errno,
+				specific_error.filename)
+		}
 	case Validation_Error:
 		fmt.wprintfln(stderr, "[%T] %s", specific_error, specific_error.message)
 	case Help_Request:
