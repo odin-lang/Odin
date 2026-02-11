@@ -195,7 +195,6 @@ Example:
 		}
 	}
 */
-@(require_results)
 read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
 	if it.f == nil {
 		return
