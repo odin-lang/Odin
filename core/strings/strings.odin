@@ -245,7 +245,9 @@ Returns:
 compare :: proc "contextless" (lhs, rhs: string) -> (result: int) {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
 }
-
+compare_rt :: proc "contextless" (lhs, rhs: string) -> (result: int) {
+	return runtime.memory_compare(raw_data(lhs), raw_data(rhs), min(len(lhs), len(rhs)))
+}
 /*
 Checks if rune `r` in the string `s`
 
