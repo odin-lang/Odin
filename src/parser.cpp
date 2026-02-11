@@ -3130,6 +3130,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					} else {
 						dialect = InlineAsmDialect_Intel;
 					}
+				} else {
+					syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected an identifier after hash");
