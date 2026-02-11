@@ -608,13 +608,13 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 	return strings.to_string(b)
 }
 
-// Returns a temporarily-allocated string representation of the endpoint.
+// Returns a temporarily-allocated string representation of the endpoint (if allocator isn't overwritten).
 // If there's a port, uses the `ip4address:port` or `[ip6address]:port` format, respectively.
 endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> string {
 	if ep.port == 0 {
 		return address_to_string(ep.address, allocator)
 	} else {
-		s := address_to_string(ep.address, context.temp_allocator)
+		s := address_to_string(ep.address, allocator)
 		b := strings.builder_make(allocator)
 		switch a in ep.address {
 		case IP4_Address:
