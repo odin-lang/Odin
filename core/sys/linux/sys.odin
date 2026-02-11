@@ -2616,9 +2616,9 @@ futex :: proc{
 	If you are running on a system with less than 128 cores you can use `linux.Cpu_Set` as the type for the mask argument.
 	Otherwise use an array of integers.
 */
-sched_setaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (Errno) {
+sched_setaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (int, Errno) {
 	ret := syscall(SYS_sched_setaffinity, pid, cpusetsize, mask)
-	return Errno(-ret)
+	return errno_unwrap(ret, int)
 }
 
 /*
@@ -2628,9 +2628,9 @@ sched_setaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawpt
 	If you are running on a system with less than 128 cores you can use `linux.Cpu_Set` as the type for the mask argument.
 	Otherwise use an array of integers.
 */
-sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (Errno) {
+sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (int, Errno) {
 	ret := syscall(SYS_sched_getaffinity, pid, cpusetsize, mask)
-	return Errno(-ret)
+	return errno_unwrap(ret, int)
 }
 
 // TODO(flysand): set_thread_area

@@ -16,14 +16,15 @@ Example:
 		r.reuse_record_buffer = true // Without it you have to each of the fields within it
 		defer csv.reader_destroy(&r)
 
-		csv_data, ok := os.read_entire_file(filename)
-		if ok {
+		csv_data, csv_err := os.read_entire_file(filename, context.allocator)
+		defer delete(csv_data)
+
+		if csv_err == nil {
 			csv.reader_init_with_string(&r, string(csv_data))
 		} else {
-			fmt.printfln("Unable to open file: %v", filename)
+			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, csv_err)
 			return
 		}
-		defer delete(csv_data)
 
 		for r, i, err in csv.iterator_next(&r) {
 			if err != nil { /* Do something with error */ }
@@ -39,16 +40,16 @@ Example:
 		r: csv.Reader
 		r.trim_leading_space  = true
 		r.reuse_record        = true // Without it you have to delete(record)
-		r.reuse_record_buffer = true // Without it you have to each of the fields within it
+		r.reuse_record_buffer = true // Without it you have to delete each of the fields within it
 		defer csv.reader_destroy(&r)
 
 		handle, err := os.open(filename)
+		defer os.close(handle)
 		if err != nil {
-			fmt.eprintfln("Error opening file: %v", filename)
+			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, err)
 			return
 		}
-		defer os.close(handle)
-		csv.reader_init(&r, os.stream_from_handle(handle))
+		csv.reader_init(&r, handle.stream)
 
 		for r, i in csv.iterator_next(&r) {
 			for f, j in r {
@@ -64,21 +65,23 @@ Example:
 		r.trim_leading_space  = true
 		defer csv.reader_destroy(&r)
 
-		csv_data, ok := os.read_entire_file(filename)
-		if ok {
-			csv.reader_init_with_string(&r, string(csv_data))
-		} else {
-			fmt.printfln("Unable to open file: %v", filename)
+		csv_data, csv_err := os.read_entire_file(filename, context.allocator)
+		defer delete(csv_data, context.allocator)
+		if err != nil {
+			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, csv_err)
 			return
 		}
-		defer delete(csv_data)
+		csv.reader_init_with_string(&r, string(csv_data))
 
 		records, err := csv.read_all(&r)
 		if err != nil { /* Do something with CSV parse error */ }
 
 		defer {
-			for rec in records {
-				delete(rec)
+			for record in records {
+				for field in record {
+					delete(field)
+				}
+				delete(record)
 			}
 			delete(records)
 		}

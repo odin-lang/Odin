@@ -91,7 +91,7 @@ stop_test_callback :: proc "c" (sig: libc.int) {
 		advisory_a := `
 The test runner's main thread has caught an unrecoverable error (signal `
 		advisory_b := `) and will now forcibly terminate.
-This is a dire bug and should be reported to the Odin developers.
+Unless you terminated the tests yourself, this could be a dire bug and should be reported to the Odin developers.
 `
 		libc.fwrite(raw_data(advisory_a), size_of(byte), len(advisory_a), libc.stderr)
 		libc.fwrite(raw_data(sigstr), size_of(byte), len(sigstr), libc.stderr)

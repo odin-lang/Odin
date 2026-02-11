@@ -3,81 +3,103 @@
 package filepath
 
 import "core:os"
-import "core:slice"
 
-// Walk_Proc is the type of the procedure called for each file or directory visited by 'walk'
-// The 'path' parameter contains the parameter to walk as a prefix (this is the same as info.fullpath except on 'root')
-// The 'info' parameter is the os.File_Info for the named path
-//
-// If there was a problem walking to the file or directory named by path, the incoming error will describe the problem
-// and the procedure can decide how to handle that error (and walk will not descend into that directory)
-// In the case of an error, the info argument will be 0
-// If an error is returned, processing stops
-// The sole exception is if 'skip_dir' is returned as true:
-// 	when 'skip_dir' is invoked on a directory. 'walk' skips directory contents
-// 	when 'skip_dir' is invoked on a non-directory. 'walk' skips the remaining files in the containing directory
-Walk_Proc :: #type proc(info: os.File_Info, in_err: os.Error, user_data: rawptr) -> (err: os.Error, skip_dir: bool)
+Walker :: os.Walker
 
-// walk walks the file tree rooted at 'root', calling 'walk_proc' for each file or directory in the tree, including 'root'
-// All errors that happen visiting files and directories are filtered by walk_proc
-// The files are walked in lexical order to make the output deterministic
-// NOTE: Walking large directories can be inefficient due to the lexical sort
-// NOTE: walk does not follow symbolic links
-// NOTE: os.File_Info uses the 'context.temp_allocator' to allocate, and will delete when it is done
-walk :: proc(root: string, walk_proc: Walk_Proc, user_data: rawptr) -> os.Error {
-	info, err := os.lstat(root, context.temp_allocator)
-	defer os.file_info_delete(info, context.temp_allocator)
+/*
+Initializes a walker, either using a path or a file pointer to a directory the walker will start at.
 
-	skip_dir: bool
-	if err != nil {
-		err, skip_dir = walk_proc(info, err, user_data)
-	} else {
-		err, skip_dir = _walk(info, walk_proc, user_data)
-	}
-	return nil if skip_dir else err
-}
+You are allowed to repeatedly call this to reuse it for later walks.
 
+For an example on how to use the walker, see `walker_walk`.
+*/
+walker_init :: os.walker_init
 
-@(private)
-_walk :: proc(info: os.File_Info, walk_proc: Walk_Proc, user_data: rawptr) -> (err: os.Error, skip_dir: bool) {
-	if !info.is_dir {
-		if info.fullpath == "" && info.name == "" {
-			// ignore empty things
-			return
-		}
-		return walk_proc(info, nil, user_data)
-	}
+/*
+Creates a walker, either using a path or a file pointer to a directory the walker will start at.
 
-	fis: []os.File_Info
-	err1: os.Error
-	fis, err = read_dir(info.fullpath, context.temp_allocator)
-	defer os.file_info_slice_delete(fis, context.temp_allocator)
+For an example on how to use the walker, see `walker_walk`.
+*/
+walker_create :: os.walker_create
 
-	err1, skip_dir = walk_proc(info, err, user_data)
-	if err != nil || err1 != nil || skip_dir {
-		err = err1
-		return
-	}
+/*
+Returns the last error that occurred during the walker's operations.
 
-	for fi in fis {
-		err, skip_dir = _walk(fi, walk_proc, user_data)
-		if err != nil || skip_dir {
-			if !fi.is_dir || !skip_dir {
-				return
+Can be called while iterating, or only at the end to check if anything failed.
+*/
+walker_error :: os.walker_error
+
+walker_destroy :: os.walker_destroy
+
+// Marks the current directory to be skipped (not entered into).
+walker_skip_dir :: os.walker_skip_dir
+
+/*
+Returns the next file info in the iterator, files are iterated in breadth-first order.
+
+If an error occurred opening a directory, you may get zero'd info struct and
+`walker_error` will return the error.
+
+Example:
+	package main
+
+	import "core:fmt"
+	import "core:strings"
+	import "core:os"
+
+	main :: proc() {
+		w := os.walker_create("core")
+		defer os.walker_destroy(&w)
+
+		for info in os.walker_walk(&w) {
+			// Optionally break on the first error:
+			// _ = walker_error(&w) or_break
+
+			// Or, handle error as we go:
+			if path, err := os.walker_error(&w); err != nil {
+				fmt.eprintfln("failed walking %s: %s", path, err)
+				continue
 			}
+
+			// Or, do not handle errors during iteration, and just check the error at the end.
+
+
+
+			// Skip a directory:
+			if strings.has_suffix(info.fullpath, ".git") {
+				os.walker_skip_dir(&w)
+				continue
+			}
+
+			fmt.printfln("%#v", info)
+		}
+
+		// Handle error if one happened during iteration at the end:
+		if path, err := os.walker_error(&w); err != nil {
+			fmt.eprintfln("failed walking %s: %v", path, err)
 		}
 	}
+*/
+walker_walk :: os.walker_walk
 
-	return
-}
+/*
+	Reads the file `f` (assuming it is a directory) and returns the unsorted directory entries.
+	This returns up to `n` entries OR all of them if `n <= 0`.
+*/
+read_directory :: os.read_directory
 
-@(private)
-read_dir :: proc(dir_name: string, allocator := context.temp_allocator) -> (fis: []os.File_Info, err: os.Error) {
-	f := os.open(dir_name, os.O_RDONLY) or_return
-	defer os.close(f)
-	fis = os.read_dir(f, -1, allocator) or_return
-	slice.sort_by(fis, proc(a, b: os.File_Info) -> bool {
-		return a.name < b.name
-	})
-	return
-}
+/*
+	Reads the file `f` (assuming it is a directory) and returns all of the unsorted directory entries.
+*/
+read_all_directory :: os.read_all_directory
+
+/*
+	Reads the named directory by path (assuming it is a directory) and returns the unsorted directory entries.
+	This returns up to `n` entries OR all of them if `n <= 0`.
+*/
+read_directory_by_path :: os.read_directory_by_path
+
+/*
+	Reads the named directory by path (assuming it is a directory) and returns all of the unsorted directory entries.
+*/
+read_all_directory_by_path :: os.read_all_directory_by_path
