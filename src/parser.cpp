@@ -514,6 +514,22 @@ gb_internal void error(Ast *node, char const *fmt, ...) {
 	}
 }
 
+gb_internal void error_range(TokenPos start, TokenPos end, char const *fmt, ...) {
+	GB_ASSERT(start.file_id == end.file_id);
+	GB_ASSERT(start.line == end.line);
+	GB_ASSERT(start.column <= end.column);
+	GB_ASSERT(start.offset <= end.offset);
+
+	va_list va;
+	va_start(va, fmt);
+	error_va(start, end, fmt, va);
+	va_end(va);
+	if (start.file_id != 0) {
+		AstFile *f = thread_safe_get_ast_file_from_id(start.file_id);
+		f->error_count += 1;
+	}
+}
+
 gb_internal void syntax_error_with_verbose(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
