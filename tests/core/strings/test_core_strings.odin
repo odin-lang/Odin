@@ -92,6 +92,79 @@ test_cut :: proc(t: ^testing.T) {
 	}
 }
 
+Compare_Test :: struct {
+	input_a: string,
+	input_b: string,
+	output:  int,
+}
+
+/*
+Compare two memory ranges defined by slices.
+
+This procedure performs a byte-by-byte comparison between memory ranges
+specified by slices `a` and `b`, and returns a value, specifying their relative
+ordering.
+
+If the return value is:
+- Equal to `-1`, then `a` is "smaller" than `b`.
+- Equal to `+1`, then `a` is "bigger"  than `b`.
+- Equal to `0`, then `a` and `b` are equal.
+
+The comparison is performed as follows:
+1. Each byte, upto `min(len(a), len(b))` bytes is compared between `a` and `b`.
+	- If the byte in slice `a` is smaller than a byte in slice `b`, then comparison
+	  stops and this procedure returns `-1`.
+	- If the byte in slice `a` is bigger than a byte in slice `b`, then comparison
+	  stops and this procedure returns `+1`.
+	- Otherwise the comparison continues until `min(len(a), len(b))` are compared.
+2. If all the bytes in the range are equal, then the lengths of the slices are compared.
+	- If the length of slice `a` is smaller than the length of slice `b`, then `-1` is returned.
+	- If the length of slice `b` is smaller than the length of slice `b`, then `+1` is returned.
+	- Otherwise `0` is returned.
+*/
+
+
+compare_tests :: []Compare_Test{
+	{"some example text", "some example text", 0},
+	{"some example text", "something a bit longer", -1},
+	{"some example text", "", 1},
+	{"", "example", -1},
+	{"1234", "5678", -1},
+	{"EFGHIJ", "ABCD", 1},
+	{"##123", "12345", -1},
+	{"恥ずべきフクロウ",  "恥ずべきフクロウ", 0  },
+	{"恥ずべきフクロウ",  "フクロウ", 1          },
+}
+
+//  result: `-1` if `lhs` comes first, `1` if `rhs` comes first, or `0` if they are equal
+@test
+test_compare :: proc(t: ^testing.T) {
+	for test in compare_tests {
+		res := strings.compare(test.input_a, test.input_b)
+
+		testing.expectf(
+			t,
+			res == test.output,
+			"compare(\"%v\", \"%v\") expected to return \"%v\", got \"%v\"",
+			test.input_a, test.input_b, test.output, res,
+		)
+	}
+}
+
+@test
+test_compare_rt :: proc(t: ^testing.T) {
+	for test in compare_tests {
+		res := strings.compare_rt(test.input_a, test.input_b)
+
+		testing.expectf(
+			t,
+			res == test.output,
+			"compare(\"%v\", \"%v\") expected to return \"%v\", got \"%v\"",
+			test.input_a, test.input_b, test.output, res,
+		)
+	}
+}
+
 Case_Kind :: enum {
 	Lower_Space_Case,
 	Upper_Space_Case,
