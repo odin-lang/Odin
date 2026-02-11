@@ -43,24 +43,24 @@ min :: builtin.min
 max :: builtin.max
 clamp :: builtin.clamp
 
-@(require_results) sqrt_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))) }
-@(require_results) sqrt_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))) }
-@(require_results) sqrt_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(sqrt_f32(f32(x))) }
-@(require_results) sqrt_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(sqrt_f32(f32(x))) }
-@(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
-@(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
+@(require_results) sqrt_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(sqrt_f16(f16(x), loc)) }
+@(require_results) sqrt_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(sqrt_f16(f16(x), loc)) }
+@(require_results) sqrt_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(sqrt_f32(f32(x), loc)) }
+@(require_results) sqrt_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(sqrt_f32(f32(x), loc)) }
+@(require_results) sqrt_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(sqrt_f64(f64(x), loc)) }
+@(require_results) sqrt_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(sqrt_f64(f64(x), loc)) }
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
 	sqrt_f32, sqrt_f32le, sqrt_f32be,
 	sqrt_f64, sqrt_f64le, sqrt_f64be,
 }
 
-@(require_results) sin_f16le :: proc "contextless" (θ: f16le) -> f16le { return #force_inline f16le(sin_f16(f16(θ))) }
-@(require_results) sin_f16be :: proc "contextless" (θ: f16be) -> f16be { return #force_inline f16be(sin_f16(f16(θ))) }
-@(require_results) sin_f32le :: proc "contextless" (θ: f32le) -> f32le { return #force_inline f32le(sin_f32(f32(θ))) }
-@(require_results) sin_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(sin_f32(f32(θ))) }
-@(require_results) sin_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(sin_f64(f64(θ))) }
-@(require_results) sin_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(sin_f64(f64(θ))) }
+@(require_results) sin_f16le :: proc "contextless" (θ: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(sin_f16(f16(θ), loc)) }
+@(require_results) sin_f16be :: proc "contextless" (θ: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(sin_f16(f16(θ), loc)) }
+@(require_results) sin_f32le :: proc "contextless" (θ: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(sin_f32(f32(θ), loc)) }
+@(require_results) sin_f32be :: proc "contextless" (θ: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(sin_f32(f32(θ), loc)) }
+@(require_results) sin_f64le :: proc "contextless" (θ: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(sin_f64(f64(θ), loc)) }
+@(require_results) sin_f64be :: proc "contextless" (θ: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(sin_f64(f64(θ), loc)) }
 // Return the sine of θ in radians.
 sin :: proc{
 	sin_f16, sin_f16le, sin_f16be,
@@ -68,12 +68,12 @@ sin :: proc{
 	sin_f64, sin_f64le, sin_f64be,
 }
 
-@(require_results) cos_f16le :: proc "contextless" (θ: f16le) -> f16le { return #force_inline f16le(cos_f16(f16(θ))) }
-@(require_results) cos_f16be :: proc "contextless" (θ: f16be) -> f16be { return #force_inline f16be(cos_f16(f16(θ))) }
-@(require_results) cos_f32le :: proc "contextless" (θ: f32le) -> f32le { return #force_inline f32le(cos_f32(f32(θ))) }
-@(require_results) cos_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(cos_f32(f32(θ))) }
-@(require_results) cos_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(cos_f64(f64(θ))) }
-@(require_results) cos_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(cos_f64(f64(θ))) }
+@(require_results) cos_f16le :: proc "contextless" (θ: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(cos_f16(f16(θ), loc)) }
+@(require_results) cos_f16be :: proc "contextless" (θ: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(cos_f16(f16(θ), loc)) }
+@(require_results) cos_f32le :: proc "contextless" (θ: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(cos_f32(f32(θ), loc)) }
+@(require_results) cos_f32be :: proc "contextless" (θ: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(cos_f32(f32(θ), loc)) }
+@(require_results) cos_f64le :: proc "contextless" (θ: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(cos_f64(f64(θ), loc)) }
+@(require_results) cos_f64be :: proc "contextless" (θ: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(cos_f64(f64(θ), loc)) }
 // Return the cosine of θ in radians.
 cos :: proc{
 	cos_f16, cos_f16le, cos_f16be,
@@ -81,48 +81,48 @@ cos :: proc{
 	cos_f64, cos_f64le, cos_f64be,
 }
 
-@(require_results) pow_f16le :: proc "contextless" (x, power: f16le) -> f16le { return #force_inline f16le(pow_f16(f16(x), f16(power))) }
-@(require_results) pow_f16be :: proc "contextless" (x, power: f16be) -> f16be { return #force_inline f16be(pow_f16(f16(x), f16(power))) }
-@(require_results) pow_f32le :: proc "contextless" (x, power: f32le) -> f32le { return #force_inline f32le(pow_f32(f32(x), f32(power))) }
-@(require_results) pow_f32be :: proc "contextless" (x, power: f32be) -> f32be { return #force_inline f32be(pow_f32(f32(x), f32(power))) }
-@(require_results) pow_f64le :: proc "contextless" (x, power: f64le) -> f64le { return #force_inline f64le(pow_f64(f64(x), f64(power))) }
-@(require_results) pow_f64be :: proc "contextless" (x, power: f64be) -> f64be { return #force_inline f64be(pow_f64(f64(x), f64(power))) }
+@(require_results) pow_f16le :: proc "contextless" (x, power: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(pow_f16(f16(x), f16(power), loc)) }
+@(require_results) pow_f16be :: proc "contextless" (x, power: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(pow_f16(f16(x), f16(power), loc)) }
+@(require_results) pow_f32le :: proc "contextless" (x, power: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(pow_f32(f32(x), f32(power), loc)) }
+@(require_results) pow_f32be :: proc "contextless" (x, power: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(pow_f32(f32(x), f32(power), loc)) }
+@(require_results) pow_f64le :: proc "contextless" (x, power: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(pow_f64(f64(x), f64(power), loc)) }
+@(require_results) pow_f64be :: proc "contextless" (x, power: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(pow_f64(f64(x), f64(power), loc)) }
 pow :: proc{
 	pow_f16, pow_f16le, pow_f16be,
 	pow_f32, pow_f32le, pow_f32be,
 	pow_f64, pow_f64le, pow_f64be,
 }
 
-@(require_results) fmuladd_f16le :: proc "contextless" (a, b, c: f16le) -> f16le { return #force_inline f16le(fmuladd_f16(f16(a), f16(b), f16(c))) }
-@(require_results) fmuladd_f16be :: proc "contextless" (a, b, c: f16be) -> f16be { return #force_inline f16be(fmuladd_f16(f16(a), f16(b), f16(c))) }
-@(require_results) fmuladd_f32le :: proc "contextless" (a, b, c: f32le) -> f32le { return #force_inline f32le(fmuladd_f32(f32(a), f32(b), f32(c))) }
-@(require_results) fmuladd_f32be :: proc "contextless" (a, b, c: f32be) -> f32be { return #force_inline f32be(fmuladd_f32(f32(a), f32(b), f32(c))) }
-@(require_results) fmuladd_f64le :: proc "contextless" (a, b, c: f64le) -> f64le { return #force_inline f64le(fmuladd_f64(f64(a), f64(b), f64(c))) }
-@(require_results) fmuladd_f64be :: proc "contextless" (a, b, c: f64be) -> f64be { return #force_inline f64be(fmuladd_f64(f64(a), f64(b), f64(c))) }
+@(require_results) fmuladd_f16le :: proc "contextless" (a, b, c: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(fmuladd_f16(f16(a), f16(b), f16(c), loc)) }
+@(require_results) fmuladd_f16be :: proc "contextless" (a, b, c: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(fmuladd_f16(f16(a), f16(b), f16(c), loc)) }
+@(require_results) fmuladd_f32le :: proc "contextless" (a, b, c: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(fmuladd_f32(f32(a), f32(b), f32(c), loc)) }
+@(require_results) fmuladd_f32be :: proc "contextless" (a, b, c: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(fmuladd_f32(f32(a), f32(b), f32(c), loc)) }
+@(require_results) fmuladd_f64le :: proc "contextless" (a, b, c: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(fmuladd_f64(f64(a), f64(b), f64(c), loc)) }
+@(require_results) fmuladd_f64be :: proc "contextless" (a, b, c: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(fmuladd_f64(f64(a), f64(b), f64(c), loc)) }
 fmuladd :: proc{
 	fmuladd_f16, fmuladd_f16le, fmuladd_f16be,
 	fmuladd_f32, fmuladd_f32le, fmuladd_f32be,
 	fmuladd_f64, fmuladd_f64le, fmuladd_f64be,
 }
 
-@(require_results) exp_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(exp_f16(f16(x))) }
-@(require_results) exp_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(exp_f16(f16(x))) }
-@(require_results) exp_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(exp_f32(f32(x))) }
-@(require_results) exp_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(exp_f32(f32(x))) }
-@(require_results) exp_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(exp_f64(f64(x))) }
-@(require_results) exp_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(exp_f64(f64(x))) }
+@(require_results) exp_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(exp_f16(f16(x), loc)) }
+@(require_results) exp_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(exp_f16(f16(x), loc)) }
+@(require_results) exp_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(exp_f32(f32(x), loc)) }
+@(require_results) exp_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(exp_f32(f32(x), loc)) }
+@(require_results) exp_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(exp_f64(f64(x), loc)) }
+@(require_results) exp_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(exp_f64(f64(x), loc)) }
 exp :: proc{
 	exp_f16, exp_f16le, exp_f16be,
 	exp_f32, exp_f32le, exp_f32be,
 	exp_f64, exp_f64le, exp_f64be,
 }
 
-@(require_results) pow10_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(pow10_f16(f16(x))) }
-@(require_results) pow10_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(pow10_f16(f16(x))) }
-@(require_results) pow10_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(pow10_f32(f32(x))) }
-@(require_results) pow10_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(pow10_f32(f32(x))) }
-@(require_results) pow10_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(pow10_f64(f64(x))) }
-@(require_results) pow10_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(pow10_f64(f64(x))) }
+@(require_results) pow10_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(pow10_f16(f16(x), loc)) }
+@(require_results) pow10_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(pow10_f16(f16(x), loc)) }
+@(require_results) pow10_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(pow10_f32(f32(x), loc)) }
+@(require_results) pow10_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(pow10_f32(f32(x), loc)) }
+@(require_results) pow10_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(pow10_f64(f64(x), loc)) }
+@(require_results) pow10_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(pow10_f64(f64(x), loc)) }
 pow10 :: proc{
 	pow10_f16, pow10_f16le, pow10_f16be,
 	pow10_f32, pow10_f32le, pow10_f32be,
@@ -130,7 +130,9 @@ pow10 :: proc{
 }
 
 @(require_results)
-pow10_f16 :: proc "contextless" (n: f16) -> f16 {
+pow10_f16 :: proc "contextless" (n: f16, loc := #caller_location) -> f16 {
+	validate_finite(n, loc)
+	
 	@(static, rodata) pow10_pos_tab := [?]f16{
 		1e00, 1e01, 1e02, 1e03, 1e04,
 	}
@@ -151,7 +153,9 @@ pow10_f16 :: proc "contextless" (n: f16) -> f16 {
 }
 
 @(require_results)
-pow10_f32 :: proc "contextless" (n: f32) -> f32 {
+pow10_f32 :: proc "contextless" (n: f32, loc := #caller_location) -> f32 {
+	validate_finite(n, loc)
+	
 	@(static, rodata) pow10_pos_tab := [?]f32{
 		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
@@ -179,7 +183,9 @@ pow10_f32 :: proc "contextless" (n: f32) -> f32 {
 }
 
 @(require_results)
-pow10_f64 :: proc "contextless" (n: f64) -> f64 {
+pow10_f64 :: proc "contextless" (n: f64, loc := #caller_location) -> f64 {
+	validate_finite(n, loc)
+	
 	@(static, rodata) pow10_tab := [?]f64{
 		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
 		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
@@ -207,7 +213,8 @@ pow10_f64 :: proc "contextless" (n: f64) -> f64 {
 }
 
 @(require_results)
-pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
+pow2_f64 :: proc "contextless" (#any_int exp: int, loc := #caller_location) -> (res: f64) {
+	validation_assert(exp <= 1023, loc)
 	switch {
 	case exp >= -1022 && exp <= 1023: // Normal
 		return transmute(f64)(u64(exp + F64_BIAS) << F64_SHIFT)
@@ -226,7 +233,8 @@ pow2_f64 :: proc "contextless" (#any_int exp: int) -> (res: f64) {
 }
 
 @(require_results)
-pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
+pow2_f32 :: proc "contextless" (#any_int exp: int, loc := #caller_location) -> (res: f32) {
+	validation_assert(exp <= 127, loc)
 	switch {
 	case exp >= -126 && exp <= 127:  // Normal
 		return transmute(f32)(u32(exp + F32_BIAS) << F32_SHIFT)
@@ -242,7 +250,8 @@ pow2_f32 :: proc "contextless" (#any_int exp: int) -> (res: f32) {
 }
 
 @(require_results)
-pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
+pow2_f16 :: proc "contextless" (#any_int exp: int, loc := #caller_location) -> (res: f16) {
+	validation_assert(exp <= 15, loc)
 	switch {
 	case exp >= -14 && exp <= 15:    // Normal
 		return transmute(f16)(u16(exp + F16_BIAS) << F16_SHIFT)
@@ -260,7 +269,10 @@ pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
 }
 
 @(require_results)
-ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
+ldexp_f64 :: proc "contextless" (val: f64, exp: int, loc := #caller_location) -> (result: f64) {
+	validate_finite(val, loc)
+	defer validate_finite(result, loc)
+	
 	mask  :: F64_MASK
 	shift :: F64_SHIFT
 	bias  :: F64_BIAS
@@ -272,7 +284,7 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 		return val
 	}
 	exp := exp
-	frac, e := normalize_f64(val)
+	frac, e := normalize_f64(val, loc)
 	exp += e
 	x := transmute(u64)frac
 	exp += int(x>>shift)&mask - bias
@@ -294,14 +306,14 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 	x |= u64(exp+bias) << shift
 	return m * transmute(f64)x	
 }
-@(require_results) ldexp_f16   :: proc "contextless" (val: f16, exp: int) -> f16 { return f16(ldexp_f64(f64(val), exp)) }
-@(require_results) ldexp_f32   :: proc "contextless" (val: f32, exp: int) -> f32 { return f32(ldexp_f64(f64(val), exp)) }
-@(require_results) ldexp_f16le :: proc "contextless" (val: f16le, exp: int) -> f16le { return #force_inline f16le(ldexp_f16(f16(val), exp)) }
-@(require_results) ldexp_f16be :: proc "contextless" (val: f16be, exp: int) -> f16be { return #force_inline f16be(ldexp_f16(f16(val), exp)) }
-@(require_results) ldexp_f32le :: proc "contextless" (val: f32le, exp: int) -> f32le { return #force_inline f32le(ldexp_f32(f32(val), exp)) }
-@(require_results) ldexp_f32be :: proc "contextless" (val: f32be, exp: int) -> f32be { return #force_inline f32be(ldexp_f32(f32(val), exp)) }
-@(require_results) ldexp_f64le :: proc "contextless" (val: f64le, exp: int) -> f64le { return #force_inline f64le(ldexp_f64(f64(val), exp)) }
-@(require_results) ldexp_f64be :: proc "contextless" (val: f64be, exp: int) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp)) }
+@(require_results) ldexp_f16   :: proc "contextless" (val: f16,   exp: int, loc := #caller_location) -> f16 { return f16(ldexp_f64(f64(val), exp, loc)) }
+@(require_results) ldexp_f32   :: proc "contextless" (val: f32,   exp: int, loc := #caller_location) -> f32 { return f32(ldexp_f64(f64(val), exp, loc)) }
+@(require_results) ldexp_f16le :: proc "contextless" (val: f16le, exp: int, loc := #caller_location) -> f16le { return #force_inline f16le(ldexp_f16(f16(val), exp, loc)) }
+@(require_results) ldexp_f16be :: proc "contextless" (val: f16be, exp: int, loc := #caller_location) -> f16be { return #force_inline f16be(ldexp_f16(f16(val), exp, loc)) }
+@(require_results) ldexp_f32le :: proc "contextless" (val: f32le, exp: int, loc := #caller_location) -> f32le { return #force_inline f32le(ldexp_f32(f32(val), exp, loc)) }
+@(require_results) ldexp_f32be :: proc "contextless" (val: f32be, exp: int, loc := #caller_location) -> f32be { return #force_inline f32be(ldexp_f32(f32(val), exp, loc)) }
+@(require_results) ldexp_f64le :: proc "contextless" (val: f64le, exp: int, loc := #caller_location) -> f64le { return #force_inline f64le(ldexp_f64(f64(val), exp, loc)) }
+@(require_results) ldexp_f64be :: proc "contextless" (val: f64be, exp: int, loc := #caller_location) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp, loc)) }
 // ldexp is the inverse of frexp
 // it returns val * 2**exp.
 // 
@@ -318,69 +330,107 @@ ldexp :: proc{
 }
 
 
-@(require_results) log_f16   :: proc "contextless" (x, base: f16)   -> f16   { return ln(x) / ln(base) }
-@(require_results) log_f16le :: proc "contextless" (x, base: f16le) -> f16le { return f16le(log_f16(f16(x), f16(base))) }
-@(require_results) log_f16be :: proc "contextless" (x, base: f16be) -> f16be { return f16be(log_f16(f16(x), f16(base))) }
+@(require_results)
+log_f16   :: proc "contextless" (x, base: f16, loc := #caller_location) -> f16 {
+	validate_finite(x, loc)
+	validate_finite(base, loc)
+	validation_assert(base > VALIDATION_EPS, loc)
+	return ln(x, loc) / ln(base, loc)
+}
 
-@(require_results) log_f32   :: proc "contextless" (x, base: f32)   -> f32   { return ln(x) / ln(base) }
-@(require_results) log_f32le :: proc "contextless" (x, base: f32le) -> f32le { return f32le(log_f32(f32(x), f32(base))) }
-@(require_results) log_f32be :: proc "contextless" (x, base: f32be) -> f32be { return f32be(log_f32(f32(x), f32(base))) }
+@(require_results)
+log_f32   :: proc "contextless" (x, base: f32, loc := #caller_location) -> f32 {
+	validate_finite(x, loc)
+	validate_finite(base, loc)
+	validation_assert(base > VALIDATION_EPS, loc)
+	return ln(x, loc) / ln(base, loc)
+}
 
-@(require_results) log_f64   :: proc "contextless" (x, base: f64)   -> f64   { return ln(x) / ln(base) }
-@(require_results) log_f64le :: proc "contextless" (x, base: f64le) -> f64le { return f64le(log_f64(f64(x), f64(base))) }
-@(require_results) log_f64be :: proc "contextless" (x, base: f64be) -> f64be { return f64be(log_f64(f64(x), f64(base))) }
+@(require_results)
+log_f64   :: proc "contextless" (x, base: f64, loc := #caller_location) -> f64 {
+	validate_finite(x, loc)
+	validate_finite(base, loc)
+	validation_assert(base > VALIDATION_EPS, loc)
+	return ln(x, loc) / ln(base, loc)
+}
+
+
+@(require_results) log_f16le :: proc "contextless" (x, base: f16le, loc := #caller_location) -> f16le { return f16le(log_f16(f16(x), f16(base), loc)) }
+@(require_results) log_f16be :: proc "contextless" (x, base: f16be, loc := #caller_location) -> f16be { return f16be(log_f16(f16(x), f16(base), loc)) }
+@(require_results) log_f32le :: proc "contextless" (x, base: f32le, loc := #caller_location) -> f32le { return f32le(log_f32(f32(x), f32(base), loc)) }
+@(require_results) log_f32be :: proc "contextless" (x, base: f32be, loc := #caller_location) -> f32be { return f32be(log_f32(f32(x), f32(base), loc)) }
+@(require_results) log_f64le :: proc "contextless" (x, base: f64le, loc := #caller_location) -> f64le { return f64le(log_f64(f64(x), f64(base), loc)) }
+@(require_results) log_f64be :: proc "contextless" (x, base: f64be, loc := #caller_location) -> f64be { return f64be(log_f64(f64(x), f64(base), loc)) }
 log :: proc{
 	log_f16, log_f16le, log_f16be,
 	log_f32, log_f32le, log_f32be,
 	log_f64, log_f64le, log_f64be,
 }
 
-@(require_results) log2_f16   :: proc "contextless" (x: f16)   -> f16   { return log(f16(x), f16(2.0)) }
-@(require_results) log2_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log_f16(f16(x), f16(2.0))) }
-@(require_results) log2_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(log_f16(f16(x), f16(2.0))) }
+@(require_results) log2_f16   :: proc "contextless" (x: f16,   loc := #caller_location) -> f16   { return log(f16(x), f16(2.0), loc) }
+@(require_results) log2_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return f16le(log_f16(f16(x), f16(2.0), loc)) }
+@(require_results) log2_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return f16be(log_f16(f16(x), f16(2.0), loc)) }
 
-@(require_results) log2_f32   :: proc "contextless" (x: f32)   -> f32   { return log(f32(x), f32(2.0)) }
-@(require_results) log2_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(log_f32(f32(x), f32(2.0))) }
-@(require_results) log2_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(log_f32(f32(x), f32(2.0))) }
+@(require_results) log2_f32   :: proc "contextless" (x: f32,   loc := #caller_location) -> f32   { return log(f32(x), f32(2.0), loc) }
+@(require_results) log2_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return f32le(log_f32(f32(x), f32(2.0), loc)) }
+@(require_results) log2_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return f32be(log_f32(f32(x), f32(2.0), loc)) }
 
-@(require_results) log2_f64   :: proc "contextless" (x: f64)   -> f64   { return log(f64(x), f64(2.0)) }
-@(require_results) log2_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log_f64(f64(x), f64(2.0))) }
-@(require_results) log2_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log_f64(f64(x), f64(2.0))) }
-
+@(require_results) log2_f64   :: proc "contextless" (x: f64,   loc := #caller_location) -> f64   { return log(f64(x), f64(2.0), loc) }
+@(require_results) log2_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return f64le(log_f64(f64(x), f64(2.0), loc)) }
+@(require_results) log2_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return f64be(log_f64(f64(x), f64(2.0), loc)) }
 log2 :: proc{
 	log2_f16, log2_f16le, log2_f16be,
 	log2_f32, log2_f32le, log2_f32be,
 	log2_f64, log2_f64le, log2_f64be,
 }
 
-@(require_results) log10_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN10 }
-@(require_results) log10_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log10_f16(f16(x))) }
-@(require_results) log10_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(log10_f16(f16(x))) }
+@(require_results) log10_f16   :: proc "contextless" (x: f16,   loc := #caller_location) -> f16   { return ln(x, loc)/LN10 }
+@(require_results) log10_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return f16le(log10_f16(f16(x), loc)) }
+@(require_results) log10_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return f16be(log10_f16(f16(x), loc)) }
 
-@(require_results) log10_f32   :: proc "contextless" (x: f32)   -> f32   { return ln(x)/LN10 }
-@(require_results) log10_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(log10_f32(f32(x))) }
-@(require_results) log10_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(log10_f32(f32(x))) }
+@(require_results) log10_f32   :: proc "contextless" (x: f32,   loc := #caller_location) -> f32   { return ln(x, loc)/LN10 }
+@(require_results) log10_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return f32le(log10_f32(f32(x), loc)) }
+@(require_results) log10_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return f32be(log10_f32(f32(x), loc)) }
 
-@(require_results) log10_f64   :: proc "contextless" (x: f64)   -> f64   { return ln(x)/LN10 }
-@(require_results) log10_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log10_f64(f64(x))) }
-@(require_results) log10_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log10_f64(f64(x))) }
+@(require_results) log10_f64   :: proc "contextless" (x: f64,   loc := #caller_location) -> f64   { return ln(x, loc)/LN10 }
+@(require_results) log10_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return f64le(log10_f64(f64(x), loc)) }
+@(require_results) log10_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return f64be(log10_f64(f64(x), loc)) }
 log10 :: proc{
 	log10_f16, log10_f16le, log10_f16be,
 	log10_f32, log10_f32le, log10_f32be,
 	log10_f64, log10_f64le, log10_f64be,
 }
 
-@(require_results) tan_f16   :: proc "contextless" (θ: f16)   -> f16   { return sin(θ)/cos(θ) }
-@(require_results) tan_f16le :: proc "contextless" (θ: f16le) -> f16le { return f16le(tan_f16(f16(θ))) }
-@(require_results) tan_f16be :: proc "contextless" (θ: f16be) -> f16be { return f16be(tan_f16(f16(θ))) }
+@(require_results)
+tan_f16 :: proc "contextless" (θ: f16, loc := #caller_location) -> f16 {
+	validate_finite(θ, loc)
+	denom := cos(θ, loc)
+	validation_assert(abs(denom) > VALIDATION_EPS, loc)
+	return sin(θ, loc) / denom
+}
 
-@(require_results) tan_f32   :: proc "contextless" (θ: f32)   -> f32   { return sin(θ)/cos(θ) }
-@(require_results) tan_f32le :: proc "contextless" (θ: f32le) -> f32le { return f32le(tan_f32(f32(θ))) }
-@(require_results) tan_f32be :: proc "contextless" (θ: f32be) -> f32be { return f32be(tan_f32(f32(θ))) }
+@(require_results)
+tan_f32 :: proc "contextless" (θ: f32, loc := #caller_location) -> f32 {
+	validate_finite(θ, loc)
+	denom := cos(θ, loc)
+	validation_assert(abs(denom) > VALIDATION_EPS, loc)
+	return sin(θ, loc) / denom
+}
 
-@(require_results) tan_f64   :: proc "contextless" (θ: f64)   -> f64   { return sin(θ)/cos(θ) }
-@(require_results) tan_f64le :: proc "contextless" (θ: f64le) -> f64le { return f64le(tan_f64(f64(θ))) }
-@(require_results) tan_f64be :: proc "contextless" (θ: f64be) -> f64be { return f64be(tan_f64(f64(θ))) }
+@(require_results)
+tan_f64 :: proc "contextless" (θ: f64, loc := #caller_location) -> f64 {
+	validate_finite(θ, loc)
+	denom := cos(θ, loc)
+	validation_assert(abs(denom) > VALIDATION_EPS, loc)
+	return sin(θ, loc) / denom
+}
+
+@(require_results) tan_f16le :: proc "contextless" (θ: f16le, loc := #caller_location) -> f16le { return f16le(tan_f16(f16(θ), loc)) }
+@(require_results) tan_f16be :: proc "contextless" (θ: f16be, loc := #caller_location) -> f16be { return f16be(tan_f16(f16(θ), loc)) }
+@(require_results) tan_f32le :: proc "contextless" (θ: f32le, loc := #caller_location) -> f32le { return f32le(tan_f32(f32(θ), loc)) }
+@(require_results) tan_f32be :: proc "contextless" (θ: f32be, loc := #caller_location) -> f32be { return f32be(tan_f32(f32(θ), loc)) }
+@(require_results) tan_f64le :: proc "contextless" (θ: f64le, loc := #caller_location) -> f64le { return f64le(tan_f64(f64(θ), loc)) }
+@(require_results) tan_f64be :: proc "contextless" (θ: f64be, loc := #caller_location) -> f64be { return f64be(tan_f64(f64(θ), loc)) }
 // Return the tangent of θ in radians.
 tan :: proc{
 	tan_f16, tan_f16le, tan_f16be,
@@ -388,16 +438,37 @@ tan :: proc{
 	tan_f64, tan_f64le, tan_f64be,
 }
 
-@(require_results) lerp :: proc "contextless" (a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t }
-@(require_results) saturate :: proc "contextless" (a: $T) -> (x: T) { return clamp(a, 0, 1) }
+@(require_results)
+lerp :: proc "contextless" (a, b: $T, t: $E, loc := #caller_location) -> (x: T) where intrinsics.type_is_float(E) {
+	validate_finite(a, loc)
+	validate_finite(b, loc)
+	validate_finite(t, loc)
+	return a*(1-t) + b*t
+}
 
 @(require_results)
-unlerp :: proc "contextless" (a, b, x: $T) -> (t: T) where intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
+saturate :: proc "contextless" (a: $T) -> (x: T) where intrinsics.type_is_float(T) {
+	return clamp(a, 0, 1)
+}
+
+@(require_results)
+unlerp :: proc "contextless" (a, b, x: $T, loc := #caller_location) -> (t: T) where intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
+	validate_finite(a, loc)
+	validate_finite(b, loc)
+	validate_finite(x, loc)
+	validation_assert(abs(b - a) > VALIDATION_EPS, loc)
 	return (x-a)/(b-a)
 }
 
 @(require_results)
-remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T, loc := #caller_location) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	validate_finite(old_value, loc)
+	validate_finite(old_min, loc)
+	validate_finite(old_max, loc)
+	validate_finite(new_min, loc)
+	validate_finite(new_max, loc)
+	validation_assert(ans(new_max - new_min) > VALIDATION_EPS, loc)
+	
 	old_range := old_max - old_min
 	new_range := new_max - new_min
 	if old_range == 0 {
@@ -412,26 +483,25 @@ remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) 
 }
 
 @(require_results)
-remap_clamped :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
-	remapped := #force_inline remap(old_value, old_min, old_max, new_min, new_max)
+remap_clamped :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T, loc := #caller_location) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	remapped := #force_inline remap(old_value, old_min, old_max, new_min, new_max, loc)
 	return clamp(remapped, new_min, new_max)
 }
 
 @(require_results)
-wrap :: proc "contextless" (x, y: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
-	tmp := mod(x, y)
+wrap :: proc "contextless" (x, y: $T, loc := #caller_location) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	tmp := mod(x, y, loc)
 	return y + tmp if tmp < 0 else tmp
 }
 @(require_results)
-angle_diff :: proc "contextless" (a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
-
-	dist := wrap(b - a, TAU)
-	return wrap(dist*2, TAU) - dist
+angle_diff :: proc "contextless" (a, b: $T, loc := #caller_location) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	dist := wrap(b - a, TAU, loc)
+	return wrap(dist*2, TAU, loc) - dist
 }
 
 @(require_results)
-angle_lerp :: proc "contextless" (a, b, t: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
-	return a + angle_diff(a, b) * t
+angle_lerp :: proc "contextless" (a, b, t: $T, loc := #caller_location) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	return a + angle_diff(a, b, loc) * t
 }
 
 @(require_results)
@@ -440,21 +510,31 @@ step :: proc "contextless" (edge, x: $T) -> T where intrinsics.type_is_numeric(T
 }
 
 @(require_results)
-smoothstep :: proc "contextless" (edge0, edge1, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+smoothstep :: proc "contextless" (edge0, edge1, x: $T, loc := #caller_location) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
+	validate_finite(edge0, loc)
+	validate_finite(edge1, loc)
+	validate_finite(x, loc)
+	validation_assert(abs(edge1 - edge0) > VALIDATION_EPS, loc)
+	
 	t := clamp((x - edge0) / (edge1 - edge0), 0, 1)
 	return t * t * (3 - 2*t)
 }
 
 @(require_results)
-bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_numeric(T) {
-	return t / (((1/b) - 2) * (1 - t) + 1)
+bias :: proc "contextless" (t, b: $T, loc := #caller_location) -> T where intrinsics.type_is_numeric(T) {
+	validate_finite(t)
+	validate_finite(b)
+	validation_assert(abs(b) > VALIDATION_EPS)
+	denom := (((1/b) - 2) * (1 - t) + 1)
+	validation_assert(abs(denom) > VALIDATION_EPS)
+	return t / denom
 }
 @(require_results)
-gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
+gain :: proc "contextless" (t, g: $T, loc := #caller_location) -> T where intrinsics.type_is_float(T) {
 	if t < 0.5 {
-		return bias(t*2, g) * 0.5
+		return bias(t*2, g, loc) * 0.5
 	}
-	return bias(t*2 - 1, 1 - g) * 0.5 + 0.5
+	return bias(t*2 - 1, 1 - g, loc) * 0.5 + 0.5
 }
 
 @(require_results) sign_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(int(0 < x) - int(x < 0)) }
@@ -551,24 +631,24 @@ copy_sign :: proc{
 	copy_sign_f64, copy_sign_f64le, copy_sign_f64be,
 }
 
-@(require_results) to_radians_f16   :: proc "contextless" (degrees: f16)   -> f16   { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f16le :: proc "contextless" (degrees: f16le) -> f16le { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f16be :: proc "contextless" (degrees: f16be) -> f16be { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f32   :: proc "contextless" (degrees: f32)   -> f32   { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f32le :: proc "contextless" (degrees: f32le) -> f32le { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f32be :: proc "contextless" (degrees: f32be) -> f32be { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f64   :: proc "contextless" (degrees: f64)   -> f64   { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f64le :: proc "contextless" (degrees: f64le) -> f64le { return degrees * RAD_PER_DEG }
-@(require_results) to_radians_f64be :: proc "contextless" (degrees: f64be) -> f64be { return degrees * RAD_PER_DEG }
-@(require_results) to_degrees_f16   :: proc "contextless" (radians: f16)   -> f16   { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f16le :: proc "contextless" (radians: f16le) -> f16le { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f16be :: proc "contextless" (radians: f16be) -> f16be { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f32   :: proc "contextless" (radians: f32)   -> f32   { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f32le :: proc "contextless" (radians: f32le) -> f32le { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f32be :: proc "contextless" (radians: f32be) -> f32be { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f64   :: proc "contextless" (radians: f64)   -> f64   { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f64le :: proc "contextless" (radians: f64le) -> f64le { return radians * DEG_PER_RAD }
-@(require_results) to_degrees_f64be :: proc "contextless" (radians: f64be) -> f64be { return radians * DEG_PER_RAD }
+@(require_results) to_radians_f16   :: proc "contextless" (degrees: f16,   loc := #caller_location) -> f16   { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f16le :: proc "contextless" (degrees: f16le, loc := #caller_location) -> f16le { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f16be :: proc "contextless" (degrees: f16be, loc := #caller_location) -> f16be { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f32   :: proc "contextless" (degrees: f32,   loc := #caller_location) -> f32   { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f32le :: proc "contextless" (degrees: f32le, loc := #caller_location) -> f32le { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f32be :: proc "contextless" (degrees: f32be, loc := #caller_location) -> f32be { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f64   :: proc "contextless" (degrees: f64,   loc := #caller_location) -> f64   { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f64le :: proc "contextless" (degrees: f64le, loc := #caller_location) -> f64le { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_radians_f64be :: proc "contextless" (degrees: f64be, loc := #caller_location) -> f64be { validate_finite(degrees, loc); return degrees * RAD_PER_DEG }
+@(require_results) to_degrees_f16   :: proc "contextless" (radians: f16,   loc := #caller_location) -> f16   { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f16le :: proc "contextless" (radians: f16le, loc := #caller_location) -> f16le { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f16be :: proc "contextless" (radians: f16be, loc := #caller_location) -> f16be { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f32   :: proc "contextless" (radians: f32,   loc := #caller_location) -> f32   { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f32le :: proc "contextless" (radians: f32le, loc := #caller_location) -> f32le { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f32be :: proc "contextless" (radians: f32be, loc := #caller_location) -> f32be { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f64   :: proc "contextless" (radians: f64,   loc := #caller_location) -> f64   { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f64le :: proc "contextless" (radians: f64le, loc := #caller_location) -> f64le { validate_finite(radians, loc); return radians * DEG_PER_RAD }
+@(require_results) to_degrees_f64be :: proc "contextless" (radians: f64be, loc := #caller_location) -> f64be { validate_finite(radians, loc); return radians * DEG_PER_RAD }
 to_radians :: proc{
 	to_radians_f16, to_radians_f16le, to_radians_f16be,
 	to_radians_f32, to_radians_f32le, to_radians_f32be,
@@ -581,7 +661,8 @@ to_degrees :: proc{
 }
 
 @(require_results)
-trunc_f16 :: proc "contextless" (x: f16) -> f16 {
+trunc_f16 :: proc "contextless" (x: f16, loc := #caller_location) -> f16 {
+	validate_finite(x, loc)
 	trunc_internal :: proc "contextless" (f: f16) -> f16 {
 		mask  :: F16_MASK
 		shift :: F16_SHIFT
@@ -610,11 +691,12 @@ trunc_f16 :: proc "contextless" (x: f16) -> f16 {
 	}
 	return trunc_internal(x)
 }
-@(require_results) trunc_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(trunc_f16(f16(x))) }
-@(require_results) trunc_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(trunc_f16(f16(x))) }
+@(require_results) trunc_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(trunc_f16(f16(x), loc)) }
+@(require_results) trunc_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(trunc_f16(f16(x), loc)) }
 
 @(require_results)
-trunc_f32 :: proc "contextless" (x: f32) -> f32 {
+trunc_f32 :: proc "contextless" (x: f32, loc := #caller_location) -> f32 {
+	validate_finite(x, loc)
 	trunc_internal :: proc "contextless" (f: f32) -> f32 {
 		mask  :: F32_MASK
 		shift :: F32_SHIFT
@@ -643,11 +725,12 @@ trunc_f32 :: proc "contextless" (x: f32) -> f32 {
 	}
 	return trunc_internal(x)
 }
-@(require_results) trunc_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(trunc_f32(f32(x))) }
-@(require_results) trunc_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(trunc_f32(f32(x))) }
+@(require_results) trunc_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(trunc_f32(f32(x), loc)) }
+@(require_results) trunc_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(trunc_f32(f32(x), loc)) }
 
 @(require_results)
-trunc_f64 :: proc "contextless" (x: f64) -> f64 {
+trunc_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
+	validate_finite(x, loc)
 	trunc_internal :: proc "contextless" (f: f64) -> f64 {
 		mask  :: F64_MASK
 		shift :: F64_SHIFT
@@ -676,8 +759,8 @@ trunc_f64 :: proc "contextless" (x: f64) -> f64 {
 	}
 	return trunc_internal(x)
 }
-@(require_results) trunc_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(trunc_f64(f64(x))) }
-@(require_results) trunc_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(trunc_f64(f64(x))) }
+@(require_results) trunc_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(trunc_f64(f64(x), loc)) }
+@(require_results) trunc_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(trunc_f64(f64(x), loc)) }
 // Removes the fractional part of the value, i.e. rounds towards zero.
 trunc :: proc{
 	trunc_f16, trunc_f16le, trunc_f16be,
@@ -686,7 +769,9 @@ trunc :: proc{
 }
 
 @(require_results)
-round_f16 :: proc "contextless" (x: f16) -> f16 {
+round_f16 :: proc "contextless" (x: f16, loc := #caller_location) -> f16 {
+	validate_finite(x, loc)
+	
 	// origin: Go /src/math/floor.go
 	//
 	// Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -739,11 +824,13 @@ round_f16 :: proc "contextless" (x: f16) -> f16 {
 
 	return transmute(f16)bits
 }
-@(require_results) round_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(round_f16(f16(x))) }
-@(require_results) round_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(round_f16(f16(x))) }
+@(require_results) round_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(round_f16(f16(x), loc)) }
+@(require_results) round_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(round_f16(f16(x), loc)) }
 
 @(require_results)
-round_f32 :: proc "contextless" (x: f32) -> f32 {
+round_f32 :: proc "contextless" (x: f32, loc := #caller_location) -> f32 {
+	validate_finite(x, loc)
+	
 	// origin: Go /src/math/floor.go
 	//
 	// Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -796,11 +883,13 @@ round_f32 :: proc "contextless" (x: f32) -> f32 {
 
 	return transmute(f32)bits
 }
-@(require_results) round_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(round_f32(f32(x))) }
-@(require_results) round_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(round_f32(f32(x))) }
+@(require_results) round_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(round_f32(f32(x), loc)) }
+@(require_results) round_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(round_f32(f32(x), loc)) }
 
 @(require_results)
-round_f64 :: proc "contextless" (x: f64) -> f64 {
+round_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
+	validate_finite(x, loc)
+	
 	// origin: Go /src/math/floor.go
 	//
 	// Copyright (c) 2009 The Go Authors. All rights reserved.
@@ -853,8 +942,8 @@ round_f64 :: proc "contextless" (x: f64) -> f64 {
 
 	return transmute(f64)bits
 }
-@(require_results) round_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(round_f64(f64(x))) }
-@(require_results) round_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(round_f64(f64(x))) }
+@(require_results) round_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(round_f64(f64(x), loc)) }
+@(require_results) round_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(round_f64(f64(x), loc)) }
 round :: proc{
 	round_f16, round_f16le, round_f16be,
 	round_f32, round_f32le, round_f32be,
@@ -862,17 +951,17 @@ round :: proc{
 }
 
 
-@(require_results) ceil_f16   :: proc "contextless" (x: f16)   -> f16   { return -floor(-x) }
-@(require_results) ceil_f16le :: proc "contextless" (x: f16le) -> f16le { return -floor(-x) }
-@(require_results) ceil_f16be :: proc "contextless" (x: f16be) -> f16be { return -floor(-x) }
+@(require_results) ceil_f16   :: proc "contextless" (x: f16,   loc := #caller_location) -> f16   { return -floor(-x, loc) }
+@(require_results) ceil_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return -floor(-x, loc) }
+@(require_results) ceil_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return -floor(-x, loc) }
 
-@(require_results) ceil_f32   :: proc "contextless" (x: f32)   -> f32   { return -floor(-x) }
-@(require_results) ceil_f32le :: proc "contextless" (x: f32le) -> f32le { return -floor(-x) }
-@(require_results) ceil_f32be :: proc "contextless" (x: f32be) -> f32be { return -floor(-x) }
+@(require_results) ceil_f32   :: proc "contextless" (x: f32,   loc := #caller_location) -> f32   { return -floor(-x, loc) }
+@(require_results) ceil_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return -floor(-x, loc) }
+@(require_results) ceil_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return -floor(-x, loc) }
 
-@(require_results) ceil_f64   :: proc "contextless" (x: f64)   -> f64   { return -floor(-x) }
-@(require_results) ceil_f64le :: proc "contextless" (x: f64le) -> f64le { return -floor(-x) }
-@(require_results) ceil_f64be :: proc "contextless" (x: f64be) -> f64be { return -floor(-x) }
+@(require_results) ceil_f64   :: proc "contextless" (x: f64,   loc := #caller_location) -> f64   { return -floor(-x, loc) }
+@(require_results) ceil_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return -floor(-x, loc) }
+@(require_results) ceil_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return -floor(-x, loc) }
 
 ceil :: proc{
 	ceil_f16, ceil_f16le, ceil_f16be,
@@ -881,56 +970,59 @@ ceil :: proc{
 }
 
 @(require_results)
-floor_f16   :: proc "contextless" (x: f16)   -> f16 {
+floor_f16   :: proc "contextless" (x: f16, loc := #caller_location)   -> f16 {
+	validate_finite(x, loc)
 	if x == 0 || is_nan(x) || is_inf(x) {
 		return x
 	}
 	if x < 0 {
-		d, fract := modf(-x)
+		d, fract := modf(-x, loc)
 		if fract != 0.0 {
 			d = d + 1
 		}
 		return -d
 	}
-	d, _ := modf(x)
+	d, _ := modf(x, loc)
 	return d
 }
-@(require_results) floor_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(floor_f16(f16(x))) }
-@(require_results) floor_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(floor_f16(f16(x))) }
+@(require_results) floor_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return #force_inline f16le(floor_f16(f16(x), loc)) }
+@(require_results) floor_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return #force_inline f16be(floor_f16(f16(x), loc)) }
 @(require_results)
-floor_f32 :: proc "contextless" (x: f32)   -> f32 {
+floor_f32 :: proc "contextless" (x: f32, loc := #caller_location)   -> f32 {
+	validate_finite(x, loc)
 	if x == 0 || is_nan(x) || is_inf(x) {
 		return x
 	}
 	if x < 0 {
-		d, fract := modf(-x)
+		d, fract := modf(-x, loc)
 		if fract != 0.0 {
 			d = d + 1
 		}
 		return -d
 	}
-	d, _ := modf(x)
+	d, _ := modf(x, loc)
 	return d
 }
-@(require_results) floor_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(floor_f32(f32(x))) }
-@(require_results) floor_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(floor_f32(f32(x))) }
+@(require_results) floor_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return #force_inline f32le(floor_f32(f32(x), loc)) }
+@(require_results) floor_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return #force_inline f32be(floor_f32(f32(x), loc)) }
 @(require_results)
-floor_f64   :: proc "contextless" (x: f64)   -> f64 {
+floor_f64   :: proc "contextless" (x: f64, loc := #caller_location)   -> f64 {
+	validate_finite(x, loc)
 	if x == 0 || is_nan(x) || is_inf(x) {
 		return x
 	}
 	if x < 0 {
-		d, fract := modf(-x)
+		d, fract := modf(-x, loc)
 		if fract != 0.0 {
 			d = d + 1
 		}
 		return -d
 	}
-	d, _ := modf(x)
+	d, _ := modf(x, loc)
 	return d
 }
-@(require_results) floor_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(floor_f64(f64(x))) }
-@(require_results) floor_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(floor_f64(f64(x))) }
+@(require_results) floor_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return #force_inline f64le(floor_f64(f64(x), loc)) }
+@(require_results) floor_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return #force_inline f64be(floor_f64(f64(x), loc)) }
 floor :: proc{
 	floor_f16, floor_f16le, floor_f16be,
 	floor_f32, floor_f32le, floor_f32be,
@@ -939,8 +1031,8 @@ floor :: proc{
 
 
 @(require_results)
-floor_div :: proc "contextless" (x, y: $T) -> T
-	where intrinsics.type_is_integer(T) {
+floor_div :: proc "contextless" (x, y: $T, loc := #caller_location) -> T where intrinsics.type_is_integer(T) {
+	validation_assert(y != 0, loc)
 	a := x / y
 	r := x % y
 	if (r > 0 && y < 0) || (r < 0 && y > 0) {
@@ -950,8 +1042,8 @@ floor_div :: proc "contextless" (x, y: $T) -> T
 }
 
 @(require_results)
-floor_mod :: proc "contextless" (x, y: $T) -> T
-	where intrinsics.type_is_integer(T) {
+floor_mod :: proc "contextless" (x, y: $T, loc := #caller_location) -> T where intrinsics.type_is_integer(T) {
+	validation_assert(y != 0, loc)
 	r := x % y
 	if (r > 0 && y < 0) || (r < 0 && y > 0) {
 		r += y
@@ -960,16 +1052,16 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 }
 
 @(require_results)
-divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
-	where intrinsics.type_is_integer(T) {
+divmod :: #force_inline proc "contextless" (x, y: $T, loc := #caller_location) -> (div, mod: T) where intrinsics.type_is_integer(T) {
+	validation_assert(y != 0, loc)
 	div = x / y
 	mod = x % y
 	return
 }
 
 @(require_results)
-floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
-	where intrinsics.type_is_integer(T) {
+floor_divmod :: #force_inline proc "contextless" (x, y: $T, loc := #caller_location) -> (div, mod: T) where intrinsics.type_is_integer(T) {
+	validation_assert(y != 0, loc)
 	div = x / y
 	mod = x % y
 	if (div > 0 && y < 0) || (mod < 0 && y > 0) {
@@ -981,7 +1073,9 @@ floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 
 
 @(require_results)
-modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
+modf_f16   :: proc "contextless" (x: f16, loc := #caller_location) -> (int: f16, frac: f16) {
+	validate_finite(x, loc)
+	
 	shift :: F16_SHIFT
 	mask  :: F16_MASK
 	bias  :: F16_BIAS
@@ -989,7 +1083,7 @@ modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 	if x < 1 {
 		switch {
 		case x < 0:
-			int, frac = modf(-x)
+			int, frac = modf_f16(-x, loc)
 			return -int, -frac
 		case x == 0:
 			return x, x
@@ -1008,17 +1102,19 @@ modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 	return
 }
 @(require_results)
-modf_f16le :: proc "contextless" (x: f16le) -> (int: f16le, frac: f16le) {
-	i, f := #force_inline modf_f16(f16(x))
+modf_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> (int: f16le, frac: f16le) {
+	i, f := #force_inline modf_f16(f16(x), loc)
 	return f16le(i), f16le(f)
 }
 @(require_results)
-modf_f16be :: proc "contextless" (x: f16be) -> (int: f16be, frac: f16be) {
-	i, f := #force_inline modf_f16(f16(x))
+modf_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> (int: f16be, frac: f16be) {
+	i, f := #force_inline modf_f16(f16(x), loc)
 	return f16be(i), f16be(f)
 }
 @(require_results)
-modf_f32 :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
+modf_f32 :: proc "contextless" (x: f32, loc := #caller_location) -> (int: f32, frac: f32) {
+	validate_finite(x, loc)
+	
 	shift :: F32_SHIFT
 	mask  :: F32_MASK
 	bias  :: F32_BIAS
@@ -1026,7 +1122,7 @@ modf_f32 :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
 	if x < 1 {
 		switch {
 		case x < 0:
-			int, frac = modf(-x)
+			int, frac = modf_f32(-x, loc)
 			return -int, -frac
 		case x == 0:
 			return x, x
@@ -1045,17 +1141,19 @@ modf_f32 :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
 	return
 }
 @(require_results)
-modf_f32le :: proc "contextless" (x: f32le) -> (int: f32le, frac: f32le) {
-	i, f := #force_inline modf_f32(f32(x))
+modf_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> (int: f32le, frac: f32le) {
+	i, f := #force_inline modf_f32(f32(x), loc)
 	return f32le(i), f32le(f)
 }
 @(require_results)
-modf_f32be :: proc "contextless" (x: f32be) -> (int: f32be, frac: f32be) {
-	i, f := #force_inline modf_f32(f32(x))
+modf_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> (int: f32be, frac: f32be) {
+	i, f := #force_inline modf_f32(f32(x), loc)
 	return f32be(i), f32be(f)
 }
 @(require_results)
-modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
+modf_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> (int: f64, frac: f64) {
+	validate_finite(x, loc)
+	
 	shift :: F64_SHIFT
 	mask  :: F64_MASK
 	bias  :: F64_BIAS
@@ -1063,7 +1161,7 @@ modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
 	if x < 1 {
 		switch {
 		case x < 0:
-			int, frac = modf(-x)
+			int, frac = modf_f64(-x, loc)
 			return -int, -frac
 		case x == 0:
 			return x, x
@@ -1082,13 +1180,13 @@ modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
 	return
 }
 @(require_results)
-modf_f64le :: proc "contextless" (x: f64le) -> (int: f64le, frac: f64le) {
-	i, f := #force_inline modf_f64(f64(x))
+modf_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> (int: f64le, frac: f64le) {
+	i, f := #force_inline modf_f64(f64(x), loc)
 	return f64le(i), f64le(f)
 }
 @(require_results)
-modf_f64be :: proc "contextless" (x: f64be) -> (int: f64be, frac: f64be) {
-	i, f := #force_inline modf_f64(f64(x))
+modf_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> (int: f64be, frac: f64be) {
+	i, f := #force_inline modf_f64(f64(x), loc)
 	return f64be(i), f64be(f)
 }
 modf :: proc{
@@ -1099,57 +1197,110 @@ modf :: proc{
 split_decimal :: modf
 
 @(require_results)
-mod_f16 :: proc "contextless" (x, y: f16) -> (n: f16) {
+mod_f16 :: proc "contextless" (x, y: f16, loc := #caller_location) -> (n: f16) {
+	validation_assert(y > VALIDATION_EPS, loc)
 	z := abs(y)
-	n = remainder(abs(x), z)
+	n = remainder(abs(x), z, loc)
 	if sign(n) < 0 {
 		n += z
 	}
 	return copy_sign(n, x)
 }
-@(require_results) mod_f16le :: proc "contextless" (x, y: f16le) -> (n: f16le) { return #force_inline f16le(mod_f16(f16(x), f16(y))) }
-@(require_results) mod_f16be :: proc "contextless" (x, y: f16be) -> (n: f16be) { return #force_inline f16be(mod_f16(f16(x), f16(y))) }
+@(require_results) mod_f16le :: proc "contextless" (x, y: f16le, loc := #caller_location) -> (n: f16le) { return #force_inline f16le(mod_f16(f16(x), f16(y), loc)) }
+@(require_results) mod_f16be :: proc "contextless" (x, y: f16be, loc := #caller_location) -> (n: f16be) { return #force_inline f16be(mod_f16(f16(x), f16(y), loc)) }
 @(require_results)
-mod_f32 :: proc "contextless" (x, y: f32)   -> (n: f32) {
+mod_f32 :: proc "contextless" (x, y: f32, loc := #caller_location)   -> (n: f32) {
+	validation_assert(y > VALIDATION_EPS, loc)
 	z := abs(y)
-	n = remainder(abs(x), z)
+	n = remainder(abs(x), z, loc)
 	if sign(n) < 0 {
 		n += z
 	}
 	return copy_sign(n, x)
 }
+@(require_results) mod_f32le :: proc "contextless" (x, y: f32le, loc := #caller_location) -> (n: f32le) { return #force_inline f32le(mod_f32(f32(x), f32(y), loc)) }
+@(require_results) mod_f32be :: proc "contextless" (x, y: f32be, loc := #caller_location) -> (n: f32be) { return #force_inline f32be(mod_f32(f32(x), f32(y), loc)) }
 @(require_results)
-mod_f32le :: proc "contextless" (x, y: f32le) -> (n: f32le) { return #force_inline f32le(mod_f32(f32(x), f32(y))) }
-@(require_results)
-mod_f32be :: proc "contextless" (x, y: f32be) -> (n: f32be) { return #force_inline f32be(mod_f32(f32(x), f32(y))) }
-@(require_results)
-mod_f64 :: proc "contextless" (x, y: f64)   -> (n: f64) {
+mod_f64 :: proc "contextless" (x, y: f64, loc := #caller_location)   -> (n: f64) {
+	validation_assert(y > VALIDATION_EPS, loc)
 	z := abs(y)
-	n = remainder(abs(x), z)
+	n = remainder(abs(x), z, loc)
 	if sign(n) < 0 {
 		n += z
 	}
 	return copy_sign(n, x)
 }
-@(require_results)
-mod_f64le :: proc "contextless" (x, y: f64le) -> (n: f64le) { return #force_inline f64le(mod_f64(f64(x), f64(y))) }
-@(require_results)
-mod_f64be :: proc "contextless" (x, y: f64be) -> (n: f64be) { return #force_inline f64be(mod_f64(f64(x), f64(y))) }
+@(require_results) mod_f64le :: proc "contextless" (x, y: f64le, loc := #caller_location) -> (n: f64le) { return #force_inline f64le(mod_f64(f64(x), f64(y), loc)) }
+@(require_results) mod_f64be :: proc "contextless" (x, y: f64be, loc := #caller_location) -> (n: f64be) { return #force_inline f64be(mod_f64(f64(x), f64(y), loc)) }
 mod :: proc{
 	mod_f16, mod_f16le, mod_f16be,
 	mod_f32, mod_f32le, mod_f32be,
 	mod_f64, mod_f64le, mod_f64be,
 }
 
-@(require_results) remainder_f16   :: proc "contextless" (x, y: f16  ) -> f16   { return x - round(x/y) * y }
-@(require_results) remainder_f16le :: proc "contextless" (x, y: f16le) -> f16le { return x - round(x/y) * y }
-@(require_results) remainder_f16be :: proc "contextless" (x, y: f16be) -> f16be { return x - round(x/y) * y }
-@(require_results) remainder_f32   :: proc "contextless" (x, y: f32  ) -> f32   { return x - round(x/y) * y }
-@(require_results) remainder_f32le :: proc "contextless" (x, y: f32le) -> f32le { return x - round(x/y) * y }
-@(require_results) remainder_f32be :: proc "contextless" (x, y: f32be) -> f32be { return x - round(x/y) * y }
-@(require_results) remainder_f64   :: proc "contextless" (x, y: f64  ) -> f64   { return x - round(x/y) * y }
-@(require_results) remainder_f64le :: proc "contextless" (x, y: f64le) -> f64le { return x - round(x/y) * y }
-@(require_results) remainder_f64be :: proc "contextless" (x, y: f64be) -> f64be { return x - round(x/y) * y }
+@(require_results)
+remainder_f16   :: proc "contextless" (x, y: f16  , loc := #caller_location) -> f16   {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f16le :: proc "contextless" (x, y: f16le, loc := #caller_location) -> f16le {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f16be :: proc "contextless" (x, y: f16be, loc := #caller_location) -> f16be {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f32   :: proc "contextless" (x, y: f32  , loc := #caller_location) -> f32   {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f32le :: proc "contextless" (x, y: f32le, loc := #caller_location) -> f32le {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f32be :: proc "contextless" (x, y: f32be, loc := #caller_location) -> f32be {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f64   :: proc "contextless" (x, y: f64  , loc := #caller_location) -> f64   {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f64le :: proc "contextless" (x, y: f64le, loc := #caller_location) -> f64le {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
+@(require_results)
+remainder_f64be :: proc "contextless" (x, y: f64be, loc := #caller_location) -> f64be {
+	validate_finite(x, loc)
+	validate_finite(y, loc)
+	validation_assert(abs(y) > VALIDATION_EPS, loc)
+	return x - round(x/y, loc) * y
+}
 remainder :: proc{
 	remainder_f16, remainder_f16le, remainder_f16be,
 	remainder_f32, remainder_f32le, remainder_f32be,
@@ -1157,8 +1308,8 @@ remainder :: proc{
 }
 
 @(require_results)
-gcd :: proc "contextless" (x, y: $T) -> T
-	where intrinsics.type_is_ordered_numeric(T) {
+gcd :: proc "contextless" (x, y: $T, loc := #caller_location) -> T where intrinsics.type_is_ordered_numeric(T) {
+	validation_assert(x != 0 || y != 0, loc)
 	x, y := x, y
 	for y != 0 {
 		x %= y
@@ -1168,39 +1319,43 @@ gcd :: proc "contextless" (x, y: $T) -> T
 }
 
 @(require_results)
-lcm :: proc "contextless" (x, y: $T) -> T
-	where intrinsics.type_is_ordered_numeric(T) {
-	return x / gcd(x, y) * y
+lcm :: proc "contextless" (x, y: $T, loc := #caller_location) -> T where intrinsics.type_is_ordered_numeric(T) {
+	denom := gcd(x, y) * y
+	validation_assert(abs(denom) > VALIDATION_EPS, loc)
+	return x / denom
 }
 
 @(require_results)
-normalize_f16 :: proc "contextless" (x: f16) -> (y: f16, exponent: int) {
+normalize_f16 :: proc "contextless" (x: f16, loc := #caller_location) -> (y: f16, exponent: int) {
+	validate_finite(x, loc)
 	if abs(x) < F16_MIN {
 		return x * (1<<F16_SHIFT), -F16_SHIFT
 	}
 	return x, 0
 }
 @(require_results)
-normalize_f32 :: proc "contextless" (x: f32) -> (y: f32, exponent: int) {
+normalize_f32 :: proc "contextless" (x: f32, loc := #caller_location) -> (y: f32, exponent: int) {
+	validate_finite(x, loc)
 	if abs(x) < F32_MIN {
 		return x * (1<<F32_SHIFT), -F32_SHIFT
 	}
 	return x, 0
 }
 @(require_results)
-normalize_f64 :: proc "contextless" (x: f64) -> (y: f64, exponent: int) {
+normalize_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> (y: f64, exponent: int) {
+	validate_finite(x, loc)
 	if abs(x) < F64_MIN {
 		return x * (1<<F64_SHIFT), -F64_SHIFT
 	}
 	return x, 0
 }
 
-@(require_results) normalize_f16le :: proc "contextless" (x: f16le) -> (y: f16le, exponent: int) { y0, e := normalize_f16(f16(x)); return f16le(y0), e }
-@(require_results) normalize_f16be :: proc "contextless" (x: f16be) -> (y: f16be, exponent: int) { y0, e := normalize_f16(f16(x)); return f16be(y0), e }
-@(require_results) normalize_f32le :: proc "contextless" (x: f32le) -> (y: f32le, exponent: int) { y0, e := normalize_f32(f32(x)); return f32le(y0), e }
-@(require_results) normalize_f32be :: proc "contextless" (x: f32be) -> (y: f32be, exponent: int) { y0, e := normalize_f32(f32(x)); return f32be(y0), e }
-@(require_results) normalize_f64le :: proc "contextless" (x: f64le) -> (y: f64le, exponent: int) { y0, e := normalize_f64(f64(x)); return f64le(y0), e }
-@(require_results) normalize_f64be :: proc "contextless" (x: f64be) -> (y: f64be, exponent: int) { y0, e := normalize_f64(f64(x)); return f64be(y0), e }
+@(require_results) normalize_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> (y: f16le, exponent: int) { y0, e := normalize_f16(f16(x), loc); return f16le(y0), e }
+@(require_results) normalize_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> (y: f16be, exponent: int) { y0, e := normalize_f16(f16(x), loc); return f16be(y0), e }
+@(require_results) normalize_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> (y: f32le, exponent: int) { y0, e := normalize_f32(f32(x), loc); return f32le(y0), e }
+@(require_results) normalize_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> (y: f32be, exponent: int) { y0, e := normalize_f32(f32(x), loc); return f32be(y0), e }
+@(require_results) normalize_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> (y: f64le, exponent: int) { y0, e := normalize_f64(f64(x), loc); return f64le(y0), e }
+@(require_results) normalize_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> (y: f64be, exponent: int) { y0, e := normalize_f64(f64(x), loc); return f64be(y0), e }
 
 normalize :: proc{
 	normalize_f16,
@@ -1215,37 +1370,39 @@ normalize :: proc{
 }
 
 @(require_results)
-frexp_f16   :: proc "contextless" (x: f16)   -> (significand: f16,   exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f16   :: proc "contextless" (x: f16, loc := #caller_location)   -> (significand: f16,   exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f16(f), e
 }
 @(require_results)
-frexp_f16le :: proc "contextless" (x: f16le) -> (significand: f16le, exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> (significand: f16le, exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f16le(f), e
 }
 @(require_results)
-frexp_f16be :: proc "contextless" (x: f16be) -> (significand: f16be, exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> (significand: f16be, exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f16be(f), e
 }
 @(require_results)
-frexp_f32 :: proc "contextless" (x: f32)     -> (significand: f32,   exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f32 :: proc "contextless" (x: f32, loc := #caller_location)     -> (significand: f32,   exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f32(f), e
 }
 @(require_results)
-frexp_f32le :: proc "contextless" (x: f32le) -> (significand: f32le, exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> (significand: f32le, exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f32le(f), e
 }
 @(require_results)
-frexp_f32be :: proc "contextless" (x: f32be) -> (significand: f32be, exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> (significand: f32be, exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f32be(f), e
 }
 @(require_results)
-frexp_f64 :: proc "contextless" (f: f64) -> (significand: f64, exponent: int) {
+frexp_f64 :: proc "contextless" (f: f64, loc := #caller_location) -> (significand: f64, exponent: int) {
+	validate_finite(f, loc)
+	
 	mask  :: F64_MASK
 	shift :: F64_SHIFT
 	bias  :: F64_BIAS
@@ -1258,7 +1415,7 @@ frexp_f64 :: proc "contextless" (f: f64) -> (significand: f64, exponent: int) {
 	}
 	f := f
 	
-	f, exponent = normalize_f64(f)
+	f, exponent = normalize_f64(f, loc)
 	x := transmute(u64)f
 	exponent += int((x>>shift)&mask) - bias + 1
 	x &~= mask << shift
@@ -1267,13 +1424,13 @@ frexp_f64 :: proc "contextless" (f: f64) -> (significand: f64, exponent: int) {
 	return
 }
 @(require_results)
-frexp_f64le :: proc "contextless" (x: f64le) -> (significand: f64le, exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> (significand: f64le, exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f64le(f), e
 }
 @(require_results)
-frexp_f64be :: proc "contextless" (x: f64be) -> (significand: f64be, exponent: int) {
-	f, e := frexp_f64(f64(x))
+frexp_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> (significand: f64be, exponent: int) {
+	f, e := frexp_f64(f64(x), loc)
 	return f64be(f), e
 }
 
@@ -1832,7 +1989,11 @@ atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 
 
 @(require_results)
-asin_f64 :: proc "contextless" (x: f64) -> f64 {
+asin_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
+	validate_finite(x, loc)
+	validation_assert(x >= -1, loc)
+	validation_assert(x <= 1, loc)
+	
 	/* origin: FreeBSD /usr/src/lib/msun/src/e_asin.c */
 	/*
 	 * ====================================================
@@ -1889,7 +2050,7 @@ asin_f64 :: proc "contextless" (x: f64) -> f64 {
 	}
 	/* 1 > |x| >= 0.5 */
 	z = (1 - abs(x))*0.5
-	s = sqrt(z)
+	s = sqrt(z, loc)
 	r = R(z)
 	if ix >= 0x3fef3333 {  /* if |x| > 0.975 */
 		x = pio2_hi-(2*(s+s*r)-pio2_lo)
@@ -1903,38 +2064,14 @@ asin_f64 :: proc "contextless" (x: f64) -> f64 {
 	}
 	return -x if hx >> 31 != 0 else x
 }
-@(require_results)
-asin_f64le :: proc "contextless" (x: f64le) -> f64le {
-	return f64le(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f64be :: proc "contextless" (x: f64be) -> f64be {
-	return f64be(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f32 :: proc "contextless" (x: f32) -> f32 {
-	return f32(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f32le :: proc "contextless" (x: f32le) -> f32le {
-	return f32le(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f32be :: proc "contextless" (x: f32be) -> f32be {
-	return f32be(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f16 :: proc "contextless" (x: f16) -> f16 {
-	return f16(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f16le :: proc "contextless" (x: f16le) -> f16le {
-	return f16le(asin_f64(f64(x)))
-}
-@(require_results)
-asin_f16be :: proc "contextless" (x: f16be) -> f16be {
-	return f16be(asin_f64(f64(x)))
-}
+@(require_results) asin_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return f64le(asin_f64(f64(x), loc)) }
+@(require_results) asin_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return f64be(asin_f64(f64(x), loc)) }
+@(require_results) asin_f32	  :: proc "contextless" (x: f32,   loc := #caller_location) -> f32   { return f32(asin_f64(f64(x), loc)) }
+@(require_results) asin_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return f32le(asin_f64(f64(x), loc)) }
+@(require_results) asin_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return f32be(asin_f64(f64(x), loc)) }
+@(require_results) asin_f16	  :: proc "contextless" (x: f16,   loc := #caller_location) -> f16   { return f16(asin_f64(f64(x), loc)) }
+@(require_results) asin_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return f16le(asin_f64(f64(x), loc)) }
+@(require_results) asin_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return f16be(asin_f64(f64(x), loc)) }
 // Return the arc sine of x, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
 asin :: proc{
 	asin_f64, asin_f32, asin_f16,
@@ -1945,7 +2082,11 @@ asin :: proc{
 
 
 @(require_results)
-acos_f64 :: proc "contextless" (x: f64) -> f64 {
+acos_f64 :: proc "contextless" (x: f64, loc := #caller_location) -> f64 {
+	validate_finite(x, loc)
+	validation_assert(x >= -1, loc)
+	validation_assert(x <= 1, loc)
+
 	/* origin: FreeBSD /usr/src/lib/msun/src/e_acos.c */
 	/*
 	 * ====================================================
@@ -2005,51 +2146,27 @@ acos_f64 :: proc "contextless" (x: f64) -> f64 {
 	/* x < -0.5 */
 	if hx >> 31 != 0 {
 		z = (1.0+x)*0.5
-		s = sqrt(z)
+		s = sqrt(z, loc)
 		w = R(z)*s-pio2_lo
 		return 2*(pio2_hi - (s+w))
 	}
 	/* x > 0.5 */
 	z = (1.0-x)*0.5
-	s = sqrt(z)
+	s = sqrt(z, loc)
 	df = s
 	(^u64)(&df)^ &= 0xffffffff_00000000
 	c = (z-df*df)/(s+df)
 	w = R(z)*s+c
 	return 2*(df+w)
 }
-@(require_results)
-acos_f64le :: proc "contextless" (x: f64le) -> f64le {
-	return f64le(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f64be :: proc "contextless" (x: f64be) -> f64be {
-	return f64be(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f32 :: proc "contextless" (x: f32) -> f32 {
-	return f32(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f32le :: proc "contextless" (x: f32le) -> f32le {
-	return f32le(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f32be :: proc "contextless" (x: f32be) -> f32be {
-	return f32be(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f16 :: proc "contextless" (x: f16) -> f16 {
-	return f16(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f16le :: proc "contextless" (x: f16le) -> f16le {
-	return f16le(acos_f64(f64(x)))
-}
-@(require_results)
-acos_f16be :: proc "contextless" (x: f16be) -> f16be {
-	return f16be(acos_f64(f64(x)))
-}
+@(require_results) acos_f64le :: proc "contextless" (x: f64le, loc := #caller_location) -> f64le { return f64le(acos_f64(f64(x), loc)) }
+@(require_results) acos_f64be :: proc "contextless" (x: f64be, loc := #caller_location) -> f64be { return f64be(acos_f64(f64(x), loc)) }
+@(require_results) acos_f32   :: proc "contextless" (x: f32,   loc := #caller_location) -> f32   { return f32(acos_f64(f64(x), loc)) }
+@(require_results) acos_f32le :: proc "contextless" (x: f32le, loc := #caller_location) -> f32le { return f32le(acos_f64(f64(x), loc)) }
+@(require_results) acos_f32be :: proc "contextless" (x: f32be, loc := #caller_location) -> f32be { return f32be(acos_f64(f64(x), loc)) }
+@(require_results) acos_f16   :: proc "contextless" (x: f16,   loc := #caller_location) -> f16   { return f16(acos_f64(f64(x), loc)) }
+@(require_results) acos_f16le :: proc "contextless" (x: f16le, loc := #caller_location) -> f16le { return f16le(acos_f64(f64(x), loc)) }
+@(require_results) acos_f16be :: proc "contextless" (x: f16be, loc := #caller_location) -> f16be { return f16be(acos_f64(f64(x), loc)) }
 // Return the arc cosine of x, in radians. Defined on the domain of [-1, 1] with a range of [0, π].
 acos :: proc{
 	acos_f64, acos_f32, acos_f16,
@@ -2059,13 +2176,13 @@ acos :: proc{
 }
 
 @(require_results)
-sinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return copy_sign(((exp(x) - exp(-x))*0.5), x)
+sinh :: proc "contextless" (x: $T, loc := #caller_location) -> T where intrinsics.type_is_float(T) {
+	return copy_sign(((exp(x, loc) - exp(-x, loc))*0.5), x)
 }
 
 @(require_results)
-cosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return ((exp(x) + exp(-x))*0.5)
+cosh :: proc "contextless" (x: $T, loc := #caller_location) -> T where intrinsics.type_is_float(T) {
+	return ((exp(x, loc) + exp(-x, loc))*0.5)
 }
 
 @(require_results)
@@ -2105,7 +2222,9 @@ tanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 }
 
 @(require_results)
-asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+asinh :: proc "contextless" (y: $T, loc := #caller_location) -> T where intrinsics.type_is_float(T) {
+	validate_finite(y, loc)
+	
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/s_asinh.c
 	// and came with this notice. 
@@ -2152,7 +2271,9 @@ asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 }
 
 @(require_results)
-acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+acosh :: proc "contextless" (y: $T, loc := #caller_location) -> T where intrinsics.type_is_float(T) {
+	validate_finite(y, loc)
+
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/e_acosh.c
 	// and came with this notice. 
@@ -2184,7 +2305,9 @@ acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 }
 
 @(require_results)
-atanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+atanh :: proc "contextless" (y: $T, loc := #caller_location) -> T where intrinsics.type_is_float(T) {
+	validate_finite(y, loc)
+	
 	// The original C code, the long comment, and the constants
 	// below are from FreeBSD's /usr/src/lib/msun/src/e_atanh.c
 	// and came with this notice. 
