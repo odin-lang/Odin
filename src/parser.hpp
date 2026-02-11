@@ -587,6 +587,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Scope *scope; \
 		Token token; \
 		Ast *label; \
+		Ast *init; \
 		Slice<Ast *> vals; \
 		Token in_token; \
 		Ast *expr; \
@@ -596,6 +597,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \
 		Token unroll_token; \
+		Ast *init; \
 		Slice<Ast *> args; \
 		Token for_token; \
 		Ast *val0; \
