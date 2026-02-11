@@ -205,8 +205,7 @@ Options :: struct {
 parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Writer) {
 	test_names: strings.Builder
 
-	for i := 0; i < len(argv); i+=1 {
-		arg := argv[i]
+	for arg in argv {
 		if strings.starts_with(arg, "-tests:") {
 			tests := arg[strings.index(arg, ":")+1:]
 			if len(tests) < 1 {
