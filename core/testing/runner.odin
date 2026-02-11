@@ -225,11 +225,11 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 
 			fmt.wprintfln(stdout, "Usage: %v [OPTIONS]", exe_name)
 			fmt.wprintfln(stdout, "OPTIONS:")
-			fmt.wprintfln(stdout, "        -help:")
-			fmt.wprintfln(stdout, "            Display this help text and exit.")
+			fmt.wprintln(stdout, "        -help:")
+			fmt.wprintln(stdout, "            Display this help text and exit.")
 			fmt.wprintln(stdout)
-			fmt.wprintfln(stdout, "        -tests:<test_name[,...]>")
-			fmt.wprintfln(stdout, "            Specify a specific set of tests to run by name.\n" +
+			fmt.wprintln(stdout, "        -tests:<test_name[,...]>")
+			fmt.wprintln(stdout, "            Specify a specific set of tests to run by name.\n" +
 			                      "            Each test is separated by a comma and may optionally include the package name.\n" +
 			                      "            This may be useful when running tests on multiple packages with `-all-packages`.\n" +
 			                      "            The format is: `package.test_name,test_name_only,...`")
