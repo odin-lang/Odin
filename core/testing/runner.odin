@@ -207,7 +207,7 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 
 	for arg in argv {
 		if strings.starts_with(arg, "-tests:") {
-			tests := arg[strings.index(arg, ":")+1:]
+			_, _, tests := strings.partition(arg, ":")
 			if len(tests) < 1 {
 				fmt.wprintln(stderr, "No test names specified for '-tests:'")
 				os.exit(-1)
