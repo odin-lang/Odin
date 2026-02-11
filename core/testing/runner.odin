@@ -216,7 +216,7 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 			if len(test_names.buf) > 0 {
 				strings.write_byte(&test_names, ',')
 			}
-			strings.write_bytes(&test_names, transmute([]u8)tests)
+			strings.write_string(&test_names, tests)
 		} else if arg == "-help" {
 			exe_name := "test"
 			if path, err := os.get_executable_path(context.temp_allocator); err == nil {
