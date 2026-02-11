@@ -5,7 +5,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:bytes"
 import "core:io"
-//import "core:mem"
+import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -63,7 +63,7 @@ Returns:
 - res: A string created from the byte pointer and length
 */
 string_from_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
-	return transmute(string)mem.Raw_String{ptr, len}
+	return transmute(string)runtime.Raw_String{ptr, len}
 }
 
 /*
@@ -97,7 +97,7 @@ Returns:
 - res: The converted cstring
 */
 unsafe_string_to_cstring :: proc(str: string) -> (res: cstring) {
-	d := transmute(mem.Raw_String)str
+	d := transmute(runtime.Raw_String)str
 	return cstring(d.data)
 }
 
