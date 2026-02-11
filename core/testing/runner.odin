@@ -28,6 +28,7 @@ import            "core:terminal"
 import            "core:terminal/ansi"
 import            "core:thread"
 import            "core:time"
+import            "core:path/slashpath"
 
 // Specify how many threads to use when running tests.
 TEST_THREADS          : int    : #config(ODIN_TEST_THREADS,              0)
