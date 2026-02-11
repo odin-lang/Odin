@@ -213,7 +213,7 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 				os.exit(-1)
 			}
 
-			if len(test_names.buf) > 0 {
+			if strings.builder_len(test_names) > 0 {
 				strings.write_byte(&test_names, ',')
 			}
 			strings.write_string(&test_names, tests)
