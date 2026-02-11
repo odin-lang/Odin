@@ -241,7 +241,7 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 		}
 	}
 
-	opts.test_names = string(test_names.buf[:])
+	opts.test_names = strings.to_string(test_names)
 }
 
 runner :: proc(internal_tests: []Internal_Test) -> bool {
