@@ -1930,7 +1930,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 								if (rs->vals.count < max_val_count) {
 									TokenPos start = ast_token(rs->vals[0]).pos;
 									TokenPos end   = ast_end_pos(rs->vals[rs->vals.count-1]);
-									error_range(start, end, "Expected a %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
+									error_range(start, end, "Expected %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
 								}
 							}
 						}
