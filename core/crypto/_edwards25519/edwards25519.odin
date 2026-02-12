@@ -13,7 +13,8 @@ See:
 
 import "core:crypto"
 import field "core:crypto/_fiat/field_curve25519"
-import "core:mem"
+
+zero_explicit :: crypto.zero_explicit
 
 // Group_Element is an edwards25519 group element, as extended homogenous
 // coordinates, which represents the affine point `(x, y)` as `(X, Y, Z, T)`,
@@ -96,7 +97,7 @@ Group_Element :: struct {
 }
 
 ge_clear :: proc "contextless" (ge: ^Group_Element) {
-	mem.zero_explicit(ge, size_of(Group_Element))
+	zero_explicit(ge, size_of(Group_Element))
 }
 
 ge_set :: proc "contextless" (ge, a: ^Group_Element) {
@@ -159,7 +160,7 @@ ge_set_bytes :: proc "contextless" (ge: ^Group_Element, b: []byte) -> bool {
 
 	ge_cond_assign(ge, &tmp, is_canonical)
 
-	mem.zero_explicit(&buf, size_of(buf))
+	zero_explicit(&buf, size_of(buf))
 
 	return is_canonical == 1
 }
@@ -231,8 +232,8 @@ ge_add :: proc "contextless" (ge, a, b: ^Group_Element) {
 	scratch: Add_Scratch = ---
 	ge_add_addend(ge, a, &b_, &scratch)
 
-	mem.zero_explicit(&b_, size_of(Addend_Group_Element))
-	mem.zero_explicit(&scratch, size_of(Add_Scratch))
+	zero_explicit(&b_, size_of(Addend_Group_Element))
+	zero_explicit(&scratch, size_of(Add_Scratch))
 }
 
 @(private)
@@ -352,7 +353,7 @@ ge_double :: proc "contextless" (ge, a: ^Group_Element, scratch: ^Double_Scratch
 	field.fe_carry_mul(&ge.z, F, G_)
 
 	if sanitize {
-		mem.zero_explicit(scratch, size_of(Double_Scratch))
+		zero_explicit(scratch, size_of(Double_Scratch))
 	}
 }
 

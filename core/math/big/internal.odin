@@ -29,7 +29,7 @@ package math_big
 
 import "base:builtin"
 import "base:intrinsics"
-import "core:mem"
+import "base:runtime"
 import rnd "core:math/rand"
 
 /*
@@ -989,7 +989,8 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 		Zero remainder. Special case, can't use `internal_zero_unused`.
 	*/
 	if zero_count > 0 {
-		mem.zero_slice(remainder.digit[zero_count:])
+		data := remainder.digit[zero_count:]
+		_zero(data)
 	}
 
 	/*
@@ -1015,7 +1016,7 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 	Assumes `a` not to be `nil`.
 */
 internal_int_allocated_cap :: #force_inline proc(a: ^Int) -> (cap: int) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit
+	raw := transmute(runtime.Raw_Dynamic_Array)a.digit
 	return raw.cap
 }
 
@@ -1845,7 +1846,7 @@ internal_int_destroy :: proc(integers: ..^Int) {
 
 	for &a in integers {
 		if internal_int_allocated_cap(a) > 0 {
-			mem.zero_slice(a.digit[:])
+			_zero(a.digit[:])
 			free(&a.digit[0])
 		}
 		a = &Int{}
@@ -2177,7 +2178,7 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
-		mem_err: mem.Allocator_Error
+		mem_err: runtime.Allocator_Error
 		a.digit, mem_err = make([dynamic]DIGIT, needed, allocator)
 		if mem_err != nil {
 			return cast(Error)mem_err
@@ -2208,9 +2209,9 @@ internal_grow :: proc { internal_int_grow, }
 	Assumes `a` not to be `nil`.
 */
 internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit
+	raw := transmute(runtime.Raw_Dynamic_Array)a.digit
 	if raw.cap != 0 {
-		mem.zero_slice(a.digit[:a.used])
+		_zero(a.digit[:a.used])
 	}
 	a.sign = .Zero_or_Positive
 	a.used = 0
@@ -2273,7 +2274,7 @@ internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allo
 	/*
 		Zero the entirety.
 	*/
-	mem.zero_slice(a.digit[:])
+	_zero(a.digit[:])
 
 	/*
 		Set the bit.
@@ -2944,10 +2945,14 @@ internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 		Zero remainder.
 	*/
 	if zero_count > 0 && dest.used < len(dest.digit) {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count])
+		_zero(dest.digit[dest.used:][:zero_count])
 	}
 }
 internal_zero_unused :: proc { internal_int_zero_unused, }
+
+_zero :: proc(data: []DIGIT) {
+	intrinsics.mem_zero(raw_data(data), size_of(DIGIT)*len(data))
+}
 
 /*
 	==========================    End of low-level routines   ==========================

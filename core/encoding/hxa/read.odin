@@ -1,7 +1,6 @@
 package encoding_hxa
 
 import "core:fmt"
-import "core:mem"
 
 Read_Error :: enum {
 	None,
@@ -45,7 +44,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		}
 		ptr := raw_data(r.data[r.offset:])
 
-		value = mem.slice_ptr((^T)(ptr), count)
+		value = ([^]T)(ptr)[:count]
 		r.offset += size_of(T)*count
 		return
 	}

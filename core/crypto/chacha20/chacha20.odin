@@ -8,8 +8,8 @@ See:
 package chacha20
 
 import "core:bytes"
+import "core:crypto"
 import "core:crypto/_chacha20"
-import "core:mem"
 
 // KEY_SIZE is the (X)ChaCha20 key size in bytes.
 KEY_SIZE :: _chacha20.KEY_SIZE
@@ -50,7 +50,7 @@ init :: proc(ctx: ^Context, key, iv: []byte, impl := DEFAULT_IMPLEMENTATION) {
 		// The sub-key is stored in the keystream buffer.  While
 		// this will be overwritten in most circumstances, explicitly
 		// clear it out early.
-		mem.zero_explicit(&ctx._state._buffer, KEY_SIZE)
+		crypto.zero_explicit(&ctx._state._buffer, KEY_SIZE)
 	}
 }
 

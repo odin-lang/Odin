@@ -2,13 +2,13 @@ package objc_Foundation
 
 import "base:intrinsics"
 import "base:builtin"
-import "core:mem"
+import "base:runtime"
 
 @(objc_class="NSBlock")
 Block :: struct {using _: Object}
 
 @(objc_type=Block, objc_name="createGlobal", objc_is_class_method=true)
-Block_createGlobal :: proc (user_data: rawptr, user_proc: proc "c" (user_data: rawptr), allocator := context.allocator) -> (^Block, mem.Allocator_Error) #optional_allocator_error {
+Block_createGlobal :: proc (user_data: rawptr, user_proc: proc "c" (user_data: rawptr), allocator := context.allocator) -> (^Block, runtime.Allocator_Error) #optional_allocator_error {
 	return Block_createInternal(true, user_data, user_proc, allocator)
 }
 @(objc_type=Block, objc_name="createLocal", objc_is_class_method=true)
@@ -17,7 +17,7 @@ Block_createLocal :: proc (user_data: rawptr, user_proc: proc "c" (user_data: ra
 	return b
 }
 @(objc_type=Block, objc_name="createGlobalWithParam", objc_is_class_method=true)
-Block_createGlobalWithParam :: proc (user_data: rawptr, user_proc: proc "c" (user_data: rawptr, t: $T), allocator := context.allocator) -> (^Block, mem.Allocator_Error) #optional_allocator_error {
+Block_createGlobalWithParam :: proc (user_data: rawptr, user_proc: proc "c" (user_data: rawptr, t: $T), allocator := context.allocator) -> (^Block, runtime.Allocator_Error) #optional_allocator_error {
 	return Block_createInternalWithParam(true, user_data, user_proc, allocator)
 }
 @(objc_type=Block, objc_name="createLocalWithParam", objc_is_class_method=true)
@@ -69,7 +69,7 @@ foreign libSystem {
 }
 
 @(private="file")
-internal_block_literal_make :: proc (is_global: bool, user_data: rawptr, user_proc: rawptr, invoke: rawptr, allocator: mem.Allocator) ->  (b: ^Block, err: mem.Allocator_Error) {
+internal_block_literal_make :: proc (is_global: bool, user_data: rawptr, user_proc: rawptr, invoke: rawptr, allocator: runtime.Allocator) ->  (b: ^Block, err: runtime.Allocator_Error) {
 	_init :: proc(bl: ^Internal_Block_Literal, is_global: bool, user_data: rawptr, user_proc: rawptr, invoke: rawptr) {
 		// Set to true on blocks that have captures (and thus are not true
 		// global blocks) but are known not to escape for various other
@@ -105,7 +105,7 @@ internal_block_literal_make :: proc (is_global: bool, user_data: rawptr, user_pr
 }
 
 @(private="file")
-Block_createInternal :: proc (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr), allocator: mem.Allocator) -> (b: ^Block, err: mem.Allocator_Error) {
+Block_createInternal :: proc (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr), allocator: runtime.Allocator) -> (b: ^Block, err: runtime.Allocator_Error) {
 	invoke :: proc "c" (bl: ^Internal_Block_Literal) {
 		user_proc := (proc "c" (rawptr))(bl.user_proc)
 		user_proc(bl.user_data)
@@ -114,7 +114,7 @@ Block_createInternal :: proc (is_global: bool, user_data: rawptr, user_proc: pro
 }
 
 @(private="file")
-Block_createInternalWithParam :: proc (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr, t: $T), allocator: mem.Allocator) -> (b: ^Block, err: mem.Allocator_Error) {
+Block_createInternalWithParam :: proc (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr, t: $T), allocator: runtime.Allocator) -> (b: ^Block, err: runtime.Allocator_Error) {
 	invoke :: proc "c" (bl: ^Internal_Block_Literal, t: T) {
 		user_proc := (proc "c" (rawptr, T))(bl.user_proc)
 		user_proc(bl.user_data, t)

@@ -15,9 +15,9 @@ package sha2
         zhibog, dotbmp:  Initial implementation.
 */
 
+@(require) import "core:crypto"
 @(require) import "core:encoding/endian"
 import "core:math/bits"
-@(require) import "core:mem"
 
 // DIGEST_SIZE_224 is the SHA-224 digest size in bytes.
 DIGEST_SIZE_224 :: 28
@@ -260,7 +260,7 @@ reset :: proc(ctx: ^$T) {
 		return
 	}
 
-	mem.zero_explicit(ctx, size_of(ctx^))
+	crypto.zero_explicit(ctx, size_of(ctx^))
 }
 
 /*

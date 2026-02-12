@@ -2,7 +2,6 @@ package container_dynamic_bit_array
 
 import "base:builtin"
 import "base:intrinsics"
-import "core:mem"
 
 /*
 	Note that these constants are dependent on the backing being a u64.
@@ -329,7 +328,7 @@ Inputs:
 */
 clear :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
-	mem.zero_slice(ba.bits[:])
+	intrinsics.mem_zero(raw_data(ba.bits), builtin.len(ba.bits) * NUM_BITS / 8)
 }
 /*
 Gets the length of set and unset valid bits in the Bit_Array.

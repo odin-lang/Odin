@@ -4,7 +4,6 @@ import "core:crypto"
 import secec "core:crypto/_weierstrass"
 import "core:crypto/x25519"
 import "core:crypto/x448"
-import "core:mem"
 import "core:reflect"
 
 // Note: For these primitives scalar size = point size
@@ -125,7 +124,7 @@ private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 
 		// 384-bits reduced makes the modulo bias insignificant
 		b: [48]byte = ---
-		defer (mem.zero_explicit(&b, size_of(b)))
+		defer (crypto.zero_explicit(&b, size_of(b)))
 		for {
 			crypto.rand_bytes(b[:])
 			_ = secec.sc_set_bytes(sc, b[:])
@@ -137,7 +136,7 @@ private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 		sc := &priv_key._impl.(secec.Scalar_p384r1)
 
 		b: [48]byte = ---
-		defer (mem.zero_explicit(&b, size_of(b)))
+		defer (crypto.zero_explicit(&b, size_of(b)))
 		for {
 			crypto.rand_bytes(b[:])
 			did_reduce := secec.sc_set_bytes(sc, b[:])
@@ -292,7 +291,7 @@ private_key_equal :: proc(p, q: ^Private_Key) -> bool {
 
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
-	mem.zero_explicit(priv_key, size_of(Private_Key))
+	crypto.zero_explicit(priv_key, size_of(Private_Key))
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
@@ -412,7 +411,7 @@ public_key_equal :: proc(p, q: ^Public_Key) -> bool {
 
 // public_key_clear clears pub_key to the uninitialized state.
 public_key_clear :: proc "contextless" (pub_key: ^Public_Key) {
-	mem.zero_explicit(pub_key, size_of(Public_Key))
+	crypto.zero_explicit(pub_key, size_of(Public_Key))
 }
 
 // ecdh performs an Elliptic Curve Diffie-Hellman key exchange betwween

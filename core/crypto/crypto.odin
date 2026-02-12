@@ -1,9 +1,9 @@
 // A selection of cryptography algorithms and useful helper routines.
 package crypto
 
+import "base:intrinsics"
 import "base:runtime"
 import subtle "core:crypto/_subtle"
-import "core:mem"
 
 // Omit large precomputed tables, trading off performance for size.
 COMPACT_IMPLS: bool : #config(ODIN_CRYPTO_COMPACT, false)
@@ -38,8 +38,8 @@ compare_constant_time :: proc "contextless" (a, b: []byte) -> int {
 // contents of the memory being compared.
 @(optimization_mode="none")
 compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> int {
-	x := mem.slice_ptr(a, n)
-	y := mem.slice_ptr(b, n)
+	x := ([^]byte)(a)[:n]
+	y := ([^]byte)(b)[:n]
 
 	v: byte
 	for i in 0..<n {
@@ -61,6 +61,41 @@ is_zero_constant_time :: proc "contextless" (b: []byte) -> int {
 	return subtle.byte_eq(0, v)
 }
 
+/*
+Set each byte of a memory range to zero.
+
+This procedure copies the value `0` into the `len` bytes of a memory range,
+starting at address `data`.
+
+This procedure returns the pointer to `data`.
+
+Unlike the `zero()` procedure, which can be optimized away or reordered by the
+compiler under certain circumstances, `zero_explicit()` procedure can not be
+optimized away or reordered with other memory access operations, and the
+compiler assumes volatile semantics of the memory.
+*/
+zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+	// This routine tries to avoid the compiler optimizing away the call,
+	// so that it is always executed.  It is intended to provide
+	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
+	// memset_s call.
+	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
+	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
+	return data
+}
+
+/*
+Set each byte of a memory range to a specific value.
+
+This procedure copies value specified by the `value` parameter into each of the
+`len` bytes of a memory range, located at address `data`.
+
+This procedure returns the pointer to `data`.
+*/
+set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
+	return runtime.memset(data, i32(value), len)
+}
+
 // rand_bytes fills the dst buffer with cryptographic entropy taken from
 // the system entropy source.  This routine will block if the system entropy
 // source is not ready yet.  All system entropy source failures are treated
@@ -70,7 +105,7 @@ is_zero_constant_time :: proc "contextless" (b: []byte) -> int {
 // `HAS_RAND_BYTES` boolean constant.
 rand_bytes :: proc (dst: []byte) {
 	// zero-fill the buffer first
-	mem.zero_explicit(raw_data(dst), len(dst))
+	zero_explicit(raw_data(dst), len(dst))
 
 	runtime.rand_bytes(dst)
 }

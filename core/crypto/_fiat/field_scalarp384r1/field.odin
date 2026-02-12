@@ -1,9 +1,9 @@
 package field_scalarp384r1
 
+import "core:crypto"
 import subtle "core:crypto/_subtle"
 import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
 
 @(private, rodata)
 TWO_256 := Montgomery_Domain_Field_Element{
@@ -16,7 +16,7 @@ TWO_256 := Montgomery_Domain_Field_Element{
 }
 
 fe_clear :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) {
-	mem.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
+	crypto.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
 }
 
 fe_clear_vec :: proc "contextless" (
@@ -50,8 +50,8 @@ fe_from_bytes :: proc "contextless" (
 		tmp: Non_Montgomery_Domain_Field_Element = ---
 		fe_unchecked_set_saturated(&tmp, arg1)
 		reduced := tmp
-		defer mem.zero_explicit(&tmp, size_of(tmp))
-		defer mem.zero_explicit(&reduced, size_of(reduced))
+		defer crypto.zero_explicit(&tmp, size_of(tmp))
+		defer crypto.zero_explicit(&reduced, size_of(reduced))
 
 		borrow: u64
 		reduced[0], borrow = bits.sub_u64(tmp[0], ELL[0], borrow)
@@ -78,7 +78,7 @@ fe_from_bytes :: proc "contextless" (
 		// Zero extend to 512-bits.
 		src_512: [64]byte
 		copy(src_512[64-s_len:], arg1)
-		defer mem.zero_explicit(&src_512, size_of(src_512))
+		defer crypto.zero_explicit(&src_512, size_of(src_512))
 
 		fe_unchecked_set(out1, src_512[32:]) // a
 		b: Montgomery_Domain_Field_Element
@@ -117,12 +117,12 @@ fe_unchecked_set_saturated :: proc "contextless" (out1: ^Non_Montgomery_Domain_F
 @(private)
 fe_unchecked_set :: proc "contextless" (out1: ^Montgomery_Domain_Field_Element, arg1: []byte) {
 	arg1_384: [48]byte
-	defer mem.zero_explicit(&arg1_384, size_of(arg1_384))
+	defer crypto.zero_explicit(&arg1_384, size_of(arg1_384))
 	copy(arg1_384[48-len(arg1):], arg1)
 
 	tmp: Non_Montgomery_Domain_Field_Element = ---
 	fe_unchecked_set_saturated(&tmp, arg1_384[:])
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	fe_to_montgomery(out1, &tmp)
 }
@@ -141,7 +141,7 @@ fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_
 	endian.unchecked_put_u64be(out1[8:], tmp[4])
 	endian.unchecked_put_u64be(out1[0:], tmp[5])
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 }
 
 fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) -> int {
@@ -157,7 +157,7 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 
 fe_is_odd :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) -> int {
 	tmp: Non_Montgomery_Domain_Field_Element = ---
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	fe_from_montgomery(&tmp, arg1)
 	return int(tmp[0] & 1)

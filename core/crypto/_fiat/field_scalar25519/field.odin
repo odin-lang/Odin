@@ -1,9 +1,9 @@
 package field_scalar25519
 
+import "core:crypto"
 import subtle "core:crypto/_subtle"
 import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
 
 @(private, rodata)
 _TWO_168 := Montgomery_Domain_Field_Element {
@@ -21,7 +21,7 @@ _TWO_336 := Montgomery_Domain_Field_Element {
 }
 
 fe_clear :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) {
-	mem.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
+	crypto.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
 }
 
 fe_from_bytes :: proc "contextless" (
@@ -35,7 +35,7 @@ fe_from_bytes :: proc "contextless" (
 		endian.unchecked_get_u64le(arg1[16:]),
 		endian.unchecked_get_u64le(arg1[24:]),
 	}
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	// Check that tmp is in the the range [0, ELL).
 	if !unsafe_assume_canonical {
@@ -67,7 +67,7 @@ fe_from_bytes_rfc8032 :: proc "contextless" (
 
 	fe_from_bytes_wide(out1, &tmp)
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 }
 
 fe_from_bytes_wide :: proc "contextless" (
@@ -101,7 +101,7 @@ _fe_from_bytes_short :: proc "contextless" (out1: ^Montgomery_Domain_Field_Eleme
 	copy(tmp[:], arg1)
 
 	_ = fe_from_bytes(out1, &tmp, true)
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 }
 
 fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_Element) {
@@ -115,7 +115,7 @@ fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_
 	endian.unchecked_put_u64le(out1[16:], tmp[2])
 	endian.unchecked_put_u64le(out1[24:], tmp[3])
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 }
 
 fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) -> int {

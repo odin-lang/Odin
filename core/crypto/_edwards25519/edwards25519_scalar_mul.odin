@@ -3,7 +3,6 @@ package _edwards25519
 import "core:crypto"
 import field "core:crypto/_fiat/field_scalar25519"
 import subtle "core:crypto/_subtle"
-import "core:mem"
 
 ge_scalarmult :: proc "contextless" (ge, p: ^Group_Element, sc: ^Scalar) {
 	tmp: field.Non_Montgomery_Domain_Field_Element
@@ -11,7 +10,7 @@ ge_scalarmult :: proc "contextless" (ge, p: ^Group_Element, sc: ^Scalar) {
 
 	ge_scalarmult_raw(ge, p, &tmp)
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	zero_explicit(&tmp, size_of(tmp))
 }
 
 ge_scalarmult_vartime :: proc "contextless" (ge, p: ^Group_Element, sc: ^Scalar) {
@@ -134,9 +133,9 @@ ge_scalarmult_raw :: proc "contextless" (
 
 	if !unsafe_is_vartime {
 		ge_clear(&tmp)
-		mem.zero_explicit(&tmp_add, size_of(Add_Scratch))
-		mem.zero_explicit(&tmp_addend, size_of(Addend_Group_Element))
-		mem.zero_explicit(&tmp_dbl, size_of(Double_Scratch))
+		zero_explicit(&tmp_add, size_of(Add_Scratch))
+		zero_explicit(&tmp_addend, size_of(Addend_Group_Element))
+		zero_explicit(&tmp_dbl, size_of(Double_Scratch))
 	}
 }
 
