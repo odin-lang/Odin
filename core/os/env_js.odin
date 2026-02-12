@@ -2,15 +2,15 @@
 #+private
 package os
 
+// None of this does anything on js/wasm.
+// It's only here so importing `core:os` on wasm panics cleanly,
+// without spamming about all sorts of missing procs and types.
+
 import "base:runtime"
 
 build_env :: proc() -> (err: Error) {
 	return
 }
-
-// delete_string_if_not_original :: proc(str: string) {
-
-// }
 
 @(require_results)
 _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {

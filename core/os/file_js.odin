@@ -2,12 +2,17 @@
 #+private
 package os
 
-import "base:runtime"
+// None of this does anything on js/wasm.
+// It's only here so importing `core:os` on wasm panics cleanly,
+// without spamming about all sorts of missing procs and types.
 
+import "base:runtime"
 import "core:io"
 import "core:time"
 
-File_Impl :: distinct rawptr
+File_Impl :: struct {
+	file: File,
+}
 
 _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	return nil, .Unsupported
