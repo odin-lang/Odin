@@ -241,15 +241,7 @@ Inputs:
 Returns:
 - result: `-1` if `lhs` comes first, `1` if `rhs` comes first, or `0` if they are equal
 */
-compare :: proc "contextless" (lhs, rhs: string) -> (res: int) {
-	res = runtime.string_cmp(lhs, rhs)
-	if res == 0 && len(lhs) != len(rhs) {
-		return len(lhs) <= len(rhs) ? -1 : +1
-	} else if len(lhs) == 0 && len(rhs) == 0 {
-		return 0
-	}
-	return res
-}
+compare :: runtime.string_cmp
 
 /*
 Checks if rune `r` in the string `s`
