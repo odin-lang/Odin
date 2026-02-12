@@ -145,7 +145,7 @@ This will remove duplicate separators and unneeded references to the current or
 parent directory.
 */
 @(require_results)
-clean_path :: proc(path: string, allocator: runtime.Allocator) -> (cleaned: string, err: Error) {
+clean_path :: proc(path: string, allocator: runtime.Allocator) -> (cleaned: string, err: runtime.Allocator_Error) {
 	if path == "" || path == "." {
 		return strings.clone(".", allocator)
 	}
@@ -491,7 +491,7 @@ Join all `elems` with the system's path separator and normalize the result.
 For example, `join_path({"/home", "foo", "bar.txt"})` will result in `"/home/foo/bar.txt"`.
 */
 @(require_results)
-join_path :: proc(elems: []string, allocator: runtime.Allocator) -> (joined: string, err: Error) {
+join_path :: proc(elems: []string, allocator: runtime.Allocator) -> (joined: string, err: runtime.Allocator_Error) {
 	for e, i in elems {
 		if e != "" {
 			temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })

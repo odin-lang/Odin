@@ -5,10 +5,9 @@ import "core:testing"
 
 @(test)
 test_clone :: proc(t: ^testing.T) {
-	joined, err := os.join_path({#directory, "file.odin"}, context.temp_allocator)
-	testing.expect_value(t, err, nil)
-	f: ^os.File
-	f, err = os.open(joined)
+	joined, j_err := os.join_path({#directory, "file.odin"}, context.temp_allocator)
+	testing.expect_value(t, j_err, nil)
+	f, err := os.open(joined)
 	testing.expect_value(t, err, nil)
 	testing.expect(t, f != nil)
 
