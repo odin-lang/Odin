@@ -70,6 +70,11 @@ sc_square :: proc {
 	p384r1.fe_square,
 }
 
+sc_inv :: proc {
+	p256r1.fe_inv,
+	p384r1.fe_inv,
+}
+
 sc_cond_assign :: proc {
 	p256r1.fe_cond_assign,
 	p384r1.fe_cond_assign,
