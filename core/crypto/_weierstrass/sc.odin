@@ -40,7 +40,7 @@ sc_zero :: proc {
 	p384r1.fe_zero,
 }
 
-sc_one_p256r1 :: proc {
+sc_one :: proc {
 	p256r1.fe_one,
 	p384r1.fe_one,
 }
@@ -68,6 +68,11 @@ sc_mul :: proc {
 sc_square :: proc {
 	p256r1.fe_square,
 	p384r1.fe_square,
+}
+
+sc_inv :: proc {
+	p256r1.fe_inv,
+	p384r1.fe_inv,
 }
 
 sc_cond_assign :: proc {
