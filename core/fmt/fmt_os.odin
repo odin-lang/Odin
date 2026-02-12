@@ -8,59 +8,61 @@ import "core:os"
 import "core:io"
 import "core:bufio"
 
+// NOTE(Jeroen): The other option is to deprecate `fprint*` and make it an alias for `wprint*`, using File.stream directly.
+
 // fprint formats using the default print settings and writes to fd
-fprint :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true) -> int {
+fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
+	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 	w := bufio.writer_to_writer(&b)
 	return wprint(w, ..args, sep=sep, flush=flush)
 }
 
 // fprintln formats using the default print settings and writes to fd
-fprintln :: proc(fd: os.Handle, args: ..any, sep := " ", flush := true) -> int {
+fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
+	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprintln(w, ..args, sep=sep, flush=flush)
 }
 // fprintf formats according to the specified format string and writes to fd
-fprintf :: proc(fd: os.Handle, fmt: string, args: ..any, flush := true, newline := false) -> int {
+fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline := false) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
+	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprintf(w, fmt, ..args, flush=flush, newline=newline)
 }
 // fprintfln formats according to the specified format string and writes to fd, followed by a newline.
-fprintfln :: proc(fd: os.Handle, fmt: string, args: ..any, flush := true) -> int {
-	return fprintf(fd, fmt, ..args, flush=flush, newline=true)
+fprintfln :: proc(f: ^os.File, fmt: string, args: ..any, flush := true) -> int {
+	return fprintf(f, fmt, ..args, flush=flush, newline=true)
 }
-fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info, flush := true) -> (n: int, err: io.Error) {
+fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
+	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprint_type(w, info, flush=flush)
 }
-fprint_typeid :: proc(fd: os.Handle, id: typeid, flush := true) -> (n: int, err: io.Error) {
+fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (n: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
+	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprint_typeid(w, id, flush=flush)

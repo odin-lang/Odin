@@ -10,10 +10,6 @@ region_load :: proc(reg: string, allocator := context.allocator) ->  (out_reg: ^
 	return _region_load(reg, allocator)
 }
 
-region_load_from_file :: proc(file_path, reg: string, allocator := context.allocator) ->  (out_reg: ^datetime.TZ_Region, ok: bool) {
-	return load_tzif_file(file_path, reg, allocator)
-}
-
 region_load_from_buffer :: proc(buffer: []u8, reg: string, allocator := context.allocator) ->  (out_reg: ^datetime.TZ_Region, ok: bool) {
 	return parse_tzif(buffer, reg, allocator)
 }

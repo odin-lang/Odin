@@ -459,38 +459,63 @@ split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok
 	return
 }
 
-// Joins an address or hostname with a port.
-join_port :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
+// Joins an address or hostname with a port, allocated using an Allocator.
+join_port_allocator :: proc(address_or_host: string, port: int, allocator := context.allocator) -> string {
 	addr_or_host, _, ok := split_port(address_or_host)
 	if !ok {
 		return addr_or_host
 	}
 
 	b := strings.builder_make(allocator)
-
 	addr := parse_address(addr_or_host)
 	if addr == nil {
 		// hostname
 		strings.write_string(&b, addr_or_host)
 		strings.write_string(&b, ":")
 		strings.write_int(&b, port)
+		return strings.to_string(b)
 	} else {
-		switch _ in addr {
-		case IP4_Address:
-			strings.write_string(&b, address_to_string(addr))
-			strings.write_string(&b, ":")
-			strings.write_int(&b, port)
-		case IP6_Address:
-			strings.write_string(&b, "[")
-			strings.write_string(&b, address_to_string(addr))
-			strings.write_string(&b, "]:")
-			strings.write_int(&b, port)
-		}
+		return _join_port_internal(addr, port, &b)
 	}
-	return strings.to_string(b)
 }
 
+// Joins an address or hostname with a port, allocated using a `strings.Builder`.
+join_port_builder :: proc(address_or_host: string, port: int, b: ^strings.Builder) -> string {
+	addr_or_host, _, ok := split_port(address_or_host)
+	if !ok {
+		return addr_or_host
+	}
 
+	addr := parse_address(addr_or_host)
+	if addr == nil {
+		// hostname
+		strings.write_string(b, addr_or_host)
+		strings.write_string(b, ":")
+		strings.write_int(b, port)
+		return strings.to_string(b^)
+	} else {
+		return _join_port_internal(addr, port, b)
+	}
+}
+
+join_port :: proc{join_port_allocator, join_port_builder}
+
+// Also used in `endpoint_to_string_builder`.
+@(private)
+_join_port_internal :: proc(addr: Address, port: int, b: ^strings.Builder) -> string {
+	switch a in addr {
+	case IP4_Address:
+		address_to_string_builder(addr, b)
+		strings.write_string(b, ":")
+		strings.write_int(b, port)
+	case IP6_Address:
+		strings.write_string(b, "[")
+		address_to_string_builder(addr, b)
+		strings.write_string(b, "]:")
+		strings.write_int(b, port)
+	}
+	return strings.to_string(b^)
+}
 
 // TODO(tetra): Do we need this?
 map_to_ip6 :: proc(addr: Address) -> Address {
@@ -510,17 +535,26 @@ map_to_ip6 :: proc(addr: Address) -> Address {
 
 	See RFC 5952 section 4 for IPv6 representation recommendations.
 */
-address_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
+address_to_string_allocator :: proc(addr: Address, allocator := context.temp_allocator) -> string {
 	b := strings.builder_make(allocator)
+	return address_to_string_builder(addr, &b)
+}
+
+/*
+	Returns a string representation of the address using a `strings.Builder`.
+
+	See RFC 5952 section 4 for IPv6 representation recommendations.
+*/
+address_to_string_builder :: proc(addr: Address, b: ^strings.Builder) -> string {
 	switch v in addr {
 	case IP4_Address:
-		strings.write_uint(&b, uint(v[0]))
-		strings.write_byte(&b, '.')
-		strings.write_uint(&b, uint(v[1]))
-		strings.write_byte(&b, '.')
-		strings.write_uint(&b, uint(v[2]))
-		strings.write_byte(&b, '.')
-		strings.write_uint(&b, uint(v[3]))
+		strings.write_uint(b, uint(v[0]))
+		strings.write_byte(b, '.')
+		strings.write_uint(b, uint(v[1]))
+		strings.write_byte(b, '.')
+		strings.write_uint(b, uint(v[2]))
+		strings.write_byte(b, '.')
+		strings.write_uint(b, uint(v[3]))
 	case IP6_Address:
 		// First find the longest run of zeroes.
 		Zero_Run :: struct {
@@ -574,7 +608,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 		for val, i in v {
 			if best.start == i || best.end == i {
 				// For the left and right side of the best zero run, print a `:`.
-				strings.write_string(&b, ":")
+				strings.write_string(b, ":")
 			} else if i < best.start {
 				/*
 					If we haven't made it to the best run yet, print the digit.
@@ -584,10 +618,10 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 
 				buf: [32]byte
 				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val), strconv.digits, {})
-				strings.write_string(&b, str)
+				strings.write_string(b, str)
 
 				if i < best.start - 1 {
-					strings.write_string(&b, ":")
+					strings.write_string(b, ":")
 				}
 			} else if i > best.end {
 				/*
@@ -597,42 +631,38 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 
 				buf: [32]byte
 				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val), strconv.digits, {})
-				strings.write_string(&b, str)
+				strings.write_string(b, str)
 
 				if i != 7 {
-					strings.write_string(&b, ":")
+					strings.write_string(b, ":")
 				}
 			}
 		}
 	}
-	return strings.to_string(b)
+	return strings.to_string(b^)
 }
+address_to_string :: proc{address_to_string_allocator, address_to_string_builder}
 
 // Returns a temporarily-allocated string representation of the endpoint.
 // If there's a port, uses the `ip4address:port` or `[ip6address]:port` format, respectively.
-endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) -> string {
+endpoint_to_string_allocator :: proc(ep: Endpoint, allocator := context.temp_allocator) -> string {
+	b := strings.builder_make(allocator)
+	return endpoint_to_string_builder(ep, &b)
+}
+
+// Returns a string representation of the endpoint using a `strings.Builder`.
+// If there's a port, uses the `ip4address:port` or `[ip6address]:port` format, respectively.
+endpoint_to_string_builder :: proc(ep: Endpoint, b: ^strings.Builder) -> string {
 	if ep.port == 0 {
-		return address_to_string(ep.address, allocator)
+		return address_to_string(ep.address, b)
 	} else {
-		s := address_to_string(ep.address, context.temp_allocator)
-		b := strings.builder_make(allocator)
-		switch a in ep.address {
-		case IP4_Address:
-			strings.write_string(&b, s)
-			strings.write_string(&b, ":")
-			strings.write_int(&b, ep.port)
-		case IP6_Address:
-			strings.write_string(&b, "[")
-			strings.write_string(&b, s)
-			strings.write_string(&b, "]:")
-			strings.write_int(&b, ep.port)
-		}
-		return strings.to_string(b)
+		return _join_port_internal(ep.address, ep.port, b)
 	}
 }
 
-to_string :: proc{address_to_string, endpoint_to_string}
+endpoint_to_string :: proc{endpoint_to_string_allocator, endpoint_to_string_builder}
 
+to_string :: proc{address_to_string_allocator, address_to_string_builder, endpoint_to_string_allocator, endpoint_to_string_builder}
 
 family_from_address :: proc(addr: Address) -> Address_Family {
 	switch _ in addr {

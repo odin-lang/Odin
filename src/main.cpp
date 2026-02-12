@@ -2080,7 +2080,6 @@ gb_internal void show_defineables(Checker *c) {
 gb_internal void show_import_graph(Checker *c) {
 	Parser *p = c->parser;
 
-	gb_printf("\nDOT Import graph:\n\n");
 	gb_printf("digraph odin_import_graph {\n\tnode [shape=box];\n");
 
 	int cluster_counter = 0;

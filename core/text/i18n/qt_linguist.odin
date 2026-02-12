@@ -11,7 +11,6 @@ package i18n
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-import "core:os"
 import "core:encoding/xml"
 import "core:strings"
 
@@ -56,9 +55,7 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 		return nil, .TS_File_Parse_Error
 	}
 
-	/*
-		Initalize Translation, interner and optional pluralizer.
-	*/
+	// Initalize Translation, interner and optional pluralizer.
 	translation = new(Translation)
 	translation.pluralize = pluralizer
 	strings.intern_init(&translation.intern, allocator, allocator)
@@ -69,7 +66,6 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 		child_id := get_id(value) or_return
 
 		// These should be <context>s.
-
 		if ts.elements[child_id].ident != "context" {
 			return translation, .TS_File_Expected_Context
 		}
@@ -158,13 +154,3 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 	return
 }
 
-parse_qt_linguist_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
-	context.allocator = allocator
-
-	data, data_ok := os.read_entire_file(filename)
-	if !data_ok { return {}, .File_Error }
-
-	return parse_qt_linguist_from_bytes(data, options, pluralizer, allocator)
-}
-
-parse_qt :: proc { parse_qt_linguist_file, parse_qt_linguist_from_bytes }

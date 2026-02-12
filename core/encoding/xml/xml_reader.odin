@@ -9,13 +9,12 @@ package encoding_xml
 	- Jeroen van Rijn: Initial implementation.
 */
 
-import "core:bytes"
-import "core:encoding/entity"
-import "base:intrinsics"
-import "core:mem"
-import "core:os"
-import "core:strings"
-import "base:runtime"
+import    "base:runtime"
+import    "core:bytes"
+import    "core:encoding/entity"
+import    "base:intrinsics"
+import    "core:mem"
+import    "core:strings"
 
 likely :: intrinsics.expect
 
@@ -372,19 +371,6 @@ parse_string :: proc(data: string, options := DEFAULT_OPTIONS, path := "", error
 }
 
 parse :: proc { parse_string, parse_bytes }
-
-// Load an XML file
-load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
-	context.allocator = allocator
-	options := options
-
-	data, data_ok := os.read_entire_file(filename)
-	if !data_ok { return {}, .File_Error }
-
-	options.flags += { .Input_May_Be_Modified }
-
-	return parse_bytes(data, options, filename, error_handler, allocator)
-}
 
 destroy :: proc(doc: ^Document, allocator := context.allocator) {
 	context.allocator = allocator
