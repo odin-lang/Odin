@@ -17,7 +17,7 @@ package math_big
 		- Also look at extracting and splatting several digits at once.
 */
 
-import "core:mem"
+import "base:runtime"
 import "core:os"
 
 /*
@@ -69,7 +69,7 @@ internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(
 	l := len(as)
 	assert(l > 0)
 
-	data := transmute([]u8)mem.Raw_Slice{
+	data := transmute([]u8)runtime.Raw_Slice{
 		data = raw_data(as),
 		len  = l,
 	}
