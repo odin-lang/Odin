@@ -268,20 +268,17 @@ Output:
 
 */
 builder_from_bytes :: proc(backing: []byte) -> (res: Builder) {
-	return Builder{ buf = buffer_from_slice(backing) }
-}
-
-@(private)
-buffer_from_slice :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
-    return transmute([dynamic]E)runtime.Raw_Dynamic_Array{
-        data      = raw_data(backing),
-        len       = 0,
-        cap       = len(backing),
-        allocator = runtime.Allocator{
-            procedure = runtime.nil_allocator_proc,
-            data = nil,
-        },
-    }
+	return Builder{
+		buf = transmute([dynamic]byte)runtime.Raw_Dynamic_Array{
+			data      = raw_data(backing),
+			len       = 0,
+			cap       = len(backing),
+			allocator = runtime.Allocator{
+				procedure = runtime.nil_allocator_proc,
+				data = nil,
+			},
+		},
+	}
 }
 
 // Alias to `builder_from_bytes`
