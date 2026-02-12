@@ -242,15 +242,7 @@ Returns:
 - result: `-1` if `lhs` comes first, `1` if `rhs` comes first, or `0` if they are equal
 */
 compare :: proc "contextless" (lhs, rhs: string) -> (res: int) {
-	a := transmute([]byte)lhs
-	b := transmute([]byte)rhs
-	res = runtime.memory_compare(raw_data(a), raw_data(b), min(len(a), len(b)))
-	if res == 0 && len(a) != len(b) {
-		return len(a) <= len(b) ? -1 : +1
-	} else if len(a) == 0 && len(b) == 0 {
-		return 0
-	}
-	return res
+	return runtime.string_cmp(lhs, rhs)
 }
 
 /*
