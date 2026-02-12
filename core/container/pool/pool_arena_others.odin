@@ -9,11 +9,9 @@ package container_pool
 
 import "base:runtime"
 
-import "core:mem"
-
 _Pool_Arena :: runtime.Arena
 
-_DEFAULT_BLOCK_SIZE :: mem.Megabyte
+_DEFAULT_BLOCK_SIZE :: runtime.Megabyte
 
 _pool_arena_init :: proc(arena: ^Pool_Arena, block_size: uint = DEFAULT_BLOCK_SIZE) -> (err: runtime.Allocator_Error) {
 	runtime.arena_init(arena, block_size, runtime.default_allocator()) or_return
