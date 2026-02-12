@@ -9,8 +9,8 @@ truncate it from the encoded output.
 */
 package encoding_base64
 
+import "base:runtime"
 import "core:io"
-import "core:mem"
 import "core:strings"
 
 ENC_TABLE := [64]byte {
@@ -110,7 +110,7 @@ DEC_URL_TABLE := [256]u8 {
 }
 
 
-encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: mem.Allocator_Error) #optional_allocator_error {
+encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	out_length := encoded_len(data)
 	if out_length == 0 {
 		return
@@ -161,7 +161,7 @@ encoded_len :: proc(data: []byte) -> int {
 	return ((4 * length / 3) + 3) &~ 3
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (decoded: []byte, err: mem.Allocator_Error) #optional_allocator_error {
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (decoded: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	out_length := decoded_len(data)
 
 	out   := strings.builder_make(0, out_length, allocator) or_return
