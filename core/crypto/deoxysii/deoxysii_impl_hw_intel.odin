@@ -4,7 +4,6 @@ package deoxysii
 import "base:intrinsics"
 import "core:crypto"
 import "core:crypto/aes"
-import "core:mem"
 import "core:simd"
 import "core:simd/x86"
 
@@ -374,7 +373,7 @@ d_hw :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte
 
 		copy(dst[n*BLOCK_SIZE:], m_star[:])
 
-		mem.zero_explicit(&m_star, size_of(m_star))
+		crypto.zero_explicit(&m_star, size_of(m_star))
 	}
 
 	// Associated data
@@ -428,7 +427,7 @@ d_hw :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte
 	intrinsics.unaligned_store((^x86.__m128i)(raw_data(&tmp)), auth)
 	ok := crypto.compare_constant_time(tmp[:], tag) == 1
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 
 	return ok
 }

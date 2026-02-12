@@ -4,7 +4,6 @@ import "core:bytes"
 import "core:crypto/_aes/ct64"
 import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
 
 // CTR_IV_SIZE is the size of the CTR mode IV in bytes.
 CTR_IV_SIZE :: 16
@@ -117,7 +116,7 @@ reset_ctr :: proc "contextless" (ctx: ^Context_CTR) {
 	ctx._off = 0
 	ctx._ctr_hi = 0
 	ctx._ctr_lo = 0
-	mem.zero_explicit(&ctx._buffer, size_of(ctx._buffer))
+	zero_explicit(&ctx._buffer, size_of(ctx._buffer))
 	ctx._is_initialized = false
 }
 
@@ -172,7 +171,7 @@ ctr_blocks :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_boun
 	// Write back the counter.
 	ctx._ctr_hi, ctx._ctr_lo = ctr_hi, ctr_lo
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	zero_explicit(&tmp, size_of(tmp))
 }
 
 @(private)

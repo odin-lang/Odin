@@ -1,12 +1,12 @@
 package field_p384r1
 
+import "core:crypto"
 import subtle "core:crypto/_subtle"
 import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
 
 fe_clear :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) {
-	mem.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
+	crypto.zero_explicit(arg1, size_of(Montgomery_Domain_Field_Element))
 }
 
 fe_clear_vec :: proc "contextless" (
@@ -33,7 +33,7 @@ fe_from_bytes :: proc "contextless" (
 		endian.unchecked_get_u64be(arg1[8:]),
 		endian.unchecked_get_u64be(arg1[0:]),
 	}
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	// Check that tmp is in the the range [0, ELL).
 	if !unsafe_assume_canonical {
@@ -67,7 +67,7 @@ fe_to_bytes :: proc "contextless" (out1: []byte, arg1: ^Montgomery_Domain_Field_
 	endian.unchecked_put_u64be(out1[8:], tmp[4])
 	endian.unchecked_put_u64be(out1[0:], tmp[5])
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 }
 
 @(require_results)
@@ -87,7 +87,7 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 @(require_results)
 fe_is_odd :: proc "contextless" (arg1: ^Montgomery_Domain_Field_Element) -> int {
 	tmp: Non_Montgomery_Domain_Field_Element = ---
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	fe_from_montgomery(&tmp, arg1)
 	return int(tmp[0] & 1)

@@ -13,7 +13,6 @@ import "core:crypto"
 import "core:crypto/chacha20"
 import "core:crypto/poly1305"
 import "core:encoding/endian"
-import "core:mem"
 
 // KEY_SIZE is the chacha20poly1305 key size in bytes.
 KEY_SIZE :: chacha20.KEY_SIZE
@@ -103,7 +102,7 @@ seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 	chacha20.keystream_bytes(&stream_ctx, otk[:])
 	mac_ctx: poly1305.Context = ---
 	poly1305.init(&mac_ctx, otk[:])
-	mem.zero_explicit(&otk, size_of(otk))
+	crypto.zero_explicit(&otk, size_of(otk))
 
 	aad_len, ciphertext_len := len(aad), len(ciphertext)
 
@@ -164,7 +163,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 
 	mac_ctx: poly1305.Context = ---
 	poly1305.init(&mac_ctx, otk[:])
-	defer mem.zero_explicit(&otk, size_of(otk))
+	defer crypto.zero_explicit(&otk, size_of(otk))
 
 	aad_len, ciphertext_len := len(aad), len(ciphertext)
 
@@ -188,7 +187,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	// Validate the tag in constant time.
 	if crypto.compare_constant_time(tag, derived_tag) != 1 {
 		// Zero out the plaintext, as a defense in depth measure.
-		mem.zero_explicit(raw_data(plaintext), ciphertext_len)
+		crypto.zero_explicit(raw_data(plaintext), ciphertext_len)
 		return false
 	}
 
@@ -202,7 +201,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 // reset sanitizes the Context.  The Context must be
 // re-initialized to be used again.
 reset :: proc "contextless" (ctx: ^Context) {
-	mem.zero_explicit(&ctx._key, len(ctx._key))
+	crypto.zero_explicit(&ctx._key, len(ctx._key))
 	ctx._is_xchacha = false
 	ctx._is_initialized = false
 }

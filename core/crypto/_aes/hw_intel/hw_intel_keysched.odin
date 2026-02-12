@@ -25,7 +25,6 @@ package aes_hw_intel
 
 import "base:intrinsics"
 import "core:crypto/_aes"
-import "core:mem"
 import "core:simd/x86"
 
 // Intel AES-NI based implementation.  Inspiration taken from BearSSL.
@@ -174,5 +173,28 @@ keysched :: proc(ctx: ^Context, key: []byte) {
 
 	ctx._num_rounds = num_rounds
 
-	mem.zero_explicit(&sks, size_of(sks))
+	zero_explicit(&sks, size_of(sks))
+}
+
+/*
+Set each byte of a memory range to zero.
+
+This procedure copies the value `0` into the `len` bytes of a memory range,
+starting at address `data`.
+
+This procedure returns the pointer to `data`.
+
+Unlike the `zero()` procedure, which can be optimized away or reordered by the
+compiler under certain circumstances, `zero_explicit()` procedure can not be
+optimized away or reordered with other memory access operations, and the
+compiler assumes volatile semantics of the memory.
+*/
+zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+	// This routine tries to avoid the compiler optimizing away the call,
+	// so that it is always executed.  It is intended to provide
+	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
+	// memset_s call.
+	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
+	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
+	return data
 }

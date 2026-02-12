@@ -9,7 +9,6 @@ package x25519
 import "core:crypto"
 import ed "core:crypto/_edwards25519"
 import field "core:crypto/_fiat/field_curve25519"
-import "core:mem"
 
 // SCALAR_SIZE is the size of a X25519 scalar (private key) in bytes.
 SCALAR_SIZE :: 32
@@ -119,7 +118,7 @@ scalarmult :: proc(dst, scalar, point: []byte) {
 	d := (^[32]byte)(raw_data(dst))
 	_scalarmult(d, &e, p)
 
-	mem.zero_explicit(&e, size_of(e))
+	crypto.zero_explicit(&e, size_of(e))
 }
 
 // scalarmult_basepoint "multiplies" the provided scalar with the X25519

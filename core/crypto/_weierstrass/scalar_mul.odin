@@ -2,7 +2,6 @@ package _weierstrass
 
 import "core:crypto"
 @(require) import subtle "core:crypto/_subtle"
-@(require) import "core:mem"
 
 pt_scalar_mul :: proc "contextless" (
 	p, a: ^$T,
@@ -23,7 +22,7 @@ pt_scalar_mul :: proc "contextless" (
 	pt_scalar_mul_bytes(p, a, b[:], unsafe_is_vartime)
 
 	if !unsafe_is_vartime {
-		mem.zero_explicit(&b, size_of(b))
+		crypto.zero_explicit(&b, size_of(b))
 	}
 }
 
@@ -69,7 +68,7 @@ pt_scalar_mul_bytes :: proc "contextless" (
 	pt_set(p, &q)
 
 	if !unsafe_is_vartime {
-		mem.zero_explicit(&p_tbl, size_of(p_tbl))
+		crypto.zero_explicit(&p_tbl, size_of(p_tbl))
 		pt_clear_vec([]^T{&q, &tmp})
 	}
 }
@@ -116,7 +115,7 @@ when crypto.COMPACT_IMPLS == true {
 		}
 
 		if !unsafe_is_vartime {
-			mem.zero_explicit(&b, size_of(b))
+			crypto.zero_explicit(&b, size_of(b))
 			pt_clear(&tmp)
 		}
 	}

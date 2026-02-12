@@ -10,8 +10,8 @@ package _blake2
     Implementation of the BLAKE2 hashing algorithm, as defined in <https://datatracker.ietf.org/doc/html/rfc7693> and <https://www.blake2.net/>
 */
 
+import "base:intrinsics"
 import "core:encoding/endian"
-import "core:mem"
 
 BLAKE2S_BLOCK_SIZE :: 64
 BLAKE2S_SIZE :: 32
@@ -145,7 +145,7 @@ init :: proc "contextless" (ctx: ^$T, cfg: ^Blake2_Config) {
 		}
 	}
 
-	mem.zero(&ctx.x, size_of(ctx.x)) // Done with the scratch space, no barrier.
+	intrinsics.mem_zero(&ctx.x, size_of(ctx.x)) // Done with the scratch space, no barrier.
 
 	if cfg.tree != nil && cfg.tree.(Blake2_Tree).is_last_node {
 		ctx.is_last_node = true
@@ -222,7 +222,7 @@ reset :: proc "contextless" (ctx: ^$T) {
 		return
 	}
 
-	mem.zero_explicit(ctx, size_of(ctx^))
+	zero_explicit(ctx, size_of(ctx^))
 }
 
 @(private)
@@ -2876,4 +2876,28 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 	}
 	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] =
 		h0, h1, h2, h3, h4, h5, h6, h7
+}
+
+/*
+Set each byte of a memory range to zero.
+
+This procedure copies the value `0` into the `len` bytes of a memory range,
+starting at address `data`.
+
+This procedure returns the pointer to `data`.
+
+Unlike the `zero()` procedure, which can be optimized away or reordered by the
+compiler under certain circumstances, `zero_explicit()` procedure can not be
+optimized away or reordered with other memory access operations, and the
+compiler assumes volatile semantics of the memory.
+*/
+@(private)
+zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+	// This routine tries to avoid the compiler optimizing away the call,
+	// so that it is always executed.  It is intended to provide
+	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
+	// memset_s call.
+	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
+	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
+	return data
 }
