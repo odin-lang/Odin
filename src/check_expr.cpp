@@ -153,13 +153,19 @@ gb_internal bool is_load_directive_call(Ast *call) {
 gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found);
 
 gb_internal void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
+	int limit = build_context.did_you_mean_limit;
 	auto results = did_you_mean_results(d);
+	int count = 0;
 	if (results.count != 0) {
 		error_line("\tSuggestion: Did you mean?\n");
 		for (auto const &result : results) {
 			String const &target = result.target;
 			error_line("\t\t%s%.*s\n", prefix, LIT(target));
 			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
+			if (limit > 0 && ++count == limit) {
+				error_line("\t\t... and %td more ...", results.count - limit);
+				break;
+			}
 		}
 	}
 }

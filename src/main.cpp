@@ -330,6 +330,7 @@ enum BuildFlagKind {
 	BuildFlag_UseSingleModule,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
+	BuildFlag_DidYouMeanLimit,
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
@@ -562,6 +563,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_DidYouMeanLimit,         str_lit("did-you-mean-limit"),        BuildFlagParam_Integer, Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
@@ -1305,6 +1307,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowDebugMessages:
 							build_context.show_debug_messages = true;
 							break;
+
+						case BuildFlag_DidYouMeanLimit:
+							{
+								GB_ASSERT(value.kind == ExactValue_Integer);
+								isize count = cast(isize)big_int_to_i64(&value.value_integer);
+								if (count <= 0) {
+									gb_printf_err("%.*s expected a positive non-zero number, got %.*s\n", LIT(name), LIT(param));
+									build_context.did_you_mean_limit = DEFAULT_DID_YOU_MEAN_LIMIT;
+								} else {
+									build_context.did_you_mean_limit = (int)count;
+								}
+							}
+							break;
+
 						case BuildFlag_Vet:
 							build_context.vet_flags |= VetFlag_All;
 							break;
@@ -1852,6 +1868,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 		gb_printf_err("`-test-all-packages` can only be used with `odin build -build-mode:test`, `odin test`, or `odin doc`.\n");
 		bad_flags = true;
 	}
+
+	if (build_context.did_you_mean_limit == 0) build_context.did_you_mean_limit = DEFAULT_DID_YOU_MEAN_LIMIT;
 
 	return !bad_flags;
 }
@@ -2835,6 +2853,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Sets the maximum number of errors that can be displayed before the compiler terminates.");
 			print_usage_line(2, "Must be an integer >0.");
 			print_usage_line(2, "If not set, the default max error count is %d.", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
+		}
+
+		if (print_flag("-did-you-mean-limit:<integer>")) {
+			print_usage_line(2, "Sets the maximum number of suggestions the compiler provides.");
+			print_usage_line(2, "Must be an integer >0.");
+			print_usage_line(2, "If not set, the default limit is %d.", DEFAULT_DID_YOU_MEAN_LIMIT);
 		}
 	}
 
