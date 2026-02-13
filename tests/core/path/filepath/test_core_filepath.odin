@@ -130,6 +130,6 @@ test_stem :: proc(t: ^testing.T) {
 	}
 
 	for d in short_stem {
-		testing.expect_value(t, filepath.stem(d[0]), d[1])
+		testing.expect_value(t, filepath.short_stem(d[0]), d[1])
 	}
 }
