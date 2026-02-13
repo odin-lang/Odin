@@ -997,16 +997,18 @@ trim_left :: proc(s: []byte, cutset: []byte) -> []byte {
 	if s == nil || cutset == nil {
 		return s
 	}
-	state := cutset
-	return trim_left_proc_with_state(s, is_in_cutset, &state)
+	begin := 0; end := len(s)
+	for ; begin < end && index_byte(cutset, s[begin]) >= 0; begin += 1 {}
+	return s[begin:]
 }
 
 trim_right :: proc(s: []byte, cutset: []byte) -> []byte {
 	if s == nil || cutset == nil {
 		return s
 	}
-	state := cutset
-	return trim_right_proc_with_state(s, is_in_cutset, &state)
+	begin := 0; end := len(s)
+	for ; end > begin && index_byte(cutset, s[end - 1]) >= 0; end -= 1 {}
+	return s[:end]
 }
 
 trim :: proc(s: []byte, cutset: []byte) -> []byte {
