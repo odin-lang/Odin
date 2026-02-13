@@ -110,3 +110,26 @@ delete_split :: proc(s: []string) {
 	}
 	delete(s)
 }
+
+@(test)
+test_stem :: proc(t: ^testing.T) {
+	@static stem := [][2]string{
+		{"builder.tar.gz",   "builder.tar"},
+		{"./builder.tar.gz", "builder.tar"},
+		{"./builder/",       ""},
+	}
+
+	@static short_stem := [][2]string{
+		{"builder.tar",   "builder"},
+		{"./builder.tar", "builder"},
+		{"./builder/",    ""},
+	}
+
+	for d in stem {
+		testing.expect_value(t, filepath.stem(d[0]), d[1])
+	}
+
+	for d in short_stem {
+		testing.expect_value(t, filepath.stem(d[0]), d[1])
+	}
+}

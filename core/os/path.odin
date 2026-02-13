@@ -382,25 +382,21 @@ Returns an empty string if there is no stem. e.g: '.gitignore'.
 Returns an empty string if there's a trailing path separator.
 */
 stem :: proc(path: string) -> string {
-	if len(path) > 0 {
-		if is_path_separator(path[len(path) - 1]) {
-			// NOTE(tetra): Trailing separator
-			return ""
-		} else if path[0] == '.' {
-			return ""
-		}
+	// If the last character is a path separator, there is no file.
+	if is_path_separator(path[len(path) - 1]) {
+		return ""
 	}
 
-	// NOTE(tetra): Get the basename
-	path := path
-	if i := strings.last_index_any(path, Path_Separator_Chars); i != -1 {
-		path = path[i+1:]
+	// Get the base path.
+	p := base(path)
+	if i := strings.last_index_any(p, Path_Separator_Chars); i != -1 {
+		p = p[i+1:]
 	}
 
-	if i := strings.last_index_byte(path, '.'); i != -1 {
-		return path[:i]
+	if i := strings.last_index_byte(p, '.'); i != -1 {
+		return p[:i]
 	}
-	return path
+	return p
 }
 
 /*
