@@ -250,26 +250,14 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 	then `"."` is returned.
 */
 dir :: proc(path: string, allocator := context.allocator) -> string {
-	context.allocator = allocator
-	vol_len := len(volume_name(path))
-	when ODIN_OS == .Windows {
-		if len(path) >= 3 && is_separator(path[2]) {
-			vol_len += 1
-		}
-	}
-	vol := path[:vol_len]
-
 	i := len(path) - 1
-	for i >= vol_len && !is_separator(path[i]) {
+	for i > 0 && !is_separator(path[i]) {
 		i -= 1
 	}
-	dir, dir_err := clean(path[vol_len : i+1], allocator)
+	res, dir_err := clean(path[:i], allocator)
+
 	if dir_err != nil { return "" }
-	defer delete(dir)
-	if dir == "." && vol_len > 2 {
-		return strings.clone(vol)
-	}
-	return strings.concatenate({vol, dir})
+	return res
 }
 
 
