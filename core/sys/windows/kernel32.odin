@@ -470,6 +470,7 @@ foreign kernel32 {
 	GlobalAlloc   :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
 	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	GlobalFree    :: proc(mem: LPVOID) -> LPVOID ---
+	GlobalSize    :: proc(Mem: LPVOID) -> SIZE_T ---
 	
 	GlobalLock   :: proc(hMem: HGLOBAL) -> LPVOID ---
 	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---

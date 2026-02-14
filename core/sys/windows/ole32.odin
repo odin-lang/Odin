@@ -1,6 +1,6 @@
 package sys_windows
 
-foreign import "system:Ole32.lib"
+foreign import Ole32 "system:Ole32.lib"
 
 //objbase.h
 // Note(Dragos): https://learn.microsoft.com/en-us/windows/win32/api/objbase/ne-objbase-coinit makes you believe that MULTITHREADED == 3. That is wrong. See definition of objbase.h
