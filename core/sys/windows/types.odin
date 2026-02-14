@@ -1,4 +1,3 @@
-#+build windows
 package sys_windows
 
 import "core:c"

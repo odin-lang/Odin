@@ -1,4 +1,3 @@
-#+build windows
 package sys_windows
 
 foreign import Ole32 "system:Ole32.lib"
