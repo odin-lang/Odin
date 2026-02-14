@@ -67,8 +67,8 @@ truncate_to_rune :: proc(str: []byte, r: rune) -> []byte {
 	return str[:n]
 }
 
-// Compares two strings, returning a value representing which one comes first lexiographically.
-// -1 for `a`; 1 for `b`, or 0 if they are equal.
+// Compares two []byte, returning a value representing which one comes first lexiographically.
+// Returns: -1 for `lhs`, 1 for `rhs`, or 0 if they are equal.
 compare :: proc(lhs, rhs: []byte) -> int {
 	res := runtime.memory_compare(raw_data(lhs), raw_data(rhs), min(len(lhs), len(rhs)))
 	if res == 0 && len(lhs) != len(rhs) {
