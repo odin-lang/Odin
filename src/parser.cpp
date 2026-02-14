@@ -1367,12 +1367,13 @@ gb_internal Ast *ast_package_decl(AstFile *f, Token token, Token name, CommentGr
 	return result;
 }
 
-gb_internal Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token import_name,
+gb_internal Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token import_name, bool is_lazy,
                      CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ImportDecl);
 	result->ImportDecl.token       = token;
 	result->ImportDecl.relpath     = relpath;
 	result->ImportDecl.import_name = import_name;
+	result->ImportDecl.is_lazy     = is_lazy;
 	result->ImportDecl.docs        = docs;
 	result->ImportDecl.comment     = comment;
 	result->ImportDecl.attributes.allocator = ast_allocator(f);
@@ -5063,7 +5064,7 @@ enum ImportDeclKind {
 	ImportDecl_Using,
 };
 
-gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
+gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind, bool is_lazy = false) {
 	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
 	Token import_name = {};
@@ -5084,7 +5085,7 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		syntax_error(import_name, "Cannot use 'import' within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
-		s = ast_import_decl(f, token, file_path, import_name, docs, f->line_comment);
+		s = ast_import_decl(f, token, file_path, import_name, is_lazy, docs, f->line_comment);
 		array_add(&f->imports, s);
 	}
 
@@ -5467,6 +5468,15 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
+		} else if (tag == "lazy") {
+			if (f->curr_token.kind != Token_import) {
+				syntax_error(token, "#lazy can only be applied to an 'import' statement");
+				s = ast_bad_stmt(f, token, f->curr_token);
+				fix_advance_to_next_stmt(f);
+				return s;
+			}
+			s = parse_import_decl(f, ImportDecl_Standard, true);
+			return s;
 		} else if (tag == "define") {
 			s = ast_bad_stmt(f, token, f->curr_token);
 
@@ -6197,7 +6207,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
-			if (!ok) {
+			if (!ok && !id->is_lazy) {
 				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
 				continue;
 			}
@@ -6207,7 +6217,9 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			if (is_package_name_reserved(import_path)) {
 				continue;
 			}
-			try_add_import_path(p, import_path, original_string, ast_token(node).pos);
+			if (!id->is_lazy) {
+				try_add_import_path(p, import_path, original_string, ast_token(node).pos);
+			}
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 

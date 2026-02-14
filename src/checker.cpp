@@ -5136,6 +5136,9 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 		}
 		AstPackage **found = string_map_get(&c->info.packages, path);
 		if (found == nullptr) {
+			if (id->is_lazy) {
+				return;
+			}
 			Token token = ast_token(decl);
 			error(token, "Unable to find package: %.*s", LIT(path));
 			exit_with_errors();
@@ -5323,7 +5326,14 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	bool force_use = false;
 
-	if (id->fullpath == "builtin") {
+	if (id->is_lazy) {
+		AstPackage **found = string_map_get(pkgs, id->fullpath);
+		if (found == nullptr) {
+			return;
+		}
+		AstPackage *pkg = *found;
+		scope = pkg->scope;
+	} else if (id->fullpath == "builtin") {
 		scope = builtin_pkg->scope;
 		force_use = true;
 	} else if (id->fullpath == "intrinsics") {
