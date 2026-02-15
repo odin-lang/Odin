@@ -101,13 +101,22 @@ test_clean_path :: proc(t: ^testing.T) {
 
 @(test)
 replace_path_separators :: proc(t: ^testing.T) {
-	P :: "W:/Odin/core/os/path.odin"
+	{
+		P :: "W:/Odin/core/os/path.odin"
 
-	p1, _ := os.replace_path_separators(P, '😀', context.temp_allocator)
-	testing.expect_value(t, p1, "W:😀Odin😀core😀os😀path.odin")
+		p1, _ := os.replace_path_separators(P, '😀', context.temp_allocator)
+		testing.expect_value(t, p1, "W:😀Odin😀core😀os😀path.odin")
 
-	p2, _ := os.replace_path_separators(P, '|', context.temp_allocator)
-	testing.expect_value(t, p2, "W:|Odin|core|os|path.odin")
+		p2, _ := os.replace_path_separators(P, '|', context.temp_allocator)
+		testing.expect_value(t, p2, "W:|Odin|core|os|path.odin")
+	}
+
+	{
+		P :: "W:/恥知らずなフクロウ/path.odin"
+
+		p1, _ := os.replace_path_separators(P, '😀', context.temp_allocator)
+		testing.expect_value(t, p1, "W:😀恥知らずなフクロウ😀path.odin")
+	}
 }
 
 @(test)
