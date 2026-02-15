@@ -28,6 +28,7 @@ import            "core:terminal"
 import            "core:terminal/ansi"
 import            "core:thread"
 import            "core:time"
+import            "core:path/slashpath"
 
 // Specify how many threads to use when running tests.
 TEST_THREADS          : int    : #config(ODIN_TEST_THREADS,              0)
@@ -196,6 +197,53 @@ run_test_task :: proc(task: thread.Task) {
 	})
 }
 
+Options :: struct {
+	// Equivalent to the TEST_NAMES compile-time definition, but used dynamically at runtime.
+	test_names: string,
+}
+
+parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Writer) {
+	test_names: strings.Builder
+
+	for arg in argv {
+		if strings.starts_with(arg, "-tests:") {
+			_, _, tests := strings.partition(arg, ":")
+			if len(tests) < 1 {
+				fmt.wprintln(stderr, "No test names specified for '-tests:'")
+				os.exit(-1)
+			}
+
+			if strings.builder_len(test_names) > 0 {
+				strings.write_byte(&test_names, ',')
+			}
+			strings.write_string(&test_names, tests)
+		} else if arg == "-help" {
+			exe_name := "test"
+			if path, err := os.get_executable_path(context.temp_allocator); err == nil {
+				exe_name = slashpath.base(path)
+			}
+
+			fmt.wprintfln(stdout, "Usage: %v [OPTIONS]", exe_name)
+			fmt.wprintfln(stdout, "OPTIONS:")
+			fmt.wprintln(stdout, "        -help:")
+			fmt.wprintln(stdout, "            Display this help text and exit.")
+			fmt.wprintln(stdout)
+			fmt.wprintln(stdout, "        -tests:<test_name[,...]>")
+			fmt.wprintln(stdout, "            Specify a specific set of tests to run by name.\n" +
+			                      "            Each test is separated by a comma and may optionally include the package name.\n" +
+			                      "            This may be useful when running tests on multiple packages with `-all-packages`.\n" +
+			                      "            The format is: `package.test_name,test_name_only,...`")
+			fmt.wprintln(stdout)
+			os.exit(0)
+		} else {
+			fmt.wprintfln(stderr, "Unknown argument encountered '%v'", arg)
+			os.exit(-1)
+		}
+	}
+
+	opts.test_names = strings.to_string(test_names)
+}
+
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	BATCH_BUFFER_SIZE     :: 32 * mem.Kilobyte
 	POOL_BLOCK_SIZE       :: 16 * mem.Kilobyte
@@ -219,6 +267,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
+
+	// `-vet` needs parameters to be shadowed by themselves first as an
+	// explicit declaration, to allow the next line to work.
+	// NOTE(@harold): Moved out of scope below as it's no longer under a `when` block, but under `if`.
+	internal_tests := internal_tests
+
 	stdout := os.to_stream(os.stdout)
 	stderr := os.to_stream(os.stderr)
 
@@ -229,54 +283,58 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	should_show_animations := FANCY_OUTPUT && terminal.color_enabled && !global_ansi_disabled
 
+	// -- Parse CLI options
+	opts: Options
+	parse_cli_options(os.args[1:], &opts, stdout, stderr)
+
+	test_names: string = TEST_NAMES
+	if len(opts.test_names) > 0 {
+		test_names = opts.test_names
+	}
+
 	// -- Prepare test data.
 
 	alloc_error: mem.Allocator_Error
 
-	when TEST_NAMES != "" {
-		select_internal_tests: [dynamic]Internal_Test
-		defer delete(select_internal_tests)
+	select_internal_tests: [dynamic]Internal_Test
+	defer delete(select_internal_tests)
 
-		{
-			index_list := TEST_NAMES
-			for selector in strings.split_iterator(&index_list, ",") {
-				// Temp allocator is fine since we just need to identify which test it's referring to.
-				split_selector := strings.split(selector, ".", context.temp_allocator)
+	if test_names != "" {
+		index_list := test_names
+		for selector in strings.split_iterator(&index_list, ",") {
+			// Temp allocator is fine since we just need to identify which test it's referring to.
+			split_selector := strings.split(selector, ".", context.temp_allocator)
 
-				found := false
-				switch len(split_selector) {
-				case 1:
-					// Only the test name?
-					#no_bounds_check name := split_selector[0]
-					find_test_by_name: for it in internal_tests {
-						if it.name == name {
-							found = true
-							_, alloc_error = append(&select_internal_tests, it)
-							fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
-							break find_test_by_name
-						}
-					}
-				case 2:
-					#no_bounds_check pkg  := split_selector[0]
-					#no_bounds_check name := split_selector[1]
-					find_test_by_pkg_and_name: for it in internal_tests {
-						if it.pkg == pkg && it.name == name {
-							found = true
-							_, alloc_error = append(&select_internal_tests, it)
-							fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
-							break find_test_by_pkg_and_name
-						}
+			found := false
+			switch len(split_selector) {
+			case 1:
+				// Only the test name?
+				#no_bounds_check name := split_selector[0]
+				find_test_by_name: for it in internal_tests {
+					if it.name == name {
+						found = true
+						_, alloc_error = append(&select_internal_tests, it)
+						fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
+						break find_test_by_name
 					}
 				}
-				if !found {
-					fmt.wprintfln(stderr, "No test found for the name: %q", selector)
+			case 2:
+				#no_bounds_check pkg  := split_selector[0]
+				#no_bounds_check name := split_selector[1]
+				find_test_by_pkg_and_name: for it in internal_tests {
+					if it.pkg == pkg && it.name == name {
+						found = true
+						_, alloc_error = append(&select_internal_tests, it)
+						fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
+						break find_test_by_pkg_and_name
+					}
 				}
+			}
+			if !found {
+				fmt.wprintfln(stderr, "No test found for the name: %q", selector)
 			}
 		}
 
-		// `-vet` needs parameters to be shadowed by themselves first as an
-		// explicit declaration, to allow the next line to work.
-		internal_tests := internal_tests
 		// Intentional shadow with user-specified tests.
 		internal_tests = select_internal_tests[:]
 	}
