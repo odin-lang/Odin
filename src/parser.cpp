@@ -5427,9 +5427,15 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			s = parse_stmt(f);
 			switch (s->kind) {
 			case Ast_SwitchStmt:
+				if (s->SwitchStmt.partial) {
+					syntax_error(token, "#partial already applied to a switch statement");
+				}
 				s->SwitchStmt.partial = true;
 				break;
 			case Ast_TypeSwitchStmt:
+				if (s->TypeSwitchStmt.partial) {
+					syntax_error(token, "#partial already applied to a switch statement");
+				}
 				s->TypeSwitchStmt.partial = true;
 				break;
 			case Ast_EmptyStmt:
