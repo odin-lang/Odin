@@ -226,7 +226,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	//               If we optimize `itoa` further, this needs to be evaluated.
 	itoa_method := _itoa_raw_full
 
-	when !MATH_BIG_FORCE_32_BIT && ODIN_OPTIMIZATION_MODE >= .Size {
+	when ODIN_OPTIMIZATION_MODE >= .Size {
 		if count >= 32768 {
 			itoa_method = _itoa_raw_old
 		}
