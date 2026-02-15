@@ -29,22 +29,39 @@ with the `new_sep` rune.
 *Allocates Using Provided Allocator*
 */
 replace_path_separators :: proc(path: string, new_sep: rune, allocator: runtime.Allocator) -> (new_path: string, err: Error) {
-	buf := make([]u8, len(path), allocator) or_return
+	length       := len(path)
+	rep_b, rep_w := utf8.encode_rune(new_sep)
 
-	i: int
+	byte_oriented := rep_w == 1
+
 	for r in path {
-		replacement := r
 		if r == '/' || r == '\\' {
-			replacement = new_sep
+			length += rep_w - 1
 		}
+		if r > rune(0x7f) {
+			byte_oriented = false
+		}
+	}
 
-		if replacement <= rune(0x7F) {
-			buf[i] = u8(replacement)
-			i += 1
-		} else {
-			b, w := utf8.encode_rune(r)
-			copy(buf[i:], b[:w])
-			i += w
+	buf := make([]u8, length, allocator) or_return
+
+	if byte_oriented {
+		// Neither replacement rune or any other rune in the path takes up more than 1 byte
+		str := transmute([]byte)path
+		#no_bounds_check for b, i in str {
+			buf[i] = u8(new_sep) if b == '/' || b == '\\' else b
+		}
+	} else {
+		i: int
+		for r in path {
+			if r == '/' || r == '\\' {
+				copy(buf[i:], rep_b[:rep_w])
+				i += rep_w
+			} else {
+				r_b, r_w := utf8.encode_rune(r)
+				copy(buf[i:], r_b[:r_w])
+				i += r_w
+			}
 		}
 	}
 	return string(buf), nil
