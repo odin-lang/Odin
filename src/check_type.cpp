@@ -1610,6 +1610,11 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
 		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+		if (pts[0] == '^' && pts[0] != ots[0]){
+			gbString os = expr_to_string(operand.expr);
+			defer (gb_string_free(os));
+			error_line("\tSuggestion: Try passing the pointer instead of the value with '&%s'\n", os);
+		}
 
 		Type *pt = poly_type;
 		while (pt && pt->kind == Type_Generic && pt->Generic.specialized) {
