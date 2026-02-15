@@ -643,14 +643,14 @@ EventFilter :: proc "c" (userdata: rawptr, event: ^Event) -> bool
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	PumpEvents          :: proc() ---
-	PeepEvents          :: proc(events: [^]Event, numevents: c.int, action: EventAction, minType, maxType: EventType) -> int ---
+	PeepEvents          :: proc(events: Maybe([^]Event), numevents: c.int, action: EventAction, minType, maxType: EventType) -> int ---
 	HasEvent            :: proc(type: EventType) -> bool ---
 	HasEvents           :: proc(minType, maxType: EventType) -> bool ---
 	FlushEvent          :: proc(type: EventType) ---
 	FlushEvents         :: proc(minType, maxType: EventType) ---
-	PollEvent           :: proc(event: ^Event) -> bool ---
-	WaitEvent           :: proc(event: ^Event) -> bool ---
-	WaitEventTimeout    :: proc(event: ^Event, timeoutMS: Sint32) -> bool ---
+	PollEvent           :: proc(event: Maybe(^Event)) -> bool ---
+	WaitEvent           :: proc(event: Maybe(^Event)) -> bool ---
+	WaitEventTimeout    :: proc(event: Maybe(^Event), timeoutMS: Sint32) -> bool ---
 	PushEvent           :: proc(event: ^Event) -> bool ---
 	SetEventFilter      :: proc(filter: EventFilter, userdata: rawptr) ---
 	GetEventFilter      :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---

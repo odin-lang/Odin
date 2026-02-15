@@ -6,7 +6,7 @@ import "core:c"
 
 import win32 "core:sys/windows"
 
-WindowsMessageHook :: #type proc(userdata: rawptr, msg: ^win32.MSG) -> bool
+WindowsMessageHook :: #type proc "c" (userdata: rawptr, msg: ^win32.MSG) -> bool
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -46,6 +46,11 @@ foreign lib {
 
 RequestAndroidPermissionCallback :: #type proc "c" (userdata: rawptr, permission: cstring, granted: bool)
 
+AndroidExternalStorageFlags :: distinct bit_set[AndroidExternalStorageFlag; Uint32]
+AndroidExternalStorageFlag :: enum Uint32 {
+	Read,
+	Write,
+}
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
@@ -56,7 +61,7 @@ foreign lib {
 	IsDeXMode                      :: proc() -> bool ---
 	SendAndroidBackButton          :: proc()  ---
 	GetAndroidInternalStoragePath  :: proc() -> cstring ---
-	GetAndroidExternalStorageState :: proc() -> Uint32 ---
+	GetAndroidExternalStorageState :: proc() -> AndroidExternalStorageFlags ---
 	GetAndroidExternalStoragePath  :: proc() -> cstring ---
 	GetAndroidCachePath            :: proc() -> cstring ---
 	RequestAndroidPermission       :: proc(permission: cstring, cb: RequestAndroidPermissionCallback, userdata: rawptr) -> bool ---
