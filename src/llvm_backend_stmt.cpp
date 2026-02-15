@@ -756,6 +756,10 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 
 	lb_open_scope(p, scope);
 
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
+	}
+
 	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
 	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
 	Type *val0_type = nullptr;
@@ -948,6 +952,10 @@ gb_internal void lb_build_range_tuple(lbProcedure *p, AstRangeStmt *rs, Scope *s
 
 	lb_open_scope(p, scope);
 
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
+	}
+
 	lbBlock *loop = lb_create_block(p, "for.tuple.loop");
 	lb_emit_jump(p, loop);
 	lb_start_block(p, loop);
@@ -1002,6 +1010,9 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 	lb_open_scope(p, scope);
 
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
+	}
 
 	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
 	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
@@ -1152,6 +1163,10 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 
 	lb_open_scope(p, scope);
+
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
+	}
 
 	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
 	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
@@ -1351,6 +1366,10 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 	lbModule *m = p->module;
 
 	lb_open_scope(p, scope); // Open scope here
+
+	if (rs->init != nullptr) {
+		lb_build_stmt(p, rs->init);
+	}
 
 	Ast *val0 = lb_strip_and_prefix(rs->val0);
 	Ast *val1 = lb_strip_and_prefix(rs->val1);
