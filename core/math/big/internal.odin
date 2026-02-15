@@ -1688,7 +1688,7 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	*/
 	if n == 2 { return #force_inline internal_sqrt(dest, src) }
 
-	if n < 0 || n > int(_DIGIT_MAX) { return .Invalid_Argument }
+	if n < 0 || _WORD(n) > _WORD(_DIGIT_MAX) { return .Invalid_Argument }
 
 	if n & 1 == 0 && #force_inline internal_is_negative(src) { return .Invalid_Argument }
 
