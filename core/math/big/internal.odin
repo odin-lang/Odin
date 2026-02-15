@@ -30,7 +30,7 @@ package math_big
 import "base:builtin"
 import "base:intrinsics"
 import "base:runtime"
-import rnd "core:math/rand"
+@(require) import rnd "core:math/rand"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -1178,6 +1178,8 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
+	internal_clamp(a)
+	internal_clamp(b)
 
 	// Compare based on used digits.
 	if a.used != b.used {
@@ -1450,6 +1452,7 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
+	internal_clamp(a)
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
 	return _private_int_log(a, base)
@@ -2820,9 +2823,9 @@ internal_platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
 internal_count_lsb :: proc { internal_int_count_lsb, internal_platform_count_lsb, }
 
 internal_int_random_digit :: proc() -> (res: DIGIT) {
-	when _DIGIT_BITS == 60 { // DIGIT = u64
+	when _DIGIT_TYPE_BITS == 64 { // DIGIT = u64
 		return DIGIT(rnd.uint64()) & _MASK
-	} else when _DIGIT_BITS == 28 { // DIGIT = u32
+	} else when _DIGIT_TYPE_BITS == 32 { // DIGIT = u32
 		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
