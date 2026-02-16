@@ -314,7 +314,7 @@ valid_string :: proc "contextless" (s: string) -> bool {
 			return false
 		} else if size == 3 {
 			// Okay
-		} else if d := s[i+3]; b < 0x80 || 0xbf < d {
+		} else if d := s[i+3]; d < 0x80 || 0xbf < d {
 			return false
 		}
 		i += size
