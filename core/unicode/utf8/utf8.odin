@@ -1,6 +1,8 @@
 // Procedures and constants to support text-encoding in the `UTF-8` character encoding.
 package utf8
 
+@(require) import "base:runtime"
+
 RUNE_ERROR :: '\ufffd'
 RUNE_SELF  :: 0x80
 RUNE_BOM   :: 0xfeff
@@ -145,10 +147,10 @@ decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 }
 
 @(require_results)
-string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (runes: []rune) {
+string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (runes: []rune, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count_in_string(s)
 
-	runes = make([]rune, n, allocator)
+	runes = make([]rune, n, allocator) or_return
 	i := 0
 	for r in s {
 		runes[i] = r
@@ -158,14 +160,14 @@ string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (r
 }
 
 @(require_results)
-runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -> string {
+runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -> (s: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	byte_count := 0
 	for r in runes {
 		_, w := encode_rune(r)
 		byte_count += w
 	}
 
-	bytes := make([]byte, byte_count, allocator)
+	bytes := make([]byte, byte_count, allocator) or_return
 	offset := 0
 	for r in runes {
 		b, w := encode_rune(r)
@@ -173,7 +175,8 @@ runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -
 		offset += w
 	}
 
-	return string(bytes)
+	s = string(bytes)
+	return 
 }
 
 
