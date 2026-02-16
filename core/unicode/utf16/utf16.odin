@@ -128,7 +128,7 @@ decode_rune_in_string :: proc "contextless" (s: string16) -> (r: rune, width: in
 	return
 }
 
-string_to_runes :: proc "odin" (s: string16, allocator := context.allocator) -> (runes: []rune, err: runtime.Allocator_Error) {
+string_to_runes :: proc "odin" (s: string16, allocator := context.allocator) -> (runes: []rune, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(s)
 
 	runes = make([]rune, n, allocator) or_return

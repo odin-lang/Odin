@@ -147,7 +147,7 @@ decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) {
 }
 
 @(require_results)
-string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (runes: []rune, err: runtime.Allocator_Error) {
+string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (runes: []rune, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count_in_string(s)
 
 	runes = make([]rune, n, allocator) or_return
@@ -160,7 +160,7 @@ string_to_runes :: proc "odin" (s: string, allocator := context.allocator) -> (r
 }
 
 @(require_results)
-runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -> (s: string, err: runtime.Allocator_Error) {
+runes_to_string :: proc "odin" (runes: []rune, allocator := context.allocator) -> (s: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	byte_count := 0
 	for r in runes {
 		_, w := encode_rune(r)
