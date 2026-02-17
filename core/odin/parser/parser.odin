@@ -881,7 +881,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	body: ^ast.Stmt
 	is_range := false
 
-	if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
+	general_conds: if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
 		prev_level := p.expr_level
 		defer p.expr_level = prev_level
 		p.expr_level = -1
@@ -929,6 +929,17 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				error(p, p.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", tokenizer.tokens[p.curr_tok.kind])
 			} else {
 				if p.curr_tok.kind != .Semicolon {
+					if p.curr_tok.kind == .Ident {
+						next_token := peek_token(p)
+						if next_token.kind == .In || next_token.kind == .Comma {
+							cond = parse_simple_stmt(p, {.In})
+							as := cond.derived_stmt.(^ast.Assign_Stmt)
+							assert(as.op.kind == .In)
+							is_range = true
+							break general_conds
+						}
+					}
+
 					cond = parse_simple_stmt(p, nil)
 				}
 
@@ -967,6 +978,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		range_stmt := ast.new(ast.Range_Stmt, tok.pos, body)
 		range_stmt.for_pos = tok.pos
+		range_stmt.init = init
 		range_stmt.vals = vals
 		range_stmt.in_pos = assign_stmt.op.pos
 		range_stmt.expr = rhs

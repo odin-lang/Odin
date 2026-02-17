@@ -1705,10 +1705,16 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 	TEMPORARY_ALLOCATOR_GUARD();
 
-	u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 	check_open_scope(ctx, node);
 	check_label(ctx, rs->label, node);
+
+	Operand init = {};
+	if (rs->init != nullptr) {
+		check_stmt(ctx, rs->init, mod_flags);
+	}
+
+	u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 	auto vals = array_make<Type *>(temporary_allocator(), 0, 2);
 	auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);

@@ -432,6 +432,7 @@ For_Stmt :: struct {
 Range_Stmt :: struct {
 	using node: Stmt,
 	label:     ^Expr, // possibly nil
+	init:      ^Stmt,
 	for_pos:   tokenizer.Pos,
 	vals:      []^Expr,
 	in_pos:    tokenizer.Pos,

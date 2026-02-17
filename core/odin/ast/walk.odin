@@ -222,6 +222,9 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.label != nil {
 			walk(v, n.label)
 		}
+		if n.init != nil {
+			walk(v, n.init)
+		}
 		for val in n.vals {
 			if val != nil {
 				walk(v, val)
