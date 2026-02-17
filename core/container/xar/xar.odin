@@ -410,7 +410,7 @@ array_linear_search :: proc(x: ^$X/Array($T, $SHIFT), elem: T) -> (index: int, f
 			return i, true
 		}
 	}
-	return -1, flase
+	return -1, false
 }
 
 
