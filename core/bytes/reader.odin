@@ -61,6 +61,17 @@ reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Erro
 	}
 	return
 }
+reader_read_slice :: proc(r: ^Reader, slice: $T/[]$S) -> (n: int, err: io.Error) {
+	b := ([^]byte)(raw_data(slice))[:len(slice)*size_of(S)]
+	return reader_read(r, b)
+}
+
+reader_read_slice_at :: proc(r: ^Reader, slice: $T/[]$S, off: i64) -> (n: int, err: io.Error) {
+	b := ([^]byte)(raw_data(slice))[:len(slice)*size_of(S)]
+	return reader_read_at(r, b, offset)
+}
+
+
 reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
