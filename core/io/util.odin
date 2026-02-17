@@ -8,6 +8,11 @@ read_ptr :: proc(r: Reader, p: rawptr, byte_size: int, n_read: ^int = nil) -> (n
 	return read(r, ([^]byte)(p)[:byte_size], n_read)
 }
 
+read_slice :: proc(r: Reader, p: rawptr, byte_size: int, n_read: ^int = nil) -> (n: int, err: Error) {
+	size := len(slice)*size_of(T)
+	return read_ptr(w, raw_data(slice), size, n_read)
+}
+
 write_ptr :: proc(w: Writer, p: rawptr, byte_size: int, n_written: ^int = nil) -> (n: int, err: Error) {
 	return write(w, ([^]byte)(p)[:byte_size], n_written)
 }
@@ -19,6 +24,12 @@ read_ptr_at :: proc(r: Reader_At, p: rawptr, byte_size: int, offset: i64, n_read
 write_ptr_at :: proc(w: Writer_At, p: rawptr, byte_size: int, offset: i64, n_written: ^int = nil) -> (n: int, err: Error) {
 	return write_at(w, ([^]byte)(p)[:byte_size], offset, n_written)
 }
+
+write_slice :: proc(w: Writer, slice: $S/[]$T, n_written: ^int = nil) -> (n: int, err: Error) {
+	size := len(slice)*size_of(T)
+	return write_ptr(w, raw_data(slice), size, n_written)
+}
+
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [64]byte

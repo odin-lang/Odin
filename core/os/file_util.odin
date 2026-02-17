@@ -111,6 +111,25 @@ read_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
 }
 
 
+/*
+	`write_slice` is a utility procedure that writes the bytes points at `slice`.
+
+	It is equivalent to: `write(f, ([^]byte)(raw_data(slice))[:len(slice)*size_of(slice[0]))])`
+*/
+write_slice :: proc(f: ^File, slice: $S/[]$T) -> (n: int, err: Error) {
+	return write(f, ([^]byte)(raw_data(slice))[:len(slice)*size_of(slice[0]))])
+}
+
+/*
+	`read_slice` is a utility procedure that writes the bytes points at `slice`.
+
+	It is equivalent to: `read(f, ([^]byte)(raw_data(slice))[:len(slice)*size_of(slice[0]))])`
+*/
+read_slice :: proc(f: ^File, slice: $S/[]$T) -> (n: int, err: Error) {
+	return read(f, ([^]byte)(raw_data(slice))[:len(slice)*size_of(slice[0]))])
+}
+
+
 
 /*
 	`read_at_least` reads from `f` into `buf` until it has read at least `min` bytes.

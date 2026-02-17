@@ -176,6 +176,11 @@ buffer_write_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int, loc := #caller_loca
 	return buffer_write(b, ([^]byte)(ptr)[:size], loc=loc)
 }
 
+buffer_write_slice :: proc(b: ^Buffer, slice: $S/[]$T, loc := #caller_location) -> (n: int, err: io.Error) {
+	size := len(slice)*size_of(T)
+	return buffer_write(b, ([^]byte)(raw_data(slice))[:size], loc=loc)
+}
+
 buffer_write_string :: proc(b: ^Buffer, s: string, loc := #caller_location) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 	m, ok := _buffer_try_grow(b, len(s), loc=loc)
@@ -247,6 +252,12 @@ buffer_read :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 buffer_read_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
 	return buffer_read(b, ([^]byte)(ptr)[:size])
 }
+
+buffer_read_slice :: proc(b: ^Buffer, slice: $S/[]$T) -> (n: int, err: io.Error) {
+	size := len(slice)*size_of(T)
+	return buffer_read(b, ([^]byte)(raw_data(slice))[:size])
+}
+
 
 buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
 	if len(p) == 0 {
