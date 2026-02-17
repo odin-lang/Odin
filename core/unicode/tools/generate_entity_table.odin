@@ -1,4 +1,4 @@
-package xml_example
+package xml_tools
 
 import      "core:encoding/xml"
 import      "core:os"
@@ -20,17 +20,27 @@ Entity :: struct {
 }
 
 main :: proc() {
-	filename := path.join({ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml"})
+	filename, err_xml := path.join({ODIN_ROOT, "tests", "core", "assets", "XML", "unicode.xml"}, context.allocator)
 	defer delete(filename)
 
-	generated_filename := path.join({ODIN_ROOT, "core", "encoding", "entity", "generated.odin"})
+	if err_xml != .None {
+		fmt.eprintfln("Join path error for unicode.xml: %v", err_xml);
+		os.exit(1);
+	}
+
+	generated_filename, err_generated := path.join({ODIN_ROOT, "core", "encoding", "entity", "generated.odin"}, context.allocator)
 	defer delete(generated_filename)
+
+	if err_generated != .None {
+		fmt.eprintfln("Join path error for generated.odin: %v", err_generated);
+		os.exit(1);
+	}
 
 	doc, err := xml.load_from_file(filename, OPTIONS, Error_Handler)
 	defer xml.destroy(doc)
 
 	if err != .None {
-		fmt.printfln("Load/Parse error: %v", err)
+		fmt.eprintfln("Load/Parse error: %v", err)
 		if err == .File_Error {
 			fmt.eprintfln("%q not found. Did you run \"tests\\download_assets.py\"?", filename)
 		}
