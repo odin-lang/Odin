@@ -8,7 +8,7 @@ read_ptr :: proc(r: Reader, p: rawptr, byte_size: int, n_read: ^int = nil) -> (n
 	return read(r, ([^]byte)(p)[:byte_size], n_read)
 }
 
-read_slice :: proc(r: Reader, p: rawptr, byte_size: int, n_read: ^int = nil) -> (n: int, err: Error) {
+read_slice :: proc(r: Reader, slice: $S/[]$T, n_read: ^int = nil) -> (n: int, err: Error) {
 	size := len(slice)*size_of(T)
 	return read_ptr(w, raw_data(slice), size, n_read)
 }
