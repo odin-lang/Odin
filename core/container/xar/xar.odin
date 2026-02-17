@@ -26,7 +26,6 @@
 */
 package container_xar
 
-@(require) import "core:mem"
 @(require) import "base:intrinsics"
 @(require) import "base:runtime"
 
@@ -73,7 +72,7 @@ MAX_SHIFT :: PLATFORM_BITS>>1
 Array :: struct($T: typeid, $SHIFT: uint) where 0 < SHIFT, SHIFT <= MAX_SHIFT {
 	chunks:    [(1 << (_LOG2_PLATFORM_BITS - intrinsics.constant_log2(SHIFT))) + 1][^]T,
 	len:       int,
-	allocator: mem.Allocator,
+	allocator: runtime.Allocator,
 }
 
 
@@ -84,7 +83,7 @@ Initializes an exponential array with the given allocator.
 - `x`: Pointer to the exponential array to initialize
 - `allocator`: Allocator to use for chunk allocations (defaults to context.allocator)
 */
-init :: proc(x: ^$X/Array($T, $SHIFT), allocator := context.allocator) {
+array_init :: proc(x: ^$X/Array($T, $SHIFT), allocator := context.allocator) {
 	x^ = {allocator = allocator}
 }
 
@@ -94,12 +93,12 @@ Frees all allocated chunks and resets the exponential array.
 **Inputs**
 - `x`: Pointer to the exponential array to destroy
 */
-destroy :: proc(x: ^$X/Array($T, $SHIFT)) {
+array_destroy :: proc(x: ^$X/Array($T, $SHIFT)) {
 	#reverse for c, i in x.chunks {
 		if c != nil {
 			n := 1 << (SHIFT + uint(i if i > 0 else 1) - 1)
 			size_in_bytes := n * size_of(T)
-			mem.free_with_size(c, size_in_bytes, x.allocator)
+			runtime.mem_free_with_size(c, size_in_bytes, x.allocator)
 		}
 	}
 	x^ = {}
@@ -109,19 +108,19 @@ destroy :: proc(x: ^$X/Array($T, $SHIFT)) {
 Resets the array's length to zero without freeing memory.
 Allocated chunks are retained for reuse.
 */
-clear :: proc "contextless" (x: ^$X/Array($T, $SHIFT)) {
+array_clear :: proc "contextless" (x: ^$X/Array($T, $SHIFT)) {
 	x.len = 0
 }
 
 // Returns the length of the exponential-array
 @(require_results)
-len :: proc "contextless" (x: $X/Array($T, $SHIFT)) -> int {
+array_len :: proc "contextless" (x: $X/Array($T, $SHIFT)) -> int {
 	return x.len
 }
 
 // Returns the number of allocated elements
 @(require_results)
-cap :: proc "contextless" (x: $X/Array($T, $SHIFT)) -> int {
+array_cap :: proc "contextless" (x: $X/Array($T, $SHIFT)) -> int {
 	#reverse for c, i in x.chunks {
 		if c != nil {
 			return 1 << (SHIFT + uint(i if i > 0 else 1))
@@ -161,7 +160,7 @@ Get a copy of the element at the specified index.
 - a copy of the element
 */
 @(require_results)
-get :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: T) #no_bounds_check {
+array_get :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: T) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	return x.chunks[chunk_idx][elem_idx]
@@ -200,7 +199,7 @@ Example:
 	}
 */
 @(require_results)
-get_ptr :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: ^T) #no_bounds_check {
+array_get_ptr :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) -> (val: ^T) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	return &x.chunks[chunk_idx][elem_idx]
@@ -208,7 +207,7 @@ get_ptr :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_lo
 
 // No bounds checking
 @(require_results)
-get_ptr_unsafe :: proc "contextless" (x: ^$X/Array($T, $SHIFT), #any_int index: int) -> (val: ^T) #no_bounds_check {
+array_get_ptr_unsafe :: proc "contextless" (x: ^$X/Array($T, $SHIFT), #any_int index: int) -> (val: ^T) #no_bounds_check {
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	return &x.chunks[chunk_idx][elem_idx]
 }
@@ -221,14 +220,15 @@ Set the element at the specified index to the given value.
 - `index`: Position of the element (0-indexed)
 - `value`: The value to set
 */
-set :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, value: T, loc := #caller_location) #no_bounds_check {
+array_set :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, value: T, loc := #caller_location) #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, uint(index))
 	x.chunks[chunk_idx][elem_idx] = value
 }
 
-append    :: proc{push_back_elem, push_back_elems}
-push_back :: proc{push_back_elem, push_back_elems}
+array_append    :: proc{array_push_back_elem, array_push_back_elems}
+array_push_back :: proc{array_push_back_elem, array_push_back_elems}
+
 
 /*
 Append an element to the end of the exponential array.
@@ -257,7 +257,7 @@ Example:
 		fmt.println(xar.get(&x, 1))  // world
 	}
 */
-push_back_elem :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_location) -> (n: int, err: mem.Allocator_Error) {
+array_push_back_elem :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) {
 	if x.allocator.procedure == nil {
 		// to minic `[dynamic]T` behaviour
 		x.allocator = context.allocator
@@ -284,14 +284,16 @@ Append multiple elements to the end of the exponential array.
 - number of elements successfully added
 - allocation error if chunk allocation failed (partial append possible)
 */
-push_back_elems :: proc(x: ^$X/Array($T, $SHIFT), values: ..T, loc := #caller_location) -> (n: int, err: mem.Allocator_Error) {
+array_push_back_elems :: proc(x: ^$X/Array($T, $SHIFT), values: ..T, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) {
 	for value in values {
-		n += push_back_elem(x, value, loc) or_return
+		n += array_push_back_elem(x, value, loc) or_return
 	}
 	return
 }
 
-append_and_get_ptr :: push_back_elem_and_get_ptr
+array_append_and_get_ptr :: array_push_back_elem_and_get_ptr
+append_and_get_ptr       :: array_push_back_elem_and_get_ptr
+
 /*
 Append an element and return a stable pointer to it.
 This is useful when you need to initialize a complex struct in-place or
@@ -318,7 +320,7 @@ Example:
 	}
 */
 @(require_results)
-push_back_elem_and_get_ptr :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_location) -> (ptr: ^T, err: mem.Allocator_Error) {
+array_push_back_elem_and_get_ptr :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_location) -> (ptr: ^T, err: runtime.Allocator_Error) {
 	if x.allocator.procedure == nil {
 		// to minic `[dynamic]T` behaviour
 		x.allocator = context.allocator
@@ -337,7 +339,7 @@ push_back_elem_and_get_ptr :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #c
 // `pop` will remove and return the end value of an exponential array `x` and reduces the length of the array by 1.
 //
 // Note: If the exponential array has no elements (`xar.len(x) == 0`), this procedure will panic.
-pop :: proc(x: ^$X/Array($T, $SHIFT), loc := #caller_location) -> (val: T) {
+array_pop :: proc(x: ^$X/Array($T, $SHIFT), loc := #caller_location) -> (val: T) {
 	assert(x.len > 0, loc=loc)
 	index := uint(x.len-1)
 	chunk_idx, elem_idx, _ := _meta_get(SHIFT, index)
@@ -348,7 +350,7 @@ pop :: proc(x: ^$X/Array($T, $SHIFT), loc := #caller_location) -> (val: T) {
 // `pop_safe` trys to remove and return the end value of dynamic array `x` and reduces the length of the array by 1.
 // If the operation is not possible, it will return false.
 @(require_results)
-pop_safe :: proc(x: ^$X/Array($T, $SHIFT)) -> (val: T, ok: bool) {
+array_pop_safe :: proc(x: ^$X/Array($T, $SHIFT)) -> (val: T, ok: bool) {
 	if x.len == 0 {
 		return
 	}
@@ -390,14 +392,25 @@ pop_safe :: proc(x: ^$X/Array($T, $SHIFT)) -> (val: T, ok: bool) {
 			fmt.println(xar.get(&x, 1))  // 20
 		}
 */
-unordered_remove :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) {
+array_unordered_remove :: proc(x: ^$X/Array($T, $SHIFT), #any_int index: int, loc := #caller_location) {
 	runtime.bounds_check_error_loc(loc, index, x.len)
 	n := x.len-1
 	if index != n {
-		end := get(x, n)
-		set(x, index, end)
+		end := array_get(x, n)
+		array_set(x, index, end)
 	}
 	x.len -= 1
+}
+
+@(require_results)
+array_linear_search :: proc(x: ^$X/Array($T, $SHIFT), elem: T) -> (index: int, found: bool) where intrinsics.type_is_comparable(T) {
+	it := array_iterator(x)
+	for val, i in array_iterate_by_val(it) {
+		if val == elem {
+			return i, true
+		}
+	}
+	return -1, flase
 }
 
 
@@ -408,7 +421,7 @@ Fields:
 - `xar`: Pointer to the exponential array being iterated
 - `idx`: Current iteration index
 */
-Iterator :: struct($T: typeid, $SHIFT: uint) {
+Array_Iterator :: struct($T: typeid, $SHIFT: uint) {
 	xar: ^Array(T, SHIFT),
 	idx: int,
 }
@@ -447,7 +460,7 @@ Output:
 	20
 	30
 */
-iterator :: proc(xar: ^$X/Array($T, $SHIFT)) -> Iterator(T, SHIFT) {
+array_iterator :: proc(xar: ^$X/Array($T, $SHIFT)) -> Array_Iterator(T, SHIFT) {
 	return {xar = auto_cast xar, idx = 0}
 }
 
@@ -461,11 +474,12 @@ Advance the iterator and returns the next element.
 - current element
 - `true` if an element was returned, `false` if iteration is complete
 */
-iterate_by_val :: proc(it: ^Iterator($T, $SHIFT)) -> (val: T, ok: bool) {
+array_iterate_by_val :: proc(it: ^Array_Iterator($T, $SHIFT)) -> (val: T, idx: int, ok: bool) {
 	if it.idx >= it.xar.len {
 		return
 	}
-	val = get(it.xar, it.idx)
+	val = array_get(it.xar, it.idx)
+	idx = it.idx
 	it.idx += 1
 	return val, true
 }
@@ -481,11 +495,42 @@ Advance the iterator and returns a pointer to the next element.
 - pointer to the current element
 - `true` if an element was returned, `false` if iteration is complete
 */
-iterate_by_ptr :: proc(it: ^Iterator($T, $SHIFT)) -> (val: ^T, ok: bool) {
+array_iterate_by_ptr :: proc(it: ^Array_Iterator($T, $SHIFT)) -> (val: ^T, idx: int, ok: bool) {
 	if it.idx >= it.xar.len {
 		return
 	}
-	val = get_ptr(it.xar, it.idx)
+	val = array_get_ptr(it.xar, it.idx)
+	idx = it.idx
 	it.idx += 1
 	return val, true
 }
+
+
+
+
+init                      :: proc{array_init,           freelist_init}
+destroy                   :: proc{array_destroy,        freelist_destroy}
+clear                     :: proc{array_clear,          freelist_clear}
+len                       :: proc{array_len,            freelist_len}
+cap                       :: proc{array_cap,            freelist_cap}
+get                       :: proc{array_get,            freelist_get}
+get_ptr_unsafe            :: proc{array_get_ptr_unsafe}
+get_ptr                   :: proc{array_get_ptr,        freelist_get_ptr}
+set                       :: proc{array_set,            freelist_set}
+append                    :: proc{array_push_back_elem, array_push_back_elems}
+push_back                 :: proc{array_push_back_elem, array_push_back_elems}
+push_back_elem            :: proc{array_push_back_elem}
+push_back_elems           :: proc{array_push_back_elems}
+push_back_elem_and_get_ptr:: proc{array_push_back_elem_and_get_ptr}
+pop                       :: proc{array_pop,            freelist_pop}
+pop_safe                  :: proc{array_pop_safe}
+unordered_remove          :: proc{array_unordered_remove}
+iterator                  :: proc{array_iterator,       freelist_iterator}
+iterate_by_val            :: proc{array_iterate_by_val, freelist_iterate_by_val}
+iterate_by_ptr            :: proc{array_iterate_by_ptr, freelist_iterate_by_ptr}
+
+push_with_index :: proc{freelist_push_with_index}
+push            :: proc{freelist_push}
+release         :: proc{freelist_release}
+linear_search   :: proc{array_linear_search, freelist_linear_search}
+is_freed        :: proc{freelist_is_freed}

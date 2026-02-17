@@ -3,7 +3,6 @@ package sync_chan
 import "base:builtin"
 import "base:intrinsics"
 import "base:runtime"
-import "core:mem"
 import "core:sync"
 import "core:math/rand"
 
@@ -255,20 +254,20 @@ Example:
 	}
 */
 @(require_results)
-create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
+create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator, loc := #caller_location) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
 	assert(msg_size <= int(max(u16)))
 	align := max(align_of(Raw_Chan), msg_alignment)
 
-	size := mem.align_forward_int(size_of(Raw_Chan), align)
+	size := runtime.align_forward_int(size_of(Raw_Chan), align)
 	offset := size
 	size += msg_size
-	size = mem.align_forward_int(size, align)
+	size = runtime.align_forward_int(size, align)
 
-	ptr := mem.alloc(size, align, allocator) or_return
-	c = (^Raw_Chan)(ptr)
+	data := runtime.mem_alloc(size, align, allocator, loc) or_return
+	c = (^Raw_Chan)(raw_data(data))
 	c.allocator = allocator
 	c.allocation_size = size
-	c.unbuffered_data = ([^]byte)(ptr)[offset:]
+	c.unbuffered_data = raw_data(data[offset:])
 	c.msg_size = u16(msg_size)
 	return
 }
@@ -300,7 +299,7 @@ Example:
 	}
 */
 @(require_results)
-create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap: int, allocator: runtime.Allocator) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
+create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap: int, allocator: runtime.Allocator, loc := #caller_location) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
 	assert(msg_size <= int(max(u16)))
 	if cap <= 0 {
 		return create_raw_unbuffered(msg_size, msg_alignment, allocator)
@@ -308,15 +307,16 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 
 	align := max(align_of(Raw_Chan), msg_alignment, align_of(Raw_Queue))
 
-	size := mem.align_forward_int(size_of(Raw_Chan), align)
+	size := runtime.align_forward_int(size_of(Raw_Chan), align)
 	q_offset := size
-	size = mem.align_forward_int(q_offset + size_of(Raw_Queue), msg_alignment)
+	size = runtime.align_forward_int(q_offset + size_of(Raw_Queue), msg_alignment)
 	offset := size
 	size += msg_size * cap
-	size = mem.align_forward_int(size, align)
+	size = runtime.align_forward_int(size, align)
 
-	ptr := mem.alloc(size, align, allocator) or_return
-	c = (^Raw_Chan)(ptr)
+	data := runtime.mem_alloc(size, align, allocator, loc) or_return
+	ptr  := raw_data(data)
+	c = (^Raw_Chan)(raw_data(data))
 	c.allocator = allocator
 	c.allocation_size = size
 
@@ -339,10 +339,10 @@ Destroys the Channel.
 **Returns**:
 - An `Allocator_Error`
 */
-destroy :: proc(c: ^Raw_Chan) -> (err: runtime.Allocator_Error) {
+destroy :: proc(c: ^Raw_Chan, loc := #caller_location) -> (err: runtime.Allocator_Error) {
 	if c != nil {
 		allocator := c.allocator
-		err = mem.free_with_size(c, c.allocation_size, allocator)
+		err = runtime.mem_free_with_size(c, c.allocation_size, allocator, loc)
 	}
 	return
 }
@@ -633,7 +633,7 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 		c.did_read = false
 		defer c.did_read = false
 
-		mem.copy(c.unbuffered_data, msg_in, int(c.msg_size))
+		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
 
 		c.w_waiting += 1
 
@@ -711,7 +711,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 
 		msg := raw_queue_pop(c.queue)
 		if msg != nil {
-			mem.copy(msg_out, msg, int(c.msg_size))
+			intrinsics.mem_copy(msg_out, msg, int(c.msg_size))
 		}
 
 		if c.w_waiting > 0 {
@@ -731,7 +731,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 			return
 		}
 
-		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
+		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
 		c.w_waiting -= 1
 
 		c.did_read = true
@@ -798,7 +798,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 			return false
 		}
 
-		mem.copy(c.unbuffered_data, msg_in, int(c.msg_size))
+		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
 		c.w_waiting += 1
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
@@ -848,7 +848,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 
 		msg := raw_queue_pop(c.queue)
 		if msg != nil {
-			mem.copy(msg_out, msg, int(c.msg_size))
+			intrinsics.mem_copy(msg_out, msg, int(c.msg_size))
 		}
 
 		if c.w_waiting > 0 {
@@ -862,7 +862,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 			return false
 		}
 
-		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
+		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
 		c.w_waiting -= 1
 
 		sync.signal(&c.w_cond)
@@ -1359,7 +1359,7 @@ raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
 	}
 
 	val_ptr := q.data[pos*q.size:]
-	mem.copy(val_ptr, data, q.size)
+	intrinsics.mem_copy(val_ptr, data, q.size)
 	q.len += 1
 	return true
 }

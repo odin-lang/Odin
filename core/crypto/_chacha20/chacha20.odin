@@ -1,8 +1,8 @@
 package _chacha20
 
+import "core:crypto"
 import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
 
 // KEY_SIZE is the (X)ChaCha20 key size in bytes.
 KEY_SIZE :: 32
@@ -88,8 +88,8 @@ seek :: proc(ctx: ^Context, block_nr: u64) {
 // reset sanitizes the Context.  The Context must be re-initialized to
 // be used again.
 reset :: proc(ctx: ^Context) {
-	mem.zero_explicit(&ctx._s, size_of(ctx._s))
-	mem.zero_explicit(&ctx._buffer, size_of(ctx._buffer))
+	crypto.zero_explicit(&ctx._s, size_of(ctx._s))
+	crypto.zero_explicit(&ctx._buffer, size_of(ctx._buffer))
 
 	ctx._is_initialized = false
 }

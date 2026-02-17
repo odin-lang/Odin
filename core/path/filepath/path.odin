@@ -2,35 +2,37 @@
 // To process paths such as URLs that depend on forward slashes regardless of the OS, use the slashpath package.
 package filepath
 
-import "base:runtime"
+import "core:os"
 import "core:strings"
 
 SEPARATOR_CHARS :: `/\`
 
 // is_separator checks whether the byte is a valid separator character
-is_separator :: proc(c: byte) -> bool {
-	switch c {
-	case '/':  return true
-	case '\\': return ODIN_OS == .Windows
-	}
-	return false
-}
+is_separator :: os.is_path_separator
 
-@(private)
-is_slash :: proc(c: byte) -> bool {
-	return c == '\\' || c == '/'
-}
+/*
+	In Windows, returns `true` if `path` is one of the following:
+	"CON", "PRN", "AUX", "NUL",
+	"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+
+	On other platforms, returns `false`.
+*/
+is_reserved_name :: os.is_reserved_name
 
 // Splits path immediate following the last separator; separating the path into a directory and file.
 // If no separator is found, `dir` will be empty and `path` set to `path`.
-split :: proc(path: string) -> (dir, file: string) {
-	vol := volume_name(path)
-	i := len(path) - 1
-	for i >= len(vol) && !is_separator(path[i]) {
-		i -= 1
-	}
-	return path[:i+1], path[i+1:]
-}
+split :: os.split_path
+
+
+/*
+Join all `elems` with the system's path separator and normalize the result.
+
+*Allocates Using Provided Allocator*
+
+For example, `join_path({"/home", "foo", "bar.txt"})` will result in `"/home/foo/bar.txt"`.
+*/
+join :: os.join_path
 
 /*
 	Returns leading volume name.
@@ -39,79 +41,7 @@ split :: proc(path: string) -> (dir, file: string) {
 	  "C:\foo\bar\baz" will return "C:" on Windows.
 	  Everything else will be "".
 */
-volume_name :: proc(path: string) -> string {
-	return path[:volume_name_len(path)]
-}
-
-// Returns the length of the volume name in bytes.
-volume_name_len :: proc(path: string) -> int {
-	if ODIN_OS == .Windows {
-		if len(path) < 2 {
-			return 0
-		}
-
-		if path[1] == ':' {
-			switch path[0] {
-			case 'a'..='z', 'A'..='Z':
-				return 2
-			}
-		}
-
-		/*
-			See: URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
-			Further allowed paths can be of the form of:
-			- \\server\share or \\server\share\more\path
-			- \\?\C:\...
-			- \\.\PhysicalDriveX
-		*/
-		// Any remaining kind of path has to start with two slashes.
-		if !is_separator(path[0]) || !is_separator(path[1]) {
-			return 0
-		}
-
-		// Device path. The volume name is the whole string
-		if len(path) >= 5 && path[2] == '.' && is_separator(path[3]) {
-			return len(path)
-		}
-
-		// We're a UNC share `\\host\share`, file namespace `\\?\C:` or UNC in file namespace `\\?\\host\share`
-		prefix := 2
-
-		// File namespace.
-		if len(path) >= 5 && path[2] == '?' && is_separator(path[3]) {
-			if is_separator(path[4]) {
-				// `\\?\\` UNC path in file namespace
-				prefix = 5
-			}
-
-			if len(path) >= 6 && path[5] == ':' {
-				switch path[4] {
-				case 'a'..='z', 'A'..='Z':
-					return 6
-				case:
-					return 0
-				}
-			}
-		}
-
-		// UNC path, minimum version of the volume is `\\h\s` for host, share.
-		// Can also contain an IP address in the host position.
-		slash_count := 0
-		for i in prefix..<len(path) {
-			// Host needs to be at least 1 character
-			if is_separator(path[i]) && i > 0 {
-				slash_count += 1
-
-				if slash_count == 2 {
-					return i
-				}
-			}
-		}
-
-		return len(path)
-	}
-	return 0
-}
+volume_name :: os.volume_name
 
 /*
 	Gets the file name and extension from a path.
@@ -123,30 +53,7 @@ volume_name_len :: proc(path: string) -> int {
 
 	Returns "." if the path is an empty string.
 */
-base :: proc(path: string) -> string {
-	if path == "" {
-		return "."
-	}
-
-	path := path
-	for len(path) > 0 && is_separator(path[len(path)-1]) {
-		path = path[:len(path)-1]
-	}
-
-	path = path[volume_name_len(path):]
-
-	i := len(path)-1
-	for i >= 0 && !is_separator(path[i]) {
-		i -= 1
-	}
-	if i >= 0 {
-		path = path[i+1:]
-	}
-	if path == "" {
-		return SEPARATOR_STRING
-	}
-	return path
-}
+base :: os.base
 
 /*
 	Gets the name of a file from a path.
@@ -163,24 +70,7 @@ base :: proc(path: string) -> string {
 	Returns an empty string if there is no stem. e.g: '.gitignore'.
 	Returns an empty string if there's a trailing path separator.
 */
-stem :: proc(path: string) -> string {
-	if len(path) > 0 && is_separator(path[len(path) - 1]) {
-		// NOTE(tetra): Trailing separator
-		return ""
-	}
-
-	// NOTE(tetra): Get the basename
-	path := path
-	if i := strings.last_index_any(path, SEPARATOR_CHARS); i != -1 {
-		path = path[i+1:]
-	}
-
-	if i := strings.last_index_byte(path, '.'); i != -1 {
-		return path[:i]
-	}
-
-	return path
-}
+stem :: os.stem
 
 /*
 	Gets the name of a file from a path.
@@ -196,13 +86,7 @@ stem :: proc(path: string) -> string {
 	Returns an empty string if there is no stem. e.g: '.gitignore'.
 	Returns an empty string if there's a trailing path separator.
 */
-short_stem :: proc(path: string) -> string {
-	s := stem(path)
-	if i := strings.index_byte(s, '.'); i != -1 {
-		return s[:i]
-	}
-	return s
-}
+short_stem :: os.short_stem
 
 /*
 	Gets the file extension from a path, including the dot.
@@ -219,14 +103,7 @@ short_stem :: proc(path: string) -> string {
 	Returns an empty string if there is no dot.
 	Returns an empty string if there is a trailing path separator.
 */
-ext :: proc(path: string) -> string {
-	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
-		if path[i] == '.' {
-			return path[i:]
-		}
-	}
-	return ""
-}
+ext :: os.ext
 
 /*
 	Gets the file extension from a path, including the dot.
@@ -242,24 +119,7 @@ ext :: proc(path: string) -> string {
 	Returns an empty string if there is no dot.
 	Returns an empty string if there is a trailing path separator.
 */
-long_ext :: proc(path: string) -> string {
-	if len(path) > 0 && is_separator(path[len(path) - 1]) {
-		// NOTE(tetra): Trailing separator
-		return ""
-	}
-
-	// NOTE(tetra): Get the basename
-	path := path
-	if i := strings.last_index_any(path, SEPARATOR_CHARS); i != -1 {
-		path = path[i+1:]
-	}
-
-	if i := strings.index_byte(path, '.'); i != -1 {
-		return path[i:]
-	}
-
-	return ""
-}
+long_ext :: os.long_ext
 
 /*
 	Returns the shortest path name equivalent to `path` through solely lexical processing.
@@ -276,108 +136,30 @@ long_ext :: proc(path: string) -> string {
 	If the result of the path is an empty string, the returned path with be `"."`.
 
 */
-clean :: proc(path: string, allocator := context.allocator) -> (cleaned: string, err: runtime.Allocator_Error) #optional_allocator_error {
-	context.allocator = allocator
+clean :: os.clean_path
 
-	path := path
-	original_path := path
-	vol_len := volume_name_len(path)
-	path = path[vol_len:]
+/*
+Returns the result of replacing each path separator character in the path
+with the specific character `new_sep`.
 
-	if path == "" {
-		if vol_len > 1 && original_path[1] != ':' {
-			s, ok := from_slash(original_path)
-			if !ok {
-				s = strings.clone(s) or_return
-			}
-			return s, nil
-		}
-		return strings.concatenate({original_path, "."})
-	}
+*Allocates Using Provided Allocator*
+*/
+replace_path_separators := os.replace_path_separators
 
-	rooted := is_separator(path[0])
+/*
+Return true if `path` is an absolute path as opposed to a relative one.
+*/
+is_abs :: os.is_absolute_path
 
-	n := len(path)
-	out := &Lazy_Buffer{
-		s = path,
-		vol_and_path = original_path,
-		vol_len = vol_len,
-	}
-	defer lazy_buffer_destroy(out)
+/*
+Get the absolute path to `path` with respect to the process's current directory.
 
-	r, dot_dot := 0, 0
-	if rooted {
-		lazy_buffer_append(out, SEPARATOR) or_return
-		r, dot_dot = 1, 1
-	}
-
-	for r < n {
-		switch {
-		case is_separator(path[r]):
-			r += 1
-		case path[r] == '.' && (r+1 == n || is_separator(path[r+1])):
-			r += 1
-		case path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_separator(path[r+2])):
-			r += 2
-			switch {
-			case out.w > dot_dot:
-				out.w -= 1
-				for out.w > dot_dot && !is_separator(lazy_buffer_index(out, out.w)) {
-					out.w -= 1
-				}
-			case !rooted:
-				if out.w > 0 {
-					lazy_buffer_append(out, SEPARATOR) or_return
-				}
-				lazy_buffer_append(out, '.') or_return
-				lazy_buffer_append(out, '.') or_return
-				dot_dot = out.w
-			}
-		case:
-			if rooted && out.w != 1 || !rooted && out.w != 0 {
-				lazy_buffer_append(out, SEPARATOR) or_return
-			}
-			for ; r < n && !is_separator(path[r]); r += 1 {
-				lazy_buffer_append(out, path[r]) or_return
-			}
-
-		}
-	}
-
-	if out.w == 0 {
-		lazy_buffer_append(out, '.') or_return
-	}
-
-	s := lazy_buffer_string(out) or_return
-
-	new_allocation: bool
-	cleaned, new_allocation = from_slash(s)
-	if new_allocation {
-		delete(s)
-	}
-	return
-}
-
-// Returns the result of replacing each forward slash `/` character in the path with the separate OS specific character.
-from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
-	if SEPARATOR == '/' {
-		return path, false
-	}
-	return strings.replace_all(path, "/", SEPARATOR_STRING, allocator)
-}
-
-// Returns the result of replacing each OS specific separator with a forward slash `/` character.
-to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
-	if SEPARATOR == '/' {
-		return path, false
-	}
-	return strings.replace_all(path, SEPARATOR_STRING, "/", allocator)
-}
-
+*Allocates Using Provided Allocator*
+*/
+abs :: os.get_absolute_path
 
 Relative_Error :: enum {
 	None,
-
 	Cannot_Relate,
 }
 
@@ -390,8 +172,10 @@ Relative_Error :: enum {
 */
 rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
 	context.allocator = allocator
-	base_clean   := clean(base_path,   allocator)
-	target_clean := clean(target_path, allocator)
+	base_clean, base_err     := clean(base_path,   allocator)
+	if base_err   != nil { return "", .Cannot_Relate}
+	target_clean, target_err := clean(target_path, allocator)
+	if target_err != nil { return "", .Cannot_Relate}
 	defer delete(base_clean,   allocator)
 	defer delete(target_clean, allocator)
 
@@ -466,18 +250,14 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 	then `"."` is returned.
 */
 dir :: proc(path: string, allocator := context.allocator) -> string {
-	context.allocator = allocator
-	vol := volume_name(path)
 	i := len(path) - 1
-	for i >= len(vol) && !is_separator(path[i]) {
+	for i > 0 && !is_separator(path[i]) {
 		i -= 1
 	}
-	dir := clean(path[len(vol) : i+1])
-	defer delete(dir)
-	if dir == "." && len(vol) > 2 {
-		return strings.clone(vol)
-	}
-	return strings.concatenate({vol, dir})
+	res, dir_err := clean(path[:i], allocator)
+
+	if dir_err != nil { return "" }
+	return res
 }
 
 
@@ -487,108 +267,4 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 // An empty string returns nil. A non-empty string with no separators returns a 1-element array.
 // Any empty components will be included, e.g. `a::b` will return a 3-element array, as will `::`.
 // Separators within pairs of double-quotes will be ignored and stripped, e.g. `"a:b"c:d` will return []{`a:bc`, `d`}.
-split_list :: proc(path: string, allocator := context.allocator) -> (list: []string, err: runtime.Allocator_Error) #optional_allocator_error {
-	if path == "" {
-		return nil, nil
-	}
-
-	start: int
-	quote: bool
-
-	start, quote = 0, false
-	count := 0
-
-	for i := 0; i < len(path); i += 1 {
-		c := path[i]
-		switch {
-		case c == '"':
-			quote = !quote
-		case c == LIST_SEPARATOR && !quote:
-			count += 1
-		}
-	}
-
-	start, quote = 0, false
-	list = make([]string, count + 1, allocator) or_return
-	index := 0
-	for i := 0; i < len(path); i += 1 {
-		c := path[i]
-		switch {
-		case c == '"':
-			quote = !quote
-		case c == LIST_SEPARATOR && !quote:
-			list[index] = path[start:i]
-			index += 1
-			start = i + 1
-		}
-	}
-	assert(index == count)
-	list[index] = path[start:]
-
-	for s0, i in list {
-		s, new := strings.replace_all(s0, `"`, ``, allocator)
-		if !new {
-			s = strings.clone(s, allocator) or_return
-		}
-		list[i] = s
-	}
-
-	return list, nil
-}
-
-
-
-
-/*
-	Lazy_Buffer is a lazily made path buffer
-	When it does allocate, it uses the context.allocator
- */
-@(private)
-Lazy_Buffer :: struct {
-	s: string,
-	b: []byte,
-	w: int, // write index
-	vol_and_path: string,
-	vol_len:      int,
-}
-
-@(private)
-lazy_buffer_index :: proc(lb: ^Lazy_Buffer, i: int) -> byte {
-	if lb.b != nil {
-		return lb.b[i]
-	}
-	return lb.s[i]
-}
-@(private)
-lazy_buffer_append :: proc(lb: ^Lazy_Buffer, c: byte) -> (err: runtime.Allocator_Error) {
-	if lb.b == nil {
-		if lb.w < len(lb.s) && lb.s[lb.w] == c {
-			lb.w += 1
-			return
-		}
-		lb.b = make([]byte, len(lb.s)) or_return
-		copy(lb.b, lb.s[:lb.w])
-	}
-	lb.b[lb.w] = c
-	lb.w += 1
-	return
-}
-@(private)
-lazy_buffer_string :: proc(lb: ^Lazy_Buffer) -> (s: string, err: runtime.Allocator_Error) {
-	if lb.b == nil {
-		return strings.clone(lb.vol_and_path[:lb.vol_len+lb.w])
-	}
-
-	x := lb.vol_and_path[:lb.vol_len]
-	y := string(lb.b[:lb.w])
-	z := make([]byte, len(x)+len(y)) or_return
-	copy(z, x)
-	copy(z[len(x):], y)
-	return string(z), nil
-}
-@(private)
-lazy_buffer_destroy :: proc(lb: ^Lazy_Buffer) -> runtime.Allocator_Error {
-	err := delete(lb.b)
-	lb^ = {}
-	return err
-}
+split_list :: os.split_path_list

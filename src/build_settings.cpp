@@ -9,6 +9,7 @@
 // #endif
 
 #define DEFAULT_MAX_ERROR_COLLECTOR_COUNT (36)
+#define DEFAULT_DID_YOU_MEAN_LIMIT (10)
 
 enum TargetOsKind : u16 {
 	TargetOs_Invalid,
@@ -538,6 +539,7 @@ struct BuildContext {
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
+	bool   show_import_graph;
 
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
@@ -579,6 +581,8 @@ struct BuildContext {
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
+
+	int    did_you_mean_limit;
 
 	bool   copy_file_contents;
 

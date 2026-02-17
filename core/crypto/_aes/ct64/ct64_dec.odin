@@ -22,8 +22,6 @@
 
 package aes_ct64
 
-import "base:intrinsics"
-
 inv_sub_bytes :: proc "contextless" (q: ^[8]u64) {
 	// AES S-box is:
 	//   S(x) = A(I(x)) ^ 0x63

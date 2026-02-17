@@ -8,7 +8,6 @@ package hmac
 
 import "core:crypto"
 import "core:crypto/hash"
-import "core:mem"
 
 // sum will compute the HMAC with the specified algorithm and key
 // over msg, and write the computed tag to dst.  It requires that
@@ -126,7 +125,7 @@ _init_hashes :: proc(ctx: ^Context, algorithm: hash.Algorithm, key: []byte) {
 	kLen := len(key)
 	B := hash.BLOCK_SIZES[algorithm]
 	K0 := K0_buf[:B]
-	defer mem.zero_explicit(raw_data(K0), B)
+	defer crypto.zero_explicit(raw_data(K0), B)
 
 	switch {
 	case kLen == B, kLen < B:
@@ -157,7 +156,7 @@ _init_hashes :: proc(ctx: ^Context, algorithm: hash.Algorithm, key: []byte) {
 	hash.init(&ctx._i_hash, algorithm)
 
 	kPad := kPad_buf[:B]
-	defer mem.zero_explicit(raw_data(kPad), B)
+	defer crypto.zero_explicit(raw_data(kPad), B)
 
 	for v, i in K0 {
 		kPad[i] = v ~ _I_PAD

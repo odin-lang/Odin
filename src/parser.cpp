@@ -353,12 +353,14 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		break;
 	case Ast_RangeStmt:
 		n->RangeStmt.label = clone_ast(n->RangeStmt.label, f);
+		n->RangeStmt.init  = clone_ast(n->RangeStmt.init, f);
 		n->RangeStmt.vals  = clone_ast_array(n->RangeStmt.vals, f);
 		n->RangeStmt.expr  = clone_ast(n->RangeStmt.expr, f);
 		n->RangeStmt.body  = clone_ast(n->RangeStmt.body, f);
 		break;
 	case Ast_UnrollRangeStmt:
 		n->UnrollRangeStmt.args = clone_ast_array(n->UnrollRangeStmt.args, f);
+		n->UnrollRangeStmt.init = clone_ast(n->UnrollRangeStmt.init, f);
 		n->UnrollRangeStmt.val0 = clone_ast(n->UnrollRangeStmt.val0, f);
 		n->UnrollRangeStmt.val1 = clone_ast(n->UnrollRangeStmt.val1, f);
 		n->UnrollRangeStmt.expr = clone_ast(n->UnrollRangeStmt.expr, f);
@@ -510,6 +512,22 @@ gb_internal void error(Ast *node, char const *fmt, ...) {
 	va_end(va);
 	if (node != nullptr && node->file_id != 0) {
 		AstFile *f = node->thread_safe_file();
+		f->error_count += 1;
+	}
+}
+
+gb_internal void error_range(TokenPos start, TokenPos end, char const *fmt, ...) {
+	GB_ASSERT(start.file_id == end.file_id);
+	GB_ASSERT(start.line == end.line);
+	GB_ASSERT(start.column <= end.column);
+	GB_ASSERT(start.offset <= end.offset);
+
+	va_list va;
+	va_start(va, fmt);
+	error_va(start, end, fmt, va);
+	va_end(va);
+	if (start.file_id != 0) {
+		AstFile *f = thread_safe_get_ast_file_from_id(start.file_id);
 		f->error_count += 1;
 	}
 }
@@ -1039,9 +1057,10 @@ gb_internal Ast *ast_for_stmt(AstFile *f, Token token, Ast *init, Ast *cond, Ast
 	return result;
 }
 
-gb_internal Ast *ast_range_stmt(AstFile *f, Token token, Slice<Ast *> vals, Token in_token, Ast *expr, Ast *body) {
+gb_internal Ast *ast_range_stmt(AstFile *f, Token token, Ast *init, Slice<Ast *> vals, Token in_token, Ast *expr, Ast *body) {
 	Ast *result = alloc_ast_node(f, Ast_RangeStmt);
 	result->RangeStmt.token = token;
+	result->RangeStmt.init = init;
 	result->RangeStmt.vals = vals;
 	result->RangeStmt.in_token = in_token;
 	result->RangeStmt.expr  = expr;
@@ -1049,9 +1068,10 @@ gb_internal Ast *ast_range_stmt(AstFile *f, Token token, Slice<Ast *> vals, Toke
 	return result;
 }
 
-gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Slice<Ast *> args, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Ast *init, Slice<Ast *> args, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
 	Ast *result = alloc_ast_node(f, Ast_UnrollRangeStmt);
 	result->UnrollRangeStmt.unroll_token = unroll_token;
+	result->UnrollRangeStmt.init      = init;
 	result->UnrollRangeStmt.args      = args;
 	result->UnrollRangeStmt.for_token = for_token;
 	result->UnrollRangeStmt.val0      = val0;
@@ -3130,6 +3150,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					} else {
 						dialect = InlineAsmDialect_Intel;
 					}
+				} else {
+					syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected an identifier after hash");
@@ -4865,7 +4887,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 				body = parse_block_stmt(f, false);
 			}
 
-			return ast_range_stmt(f, token, {}, in_token, rhs, body);
+			return ast_range_stmt(f, token, init, {}, in_token, rhs, body);
 		}
 
 		if (f->curr_token.kind != Token_Semicolon) {
@@ -4880,9 +4902,20 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 			cond = nullptr;
 
 			if (f->curr_token.kind == Token_OpenBrace || f->curr_token.kind == Token_do) {
-				syntax_error(f->curr_token, "Expected ';', followed by a condition expression and post statement, got %.*s", LIT(token_strings[f->curr_token.kind]));
+				syntax_error(f->curr_token, "Expected ';', followed by a condition expression and post statement, or 'x in y' style loop, got %.*s", LIT(token_strings[f->curr_token.kind]));
 			} else {
 				if (f->curr_token.kind != Token_Semicolon) {
+					if (f->curr_token.kind == Token_Ident) {
+						// for init; x in y { }
+						Token next_token = peek_token(f);
+						if (next_token.kind == Token_in || next_token.kind == Token_Comma) {
+							cond = parse_simple_stmt(f, StmtAllowFlag_In);
+							GB_ASSERT(cond->kind == Ast_AssignStmt && cond->AssignStmt.op.kind == Token_in);
+							is_range = true;
+							goto range_skip;
+						}
+					}
+
 					cond = parse_simple_stmt(f, StmtAllowFlag_None);
 				}
 
@@ -4900,6 +4933,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 		}
 	}
 
+range_skip:;
 
 	if (allow_token(f, Token_do)) {
 		body = parse_do_body(f, token, "the for statement");
@@ -4915,7 +4949,7 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 		if (cond->AssignStmt.rhs.count > 0) {
 			rhs = cond->AssignStmt.rhs[0];
 		}
-		return ast_range_stmt(f, token, vals, in_token, rhs, body);
+		return ast_range_stmt(f, token, init, vals, in_token, rhs, body);
 	}
 
 	cond = convert_stmt_to_expr(f, cond, str_lit("boolean expression"));
@@ -5249,6 +5283,7 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	}
 
 	Token for_token = expect_token(f, Token_for);
+	Ast *init = nullptr;
 	Ast *val0 = nullptr;
 	Ast *val1 = nullptr;
 	Token in_token = {};
@@ -5291,7 +5326,7 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	if (bad_stmt) {
 		return ast_bad_stmt(f, unroll_token, f->curr_token);
 	}
-	return ast_unroll_range_stmt(f, unroll_token, slice_from_array(args), for_token, val0, val1, in_token, expr, body);
+	return ast_unroll_range_stmt(f, unroll_token, init, slice_from_array(args), for_token, val0, val1, in_token, expr, body);
 }
 
 gb_internal Ast *parse_stmt(AstFile *f) {
@@ -5409,9 +5444,15 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			s = parse_stmt(f);
 			switch (s->kind) {
 			case Ast_SwitchStmt:
+				if (s->SwitchStmt.partial) {
+					syntax_error(token, "#partial already applied to a switch statement");
+				}
 				s->SwitchStmt.partial = true;
 				break;
 			case Ast_TypeSwitchStmt:
+				if (s->TypeSwitchStmt.partial) {
+					syntax_error(token, "#partial already applied to a switch statement");
+				}
 				s->TypeSwitchStmt.partial = true;
 				break;
 			case Ast_EmptyStmt:

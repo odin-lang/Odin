@@ -82,6 +82,8 @@ foreign Kernel32 {
 		dwFileOffsetLow:      u32,
 		dwNumberOfBytesToMap: uint,
 	) -> rawptr ---
+
+	UnmapViewOfFile :: proc(lpBaseAddress: rawptr) -> b32 ---
 }
 
 @(no_sanitize_address)
@@ -184,4 +186,9 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 
 	file_data := MapViewOfFile(handle, desired_access, 0, 0, uint(size))
 	return ([^]byte)(file_data)[:size], nil
+}
+
+@(no_sanitize_address)
+_unmap_file :: proc "contextless" (data: []byte) {
+	UnmapViewOfFile(raw_data(data))
 }

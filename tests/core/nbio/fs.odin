@@ -1,9 +1,9 @@
 package tests_nbio
 
-import    "core:nbio"
-import    "core:testing"
-import    "core:time"
-import os "core:os/os2"
+import "core:nbio"
+import "core:testing"
+import "core:time"
+import "core:os"
 
 @(test)
 close_invalid_handle :: proc(t: ^testing.T) {

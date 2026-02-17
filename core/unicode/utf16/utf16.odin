@@ -1,6 +1,7 @@
 // Procedures and constants to support text-encoding in the `UTF-16` character encoding.
 package utf16
 
+@(require) import "base:runtime"
 import "core:unicode/utf8"
 
 REPLACEMENT_CHAR :: '\ufffd'
@@ -127,10 +128,10 @@ decode_rune_in_string :: proc "contextless" (s: string16) -> (r: rune, width: in
 	return
 }
 
-string_to_runes :: proc "odin" (s: string16, allocator := context.allocator) -> (runes: []rune) {
+string_to_runes :: proc "odin" (s: string16, allocator := context.allocator) -> (runes: []rune, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(s)
 
-	runes = make([]rune, n, allocator)
+	runes = make([]rune, n, allocator) or_return
 	i := 0
 	for r in s {
 		runes[i] = r

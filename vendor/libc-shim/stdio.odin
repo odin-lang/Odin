@@ -4,93 +4,60 @@ package odin_libc
 import "base:runtime"
 
 import "core:c"
-import "core:io"
-import "core:os"
 import "core:strconv"
 
 import stb "vendor:stb/sprintf"
 
-FILE :: uintptr
+FILE :: rawptr
 
 EOF :: -1
 
 @(require, linkage="strong", link_name="fopen")
 fopen :: proc "c" (path: cstring, mode: cstring) -> FILE {
 	context = g_ctx
-	unimplemented("vendor/libc-shim: fopen")
+	return _fopen(path, mode)
 }
 
 @(require, linkage="strong", link_name="fseek")
 fseek :: proc "c" (file: FILE, offset: c.long, whence: i32) -> i32 {
 	context = g_ctx
-	handle := os.Handle(file-1)
-	_, err := os.seek(handle, i64(offset), int(whence))
-	if err != nil {
-		return -1
-	}
-	return 0
+	return _fseek(file, offset, whence)
 }
 
 @(require, linkage="strong", link_name="ftell")
 ftell :: proc "c" (file: FILE) -> c.long {
 	context = g_ctx
-	handle := os.Handle(file-1)
-	off, err := os.seek(handle, 0, os.SEEK_CUR)
-	if err != nil {
-		return -1
-	}
-	return c.long(off)
+	return _ftell(file)
 }
 
 @(require, linkage="strong", link_name="fclose")
 fclose :: proc "c" (file: FILE) -> i32 {
 	context = g_ctx
-	handle := os.Handle(file-1)
-	if os.close(handle) != nil {
-		return -1
-	}
-	return 0
+	return _fclose(file)
 }
 
 @(require, linkage="strong", link_name="fread")
 fread :: proc "c" (buffer: [^]byte, size: uint, count: uint, file: FILE) -> uint {
 	context = g_ctx
-	handle := os.Handle(file-1)
-	n, _   := os.read(handle, buffer[:min(size, count)])
-	return uint(max(0, n))
+	return _fread(buffer, size, count, file)
 }
 
 @(require, linkage="strong", link_name="fwrite")
 fwrite :: proc "c" (buffer: [^]byte, size: uint, count: uint, file: FILE) -> uint {
 	context = g_ctx
-	handle := os.Handle(file-1)
-	n, _   := os.write(handle, buffer[:min(size, count)])
-	return uint(max(0, n))
+	return _fwrite(buffer, size, count, file)
 }
 
 @(require, linkage="strong", link_name="putchar")
 putchar :: proc "c" (char: c.int) -> c.int {
 	context = g_ctx
-
-	n, err := os.write_byte(os.stdout, byte(char))	
-	if n == 0 || err != nil {
-		return EOF
-	}
-	return char
+	return _putchar(char)
 }
 
 @(require, linkage="strong", link_name="getchar")
 getchar :: proc "c" () -> c.int {
-	when #defined(os.stdin) {
-		ret: [1]byte
-		n, err := os.read(os.stdin, ret[:])
-		if n == 0 || err != nil {
-			return EOF
-		}
-		return c.int(ret[0])
-	} else {
-		return EOF
-	}
+	context = g_ctx
+	return _getchar()
 }
 
 @(require, linkage="strong", link_name="vsnprintf")
@@ -108,8 +75,6 @@ vsprintf :: proc "c" (buf: [^]byte, fmt: cstring, args: ^c.va_list) -> i32 {
 @(require, linkage="strong", link_name="vfprintf")
 vfprintf :: proc "c" (file: FILE, fmt: cstring, args: ^c.va_list) -> i32 {
 	context = g_ctx
-
-	handle := os.Handle(file-1)
 
 	MAX_STACK :: 4096
 
@@ -133,12 +98,15 @@ vfprintf :: proc "c" (file: FILE, fmt: cstring, args: ^c.va_list) -> i32 {
 		delete(buf)
 	}
 
-	_, err := io.write_full(os.stream_from_handle(handle), buf)
-	if err != nil {
-		return -1
+	written: i32
+	for len(buf) > 0 {
+		n := _fwrite(raw_data(buf), size_of(byte), len(buf), file)
+		if n == 0 { break }
+		buf = buf[n:]
+		written += i32(n)
 	}
 
-	return i32(len(buf))
+	return written
 }
 
 /*

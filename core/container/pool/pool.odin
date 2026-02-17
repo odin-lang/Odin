@@ -1,12 +1,12 @@
 package container_pool
 
 import "base:intrinsics"
+import "base:runtime"
 import "base:sanitizer"
-
-import "core:mem"
 import "core:sync"
 
 _ :: sanitizer
+_ :: sync
 
 DEFAULT_BLOCK_SIZE :: _DEFAULT_BLOCK_SIZE
 
@@ -33,7 +33,7 @@ Pool :: struct($T: typeid) {
 }
 
 @(require_results)
-init :: proc(p: ^Pool($T), $link_field: string, block_size: uint = DEFAULT_BLOCK_SIZE) -> (err: mem.Allocator_Error)
+init :: proc(p: ^Pool($T), $link_field: string, block_size: uint = DEFAULT_BLOCK_SIZE) -> (err: runtime.Allocator_Error)
 	where intrinsics.type_has_field(T, link_field),
 	      intrinsics.type_field_type(T, link_field) == ^T {
 	p.link_off = offset_of_by_string(T, link_field)
@@ -58,7 +58,7 @@ destroy :: proc(p: ^Pool($T)) {
 }
 
 @(require_results)
-get :: proc(p: ^Pool($T)) -> (elem: ^T, err: mem.Allocator_Error) #optional_allocator_error {
+get :: proc(p: ^Pool($T)) -> (elem: ^T, err: runtime.Allocator_Error) #optional_allocator_error {
 	defer sync.atomic_add_explicit(&p.num_outstanding, 1, .Relaxed)
 
 	for {
@@ -78,7 +78,7 @@ get :: proc(p: ^Pool($T)) -> (elem: ^T, err: mem.Allocator_Error) #optional_allo
 }
 
 put :: proc(p: ^Pool($T), elem: ^T) {
-	mem.zero_item(elem)
+	intrinsics.mem_zero(elem, size_of(T))
 	_poison_elem(p, elem)
 
 	defer sync.atomic_sub_explicit(&p.num_outstanding, 1, .Relaxed)
@@ -113,28 +113,30 @@ _set_next :: proc(p: ^Pool($T), elem: ^T, next: ^T) {
 	(^^T)(uintptr(elem) + p.link_off)^ = next
 }
 
-@(disabled=.Address not_in ODIN_SANITIZER_FLAGS)
 _poison_elem :: proc(p: ^Pool($T), elem: ^T) {
-	if p.link_off > 0 {
-		sanitizer.address_poison_rawptr(elem, int(p.link_off))
-	}
+	when .Address in ODIN_SANITIZER_FLAGS {
+		if p.link_off > 0 {
+			sanitizer.address_poison_rawptr(elem, int(p.link_off))
+		}
 
-	len := size_of(T) - p.link_off - size_of(rawptr)
-	if len > 0 {
-		ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
-		sanitizer.address_poison_rawptr(ptr, int(len))
+		len := size_of(T) - p.link_off - size_of(rawptr)
+		if len > 0 {
+			ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
+			sanitizer.address_poison_rawptr(ptr, int(len))
+		}
 	}
 }
 
-@(disabled=.Address not_in ODIN_SANITIZER_FLAGS)
 _unpoison_elem :: proc(p: ^Pool($T), elem: ^T) {
-	if p.link_off > 0 {
-		sanitizer.address_unpoison_rawptr(elem, int(p.link_off))
-	}
+	when .Address in ODIN_SANITIZER_FLAGS {
+		if p.link_off > 0 {
+			sanitizer.address_unpoison_rawptr(elem, int(p.link_off))
+		}
 
-	len := size_of(T) - p.link_off - size_of(rawptr)
-	if len > 0 {
-		ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
-		sanitizer.address_unpoison_rawptr(ptr, int(len))
+		len := size_of(T) - p.link_off - size_of(rawptr)
+		if len > 0 {
+			ptr := rawptr(uintptr(elem) + p.link_off + size_of(rawptr))
+			sanitizer.address_unpoison_rawptr(ptr, int(len))
+		}
 	}
 }

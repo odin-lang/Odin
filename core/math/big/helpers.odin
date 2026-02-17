@@ -7,7 +7,6 @@ package math_big
 
 import "base:intrinsics"
 import "base:runtime"
-import rnd "core:math/rand"
 
 /*
 	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
@@ -362,17 +361,7 @@ platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
 
 count_lsb :: proc { int_count_lsb, platform_count_lsb, }
 
-int_random_digit :: proc() -> (res: DIGIT) {
-	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rnd.uint64()) & _MASK
-	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rnd.uint32()) & _MASK
-	} else {
-		panic("Unsupported DIGIT size.")
-	}
-
-	return 0 // We shouldn't get here.
-}
+int_random_digit :: internal_int_random_digit
 
 int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	/*

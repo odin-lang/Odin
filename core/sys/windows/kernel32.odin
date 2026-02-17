@@ -470,6 +470,7 @@ foreign kernel32 {
 	GlobalAlloc   :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
 	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	GlobalFree    :: proc(mem: LPVOID) -> LPVOID ---
+	GlobalSize    :: proc(Mem: LPVOID) -> SIZE_T ---
 	
 	GlobalLock   :: proc(hMem: HGLOBAL) -> LPVOID ---
 	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---
@@ -1194,6 +1195,79 @@ foreign kernel32 {
 		product_type:   ^Windows_Product_Type,
 	) -> BOOL ---
 }
+
+
+MEM_REPLACE_PLACEHOLDER  :: 0x00004000
+MEM_RESERVE_PLACEHOLDER  :: 0x00040000
+MEM_PRESERVE_PLACEHOLDER :: 0x00000002
+MEM_RESET_UNDO           ::  0x1000000
+MEM_64K_PAGES            :: 0x20400000
+MEM_PHYSICAL             :: 0x00400000
+
+MEM_EXTENDED_PARAMETER_TYPE :: enum c_int {
+	MemExtendedParameterInvalidType = 0,
+	MemExtendedParameterAddressRequirements,
+	MemExtendedParameterNumaNode,
+	MemExtendedParameterPartitionHandle,
+	MemExtendedParameterUserPhysicalHandle,
+	MemExtendedParameterAttributeFlags,
+	MemExtendedParameterImageMachine,
+}
+
+MEM_EXTENDED_PARAMETER_NONPAGED	      :: 0x02
+MEM_EXTENDED_PARAMETER_NONPAGED_LARGE :: 0x08
+MEM_EXTENDED_PARAMETER_NONPAGED_HUGE  :: 0x10
+MEM_EXTENDED_PARAMETER_EC_CODE        :: 0x40
+
+MEM_ADDRESS_REQUIREMENTS :: struct {
+	LowestStartingAddress: PVOID,
+	HighestEndingAddress:  PVOID,
+	Alignment:             SIZE_T,
+}
+PMEM_ADDRESS_REQUIREMENTS :: ^MEM_ADDRESS_REQUIREMENTS
+
+MEM_EXTENDED_PARAMETER_TYPE_BITS :: 8
+
+MEM_EXTENDED_PARAMETER :: struct {
+	using DUMMYSTRUCTNAME: bit_field DWORD64 {
+		Type:        MEM_EXTENDED_PARAMETER_TYPE | MEM_EXTENDED_PARAMETER_TYPE_BITS,
+		Reserved:    DWORD64                     | 64 - MEM_EXTENDED_PARAMETER_TYPE_BITS,
+	},
+	using DUMMYUNIONNAME: struct #raw_union {
+		ULong64: DWORD64,
+		Pointer: PVOID,
+		Size:    SIZE_T,
+		Handle:  HANDLE,
+		ULong:   DWORD,
+	},
+}
+
+
+@(default_calling_convention="system")
+foreign one_core {
+	VirtualAlloc2 :: proc(
+		Process:            HANDLE,
+		BaseAddress:        LPVOID,
+		Size:               SIZE_T,
+		AllocationType:     ULONG,
+		PageProtection:     ULONG,
+		ExtendedParameters: ^MEM_EXTENDED_PARAMETER,
+		ParameterCount:     ULONG,
+	) -> LPVOID ---
+
+	MapViewOfFile3 :: proc(
+		FileMappingHandle:  HANDLE,
+		ProcessHandle:      HANDLE,
+		BaseAddress:        PVOID,
+		Offset:             ULONG64,
+		ViewSize:           SIZE_T,
+		AllocationType:     ULONG,
+		PageProtection:     ULONG,
+		ExtendedParameters: ^MEM_EXTENDED_PARAMETER,
+		ParameterCount:     ULONG,
+	) -> PVOID ---
+}
+
 
 HandlerRoutine :: proc "system" (dwCtrlType: DWORD) -> BOOL
 PHANDLER_ROUTINE :: HandlerRoutine

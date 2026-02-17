@@ -1,6 +1,6 @@
 package _weierstrass
 
-@(require) import "core:mem"
+@(require) import "core:crypto"
 
 @(private)
 SEC_PREFIX_IDENTITY        :: 0x00
@@ -92,7 +92,7 @@ pt_sec_bytes :: proc "contextless" (b: []byte, p: ^$T, compressed: bool) -> bool
 		// 1 redundant rescale call.
 		y_is_odd := byte(y[FE_SZ-1] & 1)
 		b[0] = SEC_PREFIX_COMPRESSED_EVEN + y_is_odd
-		mem.zero_explicit(&y_, size_of(y_))
+		crypto.zero_explicit(&y_, size_of(y_))
 	}
 
 	return true
