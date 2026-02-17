@@ -1,8 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-gb_global BlockingMutex hash_exact_value_mutex;
-
 struct Ast;
 struct HashKey;
 struct Type;
@@ -54,9 +52,6 @@ struct ExactValue {
 gb_global ExactValue const empty_exact_value = {};
 
 gb_internal uintptr hash_exact_value(ExactValue v) {
-	mutex_lock(&hash_exact_value_mutex);
-	defer (mutex_unlock(&hash_exact_value_mutex));
-
 	uintptr res = 0;
 	
 	switch (v.kind) {

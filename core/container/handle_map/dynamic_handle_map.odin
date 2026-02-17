@@ -48,7 +48,8 @@ dynamic_add :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), item: T, loc :=
 		xar.append(&m.items, T{}, loc) or_return
 	}
 
-	i := xar.append(&m.items, item, loc) or_return
+	_ = xar.append(&m.items, item, loc) or_return
+	i := xar.len(m.items)-1
 
 	ptr := xar.get_ptr_unsafe(&m.items, i)
 	ptr^ = item

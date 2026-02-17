@@ -5,10 +5,10 @@ See: [[ https://www.rfc-editor.org/rfc/rfc2898 ]]
 */
 package pbkdf2
 
+import "core:crypto"
 import "core:crypto/hash"
 import "core:crypto/hmac"
 import "core:encoding/endian"
-import "core:mem"
 
 // derive invokes PBKDF2-HMAC with the specified hash algorithm, password,
 // salt, iteration count, and outputs the derived key to dst.
@@ -71,7 +71,7 @@ derive :: proc(
 	if r > 0 {
 		tmp: [hash.MAX_DIGEST_SIZE]byte
 		blk := tmp[:h_len]
-		defer mem.zero_explicit(raw_data(blk), h_len)
+		defer crypto.zero_explicit(raw_data(blk), h_len)
 
 		_F(&base, salt, iterations, u32(l + 1), blk)
 		copy(dst_blk, blk)
@@ -84,7 +84,7 @@ _F :: proc(base: ^hmac.Context, salt: []byte, c: u32, i: u32, dst_blk: []byte) {
 
 	tmp: [hash.MAX_DIGEST_SIZE]byte
 	u := tmp[:h_len]
-	defer mem.zero_explicit(raw_data(u), h_len)
+	defer crypto.zero_explicit(raw_data(u), h_len)
 
 	// F (P, S, c, i) = U_1 \xor U_2 \xor ... \xor U_c
 	//

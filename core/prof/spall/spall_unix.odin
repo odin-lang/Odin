@@ -2,29 +2,23 @@
 #+build darwin, freebsd, openbsd, netbsd
 package spall
 
-// Only for types.
-import "core:os"
-
 import "core:sys/posix"
 
 MAX_RW :: 0x7fffffff
 
 @(no_instrumentation)
-_write :: proc "contextless" (fd: os.Handle, data: []byte) -> (n: int, err: os.Error) #no_bounds_check /* bounds check would segfault instrumentation */ {
-	if len(data) == 0 {
-		return 0, nil
-	}
-
+_write :: proc "contextless" (fd: uintptr, data: []byte) #no_bounds_check /* bounds check would segfault instrumentation */ {
+	n: int
 	for n < len(data) {
 		chunk := data[:min(len(data), MAX_RW)]
 		written := posix.write(posix.FD(fd), raw_data(chunk), len(chunk))
 		if written < 0 {
-			return n, os.get_last_error()
+			return
 		}
 		n += written
 	}
 
-	return n, nil
+	return
 }
 
 // NOTE(tetra): "RAW" means: Not adjusted by NTP.

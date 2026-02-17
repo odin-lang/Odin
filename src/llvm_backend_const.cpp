@@ -678,6 +678,22 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 }
 #endif
 
+gb_internal void lb_const_array_spread(lbModule *m, lbConstContext cc, Type *array, ExactValue value, lbValue *res) {
+	GB_ASSERT(array->kind == Type_Array);
+	
+	i64 count  = array->Array.count;
+	Type *elem = array->Array.elem;
+
+	lbValue single_elem = lb_const_value(m, elem, value, cc);
+
+	LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+	for (i64 i = 0; i < count; i++) {
+		elems[i] = single_elem.value;
+	}
+
+	res->value = llvm_const_array(m, lb_type(m, elem), elems, cast(unsigned)count);
+}
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc, Type *value_type) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -736,13 +752,14 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				}
 				LLVMValueRef tag = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);
 				LLVMValueRef padding = nullptr;
-				LLVMValueRef values[3] = {cv.value, tag, padding};
 
 				isize value_count = 2;
 				if (LLVMCountStructElementTypes(llvm_type) > 2) {
 					value_count = 3;
 					padding = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
 				}
+
+				LLVMValueRef values[3] = {cv.value, tag, padding};
 				res.value = llvm_const_named_struct_internal(m, llvm_type, values, value_count);
 				res.type = original_type;
 				return res;
@@ -966,34 +983,29 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 
 		}
-	} else if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
-		if (is_type_rune_array(type)) {
-			i64 count  = type->Array.count;
-			Type *elem = type->Array.elem;
-			LLVMTypeRef et = lb_type(m, elem);
+	} else if (is_type_rune_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
+		i64 count  = type->Array.count;
+		Type *elem = type->Array.elem;
+		LLVMTypeRef et = lb_type(m, elem);
 
-			Rune rune;
-			isize offset = 0;
-			isize width = 1;
-			String s = value.value_string;
+		Rune rune;
+		isize offset = 0;
+		isize width = 1;
+		String s = value.value_string;
 
-			LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 
-			for (i64 i = 0; i < count && offset < s.len; i++) {
-				width = utf8_decode(s.text+offset, s.len-offset, &rune);
-				offset += width;
+		for (i64 i = 0; i < count && offset < s.len; i++) {
+			width = utf8_decode(s.text+offset, s.len-offset, &rune);
+			offset += width;
 
-				elems[i] = LLVMConstInt(et, rune, true);
+			elems[i] = LLVMConstInt(et, rune, true);
 
-			}
-			GB_ASSERT(offset == s.len);
-
-			res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
-			return res;
 		}
-		// NOTE(bill, 2021-10-07): Allow for array programming value constants
-		Type *core_elem = core_array_type(type);
-		return lb_const_value(m, core_elem, value, cc);
+		GB_ASSERT(offset == s.len);
+
+		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
+		return res;
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
 		GB_ASSERT(type->Array.count == value.value_string.len);
 		LLVMValueRef data = LLVMConstStringInContext(ctx,
@@ -1004,21 +1016,9 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		return res;
 	} else if (is_type_array(type) &&
 		value.kind != ExactValue_Invalid &&
-		value.kind != ExactValue_String &&
 		value.kind != ExactValue_Compound) {
-
-		i64 count  = type->Array.count;
-		Type *elem = type->Array.elem;
-
-
-		lbValue single_elem = lb_const_value(m, elem, value, cc);
-
-		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
-		for (i64 i = 0; i < count; i++) {
-			elems[i] = single_elem.value;
-		}
-
-		res.value = llvm_const_array(m, lb_type(m, elem), elems, cast(unsigned)count);
+			
+		lb_const_array_spread(m, cc, type, value, &res);
 		return res;
 	} else if (is_type_matrix(type) &&
 		value.kind != ExactValue_Invalid &&
@@ -2008,4 +2008,3 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 	return lb_const_nil(m, original_type);
 }
-

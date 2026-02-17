@@ -4,7 +4,6 @@ import "core:crypto"
 import field "core:crypto/_fiat/field_curve25519"
 import scalar "core:crypto/_fiat/field_scalar25519"
 import subtle "core:crypto/_subtle"
-import "core:mem"
 
 ge_scalarmult_basepoint :: proc "contextless" (ge: ^Group_Element, sc: ^Scalar) {
 	when crypto.COMPACT_IMPLS == true {
@@ -27,9 +26,9 @@ ge_scalarmult_basepoint :: proc "contextless" (ge: ^Group_Element, sc: ^Scalar) 
 			mul_bp_tbl_add(ge, &Gen_Multiply_Table_edwards25519_hi[i], hi, &tmp_add, &tmp_addend, false)
 		}
 
-		mem.zero_explicit(&tmp_sc, size_of(tmp_sc))
-		mem.zero_explicit(&tmp_add, size_of(Add_Scratch))
-		mem.zero_explicit(&tmp_addend, size_of(Basepoint_Addend_Group_Element))
+		zero_explicit(&tmp_sc, size_of(tmp_sc))
+		zero_explicit(&tmp_add, size_of(Add_Scratch))
+		zero_explicit(&tmp_addend, size_of(Basepoint_Addend_Group_Element))
 	}
 }
 

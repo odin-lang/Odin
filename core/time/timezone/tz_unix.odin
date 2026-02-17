@@ -4,17 +4,17 @@ package timezone
 
 import "core:os"
 import "core:strings"
-import "core:path/filepath"
 import "core:time/datetime"
+import "core:path/filepath"
 
 local_tz_name :: proc(allocator := context.allocator) -> (name: string, success: bool) {
 	local_str, ok := os.lookup_env("TZ", allocator)
 	if !ok {
 		orig_localtime_path := "/etc/localtime"
-		path, err := os.absolute_path_from_relative(orig_localtime_path, allocator)
+		path, err := os.get_absolute_path(orig_localtime_path, allocator)
 		if err != nil {
 			// If we can't find /etc/localtime, fallback to UTC
-			if err == .ENOENT {
+			if err == .Not_Exist {
 				str, err2 := strings.clone("UTC", allocator)
 				if err2 != nil { return }
 				return str, true
@@ -28,16 +28,20 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 		// This is a hackaround, because FreeBSD copies rather than softlinks their local timezone file,
 		// *sometimes* and then stores the original name of the timezone in /var/db/zoneinfo instead
 		if path == orig_localtime_path {
-			data := os.read_entire_file("/var/db/zoneinfo", allocator) or_return
+			data, data_err := os.read_entire_file("/var/db/zoneinfo", allocator)
+			if data_err != nil {
+				return "", false
+			}
 			return strings.trim_right_space(string(data)), true
 		}
 
 		// Looking for tz path (ex fmt: "UTC", "Etc/UTC" or "America/Los_Angeles")
-		path_dir, path_file := filepath.split(path)
+		path_dir, path_file := os.split_path(path)
+
 		if path_dir == "" {
 			return
 		}
-		upper_path_dir, upper_path_chunk := filepath.split(path_dir[:len(path_dir)-1])
+		upper_path_dir, upper_path_chunk := os.split_path(path_dir[:len(path_dir)])
 		if upper_path_dir == "" {
 			return
 		}
@@ -47,8 +51,8 @@ local_tz_name :: proc(allocator := context.allocator) -> (name: string, success:
 			if err != nil { return }
 			return region_str, true
 		} else {
-			region_str, err := filepath.join({upper_path_chunk, path_file}, allocator = allocator)
-			if err != nil { return }
+			region_str, region_str_err := os.join_path({upper_path_chunk, path_file}, allocator = allocator)
+			if region_str_err != nil { return }
 			return region_str, true
 		}
 	}
@@ -85,9 +89,10 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 	defer if tzdir_ok { delete(tzdir_str, allocator) }
 
 	if tzdir_ok {
-		region_path := filepath.join({tzdir_str, reg_str}, allocator)
+		region_path, err := filepath.join({tzdir_str, reg_str}, allocator)
+		if err != nil { return nil, false }
 		defer delete(region_path, allocator)
-		
+
 		if tz_reg, ok := load_tzif_file(region_path, reg_str, allocator); ok {
 			return tz_reg, true
 		}
@@ -95,7 +100,8 @@ _region_load :: proc(_reg_str: string, allocator := context.allocator) -> (out_r
 
 	db_paths := []string{"/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"}
 	for db_path in db_paths {
-		region_path := filepath.join({db_path, reg_str}, allocator)
+		region_path, err := filepath.join({db_path, reg_str}, allocator)
+		if err != nil { return nil, false}
 		defer delete(region_path, allocator)
 
 		if tz_reg, ok := load_tzif_file(region_path, reg_str, allocator); ok {

@@ -514,6 +514,22 @@ gb_internal void error(Ast *node, char const *fmt, ...) {
 	}
 }
 
+gb_internal void error_range(TokenPos start, TokenPos end, char const *fmt, ...) {
+	GB_ASSERT(start.file_id == end.file_id);
+	GB_ASSERT(start.line == end.line);
+	GB_ASSERT(start.column <= end.column);
+	GB_ASSERT(start.offset <= end.offset);
+
+	va_list va;
+	va_start(va, fmt);
+	error_va(start, end, fmt, va);
+	va_end(va);
+	if (start.file_id != 0) {
+		AstFile *f = thread_safe_get_ast_file_from_id(start.file_id);
+		f->error_count += 1;
+	}
+}
+
 gb_internal void syntax_error_with_verbose(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
@@ -3130,6 +3146,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					} else {
 						dialect = InlineAsmDialect_Intel;
 					}
+				} else {
+					syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected an identifier after hash");
@@ -5409,9 +5427,15 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			s = parse_stmt(f);
 			switch (s->kind) {
 			case Ast_SwitchStmt:
+				if (s->SwitchStmt.partial) {
+					syntax_error(token, "#partial already applied to a switch statement");
+				}
 				s->SwitchStmt.partial = true;
 				break;
 			case Ast_TypeSwitchStmt:
+				if (s->TypeSwitchStmt.partial) {
+					syntax_error(token, "#partial already applied to a switch statement");
+				}
 				s->TypeSwitchStmt.partial = true;
 				break;
 			case Ast_EmptyStmt:

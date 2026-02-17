@@ -1,11 +1,11 @@
 package tests_nbio
 
-import    "core:log"
-import    "core:nbio"
-import    "core:testing"
-import    "core:thread"
-import    "core:time"
-import os "core:os/os2"
+import "core:log"
+import "core:nbio"
+import "core:testing"
+import "core:thread"
+import "core:time"
+import "core:os"
 
 ev :: testing.expect_value
 e  :: testing.expect

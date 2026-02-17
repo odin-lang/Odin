@@ -8,7 +8,7 @@ package i18n
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-import "core:strings"
+import    "core:strings"
 
 // Currently active catalog.
 ACTIVE: ^Translation

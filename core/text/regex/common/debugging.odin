@@ -8,15 +8,8 @@ package regex_common
 		Feoramund: Initial implementation.
 */
 
-@require import "core:os"
 import "core:io"
 import "core:strings"
-
-ODIN_DEBUG_REGEX :: #config(ODIN_DEBUG_REGEX, false)
-
-when ODIN_DEBUG_REGEX {
-	debug_stream := os.stream_from_handle(os.stderr)
-}
 
 write_padded_hex :: proc(w: io.Writer, #any_int n, zeroes: int) {
 	sb := strings.builder_make()

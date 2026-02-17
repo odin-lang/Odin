@@ -19,7 +19,6 @@ package math_big
 */
 
 import "base:intrinsics"
-import "core:mem"
 
 /*
 	Multiplies |a| * |b| and only computes upto digs digits of result.
@@ -817,7 +816,7 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 	x1.used = src.used - B
 
 	#force_inline internal_copy_digits(x0, src, x0.used)
-	#force_inline mem.copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used)
+	intrinsics.mem_copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used)
 	#force_inline internal_clamp(x0)
 
 	/*
@@ -882,9 +881,9 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	a1.used = B
 	a2.used = src.used - 2 * B
 
-	#force_inline mem.copy_non_overlapping(&a0.digit[0], &src.digit[    0], size_of(DIGIT) * a0.used)
-	#force_inline mem.copy_non_overlapping(&a1.digit[0], &src.digit[    B], size_of(DIGIT) * a1.used)
-	#force_inline mem.copy_non_overlapping(&a2.digit[0], &src.digit[2 * B], size_of(DIGIT) * a2.used)
+	intrinsics.mem_copy_non_overlapping(&a0.digit[0], &src.digit[    0], size_of(DIGIT) * a0.used)
+	intrinsics.mem_copy_non_overlapping(&a1.digit[0], &src.digit[    B], size_of(DIGIT) * a1.used)
+	intrinsics.mem_copy_non_overlapping(&a2.digit[0], &src.digit[2 * B], size_of(DIGIT) * a2.used)
 
 	internal_clamp(a0)
 	internal_clamp(a1)
@@ -2340,7 +2339,7 @@ _private_int_dr_reduce :: proc(x, n: ^Int, k: DIGIT, allocator := context.alloca
 		/*
 			Zero words above m.
 		*/
-		mem.zero_slice(x.digit[m + 1:][:x.used - m])
+		_zero(x.digit[m + 1:][:x.used - m])
 
 		/*
 			Clamp, sub and return.
@@ -3137,7 +3136,7 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0)) -> 
 	}
 
 	digits = min(digits, len(src.digit), len(dest.digit))
-	mem.copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits)
+	intrinsics.mem_copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits)
 	return nil
 }
 
@@ -3175,7 +3174,7 @@ _private_int_shl_leg :: proc(quotient: ^Int, digits: int, allocator := context.a
 	}
 
 	quotient.used += digits
-	mem.zero_slice(quotient.digit[:digits])
+	_zero(quotient.digit[:digits])
 	return nil
 }
 
@@ -3283,9 +3282,8 @@ _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 }
 #assert(_PRIME_TAB_SIZE * size_of(DIGIT) == size_of(_private_prime_table))
 
-when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
-	@(rodata)
-	_factorial_table := [35]_WORD{
+@(rodata)
+_factorial_table := [35]_WORD{
 /* f(00): */                                                     1,
 /* f(01): */                                                     1,
 /* f(02): */                                                     2,
@@ -3321,33 +3319,8 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 /* f(32): */       263_130_836_933_693_530_167_218_012_160_000_000,
 /* f(33): */     8_683_317_618_811_886_495_518_194_401_280_000_000,
 /* f(34): */   295_232_799_039_604_140_847_618_609_643_520_000_000,
-	}
-} else {
-	@(rodata)
-	_factorial_table := [21]_WORD{
-/* f(00): */                                                     1,
-/* f(01): */                                                     1,
-/* f(02): */                                                     2,
-/* f(03): */                                                     6,
-/* f(04): */                                                    24,
-/* f(05): */                                                   120,
-/* f(06): */                                                   720,
-/* f(07): */                                                 5_040,
-/* f(08): */                                                40_320,
-/* f(09): */                                               362_880,
-/* f(10): */                                             3_628_800,
-/* f(11): */                                            39_916_800,
-/* f(12): */                                           479_001_600,
-/* f(13): */                                         6_227_020_800,
-/* f(14): */                                        87_178_291_200,
-/* f(15): */                                     1_307_674_368_000,
-/* f(16): */                                    20_922_789_888_000,
-/* f(17): */                                   355_687_428_096_000,
-/* f(18): */                                 6_402_373_705_728_000,
-/* f(19): */                               121_645_100_408_832_000,
-/* f(20): */                             2_432_902_008_176_640_000,
-	}
 }
+
 
 /*
 	=========================  End of private tables  ========================

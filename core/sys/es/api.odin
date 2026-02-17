@@ -566,7 +566,7 @@ ECHO_REQUEST_MAX_LENGTH ::  (48)
 CONNECTION_OPEN_WAIT ::  (1 << 0)
 FILE_CONTROL_NOTIFY_MONITORS ::  (1 << 0)
 FILE_CONTROL_FLUSH ::  (1 << 1)
-using StandardIcon :: enum i32 {
+StandardIcon :: enum i32 {
 	ICON_NONE,
 	ICON_ACTION_UNAVAILABLE_SYMBOLIC,
 	ICON_ADDRESS_BOOK_NEW,
@@ -1632,7 +1632,7 @@ using StandardIcon :: enum i32 {
 	ICON_WEATHER_STORM_TORNADO_SYMBOLIC,
 	ICON_WEATHER_WINDY_SYMBOLIC,
 }
-using FatalError :: enum i32 {
+FatalError :: enum i32 {
 	FATAL_ERROR_INVALID_BUFFER,
 	FATAL_ERROR_UNKNOWN_SYSCALL,
 	FATAL_ERROR_INVALID_MEMORY_REGION,
@@ -1657,7 +1657,7 @@ using FatalError :: enum i32 {
 	FATAL_ERROR_ABORT,
 	FATAL_ERROR_COUNT,
 }
-using SyscallType :: enum i32 {
+SyscallType :: enum i32 {
 	SYSCALL_ALLOCATE,
 	SYSCALL_FREE,
 	SYSCALL_SHARE_MEMORY,
@@ -1768,7 +1768,7 @@ using SyscallType :: enum i32 {
 	SYSCALL_DEBUG_COMMAND,
 	SYSCALL_COUNT,
 }
-using MessageType :: enum i32 {
+MessageType :: enum i32 {
 	MSG_WM_START =  0x1000,
 	MSG_MOUSE_MOVED =  0x1001,
 	MSG_WINDOW_ACTIVATED =  0x1002,
@@ -1880,18 +1880,18 @@ using MessageType :: enum i32 {
 	MSG_USER_START =  0x8000,
 	MSG_USER_END =  0xBFFF,
 }
-using DrawMode :: enum i32 {
+DrawMode :: enum i32 {
 	DRAW_MODE_REPEAT_FIRST =  1 ,
 	DRAW_MODE_STRECH,
 	DRAW_MODE_REPEAT,
 	DRAW_MODE_NONE,
 }
-using ClipboardFormat :: enum i32 {
+ClipboardFormat :: enum i32 {
 	CLIPBOARD_FORMAT_EMPTY,
 	CLIPBOARD_FORMAT_TEXT,
 	CLIPBOARD_FORMAT_FILE_LIST,
 }
-using CursorStyle :: enum i32 {
+CursorStyle :: enum i32 {
 	CURSOR_NORMAL,
 	CURSOR_TEXT,
 	CURSOR_RESIZE_VERTICAL,
@@ -1923,30 +1923,30 @@ using CursorStyle :: enum i32 {
 	CURSOR_BLANK,
 	CURSOR_COUNT,
 }
-using WindowStyle :: enum i32 {
+WindowStyle :: enum i32 {
 	WINDOW_NORMAL,
 	WINDOW_CONTAINER,
 	WINDOW_MENU,
 	WINDOW_TIP,
 	WINDOW_PLAIN,
 }
-using FormatValueType :: enum i32 {
+FormatValueType :: enum i32 {
 	FORMAT_VALUE_INVALID,
 	FORMAT_VALUE_STRING,
 	FORMAT_VALUE_NUMBER,
 	FORMAT_VALUE_TIME,
 }
-using CheckState :: enum i32 {
+CheckState :: enum i32 {
 	CHECK_UNCHECKED =  0,
 	CHECK_CHECKED =  1,
 	CHECK_INDETERMINATE =  2,
 }
-using DocumentState :: enum i32 {
+DocumentState :: enum i32 {
 	DOCUMENT_STATE_EMPTY,
 	DOCUMENT_STATE_UNSAVED,
 	DOCUMENT_STATE_FILE,
 }
-using TransitionType :: enum i32 {
+TransitionType :: enum i32 {
 	TRANSITION_NONE,
 	TRANSITION_SLIDE_UP,
 	TRANSITION_SLIDE_DOWN,
@@ -1963,7 +1963,7 @@ using TransitionType :: enum i32 {
 	TRANSITION_FADE_IN,
 	TRANSITION_FADE_OUT,
 }
-using MemoryProtection :: enum i32 {
+MemoryProtection :: enum i32 {
 	MEMORY_PROTECTION_READ_ONLY,
 	MEMORY_PROTECTION_READ_WRITE,
 	MEMORY_PROTECTION_EXECUTABLE,
@@ -2675,7 +2675,7 @@ MemoryDecommit :: #force_inline proc "c" (pointer_ :   rawptr, bytes_ :   int   
 MemoryFill :: #force_inline proc "c" (from_ :   rawptr, to_ :   rawptr, byte_ :   u8     ){ addr := 0x1000 + 86 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   rawptr,   u8     )) (fp))(from_, to_, byte_)}
 MemoryMove :: #force_inline proc "c" (_start_ :   rawptr, _end_ :   rawptr, amount_ :   int     , zeroEmptySpace_ :   bool){ addr := 0x1000 + 88 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   rawptr,   int     ,   bool)) (fp))(_start_, _end_, amount_, zeroEmptySpace_)}
 MemoryOpen :: #force_inline proc "c" (size_ :   int   , name_ : string, flags_ :   u32     ) ->   Handle{ addr := 0x1000 + 89 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   , ^u8, int,   u32     ) ->   Handle) (fp))(size_, raw_data(name_), len(name_), flags_)}
-MemoryReserve :: #force_inline proc "c" (size_ :   int   , protection_ :   MemoryProtection = MEMORY_PROTECTION_READ_WRITE, commitAll_ :   bool = true) ->   rawptr{ addr := 0x1000 + 25 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   MemoryProtection,   bool) ->   rawptr) (fp))(size_, protection_, commitAll_)}
+MemoryReserve :: #force_inline proc "c" (size_ :   int   , protection_ :   MemoryProtection = .MEMORY_PROTECTION_READ_WRITE, commitAll_ :   bool = true) ->   rawptr{ addr := 0x1000 + 25 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  int   ,   MemoryProtection,   bool) ->   rawptr) (fp))(size_, protection_, commitAll_)}
 MemoryShare :: #force_inline proc "c" (sharedMemoryRegion_ :   Handle, targetProcess_ :   Handle, readOnly_ :   bool) ->   Handle{ addr := 0x1000 + 90 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  Handle,   Handle,   bool) ->   Handle) (fp))(sharedMemoryRegion_, targetProcess_, readOnly_)}
 MemorySumBytes :: #force_inline proc "c" (data_ :   ^u8     , bytes_ :   int   ) ->   u8     { addr := 0x1000 + 91 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^u8     ,   int   ) ->   u8     ) (fp))(data_, bytes_)}
 MemoryUnreserve :: #force_inline proc "c" (pointer_ :   rawptr, size_ :   int    = 0){ addr := 0x1000 + 319 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  rawptr,   int   )) (fp))(pointer_, size_)}
@@ -2858,7 +2858,7 @@ WindowSetIcon :: #force_inline proc "c" (window_ :   ^Window, iconID_ :   u32   
 WindowSetTitle :: #force_inline proc "c" (window_ :   ^Window, title_ : string = ""){ addr := 0x1000 + 268 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Window, ^u8, int)) (fp))(window_, raw_data(title_), len(title_))}
 MenuGetSource :: #force_inline proc "c" (menu_ :   ^Menu) ->   ^Element{ addr := 0x1000 + 269 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Menu) ->   ^Element) (fp))(menu_)}
 ButtonSetIcon :: #force_inline proc "c" (button_ :   ^Button, iconID_ :   u32     ){ addr := 0x1000 + 270 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   u32     )) (fp))(button_, iconID_)}
-ButtonSetCheck :: #force_inline proc "c" (button_ :   ^Button, checkState_ :   CheckState = CHECK_CHECKED, sendUpdatedMessage_ :   bool = true){ addr := 0x1000 + 271 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CheckState,   bool)) (fp))(button_, checkState_, sendUpdatedMessage_)}
+ButtonSetCheck :: #force_inline proc "c" (button_ :   ^Button, checkState_ :   CheckState = .CHECK_CHECKED, sendUpdatedMessage_ :   bool = true){ addr := 0x1000 + 271 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CheckState,   bool)) (fp))(button_, checkState_, sendUpdatedMessage_)}
 ButtonGetCheck :: #force_inline proc "c" (button_ :   ^Button) ->   CheckState{ addr := 0x1000 + 272 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); return ((proc "c" (  ^Button) ->   CheckState) (fp))(button_)}
 ButtonOnCommand :: #force_inline proc "c" (button_ :   ^Button, callback_ :   CommandCallbackFunction, command_ :   ^Command = nil){ addr := 0x1000 + 273 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   CommandCallbackFunction,   ^Command)) (fp))(button_, callback_, command_)}
 ButtonSetCheckBuddy :: #force_inline proc "c" (button_ :   ^Button, checkBuddy_ :   ^Element){ addr := 0x1000 + 274 * size_of(int); fp := (rawptr(((^uintptr)(uintptr(addr)))^)); ((proc "c" (  ^Button,   ^Element)) (fp))(button_, checkBuddy_)}

@@ -25,6 +25,7 @@ foreign user32 {
 		idProcess, idThread: DWORD,
 		dwFlags:             WinEventFlags,
 	) -> HWINEVENTHOOK ---
+	UnhookWinEvent :: proc(winEventHook: HWINEVENTHOOK) -> BOOL ---
 
 	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
 
@@ -317,12 +318,26 @@ foreign user32 {
 	GetProcessWindowStation   :: proc() -> HWINSTA ---
 	GetUserObjectInformationW :: proc(hObj: HANDLE, nIndex: GetUserObjectInformationFlags, pvInfo: PVOID, nLength: DWORD, lpnLengthNeeded: LPDWORD) -> BOOL ---
 	
-	OpenClipboard              :: proc(hWndNewOwner: HWND) -> BOOL ---
-	CloseClipboard             :: proc() -> BOOL ---
-	GetClipboardData           :: proc(uFormat: UINT) -> HANDLE ---
-	SetClipboardData           :: proc(uFormat: UINT, hMem: HANDLE) -> HANDLE ---
-	IsClipboardFormatAvailable :: proc(format: UINT) -> BOOL ---
-	EmptyClipboard             :: proc() -> BOOL ---
+	OpenClipboard                 :: proc(hWndNewOwner: HWND) -> BOOL ---
+	CloseClipboard                :: proc() -> BOOL ---
+	GetClipboardData              :: proc(uFormat: UINT) -> HANDLE ---
+	SetClipboardData              :: proc(uFormat: UINT, hMem: HANDLE) -> HANDLE ---
+	IsClipboardFormatAvailable    :: proc(format: UINT) -> BOOL ---
+	EmptyClipboard                :: proc() -> BOOL ---
+	AddClipboardFormatListener    :: proc(hwnd: HWND) -> BOOL ---
+	ChangeClipboardChain          :: proc(hWndRemove: HWND, hWndNewNext: HWND) -> BOOL ---
+	CountClipboardFormats         :: proc() -> c_int ---
+	EnumClipboardFormats          :: proc(format: UINT) -> UINT ---
+	GetClipboardFormatNameW       :: proc(format: UINT, lpszFormatName: LPWSTR, cchMaxCount: c_int) -> c_int ---
+	GetClipboardOwner             :: proc() -> HWND---
+	GetClipboardSequenceNumber    :: proc() -> DWORD ---
+	GetClipboardViewer            :: proc() -> HWND ---
+	GetOpenClipboardWindow        :: proc() -> HWND ---
+	GetPriorityClipboardFormat    :: proc(paFormatPriorityList: ^UINT, cFormats: c_int) -> c_int ---
+	GetUpdatedClipboardFormats    :: proc(lpuiFormats: ^UINT, cFormats: UINT, pcFormatsOut: ^UINT) -> BOOL ---
+	RegisterClipboardFormatW      :: proc(lpszFormat: LPCWSTR ) -> UINT ---
+	RemoveClipboardFormatListener :: proc(hwnd: HWND) -> BOOL ---
+	SetClipboardViewer            :: proc(hWndNewViewer: HWND) -> HWND ---
 
 	SetScrollInfo   :: proc(hwnd: HWND, nBar: c_int, lpsi: ^SCROLLINFO, redraw: BOOL) -> c_int ---
 	GetScrollInfo   :: proc(hwnd: HWND, nBar: c_int, lpsi: ^SCROLLINFO) -> BOOL ---
@@ -410,6 +425,16 @@ GET_RAWINPUT_CODE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) ->
 @(require_results)
 MAKEINTRESOURCEW :: #force_inline proc "contextless" (#any_int i: int) -> LPWSTR {
 	return cast(LPWSTR)uintptr(WORD(i))
+}
+
+@(require_results)
+RAWINPUT_ALIGN :: proc "contextless" (x: uintptr) -> uintptr {
+	return (x + size_of(uintptr) - 1) & ~uintptr(size_of(uintptr) - 1)
+}
+
+@(require_results)
+NEXTRAWINPUTBLOCK :: proc "contextless" (ptr: ^RAWINPUT) -> ^RAWINPUT {
+	return cast(^RAWINPUT)RAWINPUT_ALIGN(uintptr(ptr) + uintptr(ptr.header.dwSize))
 }
 
 Monitor_From_Flags :: enum DWORD {
@@ -951,3 +976,11 @@ GW_OWNER            :: 4
 GW_CHILD            :: 5
 GW_ENABLEDPOPUP     :: 6
 GW_MAX              :: 6
+
+COPYDATASTRUCT :: struct {
+	dwData: ULONG_PTR,
+	cbData: DWORD,
+	lpData: PVOID,
+}
+
+PCOPYDATASTRUCT :: ^COPYDATASTRUCT

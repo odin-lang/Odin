@@ -12,6 +12,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: build Odin
         shell: cmd
         run: |
@@ -47,6 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: (Linux) Download LLVM and Build Odin
         run: |
           docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
@@ -87,6 +91,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: (Linux ARM) Download LLVM and Build Odin
         run: |
           docker run --rm -v "$PWD:/src" -w /src arm64v8/alpine sh -c '
@@ -127,6 +133,8 @@ jobs:
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: Download LLVM and setup PATH
         run: |
           brew update
@@ -166,6 +174,8 @@ jobs:
     runs-on: macos-latest # ARM machine
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: Download LLVM and setup PATH
         run: |
           brew update

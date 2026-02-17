@@ -11,7 +11,6 @@ package ed25519
 import "core:crypto"
 import grp "core:crypto/_edwards25519"
 import "core:crypto/sha2"
-import "core:mem"
 
 // PRIVATE_KEY_SIZE is the byte-encoded private key size.
 PRIVATE_KEY_SIZE :: 32
@@ -89,7 +88,7 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
-	mem.zero_explicit(priv_key, size_of(Private_Key))
+	crypto.zero_explicit(priv_key, size_of(Private_Key))
 }
 
 // sign writes the signature by priv_key over msg to sig.

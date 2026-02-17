@@ -2,9 +2,9 @@
 package aegis
 
 import "base:intrinsics"
+import "core:crypto"
 import "core:crypto/aes"
 import "core:encoding/endian"
-import "core:mem"
 import "core:simd/x86"
 
 @(private)
@@ -261,7 +261,7 @@ dec_hw_256 :: #force_inline proc "contextless" (st: ^State_HW, xi, ci: []byte) #
 @(private = "file", enable_target_feature = "sse2,aes")
 dec_partial_hw_128l :: #force_inline proc "contextless" (st: ^State_HW, xn, cn: []byte) #no_bounds_check {
 	tmp: [_RATE_128L]byte
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	z0, z1 := z_hw_128l(st)
 	copy(tmp[:], cn)
@@ -286,7 +286,7 @@ dec_partial_hw_128l :: #force_inline proc "contextless" (st: ^State_HW, xn, cn: 
 @(private = "file", enable_target_feature = "sse2,aes")
 dec_partial_hw_256 :: #force_inline proc "contextless" (st: ^State_HW, xn, cn: []byte) #no_bounds_check {
 	tmp: [_RATE_256]byte
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	z := z_hw_256(st)
 	copy(tmp[:], cn)
@@ -385,5 +385,5 @@ finalize_hw :: proc "contextless" (st: ^State_HW, tag: []byte, ad_len, msg_len: 
 
 @(private)
 reset_state_hw :: proc "contextless" (st: ^State_HW) {
-	mem.zero_explicit(st, size_of(st^))
+	crypto.zero_explicit(st, size_of(st^))
 }

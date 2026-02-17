@@ -6,7 +6,6 @@ import "core:crypto"
 import "core:crypto/_aes"
 import "core:crypto/_aes/hw_intel"
 import "core:encoding/endian"
-import "core:mem"
 import "core:simd/x86"
 
 @(private)
@@ -23,9 +22,9 @@ gcm_seal_hw :: proc(ctx: ^Context_Impl_Hardware, dst, tag, iv, aad, plaintext: [
 	final_ghash_hw(&s, &h, &j0_enc, len(aad), len(plaintext))
 	copy(tag, s[:])
 
-	mem.zero_explicit(&h, len(h))
-	mem.zero_explicit(&j0, len(j0))
-	mem.zero_explicit(&j0_enc, len(j0_enc))
+	zero_explicit(&h, len(h))
+	zero_explicit(&j0, len(j0))
+	zero_explicit(&j0_enc, len(j0_enc))
 }
 
 @(private)
@@ -42,13 +41,13 @@ gcm_open_hw :: proc(ctx: ^Context_Impl_Hardware, dst, iv, aad, ciphertext, tag: 
 
 	ok := crypto.compare_constant_time(s[:], tag) == 1
 	if !ok {
-		mem.zero_explicit(raw_data(dst), len(dst))
+		zero_explicit(raw_data(dst), len(dst))
 	}
 
-	mem.zero_explicit(&h, len(h))
-	mem.zero_explicit(&j0, len(j0))
-	mem.zero_explicit(&j0_enc, len(j0_enc))
-	mem.zero_explicit(&s, len(s))
+	zero_explicit(&h, len(h))
+	zero_explicit(&j0, len(j0))
+	zero_explicit(&j0_enc, len(j0_enc))
+	zero_explicit(&s, len(s))
 
 	return ok
 }
@@ -228,8 +227,8 @@ gctr_hw :: proc(
 		n -= l
 	}
 
-	mem.zero_explicit(&blks, size_of(blks))
-	mem.zero_explicit(&sks, size_of(sks))
+	zero_explicit(&blks, size_of(blks))
+	zero_explicit(&sks, size_of(sks))
 }
 
 // BUG: Sticking this in gctr_hw (like the other implementations) crashes

@@ -495,15 +495,18 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 		goto end;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
+		rw_mutex_shared_lock(&s->parent->mutex);
 		found = string_map_get(&s->parent->elements, key);
 		if (found) {
 			if ((*found)->flags & EntityFlag_Result) {
 				if (entity != *found) {
 					result = *found;
 				}
+				rw_mutex_shared_unlock(&s->parent->mutex);
 				goto end;
 			}
 		}
+		rw_mutex_shared_unlock(&s->parent->mutex);
 	}
 
 	string_map_set(&s->elements, key, entity);
@@ -1792,7 +1795,22 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value, bool use_mutex) {
+struct alignas(GB_CACHE_LINE_SIZE) TypeAndValueMutexStripes {
+	BlockingMutex mutex;
+	u8 padding[GB_CACHE_LINE_SIZE - gb_size_of(BlockingMutex)];
+};
+
+enum { TypeAndValueMutexStripes_COUNT = 128 };
+gb_global TypeAndValueMutexStripes tav_mutex_stripes[TypeAndValueMutexStripes_COUNT];
+
+gb_internal BlockingMutex *tav_mutex_for_node(Ast *node) {
+	GB_ASSERT(node != nullptr);
+	uintptr h = cast(uintptr)node;
+	h ^= h >> 6;
+	return &tav_mutex_stripes[h % TypeAndValueMutexStripes_COUNT].mutex;
+}
+
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1803,14 +1821,18 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		return;
 	}
 
-	BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
-	if (ctx->decl) {
-		mutex = &ctx->decl->type_and_value_mutex;
-	} else if (ctx->pkg) {
-		mutex = &ctx->pkg->type_and_value_mutex;
-	}
+	BlockingMutex *mutex = tav_mutex_for_node(expr);
 
-	if (use_mutex) mutex_lock(mutex);
+	/* Previous logic:
+		BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
+		if (ctx->decl) {
+			mutex = &ctx->decl->type_and_value_mutex;
+		} else if (ctx->pkg) {
+			mutex = &ctx->pkg->type_and_value_mutex;
+		}
+	*/
+
+	mutex_lock(mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -1835,7 +1857,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 			break;
 		};
 	}
-	if (use_mutex) mutex_unlock(mutex);
+	mutex_unlock(mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {

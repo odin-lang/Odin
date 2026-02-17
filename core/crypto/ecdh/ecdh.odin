@@ -4,7 +4,6 @@ import "core:crypto"
 import secec "core:crypto/_weierstrass"
 import "core:crypto/x25519"
 import "core:crypto/x448"
-import "core:mem"
 import "core:reflect"
 
 // Note: For these primitives scalar size = point size
@@ -18,6 +17,7 @@ X448_Buf :: [x448.SCALAR_SIZE]byte
 Curve :: enum {
 	Invalid,
 	SECP256R1,
+	SECP384R1,
 	X25519,
 	X448,
 }
@@ -26,6 +26,7 @@ Curve :: enum {
 CURVE_NAMES := [Curve]string {
 	.Invalid   = "Invalid",
 	.SECP256R1 = "secp256r1",
+	.SECP384R1 = "secp384r1",
 	.X25519    = "X25519",
 	.X448      = "X448",
 }
@@ -34,6 +35,7 @@ CURVE_NAMES := [Curve]string {
 PRIVATE_KEY_SIZES := [Curve]int {
 	.Invalid   = 0,
 	.SECP256R1 = secec.SC_SIZE_P256R1,
+	.SECP384R1 = secec.SC_SIZE_P384R1,
 	.X25519    = x25519.SCALAR_SIZE,
 	.X448      = x448.SCALAR_SIZE,
 }
@@ -42,6 +44,7 @@ PRIVATE_KEY_SIZES := [Curve]int {
 PUBLIC_KEY_SIZES := [Curve]int {
 	.Invalid   = 0,
 	.SECP256R1 = 1 + 2 * secec.FE_SIZE_P256R1,
+	.SECP384R1 = 1 + 2 * secec.FE_SIZE_P384R1,
 	.X25519    = x25519.POINT_SIZE,
 	.X448      = x448.POINT_SIZE,
 }
@@ -50,6 +53,7 @@ PUBLIC_KEY_SIZES := [Curve]int {
 SHARED_SECRET_SIZES := [Curve]int {
 	.Invalid   = 0,
 	.SECP256R1 = secec.FE_SIZE_P256R1,
+	.SECP384R1 = secec.FE_SIZE_P384R1,
 	.X25519    = x25519.POINT_SIZE,
 	.X448      = x448.POINT_SIZE,
 }
@@ -58,6 +62,7 @@ SHARED_SECRET_SIZES := [Curve]int {
 _PRIV_IMPL_IDS := [Curve]typeid {
 	.Invalid           = nil,
 	.SECP256R1         = typeid_of(secec.Scalar_p256r1),
+	.SECP384R1         = typeid_of(secec.Scalar_p384r1),
 	.X25519            = typeid_of(X25519_Buf),
 	.X448              = typeid_of(X448_Buf),
 }
@@ -66,6 +71,7 @@ _PRIV_IMPL_IDS := [Curve]typeid {
 _PUB_IMPL_IDS := [Curve]typeid {
 	.Invalid           = nil,
 	.SECP256R1         = typeid_of(secec.Point_p256r1),
+	.SECP384R1         = typeid_of(secec.Point_p384r1),
 	.X25519            = typeid_of(X25519_Buf),
 	.X448              = typeid_of(X448_Buf),
 }
@@ -77,6 +83,7 @@ Private_Key :: struct {
 	_curve: Curve,
 	_impl: union {
 		secec.Scalar_p256r1,
+		secec.Scalar_p384r1,
 		X25519_Buf,
 		X448_Buf,
 	},
@@ -90,6 +97,7 @@ Public_Key :: struct {
 	_curve: Curve,
 	_impl: union {
 		secec.Point_p256r1,
+		secec.Point_p384r1,
 		X25519_Buf,
 		X448_Buf,
 	},
@@ -116,11 +124,23 @@ private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 
 		// 384-bits reduced makes the modulo bias insignificant
 		b: [48]byte = ---
-		defer (mem.zero_explicit(&b, size_of(b)))
+		defer (crypto.zero_explicit(&b, size_of(b)))
 		for {
 			crypto.rand_bytes(b[:])
 			_ = secec.sc_set_bytes(sc, b[:])
 			if secec.sc_is_zero(sc) == 0 { // Likely
+				break
+			}
+		}
+	case .SECP384R1:
+		sc := &priv_key._impl.(secec.Scalar_p384r1)
+
+		b: [48]byte = ---
+		defer (crypto.zero_explicit(&b, size_of(b)))
+		for {
+			crypto.rand_bytes(b[:])
+			did_reduce := secec.sc_set_bytes(sc, b[:])
+			if !did_reduce && secec.sc_is_zero(sc) == 0 { // Likely
 				break
 			}
 		}
@@ -166,6 +186,17 @@ private_key_set_bytes :: proc(priv_key: ^Private_Key, curve: Curve, b: []byte) -
 			private_key_clear(priv_key)
 			return false
 		}
+	case .SECP384R1:
+		sc := &priv_key._impl.(secec.Scalar_p384r1)
+		did_reduce := secec.sc_set_bytes(sc, b)
+		is_zero := secec.sc_is_zero(sc) == 1
+
+		// Reject `0` and scalars that are not less than the
+		// curve order.
+		if did_reduce || is_zero {
+			private_key_clear(priv_key)
+			return false
+		}
 	case .X25519:
 		sc := &priv_key._impl.(X25519_Buf)
 		copy(sc[:], b)
@@ -187,6 +218,11 @@ private_key_generate_public :: proc(priv_key: ^Private_Key) {
 	switch &sc in priv_key._impl {
 	case secec.Scalar_p256r1:
 		pub_key: secec.Point_p256r1 = ---
+		secec.pt_scalar_mul_generator(&pub_key, &sc)
+		secec.pt_rescale(&pub_key, &pub_key)
+		priv_key._pub_key._impl = pub_key
+	case secec.Scalar_p384r1:
+		pub_key: secec.Point_p384r1 = ---
 		secec.pt_scalar_mul_generator(&pub_key, &sc)
 		secec.pt_rescale(&pub_key, &pub_key)
 		priv_key._pub_key._impl = pub_key
@@ -214,6 +250,9 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	case .SECP256R1:
 		sc := &priv_key._impl.(secec.Scalar_p256r1)
 		secec.sc_bytes(dst, sc)
+	case .SECP384R1:
+		sc := &priv_key._impl.(secec.Scalar_p384r1)
+		secec.sc_bytes(dst, sc)
 	case .X25519:
 		sc := &priv_key._impl.(X25519_Buf)
 		copy(dst, sc[:])
@@ -236,6 +275,9 @@ private_key_equal :: proc(p, q: ^Private_Key) -> bool {
 	case .SECP256R1:
 		sc_p, sc_q := &p._impl.(secec.Scalar_p256r1), &q._impl.(secec.Scalar_p256r1)
 		return secec.sc_equal(sc_p, sc_q) == 1
+	case .SECP384R1:
+		sc_p, sc_q := &p._impl.(secec.Scalar_p384r1), &q._impl.(secec.Scalar_p384r1)
+		return secec.sc_equal(sc_p, sc_q) == 1
 	case .X25519:
 		b_p, b_q  := &p._impl.(X25519_Buf), &q._impl.(X25519_Buf)
 		return crypto.compare_constant_time(b_p[:], b_q[:]) == 1
@@ -249,7 +291,7 @@ private_key_equal :: proc(p, q: ^Private_Key) -> bool {
 
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
-	mem.zero_explicit(priv_key, size_of(Private_Key))
+	crypto.zero_explicit(priv_key, size_of(Private_Key))
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
@@ -273,6 +315,16 @@ public_key_set_bytes :: proc(pub_key: ^Public_Key, curve: Curve, b: []byte) -> b
 		}
 
 		pt := &pub_key._impl.(secec.Point_p256r1)
+		ok := secec.pt_set_sec_bytes(pt, b)
+		if !ok || secec.pt_is_identity(pt) == 1 {
+			return false
+		}
+	case .SECP384R1:
+		if b[0] != secec.SEC_PREFIX_UNCOMPRESSED {
+			return false
+		}
+
+		pt := &pub_key._impl.(secec.Point_p384r1)
 		ok := secec.pt_set_sec_bytes(pt, b)
 		if !ok || secec.pt_is_identity(pt) == 1 {
 			return false
@@ -313,6 +365,14 @@ public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
 		dst[0] = secec.SEC_PREFIX_UNCOMPRESSED
 		secec.fe_bytes(dst[1:1+secec.FE_SIZE_P256R1], &pt.x)
 		secec.fe_bytes(dst[1+secec.FE_SIZE_P256R1:], &pt.y)
+	case .SECP384R1:
+		// Invariant: Unless the caller is manually building pub_key
+		// `Z = 1`, so we can skip the rescale.
+		pt := &pub_key._impl.(secec.Point_p384r1)
+
+		dst[0] = secec.SEC_PREFIX_UNCOMPRESSED
+		secec.fe_bytes(dst[1:1+secec.FE_SIZE_P384R1], &pt.x)
+		secec.fe_bytes(dst[1+secec.FE_SIZE_P384R1:], &pt.y)
 	case .X25519:
 		pt := &pub_key._impl.(X25519_Buf)
 		copy(dst, pt[:])
@@ -335,6 +395,9 @@ public_key_equal :: proc(p, q: ^Public_Key) -> bool {
 	case .SECP256R1:
 		pt_p, pt_q := &p._impl.(secec.Point_p256r1), &q._impl.(secec.Point_p256r1)
 		return secec.pt_equal(pt_p, pt_q) == 1
+	case .SECP384R1:
+		pt_p, pt_q := &p._impl.(secec.Point_p384r1), &q._impl.(secec.Point_p384r1)
+		return secec.pt_equal(pt_p, pt_q) == 1
 	case .X25519:
 		b_p, b_q  := &p._impl.(X25519_Buf), &q._impl.(X25519_Buf)
 		return crypto.compare_constant_time(b_p[:], b_q[:]) == 1
@@ -348,7 +411,7 @@ public_key_equal :: proc(p, q: ^Public_Key) -> bool {
 
 // public_key_clear clears pub_key to the uninitialized state.
 public_key_clear :: proc "contextless" (pub_key: ^Public_Key) {
-	mem.zero_explicit(pub_key, size_of(Public_Key))
+	crypto.zero_explicit(pub_key, size_of(Public_Key))
 }
 
 // ecdh performs an Elliptic Curve Diffie-Hellman key exchange betwween
@@ -365,6 +428,13 @@ ecdh :: proc(priv_key: ^Private_Key, pub_key: ^Public_Key, dst: []byte) -> bool 
 	case .SECP256R1:
 		sc, pt := &priv_key._impl.(secec.Scalar_p256r1), &pub_key._impl.(secec.Point_p256r1)
 		ss: secec.Point_p256r1
+		defer secec.pt_clear(&ss)
+
+		secec.pt_scalar_mul(&ss, pt, sc)
+		return secec.pt_bytes(dst, nil, &ss)
+	case .SECP384R1:
+		sc, pt := &priv_key._impl.(secec.Scalar_p384r1), &pub_key._impl.(secec.Point_p384r1)
+		ss: secec.Point_p384r1
 		defer secec.pt_clear(&ss)
 
 		secec.pt_scalar_mul(&ss, pt, sc)

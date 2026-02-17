@@ -1,8 +1,8 @@
 package aegis
 
+import "core:crypto"
 import aes "core:crypto/_aes/ct64"
 import "core:encoding/endian"
-import "core:mem"
 
 // This uses the bitlsiced 64-bit general purpose register SWAR AES
 // round function.  The intermediate state is stored in interleaved
@@ -324,7 +324,7 @@ dec_sw_256 :: #force_inline proc "contextless" (st: ^State_SW, xi, ci: []byte) #
 @(private = "file")
 dec_partial_sw_128l :: proc "contextless" (st: ^State_SW, xn, cn: []byte) #no_bounds_check {
 	tmp: [_RATE_128L]byte
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	z0_0, z0_1, z1_0, z1_1 := z_sw_128l(st)
 	copy(tmp[:], cn)
@@ -349,7 +349,7 @@ dec_partial_sw_128l :: proc "contextless" (st: ^State_SW, xn, cn: []byte) #no_bo
 @(private = "file")
 dec_partial_sw_256 :: proc "contextless" (st: ^State_SW, xn, cn: []byte) #no_bounds_check {
 	tmp: [_RATE_256]byte
-	defer mem.zero_explicit(&tmp, size_of(tmp))
+	defer crypto.zero_explicit(&tmp, size_of(tmp))
 
 	z_0, z_1 := z_sw_256(st)
 	copy(tmp[:], cn)
@@ -448,5 +448,5 @@ finalize_sw :: proc "contextless" (st: ^State_SW, tag: []byte, ad_len, msg_len: 
 
 @(private)
 reset_state_sw :: proc "contextless" (st: ^State_SW) {
-	mem.zero_explicit(st, size_of(st^))
+	crypto.zero_explicit(st, size_of(st^))
 }

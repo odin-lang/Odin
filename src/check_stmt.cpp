@@ -1724,6 +1724,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 	bool is_range = false;
 	bool is_possibly_addressable = true;
 	isize max_val_count = 2;
+
 	if (is_ast_range(expr)) {
 		ast_node(ie, BinaryExpr, expr);
 		Operand x = {};
@@ -1884,7 +1885,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						error_line("\tMultiple return valued parameters in a range statement are limited to a minimum of 1 usable values with a trailing boolean for the conditional, got %td\n", count);
 						break;
 					}
-					enum : isize {MAXIMUM_COUNT = 100};
+					enum : isize {MAXIMUM_COUNT = 20};
 					if (count > MAXIMUM_COUNT) {
 						ERROR_BLOCK();
 						check_not_tuple(ctx, &operand);
@@ -1900,7 +1901,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						break;
 					}
 
-					max_val_count = count;
+					max_val_count = count-1;
 
 					for (Entity *e : t->Tuple.variables) {
 						array_add(&vals, e->type);
@@ -1919,6 +1920,20 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 					if (is_reverse) {
 						error(node, "#reverse for is not supported for multiple return valued parameters");
+					}
+
+					Ast *expr = unparen_expr(operand.expr);
+					if (expr->kind == Ast_CallExpr) {
+						Type *p = base_type(type_of_expr(expr->CallExpr.proc));
+						if (p != nullptr && p->kind == Type_Proc) {
+							if (p->Proc.require_results) {
+								if (rs->vals.count < max_val_count) {
+									TokenPos start = ast_token(rs->vals[0]).pos;
+									TokenPos end   = ast_end_pos(rs->vals[rs->vals.count-1]);
+									error_range(start, end, "Expected %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
+								}
+							}
+						}
 					}
 				}
 				break;
@@ -2950,7 +2965,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 		if ((feature_flags & OptInFeatureFlag_UsingStmt) == 0) {
 			ERROR_BLOCK();
 			error(node, "'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring");
-			error_line("\tIt you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
+			error_line("\tIf you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
 		}
 
 		for (Ast *expr : us->list) {

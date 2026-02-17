@@ -5325,6 +5325,173 @@ IGraphicsCommandList6_VTable :: struct {
 	DispatchMesh: proc "system" (this: ^IGraphicsCommandList6, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
 }
 
+
+BARRIER_LAYOUT :: enum u32 {
+	UNDEFINED                                          = 0xffffffff,
+	COMMON                                             = 0,
+	PRESENT                                            = 0,
+	GENERIC_READ                                       = 1,
+	RENDER_TARGET                                      = 2,
+	UNORDERED_ACCESS                                   = 3,
+	DEPTH_STENCIL_WRITE                                = 4,
+	DEPTH_STENCIL_READ                                 = 5,
+	SHADER_RESOURCE                                    = 6,
+	COPY_SOURCE                                        = 7,
+	COPY_DEST                                          = 8,
+	RESOLVE_SOURCE                                     = 9,
+	RESOLVE_DEST                                       = 10,
+	SHADING_RATE_SOURCE                                = 11,
+	VIDEO_DECODE_READ                                  = 12,
+	VIDEO_DECODE_WRITE                                 = 13,
+	VIDEO_PROCESS_READ                                 = 14,
+	VIDEO_PROCESS_WRITE                                = 15,
+	VIDEO_ENCODE_READ                                  = 16,
+	VIDEO_ENCODE_WRITE                                 = 17,
+	DIRECT_QUEUE_COMMON                                = 18,
+	DIRECT_QUEUE_GENERIC_READ                          = 19,
+	DIRECT_QUEUE_UNORDERED_ACCESS                      = 20,
+	DIRECT_QUEUE_SHADER_RESOURCE                       = 21,
+	DIRECT_QUEUE_COPY_SOURCE                           = 22,
+	DIRECT_QUEUE_COPY_DEST                             = 23,
+	COMPUTE_QUEUE_COMMON                               = 24,
+	COMPUTE_QUEUE_GENERIC_READ                         = 25,
+	COMPUTE_QUEUE_UNORDERED_ACCESS                     = 26,
+	COMPUTE_QUEUE_SHADER_RESOURCE                      = 27,
+	COMPUTE_QUEUE_COPY_SOURCE                          = 28,
+	COMPUTE_QUEUE_COPY_DEST                            = 29,
+	DIRECT_QUEUE_GENERIC_READ_COMPUTE_QUEUE_ACCESSIBLE = 31,
+}
+
+BARRIER_SYNC_FLAG :: enum u32 {
+	ALL                                                   = 0, // 0x1
+	DRAW                                                  = 1, // 0x2
+	INDEX_INPUT                                           = 2, // 0x4
+	VERTEX_SHADING                                        = 3, // 0x8
+	PIXEL_SHADING                                         = 4, // 0x10
+	DEPTH_STENCIL                                         = 5, // 0x20
+	RENDER_TARGET                                         = 6, // 0x40
+	COMPUTE_SHADING                                       = 7, // 0x80
+	RAYTRACING                                            = 8, // 0x100
+	COPY                                                  = 9, // 0x200
+	RESOLVE                                               = 10, // 0x400
+	EXECUTE_INDIRECT                                      = 11, // 0x800
+	PREDICATION                                           = 11, // 0x800
+	ALL_SHADING                                           = 12, // 0x1000
+	NON_PIXEL_SHADING                                     = 13, // 0x2000
+	EMIT_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO = 14, // 0x4000
+	CLEAR_UNORDERED_ACCESS_VIEW                           = 15, // 0x8000
+	VIDEO_DECODE                                          = 20, // 0x100000
+	VIDEO_PROCESS                                         = 21, // 0x200000
+	VIDEO_ENCODE                                          = 22, // 0x400000
+	BUILD_RAYTRACING_ACCELERATION_STRUCTURE               = 23, // 0x800000
+	COPY_RAYTRACING_ACCELERATION_STRUCTURE                = 24, // 0x1000000
+	SPLIT                                                 = 31, // 0x80000000
+}
+
+BARRIER_SYNC_FLAGS :: bit_set[BARRIER_SYNC_FLAG; u32]
+
+BARRIER_ACCESS_FLAG :: enum u32 {
+	VERTEX_BUFFER                           = 0, // 0x1
+	CONSTANT_BUFFER                         = 1, // 0x2
+	INDEX_BUFFER                            = 2, // 0x4
+	RENDER_TARGET                           = 3, // 0x8
+	UNORDERED_ACCESS                        = 4, // 0x10
+	DEPTH_STENCIL_WRITE                     = 5, // 0x20
+	DEPTH_STENCIL_READ                      = 6, // 0x40
+	SHADER_RESOURCE                         = 7, // 0x80
+	STREAM_OUTPUT                           = 8, // 0x100
+	INDIRECT_ARGUMENT                       = 9, // 0x200
+	PREDICATION                             = 9, // 0x200
+	COPY_DEST                               = 10, // 0x400
+	COPY_SOURCE                             = 11, // 0x800
+	RESOLVE_DEST                            = 12, // 0x1000
+	RESOLVE_SOURCE                          = 13, // 0x2000
+	RAYTRACING_ACCELERATION_STRUCTURE_READ  = 14, // 0x4000
+	RAYTRACING_ACCELERATION_STRUCTURE_WRITE = 15, // 0x8000
+	SHADING_RATE_SOURCE                     = 16, // 0x10000
+	VIDEO_DECODE_READ                       = 17, // 0x20000
+	VIDEO_DECODE_WRITE                      = 18, // 0x40000
+	VIDEO_PROCESS_READ                      = 19, // 0x80000
+	VIDEO_PROCESS_WRITE                     = 20, // 0x100000
+	VIDEO_ENCODE_READ                       = 21, // 0x200000
+	VIDEO_ENCODE_WRITE                      = 22, // 0x400000
+	NO_ACCESS                               = 31, // 0x80000000
+}
+
+BARRIER_ACCESS_FLAGS :: bit_set[BARRIER_ACCESS_FLAG; u32]
+
+BARRIER_TYPE :: enum i32 {
+	GLOBAL,
+	TEXTURE,
+	BUFFER,
+}
+
+TEXTURE_BARRIER_FLAGS :: enum i32 {
+	NONE    = 0x0,
+	DISCARD = 0x1,
+}
+
+BARRIER_SUBRESOURCE_RANGE :: struct {
+	IndexOrFirstMipLevel: uint,
+	NumMipLevels:         uint,
+	FirstArraySlice:      uint,
+	NumArraySlices:       uint,
+	FirstPlane:           uint,
+	NumPlanes:            uint,
+}
+
+GLOBAL_BARRIER :: struct {
+	SyncBefore:   BARRIER_SYNC_FLAGS,
+	SyncAfter:    BARRIER_SYNC_FLAGS,
+	AccessBefore: BARRIER_ACCESS_FLAGS,
+	AccessAfter:  BARRIER_ACCESS_FLAGS,
+}
+
+TEXTURE_BARRIER :: struct {
+	SyncBefore:   BARRIER_SYNC_FLAGS,
+	SyncAfter:    BARRIER_SYNC_FLAGS,
+	AccessBefore: BARRIER_ACCESS_FLAGS,
+	AccessAfter:  BARRIER_ACCESS_FLAGS,
+	LayoutBefore: BARRIER_LAYOUT,
+	LayoutAfter:  BARRIER_LAYOUT,
+	pResource:    ^IResource,
+	Subresources: BARRIER_SUBRESOURCE_RANGE,
+	Flags: TEXTURE_BARRIER_FLAGS,
+}
+
+BUFFER_BARRIER :: struct {
+	SyncBefore:   BARRIER_SYNC_FLAGS,
+	SyncAfter:    BARRIER_SYNC_FLAGS,
+	AccessBefore: BARRIER_ACCESS_FLAGS,
+	AccessAfter:  BARRIER_ACCESS_FLAGS,
+	pRessource:   ^IResource,
+	Offset:       u64,
+	Size:         u64,
+}
+
+BARRIER_GROUP :: struct {
+	Type:        BARRIER_TYPE,
+	NumBarriers: u32,
+	using _: struct #raw_union {
+		pGlobalBarriers:  [^]GLOBAL_BARRIER  `raw_union_tag:"Type=GLOBAL"`,
+		pTextureBarriers: [^]TEXTURE_BARRIER `raw_union_tag:"Type=TEXTURE"`,
+		pBufferBarriers:  [^]BUFFER_BARRIER  `raw_union_tag:"Type=BARRIER"`,
+	},
+}
+
+
+IGraphicsCommandList7_UUID_STRING :: "dd171223-8b61-4769-90e3-160ccde4e2c1"
+IGraphicsCommandList7_UUID := &IID{0xdd171223, 0x8b61, 0x4769, {0x90, 0xe3, 0x16, 0x0c, 0xcd, 0xe4, 0xe2, 0xc1}}
+IGraphicsCommandList7 :: struct #raw_union {
+	#subtype id3d12graphicscommandlist6: IGraphicsCommandList6,
+	using id3d12graphicscommandlist7_vtable: ^IGraphicsCommandList7_VTable,
+}
+IGraphicsCommandList7_VTable :: struct {
+	using id3d12graphicscommandlist6_vtable: IGraphicsCommandList6_VTable,
+	Barrier: proc "system" (this: ^IGraphicsCommandList7, NumBarrierGroups: u32, pBarrierGroups: [^]BARRIER_GROUP),
+}
+
+
 SHADER_VERSION_TYPE :: enum u32 {
 	PIXEL_SHADER          = 0,
 	VERTEX_SHADER         = 1,

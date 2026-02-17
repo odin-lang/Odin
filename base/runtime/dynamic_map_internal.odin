@@ -283,7 +283,9 @@ map_desired_position :: #force_inline proc "contextless" (m: Raw_Map, hash: Map_
 map_probe_distance :: #force_inline proc "contextless" (m: Raw_Map, hash: Map_Hash, slot: uintptr) -> uintptr {
 	// We do not use map_cap since we know the capacity will not be zero here.
 	capacity := uintptr(1) << map_log2_cap(m)
-	return (slot + capacity - map_desired_position(m, hash)) & (capacity - 1)
+
+	// return (slot + capacity - map_desired_position(m, hash)) & (capacity - 1)
+	return (slot - uintptr(hash)) & (capacity - 1) // NOTE(bill): this is equivalent to the above, but less operations
 }
 
 // When working with the type-erased structure at runtime we need information

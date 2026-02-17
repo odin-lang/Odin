@@ -1,9 +1,9 @@
 #+build darwin, freebsd, openbsd, netbsd
 package tests_core_sys_kqueue
 
-import    "core:strings"
-import    "core:testing"
-import os "core:os/os2"
+import "core:strings"
+import "core:testing"
+import "core:os"
 
 @(test)
 structs :: proc(t: ^testing.T) {

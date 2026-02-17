@@ -37,8 +37,8 @@ Unified_Parse_Error_Reason :: union #shared_nil {
 Open_File_Error :: struct {
 	filename: string,
 	errno: os.Error,
-	mode: int,
-	perms: int,
+	flags: os.File_Flags,
+	perms: os.Permissions,
 }
 
 // Raised during parsing.

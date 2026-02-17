@@ -4,7 +4,6 @@ package aes
 import "base:intrinsics"
 import "core:crypto/_aes"
 import "core:math/bits"
-import "core:mem"
 import "core:simd/x86"
 
 @(private)
@@ -130,8 +129,8 @@ ctr_blocks_hw :: proc(ctx: ^Context_CTR, dst, src: []byte, nr_blocks: int) #no_b
 	// Write back the counter.
 	ctx._ctr_hi, ctx._ctr_lo = ctr_hi, ctr_lo
 
-	mem.zero_explicit(&blks, size_of(blks))
-	mem.zero_explicit(&sks, size_of(sks))
+	zero_explicit(&blks, size_of(blks))
+	zero_explicit(&sks, size_of(sks))
 }
 
 @(private, enable_target_feature = "sse2")

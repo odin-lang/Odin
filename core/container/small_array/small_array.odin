@@ -386,7 +386,7 @@ Attempts to add the given element at the beginning.
 This operation assumes that the small-array is not empty.
 
 Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+through get_ptr(_safe) to reference incorrect elements.
 
 **Inputs**
 - `a`: A pointer to the small-array
@@ -466,7 +466,7 @@ Removes and returns the first element of the small-array.
 This operation assumes that the small-array is not empty.
 
 Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+through get_ptr(_safe) to reference incorrect elements.
 
 **Inputs**
 - `a`: A pointer to the small-array
@@ -542,7 +542,7 @@ Attempts to remove and return the first element of the small array.
 Unlike `pop_front`, it does not assume that the array is non-empty.
 
 Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+through get_ptr(_safe) to reference incorrect elements.
 
 **Inputs**
 - `a`: A pointer to the small-array
@@ -616,7 +616,7 @@ consume :: proc "odin" (a: ^$A/Small_Array($N, $T), count: int, loc := #caller_l
 Removes the element at the specified index while retaining order.
 
 Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+through get_ptr(_safe) to reference incorrect elements.
 
 **Inputs**
 - `a`: A pointer to the small-array
@@ -754,7 +754,7 @@ push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) -
 Tries to insert an element at the specified position.
 
 Note: Performing this operation will cause pointers obtained
-through get_ptr(_save) to reference incorrect elements.
+through get_ptr(_safe) to reference incorrect elements.
 
 **Inputs**
 - `a`: A pointer to the small-array

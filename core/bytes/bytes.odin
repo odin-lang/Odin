@@ -1,8 +1,8 @@
 // Procedures for manipulation of `[]byte` slices.
 package bytes
 
+import "base:runtime"
 import "base:intrinsics"
-import "core:mem"
 import "core:simd"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -40,7 +40,7 @@ clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location
 	return c[:len(s)]
 }
 
-clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
+clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: runtime.Allocator_Error) {
 	c := make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
 	return c[:len(s)], nil
@@ -48,7 +48,7 @@ clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_loc
 
 ptr_from_slice :: ptr_from_bytes
 ptr_from_bytes :: proc(str: []byte) -> ^byte {
-	d := transmute(mem.Raw_String)str
+	d := transmute(runtime.Raw_String)str
 	return d.data
 }
 
@@ -67,10 +67,16 @@ truncate_to_rune :: proc(str: []byte, r: rune) -> []byte {
 	return str[:n]
 }
 
-// Compares two strings, returning a value representing which one comes first lexiographically.
-// -1 for `a`; 1 for `b`, or 0 if they are equal.
+// Compares two []byte, returning a value representing which one comes first lexiographically.
+// Returns: -1 for `lhs`, 1 for `rhs`, or 0 if they are equal.
 compare :: proc(lhs, rhs: []byte) -> int {
-	return mem.compare(lhs, rhs)
+	res := runtime.memory_compare(raw_data(lhs), raw_data(rhs), min(len(lhs), len(rhs)))
+	if res == 0 && len(lhs) != len(rhs) {
+		return len(lhs) <= len(rhs) ? -1 : +1
+	} else if len(lhs) == 0 && len(rhs) == 0 {
+		return 0
+	}
+	return res
 }
 
 contains_rune :: proc(s: []byte, r: rune) -> int {
@@ -176,7 +182,7 @@ join :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> []byte
 	return b
 }
 
-join_safe :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> (data: []byte, err: mem.Allocator_Error) {
+join_safe :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> (data: []byte, err: runtime.Allocator_Error) {
 	if len(a) == 0 {
 		return nil, nil
 	}
@@ -212,7 +218,7 @@ concatenate :: proc(a: [][]byte, allocator := context.allocator) -> []byte {
 	return b
 }
 
-concatenate_safe :: proc(a: [][]byte, allocator := context.allocator) -> (data: []byte, err: mem.Allocator_Error) {
+concatenate_safe :: proc(a: [][]byte, allocator := context.allocator) -> (data: []byte, err: runtime.Allocator_Error) {
 	if len(a) == 0 {
 		return nil, nil
 	}
@@ -991,16 +997,18 @@ trim_left :: proc(s: []byte, cutset: []byte) -> []byte {
 	if s == nil || cutset == nil {
 		return s
 	}
-	state := cutset
-	return trim_left_proc_with_state(s, is_in_cutset, &state)
+	begin := 0; end := len(s)
+	for ; begin < end && index_byte(cutset, s[begin]) >= 0; begin += 1 {}
+	return s[begin:]
 }
 
 trim_right :: proc(s: []byte, cutset: []byte) -> []byte {
 	if s == nil || cutset == nil {
 		return s
 	}
-	state := cutset
-	return trim_right_proc_with_state(s, is_in_cutset, &state)
+	begin := 0; end := len(s)
+	for ; end > begin && index_byte(cutset, s[end - 1]) >= 0; end -= 1 {}
+	return s[:end]
 }
 
 trim :: proc(s: []byte, cutset: []byte) -> []byte {

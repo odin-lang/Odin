@@ -1,7 +1,6 @@
 package _edwards25519
 
 import field "core:crypto/_fiat/field_scalar25519"
-import "core:mem"
 
 Scalar :: field.Montgomery_Domain_Field_Element
 
@@ -19,7 +18,7 @@ sc_set_u64 :: proc "contextless" (sc: ^Scalar, i: u64) {
 	tmp := field.Non_Montgomery_Domain_Field_Element{i, 0, 0, 0}
 	field.fe_to_montgomery(sc, &tmp)
 
-	mem.zero_explicit(&tmp, size_of(tmp))
+	zero_explicit(&tmp, size_of(tmp))
 }
 
 @(require_results)
@@ -36,7 +35,7 @@ sc_set_bytes_rfc8032 :: proc "contextless" (sc: ^Scalar, b: []byte) {
 }
 
 sc_clear :: proc "contextless" (sc: ^Scalar) {
-	mem.zero_explicit(sc, size_of(Scalar))
+	zero_explicit(sc, size_of(Scalar))
 }
 
 sc_set :: field.fe_set

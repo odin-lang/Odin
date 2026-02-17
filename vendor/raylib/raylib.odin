@@ -91,9 +91,6 @@ import "core:c"
 import "core:fmt"
 import "core:mem"
 
-import "core:math/linalg"
-_ :: linalg
-
 MAX_TEXTFORMAT_BUFFERS :: #config(RAYLIB_MAX_TEXTFORMAT_BUFFERS, 4)
 MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 MAX_MATERIAL_MAPS      :: #config(RAYLIB_MAX_MATERIAL_MAPS, 12)
@@ -128,7 +125,7 @@ when ODIN_OS == .Windows {
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
-	} 
+	}
 } else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	foreign import lib {
 		RAYLIB_WASM_LIB,
@@ -142,7 +139,7 @@ VERSION_MINOR :: 5
 VERSION_PATCH :: 0
 VERSION :: "5.5"
 
-PI :: 3.14159265358979323846 
+PI :: 3.14159265358979323846
 DEG2RAD :: PI/180.0
 RAD2DEG :: 180.0/PI
 
@@ -235,7 +232,7 @@ RenderTexture :: struct {
 	id:       c.uint,             // OpenGL framebuffer object id
 	texture: Texture,             // Color buffer attachment texture
 	depth:   Texture,             // Depth buffer attachment texture
-} 
+}
 
 // RenderTexture2D type, same as RenderTexture
 RenderTexture2D :: RenderTexture
@@ -257,7 +254,7 @@ GlyphInfo :: struct {
 	offsetY:  c.int,              // Character offset Y when drawing
 	advanceX: c.int,              // Character advance position X
 	image:    Image,              // Character image data
-} 
+}
 
 // Font type, includes texture and charSet array data
 Font :: struct {
@@ -851,7 +848,7 @@ Gesture :: enum c.uint {
 }
 Gestures :: distinct bit_set[Gesture; c.uint]
 
-// Camera speed values 
+// Camera speed values
 CAMERA_MOVE_SPEED :: 5.4
 CAMERA_ROTATION_SPEED :: 0.03
 CAMERA_PAN_SPEED :: 0.2
@@ -1029,7 +1026,7 @@ foreign lib {
 	GetScreenToWorld2D    :: proc(position: Vector2, camera: Camera2D) -> Vector2 ---                            // Get the world space position for a 2d camera screen space position
 	GetCameraMatrix       :: proc(camera: Camera) -> Matrix ---                                                  // Get camera transform matrix (view matrix)
 	GetCameraMatrix2D     :: proc(camera: Camera2D) -> Matrix ---                                                // Get camera 2d transform matrix
-	
+
 	// Timing-related functions
 
 	SetTargetFPS :: proc(fps: c.int) --- // Set target FPS (maximum)
@@ -1110,7 +1107,7 @@ foreign lib {
 	ComputeMD5       :: proc (data: rawptr,    dataSize: c.int) -> [^]c.uint ---                               // Compute MD5 hash code, returns static int[4] (16 bytes)
 	ComputeSHA1      :: proc(data: rawptr,     dataSize: c.int) -> [^]c.uint ---                               // Compute SHA1 hash code, returns static int[5] (20 bytes)
 
-	
+
 	// Automation events functionality
 
 	LoadAutomationEventList       :: proc(fileName: cstring) -> AutomationEventList ---             // Load automation events list from file, NULL for empty list, capacity = MAX_AUTOMATION_EVENTS
@@ -1151,14 +1148,14 @@ foreign lib {
 	SetGamepadMappings       :: proc(mappings: cstring) -> c.int ---                                     // Set internal gamepad mappings (SDL_GameControllerDB)
 	SetGamepadVibration      :: proc(gamepad: c.int, leftMotor: f32, rightMotor: f32, duration: f32) --- // Set gamepad vibration for both motors (duration in seconds)
 
-	
+
 	// Input-related functions: mouse
 
 	IsMouseButtonPressed  :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been pressed once
 	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is being pressed
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
 	IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---
-	
+
 	GetMouseX             :: proc() -> c.int ---                      // Returns mouse position X
 	GetMouseY             :: proc() -> c.int ---                      // Returns mouse position Y
 	GetMousePosition      :: proc() -> Vector2 ---                    // Returns mouse position XY
@@ -1226,7 +1223,7 @@ foreign lib {
 	GetShapesTexture :: proc() -> Texture2D ---                             // Get texture that is used for shapes drawing
 	GetShapesTextureRectangle :: proc() -> Rectangle ---                    // Get texture source rectangle that is used for shapes drawing
 
-	
+
 	// Basic shapes drawing functions
 
 	DrawPixel                   :: proc(posX, posY: c.int, color: Color) ---                                                                          // Draw a pixel using geometry [Can be slow, use with care]
@@ -1422,7 +1419,7 @@ foreign lib {
 	DrawTextureNPatch :: proc(texture: Texture2D, nPatchInfo: NPatchInfo, dest: Rectangle, origin: Vector2, rotation: f32, tint: Color) --- // Draws a texture (or part of it) that stretches or shrinks nicely
 
 	// Color/pixel related functions
-	
+
 	@(deprecated="Prefer col1 == col2")
 	ColorIsEqual        :: proc(col1, col2: Color) ---                                  // Check if two colors are equal
 	Fade                :: proc(color: Color, alpha: f32) -> Color ---                  // Get color with alpha applied, alpha goes from 0.0f to 1.0f
@@ -1730,15 +1727,15 @@ IsGestureDetected :: proc "c" (gesture: Gesture) -> bool {
 TextFormat :: proc(text: cstring, args: ..any) -> cstring {
 	@static buffers: [MAX_TEXTFORMAT_BUFFERS][MAX_TEXT_BUFFER_LENGTH]byte
 	@static index: u32
-	
+
 	buffer := buffers[index][:]
 	mem.zero_slice(buffer)
-	
+
 	index = (index+1)%MAX_TEXTFORMAT_BUFFERS
-	
+
 	str := fmt.bprintf(buffer[:len(buffer)-1], string(text), ..args)
 	buffer[len(str)] = 0
-	
+
 	return cstring(raw_data(buffer))
 }
 
@@ -1785,7 +1782,7 @@ MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	case .Free:
 		MemFree(old_memory)
 		return nil, nil
-	
+
 	case .Resize, .Resize_Non_Zeroed:
 		ptr := MemRealloc(old_memory, c.uint(size))
 		if ptr == nil {
@@ -1794,10 +1791,10 @@ MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 		data = mem.byte_slice(ptr, size)
 		return
-	
+
 	case .Free_All, .Query_Features, .Query_Info:
 		return nil, .Mode_Not_Implemented
-	}	
+	}
 	return nil, .Mode_Not_Implemented
 }
 

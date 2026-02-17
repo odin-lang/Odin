@@ -648,6 +648,18 @@ gb_internal lbValue lb_emit_count_leading_zeros(lbProcedure *p, lbValue x, Type 
 	return res;
 }
 
+gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type);
+
+gb_internal lbValue lb_emit_count_trailing_ones(lbProcedure *p, lbValue x, Type *type) {
+	lbValue z = lb_emit_unary_arith(p, Token_Xor, x, type);
+	return lb_emit_count_trailing_zeros(p, z, type);
+}
+
+gb_internal lbValue lb_emit_count_leading_ones(lbProcedure *p, lbValue x, Type *type) {
+	lbValue z = lb_emit_unary_arith(p, Token_Xor, x, type);
+	return lb_emit_count_leading_zeros(p, z, type);
+}
+
 
 
 gb_internal lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type) {
@@ -2419,7 +2431,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 
 	Ast *proc_lit = unparen_expr(ce->args[capture_arg_count]);
 	if (proc_lit->kind == Ast_Ident) {
-		proc_lit = proc_lit->Ident.entity->decl_info->proc_lit;
+		proc_lit = proc_lit->Ident.entity.load()->decl_info->proc_lit;
 	}
 	GB_ASSERT(proc_lit->kind == Ast_ProcLit);
 

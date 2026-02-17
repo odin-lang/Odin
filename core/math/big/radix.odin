@@ -16,8 +16,6 @@ package math_big
 */
 
 import "base:intrinsics"
-import "core:mem"
-import "core:os"
 
 /*
 	This version of `itoa` allocates on behalf of the caller. The caller must free the string.
@@ -144,7 +142,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		written = len(buffer) - available
 		if written < size {
 			diff := size - written
-			mem.copy(&buffer[0], &buffer[diff], written)
+			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 		}
 		return written, nil
 	}
@@ -177,7 +175,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		written = len(buffer) - available
 		if written < size {
 			diff := size - written
-			mem.copy(&buffer[0], &buffer[diff], written)
+			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 		}
 		return written, nil
 	}
@@ -218,7 +216,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		written = len(buffer) - available
 		if written < size {
 			diff := size - written
-			mem.copy(&buffer[0], &buffer[diff], written)
+			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 		}
 		return written, nil
 	}
@@ -228,7 +226,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	//               If we optimize `itoa` further, this needs to be evaluated.
 	itoa_method := _itoa_raw_full
 
-	when !MATH_BIG_FORCE_32_BIT && ODIN_OPTIMIZATION_MODE >= .Size {
+	when ODIN_OPTIMIZATION_MODE >= .Size {
 		if count >= 32768 {
 			itoa_method = _itoa_raw_old
 		}
@@ -386,64 +384,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	return size, nil
 }
 
-/*
-	We might add functions to read and write byte-encoded Ints from/to files, using `int_to_bytes_*` functions.
 
-	LibTomMath allows exporting/importing to/from a file in ASCII, but it doesn't support a much more compact representation in binary, even though it has several pack functions int_to_bytes_* (which I expanded upon and wrote Python interoperable versions of as well), and (un)pack, which is GMP compatible.
-	Someone could implement their own read/write binary int procedures, of course.
-
-	Could be worthwhile to add a canonical binary file representation with an optional small header that says it's an Odin big.Int, big.Rat or Big.Float, byte count for each component that follows, flag for big/little endian and a flag that says a checksum exists at the end of the file.
-	For big.Rat and big.Float the header couldn't be optional, because we'd have no way to distinguish where the components end.
-*/
-
-/*
-	Read an Int from an ASCII file.
-*/
-internal_int_read_from_ascii_file :: proc(a: ^Int, filename: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	/*
-		We can either read the entire file at once, or read a bunch at a time and keep multiplying by the radix.
-		For now, we'll read the entire file. Eventually we'll replace this with a copy that duplicates the logic
-		of `atoi` so we don't need to read the entire file.
-	*/
-
-	res, ok := os.read_entire_file(filename, allocator)
-	defer delete(res, allocator)
-
-	if !ok {
-		return .Cannot_Read_File
-	}
-
-	as := string(res)
-	return atoi(a, as, radix)
-}
-
-/*
-	Write an Int to an ASCII file.
-*/
-internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	/*
-		For now we'll convert the Int using itoa and writing the result in one go.
-		If we want to preserve memory we could duplicate the itoa logic and write backwards.
-	*/
-
-	as := itoa(a, radix) or_return
-	defer delete(as)
-
-	l := len(as)
-	assert(l > 0)
-
-	data := transmute([]u8)mem.Raw_Slice{
-		data = raw_data(as),
-		len  = l,
-	}
-
-	ok := os.write_entire_file(filename, data, truncate=true)
-	return nil if ok else .Cannot_Write_File
-}
 
 /*
 	Calculate the size needed for `internal_int_pack`.
@@ -698,7 +639,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	written = len(buffer) - available
 	if written < len(buffer) {
 		diff := len(buffer) - written
-		mem.copy(&buffer[0], &buffer[diff], written)
+		intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 	}
 	return written, nil
 }
@@ -746,7 +687,7 @@ _itoa_raw_old :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false,
 	written = len(buffer) - available
 	if written < len(buffer) {
 		diff := len(buffer) - written
-		mem.copy(&buffer[0], &buffer[diff], written)
+		intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 	}
 	return written, nil
 }

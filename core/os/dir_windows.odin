@@ -1,114 +1,144 @@
+#+private
 package os
 
-import win32 "core:sys/windows"
-import "core:strings"
 import "base:runtime"
+import "core:time"
+import win32 "core:sys/windows"
+
+@(private="file")
+find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	// Ignore "." and ".."
+	if d.cFileName[0] == '.' && d.cFileName[1] == 0 {
+		return
+	}
+	if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
+		return
+	}
+
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	path := concatenate({base_path, `\`, win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""}, allocator) or_return
+
+	handle := win32.HANDLE(_open_internal(path, {.Read}, Permissions_Read_Write_All) or_else 0)
+	defer win32.CloseHandle(handle)
+
+	fi.fullpath = path
+	fi.name = basename(path)
+	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
+
+	fi.type, fi.mode = _file_type_mode_from_file_attributes(d.dwFileAttributes, handle, d.dwReserved0)
+
+	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
+	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
+	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+
+	if file_id_info: win32.FILE_ID_INFO; handle != nil && win32.GetFileInformationByHandleEx(handle, .FileIdInfo, &file_id_info, size_of(file_id_info)) {
+		#assert(size_of(fi.inode) == size_of(file_id_info.FileId))
+		#assert(size_of(fi.inode) == 16)
+		runtime.mem_copy_non_overlapping(&fi.inode, &file_id_info.FileId, 16)
+	}
+
+	return
+}
+
+Read_Directory_Iterator_Impl :: struct {
+	find_data:     win32.WIN32_FIND_DATAW,
+	find_handle:   win32.HANDLE,
+	path:          string,
+	prev_fi:       File_Info,
+	no_more_files: bool,
+}
+
 
 @(require_results)
-read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Error) {
-	@(require_results)
-	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
-		// Ignore "." and ".."
-		if d.cFileName[0] == '.' && d.cFileName[1] == 0 {
+_read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info, index: int, ok: bool) {
+	for !it.impl.no_more_files {
+		err: Error
+		file_info_delete(it.impl.prev_fi, file_allocator())
+		it.impl.prev_fi = {}
+
+		fi, err = find_data_to_file_info(it.impl.path, &it.impl.find_data, file_allocator())
+		if err != nil {
+			read_directory_iterator_set_error(it, it.impl.path, err)
 			return
 		}
-		if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
-			return
-		}
-		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:]) or_else ""})
-		fi.fullpath = path
-		fi.name = basename(path)
-		fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
-		if d.dwFileAttributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
-			fi.mode |= 0o444
-		} else {
-			fi.mode |= 0o666
+		if fi.name != "" {
+			it.impl.prev_fi = fi
+			ok = true
+			index = it.index
+			it.index += 1
 		}
 
-		is_sym := false
-		if d.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_Point == 0 {
-			is_sym = false
-		} else {
-			is_sym = d.dwReserved0 == win32.IO_REPARSE_TAG_SYMLINK || d.dwReserved0 == win32.IO_REPARSE_TAG_MOUNT_POINT
-		}
-
-		if is_sym {
-			fi.mode |= File_Mode_Sym_Link
-		} else {
-			if d.dwFileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-				fi.mode |= 0o111 | File_Mode_Dir
+		if !win32.FindNextFileW(it.impl.find_handle, &it.impl.find_data) {
+			e := _get_platform_error()
+			if pe, _ := is_platform_error(e); pe != i32(win32.ERROR_NO_MORE_FILES) {
+				read_directory_iterator_set_error(it, it.impl.path, e)
 			}
-
-			// fi.mode |= file_type_mode(h);
+			it.impl.no_more_files = true
 		}
+		if ok {
+			return
+		}
+	}
+	return
+}
 
-		windows_set_file_info_times(&fi, d)
+_read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
+	it.impl.no_more_files = false
 
-		fi.is_dir = fi.mode & File_Mode_Dir != 0
+	if f == nil || f.impl == nil {
+		read_directory_iterator_set_error(it, "", .Invalid_File)
 		return
 	}
 
-	if fd == 0 {
-		return nil, ERROR_INVALID_HANDLE
+	it.f = f
+	impl := (^File_Impl)(f.impl)
+
+	// NOTE: Allow calling `init` to target a new directory with the same iterator - reset idx.
+	if it.impl.find_handle != nil {
+		win32.FindClose(it.impl.find_handle)
+	}
+	if it.impl.path != "" {
+		delete(it.impl.path, file_allocator())
 	}
 
-	context.allocator = allocator
-
-	h := win32.HANDLE(fd)
-
-	dir_fi, _ := file_info_from_get_file_information_by_handle("", h)
-	if !dir_fi.is_dir {
-		return nil, .Not_Dir
-	}
-
-	n := n
-	size := n
-	if n <= 0 {
-		n = -1
-		size = 100
-	}
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
-
-	wpath := cleanpath_from_handle_u16(fd, context.temp_allocator) or_return
-	if len(wpath) == 0 {
+	if !is_directory(impl.name) {
+		read_directory_iterator_set_error(it, impl.name, .Invalid_Dir)
 		return
 	}
 
-	dfi := make([dynamic]File_Info, 0, size) or_return
+	wpath := string16(impl.wname)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator) or_return
+	wpath_search := make([]u16, len(wpath)+3, temp_allocator)
 	copy(wpath_search, wpath)
 	wpath_search[len(wpath)+0] = '\\'
 	wpath_search[len(wpath)+1] = '*'
 	wpath_search[len(wpath)+2] = 0
 
-	path := cleanpath_from_buf(wpath)
-	defer delete(path)
-
-	find_data := &win32.WIN32_FIND_DATAW{}
-	find_handle := win32.FindFirstFileW(cstring16(raw_data(wpath_search)), find_data)
-	if find_handle == win32.INVALID_HANDLE_VALUE {
-		err = get_last_error()
-		return dfi[:], err
+	it.impl.find_handle = win32.FindFirstFileW(cstring16(raw_data(wpath_search)), &it.impl.find_data)
+	if it.impl.find_handle == win32.INVALID_HANDLE_VALUE {
+		read_directory_iterator_set_error(it, impl.name, _get_platform_error())
+		return
 	}
-	defer win32.FindClose(find_handle)
-	for n != 0 {
-		fi: File_Info
-		fi = find_data_to_file_info(path, find_data)
-		if fi.name != "" {
-			append(&dfi, fi)
-			n -= 1
-		}
-
-		if !win32.FindNextFileW(find_handle, find_data) {
-			e := get_last_error()
-			if e == ERROR_NO_MORE_FILES {
-				break
-			}
-			return dfi[:], e
-		}
+	defer if it.err.err != nil {
+		win32.FindClose(it.impl.find_handle)
 	}
 
-	return dfi[:], nil
+	err: Error
+	it.impl.path, err = _cleanpath_from_buf(wpath, file_allocator())
+	if err != nil {
+		read_directory_iterator_set_error(it, impl.name, err)
+	}
+
+	return
+}
+
+_read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
+	if it.f == nil {
+		return
+	}
+	file_info_delete(it.impl.prev_fi, file_allocator())
+	delete(it.impl.path, file_allocator())
+	win32.FindClose(it.impl.find_handle)
 }

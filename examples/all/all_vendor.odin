@@ -2,6 +2,7 @@
 package all
 
 @(require) import "vendor:cgltf"
+@(require) import "vendor:curl"
 @(require) import "vendor:ENet"
 @(require) import "vendor:OpenEXRCore"
 @(require) import "vendor:ggpo"
