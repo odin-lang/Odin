@@ -1,4 +1,4 @@
-package weistrass_tools
+package edwards_tools
 
 import ed "core:crypto/_edwards25519"
 import field "core:crypto/_fiat/field_curve25519"
@@ -78,7 +78,11 @@ main :: proc() {
 		}
 	}
 
-	fn := path.join({ODIN_ROOT, "core", "crypto", "_edwards25519", "edwards25519_table.odin"})
+	fn, err := path.join({ODIN_ROOT, "core", "crypto", "_edwards25519", "edwards25519_table.odin"}, context.allocator)
+	if err != .None {
+		fmt.printfln("Join path error for edwards25519_table.odin: %v", err);
+		os.exit(1);
+	}
 	bld: strings.Builder
 	w := strings.to_writer(&bld)
 
