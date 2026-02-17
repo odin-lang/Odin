@@ -57,9 +57,9 @@ example :: proc() {
 	fmt.printf("[Average]: %v bytes in %.2f ms (%.2f MiB/s).\n", len(input), average_ms, average_speed)
 
 	if errs[0] != .None {
-		fmt.printf("Load/Parse error: %v\n", errs[0])
+		fmt.eprintf("Load/Parse error: %v\n", errs[0])
 		if errs[0] == .File_Error {
-			fmt.println("\"unicode.xml\" not found. Did you run \"tests\\download_assets.py\"?")
+			fmt.eprintln("\"unicode.xml\" not found. Did you run \"tests\\download_assets.py\"?")
 		}
 		return
 	}

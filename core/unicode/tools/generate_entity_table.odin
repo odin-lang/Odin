@@ -24,7 +24,7 @@ main :: proc() {
 	defer delete(filename)
 
 	if err_xml != .None {
-		fmt.printfln("Join path error for unicode.xml: %v", err_xml);
+		fmt.eprintfln("Join path error for unicode.xml: %v", err_xml);
 		os.exit(1);
 	}
 
@@ -32,7 +32,7 @@ main :: proc() {
 	defer delete(generated_filename)
 
 	if err_generated != .None {
-		fmt.printfln("Join path error for generated.odin: %v", err_generated);
+		fmt.eprintfln("Join path error for generated.odin: %v", err_generated);
 		os.exit(1);
 	}
 
@@ -40,7 +40,7 @@ main :: proc() {
 	defer xml.destroy(doc)
 
 	if err != .None {
-		fmt.printfln("Load/Parse error: %v", err)
+		fmt.eprintfln("Load/Parse error: %v", err)
 		if err == .File_Error {
 			fmt.eprintfln("%q not found. Did you run \"tests\\download_assets.py\"?", filename)
 		}

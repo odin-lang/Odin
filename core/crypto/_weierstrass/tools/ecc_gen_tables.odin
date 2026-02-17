@@ -70,7 +70,7 @@ gen_tables :: proc($CURVE: string) {
 	fn_ := "sec" + CURVE + "_table.odin"
 	fn, err := path.join({ODIN_ROOT, "core", "crypto", "_weierstrass", fn_}, context.allocator)
 	if err != .None {
-		fmt.printfln("Join path error for %s: %v", fn_, err);
+		fmt.eprintfln("Join path error for %s: %v", fn_, err);
 		os.exit(1);
 	}
 	bld: strings.Builder
