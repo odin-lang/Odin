@@ -2,19 +2,16 @@
 package os
 
 import "base:runtime"
-import "base:intrinsics"
 
 import "core:bytes"
-import "core:c"
 import "core:sys/darwin"
 import "core:sys/posix"
 import "core:sys/unix"
 import "core:time"
 
-foreign import libc    "system:System"
-foreign import pthread "system:System"
+foreign import libsystem "system:System"
 
-foreign libc {
+foreign libsystem {
 	sysctl :: proc "c" (
 		name: [^]i32, namelen: u32,
 		oldp: rawptr, oldlenp: ^uint,
@@ -22,23 +19,24 @@ foreign libc {
 	) -> posix.result ---
 
 	@(link_name="sysctlbyname")
-	_sysctlbyname :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
+	_sysctlbyname :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> posix.result ---
+
+	// NOTE(Oskar): available from OSX 10.6 and iOS 3.2.
+	// For older versions there is `syscall(SYS_thread_selfid)`, but not really
+	// the same thing apparently.
+	pthread_threadid_np :: proc "c" (rawptr, ^u64) -> i32 ---
 }
 
 _get_current_thread_id :: proc "contextless" () -> int {
 	tid: u64
-	// NOTE(Oskar): available from OSX 10.6 and iOS 3.2.
-	// For older versions there is `syscall(SYS_thread_selfid)`, but not really
-	// the same thing apparently.
-	foreign pthread { pthread_threadid_np :: proc "c" (rawptr, ^u64) -> c.int --- }
 	pthread_threadid_np(nil, &tid)
 	return int(tid)
 }
 
 _get_processor_core_count :: proc() -> int {
-	count : int = 0
+	count: int = 0
 	count_size := size_of(count)
-	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {
+	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == .OK {
 		if count > 0 {
 			return count
 		}

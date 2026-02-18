@@ -539,6 +539,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 		exit_code: u32
 		if !win32.GetExitCodeProcess(handle, &exit_code) {
 			err =_get_platform_error()
+			_process_close(process)
 			return
 		}
 		time_created: win32.FILETIME
@@ -547,6 +548,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 		time_user: win32.FILETIME
 		if !win32.GetProcessTimes(handle, &time_created, &time_exited, &time_kernel, &time_user) {
 			err = _get_platform_error()
+			_process_close(process)
 			return
 		}
 		process_state = {
@@ -557,17 +559,18 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 			system_time = _filetime_to_duration(time_kernel),
 			user_time   = _filetime_to_duration(time_user),
 		}
+		_process_close(process)
 		return
 	case win32.WAIT_TIMEOUT:
 		err = General_Error.Timeout
 		return
 	case:
 		err = _get_platform_error()
+		_process_close(process)
 		return
 	}
 }
 
-@(private="package")
 _process_close :: proc(process: Process) -> Error {
 	if !win32.CloseHandle(win32.HANDLE(process.handle)) {
 		return _get_platform_error()
@@ -584,6 +587,49 @@ _process_kill :: proc(process: Process) -> Error {
 	if !win32.TerminateProcess(win32.HANDLE(process.handle), 9) {
 		return _get_platform_error()
 	}
+	return nil
+}
+
+@(private="package")
+_process_terminate :: proc(process: Process) -> Error {
+	Enum_Windows_State :: struct {
+		has_windows: bool,
+		pid:         int,
+	}
+	state: Enum_Windows_State
+	state.pid = process.pid
+	ok := win32.EnumWindows(
+		proc "system" (hwnd: win32.HWND, lParam: win32.LPARAM) -> win32.BOOL {
+			#assert(size_of(win32.LPARAM) == size_of(^Enum_Windows_State))
+			state := (^Enum_Windows_State)(rawptr(uintptr(lParam)))
+
+			dwPid: win32.DWORD
+			win32.GetWindowThreadProcessId(hwnd, &dwPid)
+			if (dwPid == win32.DWORD(state.pid)) {
+				state.has_windows = true
+				win32.PostMessageW(hwnd, win32.WM_CLOSE, 0, 0)
+			}
+
+			return true
+		},
+		win32.LPARAM(uintptr(&state)),
+	)
+	if state.has_windows {
+		if ok {
+			return nil
+		}
+
+		err      := _get_platform_error()
+		kill_err := _process_kill(process)
+		return kill_err == nil ? nil : err
+	}
+
+	if !win32.GenerateConsoleCtrlEvent(win32.CTRL_C_EVENT, win32.DWORD(process.pid)) {
+		err      := _get_platform_error()
+		kill_err := _process_kill(process)
+		return kill_err == nil ? nil : err
+	}
+
 	return nil
 }
 
