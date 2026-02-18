@@ -481,7 +481,7 @@ array_iterate_by_val :: proc(it: ^Array_Iterator($T, $SHIFT)) -> (val: T, idx: i
 	val = array_get(it.xar, it.idx)
 	idx = it.idx
 	it.idx += 1
-	return val, true
+	return val, idx, true
 }
 
 
@@ -502,7 +502,7 @@ array_iterate_by_ptr :: proc(it: ^Array_Iterator($T, $SHIFT)) -> (val: ^T, idx: 
 	val = array_get_ptr(it.xar, it.idx)
 	idx = it.idx
 	it.idx += 1
-	return val, true
+	return val, idx, true
 }
 
 
