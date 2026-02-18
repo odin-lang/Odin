@@ -9,7 +9,6 @@ import "core:time"
 import "core:slice"
 import "core:strings"
 import "core:strconv"
-import "core:sys/unix"
 import "core:sys/linux"
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
@@ -46,7 +45,7 @@ _get_ppid :: proc() -> int {
 
 @(private="package")
 _get_current_thread_id :: proc "contextless" () -> int {
-	return unix.sys_gettid()
+	return int(linux.gettid())
 }
 
 @(private="package")
