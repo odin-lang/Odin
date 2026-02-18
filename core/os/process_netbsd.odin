@@ -2,7 +2,6 @@
 #+build netbsd
 package os
 
-import "core:c"
 foreign import libc "system:c"
 
 @(private)
@@ -10,7 +9,7 @@ foreign libc {
 	_lwp_self     :: proc() -> i32 ---
 
 	@(link_name="sysctlbyname")
-	_sysctlbyname :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
+	_sysctlbyname :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> i32 ---
 }
 
 @(require_results)

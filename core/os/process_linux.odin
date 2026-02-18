@@ -5,19 +5,12 @@ package os
 import "base:runtime"
 import "base:intrinsics"
 
-import "core:c"
 import "core:time"
 import "core:slice"
 import "core:strings"
 import "core:strconv"
 import "core:sys/unix"
 import "core:sys/linux"
-
-foreign import libc "system:c"
-
-foreign libc {
-	@(link_name="get_nprocs")       _unix_get_nprocs    :: proc() -> c.int ---
-}
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
 
@@ -682,6 +675,8 @@ _reap_terminated :: proc(process: Process) -> (state: Process_State, err: Error)
 		state.exit_code = int(info.status)
 		state.success = false
 	}
+
+	_process_close(process)
 	return
 }
 
@@ -723,6 +718,8 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 				start_tick = time.tick_now()
 				continue
 			}
+
+			_process_close(process)
 			return process_state, _get_platform_error(errno)
 		}
 
@@ -733,6 +730,7 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 		}
 
 		if errno = linux.waitid(.PIDFD, linux.Id(process.handle), &info, {.WEXITED, .WNOHANG, .WNOWAIT}, nil); errno != .NONE {
+			_process_close(process)
 			return process_state, _get_platform_error(errno)
 		}
 
@@ -767,6 +765,8 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 			process_state.success = false
 		}
 	}
+
+	_process_close(process)
 	return
 }
 
@@ -783,6 +783,7 @@ _timed_wait_on_pid :: proc(process: Process, timeout: time.Duration) -> (process
 	org_sigset: linux.Sig_Set
 	errno := linux.rt_sigprocmask(.SIG_BLOCK, &sigchld_set, &org_sigset)
 	if errno != .NONE {
+		_process_close(process)
 		return process_state, _get_platform_error(errno)
 	}
 	defer linux.rt_sigprocmask(.SIG_SETMASK, &org_sigset, nil)
@@ -814,6 +815,7 @@ _timed_wait_on_pid :: proc(process: Process, timeout: time.Duration) -> (process
 			timeout -= time.tick_since(start_tick)
 			start_tick = time.tick_now()
 		case .EINVAL:
+			_process_close(process)
 			return process_state, _get_platform_error(errno)
 		}
 	}
@@ -852,13 +854,13 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (Process_Stat
 		return process_state, .Timeout
 	}
 	if errno != .NONE {
+		_process_close(process)
 		return process_state, _get_platform_error(errno)
 	}
 
 	return _reap_terminated(process)
 }
 
-@(private="package")
 _process_close :: proc(process: Process) -> Error {
 	if process.handle == 0 || process.handle == PIDFD_UNASSIGNED {
 		return nil
@@ -872,3 +874,7 @@ _process_kill :: proc(process: Process) -> Error {
 	return _get_platform_error(linux.kill(linux.Pid(process.pid), .SIGKILL))
 }
 
+@(private="package")
+_process_terminate :: proc(process: Process) -> Error {
+	return _get_platform_error(linux.kill(linux.Pid(process.pid), .SIGTERM))
+}
