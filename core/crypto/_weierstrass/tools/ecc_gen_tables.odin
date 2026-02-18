@@ -1,4 +1,4 @@
-package weistrass_tools
+package weierstrass_tools
 
 import secec "core:crypto/_weierstrass"
 import "core:fmt"
@@ -68,7 +68,11 @@ gen_tables :: proc($CURVE: string) {
 	}
 
 	fn_ := "sec" + CURVE + "_table.odin"
-	fn := path.join({ODIN_ROOT, "core", "crypto", "_weierstrass", fn_})
+	fn, err := path.join({ODIN_ROOT, "core", "crypto", "_weierstrass", fn_}, context.allocator)
+	if err != .None {
+		fmt.eprintfln("Join path error for %s: %v", fn_, err);
+		os.exit(1);
+	}
 	bld: strings.Builder
 	w := strings.to_writer(&bld)
 
