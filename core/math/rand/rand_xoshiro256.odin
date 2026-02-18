@@ -3,8 +3,6 @@ package rand
 import "base:intrinsics"
 import "base:runtime"
 
-import "core:math/bits"
-
 /*
 The state for a xoshiro256** pseudorandom generator.
 */
@@ -17,7 +15,7 @@ xoshiro256_random_generator_proc :: proc(data: rawptr, mode: runtime.Random_Gene
 	read_u64 :: proc "contextless" (r: ^Xoshiro256_Random_State) -> u64 {
 		// xoshiro256** output function and state transition
 
-		result := bits.rotate_left64(r.s[1] * 5, 7) * 9
+		result := rotate_left64(r.s[1] * 5, 7) * 9
 		t := r.s[1] << 17
 
 		r.s[2] = r.s[2] ~ r.s[0]
@@ -25,9 +23,15 @@ xoshiro256_random_generator_proc :: proc(data: rawptr, mode: runtime.Random_Gene
 		r.s[1] = r.s[1] ~ r.s[2]
 		r.s[0] = r.s[0] ~ r.s[3]
 		r.s[2] = r.s[2] ~ t
-		r.s[3] = bits.rotate_left64(r.s[3], 45)
+		r.s[3] = rotate_left64(r.s[3], 45)
 
 		return result
+
+		rotate_left64 :: proc "contextless" (x: u64, k: int) -> u64 {
+			n :: 64
+			s := uint(k) & (n-1)
+			return x << s | x >> (n-s)
+		}
 	}
 
 	@(thread_local)

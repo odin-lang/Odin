@@ -4,7 +4,7 @@ package directx_d3d11
 foreign import "system:d3d11.lib"
 
 import "../dxgi"
-import "../d3d_compiler"
+import "../d3d_common"
 import "core:sys/windows"
 
 IUnknown        :: dxgi.IUnknown
@@ -26,9 +26,7 @@ LPCWSTR  :: windows.LPCWSTR
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE
 
-IModuleInstance :: d3d_compiler.ID3D11ModuleInstance
-IBlob           :: d3d_compiler.ID3DBlob
-IModule         :: d3d_compiler.ID3D11Module
+IBlob           :: d3d_common.ID3DBlob
 
 @(default_calling_convention="system", link_prefix="D3D11")
 foreign d3d11 {
@@ -3568,6 +3566,34 @@ PARAMETER_DESC :: struct {
 	FirstOutRegister:  u32,
 	FirstOutComponent: u32,
 }
+
+IModule :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using id3d11module_vtable: ^IModule_VTable,
+}
+IModule_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	CreateInstance: proc "system" (this: ^IModule, pNamespace: LPCSTR, ppModuleInstance: ^^IModuleInstance) -> HRESULT,
+}
+
+IModuleInstance :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using id3d11moduleinstance_vtable: ^IModuleInstance_VTable,
+}
+IModuleInstance_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	BindConstantBuffer:                      proc "system" (this: ^IModuleInstance, uSrcSlot: u32, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
+	BindConstantBufferByName:                proc "system" (this: ^IModuleInstance, pName: LPCSTR, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
+	BindResource:                            proc "system" (this: ^IModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindResourceByName:                      proc "system" (this: ^IModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindSampler:                             proc "system" (this: ^IModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindSamplerByName:                       proc "system" (this: ^IModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindUnorderedAccessView:                 proc "system" (this: ^IModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindUnorderedAccessViewByName:           proc "system" (this: ^IModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
+	BindResourceAsUnorderedAccessView:       proc "system" (this: ^IModuleInstance, uSrcSrvSlot: u32, uDstUavSlot: u32, uCount: u32) -> HRESULT,
+	BindResourceAsUnorderedAccessViewByName: proc "system" (this: ^IModuleInstance, pSrvName: LPCSTR, uDstUavSlot: u32, uCount: u32) -> HRESULT,
+}
+
 
 ID3D11ShaderReflectionType_UUID_STRING :: "6E6FFA6A-9BAE-4613-A51E-91652D508C21"
 ID3D11ShaderReflectionType_UUID := &IID{0x6E6FFA6A, 0x9BAE, 0x4613, {0xA5, 0x1E, 0x91, 0x65, 0x2D, 0x50, 0x8C, 0x21}}

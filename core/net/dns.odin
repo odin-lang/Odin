@@ -25,7 +25,6 @@ package net
 import "base:runtime"
 import "core:bufio"
 import "core:io"
-import "core:math/rand"
 import "core:mem"
 import "core:strings"
 import "core:time"
@@ -192,7 +191,10 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	init_dns_configuration()
 	context.allocator = allocator
 
-	id := u16be(rand.uint32())
+	id: u16be
+	rand_ok := runtime.random_generator_read_ptr(context.random_generator, &id, size_of(id))
+	assert(rand_ok, "uninitialized gen/context.random_generator")
+
 	dns_packet_buf: [DNS_PACKET_MIN_LEN]byte = ---
 	dns_packet := make_dns_packet(dns_packet_buf[:], id, hostname, type) or_return
 

@@ -7,8 +7,9 @@ import win32 "core:sys/windows"
 D3DCOMPILER_DLL_A :: "d3dcompiler_47.dll"
 COMPILER_VERSION :: 47
 
-
 import "../dxgi"
+import "../d3d11"
+import "../d3d_common"
 
 BOOL            :: dxgi.BOOL
 IID             :: dxgi.IID
@@ -16,6 +17,8 @@ SIZE_T          :: dxgi.SIZE_T
 HRESULT         :: dxgi.HRESULT
 IUnknown        :: dxgi.IUnknown
 IUnknown_VTable :: dxgi.IUnknown_VTable
+
+ID3DBlob :: d3d_common.ID3DBlob
 
 LPCSTR   :: win32.LPCSTR
 LPCWSTR  :: win32.LPCWSTR
@@ -34,7 +37,7 @@ foreign d3dcompiler {
 	Disassemble                    :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, szComments: LPCSTR, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
 	DisassembleRegion              :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, szComments: LPCSTR, StartByteOffset: SIZE_T, NumInsts: SIZE_T, pFinishByteOffset: ^SIZE_T, ppDisassembly: ^^ID3DBlob) -> HRESULT ---
 	CreateLinker                   :: proc(ppLinker: ^^ID3D11Linker) -> HRESULT ---
-	LoadModule                     :: proc(pSrcData: rawptr, cbSrcDataSize: SIZE_T, ppModule: ^^ID3D11Module) -> HRESULT ---
+	LoadModule                     :: proc(pSrcData: rawptr, cbSrcDataSize: SIZE_T, ppModule: ^^d3d11.IModule) -> HRESULT ---
 	GetTraceInstructionOffsets     :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, Flags: u32, StartInstIndex: SIZE_T, NumInsts: SIZE_T, pOffsets: ^SIZE_T, pTotalInsts: ^SIZE_T) -> HRESULT ---
 	GetInputSignatureBlob          :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, ppSignatureBlob: ^^ID3DBlob) -> HRESULT ---
 	GetOutputSignatureBlob         :: proc(pSrcData: rawptr, SrcDataSize: SIZE_T, ppSignatureBlob: ^^ID3DBlob) -> HRESULT ---
@@ -121,29 +124,11 @@ SHADER_MACRO :: struct {
 	Definition: LPCSTR,
 }
 
-ID3D10Blob_UUID_STRING :: "8BA5FB08-5195-40E2-AC58-0D989C3A0102"
-ID3D10Blob_UUID := &IID{0x8BA5FB08, 0x5195, 0x40E2, {0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02}}
-ID3D10Blob :: struct #raw_union {
-	#subtype iunknown: IUnknown,
-	using id3d10blob_vtable: ^ID3D10Blob_VTable,
-}
-ID3D10Blob_VTable :: struct {
-	using iunknown_vtable: IUnknown_VTable,
-	GetBufferPointer: proc "system" (this: ^ID3D10Blob) -> rawptr,
-	GetBufferSize:    proc "system" (this: ^ID3D10Blob) -> SIZE_T,
-}
-
-
-ID3DBlob :: ID3D10Blob
-ID3DBlob_VTable :: ID3D10Blob_VTable
-
-
 INCLUDE_TYPE :: enum i32 {
 	INCLUDE_LOCAL       = 0,
 	INCLUDE_SYSTEM      = 1,
 	_10_INCLUDE_LOCAL   = 0,
 	_10_INCLUDE_SYSTEM  = 1,
-	INCLUDE_FORCE_DWORD = 2147483647,
 }
 
 ID3DInclude :: struct {
@@ -158,43 +143,14 @@ ID3DInclude_VTable :: struct {
 D3DCOMPILE_STANDARD_FILE_INCLUDE :: (^ID3DInclude)(uintptr(1))
 
 
-ID3D11Module :: struct #raw_union {
-	#subtype iunknown: IUnknown,
-	using id3d11module_vtable: ^ID3D11Module_VTable,
-}
-ID3D11Module_VTable :: struct {
-	using iunknown_vtable: IUnknown_VTable,
-	CreateInstance: proc "system" (this: ^ID3D11Module, pNamespace: LPCSTR, ppModuleInstance: ^^ID3D11ModuleInstance) -> HRESULT,
-}
-
-
-ID3D11ModuleInstance :: struct #raw_union {
-	#subtype iunknown: IUnknown,
-	using id3d11moduleinstance_vtable: ^ID3D11ModuleInstance_VTable,
-}
-ID3D11ModuleInstance_VTable :: struct {
-	using iunknown_vtable: IUnknown_VTable,
-	BindConstantBuffer:                      proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
-	BindConstantBufferByName:                proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, cbDstOffset: u32) -> HRESULT,
-	BindResource:                            proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindResourceByName:                      proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindSampler:                             proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindSamplerByName:                       proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindUnorderedAccessView:                 proc "system" (this: ^ID3D11ModuleInstance, uSrcSlot: u32, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindUnorderedAccessViewByName:           proc "system" (this: ^ID3D11ModuleInstance, pName: LPCSTR, uDstSlot: u32, uCount: u32) -> HRESULT,
-	BindResourceAsUnorderedAccessView:       proc "system" (this: ^ID3D11ModuleInstance, uSrcSrvSlot: u32, uDstUavSlot: u32, uCount: u32) -> HRESULT,
-	BindResourceAsUnorderedAccessViewByName: proc "system" (this: ^ID3D11ModuleInstance, pSrvName: LPCSTR, uDstUavSlot: u32, uCount: u32) -> HRESULT,
-}
-
-
 ID3D11Linker :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11linker_vtable: ^ID3D11Linker_VTable,
 }
 ID3D11Linker_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Link:                    proc "system" (this: ^ID3D11Linker, pEntry: ^ID3D11ModuleInstance, pEntryName: LPCSTR, pTargetName: LPCSTR, uFlags: u32, ppShaderBlob: ^^ID3DBlob, ppErrorBuffer: ^^ID3DBlob) -> HRESULT,
-	UseLibrary:              proc "system" (this: ^ID3D11Linker, pLibraryMI: ^ID3D11ModuleInstance) -> HRESULT,
+	Link:                    proc "system" (this: ^ID3D11Linker, pEntry: ^d3d11.IModuleInstance, pEntryName: LPCSTR, pTargetName: LPCSTR, uFlags: u32, ppShaderBlob: ^^ID3DBlob, ppErrorBuffer: ^^ID3DBlob) -> HRESULT,
+	UseLibrary:              proc "system" (this: ^ID3D11Linker, pLibraryMI: ^d3d11.IModuleInstance) -> HRESULT,
 	AddClipPlaneFromCBuffer: proc "system" (this: ^ID3D11Linker, uCBufferSlot: u32, uCBufferEntry: u32) -> HRESULT,
 }
 
