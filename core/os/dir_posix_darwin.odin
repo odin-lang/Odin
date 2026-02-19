@@ -3,7 +3,7 @@ package os
 
 import "core:sys/darwin"
 
-_copy_directory_all_native :: proc(dst, src: string, dst_perm := 0o755) -> (err: Error) {
+_copy_directory_all_native :: proc(dst, src: string, dst_perm := Permissions_Default) -> (err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
 	csrc := clone_to_cstring(src, temp_allocator) or_return
