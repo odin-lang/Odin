@@ -636,7 +636,7 @@ def try_download_file(url, out_file):
 	 	print("Could not download", url)
 	 	return 1	
 
-def try_download_and_unpack_zip(suite):
+def try_download_and_unpack_zip(suite, debug):
 	url      = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))
 	out_file = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
 
@@ -670,13 +670,18 @@ def try_download_and_unpack_zip(suite):
 				 	print("❌ Expected {}, got {} for {}".format(HMAC_DIGESTS[file.filename], hmac_digest, file.filename))
 				 	return 4
 				else:
-					print("✅ {} *{}".format(hmac_digest, file.filename))
+					if debug:
+						print("✅ {} *{}".format(hmac_digest, file.filename))
 
 	#except:
 	#	print("Could not extract ZIP file")
 	#	return 2
 
 def main():
+	debug = False
+	if len(sys.argv) >= 3 and sys.argv[2] == "debug":
+		debug = True
+
 	for suite in TEST_SUITES:
 		print("Downloading {} assets".format(suite))
 
@@ -688,7 +693,7 @@ def main():
 			pass
 
 		# Try downloading and unpacking the assets
-		r = try_download_and_unpack_zip(suite)
+		r = try_download_and_unpack_zip(suite, debug)
 		if r is not None:
 			return r
 
