@@ -16,8 +16,8 @@ test_time_and_date_formatting :: proc(t: ^testing.T) {
 		d := time.Duration(now._nsec)
 
 		testing.expect_value(t, time.to_string_hms       (now, buf[:]),               "00:12:44")
-		testing.expect_value(t, time.to_string_hms_12    (now, buf[:]),               "00:12:44 am")
-		testing.expect_value(t, time.to_string_hms_12    (now, buf[:],  {"㏂", "㏘"}), "00:12:44㏂")
+		testing.expect_value(t, time.to_string_hms_12    (now, buf[:]),               "12:12:44 am")
+		testing.expect_value(t, time.to_string_hms_12    (now, buf[:],  {"㏂", "㏘"}), "12:12:44㏂")
 		testing.expect_value(t, time.to_string_hms       (d,   buf[:]),               "00:12:44")
 
 		testing.expect_value(t, time.to_string_yyyy_mm_dd(now, buf[:]),               "1677-09-21")
