@@ -1,5 +1,6 @@
 package test_core_crypto
 
+import "core:crypto"
 import ec "core:crypto/_weierstrass"
 import "core:encoding/hex"
 import "core:math/big"
@@ -881,7 +882,7 @@ test_p384_scalar_mul :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_p256_s11n_sec_identity ::proc(t: ^testing.T) {
+test_p256_s11n_sec_identity :: proc(t: ^testing.T) {
 	p: ec.Point_p256r1
 
 	ec.pt_generator(&p)
@@ -901,7 +902,7 @@ test_p256_s11n_sec_identity ::proc(t: ^testing.T) {
 }
 
 @(test)
-test_p256_s11n_sec_generator ::proc(t: ^testing.T) {
+test_p256_s11n_sec_generator :: proc(t: ^testing.T) {
 	p, g: ec.Point_p256r1
 
 	ec.pt_generator(&g)
@@ -916,4 +917,34 @@ test_p256_s11n_sec_generator ::proc(t: ^testing.T) {
 	ok = ec.pt_set_sec_bytes(&p, b[:])
 	testing.expectf(t, ok, "%s", s)
 	testing.expect(t, ec.pt_equal(&g, &p) == 1)
+}
+
+@(test)
+test_p256_sc_inv :: proc(t: ^testing.T) {
+	if crypto.HAS_RAND_BYTES == false {
+		return
+	}
+
+	sc, sc_inv, sc_prod, sc_one: ec.Scalar_p256r1
+	ec.sc_set_random(&sc)
+	ec.sc_inv(&sc_inv, &sc)
+	ec.sc_one(&sc_one)
+
+	ec.sc_mul(&sc_prod, &sc, &sc_inv)
+	testing.expect(t, ec.sc_equal(&sc_prod, &sc_one) == 1)
+}
+
+@(test)
+test_p384_sc_inv :: proc(t: ^testing.T) {
+	if crypto.HAS_RAND_BYTES == false {
+		return
+	}
+
+	sc, sc_inv, sc_prod, sc_one: ec.Scalar_p384r1
+	ec.sc_set_random(&sc)
+	ec.sc_inv(&sc_inv, &sc)
+	ec.sc_one(&sc_one)
+
+	ec.sc_mul(&sc_prod, &sc, &sc_inv)
+	testing.expect(t, ec.sc_equal(&sc_prod, &sc_one) == 1)
 }

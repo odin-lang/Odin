@@ -15,7 +15,9 @@ import "core:crypto/aes"
 import "core:crypto/chacha20"
 import "core:crypto/chacha20poly1305"
 import "core:crypto/ecdh"
+import "core:crypto/ecdsa"
 import "core:crypto/ed25519"
+import "core:crypto/hash"
 import "core:crypto/hkdf"
 import "core:crypto/hmac"
 import "core:crypto/kmac"
@@ -72,6 +74,9 @@ import "core:crypto/deoxysii"
 // - crypto/_weierstrass
 //   - ecdh_secp256r1_ecpoint_test.json
 //   - ecdh_secp384r1_ecpoint_test.json
+//   - ecdsa_secp256r1_sha256_test.json
+//   - ecdsa_secp256r1_sha512_test.json
+//   - ecdsa_secp384r1_sha384_test.json
 //
 // Not covered (not in wycheproof):
 // - crypto/blake2b
@@ -653,12 +658,12 @@ test_eddsa_ed25519 :: proc(t: ^testing.T) {
 			verify_ok := ed25519.verify(&pk, msg, sig)
 			result_ok := result_check(test_vector.result, verify_ok)
 			testing.expectf(
-			                t,
-			                result_ok,
-					"eddsa/ed25519/%d: verify failed: expected %s actual %v",
-					test_vector.tc_id,
-					test_vector.result,
-					verify_ok,
+                t,
+                result_ok,
+				"eddsa/ed25519/%d: verify failed: expected %s actual %v",
+				test_vector.tc_id,
+				test_vector.result,
+				verify_ok,
 			)
 			if !result_ok {
 				num_failed += 1
@@ -678,6 +683,134 @@ test_eddsa_ed25519 :: proc(t: ^testing.T) {
 		num_failed,
 		num_skipped,
 	)
+}
+
+@(test)
+test_ecdsa :: proc(t: ^testing.T) {
+	arena: mem.Arena
+	arena_backing := make([]byte, ARENA_SIZE)
+	defer delete(arena_backing)
+	mem.arena_init(&arena, arena_backing)
+	context.allocator = mem.arena_allocator(&arena)
+
+	log.debug("ecdsa: starting")
+
+	files := []string {
+		"ecdsa_secp256r1_sha256_test.json",
+		"ecdsa_secp256r1_sha512_test.json",
+		"ecdsa_secp384r1_sha384_test.json",
+	}
+
+	for f in files {
+		mem.free_all() // Probably don't need this, but be safe.
+
+		fn, _ := os.join_path([]string{BASE_PATH, f}, context.allocator)
+
+		test_vectors: Test_Vectors(Ecdsa_Test_Group)
+		load_ok := load(&test_vectors, fn)
+		testing.expectf(t, load_ok, "Unable to load {}", f)
+		if !load_ok {
+			continue
+		}
+
+		testing.expectf(t, test_ecdsa_impl(t, &test_vectors), "ecdsa failed")
+	}
+}
+
+test_ecdsa_impl :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Ecdsa_Test_Group)) -> bool {
+	curve_str := test_vectors.test_groups[0].public_key.curve
+	hash_str := test_vectors.test_groups[0].sha
+
+	curve_alg: ecdsa.Curve
+	switch curve_str {
+	case "secp256r1":
+		curve_alg = .SECP256R1
+	case "secp384r1":
+		curve_alg = .SECP384R1
+	case:
+		log.errorf("ecdsa: unsupported curve: %s", curve_str)
+	}
+
+	hash_alg: hash.Algorithm
+	switch hash_str {
+	case "SHA-256":
+		hash_alg = .SHA256
+	case "SHA-384":
+		hash_alg = .SHA384
+	case "SHA-512":
+		hash_alg = .SHA512
+	case:
+		log.errorf("ecdsa: unsupported hash: %s", hash_str)
+	}
+
+	log.debugf("ecdsa/%s/%s: starting", curve_str, hash_str)
+
+	num_ran, num_passed, num_failed, num_skipped: int
+	for &test_group, i in test_vectors.test_groups {
+		pk_bytes := hexbytes_decode(test_group.public_key.uncompressed)
+
+		pk: ecdsa.Public_Key
+		pk_ok := ecdsa.public_key_set_bytes(&pk, curve_alg, pk_bytes)
+		testing.expectf(t, pk_ok, "ecdsa/%s/%s/%d: invalid public key: %s", curve_str, hash_str, i, test_group.public_key.uncompressed)
+		if !pk_ok {
+			num_failed += len(test_group.tests)
+			continue
+		}
+
+		for &test_vector in test_group.tests {
+			num_ran += 1
+
+			if comment := test_vector.comment; comment != "" {
+				log.debugf(
+					"ecda/%s/%s/%d: %s: %+v",
+					curve_str,
+					hash_str,
+					test_vector.tc_id,
+					comment,
+					test_vector.flags,
+				)
+			} else {
+				log.debugf("ecdsa/%s/%s/%d: %+v", curve_str, hash_str, test_vector.tc_id, test_vector.flags)
+			}
+
+			msg := hexbytes_decode(test_vector.msg)
+			sig := hexbytes_decode(test_vector.sig)
+
+			verify_ok := ecdsa.verify_asn1(&pk, hash_alg, msg, sig)
+			result_ok := result_check(test_vector.result, verify_ok)
+			testing.expectf(
+				t,
+				result_ok,
+				"ecdsa/%s/%s/%d: verify failed: expected %s actual %v",
+				curve_str,
+				hash_str,
+				test_vector.tc_id,
+				test_vector.result,
+				verify_ok,
+			)
+			if !result_ok {
+				num_failed += 1
+				continue
+			}
+
+			num_passed += 1
+		}
+	}
+
+	assert(num_ran == test_vectors.number_of_tests)
+	assert(num_passed + num_failed + num_skipped == num_ran)
+
+	log.infof(
+		"ecdsa/%s/%s: ran %d, passed %d, failed %d, skipped %d",
+		curve_str,
+		hash_str,
+		num_ran,
+		num_passed,
+		num_failed,
+		num_skipped,
+	)
+
+	return num_failed == 0
 }
 
 @(test)

@@ -47,6 +47,25 @@ Public_Key :: struct {
 	_is_initialized: bool,
 }
 
+// private_key_generate uses the system entropy source to generate a new
+// Private_Key.  This will only fail iff the system entropy source is
+// missing or broken.
+private_key_generate :: proc(priv_key: ^Private_Key) -> bool {
+	private_key_clear(priv_key)
+
+	if !crypto.HAS_RAND_BYTES {
+		return false
+	}
+
+	b: [PRIVATE_KEY_SIZE]byte
+	defer crypto.zero_explicit(&b, size_of(b))
+
+	crypto.rand_bytes(b[:])
+	private_key_set_bytes(priv_key, b[:])
+
+	return true
+}
+
 // private_key_set_bytes decodes a byte-encoded private key, and returns
 // true iff the operation was successful.
 private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
