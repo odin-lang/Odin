@@ -16,11 +16,11 @@ _is_path_separator :: proc(c: byte) -> (ok: bool) {
 	return c == _Path_Separator
 }
 
-_mkdir :: proc(name: string, perm: int) -> (err: Error) {
+_mkdir :: proc(name: string, perm: Permissions) -> (err: Error) {
 	return .Unsupported
 }
 
-_mkdir_all :: proc(path: string, perm: int) -> (err: Error) {
+_mkdir_all :: proc(path: string, perm: Permissions) -> (err: Error) {
 	return .Unsupported
 }
 

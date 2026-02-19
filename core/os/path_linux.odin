@@ -17,14 +17,14 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == _Path_Separator
 }
 
-_mkdir :: proc(path: string, perm: int) -> Error {
+_mkdir :: proc(path: string, perm: Permissions) -> Error {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	path_cstr := clone_to_cstring(path, temp_allocator) or_return
-	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)u32(perm)))
+	return _get_platform_error(linux.mkdir(path_cstr, transmute(linux.Mode)transmute(u32)perm))
 }
 
-_mkdir_all :: proc(path: string, perm: int) -> Error {
-	mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: int, has_created: ^bool) -> Error {
+_mkdir_all :: proc(path: string, perm: Permissions) -> Error {
+	mkdirat :: proc(dfd: linux.Fd, path: []u8, perm: Permissions, has_created: ^bool) -> Error {
 		i: int
 		for ; i < len(path) - 1 && path[i] != '/'; i += 1 {}
 		if i == 0 {
@@ -34,7 +34,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 		new_dfd, errno := linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		#partial switch errno {
 		case .ENOENT:
-			if errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)u32(perm)); errno != .NONE {
+			if errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)transmute(u32)perm); errno != .NONE {
 				return _get_platform_error(errno)
 			}
 			has_created^ = true

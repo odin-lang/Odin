@@ -74,7 +74,7 @@ Make a new directory.
 
 If `path` is relative, it will be relative to the process's current working directory.
 */
-make_directory :: proc(name: string, perm: int = 0o755) -> Error {
+make_directory :: proc(name: string, perm := Permissions_Default_Directory) -> Error {
 	return _mkdir(name, perm)
 }
 
@@ -85,7 +85,7 @@ Make a new directory, creating new intervening directories when needed.
 
 If `path` is relative, it will be relative to the process's current working directory.
 */
-make_directory_all :: proc(path: string, perm: int = 0o755) -> Error {
+make_directory_all :: proc(path: string, perm := Permissions_Default_Directory) -> Error {
 	return _mkdir_all(path, perm)
 }
 

@@ -14,7 +14,7 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == _Path_Separator
 }
 
-_mkdir :: proc(name: string, perm: int) -> Error {
+_mkdir :: proc(name: string, perm: Permissions) -> Error {
 	dir_fd, relative, ok := match_preopen(name)
 	if !ok {
 		return .Invalid_Path
@@ -23,7 +23,7 @@ _mkdir :: proc(name: string, perm: int) -> Error {
 	return _get_platform_error(wasi.path_create_directory(dir_fd, relative))
 }
 
-_mkdir_all :: proc(path: string, perm: int) -> Error {
+_mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	if path == "" {
 		return .Invalid_Path
 	}

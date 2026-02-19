@@ -14,16 +14,16 @@ _is_path_separator :: proc(c: byte) -> bool {
 	return c == _Path_Separator
 }
 
-_mkdir :: proc(name: string, perm: int) -> (err: Error) {
+_mkdir :: proc(name: string, perm: Permissions) -> (err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	cname := clone_to_cstring(name, temp_allocator) or_return
-	if posix.mkdir(cname, transmute(posix.mode_t)posix._mode_t(perm)) != .OK {
+	if posix.mkdir(cname, transmute(posix.mode_t)posix._mode_t(transmute(u32)perm)) != .OK {
 		return _get_platform_error()
 	}
 	return nil
 }
 
-_mkdir_all :: proc(path: string, perm: int) -> Error {
+_mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	if path == "" {
 		return .Invalid_Path
 	}
@@ -37,7 +37,7 @@ _mkdir_all :: proc(path: string, perm: int) -> Error {
 	clean_path := clean_path(path, temp_allocator) or_return
 	return internal_mkdir_all(clean_path, perm)
 
-	internal_mkdir_all :: proc(path: string, perm: int) -> Error {
+	internal_mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 		dir, file := split_path(path)
 		if file != path && dir != "/" {
 			if len(dir) > 1 && dir[len(dir) - 1] == '/' {
