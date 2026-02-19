@@ -46,7 +46,7 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 			internal_mkdir_all(dir) or_return
 		}
 
-		err := _mkdir(path, 0)
+		err := _mkdir(path, Permissions_Default)
 		if err == .Exist { err = nil }
 		return err
 	}
