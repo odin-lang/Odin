@@ -26,36 +26,42 @@ error() {
 	exit 1
 }
 
+SUPPORTED_LLVM_VERSIONS="21 20 19 18 17 14"
+
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
-    if   [ -n "$(command -v $(brew --prefix llvm@21)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@21)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@20)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@20)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@19)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@19)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@18)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@17)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@17)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@14)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@14)/bin/llvm-config"
-    fi
+	for V in $SUPPORTED_LLVM_VERSIONS; do
+		if [ -n "$(command -v $(brew --prefix llvm@$V)/bin/llvm-config)" ]; then
+			LLVM_CONFIG="$(brew --prefix llvm@$V)/bin/llvm-config"
+			break
+		fi
+	done
 fi
 
 if [ -z "$LLVM_CONFIG" ]; then
-	# darwin, linux, openbsd
-	if   [ -n "$(command -v llvm-config-21)" ]; then LLVM_CONFIG="llvm-config-21"
-	elif [ -n "$(command -v llvm-config-20)" ]; then LLVM_CONFIG="llvm-config-20"
-	elif [ -n "$(command -v llvm-config-19)" ]; then LLVM_CONFIG="llvm-config-19"
-	elif [ -n "$(command -v llvm-config-18)" ]; then LLVM_CONFIG="llvm-config-18"
-	elif [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
-	elif [ -n "$(command -v llvm-config-14)" ]; then LLVM_CONFIG="llvm-config-14"
-	# freebsd
-	elif [ -n "$(command -v llvm-config21)" ]; then  LLVM_CONFIG="llvm-config21"
-	elif [ -n "$(command -v llvm-config20)" ]; then  LLVM_CONFIG="llvm-config20"
-	elif [ -n "$(command -v llvm-config19)" ]; then  LLVM_CONFIG="llvm-config19"
-	elif [ -n "$(command -v llvm-config18)" ]; then  LLVM_CONFIG="llvm-config18"
-	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config17"
-	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config14"
-	# fallback
-	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
-	else
-		error "No llvm-config command found. Set LLVM_CONFIG to proceed."
+	DEFAULT_VERSION=""
+
+	if [ -n "$(command -v llvm-config)" ]; then
+		DEFAULT_VERSION=$(llvm-config --version | awk -F. '{print $1}')
+	fi
+
+	for V in $SUPPORTED_LLVM_VERSIONS; do
+		if [ "$DEFAULT_VERSION" = "$V" ]; then
+			LLVM_CONFIG="llvm-config"
+			break
+		# darwin, linux, openbsd
+		elif [ -n "$(command -v "llvm-config-$V")" ]; then
+			LLVM_CONFIG="llvm-config-$V"
+			break
+		# freebsd
+		elif [ -n "$(command -v "llvm-config$V")" ]; then
+			LLVM_CONFIG="llvm-config$V"
+			break
+		fi
+	done
+
+	if [ -z "$LLVM_CONFIG" ]; then
+		error "No supported llvm-config command found. Set LLVM_CONFIG to proceed."
 	fi
 fi
 
