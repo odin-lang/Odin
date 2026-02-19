@@ -329,14 +329,20 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 	return
 }
 
-_process_close :: proc(process: Process) -> Error {
-	return nil
-}
-
 _process_kill :: proc(process: Process) -> (err: Error) {
 	_process_handle_still_valid(process) or_return
 
 	if posix.kill(posix.pid_t(process.pid), .SIGKILL) != .OK {
+		err = _get_platform_error()
+	}
+
+	return
+}
+
+_process_terminate :: proc(process: Process) -> (err: Error) {
+	_process_handle_still_valid(process) or_return
+
+	if posix.kill(posix.pid_t(process.pid), .SIGTERM) != .OK {
 		err = _get_platform_error()
 	}
 

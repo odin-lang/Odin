@@ -66,11 +66,11 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 	return
 }
 
-_process_close :: proc(process: Process) -> Error {
+_process_kill :: proc(process: Process) -> (err: Error) {
 	return .Unsupported
 }
 
-_process_kill :: proc(process: Process) -> (err: Error) {
+_process_terminate :: proc(process: Process) -> (err: Error) {
 	return .Unsupported
 }
 

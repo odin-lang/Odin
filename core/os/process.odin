@@ -311,7 +311,8 @@ This procedure obtains a process handle of a process specified by `pid`.
 This procedure can be subject to race conditions. See the description of
 `Process`.
 
-Use `process_close()` function to close the process handle.
+Use the `process_wait()` procedure (optionally prefaced with a `process_kill()`)
+to close and free the process handle.
 */
 @(require_results)
 process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Error) {
@@ -360,10 +361,8 @@ be created. It contains information such as the command line, the
 environment of the process, the starting directory and many other options.
 Most of the fields in the struct can be set to `nil` or an empty value.
 
-Use `process_close` to close the handle to the process. Note, that this
-is not the same as terminating the process. One can terminate the process
-and not close the handle, in which case the handle would be leaked. In case
-the function returns an error, an invalid handle is returned.
+Use the `process_wait()` procedure (optionally prefaced with a `process_kill()`)
+to close and free the process handle.
 
 This procedure is not thread-safe. It may alter the inheritance properties
 of file handles in an unpredictable manner. In case multiple threads change
@@ -495,7 +494,7 @@ Process_State :: struct {
 	// Will also store the number of the exception or signal that has crashed the
 	// process.
 	exit_code: int,
-	// Specifies whether the termination of the process was successfull or not,
+	// Specifies whether the termination of the process was successful or not,
 	// i.e. whether it has crashed or not.
 	// **Note(windows)**: On windows `true` is always returned, as there is no
 	// reliable way to obtain information about whether the process has crashed.
@@ -511,7 +510,9 @@ Wait for a process event.
 
 This procedure blocks the execution until the process has exited or the
 timeout (if specified) has reached zero. If the timeout is `TIMEOUT_INFINITE`,
-no timeout restriction is imposed and the procedure can block indefinately.
+no timeout restriction is imposed and the procedure can block indefinitely.
+
+If the timeout is 0, no blocking will be done and the current state is returned.
 
 If the timeout has expired, the `General_Error.Timeout` is returned as
 the error.
@@ -525,24 +526,25 @@ process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_
 }
 
 /*
-Close the handle to a process.
+Kill a process.
 
-This procedure closes the handle associated with a process. It **does not**
-terminate a process, in case it was running. In case a termination is
-desired, kill the process first, wait for the process to finish,
-then close the handle.
+This procedure kills a process, specified by it's handle, `process`.
+
+The process is forced to exit and can't ignore the request.
 */
 @(require_results)
-process_close :: proc(process: Process) -> (Error) {
-	return _process_close(process)
+process_kill :: proc(process: Process) -> (Error) {
+	return _process_kill(process)
 }
 
 /*
 Terminate a process.
 
 This procedure terminates a process, specified by it's handle, `process`.
+
+The process is requested to exit and can ignore the request.
 */
 @(require_results)
-process_kill :: proc(process: Process) -> (Error) {
-	return _process_kill(process)
+process_terminate :: proc(process: Process) -> (Error) {
+	return _process_terminate(process)
 }
