@@ -292,7 +292,7 @@ init_gpu_info :: proc "contextless" () {
 
 	index     := sys.DWORD(0)
 	gpu_count := 0
-	gpu_loop: for index < MAX_GPUS {
+	gpu_loop: for gpu_count < MAX_GPUS {
 		defer index += 1
 
 		buf_wstring: [100]u16
@@ -350,7 +350,7 @@ init_gpu_info :: proc "contextless" () {
 		if vram, ok := read_reg_i64(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize"); ok {
 			gpu.total_ram = int(vram)
 		}
-		gpu_count += 1
+		gpu_count += 1 // not deferred at the top because it only increments if we get this far.
 	}
 	gpus = _gpus[:gpu_count]
 }
