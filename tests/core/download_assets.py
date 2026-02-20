@@ -11,7 +11,6 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'Wycheproof']
-DOWNLOAD_BASE_PATH = sys.argv[1] + "/{}"
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
 HMAC_HASH          = hashlib.sha3_512
@@ -636,29 +635,26 @@ def try_download_file(url, out_file):
 	 	print("Could not download", url)
 	 	return 1	
 
-def try_download_and_unpack_zip(suite, debug):
+def try_download_and_unpack_zip(base_path, suite, debug):
 	url      = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))
-	out_file = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
+	out_file = base_path + "/{}.zip".format(suite)
 
-	print("\tDownloading {} to {}".format(url, out_file))
+	print("Downloading {} to {}".format(url, out_file))
 
-	if try_download_file(url, out_file) is not None:
-		print("Could not download ZIP file")
-		return 1
+	try_download_file(url, out_file)
 
 	# Try opening the ZIP file and extracting the test images
 	#try:
 	with zipfile.ZipFile(out_file) as z:
-		print("\tUnpacking and verifying using HMAC(\"{}\", data, {}):\n".format(HMAC_KEY, HMAC_HASH.__name__))
+		print("Unpacking and verifying using HMAC(\"{}\", data, {}):\n".format(HMAC_KEY, HMAC_HASH.__name__))
 		for file in z.filelist:
 			if file.filename not in HMAC_DIGESTS:
 				print("Missing digest for {}".format(file.filename))
 				return 3
 
-			extract_path = DOWNLOAD_BASE_PATH.format(suite)
-			z.extract(file, extract_path)
+			z.extract(file, base_path)
 
-			file_path = "{}/{}".format(extract_path, file.filename)
+			file_path = "{}/{}".format(base_path, file.filename)
 
 			with open(file_path, "rb") as f:
 				file_data = f.read()
@@ -673,32 +669,37 @@ def try_download_and_unpack_zip(suite, debug):
 					if debug:
 						print("✅ {} *{}".format(hmac_digest, file.filename))
 
+	if debug:
+		print("\n")
+
 	#except:
 	#	print("Could not extract ZIP file")
 	#	return 2
 
 def main():
+	if len(sys.argv) < 2:
+		print("Usage: {} <path to assets> [debug]".format(sys.argv[0]))
+		return 1
+
 	debug = False
 	if len(sys.argv) >= 3 and sys.argv[2] == "debug":
 		debug = True
 
 	for suite in TEST_SUITES:
-		print("Downloading {} assets".format(suite))
-
+		base_path = sys.argv[1] + "/{}".format(suite)
 		# Make assets path
 		try:
-			path = DOWNLOAD_BASE_PATH.format(suite)
-			os.makedirs(path)
+			os.makedirs(base_path)
 		except FileExistsError:
 			pass
 
 		# Try downloading and unpacking the assets
-		r = try_download_and_unpack_zip(suite, debug)
+		r = try_download_and_unpack_zip(base_path, suite, debug)
 		if r is not None:
 			return r
 
 		# We could fall back on downloading the PNG files individually, but it's slow
-		print("\nDone downloading {} assets.".format(suite))
+		print("Done downloading {} assets.\n".format(suite))
 
 	return 0
 
