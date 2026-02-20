@@ -289,10 +289,10 @@ init_gpu_info :: proc "contextless" () {
 	defer sys.RegCloseKey(gpu_key)
 
 	gpu: ^GPU
-	gpu_count := 0
 
-	index := sys.DWORD(0)
-	gpu_loop: for {
+	index     := sys.DWORD(0)
+	gpu_count := 0
+	gpu_loop: for index < MAX_GPUS {
 		defer index += 1
 
 		buf_wstring: [100]u16
@@ -307,13 +307,13 @@ init_gpu_info :: proc "contextless" () {
 			&buf_wstring[0],
 			&buf_len,
 		); status != i32(sys.ERROR_SUCCESS) {
-			break
+			break gpu_loop
 		}
 
 		utf16.decode_to_utf8(buf_leaf[:], buf_wstring[:])
 		leaf := string(cstring(&buf_leaf[0]))
 
-		// Skip leafs that are not of the form 000x
+		// Skip leaves that are not of the form 000x
 		if !is_integer(leaf) {
 			continue
 		}
@@ -350,11 +350,7 @@ init_gpu_info :: proc "contextless" () {
 		if vram, ok := read_reg_i64(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize"); ok {
 			gpu.total_ram = int(vram)
 		}
-
 		gpu_count += 1
-		if gpu_count > MAX_GPUS {
-			break gpu_loop
-		}
 	}
 	gpus = _gpus[:gpu_count]
 }
