@@ -136,6 +136,7 @@ freelist_iterate_by_val :: proc(it: ^Freelist_Iterator($T, $SHIFT)) -> (val: T, 
 		}
 		it.idx += 1
 	}
+	it.idx = 0
 	return
 }
 
@@ -150,5 +151,6 @@ freelist_iterate_by_ptr :: proc(it: ^Freelist_Iterator($T, $SHIFT)) -> (val: ^T,
 		}
 		it.idx += 1
 	}
+	it.idx = 0
 	return
 }

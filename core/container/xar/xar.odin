@@ -476,6 +476,7 @@ Advance the iterator and returns the next element.
 */
 array_iterate_by_val :: proc(it: ^Array_Iterator($T, $SHIFT)) -> (val: T, idx: int, ok: bool) {
 	if it.idx >= it.xar.len {
+		it.idx = 0
 		return
 	}
 	val = array_get(it.xar, it.idx)
@@ -497,6 +498,7 @@ Advance the iterator and returns a pointer to the next element.
 */
 array_iterate_by_ptr :: proc(it: ^Array_Iterator($T, $SHIFT)) -> (val: ^T, idx: int, ok: bool) {
 	if it.idx >= it.xar.len {
+		it.idx = 0
 		return
 	}
 	val = array_get_ptr(it.xar, it.idx)
