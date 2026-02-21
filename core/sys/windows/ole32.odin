@@ -1,3 +1,4 @@
+#+build windows
 package sys_windows
 
 // Don't add a `#+build windows` guard to this file. It's used for `dxgi` on non-Windows platforms, for example.
