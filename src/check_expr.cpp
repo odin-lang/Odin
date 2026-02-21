@@ -6505,11 +6505,29 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			} else {
 				if (show_error) {
 					check_assignment(c, o, param_type, str_lit("procedure argument"));
+					gbString pts = type_to_string(param_type);
+					gbString ots = type_to_string(o->type, true);
+					defer (gb_string_free(pts));
+					defer (gb_string_free(ots));
+					if (pts[0] == '^' && pts[0] != ots[0]){
+						gbString os = expr_to_string(o->expr);
+						defer (gb_string_free(os));
+						error_line("\tSuggestion: Try passing the pointer instead of the value with '&%s'\n", os);
+					}
 				}
 				err = CallArgumentError_WrongTypes;
 			}
 		} else if (show_error) {
 			check_assignment(c, o, param_type, str_lit("procedure argument"));
+			// gbString pts = type_to_string(param_type);
+			// gbString ots = type_to_string(o->type, true);
+			// defer (gb_string_free(pts));
+			// defer (gb_string_free(ots));
+			// if (pts[0] == '^' && pts[0] != ots[0]){
+			// 	gbString os = expr_to_string(o->expr);
+			// 	defer (gb_string_free(os));
+			// 	error_line("\tSuggestion: Try passing the pointer instead of the value with '&%s'\n", os);
+			// }
 		}
 
 		if (e && e->flags & EntityFlag_ConstInput) {
