@@ -1878,6 +1878,7 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 		case TargetArch_i386:
 		case TargetArch_wasm32:
 		case TargetArch_wasm64p32:
+		case TargetArch_wasm64:
 			is_possible = false;
 			break;
 		}
