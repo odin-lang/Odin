@@ -186,7 +186,7 @@ xml_test_unicode :: proc(t: ^testing.T) {
 			expected_doctype = "",
 		},
 		err       = .None,
-		crc32     = 0x73070b55,
+		crc32     = 0x738664b1,
 	})
 }
 

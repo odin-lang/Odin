@@ -24,16 +24,16 @@ main :: proc() {
 	defer delete(filename)
 
 	if err_xml != .None {
-		fmt.eprintfln("Join path error for unicode.xml: %v", err_xml);
-		os.exit(1);
+		fmt.eprintfln("Join path error for unicode.xml: %v", err_xml)
+		os.exit(1)
 	}
 
 	generated_filename, err_generated := path.join({ODIN_ROOT, "core", "encoding", "entity", "generated.odin"}, context.allocator)
 	defer delete(generated_filename)
 
 	if err_generated != .None {
-		fmt.eprintfln("Join path error for generated.odin: %v", err_generated);
-		os.exit(1);
+		fmt.eprintfln("Join path error for generated.odin: %v", err_generated)
+		os.exit(1)
 	}
 
 	doc, err := xml.load_from_file(filename, OPTIONS, Error_Handler)
@@ -245,12 +245,12 @@ TABLE_FILE_PROLOG :: `/*
 	This file is generated from "https://github.com/w3c/xml-entities/blob/gh-pages/unicode.xml".
 	
 	UPDATE:
-		- Ensure the XML file was downloaded using "tests\core\download_assets.py".
+		- Ensure the XML file was downloaded using "tests\core\download_assets.py", given the path to the "tests\assets" directory.
 		- Run "core/unicode/tools/generate_entity_table.odin"
 
 	Odin unicode generated tables: https://github.com/odin-lang/Odin/tree/master/core/encoding/entity
 
-		Copyright David Carlisle 1999-2023
+		Copyright David Carlisle 1999-2025
 
 		Use and distribution of this code are permitted under the terms of the
 		W3C Software Notice and License.
