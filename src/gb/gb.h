@@ -278,6 +278,11 @@ extern "C" {
 	#include <semaphore.h>
 #endif
 
+#if defined(GB_SYSTEM_LINUX)
+	#include <grp.h>
+	#include <pwd.h>
+#endif
+
 
 ////////////////////////////////////////////////////////////////
 //
