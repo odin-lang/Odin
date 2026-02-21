@@ -25,6 +25,13 @@ MinY :: proc(aRect: Rect) -> Float {
 	return aRect.origin.y
 }
 
+RectEdge :: enum UInteger {
+	MinXEdge = 0, // left
+	MinYEdge = 1, // bottom
+	MaxXEdge = 2, // right
+	MaxYEdge = 3, // top
+}
+
 Depth :: enum UInteger {
 	onehundredtwentyeightBitRGB = 544,
 	sixtyfourBitRGB             = 528,

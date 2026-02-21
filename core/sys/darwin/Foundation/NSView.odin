@@ -48,3 +48,71 @@ View_isFlipped :: proc "c" (self: ^View) -> BOOL {
 View_setIsFlipped :: proc "c" (self: ^View, flipped: BOOL) {
 	msgSend(nil, self, "setIsFlipped:", flipped)
 }
+@(objc_type=View, objc_name="translatesAutoresizingMaskIntoConstraints")
+View_translatesAutoresizingMaskIntoConstraints :: proc "c" (self: ^View) -> BOOL {
+	return msgSend(BOOL, self, "translatesAutoresizingMaskIntoConstraints")
+}
+@(objc_type=View, objc_name="setTranslatesAutoresizingMaskIntoConstraints")
+View_setTranslatesAutoresizingMaskIntoConstraints :: proc "c" (self: ^View, translatesAutoresizingMaskIntoConstraints: BOOL) {
+	msgSend(nil, self, "setTranslatesAutoresizingMaskIntoConstraints:", translatesAutoresizingMaskIntoConstraints)
+}
+@(objc_type=View, objc_name="bottomAnchor")
+View_bottomAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "bottomAnchor")
+}
+@(objc_type=View, objc_name="centerXAnchor")
+View_centerXAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "centerXAnchor")
+}
+@(objc_type=View, objc_name="centerYAnchor")
+View_centerYAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "centerYAnchor")
+}
+@(objc_type=View, objc_name="firstBaselineAnchor")
+View_firstBaselineAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "firstBaselineAnchor")
+}
+@(objc_type=View, objc_name="heightAnchor")
+View_heightAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "heightAnchor")
+}
+@(objc_type=View, objc_name="lastBaselineAnchor")
+View_lastBaselineAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "lastBaselineAnchor")
+}
+@(objc_type=View, objc_name="leadingAnchor")
+View_leadingAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "leadingAnchor")
+}
+@(objc_type=View, objc_name="leftAnchor")
+View_leftAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "leftAnchor")
+}
+@(objc_type=View, objc_name="rightAnchor")
+View_rightAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "rightAnchor")
+}
+@(objc_type=View, objc_name="topAnchor")
+View_topAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "topAnchor")
+}
+@(objc_type=View, objc_name="trailingAnchor")
+View_trailingAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "trailingAnchor")
+}
+@(objc_type=View, objc_name="widthAnchor")
+View_widthAnchor :: proc "c" (self: ^View) -> ^LayoutAnchor {
+	return msgSend(^LayoutAnchor, self, "widthAnchor")
+}
+@(objc_type=View, objc_name="layoutSubtreeIfNeeded")
+View_layoutSubtreeIfNeeded :: proc "c" (self: ^View) {
+	msgSend(nil, self, "layoutSubtreeIfNeeded")
+}
+@(objc_type=View, objc_name="fittingSize")
+View_fittingSize :: proc "c" (self: ^View) -> Size {
+	return msgSend(Size, self, "fittingSize")
+}
+@(objc_type=View, objc_name="window")
+View_window :: proc "c" (self: ^View) -> ^Window {
+	return msgSend(^Window, self, "window")
+}
