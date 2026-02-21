@@ -8,12 +8,12 @@ package encoding_unicode_entity
 	This file is generated from "https://github.com/w3c/xml-entities/blob/gh-pages/unicode.xml".
 	
 	UPDATE:
-		- Ensure the XML file was downloaded using "tests\core\download_assets.py".
+		- Ensure the XML file was downloaded using "tests\core\download_assets.py", given the path to the "tests\assets" directory.
 		- Run "core/unicode/tools/generate_entity_table.odin"
 
 	Odin unicode generated tables: https://github.com/odin-lang/Odin/tree/master/core/encoding/entity
 
-		Copyright David Carlisle 1999-2023
+		Copyright David Carlisle 1999-2025
 
 		Use and distribution of this code are permitted under the terms of the
 		W3C Software Notice and License.
