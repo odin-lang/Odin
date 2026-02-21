@@ -76,6 +76,7 @@ foreign user32 {
 	EnumPropsW          :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW) -> INT ---
 	EnumPropsExW        :: proc(hWnd: HWND, lpEnumFunc: PROPENUMPROCW, lParam: LPARAM) -> INT ---
 	GetMessageW         :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> INT ---
+	GetMessageExtraInfo :: proc() -> LPARAM ---
 
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
@@ -210,6 +211,7 @@ foreign user32 {
 	EnumDisplayDevicesW  :: proc(lpDevice: LPCWSTR, iDevNum: DWORD, lpDisplayDevice: PDISPLAY_DEVICEW, dwFlags: DWORD) -> BOOL ---
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
 
+	WindowFromPoint     :: proc(pt: POINT) -> HWND ---
 	MonitorFromPoint    :: proc(pt: POINT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	MonitorFromRect     :: proc(lprc: LPRECT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
 	MonitorFromWindow   :: proc(hwnd: HWND, dwFlags: Monitor_From_Flags) -> HMONITOR ---
