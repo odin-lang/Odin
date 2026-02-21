@@ -5,6 +5,9 @@ import "base:intrinsics"
 import "base:builtin"
 _ :: intrinsics
 
+/*
+`Float_Class enum` is a representation of _special values_ according to [[IEEE Standard for Floating-Point Arithmetic (IEEE 754);https://en.wikipedia.org/wiki/IEEE_754#Special_values]]
+*/
 Float_Class :: enum {
 	Normal,    // an ordinary nonzero floating point value
 	Subnormal, // a subnormal floating point value
@@ -35,8 +38,8 @@ MAX_F64_PRECISION :: 16 // Maximum number of meaningful digits after the decimal
 MAX_F32_PRECISION ::  8 // Maximum number of meaningful digits after the decimal point for 'f32'
 MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal point for 'f16'
 
-RAD_PER_DEG :: TAU/360.0
-DEG_PER_RAD :: 360.0/TAU
+RAD_PER_DEG :: TAU/360.0 // Being used to convert degrees to radians. (see `math.to_radians`)
+DEG_PER_RAD :: 360.0/TAU // Being used to convert radians to degrees. (see `math.to_degrees`)
 
 abs :: builtin.abs
 min :: builtin.min
@@ -49,6 +52,57 @@ clamp :: builtin.clamp
 @(require_results) sqrt_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(sqrt_f32(f32(x))) }
 @(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
 @(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
+/*
+Return square root of given input.
+
+**Only accept floats**
+
+Inputs:
+- x: input value of type floats
+
+Output:
+- x: ouput value that with same type of the input
+
+Example:
+        x_float: f64   = 4.0;    sqrt_x_float := math.sqrt(x_float) // using default type of f64
+        x_f16:   f16   = 30.90;  sqrt_x_f16   := math.sqrt(x_f16)
+        x_f16le: f16le = 50.0;   sqrt_x_f16le := math.sqrt(x_f16le)
+        x_f16be: f16be = 100;    sqrt_x_f16be := math.sqrt(x_f16be)
+        x_f32:   f32   = 4.89;   sqrt_x_f32   := math.sqrt(x_f32)
+        x_f32le: f32le = 3.14;   sqrt_x_f32le := math.sqrt(x_f32le)
+        x_f32be: f32be = 2.0;    sqrt_x_f32be := math.sqrt(x_f32be)
+        x_f64le: f64le = 1000.0; sqrt_x_f64le := math.sqrt(x_f64le)
+        x_f64be: f64be = 89.98;  sqrt_x_f64be := math.sqrt(x_f64be)
+
+        // special cases, (see Float_Class and math.classfiy)
+        y_f64_pos_zero: f64 = +0.0;             sqrt_y_f64_pos_zero := math.sqrt(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             sqrt_y_f32_neg_zero := math.sqrt(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); sqrt_y_f16_pos_inf  := math.sqrt(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  sqrt_y_f32_zero_inf := math.sqrt(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); sqrt_y_f64_neg_inf  := math.sqrt(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); sqrt_y_f64be_nan    := math.sqrt(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); sqrt_y_f16le_nan    := math.sqrt(y_f16le_nan)    // NaN
+
+Output:
+        2 // `f64`
+        5.559 // `f16`
+        7.07 // `f16le`
+        10 // `f16be`
+        2.2113345 // `f32`
+        1.77200449 // `f32le`
+        1.4142135 // `f32be`
+        31.622776601683793 // `f64le`
+        9.485778829384543 // `f64be`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        +Inf // `f16`
+        +Inf // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
 	sqrt_f32, sqrt_f32le, sqrt_f32be,
@@ -61,7 +115,52 @@ sqrt :: proc{
 @(require_results) sin_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(sin_f32(f32(θ))) }
 @(require_results) sin_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(sin_f64(f64(θ))) }
 @(require_results) sin_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(sin_f64(f64(θ))) }
-// Return the sine of θ in radians.
+/*
+Return sine of given input in radian.
+
+**Only accept floats**
+
+math.sin assumes input in radians.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        math.sin(f16(30.0))
+        math.sin(math.to_radians(f64(30.0)))
+        math.sin(f16(90.0))
+        math.sin(math.to_radians(f64(90.0)))
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             sin_y_f64_pos_zero := math.sin(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             sin_y_f32_neg_zero := math.sin(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); sin_y_f16_pos_inf  := math.sin(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  sin_y_f32_zero_inf := math.sin(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); sin_y_f64_neg_inf  := math.sin(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); sin_y_f64be_nan    := math.sin(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); sin_y_f16le_nan    := math.sin(y_f16le_nan)    // NaN
+
+
+Output:
+        -0.9878 // `f16`
+        0.49999999999999994 // `f64`
+        0.894 // `f16`
+        1 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 sin :: proc{
 	sin_f16, sin_f16le, sin_f16be,
 	sin_f32, sin_f32le, sin_f32be,
@@ -74,7 +173,51 @@ sin :: proc{
 @(require_results) cos_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(cos_f32(f32(θ))) }
 @(require_results) cos_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(cos_f64(f64(θ))) }
 @(require_results) cos_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(cos_f64(f64(θ))) }
-// Return the cosine of θ in radians.
+/*
+Return cosine of given input in radian.
+
+**Only accept floats**
+
+math.cos assumes input in radians.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        math.cos(f16(30.0))
+        math.cos(math.to_radians(f64(30.0)))
+        math.cos(f16(60.0))
+        math.cos(math.to_radians(f64(60.0)))
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             cos_y_f64_pos_zero := math.cos(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             cos_y_f32_neg_zero := math.cos(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); cos_y_f16_pos_inf  := math.cos(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  cos_y_f32_zero_inf := math.cos(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); cos_y_f64_neg_inf  := math.cos(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); cos_y_f64be_nan    := math.cos(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); cos_y_f16le_nan    := math.cos(y_f16le_nan)    // NaN
+
+Output:
+        0.1543 // `f16`
+        0.8660254037844387 // `f64`
+        -0.9526 // `f16`
+        0.5000000000000001 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        1 // `f64`
+        1 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 cos :: proc{
 	cos_f16, cos_f16le, cos_f16be,
 	cos_f32, cos_f32le, cos_f32be,
@@ -381,7 +524,51 @@ log10 :: proc{
 @(require_results) tan_f64   :: proc "contextless" (θ: f64)   -> f64   { return sin(θ)/cos(θ) }
 @(require_results) tan_f64le :: proc "contextless" (θ: f64le) -> f64le { return f64le(tan_f64(f64(θ))) }
 @(require_results) tan_f64be :: proc "contextless" (θ: f64be) -> f64be { return f64be(tan_f64(f64(θ))) }
-// Return the tangent of θ in radians.
+/*
+Return tangent of given input in radian.
+
+**Only accept floats**
+
+math.tan assumes input in radians.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        math.tan(f16(30.0))
+        math.tan(math.to_radians(f64(30.0)))
+        math.tan(f16(60.0))
+        math.tan(math.to_radians(f64(60.0)))
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             tan_y_f64_pos_zero := math.tan(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             tan_y_f32_neg_zero := math.tan(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); tan_y_f16_pos_inf  := math.tan(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  tan_y_f32_zero_inf := math.tan(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); tan_y_f64_neg_inf  := math.tan(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); tan_y_f64be_nan    := math.tan(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); tan_y_f16le_nan    := math.tan(y_f16le_nan)    // NaN
+
+Output:
+        -6.402 // `f16`
+        0.5773502691896256 // `f64`
+        0.32 // `f16`
+        1.7320508075688767 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 tan :: proc{
 	tan_f16, tan_f16le, tan_f16be,
 	tan_f32, tan_f32le, tan_f32be,
@@ -569,11 +756,105 @@ copy_sign :: proc{
 @(require_results) to_degrees_f64   :: proc "contextless" (radians: f64)   -> f64   { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64le :: proc "contextless" (radians: f64le) -> f64le { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64be :: proc "contextless" (radians: f64be) -> f64be { return radians * DEG_PER_RAD }
+/*
+Convert given input to radians.
+
+**Only accept floats**.
+
+Convertion is implemented by multipication of input and constant `math.RAD_PER_DEG`.
+
+`math.RAD_PER_DEG` = 0.017453292519943295.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Inputs:
+- degrees: input value of type floats.
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        math.to_radians(f16(30.0))
+        math.to_radians(f64(30.0))
+        math.to_radians(f16(60.0))
+        math.to_radians(f64(60.0))
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             rad_y_f64_pos_zero := math.to_radians(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             rad_y_f32_neg_zero := math.to_radians(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); rad_y_f16_pos_inf  := math.to_radians(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  rad_y_f32_zero_inf := math.to_radians(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); rad_y_f64_neg_inf  := math.to_radians(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); rad_y_f64be_nan    := math.to_radians(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); rad_y_f16le_nan    := math.to_radians(y_f16le_nan)    // NaN
+
+Output:
+        0.5239 // `f16`
+        0.5235987755982988 // `f64`
+        1.0479 // `f16`
+        1.0471975511965976 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        +Inf // `f16`
+        +Inf // `f32`
+        -Inf // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 to_radians :: proc{
 	to_radians_f16, to_radians_f16le, to_radians_f16be,
 	to_radians_f32, to_radians_f32le, to_radians_f32be,
 	to_radians_f64, to_radians_f64le, to_radians_f64be,
 }
+/*
+Convert given input to degrees.
+
+**Only accept floats**.
+
+Convertion is implemented by multipication of input and constant `math.DEG_PER_RAD`.
+
+`math.DEG_PER_RAD` = 57.29577951308232.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Inputs:
+- radians: input value of type floats.
+
+Output:
+- x: ouput value that with same type of the input in degrees
+
+Example:
+        math.to_degrees(f16(0.523598))
+        math.to_degrees(f64(0.523598))
+        math.to_degrees(f16(1.047197))
+        math.to_degrees(f64(1.047197))
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             deg_y_f64_pos_zero := math.to_degrees(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             deg_y_f32_neg_zero := math.to_degrees(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); deg_y_f16_pos_inf  := math.to_degrees(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  deg_y_f32_zero_inf := math.to_degrees(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); deg_y_f64_neg_inf  := math.to_degrees(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); deg_y_f64be_nan    := math.to_degrees(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); deg_y_f16le_nan    := math.to_degrees(y_f16le_nan)    // NaN
+
+Output:
+        29.98 // `f16`
+        29.999955561490879 // `f64`
+        59.97 // `f16`
+        59.99996841876126 // `f64`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        +Inf // `f16`
+        +Inf // `f32`
+        -Inf // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 to_degrees :: proc{
 	to_degrees_f16, to_degrees_f16le, to_degrees_f16be,
 	to_degrees_f32, to_degrees_f32le, to_degrees_f32be,
@@ -1823,7 +2104,91 @@ atan2 :: proc{
 	atan2_f16le, atan2_f16be,
 }
 
-// Return the arc tangent of x, in radians. Defined on the domain of [-∞, ∞] with a range of [-π/2, π/2]
+/*
+Return inverse of tangent (arctan) of given input.
+
+**Only accept floats**
+
+Relation with math.tan:
+
+    x = tan(y)
+    y = atan(x)
+
+    For real result, x could be any real numbers,
+    resulting single value that lies in following range(s)
+
+        [-π/2, π/2] (in radians)
+        [ -90,  90] (in degrees)
+
+Note:
+    Implementation of math.atan using math.atan2(y,x) where y is the input value,
+    and x is set to 1. See math.atan2 for detail.
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+For special cases related math.atan2(x, 1)
+
+    atan2(  0, 1) = 0
+    atan2( -0, 1) = - 0
+    atan2(  ∞, 1) = π/2
+    atan2( +∞, 1) = + π/2
+    atan2( -∞, 1) = - π/2
+    atan2(NaN, 1) = NaN
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        x30_f32:     f32 = 30.0;                     tan_x30_f32     := math.tan(x30_f32);     atan_x30_f32     := math.atan(tan_x30_f32)     // without converting to radians
+        x30_f32_rad: f32 = math.to_radians(x30_f32); tan_x30_f32_rad := math.tan(x30_f32_rad); atan_x30_f32_rad := math.atan(tan_x30_f32_rad) // convert to radians first
+
+            // convert atan() back to degrees
+            invers_atan_x30:       f32 = math.to_degrees(atan_x30_f32)
+            invers_atan_x30_rad:   f32 = math.to_degrees(atan_x30_f32_rad)
+
+        x60_f64le:     f64le = 60.0;                       tan_x60_f64le     := math.tan(x60_f64le);     atan_x60_f64le     := math.atan(tan_x60_f64le)     // without converting to radians
+        x60_f64le_rad: f64le = math.to_radians(x60_f64le); tan_x60_f64le_rad := math.tan(x60_f64le_rad); atan_x60_f64le_rad := math.atan(tan_x60_f64le_rad) // convert to radians first
+
+            // convert atan() back to degrees
+            invers_atan_x60:     f64le = math.to_degrees(atan_x60_f64le)
+            invers_atan_x60_rad: f64le = math.to_degrees(atan_x60_f64le_rad)
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             atan_y_f64_pos_zero := math.atan(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             atan_y_f32_neg_zero := math.atan(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); atan_y_f16_pos_inf  := math.atan(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  atan_y_f32_zero_inf := math.atan(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); atan_y_f64_neg_inf  := math.atan(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); atan_y_f64be_nan    := math.atan(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); atan_y_f16le_nan    := math.atan(y_f16le_nan)    // NaN
+
+
+Output:
+        30; -6.405331; -1.41592658 // `f32`; `f32`; `f32`
+        0.52359879; 0.57735026; 0.52359879 // `f32`; `f32`; `f32`
+
+                // convert atan() back to degrees
+                -81.126617 // `f32`
+                30.000002 // `f32`
+
+        60; 0.3200403893795629; 0.3097395817939284 // `f64le`; `f64le`; `f64le`
+        1.0471975511965976; 1.7320508075688767; 1.0471975511965976 // `f64le`; `f64le`; `f64le`
+
+                // convert atan() back to degrees
+                17.74677078493925 // `f64le`
+                59.99999999999999 // `f64le`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        1.57 // `f16`
+        1.57079637 // `f32`
+        -1.5707963267948966 // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 @(require_results)
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1)
@@ -1935,7 +2300,82 @@ asin_f16le :: proc "contextless" (x: f16le) -> f16le {
 asin_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(asin_f64(f64(x)))
 }
-// Return the arc sine of x, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
+/*
+Return inverse of sine (arcsin) of given input in radians.
+
+**Only accept floats**
+
+Relation with math.sin:
+
+    x = sin(y)
+    y = asin(x)
+
+    For real result, x should be in domain of [-1, 1],
+    resulting single value that lies in following range(s)
+
+        [  -π/2,   π/2] (in radians)
+        [-90°/2, 90°/2] (in degrees)
+
+Beware of special cases i.e. `-0.0`, `+0.0`, `-Inf`, `+Inf`, and `Nan` (see examples).
+
+Note:
+   Implementation of asin was developed at SunSoft, a Sun Microsystems, Inc. (1993).
+   For detail implementation, see source code, at `asin_f64` procedure.
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        x30_f32:     f32 = 30.0;                     sin_x30_f32     := math.sin(x30_f32);     asin_x30_f32     := math.asin(sin_x30_f32)     // without converting to radians
+        x30_f32_rad: f32 = math.to_radians(x30_f32); sin_x30_f32_rad := math.sin(x30_f32_rad); asin_x30_f32_rad := math.asin(sin_x30_f32_rad) // convert to radians first
+
+            // convert asin() back to degrees
+            invers_asin_x30:       f32 = math.to_degrees(asin_x30_f32)
+            invers_asin_x30_rad:   f32 = math.to_degrees(asin_x30_f32_rad)
+
+        x60_f64le:     f64le = 60.0;                       sin_x60_f64le     := math.sin(x60_f64le);     asin_x60_f64le     := math.asin(sin_x60_f64le)     // without converting to radians
+        x60_f64le_rad: f64le = math.to_radians(x60_f64le); sin_x60_f64le_rad := math.sin(x60_f64le_rad); asin_x60_f64le_rad := math.asin(sin_x60_f64le_rad) // convert to radians first
+
+            // convert asin() back to degrees
+            invers_asin_x60:     f64le = math.to_degrees(asin_x60_f64le)
+            invers_asin_x60_rad: f64le = math.to_degrees(asin_x60_f64le_rad)
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             asin_y_f64_pos_zero := math.asin(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             asin_y_f32_neg_zero := math.asin(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); asin_y_f16_pos_inf  := math.asin(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  asin_y_f32_zero_inf := math.asin(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); asin_y_f64_neg_inf  := math.asin(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); asin_y_f64be_nan    := math.asin(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); asin_y_f16le_nan    := math.asin(y_f16le_nan)    // NaN
+
+Output:
+        30; -0.9880316; -1.41592658 // `f32`; `f32`; `f32`
+        0.52359879; 0.5; 0.52359879 // `f32`; `f32`; `f32`
+
+                // convert asin() back to degrees
+                -81.126617 // `f32`
+                30.000002 // `f32`
+
+        60; -0.30481062110221668; -0.30973958179392846 // `f64le`; `f64le`; `f64le`
+        1.0471975511965976; 0.8660254037844386; 1.0471975511965976 // `f64le`; `f64le`; `f64le`
+
+                // convert asin() back to degrees
+                -17.746770784939255 // `f64le`
+                59.99999999999999 // `f64le`
+
+        // special cases, (see Float_Class and math.classfiy)
+        0 // `f64`
+        -0 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 asin :: proc{
 	asin_f64, asin_f32, asin_f16,
 	asin_f64le, asin_f64be,
@@ -2050,7 +2490,80 @@ acos_f16le :: proc "contextless" (x: f16le) -> f16le {
 acos_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(acos_f64(f64(x)))
 }
-// Return the arc cosine of x, in radians. Defined on the domain of [-1, 1] with a range of [0, π].
+/*
+Return inverse of cosine (arccos) of given input.
+
+**Only accept floats**
+
+Relation with math.cos:
+
+    x = cos(y)
+    y = acos(x)
+
+    For real result, x should be in domain of [-1, 1],
+    resulting single value that lies in following range(s)
+
+        [ 0,   π] (in radians)
+        [ 0, 180] (in degrees)
+
+Note:
+   Implementation of asin was developed at SunSoft, a Sun Microsystems, Inc. (1993).
+   For detail implementation, see source code, at acos_f64 procedure.
+
+Inputs:
+- x: input value of type floats in radians
+
+Output:
+- x: ouput value that with same type of the input in radians
+
+Example:
+        x30_f32:     f32 = 30.0;                     cos_x30_f32     := math.cos(x30_f32);     acos_x30_f32     := math.acos(cos_x30_f32)     // without converting to radians
+        x30_f32_rad: f32 = math.to_radians(x30_f32); cos_x30_f32_rad := math.cos(x30_f32_rad); acos_x30_f32_rad := math.acos(cos_x30_f32_rad) // convert to radians first
+
+            // convert acos() back to degrees
+            invers_acos_x30:       f32 = math.to_degrees(acos_x30_f32)
+            invers_acos_x30_rad:   f32 = math.to_degrees(acos_x30_f32_rad)
+
+        x60_f64le:     f64le = 60.0;                       cos_x60_f64le     := math.cos(x60_f64le);     acos_x60_f64le     := math.acos(cos_x60_f64le)     // without converting to radians
+        x60_f64le_rad: f64le = math.to_radians(x60_f64le); cos_x60_f64le_rad := math.cos(x60_f64le_rad); acos_x60_f64le_rad := math.acos(cos_x60_f64le_rad) // convert to radians first
+
+            // convert acos() back to degrees
+            invers_acos_x60:     f64le = math.to_degrees(acos_x60_f64le)
+            invers_acos_x60_rad: f64le = math.to_degrees(acos_x60_f64le_rad)
+
+        // special cases. (see Float_Class and math.classify)
+        y_f64_pos_zero: f64 = +0.0;             acos_y_f64_pos_zero := math.acos(y_f64_pos_zero) // +0.0
+        y_f32_neg_zero: f32 = -0.0;             acos_y_f32_neg_zero := math.acos(y_f32_neg_zero) // -0.0
+        y_f16_pos_inf:  f16 = math.inf_f16(+1); acos_y_f16_pos_inf  := math.acos(y_f16_pos_inf)  // +Inf
+        y_f32_zero_inf: f32 = math.inf_f32(0);  acos_y_f32_zero_inf := math.acos(y_f32_zero_inf) // Inf
+        y_f64_neg_inf:  f64 = math.inf_f64(-1); acos_y_f64_neg_inf  := math.acos(y_f64_neg_inf)  // -Inf
+        y_f64be_nan:  f64be = math.nan_f64be(); acos_y_f64be_nan    := math.acos(y_f64be_nan)    // NaN
+        y_f16le_nan:  f16le = math.nan_f16le(); acos_y_f16le_nan    := math.acos(y_f16le_nan)    // NaN
+
+Output:
+        30; 0.15425146; 1.41592658 // `f32`; `f32`; `f32`
+        0.52359879; 0.86602539; 0.52359879 // `f32`; `f32`; `f32`
+
+                // convert acos() back to degrees
+                81.126617 // `f32`
+                30.000002 // `f32`
+
+        60; -0.9524129804151563; 2.831853071795865 // `f64le`; `f64le`; `f64le`
+        1.0471975511965976; 0.5000000000000001; 1.0471975511965976 // `f64le`; `f64le`; `f64le`
+
+                // convert acos() back to degrees
+                162.25322921506077 // `f64le`
+                59.99999999999999 // `f64le`
+
+        // special cases, (see Float_Class and math.classfiy)
+        1.5707963267948966 // `f64`
+        1.57079637 // `f32`
+        NaN // `f16`
+        NaN // `f32`
+        NaN // `f64`
+        NaN // `f64be`
+        NaN // `f16le`
+*/
 acos :: proc{
 	acos_f64, acos_f32, acos_f16,
 	acos_f64le, acos_f64be,
