@@ -34,9 +34,9 @@ foreign lib {
 	CopyProperties                :: proc(src, dst: PropertiesID) -> bool ---
 	LockProperties                :: proc(props: PropertiesID)    -> bool ---
 	UnlockProperties              :: proc(props: PropertiesID) ---
-	SetPointerPropertyWithCleanup :: proc(props: PropertiesID, name: cstring, value: rawptr, cleanup: CleanupPropertyCallback, userdata: rawptr) -> bool ---
-	SetPointerProperty            :: proc(props: PropertiesID, name: cstring, value: rawptr)  -> bool ---
-	SetStringProperty             :: proc(props: PropertiesID, name: cstring, value: cstring) -> bool ---
+	SetPointerPropertyWithCleanup :: proc(props: PropertiesID, name: cstring, value: Maybe(rawptr), cleanup: Maybe(CleanupPropertyCallback), userdata: rawptr) -> bool ---
+	SetPointerProperty            :: proc(props: PropertiesID, name: cstring, value: Maybe(rawptr))  -> bool ---
+	SetStringProperty             :: proc(props: PropertiesID, name: cstring, value: Maybe(cstring)) -> bool ---
 	SetNumberProperty             :: proc(props: PropertiesID, name: cstring, value: Sint64)  -> bool ---
 	SetFloatProperty              :: proc(props: PropertiesID, name: cstring, value: f32)     -> bool ---
 	SetBooleanProperty            :: proc(props: PropertiesID, name: cstring, value: bool)    -> bool ---

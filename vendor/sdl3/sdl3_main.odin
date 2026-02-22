@@ -3,7 +3,7 @@ package sdl3
 
 import "core:c"
 
-main_func :: #type proc(argc: c.int, argv: [^]cstring)
+main_func :: #type proc "c" (argc: c.int, argv: [^]cstring) -> c.int
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -12,9 +12,9 @@ foreign lib {
 	AppEvent              :: proc(appstate: rawptr, event: ^Event) -> AppResult ---
 	AppQuit               :: proc(appstate: rawptr, result: AppResult) ---
 	SetMainReady          :: proc() ---
-	RunApp                :: proc(argc: c.int, argv: [^]cstring, mainFunction: main_func, reserved: rawptr) -> c.int ---
+	RunApp                :: proc(argc: c.int, argv: Maybe([^]cstring), mainFunction: main_func, reserved: rawptr) -> c.int ---
 	EnterAppMainCallbacks :: proc(argc: c.int, argv: [^]cstring, appinit: AppInit_func, appiter: AppIterate_func, appevent: AppEvent_func, appquit: AppQuit_func) -> c.int ---
-	RegisterApp           :: proc(name: cstring, style: Uint32, hInst: rawptr) -> bool ---
+	RegisterApp           :: proc(name: Maybe(cstring), style: Uint32, hInst: rawptr) -> bool ---
 	UnregisterApp         :: proc() ---
 	GDKSuspendComplete    :: proc() ---
 }

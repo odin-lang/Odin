@@ -33,15 +33,15 @@ PROP_TEXTINPUT_ANDROID_INPUTTYPE_NUMBER :: "SDL.textinput.android.inputtype"
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	HasKeyboard                  :: proc() -> bool ---
-	GetKeyboards                 :: proc(count: ^c.int) -> [^]KeyboardID ---
+	GetKeyboards                 :: proc(count: Maybe(^c.int)) -> [^]KeyboardID ---
 	GetKeyboardNameForID         :: proc(instance_id: KeyboardID) -> cstring ---
 	GetKeyboardFocus             :: proc() -> ^Window ---
-	GetKeyboardState             :: proc(numkeys: ^c.int) -> [^]bool ---
+	GetKeyboardState             :: proc(numkeys: Maybe(^c.int)) -> [^]bool ---
 	ResetKeyboard                :: proc() ---
 	GetModState                  :: proc() -> Keymod ---
 	SetModState                  :: proc(modstate: Keymod) ---
 	GetKeyFromScancode           :: proc(scancode: Scancode, modstate: Keymod, key_event: bool) -> Keycode ---
-	GetScancodeFromKey           :: proc(key: Keycode, modstate: ^Keymod) -> Scancode ---
+	GetScancodeFromKey           :: proc(key: Keycode, modstate: Maybe(^Keymod)) -> Scancode ---
 	SetScancodeName              :: proc(scancode: Scancode, name: cstring) -> bool ---
 	GetScancodeName              :: proc(scancode: Scancode) -> cstring ---
 	GetScancodeFromName          :: proc(name: cstring) -> Scancode ---
@@ -53,7 +53,7 @@ foreign lib {
 	StopTextInput                :: proc(window: ^Window) -> bool ---
 	ClearComposition             :: proc(window: ^Window) -> bool ---
 	SetTextInputArea             :: proc(window: ^Window, rect: Maybe(^Rect), cursor: c.int) -> bool ---
-	GetTextInputArea             :: proc(window: ^Window, rect: ^Rect, cursor: ^c.int) -> bool ---
+	GetTextInputArea             :: proc(window: ^Window, rect: Maybe(^Rect), cursor: Maybe(^c.int)) -> bool ---
 	HasScreenKeyboardSupport     :: proc() -> bool ---
 	ScreenKeyboardShown          :: proc(window: ^Window) -> bool ---
 }

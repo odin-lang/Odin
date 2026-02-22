@@ -15,5 +15,5 @@ foreign lib {
 	ClearClipboardData      :: proc() -> bool ---
 	GetClipboardData        :: proc(mime_type: cstring, size: ^uint) -> rawptr ---
 	HasClipboardData        :: proc(mime_type: cstring) -> bool ---
-	GetClipboardMimeTypes   :: proc(num_mime_types: ^uint) -> [^][^]Uint8 ---
+	GetClipboardMimeTypes   :: proc(num_mime_types: Maybe(^uint)) -> [^][^]Uint8 ---
 }

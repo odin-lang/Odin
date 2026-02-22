@@ -13,5 +13,5 @@ foreign lib {
 	ClearError  :: proc() -> bool ---
 }
 
-Unsupported       :: proc "c" ()               -> bool { return SetError("That operation is not supported")  }
-InvalidParamError :: proc "c" (param: cstring) -> bool { return SetError("Parameter '%s' is invalid", param) }
+Unsupported       :: #force_inline proc "c" ()               -> bool { return SetError("That operation is not supported")  }
+InvalidParamError :: #force_inline proc "c" (param: cstring) -> bool { return SetError("Parameter '%s' is invalid", param) }

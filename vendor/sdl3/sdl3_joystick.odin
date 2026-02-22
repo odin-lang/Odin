@@ -42,7 +42,7 @@ foreign lib {
 	LockJoysticks                  :: proc() ---
 	UnlockJoysticks                :: proc() ---
 	HasJoystick                    :: proc() -> bool ---
-	GetJoysticks                   :: proc(count: ^c.int) -> [^]JoystickID ---
+	GetJoysticks                   :: proc(count: Maybe(^c.int)) -> [^]JoystickID ---
 	GetJoystickNameForID           :: proc(instance_id: JoystickID) -> cstring ---
 	GetJoystickPathForID           :: proc(instance_id: JoystickID) -> cstring ---
 	GetJoystickPlayerIndexForID    :: proc(instance_id: JoystickID) -> c.int ---
@@ -166,5 +166,5 @@ foreign lib {
 	SendJoystickEffect            :: proc(joystick: ^Joystick, data: rawptr, size: c.int) -> bool ---
 	CloseJoystick                 :: proc(joystick: ^Joystick) ---
 	GetJoystickConnectionState    :: proc(joystick: ^Joystick) -> JoystickConnectionState ---
-	GetJoystickPowerInfo          :: proc(joystick: ^Joystick, percent: c.int) -> PowerState ---
+	GetJoystickPowerInfo          :: proc(joystick: ^Joystick, percent: Maybe(^c.int)) -> PowerState ---
 }

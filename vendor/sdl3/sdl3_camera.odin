@@ -32,16 +32,16 @@ foreign lib {
 	GetNumCameraDrivers       :: proc() -> c.int ---
 	GetCameraDriver           :: proc(index: c.int) -> cstring ---
 	GetCurrentCameraDriver    :: proc() -> cstring ---
-	GetCameras                :: proc(count: ^c.int) -> [^]CameraID ---
-	GetCameraSupportedFormats :: proc(instance_id: CameraID, count: ^c.int) -> [^]^CameraSpec ---
+	GetCameras                :: proc(count: Maybe(^c.int)) -> [^]CameraID ---
+	GetCameraSupportedFormats :: proc(instance_id: CameraID, count: Maybe(^c.int)) -> [^]^CameraSpec ---
 	GetCameraName             :: proc(instance_id: CameraID) -> cstring ---
 	GetCameraPosition         :: proc(instance_id: CameraID) -> CameraPosition ---
-	OpenCamera                :: proc(instance_id: CameraID, spec: ^CameraSpec) -> ^Camera ---
+	OpenCamera                :: proc(instance_id: CameraID, spec: Maybe(^CameraSpec)) -> ^Camera ---
 	GetCameraPermissionState  :: proc(camera: ^Camera) -> CameraPermissionState ---
 	GetCameraID               :: proc(camera: ^Camera) -> CameraID ---
 	GetCameraProperties       :: proc(camera: ^Camera) -> PropertiesID ---
 	GetCameraFormat           :: proc(camera: ^Camera, spec: ^CameraSpec) -> bool ---
-	AcquireCameraFrame        :: proc(camera: ^Camera, timestampNS: ^Uint64) -> ^Surface ---
+	AcquireCameraFrame        :: proc(camera: ^Camera, timestampNS: Maybe(^Uint64)) -> ^Surface ---
 	ReleaseCameraFrame        :: proc(camera: ^Camera, frame: ^Surface) ---
 	CloseCamera               :: proc(camera: ^Camera) ---
 }

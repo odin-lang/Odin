@@ -53,7 +53,7 @@ foreign lib {
 	Quit                   :: proc() ---
 	IsMainThread           :: proc() -> bool ---
 	RunOnMainThread        :: proc(callback: MainThreadCallback, userdata: rawptr, wait_complete: bool) -> bool ---
-	SetAppMetadata         :: proc(appname, appversion, appidentifier: cstring) -> bool ---
-	SetAppMetadataProperty :: proc(name: cstring, value: cstring) -> bool ---
+	SetAppMetadata         :: proc(appname, appversion, appidentifier: Maybe(cstring)) -> bool ---
+	SetAppMetadataProperty :: proc(name: cstring, value: Maybe(cstring)) -> bool ---
 	GetAppMetadataProperty :: proc(name: cstring) -> cstring ---
 }

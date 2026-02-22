@@ -52,7 +52,7 @@ AssertionHandler :: #type proc "c" (data: ^AssertData, userdata: rawptr) -> Asse
 foreign lib {
 	ReportAssertion :: proc(data: ^AssertData, func, file: cstring, line: c.int) -> AssertState ---
 
-	SetAssertionHandler        :: proc(handler: AssertionHandler, userdata: rawptr) ---
+	SetAssertionHandler        :: proc(handler: Maybe(AssertionHandler), userdata: rawptr) ---
 	GetDefaultAssertionHandler :: proc() -> AssertionHandler ---
 	GetAssertionReport         :: proc() -> AssertData ---
 	ResetAssertionReport       :: proc() ---

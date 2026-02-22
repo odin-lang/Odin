@@ -70,9 +70,9 @@ foreign lib {
 	FlushIO         :: proc(ctx: ^IOStream) -> bool ---
 
 	@(require_results)
-	LoadFile_IO     :: proc(src: ^IOStream, datasize: ^uint, closeio: bool) -> rawptr ---
+	LoadFile_IO     :: proc(src: ^IOStream, datasize: Maybe(^uint), closeio: bool) -> rawptr ---
 	@(require_results)
-	LoadFile        :: proc(file: cstring, datasize: ^uint) -> rawptr ---
+	LoadFile        :: proc(file: cstring, datasize: Maybe(^uint)) -> rawptr ---
 	SaveFile_IO     :: proc(src: ^IOStream, data: rawptr, datasize: uint, closeio: bool) -> bool ---
 	SaveFile        :: proc(file: cstring, data: rawptr, datasize: uint) -> bool ---
 
