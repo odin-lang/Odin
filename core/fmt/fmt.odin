@@ -1030,20 +1030,60 @@ fmt_bool :: proc(fi: ^Info, b: bool, verb: rune) {
 // Inputs:
 // - fi: A pointer to an Info structure
 // - width: The number of padding characters to write
+// - pad_byte: The padding character to write
 //
-fmt_write_padding :: proc(fi: ^Info, width: int) {
+fmt_write_padding :: proc(fi: ^Info, width: int, pad_byte: byte) {
 	if width <= 0 {
 		return
-	}
-
-	pad_byte: byte = ' '
-	if !fi.space {
-		pad_byte = '0'
 	}
 
 	for i := 0; i < width; i += 1 {
 		io.write_byte(fi.writer, pad_byte, &fi.n)
 	}
+}
+// Writes the int format prefix, if any, to a buffer (for example "-0x" or " 0b")
+//
+// Inputs:
+// - buf: The buffer to write the prefix to
+// - fi: A pointer to an Info structure
+// - base: The base for the integer
+// - is_neg: Indicates if the number is negative and the prefix needs a "-"
+//
+// Returns:
+// - The string containing the prefix written to the buffer
+//
+get_int_prefix :: proc(buf: ^[3]byte, fi: ^Info, base: int, is_neg: bool) -> string {
+	i := 0
+
+	if is_neg {
+		buf[i] = '-'
+		i += 1
+	} else if fi.plus {
+		buf[i] = '+'
+		i += 1
+	} else if fi.space {
+		buf[i] = ' '
+		i += 1
+	}
+
+	if fi.hash && base != 10 {
+		buf[i] = '0'
+		i += 1
+
+		switch base {
+		case 2:  buf[i] = 'b'
+		case 8:  buf[i] = 'o'
+		// case 10: buf[i] = 'd'
+		case 12: buf[i] = 'z'
+		case 16: buf[i] = 'x'
+		case:
+			panic("get_int_prefix: unknown base, whoops")
+		}
+
+		i += 1
+	}
+
+	return string(buf[:i])
 }
 // Formats an integer value with specified base, sign, bit size, and digits
 //
@@ -1055,77 +1095,24 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 // - bit_size: The bit size of the integer
 // - digits: A string containing the digits for formatting
 //
-// WARNING: May panic if the width and precision are too big, causing a buffer overrun
+// WARNING: May panic if the width is too big, causing a buffer overrun
 //
 _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, digits: string) {
-	_, neg := strconv.is_integer_negative(u, is_signed, bit_size)
 
 	BUF_SIZE :: 256
-	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3 // 3 extra bytes for sign and prefix
-		if width > BUF_SIZE {
-			// TODO(bill):????
-			panic("_fmt_int: buffer overrun. Width and precision too big")
-		}
+	if fi.width_set && fi.width > BUF_SIZE {
+		// TODO(bill):????
+		panic("_fmt_int: buffer overrun. Width too big")
 	}
 
 	buf: [BUF_SIZE]byte
-	start := 0
+	pre_buf: [3]byte
 
-	if fi.hash && !is_signed {
-		switch base {
-		case 2:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'b', &fi.n)
-			start = 2
+	u_abs, is_neg := strconv.is_integer_negative(u, is_signed, bit_size)
+	prefix := get_int_prefix(&pre_buf, fi, base, is_neg)
+	s := strconv.write_bits(buf[:], u_abs, base, false, bit_size, digits, {})
 
-		case 8:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'o', &fi.n)
-			start = 2
-
-		case 12:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'z', &fi.n)
-			start = 2
-
-		case 16:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'x', &fi.n)
-			start = 2
-		}
-	}
-
-	prec := 0
-	if fi.prec_set {
-		prec = fi.prec
-		if prec == 0 && u == 0 {
-			fmt_write_padding(fi, fi.width)
-			return
-		}
-	} else if fi.zero && fi.width_set {
-		prec = fi.width
-		if neg || fi.plus {
-			// There needs to be space for the "sign"
-			prec -= 1
-		}
-	}
-
-	switch base {
-	case 2, 8, 10, 12, 16:
-		break
-	case:
-		panic("_fmt_int: unknown base, whoops")
-	}
-
-	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
-	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
-	prev_zero := fi.zero
-	defer fi.zero = prev_zero
-	fi.zero = false
-	_pad(fi, s)
+	_pad(fi, prefix, s)
 }
 // Formats an int128 value based on the provided formatting options.
 //
@@ -1140,89 +1127,21 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 // WARNING: Panics if the formatting options result in a buffer overrun.
 //
 _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
-	_, neg := strconv.is_integer_negative_128(u, is_signed, bit_size)
 
 	BUF_SIZE :: 256
-	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3 // 3 extra bytes for sign and prefix
-		if width > BUF_SIZE {
-			// TODO(bill):????
-			panic("_fmt_int: buffer overrun. Width and precision too big")
-		}
+	if fi.width_set && fi.width > BUF_SIZE{
+		// TODO(bill):????
+		panic("_fmt_int: buffer overrun. Width too big")
 	}
 
 	buf: [256]byte
-	start := 0
+	pre_buf: [3]byte
 
-	if fi.hash && !is_signed {
-		switch base {
-		case 2:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'b', &fi.n)
-			start = 2
+	u_abs, is_neg := strconv.is_integer_negative_128(u, is_signed, bit_size)
+	prefix := get_int_prefix(&pre_buf, fi, base, is_neg)
+	s := strconv.write_bits_128(buf[:], u_abs, base, false, bit_size, digits, {})
 
-		case 8:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'o', &fi.n)
-			start = 2
-
-		case 12:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'z', &fi.n)
-			start = 2
-
-		case 16:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'x', &fi.n)
-			start = 2
-		}
-	}
-
-	prec := 0
-	if fi.prec_set {
-		prec = fi.prec
-		if prec == 0 && u == 0 {
-			fmt_write_padding(fi, fi.width)
-			return
-		}
-	} else if fi.zero && fi.width_set {
-		prec = fi.width
-		if neg || fi.plus {
-			// There needs to be space for the "sign"
-			prec -= 1
-		}
-	}
-
-	switch base {
-	case 2, 8, 10, 12, 16:
-		break
-	case:
-		panic("_fmt_int: unknown base, whoops")
-	}
-
-	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
-	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
-
-	if fi.hash && fi.zero && fi.indent == 0 {
-		c: byte = 0
-		switch base {
-		case 2:  c = 'b'
-		case 8:  c = 'o'
-		case 12: c = 'z'
-		case 16: c = 'x'
-		}
-		if c != 0 {
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, c, &fi.n)
-		}
-	}
-
-	prev_zero := fi.zero
-	defer fi.zero = prev_zero
-	fi.zero = false
-	_pad(fi, s)
+	_pad(fi, prefix, s)
 }
 // Units of measurements:
 @(rodata) __MEMORY_LOWER := " b kib mib gib tib pib eib"
@@ -1274,14 +1193,17 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 	copy(buf[len(str):], units[off:off+unit_len])
 	str = string(buf[:len(str)+unit_len])
 
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
+	prefix, s := _split_float_prefix(fi, str)
+
+	prev_zero := fi.zero
+	defer fi.zero = prev_zero
+
+	if str[1] == 'I' || str[0] == 'N' {
+		// no formatting with zero for "+Inf", "-Inf", or "NaN"
+		fi.zero = false
 	}
 
-	_pad(fi, str)
+	_pad(fi, prefix, s)
 }
 // Hex Values:
 @(rodata) __DIGITS_LOWER := "0123456789abcdefx"
@@ -1377,28 +1299,68 @@ fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: ru
 //
 // Inputs:
 // - fi: A pointer to the Info struct containing formatting options.
+// - prefix: prefix to write before s
 // - s: The string to be padded.
 //
-_pad :: proc(fi: ^Info, s: string) {
+_pad :: proc(fi: ^Info, prefix, s: string) {
+
+	if s == "" {
+		if fi.width_set {
+			// don't write prefix when there is no string to write
+			fmt_write_padding(fi, fi.width, ' ')
+		}
+		return
+	}
+
 	if !fi.width_set {
+		io.write_string(fi.writer, prefix, &fi.n)
 		io.write_string(fi.writer, s, &fi.n)
 		return
 	}
 
-
-	width := fi.width - utf8.rune_count_in_string(s)
+	pad_width := fi.width - utf8.rune_count_in_string(s) - utf8.rune_count_in_string(prefix)
 	if fi.minus { // right pad
+		io.write_string(fi.writer, prefix, &fi.n)
 		io.write_string(fi.writer, s, &fi.n)
-		fmt_write_padding(fi, width)
-	} else if !fi.space && s != "" && (s[0] == '-' || s[0] == '+') {
-		// left pad accounting for zero pad of negative number
-		io.write_byte(fi.writer, s[0], &fi.n)
-		fmt_write_padding(fi, width)
-		io.write_string(fi.writer, s[1:], &fi.n)
-	} else { // left pad
-		fmt_write_padding(fi, width)
+		fmt_write_padding(fi, pad_width, ' ')
+	} else if fi.zero {
+		// left pad with zero
+		io.write_string(fi.writer, prefix, &fi.n)
+		fmt_write_padding(fi, pad_width, '0')
+		io.write_string(fi.writer, s, &fi.n)
+	} else { // left pad with space
+		fmt_write_padding(fi, pad_width, ' ')
+		io.write_string(fi.writer, prefix, &fi.n)
 		io.write_string(fi.writer, s, &fi.n)
 	}
+}
+// Splits a float string into prefix ("+", "-", or " ") and the remaining string
+//
+// Inputs:
+// - fi: A pointer to the Info struct containing formatting options.
+// - str: the float string
+//
+_split_float_prefix :: proc(fi: ^Info, str: string) -> (string, string) {
+	prefix := ""
+	s_start := 0
+
+	switch str[0]  {
+	case '+':
+		if fi.plus || str[1] == 'I' {
+			prefix = "+"
+		} else if fi.space {
+			prefix = " "
+		}
+		s_start = 1
+	case '-':
+		prefix = "-"
+		s_start = 1
+	case 'N':
+		if fi.plus || fi.space {
+			prefix = " "
+		}
+	}
+	return prefix, str[s_start:]
 }
 // Formats a floating-point number with a specific format and precision.
 //
@@ -1422,14 +1384,17 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
 	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
 
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
+	prefix, s := _split_float_prefix(fi, str)
+
+	prev_zero := fi.zero
+	defer fi.zero = prev_zero
+
+	if str[1] == 'I' || str[0] == 'N' {
+		// no formatting with zero for "+Inf", "-Inf", or "NaN"
+		fi.zero = false
 	}
 
-	_pad(fi, str)
+	_pad(fi, prefix, s)
 }
 // Formats a floating-point number with a specific format.
 //
@@ -1629,11 +1594,14 @@ fmt_cstring16 :: proc(fi: ^Info, s: cstring16, verb: rune) {
 //
 fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	u := u64(uintptr(p))
+
+	prev_hash := fi.hash
+	defer fi.hash = prev_hash
+
 	switch verb {
 	case 'p', 'v', 'w':
-		if !fi.hash {
-			io.write_string(fi.writer, "0x", &fi.n)
-		}
+		// pointers have inverse behaviour for "#"
+		fi.hash = !fi.hash
 		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
 
 	case 'b': _fmt_int(fi, u,  2, false, 8*size_of(rawptr), __DIGITS_UPPER)
