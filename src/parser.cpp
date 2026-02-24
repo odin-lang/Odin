@@ -6725,11 +6725,6 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
-	if (f->curr_token.kind == Token_Comment) {
-		consume_comment_groups(f, f->prev_token);
-	}
-
-	CommentGroup *docs = f->lead_comment;
 
 	Array<Token> tags = array_make<Token>(temporary_allocator());
 	bool first_invalid_token_set = false;
@@ -6750,6 +6745,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 			advance_token(f);
 		}
 	}
+
+	CommentGroup *docs = f->lead_comment;
 
 	if (f->curr_token.kind != Token_package) {
 		ERROR_BLOCK();
