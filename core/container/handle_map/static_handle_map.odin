@@ -170,6 +170,7 @@ static_iterate :: proc "contextless" (it: ^$HI/Static_Handle_Map_Iterator($H/Sta
 			return e, e.handle, true
 		}
 	}
+	it.index = 0
 	return
 }
 

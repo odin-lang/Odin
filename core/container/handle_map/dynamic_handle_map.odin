@@ -137,5 +137,6 @@ dynamic_iterate :: proc "contextless" (it: ^$DHI/Dynamic_Handle_Map_Iterator($D/
 			return e, e.handle, true
 		}
 	}
+	it.index = 0
 	return
 }
