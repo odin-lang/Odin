@@ -1434,9 +1434,6 @@ gb_internal Token consume_comment(AstFile *f, isize *end_line_) {
 	if (end_line_) *end_line_ = end_line;
 
 	next_token0(f);
-	if (f->curr_token.pos.line > tok.pos.line || tok.kind == Token_EOF) {
-		end_line++;
-	}
 	return tok;
 }
 
