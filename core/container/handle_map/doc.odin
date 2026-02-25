@@ -24,9 +24,11 @@ Example:
 		hm.remove(&entities, h1)
 
 		h3 := hm.add(&entities, Entity{pos = {6, 7}})
+		assert(hm.is_valid(entities, h3))
 
 		it := hm.iterator_make(&entities)
 		for e, h in hm.iterate(&it) {
+			assert(hm.is_valid(entities, h))
 			e.pos += {1, 2}
 		}
 	}
@@ -46,9 +48,11 @@ Example:
 		hm.remove(&entities, h1)
 
 		h3 := hm.add(&entities, Entity{pos = {6, 7}})
+		assert(hm.is_valid(entities, h3))
 
 		it := hm.iterator_make(&entities)
 		for e, h in hm.iterate(&it) {
+			assert(hm.is_valid(entities, h))
 			e.pos += {1, 2}
 		}
 	}

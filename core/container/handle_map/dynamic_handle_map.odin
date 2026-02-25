@@ -31,7 +31,7 @@ dynamic_destroy :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) {
 }
 
 @(require_results)
-dynamic_add :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), item: T, loc := #caller_location) -> (handle: Handle_Type, err: runtime.Allocator_Error) {
+dynamic_add :: proc(m: ^$D/Dynamic_Handle_Map($T, $Handle_Type), item: T, loc := #caller_location) -> (handle: Handle_Type, err: runtime.Allocator_Error) #optional_allocator_error {
 	if xar.len(m.unused_items) > 0 {
 		i := xar.pop(&m.unused_items)
 		ptr := xar.get_ptr_unsafe(&m.items, i)
