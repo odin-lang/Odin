@@ -17,9 +17,9 @@ DialogFileCallback :: #type proc "c" (userdata: rawptr, filelist: [^]cstring, fi
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	ShowOpenFileDialog           :: proc(callback: DialogFileCallback, userdata: rawptr, window: ^Window, filters: [^]DialogFileFilter, nfilters: c.int, default_location: cstring, allow_many: bool) ---
-	ShowSaveFileDialog           :: proc(callback: DialogFileCallback, userdata: rawptr, window: ^Window, filters: [^]DialogFileFilter, nfilters: c.int, default_location: cstring) ---
-	ShowOpenFolderDialog         :: proc(callback: DialogFileCallback, userdata: rawptr, window: ^Window, default_location: cstring, allow_many: bool) ---
+	ShowOpenFileDialog           :: proc(callback: DialogFileCallback, userdata: rawptr, window: Maybe(^Window), filters: Maybe([^]DialogFileFilter), nfilters: c.int, default_location: Maybe(cstring), allow_many: bool) ---
+	ShowSaveFileDialog           :: proc(callback: DialogFileCallback, userdata: rawptr, window: Maybe(^Window), filters: Maybe([^]DialogFileFilter), nfilters: c.int, default_location: Maybe(cstring)) ---
+	ShowOpenFolderDialog         :: proc(callback: DialogFileCallback, userdata: rawptr, window: Maybe(^Window), default_location: Maybe(cstring), allow_many: bool) ---
 	ShowFileDialogWithProperties :: proc(type: FileDialogType, callback: DialogFileCallback, userdata: rawptr, props: PropertiesID) ---
 }
 

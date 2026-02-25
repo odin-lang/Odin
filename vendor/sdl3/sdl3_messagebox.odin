@@ -57,5 +57,5 @@ MessageBoxData :: struct {
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	ShowMessageBox       :: proc(#by_ptr messageboxdata: MessageBoxData, buttonid: ^c.int) -> bool ---
-	ShowSimpleMessageBox :: proc(flags: MessageBoxFlags, title, message: cstring, window: ^Window) -> bool ---
+	ShowSimpleMessageBox :: proc(flags: MessageBoxFlags, title, message: cstring, window: Maybe(^Window)) -> bool ---
 }

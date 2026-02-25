@@ -59,7 +59,7 @@ foreign lib {
 	RemovePath          :: proc(path: cstring) -> bool ---
 	RenamePath          :: proc(oldpath, newpath: cstring) -> bool ---
 	CopyFile            :: proc(oldpath, newpath: cstring) -> bool ---
-	GetPathInfo         :: proc(path: cstring, info: ^PathInfo) -> bool ---
-	GlobDirectory       :: proc(path: cstring, pattern: cstring, flags: GlobFlags, count: ^c.int) -> [^][^]c.char ---
+	GetPathInfo         :: proc(path: cstring, info: Maybe(^PathInfo)) -> bool ---
+	GlobDirectory       :: proc(path: cstring, pattern: Maybe(cstring), flags: GlobFlags, count: Maybe(^c.int)) -> [^][^]c.char ---
 	GetCurrentDirectory :: proc() -> [^]c.char ---
 }
