@@ -14,8 +14,8 @@ Example:
 	{ // static map
 		entities: hm.Static_Handle_Map(1024, Entity, Handle)
 
-		h1 := hm.add(&entities, Entity{pos = {1,  4}})
-		h2 := hm.add(&entities, Entity{pos = {9, 16}})
+		h1, ok1 := hm.add(&entities, Entity{pos = {1,  4}})
+		h2, _   := hm.add(&entities, Entity{pos = {9, 16}})
 
 		if e, ok := hm.get(&entities, h2); ok {
 			e.pos.x += 32
@@ -36,8 +36,8 @@ Example:
 		hm.dynamic_init(&entities, context.allocator)
 		defer hm.dynamic_destroy(&entities)
 
-		h1 := hm.add(&entities, Entity{pos = {1,  4}})
-		h2 := hm.add(&entities, Entity{pos = {9, 16}})
+		h1, err0 := hm.add(&entities, Entity{pos = {1,  4}})
+		h2, err1 := hm.add(&entities, Entity{pos = {9, 16}})
 
 		if e, ok := hm.get(&entities, h2); ok {
 			e.pos.x += 32
@@ -45,7 +45,7 @@ Example:
 
 		hm.remove(&entities, h1)
 
-		h3 := hm.add(&entities, Entity{pos = {6, 7}})
+		h3, _ := hm.add(&entities, Entity{pos = {6, 7}})
 
 		it := hm.iterator_make(&entities)
 		for e, h in hm.iterate(&it) {
