@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package odin_tokenizer
 
 import "core:strings"
@@ -113,54 +114,97 @@ Token_Kind :: enum u32 {
 		Range_Full,    // ..=
 	B_Operator_End,
 
-	B_Keyword_Begin,
-		Import,      // import
-		Foreign,     // foreign
-		Package,     // package
-		Typeid,      // typeid
-		When,        // when
-		Where,       // where
-		If,          // if
-		Else,        // else
-		For,         // for
-		Switch,      // switch
-		In,          // in
-		Not_In,      // not_in
-		Do,          // do
-		Case,        // case
-		Break,       // break
-		Continue,    // continue
-		Fallthrough, // fallthrough
-		Defer,       // defer
-		Return,      // return
-		Proc,        // proc
-		Struct,      // struct
-		Union,       // union
-		Enum,        // enum
-		Bit_Set,     // bit_set
-		Bit_Field,   // bit_field
-		Map,         // map
-		Dynamic,     // dynamic
-		Auto_Cast,   // auto_cast
-		Cast,        // cast
-		Transmute,   // transmute
-		Distinct,    // distinct
-		Using,       // using
-		Context,     // context
-		Or_Else,     // or_else
-		Or_Return,   // or_return
-		Or_Break,    // or_break
-		Or_Continue, // or_continue
-		Asm,         // asm
-		Inline,      // inline
-		No_Inline,   // no_inline
-		Matrix,      // matrix
-	B_Keyword_End,
+				 //Keywords
+	Import,      // import
+	Foreign,     // foreign
+	Package,     // package
+	Typeid,      // typeid
+	When,        // when
+	Where,       // where
+	If,          // if
+	Else,        // else
+	For,         // for
+	Switch,      // switch
+	In,          // in
+	Not_In,      // not_in
+	Do,          // do
+	Case,        // case
+	Break,       // break
+	Continue,    // continue
+	Fallthrough, // fallthrough
+	Defer,       // defer
+	Return,      // return
+	Proc,        // proc
+	Struct,      // struct
+	Union,       // union
+	Enum,        // enum
+	Bit_Set,     // bit_set
+	Bit_Field,   // bit_field
+	Map,         // map
+	Dynamic,     // dynamic
+	Auto_Cast,   // auto_cast
+	Cast,        // cast
+	Transmute,   // transmute
+	Distinct,    // distinct
+	Using,       // using
+	Context,     // context
+	Or_Else,     // or_else
+	Or_Return,   // or_return
+	Or_Break,    // or_break
+	Or_Continue, // or_continue
+	Asm,         // asm
+	Inline,      // inline
+	No_Inline,   // no_inline
+	Matrix,      // matrix
 
 	COUNT,
 
 	B_Custom_Keyword_Begin = COUNT+1,
 	// ... Custom keywords
+}
+
+keywords := map [string]Token_Kind{
+	"import" = .Import,
+	"foreign" = .Foreign,
+	"package" = .Package,
+	"typeid" = .Typeid,
+	"when" = .When,
+	"where" = .Where,
+	"if" = .If,
+	"else" = .Else,
+	"for" = .For,
+	"switch" = .Switch,
+	"in" = .In,
+	"not_in" = .Not_In,
+	"do" = .Do,
+	"case" = .Case,
+	"break" = .Break,
+	"continue" = .Continue,
+	"fallthrough" = .Fallthrough,
+	"defer" = .Defer,
+	"return" = .Return,
+	"proc" = .Proc,
+	"struct" = .Struct,
+	"union" = .Union,
+	"enum" = .Enum,
+	"bit_set" = .Bit_Set,
+	"bit_field" = .Bit_Field,
+	"map" = .Map,
+	"dynamic" = .Dynamic,
+	"auto_cast" = .Auto_Cast,
+	"cast" = .Cast,
+	"transmute" = .Transmute,
+	"distinct" = .Distinct,
+	"using" = .Using,
+	"context" = .Context,
+	"or_else" = .Or_Else,
+	"or_return" = .Or_Return,
+	"or_break" = .Or_Break,
+	"or_continue" = .Or_Continue,
+	"asm" = .Asm,
+	"inline" = .Inline,
+	"no_inline" = .No_Inline,
+	"matrix" = .Matrix,
 }
 
 tokens := [Token_Kind.COUNT]string {
