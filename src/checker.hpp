@@ -585,7 +585,6 @@ gb_internal u64 check_vet_flags(CheckerContext *c);
 gb_internal u64 check_vet_flags(Ast *node);
 
 
-
 struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
