@@ -585,6 +585,11 @@ gb_internal u64 check_vet_flags(CheckerContext *c);
 gb_internal u64 check_vet_flags(Ast *node);
 
 
+struct DeferredMapKeyCheck {
+	Ast  *node;
+	Type *key;
+};
+
 struct Checker {
 	Parser *    parser;
 	CheckerInfo info;
@@ -598,6 +603,7 @@ struct Checker {
 	BlockingMutex nested_proc_lits_mutex;
 	Array<DeclInfo *> nested_proc_lits;
 
+	Array<DeferredMapKeyCheck> deferred_map_key_checks;
 
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
 	MPSCQueue<Type *> soa_types_to_complete;

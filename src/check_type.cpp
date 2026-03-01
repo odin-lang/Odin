@@ -2859,6 +2859,24 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	}
 }
 
+gb_internal void validate_map_key(CheckerContext *ctx, Ast *node, Type *key) {
+	if (!is_type_valid_for_keys(key)) {
+		if (is_type_boolean(key)) {
+			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
+		} else {
+			gbString str = type_to_string(key);
+			error(node, "Invalid type of a key for a map, got '%s'", str);
+			gb_string_free(str);
+		}
+	}
+	if (type_size_of(key) == 0) {
+		gbString str = type_to_string(key);
+		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
+		gb_string_free(str);
+	}
+	add_map_key_type_dependencies(ctx, key);
+}
+
 gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
@@ -2878,28 +2896,29 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	Type *key   = check_type(ctx, mt->key);
 	Type *value = check_type(ctx, mt->value);
 
-	if (!is_type_valid_for_keys(key)) {
-		if (is_type_boolean(key)) {
-			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
-		} else {
-			gbString str = type_to_string(key);
-			error(node, "Invalid type of a key for a map, got '%s'", str);
-			gb_string_free(str);
-		}
-	}
-	if (type_size_of(key) == 0) {
-		gbString str = type_to_string(key);
-		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
-		gb_string_free(str);
-	}
-
 	type->Map.key   = key;
 	type->Map.value = value;
 
-	add_map_key_type_dependencies(ctx, key);
+	// If the key type is still being resolved its struct fields may be empty causing false invalid key errors.
+	// Defer to check_deferred_map_key_types which runs after all global entities are resolved.
+	if (key->kind == Type_Named && key->Named.type_name && key->Named.type_name->state == EntityState_InProgress) {
+		DeferredMapKeyCheck d = {node, key};
+		array_add(&ctx->checker->deferred_map_key_checks, d);
+	} else {
+		validate_map_key(ctx, node, key);
+	}
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
+}
+
+gb_internal void check_deferred_map_key_types(Checker *c) {
+	CheckerContext ctx = c->builtin_ctx;
+	ctx.decl = make_decl_info(nullptr, nullptr);
+	for_array(i, c->deferred_map_key_checks) {
+		DeferredMapKeyCheck const &d = c->deferred_map_key_checks[i];
+		validate_map_key(&ctx, d.node, d.key);
+	}
 }
 
 gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
