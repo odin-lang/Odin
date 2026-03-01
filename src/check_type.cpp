@@ -2869,7 +2869,7 @@ gb_internal void validate_map_key(CheckerContext *ctx, Ast *node, Type *key) {
 			gb_string_free(str);
 		}
 	}
-	if (type_size_of(key) == 0) {
+	else if (type_size_of(key) == 0) {
 		gbString str = type_to_string(key);
 		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
 		gb_string_free(str);
@@ -2901,7 +2901,7 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 	// If the key type is still being resolved its struct fields may be empty causing false invalid key errors.
 	// Defer to check_deferred_map_key_types which runs after all global entities are resolved.
-	if (key->kind == Type_Named && key->Named.type_name && key->Named.type_name->state == EntityState_InProgress) {
+	if (key->kind == Type_Named && key->Named.type_name && key->Named.type_name->state.load() == EntityState_InProgress) {
 		array_add(&ctx->checker->deferred_map_key_checks, node);
 	} else {
 		validate_map_key(ctx, node, key);
@@ -2914,8 +2914,7 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 gb_internal void check_deferred_map_key_types(Checker *c) {
 	CheckerContext ctx = c->builtin_ctx;
 	ctx.decl = make_decl_info(nullptr, nullptr);
-	for_array(i, c->deferred_map_key_checks) {
-		Ast *node = c->deferred_map_key_checks[i];
+	for (Ast *node : c->deferred_map_key_checks) {
 		validate_map_key(&ctx, node, node->tav.type->Map.key);
 	}
 }
