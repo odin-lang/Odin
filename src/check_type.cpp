@@ -2902,8 +2902,7 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	// If the key type is still being resolved its struct fields may be empty causing false invalid key errors.
 	// Defer to check_deferred_map_key_types which runs after all global entities are resolved.
 	if (key->kind == Type_Named && key->Named.type_name && key->Named.type_name->state == EntityState_InProgress) {
-		DeferredMapKeyCheck d = {node, key};
-		array_add(&ctx->checker->deferred_map_key_checks, d);
+		array_add(&ctx->checker->deferred_map_key_checks, node);
 	} else {
 		validate_map_key(ctx, node, key);
 	}
@@ -2916,8 +2915,8 @@ gb_internal void check_deferred_map_key_types(Checker *c) {
 	CheckerContext ctx = c->builtin_ctx;
 	ctx.decl = make_decl_info(nullptr, nullptr);
 	for_array(i, c->deferred_map_key_checks) {
-		DeferredMapKeyCheck const &d = c->deferred_map_key_checks[i];
-		validate_map_key(&ctx, d.node, d.key);
+		Ast *node = c->deferred_map_key_checks[i];
+		validate_map_key(&ctx, node, node->tav.type->Map.key);
 	}
 }
 
