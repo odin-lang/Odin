@@ -2868,11 +2868,13 @@ gb_internal void validate_map_key(CheckerContext *ctx, Ast *node, Type *key) {
 			error(node, "Invalid type of a key for a map, got '%s'", str);
 			gb_string_free(str);
 		}
+		return;
 	}
-	else if (type_size_of(key) == 0) {
+	if (type_size_of(key) == 0) {
 		gbString str = type_to_string(key);
 		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
 		gb_string_free(str);
+		return;
 	}
 	add_map_key_type_dependencies(ctx, key);
 }
