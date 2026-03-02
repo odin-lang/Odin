@@ -29,6 +29,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_6068.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6101.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6165.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_6348.odin %COMMON%  || exit /b
 
 @echo off
 

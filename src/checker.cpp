@@ -1603,6 +1603,7 @@ gb_internal void init_checker(Checker *c) {
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
 	array_init(&c->nested_proc_lits, heap_allocator(), 0, 1<<20);
+	array_init(&c->deferred_map_key_checks, heap_allocator());
 
 	mpsc_init(&c->global_untyped_queue, a); // , 1<<20);
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
@@ -1617,6 +1618,7 @@ gb_internal void destroy_checker(Checker *c) {
 
 	array_free(&c->nested_proc_lits);
 	array_free(&c->procs_to_check);
+	array_free(&c->deferred_map_key_checks);
 	mpsc_destroy(&c->global_untyped_queue);
 	mpsc_destroy(&c->soa_types_to_complete);
 }
@@ -5050,6 +5052,8 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_align_of(e->type);
 		}
 	}
+
+	check_deferred_map_key_types(c);
 
 	in_single_threaded_checker_stage.store(false, std::memory_order_relaxed);
 }
