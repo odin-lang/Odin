@@ -1501,6 +1501,11 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 
 	case Type_BitSet:
 		if (source->kind == Type_BitSet) {
+			if (!is_type_polymorphic(poly->BitSet.elem)) {
+				if (poly->BitSet.upper != source->BitSet.upper || poly->BitSet.lower != source->BitSet.lower) {
+					return false;
+				}
+			}
 			if (!is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type)) {
 				return false;
 			}
