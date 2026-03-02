@@ -20,9 +20,9 @@ foreign gdi32 {
 
 	CreateDIBPatternBrush :: proc(h: HGLOBAL, iUsage: UINT) -> HBRUSH ---
 	CreateBitmap          :: proc(nWidth: INT, nHeight: INT, nPlanes: UINT, nBitCount: UINT, lpBits: LPVOID) -> HBITMAP ---
-	CreateDIBitmap        :: proc(hdc: HDC, pbmih: ^BITMAPINFOHEADER, flInit: DWORD, pjBits: VOID, pbmi: ^BITMAPINFO, iUsage: UINT) -> HBITMAP ---
-	CreateDIBSection      :: proc(hdc: HDC, pbmi: ^BITMAPINFO, usage: UINT, ppvBits: ^^VOID, hSection: HANDLE, offset: DWORD) -> HBITMAP ---
-	StretchDIBits         :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: VOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
+	CreateDIBitmap        :: proc(hdc: HDC, pbmih: ^BITMAPINFOHEADER, flInit: DWORD, pjBits: PVOID, pbmi: ^BITMAPINFO, iUsage: UINT) -> HBITMAP ---
+	CreateDIBSection      :: proc(hdc: HDC, pbmi: ^BITMAPINFO, usage: UINT, ppvBits: ^PVOID, hSection: HANDLE, offset: DWORD) -> HBITMAP ---
+	StretchDIBits         :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: LPVOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
 	StretchBlt            :: proc(hdcDest: HDC, xDest, yDest, wDest, hDest: INT, hdcSrc: HDC, xSrc, ySrc, wSrc, hSrc: INT, rop: DWORD) -> BOOL ---
 
 	SetPixelFormat      :: proc(hdc: HDC, format: INT, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
@@ -54,7 +54,7 @@ foreign gdi32 {
 	CreateCompatibleBitmap :: proc(hdc: HDC, cx, cy: INT) -> HBITMAP ---
 	BitBlt                 :: proc(hdc: HDC, x, y, cx, cy: INT, hdcSrc: HDC, x1, y1: INT, rop: DWORD) -> BOOL ---
 	GetDIBits              :: proc(hdc: HDC, hbm: HBITMAP, start, cLines: UINT, lpvBits: LPVOID, lpbmi: ^BITMAPINFO, usage: UINT) -> INT ---
-	SetDIBits              :: proc(hdc: HDC, hbm: HBITMAP, start: UINT, cLines: UINT, lpBits: VOID, lpbmi: ^BITMAPINFO, ColorUse: UINT) -> INT ---
+	SetDIBits              :: proc(hdc: HDC, hbm: HBITMAP, start: UINT, cLines: UINT, lpBits: PVOID, lpbmi: ^BITMAPINFO, ColorUse: UINT) -> INT ---
 	SetDIBColorTable       :: proc(hdc: HDC, iStart: UINT, cEntries: UINT, prgbq: ^RGBQUAD) -> UINT ---
 	GetDIBColorTable       :: proc(hdc: HDC, iStart: UINT, cEntries: UINT, prgbq: ^RGBQUAD) -> UINT ---
 
