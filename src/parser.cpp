@@ -6790,37 +6790,12 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 	f->package_name = package_name.string;
 
-	{
-		if (docs != nullptr && docs->list.count > 0) {
-			for (Token const &tok : docs->list) {
-				GB_ASSERT(tok.kind == Token_Comment);
-				String str = tok.string;
-
-				if (!string_starts_with(str, str_lit("//"))) {
-					continue;
-				}
-
-				String lc = string_trim_whitespace(substring(str, 2, str.len));
-				if (string_starts_with(lc, str_lit("+"))) {
-					syntax_warning(tok, "'//+' is deprecated: Use '#+' instead");
-					String lt = substring(lc, 1, lc.len);
-					if (parse_file_tag(lt, tok, f) == false) {
-						return false;
-					}
-				}
-			}
-		}
-
-		for (Token const &tok : tags) {
-			GB_ASSERT(tok.kind == Token_FileTag);
-			String str = tok.string;
-
-			if (string_starts_with(str, str_lit("#+"))) {
-				String lt = string_trim_whitespace(substring(str, 2, str.len));
-				if (parse_file_tag(lt, tok, f) == false) {
-					return false;
-				}
-			}
+	for (Token const &tok : tags) {
+		GB_ASSERT(tok.kind == Token_FileTag);
+		GB_ASSERT(string_starts_with(tok.string, str_lit("#+")));
+		String lt = string_trim_whitespace(substring(tok.string, 2, tok.string.len));
+		if (parse_file_tag(lt, tok, f) == false) {
+			return false;
 		}
 	}
 
