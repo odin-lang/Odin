@@ -3664,6 +3664,24 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		}
 	}
 
+	if (is_const_expr) {
+		Type *src = core_type(x->type);
+		Type *dst = core_type(type);
+
+		if (is_type_string(src) && is_type_string(dst)) {
+			bool src_utf16 = is_type_string16(src) || is_type_cstring16(src);
+			bool dst_utf16 = is_type_string16(dst) || is_type_cstring16(dst);
+
+			if (!src_utf16 && dst_utf16) {
+				x->value = exact_value_string16(string_to_string16(permanent_allocator(), x->value.value_string));
+			}
+
+			if (src_utf16 && !dst_utf16) {
+				x->value = exact_value_string(string16_to_string(permanent_allocator(), x->value.value_string16));
+			}
+		}
+	}
+
 	x->type = type;
 }
 
