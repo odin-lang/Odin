@@ -702,6 +702,7 @@ type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 // This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
+@(require_results)
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	n := u64(len(type_table))
 	i := transmute(u64)id % n
@@ -717,6 +718,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 
 when !ODIN_NO_RTTI {
 	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
+	@(require_results)
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
@@ -725,6 +727,7 @@ when !ODIN_NO_RTTI {
 	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
 	// returns the backing integer type of an enum or bit_set `typeid`.
 	// This is also aliased as `typeid_base_without_enum`
+	@(require_results)
 	typeid_core :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_core(type_info_of(id))
 		return ti.id
@@ -735,6 +738,7 @@ when !ODIN_NO_RTTI {
 	// This is also aliased as `typeid_core`
 	typeid_base_without_enum :: typeid_core
 
+	@(require_results)
 	typeid_underlying :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_underlying(type_info_of(id))
 		return ti.id
