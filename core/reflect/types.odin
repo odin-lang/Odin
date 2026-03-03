@@ -442,10 +442,7 @@ is_endian_platform :: proc(info: ^Type_Info) -> bool {
 	case Type_Info_Integer:
 		return v.endianness == .Platform
 	case Type_Info_Bit_Set:
-		if v.underlying != nil {
-			return is_endian_platform(v.underlying)
-		}
-		return true
+		return is_endian_platform(v.underlying)
 	case Type_Info_Pointer:
 		return true
 	}
@@ -467,10 +464,7 @@ is_endian_little :: proc(info: ^Type_Info) -> bool {
 		}
 		return v.endianness == .Little
 	case Type_Info_Bit_Set:
-		if v.underlying != nil {
-			return is_endian_platform(v.underlying)
-		}
-		return ODIN_ENDIAN == .Little
+		return is_endian_little(v.underlying)
 	case Type_Info_Pointer:
 		return ODIN_ENDIAN == .Little
 	}
@@ -492,10 +486,7 @@ is_endian_big :: proc(info: ^Type_Info) -> bool {
 		}
 		return v.endianness == .Big
 	case Type_Info_Bit_Set:
-		if v.underlying != nil {
-			return is_endian_platform(v.underlying)
-		}
-		return ODIN_ENDIAN == .Big
+		return is_endian_big(v.underlying)
 	case Type_Info_Pointer:
 		return ODIN_ENDIAN == .Big
 	}
@@ -754,7 +745,7 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 			io.write_string(w, "..=",       &n) or_return
 			io.write_i64(w, info.upper, 10, &n) or_return
 		}
-		if info.underlying != nil {
+		if info.explicit_underlying {
 			io.write_string(w, "; ",       &n) or_return
 			write_type(w, info.underlying, &n) or_return
 		}

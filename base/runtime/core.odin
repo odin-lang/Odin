@@ -166,10 +166,11 @@ Type_Info_Map :: struct {
 	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
-	elem:       ^Type_Info,
-	underlying: ^Type_Info, // Possibly nil
-	lower:      i64,
-	upper:      i64,
+	elem:                ^Type_Info,
+	underlying:          ^Type_Info,
+	explicit_underlying: bool, // false = bit_set[T], true = bit_set[T, U]
+	lower:               i64,
+	upper:               i64,
 }
 Type_Info_Simd_Vector :: struct {
 	elem:       ^Type_Info,
@@ -676,11 +677,32 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	return base
 }
 
+@(require_results)
+type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
+	if info == nil {
+		return nil
+	}
+
+	base := info
+	loop: for {
+		#partial switch i in base.variant {
+		case Type_Info_Named:     base = i.base
+		case Type_Info_Enum:      base = i.base
+		case Type_Info_Bit_Set:   base = i.underlying
+		case Type_Info_Bit_Field: base = i.backing_type
+		case:
+			break loop
+		}
+	}
+	return base
+}
+
 // type_info_base_without_enum returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
 // returns the backing integer type of an enum or bit_set `^Type_Info`.
 // This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
+@(require_results)
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	n := u64(len(type_table))
 	i := transmute(u64)id % n
@@ -696,6 +718,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 
 when !ODIN_NO_RTTI {
 	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
+	@(require_results)
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
@@ -704,6 +727,7 @@ when !ODIN_NO_RTTI {
 	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
 	// returns the backing integer type of an enum or bit_set `typeid`.
 	// This is also aliased as `typeid_base_without_enum`
+	@(require_results)
 	typeid_core :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_core(type_info_of(id))
 		return ti.id
@@ -713,6 +737,12 @@ when !ODIN_NO_RTTI {
 	// returns the backing integer type of an enum or bit_set `typeid`.
 	// This is also aliased as `typeid_core`
 	typeid_base_without_enum :: typeid_core
+
+	@(require_results)
+	typeid_underlying :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_underlying(type_info_of(id))
+		return ti.id
+	}
 }
 
 
