@@ -478,7 +478,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 			print_string("..")
 			print_i64(info.upper)
 		}
-		if info.underlying != nil {
+		if info.explicit_underlying {
 			print_string("; ")
 			print_type(info.underlying)
 		}
@@ -893,7 +893,7 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 			write_string(i, buf, "..")       or_return
 			write_i64   (i, buf, info.upper) or_return
 		}
-		if info.underlying != nil {
+		if info.explicit_underlying {
 			write_string    (i, buf, "; ")            or_return
 			write_write_type(i, buf, info.underlying) or_return
 		}

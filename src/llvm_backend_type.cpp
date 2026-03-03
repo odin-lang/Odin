@@ -923,15 +923,25 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				GB_ASSERT(is_type_typed(t->BitSet.elem));
 
 
-				LLVMValueRef vals[4] = {
-					get_type_info_ptr(m, t->BitSet.elem),
-					LLVMConstNull(lb_type(m, t_type_info_ptr)),
-					lb_const_int(m, t_i64, t->BitSet.lower).value,
-					lb_const_int(m, t_i64, t->BitSet.upper).value,
+				LLVMValueRef vals[5] = {
+					get_type_info_ptr(m, t->BitSet.elem),          // ^Type_Info
+					nullptr,                                       // ^Type_Info
+					nullptr,                                       // bool
+					lb_const_int(m, t_i64, t->BitSet.lower).value, // i64
+					lb_const_int(m, t_i64, t->BitSet.upper).value, // i64
 				};
+				Type *underlying = nullptr;
+				bool explicit_underlying = false;
 				if (t->BitSet.underlying != nullptr) {
+					underlying = t->BitSet.underlying;
+					explicit_underlying = true;
 					vals[1] = get_type_info_ptr(m, t->BitSet.underlying);
+					vals[2] = lb_const_bool(m, t_bool, true).value;
+				} else {
+					underlying = bit_set_to_int(t);
 				}
+				vals[1] = get_type_info_ptr(m, underlying);
+				vals[2] = lb_const_bool(m, t_bool, explicit_underlying).value;
 
 				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
 			}
