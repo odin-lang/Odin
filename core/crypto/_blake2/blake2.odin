@@ -11,6 +11,7 @@ package _blake2
 */
 
 import "base:intrinsics"
+import "core:crypto"
 import "core:encoding/endian"
 
 BLAKE2S_BLOCK_SIZE :: 64
@@ -133,7 +134,7 @@ init :: proc "contextless" (ctx: ^$T, cfg: ^Blake2_Config) {
 			p[17] = cfg.tree.(Blake2_Tree).inner_hash_size
 		}
 	} else {
-		p[2], p[3] = 1, 1
+		p[2], p[3], p[4], p[5], p[6], p[7] = 1, 1, 0, 0, 0, 0
 	}
 	ctx.size = cfg.size
 	for i := 0; i < 8; i += 1 {
@@ -222,7 +223,7 @@ reset :: proc "contextless" (ctx: ^$T) {
 		return
 	}
 
-	zero_explicit(ctx, size_of(ctx^))
+	crypto.zero_explicit(ctx, size_of(ctx^))
 }
 
 @(private)
@@ -244,6 +245,9 @@ blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
 		ctx.f[1] = 0xffffffff
 	}
 
+	for i := ctx.nx; i < BLAKE2S_BLOCK_SIZE; i+= 1 {
+		ctx.x[i] = 0
+	}
 	blocks(ctx, ctx.x[:])
 
 	dst: [BLAKE2S_SIZE]byte
@@ -272,6 +276,9 @@ blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 		ctx.f[1] = 0xffffffffffffffff
 	}
 
+	for i := ctx.nx; i < BLAKE2B_BLOCK_SIZE; i+= 1 {
+		ctx.x[i] = 0
+	}
 	blocks(ctx, ctx.x[:])
 
 	dst: [BLAKE2B_SIZE]byte
@@ -2876,28 +2883,4 @@ blake2b_blocks :: #force_inline proc "contextless" (ctx: ^Blake2b_Context, p: []
 	}
 	ctx.h[0], ctx.h[1], ctx.h[2], ctx.h[3], ctx.h[4], ctx.h[5], ctx.h[6], ctx.h[7] =
 		h0, h1, h2, h3, h4, h5, h6, h7
-}
-
-/*
-Set each byte of a memory range to zero.
-
-This procedure copies the value `0` into the `len` bytes of a memory range,
-starting at address `data`.
-
-This procedure returns the pointer to `data`.
-
-Unlike the `zero()` procedure, which can be optimized away or reordered by the
-compiler under certain circumstances, `zero_explicit()` procedure can not be
-optimized away or reordered with other memory access operations, and the
-compiler assumes volatile semantics of the memory.
-*/
-@(private)
-zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
-	// This routine tries to avoid the compiler optimizing away the call,
-	// so that it is always executed.  It is intended to provide
-	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
-	// memset_s call.
-	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
-	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
-	return data
 }
