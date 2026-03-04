@@ -4891,13 +4891,15 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 		}
 
 		if (f->curr_token.kind != Token_Semicolon) {
+			Token before = f->curr_token;
+
 			cond = parse_simple_stmt(f, StmtAllowFlag_In);
 			if (cond->kind == Ast_AssignStmt && cond->AssignStmt.op.kind == Token_in) {
 				is_range = true;
 			}
 
 			if (cond->kind == Ast_ExprStmt && is_ast_type(cond->ExprStmt.expr)) {
-				syntax_error(cond->ExprStmt.expr->EnumType.token, "Expected an expression, got %.*s", LIT(ast_strings[cond->ExprStmt.expr->kind]));
+				syntax_error(before, "Expected an expression, got %.*s", LIT(ast_strings[cond->ExprStmt.expr->kind]));
 			}
 		}
 
