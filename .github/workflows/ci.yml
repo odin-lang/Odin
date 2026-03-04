@@ -88,6 +88,8 @@ jobs:
           brew update
           brew install llvm@20 lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
+          export LDFLAGS="-L/opt/homebrew/opt/lua@5.4/lib"
+          export CPPFLAGS="-I/opt/homebrew/opt/lua@5.4/include"
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-latest'
@@ -95,6 +97,8 @@ jobs:
           brew update
           brew install llvm@20 wasmtime lua@5.4 lld
           echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
+          export LDFLAGS="-L/opt/homebrew/opt/lua@5.4/lib"
+          export CPPFLAGS="-I/opt/homebrew/opt/lua@5.4/include"
 
       - name: Download LLVM (Ubuntu)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
