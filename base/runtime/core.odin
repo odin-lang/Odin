@@ -656,7 +656,7 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 
 // type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
-// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// returns the backing integer type of an enum `^Type_Info`.
 // This is also aliased as `type_info_base_without_enum`
 @(require_results)
 type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
@@ -678,7 +678,8 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 
 
 
-// `type_info_underlying` returns underlying (backing) type
+// type_info_underlying returns the underlying (backing) type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum `^Type_Info` AND/OR the underlying integer type of a bit_set or bit_field.
 @(require_results)
 type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
@@ -726,7 +727,7 @@ when !ODIN_NO_RTTI {
 		return ti.id
 	}
 	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
-	// returns the backing integer type of an enum or bit_set `typeid`.
+	// returns the backing integer type of an enum `typeid`.
 	// This is also aliased as `typeid_base_without_enum`
 	@(require_results)
 	typeid_core :: proc "contextless" (id: typeid) -> typeid {
