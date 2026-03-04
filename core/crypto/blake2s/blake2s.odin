@@ -28,10 +28,21 @@ Context :: _blake2.Blake2s_Context
 
 // init initializes a Context with the default BLAKE2s config.
 init :: proc(ctx: ^Context, digest_size := DIGEST_SIZE) {
-	ensure(digest_size <= _blake2.MAX_SIZE, "crypto/blake2s: invalid digest size")
+	ensure(digest_size <= DIGEST_SIZE, "crypto/blake2s: invalid digest size")
 
 	cfg: _blake2.Blake2_Config
 	cfg.size = u8(digest_size)
+	_blake2.init(ctx, &cfg)
+}
+
+// init_mac initializes a Context with a user provided key.
+init_mac :: proc(ctx: ^Context, key: []byte, digest_size := DIGEST_SIZE) {
+	ensure(digest_size <= DIGEST_SIZE, "crypto/blake2s: invalid digest size")
+	ensure(len(key) <= DIGEST_SIZE, "crypto/blake2s: invalid key size")
+
+	cfg: _blake2.Blake2_Config
+	cfg.size = u8(digest_size)
+	cfg.key = key
 	_blake2.init(ctx, &cfg)
 }
 

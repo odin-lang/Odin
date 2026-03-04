@@ -27,6 +27,7 @@ package all
 @(require) import "core:crypto/aead"
 @(require) import "core:crypto/aegis"
 @(require) import "core:crypto/aes"
+@(require) import "core:crypto/argon2id"
 @(require) import "core:crypto/blake2b"
 @(require) import "core:crypto/blake2s"
 @(require) import "core:crypto/chacha20"
