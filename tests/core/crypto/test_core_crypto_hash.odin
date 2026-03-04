@@ -5,6 +5,9 @@ import "core:bytes"
 import "core:encoding/hex"
 import "core:strings"
 import "core:testing"
+
+import "core:crypto/blake2b"
+import "core:crypto/blake2s"
 import "core:crypto/hash"
 
 @(test)
@@ -596,4 +599,139 @@ test_hash :: proc(t: ^testing.T) {
 			c_str,
 		)
 	}
+}
+
+@(private="file")
+selftest_seq :: proc(dst: []byte, seed: u32) {
+	a := 0xdead4bad * seed
+	b: u32 = 1
+
+	for i in 0 ..< len(dst) {
+		a, b = b, a + b
+		dst[i] = byte(b >> 24)
+	}
+}
+
+@(test)
+test_blake2b_self :: proc(t: ^testing.T) {
+	expected := []byte{
+		0xC2, 0x3A, 0x78, 0x00, 0xD9, 0x81, 0x23, 0xBD,
+		0x10, 0xF5, 0x06, 0xC6, 0x1E, 0x29, 0xDA, 0x56,
+		0x03, 0xD7, 0x63, 0xB8, 0xBB, 0xAD, 0x2E, 0x73,
+		0x7F, 0x5E, 0x76, 0x5A, 0x7B, 0xCC, 0xD4, 0x75,
+	}
+	md_lens := []int{20, 32, 48, 64}
+    src_lens := []int{0, 3, 128, 129, 255, 1024}
+
+	b2b := proc(dst, src: []byte) {
+		ctx: blake2b.Context
+
+		blake2b.init(&ctx, len(dst))
+		blake2b.update(&ctx, src)
+		blake2b.final(&ctx, dst)
+	}
+	b2b_keyed := proc(dst, key, src: []byte) {
+		ctx: blake2b.Context
+
+		blake2b.init_mac(&ctx, key, len(dst))
+		blake2b.update(&ctx, src)
+		blake2b.final(&ctx, dst)
+	}
+
+	buf: [1024]byte
+	md, key: [64]byte
+
+	ctx: blake2b.Context
+	blake2b.init(&ctx, 32)
+
+	for md_len in md_lens {
+		dst := md[:md_len]
+		for src_len in src_lens {
+			src := buf[:src_len]
+
+			selftest_seq(src, u32(src_len))
+			b2b(dst, src)
+			blake2b.update(&ctx, dst)
+
+			k := key[:md_len]
+			selftest_seq(k, u32(md_len))
+			b2b_keyed(dst, k, src)
+			blake2b.update(&ctx, dst)
+		}
+	}
+
+	blake2b.final(&ctx, md[:32])
+
+	expected_str := string(hex.encode(expected, context.temp_allocator))
+	actual_str := string(hex.encode(md[:32], context.temp_allocator))
+
+	testing.expectf(
+		t,
+		expected_str == actual_str,
+		"blake2b/self-test: Expected: %s Got %s",
+		expected_str,
+		actual_str,
+	)
+}
+
+@(test)
+test_blake2s_self :: proc(t: ^testing.T) {
+	expected := []byte{
+		0x6A, 0x41, 0x1F, 0x08, 0xCE, 0x25, 0xAD, 0xCD,
+		0xFB, 0x02, 0xAB, 0xA6, 0x41, 0x45, 0x1C, 0xEC,
+		0x53, 0xC5, 0x98, 0xB2, 0x4F, 0x4F, 0xC7, 0x87,
+		0xFB, 0xDC, 0x88, 0x79, 0x7F, 0x4C, 0x1D, 0xFE,
+	}
+	md_lens := []int{16, 20, 28, 32}
+    src_lens := []int{0, 3, 64, 65, 255, 1024}
+
+	b2s := proc(dst, src: []byte) {
+		ctx: blake2s.Context
+
+		blake2s.init(&ctx, len(dst))
+		blake2s.update(&ctx, src)
+		blake2s.final(&ctx, dst)
+	}
+	b2s_keyed := proc(dst, key, src: []byte) {
+		ctx: blake2s.Context
+
+		blake2s.init_mac(&ctx, key, len(dst))
+		blake2s.update(&ctx, src)
+		blake2s.final(&ctx, dst)
+	}
+
+	buf: [1024]byte
+	md, key: [32]byte
+
+	ctx: blake2s.Context
+	blake2s.init(&ctx)
+
+	for md_len in md_lens {
+		dst := md[:md_len]
+		for src_len in src_lens {
+			src := buf[:src_len]
+
+			selftest_seq(src, u32(src_len))
+			b2s(dst, src)
+			blake2s.update(&ctx, dst)
+
+			k := key[:md_len]
+			selftest_seq(k, u32(md_len))
+			b2s_keyed(dst, k, src)
+			blake2s.update(&ctx, dst)
+		}
+	}
+
+	blake2s.final(&ctx, md[:])
+
+	expected_str := string(hex.encode(expected, context.temp_allocator))
+	actual_str := string(hex.encode(md[:], context.temp_allocator))
+
+	testing.expectf(
+		t,
+		expected_str == actual_str,
+		"blake2s/self-test: Expected: %s Got %s",
+		expected_str,
+		actual_str,
+	)
 }
