@@ -656,7 +656,7 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 }
 
 
-// type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// `type_info_core` returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
 // returns the backing integer type of an enum or bit_set `^Type_Info`.
 // This is also aliased as `type_info_base_without_enum`
 @(require_results)
@@ -670,6 +670,7 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 		#partial switch i in base.variant {
 		case Type_Info_Named:     base = i.base
 		case Type_Info_Enum:      base = i.base
+		case Type_Info_Bit_Set:   base = i.underlying
 		case Type_Info_Bit_Field: base = i.backing_type
 		case: break loop
 		}
@@ -677,27 +678,10 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	return base
 }
 
-@(require_results)
-type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
-	if info == nil {
-		return nil
-	}
+// `type_info_underlying` returns underlying (backing) type
+type_info_underlying :: type_info_core
 
-	base := info
-	loop: for {
-		#partial switch i in base.variant {
-		case Type_Info_Named:     base = i.base
-		case Type_Info_Enum:      base = i.base
-		case Type_Info_Bit_Set:   base = i.underlying
-		case Type_Info_Bit_Field: base = i.backing_type
-		case:
-			break loop
-		}
-	}
-	return base
-}
-
-// type_info_base_without_enum returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// `type_info_base_without_enum` returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
 // returns the backing integer type of an enum or bit_set `^Type_Info`.
 // This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
