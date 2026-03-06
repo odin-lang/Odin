@@ -143,6 +143,8 @@ package all
 
 @(require) import "core:sys/orca"
 @(require) import "core:sys/info"
+@(require) import "core:sys/wasm/js"
+@(require) import "core:sys/wasm/wasi"
 
 @(require) import "core:unicode"
 @(require) import "core:unicode/utf8"
