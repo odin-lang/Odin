@@ -140,13 +140,18 @@ jobs:
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Wycheproof tests
+
         run: ./odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed
       - name: Vendor library tests
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
         if: matrix.os != 'macos-15-intel' && matrix.os != 'macos-latest'
-      - name: Vendor library tests (MacOS)
+      - name: Vendor library tests (MacOS ARM)
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/opt/homebrew/opt/lua@5.4/lib"
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest'
+      - name: Vendor library tests (MacOS Intel)
+        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/usr/local/opt/lua@5.4/lib"
+        if: matrix.os == 'macos-15-intel'
+
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: GitHub Issue tests
