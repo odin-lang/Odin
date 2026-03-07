@@ -197,7 +197,12 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 
 	BigInt b = {};
 	big_int_from_u64(&b, base);
+	defer (big_int_dealloc(&b));
+
 	mp_zero(dst);
+
+	BigInt digit = {};
+	defer (big_int_dealloc(&digit));
 
 	isize i = 0;
 	for (; i < len; i++) {
@@ -224,9 +229,10 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			}
 			break;
 		}
-		BigInt val = big_int_make_u64(v);
+
+		big_int_from_u64(&digit, v);
 		big_int_mul_eq(dst, &b);
-		big_int_add_eq(dst, &val);
+		big_int_add_eq(dst, &digit);
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
@@ -235,6 +241,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 		if (text[i] == '+') {
 			i += 1;
 		}
+
 		u64 exp = 0;
 		for (; i < len; i++) {
 			char r = cast(char)text[i];
@@ -251,8 +258,19 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			exp *= 10;
 			exp += v;
 		}
+
+		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).
+		//               As an integer, not even larger than `max(u128)` which has a base 10 exponent of 38.
+		//               But we also use this path to parse float literals like those in `core:math.pow10_f64`,
+		//               so we have to stick with 1e308.
+		if (exp > 308) {
+			*success = false;
+			return;
+		}
+
 		BigInt tmp = {};
 		mp_init(&tmp);
+		defer (big_int_dealloc(&tmp));
 		big_int_exp_u64(&tmp, &b, exp, success);
 		big_int_mul_eq(dst, &tmp);
 	}

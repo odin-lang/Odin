@@ -804,7 +804,12 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 			syntax_error(token, "Invalid integer literal");
 			break;
 		case Token_Float:
-			syntax_error(token, "Invalid float literal");
+			// NOTE(Jeroen): Could be an integer, see `exact_value_float_from_string`
+			if (!string_contains_char(s, '.') && !string_contains_char(s, '-')) {
+				syntax_error(token, "Invalid integer literal");
+			} else {
+				syntax_error(token, "Invalid float literal");
+			}
 			break;
 		default:
 			syntax_error(token, "Invalid token literal");
