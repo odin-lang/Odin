@@ -804,7 +804,7 @@ inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, ar
 
 
 
-// `assign_at_elem` assigns a value at a given index. If the requested index is smaller than the current
+// `assign_at_elem` assigns a value at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+1` and then assign as `index`.
 @builtin
 assign_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
@@ -820,7 +820,7 @@ assign_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, arg: E, loc 
 }
 
 
-// `assign_at_elems` assigns a values at a given index. If the requested index is smaller than the current
+// `assign_at_elems` assigns a values at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+len(args)` and then assign as `index`.
 @builtin
 assign_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
@@ -838,7 +838,7 @@ assign_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadca
 	return
 }
 
-// `assign_at_elem_string` assigns a string at a given index. If the requested index is smaller than the current
+// `assign_at_elem_string` assigns a string at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+len(arg)` and then assign as `index`.
 @builtin
 assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, arg: string, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
@@ -856,7 +856,7 @@ assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, ar
 	return
 }
 
-// `assign_at` assigns a value at a given index. If the requested index is smaller than the current
+// `assign_at` assigns a value at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+size_needed` and then assign as `index`.
 @builtin
 assign_at :: proc{
