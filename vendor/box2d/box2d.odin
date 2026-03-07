@@ -47,6 +47,9 @@ FreeFcn :: #type proc "c" (mem: rawptr)
 // Prototype for the user assert callback. Return 0 to skip the debugger break.
 AssertFcn :: #type proc "c" (condition, file_name: cstring, line_number: i32) -> i32
 
+// Prototype for user log callback. Used to log warnings.
+//LogFcn :: #type proc "c" (message: cstring)
+
 // Version numbering scheme.
 //
 // See https://semver.org/
@@ -62,13 +65,17 @@ HASH_INIT :: 5381
 foreign lib {
 	// This allows the user to override the allocation functions. These should be
 	//	set during application startup.
-	SetAllocator :: proc(allocFcn: AllocFcn, freefcn: FreeFcn) ---
+	SetAllocator            :: proc(allocFcn: AllocFcn, freefcn: FreeFcn) ---
 	// @return the total bytes allocated by Box2D
-	GetByteCount :: proc() -> c.int ---
+	GetByteCount            :: proc() -> c.int ---
 	// Override the default assert callback
 	//	@param assertFcn a non-null assert callback
-	SetAssertFcn :: proc(assertfcn: AssertFcn) ---
-
+	SetAssertFcn            :: proc(assertfcn: AssertFcn) ---
+	// Override the default log function
+	// @param logFcn a non-null log callback
+	//SetLogFcn               :: proc(logfcn: LogFcn) ---
+	// Get the current version of Box2D
+	GetVersion              :: proc() -> Version ---
 	// Get the absolute number of system ticks. The value is platform specific.
 	GetTicks                :: proc() -> u64 ---
 	// Get the milliseconds passed from an initial tick value.
@@ -520,7 +527,7 @@ foreign lib {
 	//	@return the world id.
 	CreateWorld                   :: proc(#by_ptr def: WorldDef) -> WorldId ---
 
-	// Destroy a world
+	// Destroy a world. This efficiently destroys all bodies, shapes, and joints in the simulation.
 	DestroyWorld                  :: proc(worldId: WorldId) ---
 
 	// World id validation. Provides validation for up to 64K allocations.
