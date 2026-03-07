@@ -13,7 +13,7 @@ ZERO_WIDTH_JOINER     :: '\u200D'
 WORD_JOINER           :: '\u2060'
 
 @(require_results)
-binary_search :: proc(c: i32, table: []i32, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
+binary_search :: proc(c: $T, table: []T, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, length*stride-1, len(table))
 	n := length
 	t := 0
@@ -134,8 +134,13 @@ is_title :: proc(r: rune) -> bool {
 @(require_results)
 is_digit :: proc(r: rune) -> bool {
 	if r <= MAX_LATIN1 {
-		return '0' <= r && r <= '9'
+		return ('0' <= r && r <= '9') || r == 0x00B9 || (r >= 0x00B2 && r <= 0x0B3)
 	}
+
+	if in_range(r, nd_ranges) do return true
+	
+	if in_range(r, extra_digits_ranges) do return true
+
 	return false
 }
 
