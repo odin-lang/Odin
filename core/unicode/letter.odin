@@ -225,12 +225,25 @@ is_control :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
+/*
+Checks to see if the rune `r` is a number. This means the rune is a member
+of the general category Nd, Nl, or No.
+
+Inputs:
+r: The rune to check if it is number.
+
+Returns:
+`true` if the ruen belongs to the general category Nd, Nl, or No. `false`
+is return in all other cases.
+
+*/
 @(require_results)
 is_number :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pN != 0
 	}
-	return false
+
+	return in_range(r, nd_ranges) || in_range(r, nl_ranges) || in_range(r, no_ranges)
 }
 
 @(require_results)
