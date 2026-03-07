@@ -131,6 +131,17 @@ is_title :: proc(r: rune) -> bool {
 	return is_upper(r) && is_lower(r)
 }
 
+/*
+This function determincs if a rune is a digit. To be a digit the 
+charage either has a Numeric_Type of Digit or Decimal. 
+
+Inputs:
+- r: The rune to check if it is a digit.
+
+Returns:
+`true` if the rune `r` is a digit, `false` in all other cases
+
+*/
 @(require_results)
 is_digit :: proc(r: rune) -> bool {
 	if r <= MAX_LATIN1 {
