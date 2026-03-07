@@ -159,7 +159,7 @@ float_t          :: float
 double_t         :: double
 
 NAN              := transmute(double)(_nan_bit_pattern)
-INFINITY         :: 1e5000
+INFINITY         :: 0h7ff00000_00000000 // +Inf
 
 HUGE_VALF        :: INFINITY
 HUGE_VAL         :: double(INFINITY)
