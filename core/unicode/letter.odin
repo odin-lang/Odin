@@ -132,6 +132,20 @@ is_title :: proc(r: rune) -> bool {
 }
 
 /*
+Returns true if the rune `r` is in the General Category Nd
+
+Inputs:
+- r: The run to check if it is in the general category Nd.
+
+Returns:
+`true` if the rune is in the general category Nd and `false` otherwise
+
+*/
+is_decimal :: proc(r: rune) -> bool {
+	return in_range(r, nd_ranges)
+}
+
+/*
 This function determincs if a rune is a digit. To be a digit the 
 charage either has a Numeric_Type of Digit or Decimal. 
 
