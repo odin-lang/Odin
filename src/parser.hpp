@@ -931,3 +931,5 @@ gb_internal bool allow_field_separator(AstFile *f);
 
 
 gb_internal void parse_enforce_tabs(AstFile *f);
+
+gb_internal void maybe_dump_ast(AstFile *f, Array<Token> const& tags);
