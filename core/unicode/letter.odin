@@ -259,6 +259,13 @@ is_symbol :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pS != 0
 	}
+
+	s := in_range(r, sc_ranges) || in_range(r, sm_ranges) 
+	
+	if s || in_range(r, so_ranges) || in_range(r, sk_ranges) {
+		return true
+	}
+
 	return false
 }
 

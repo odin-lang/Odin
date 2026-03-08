@@ -291,10 +291,10 @@ main :: proc() {
 		// .Pi, // Initial_Punctuation, an initial quotation mark
 		// .Po, // Other_Punctuation, a punctuation mark of other type
 		// .Ps, // Open_Punctuation, an opening punctuation mark (of a pair)
-		.Sc, // Currency_Symbol, a currency sign
-		.Sk, // Modifier_Symbol, a non-letterlike modifier symbol
-		.Sm, // Math_Symbol, a symbol of mathematical use
-		.So, // Other_Symbol, a symbol of other type
+		// .Sc, // Currency_Symbol, a currency sign
+		// .Sk, // Modifier_Symbol, a non-letterlike modifier symbol
+		// .Sm, // Math_Symbol, a symbol of mathematical use
+		// .So, // Other_Symbol, a symbol of other type
 		.Zl, // Line_Separator, U+2028 LINE SEPARATOR only
 		.Zp, // Paragraph_Separator, U+2029 PARAGRAPH SEPARATOR only
 		.Zs, // Space_Separator, a space character (of various non-zero widths)
