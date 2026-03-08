@@ -39,6 +39,10 @@ Calling_Convention :: enum u8 {
 
 	Win64       = 9,
 	SysV        = 10,
+
+	Preserve_None = 11,
+	Preserve_Most = 12,
+	Preserve_All  = 13,
 }
 
 Type_Info_Enum_Value :: distinct i64
