@@ -149,9 +149,13 @@ is_digit :: proc(r: rune) -> bool {
 		return ('0' <= r && r <= '9') || r == 0x00B9 || (r >= 0x00B2 && r <= 0x0B3)
 	}
 
-	if in_range(r, nd_ranges) do return true
+	if in_range(r, nd_ranges) {
+		return true
+	}
 	
-	if in_range(r, extra_digits_ranges) do return true
+	if in_range(r, extra_digits_ranges) {
+		return true
+	}
 
 	return false
 }
