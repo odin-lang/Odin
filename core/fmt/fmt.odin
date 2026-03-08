@@ -2592,11 +2592,19 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 				prec = 6
 				buf[w] = 'm'
 			}
+			if fi.hash {
+				w -= 1
+				buf[w] = ' '
+			}
 			w, u = ffrac(buf[:w], u, prec)
 			w = fint(buf[:w], u)
 		} else {
 			w -= 1
 			buf[w] = 's'
+			if fi.hash {
+				w -= 1
+				buf[w] = ' '
+			}
 			w, u = ffrac(buf[:w], u, 9)
 			w = fint(buf[:w], u%60)
 			u /= 60
