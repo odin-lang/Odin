@@ -83,19 +83,22 @@ is_upper :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
 		return u32(r)-'A' < 26
 	}
-	c := i32(r)
-	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
-	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_lower_singlets[:], len(to_lower_singlets)/2, 2)
-	if p >= 0 && c == to_lower_singlets[p] {
-		return true
-	}
-	return false
+	return in_range(r, lu_ranges) || in_range(r, other_uppercase_ranges)
 }
 
 is_alpha :: is_letter
+
+/*
+Return true if the rune `r` is a letter. Being a letter means that the rune has
+the Unicode general category property of L. In practice, the character will have
+a general category property of Ll, Lm, Lo, Lt, or Lu.
+
+Inputs:
+- r: The rune which will be check for having the property of being a letter.
+
+Returns:
+`true` when the rune `r` is a letter. `false` will be returned in all other cases.
+*/
 @(require_results)
 is_letter :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -105,16 +108,9 @@ is_letter :: proc(r: rune) -> bool #no_bounds_check {
 		return true
 	}
 
-	c := i32(r)
-	p := binary_search(c, alpha_ranges[:], len(alpha_ranges)/2, 2)
-	if p >= 0 && alpha_ranges[p] <= c && c <= alpha_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, alpha_singlets[:], len(alpha_singlets), 1)
-	if p >= 0 && c == alpha_singlets[p] {
-		return true
-	}
-	return false
+	ll_lu := in_range(r, ll_ranges) || in_range(r, lu_ranges) 	
+
+	return ll_lu || in_range(r, lo_ranges) || in_range(r, lt_ranges) || in_range(r, lm_ranges) 
 }
 
 @(require_results)
