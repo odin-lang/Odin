@@ -197,6 +197,15 @@ is_graphic :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pg != 0
 	}
+
+	if is_letter(r) || is_number(r) || is_punct(r) || is_symbol(r) || in_range(r, zs_ranges) {
+		return true
+	}
+
+	if  in_range(r, mc_ranges) || in_range(r, me_ranges) || in_range(r, mn_ranges) {
+		return true
+	}
+
 	return false
 }
 

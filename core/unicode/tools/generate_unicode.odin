@@ -278,9 +278,9 @@ main :: proc() {
 		// .Lo, // Other_Letter, other letters, including syllables and ideographs
 		// .Lt, // Titlecase_Letter, a digraph encoded as a single character, with first part uppercase
 		// .Lu, // Uppercase_Letter, an uppercase letter
-		.Mc, // Spacing_Mark, a spacing combining mark (positive advance width)
-		.Me, // Enclosing_Mark, an enclosing combining mark
-		.Mn, // Nonspacing_Mark, a nonspacing combining mark (zero advance width)
+		// .Mc, // Spacing_Mark, a spacing combining mark (positive advance width)
+		// .Me, // Enclosing_Mark, an enclosing combining mark
+		// .Mn, // Nonspacing_Mark, a nonspacing combining mark (zero advance width)
 		//.Nd, // Decimal_Number, a decimal digit
 		//.Nl, // Letter_Number, a letterlike numeric character
 		//.No, // Other_Number, a numeric character of other type
@@ -295,9 +295,9 @@ main :: proc() {
 		// .Sk, // Modifier_Symbol, a non-letterlike modifier symbol
 		// .Sm, // Math_Symbol, a symbol of mathematical use
 		// .So, // Other_Symbol, a symbol of other type
-		.Zl, // Line_Separator, U+2028 LINE SEPARATOR only
-		.Zp, // Paragraph_Separator, U+2029 PARAGRAPH SEPARATOR only
-		.Zs, // Space_Separator, a space character (of various non-zero widths)
+		 .Zl, // Line_Separator, U+2028 LINE SEPARATOR only
+		 .Zp, // Paragraph_Separator, U+2029 PARAGRAPH SEPARATOR only
+		//.Zs, // Space_Separator, a space character (of various non-zero widths)
 	}
  
  	write_loop : for gc, i in general_category_ranges { 
