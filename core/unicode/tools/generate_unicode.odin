@@ -284,13 +284,13 @@ main :: proc() {
 		//.Nd, // Decimal_Number, a decimal digit
 		//.Nl, // Letter_Number, a letterlike numeric character
 		//.No, // Other_Number, a numeric character of other type
-		.Pc, // Connector_Punctuation, a connecting punctuation mark, like a tie
-		.Pd, // Dash_Punctuation, a dash or hyphen punctuation mark
-		.Pe, // Close_Punctuation, a closing punctuation mark (of a pair)
-		.Pf, // Final_Punctuation, a final quotation mark
-		.Pi, // Initial_Punctuation, an initial quotation mark
-		.Po, // Other_Punctuation, a punctuation mark of other type
-		.Ps, // Open_Punctuation, an opening punctuation mark (of a pair)
+		// .Pc, // Connector_Punctuation, a connecting punctuation mark, like a tie
+		// .Pd, // Dash_Punctuation, a dash or hyphen punctuation mark
+		// .Pe, // Close_Punctuation, a closing punctuation mark (of a pair)
+		// .Pf, // Final_Punctuation, a final quotation mark
+		// .Pi, // Initial_Punctuation, an initial quotation mark
+		// .Po, // Other_Punctuation, a punctuation mark of other type
+		// .Ps, // Open_Punctuation, an opening punctuation mark (of a pair)
 		.Sc, // Currency_Symbol, a currency sign
 		.Sk, // Modifier_Symbol, a non-letterlike modifier symbol
 		.Sm, // Math_Symbol, a symbol of mathematical use
