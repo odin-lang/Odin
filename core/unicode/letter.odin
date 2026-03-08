@@ -242,7 +242,16 @@ is_punct :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pP != 0
 	}
-	return false
+
+	if in_range(r, pc_ranges) || in_range(r, pd_ranges) || in_range(r, pe_ranges) {
+		return true
+	}
+	
+	if in_range(r, pf_ranges) || in_range(r, pi_ranges) || in_range(r, po_ranges) {
+		return true
+	}
+
+	return in_range(r, ps_ranges)
 }
 
 @(require_results)
