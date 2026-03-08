@@ -10,7 +10,9 @@ in_range :: proc(r: rune, range: Range) -> bool {
 
 		length := len(range.ranges_16)
 		index := binary_search(r16, range.ranges_16, length/2, 2) if length > 0 else -1
-		if index >= 0 && range.ranges_16[index] <= r16 && range.ranges_16[index+1] >= r16 do return true
+		if index >= 0 && range.ranges_16[index] <= r16 && range.ranges_16[index+1] >= r16 {
+			return true
+		}
 
 		length = len(range.single_16)
 		index = binary_search(r16, range.single_16, length, 1) if length > 0 else -1 
@@ -23,11 +25,15 @@ in_range :: proc(r: rune, range: Range) -> bool {
 
 	length := len(range.ranges_32)
 	index := binary_search(r32, range.ranges_32, length/2, 2) if length >0 else -1
-	if index >= 0 && range.ranges_32[index] <= r32 && range.ranges_32[index+1] >= r32 do return true
+	if index >= 0 && range.ranges_32[index] <= r32 && range.ranges_32[index+1] >= r32 {
+		return true
+	}
 
 	length = len(range.single_32)
 	index = binary_search(r32, range.single_32, length, 1) if length > 0 else -1
-	if index >= 0 && range.single_32[index] == r32  do return true
+	if index >= 0 && range.single_32[index] == r32  {
+		return true
+	}
 	
 
 	return false
