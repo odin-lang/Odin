@@ -267,6 +267,7 @@ load_protperty_list :: proc (
 					if !(c >= '0' && c <= '9') && !(c >= 'A' && c <= 'F') {
 						if c == '.' {
 							is_range = true
+							rr.last = 0
 							continue
 						} else {
 							err = UCD_Error.Invalid_Hex_Number
@@ -274,14 +275,14 @@ load_protperty_list :: proc (
 						}
 					}
 					if is_range {
+						rr.last *= 16
+						rr.last += cast(rune)(c >= '0' && c <= '9')  * cast(rune)(c - '0')  
+						rr.last += cast(rune)(c >= 'A' && c <= 'F')  * cast(rune)(c - 'A' + 10)
+					} else {
 						rr.first *= 16
 						rr.first += cast(rune)(c >= '0' && c <= '9')  * cast(rune)(c - '0')  
 						rr.first += cast(rune)(c >= 'A' && c <= 'F')  * cast(rune)(c - 'A' + 10)
 						rr.last = rr.first
-					} else {
-						rr.last *= 16
-						rr.last += cast(rune)(c >= '0' && c <= '9')  * cast(rune)(c - '0')  
-						rr.last += cast(rune)(c >= 'A' && c <= 'F')  * cast(rune)(c - 'A' + 10)
 					}
 				}
 
