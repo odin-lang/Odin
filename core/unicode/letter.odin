@@ -75,16 +75,7 @@ is_lower :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
 		return u32(r)-'a' < 26
 	}
-	c := i32(r)
-	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
-	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_upper_singlets[:], len(to_upper_singlets)/2, 2)
-	if p >= 0 && c == to_upper_singlets[p] {
-		return true
-	}
-	return false
+	return in_range(r, ll_ranges) || in_range(r, other_lowercase_ranges)
 }
 
 @(require_results)
