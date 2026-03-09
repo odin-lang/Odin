@@ -13,7 +13,7 @@ ZERO_WIDTH_JOINER     :: '\u200D'
 WORD_JOINER           :: '\u2060'
 
 @(require_results)
-binary_search :: proc(c: i32, table: []i32, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
+binary_search :: proc(c: $T, table: []T, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
 	runtime.bounds_check_error_loc(loc, length*stride-1, len(table))
 	n := length
 	t := 0
@@ -75,16 +75,7 @@ is_lower :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
 		return u32(r)-'a' < 26
 	}
-	c := i32(r)
-	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
-	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_upper_singlets[:], len(to_upper_singlets)/2, 2)
-	if p >= 0 && c == to_upper_singlets[p] {
-		return true
-	}
-	return false
+	return in_range(r, ll_ranges) || in_range(r, other_lowercase_ranges)
 }
 
 @(require_results)
@@ -92,19 +83,22 @@ is_upper :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
 		return u32(r)-'A' < 26
 	}
-	c := i32(r)
-	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
-	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_lower_singlets[:], len(to_lower_singlets)/2, 2)
-	if p >= 0 && c == to_lower_singlets[p] {
-		return true
-	}
-	return false
+	return in_range(r, lu_ranges) || in_range(r, other_uppercase_ranges)
 }
 
 is_alpha :: is_letter
+
+/*
+Return true if the rune `r` is a letter. Being a letter means that the rune has
+the Unicode general category property of L. In practice, the character will have
+a general category property of Ll, Lm, Lo, Lt, or Lu.
+
+Inputs:
+- r: The rune which will be check for having the property of being a letter.
+
+Returns:
+`true` when the rune `r` is a letter. `false` will be returned in all other cases.
+*/
 @(require_results)
 is_letter :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -114,16 +108,9 @@ is_letter :: proc(r: rune) -> bool #no_bounds_check {
 		return true
 	}
 
-	c := i32(r)
-	p := binary_search(c, alpha_ranges[:], len(alpha_ranges)/2, 2)
-	if p >= 0 && alpha_ranges[p] <= c && c <= alpha_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, alpha_singlets[:], len(alpha_singlets), 1)
-	if p >= 0 && c == alpha_singlets[p] {
-		return true
-	}
-	return false
+	ll_lu := in_range(r, ll_ranges) || in_range(r, lu_ranges) 	
+
+	return ll_lu || in_range(r, lo_ranges) || in_range(r, lt_ranges) || in_range(r, lm_ranges) 
 }
 
 @(require_results)
@@ -131,11 +118,45 @@ is_title :: proc(r: rune) -> bool {
 	return is_upper(r) && is_lower(r)
 }
 
+/*
+Returns true if the rune `r` is in the General Category Nd
+
+Inputs:
+- r: The run to check if it is in the general category Nd.
+
+Returns:
+`true` if the rune is in the general category Nd and `false` otherwise
+
+*/
+is_decimal :: proc(r: rune) -> bool {
+	return in_range(r, nd_ranges)
+}
+
+/*
+This function determincs if a rune is a digit. To be a digit the 
+charage either has a Numeric_Type of Digit or Decimal. 
+
+Inputs:
+- r: The rune to check if it is a digit.
+
+Returns:
+`true` if the rune `r` is a digit, `false` in all other cases
+
+*/
 @(require_results)
 is_digit :: proc(r: rune) -> bool {
 	if r <= MAX_LATIN1 {
-		return '0' <= r && r <= '9'
+		return ('0' <= r && r <= '9') || r == 0x00B9 || (r >= 0x00B2 && r <= 0x0B3)
 	}
+
+	if in_range(r, nd_ranges) {
+		return true
+	}
+	
+	if in_range(r, extra_digits_ranges) {
+		return true
+	}
+
 	return false
 }
 
@@ -176,6 +197,15 @@ is_graphic :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pg != 0
 	}
+
+	if is_letter(r) || is_number(r) || is_punct(r) || is_symbol(r) || in_range(r, zs_ranges) {
+		return true
+	}
+
+	if  in_range(r, mc_ranges) || in_range(r, me_ranges) || in_range(r, mn_ranges) {
+		return true
+	}
+
 	return false
 }
 
@@ -195,12 +225,25 @@ is_control :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
+/*
+Checks to see if the rune `r` is a number. This means the rune is a member
+of the general category Nd, Nl, or No.
+
+Inputs:
+r: The rune to check if it is number.
+
+Returns:
+`true` if the ruen belongs to the general category Nd, Nl, or No. `false`
+is return in all other cases.
+
+*/
 @(require_results)
 is_number :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pN != 0
 	}
-	return false
+
+	return in_range(r, nd_ranges) || in_range(r, nl_ranges) || in_range(r, no_ranges)
 }
 
 @(require_results)
@@ -208,7 +251,16 @@ is_punct :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pP != 0
 	}
-	return false
+
+	if in_range(r, pc_ranges) || in_range(r, pd_ranges) || in_range(r, pe_ranges) {
+		return true
+	}
+	
+	if in_range(r, pf_ranges) || in_range(r, pi_ranges) || in_range(r, po_ranges) {
+		return true
+	}
+
+	return in_range(r, ps_ranges)
 }
 
 @(require_results)
@@ -216,6 +268,13 @@ is_symbol :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pS != 0
 	}
+
+	s := in_range(r, sc_ranges) || in_range(r, sm_ranges) 
+	
+	if s || in_range(r, so_ranges) || in_range(r, sk_ranges) {
+		return true
+	}
+
 	return false
 }
 
