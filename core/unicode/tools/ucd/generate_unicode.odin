@@ -3,129 +3,112 @@ package ucd
 import "core:fmt"
 import "core:os"
 import "core:strings"
-import "base:runtime"
 import "core:mem"
 import "core:io"
 import "core:log"
 
 // Table 2-3. Types of Code Points
 // Table 4-4. General_Category Values page 229
-
 // Reference https://www.unicode.org/reports/tr44/
 
-
 /*
-Formats a Dynamic_Range into a set of fixed length arrays and writes
-corresponding to a io.Writer. The value of the parameter `name`will be used as a
-prefix to the array names. If a dynamic array contained in the `range` is empty,
-no corresponding fixed length array will be written.
+Formats a `Dynamic_Range` into a set of fixed length arrays and writes them to an `io.Writer`.
+The value of the parameter `name` will be used as a prefix to the array names.
+
+If a dynamic array contained in the `range` is empty, no corresponding fixed length array will be written.
 
 Inputs:
-- writer: The io.Writer to be written to.
+- writer: The `io.Writer` to be written to.
 - name: Prefix to add to any array that is written to `writer`
-- range: The Dynamic_Range to format and write to writer.
+- range: `The Dynamic_Range` to format and write to writer.
 */
-write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range) -> int {
-	n_written : int
+write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range) {
 	if len(range.single_16) > 0 {
-		n_written += fmt.wprintln(writer, "@(rodata)")
-		n_written += fmt.wprintf(writer, "%s_singles16 := [?]u16{{", name)
-		line_length := 100
-		for v in range.single_16 {
-			str_buffer : [32]byte
-			str := fmt.bprintf(str_buffer[:], " 0x%4X,",v)
-
-			if line_length + len(str) > 80 {
-				n_written += fmt.wprintf(writer, "\n")
-				line_length = fmt.wprintf(writer, "\t0x%4X,",v)
-				n_written +=  line_length
+		fmt.wprintln(writer, "@(rodata)")
+		fmt.wprintf(writer, "%s_singles16 := [?]u16{{", name)
+		for v, count in range.single_16 {
+			if count % 8 == 0 {
+				fmt.wprintf(writer, "\n\t0x%4X,", v)
+				continue
 			} else {
-				temp, _ := io.write_string(writer, str)
-				line_length += temp
-				n_written += temp
+				fmt.wprintf(writer, " 0x%4X,", v)
 			}
 		}
-		n_written += fmt.wprintln(writer, "\n}\n")
+		fmt.wprintln(writer, "\n}\n")
 	}
 
 	if len(range.ranges_16) > 0 {
-		n_written += fmt.wprintln(writer, "@(rodata)")
-		n_written += fmt.wprintfln(writer, "%s_ranges16 := [?]u16{{", name)
+		fmt.wprintln(writer, "@(rodata)")
+		fmt.wprintfln(writer, "%s_ranges16 := [?]u16{{", name)
 		for v in range.ranges_16 {
-			n_written += fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
+			fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
 		}
-		n_written += fmt.wprintln(writer, "}\n")
+		fmt.wprintln(writer, "}\n")
 	}
 
 	if len(range.single_32) > 0 {
-		n_written += fmt.wprintln(writer, "@(rodata)")
-		n_written += fmt.wprintf(writer, "%s_singles32 := [?]i32{{", name)
-		line_length := 100
-		for v in range.single_32 {
-			str_buffer : [32]byte
-			str := fmt.bprintf(str_buffer[:], " 0x%4X,",v)
-
-			if line_length + len(str) > 80 {
-				n_written += fmt.wprint(writer, "\n")
-				line_length = fmt.wprintf(writer, "\t0x%4X,",v)
-				n_written += line_length
+		fmt.wprintln(writer, "@(rodata)")
+		fmt.wprintf(writer, "%s_singles32 := [?]i32{{", name)
+		for v, count in range.single_32 {
+			if count % 8 == 0 {
+				fmt.wprintf(writer, "\n\t0x%4X,", v)
+				continue
 			} else {
-				temp, _ := io.write_string(writer, str)
-				line_length += temp
-				n_written += temp
+				fmt.wprintf(writer, " 0x%4X,", v)
 			}
 		}
-		n_written += fmt.wprintln(writer, "\n}\n")
+		fmt.wprintln(writer, "\n}\n")
 	}
 
 	if len(range.ranges_32) > 0 {
-		n_written += fmt.wprintln(writer, "@(rodata)")
-		n_written += fmt.wprintfln(writer, "%s_ranges32 := [?]i32{{", name)
+		fmt.wprintln(writer, "@(rodata)")
+		fmt.wprintfln(writer, "%s_ranges32 := [?]i32{{", name)
 		for v in range.ranges_32 {
-			n_written += fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
+			fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
 		}
-		n_written += fmt.wprintln(writer, "}\n")
+		fmt.wprintln(writer, "}\n")
 	}
 
-	return n_written
+	return
 }
 
-write_range :: proc(writer: io.Writer, name: union{string, General_Category}, range: Dynamic_Range) -> (n_written: int) {
+write_range :: proc(writer: io.Writer, name: union{string, General_Category}, range: Dynamic_Range) {
 	buffer: [128]byte
 	str: string
 
-	switch n in name{
+	switch n in name {
 	case string:
 		assert(len(n) <= len(buffer))
-		runtime.mem_copy(&buffer[0], raw_data(n), len(n))
-		str = transmute(string) buffer[0:len(n)]
+		copy(buffer[:], n)
+		str = string(buffer[:len(n)])
 
 	case General_Category:
 		str = fmt.bprintf(buffer[:], "%s", n)
 	}
 
+	// lowercase table names
 	for &b in buffer[0:len(str)] {
 		if b >= 'A' && b <= 'Z' {
 			b += ('a' - 'A')
 		}
 	}
 
-	n_written = write_range_arrays(writer, str, range)
+	write_range_arrays(writer, str, range)
 
-	n_written += fmt.wprintfln(writer, "%s_ranges := Range{{", str)
+	fmt.wprintfln(writer, "%s_ranges := Range{{", str)
 	if len(range.single_16) > 0 {
-		n_written += fmt.wprintfln(writer, "\tsingle_16 = %s_singles16[:],", str)
+		fmt.wprintfln(writer, "\tsingle_16 = %s_singles16[:],", str)
 	}
 	if len(range.ranges_16) > 0 {
-		n_written += fmt.wprintfln(writer, "\tranges_16 = %s_ranges16[:],", str)
+		fmt.wprintfln(writer, "\tranges_16 = %s_ranges16[:],", str)
 	}
 	if len(range.single_32) > 0 {
-		n_written += fmt.wprintfln(writer, "\tsingle_32 = %s_singles32[:],", str)
+		fmt.wprintfln(writer, "\tsingle_32 = %s_singles32[:],", str)
 	}
 	if len(range.ranges_32) > 0 {
-		n_written += fmt.wprintfln(writer, "\tranges_32 = %s_ranges32[:],", str)
+		fmt.wprintfln(writer, "\tranges_32 = %s_ranges32[:],", str)
 	}
-	n_written += fmt.wprintln(writer, "}\n")
+	fmt.wprintln(writer, "}\n")
 
 	return
 }
@@ -283,13 +266,13 @@ main :: proc() {
 		//.Zs, // Space_Separator, a space character (of various non-zero widths)
 	}
 
-	write_loop : for gc, i in general_category_ranges {
+	write_loop: for range, category in general_category_ranges {
 		for excluded in to_exclude {
-			if i == excluded {
+			if category == excluded {
 				continue write_loop
 			}
 		}
-		write_range(writer, i, gc)
+		write_range(writer, category, range)
 	}
 
 	write_range(writer, "extra_digits",    extra_digits)

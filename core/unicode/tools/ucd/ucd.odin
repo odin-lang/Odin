@@ -33,18 +33,18 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 
 	str := string(data)
 	line_loop: for _line in strings.split_lines_iterator(&str) {
+		// Ignore any comments
 		line, _, _ := strings.partition(_line, "#")
-		if len(line) == 0 {
-			continue
-		}
+
+		// Skip empty lines
+		if len(line) == 0 { continue }
 
 		is_range := false
-		cp: rune
-		name: string
-		gc: General_Category
-
-		num_6 : string
-		num_7 : string
+		cp:    rune
+		name:  string
+		gc:    General_Category
+		num_6: string
+		num_7: string
 		nt := Numeric_Type.None
 
 		field_num := 0
@@ -76,7 +76,7 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 			case 3: // Canonical_Combining_Class
 			case 4: // Bidi Class
 			case 5: // Decomposition_Type and Decomposition_Mapping
-			// Numeric_Type and Numberic_Value
+			// Numeric_Type and Numeric_Value
 			case 6:
 				num_6 = field
 
