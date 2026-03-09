@@ -98,38 +98,39 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 					nt = .None
 				}
 
-			case 9: // Bidi mirrored
+			case 9:  // Bidi mirrored
 			case 10: // Unicode 1 Name (Obsolete as of 6.2.0)
 			case 11: // should be null
 			case 12:
 			case 13:
 			case 14:
-			case: 
-				unreachable()
+			case:
+				err = .Extra_Fields
+				return
 			}
 		}
 
 		if is_range {
-			cr : Char_Range
-			cr.gc = gc
-			cr.first_cp = first_cp
-			cr.last_cp = cp
-			cr.name = name
-			cr.nt = nt
-			append(&unicode_data, cr)
+			append(&unicode_data, Char_Range {
+				gc       = gc,
+				first_cp = first_cp,
+				last_cp  = cp,
+				name     = name,
+				nt       = nt,
+			})
 		} else {
-			c : Char
-			c.gc = gc
-			c.cp = cp
-			c.name = name
-			c.nt = nt
-			append(&unicode_data, c)
+			append(&unicode_data, Char{
+				gc   = gc,
+				cp   = cp,
+				name = name,
+				nt   = nt,
+			})
 		}
 	}
 	return
 }
 
-destroy_unicode_data :: proc(unicode_data: Unicode_Data){
+destroy_unicode_data :: proc(unicode_data: Unicode_Data) {
 	for point in unicode_data {
 		switch p in point {
 		case Char:
@@ -143,9 +144,9 @@ destroy_unicode_data :: proc(unicode_data: Unicode_Data){
 
 
 gc_ranges :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (lst: [General_Category]Dynamic_Range) {
-	range := Range_Rune {
+	range := Range_Rune{
 		first = -1,
-		last = -1,
+		last  = -1,
 	}
 	gc: General_Category
 
@@ -174,6 +175,7 @@ gc_ranges :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (lst: [G
 			range.last = -1
 		}
 	}
+
 	if range.first != -1 {
 		append_to_dynamic_range(&lst[gc], range, allocator)
 	}
@@ -274,15 +276,10 @@ load_property_list :: proc(filename: string, allocator := context.allocator) -> 
 			field := strings.trim_space(_field)
 
 			switch i {
-			case 0: // Code point or code point range
-				rr.first, rr.last = decode_rune(field) or_return
-
-			case 1:
-				prop = string_to_proplist_property(field) or_return
-
-			case:
-				err = UCD_Error.Extra_Fields
-				return
+			// Code point or code point range
+			case 0: rr.first, rr.last = decode_rune(field) or_return
+			case 1: prop = string_to_proplist_property(field) or_return
+			case:   return {}, .Extra_Fields
 			}
 		}
 

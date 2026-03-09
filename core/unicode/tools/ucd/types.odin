@@ -3,7 +3,7 @@ package ucd
 import "core:os"
 
 Age :: enum byte {
-	Nil = 0,
+	Age_Unknown = 0,
 	Age_1_1,
 	Age_2_0,
 	Age_2_1,
@@ -421,50 +421,48 @@ Block :: enum {
 
 Combining_Class :: distinct byte
 
-Paired_Brack_Type :: enum {
-	Nil,
+Paired_Bracket_Type :: enum {
+	Unknown,
 	Open,
 	Close,
 	None,
 }
 
 Bidi_Class :: enum {
-	Nil, // 
-	L,   // Left-to-Right  LRM
-	R,   // Right-to-Left  RLM
-	AL,  // Right-to-Left Arabic ALM 
-	EN,  // European Number
-	ES,  // European Number Separator
-	ET,  // European Number Terminator
-	AN,  // Arabic Number
-	CS,  // Common Number Separator
-	NSM, // Nonspacing Mark
-	BN,  // Boundary Neutral
-	B,   // Paragraph Separator
-	S,   // Segment Separator
-	WS,  // Whitespace
-	ON,  // Other Neutrals
-	LRE, // Left-to-Right Embedding  LRE    
-	LRO, // Left-to-Right Override   LRO
-	RLE, // Right-to-Left Embedding  RLE
-	RLO, // Right-to-Left Override   RLO
-	PDF, // Pop Directional Format   PDF
-	LRI, // Left-to-Right Isolate    LRI
-	RLI, // Right-to-Left Isolate    RLI
-	FSI, // First Strong Isolate     FSI
-	PDI, // Pop Directional Isolate  PDI
+	Unknown, //
+	L,       // Left-to-Right  LRM
+	R,       // Right-to-Left  RLM
+	AL,      // Right-to-Left Arabic ALM
+	EN,      // European Number
+	ES,      // European Number Separator
+	ET,      // European Number Terminator
+	AN,      // Arabic Number
+	CS,      // Common Number Separator
+	NSM,     // Nonspacing Mark
+	BN,      // Boundary Neutral
+	B,       // Paragraph Separator
+	S,       // Segment Separator
+	WS,      // Whitespace
+	ON,      // Other Neutrals
+	LRE,     // Left-to-Right Embedding  LRE
+	LRO,     // Left-to-Right Override   LRO
+	RLE,     // Right-to-Left Embedding  RLE
+	RLO,     // Right-to-Left Override   RLO
+	PDF,     // Pop Directional Format   PDF
+	LRI,     // Left-to-Right Isolate    LRI
+	RLI,     // Right-to-Left Isolate    RLI
+	FSI,     // First Strong Isolate     FSI
+	PDI,     // Pop Directional Isolate  PDI
 }
-
 
 Bidi :: struct {
-	bc: Bidi_Class,
+	bc:  Bidi_Class,
 	bmg: Maybe(rune), // mirrored glyph
-	m: bool, // Bidi mirrored
-	c: bool, // Bidi control property
-	bpt : Paired_Brack_Type, // bidi paired bracket type 
-	bpb : rune, // bidi paired bracket properties 
+	m:   bool, // Bidi mirrored
+	c:   bool, // Bidi control property
+	pb:  Paired_Bracket_Type, // bidi paired bracket type
+	bpb: rune, // bidi paired bracket properties
 }
-
 
 Decomposition_Type :: enum {
 	Nil = 0,
@@ -490,71 +488,71 @@ Decomposition_Type :: enum {
 
 Trinary_Bool :: enum {
 	Maybe = -1,
-	False = 0,
-	True = 1,
+	False =  0,
+	True  =  1,
 }
 
 Decomposition_Mapping :: distinct [dynamic]rune 
 
 Decomposition :: struct {
-	dt: Decomposition_Type, // Decomposition type
-	dm: Decomposition_Mapping, // Decomposition Mapping
-	ce: bool, // Composition Exclusion
-	comp_ex: bool, // Full Composition Exclusion
-	nfc_quick_check: Trinary_Bool,
-	nfd_quick_check: bool,
+	dt:               Decomposition_Type, // Decomposition type
+	dm:               Decomposition_Mapping, // Decomposition Mapping
+	ce:               bool, // Composition Exclusion
+	comp_ex:          bool, // Full Composition Exclusion
+	nfc_quick_check:  Trinary_Bool,
+	nfd_quick_check:  bool,
 	nfkc_quick_check: Trinary_Bool,
 	nfkd_quick_check: bool,
 }
 
 Numeric_Type :: enum {
-	None = 0, // None
-	Decimal, // De
-	Digit, // Di
-	Numeric, // Nu
+	None     = 0, // None
+	Decimal,      // De
+	Digit,        // Di
+	Numeric,      // Nu
 }
 
 /*
 Note: Value is NAN when numberator and denominator ar 0
 */
 Numberic_Value :: struct {
-	numerator: int,
+	numerator:   int,
 	denominator: int,
 }
 
 Char :: struct {
-	cp: rune,
-	name: string, 
-	gc: General_Category,
-	ccc: Combining_Class,
-	bc: Bidi_Class,
-	dt: Decomposition_Type,
-	dm: Decomposition_Mapping,
-	nt: Numeric_Type,
-	nv: Numberic_Value,
-	bm: bool,
+	cp:    rune,
+	name:  string,
+	gc:    General_Category,
+	ccc:   Combining_Class,
+	bc:    Bidi_Class,
+	dt:    Decomposition_Type,
+	dm:    Decomposition_Mapping,
+	nt:    Numeric_Type,
+	nv:    Numberic_Value,
+	bm:    bool,
 	name1: string,
-	sum: string, // Simple uppercase mapping
-	slm: string, // Simple lowercase mapping
-	stm: string, // Simple titlecase_mapping
+	sum:   string, // Simple uppercase mapping
+	slm:   string, // Simple lowercase mapping
+	stm:   string, // Simple titlecase_mapping
 }
 
 Char_Range :: struct {
 	first_cp: rune,
-	last_cp: rune,
-	name: string, 
-	gc: General_Category,
-	ccc: Combining_Class,
-	bc: Bidi_Class,
-	dt: Decomposition_Type,
-	dm: Decomposition_Mapping,
-	nt: Numeric_Type,
-	nv: Numberic_Value,
-	bm: bool,
-	name1: string,
-	sum: string, // Simple uppercase mapping
-	slm: string, // Simple lowercase mapping
-	stm: string, // Simple titlecase_mapping
+	last_cp:  rune,
+	name:     string,
+	gc:       General_Category,
+	ccc:      Combining_Class,
+	bc:       Bidi_Class,
+	dt:       Decomposition_Type,
+	dm:       Decomposition_Mapping,
+	nt:       Numeric_Type,
+	nv:       Numberic_Value,
+	bm:       bool,
+	name1:    string,
+	sum:      string, // Simple uppercase mapping
+	slm:      string, // Simple lowercase mapping
+	stm:      string, // Simple titlecase_mapping
 }
 
 Chars :: union {
@@ -565,7 +563,8 @@ Chars :: union {
 Unicode_Data :: distinct [dynamic]Chars
 
 
-PropList_Property :: enum {
+Prop_List_Property :: enum {
+	Unknown,
 	White_Space,
 	Bidi_Control,
 	Join_Control,
@@ -613,6 +612,7 @@ UCD_Error :: enum {
 	Element_Not_Repertoire,
 	Extra_Fields,
 	Unknown_Property,
+	Unknown_Bidi_Class,
 
 	NO_REPERTOIRE,
 	UNEXPECTED_STRING,
@@ -632,70 +632,62 @@ Error :: union #shared_nil {
 
 Range_u16 :: struct {
 	first: u16,
-	last: u16,
+	last:  u16,
 }
 
 Range_i32 :: struct {
 	first: i32,
-	last: i32,
+	last:  i32,
 }
 
 Range_Rune :: struct {
 	first: rune,
-	last: rune,
+	last:  rune,
 }
 
 Dynamic_Range :: struct {
-	single_16 : [dynamic]u16,
-	ranges_16 : [dynamic]Range_u16,
-	single_32 : [dynamic]i32,
-	ranges_32 : [dynamic]Range_i32,
+	single_16: [dynamic]u16,
+	ranges_16: [dynamic]Range_u16,
+	single_32: [dynamic]i32,
+	ranges_32: [dynamic]Range_i32,
 }
 
-append_to_dynamic_range :: proc(
-	dr: ^Dynamic_Range,
-	range: Range_Rune,
-	allocator := context.allocator,
-) {
+append_to_dynamic_range :: proc(dr: ^Dynamic_Range, range: Range_Rune, allocator := context.allocator) {
 	if range.first == range.last && range.first <= 0xFFFF {
 		if len(dr.single_16) == 0 {
 			dr.single_16 = make([dynamic]u16, 0, 512, allocator) 
 		}
-		append(&dr.single_16, cast(u16) range.first)
+		append(&dr.single_16, cast(u16)range.first)
 	} else if range.first == range.last {
 		if len(dr.single_32) == 0 {
 			dr.single_32 = make([dynamic]i32, 0, 512, allocator) 
 		}
-		append(&dr.single_32, cast(i32) range.first)
+		append(&dr.single_32, cast(i32)range.first)
 	
 	} else if range.first <= 0xFFFF && range.last <= 0xFFFF {
 		if len(dr.ranges_16) == 0 {
 			dr.ranges_16 = make([dynamic]Range_u16, 0, 128, allocator) 
 		}
-		r := Range_u16{ cast(u16)range.first, cast(u16) range.last}
+		r := Range_u16{ cast(u16)range.first, cast(u16)range.last}
 		append(&dr.ranges_16, r)
 	
 	} else {
 		if len(dr.ranges_32) == 0 {
 			dr.ranges_32 = make([dynamic]Range_i32, 0, 128, allocator) 
 		}
-		r := Range_i32{ cast(i32)range.first, cast(i32) range.last}
+		r := Range_i32{ cast(i32)range.first, cast(i32)range.last}
 		append(&dr.ranges_32, r)
 	}
 }
 
-destroy_dynamic_range :: proc (
-	dr: Dynamic_Range,
-){
+destroy_dynamic_range :: proc(dr: Dynamic_Range) {
 	delete(dr.ranges_16)
 	delete(dr.ranges_32)
 	delete(dr.single_16)
 	delete(dr.single_32)
 }
 
-destroy_general_category_ranges :: proc(
-	gcr: [General_Category]Dynamic_Range,
-){
+destroy_general_category_ranges :: proc(gcr: [General_Category]Dynamic_Range) {
 	for r in gcr {
 		destroy_dynamic_range(r)
 	}
