@@ -58,6 +58,33 @@ test_align_bumping_block_limit :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_large_minimum_block_size :: proc(t: ^testing.T) {
+	a: virtual.Arena
+	defer virtual.arena_destroy(&a)
+
+	init_err := virtual.arena_init_growing(&a, 16*mem.Megabyte)
+	testing.expect_value(t, init_err, nil)
+
+	align : uint = 4
+	for _ in 0..<6 {
+		data, err := virtual.arena_alloc(&a, 18874368, align)
+		testing.expect_value(t, err, nil)
+		testing.expect(t, len(data) == 18874368)
+		testing.expect(t, uintptr(raw_data(data)) & uintptr(align-1) == 0)
+		align *= 2
+		virtual.arena_free_all(&a)
+	}
+
+	align = 4
+	for _ in 0..<32 {
+		data, err := virtual.arena_alloc(&a, 1048576, align)
+		testing.expect_value(t, err, nil)
+		testing.expect(t, len(data) == 1048576)
+		testing.expect(t, uintptr(raw_data(data)) & uintptr(align-1) == 0)
+	}
+}
+
+@(test)
 tlsf_test_overlap_and_zero :: proc(t: ^testing.T) {
 	default_allocator := context.allocator
 	alloc: tlsf.Allocator
