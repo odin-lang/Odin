@@ -15,14 +15,17 @@ load_unicode_data :: proc(
 	}
 	defer free_all(context.temp_allocator)
 
-	line_iter := Line_Iterator{data = data }
+	// line_iter := Line_Iterator{data = data }
 	first_cp: rune
 
-	line_loop: for line, line_num in line_iterator(&line_iter) {
-		// Skip empty lines
+	str := string(data)
+	line_no := 1
+	line_loop: for _line in strings.split_lines_iterator(&str) {
+		defer line_no += 1
+		line, _, _ := strings.partition(_line, "#")
 		if len(line) == 0 do continue
 
-		field_iter := Field_Iterator{line = line}
+		// field_iter := Field_Iterator{line = line}
 		is_range := false
 		cp: rune
 		name: string
@@ -33,7 +36,11 @@ load_unicode_data :: proc(
 		nt := Numeric_Type.None
 		nv : Numberic_Value
 
-		for field, field_num in field_iterator(&field_iter) {
+		field_num := 0
+		for field in strings.split_iterator(&line, ";") {
+			defer field_num += 1
+			field := strings.trim_space(field)
+
 			switch field_num {
 			case 0: // Code point
 				cp = 0
@@ -52,10 +59,10 @@ load_unicode_data :: proc(
 				}
 				
 				if len(field) > 9 && field[0] == '<' && strings.ends_with(transmute(string) field, ", Last>") {
-					name = strings.clone_from_bytes(field[1:len(field)-7], allocator)
+					name = strings.clone(field[1:len(field)-7], allocator)
 					is_range = true
 				} else {
-					name = strings.clone_from_bytes(field[:], allocator)
+					name = strings.clone(field[:], allocator)
 				}
 
 			case 2: // General_Category
@@ -236,6 +243,8 @@ destroy_protperty_list :: proc(
 	}
 }
 
+import "core:fmt"
+
 load_protperty_list :: proc (
 	filename : string,
 	allocator := context.allocator,
@@ -251,16 +260,26 @@ load_protperty_list :: proc (
 	line_iter := Line_Iterator{
 		data = data
 	}
-	for line in line_iterator(&line_iter) {
+
+	str := string(data)
+	line_no := 1
+	for _line in strings.split_lines_iterator(&str) {
+		defer line_no += 1
+		line, _, _ := strings.partition(_line, "#")
 		if len(line) == 0 do continue
-		field_iter := Field_Iterator{ line = line}
+		fmt.printfln("%d: %q", line_no, line)
 
 		is_range: bool
 
 		rr : Range_Rune
 
 		prop: PropList_Property 
-		for field, i in field_iterator(&field_iter) {
+		i := 0
+		for field in strings.split_iterator(&line, ";") {
+			defer i += 1
+			field := strings.trim_space(field)
+			fmt.printfln("%d: %q", i, field)
+
 			switch i {
 			case 0: // Code point or code point range
 				for c in field {
@@ -303,6 +322,3 @@ load_protperty_list :: proc (
 
 	return
 }
-
-
-

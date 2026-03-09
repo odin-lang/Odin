@@ -1,4 +1,5 @@
-package main
+package ucd
+
 import "core:fmt"
 import path "core:path/filepath"
 import "core:os"
@@ -7,7 +8,6 @@ import "base:runtime"
 import "core:mem"
 import "core:io"
 import "core:log"
-import "ucd"
 
 // Table 2-3. Types of Code Points
 // Table 4-4. General_Category Values page 229
@@ -16,7 +16,7 @@ import "ucd"
 
 
 /*
-Formats a ucd.Dynamic_Range into a set of fixed length arrays and writes
+Formats a Dynamic_Range into a set of fixed length arrays and writes
 corresponding to a io.Writer. The value of the parameter `name`will be used as a
 prefix to the array names. If a dynamic array contained in the `range` is empty,
 no corresponding fixed length array will be written.
@@ -24,12 +24,12 @@ no corresponding fixed length array will be written.
 Inputs:
 - writer: The io.Writer to be written to.
 - name: Prefix to add to any array that is written to `writer`
-- range: The ucd.Dynamic_Range to format and write to writer.
+- range: The Dynamic_Range to format and write to writer.
 */
 write_range_arrays :: proc(
 	writer: io.Writer,
 	name: string,
-	range : ucd.Dynamic_Range,
+	range : Dynamic_Range,
 ) -> int {
 	n_written : int
 	if len(range.single_16) > 0 { 
@@ -98,8 +98,8 @@ write_range_arrays :: proc(
 write_range :: proc(
 	writer: io.Writer,
 	name: union{string,
-	ucd.General_Category},
-	range: ucd.Dynamic_Range,
+	General_Category},
+	range: Dynamic_Range,
 ) -> (n_written: int) {
 	buffer: [128]byte
 	str: string
@@ -110,7 +110,7 @@ write_range :: proc(
 		runtime.mem_copy(&buffer[0], raw_data(n), len(n))
 		str = transmute(string) buffer[0:len(n)]
 
-	case ucd.General_Category:
+	case General_Category:
 		str = fmt.bprintf(buffer[:], "%s", n)
 	}
 
@@ -221,28 +221,28 @@ main :: proc() {
 		"tests","core","assets","UCD","UnicodeData.txt"}, context.allocator)
 	defer delete(ucd_path)
 
-	unicode_data, ucd_err := ucd.load_unicode_data(ucd_path)
+	unicode_data, ucd_err := load_unicode_data(ucd_path)
 	if ucd_err != nil {
 		log.errorf("Error loading Unicode data. %s", ucd_err)
 	}
-	defer ucd.destroy_unicode_data(unicode_data)
+	defer destroy_unicode_data(unicode_data)
 
-	general_category_ranges := ucd.gc_ranges(&unicode_data)
-	defer ucd.destroy_general_category_ranges(general_category_ranges)  
+	general_category_ranges := gc_ranges(&unicode_data)
+	defer destroy_general_category_ranges(general_category_ranges)
 
-	extra_digits := ucd.extra_digits(&unicode_data)
-	defer ucd.destroy_dynamic_range(extra_digits) 
+	extra_digits := extra_digits(&unicode_data)
+	defer destroy_dynamic_range(extra_digits)
 
 
 	proplist_path, _ := path.join({ODIN_ROOT,
 		"tests","core","assets","UCD","PropList.txt"}, context.allocator)
 	defer delete(proplist_path)
-	proplist, proplist_err := ucd.load_protperty_list(proplist_path)
+	proplist, proplist_err := load_protperty_list(proplist_path)
 	if proplist_err != nil {
 		log.errorf("Error loading PropList.txt. %s", proplist_err)
 		return
 	}
-	defer ucd.destroy_protperty_list(proplist) 
+	defer destroy_protperty_list(proplist)
 
 
 
@@ -267,7 +267,7 @@ main :: proc() {
 
 	//List of the general categories to skip when generating the code for
 	//core/unicode/generated.txt. 
-	to_exclude := [?]ucd.General_Category{
+	to_exclude := [?]General_Category{
 		.Cc, // Control, a C0 or C1 control code
 		.Cf, // Format, a format control character
 		.Cn, // Unassigned, a reserved unassigned code point or a noncharacter
