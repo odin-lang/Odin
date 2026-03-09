@@ -77,7 +77,7 @@ string_to_proplist_property :: proc(str: string) -> (prop: Prop_List_Property) {
 	case "Prepended_Concatenation_Mark":       prop = .Prepended_Concatenation_Mark
 	case "Regional_Indicator":                 prop = .Regional_Indicator
 	case "Modifier_Combining_Mark":            prop = .Modifier_Combining_Mark
-	case:                                      prop = .Unknown_Property
+	case:                                      prop = .Unknown
 	}
 	return
 }
