@@ -214,55 +214,53 @@ string_to_paired_bracket_type :: proc "contextless"(str: string) -> Paired_Brack
 
 string_to_bidi_class :: proc "contextless"(str: string) -> Bidi_Class {
 	switch str {
-		case "AL":
+	case "AL":
 			return .AL
-		case "AN":
+	case "AN":
 			return .AN
-		case "B":
+	case "B":
 			return .B
-		case "BN":
+	case "BN":
 			return .BN
-		case "CS":
+	case "CS":
 			return .CS
-		case "EN":
+	case "EN":
 			return .EN
-		case "ES":
+	case "ES":
 			return .ES
-		case "ET":
+	case "ET":
 			return .ET
-		case "FSI":
+	case "FSI":
 			return .FSI
-		case "L":
+	case "L":
 			return .L
-		case "LRE":
+	case "LRE":
 			return .LRE
-		case "LRI":
+	case "LRI":
 			return .LRI
-		case "LRO":
+	case "LRO":
 			return .LRO
-		case "NSM":
+	case "NSM":
 			return .NSM
-		case "ON":
+	case "ON":
 			return .ON
-		case "PDF":
+	case "PDF":
 			return .PDF
-		case "PDI":
+	case "PDI":
 			return .PDI
-		case "R":
+	case "R":
 			return .R
-		case "RLE":
+	case "RLE":
 			return .RLE
-		case "RLI":
+	case "RLI":
 			return .RLI
-		case "RLO":
+	case "RLO":
 			return .RLO
-		case "S":
+	case "S":
 			return .S
-		case "WS":
+	case "WS":
 			return .WS 
-		case:
-		// TODO: Add error for this
-			unreachable()
+	case: unreachable() // TODO: Add error for this
 	}
 }
 

@@ -2,20 +2,12 @@ package ucd
 
 import "core:strings"
 import "core:os"
+// import "core:fmt"
 
-load_unicode_data :: proc(
-	filename: string,
-	allocator := context.allocator,
-) -> (unicode_data : Unicode_Data, err: Error) {
-
-	data, os_error := os.read_entire_file(filename, context.temp_allocator)
-	if os_error != nil {
-		err = os_error
-		return 
-	}
+load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (unicode_data: Unicode_Data, err: Error) {
+	data := os.read_entire_file(filename, context.temp_allocator) or_return
 	defer free_all(context.temp_allocator)
 
-	// line_iter := Line_Iterator{data = data }
 	first_cp: rune
 
 	str := string(data)
@@ -23,7 +15,7 @@ load_unicode_data :: proc(
 	line_loop: for _line in strings.split_lines_iterator(&str) {
 		defer line_no += 1
 		line, _, _ := strings.partition(_line, "#")
-		if len(line) == 0 do continue
+		if len(line) == 0 { continue }
 
 		// field_iter := Field_Iterator{line = line}
 		is_range := false
@@ -34,31 +26,29 @@ load_unicode_data :: proc(
 		num_6 : string
 		num_7 : string
 		nt := Numeric_Type.None
-		nv : Numberic_Value
 
 		field_num := 0
-		for field in strings.split_iterator(&line, ";") {
+		for _field in strings.split_iterator(&line, ";") {
 			defer field_num += 1
-			field := strings.trim_space(field)
+			field := strings.trim_space(_field)
 
 			switch field_num {
 			case 0: // Code point
 				cp = 0
 
 				for c in field {
-					if !(c >= '0' && c <= '9') && !(c >= 'A' && c <= 'F') do break 
+					if !(c >= '0' && c <= '9') && !(c >= 'A' && c <= 'F') { break }
 					cp *= 16
-					cp += cast(rune)(c >= '0' && c <= '9')  * cast(rune)(c - '0')  
-					cp += cast(rune)(c >= 'A' && c <= 'F')  * cast(rune)(c - 'A' + 10)
+					cp += (c - '0') if c >= '0' && c <= '9' else (c - 'A' + 10)
 				}
 
 			case 1: // Name
-				if len(field) > 9 && field[0] == '<' && strings.ends_with(transmute(string) field, ", First>") {
+				if len(field) > 9 && field[0] == '<' && strings.ends_with(field, ", First>") {
 					first_cp = cp
 					continue line_loop
 				}
 				
-				if len(field) > 9 && field[0] == '<' && strings.ends_with(transmute(string) field, ", Last>") {
+				if len(field) > 9 && field[0] == '<' && strings.ends_with(field, ", Last>") {
 					name = strings.clone(field[1:len(field)-7], allocator)
 					is_range = true
 				} else {
@@ -67,27 +57,27 @@ load_unicode_data :: proc(
 
 			case 2: // General_Category
 				// NOTE: This is currently igorning a possible error it should probably be fixed
-				gc, _ = string_to_general_category(transmute(string)field)
+				gc, _ = string_to_general_category(field)
 
 			case 3: // Canonical_Combining_Class
 			case 4: // Bidi Class
 			case 5: // Decomposition_Type and Decomposition_Mapping
 			// Numeric_Type and Numberic_Value
 			case 6:
-				num_6 = transmute(string)field
+				num_6 = field
 
 			case 7:  
-				num_7 = transmute(string)field
+				num_7 = field
 
 			case 8:
 				switch {
-				case num_6 != "" && num_7 != "" && transmute(string) field != "" :
+				case num_6 != "" && num_7 != "" && field != "" :
 					nt = .Decimal 
 
-				case num_6 == "" && num_7 != "" && transmute(string) field != "" :
+				case num_6 == "" && num_7 != "" && field != "" :
 					nt = .Digit
 
-				case num_6 == "" && num_7 == "" && transmute(string) field != "" :
+				case num_6 == "" && num_7 == "" && field != "" :
 					nt = .Numeric
 
 				case:
@@ -154,12 +144,14 @@ gc_ranges :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (lst: [G
 				range.last = -1
 			}
 
-			range.first = transmute(rune) min(transmute(u32)range.first, transmute(u32)p.cp)
+			range.first = rune(min(u32(range.first), u32(p.cp)))
 			gc = p.gc
 			range.last = p.cp	
 
 		case Char_Range:
-			if range.first != -1 do append_to_dynamic_range(&lst[gc], range, allocator)
+			if range.first != -1 {
+				append_to_dynamic_range(&lst[gc], range, allocator)
+			}
 			
 			range.first = p.first_cp
 			range.last = p.last_cp
@@ -168,7 +160,9 @@ gc_ranges :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (lst: [G
 			range.last = -1
 		}
 	}
-	if range.first != -1 do append_to_dynamic_range(&lst[gc], range, allocator)
+	if range.first != -1 {
+		append_to_dynamic_range(&lst[gc], range, allocator)
+	}
 
 	return
 }
@@ -194,14 +188,16 @@ extra_digits :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (Dyna
 			}
 		
 			if exd_type {
-				range.first = transmute(rune) min(transmute(u32)range.first, transmute(u32)p.cp)
+				range.first = rune(min(u32(range.first), u32(p.cp)))
 				range.last = p.cp	
 			}
 
 		case Char_Range:
 			exd_type :=  p.gc != .Nd && (p.nt == .Decimal || p.nt == .Digit)
 
-			if range.first != -1 do append_to_dynamic_range(&exd, range, allocator)
+			if range.first != -1 {
+				append_to_dynamic_range(&exd, range, allocator)
+			}
 		
 			if exd_type {
 				range.first = p.first_cp
@@ -212,29 +208,28 @@ extra_digits :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (Dyna
 			range.last = -1
 		}
 	}
-	if range.first != -1 do append_to_dynamic_range(&exd, range, allocator)
+	if range.first != -1 {
+		append_to_dynamic_range(&exd, range, allocator)
+	}
 
 	return exd
 }
 
 /*
-Data containted in the Unicode fiel PropList.txt 
+Data contained in the Unicode fiel PropList.txt
 
-A `PropList` is the data containted in the Unicode Database (UCD) file 
-PropList.txt. It is created with the procedure `load_property_list` and 
-destroy with the procedure `destroy_property_list`.
+A `Prop_List` is the data contained in the Unicode Database (UCD) file `PropList.txt`.
+It is created with the procedure `load_property_list` and destroyed with the procedure `destroy_property_list`.
 */
-PropList ::[PropList_Property]Dynamic_Range
+Prop_List :: [PropList_Property]Dynamic_Range
 
 /*
-This function destroys a `PropList` created by `load_property_list`.
+This function destroys a `Prop_List` created by `load_property_list`.
 
 Inputs:
-- props: The PropList to destroy
+- props: The Prop_List to destroy
 */
-destroy_protperty_list :: proc(
-	props: [PropList_Property]Dynamic_Range,
-){
+destroy_property_list :: proc(props: Prop_List) {
 	for r in props {
 		delete(r.ranges_16)
 		delete(r.ranges_32)
@@ -243,31 +238,18 @@ destroy_protperty_list :: proc(
 	}
 }
 
-import "core:fmt"
 
-load_protperty_list :: proc (
-	filename : string,
-	allocator := context.allocator,
-) -> (props: [PropList_Property]Dynamic_Range, err: Error) {
 
-	data, os_error := os.read_entire_file(filename, allocator)
-	if os_error != nil {
-		err = os_error
-		return 
-	}
+load_property_list :: proc(filename: string, allocator := context.allocator) -> (props: Prop_List, err: Error) {
+	data := os.read_entire_file(filename, allocator) or_return
 	defer delete(data)
 
-	line_iter := Line_Iterator{
-		data = data
-	}
-
 	str := string(data)
-	line_no := 1
 	for _line in strings.split_lines_iterator(&str) {
-		defer line_no += 1
 		line, _, _ := strings.partition(_line, "#")
-		if len(line) == 0 do continue
-		fmt.printfln("%d: %q", line_no, line)
+		if len(line) == 0 {
+			continue
+		}
 
 		is_range: bool
 
@@ -275,10 +257,9 @@ load_protperty_list :: proc (
 
 		prop: PropList_Property 
 		i := 0
-		for field in strings.split_iterator(&line, ";") {
+		for _field in strings.split_iterator(&line, ";") {
 			defer i += 1
-			field := strings.trim_space(field)
-			fmt.printfln("%d: %q", i, field)
+			field := strings.trim_space(_field)
 
 			switch i {
 			case 0: // Code point or code point range
@@ -295,18 +276,16 @@ load_protperty_list :: proc (
 					}
 					if is_range {
 						rr.last *= 16
-						rr.last += cast(rune)(c >= '0' && c <= '9')  * cast(rune)(c - '0')  
-						rr.last += cast(rune)(c >= 'A' && c <= 'F')  * cast(rune)(c - 'A' + 10)
+						rr.last += (c - '0') if (c >= '0' && c <= '9') else (c - 'A' + 10)
 					} else {
 						rr.first *= 16
-						rr.first += cast(rune)(c >= '0' && c <= '9')  * cast(rune)(c - '0')  
-						rr.first += cast(rune)(c >= 'A' && c <= 'F')  * cast(rune)(c - 'A' + 10)
+						rr.first += (c - '0') if (c >= '0' && c <= '9') else (c - 'A' + 10)
 						rr.last = rr.first
 					}
 				}
 
 			case 1:
-				prop, err = string_to_proplist_property(transmute(string)field)
+				prop, err = string_to_proplist_property(field)
 				if err != nil {
 					return
 				}
