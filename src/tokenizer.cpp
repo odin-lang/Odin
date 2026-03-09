@@ -379,6 +379,7 @@ gb_internal void advance_to_next_rune(Tokenizer *t) {
 
 gb_internal void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *data, isize size) {
 	t->fullpath = fullpath;
+	t->column_minus_one = -1;
 	t->line_count = 1;
 
 	t->start = cast(u8 *)data;
