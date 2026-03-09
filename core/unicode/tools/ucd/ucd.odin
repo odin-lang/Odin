@@ -237,7 +237,7 @@ Data contained in the Unicode fiel PropList.txt
 A `Prop_List` is the data contained in the Unicode Database (UCD) file `PropList.txt`.
 It is created with the procedure `load_property_list` and destroyed with the procedure `destroy_property_list`.
 */
-Prop_List :: [PropList_Property]Dynamic_Range
+Prop_List :: [Prop_List_Property]Dynamic_Range
 
 /*
 This function destroys a `Prop_List` created by `load_property_list`.
@@ -268,7 +268,7 @@ load_property_list :: proc(filename: string, allocator := context.allocator) -> 
 		}
 
 		rr:   Range_Rune
-		prop: PropList_Property
+		prop: Prop_List_Property
 
 		i := 0
 		for _field in strings.split_iterator(&line, ";") {

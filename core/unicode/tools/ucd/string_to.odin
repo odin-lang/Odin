@@ -37,7 +37,7 @@ string_to_general_category :: proc "contextless" (str: string) -> (gc: General_C
 	return
 }
 
-string_to_proplist_property :: proc(str: string) -> (prop: Prop_List_Property) {
+string_to_proplist_property :: proc(str: string) -> (prop: Prop_List_Property, err: Error) {
 	switch str {
 	case "White_Space":                        prop = .White_Space
 	case "Bidi_Control":                       prop = .Bidi_Control
@@ -77,7 +77,8 @@ string_to_proplist_property :: proc(str: string) -> (prop: Prop_List_Property) {
 	case "Prepended_Concatenation_Mark":       prop = .Prepended_Concatenation_Mark
 	case "Regional_Indicator":                 prop = .Regional_Indicator
 	case "Modifier_Combining_Mark":            prop = .Modifier_Combining_Mark
-	case:                                      prop = .Unknown_Property
+	case:                                      prop = .Unknown
+											   err = UCD_Error.Unknown_Property
 	}
 	return
 }
