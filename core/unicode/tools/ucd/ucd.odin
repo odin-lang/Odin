@@ -2,7 +2,28 @@ package ucd
 
 import "core:strings"
 import "core:os"
-// import "core:fmt"
+import "core:strconv"
+
+decode_rune :: proc(str: string) -> (cp1, cp2: rune, err: Error) {
+	head, _, tail := strings.partition(str, "..")
+
+	if _cp1, _ok := strconv.parse_int(head, 16); !_ok {
+		return 0, 0, .Invalid_Hex_Number
+	} else {
+		cp1 = rune(_cp1)
+	}
+
+	if len(tail) == 0 {
+		return cp1, cp1, nil
+	}
+
+	if _cp2, _ok := strconv.parse_int(tail, 16); !_ok {
+		return 0, 0, .Invalid_Hex_Number
+	} else {
+		cp2 = rune(_cp2)
+	}
+	return
+}
 
 load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (unicode_data: Unicode_Data, err: Error) {
 	data := os.read_entire_file(filename, context.temp_allocator) or_return
@@ -11,13 +32,12 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 	first_cp: rune
 
 	str := string(data)
-	line_no := 1
 	line_loop: for _line in strings.split_lines_iterator(&str) {
-		defer line_no += 1
 		line, _, _ := strings.partition(_line, "#")
-		if len(line) == 0 { continue }
+		if len(line) == 0 {
+			continue
+		}
 
-		// field_iter := Field_Iterator{line = line}
 		is_range := false
 		cp: rune
 		name: string
@@ -34,13 +54,7 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 
 			switch field_num {
 			case 0: // Code point
-				cp = 0
-
-				for c in field {
-					if !(c >= '0' && c <= '9') && !(c >= 'A' && c <= 'F') { break }
-					cp *= 16
-					cp += (c - '0') if c >= '0' && c <= '9' else (c - 'A' + 10)
-				}
+				cp, _ = decode_rune(field) or_return
 
 			case 1: // Name
 				if len(field) > 9 && field[0] == '<' && strings.ends_with(field, ", First>") {
@@ -251,11 +265,9 @@ load_property_list :: proc(filename: string, allocator := context.allocator) -> 
 			continue
 		}
 
-		is_range: bool
+		rr:   Range_Rune
+		prop: PropList_Property
 
-		rr : Range_Rune
-
-		prop: PropList_Property 
 		i := 0
 		for _field in strings.split_iterator(&line, ";") {
 			defer i += 1
@@ -263,32 +275,10 @@ load_property_list :: proc(filename: string, allocator := context.allocator) -> 
 
 			switch i {
 			case 0: // Code point or code point range
-				for c in field {
-					if !(c >= '0' && c <= '9') && !(c >= 'A' && c <= 'F') {
-						if c == '.' {
-							is_range = true
-							rr.last = 0
-							continue
-						} else {
-							err = UCD_Error.Invalid_Hex_Number
-							return
-						}
-					}
-					if is_range {
-						rr.last *= 16
-						rr.last += (c - '0') if (c >= '0' && c <= '9') else (c - 'A' + 10)
-					} else {
-						rr.first *= 16
-						rr.first += (c - '0') if (c >= '0' && c <= '9') else (c - 'A' + 10)
-						rr.last = rr.first
-					}
-				}
+				rr.first, rr.last = decode_rune(field) or_return
 
 			case 1:
-				prop, err = string_to_proplist_property(field)
-				if err != nil {
-					return
-				}
+				prop = string_to_proplist_property(field) or_return
 
 			case:
 				err = UCD_Error.Extra_Fields
