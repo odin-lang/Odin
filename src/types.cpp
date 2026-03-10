@@ -4201,8 +4201,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.is_packed) {
 			return 1;
 		}
-
-		type_set_offsets(t);
+		// Avoid forcing offset computation here. The caller's type-path state must
+		// be able to detect recursive field cycles before any nested struct tries to
+		// re-enter this struct's offset mutex.
 
 		i64 max = 1;
 		for_array(i, t->Struct.fields) {
