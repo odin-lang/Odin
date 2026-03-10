@@ -1,5 +1,14 @@
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise);
 
+gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
+	GB_ASSERT(bit_count <= 64);
+	if (bit_count == 0) {
+		return LLVMConstInt(type, 0, false);
+	}
+	u64 mask = bit_count == 64 ? ~0ull : (1ull<<bit_count)-1;
+	return LLVMConstInt(type, mask, false);
+}
+
 gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *final_type) {
 	lbModule *m = p->module;
 
@@ -5148,13 +5157,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				for (isize i = 0; i < fields.count; i++) {
 					auto const &f = fields[i];
 
-					LLVMValueRef mask = LLVMConstInt(lit, 1, false);
-					#if LLVM_VERSION_MAJOR >= 19
-						mask = LLVMBuildShl(p->builder, mask, LLVMConstInt(lit, f.bit_size, false), "");
-					#else
-						mask = LLVMConstShl(mask, LLVMConstInt(lit, f.bit_size, false));
-					#endif
-					mask = LLVMConstSub(mask, LLVMConstInt(lit, 1, false));
+					LLVMValueRef mask = lb_const_low_bits_mask(lit, f.bit_size);
 
 					LLVMValueRef elem = values[i].value;
 					if (lb_sizeof(lit) < lb_sizeof(LLVMTypeOf(elem))) {
@@ -5200,13 +5203,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						GB_ASSERT(mask_width > 0);
 						bits_to_set -= mask_width;
 
-						LLVMValueRef mask = LLVMConstInt(vt, 1, false);
-						#if LLVM_VERSION_MAJOR >= 19
-							mask = LLVMBuildShl(p->builder, mask, LLVMConstInt(vt, mask_width, false), "");
-						#else
-							mask = LLVMConstShl(mask, LLVMConstInt(vt, mask_width, false));
-						#endif
-						mask = LLVMConstSub(mask, LLVMConstInt(vt, 1, false));
+						LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
 
 						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
 
@@ -6075,5 +6072,4 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	return {};
 }
-
 
