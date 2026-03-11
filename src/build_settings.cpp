@@ -388,7 +388,7 @@ u64 get_feature_flag_from_name(String const &name) {
 	}
 	if (name == "using-stmt") {
 		return OptInFeatureFlag_UsingStmt;
-  }
+	}
 	if (name == "force-type-assert") {
 		return OptInFeatureFlag_ForceTypeAssert;
 	}

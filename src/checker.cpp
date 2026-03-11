@@ -238,8 +238,7 @@ gb_internal Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*f->total_file_decl_count);
 	Scope *s = create_scope(info, f->pkg->scope);
-	string_map_init(&s->elements, init_elements_capacity);
-
+	scope_reserve(s, init_elements_capacity);
 
 	s->flags |= ScopeFlag_File;
 	s->file = f;
