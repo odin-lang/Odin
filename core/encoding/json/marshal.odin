@@ -320,6 +320,16 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		}
 		opt_write_end(w, opt, ']') or_return
 
+	case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:
+		opt_write_start(w, opt, '[') or_return
+		len := (^int)(uintptr(v.data) + info.len_offset)^
+		for i in 0..<len {
+			opt_write_iteration(w, opt, i == 0) or_return
+			data := uintptr(v.data) + uintptr(i*info.elem_size)
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+		}
+		opt_write_end(w, opt, ']') or_return
+
 	case runtime.Type_Info_Slice:
 		opt_write_start(w, opt, '[') or_return
 		slice := cast(^mem.Raw_Slice)v.data
