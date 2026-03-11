@@ -1234,6 +1234,11 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 2: result_type = t_int;       break;
 		case 3: result_type = t_allocator; break;
 		}
+	} else if (is_type_fixed_capacity_dynamic_array(t)) {
+		switch (index) {
+		case 0: result_type = alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity); break;
+		case 1: result_type = t_int; break;
+		}
 	} else if (is_type_map(t)) {
 		init_map_internal_debug_types(t);
 		Type *itp = alloc_type_pointer(t_raw_map);
@@ -1747,6 +1752,11 @@ gb_internal lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da) {
 gb_internal lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da) {
 	GB_ASSERT(is_type_dynamic_array(da.type));
 	return lb_emit_struct_ev(p, da, 2);
+}
+
+gb_internal lbValue lb_fixed_capacity_dynamic_array_len(lbProcedure *p, lbValue da) {
+	GB_ASSERT(is_type_fixed_capacity_dynamic_array(da.type));
+	return lb_emit_struct_ev(p, da, 1);
 }
 
 gb_internal lbValue lb_map_len(lbProcedure *p, lbValue value) {

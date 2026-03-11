@@ -456,6 +456,12 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		break;
 	case Ast_DynamicArrayType:
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem, f);
+		n->DynamicArrayType.tag  = clone_ast(n->DynamicArrayType.tag, f);
+		break;
+	case Ast_FixedCapacityDynamicArrayType:
+		n->FixedCapacityDynamicArrayType.elem     = clone_ast(n->FixedCapacityDynamicArrayType.elem, f);
+		n->FixedCapacityDynamicArrayType.capacity = clone_ast(n->FixedCapacityDynamicArrayType.capacity, f);
+		n->FixedCapacityDynamicArrayType.tag      = clone_ast(n->FixedCapacityDynamicArrayType.tag, f);
 		break;
 	case Ast_StructType:
 		n->StructType.fields             = clone_ast_array(n->StructType.fields, f);
@@ -1251,6 +1257,14 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 	Ast *result = alloc_ast_node(f, Ast_DynamicArrayType);
 	result->DynamicArrayType.token = token;
 	result->DynamicArrayType.elem  = elem;
+	return result;
+}
+
+gb_internal Ast *ast_fixed_capacity_dynamic_array_type(AstFile *f, Token token, Ast *capacity, Ast *elem) {
+	Ast *result = alloc_ast_node(f, Ast_FixedCapacityDynamicArrayType);
+	result->FixedCapacityDynamicArrayType.token    = token;
+	result->FixedCapacityDynamicArrayType.capacity = capacity;
+	result->FixedCapacityDynamicArrayType.elem     = elem;
 	return result;
 }
 
@@ -2470,9 +2484,10 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
 			switch (type->kind) {
-			case Ast_ArrayType:        type->ArrayType.tag        = tag; break;
-			case Ast_DynamicArrayType: type->DynamicArrayType.tag = tag; break;
-			case Ast_PointerType:      type->PointerType.tag      = tag; break;
+			case Ast_ArrayType:                     type->ArrayType.tag        = tag; break;
+			case Ast_DynamicArrayType:              type->DynamicArrayType.tag = tag; break;
+			case Ast_PointerType:                   type->PointerType.tag      = tag; break;
+			case Ast_FixedCapacityDynamicArrayType: type->FixedCapacityDynamicArrayType.tag = tag; break;
 			default:
 				syntax_error(type, "Expected an array or pointer type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
 				break;
@@ -2702,8 +2717,25 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (f->curr_token.kind == Token_Question) {
 			count_expr = ast_unary_expr(f, expect_token(f, Token_Question), nullptr);
 		} else if (allow_token(f, Token_dynamic)) {
+			Ast *capacity = nullptr;
+			if (f->curr_token.kind == Token_Semicolon && f->curr_token.string == ";") {
+				expect_token(f, Token_Semicolon);
+				capacity = parse_expr(f, false);
+			} else if (allow_token(f, Token_Comma) || allow_token(f, Token_Semicolon)) {
+				String p = token_to_string(f->prev_token);
+				syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
+
+				capacity = parse_expr(f, false);
+			}
 			expect_token(f, Token_CloseBracket);
-			return ast_dynamic_array_type(f, token, parse_type(f));
+
+			Ast *elem = parse_type(f);
+
+			if (capacity == nullptr) {
+				return ast_dynamic_array_type(f, token, elem);
+			} else {
+				return ast_fixed_capacity_dynamic_array_type(f, token, capacity, elem);
+			}
 		} else if (f->curr_token.kind != Token_CloseBracket) {
 			f->expr_level++;
 			count_expr = parse_expr(f, false);
@@ -3186,6 +3218,7 @@ gb_internal bool is_literal_type(Ast *node) {
 	case Ast_StructType:
 	case Ast_UnionType:
 	case Ast_EnumType:
+	case Ast_FixedCapacityDynamicArrayType:
 	case Ast_DynamicArrayType:
 	case Ast_MapType:
 	case Ast_BitSetType:

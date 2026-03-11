@@ -206,6 +206,14 @@ Type_Info_Bit_Field :: struct {
 	field_count:  int,
 }
 
+Type_Info_Fixed_Capacity_Dynamic_Array :: struct {
+	elem: ^Type_Info,
+	elem_size:  int,
+	capacity:   int,
+	len_offset: uintptr,
+}
+
+
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
 	Simple_Compare = 1,
@@ -246,6 +254,7 @@ Type_Info :: struct {
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
 		Type_Info_Bit_Field,
+		Type_Info_Fixed_Capacity_Dynamic_Array,
 	},
 }
 
@@ -423,6 +432,11 @@ Raw_Dynamic_Array :: struct {
 	len:       int,
 	cap:       int,
 	allocator: Allocator,
+}
+
+Raw_Fixed_Capacity_Dynamic_Array :: struct($Capacity: uint, $T: typeid) {
+	data: [Capacity]T,
+	len:  int,
 }
 
 // The raw, type-erased representation of a map.

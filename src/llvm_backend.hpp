@@ -533,6 +533,7 @@ gb_internal lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da);
+gb_internal lbValue lb_fixed_capacity_dynamic_array_len(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_map_len(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_map_cap(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);

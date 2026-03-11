@@ -3642,6 +3642,31 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		return true;
 	case_end;
 
+	case_ast_node(dat, FixedCapacityDynamicArrayType, e);
+		Operand o = {};
+		i64 capacity = check_array_count(ctx, &o, dat->capacity);
+		Type *generic_type = nullptr;
+		if (o.mode == Addressing_Type && o.type->kind == Type_Generic) {
+			generic_type = o.type;
+		}
+
+		if (capacity < 0) {
+			error(dat->capacity, "? can only be used in conjunction with compound literals of fixed-length arrays");
+			capacity = 0;
+		}
+
+
+		Type *elem = check_type(ctx, dat->elem);
+		if (dat->tag != nullptr) {
+			GB_ASSERT(dat->tag->kind == Ast_BasicDirective);
+			String name = dat->tag->BasicDirective.name.string;
+			error(dat->tag, "Invalid tag applied to fixed capacity dynamic array, got #%.*s", LIT(name));
+		}
+		*type = alloc_type_fixed_capacity_dynamic_array(elem, capacity, generic_type);
+		set_base_type(named_type, *type);
+		return true;
+	case_end;
+
 	case_ast_node(st, StructType, e);
 		CheckerContext c = *ctx;
 		c.in_polymorphic_specialization = false;

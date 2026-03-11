@@ -4700,6 +4700,25 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr(elem);
 	}
 
+	case Type_FixedCapacityDynamicArray: {
+		lbValue array = {};
+		array = lb_build_addr_ptr(p, ie->expr);
+		if (deref) {
+			array = lb_emit_load(p, array);
+		}
+		lbValue index = lb_build_expr(p, ie->index);
+		index = lb_emit_conv(p, index, t_int);
+
+		lbValue array_ptr = lb_emit_struct_ep(p, array, 0);
+		lbValue elem = lb_emit_array_ep(p, array_ptr, index);
+
+		auto index_tv = type_and_value_of_expr(ie->index);
+		lbValue len = lb_emit_struct_ep(p, array, 1);
+		len = lb_emit_load(p, len);
+		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		return lb_addr(elem);
+	}
+
 	case Type_EnumeratedArray: {
 		lbValue array = {};
 		array = lb_build_addr_ptr(p, ie->expr);
@@ -4936,6 +4955,31 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			}
 		}
 		lbValue elem    = lb_emit_ptr_offset(p, lb_array_elem(p, lb_addr_get_ptr(p, addr)), low);
+		lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+		lbAddr slice = lb_add_local_generated(p, slice_type, false);
+		lb_fill_slice(p, slice, elem, new_len);
+		return slice;
+	}
+
+	case Type_FixedCapacityDynamicArray: {
+		Type *elem_type = type->FixedCapacityDynamicArray.elem;
+		Type *slice_type = alloc_type_slice(elem_type);
+
+		lbValue len = lb_fixed_capacity_dynamic_array_len(p, base);
+		if (high.value == nullptr) high = len;
+
+		bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
+		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
+
+		if (!low_const || !high_const) {
+			if (!no_indices) {
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+			}
+		}
+		lbValue data_ptr = lb_addr_get_ptr(p, addr);
+		lbValue array_ptr = lb_emit_struct_ep(p, data_ptr, 0);
+		lbValue elem    = lb_emit_ptr_offset(p, lb_array_elem(p, array_ptr), low);
 		lbValue new_len = lb_emit_arith(p, Token_Sub, high, low, t_int);
 
 		lbAddr slice = lb_add_local_generated(p, slice_type, false);

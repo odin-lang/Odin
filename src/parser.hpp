@@ -764,8 +764,14 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 	AST_KIND(DynamicArrayType, "dynamic array type", struct { \
 		Token token; \
-		Ast *elem; \
-		Ast *tag;  \
+		Ast *elem;   \
+		Ast *tag;    \
+	}) \
+	AST_KIND(FixedCapacityDynamicArrayType, "fixed capacity dynamic array type", struct { \
+		Token token;   \
+		Ast *capacity; \
+		Ast *elem;     \
+		Ast *tag;      \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
 		Scope *scope; \

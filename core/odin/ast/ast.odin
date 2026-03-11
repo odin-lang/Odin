@@ -786,6 +786,16 @@ Dynamic_Array_Type :: struct {
 	elem:        ^Expr,
 }
 
+Fixed_Capacity_Dynamic_Array_Type :: struct {
+	using node: Expr,
+	tag:         ^Expr, // possibly nil
+	open:        tokenizer.Pos,
+	dynamic_pos: tokenizer.Pos,
+	capacity:    ^Expr,
+	close:       tokenizer.Pos,
+	elem:        ^Expr,
+}
+
 Struct_Type :: struct {
 	using node: Expr,
 	tok_pos:         tokenizer.Pos,
@@ -931,6 +941,7 @@ Any_Node :: union {
 	^Multi_Pointer_Type,
 	^Array_Type,
 	^Dynamic_Array_Type,
+	^Fixed_Capacity_Dynamic_Array_Type,
 	^Struct_Type,
 	^Union_Type,
 	^Enum_Type,
@@ -1017,6 +1028,7 @@ Any_Expr :: union {
 	^Multi_Pointer_Type,
 	^Array_Type,
 	^Dynamic_Array_Type,
+	^Fixed_Capacity_Dynamic_Array_Type,
 	^Struct_Type,
 	^Union_Type,
 	^Enum_Type,

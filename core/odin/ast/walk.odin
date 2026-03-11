@@ -380,6 +380,12 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.tag)
 		}
 		walk(v, n.elem)
+	case ^Fixed_Capacity_Dynamic_Array_Type:
+		if n.tag != nil {
+			walk(v, n.tag)
+		}
+		walk(v, n.capacity)
+		walk(v, n.elem)
 	case ^Struct_Type:
 		if n.poly_params != nil {
 			walk(v, n.poly_params)

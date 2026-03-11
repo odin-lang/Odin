@@ -105,6 +105,11 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y := b.variant.(Type_Info_Slice) or_return
 		return are_types_identical(x.elem, y.elem)
 
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		y := b.variant.(Type_Info_Fixed_Capacity_Dynamic_Array) or_return
+		if x.capacity != y.capacity { return false }
+		return are_types_identical(x.elem, y.elem)
+
 	case Type_Info_Parameters:
 		y := b.variant.(Type_Info_Parameters) or_return
 		if len(x.types) != len(y.types) { return false }
@@ -660,6 +665,12 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 	case Type_Info_Slice:
 		io.write_string(w, "[]", &n) or_return
 		write_type(w, info.elem, &n) or_return
+
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		io.write_string(w, "[dynamic;",         &n) or_return
+		io.write_i64(w, i64(info.capacity), 10, &n) or_return
+		io.write_string(w, "]",                 &n) or_return
+		write_type(w, info.elem,                &n) or_return
 
 	case Type_Info_Map:
 		io.write_string(w, "map[", &n) or_return

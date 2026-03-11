@@ -2634,6 +2634,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->Array.count);
 			type = t_untyped_integer;
+		} else if (is_type_fixed_capacity_dynamic_array(op_type)) {
+			Type *at = core_type(op_type);
+			if (id == BuiltinProc_cap) {
+				mode = Addressing_Constant;
+				value = exact_value_i64(at->FixedCapacityDynamicArray.capacity);
+				type = t_untyped_integer;
+			} else {
+				GB_ASSERT(id == BuiltinProc_len);
+				mode = Addressing_Value;
+			}
 		} else if (is_type_enumerated_array(op_type) && id == BuiltinProc_len) {
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;
@@ -5167,6 +5177,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					case Type_Array:
 					case Type_EnumeratedArray:
 					case Type_SimdVector:
+					case Type_FixedCapacityDynamicArray:
 						operand->type = alloc_type_multi_pointer(base_array_type(base));
 						break;
 					case Type_Matrix:

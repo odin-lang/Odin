@@ -2323,6 +2323,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_len(p, v);
+		} else if (is_type_fixed_capacity_dynamic_array(t)) {
+			return lb_fixed_capacity_dynamic_array_len(p, v);
 		} else if (is_type_map(t)) {
 			return lb_map_len(p, v);
 		} else if (is_type_soa_struct(t)) {
@@ -2344,6 +2346,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			GB_PANIC("Unreachable");
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
+		} else if (is_type_fixed_capacity_dynamic_array(t)) {
+			GB_PANIC("Fixed capacity dynamic array capacities are constant");
 		} else if (is_type_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {

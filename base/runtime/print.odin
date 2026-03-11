@@ -392,6 +392,12 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_string("[]")
 		print_type(info.elem)
 
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		print_string("[dynamic; ")
+		print_u64(u64(info.capacity))
+		print_string("]")
+		print_type(info.elem)
+
 	case Type_Info_Map:
 		print_string("map[")
 		print_type(info.key)
@@ -806,6 +812,12 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 	case Type_Info_Slice:
 		write_string    (i, buf, "[]")      or_return
 		write_write_type(i, buf, info.elem) or_return
+
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		write_string    (i, buf, "[dynamic; ")       or_return
+		write_u64       (i, buf, u64(info.capacity)) or_return
+		write_string    (i, buf, "]")                or_return
+		write_write_type(i, buf, info.elem)          or_return
 
 	case Type_Info_Map:
 		write_string    (i, buf, "map[")     or_return

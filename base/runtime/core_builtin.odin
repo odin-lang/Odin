@@ -254,6 +254,7 @@ non_zero_reserve :: proc{
 @builtin
 resize :: proc{
 	resize_dynamic_array,
+	resize_fixed_capacity_dynamic_array,
 
 	resize_soa,
 }
@@ -261,6 +262,7 @@ resize :: proc{
 @builtin
 non_zero_resize :: proc{
 	non_zero_resize_dynamic_array,
+	non_zero_resize_fixed_capacity_dynamic_array,
 
 	non_zero_resize_soa,
 }
@@ -686,12 +688,52 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 	return
 }
 
+
+// `append_fixed_capacity_elem` appends an element to the end of a fixed capacity dynamic array. Returns 0 on failure
+@builtin
+append_fixed_capacity_elem :: proc(array: ^$T/[dynamic; $N]$E, #no_broadcast arg: E) -> (n: int) {
+	Raw :: Raw_Fixed_Capacity_Dynamic_Array(N, E)
+
+	if (^Raw)(array).len >= N {
+		return 0
+	}
+
+	when size_of(E) != 0 {
+		#no_bounds_check (^Raw)(array).data[(^Raw)(array).len] = arg
+	}
+	(^Raw)(array).len += 1
+	return 1
+}
+
+
+// `append_fixed_capacity_elem` appends an element to the end of a fixed capacity dynamic array. Returns 0 on failure
+@builtin
+append_fixed_capacity_elems :: proc(array: ^$T/[dynamic; $N]$E, #no_broadcast args: ..E) -> (n: int) {
+	Raw :: Raw_Fixed_Capacity_Dynamic_Array(N, E)
+	raw := (^Raw)(array)
+
+	n = min(N - len(args), len(args))
+
+	when size_of(E) != 0 {
+		for i in 0..<n {
+			#no_bounds_check raw.data[i] = args[i]
+		}
+	}
+
+	raw.len += n
+	return n
+}
+
+
 // The append built-in procedure appends elements to the end of a dynamic array
 @builtin
 append :: proc{
 	append_elem,
 	append_elems,
 	append_elem_string,
+
+	append_fixed_capacity_elem,
+	append_fixed_capacity_elems,
 
 	append_soa_elem,
 	append_soa_elems,
@@ -702,6 +744,8 @@ non_zero_append :: proc{
 	non_zero_append_elem,
 	non_zero_append_elems,
 	non_zero_append_elem_string,
+
+	append_fixed_capacity_elem,
 
 	non_zero_append_soa_elem,
 	non_zero_append_soa_elems,
@@ -994,6 +1038,42 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: int, loc :
 @builtin
 non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: int, loc := #caller_location) -> Allocator_Error {
 	return _resize_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), length, false, loc=loc)
+}
+
+
+
+// `resize_fixed_capacity_dynamic_array` will try to resize memory of a passed fixed capacity dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
+//
+// Note: Prefer the procedure group `resize`
+@builtin
+resize_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, #any_int length: int) -> bool {
+	if array == nil {
+		return false
+	}
+	raw := (^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array)
+	if raw.len < length {
+		size_of_elem :: size_of(E)
+
+		num_reused := min(N, length) - a.len
+		intrinsics.mem_zero(([^]byte)(a.data)[a.len*size_of_elem:], num_reused*size_of_elem)
+	}
+	new_length := clamp(length, 0, N)
+	raw.len = new_length
+	return true
+}
+
+// `non_zero_resize_fixed_capacity_dynamic_array` will try to resize memory of a passed fixed capacity dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
+//
+// Note: Prefer the procedure group `resize`
+@builtin
+non_zero_resize_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, #any_int length: int) -> bool {
+	if array == nil {
+		return false
+	}
+	raw := (^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array)
+	new_length := clamp(length, 0, N)
+	raw.len = new_length
+	return true
 }
 
 // Shrinks the capacity of a dynamic array down to the current length, or the given capacity.

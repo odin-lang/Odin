@@ -1490,6 +1490,22 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true, modify_type);
 		}
 		return false;
+
+	case Type_FixedCapacityDynamicArray:
+		if (source->kind == Type_FixedCapacityDynamicArray) {
+			if (poly->FixedCapacityDynamicArray.generic_capacity != nullptr) {
+				if (!polymorphic_assign_index(&poly->FixedCapacityDynamicArray.generic_capacity,
+				                              &poly->FixedCapacityDynamicArray.capacity,
+				                              source->FixedCapacityDynamicArray.capacity)) {
+					return false;
+				}
+			}
+			if (poly->FixedCapacityDynamicArray.capacity == source->FixedCapacityDynamicArray.capacity) {
+				return is_polymorphic_type_assignable(c, poly->FixedCapacityDynamicArray.elem, source->FixedCapacityDynamicArray.elem, true, modify_type);
+			}
+		}
+		return false;
+
 	case Type_Slice:
 		if (source->kind == Type_Slice) {
 			return is_polymorphic_type_assignable(c, poly->Slice.elem, source->Slice.elem, true, modify_type);
@@ -8761,6 +8777,14 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 			o->mode = Addressing_Variable;
 		}
 		return true;
+
+	case Type_FixedCapacityDynamicArray:
+		o->type = t->FixedCapacityDynamicArray.elem;
+		if (o->mode != Addressing_Constant) {
+			o->mode = Addressing_Variable;
+		}
+		return true;
+
 	case Type_Struct:
 		if (t->Struct.soa_kind != StructSoa_None) {
 			if (t->Struct.soa_kind == StructSoa_Fixed) {
@@ -11410,6 +11434,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			// Okay
 		} else if (is_type_enumerated_array(t)) {
 			// Okay
+		} else if (is_type_fixed_capacity_dynamic_array(t)) {
+			// Okay
 		} else if (is_type_string(t)) {
 			// Okay
 		} else if (is_type_matrix(t)) {
@@ -11554,6 +11580,11 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 	case Type_DynamicArray:
 		valid = true;
 		o->type = alloc_type_slice(t->DynamicArray.elem);
+		break;
+
+	case Type_FixedCapacityDynamicArray:
+		valid = true;
+		o->type = alloc_type_slice(t->FixedCapacityDynamicArray.elem);
 		break;
 
 	case Type_Struct:
@@ -12110,6 +12141,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case Ast_MultiPointerType:
 	case Ast_ArrayType:
 	case Ast_DynamicArrayType:
+	case Ast_FixedCapacityDynamicArrayType:
 	case Ast_StructType:
 	case Ast_UnionType:
 	case Ast_EnumType:
