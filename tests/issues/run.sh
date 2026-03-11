@@ -43,6 +43,12 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+if [[ $($ODIN build ../test_issue_6401.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 set +x
 
 popd
