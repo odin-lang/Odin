@@ -1404,8 +1404,8 @@ resize_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; 
 	if raw.len < length {
 		size_of_elem :: size_of(E)
 
-		num_reused := min(N, length) - a.len
-		intrinsics.mem_zero(([^]byte)(a.data)[a.len*size_of_elem:], num_reused*size_of_elem)
+		num_reused := min(N, length) - raw.len
+		intrinsics.mem_zero(([^]byte)(a.data)[raw.len*size_of_elem:], num_reused*size_of_elem)
 	}
 	new_length := clamp(length, 0, N)
 	raw.len = new_length

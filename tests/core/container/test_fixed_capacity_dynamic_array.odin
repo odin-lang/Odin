@@ -26,11 +26,11 @@ test_fixed_capacity_dynamic_array_inject_at :: proc(t: ^testing.T) {
 	array: [dynamic; 13]int
 	append(&array, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 
-	testing.expect(t, inject_at(&array, 0, 0), "Expected to be able to inject into small array")
+	testing.expect(t, inject_at(&array, 0, 0), "Expected to be able to inject into fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }))
-	testing.expect(t, inject_at(&array, 0, 5), "Expected to be able to inject into small array")
+	testing.expect(t, inject_at(&array, 0, 5), "Expected to be able to inject into fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { 0, 0, 1, 2, 3, 0, 4, 5, 6, 7, 8, 9 }))
-	testing.expect(t, inject_at(&array, 0, len(array)), "Expected to be able to inject into small array")
+	testing.expect(t, inject_at(&array, 0, len(array)), "Expected to be able to inject into fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { 0, 0, 1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 0 }))
 }
 
@@ -38,18 +38,21 @@ test_fixed_capacity_dynamic_array_inject_at :: proc(t: ^testing.T) {
 test_fixed_capacity_dynamic_array_push_back_elems :: proc(t: ^testing.T) {
 	array: [dynamic; 2]int
 	testing.expect(t, slice_equal(array[:], []int { }))
-	testing.expect(t, append(&array, 0), "Expected to be able to append to empty small array")
+	testing.expect(t, append(&array, 0) == 1, "Expected to be able to append to empty fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { 0 }))
-	testing.expect(t, append(&array, 1, 2) == false, "Expected to fail appending multiple elements beyond capacity of small array")
-	testing.expect(t, append(&array, 1), "Expected to be able to append to small array")
+	testing.expect(t, append(&array, 1) == 1, "Expected to be able to append to fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { 0, 1 }))
-	testing.expect(t, append(&array, 1) == false, "Expected to fail appending to full small array")
-	testing.expect(t, append(&array, 1, 2) == false, "Expected to fail appending multiple elements to full small array")
+	testing.expect(t, append(&array, 1, 2) == 1, "Expected to fail appending multiple elements beyond capacity of fixed capacity dynamic array")
+	clear(&array)
+	testing.expect(t, append(&array, 1) == 1, "Expected to be able to append to fixed capacity dynamic array")
+	testing.expect(t, append(&array, 2) == 1, "Expected to be able to append to fixed capacity dynamic array")
+	testing.expect(t, append(&array, 1) != 1, "Expected to fail appending to full fixed capacity dynamic array")
+	testing.expect(t, append(&array, 1, 2) != 2, "Expected to fail appending multiple elements to full fixed capacity dynamic array")
 	clear(&array)
 	testing.expect(t, slice_equal(array[:], []int { }))
-	testing.expect(t, append(&array, 1, 2, 3) == false, "Expected to fail appending multiple elements to empty small array")
+	testing.expect(t, append(&array, 1, 2, 3) != 3, "Expected to fail appending multiple elements to empty fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { }))
-	testing.expect(t, append(&array, 1, 2), "Expected to be able to append multiple elements to empty small array")
+	testing.expect(t, append(&array, 1, 2) == 2, "Expected to be able to append multiple elements to empty fixed capacity dynamic array")
 	testing.expect(t, slice_equal(array[:], []int { 1, 2 }))
 }
 
