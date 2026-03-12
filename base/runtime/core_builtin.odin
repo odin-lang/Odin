@@ -119,14 +119,14 @@ copy :: proc{copy_slice, copy_from_string, copy_from_string16}
 
 
 
-// `unordered_remove` removed the element at the specified `index`. It does so by replacing the current end value
+// `unordered_remove_dynamic_array` removed the element at the specified `index`. It does so by replacing the current end value
 // with the old value, and reducing the length of the dynamic array by 1.
 //
 // Note: This is an O(1) operation.
 // Note: If you want the elements to remain in their order, use `ordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-unordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+unordered_remove_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	n := len(array)-1
 	if index != n {
@@ -134,13 +134,13 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #ca
 	}
 	(^Raw_Dynamic_Array)(array).len -= 1
 }
-// `ordered_remove` removed the element at the specified `index` whilst keeping the order of the other elements.
+// `ordered_remove_dynamic_array` removed the element at the specified `index` whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
 // Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-ordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+ordered_remove_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		copy(array[index:], array[index+1:])
@@ -148,12 +148,12 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #call
 	(^Raw_Dynamic_Array)(array).len -= 1
 }
 
-// `remove_range` removes a range of elements specified by the range `lo` and `hi`, whilst keeping the order of the other elements.
+// `remove_range_dynamic_array` removes a range of elements specified by the range `lo` and `hi`, whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
 // Note: If the range is out of bounds, this procedure will panic.
 @builtin
-remove_range :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
+remove_range_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
 	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array))
 	n := max(hi-lo, 0)
 	if n > 0 {
@@ -163,6 +163,71 @@ remove_range :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #calle
 		(^Raw_Dynamic_Array)(array).len -= n
 	}
 }
+
+// `unordered_remove_fixed_capacity_dynamic_array` removed the element at the specified `index`. It does so by replacing the current end value
+// with the old value, and reducing the length of the dynamic array by 1.
+//
+// Note: This is an O(1) operation.
+// Note: If you want the elements to remain in their order, use `ordered_remove`.
+// Note: If the index is out of bounds, this procedure will panic.
+@builtin
+unordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	n := len(array)-1
+	if index != n {
+		array[index] = array[n]
+	}
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+}
+// `ordered_remove_fixed_capacity_dynamic_array` removed the element at the specified `index` whilst keeping the order of the other elements.
+//
+// Note: This is an O(N) operation.
+// Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
+// Note: If the index is out of bounds, this procedure will panic.
+@builtin
+ordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	if index+1 < len(array) {
+		copy(array[index:], array[index+1:])
+	}
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+}
+
+// `remove_range_fixed_capacity_dynamic_array` removes a range of elements specified by the range `lo` and `hi`, whilst keeping the order of the other elements.
+//
+// Note: This is an O(N) operation.
+// Note: If the range is out of bounds, this procedure will panic.
+@builtin
+remove_range_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
+	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array))
+	n := max(hi-lo, 0)
+	if n > 0 {
+		if hi != len(array) {
+			copy(array[lo:], array[hi:])
+		}
+		(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= n
+	}
+}
+
+@builtin
+unordered_remove :: proc{
+	unordered_remove_dynamic_array,
+	unordered_remove_fixed_capacity_dynamic_array,
+}
+
+
+@builtin
+ordered_remove :: proc{
+	ordered_remove_dynamic_array,
+	ordered_remove_fixed_capacity_dynamic_array,
+}
+
+@builtin
+remove_range :: proc{
+	remove_range_dynamic_array,
+	remove_range_fixed_capacity_dynamic_array,
+}
+
 
 
 // `pop_dynamic_array` will remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
