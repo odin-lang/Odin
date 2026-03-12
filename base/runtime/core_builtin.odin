@@ -879,7 +879,7 @@ append_fixed_capacity_elems :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #
 	Raw :: Raw_Fixed_Capacity_Dynamic_Array(N, E)
 	raw := (^Raw)(array)
 
-	n = min(N - len(args), len(args))
+	n = min(N - len(array), len(args))
 
 	when size_of(E) != 0 {
 		for i in 0..<n {
