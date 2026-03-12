@@ -285,6 +285,32 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 		}
 		return
 
+
+	case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:
+		if info.elem.id == byte {
+			raw := (^[dynamic]byte)(v.data)
+			return err_conv(_encode_bytes(e, raw[:]))
+		}
+
+		array_len := (^int)(uintptr(v.data) + info.len_offset)^
+		array_data := uintptr(v.data)
+		err_conv(_encode_u64(e, u64(array_len), .Array)) or_return
+
+		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
+			for i in 0..<array_len {
+				data := array_data + uintptr(i*info.elem_size)
+				impl->marshal(e, any{rawptr(data), info.elem.id}) or_return
+			}
+			return
+		}
+
+		elem_ti := runtime.type_info_core(type_info_of(info.elem.id))
+		for i in 0..<array_len {
+			data := array_data + uintptr(i*info.elem_size)
+			_marshal_into_encoder(e, any{rawptr(data), info.elem.id}, elem_ti) or_return
+		}
+		return
+
 	case runtime.Type_Info_Slice:
 		if info.elem.id == byte {
 			raw := (^[]byte)(v.data)
