@@ -180,6 +180,7 @@ type_is_bit_set          :: proc($T: typeid) -> bool ---
 type_is_bit_field        :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_is_matrix           :: proc($T: typeid) -> bool ---
+type_is_fixed_capacity_dynamic_array :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
@@ -221,6 +222,8 @@ type_is_subtype_of  :: proc($T, $U: typeid) -> bool ---
 type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
+
+type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
 
 // "Contiguous" means that the set of enum constants, when sorted, have a difference of either 0 or 1 between consecutive values.
 // This is the exact opposite of "sparse".

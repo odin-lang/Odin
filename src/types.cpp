@@ -4755,8 +4755,9 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 		case 1: // len
 			if (field_type_) *field_type_ = t_int;
 			{
+				i64 elem_size = type_size_of(t->FixedCapacityDynamicArray.elem);
 				i64 offset = 0;
-				offset = type_size_of(alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity));
+				offset = elem_size * t->FixedCapacityDynamicArray.capacity;
 				offset = align_formula(offset, build_context.int_size);
 				return offset;
 			}

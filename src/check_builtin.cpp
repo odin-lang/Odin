@@ -58,6 +58,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_simd_vector,
 	is_type_matrix,
 	is_type_raw_union,
+	is_type_fixed_capacity_dynamic_array,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
@@ -7623,6 +7624,31 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_u64(sel.index[0]);
+			operand->type = t_uintptr;
+			break;
+		}
+		break;
+
+	case BuiltinProc_type_fixed_capacity_dynamic_array_len_offset:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_fixed_capacity_dynamic_array(type)) {
+				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			i64 sz = type_size_of(type);
+			gb_unused(sz);
+			i64 offset = type_offset_of(type, 1);
+
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(cast(u64)offset);
 			operand->type = t_uintptr;
 			break;
 		}
