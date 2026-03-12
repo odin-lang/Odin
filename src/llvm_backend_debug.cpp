@@ -442,14 +442,14 @@ gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, T
 		LLVMDIFlagZero, lb_debug_type(m, elem_type)
 	);
 
-	i64 len_offset = type_offset_of(bt, 1);
+	i64 len_offset_in_bits = 8*type_offset_of(bt, 1);
 
 	elements[1] = LLVMDIBuilderCreateMemberType(
 		m->debug_builder, member_scope,
 		"len", 3,
 		file, line,
 		int_bits, int_bits,
-		len_offset,
+		len_offset_in_bits,
 		LLVMDIFlagZero, lb_debug_type(m, t_int)
 	);
 
