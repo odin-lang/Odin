@@ -171,7 +171,7 @@ remove_range_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int,
 // Note: If you want the elements to remain in their order, use `ordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-unordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+unordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	n := len(array)-1
 	if index != n {
@@ -185,7 +185,7 @@ unordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T
 // Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-ordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+ordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		copy(array[index:], array[index+1:])
@@ -198,7 +198,7 @@ ordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, 
 // Note: This is an O(N) operation.
 // Note: If the range is out of bounds, this procedure will panic.
 @builtin
-remove_range_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$T, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
+remove_range_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
 	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array))
 	n := max(hi-lo, 0)
 	if n > 0 {
@@ -1405,7 +1405,7 @@ resize_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; 
 		size_of_elem :: size_of(E)
 
 		num_reused := min(N, length) - raw.len
-		intrinsics.mem_zero(([^]byte)(a.data)[raw.len*size_of_elem:], num_reused*size_of_elem)
+		intrinsics.mem_zero(([^]byte)(raw.data)[raw.len*size_of_elem:], num_reused*size_of_elem)
 	}
 	new_length := clamp(length, 0, N)
 	raw.len = new_length
