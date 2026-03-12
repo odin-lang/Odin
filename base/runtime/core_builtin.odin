@@ -1059,7 +1059,7 @@ inject_at_elem_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, 
 	m :: 1
 	new_size := n + m
 
-	resize(array, new_size, loc) or_return
+	resize(array, new_size) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
 		array[index] = arg
@@ -1084,7 +1084,7 @@ inject_at_elems_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E,
 	m := len(args)
 	new_size := n + m
 
-	resize(array, new_size, loc) or_return
+	resize(array, new_size) or_return
 	when size_of(E) != 0 {
 		copy(array[index + m:], array[index:])
 		copy(array[index:], args)
@@ -1109,7 +1109,7 @@ inject_at_elem_string_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; 
 	m := len(arg)
 	new_size := n + m
 
-	resize(array, new_size, loc) or_return
+	resize(array, new_size) or_return
 	copy(array[index+m:], array[index:])
 	copy(array[index:], arg)
 	return true
