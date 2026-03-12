@@ -218,6 +218,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 	case Type_Info_Slice:            return v.elem.id
 	case Type_Info_Dynamic_Array:    return v.elem.id
 	case Type_Info_Simd_Vector:      return v.elem.id
+	case Type_Info_Fixed_Capacity_Dynamic_Array: return v.elem.id
 	}
 	return id
 }
@@ -308,6 +309,9 @@ length :: proc(val: any) -> int {
 	case Type_Info_Dynamic_Array:
 		return (^runtime.Raw_Dynamic_Array)(val.data).len
 
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		return (^int)(uintptr(val.data) + a.len_offset)^
+
 	case Type_Info_Map:
 		return runtime.map_len((^runtime.Raw_Map)(val.data)^)
 
@@ -359,6 +363,9 @@ capacity :: proc(val: any) -> int {
 
 	case Type_Info_Dynamic_Array:
 		return (^runtime.Raw_Dynamic_Array)(val.data).cap
+
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		return a.capacity
 
 	case Type_Info_Map:
 		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
@@ -418,6 +425,13 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(a.elem.size * i)
 		data := rawptr(uintptr(raw.data) + offset)
+		return any{data, a.elem.id}
+
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		count := (^int)(uintptr(val.data) + a.len_offset)^
+		runtime.bounds_check_error_loc(loc, i, count)
+		offset := uintptr(a.elem.size * i)
+		data := rawptr(uintptr(val.data) + offset)
 		return any{data, a.elem.id}
 
 	case Type_Info_String:
@@ -1775,6 +1789,10 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 	case Type_Info_Slice:
 		valid = true
 		value = (^runtime.Raw_Slice)(a.data).data
+
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		valid = true
+		value = a.data
 
 	case Type_Info_Dynamic_Array:
 		valid = true

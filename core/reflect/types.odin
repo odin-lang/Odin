@@ -433,6 +433,13 @@ is_simd_vector :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector)
 	return ok
 }
+// Returns true when the type is a dynamic-array type ([dynamic]T), false otherwise.
+@(require_results)
+is_fixed_capacity_dynamic_array :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	_, ok := type_info_base(info).variant.(Type_Info_Fixed_Capacity_Dynamic_Array)
+	return ok
+}
 
 
 // Returns true when the core-type is represented with a platform-native endian type, and returns false otherwise.
@@ -839,6 +846,8 @@ has_no_indirections :: proc(ti: ^Type_Info) -> bool {
 	case Type_Info_Array:
 		return has_no_indirections(info.elem)
 	case Type_Info_Enumerated_Array:
+		return has_no_indirections(info.elem)
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
 		return has_no_indirections(info.elem)
 
 	case Type_Info_Simd_Vector:
