@@ -1109,13 +1109,13 @@ gb_internal Type *alloc_type_fixed_capacity_dynamic_array(Type *elem, i64 capaci
 		t->FixedCapacityDynamicArray.elem = elem;
 		t->FixedCapacityDynamicArray.capacity = capacity;
 		t->FixedCapacityDynamicArray.generic_capacity = generic_capacity;
-		t->FixedCapacityDynamicArray.padding_needed = 0;
+		t->FixedCapacityDynamicArray.padding_needed = -1;
 		return t;
 	}
 	Type *t = alloc_type(Type_FixedCapacityDynamicArray);
 	t->FixedCapacityDynamicArray.elem = elem;
 	t->FixedCapacityDynamicArray.capacity = capacity;
-	t->FixedCapacityDynamicArray.padding_needed = 0;
+	t->FixedCapacityDynamicArray.padding_needed = -1;
 	return t;
 }
 
@@ -4513,9 +4513,6 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			size = align_formula(size, build_context.int_size);
 
 			i64 padding = size - old_size;
-			if (t->FixedCapacityDynamicArray.padding_needed >= 0) {
-				GB_ASSERT(t->FixedCapacityDynamicArray.padding_needed == padding);
-			}
 			t->FixedCapacityDynamicArray.padding_needed = padding;
 
 			size += 1*build_context.int_size;

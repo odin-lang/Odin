@@ -10321,6 +10321,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	case Type_DynamicArray:
 	case Type_SimdVector:
 	case Type_Matrix:
+	case Type_FixedCapacityDynamicArray:
 	{
 		Type *elem_type = nullptr;
 		String context_name = {};
@@ -10351,6 +10352,10 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			elem_type = t->DynamicArray.elem;
 			context_name = str_lit("dynamic array literal");
 			is_constant = false;
+		} else if (t->kind == Type_FixedCapacityDynamicArray) {
+			elem_type = t->FixedCapacityDynamicArray.elem;
+			context_name = str_lit("fixed capacity dynamic array literal");
+			max_type_count = t->FixedCapacityDynamicArray.capacity;
 		} else if (t->kind == Type_SimdVector) {
 			elem_type = t->SimdVector.elem;
 			context_name = str_lit("simd vector literal");

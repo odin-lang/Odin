@@ -4495,6 +4495,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	case Type_DynamicArray:    et = bt->DynamicArray.elem;    break;
 	case Type_SimdVector:      et = bt->SimdVector.elem;      break;
 	case Type_Matrix:          et = bt->Matrix.elem;          break;
+	case Type_FixedCapacityDynamicArray: et = bt->FixedCapacityDynamicArray.elem; break;
 	}
 	GB_ASSERT(et != nullptr);
 
@@ -5102,12 +5103,13 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	Type *et = nullptr;
 	switch (bt->kind) {
-	case Type_Array:           et = bt->Array.elem;           break;
-	case Type_EnumeratedArray: et = bt->EnumeratedArray.elem; break;
-	case Type_Slice:           et = bt->Slice.elem;           break;
-	case Type_BitSet:          et = bt->BitSet.elem;          break;
-	case Type_SimdVector:      et = bt->SimdVector.elem;      break;
-	case Type_Matrix:          et = bt->Matrix.elem;          break;
+	case Type_Array:              et = bt->Array.elem;           break;
+	case Type_EnumeratedArray:    et = bt->EnumeratedArray.elem; break;
+	case Type_Slice:              et = bt->Slice.elem;           break;
+	case Type_BitSet:             et = bt->BitSet.elem;          break;
+	case Type_SimdVector:         et = bt->SimdVector.elem;      break;
+	case Type_Matrix:             et = bt->Matrix.elem;          break;
+	case Type_FixedCapacityDynamicArray: et = bt->FixedCapacityDynamicArray.elem; break;
 	}
 
 	String proc_name = {};
@@ -5485,6 +5487,25 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				}
 				lb_fill_slice(p, v, data, count);
 			}
+		}
+		break;
+	}
+
+	case Type_FixedCapacityDynamicArray: {
+		if (cl->elems.count > 0) {
+			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+
+			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+
+			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
+
+			lbValue dst_ptr = lb_addr_get_ptr(p, v);
+			for_array(i, temp_data) {
+				i32 index = cast(i32)(temp_data[i].elem_index);
+				temp_data[i].gep = lb_emit_array_epi(p, dst_ptr, index);
+			}
+
+			lb_build_addr_compound_lit_assign_array(p, temp_data);
 		}
 		break;
 	}

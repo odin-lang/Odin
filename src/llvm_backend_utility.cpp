@@ -1567,16 +1567,27 @@ gb_internal lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, isize index) {
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
-	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
+
 	GB_ASSERT(0 <= index);
+	if (is_type_fixed_capacity_dynamic_array(st)) {
+		lbValue data = lb_emit_struct_ep(p, s, 0);
+		return lb_emit_epi(p, data, index);
+	}
+
+	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
 	return lb_emit_epi(p, s, index);
 }
 gb_internal lbValue lb_emit_array_epi(lbModule *m, lbValue s, isize index) {
 	Type *t = s.type;
 	GB_ASSERT(is_type_pointer(t));
 	Type *st = base_type(type_deref(t));
-	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
 	GB_ASSERT(0 <= index);
+	if (is_type_fixed_capacity_dynamic_array(st)) {
+		lbValue data = lb_emit_epi(m, s, 0);
+		return lb_emit_epi(m, data, index);
+	}
+
+	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
 	return lb_emit_epi(m, s, index);
 }
 
