@@ -77,7 +77,7 @@ update :: proc "contextless" (ctx: ^Context, data: []byte) {
 // final finalizes the Context, writes the digest to hash, and calls
 // reset on the Context.
 //
-// Iff finalize_clone is set, final will work on a copy of the Context,
+// If finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc "contextless" (ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	_sha3.final((^_sha3.Context)(ctx), hash, finalize_clone)

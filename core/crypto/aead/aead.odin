@@ -13,7 +13,7 @@ seal_oneshot :: proc(algo: Algorithm, dst, tag, key, iv, aad, plaintext: []byte,
 
 // open authenticates the aad and ciphertext, and decrypts the ciphertext,
 // with the provided algorithm, key, iv, and tag, and stores the output in dst,
-// returning true iff the authentication was successful.  If authentication
+// returning true if the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
 // dst and ciphertext MUST alias exactly or not at all.

@@ -136,7 +136,7 @@ chacha8rand_refill_simd256 :: proc(r: ^Default_Random_State) {
 		//
 		// LLVM appears not to consider "this instruction is totally
 		// awful on the given microarchitcture", which leads to
-		// `VPCOMPRESSED` being generated iff AVX512 support is
+		// `VPCOMPRESSED` being generated if AVX512 support is
 		// enabled for `intrinsics.simd_masked_compress_store`.
 		// On Zen 4, this leads to a 50% performance regression vs
 		// the 128-bit SIMD code.

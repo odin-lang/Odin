@@ -1424,8 +1424,8 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 		truncated: r = a - b*trunc(a/b)
 		floored:   r = a - b*floor(a/b)
 
-		IFF a/0 == 0, then (a%0 == a) or (a%%0 == a)
-		IFF a/0 == a, then (a%0 == 0) or (a%%0 == 0)
+		IF a/0 == 0, then (a%0 == a) or (a%%0 == a)
+		IF a/0 == a, then (a%0 == 0) or (a%%0 == 0)
 	*/
 
 	switch (behaviour)  {

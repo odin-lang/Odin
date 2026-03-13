@@ -8,11 +8,11 @@ import subtle "core:crypto/_subtle"
 // Omit large precomputed tables, trading off performance for size.
 COMPACT_IMPLS: bool : #config(ODIN_CRYPTO_COMPACT, false)
 
-// HAS_RAND_BYTES is true iff the runtime provides a cryptographic
+// HAS_RAND_BYTES is true if the runtime provides a cryptographic
 // entropy source.
 HAS_RAND_BYTES :: runtime.HAS_RAND_BYTES
 
-// compare_constant_time returns 1 iff a and b are equal, 0 otherwise.
+// compare_constant_time returns 1 if a and b are equal, 0 otherwise.
 //
 // The execution time of this routine is constant regardless of the contents
 // of the slices being compared, as long as the length of the slices is equal.
@@ -31,7 +31,7 @@ compare_constant_time :: proc "contextless" (a, b: []byte) -> int {
 	return compare_byte_ptrs_constant_time(raw_data(a), raw_data(b), n)
 }
 
-// compare_byte_ptrs_constant_time returns 1 iff the bytes pointed to by
+// compare_byte_ptrs_constant_time returns 1 if the bytes pointed to by
 // a and b are equal, 0 otherwise.
 //
 // The execution time of this routine is constant regardless of the
@@ -46,12 +46,12 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 		v |= x[i] ~ y[i]
 	}
 
-	// After the loop, v == 0 iff a == b.  The subtraction will underflow
-	// iff v == 0, setting the sign-bit, which gets returned.
+	// After the loop, v == 0 if a == b.  The subtraction will underflow
+	// if v == 0, setting the sign-bit, which gets returned.
 	return subtle.eq(0, v)
 }
 
-// is_zero_constant_time returns 1 iff b is all 0s, 0 otherwise.
+// is_zero_constant_time returns 1 if b is all 0s, 0 otherwise.
 is_zero_constant_time :: proc "contextless" (b: []byte) -> int {
 	v: byte
 	for b_ in b {

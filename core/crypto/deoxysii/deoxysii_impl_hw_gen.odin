@@ -4,7 +4,7 @@ package deoxysii
 @(private = "file")
 ERR_HW_NOT_SUPPORTED :: "crypto/deoxysii: hardware implementation unsupported"
 
-// is_hardware_accelerated returns true iff hardware accelerated Deoxys-II
+// is_hardware_accelerated returns true if hardware accelerated Deoxys-II
 // is supported.
 is_hardware_accelerated :: proc "contextless" () -> bool {
 	return false

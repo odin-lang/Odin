@@ -79,7 +79,7 @@ Public_Key :: struct {
 }
 
 // private_key_generate uses the system entropy source to generate a new
-// Private_Key.  This will only fail iff the system entropy source is
+// Private_Key.  This will only fail if the system entropy source is
 // missing or broken.
 private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 	private_key_clear(priv_key)
@@ -111,7 +111,7 @@ private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 }
 
 // private_key_set_bytes decodes a byte-encoded private key, and returns
-// true iff the operation was successful.
+// true if the operation was successful.
 private_key_set_bytes :: proc(priv_key: ^Private_Key, curve: Curve, b: []byte) -> bool {
 	private_key_clear(priv_key)
 
@@ -194,7 +194,7 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	}
 }
 
-// private_key_equal returns true iff the private keys are equal,
+// private_key_equal returns true if the private keys are equal,
 // in constant time.
 private_key_equal :: proc(p, q: ^Private_Key) -> bool {
 	if p._curve != q._curve {
@@ -219,7 +219,7 @@ private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
-// true iff the operation was successful.
+// true if the operation was successful.
 public_key_set_bytes :: proc(pub_key: ^Public_Key, curve: Curve, b: []byte) -> bool {
 	public_key_clear(pub_key)
 
@@ -296,7 +296,7 @@ public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
 	}
 }
 
-// public_key_equal returns true iff the public keys are equal,
+// public_key_equal returns true if the public keys are equal,
 // in constant time.
 public_key_equal :: proc(p, q: ^Public_Key) -> bool {
 	if p._curve != q._curve {
