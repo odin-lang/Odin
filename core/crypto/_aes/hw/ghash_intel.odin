@@ -21,7 +21,7 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #+build amd64
-package aes_hw_intel
+package aes_hw
 
 import "base:intrinsics"
 import "core:crypto/_aes"
