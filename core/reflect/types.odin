@@ -32,36 +32,36 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		return x.signed == y.signed && x.endianness == y.endianness
 
 	case Type_Info_Rune:
-		_, ok := b.variant.(Type_Info_Rune)
-		return ok
+		_ = b.variant.(Type_Info_Rune) or_return
+		return true
 
 	case Type_Info_Float:
-		_, ok := b.variant.(Type_Info_Float)
-		return ok
+		y := b.variant.(Type_Info_Float) or_return
+		return x.endianness == y.endianness
 
 	case Type_Info_Complex:
-		_, ok := b.variant.(Type_Info_Complex)
-		return ok
+		_ = b.variant.(Type_Info_Complex) or_return
+		return true
 
 	case Type_Info_Quaternion:
-		_, ok := b.variant.(Type_Info_Quaternion)
-		return ok
+		_ = b.variant.(Type_Info_Quaternion) or_return
+		return true
 
 	case Type_Info_Type_Id:
-		_, ok := b.variant.(Type_Info_Type_Id)
-		return ok
+		_ = b.variant.(Type_Info_Type_Id) or_return
+		return true
 
 	case Type_Info_String:
-		_, ok := b.variant.(Type_Info_String)
-		return ok
+		y := b.variant.(Type_Info_String) or_return
+		return x.is_cstring == y.is_cstring && x.encoding == y.encoding
 
 	case Type_Info_Boolean:
-		_, ok := b.variant.(Type_Info_Boolean)
-		return ok
+		_ = b.variant.(Type_Info_Boolean) or_return
+		return true
 
 	case Type_Info_Any:
-		_, ok := b.variant.(Type_Info_Any)
-		return ok
+		_ = b.variant.(Type_Info_Any) or_return
+		return true
 
 	case Type_Info_Pointer:
 		y := b.variant.(Type_Info_Pointer) or_return
@@ -78,22 +78,19 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Procedure:
 		y := b.variant.(Type_Info_Procedure) or_return
-		switch {
-		case x.variadic   != y.variadic,
-		     x.convention != y.convention:
-			return false
-		}
+		(x.variadic   == y.variadic)         or_return
+		(x.convention == y.convention)       or_return
 
 		return are_types_identical(x.params, y.params) && are_types_identical(x.results, y.results)
 
 	case Type_Info_Array:
 		y := b.variant.(Type_Info_Array) or_return
-		if x.count != y.count { return false }
+		(x.count == y.count)             or_return
 		return are_types_identical(x.elem, y.elem)
 
 	case Type_Info_Enumerated_Array:
 		y := b.variant.(Type_Info_Enumerated_Array) or_return
-		if x.count != y.count { return false }
+		(x.count == y.count)                        or_return
 		return are_types_identical(x.index, y.index) &&
 		       are_types_identical(x.elem, y.elem)
 
@@ -107,17 +104,15 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 
 	case Type_Info_Fixed_Capacity_Dynamic_Array:
 		y := b.variant.(Type_Info_Fixed_Capacity_Dynamic_Array) or_return
-		if x.capacity != y.capacity { return false }
+		(x.capacity == y.capacity)                              or_return
 		return are_types_identical(x.elem, y.elem)
 
 	case Type_Info_Parameters:
 		y := b.variant.(Type_Info_Parameters) or_return
-		if len(x.types) != len(y.types) { return false }
+		(len(x.types) == len(y.types))        or_return
 		for _, i in x.types {
 			xt, yt := x.types[i], y.types[i]
-			if !are_types_identical(xt, yt) {
-				return false
-			}
+			are_types_identical(xt, yt) or_return
 		}
 		return true
 
@@ -136,59 +131,64 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 			xt, yt := x.types[i], y.types[i]
 			xl, yl := x.tags[i],  y.tags[i]
 
-			if xn != yn { return false }
-			if !are_types_identical(xt, yt) { return false }
-			if xl != yl { return false }
+			(xn == yn)                  or_return
+			are_types_identical(xt, yt) or_return
+			(xl == yl)                  or_return
 		}
 		return true
 
 	case Type_Info_Union:
-		y := b.variant.(Type_Info_Union) or_return
-		if len(x.variants) != len(y.variants) { return false }
+		y := b.variant.(Type_Info_Union)     or_return
+		(len(x.variants) == len(y.variants)) or_return
 
 		for _, i in x.variants {
 			xv, yv := x.variants[i], y.variants[i]
-			if !are_types_identical(xv, yv) { return false }
+			are_types_identical(xv, yv) or_return
 		}
 		return true
 
 	case Type_Info_Enum:
-		// NOTE(bill): Should be handled above
-		return false
+		y := b.variant.(Type_Info_Enum)     or_return
+		are_types_identical(x.base, y.base) or_return
+		(len(x.names) == len(y.names))      or_return
+
+		for _, i in x.names {
+			(x.names[i]  == y.names[i])  or_return
+			(x.values[i] == y.values[i]) or_return
+		}
+		return true
 
 	case Type_Info_Map:
 		y := b.variant.(Type_Info_Map) or_return
 		return are_types_identical(x.key, y.key) && are_types_identical(x.value, y.value)
 
 	case Type_Info_Bit_Set:
-		y := b.variant.(Type_Info_Bit_Set) or_return
-		return x.elem == y.elem && x.lower == y.lower && x.upper == y.upper
+		y := b.variant.(Type_Info_Bit_Set)              or_return
+		are_types_identical(x.underlying, y.underlying) or_return
+		are_types_identical(x.elem, y.elem)             or_return
+
+		return x.lower == y.lower && x.upper == y.upper
 
 	case Type_Info_Simd_Vector:
 		y := b.variant.(Type_Info_Simd_Vector) or_return
 		return x.count == y.count && x.elem == y.elem
 		
 	case Type_Info_Matrix:
-		y := b.variant.(Type_Info_Matrix) or_return
-		if x.row_count != y.row_count { return false }
-		if x.column_count != y.column_count { return false }
-		if x.layout != y.layout { return false }
+		y := b.variant.(Type_Info_Matrix)  or_return
+		(x.row_count    == y.row_count)    or_return
+		(x.column_count == y.column_count) or_return
+		(x.layout       == y.layout)       or_return
 		return are_types_identical(x.elem, y.elem)
 
 	case Type_Info_Bit_Field:
-		y := b.variant.(Type_Info_Bit_Field) or_return
-		if !are_types_identical(x.backing_type, y.backing_type) { return false }
-		if x.field_count != y.field_count { return false }
+		y := b.variant.(Type_Info_Bit_Field)                or_return
+		are_types_identical(x.backing_type, y.backing_type) or_return
+		(x.field_count == y.field_count)                    or_return
+
 		for _, i in x.names[:x.field_count] {
-			if x.names[i] != y.names[i] {
-				return false
-			}
-			if !are_types_identical(x.types[i], y.types[i]) {
-				return false
-			}
-			if x.bit_sizes[i] != y.bit_sizes[i] {
-				return false
-			}
+			(x.names[i] == y.names[i])                  or_return
+			are_types_identical(x.types[i], y.types[i]) or_return
+			(x.bit_sizes[i] == y.bit_sizes[i])          or_return
 		}
 		return true
 	}
@@ -334,7 +334,8 @@ is_soa_pointer :: proc(info: ^Type_Info) -> bool {
 is_pointer_internally :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	#partial switch v in type_info_base(info).variant {
-	case Type_Info_Pointer, Type_Info_Multi_Pointer,
+	case Type_Info_Pointer,
+	     Type_Info_Multi_Pointer,
 	     Type_Info_Procedure:
 		return true
 	case Type_Info_String:
@@ -674,7 +675,7 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		write_type(w, info.elem, &n) or_return
 
 	case Type_Info_Fixed_Capacity_Dynamic_Array:
-		io.write_string(w, "[dynamic;",         &n) or_return
+		io.write_string(w, "[dynamic; ",        &n) or_return
 		io.write_i64(w, i64(info.capacity), 10, &n) or_return
 		io.write_string(w, "]",                 &n) or_return
 		write_type(w, info.elem,                &n) or_return
