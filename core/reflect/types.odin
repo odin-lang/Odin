@@ -434,7 +434,7 @@ is_simd_vector :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector)
 	return ok
 }
-// Returns true when the type is a dynamic-array type ([dynamic]T), false otherwise.
+// Returns true when the type is a fixed-capacity dynamic-array type ([dynamic; N]T), false otherwise.
 @(require_results)
 is_fixed_capacity_dynamic_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
