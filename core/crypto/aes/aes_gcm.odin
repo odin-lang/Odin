@@ -65,7 +65,7 @@ seal_gcm :: proc(ctx: ^Context_GCM, dst, tag, iv, aad, plaintext: []byte) {
 
 // open_gcm authenticates the aad and ciphertext, and decrypts the ciphertext,
 // with the provided Context_GCM, iv, and tag, and stores the output in dst,
-// returning true iff the authentication was successful.  If authentication
+// returning true if and only if (⟺) the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
 // dst and plaintext MUST alias exactly or not at all.

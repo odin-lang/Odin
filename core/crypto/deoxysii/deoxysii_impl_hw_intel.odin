@@ -21,7 +21,7 @@ _PREFIX_MSG_BLOCK :: x86.__m128i{PREFIX_MSG_BLOCK << PREFIX_SHIFT, 0}
 @(private = "file")
 _PREFIX_MSG_FINAL :: x86.__m128i{PREFIX_MSG_FINAL << PREFIX_SHIFT, 0}
 
-// is_hardware_accelerated returns true iff hardware accelerated Deoxys-II
+// is_hardware_accelerated returns true if and only if (⟺) hardware accelerated Deoxys-II
 // is supported.
 is_hardware_accelerated :: proc "contextless" () -> bool {
 	return aes.is_hardware_accelerated()

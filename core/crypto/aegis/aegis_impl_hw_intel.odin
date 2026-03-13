@@ -20,7 +20,7 @@ State_HW :: struct {
 	rate: int,
 }
 
-// is_hardware_accelerated returns true iff hardware accelerated AEGIS
+// is_hardware_accelerated returns true if and only if (⟺) hardware accelerated AEGIS
 // is supported.
 is_hardware_accelerated :: proc "contextless" () -> bool {
 	return aes.is_hardware_accelerated()

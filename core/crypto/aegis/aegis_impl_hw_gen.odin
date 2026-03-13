@@ -7,7 +7,7 @@ ERR_HW_NOT_SUPPORTED :: "crypto/aegis: hardware implementation unsupported"
 @(private)
 State_HW :: struct {}
 
-// is_hardware_accelerated returns true iff hardware accelerated AEGIS
+// is_hardware_accelerated returns true if and only if (⟺) hardware accelerated AEGIS
 // is supported.
 is_hardware_accelerated :: proc "contextless" () -> bool {
 	return false

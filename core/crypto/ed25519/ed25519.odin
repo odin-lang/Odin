@@ -48,7 +48,7 @@ Public_Key :: struct {
 }
 
 // private_key_generate uses the system entropy source to generate a new
-// Private_Key.  This will only fail iff the system entropy source is
+// Private_Key.  This will only fail if and only if (⟺) the system entropy source is
 // missing or broken.
 private_key_generate :: proc(priv_key: ^Private_Key) -> bool {
 	private_key_clear(priv_key)
@@ -67,7 +67,7 @@ private_key_generate :: proc(priv_key: ^Private_Key) -> bool {
 }
 
 // private_key_set_bytes decodes a byte-encoded private key, and returns
-// true iff the operation was successful.
+// true if and only if (⟺) the operation was successful.
 private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 	if len(b) != PRIVATE_KEY_SIZE {
 		return false
@@ -167,7 +167,7 @@ sign :: proc(priv_key: ^Private_Key, msg, sig: []byte) {
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
-// true iff the operation was successful.
+// true if and only if (⟺) the operation was successful.
 public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> bool {
 	if len(b) != PUBLIC_KEY_SIZE {
 		return false
@@ -205,14 +205,14 @@ public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
 	copy(dst, pub_key._b[:])
 }
 
-// public_key_equal returns true iff pub_key is equal to other.
+// public_key_equal returns true if and only if (⟺) pub_key is equal to other.
 public_key_equal :: proc(pub_key, other: ^Public_Key) -> bool {
 	ensure(pub_key._is_initialized && other._is_initialized, "crypto/ed25519: uninitialized public key")
 
 	return crypto.compare_constant_time(pub_key._b[:], other._b[:]) == 1
 }
 
-// verify returns true iff sig is a valid signature by pub_key over msg.
+// verify returns true if and only if (⟺) sig is a valid signature by pub_key over msg.
 //
 // The optional `allow_small_order_A` parameter will make this
 // implementation strictly compatible with FIPS 186-5, at the expense of

@@ -215,7 +215,7 @@ _store_simd128 :: #force_inline proc "contextless" (
 	intrinsics.unaligned_store((^simd.u32x4)(dst[3:]), v3)
 }
 
-// is_performant returns true iff the target and current host both support
+// is_performant returns true if and only if (⟺) the target and current host both support
 // "enough" 128-bit SIMD to make this implementation performant.
 is_performant :: proc "contextless" () -> bool {
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 || ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 || ODIN_ARCH == .riscv64 {

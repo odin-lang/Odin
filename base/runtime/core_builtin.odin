@@ -1094,7 +1094,7 @@ card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
 
 
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `context.assertion_failure_procedure` to assert.
 //
 // This routine will be ignored when `ODIN_DISABLE_ASSERT` is true.
@@ -1118,7 +1118,7 @@ assert :: proc(condition: bool, message := #caller_expression(condition), loc :=
 	}
 }
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `context.assertion_failure_procedure` to assert.
 // This routine ignores `ODIN_DISABLE_ASSERT`, and will always execute.
 @builtin
@@ -1158,7 +1158,7 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	p("not yet implemented", message, loc)
 }
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 //
 // This routine will be ignored when `ODIN_DISABLE_ASSERT` is true.
@@ -1178,7 +1178,7 @@ assert_contextless :: proc "contextless" (condition: bool, message := #caller_ex
 	}
 }
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 @builtin
 ensure_contextless :: proc "contextless" (condition: bool, message := #caller_expression(condition), loc := #caller_location) {

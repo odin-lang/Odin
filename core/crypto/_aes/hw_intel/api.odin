@@ -3,7 +3,7 @@ package aes_hw_intel
 
 import "core:sys/info"
 
-// is_supported returns true iff hardware accelerated AES
+// is_supported returns true if and only if (⟺) hardware accelerated AES
 // is supported.
 is_supported :: proc "contextless" () -> bool {
 	// Note: Everything with AES-NI and PCLMULQDQ has support for

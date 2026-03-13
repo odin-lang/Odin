@@ -4460,9 +4460,9 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		    			truncated: r = a - b*trunc(a/b)
 		    			floored:   r = a - b*floor(a/b)
 
-		    			IFF a/0 == 0,        then (a%0 == a) or (a%%0 == a)
-		    			IFF a/0 == a,        then (a%0 == 0) or (a%%0 == 0)
-		    			IFF a/0 == 0b111..., then (a%0 == a) or (a%%0 == a)
+		    			If and only if (⟺) a/0 == 0,        then (a%0 == a) or (a%%0 == a)
+		    			If and only if (⟺) a/0 == a,        then (a%0 == 0) or (a%%0 == 0)
+		    			If and only if (⟺) a/0 == 0b111..., then (a%0 == a) or (a%%0 == a)
 		    		*/
 
 				switch (zero_behaviour) {

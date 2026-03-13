@@ -141,7 +141,7 @@ parse_asn1_sig :: proc(sig: []byte) -> (r, s: []byte, ok: bool) {
 		return nil, nil, false
 	}
 
-	// DER requires a leading 0 iff the sign bit of the leading byte
+	// DER requires a leading 0 if and only if (⟺) the sign bit of the leading byte
 	// is set to distinguish between positive and negative integers,
 	// and the minimal length representation.  `r` and `s` are always
 	// going to be unsigned, so we validate malformed DER and strip
