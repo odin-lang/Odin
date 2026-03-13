@@ -454,6 +454,8 @@ is_endian_platform :: proc(info: ^Type_Info) -> bool {
 	#partial switch v in info.variant {
 	case Type_Info_Integer:
 		return v.endianness == .Platform
+	case Type_Info_Float:
+		return v.endianness == .Platform
 	case Type_Info_Bit_Set:
 		return is_endian_platform(v.underlying)
 	case Type_Info_Pointer:
@@ -476,6 +478,11 @@ is_endian_little :: proc(info: ^Type_Info) -> bool {
 			return ODIN_ENDIAN == .Little
 		}
 		return v.endianness == .Little
+	case Type_Info_Float:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Little
+		}
+		return v.endianness == .Little
 	case Type_Info_Bit_Set:
 		return is_endian_little(v.underlying)
 	case Type_Info_Pointer:
@@ -494,6 +501,11 @@ is_endian_big :: proc(info: ^Type_Info) -> bool {
 	info = type_info_core(info)
 	#partial switch v in info.variant {
 	case Type_Info_Integer:
+		if v.endianness == .Platform {
+			return ODIN_ENDIAN == .Big
+		}
+		return v.endianness == .Big
+	case Type_Info_Float:
 		if v.endianness == .Platform {
 			return ODIN_ENDIAN == .Big
 		}
