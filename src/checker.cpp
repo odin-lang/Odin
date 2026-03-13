@@ -2240,7 +2240,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	case Type_BitSet:
 		add_type_info_type_internal(c, bt->BitSet.elem);
-		add_type_info_type_internal(c, bt->BitSet.underlying);
+		add_type_info_type_internal(c, bit_set_to_int(bt));
 		break;
 
 	case Type_Pointer:
@@ -2479,7 +2479,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_BitSet:
 		add_min_dep_type_info(c, bt->BitSet.elem);
-		add_min_dep_type_info(c, bt->BitSet.underlying);
+		add_min_dep_type_info(c, bit_set_to_int(bt));
 		break;
 
 	case Type_Pointer:
