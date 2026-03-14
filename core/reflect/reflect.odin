@@ -1948,7 +1948,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		}
 
 		for i in 0..<a_count {
-			// size the data is stored at the start, this is possible
+			// since the data is stored at the start, this is possible
 			x := rawptr(uintptr(a.data) + uintptr(v.elem_size*i))
 			y := rawptr(uintptr(b.data) + uintptr(v.elem_size*i))
 			if !equal(any{x, v.elem.id}, any{y, v.elem.id}, including_indirect_array_recursion, recursion_level) {
