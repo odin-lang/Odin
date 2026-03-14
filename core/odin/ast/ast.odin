@@ -787,7 +787,7 @@ Dynamic_Array_Type :: struct {
 }
 
 Fixed_Capacity_Dynamic_Array_Type :: struct {
-	using node: Expr,
+	using node:  Expr,
 	tag:         ^Expr, // possibly nil
 	open:        tokenizer.Pos,
 	dynamic_pos: tokenizer.Pos,
