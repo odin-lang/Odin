@@ -2278,7 +2278,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	case Type_FixedCapacityDynamicArray:
 		add_type_info_type_internal(c, bt->FixedCapacityDynamicArray.elem);
-		add_type_info_type_internal(c, t_allocator);
+		add_type_info_type_internal(c, t_int);
 		break;
 
 	case Type_Enum:
@@ -2521,6 +2521,8 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_FixedCapacityDynamicArray:
 		add_min_dep_type_info(c, bt->FixedCapacityDynamicArray.elem);
+		add_min_dep_type_info(c, alloc_type_pointer(bt->FixedCapacityDynamicArray.elem));
+		add_min_dep_type_info(c, alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity));
 		add_min_dep_type_info(c, t_int);
 
 	case Type_Enum:

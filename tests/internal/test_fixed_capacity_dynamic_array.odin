@@ -1,6 +1,21 @@
-package test_core_container
+package test_internal
 
 import "core:testing"
+
+@(private="file")
+slice_equal :: proc(a, b: []int) -> bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for a, i in a {
+		if b[i] != a {
+			return false
+		}
+	}
+	return true
+}
+
 
 @(test)
 test_fixed_capacity_dynamic_array_removes :: proc(t: ^testing.T) {

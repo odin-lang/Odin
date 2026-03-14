@@ -2559,7 +2559,7 @@ gb_internal bool type_has_nil(Type *t) {
 		return true;
 
 	case Type_FixedCapacityDynamicArray:
-		// TODO(bill): should it have `nil`?
+		// it's like a normal array, so no, similar to `#soa[N]T
 		return false;
 
 	case Type_Union:
