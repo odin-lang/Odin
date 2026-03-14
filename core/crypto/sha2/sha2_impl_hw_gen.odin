@@ -1,4 +1,6 @@
 #+build !amd64
+#+build !arm64
+#+build !arm32
 package sha2
 
 @(private = "file")
