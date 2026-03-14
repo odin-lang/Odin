@@ -287,13 +287,13 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 
 
 	case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:
+		array_data := uintptr(v.data)
+		array_len := (^int)(array_data + info.len_offset)^
 		if info.elem.id == byte {
-			raw := (^[dynamic]byte)(v.data)
-			return err_conv(_encode_bytes(e, raw[:]))
+					raw := runtime.Raw_Slice{v.data, array_len}
+					return err_conv(_encode_bytes(e, transmute([]byte)raw))
 		}
 
-		array_len := (^int)(uintptr(v.data) + info.len_offset)^
-		array_data := uintptr(v.data)
 		err_conv(_encode_u64(e, u64(array_len), .Array)) or_return
 
 		if impl, ok := _tag_implementations_type[info.elem.id]; ok {
