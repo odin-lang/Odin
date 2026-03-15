@@ -1,6 +1,7 @@
 #+private
 package os
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
 import win32 "core:sys/windows"
@@ -157,18 +158,30 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 	}
 }
 
-@(private)
-can_use_long_paths: bool
 
-@(init)
-init_long_path_support :: proc "contextless" () {
+@(require_results)
+has_long_path_support :: proc "contextless" () -> bool {
+	@(static)
+	can_use_long_paths_lock: win32.SRWLOCK
+	@(static)
+	can_use_long_paths_checked: bool // atomic
+	@(static)
+	can_use_long_paths: bool
+
+	if intrinsics.atomic_load_explicit(&can_use_long_paths_checked, .Acquire) == true {
+		return can_use_long_paths
+	}
+	win32.AcquireSRWLockExclusive(&can_use_long_paths_lock)
+	defer win32.ReleaseSRWLockExclusive(&can_use_long_paths_lock)
+	defer intrinsics.atomic_store_explicit(&can_use_long_paths_checked, true, .Release)
+
 	can_use_long_paths = false
 
 	key: win32.HKEY
 	res := win32.RegOpenKeyExW(win32.HKEY_LOCAL_MACHINE, win32.L(`SYSTEM\CurrentControlSet\Control\FileSystem`), 0, win32.KEY_READ, &key)
 	defer win32.RegCloseKey(key)
 	if res != 0 {
-		return
+		return can_use_long_paths
 	}
 
 	value: u32
@@ -183,11 +196,13 @@ init_long_path_support :: proc "contextless" () {
 		&size,
 	)
 	if res != 0 {
-		return
+		return can_use_long_paths
 	}
 	if value == 1 {
 		can_use_long_paths = true
 	}
+
+	return can_use_long_paths
 }
 
 @(require_results)
@@ -202,9 +217,10 @@ _fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wst
 
 @(require_results)
 _fix_long_path_internal :: proc(path: string) -> string {
-	if can_use_long_paths {
+	if has_long_path_support() {
 		return path
 	}
+
 
 	// When using win32 to create a directory, the path
 	// cannot be too long that you cannot append an 8.3
