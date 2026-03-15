@@ -1,4 +1,5 @@
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise);
+gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr);
 
 gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
 	GB_ASSERT(bit_count <= 64);
@@ -4291,6 +4292,24 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 				return lb_build_expr(p, se->expr);
 			}
 		}
+		{
+			Type *src_type = base_type(type_of_expr(se->expr));
+			if (is_type_pointer(src_type)) {
+				src_type = base_type(type_deref(src_type));
+			}
+
+			if (is_type_slice(src_type) ||
+			    is_type_dynamic_array(src_type) ||
+			    is_type_string(src_type) ||
+			    is_type_string16(src_type)) {
+				return lb_build_slice_expr_value(p, expr);
+			}
+
+			if (is_type_multi_pointer(src_type) && se->high != nullptr) {
+				return lb_build_slice_expr_value(p, expr);
+			}
+		}
+
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
 
@@ -4852,6 +4871,127 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
+
+gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
+	ast_node(se, SliceExpr, expr);
+
+	lbValue base = lb_build_expr(p, se->expr);
+	Type *type = base_type(base.type);
+
+	if (is_type_pointer(type)) {
+		type = base_type(type_deref(type));
+		base = lb_emit_load(p, base);
+	}
+
+	lbValue low  = lb_const_int(p->module, t_int, 0);
+	lbValue high = {};
+
+	if (se->low  != nullptr) {
+		low = lb_correct_endianness(p, lb_build_expr(p, se->low));
+	}
+	if (se->high != nullptr) {
+		high = lb_correct_endianness(p, lb_build_expr(p, se->high));
+	}
+
+	bool no_indices = se->low == nullptr && se->high == nullptr;
+
+	switch (type->kind) {
+	case Type_Slice: {
+		Type *slice_type = type;
+		lbValue len = lb_slice_len(p, base);
+		if (high.value == nullptr) high = len;
+
+		if (!no_indices) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+		}
+
+		lbValue elem = lb_emit_ptr_offset(p, lb_slice_elem(p, base), low);
+		lbValue new_len = (se->low == nullptr)
+			? lb_emit_conv(p, high, t_int)
+			: lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+		return lb_make_slice_value(p, slice_type, elem, new_len);
+	}
+
+	case Type_DynamicArray: {
+		Type *elem_type = type->DynamicArray.elem;
+		Type *slice_type = alloc_type_slice(elem_type);
+
+		lbValue len = lb_dynamic_array_len(p, base);
+		if (high.value == nullptr) high = len;
+
+		if (!no_indices) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+		}
+
+		lbValue elem = lb_emit_ptr_offset(p, lb_dynamic_array_elem(p, base), low);
+		lbValue new_len = (se->low == nullptr)
+			? lb_emit_conv(p, high, t_int)
+			: lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+		return lb_make_slice_value(p, slice_type, elem, new_len);
+	}
+
+	case Type_Basic: {
+		if (is_type_string16(type)) {
+			GB_ASSERT_MSG(are_types_identical(type, t_string16), "got %s", type_to_string(type));
+			lbValue len = lb_string_len(p, base);
+			if (high.value == nullptr) high = len;
+
+			if (!no_indices) {
+				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+			}
+
+			lbValue elem = lb_emit_ptr_offset(p, lb_string_elem(p, base), low);
+			lbValue new_len = (se->low == nullptr)
+				? lb_emit_conv(p, high, t_int)
+				: lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+			return lb_make_string_value(p, t_string16, elem, new_len);
+		}
+		GB_ASSERT_MSG(are_types_identical(type, t_string), "got %s", type_to_string(type));
+		lbValue len = lb_string_len(p, base);
+		if (high.value == nullptr) high = len;
+
+		if (!no_indices) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
+		}
+
+		lbValue elem = lb_emit_ptr_offset(p, lb_string_elem(p, base), low);
+		lbValue new_len = (se->low == nullptr)
+			? lb_emit_conv(p, high, t_int)
+			: lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+		return lb_make_string_value(p, t_string, elem, new_len);
+	}
+
+	case Type_MultiPointer: {
+		GB_ASSERT(se->high != nullptr);
+		Type *elem_type = type->MultiPointer.elem;
+		Type *slice_type = alloc_type_slice(elem_type);
+
+		low = lb_emit_conv(p, low, t_int);
+		high = lb_emit_conv(p, high, t_int);
+
+		lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+
+		LLVMValueRef indices[1] = {low.value};
+		lbValue ptr = {};
+		ptr.value = LLVMBuildGEP2(p->builder, lb_type(p->module, elem_type), base.value, indices, 1, "");
+		ptr.type = alloc_type_pointer(elem_type);
+
+		lbValue new_len = (se->low == nullptr)
+			? lb_emit_conv(p, high, t_int)
+			: lb_emit_arith(p, Token_Sub, high, low, t_int);
+
+		return lb_make_slice_value(p, slice_type, ptr, new_len);
+	}
+
+	default:
+		GB_PANIC("lb_build_slice_expr_value: unexpected type %s", type_to_string(base.type));
+		return {};
+	}
+}
 
 gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);

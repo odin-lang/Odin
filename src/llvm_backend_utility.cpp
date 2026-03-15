@@ -1724,6 +1724,39 @@ gb_internal void lb_fill_string(lbProcedure *p, lbAddr const &string, lbValue ba
 	lb_emit_store(p, lb_emit_struct_ep(p, ptr, 1), len);
 }
 
+gb_internal lbValue lb_emit_struct_iv(lbProcedure *p, lbValue agg, lbValue field, i32 index) {
+	Type *t = base_type(agg.type);
+	i32 mapped_index = lb_convert_struct_index(p->module, t, index);
+	lbValue res = {};
+	res.value = LLVMBuildInsertValue(p->builder, agg.value, field.value, cast(unsigned)mapped_index, "");
+	res.type = agg.type;
+	return res;
+}
+
+gb_internal lbValue lb_build_struct_value(lbProcedure *p, Type *type, lbValue *fields, isize count) {
+	LLVMTypeRef llvm_type = lb_type(p->module, type);
+	lbValue agg = {};
+	agg.value = LLVMGetPoison(llvm_type);
+	agg.type = type;
+	for (isize i = 0; i < count; i++) {
+		agg = lb_emit_struct_iv(p, agg, fields[i], cast(i32)i);
+	}
+	return agg;
+}
+
+gb_internal lbValue lb_make_slice_value(lbProcedure *p, Type *slice_type, lbValue elem, lbValue len) {
+	GB_ASSERT(is_type_slice(slice_type));
+	lbValue fields[2] = {elem, len};
+	return lb_build_struct_value(p, slice_type, fields, 2);
+}
+
+gb_internal lbValue lb_make_string_value(lbProcedure *p, Type *string_type, lbValue elem, lbValue len) {
+	GB_ASSERT(is_type_string(string_type));
+	lbValue fields[2] = {elem, len};
+	return lb_build_struct_value(p, string_type, fields, 2);
+}
+
+
 gb_internal lbValue lb_string_elem(lbProcedure *p, lbValue string) {
 	Type *t = base_type(string.type);
 	if (t->kind == Type_Basic && t->Basic.kind == Basic_string16) {
