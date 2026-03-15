@@ -579,6 +579,8 @@ struct BuildContext {
 	bool internal_ignore_llvm_verification;
 	bool internal_llvm_mem2reg;
 
+	bool   enable_rvo;
+
 	bool   no_threaded_checker;
 
 	bool   show_debug_messages;

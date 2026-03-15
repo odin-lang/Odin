@@ -1,4 +1,4 @@
-#define LB_ENABLE_RVO true
+#define LB_ENABLE_RVO build_context.enable_rvo
 
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
 // Returns the callee's function type if eligible for copy elision, nullptr otherwise.
