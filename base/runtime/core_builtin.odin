@@ -883,7 +883,7 @@ append_fixed_capacity_elems :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #
 
 	when size_of(E) != 0 {
 		for i in 0..<n {
-			#no_bounds_check raw.data[i] = args[i]
+			#no_bounds_check raw.data[raw.len + i] = args[i]
 		}
 	}
 
