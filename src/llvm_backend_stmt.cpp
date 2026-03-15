@@ -2137,7 +2137,13 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			lbValue on_val = {};
 			if (switch_kind == TypeSwitch_Union) {
 				Type *ut = base_type(type_deref(parent.type));
-				on_val = lb_const_union_tag(m, ut, case_type);
+				if (is_type_untyped_nil(case_type)) {
+					GB_ASSERT(type_has_nil(ut));
+					saw_nil = true;
+					on_val = lb_const_int(m, union_tag_type(ut), 0);
+				} else {
+					on_val = lb_const_union_tag(m, ut, case_type);
+				}
 
 			} else if (switch_kind == TypeSwitch_Any) {
 				if (is_type_untyped_nil(case_type)) {
