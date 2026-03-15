@@ -2306,6 +2306,57 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 	return tuple;
 }
 
+// Check if an AST node references any polymorphic type parameters
+// TODO(bill): is this even complete enough?
+gb_internal bool ast_references_poly_params(Scope *scope, Ast *node) {
+	if (node == nullptr) {
+		return false;
+	}
+	switch (node->kind) {
+	case Ast_Ident: {
+		String name = node->Ident.token.string;
+		Entity *e = scope_lookup(scope, name);
+		if (e != nullptr && e->kind == Entity_TypeName && e->type != nullptr && e->type->kind == Type_Generic) {
+			return true;
+		}
+		return false;
+	}
+	case Ast_SelectorExpr:
+		return ast_references_poly_params(scope, node->SelectorExpr.expr);
+	case Ast_IndexExpr:
+		return ast_references_poly_params(scope, node->IndexExpr.expr);
+	case Ast_CallExpr:
+		for (Ast *arg : node->CallExpr.args) {
+			if (ast_references_poly_params(scope, arg)) {
+				return true;
+			}
+		}
+		return ast_references_poly_params(scope, node->CallExpr.proc);
+	case Ast_CompoundLit:
+		return ast_references_poly_params(scope, node->CompoundLit.type);
+	case Ast_UnaryExpr:
+		return ast_references_poly_params(scope, node->UnaryExpr.expr);
+	case Ast_ParenExpr:
+		return ast_references_poly_params(scope, node->ParenExpr.expr);
+	case Ast_DerefExpr:
+		return ast_references_poly_params(scope, node->DerefExpr.expr);
+	case Ast_PointerType:
+		return ast_references_poly_params(scope, node->PointerType.type);
+	case Ast_ArrayType:
+		return ast_references_poly_params(scope, node->ArrayType.elem) ||
+		       ast_references_poly_params(scope, node->ArrayType.count);
+	case Ast_FixedCapacityDynamicArrayType:
+		return ast_references_poly_params(scope, node->FixedCapacityDynamicArrayType.elem) ||
+		       ast_references_poly_params(scope, node->FixedCapacityDynamicArrayType.capacity);
+       case Ast_DynamicArrayType:
+	       	return ast_references_poly_params(scope, node->DynamicArrayType.elem);
+	case Ast_MapType:
+		return ast_references_poly_params(scope, node->MapType.key) ||
+		       ast_references_poly_params(scope, node->MapType.value);
+	}
+	return false;
+}
+
 gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 	if (_results == nullptr) {
 		return nullptr;
@@ -2340,7 +2391,12 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 		if (field->type == nullptr) {
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false);
 		} else {
-			type = check_type(ctx, field->type);
+			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
+				type = alloc_type_generic(ctx->scope, 0, str_lit("$deferred_return"), nullptr);
+			} else {
+				type = check_type(ctx, field->type);
+			}
+
 
 			if (default_value != nullptr) {
 				param_value = handle_parameter_value(ctx, type, nullptr, default_value, false);
