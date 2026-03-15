@@ -2522,6 +2522,7 @@ void gb_assert_handler(char const *prefix, char const *condition, char const *fi
 		va_end(va);
 	}
 	gb_printf_err("\n");
+	gb_printf_err("This is a compiler error. Please report this.\n");
 }
 
 b32 gb_is_power_of_two(isize x) {
