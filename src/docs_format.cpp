@@ -15,7 +15,7 @@ struct OdinDocVersionType {
 
 #define OdinDocVersionType_Major 0
 #define OdinDocVersionType_Minor 3
-#define OdinDocVersionType_Patch 1
+#define OdinDocVersionType_Patch 2
 
 struct OdinDocHeaderBase {
 	u8                 magic[8];
@@ -59,31 +59,31 @@ struct OdinDocPosition {
 };
 
 enum OdinDocTypeKind : u32 {
-	OdinDocType_Invalid              = 0,
-	OdinDocType_Basic                = 1,
-	OdinDocType_Named                = 2,
-	OdinDocType_Generic              = 3,
-	OdinDocType_Pointer              = 4,
-	OdinDocType_Array                = 5,
-	OdinDocType_EnumeratedArray      = 6,
-	OdinDocType_Slice                = 7,
-	OdinDocType_DynamicArray         = 8,
-	OdinDocType_Map                  = 9,
-	OdinDocType_Struct               = 10,
-	OdinDocType_Union                = 11,
-	OdinDocType_Enum                 = 12,
-	OdinDocType_Tuple                = 13,
-	OdinDocType_Proc                 = 14,
-	OdinDocType_BitSet               = 15,
-	OdinDocType_SimdVector           = 16,
-	OdinDocType_SOAStructFixed       = 17,
-	OdinDocType_SOAStructSlice       = 18,
-	OdinDocType_SOAStructDynamic     = 19,
-
-	OdinDocType_MultiPointer         = 22,
-	OdinDocType_Matrix               = 23,
-	OdinDocType_SoaPointer           = 24,
-	OdinDocType_BitField             = 25,
+	OdinDocType_Invalid                   = 0,
+	OdinDocType_Basic                     = 1,
+	OdinDocType_Named                     = 2,
+	OdinDocType_Generic                   = 3,
+	OdinDocType_Pointer                   = 4,
+	OdinDocType_Array                     = 5,
+	OdinDocType_EnumeratedArray           = 6,
+	OdinDocType_Slice                     = 7,
+	OdinDocType_DynamicArray              = 8,
+	OdinDocType_Map                       = 9,
+	OdinDocType_Struct                    = 10,
+	OdinDocType_Union                     = 11,
+	OdinDocType_Enum                      = 12,
+	OdinDocType_Tuple                     = 13,
+	OdinDocType_Proc                      = 14,
+	OdinDocType_BitSet                    = 15,
+	OdinDocType_SimdVector                = 16,
+	OdinDocType_SOAStructFixed            = 17,
+	OdinDocType_SOAStructSlice            = 18,
+	OdinDocType_SOAStructDynamic          = 19,
+	OdinDocType_MultiPointer              = 22,
+	OdinDocType_Matrix                    = 23,
+	OdinDocType_SoaPointer                = 24,
+	OdinDocType_BitField                  = 25,
+	OdinDocType_FixedCapacityDynamicArray = 26,
 };
 
 enum OdinDocTypeFlag_Basic : u32 {
@@ -144,13 +144,14 @@ struct OdinDocType {
 	OdinDocString   custom_align;
 
 	// Used by:
-	// .Array            - 1   count: 0=len
-	// .Enumerated_Array - 1   count: 0=len
-	// .SOA_Struct_Fixed - 1   count: 0=len
-	// .Bit_Set          - 2   count: 0=lower, 1=upper
-	// .Simd_Vector      - 1   count: 0=len
-	// .Matrix           - 2   count: 0=row_count, 1=column_count
-	// .Struct           - <=2 count: 0=min_field_align, 1=max_field_align
+	// .Array                        - 1   count: 0=len
+	// .Enumerated_Array             - 1   count: 0=len
+	// .SOA_Struct_Fixed             - 1   count: 0=len
+	// .Bit_Set                      - 2   count: 0=lower, 1=upper
+	// .Simd_Vector                  - 1   count: 0=len
+	// .Matrix                       - 2   count: 0=row_count, 1=column_count
+	// .Struct                       - <=2 count: 0=min_field_align, 1=max_field_align
+	// .Fixed_Capacity_Dynamic_Array - 1   count: 0=cap
 	u32 elem_count_len;
 	i64 elem_counts[OdinDocType_ElemsCap];
 
@@ -159,27 +160,28 @@ struct OdinDocType {
 	OdinDocString calling_convention;
 
 	// Used by:
-	// .Named              - 1 type:    0=base type
-	// .Generic            - <1 type:   0=specialization
-	// .Pointer            - 1 type:    0=element
-	// .Array              - 1 type:    0=element
-	// .Enumerated_Array   - 2 types:   0=index and 1=element
-	// .Slice              - 1 type:    0=element
-	// .Dynamic_Array      - 1 type:    0=element
-	// .Map                - 2 types:   0=key, 1=value
-	// .SOA_Struct_Fixed   - 1 type:    underlying SOA struct element
-	// .SOA_Struct_Slice   - 1 type:    underlying SOA struct element
-	// .SOA_Struct_Dynamic - 1 type:    underlying SOA struct element
-	// .Union              - 0+ types:  variants
-	// .Enum               - <1 type:   0=base type
-	// .Proc               - 2 types:   0=parameters, 1=results
-	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
-	// .Simd_Vector        - 1 type:    0=element
-	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
-	// .Multi_Pointer      - 1 type:    0=element
-	// .Matrix             - 1 type:    0=element
-	// .Soa_Pointer        - 1 type:    0=element
-	// .Bit_Field          - 1 type:    0=backing type
+	// .Named                        - 1 type:    0=base type
+	// .Generic                      - <1 type:   0=specialization
+	// .Pointer                      - 1 type:    0=element
+	// .Array                        - 1 type:    0=element
+	// .Enumerated_Array             - 2 types:   0=index and 1=element
+	// .Slice                        - 1 type:    0=element
+	// .Dynamic_Array                - 1 type:    0=element
+	// .Map                          - 2 types:   0=key, 1=value
+	// .SOA_Struct_Fixed             - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Slice             - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Dynamic           - 1 type:    underlying SOA struct element
+	// .Union                        - 0+ types:  variants
+	// .Enum                         - <1 type:   0=base type
+	// .Proc                         - 2 types:   0=parameters, 1=results
+	// .Bit_Set                      - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
+	// .Simd_Vector                  - 1 type:    0=element
+	// .Relative_Pointer             - 2 types:   0=pointer type, 1=base integer
+	// .Multi_Pointer                - 1 type:    0=element
+	// .Matrix                       - 1 type:    0=element
+	// .Soa_Pointer                  - 1 type:    0=element
+	// .Bit_Field                    - 1 type:    0=backing type
+	// .Fixed_Capacity_Dynamic_Array - 1 type:    0=element
 	OdinDocArray<OdinDocTypeIndex> types;
 
 	// Used by:
