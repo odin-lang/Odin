@@ -438,6 +438,50 @@ gb_internal lbValue lb_emit_try_has_value(lbProcedure *p, lbValue rhs) {
 	return has_value;
 }
 
+gb_internal bool lb_is_type_trivial(Type *type) {
+	Type *bt = base_type(type);
+	if (is_type_integer(bt) || is_type_float(bt) || is_type_boolean(bt) ||
+	    is_type_pointer(bt) || is_type_enum(bt)  || is_type_rune(bt) || is_type_typeid((bt))) {
+	    	return true;
+	}
+	return false;
+}
+
+gb_internal bool lb_is_expr_trivial(Ast *e) {
+	Type *type = default_type(type_of_expr(e));
+	if (lb_is_type_trivial(type)) {
+		e = unparen_expr(e);
+		TypeAndValue tav = type_and_value_of_expr(e);
+		if (tav.mode == Addressing_Constant) {
+			return true;
+		}
+		if (e->kind == Ast_Ident) {
+			return true;
+		}
+		if (e->kind == Ast_SelectorExpr) {
+			Ast *operand = unparen_expr(e->SelectorExpr.expr);
+			if (operand && operand->kind == Ast_Ident) {
+				// If the operand is a pointer, thus deferences it, disallow it
+				Type *ot = type_of_expr(operand);
+				if (ot == nullptr || is_type_pointer(ot)) {
+					return false;
+				}
+				return true;
+			}
+		}
+		if (e->kind == Ast_UnaryExpr && e->UnaryExpr.op.kind != Token_And) {
+			Ast *operand = unparen_expr(e->UnaryExpr.expr);
+			TypeAndValue otav = type_and_value_of_expr(operand);
+			if (otav.mode == Addressing_Constant) {
+				return true;
+			}
+			if (operand->kind == Ast_Ident) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
 
 gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue const &tv) {
 	if (arg->state_flags & StateFlag_DirectiveWasFalse) {
@@ -467,6 +511,13 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 		lb_start_block(p, then);
 		return lb_emit_conv(p, lhs, type);
 	} else {
+		if (lb_is_type_trivial(type) && lb_is_expr_trivial(else_expr)) {
+			lbValue has_value = lb_emit_try_has_value(p, rhs);
+			lbValue then_val = lb_emit_conv(p, lhs, type);
+			lbValue else_val = lb_emit_conv(p, lb_build_expr(p, else_expr), type);
+			return lb_emit_select(p, has_value, then_val, else_val);
+		}
+
 		LLVMValueRef incoming_values[2] = {};
 		LLVMBasicBlockRef incoming_blocks[2] = {};
 
