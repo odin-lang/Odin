@@ -4282,6 +4282,20 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 			error(elem, "Expected a string or no value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "deprecated") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			String msg = ev.value_string;
+			if (msg.len == 0) {
+				error(elem, "Deprecation message cannot be an empty string");
+			} else {
+				ac->deprecated_message = msg;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 	return false;
 }
