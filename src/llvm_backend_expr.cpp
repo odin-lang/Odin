@@ -4853,6 +4853,95 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
 
+	if (true) {
+		// NOTE(bill): Fused nested slice chain: src[a:b][c:d][e:f]...
+		// Walk a chain of nested SliceExprs down to the root source, then apply
+		// each slice's bounds check and offset on raw (ptr, len) SSA values,
+		// building a single aggregate at the end.
+
+
+		Ast *inner_ast = unparen_expr(se->expr);
+		if (inner_ast->kind == Ast_SliceExpr) {
+			enum {MAX_CHAIN = 8}; // this is more than enough in practice
+
+			// Collect the chain: slices[0] is innermost, slices[n-1] is outer-most `se`.
+			Ast *chain[MAX_CHAIN] = {}; // bounded depth
+			isize chain_count = 0;
+			chain[chain_count++] = expr; // outer-most
+
+			Ast *root = inner_ast;
+			while (root->kind == Ast_SliceExpr && chain_count < MAX_CHAIN) {
+				chain[chain_count++] = root;
+				root = unparen_expr(root->SliceExpr.expr);
+			}
+
+			Type *root_type = base_type(type_of_expr(root));
+			if (is_type_pointer(root_type)) {
+				root_type = base_type(type_deref(root_type));
+			}
+			if (is_type_slice(root_type)         ||
+			    is_type_dynamic_array(root_type) ||
+			    is_type_string(root_type)        ||
+			    is_type_string16(root_type)) {
+				lbModule *m = p->module;
+
+				// Evaluate the root source and extract raw (ptr, len).
+				lbValue src = lb_build_expr(p, root);
+				Type *src_type = base_type(src.type);
+				if (is_type_pointer(src_type)) {
+					src_type = base_type(type_deref(src_type));
+					src = lb_emit_load(p, src);
+				}
+
+				lbValue cur_ptr = {};
+				lbValue cur_len = {};
+				if (is_type_slice(src_type)) {
+					cur_ptr = lb_slice_elem(p, src);
+					cur_len = lb_slice_len(p, src);
+				} else if (is_type_dynamic_array(src_type)) {
+					cur_ptr = lb_dynamic_array_elem(p, src);
+					cur_len = lb_dynamic_array_len(p, src);
+				} else {
+					GB_ASSERT(is_type_string(src_type) || is_type_string16(src_type));
+					cur_ptr = lb_string_elem(p, src);
+					cur_len = lb_string_len(p, src);
+				}
+
+				// Apply each slice innermost-first (reverse of collection order).
+				for (isize i = chain_count - 1; i >= 0; i--) {
+					AstSliceExpr *s = &chain[i]->SliceExpr;
+
+					lbValue lo = lb_const_int(m, t_int, 0);
+					lbValue hi = {};
+					if (s->low  != nullptr) {
+						lo = lb_correct_endianness(p, lb_build_expr(p, s->low));
+					}
+					if (s->high != nullptr) {
+						hi = lb_correct_endianness(p, lb_build_expr(p, s->high));
+					}
+					if (hi.value == nullptr) {
+						hi = cur_len;
+					}
+
+					bool no_indices = s->low == nullptr && s->high == nullptr;
+					if (!no_indices) {
+						lb_emit_slice_bounds_check(p, s->open, lo, hi, cur_len, s->low != nullptr);
+					}
+
+					cur_ptr = (s->low == nullptr) ? cur_ptr : lb_emit_ptr_offset(p, cur_ptr, lo);
+					cur_len = (s->low == nullptr) ? lb_emit_conv(p, hi, t_int) : lb_emit_arith(p, Token_Sub, hi, lo, t_int);
+				}
+
+				// Single aggregate construction.
+				Type *result_type = type_of_expr(expr);
+				if (is_type_string(result_type)) {
+					return lb_make_string_value(p, result_type, cur_ptr, cur_len);
+				}
+				return lb_make_slice_value(p, result_type, cur_ptr, cur_len);
+			}
+		}
+	}
+
 	lbValue base = lb_build_expr(p, se->expr);
 	Type *type = base_type(base.type);
 
