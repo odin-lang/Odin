@@ -472,7 +472,7 @@ _private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := contex
 		t.digit[ix + pb] = carry
 	}
 
-    internal_swap(dest, t)
+	internal_swap(dest, t)
 	internal_destroy(t)
 	return internal_clamp(dest)
 }
