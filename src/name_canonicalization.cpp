@@ -748,8 +748,8 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		return;
 	}
 
-	type = default_type(type);
-	GB_ASSERT(!is_type_untyped(type));
+	// type = default_type(type);
+	// GB_ASSERT(!is_type_untyped(type));
 
 	switch (type->kind) {
 	case Type_Basic:
