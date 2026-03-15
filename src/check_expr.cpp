@@ -2955,14 +2955,21 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 
 	if (check_is_assignable_to(c, x, y->type) ||
 	    check_is_assignable_to(c, y, x->type)) {
+		if (x->type->failure || y->type->failure) {
+			// // skip any failures
+			x->mode = Addressing_Value;
+			x->type = t_untyped_bool;
+			return;
+		}
+
 		Type *err_type = x->type;
 		bool defined = false;
 		switch (op) {
 		case Token_CmpEq:
 		case Token_NotEq:
-			defined = (is_type_comparable(x->type) && is_type_comparable(y->type)) ||
-			          (is_operand_nil(*x) && type_has_nil(y->type)) ||
-			          (is_operand_nil(*y) && type_has_nil(x->type));
+			defined = ((is_operand_nil(*x) && type_has_nil(y->type)) ||
+			           (is_operand_nil(*y) && type_has_nil(x->type)) ||
+			           is_type_comparable(x->type) && is_type_comparable(y->type));
 			break;
 		case Token_Lt:
 		case Token_Gt:
