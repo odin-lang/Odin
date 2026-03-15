@@ -10,6 +10,44 @@ gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count)
 	return LLVMConstInt(type, mask, false);
 }
 
+gb_internal bool lb_is_expr_trivial(Ast *e) {
+	Type *type = default_type(type_of_expr(e));
+	Type *bt = base_type(type);
+	if (is_type_integer(bt) || is_type_float(bt) || is_type_boolean(bt) ||
+	    is_type_pointer(bt) || is_type_enum(bt)  || is_type_rune(bt) || is_type_typeid((bt))) {
+		e = unparen_expr(e);
+		TypeAndValue tav = type_and_value_of_expr(e);
+		if (tav.mode == Addressing_Constant) {
+			return true;
+		}
+		if (e->kind == Ast_Ident) {
+			return true;
+		}
+		if (e->kind == Ast_SelectorExpr) {
+			Ast *operand = unparen_expr(e->SelectorExpr.expr);
+			if (operand && operand->kind == Ast_Ident) {
+				// If the operand is a pointer, thus deferences it, disallow it
+				Type *ot = type_of_expr(operand);
+				if (ot == nullptr || is_type_pointer(ot)) {
+					return false;
+				}
+				return true;
+			}
+		}
+		if (e->kind == Ast_UnaryExpr && e->UnaryExpr.op.kind != Token_And) {
+			Ast *operand = unparen_expr(e->UnaryExpr.expr);
+			TypeAndValue otav = type_and_value_of_expr(operand);
+			if (otav.mode == Addressing_Constant) {
+				return true;
+			}
+			if (operand->kind == Ast_Ident) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *final_type) {
 	lbModule *m = p->module;
 
@@ -4091,10 +4129,18 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, expr);
+		GB_ASSERT(te->y != nullptr);
+		Type *type = default_type(type_of_expr(expr));
+		if (lb_is_expr_trivial(te->x) && lb_is_expr_trivial(te->y)) {
+			lbValue cond = lb_build_expr(p, te->cond);
+			lbValue x = lb_emit_conv(p, lb_build_expr(p, te->x), type);
+			lbValue y = lb_emit_conv(p, lb_build_expr(p, te->y), type);
+			return lb_emit_select(p, cond, x, y);
+		}
+
 		LLVMValueRef incoming_values[2] = {};
 		LLVMBasicBlockRef incoming_blocks[2] = {};
 
-		GB_ASSERT(te->y != nullptr);
 		lbBlock *then  = lb_create_block(p, "if.then");
 		lbBlock *done  = lb_create_block(p, "if.done"); // NOTE(bill): Append later
 		lbBlock *else_ = lb_create_block(p, "if.else");
@@ -4102,7 +4148,6 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		lb_build_cond(p, te->cond, then, else_);
 		lb_start_block(p, then);
 
-		Type *type = default_type(type_of_expr(expr));
 		LLVMTypeRef llvm_type = lb_type(p->module, type);
 
 		incoming_values[0] = lb_emit_conv(p, lb_build_expr(p, te->x), type).value;
