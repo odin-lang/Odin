@@ -2276,6 +2276,11 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, t_int);
 		break;
 
+	case Type_FixedCapacityDynamicArray:
+		add_type_info_type_internal(c, bt->FixedCapacityDynamicArray.elem);
+		add_type_info_type_internal(c, t_int);
+		break;
+
 	case Type_Enum:
 		add_type_info_type_internal(c, bt->Enum.base_type);
 		break;
@@ -2513,6 +2518,12 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, alloc_type_pointer(bt->Slice.elem));
 		add_min_dep_type_info(c, t_int);
 		break;
+
+	case Type_FixedCapacityDynamicArray:
+		add_min_dep_type_info(c, bt->FixedCapacityDynamicArray.elem);
+		add_min_dep_type_info(c, alloc_type_pointer(bt->FixedCapacityDynamicArray.elem));
+		add_min_dep_type_info(c, alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity));
+		add_min_dep_type_info(c, t_int);
 
 	case Type_Enum:
 		add_min_dep_type_info(c, bt->Enum.base_type);
@@ -3350,6 +3361,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
+	t_type_info_fixed_capacity_dynamic_array = find_core_type(c, str_lit("Type_Info_Fixed_Capacity_Dynamic_Array"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -3378,6 +3390,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
+	t_type_info_fixed_capacity_dynamic_array_ptr = alloc_type_pointer(t_type_info_fixed_capacity_dynamic_array);
 }
 
 gb_internal void init_mem_allocator(Checker *c) {

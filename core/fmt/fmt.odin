@@ -3246,6 +3246,21 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
+
+	case runtime.Type_Info_Fixed_Capacity_Dynamic_Array:
+		n := (^int)(uintptr(v.data) + info.len_offset)^
+
+		ptr := v.data // data is stored at the start
+		if ol, ok := fi.optional_len.?; ok {
+			fi.optional_len = nil
+			n = min(n, ol)
+		} else if fi.use_nul_termination {
+			fi.use_nul_termination = false
+			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
+			return
+		}
+		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
+
 	case runtime.Type_Info_Simd_Vector:
 		io.write_byte(fi.writer, '<', &fi.n)
 		defer io.write_byte(fi.writer, '>', &fi.n)

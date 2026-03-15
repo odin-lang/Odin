@@ -389,6 +389,23 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		n := copy(slice, bytes)
 		assert(n == len(bytes))
 		return
+
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		elem_base := reflect.type_info_base(t.elem)
+
+		if elem_base.id != byte { return _unsupported(v, hdr) }
+
+		bytes := err_conv(_decode_bytes(d, add, allocator=context.temp_allocator)) or_return
+		defer delete(bytes, context.temp_allocator)
+
+		if len(bytes) > t.capacity { return _unsupported(v, hdr) }
+
+		// Copy into array type, delete original.
+		slice := ([^]byte)(v.data)[:len(bytes)]
+		n := copy(slice, bytes)
+		assert(n == len(bytes))
+		(^int)(uintptr(v.data) + t.len_offset)^ = n
+		return
 	}
 
 	return _unsupported(v, hdr)
@@ -551,6 +568,21 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 
 		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > t.capacity {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+
+		(^int)(uintptr(v.data) + t.len_offset)^ = length
+
 		return
 
 	case reflect.Type_Info_Complex:

@@ -2234,6 +2234,26 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 		break;
 
+	case Type_FixedCapacityDynamicArray:
+		{
+			unsigned field_count = 0;
+
+			LLVMTypeRef fields[3] = {};
+			m->internal_type_level += 1;
+			fields[field_count++] = llvm_array_type(lb_type(m, type->FixedCapacityDynamicArray.elem), type->FixedCapacityDynamicArray.capacity);
+			m->internal_type_level -= 1;
+
+			gb_unused(type_size_of(type));
+			if (type->FixedCapacityDynamicArray.padding_needed > 0) {
+				fields[field_count++] = lb_type_padding_filler(m, type->FixedCapacityDynamicArray.padding_needed, 1); // padding
+			}
+
+			fields[field_count++] = lb_type(m, t_int); // len
+
+			return LLVMStructTypeInContext(ctx, fields, field_count, false);
+		}
+		break;
+
 	case Type_Map:
 		init_map_internal_debug_types(type);
 		GB_ASSERT(t_raw_map != nullptr);

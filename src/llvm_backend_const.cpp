@@ -694,6 +694,28 @@ gb_internal void lb_const_array_spread(lbModule *m, lbConstContext cc, Type *arr
 	res->value = llvm_const_array(m, lb_type(m, elem), elems, cast(unsigned)count);
 }
 
+gb_internal LLVMValueRef lb_fill_fixed_capacity_dynamic_array(lbModule *m, i64 elem_count, Type *original_type, LLVMValueRef *values, lbConstContext cc) {
+	Type *bt = base_type(original_type);
+	GB_ASSERT(bt->kind == Type_FixedCapacityDynamicArray);
+	Type *elem_type = bt->FixedCapacityDynamicArray.elem;
+	i64 capacity = bt->FixedCapacityDynamicArray.capacity;
+
+	Type *array_backing_type = alloc_type_array(elem_type, capacity);
+	LLVMValueRef array_backing = lb_build_constant_array_values(m, array_backing_type, elem_type, cast(isize)capacity, values, cc);
+	LLVMValueRef array_len = lb_const_int(m, t_int, elem_count).value;
+
+	isize svalue_count = 0;
+	LLVMValueRef svalues[3] = {};
+	svalues[svalue_count++] = array_backing;
+	i64 padding = bt->FixedCapacityDynamicArray.padding_needed;
+	if (padding > 0) {
+		svalues[svalue_count++] = LLVMConstNull(lb_type_padding_filler(m, padding, 1));
+	}
+	svalues[svalue_count++] = array_len;
+
+	return llvm_const_named_struct(m, original_type, svalues, svalue_count);
+}
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc, Type *value_type) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -1552,6 +1574,108 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				}
 
 				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, cc);
+				return res;
+			}
+		} else if (is_type_fixed_capacity_dynamic_array(type)) {
+			ast_node(cl, CompoundLit, value.value_compound);
+			Type *elem_type = type->FixedCapacityDynamicArray.elem;
+			i64 capacity = type->FixedCapacityDynamicArray.capacity;
+			isize elem_count = cl->elems.count;
+			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
+				return lb_const_nil(m, original_type);
+			}
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)capacity);
+
+				i64 max_index = -1;
+				isize value_index = 0;
+				for (i64 i = 0; i < capacity; i++) {
+					bool found = false;
+
+					for (isize j = 0; j < elem_count; j++) {
+						Ast *elem = cl->elems[j];
+						ast_node(fv, FieldValue, elem);
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op != Token_RangeHalf) {
+								hi += 1;
+							}
+							max_index = gb_max(max_index, hi-1);
+
+							if (lo == i) {
+								TypeAndValue tav = fv->value->tav;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								for (i64 k = lo; k < hi; k++) {
+									values[value_index++] = val;
+								}
+
+								found = true;
+								i += (hi-lo-1);
+								break;
+							}
+						} else {
+							TypeAndValue index_tav = fv->field->tav;
+							GB_ASSERT(index_tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(index_tav.value);
+
+							max_index = gb_max(max_index, index);
+
+							if (index == i) {
+								TypeAndValue tav = fv->value->tav;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								values[value_index++] = val;
+								found = true;
+								break;
+							}
+						}
+					}
+
+					if (!found) {
+						values[value_index++] = LLVMConstNull(lb_type(m, elem_type));
+					}
+				}
+
+				i64 count = max_index+1;
+				GB_ASSERT(0 < count);
+				GB_ASSERT(count <= capacity);
+
+				res.value = lb_fill_fixed_capacity_dynamic_array(m, count, original_type, values, cc);
+				return res;
+			} else if (are_types_identical(value.value_compound->tav.type, elem_type)) {
+				// Compound is of array item type; expand its value to all items in array.
+				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)capacity);
+
+				for (isize i = 0; i < capacity; i++) {
+					values[i] = lb_const_value(m, elem_type, value, cc, elem_type).value;
+				}
+
+				res.value = lb_fill_fixed_capacity_dynamic_array(m, capacity, original_type, values, cc);
+				return res;
+			} else {
+				// Assume that compound value is an array literal
+				GB_ASSERT_MSG(elem_count <= capacity, "%td <= %td", elem_count, capacity);
+
+				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)capacity);
+
+				for (isize i = 0; i < elem_count; i++) {
+					TypeAndValue tav = cl->elems[i]->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					values[i] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+				}
+				for (isize i = elem_count; i < capacity; i++) {
+					values[i] = LLVMConstNull(lb_type(m, elem_type));
+				}
+
+				res.value = lb_fill_fixed_capacity_dynamic_array(m, elem_count, original_type, values, cc);
 				return res;
 			}
 		} else if (is_type_simd_vector(type)) {

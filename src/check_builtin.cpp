@@ -58,6 +58,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_simd_vector,
 	is_type_matrix,
 	is_type_raw_union,
+	is_type_fixed_capacity_dynamic_array,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
@@ -2634,6 +2635,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->Array.count);
 			type = t_untyped_integer;
+		} else if (is_type_fixed_capacity_dynamic_array(op_type)) {
+			Type *at = core_type(op_type);
+			if (id == BuiltinProc_cap) {
+				mode = Addressing_Constant;
+				value = exact_value_i64(at->FixedCapacityDynamicArray.capacity);
+				type = t_untyped_integer;
+			} else {
+				GB_ASSERT(id == BuiltinProc_len);
+				mode = Addressing_Value;
+			}
 		} else if (is_type_enumerated_array(op_type) && id == BuiltinProc_len) {
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;
@@ -5167,6 +5178,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					case Type_Array:
 					case Type_EnumeratedArray:
 					case Type_SimdVector:
+					case Type_FixedCapacityDynamicArray:
 						operand->type = alloc_type_multi_pointer(base_array_type(base));
 						break;
 					case Type_Matrix:
@@ -7612,6 +7624,31 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_u64(sel.index[0]);
+			operand->type = t_uintptr;
+			break;
+		}
+		break;
+
+	case BuiltinProc_type_fixed_capacity_dynamic_array_len_offset:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_fixed_capacity_dynamic_array(type)) {
+				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			i64 sz = type_size_of(type);
+			gb_unused(sz);
+			i64 offset = type_offset_of(type, 1);
+
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(cast(u64)offset);
 			operand->type = t_uintptr;
 			break;
 		}

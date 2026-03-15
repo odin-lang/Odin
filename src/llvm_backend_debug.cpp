@@ -409,6 +409,69 @@ gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, Stri
 	return final_decl;
 }
 
+gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_FixedCapacityDynamicArray);
+
+	unsigned const int_bits = cast(unsigned)(8*build_context.int_size);
+
+	u64 size_in_bits = 8*type_size_of(bt);
+	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
+
+	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
+		m->debug_builder, DW_TAG_structure_type,
+		cast(char const *)name.text, cast(size_t)name.len,
+		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
+	);
+
+	lb_set_llvm_metadata(m, type, temp_forward_decl);
+
+	unsigned element_count = 2;
+	LLVMMetadataRef elements[2];
+
+	// LLVMMetadataRef member_scope = lb_get_llvm_metadata(m, bt->DynamicArray.scope);
+	LLVMMetadataRef member_scope = nullptr;
+
+	Type *elem_type = alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity);
+	elements[0] = LLVMDIBuilderCreateMemberType(
+		m->debug_builder, member_scope,
+		"data", 4,
+		file, line,
+		8*cast(u64)type_size_of(elem_type), 8*cast(u32)type_align_of(elem_type),
+		0,
+		LLVMDIFlagZero, lb_debug_type(m, elem_type)
+	);
+
+	i64 len_offset_in_bits = 8*type_offset_of(bt, 1);
+
+	elements[1] = LLVMDIBuilderCreateMemberType(
+		m->debug_builder, member_scope,
+		"len", 3,
+		file, line,
+		int_bits, int_bits,
+		len_offset_in_bits,
+		LLVMDIFlagZero, lb_debug_type(m, t_int)
+	);
+
+	LLVMMetadataRef final_decl = LLVMDIBuilderCreateStructType(
+		m->debug_builder, scope,
+		cast(char const *)name.text, cast(size_t)name.len,
+		file, line,
+		size_in_bits, align_in_bits,
+		LLVMDIFlagZero,
+		nullptr,
+		elements, element_count,
+		0,
+		nullptr,
+		"", 0
+	);
+
+	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
+	lb_set_llvm_metadata(m, type, final_decl);
+	return final_decl;
+}
+
+
 gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
@@ -899,6 +962,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	case Type_BitSet:       return lb_debug_bitset(       m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
 	case Type_Enum:         return lb_debug_enum(         m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
 	case Type_BitField:     return lb_debug_bitfield(     m, type,       type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
+	case Type_FixedCapacityDynamicArray: return lb_debug_fixed_capacity_dynamic_array(m, type, type_to_canonical_string(temporary_allocator(), type), nullptr, nullptr, 0);
 
 	case Type_Tuple:
 		if (type->Tuple.variables.count == 1) {

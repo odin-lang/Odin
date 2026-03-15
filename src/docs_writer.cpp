@@ -576,6 +576,12 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 		doc_type.kind = OdinDocType_DynamicArray;
 		doc_type.types = odin_doc_type_as_slice(w, type->DynamicArray.elem);
 		break;
+	case Type_FixedCapacityDynamicArray:
+		doc_type.kind = OdinDocType_FixedCapacityDynamicArray;
+		doc_type.elem_count_len = 1;
+		doc_type.elem_counts[0] = type->FixedCapacityDynamicArray.capacity;
+		doc_type.types = odin_doc_type_as_slice(w, type->FixedCapacityDynamicArray.elem);
+		break;
 	case Type_Map:
 		doc_type.kind = OdinDocType_Map;
 		{

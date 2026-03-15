@@ -788,6 +788,10 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		type_writer_appendc(w, "[dynamic]");
 		write_type_to_canonical_string(w, type->DynamicArray.elem);
 		return;
+	case Type_FixedCapacityDynamicArray:
+		type_writer_append_fmt(w, "[dynamic;%lld]", cast(long long)type->FixedCapacityDynamicArray.capacity);
+		write_type_to_canonical_string(w, type->FixedCapacityDynamicArray.elem);
+		return;
 	case Type_SimdVector:
 		type_writer_append_fmt(w, "#simd[%lld]", cast(long long)type->SimdVector.count);
 		write_type_to_canonical_string(w, type->SimdVector.elem);
