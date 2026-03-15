@@ -21,7 +21,7 @@ Example:
 	}
 */
 Small_Array :: struct($N: int, $T: typeid) where N >= 0 {
-	data: [N]T,
+	data: [N]T `fmt:",len"`,
 	len:  int,
 }
 
