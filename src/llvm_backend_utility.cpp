@@ -1061,6 +1061,17 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 			break;
 		}
 	}
+	if (t->kind == Type_FixedCapacityDynamicArray) {
+		switch (index) {
+		case 0: return 0; // data
+		case 1:
+			if (t->FixedCapacityDynamicArray.padding_needed > 0)  {
+				return 2;
+			}
+			return 1;
+		}
+	}
+
 	return index;
 }
 
@@ -1403,6 +1414,12 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 		case 3: result_type = t_allocator;                              break;
 		}
 		break;
+
+	case Type_FixedCapacityDynamicArray:
+		switch (index) {
+		case 0: result_type = alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity); break;
+		case 1: result_type = t_int; break;
+		}
 
 	case Type_Map:
 		{
