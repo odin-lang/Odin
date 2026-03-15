@@ -239,7 +239,7 @@ Type :: struct {
 	// .Named                        - 1 type:    0=base type
 	// .Generic                      - <1 type:   0=specialization
 	// .Pointer                      - 1 type:    0=element
-	// .Array                        - 1 type:    0=element
+	// .Array                        - 1 type:    0=element (and 1=generic index (if exists))
 	// .Enumerated_Array             - 2 types:   0=index and 1=element
 	// .Slice                        - 1 type:    0=element
 	// .Dynamic_Array                - 1 type:    0=element
@@ -257,7 +257,7 @@ Type :: struct {
 	// .Matrix                       - 1 type:    0=element
 	// .Soa_Pointer                  - 1 type:    0=element
 	// .Bit_Field                    - 1 type:    0=backing type
-	// .Fixed_Capacity_Dynamic_Array - 1 type:    0=element
+	// .Fixed_Capacity_Dynamic_Array - 1 type:    0=element (and 1=generic index (if exists))
 	types: Array(Type_Index),
 
 	// Used by:
