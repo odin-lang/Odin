@@ -252,25 +252,18 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 			LLVMValueRef v0 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 0, ""), "");
 			LLVMValueRef v1 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 1, ""), "");
 
-			lbAddr addr = lb_add_local_generated(p, x.type, false);
-			LLVMTypeRef type = llvm_addr_type(p->module, addr.addr);
-			LLVMBuildStore(p->builder, v0, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 0, ""));
-			LLVMBuildStore(p->builder, v1, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 1, ""));
-			return lb_addr_load(p, addr);
-
+			Type *et = base_complex_elem_type(x.type);
+			lbValue fields[2] = {{v0, et}, {v1, et}};
+			return lb_build_struct_value(p, x.type, fields, gb_count_of(fields));
 		} else if (is_type_quaternion(x.type)) {
 			LLVMValueRef v0 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 0, ""), "");
 			LLVMValueRef v1 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 1, ""), "");
 			LLVMValueRef v2 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 2, ""), "");
 			LLVMValueRef v3 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 3, ""), "");
 
-			lbAddr addr = lb_add_local_generated(p, x.type, false);
-			LLVMTypeRef type = llvm_addr_type(p->module, addr.addr);
-			LLVMBuildStore(p->builder, v0, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 0, ""));
-			LLVMBuildStore(p->builder, v1, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 1, ""));
-			LLVMBuildStore(p->builder, v2, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 2, ""));
-			LLVMBuildStore(p->builder, v3, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 3, ""));
-			return lb_addr_load(p, addr);
+			Type *et = base_complex_elem_type(x.type);
+			lbValue fields[4] = {{v0, et}, {v1, et}, {v2, et}, {v3, et}};
+			return lb_build_struct_value(p, x.type, fields, gb_count_of(fields));
 		} else if (is_type_simd_vector(x.type)) {
 			Type *elem = base_array_type(x.type);
 			if (is_type_float(elem)) {
@@ -1547,6 +1540,8 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 				immediate_type = t_f32;
 			}
 
+			lbAddr res = lb_add_local_generated(p, type, false);
+
 			lbValue x0 = lb_emit_struct_ev(p, lhs, 0);
 			lbValue x1 = lb_emit_struct_ev(p, lhs, 1);
 			lbValue x2 = lb_emit_struct_ev(p, lhs, 2);
@@ -1582,6 +1577,10 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 				z3 = lb_emit_conv(p, z3, ft);
 			}
 
+			lbValue d0 = lb_emit_struct_ep(p, res.addr, 0);
+			lbValue d1 = lb_emit_struct_ep(p, res.addr, 1);
+			lbValue d2 = lb_emit_struct_ep(p, res.addr, 2);
+			lbValue d3 = lb_emit_struct_ep(p, res.addr, 3);
 
 			lbValue fields[4] = {z0, z1, z2, z3};
 			return lb_build_struct_value(p, type, fields, gb_count_of(fields));
@@ -2237,7 +2236,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		lbValue q2 = lb_emit_conv(p, lb_emit_struct_ev(p, value, 2), ft);
 		lbValue q3 = lb_emit_conv(p, lb_emit_struct_ev(p, value, 3), ft);
 
-		lbValue fields[4] = {q0, q1, q2, q2};
+		lbValue fields[4] = {q0, q1, q2, q3};
 		return lb_build_struct_value(p, t, fields, gb_count_of(fields));
 	}
 
