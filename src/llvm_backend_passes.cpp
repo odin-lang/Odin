@@ -4,6 +4,9 @@
 		break;
 	case 0:
 		array_add(&passes, "always-inline");
+		if (build_context.internal_llvm_mem2reg) {
+			array_add(&passes, "function<eager-inv>(mem2reg)");
+		}
 		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 1:

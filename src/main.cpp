@@ -411,6 +411,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalByValue,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
+	BuildFlag_InternalLLVMMem2Reg,
 
 	BuildFlag_Tilde,
 
@@ -642,6 +643,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMMem2Reg,     str_lit("internal-llvm-mem2reg"), BuildFlagParam_None, Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -1633,6 +1635,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_InternalLLVMVerification:
 							build_context.internal_ignore_llvm_verification = true;
+							break;
+						case BuildFlag_InternalLLVMMem2Reg:
+							build_context.internal_llvm_mem2reg = true;
 							break;
 
 
