@@ -1064,7 +1064,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 		i64 tag_index = 0;
 		if (tag_type != nullptr) {
-			tag_index = union_variant_index(ut, tag_type);
+			tag_index = union_variant_index_checked(ut, tag_type);
 		}
 		GB_ASSERT(tag_index <= Typeid__COUNT);
 

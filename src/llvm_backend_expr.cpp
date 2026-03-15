@@ -5388,11 +5388,20 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				Type *fet = field_expr.type;
 				GB_ASSERT(fet->kind != Type_Tuple);
 
-				// HACK TODO(bill): THIS IS A MASSIVE HACK!!!!
 				if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
-					GB_ASSERT_MSG(union_variant_index(ft, fet) >= 0, "%s", type_to_string(fet));
+					if (union_is_variant_of(ft, fet)) {
+						// NOTE(bill, 2026-03-15): If it's a direct assignment for a variant to the
+						// direct union we can just assign it directly to minimize wasted code generation
+						//
+						// TODO(bill): Allow this for deeply nested unions too e.g. union{union{T}}
+						GB_ASSERT_MSG(union_variant_index_checked(ft, fet) >= 0, "%s", type_to_string(fet));
+						GB_ASSERT(are_types_identical(type_deref(gep.type), ft));
 
-					lb_emit_store_union_variant(p, gep, field_expr, fet);
+						lb_emit_store_union_variant(p, gep, field_expr, fet);
+					} else {
+						lbValue fv = lb_emit_conv(p, field_expr, ft);
+						lb_emit_store(p, gep, fv);
+					}
 				} else {
 					lbValue fv = lb_emit_conv(p, field_expr, ft);
 					lb_emit_store(p, gep, fv);

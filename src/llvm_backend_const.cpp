@@ -836,7 +836,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 			Type *tag_type = union_tag_type(bt);
 			LLVMTypeRef llvm_tag_type = lb_type(m, tag_type);
-			i64 tag_index = union_variant_index(bt, variant_type);
+			i64 tag_index = union_variant_index_checked(bt, variant_type);
 			GB_ASSERT(tag_index >= 0);
 			values[value_count++] = LLVMConstInt(llvm_tag_type, tag_index, false);
 			i64 used_size = block_size + type_size_of(tag_type);

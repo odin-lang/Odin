@@ -1497,7 +1497,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 }
 
 gb_internal lbValue lb_const_union_tag(lbModule *m, Type *u, Type *v) {
-	return lb_const_value(m, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+	return lb_const_value(m, union_tag_type(u), exact_value_i64(union_variant_index_checked(u, v)));
 }
 
 gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
@@ -1540,13 +1540,17 @@ gb_internal void lb_emit_store_union_variant_tag(lbProcedure *p, lbValue parent,
 		// No tag needed!
 	} else {
 		lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent);
-		lb_emit_store(p, tag_ptr, lb_const_union_tag(p->module, t, variant_type));
+		lbValue tag = lb_const_union_tag(p->module, t, variant_type);
+		lb_emit_store(p, tag_ptr, tag);
 	}
 }
 
 gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbValue variant, Type *variant_type) {
 	Type *pt = base_type(type_deref(parent.type));
 	GB_ASSERT(pt->kind == Type_Union);
+
+	GB_ASSERT_MSG(union_is_variant_of(pt, variant_type), "%s %s", type_to_string(pt), type_to_string(variant_type));
+
 	if (pt->Union.kind == UnionType_shared_nil) {
 		GB_ASSERT(type_size_of(variant_type));
 
