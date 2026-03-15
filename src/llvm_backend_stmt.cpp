@@ -2537,33 +2537,26 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		} else {
 			Type *ret_type = p->type->Proc.results;
 
-			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-			if (return_by_pointer) {
-				res = p->return_ptr.addr;
-			} else {
-				res = lb_add_local_generated(p, ret_type, false).addr;
-			}
-
 			auto result_values = slice_make<lbValue>(temporary_allocator(), results.count);
-			auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count);
-
 			for_array(i, results) {
 				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
 			}
-			for_array(i, results) {
-				result_eps[i] = lb_emit_struct_ep(p, res, cast(i32)i);
-			}
-			for_array(i, result_eps) {
-				lb_emit_store(p, result_eps[i], result_values[i]);
-			}
 
 			if (return_by_pointer) {
+				res = p->return_ptr.addr;
+				auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count);
+				for_array(i, results) {
+					result_eps[i] = lb_emit_struct_ep(p, res, cast(i32)i);
+				}
+				for_array(i, result_eps) {
+					lb_emit_store(p, result_eps[i], result_values[i]);
+				}
 				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
 				LLVMBuildRetVoid(p->builder);
 				return;
 			}
 
-			res = lb_emit_load(p, res);
+			res = lb_build_struct_value(p, ret_type, result_values.data, result_values.count);
 		}
 	}
 	lb_build_return_stmt_internal(p, res, pos);

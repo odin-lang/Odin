@@ -1028,15 +1028,14 @@ gb_internal lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 	lbValue res = {};
 	Type *t = val.type;
 	if (is_type_complex(t)) {
-		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, false));
 		lbValue real = lb_emit_struct_ev(p, val, 0);
 		lbValue imag = lb_emit_struct_ev(p, val, 1);
 		imag = lb_emit_unary_arith(p, Token_Sub, imag, imag.type);
-		lb_emit_store(p, lb_emit_struct_ep(p, res, 0), real);
-		lb_emit_store(p, lb_emit_struct_ep(p, res, 1), imag);
+
+		lbValue fields[2] = {real, imag};
+		return lb_build_struct_value(p, type, fields, gb_count_of(fields));
 	} else if (is_type_quaternion(t)) {
 		// @QuaternionLayout
-		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, false));
 		lbValue real = lb_emit_struct_ev(p, val, 3);
 		lbValue imag = lb_emit_struct_ev(p, val, 0);
 		lbValue jmag = lb_emit_struct_ev(p, val, 1);
@@ -1044,10 +1043,9 @@ gb_internal lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 		imag = lb_emit_unary_arith(p, Token_Sub, imag, imag.type);
 		jmag = lb_emit_unary_arith(p, Token_Sub, jmag, jmag.type);
 		kmag = lb_emit_unary_arith(p, Token_Sub, kmag, kmag.type);
-		lb_emit_store(p, lb_emit_struct_ep(p, res, 3), real);
-		lb_emit_store(p, lb_emit_struct_ep(p, res, 0), imag);
-		lb_emit_store(p, lb_emit_struct_ep(p, res, 1), jmag);
-		lb_emit_store(p, lb_emit_struct_ep(p, res, 2), kmag);
+
+		lbValue fields[4] = {imag, jmag, kmag, real};
+		return lb_build_struct_value(p, type, fields, gb_count_of(fields));
 	} else if (is_type_array_like(t)) {
 		res = lb_addr_get_ptr(p, lb_add_local_generated(p, type, true));
 		Type *elem_type = base_array_type(t);

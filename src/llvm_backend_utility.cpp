@@ -1736,7 +1736,8 @@ gb_internal lbValue lb_emit_struct_iv(lbProcedure *p, lbValue agg, lbValue field
 gb_internal lbValue lb_build_struct_value(lbProcedure *p, Type *type, lbValue *fields, isize count) {
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
 	lbValue agg = {};
-	agg.value = LLVMGetPoison(llvm_type);
+	// agg.value = LLVMGetPoison(llvm_type);
+	agg.value = LLVMConstNull(llvm_type);
 	agg.type = type;
 	for (isize i = 0; i < count; i++) {
 		agg = lb_emit_struct_iv(p, agg, fields[i], cast(i32)i);
