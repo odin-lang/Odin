@@ -1,10 +1,12 @@
 #+build !amd64
+#+build !arm64
+#+build !arm32
 package sha2
 
 @(private = "file")
 ERR_HW_NOT_SUPPORTED :: "crypto/sha2: hardware implementation unsupported"
 
-// is_hardware_accelerated_256 returns true iff hardware accelerated
+// is_hardware_accelerated_256 returns true if and only if (⟺) hardware accelerated
 // SHA-224/SHA-256 is supported.
 is_hardware_accelerated_256 :: proc "contextless" () -> bool {
 	return false

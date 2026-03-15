@@ -4,6 +4,7 @@ import "core:bytes"
 import "core:crypto"
 import "core:crypto/_aes"
 import "core:crypto/_aes/ct64"
+import aes_hw "core:crypto/_aes/hw"
 import "core:encoding/endian"
 
 // GCM_IV_SIZE is the default size of the GCM IV in bytes.
@@ -26,6 +27,10 @@ Context_GCM :: struct {
 
 // init_gcm initializes a Context_GCM with the provided key.
 init_gcm :: proc(ctx: ^Context_GCM, key: []byte, impl := DEFAULT_IMPLEMENTATION) {
+	when aes_hw.HAS_GHASH {
+		impl := aes_hw.is_ghash_supported() ? impl : .Portable
+
+	}
 	init_impl(&ctx._impl, key, impl)
 	ctx._is_initialized = true
 }
@@ -65,7 +70,7 @@ seal_gcm :: proc(ctx: ^Context_GCM, dst, tag, iv, aad, plaintext: []byte) {
 
 // open_gcm authenticates the aad and ciphertext, and decrypts the ciphertext,
 // with the provided Context_GCM, iv, and tag, and stores the output in dst,
-// returning true iff the authentication was successful.  If authentication
+// returning true if and only if (⟺) the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
 // dst and plaintext MUST alias exactly or not at all.

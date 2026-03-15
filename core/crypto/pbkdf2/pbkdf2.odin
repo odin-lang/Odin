@@ -66,7 +66,7 @@ derive :: proc(
 		dst_blk = dst_blk[h_len:]
 	}
 
-	// Instead of rounding l up, just proceass the one extra block iff
+	// Instead of rounding l up, just proceass the one extra block if and only if (⟺)
 	// r != 0.
 	if r > 0 {
 		tmp: [hash.MAX_DIGEST_SIZE]byte

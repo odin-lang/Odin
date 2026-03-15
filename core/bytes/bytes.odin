@@ -1460,7 +1460,7 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 	return subslices[:]
 }
 
-// alias returns true iff a and b have a non-zero length, and any part of
+// alias returns true if and only if (⟺) a and b have a non-zero length, and any part of
 // a overlaps with b.
 alias :: proc "contextless" (a, b: []byte) -> bool {
 	a_len, b_len := len(a), len(b)
@@ -1474,7 +1474,7 @@ alias :: proc "contextless" (a, b: []byte) -> bool {
 	return a_start <= b_end && b_start <= a_end
 }
 
-// alias_inexactly returns true iff a and b have a non-zero length,
+// alias_inexactly returns true if and only if (⟺) a and b have a non-zero length,
 // the base pointer of a and b are NOT equal, and any part of a overlaps
 // with b (ie: `alias(a, b)` with an exception that returns false for
 // `a == b`, `b = a[:len(a)-69]` and similar conditions).

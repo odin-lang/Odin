@@ -3,7 +3,7 @@ package ecdsa
 import "core:crypto/hash"
 import secec "core:crypto/_weierstrass"
 
-// verify_raw returns true iff sig is a valid signature by pub_key over
+// verify_raw returns true if and only if (⟺) sig is a valid signature by pub_key over
 // msg, hased using hash_algo, per the verification procedure specifed
 // in SEC 1, Version 2.0, Section 4.1.4.
 //
@@ -33,7 +33,7 @@ verify_raw :: proc(pub_key: ^Public_Key, hash_algo: hash.Algorithm, msg, sig: []
 	panic("crypto/ecdsa: invalid curve")
 }
 
-// verify_asn1 returns true iff sig is a valid signature by pub_key over
+// verify_asn1 returns true if and only if (⟺) sig is a valid signature by pub_key over
 // msg, hased using hash_algo, per the verification procedure specifed
 // in SEC 1, Version 2.0, Section 4.1.4.
 //

@@ -154,7 +154,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 
 			pmblock.committed = platform_total_commit
 			block.committed = pmblock.committed - base_offset
-
+			assert(block.committed <= block.reserved)
 		}
 		return
 	}
@@ -174,7 +174,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 		err = .Out_Of_Memory
 		return
 	}
-	assert(block.committed <= block.reserved)
+
 	do_commit_if_necessary(block, size, default_commit_size) or_return
 
 	data = block.base[block.used+alignment_offset:][:min_size]
