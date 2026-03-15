@@ -1742,14 +1742,25 @@ gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lb
 	return res;
 }
 
-
 gb_internal lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isize column) {
-	Type *st = base_type(s.type);
-	GB_ASSERT_MSG(is_type_matrix(st), "%s", type_to_string(st));
-	
-	lbValue value = lb_address_from_load_or_generate_local(p, s);
-	lbValue ptr = lb_emit_matrix_epi(p, value, row, column);
-	return lb_emit_load(p, ptr);
+	Type *t = s.type;
+	Type *mt = base_type(t);
+	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
+
+	isize stride_elems = matrix_type_stride_in_elems(mt);
+
+	isize index = -1;
+
+	if (mt->Matrix.is_row_major) {
+		index = column + (row * stride_elems);
+	} else {
+		index = row + (column * stride_elems);
+	}
+
+	lbValue res = {};
+	res.value = LLVMBuildExtractValue(p->builder, s.value, cast(unsigned)index, "");
+	res.type = base_array_type(mt);
+	return res;
 }
 
 gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base_elem, lbValue len) {
