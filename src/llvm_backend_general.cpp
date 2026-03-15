@@ -498,10 +498,11 @@ gb_internal lbModule *lb_module_of_expr(lbGenerator *gen, Ast *expr) {
 gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, lbModule *curr_module) {
 	lbModule **found = nullptr;
 
-	if (e->kind == Entity_Procedure &&
-	    e->decl_info &&
-	    e->decl_info->code_gen_module) {
-		return e->decl_info->code_gen_module;
+	if (e->kind == Entity_Procedure && e->decl_info) {
+	    	lbModule *mod = e->decl_info->code_gen_module.load(std::memory_order_relaxed);
+		if (mod) {
+			return mod;
+		}
 	}
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
