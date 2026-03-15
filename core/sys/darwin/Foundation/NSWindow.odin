@@ -125,6 +125,13 @@ WindowTabbingMode :: enum Integer {
 	Disallowed = 2,
 }
 
+WindowOcclusionState :: enum UInteger {
+    Visible = 0x2002,
+    Hidden  = 0x2000
+}
+WindowOcclusionStates :: distinct bit_set[WindowOcclusionState]
+WindowOcclusionStateVisible :: WindowOcclusionStates{.Visible}
+WindowOcclusionStateHidden  :: WindowOcclusionStates{.Hidden}
 
 WindowDelegateTemplate :: struct {
 	// Managing Sheets
@@ -1007,4 +1014,13 @@ Window_frameRectForContentRectInstance :: proc "c" (self: ^Window, contentRect: 
 @(objc_type = Window, objc_name = "screen")
 Window_screen :: proc "c" (self: ^Window) -> ^Screen {
 	return msgSend(^Screen, self, "screen")
+}
+@(objc_type=Window, objc_name="occlusionState")
+Window_occlusionState :: proc "c" (self: ^Window) -> WindowOcclusionState {
+    return msgSend(WindowOcclusionState, self, "occlusionState")
+}
+@(objc_type=Window, objc_name="occlusionStateVisible")
+Window_occlusionStateVisible :: proc "c" (self: ^Window) -> BOOL {
+    state := Window_occlusionState(self)
+    return state == .Visible
 }
