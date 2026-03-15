@@ -881,10 +881,8 @@ append_fixed_capacity_elems :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #
 
 	n = min(N - len(array), len(args))
 
-	when size_of(E) != 0 {
-		for i in 0..<n {
-			#no_bounds_check raw.data[raw.len + i] = args[i]
-		}
+	#no_bounds_check when size_of(E) != 0 {
+		intrinsics.mem_copy(&raw.data[raw.len], raw_data(args), n*size_of(E))
 	}
 
 	raw.len += n
@@ -895,10 +893,10 @@ append_fixed_capacity_elems :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #
 //
 // Note: Prefer using the procedure group `append`.
 @builtin
-append_fixed_capacity_string :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, args: ..string, loc := #caller_location) -> (n: int) {
+append_fixed_capacity_string :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, args: ..string) -> (n: int) {
 	n_arg: int
 	for arg in args {
-		n_arg = append_fixed_capacity_elems(array, ..transmute([]E)(arg), loc=loc)
+		n_arg = append_fixed_capacity_elems(array, ..transmute([]E)(arg))
 		n += n_arg
 		if n_arg < len(arg) {
 			return
