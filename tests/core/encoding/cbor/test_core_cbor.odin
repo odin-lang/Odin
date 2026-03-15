@@ -427,6 +427,7 @@ test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
 	}
 
 	Foo_More :: struct {
+		foo: bool,
 		bar: struct {
 			hello:   string,
 			world:   string,
@@ -436,6 +437,7 @@ test_unmarshal_map_into_struct_partially :: proc(t: ^testing.T) {
 		baz: int,
 	}
 	more := Foo_More{
+		foo = false,
 		bar = {
 			hello   = "hello",
 			world   = "world",
