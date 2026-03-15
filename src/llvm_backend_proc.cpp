@@ -3369,6 +3369,24 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return lb_emit_conv(p, res, t);
 		}
 
+	case BuiltinProc_likely:
+	case BuiltinProc_unlikely:
+		{
+			Type *t = default_type(tv.type);
+			lbValue x = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t);
+			lbValue y = lb_const_bool(p->module, t, id == BuiltinProc_likely);
+
+			char const *name = "llvm.expect";
+
+			LLVMTypeRef types[1] = {lb_type(p->module, t)};
+			lbValue res = {};
+			LLVMValueRef args[2] = { x.value, y.value };
+
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			res.type = t;
+			return lb_emit_conv(p, res, t);
+		}
+
 	case BuiltinProc_prefetch_read_instruction:
 	case BuiltinProc_prefetch_read_data:
 	case BuiltinProc_prefetch_write_instruction:

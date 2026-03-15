@@ -77,7 +77,9 @@ prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=
 prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
 
 // Compiler Hints
-expect :: proc(val, expected_val: $T) -> T ---
+expect   :: proc(val, expected_val: $T) -> T ---
+likely   :: proc(val: $T) -> T where type_is_boolean(T) ---
+unlikely :: proc(val: $T) -> T where type_is_boolean(T) ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---

@@ -144,6 +144,8 @@ BuiltinProc__atomic_end,
 	BuiltinProc_fixed_point_div_sat,
 
 	BuiltinProc_expect,
+	BuiltinProc_likely,
+	BuiltinProc_unlikely,
 
 BuiltinProc__simd_begin,
 	BuiltinProc_simd_add,
@@ -527,7 +529,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("fixed_point_mul_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("expect"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("expect"),   2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("likely"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("unlikely"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

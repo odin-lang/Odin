@@ -6257,6 +6257,33 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = x.type;
 		}
 		break;
+
+	case BuiltinProc_likely:
+	case BuiltinProc_unlikely:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_boolean(x.type)) {
+				gbString xt = type_to_string(x.type);
+				error(x.expr, "Expected a boolean expression to '%.*s', got %s", LIT(builtin_name), xt);
+				gb_string_free(xt);
+				*operand = x; // minimize error propagation
+				return true;
+			}
+
+			if (x.mode == Addressing_Constant) {
+				// NOTE(bill): just completely ignore this intrinsic entirely
+				*operand = x;
+				return true;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+		}
+		break;
 		
 	case BuiltinProc_prefetch_read_instruction:
 	case BuiltinProc_prefetch_read_data:
