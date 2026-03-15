@@ -804,7 +804,7 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 
 	op.send.sent += n
 
-	if op.send.sent < total {
+	if n < total {
 		return send_exec(op)
 	}
 
@@ -868,7 +868,7 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 	assert(is_tcp || op.recv.received == 0)
 	op.recv.received += n
 
-	if is_tcp && n != 0 && op.recv.received < total {
+	if is_tcp && n != 0 && n < total {
 		return recv_exec(op)
 	}
 

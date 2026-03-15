@@ -66,6 +66,19 @@ gb_internal String get_final_microarchitecture() {
 gb_internal String get_default_features() {
 	BuildContext *bc = &build_context;
 
+	if (bc->microarch == str_lit("native")) {
+		String features = make_string_c(LLVMGetHostCPUFeatures());
+
+		// Update the features string so LLVM uses it later.
+		if (bc->target_features_string.len > 0) {
+			bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
+		} else {
+			bc->target_features_string = features;
+		}
+
+		return features;
+	}
+
 	int off = 0;
 	for (int i = 0; i < bc->metrics.arch; i += 1) {
 		off += target_microarch_counts[i];

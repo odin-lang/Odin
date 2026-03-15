@@ -33,7 +33,7 @@ sum :: proc(dst, msg, key: []byte) {
 }
 
 // verify will verify the Poly1305 tag computed with the key over msg and
-// return true iff the tag is valid.  It requires that the tag is correctly
+// return true if and only if (⟺) the tag is valid.  It requires that the tag is correctly
 // sized.
 verify :: proc(tag, msg, key: []byte) -> bool {
 	ctx: Context = ---

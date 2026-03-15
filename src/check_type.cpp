@@ -1853,7 +1853,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		if (is_using && (feature_flags & OptInFeatureFlag_UsingStmt) == 0) {
 			ERROR_BLOCK();
 			error(param, "'using' has been disallowed as it is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring");
-			error_line("\tIt you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
+			error_line("\tIf you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
 		}
 
 		if (type_expr == nullptr) {

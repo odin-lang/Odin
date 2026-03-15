@@ -80,13 +80,13 @@ sc_square :: proc "contextless" (sc, a: ^Scalar) {
 	grp.sc_square(sc, a)
 }
 
-// sc_cond_assign sets `sc = sc` iff `ctrl == 0` and `sc = a` iff `ctrl == 1`.
+// sc_cond_assign sets `sc = sc` if and only if (⟺) `ctrl == 0` and `sc = a` if and only if (⟺) `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 sc_cond_assign :: proc(sc, a: ^Scalar, ctrl: int) {
 	grp.sc_cond_assign(sc, a, ctrl)
 }
 
-// sc_equal returns 1 iff `a == b`, and 0 otherwise.
+// sc_equal returns 1 if and only if (⟺) `a == b`, and 0 otherwise.
 @(require_results)
 sc_equal :: proc(a, b: ^Scalar) -> int {
 	return grp.sc_equal(a, b)

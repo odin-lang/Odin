@@ -82,7 +82,7 @@ internal_block_literal_make :: proc (is_global: bool, user_data: rawptr, user_pr
 		BLOCK_HAS_COPY_DISPOSE :: 1 << 25
 		BLOCK_HAS_CTOR         :: 1 << 26 // helpers have C++ code
 		BLOCK_IS_GLOBAL        :: 1 << 28
-		BLOCK_HAS_STRET        :: 1 << 29 // IFF BLOCK_HAS_SIGNATURE
+		BLOCK_HAS_STRET        :: 1 << 29 // if and only if (⟺) BLOCK_HAS_SIGNATURE
 		BLOCK_HAS_SIGNATURE    :: 1 << 30
 
 		bl.isa = is_global ? &_NSConcreteGlobalBlock : &_NSConcreteStackBlock

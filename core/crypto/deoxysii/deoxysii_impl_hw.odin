@@ -1,152 +1,183 @@
-#+build amd64
+#+build amd64,arm64,arm32
 package deoxysii
 
 import "base:intrinsics"
 import "core:crypto"
-import "core:crypto/aes"
+import aes_hw "core:crypto/_aes/hw"
 import "core:simd"
-import "core:simd/x86"
 
 // This processes a maximum of 4 blocks at a time, as that is suitable
 // for most current hardware that doesn't say "Xeon".
+//
+// TODO/perf: ARM should be able to do 8 at a time.
+
+when ODIN_ARCH == .amd64 {
+	@(private="file")
+	TARGET_FEATURES :: "sse2,ssse3,aes"
+} else when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
+	@(private="file")
+	TARGET_FEATURES :: "neon,aes"
+}
 
 @(private = "file")
-_BIT_ENC :: x86.__m128i{0x80, 0}
+_BIT_ENC :: simd.u8x16{0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 @(private = "file")
-_PREFIX_AD_BLOCK :: x86.__m128i{PREFIX_AD_BLOCK << PREFIX_SHIFT, 0}
+_PREFIX_AD_BLOCK :: simd.u8x16{
+	PREFIX_AD_BLOCK << PREFIX_SHIFT, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
 @(private = "file")
-_PREFIX_AD_FINAL :: x86.__m128i{PREFIX_AD_FINAL << PREFIX_SHIFT, 0}
+_PREFIX_AD_FINAL :: simd.u8x16{
+	PREFIX_AD_FINAL << PREFIX_SHIFT, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
 @(private = "file")
-_PREFIX_MSG_BLOCK :: x86.__m128i{PREFIX_MSG_BLOCK << PREFIX_SHIFT, 0}
+_PREFIX_MSG_BLOCK :: simd.u8x16{
+	PREFIX_MSG_BLOCK << PREFIX_SHIFT, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
 @(private = "file")
-_PREFIX_MSG_FINAL :: x86.__m128i{PREFIX_MSG_FINAL << PREFIX_SHIFT, 0}
+_PREFIX_MSG_FINAL :: simd.u8x16{
+	PREFIX_MSG_FINAL << PREFIX_SHIFT, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+}
 
-// is_hardware_accelerated returns true iff hardware accelerated Deoxys-II
+// is_hardware_accelerated returns true if and only if (⟺) hardware accelerated Deoxys-II
 // is supported.
 is_hardware_accelerated :: proc "contextless" () -> bool {
-	return aes.is_hardware_accelerated()
+	return aes_hw.is_supported()
 }
 
-@(private = "file", enable_target_feature = "sse4.1", require_results)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
 auth_tweak :: #force_inline proc "contextless" (
-	prefix:   x86.__m128i,
+	prefix:   simd.u8x16,
 	block_nr: int,
-) -> x86.__m128i {
-	return x86._mm_insert_epi64(prefix, i64(intrinsics.byte_swap(u64(block_nr))), 1)
-}
+) -> simd.u8x16 {
+	when ODIN_ENDIAN == .Little {
+		block_nr_u64 := intrinsics.byte_swap(u64(block_nr))
+	} else {
+		block_nr_u64 := u64(block_nr)
+	}
 
-@(private = "file", enable_target_feature = "sse2", require_results)
-enc_tweak :: #force_inline proc "contextless" (
-	tag:      x86.__m128i,
-	block_nr: int,
-) -> x86.__m128i {
-	return x86._mm_xor_si128(
-		x86._mm_or_si128(tag, _BIT_ENC),
-		x86.__m128i{0, i64(intrinsics.byte_swap(u64(block_nr)))},
+	return simd.bit_or(
+		prefix,
+		transmute(simd.u8x16)(simd.u64x2{0, block_nr_u64}),
 	)
 }
 
-@(private = "file", enable_target_feature = "ssse3", require_results)
-h_ :: #force_inline proc "contextless" (tk1: x86.__m128i) -> x86.__m128i {
-	return transmute(x86.__m128i)h(transmute(simd.u8x16)tk1)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
+enc_tweak :: #force_inline proc "contextless" (
+	tag:      simd.u8x16,
+	block_nr: int,
+) -> simd.u8x16 {
+	when ODIN_ENDIAN == .Little {
+		block_nr_u64 := intrinsics.byte_swap(u64(block_nr))
+	} else {
+		block_nr_u64 := u64(block_nr)
+	}
+
+	return simd.bit_xor(
+		simd.bit_or(tag, _BIT_ENC),
+		transmute(simd.u8x16)(simd.u64x2{0, block_nr_u64}),
+	)
 }
 
-@(private = "file", enable_target_feature = "sse2,ssse3,aes", require_results)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
 bc_x4 :: #force_inline proc "contextless" (
 	ctx: ^Context,
-	s_0, s_1, s_2, s_3:                 x86.__m128i,
-	tweak_0, tweak_1, tweak_2, tweak_3: x86.__m128i,
-) -> (x86.__m128i, x86.__m128i, x86.__m128i, x86.__m128i) #no_bounds_check {
+	s_0, s_1, s_2, s_3:                 simd.u8x16,
+	tweak_0, tweak_1, tweak_2, tweak_3: simd.u8x16,
+) -> (simd.u8x16, simd.u8x16, simd.u8x16, simd.u8x16) #no_bounds_check {
 	s_0, s_1, s_2, s_3 := s_0, s_1, s_2, s_3
 	tk1_0, tk1_1, tk1_2, tk1_3 := tweak_0, tweak_1, tweak_2, tweak_3
 
-	sk := intrinsics.unaligned_load((^x86.__m128i)(&ctx._subkeys[0]))
-	stk_0 := x86._mm_xor_si128(tk1_0, sk)
-	stk_1 := x86._mm_xor_si128(tk1_1, sk)
-	stk_2 := x86._mm_xor_si128(tk1_2, sk)
-	stk_3 := x86._mm_xor_si128(tk1_3, sk)
+	sk := intrinsics.unaligned_load((^simd.u8x16)(&ctx._subkeys[0]))
+	stk_0 := simd.bit_xor(tk1_0, sk)
+	stk_1 := simd.bit_xor(tk1_1, sk)
+	stk_2 := simd.bit_xor(tk1_2, sk)
+	stk_3 := simd.bit_xor(tk1_3, sk)
 
-	s_0 = x86._mm_xor_si128(s_0, stk_0)
-	s_1 = x86._mm_xor_si128(s_1, stk_1)
-	s_2 = x86._mm_xor_si128(s_2, stk_2)
-	s_3 = x86._mm_xor_si128(s_3, stk_3)
+	s_0 = simd.bit_xor(s_0, stk_0)
+	s_1 = simd.bit_xor(s_1, stk_1)
+	s_2 = simd.bit_xor(s_2, stk_2)
+	s_3 = simd.bit_xor(s_3, stk_3)
 
 	for i in 1 ..= BC_ROUNDS {
-		sk = intrinsics.unaligned_load((^x86.__m128i)(&ctx._subkeys[i]))
+		sk = intrinsics.unaligned_load((^simd.u8x16)(&ctx._subkeys[i]))
 
-		tk1_0 = h_(tk1_0)
-		tk1_1 = h_(tk1_1)
-		tk1_2 = h_(tk1_2)
-		tk1_3 = h_(tk1_3)
+		tk1_0 = h(tk1_0)
+		tk1_1 = h(tk1_1)
+		tk1_2 = h(tk1_2)
+		tk1_3 = h(tk1_3)
 
-		stk_0 = x86._mm_xor_si128(tk1_0, sk)
-		stk_1 = x86._mm_xor_si128(tk1_1, sk)
-		stk_2 = x86._mm_xor_si128(tk1_2, sk)
-		stk_3 = x86._mm_xor_si128(tk1_3, sk)
+		stk_0 = simd.bit_xor(tk1_0, sk)
+		stk_1 = simd.bit_xor(tk1_1, sk)
+		stk_2 = simd.bit_xor(tk1_2, sk)
+		stk_3 = simd.bit_xor(tk1_3, sk)
 
-		s_0 = x86._mm_aesenc_si128(s_0, stk_0)
-		s_1 = x86._mm_aesenc_si128(s_1, stk_1)
-		s_2 = x86._mm_aesenc_si128(s_2, stk_2)
-		s_3 = x86._mm_aesenc_si128(s_3, stk_3)
+		s_0 = aes_hw.aesenc(s_0, stk_0)
+		s_1 = aes_hw.aesenc(s_1, stk_1)
+		s_2 = aes_hw.aesenc(s_2, stk_2)
+		s_3 = aes_hw.aesenc(s_3, stk_3)
 	}
 
 	return s_0, s_1, s_2, s_3
 }
 
-@(private = "file", enable_target_feature = "sse2,ssse3,aes", require_results)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
 bc_x1 :: #force_inline proc "contextless" (
 	ctx:   ^Context,
-	s:     x86.__m128i,
-	tweak: x86.__m128i,
-) -> x86.__m128i #no_bounds_check {
+	s:     simd.u8x16,
+	tweak: simd.u8x16,
+) -> simd.u8x16 #no_bounds_check {
 	s, tk1 := s, tweak
 
-	sk := intrinsics.unaligned_load((^x86.__m128i)(&ctx._subkeys[0]))
-	stk := x86._mm_xor_si128(tk1, sk)
+	sk := intrinsics.unaligned_load((^simd.u8x16)(&ctx._subkeys[0]))
+	stk := simd.bit_xor(tk1, sk)
 
-	s = x86._mm_xor_si128(s, stk)
+	s = simd.bit_xor(s, stk)
 
 	for i in 1 ..= BC_ROUNDS {
-		sk = intrinsics.unaligned_load((^x86.__m128i)(&ctx._subkeys[i]))
+		sk = intrinsics.unaligned_load((^simd.u8x16)(&ctx._subkeys[i]))
 
-		tk1 = h_(tk1)
+		tk1 = h(tk1)
 
-		stk = x86._mm_xor_si128(tk1, sk)
+		stk = simd.bit_xor(tk1, sk)
 
-		s = x86._mm_aesenc_si128(s, stk)
+		s = aes_hw.aesenc(s, stk)
 	}
 
 	return s
 }
 
-@(private = "file", enable_target_feature = "sse2,ssse3,sse4.1,aes", require_results)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
 bc_absorb :: proc "contextless" (
 	ctx:          ^Context,
-	tag:          x86.__m128i,
+	tag:          simd.u8x16,
 	src:          []byte,
-	tweak_prefix: x86.__m128i,
+	tweak_prefix: simd.u8x16,
 	stk_block_nr: int,
-) -> (x86.__m128i, int) #no_bounds_check {
+) -> (simd.u8x16, int) #no_bounds_check {
 	src, stk_block_nr, tag := src, stk_block_nr, tag
 
 	nr_blocks := len(src) / BLOCK_SIZE
 	for nr_blocks >= 4 {
 		d_0, d_1, d_2, d_3 := bc_x4(
 			ctx,
-			intrinsics.unaligned_load((^x86.__m128i)(raw_data(src))),
-			intrinsics.unaligned_load((^x86.__m128i)(raw_data(src[BLOCK_SIZE:]))),
-			intrinsics.unaligned_load((^x86.__m128i)(raw_data(src[2*BLOCK_SIZE:]))),
-			intrinsics.unaligned_load((^x86.__m128i)(raw_data(src[3*BLOCK_SIZE:]))),
+			intrinsics.unaligned_load((^simd.u8x16)(raw_data(src))),
+			intrinsics.unaligned_load((^simd.u8x16)(raw_data(src[BLOCK_SIZE:]))),
+			intrinsics.unaligned_load((^simd.u8x16)(raw_data(src[2*BLOCK_SIZE:]))),
+			intrinsics.unaligned_load((^simd.u8x16)(raw_data(src[3*BLOCK_SIZE:]))),
 			auth_tweak(tweak_prefix, stk_block_nr),
 			auth_tweak(tweak_prefix, stk_block_nr + 1),
 			auth_tweak(tweak_prefix, stk_block_nr + 2),
 			auth_tweak(tweak_prefix, stk_block_nr + 3),
 		)
 
-		tag = x86._mm_xor_si128(tag, d_0)
-		tag = x86._mm_xor_si128(tag, d_1)
-		tag = x86._mm_xor_si128(tag, d_2)
-		tag = x86._mm_xor_si128(tag, d_3)
+		tag = simd.bit_xor(tag, d_0)
+		tag = simd.bit_xor(tag, d_1)
+		tag = simd.bit_xor(tag, d_2)
+		tag = simd.bit_xor(tag, d_3)
 
 		src = src[4*BLOCK_SIZE:]
 		stk_block_nr += 4
@@ -156,11 +187,11 @@ bc_absorb :: proc "contextless" (
 	for nr_blocks > 0 {
 		d := bc_x1(
 			ctx,
-			intrinsics.unaligned_load((^x86.__m128i)(raw_data(src))),
+			intrinsics.unaligned_load((^simd.u8x16)(raw_data(src))),
 			auth_tweak(tweak_prefix, stk_block_nr),
 		)
 
-		tag = x86._mm_xor_si128(tag, d)
+		tag = simd.bit_xor(tag, d)
 
 		src = src[BLOCK_SIZE:]
 		stk_block_nr += 1
@@ -170,29 +201,29 @@ bc_absorb :: proc "contextless" (
 	return tag, stk_block_nr
 }
 
-@(private = "file", enable_target_feature = "sse2,ssse3,aes", require_results)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
 bc_final :: proc "contextless" (
 	ctx: ^Context,
-	tag: x86.__m128i,
+	tag: simd.u8x16,
 	iv:  []byte,
-) -> x86.__m128i {
+) -> simd.u8x16 {
 	tmp: [BLOCK_SIZE]byte
 
 	tmp[0] = PREFIX_TAG << PREFIX_SHIFT
 	copy(tmp[1:], iv)
 
-	tweak := intrinsics.unaligned_load((^x86.__m128i)(&tmp))
+	tweak := intrinsics.unaligned_load((^simd.u8x16)(&tmp))
 
 	return bc_x1(ctx, tag, tweak)
 }
 
-@(private = "file", enable_target_feature = "sse2,ssse3,aes", require_results)
+@(private = "file", enable_target_feature = TARGET_FEATURES, require_results)
 bc_encrypt :: proc "contextless" (
 	ctx:          ^Context,
 	dst:          []byte,
 	src:          []byte,
-	iv:           x86.__m128i,
-	tweak_tag:    x86.__m128i,
+	iv:           simd.u8x16,
+	tweak_tag:    simd.u8x16,
 	stk_block_nr: int,
 ) -> int {
 	dst, src, stk_block_nr := dst, src, stk_block_nr
@@ -209,31 +240,31 @@ bc_encrypt :: proc "contextless" (
 		)
 
 		intrinsics.unaligned_store(
-			(^x86.__m128i)(raw_data(dst)),
-			x86._mm_xor_si128(
+			(^simd.u8x16)(raw_data(dst)),
+			simd.bit_xor(
 				d_0,
-				intrinsics.unaligned_load((^x86.__m128i)(raw_data(src))),
+				intrinsics.unaligned_load((^simd.u8x16)(raw_data(src))),
 			),
 		)
 		intrinsics.unaligned_store(
-			(^x86.__m128i)(raw_data(dst[BLOCK_SIZE:])),
-			x86._mm_xor_si128(
+			(^simd.u8x16)(raw_data(dst[BLOCK_SIZE:])),
+			simd.bit_xor(
 				d_1,
-				intrinsics.unaligned_load((^x86.__m128i)(raw_data(src[BLOCK_SIZE:]))),
+				intrinsics.unaligned_load((^simd.u8x16)(raw_data(src[BLOCK_SIZE:]))),
 			),
 		)
 		intrinsics.unaligned_store(
-			(^x86.__m128i)(raw_data(dst[2*BLOCK_SIZE:])),
-			x86._mm_xor_si128(
+			(^simd.u8x16)(raw_data(dst[2*BLOCK_SIZE:])),
+			simd.bit_xor(
 				d_2,
-				intrinsics.unaligned_load((^x86.__m128i)(raw_data(src[2*BLOCK_SIZE:]))),
+				intrinsics.unaligned_load((^simd.u8x16)(raw_data(src[2*BLOCK_SIZE:]))),
 			),
 		)
 		intrinsics.unaligned_store(
-			(^x86.__m128i)(raw_data(dst[3*BLOCK_SIZE:])),
-			x86._mm_xor_si128(
+			(^simd.u8x16)(raw_data(dst[3*BLOCK_SIZE:])),
+			simd.bit_xor(
 				d_3,
-				intrinsics.unaligned_load((^x86.__m128i)(raw_data(src[3*BLOCK_SIZE:]))),
+				intrinsics.unaligned_load((^simd.u8x16)(raw_data(src[3*BLOCK_SIZE:]))),
 			),
 		)
 
@@ -250,10 +281,10 @@ bc_encrypt :: proc "contextless" (
 		)
 
 		intrinsics.unaligned_store(
-			(^x86.__m128i)(raw_data(dst)),
-			x86._mm_xor_si128(
+			(^simd.u8x16)(raw_data(dst)),
+			simd.bit_xor(
 				d,
-				intrinsics.unaligned_load((^x86.__m128i)(raw_data(src))),
+				intrinsics.unaligned_load((^simd.u8x16)(raw_data(src))),
 			),
 		)
 
@@ -269,7 +300,7 @@ bc_encrypt :: proc "contextless" (
 e_hw :: proc "contextless" (ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) #no_bounds_check {
 	tmp: [BLOCK_SIZE]byte
 	copy(tmp[1:], iv)
-	iv_ := intrinsics.unaligned_load((^x86.__m128i)(raw_data(&tmp)))
+	iv_ := intrinsics.unaligned_load((^simd.u8x16)(raw_data(&tmp)))
 
 	// Algorithm 3
 	//
@@ -282,7 +313,7 @@ e_hw :: proc "contextless" (ctx: ^Context, dst, tag, iv, aad, plaintext: []byte)
 	// if A_∗ != nil then
 	//   Auth <- Auth ^ EK(0110 || la, pad10∗(A_∗))
 	// end
-	auth: x86.__m128i
+	auth: simd.u8x16
 	n: int
 
 	aad := aad
@@ -341,14 +372,14 @@ e_hw :: proc "contextless" (ctx: ^Context, dst, tag, iv, aad, plaintext: []byte)
 		copy(dst[n*BLOCK_SIZE:], m_star[:])
 	}
 
-	intrinsics.unaligned_store((^x86.__m128i)(raw_data(tag)), auth)
+	intrinsics.unaligned_store((^simd.u8x16)(raw_data(tag)), auth)
 }
 
 @(private, require_results)
 d_hw :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	tmp: [BLOCK_SIZE]byte
 	copy(tmp[1:], iv)
-	iv_ := intrinsics.unaligned_load((^x86.__m128i)(raw_data(&tmp)))
+	iv_ := intrinsics.unaligned_load((^simd.u8x16)(raw_data(&tmp)))
 
 	// Algorithm 4
 	//
@@ -360,7 +391,7 @@ d_hw :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte
 	// if C_∗ != nil then
 	//   M_∗ <- C_∗ ^ EK(1 || tag ^ l, 0^8 || N)
 	// end
-	auth := intrinsics.unaligned_load((^x86.__m128i)(raw_data(tag)))
+	auth := intrinsics.unaligned_load((^simd.u8x16)(raw_data(tag)))
 
 	m := ciphertext
 	n := bc_encrypt(ctx, dst, m, iv_, auth, 0)
@@ -385,7 +416,7 @@ d_hw :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte
 	// if A∗ != nil then
 	//   Auth <- Auth ^ EK(0110| | l_a, pad10∗(A_∗))
 	// end
-	auth = x86.__m128i{0, 0}
+	auth = simd.u8x16{}
 	aad := aad
 	auth, n = bc_absorb(ctx, auth, aad, _PREFIX_AD_BLOCK, 0)
 	aad = aad[BLOCK_SIZE*n:]
@@ -424,7 +455,7 @@ d_hw :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte
 	// Tag verification
 	// if tag0 = tag then return (M_1 || ... || M_l || M_∗)
 	// else return false
-	intrinsics.unaligned_store((^x86.__m128i)(raw_data(&tmp)), auth)
+	intrinsics.unaligned_store((^simd.u8x16)(raw_data(&tmp)), auth)
 	ok := crypto.compare_constant_time(tmp[:], tag) == 1
 
 	crypto.zero_explicit(&tmp, size_of(tmp))

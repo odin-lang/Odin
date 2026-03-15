@@ -141,7 +141,7 @@ Type_Info_Struct :: struct {
 
 	flags: Type_Info_Struct_Flags,
 
-	// These are only set iff this structure is an SOA structure
+	// These are only set if and only if (⟺) this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
 	soa_len:       i32,
 	soa_base_type: ^Type_Info,

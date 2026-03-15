@@ -21,7 +21,7 @@ sum :: proc(algorithm: hash.Algorithm, dst, msg, key: []byte) {
 }
 
 // verify will verify the HMAC tag computed with the specified algorithm
-// and key over msg and return true iff the tag is valid.  It requires
+// and key over msg and return true if and only if (⟺) the tag is valid.  It requires
 // that the tag is correctly sized.
 verify :: proc(algorithm: hash.Algorithm, tag, msg, key: []byte) -> bool {
 	tag_buf: [hash.MAX_DIGEST_SIZE]byte

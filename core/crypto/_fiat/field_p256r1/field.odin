@@ -69,7 +69,7 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Montgomery_Domain_Field_Element) ->
 	tmp: Montgomery_Domain_Field_Element = ---
 	fe_sub(&tmp, arg1, arg2)
 
-	// This will only underflow iff arg1 == arg2, and we return the borrow,
+	// This will only underflow if and only if (⟺) arg1 == arg2, and we return the borrow,
 	// which will be 1.
 	is_eq := subtle.u64_is_zero(fe_non_zero(&tmp))
 
