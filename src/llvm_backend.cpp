@@ -3187,7 +3187,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			code_mode);
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
-		LLVMSetModuleDataLayout(m->mod, LLVMCreateTargetDataLayout(target_machine));
+		LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(target_machine);
+		LLVMSetModuleDataLayout(m->mod, data_layout);
+		LLVMDisposeTargetData(data_layout);
 
 	#if LLVM_VERSION_MAJOR >= 18
 		if (build_context.fast_isel) {
