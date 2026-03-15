@@ -12009,6 +12009,17 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		if (o->mode != Addressing_Invalid) {
 			check_unary_expr(c, o, ue->op, node);
+		} else {
+			ERROR_BLOCK();
+			gbString s = expr_to_string(ue->expr);
+			defer (gb_string_free(s));
+
+			error(node, "Cannot address value '%s' as it has not got a determined type yet", s);
+
+			Entity *e = entity_of_node(ue->expr);
+			if (e != nullptr && e->kind == Entity_Variable) {
+				error_line("\tSuggestion: Add an explicit type to the declaration of '%.*s' rather than relying on type inference", LIT(e->token.string));
+			}
 		}
 		o->expr = node;
 		return Expr_Expr;
