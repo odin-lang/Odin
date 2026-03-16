@@ -1,4 +1,5 @@
-#define LB_ENABLE_RVO build_context.enable_rvo
+#define LB_ENABLE_BASIC_RVO    true
+#define LB_ENABLE_ADVANCED_RVO build_context.enable_rvo
 
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
 // Returns the callee's function type if eligible for copy elision, nullptr otherwise.
@@ -2593,7 +2594,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 	if (return_count == 1) {
 		Entity *e = tuple->variables[0];
 
-		if (LB_ENABLE_RVO && res_count == 1 && return_by_pointer) {
+		if (LB_ENABLE_BASIC_RVO && res_count == 1 && return_by_pointer) {
 			Ast *ret_expr = unparen_expr(return_results[0]);
 
 			// NOTE(bill): @RVO for `return call()` in a procedure which uses `sret` and has no defers
@@ -3058,7 +3059,7 @@ gb_internal void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr
 }
 gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 	if (as->op.kind == Token_Eq) {
-		if (LB_ENABLE_RVO) {
+		if (LB_ENABLE_ADVANCED_RVO) {
 			// @RVO for single assignments `x = call()`
 			if (as->lhs.count == 1 && as->rhs.count == 1 && !is_blank_ident(as->lhs[0])) {
 				Ast *rhs_expr = unparen_expr(as->rhs[0]);
@@ -3260,7 +3261,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				}
 			}
 		} else {
-			if (LB_ENABLE_RVO) {
+			if (LB_ENABLE_ADVANCED_RVO) {
 				// @RVO: for `x := call()`
 				if (vd->names.count == 1 && values.count == 1 && !is_blank_ident(vd->names[0])) {
 					Ast *rhs_expr = unparen_expr(values[0]);
