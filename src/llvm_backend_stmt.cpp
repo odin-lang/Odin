@@ -486,6 +486,14 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 		}
 		break;
 	}
+	case Type_FixedCapacityDynamicArray: {
+		if (val_type != nullptr) {
+			lbValue data = lb_emit_struct_ep(p, expr, 0);
+			val = lb_emit_load(p, lb_emit_array_ep(p, data, idx));
+		}
+		break;
+	}
+
 	case Type_Slice: {
 		if (val_type != nullptr) {
 			lbValue elem = lb_slice_elem(p, expr);
@@ -1363,6 +1371,15 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->EnumeratedArray.count));
 			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
+			break;
+		}
+		case Type_FixedCapacityDynamicArray: {
+			lbValue array = lb_build_addr_ptr(p, expr);
+			if (is_type_pointer(type_deref(array.type))) {
+				array = lb_emit_load(p, array);
+			}
+			lbValue count_ptr = lb_emit_struct_ep(p, array, 1);
+			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_DynamicArray: {

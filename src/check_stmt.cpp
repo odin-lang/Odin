@@ -1846,6 +1846,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				array_add(&vals, t_int);
 				break;
 
+			case Type_FixedCapacityDynamicArray:
+				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+				array_add(&vals, t->FixedCapacityDynamicArray.elem);
+				array_add(&vals, t_int);
+				break;
+
 			case Type_DynamicArray:
 				is_possibly_addressable = true;
 				array_add(&vals, t->DynamicArray.elem);
