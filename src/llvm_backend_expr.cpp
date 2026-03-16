@@ -2898,10 +2898,13 @@ gb_internal lbValue lb_emit_c_vararg(lbProcedure *p, lbValue arg, Type *type) {
 
 gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right, Type *type) {
 	GB_ASSERT((is_type_struct(type) || is_type_soa_pointer(type) || is_type_union(type)) && is_type_comparable(type));
+
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
+	i64 size = type_size_of(type);
+
 	lbValue res = {};
-	if (type_size_of(type) == 0) {
+	if (size == 0) {
 		switch (op_kind) {
 		case Token_CmpEq:
 			return lb_const_bool(p->module, t_bool, true);
@@ -2910,8 +2913,23 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 		}
 		GB_PANIC("invalid operator");
 	}
+
 	TEMPORARY_ALLOCATOR_GUARD();
+
 	if (is_type_simple_compare(type)) {
+		// if (size <= 8) {
+		// 	LLVMTypeRef int_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(size*8));
+		// 	LLVMValueRef l = OdinLLVMBuildLoad(p, int_type, LLVMBuildPointerCast(p->builder, left_ptr.value,  LLVMPointerType(int_type, 0), ""));
+		// 	LLVMValueRef r = OdinLLVMBuildLoad(p, int_type, LLVMBuildPointerCast(p->builder, right_ptr.value, LLVMPointerType(int_type, 0), ""));
+
+		// 	LLVMIntPredicate pred = (op_kind == Token_CmpEq) ? LLVMIntEQ : LLVMIntNE;
+		// 	LLVMValueRef cmp = LLVMBuildICmp(p->builder, pred, l, r, "");
+
+		// 	res.value = cmp;
+		// 	res.type = t_bool;
+		// 	return res;
+		// }
+
 		// TODO(bill): Test to see if this is actually faster!!!!
 		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
@@ -2925,6 +2943,7 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
 		res = lb_emit_call(p, value, args);
 	}
+
 	if (op_kind == Token_NotEq) {
 		res = lb_emit_unary_arith(p, Token_Not, res, res.type);
 	}

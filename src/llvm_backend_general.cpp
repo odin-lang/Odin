@@ -709,6 +709,33 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 		return;
 	}
 
+	if (LLVMIsConstant(index.value) && LLVMIsConstant(len.value)) {
+		i64 i = LLVMConstIntGetSExtValue(index.value);
+		i64 n = LLVMConstIntGetSExtValue(len.value);
+		if (0<= i && i < n) {
+			return;
+		}
+	}
+
+	if (LLVMIsAInstruction(index.value)) {
+		LLVMOpcode op = LLVMGetInstructionOpcode(index.value);
+		if (op == LLVMURem) {
+			LLVMValueRef divisor = LLVMGetOperand(index.value, 1);
+			if (divisor == len.value) {
+				return;
+			}
+		} else if (op == LLVMAnd) {
+			LLVMValueRef mask = LLVMGetOperand(index.value, 1);
+			if (LLVMIsConstant(mask) && LLVMIsConstant(len.value)) {
+				i64 m = LLVMConstIntGetSExtValue(mask);
+				i64 l = LLVMConstIntGetSExtValue(len.value);
+				if (l > 0 && (l & (l-1)) == 0 && m == l-1) {
+					return;
+				}
+			}
+		}
+	}
+
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	index = lb_emit_conv(p, index, t_int);
@@ -3567,7 +3594,30 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 }
 
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init) {
+#if 0
 	return lb_add_local(p, type, nullptr, zero_init);
+#else
+	LLVMTypeRef llvm_type = lb_type(p->module, type);
+
+	unsigned alignment = cast(unsigned)gb_max(type_align_of(type), lb_alignof(llvm_type));
+	if (is_type_matrix(type)) {
+		alignment *= 2; // NOTE(bill): Just in case
+	}
+
+	// This positions in the entry block, emits alloca, then restores position.
+	LLVMValueRef ptr = llvm_alloca(p, llvm_type, alignment, "");
+
+	if (zero_init) {
+		// Emit the zero-init store at the current position (not entry block)
+		// so it respects control flow. But the alloca itself is in entry.
+		lb_mem_zero_ptr(p, ptr, type, alignment);
+	}
+
+	lbValue val = {};
+	val.value = ptr;
+	val.type  = alloc_type_pointer(type);
+	return lb_addr(val);
+#endif
 }
 
 gb_internal lbAddr lb_add_local_generated_temp(lbProcedure *p, Type *type, i64 min_alignment) {
