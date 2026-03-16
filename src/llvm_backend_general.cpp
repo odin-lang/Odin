@@ -701,19 +701,19 @@ gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenP
 	arr[2] = lb_const_int(p->module, t_i32, col);
 }
 
-gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
+gb_internal bool lb_bounds_check_short_circuit(lbProcedure *p, lbValue index, lbValue len) {
 	if (build_context.no_bounds_check) {
-		return;
+		return true;
 	}
 	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
-		return;
+		return true;
 	}
 
 	if (LLVMIsConstant(index.value) && LLVMIsConstant(len.value)) {
 		i64 i = LLVMConstIntGetSExtValue(index.value);
 		i64 n = LLVMConstIntGetSExtValue(len.value);
-		if (0<= i && i < n) {
-			return;
+		if (0 <= i && i < n) {
+			return true;
 		}
 	}
 
@@ -722,7 +722,7 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 		if (op == LLVMURem) {
 			LLVMValueRef divisor = LLVMGetOperand(index.value, 1);
 			if (divisor == len.value) {
-				return;
+				return true;
 			}
 		} else if (op == LLVMAnd) {
 			LLVMValueRef mask = LLVMGetOperand(index.value, 1);
@@ -730,10 +730,17 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 				i64 m = LLVMConstIntGetSExtValue(mask);
 				i64 l = LLVMConstIntGetSExtValue(len.value);
 				if (l > 0 && (l & (l-1)) == 0 && m == l-1) {
-					return;
+					return true;
 				}
 			}
 		}
+	}
+	return false;
+}
+
+gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
+	if (lb_bounds_check_short_circuit(p, index, len)) {
+		return;
 	}
 
 	TEMPORARY_ALLOCATOR_GUARD();
@@ -783,6 +790,15 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 		return;
 	}
 
+	if (LLVMIsConstant(low.value) && LLVMIsConstant(high.value)) {
+		i64 i = LLVMConstIntGetSExtValue(low.value);
+		i64 n = LLVMConstIntGetSExtValue(high.value);
+		if (i < n) {
+			return;
+		}
+	}
+
+
 	low = lb_emit_conv(p, low, t_int);
 	high = lb_emit_conv(p, high, t_int);
 
@@ -795,12 +811,15 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 }
 
 gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
-	if (build_context.no_bounds_check) {
+	if (!lower_value_used && lb_bounds_check_short_circuit(p, high, len)) {
 		return;
 	}
-	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
-		return;
-	}
+	// if (lower_value_used &&
+	//     lb_bounds_check_short_circuit(p, low,  high) &&
+	//     lb_bounds_check_short_circuit(p, low,  len) &&
+	//     lb_bounds_check_short_circuit(p, high, len)) {
+	// 	return;
+	// }
 
 	high = lb_emit_conv(p, high, t_int);
 
