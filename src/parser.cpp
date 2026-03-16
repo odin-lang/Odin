@@ -1476,7 +1476,7 @@ gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_
 
 	CommentGroup *comments = nullptr;
 	if (list.count > 0) {
-		comments = gb_alloc_item(permanent_allocator(), CommentGroup);
+		comments = permanent_alloc_item<CommentGroup>();
 		comments->list = slice_from_array(list);
 		array_add(&f->comments, comments);
 	}
@@ -5151,7 +5151,7 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	}
 
 	if (file_path.string == "\".\"") {
-		syntax_error(import_name, "Cannot cyclicly import packages");
+		// syntax_error(import_name, "Cannot cyclicly import packages");
 	}
 
 	expect_semicolon(f);
@@ -5797,7 +5797,7 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
 	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
 	if (err != ParseFile_None) {
-		auto *node = gb_alloc_item(permanent_allocator(), ParseFileErrorNode);
+		auto *node = permanent_alloc_item<ParseFileErrorNode>();
 		node->err = err;
 
 		MUTEX_GUARD_BLOCK(&wd->parser->file_error_mutex) {
@@ -5817,7 +5817,7 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	f.pos.file_id = cast(i32)(f.index+1);
-	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
+	auto wd = permanent_alloc_item<ParserWorkerData>();
 	wd->parser = p;
 	wd->imported_file = f;
 	thread_pool_add_task(parser_worker_proc, wd);
@@ -5854,7 +5854,7 @@ gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, 
 	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	f.pos.file_id = cast(i32)(f.index+1);
-	auto wd = gb_alloc_item(permanent_allocator(), ForeignFileWorkerData);
+	auto wd = permanent_alloc_item<ForeignFileWorkerData>();
 	wd->parser = p;
 	wd->imported_file = f;
 	wd->foreign_kind = kind;
@@ -5874,7 +5874,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 
 	path = copy_string(permanent_allocator(), path);
 
-	AstPackage *pkg = gb_alloc_item(permanent_allocator(), AstPackage);
+	AstPackage *pkg = permanent_alloc_item<AstPackage>();
 	pkg->kind = kind;
 	pkg->fullpath = path;
 	array_init(&pkg->files, permanent_allocator());
@@ -6880,7 +6880,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	FileInfo    fi  = imported_file.fi;
 	TokenPos    pos = imported_file.pos;
 
-	AstFile *file = gb_alloc_item(permanent_allocator(), AstFile);
+	AstFile *file = permanent_alloc_item<AstFile>();
 	file->pkg = pkg;
 	file->id = cast(i32)(imported_file.index+1);
 	TokenPos err_pos = {0};

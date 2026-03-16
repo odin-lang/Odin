@@ -272,7 +272,7 @@ gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(Checker
 	GB_ASSERT(original_type->kind == Type_Named);
 	mutex_lock(&original_type->Named.gen_types_data_mutex);
 	if (original_type->Named.gen_types_data == nullptr) {
-		GenTypesData *gen_types = gb_alloc_item(permanent_allocator(), GenTypesData);
+		GenTypesData *gen_types = permanent_alloc_item<GenTypesData>();
 		gen_types->types = array_make<Entity *>(heap_allocator());
 		original_type->Named.gen_types_data = gen_types;
 	}
@@ -3303,7 +3303,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		add_type_info_type(ctx, soa_struct);
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
 	} else {
-		SoaTypeWorkerData *wd = gb_alloc_item(permanent_allocator(), SoaTypeWorkerData);
+		SoaTypeWorkerData *wd = permanent_alloc_item<SoaTypeWorkerData>();
 		wd->ctx = *ctx;
 		wd->type = soa_struct;
 		wd->wait_to_finish = true;

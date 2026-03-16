@@ -1707,7 +1707,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	}
 	defer ({
 		if (cache == nullptr) {
-			LoadFileCache *new_cache = gb_alloc_item(permanent_allocator(), LoadFileCache);
+			LoadFileCache *new_cache = permanent_alloc_item<LoadFileCache>();
 			new_cache->path = path;
 			new_cache->data = data;
 			new_cache->file_error = file_error;
@@ -1745,7 +1745,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 			case LoadFileTier_Contents: {
 				isize file_size = cast(isize)gb_file_size(&f);
 				if (file_size > 0) {
-					u8 *ptr = cast(u8 *)gb_alloc(permanent_allocator(), file_size+1);
+					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
 					gb_file_read_at(&f, ptr, file_size, 0);
 					ptr[file_size] = '\0';
 					data.text = ptr;
@@ -1950,7 +1950,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	}
 	defer ({
 		if (cache == nullptr) {
-			LoadDirectoryCache *new_cache = gb_alloc_item(permanent_allocator(), LoadDirectoryCache);
+			LoadDirectoryCache *new_cache = permanent_alloc_item<LoadDirectoryCache>();
 			new_cache->path = path;
 			new_cache->files = file_caches;
 			new_cache->file_error = file_error;
@@ -3605,18 +3605,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(type_str);
 			return false;
 		}
-		gbAllocator a = permanent_allocator();
 
 		Type *tuple = alloc_type_tuple();
 
 		if (is_type_struct(type)) {
 			isize variable_count = type->Struct.fields.count;
-			slice_init(&tuple->Tuple.variables, a, variable_count);
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
 			// NOTE(bill): don't copy the entities, this should be good enough
 			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 		} else if (is_type_array(type)) {
 			isize variable_count = cast(isize)type->Array.count;
-			slice_init(&tuple->Tuple.variables, a, variable_count);
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
 			for (isize i = 0; i < variable_count; i++) {
 				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
 			}

@@ -979,9 +979,7 @@ gb_internal void set_base_type(Type *t, Type *base) {
 
 gb_internal Type *alloc_type(TypeKind kind) {
 	// gbAllocator a = heap_allocator();
-	gbAllocator a = permanent_allocator();
-	Type *t = gb_alloc_item(a, Type);
-	gb_zero_item(t);
+	Type *t = permanent_alloc_item<Type>();
 	t->kind = kind;
 	t->cached_size  = -1;
 	t->cached_align = -1;
@@ -1076,8 +1074,8 @@ gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValu
 	Type *t = alloc_type(Type_EnumeratedArray);
 	t->EnumeratedArray.elem = elem;
 	t->EnumeratedArray.index = index;
-	t->EnumeratedArray.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
-	t->EnumeratedArray.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	t->EnumeratedArray.min_value = permanent_alloc_item<ExactValue>();
+	t->EnumeratedArray.max_value = permanent_alloc_item<ExactValue>();
 	gb_memmove(t->EnumeratedArray.min_value, min_value, gb_size_of(ExactValue));
 	gb_memmove(t->EnumeratedArray.max_value, max_value, gb_size_of(ExactValue));
 	t->EnumeratedArray.op = op;

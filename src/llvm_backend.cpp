@@ -2647,7 +2647,7 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
 			wd->m = m;
 			wd->target_machine = m->target_machine;
 			wd->do_threading = true;
@@ -2658,7 +2658,7 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
 			wd->m = m;
 			wd->target_machine = m->target_machine;
 			wd->do_threading = false;
@@ -2778,7 +2778,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
-			auto *wd = gb_alloc_item(permanent_allocator(), lbLLVMEmitWorker);
+			auto *wd = permanent_alloc_item<lbLLVMEmitWorker>();
 			wd->target_machine = m->target_machine;
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;

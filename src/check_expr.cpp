@@ -499,7 +499,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 	} else {
-		gen_procs = gb_alloc_item(permanent_allocator(), GenProcsData);
+		gen_procs = permanent_alloc_item<GenProcsData>();
 		gen_procs->procs.allocator = heap_allocator();
 		base_entity->Procedure.gen_procs = gen_procs;
 		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
@@ -536,7 +536,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 				DeclInfo *decl = other->decl_info;
 				if (decl->proc_checked_state != ProcCheckedState_Checked) {
-					ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
+					ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
 					proc_info->file  = other->file;
 					proc_info->token = other->token;
 					proc_info->decl  = decl;
@@ -630,7 +630,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		array_add(&gen_procs->procs, entity);
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
-	ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
 	proc_info->file  = file;
 	proc_info->token = token;
 	proc_info->decl  = d;
@@ -7696,7 +7696,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		}
 		named_args = slice(ce->args, positional_args.count, ce->args.count);
 
-		auto split_args = gb_alloc_item(permanent_allocator(), AstSplitArgs);
+		auto split_args = permanent_alloc_item<AstSplitArgs>();
 		split_args->positional = positional_args;
 		split_args->named = named_args;
 		ce->split_args = split_args;

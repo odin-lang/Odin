@@ -99,7 +99,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
-	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
+	lbProcedure *p = permanent_alloc_item<lbProcedure>();
 
 	p->module = m;
 	entity->code_gen_module = m;
@@ -395,7 +395,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 		GB_ASSERT_MSG(found == nullptr, "failed to create dummy procedure for: %.*s", LIT(link_name));
 	}
 
-	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
+	lbProcedure *p = permanent_alloc_item<lbProcedure>();
 
 	p->module = m;
 	p->name = link_name;

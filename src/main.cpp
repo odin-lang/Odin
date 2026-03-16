@@ -4012,8 +4012,8 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
-	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
+	Parser * parser  = permanent_alloc_item<Parser>();
+	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
 
 	MAIN_TIME_SECTION("parse files");
@@ -4151,7 +4151,7 @@ int main(int arg_count, char const **arg_ptr) {
 	} else
 #endif
 	{
-		lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+		lbGenerator *gen = permanent_alloc_item<lbGenerator>();
 		if (!lb_init_generator(gen, checker)) {
 			return 1;
 		}

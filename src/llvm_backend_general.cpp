@@ -166,7 +166,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		bool module_per_file = build_context.module_per_file && (build_context.optimization_level <= 0 || build_context.lto_kind != LTO_None);
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
-			auto m = gb_alloc_item(permanent_allocator(), lbModule);
+			auto m = permanent_alloc_item<lbModule>();
 			m->pkg = pkg;
 			m->gen = gen;
 			m->checker = c;
@@ -174,7 +174,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			lb_init_module(m, do_threading);
 
 			if (LLVM_WEAK_MONOMORPHIZATION) {
-				auto pm = gb_alloc_item(permanent_allocator(), lbModule);
+				auto pm = permanent_alloc_item<lbModule>();
 				pm->pkg = pkg;
 				pm->gen = gen;
 				pm->checker = c;
@@ -216,7 +216,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			}
 			// NOTE(bill): Probably per file is not a good idea, so leave this for later
 			for (AstFile *file : pkg->files) {
-				auto m  = gb_alloc_item(permanent_allocator(), lbModule);
+				auto m  = permanent_alloc_item<lbModule>();
 				m->file = file;
 				m->pkg  = pkg;
 				m->gen  = gen;
@@ -226,7 +226,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 
 				if (LLVM_WEAK_MONOMORPHIZATION) {
-					auto pm  = gb_alloc_item(permanent_allocator(), lbModule);
+					auto pm  = permanent_alloc_item<lbModule>();
 					pm->file = file;
 					pm->pkg  = pkg;
 					pm->gen  = gen;
@@ -242,7 +242,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		}
 
 		if (LLVM_WEAK_MONOMORPHIZATION) {
-			lbModule *m = gb_alloc_item(permanent_allocator(), lbModule);
+			lbModule *m = permanent_alloc_item<lbModule>();
 			gen->equal_module = m;
 			m->gen            = gen;
 			m->checker        = c;
@@ -2728,7 +2728,7 @@ gb_internal void lb_add_edge(lbBlock *from, lbBlock *to) {
 
 
 gb_internal lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append) {
-	lbBlock *b = gb_alloc_item(permanent_allocator(), lbBlock);
+	lbBlock *b = permanent_alloc_item<lbBlock>();
 	b->block = LLVMCreateBasicBlockInContext(p->module->ctx, name);
 	b->appended = false;
 	if (append) {

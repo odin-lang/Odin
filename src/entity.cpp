@@ -151,8 +151,8 @@ struct TypeNameObjCMetadata {
 };
 
 gb_internal TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
-	TypeNameObjCMetadata *md = gb_alloc_item(permanent_allocator(), TypeNameObjCMetadata);
-	md->mutex = gb_alloc_item(permanent_allocator(), BlockingMutex);
+	TypeNameObjCMetadata *md = permanent_alloc_item<TypeNameObjCMetadata>();
+	md->mutex = permanent_alloc_item<BlockingMutex>();
 	array_init(&md->type_entries,  heap_allocator());
 	array_init(&md->value_entries, heap_allocator());
 	return md;
@@ -345,8 +345,7 @@ gb_internal bool entity_has_deferred_procedure(Entity *e) {
 gb_global std::atomic<u64> global_entity_id;
 
 gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
-	gbAllocator a = permanent_allocator();
-	Entity *entity = gb_alloc_item(a, Entity);
+	Entity *entity = permanent_alloc_item<Entity>();
 	entity->kind   = kind;
 	entity->state  = EntityState_Unresolved;
 	entity->scope  = scope;

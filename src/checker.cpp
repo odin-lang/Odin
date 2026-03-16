@@ -123,7 +123,7 @@ gb_internal void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNod
 // }
 
 gb_internal ImportGraphNode *import_graph_node_create(gbAllocator a, AstPackage *pkg) {
-	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
+	ImportGraphNode *n = permanent_alloc_item<ImportGraphNode>();
 	n->pkg = pkg;
 	n->scope = pkg->scope;
 	return n;
@@ -163,7 +163,6 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 
 
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
-	gb_zero_item(d);
 	if (parent) {
 		mutex_lock(&parent->next_mutex);
 		d->next_sibling = parent->next_child;
@@ -181,7 +180,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
-	DeclInfo *d = gb_alloc_item(permanent_allocator(), DeclInfo);
+	DeclInfo *d = permanent_alloc_item<DeclInfo>();
 	init_decl_info(d, scope, parent);
 	return d;
 }
@@ -214,7 +213,7 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 
 
 gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
-	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
+	Scope *s = permanent_alloc_item<Scope>();
 	s->parent = parent;
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -1018,7 +1017,7 @@ gb_internal void add_global_type_entity(String name, Type *type) {
 
 gb_internal AstPackage *create_builtin_package(char const *name) {
 	gbAllocator a = permanent_allocator();
-	AstPackage *pkg = gb_alloc_item(a, AstPackage);
+	AstPackage *pkg = permanent_alloc_item<AstPackage>();
 	pkg->name = make_string_c(name);
 	pkg->kind = Package_Builtin;
 
@@ -2412,7 +2411,7 @@ gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 }
 
 gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
-	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	ProcInfo *info = permanent_alloc_item<ProcInfo>();
 	info->file  = file;
 	info->token = token;
 	info->decl  = decl;
@@ -3259,7 +3258,7 @@ gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String 
 }
 
 gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator) {
-	auto *tp = gb_alloc_item(allocator, CheckerTypePath);
+	auto *tp = gb_alloc_item(heap_allocator(), CheckerTypePath);
 	array_init(tp, allocator, 0, 16);
 	return tp;
 }
@@ -5016,7 +5015,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 }
 
 gb_internal CheckerContext *create_checker_context(Checker *c) {
-	CheckerContext *ctx = gb_alloc_item(permanent_allocator(), CheckerContext);
+	CheckerContext *ctx = permanent_alloc_item<CheckerContext>();
 	init_checker_context(ctx, c);
 	return ctx;
 }
@@ -6228,7 +6227,7 @@ gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char c
 
 	GB_ASSERT(e->decl_info != nullptr);
 
-	ProcInfo *pi = gb_alloc_item(permanent_allocator(), ProcInfo);
+	ProcInfo *pi = permanent_alloc_item<ProcInfo>();
 	pi->file  = e->file;
 	pi->token = e->token;
 	pi->decl  = e->decl_info;

@@ -260,7 +260,7 @@ gb_internal lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
 }
 
 gb_internal lbTargetList *lb_push_target_list(lbProcedure *p, Ast *label, lbBlock *break_, lbBlock *continue_, lbBlock *fallthrough_) {
-	lbTargetList *tl = gb_alloc_item(permanent_allocator(), lbTargetList);
+	lbTargetList *tl = permanent_alloc_item<lbTargetList>();
 	tl->prev = p->target_list;
 	tl->break_ = break_;
 	tl->continue_ = continue_;
