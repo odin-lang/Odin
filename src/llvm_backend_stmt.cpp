@@ -1706,6 +1706,19 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 				break;
 			}
 
+			case Type_FixedCapacityDynamicArray: {
+				lbValue array = lb_build_expr(p, expr);
+				if (!is_type_pointer(array.type)) {
+					array = lb_address_from_load_or_generate_local(p, array);
+				}
+				GB_ASSERT(is_type_pointer(array.type));
+
+				count_ptr = lb_emit_struct_ep(p, array, 1);
+
+				data_ptr = lb_emit_conv(p, array, alloc_type_pointer(t->FixedCapacityDynamicArray.elem));
+				break;
+			}
+
 			case Type_Array: {
 				lbValue array = lb_build_expr(p, expr);
 				count_ptr = lb_add_local_generated(p, t_int, false).addr;

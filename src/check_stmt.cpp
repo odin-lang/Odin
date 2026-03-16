@@ -1018,15 +1018,28 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 					inline_for_depth = exact_value_i64(unroll_count);
 				}
 				break;
+			case Type_FixedCapacityDynamicArray:
+				if (unroll_count > 0) {
+					val0 = t->FixedCapacityDynamicArray.elem;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(unroll_count);
+				}
+				break;
 			}
 		}
 
 		if (val0 == nullptr) {
+			ERROR_BLOCK();
 			gbString s = expr_to_string(operand.expr);
 			gbString t = type_to_string(operand.type);
+			defer (gb_string_free(s));
+			defer (gb_string_free(t));
 			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
-			gb_string_free(t);
-			gb_string_free(s);
+
+			if (is_type_slice(operand.type) || is_type_dynamic_array(operand.type) || is_type_fixed_capacity_dynamic_array(operand.type)) {
+				error_line("\tSuggestion: An unroll count `#unroll(N)` must be specified with an array of a runtime-known length\n");
+			}
+
 		} else if (operand.mode != Addressing_Constant && (
 				unroll_count <= 0 &&
 				compare_exact_values(Token_CmpEq, inline_for_depth, exact_value_i64(0)))) {
