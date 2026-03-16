@@ -790,10 +790,11 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 
 		for (auto const &entry : scope->elements) {
 			String name = entry.key;
+			u32 hash = entry.hash;
 			Entity *decl = entry.value;
 			if (!is_entity_exported(decl, true)) continue;
 
-			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
+			Entity *found = scope_insert_with_name(ctx->scope, name, hash, decl);
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,

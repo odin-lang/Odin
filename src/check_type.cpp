@@ -117,6 +117,10 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 		}
 	}
 
+	// Allocate all at once
+	Entity *entities_to_use = permanent_alloc_array<Entity>(variable_count);
+	isize entities_to_use_index = 0;
+
 	i32 field_src_index = 0;
 	i32 field_group_index = -1;
 	for_array(i, params) {
@@ -165,7 +169,14 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			}
 			Token name_token = name->Ident.token;
 
-			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
+			// Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
+			Entity *field = &entities_to_use[entities_to_use_index++];
+			INTERNAL_ENTITY_INIT(field, Entity_Variable, ctx->scope, name_token, type);
+			field->state = EntityState_Unresolved;
+			field->flags |= EntityFlag_Field;
+			if (is_using) field->flags |= EntityFlag_Using;
+			field->Variable.field_index = field_src_index;
+
 			add_entity(ctx, ctx->scope, name, field);
 			field->Variable.field_group_index = field_group_index;
 			if (is_subtype) {
@@ -636,7 +647,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 
 	isize min_field_count = 0;
 	for_array(field_index, st->fields) {
-	Ast *field = st->fields[field_index];
+		Ast *field = st->fields[field_index];
 		switch (field->kind) {
 		case_ast_node(f, ValueDecl, field);
 			min_field_count += f->names.count;
@@ -887,6 +898,10 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 
 	scope_reserve(ctx->scope, et->fields.count);
 
+	// Allocate all at once
+	Entity *entities_to_use = permanent_alloc_array<Entity>(et->fields.count);
+	isize entities_to_use_index = 0;
+
 	for_array(i, et->fields) {
 		Ast *field = et->fields[i];
 		Ast *ident = nullptr;
@@ -931,9 +946,6 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		// NOTE(bill): Skip blank identifiers
 		if (is_blank_ident(name)) {
 			continue;
-		} else if (name == "names") {
-			error(field, "'names' is a reserved identifier for enumerations");
-			continue;
 		}
 
 		if (min_value_set) {
@@ -957,7 +969,11 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 			max_value_set = true;
 		}
 
-		Entity *e = alloc_entity_constant(ctx->scope, ident->Ident.token, constant_type, iota);
+		// Entity *e = alloc_entity_constant(ctx->scope, ident->Ident.token, constant_type, iota);
+		Entity *e = &entities_to_use[entities_to_use_index++];
+		Token token = ident->Ident.token;
+		INTERNAL_ENTITY_INIT(e, Entity_Constant, ctx->scope, token, constant_type);
+		e->Constant.value = iota;
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
@@ -3205,7 +3221,7 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 
-		string_map_init(&scope->elements, 8);
+		scope_map_init(&scope->elements);
 
 		String params_xyzw[4] = {
 			str_lit("x"),

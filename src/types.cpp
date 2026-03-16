@@ -3617,7 +3617,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	return empty_selection;
 }
 
-gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
+gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash=0);
 gb_internal bool has_type_got_objc_class_attribute(Type *t);
 
 gb_internal Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident) {

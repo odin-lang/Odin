@@ -170,8 +170,9 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// Therefore two things can be done: the type can be assigned to state that it
 	// has been "evaluated" and the variant data can be copied across
 
+	u32 hash = string_hash(original_name);
 	rw_mutex_lock(&found_scope->mutex);
-	string_map_set(&found_scope->elements, original_name, new_entity);
+	scope_map_insert(&found_scope->elements, original_name, hash, new_entity);
 	rw_mutex_unlock(&found_scope->mutex);
 
 	original_entity->flags |= EntityFlag_Overridden;

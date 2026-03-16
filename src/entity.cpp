@@ -344,17 +344,23 @@ gb_internal bool entity_has_deferred_procedure(Entity *e) {
 
 gb_global std::atomic<u64> global_entity_id;
 
+// NOTE(bill): This exists to allow for bulk allocations of entities all at once to improve performance for type generation
+#define INTERNAL_ENTITY_INIT(entity, kind_, scope_, token_, type_) do {                  \
+	(entity)->kind   = (kind_);                                                      \
+	(entity)->state  = EntityState_Unresolved;                                       \
+	(entity)->scope  = (scope_);                                                     \
+	(entity)->token  = (token_);                                                     \
+	(entity)->type   = (type_);                                                      \
+	(entity)->id     = 1 + global_entity_id.fetch_add(1);                            \
+	if ((token_).pos.file_id) {                                                      \
+		entity->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
+	}                                                                                \
+} while (0)
+
+
 gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
 	Entity *entity = permanent_alloc_item<Entity>();
-	entity->kind   = kind;
-	entity->state  = EntityState_Unresolved;
-	entity->scope  = scope;
-	entity->token  = token;
-	entity->type   = type;
-	entity->id     = 1 + global_entity_id.fetch_add(1);
-	if (token.pos.file_id) {
-		entity->file = thread_unsafe_get_ast_file_from_id(token.pos.file_id);
-	}
+	INTERNAL_ENTITY_INIT(entity, kind, scope, token, type);
 	return entity;
 }
 
@@ -411,11 +417,10 @@ gb_internal Entity *alloc_entity_const_param(Scope *scope, Token token, Type *ty
 
 
 gb_internal Entity *alloc_entity_field(Scope *scope, Token token, Type *type, bool is_using, i32 field_index, EntityState state = EntityState_Unresolved) {
-	Entity *entity = alloc_entity_variable(scope, token, type);
+	Entity *entity = alloc_entity_variable(scope, token, type, state);
 	entity->Variable.field_index = field_index;
 	if (is_using) entity->flags |= EntityFlag_Using;
 	entity->flags |= EntityFlag_Field;
-	entity->state = state;
 	return entity;
 }
 
