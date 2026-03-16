@@ -272,15 +272,16 @@ enum { DEFAULT_SCOPE_CAPACITY = 32 };
 struct ScopeMapSlot {
 	u32     hash;
 	u32     _pad;
-	String  key;
 	Entity *value;
 };
 
 enum { SCOPE_MAP_INLINE_CAP = 16 };
 
 struct ScopeMap {
-	ScopeMapSlot inline_slots[SCOPE_MAP_INLINE_CAP];
+	ScopeMapSlot  inline_slots[SCOPE_MAP_INLINE_CAP];
+	String        inline_keys[SCOPE_MAP_INLINE_CAP];
 	ScopeMapSlot *slots;
+	String *      keys;
 	u32           count;
 	u32           cap;
 };
@@ -292,11 +293,12 @@ gb_internal gb_inline u32 scope_map_max_load(u32 cap) {
 gb_internal gb_inline void scope_map_init(ScopeMap *m) {
 	m->cap = SCOPE_MAP_INLINE_CAP;
 	m->slots = m->inline_slots;
+	m->keys = m->inline_keys;
 }
 
 
 gb_internal Entity *scope_map_insert_for_rehash(
-	ScopeMapSlot *slots, u32 mask,
+	String *keys, ScopeMapSlot *slots, u32 mask,
 	String key, u32 hash, Entity *value) {
 	u32 pos = hash & mask;
 	u32 dist = 0;
@@ -305,22 +307,22 @@ gb_internal Entity *scope_map_insert_for_rehash(
 		ScopeMapSlot *s = &slots[pos];
 
 		if (s->hash == 0) {
-			s->key   = key;
-			s->hash  = hash;
-			s->value = value;
+			keys[pos] = key;
+			s->hash   = hash;
+			s->value  = value;
 			return nullptr;
 		}
 
 		u32 existing_dist = (pos - s->hash) & mask;
 
 		if (dist > existing_dist) {
-			String  tmp_key   = s->key;
+			String  tmp_key   = keys[pos];
 			u32     tmp_hash  = s->hash;
 			Entity *tmp_value = s->value;
 
-			s->key   = key;
-			s->hash  = hash;
-			s->value = value;
+			keys[pos] = key;
+			s->hash   = hash;
+			s->value  = value;
 
 			hash  = tmp_hash;
 			value = tmp_value;
@@ -333,23 +335,38 @@ gb_internal Entity *scope_map_insert_for_rehash(
 	}
 }
 
+gb_internal gb_inline void scope_map_allocate_entries(u32 cap, String **keys, ScopeMapSlot **slots) {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	isize size = (gb_size_of(String) + gb_size_of(ScopeMapSlot)) * cap;
+	u8 *data = cast(u8 *)arena_alloc(arena, size, 8);
+
+	*keys  = cast(String *)data;
+	*slots = cast(ScopeMapSlot *)(*keys + cap);
+
+	// *keys  = permanent_alloc_array<String>(cap);
+	// *slots = permanent_alloc_array<ScopeMapSlot>(cap);
+}
+
 
 gb_internal void scope_map_grow(ScopeMap *m) {
 	u32 new_cap = m->cap << 1;
 	u32 new_mask = new_cap - 1;
 
-	ScopeMapSlot *new_slots = permanent_alloc_array<ScopeMapSlot>(new_cap);
+	String *      new_keys;
+	ScopeMapSlot *new_slots;
+	scope_map_allocate_entries(new_cap, &new_keys, &new_slots);
 
 	if (m->count > 0) {
 		for (u32 i = 0; i < m->cap; i++) {
 			if (m->slots[i].hash) {
-				scope_map_insert_for_rehash(new_slots, new_mask,
-				                            m->slots[i].key, m->slots[i].hash, m->slots[i].value);
+				scope_map_insert_for_rehash(new_keys, new_slots, new_mask,
+				                            m->keys[i], m->slots[i].hash, m->slots[i].value);
 			}
 		}
 	}
 
 	m->slots = new_slots;
+	m->keys  = new_keys;
 	m->cap   = new_cap;
 }
 
@@ -359,7 +376,7 @@ gb_internal void scope_map_reserve(ScopeMap *m, isize capacity) {
 	}
 	u32 new_cap = next_pow2_u32(cast(u32)capacity);
 	if (m->cap < new_cap && new_cap > SCOPE_MAP_INLINE_CAP) {
-		m->slots = permanent_alloc_array<ScopeMapSlot>(new_cap);
+		scope_map_allocate_entries(new_cap, &m->keys, &m->slots);
 		m->cap   = new_cap;
 	}
 }
@@ -382,14 +399,14 @@ gb_internal Entity *scope_map_insert(ScopeMap *m, String key, u32 hash, Entity *
 		ScopeMapSlot *s = &m->slots[pos];
 
 		if (s->hash == 0) {
-			s->key   = key;
+			m->keys[pos] = key;
 			s->hash  = hash;
 			s->value = value;
 			m->count += 1;
 			return nullptr;
 		}
 
-		if (s->hash == hash && s->key == key) {
+		if (s->hash == hash && m->keys[pos] == key) {
 			Entity *old = s->value;
 			s->value = value;
 			return old;
@@ -398,13 +415,13 @@ gb_internal Entity *scope_map_insert(ScopeMap *m, String key, u32 hash, Entity *
 		u32 existing_dist = (pos - s->hash) & mask;
 
 		if (dist > existing_dist) {
-			String  tmp_key   = s->key;
+			String  tmp_key   = m->keys[pos];
 			u32     tmp_hash  = s->hash;
 			Entity *tmp_value = s->value;
 
-			s->key   = key;
-			s->hash  = hash;
-			s->value = value;
+			m->keys[pos] = key;
+			s->hash      = hash;
+			s->value     = value;
 
 			key   = tmp_key;
 			hash  = tmp_hash;
@@ -423,15 +440,16 @@ gb_internal Entity *scope_map_get(ScopeMap *m, String key, u32 hash) {
 	u32 dist = 0;
 	for (;;) {
 		ScopeMapSlot *s = &m->slots[pos];
-		if (s->hash == 0) {
+		u32 curr_hash = s->hash;
+		if (curr_hash == 0) {
 			return nullptr;
 		}
 
-		u32 existing_dist = (pos - s->hash) & mask;
+		u32 existing_dist = (pos - curr_hash) & mask;
 		if (dist > existing_dist) {
 			return nullptr;
 		}
-		if (s->hash == hash && s->key == key) {
+		if (curr_hash == hash && m->keys[pos] == key) {
 			return s->value;
 		}
 

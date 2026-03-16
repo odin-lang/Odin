@@ -1050,7 +1050,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	defer (array_free(&entries));
 
 	for (auto const &element : pkg->scope->elements) {
-		String name = element.key;
+		String name = pkg->scope->elements.keys[element.hash & (pkg->scope->elements.cap-1)];
 		Entity *e = element.value;
 		switch (e->kind) {
 		case Entity_Invalid:
