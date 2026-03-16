@@ -928,6 +928,7 @@ non_zero_append :: proc{
 	non_zero_append_elem_string,
 
 	append_fixed_capacity_elem,
+	append_fixed_capacity_elems,
 	non_zero_append_elem_fixed_capacity_string,
 
 	non_zero_append_soa_elem,
