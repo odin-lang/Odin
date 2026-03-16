@@ -11,13 +11,21 @@ Command-Line Syntax:
 Arguments are treated differently depending on how they're formatted.
 The format is similar to the Odin binary's way of handling compiler flags.
 
-	type                  handling
-	------------          ------------------------
-	<positional>          depends on struct layout
-	-<flag>               set a bool true
-	-<flag:option>        set flag to option
-	-<flag=option>        set flag to option, alternative syntax
-	-<map>:<key>=<value>  set map[key] to value
+	type                    handling
+	------------            ------------------------
+	<positional>            depends on struct layout
+	-<flag>                 set a bool true
+	-<flag:option>          set flag to option
+	-<flag=option>          set flag to option, alternative syntax
+	-<flag:option1,opt...>  set bit_set flag to one or more options
+	-<flag=option1,opt...>  set bit_set flag to one or more options, alternative syntax
+	-<map>:<key>=<value>    set map[key] to value
+
+Underscores (`_`) in a flag will be replaced with dashes (`-`).
+
+Bit sets may be set with a strictly comma-separated list of options.
+
+Bit sets may also be set with a binary string of 0's and 1's, and will be parsed from left to right, from least significant bit to most significant bit. Underscores are allowed and will be ignored. However, starting with an underscore is disallowed.
 
 
 Unhandled Arguments:
