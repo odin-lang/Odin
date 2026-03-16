@@ -44,7 +44,8 @@ Context_256 :: struct {
 	length:    u64,
 	md_bits:   int,
 
-	is_initialized: bool,
+	is_hw_accelerated: bool,
+	is_initialized:    bool,
 }
 
 // Context_512 is a SHA-384, SHA-512 or SHA-512/256 instance.
@@ -55,7 +56,8 @@ Context_512 :: struct {
 	length:    u64,
 	md_bits:   int,
 
-	is_initialized: bool,
+	is_hw_accelerated: bool,
+	is_initialized:    bool,
 }
 
 // init_224 initializes a Context_256 for SHA-224.
@@ -89,6 +91,9 @@ init_512_256 :: proc(ctx: ^Context_512) {
 }
 
 @(private)
+ERR_HW_NOT_SUPPORTED :: "crypto/sha2: hardware implementation unsupported"
+
+@(private)
 _init :: proc(ctx: ^$T) {
 	when T == Context_256 {
 		switch ctx.md_bits {
@@ -113,6 +118,8 @@ _init :: proc(ctx: ^$T) {
 		case:
 			panic("crypto/sha2: invalid digest output length")
 		}
+
+		ctx.is_hw_accelerated = is_hardware_accelerated_256()
 	} else when T == Context_512 {
 		switch ctx.md_bits {
 		case 256:
@@ -148,6 +155,8 @@ _init :: proc(ctx: ^$T) {
 		case:
 			panic("crypto/sha2: invalid digest output length")
 		}
+
+		ctx.is_hw_accelerated = is_hardware_accelerated_512()
 	}
 
 	ctx.length = 0
@@ -399,7 +408,7 @@ SHA512_F4 :: #force_inline proc "contextless" (x: u64) -> u64 {
 @(private)
 sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) #no_bounds_check {
 	when T == Context_256 {
-		if is_hardware_accelerated_256() {
+		if ctx.is_hw_accelerated {
 			sha256_transf_hw(ctx, data)
 			return
 		}
@@ -410,6 +419,11 @@ sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) #no_bounds_check {
 
 		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
 	} else when T == Context_512 {
+		if ctx.is_hw_accelerated {
+			sha512_transf_hw(ctx, data)
+			return
+		}
+
 		w: [SHA512_ROUNDS]u64
 		wv: [8]u64
 		t1, t2: u64
