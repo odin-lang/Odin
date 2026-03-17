@@ -5492,6 +5492,10 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 			return e;
 		}
 	} else */if (node->kind == Ast_Ident) {
+		Entity *e = node->Ident.entity.load();
+		if (e != nullptr) {
+			return e;
+		}
 		String name = node->Ident.token.string;
 		return scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
