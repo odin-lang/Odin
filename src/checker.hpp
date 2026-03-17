@@ -278,10 +278,10 @@ struct ScopeMapSlot {
 enum { SCOPE_MAP_INLINE_CAP = 16 };
 
 struct ScopeMap {
+	String        inline_keys [SCOPE_MAP_INLINE_CAP];
 	ScopeMapSlot  inline_slots[SCOPE_MAP_INLINE_CAP];
-	String        inline_keys[SCOPE_MAP_INLINE_CAP];
-	ScopeMapSlot *slots;
 	String *      keys;
+	ScopeMapSlot *slots;
 	u32           count;
 	u32           cap;
 };

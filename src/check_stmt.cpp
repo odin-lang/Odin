@@ -789,10 +789,10 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		defer (rw_mutex_unlock(&scope->mutex));
 
 		for (auto const &entry : scope->elements) {
-			String name = scope->elements.keys[entry.hash & (scope->elements.cap-1)];
-			u32 hash = entry.hash;
 			Entity *decl = entry.value;
 			if (!is_entity_exported(decl, true)) continue;
+			String name = scope->elements.keys[entry.hash & (scope->elements.cap-1)];
+			u32 hash = entry.hash;
 
 			Entity *found = scope_insert_with_name(ctx->scope, name, hash, decl);
 			if (found != nullptr) {

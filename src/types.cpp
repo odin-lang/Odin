@@ -978,7 +978,6 @@ gb_internal void set_base_type(Type *t, Type *base) {
 
 
 gb_internal Type *alloc_type(TypeKind kind) {
-	// gbAllocator a = heap_allocator();
 	Type *t = permanent_alloc_item<Type>();
 	t->kind = kind;
 	t->cached_size  = -1;
@@ -1139,8 +1138,8 @@ gb_internal Type *alloc_type_union() {
 
 gb_internal Type *alloc_type_enum() {
 	Type *t = alloc_type(Type_Enum);
-	t->Enum.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
-	t->Enum.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	t->Enum.min_value = permanent_alloc_item<ExactValue>();
+	t->Enum.max_value = permanent_alloc_item<ExactValue>();
 	return t;
 }
 
@@ -3049,6 +3048,10 @@ gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
 		return false;
 	}
 
+	if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
+		return false;
+	}
+
 	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, true);
 }
@@ -3060,6 +3063,10 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 	}
 
 	if (!x | !y) {
+		return false;
+	}
+
+	if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
 		return false;
 	}
 
