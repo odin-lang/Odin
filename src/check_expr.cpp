@@ -1090,18 +1090,20 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		return;
 	}
 
-	// Grab definite or indefinite article matching `context_name`, or "" if not found.
-	String article = error_article(context_name);
 
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == nullptr || is_type_any(type)) {
 			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
+				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
+
 				error(operand->expr, "Use of --- in %.*s%.*s", LIT(article), LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
 			if (type == nullptr && is_type_untyped_nil(operand->type)) {
+				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
+
 				error(operand->expr, "Use of untyped nil in %.*s%.*s", LIT(article), LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
@@ -1159,6 +1161,8 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 			defer (gb_string_free(op_type_str));
 			defer (gb_string_free(expr_str));
 
+			String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
+
 			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
 			      "Cannot assign overloaded procedure group '%s' to '%s' in %.*s%.*s",
@@ -1186,6 +1190,8 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		defer (gb_string_free(type_str));
 		defer (gb_string_free(op_type_str));
 		defer (gb_string_free(expr_str));
+
+		String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
 
 		switch (operand->mode) {
 		case Addressing_Builtin:
