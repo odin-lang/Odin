@@ -3406,7 +3406,7 @@ gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *
 
 gb_internal lbValue lb_find_runtime_value(lbModule *m, String const &name) {
 	AstPackage *p = m->info->runtime_package;
-	Entity *e = scope_lookup_current(p->scope, name);
+	Entity *e = scope_lookup_current(p->scope, string_interner_insert(name));
 	return lb_find_value_from_entity(m, e);
 }
 gb_internal lbValue lb_find_package_value(lbModule *m, String const &pkg, String const &name) {

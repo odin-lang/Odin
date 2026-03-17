@@ -1819,11 +1819,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				for (isize i = 0; i < elem_count; i++) {
 					ast_node(fv, FieldValue, cl->elems[i]);
 					String name = fv->field->Ident.token.string;
+					InternedString interned = fv->field->Ident.interned;
 
 					TypeAndValue tav = fv->value->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
 
-					Selection sel = lookup_field(type, name, false);
+					Selection sel = lookup_field(type, interned, false);
 					GB_ASSERT(!sel.indirect);
 
 					Entity *f = type->Struct.fields[sel.index[0]];

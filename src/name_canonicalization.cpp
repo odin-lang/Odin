@@ -559,6 +559,8 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			// no prefix
 			return;
 		}
+		InternedString interned = entity_interned_name(e);
+
 		if (e->parent_proc_decl.load(std::memory_order_relaxed)) {
 			Entity *p = e->parent_proc_decl.load(std::memory_order_relaxed)->entity;
 			write_canonical_parent_prefix(w, p);
@@ -569,7 +571,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			}
 			type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
-		} else if (e->pkg && (scope_lookup_current(e->pkg->scope, e->token.string) == e)) {
+		} else if (e->pkg && (scope_lookup_current(e->pkg->scope, interned) == e)) {
 			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
 				type_writer_appendc(w, "$");

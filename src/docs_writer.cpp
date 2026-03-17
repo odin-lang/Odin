@@ -1050,7 +1050,8 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	defer (array_free(&entries));
 
 	for (auto const &element : pkg->scope->elements) {
-		String name = pkg->scope->elements.keys[element.hash & (pkg->scope->elements.cap-1)];
+		u32 hash = element.hash;
+		auto interned = pkg->scope->elements.keys[hash & (pkg->scope->elements.cap-1)];
 		Entity *e = element.value;
 		switch (e->kind) {
 		case Entity_Invalid:
@@ -1079,7 +1080,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 		}
 
 		OdinDocScopeEntry entry = {};
-		entry.name = odin_doc_write_string(w, name);
+		entry.name = odin_doc_write_string(w, interned.string());
 		entry.entity = odin_doc_add_entity(w, e);
 		array_add(&entries, entry);
 	}

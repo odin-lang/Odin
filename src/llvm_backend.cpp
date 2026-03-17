@@ -2946,7 +2946,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 			AstPackage *pkg = get_runtime_package(m->info);
 
 			String name = str_lit("exit");
-			Entity *e = scope_lookup_current(pkg->scope, name);
+			Entity *e = scope_lookup_current(pkg->scope, string_interner_insert(name));
 			if (e == nullptr) {
 				compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg->name), LIT(name));
 			}

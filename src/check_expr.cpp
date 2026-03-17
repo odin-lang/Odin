@@ -183,11 +183,11 @@ gb_internal void populate_check_did_you_mean_objc_entity(StringSet *set, Entity 
 
 	if (is_type) {
 		for (auto const &entry : objc_metadata->type_entries) {
-			string_set_add(set, entry.name);
+			string_set_add(set, entry.interned.string());
 		}
 	} else {
 		for (auto const &entry : objc_metadata->value_entries) {
-			string_set_add(set, entry.name);
+			string_set_add(set, entry.interned.string());
 		}
 	}
 
@@ -1090,18 +1090,20 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		return;
 	}
 
-	// Grab definite or indefinite article matching `context_name`, or "" if not found.
-	String article = error_article(context_name);
 
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == nullptr || is_type_any(type)) {
 			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
+				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
+
 				error(operand->expr, "Use of --- in %.*s%.*s", LIT(article), LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
 			if (type == nullptr && is_type_untyped_nil(operand->type)) {
+				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
+
 				error(operand->expr, "Use of untyped nil in %.*s%.*s", LIT(article), LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
@@ -1159,6 +1161,8 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 			defer (gb_string_free(op_type_str));
 			defer (gb_string_free(expr_str));
 
+			String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
+
 			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
 			      "Cannot assign overloaded procedure group '%s' to '%s' in %.*s%.*s",
@@ -1186,6 +1190,8 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		defer (gb_string_free(type_str));
 		defer (gb_string_free(op_type_str));
 		defer (gb_string_free(expr_str));
+
+		String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
 
 		switch (operand->mode) {
 		case Addressing_Builtin:
@@ -1329,7 +1335,7 @@ gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source
 	Type *gt = *gt_;
 	
 	GB_ASSERT(gt->kind == Type_Generic);
-	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
+	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name, 0);
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_TypeName) {
 		*gt_ = nullptr;
@@ -1430,7 +1436,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			if (poly->Array.generic_count != nullptr) {
 				Type *gt = poly->Array.generic_count;
 				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.name);
+				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name, 0);
 				GB_ASSERT(e != nullptr);
 				if (e->kind == Entity_TypeName) {
 					Type *index = source->EnumeratedArray.index;
@@ -1770,9 +1776,9 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
 	o->expr = n;
-	String name = n->Ident.token.string;
+	auto name = n->Ident.token.string;
 
-	Entity *e = scope_lookup(c->scope, name, n->Ident.hash);
+	Entity *e = scope_lookup(c->scope, n->Ident.interned, n->Ident.hash);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value");
@@ -2161,9 +2167,13 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		BigInt i = v.value_integer;
 
 		i64 byte_size = type_size_of(type);
-		BigInt umax = {};
-		BigInt imin = {};
-		BigInt imax = {};
+		BigInt umax;
+		BigInt imin;
+		BigInt imax;
+
+		u64 umax_64 = 0;
+		i64 imin_64 = 0;
+		i64 imax_64 = 0;
 
 		if (c->bit_field_bit_size > 0) {
 			i64 bit_size = gb_min(cast(i64)(8*byte_size), cast(i64)c->bit_field_bit_size);
@@ -2186,10 +2196,10 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			big_int_shl_eq(&imax, &bi);
 			mp_decr(&imax);
 		} else {
-			if (byte_size < 16) {
-				big_int_from_u64(&umax, unsigned_integer_maxs[byte_size]);
-				big_int_from_i64(&imin, signed_integer_mins[byte_size]);
-				big_int_from_i64(&imax, signed_integer_maxs[byte_size]);
+			if (byte_size <= 8) {
+				umax_64 = unsigned_integer_maxs[byte_size];
+				imin_64 = signed_integer_mins[byte_size];
+				imax_64 = signed_integer_maxs[byte_size];
 			} else {
 				big_int_from_u64(&umax, 1);
 				big_int_from_i64(&imin, 1);
@@ -2217,16 +2227,27 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_i16:
 		case Basic_i32:
 		case Basic_i64:
-		case Basic_i128:
 		case Basic_int:
 
 		case Basic_i16le:
 		case Basic_i32le:
 		case Basic_i64le:
-		case Basic_i128le:
 		case Basic_i16be:
 		case Basic_i32be:
 		case Basic_i64be:
+			if (c->bit_field_bit_size == 0) {
+				// return imin <= i && i <= imax;
+				if (!big_int_can_be_represented_in_64_bits(&i)) {
+					return false;
+				}
+
+				i64 val64 = big_int_to_i64(&i);
+
+				return imin_64 <= val64 && val64 <= imax_64;
+			}
+			/*fallthrough*/
+		case Basic_i128le:
+		case Basic_i128:
 		case Basic_i128be:
 			{
 				// return imin <= i && i <= imax;
@@ -2239,17 +2260,30 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_u16:
 		case Basic_u32:
 		case Basic_u64:
-		case Basic_u128:
 		case Basic_uint:
 		case Basic_uintptr:
 
 		case Basic_u16le:
 		case Basic_u32le:
 		case Basic_u64le:
-		case Basic_u128le:
 		case Basic_u16be:
 		case Basic_u32be:
 		case Basic_u64be:
+			if (c->bit_field_bit_size == 0) {
+				if (big_int_is_neg(&i)) {
+					return false;
+				}
+				if (!big_int_can_be_represented_in_64_bits(&i)) {
+					return false;
+				}
+				u64 val64 = big_int_to_u64(&i);
+
+				return val64 <= umax_64;
+
+			}
+			/*fallthrough*/
+		case Basic_u128:
+		case Basic_u128le:
 		case Basic_u128be:
 			{
 				// return 0ull <= i && i <= umax;
@@ -5192,7 +5226,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 						continue;
 					}
 					ast_node(fv, FieldValue, elem);
-					String name = fv->field->Ident.token.string;
+					auto name = fv->field->Ident.interned;
 					Selection sub_sel = lookup_field(node->tav.type, name, false);
 					if (sub_sel.index.count > 0 &&
 					    sub_sel.index[0] == index) {
@@ -5458,8 +5492,12 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 			return e;
 		}
 	} else */if (node->kind == Ast_Ident) {
+		Entity *e = node->Ident.entity.load();
+		if (e != nullptr) {
+			return e;
+		}
 		String name = node->Ident.token.string;
-		return scope_lookup(c->scope, name, node->Ident.hash);
+		return scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
@@ -5481,7 +5519,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 
 		if (op_expr->kind == Ast_Ident) {
 			String op_name = op_expr->Ident.token.string;
-			Entity *e = scope_lookup(c->scope, op_name, op_expr->Ident.hash);
+			Entity *e = scope_lookup(c->scope, op_expr->Ident.interned, op_expr->Ident.hash);
 			if (e == nullptr) {
 				return nullptr;
 			}
@@ -5494,7 +5532,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 				// If you can clean this up, please do but be really careful
 				String import_name = op_name;
 				Scope *import_scope = e->ImportName.scope;
-				String entity_name = selector->Ident.token.string;
+				auto entity_name = selector->Ident.interned;
 
 				check_op_expr = false;
 				entity = scope_lookup_current(import_scope, entity_name);
@@ -5520,7 +5558,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 
 		if (entity == nullptr && selector->kind == Ast_Ident) {
-			String field_name = selector->Ident.token.string;
+			auto field_name = selector->Ident.interned;
 			if (is_type_dynamic_array(type_deref(operand.type))) {
 				init_mem_allocator(c->checker);
 			}
@@ -5578,7 +5616,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	if (op_expr->kind == Ast_Ident) {
 		String op_name = op_expr->Ident.token.string;
-		Entity *e = scope_lookup(c->scope, op_name, op_expr->Ident.hash);
+		Entity *e = scope_lookup(c->scope, op_expr->Ident.interned, op_expr->Ident.hash);
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
@@ -5596,6 +5634,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			String import_name = op_name;
 			Scope *import_scope = e->ImportName.scope;
 			String entity_name = selector->Ident.token.string;
+			InternedString entity_name_interned = selector->Ident.interned;
 
 			if (import_scope == nullptr) {
 				ERROR_BLOCK();
@@ -5606,7 +5645,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			}
 
 			check_op_expr = false;
-			entity = scope_lookup_current(import_scope, entity_name);
+			entity = scope_lookup_current(import_scope, entity_name_interned);
 			bool allow_builtin = false;
 			if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
 				ERROR_BLOCK();
@@ -5654,7 +5693,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	}
 
 	if (entity == nullptr && selector->kind == Ast_Ident) {
-		String field_name = selector->Ident.token.string;
+		auto field_name = selector->Ident.interned;
 		Type *t = type_deref(operand->type);
 		if (t == nullptr) {
 			error(operand->expr, "Cannot use a selector expression on 0-value expression");
@@ -5993,15 +6032,14 @@ gb_internal bool is_type_valid_atomic_type(Type *elem) {
 gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **out_scope = nullptr) {
 	switch (node->kind) {
 	case_ast_node(i, Ident, node);
-		String name = i->token.string;
 		if (nested) {
-			Entity *e = scope_lookup_current(s, name);
+			Entity *e = scope_lookup_current(s, i->interned, i->hash);
 			if (e != nullptr) {
 				if (out_scope) *out_scope = e->scope;
 				return true;
 			}
 		} else {
-			Entity *e = scope_lookup(s, name, i->hash);
+			Entity *e = scope_lookup(s, i->interned, i->hash);
 			if (e != nullptr) {
 				if (out_scope) *out_scope = e->scope;
 				return true;
@@ -7816,11 +7854,14 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
+
+		c->type_path = new_checker_type_path();
+		defer ({
+			destroy_checker_type_path(c->type_path);
+			c->type_path = prev_type_path;
+		});
+
 		TEMPORARY_ALLOCATOR_GUARD();
-
-		c->type_path = new_checker_type_path(temporary_allocator());
-		defer (c->type_path = prev_type_path);
-
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
 			operands = array_make<Operand>(temporary_allocator(), ce->args.count);
@@ -8972,7 +9013,7 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		Type *enum_type = base_type(th);
 		GB_ASSERT(enum_type->kind == Type_Enum);
 
-		String name = ise->selector->Ident.token.string;
+		auto name = ise->selector->Ident.interned;
 
 		Entity *e = scope_lookup_current(enum_type->Enum.scope, name);
 		if (e == nullptr) {
@@ -9907,8 +9948,9 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			continue;
 		}
 		String name = ident->Ident.token.string;
+		auto interned = ident->Ident.interned;
 
-		Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+		Selection sel = lookup_field(type, interned, o->mode == Addressing_Type);
 		bool is_unknown = sel.entity == nullptr;
 		if (is_unknown) {
 			error(ident, "Unknown field '%.*s' in structure literal", LIT(name));
@@ -10863,8 +10905,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						continue;
 					}
 					String name = fv->field->Ident.token.string;
+					auto interned = fv->field->Ident.interned;
 
-					Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+					Selection sel = lookup_field(type, interned, o->mode == Addressing_Type);
 					if (sel.entity == nullptr) {
 						error(elem, "Unknown field '%.*s' in 'any' literal", LIT(name));
 						continue;

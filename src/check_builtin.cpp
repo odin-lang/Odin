@@ -2413,13 +2413,14 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 
 		String name = arg->Ident.token.string;
+		auto interned = arg->Ident.interned;
 
 
 		operand->type = def.type;
 		operand->mode = def.mode;
 		operand->value = def.value;
 
-		Entity *found = scope_lookup_current(config_pkg->scope, name);
+		Entity *found = scope_lookup_current(config_pkg->scope, interned);
 		if (found != nullptr) {
 			if (found->kind != Entity_Constant) {
 				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
@@ -2804,7 +2805,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		GB_ASSERT(type != nullptr);
 		
-		String field_name = {};
+		InternedString field_name = {};
 		
 		if (field_arg == nullptr) {
 			error(call, "Expected an identifier for field argument");
@@ -2812,9 +2813,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 		if (field_arg->kind == Ast_Ident) {
-			field_name = field_arg->Ident.token.string;
+			field_name = field_arg->Ident.interned;
 		}
-		if (field_name.len == 0) {
+		if (field_name.value == 0) {
 			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
@@ -2847,19 +2848,19 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+			      "'%s' has no field named '%s'", type_str, field_name.cstring());
 			gb_string_free(type_str);
 
 			Type *bt = base_type(type);
 			if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(field_name, bt->Struct.fields);
+				check_did_you_mean_type(field_name.string(), bt->Struct.fields);
 			}
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+			      "Field '%s' is embedded via a pointer in '%s'", field_name.cstring(), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -2891,7 +2892,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		GB_ASSERT(type != nullptr);
 		
-		String field_name = {};
+		InternedString field_name = {};
 		
 		if (field_arg == nullptr) {
 			error(call, "Expected a constant (not-empty) string for field argument");
@@ -2901,9 +2902,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Operand x = {};
 		check_expr(c, &x, field_arg);
 		if (x.mode == Addressing_Constant && x.value.kind == ExactValue_String) {
-			field_name = x.value.value_string;
+			field_name = string_interner_insert(x.value.value_string);
 		}
-		if (field_name.len == 0) {
+		if (field_name.value == 0) {
 			error(field_arg, "Expected a constant (non-empty) string for field argument");
 			return false;
 		}
@@ -2921,19 +2922,19 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+			      "'%s' has no field named '%s'", type_str, field_name.cstring());
 			gb_string_free(type_str);
 
 			Type *bt = base_type(type);
 			if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(field_name, bt->Struct.fields);
+				check_did_you_mean_type(field_name.string(), bt->Struct.fields);
 			}
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+			      "Field '%s' is embedded via a pointer in '%s'", field_name.string(), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -4436,7 +4437,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 			if (!fail && first_is_field_value) {
 				for_array(i, names) {
-					Selection sel = lookup_field(et, names[i], false);
+					Selection sel = lookup_field(et, string_interner_insert(names[i]), false);
 					if (sel.entity == nullptr) {
 						goto soa_zip_end;
 					}
@@ -6785,7 +6786,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			String field_name = x.value.value_string;
+			InternedString field_name = string_interner_insert(x.value.value_string);
 
 			Selection sel = lookup_field(type, field_name, false);
 			operand->mode = Addressing_Constant;
@@ -6865,12 +6866,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			String field_name = x.value.value_string;
+			InternedString field_name = string_interner_insert(x.value.value_string);
 
 			Selection sel = lookup_field(type, field_name, false);
 			if (sel.index.count == 0) {
 				gbString t = type_to_string(type);
-				error(ce->args[1], "'%.*s' is not a field of type %s", LIT(field_name), t);
+				error(ce->args[1], "'%s' is not a field of type %s", field_name.cstring(), t);
 				gb_string_free(t);
 				return false;
 			}
@@ -7625,25 +7626,25 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			String field_name = x.value.value_string;
+			InternedString field_name = string_interner_insert(x.value.value_string);
 
 			Selection sel = lookup_field(type, field_name, false);
 			if (sel.entity == nullptr) {
 				ERROR_BLOCK();
 				gbString type_str = type_to_string(bt);
 				error(ce->args[0],
-				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+				      "'%s' has no field named '%s'", type_str, field_name.cstring());
 				gb_string_free(type_str);
 
 				if (bt->kind == Type_Struct) {
-					check_did_you_mean_type(field_name, bt->Struct.fields);
+					check_did_you_mean_type(field_name.string(), bt->Struct.fields);
 				}
 				return false;
 			}
 			if (sel.indirect) {
 				gbString type_str = type_to_string(bt);
 				error(ce->args[0],
-				      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+				      "Field '%s' is embedded via a pointer in '%s'", field_name.cstring(), type_str);
 				gb_string_free(type_str);
 				return false;
 			}

@@ -3588,7 +3588,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	MAIN_TIME_SECTION("initialization");
 
-	g_string_interner = string_interner_create();
+	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
 	init_terminal();
