@@ -276,7 +276,7 @@ reset :: proc(ctx: ^$T) {
     SHA2 implementation
 */
 
-@(private, rodata)
+@(private = "file", rodata)
 SHA256_K := [64]u32 {
 	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 	0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -296,7 +296,7 @@ SHA256_K := [64]u32 {
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 }
 
-@(private, rodata)
+@(private = "file", rodata)
 SHA512_K := [80]u64 {
 	0x428a2f98d728ae22, 0x7137449123ef65cd,
 	0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,
@@ -345,67 +345,67 @@ SHA256_ROUNDS :: 64
 @(private)
 SHA512_ROUNDS :: 80
 
-@(private)
+@(private = "file")
 SHA256_CH :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
 	return (x & y) ~ (~x & z)
 }
 
-@(private)
+@(private = "file")
 SHA256_MAJ :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
 	return (x & y) ~ (x & z) ~ (y & z)
 }
 
-@(private)
+@(private = "file")
 SHA512_CH :: #force_inline proc "contextless" (x, y, z: u64) -> u64 {
 	return (x & y) ~ (~x & z)
 }
 
-@(private)
+@(private = "file")
 SHA512_MAJ :: #force_inline proc "contextless" (x, y, z: u64) -> u64 {
 	return (x & y) ~ (x & z) ~ (y & z)
 }
 
-@(private)
+@(private = "file")
 SHA256_F1 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 30) ~ bits.rotate_left32(x, 19) ~ bits.rotate_left32(x, 10)
 }
 
-@(private)
+@(private = "file")
 SHA256_F2 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 26) ~ bits.rotate_left32(x, 21) ~ bits.rotate_left32(x, 7)
 }
 
-@(private)
+@(private = "file")
 SHA256_F3 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 25) ~ bits.rotate_left32(x, 14) ~ (x >> 3)
 }
 
-@(private)
+@(private = "file")
 SHA256_F4 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 15) ~ bits.rotate_left32(x, 13) ~ (x >> 10)
 }
 
-@(private)
+@(private = "file")
 SHA512_F1 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 36) ~ bits.rotate_left64(x, 30) ~ bits.rotate_left64(x, 25)
 }
 
-@(private)
+@(private = "file")
 SHA512_F2 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 50) ~ bits.rotate_left64(x, 46) ~ bits.rotate_left64(x, 23)
 }
 
-@(private)
+@(private = "file")
 SHA512_F3 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 63) ~ bits.rotate_left64(x, 56) ~ (x >> 7)
 }
 
-@(private)
+@(private = "file")
 SHA512_F4 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 45) ~ bits.rotate_left64(x, 3) ~ (x >> 6)
 }
 
-@(private)
+@(private = "file")
 sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) #no_bounds_check {
 	when T == Context_256 {
 		if ctx.is_hw_accelerated {
