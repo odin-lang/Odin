@@ -57,6 +57,8 @@ gb_internal void big_int_dealloc(BigInt *dst) {
 	mp_clear(dst);
 }
 
+gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x);
+
 gb_internal BigInt big_int_make(BigInt const *b, bool abs=false);
 gb_internal BigInt big_int_make_abs(BigInt const *b);
 gb_internal BigInt big_int_make_u64(u64 x);
@@ -292,6 +294,11 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 }
 
 
+
+gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x) {
+	int bits_used = (x->used-1) * MP_DIGIT_BIT;
+	return bits_used <= 64;
+}
 
 gb_internal u64 big_int_to_u64(BigInt const *x) {
 	GB_ASSERT(x->sign == 0);

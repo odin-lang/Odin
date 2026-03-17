@@ -2442,6 +2442,9 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 		}
 	}
 
+	Entity *entities_to_use = permanent_alloc_array<Entity>(variable_count);
+	isize entities_to_use_index = 0;
+
 	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 	i32 field_group_index = -1;
 	for_array(i, results) {
@@ -2480,7 +2483,12 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 		if (field->names.count == 0) {
 			Token token = ast_token(field->type);
 			token.string = str_lit("");
-			Entity *param = alloc_entity_param(scope, token, type, false, false);
+			// Entity *param = alloc_entity_param(scope, token, type, false, false);
+			Entity *param = &entities_to_use[entities_to_use_index++];
+			INTERNAL_ENTITY_INIT(param, Entity_Variable, scope, token, type);
+			param->state = EntityState_Resolved;
+			param->flags |= EntityFlag_Used|EntityFlag_Param|EntityFlag_Result;
+
 			param->Variable.param_value = param_value;
 			param->Variable.field_group_index = -1;
 			array_add(&variables, param);
@@ -2503,8 +2511,17 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 					error(name, "Result value cannot be a blank identifer `_`");
 				}
 
-				Entity *param = alloc_entity_param(scope, token, type, false, false);
-				param->flags |= EntityFlag_Result;
+				// Entity *param = alloc_entity_param(scope, token, type, false, false);
+				Entity *param = &entities_to_use[entities_to_use_index++];
+				INTERNAL_ENTITY_INIT(param, Entity_Variable, scope, token, type);
+				param->state = EntityState_Resolved;
+				param->flags |= EntityFlag_Used|EntityFlag_Param|EntityFlag_Result;
+
+				if (name->kind == Ast_Ident) {
+					param->interned_name.store(name->Ident.interned);
+					param->interned_name_hash.store(name->Ident.hash);
+				}
+
 				param->Variable.param_value = param_value;
 				param->Variable.field_group_index = field_group_index;
 				array_add(&variables, param);

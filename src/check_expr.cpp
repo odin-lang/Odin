@@ -2167,9 +2167,13 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		BigInt i = v.value_integer;
 
 		i64 byte_size = type_size_of(type);
-		BigInt umax = {};
-		BigInt imin = {};
-		BigInt imax = {};
+		BigInt umax;
+		BigInt imin;
+		BigInt imax;
+
+		u64 umax_64 = 0;
+		i64 imin_64 = 0;
+		i64 imax_64 = 0;
 
 		if (c->bit_field_bit_size > 0) {
 			i64 bit_size = gb_min(cast(i64)(8*byte_size), cast(i64)c->bit_field_bit_size);
@@ -2192,10 +2196,10 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			big_int_shl_eq(&imax, &bi);
 			mp_decr(&imax);
 		} else {
-			if (byte_size < 16) {
-				big_int_from_u64(&umax, unsigned_integer_maxs[byte_size]);
-				big_int_from_i64(&imin, signed_integer_mins[byte_size]);
-				big_int_from_i64(&imax, signed_integer_maxs[byte_size]);
+			if (byte_size <= 8) {
+				umax_64 = unsigned_integer_maxs[byte_size];
+				imin_64 = signed_integer_mins[byte_size];
+				imax_64 = signed_integer_maxs[byte_size];
 			} else {
 				big_int_from_u64(&umax, 1);
 				big_int_from_i64(&imin, 1);
@@ -2223,16 +2227,27 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_i16:
 		case Basic_i32:
 		case Basic_i64:
-		case Basic_i128:
 		case Basic_int:
 
 		case Basic_i16le:
 		case Basic_i32le:
 		case Basic_i64le:
-		case Basic_i128le:
 		case Basic_i16be:
 		case Basic_i32be:
 		case Basic_i64be:
+			{
+				// return imin <= i && i <= imax;
+				if (!big_int_can_be_represented_in_64_bits(&i)) {
+					return false;
+				}
+
+				i64 val64 = big_int_to_i64(&i);
+
+				return imin_64 <= val64 && val64 <= imax_64;
+			}
+
+		case Basic_i128le:
+		case Basic_i128:
 		case Basic_i128be:
 			{
 				// return imin <= i && i <= imax;
@@ -2245,17 +2260,30 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_u16:
 		case Basic_u32:
 		case Basic_u64:
-		case Basic_u128:
 		case Basic_uint:
 		case Basic_uintptr:
 
 		case Basic_u16le:
 		case Basic_u32le:
 		case Basic_u64le:
-		case Basic_u128le:
 		case Basic_u16be:
 		case Basic_u32be:
 		case Basic_u64be:
+			{
+				if (big_int_is_neg(&i)) {
+					return false;
+				}
+				if (!big_int_can_be_represented_in_64_bits(&i)) {
+					return false;
+				}
+				u64 val64 = big_int_to_u64(&i);
+
+				return val64 <= umax_64;
+
+			}
+
+		case Basic_u128:
+		case Basic_u128le:
 		case Basic_u128be:
 			{
 				// return 0ull <= i && i <= umax;
