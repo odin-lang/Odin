@@ -667,7 +667,8 @@ gb_internal bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		return false;
 	}
 
-	Entity *shadowed = scope_lookup(parent, entity_interned_name(e));
+	auto interned = entity_interned_name(e);
+	Entity *shadowed = scope_lookup(parent, interned, e->interned_name_hash.load());
 	if (shadowed == nullptr) {
 		return false;
 	}
@@ -949,9 +950,10 @@ gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
 
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
-	InternedString key = string_interner_insert(n);
+	u32 hash = 0;
+	InternedString key = string_interner_insert(n, 0, &hash);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup(p->scope, key);
+	Entity *e = scope_lookup(p->scope, key, hash);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
@@ -963,9 +965,10 @@ gb_internal void add_package_dependency(CheckerContext *c, char const *package_n
 
 gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);
-	InternedString key = string_interner_insert(n);
+	u32 hash = 0;
+	InternedString key = string_interner_insert(n, 0, &hash);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup(p->scope, key);
+	Entity *e = scope_lookup(p->scope, key, hash);
 	if (e == nullptr) {
 		return;
 	}
@@ -2756,7 +2759,9 @@ gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity) {
 
 
 gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
-	Entity *e = scope_lookup(scope, string_interner_insert(name));
+	u32 hash = 0;
+	auto interned = string_interner_insert(name, 0, &hash);
+	Entity *e = scope_lookup(scope, interned, hash);
 	if (e == nullptr) {
 		return;
 	}
@@ -3277,16 +3282,48 @@ gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String 
 	return e->type;
 }
 
+struct CheckerTypePathStore {
+	CheckerTypePath path;
+	std::atomic<CheckerTypePathStore *> next;
+};
+
+gb_internal gb_thread_local std::atomic<CheckerTypePathStore *> checker_type_path_free_list;
+
 gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator) {
-	// TODO(bill): Cache to reuse `CheckerTypePath`
-	auto *tp = gb_alloc_item(heap_allocator(), CheckerTypePath);
-	array_init(tp, allocator, 0, 16);
-	return tp;
+	// TODO(bill): Cache to reuse `CheckerTypePath
+
+	CheckerTypePathStore *tp = nullptr;
+
+	for (;;) {
+		tp = checker_type_path_free_list.load(std::memory_order_acquire);
+		if (tp == nullptr) {
+			tp = permanent_alloc_item<CheckerTypePathStore>();
+			array_init(&tp->path, allocator, 0, 16);
+			return &tp->path;
+		}
+
+		if (checker_type_path_free_list.compare_exchange_weak(tp, tp->next.load(std::memory_order_acquire), std::memory_order_acquire, std::memory_order_relaxed)) {
+			tp->next.store(nullptr);
+			return &tp->path;
+		}
+
+	}
 }
 
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator) {
-	array_free(tp);
-	gb_free(allocator, tp);
+gb_internal void destroy_checker_type_path(CheckerTypePath *path, gbAllocator allocator) {
+	auto *tp = cast(CheckerTypePathStore *)path;
+	array_clear(&tp->path);
+
+
+	for (;;) {
+		auto *head = checker_type_path_free_list.load(std::memory_order_relaxed);
+		tp->next.store(head);
+		if (checker_type_path_free_list.compare_exchange_weak(head, tp, std::memory_order_release, std::memory_order_relaxed)) {
+			return;
+		}
+	}
+
+	// array_free(&tp->path);
 }
 
 gb_internal void check_type_path_push(CheckerContext *c, Entity *e) {

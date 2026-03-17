@@ -369,13 +369,13 @@ gb_global std::atomic<u64> global_entity_id;
 	if ((token_).pos.file_id) {                                                  \
 		e_->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
 	}                                                                            \
-	entity_interned_name(e_);                                                    \
 } while (0)
 
 
 gb_internal Entity *alloc_entity(EntityKind kind, Scope *scope, Token token, Type *type) {
 	Entity *entity = permanent_alloc_item<Entity>();
 	INTERNAL_ENTITY_INIT(entity, kind, scope, token, type);
+	entity_interned_name(entity);
 	return entity;
 }
 

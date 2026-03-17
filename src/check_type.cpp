@@ -105,9 +105,6 @@ gb_internal bool does_field_type_allow_using(Type *t) {
 
 gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields, String **tags, Slice<Ast *> const &params,
                                      isize init_field_capacity, Type *struct_type, String context) {
-	auto fields_array = array_make<Entity *>(heap_allocator(), 0, init_field_capacity);
-	auto tags_array = array_make<String>(heap_allocator(), 0, init_field_capacity);
-
 	GB_ASSERT(node->kind == Ast_StructType);
 	GB_ASSERT(struct_type->kind == Type_Struct);
 
@@ -119,6 +116,12 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			variable_count += gb_max(f->names.count, 1);
 		}
 	}
+
+	init_field_capacity = gb_max(init_field_capacity, variable_count);
+	auto fields_array = array_make<Entity *>(permanent_allocator(), 0, init_field_capacity);
+	auto tags_array   = array_make<String>(permanent_allocator(),   0, init_field_capacity);
+
+	defer (GB_ASSERT(fields_array.count == init_field_capacity));
 
 	// Allocate all at once
 	Entity *entities_to_use = permanent_alloc_array<Entity>(variable_count);
@@ -175,7 +178,10 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			// Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			Entity *field = &entities_to_use[entities_to_use_index++];
 			INTERNAL_ENTITY_INIT(field, Entity_Variable, ctx->scope, name_token, type);
-			field->state = EntityState_Unresolved;
+
+			field->interned_name.store(name->Ident.interned);
+			field->interned_name_hash.store(name->Ident.hash);
+
 			field->flags |= EntityFlag_Field;
 			if (is_using) field->flags |= EntityFlag_Using;
 			field->Variable.field_index = field_src_index;
@@ -976,6 +982,10 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		Entity *e = &entities_to_use[entities_to_use_index++];
 		Token token = ident->Ident.token;
 		INTERNAL_ENTITY_INIT(e, Entity_Constant, ctx->scope, token, constant_type);
+
+		e->interned_name.store(ident->Ident.interned);
+		e->interned_name_hash.store(ident->Ident.hash);
+
 		e->Constant.value = iota;
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
@@ -1519,7 +1529,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
 				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name);
+					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
 					GB_ASSERT(e != nullptr);
 					if (modify_type) {
 						e->kind = Entity_Constant;
@@ -1572,7 +1582,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
 				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name);
+					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
 					GB_ASSERT(e != nullptr);
 					if (modify_type) {
 						e->kind = Entity_Constant;

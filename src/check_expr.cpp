@@ -1329,7 +1329,7 @@ gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source
 	Type *gt = *gt_;
 	
 	GB_ASSERT(gt->kind == Type_Generic);
-	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name);
+	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name, 0);
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_TypeName) {
 		*gt_ = nullptr;
@@ -1430,7 +1430,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			if (poly->Array.generic_count != nullptr) {
 				Type *gt = poly->Array.generic_count;
 				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name);
+				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name, 0);
 				GB_ASSERT(e != nullptr);
 				if (e->kind == Entity_TypeName) {
 					Type *index = source->EnumeratedArray.index;
@@ -1772,7 +1772,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	o->expr = n;
 	auto name = n->Ident.token.string;
 
-	Entity *e = scope_lookup(c->scope, n->Ident.interned);
+	Entity *e = scope_lookup(c->scope, n->Ident.interned, n->Ident.hash);
 	if (e == nullptr) {
 		if (is_blank_ident(name)) {
 			error(n, "'_' cannot be used as a value");
@@ -5459,7 +5459,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 	} else */if (node->kind == Ast_Ident) {
 		String name = node->Ident.token.string;
-		return scope_lookup(c->scope, node->Ident.interned);
+		return scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
@@ -5481,7 +5481,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 
 		if (op_expr->kind == Ast_Ident) {
 			String op_name = op_expr->Ident.token.string;
-			Entity *e = scope_lookup(c->scope,op_expr->Ident.interned);
+			Entity *e = scope_lookup(c->scope, op_expr->Ident.interned, op_expr->Ident.hash);
 			if (e == nullptr) {
 				return nullptr;
 			}
@@ -5578,7 +5578,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	if (op_expr->kind == Ast_Ident) {
 		String op_name = op_expr->Ident.token.string;
-		Entity *e = scope_lookup(c->scope, op_expr->Ident.interned);
+		Entity *e = scope_lookup(c->scope, op_expr->Ident.interned, op_expr->Ident.hash);
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
@@ -6001,7 +6001,7 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 				return true;
 			}
 		} else {
-			Entity *e = scope_lookup(s, i->interned);
+			Entity *e = scope_lookup(s, i->interned, i->hash);
 			if (e != nullptr) {
 				if (out_scope) *out_scope = e->scope;
 				return true;
