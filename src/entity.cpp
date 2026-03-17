@@ -412,10 +412,9 @@ gb_internal Entity *alloc_entity_type_name(Scope *scope, Token token, Type *type
 }
 
 gb_internal Entity *alloc_entity_param(Scope *scope, Token token, Type *type, bool is_using, bool is_value) {
-	Entity *entity = alloc_entity_variable(scope, token, type);
+	Entity *entity = alloc_entity_variable(scope, token, type, EntityState_Resolved);
 	entity->flags |= EntityFlag_Used;
 	entity->flags |= EntityFlag_Param;
-	entity->state = EntityState_Resolved;
 	if (is_using) entity->flags |= EntityFlag_Using;
 	if (is_value) entity->flags |= EntityFlag_Value;
 	return entity;

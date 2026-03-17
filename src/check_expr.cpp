@@ -7822,11 +7822,14 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
+
+		c->type_path = new_checker_type_path();
+		defer ({
+			destroy_checker_type_path(c->type_path);
+			c->type_path = prev_type_path;
+		});
+
 		TEMPORARY_ALLOCATOR_GUARD();
-
-		c->type_path = new_checker_type_path(temporary_allocator());
-		defer (c->type_path = prev_type_path);
-
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
 			operands = array_make<Operand>(temporary_allocator(), ce->args.count);

@@ -1857,6 +1857,11 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 	bool is_c_vararg = false;
 	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 	i32 field_group_index = -1;
+
+
+	Entity *entities_to_use = permanent_alloc_array<Entity>(variable_count);
+	isize entities_to_use_index = 0;
+
 	for_array(i, params) {
 		Ast *param = params[i];
 		if (param->kind != Ast_Field) {
@@ -2096,7 +2101,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					p->flags &= ~FieldFlag_no_capture;
 				}
 
-				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
+				param = &entities_to_use[entities_to_use_index++];
+				INTERNAL_ENTITY_INIT(param, Entity_TypeName, scope, name->Ident.token, type);
+				param->state = EntityState_Resolved;
+				param->interned_name.store(name->Ident.interned);
+				param->interned_name_hash.store(name->Ident.hash);
+
 				param->TypeName.is_type_alias = true;
 			} else {
 				ExactValue poly_const = {};
@@ -2250,10 +2260,36 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						// failed
 					}
 
-					param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));
+					// param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));
+
+					param = &entities_to_use[entities_to_use_index++];
+					INTERNAL_ENTITY_INIT(param, Entity_Constant, scope, name->Ident.token, type);
+
+					param->flags |= EntityFlag_Used|EntityFlag_Param;
+					if (is_type_polymorphic(type)) {
+						param->flags |= EntityFlag_PolyConst;
+					}
+					param->Constant.value = poly_const;
+
+					param->interned_name.store(name->Ident.interned);
+					param->interned_name_hash.store(name->Ident.hash);
+
 					param->Constant.field_group_index = field_group_index;
 				} else {
-					param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
+					// param = alloc_entity_param(scope, name->Ident.token, type, is_using, true);
+
+					param = &entities_to_use[entities_to_use_index++];
+					INTERNAL_ENTITY_INIT(param, Entity_Variable, scope, name->Ident.token, type);
+
+					param->state = EntityState_Resolved;
+					param->flags |= EntityFlag_Used|EntityFlag_Param|EntityFlag_Value;
+					if (is_using) {
+						param->flags |= EntityFlag_Using;
+					}
+
+					param->interned_name.store(name->Ident.interned);
+					param->interned_name_hash.store(name->Ident.hash);
+
 					param->Variable.param_value = param_value;
 					param->Variable.field_group_index = field_group_index;
 					param->Variable.type_expr = type_expr;
@@ -3627,7 +3663,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 		CheckerContext c = *ctx;
 
 		TEMPORARY_ALLOCATOR_GUARD();
-		c.type_path = new_checker_type_path(temporary_allocator());
+		c.type_path = new_checker_type_path();
+		defer (destroy_checker_type_path(c.type_path));
 
 		Type *elem = t_invalid;
 		Operand o = {};
@@ -3900,8 +3937,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e) {
 	CheckerContext c = *ctx;
-	TEMPORARY_ALLOCATOR_GUARD();
-	c.type_path = new_checker_type_path(temporary_allocator());
+	c.type_path = new_checker_type_path();
+	defer (destroy_checker_type_path(c.type_path));
 
 	return check_type_expr(&c, e, nullptr);
 }

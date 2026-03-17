@@ -1550,12 +1550,12 @@ gb_internal void init_checker_context(CheckerContext *ctx, Checker *c) {
 	ctx->scope     = builtin_pkg->scope;
 	ctx->pkg       = builtin_pkg;
 
-	ctx->type_path = new_checker_type_path(heap_allocator());
+	ctx->type_path = new_checker_type_path();
 	ctx->type_level = 0;
 }
 
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
-	destroy_checker_type_path(ctx->type_path, heap_allocator());
+	destroy_checker_type_path(ctx->type_path);
 }
 
 gb_internal bool add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
@@ -3284,18 +3284,18 @@ gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String 
 
 gb_internal gb_thread_local std::atomic<AtomicFreelist<CheckerTypePath> *> checker_type_path_free_list;
 
-gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator) {
+gb_internal CheckerTypePath *new_checker_type_path() {
 	// TODO(bill): Cache to reuse `CheckerTypePath
 
 	auto *tp = atomic_freelist_get(checker_type_path_free_list);
 	if (tp == nullptr) {
 		tp = permanent_alloc_item<AtomicFreelist<CheckerTypePath> >();
-		array_init(&tp->value, allocator, 0, 16);
+		array_init(&tp->value, permanent_allocator(), 0, 16);
 	}
 	return &tp->value;
 }
 
-gb_internal void destroy_checker_type_path(CheckerTypePath *path, gbAllocator allocator) {
+gb_internal void destroy_checker_type_path(CheckerTypePath *path) {
 	auto *tp = cast(AtomicFreelist<CheckerTypePath> *)path;
 	array_clear(&tp->value);
 

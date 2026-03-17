@@ -909,8 +909,8 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 gb_internal void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
 gb_internal void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 
-gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator);
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator);
+gb_internal CheckerTypePath *new_checker_type_path();
+gb_internal void destroy_checker_type_path(CheckerTypePath *tp);
 
 gb_internal void    check_type_path_push(CheckerContext *c, Entity *e);
 gb_internal Entity *check_type_path_pop (CheckerContext *c);
