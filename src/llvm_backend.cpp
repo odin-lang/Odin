@@ -2362,8 +2362,18 @@ gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, l
 	lb_run_function_pass_manager(pass_manager, p, pass_manager_kind);
 }
 
+struct lbLLVMModulePassWorkerData {
+	lbModule *m;
+	LLVMTargetMachineRef target_machine;
+	bool do_threading;
+};
+
+gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc);
+
+
 gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
-	lbModule *m = cast(lbModule *)data;
+	lbLLVMModulePassWorkerData *wd = cast(lbLLVMModulePassWorkerData *)data;
+	lbModule *m = wd->m;
 	{
 		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
@@ -2425,23 +2435,27 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		}
 	}
 
+	lb_run_remove_unused_function_pass(m);
+	lb_run_remove_unused_globals_pass(m);
+
+
+	if (wd->do_threading) {
+		thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
+	} else {
+		lb_llvm_module_pass_worker_proc(wd);
+	}
+
 	return 0;
 }
 
 
-void lb_remove_unused_functions_and_globals(lbGenerator *gen) {
-	for (auto &entry : gen->modules) {
-		lbModule *m = entry.value;
-		lb_run_remove_unused_function_pass(m);
-		lb_run_remove_unused_globals_pass(m);
-	}
-}
-
-struct lbLLVMModulePassWorkerData {
-	lbModule *m;
-	LLVMTargetMachineRef target_machine;
-	bool do_threading;
-};
+// void lb_remove_unused_functions_and_globals(lbGenerator *gen) {
+// 	for (auto &entry : gen->modules) {
+// 		lbModule *m = entry.value;
+// 		lb_run_remove_unused_function_pass(m);
+// 		lb_run_remove_unused_globals_pass(m);
+// 	}
+// }
 
 gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
@@ -2629,13 +2643,23 @@ gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			thread_pool_add_task(lb_llvm_function_pass_per_module, m);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+			wd->m = m;
+			wd->target_machine = m->target_machine;
+			wd->do_threading = true;
+
+			thread_pool_add_task(lb_llvm_function_pass_per_module, wd);
 		}
 		thread_pool_wait();
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			lb_llvm_function_pass_per_module(m);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+			wd->m = m;
+			wd->target_machine = m->target_machine;
+			wd->do_threading = false;
+
+			lb_llvm_function_pass_per_module(wd);
 		}
 	}
 }
@@ -3703,14 +3727,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
 
-	TIME_SECTION("LLVM Function Pass");
+	TIME_SECTION("LLVM Function Pass (And Remove Unused) & Module Pass + Verification");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
-
-	TIME_SECTION("LLVM Remove Unused Functions and Globals");
-	lb_remove_unused_functions_and_globals(gen);
-
-	TIME_SECTION("LLVM Module Pass and Verification");
-	lb_llvm_module_passes_and_verification(gen, do_threading);
 
 	TIME_SECTION("LLVM Correct Entity Linkage");
 	lb_correct_entity_linkage(gen);
