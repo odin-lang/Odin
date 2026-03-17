@@ -2079,8 +2079,6 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedure *p) {
 	lb_begin_procedure_body(p);
 
-	lb_setup_type_info_data(m);
-
 	if (p->objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(m, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
 	}
@@ -3028,6 +3026,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
 
+	gen->rtti_module = &gen->default_module;
+
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
 	case TargetArch_i386:
@@ -3256,7 +3256,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Global Variables");
 
 	if (!build_context.no_rtti) {
-		lbModule *m = default_module;
+		lbModule *m = gen->rtti_module;
 
 		{ // Add type info data
 			// GB_ASSERT_MSG(info->minimum_dependency_type_info_index_map.count == info->type_info_types.count, "%tu vs %tu", info->minimum_dependency_type_info_index_map.count, info->type_info_types.count);
@@ -3553,6 +3553,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
 	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
+
+	TIME_SECTION("LLVM Runtime Type Information (RTTI)");
+	if (do_threading) {
+		thread_pool_add_task(lb_setup_type_info_data_worker, gen->rtti_module);
+	} else {
+		lb_setup_type_info_data_worker(gen->rtti_module);
+	}
 
 
 	if (build_context.ODIN_DEBUG) {

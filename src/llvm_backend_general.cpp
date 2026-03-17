@@ -249,6 +249,15 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
 			lb_init_module(m, do_threading);
 		}
+
+		if (do_threading) {
+			lbModule *m = permanent_alloc_item<lbModule>();
+			gen->rtti_module = m;
+			m->gen            = gen;
+			m->checker        = c;
+			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
+			lb_init_module(m, do_threading);
+		}
 	}
 
 	gen->default_module.gen = gen;

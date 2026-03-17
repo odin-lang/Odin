@@ -226,6 +226,8 @@ struct lbGenerator : LinkerData {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
+	lbModule *rtti_module;
+
 	lbModule *equal_module;
 
 	isize used_module_count;

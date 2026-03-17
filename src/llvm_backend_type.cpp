@@ -127,35 +127,35 @@ gb_internal lbValue lb_const_array_epi(lbModule *m, lbValue value, isize index) 
 
 
 gb_internal lbValue lb_type_info_member_types_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
-	GB_ASSERT(m == &m->gen->default_module);
+	GB_ASSERT(m == m->gen->rtti_module);
 	if (offset_) *offset_ = lb_global_type_info_member_types_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_types.addr, lb_global_type_info_member_types_index);
 	lb_global_type_info_member_types_index += cast(i32)count;
 	return offset;
 }
 gb_internal lbValue lb_type_info_member_names_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
-	GB_ASSERT(m == &m->gen->default_module);
+	GB_ASSERT(m == m->gen->rtti_module);
 	if (offset_) *offset_ = lb_global_type_info_member_names_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_names.addr, lb_global_type_info_member_names_index);
 	lb_global_type_info_member_names_index += cast(i32)count;
 	return offset;
 }
 gb_internal lbValue lb_type_info_member_offsets_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
-	GB_ASSERT(m == &m->gen->default_module);
+	GB_ASSERT(m == m->gen->rtti_module);
 	if (offset_) *offset_ = lb_global_type_info_member_offsets_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_offsets.addr, lb_global_type_info_member_offsets_index);
 	lb_global_type_info_member_offsets_index += cast(i32)count;
 	return offset;
 }
 gb_internal lbValue lb_type_info_member_usings_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
-	GB_ASSERT(m == &m->gen->default_module);
+	GB_ASSERT(m == m->gen->rtti_module);
 	if (offset_) *offset_ = lb_global_type_info_member_usings_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_usings.addr, lb_global_type_info_member_usings_index);
 	lb_global_type_info_member_usings_index += cast(i32)count;
 	return offset;
 }
 gb_internal lbValue lb_type_info_member_tags_offset(lbModule *m, isize count, i64 *offset_=nullptr) {
-	GB_ASSERT(m == &m->gen->default_module);
+	GB_ASSERT(m == m->gen->rtti_module);
 	if (offset_) *offset_ = lb_global_type_info_member_tags_index;
 	lbValue offset = lb_const_array_epi(m, lb_global_type_info_member_tags.addr, lb_global_type_info_member_tags_index);
 	lb_global_type_info_member_tags_index += cast(i32)count;
@@ -1131,9 +1131,7 @@ gb_internal void lb_setup_type_info_data(lbModule *m) { // NOTE(bill): Setup typ
 	GB_ASSERT(type->kind == Type_Array);
 	global_type_info_data_entity_count = type->Array.count;
 
-	if (true) {
-		lb_setup_type_info_data_giant_array(m, global_type_info_data_entity_count);
-	}
+	lb_setup_type_info_data_giant_array(m, global_type_info_data_entity_count);
 
 	LLVMValueRef data = lb_global_type_info_data_ptr(m).value;
 	data = LLVMConstPointerCast(data, lb_type(m, alloc_type_pointer(type->Array.elem)));
@@ -1146,4 +1144,12 @@ gb_internal void lb_setup_type_info_data(lbModule *m) { // NOTE(bill): Setup typ
 
 	// force it to be constant
 	LLVMSetGlobalConstant(global_type_table.value, true);
+}
+
+
+gb_internal WORKER_TASK_PROC(lb_setup_type_info_data_worker) {
+	lbModule *m = cast(lbModule *)data;
+
+	lb_setup_type_info_data(m);
+	return 0;
 }
