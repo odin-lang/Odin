@@ -2235,7 +2235,7 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_i16be:
 		case Basic_i32be:
 		case Basic_i64be:
-			{
+			if (c->bit_field_bit_size == 0) {
 				// return imin <= i && i <= imax;
 				if (!big_int_can_be_represented_in_64_bits(&i)) {
 					return false;
@@ -2245,7 +2245,7 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 
 				return imin_64 <= val64 && val64 <= imax_64;
 			}
-
+			/*fallthrough*/
 		case Basic_i128le:
 		case Basic_i128:
 		case Basic_i128be:
@@ -2269,7 +2269,7 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_u16be:
 		case Basic_u32be:
 		case Basic_u64be:
-			{
+			if (c->bit_field_bit_size == 0) {
 				if (big_int_is_neg(&i)) {
 					return false;
 				}
@@ -2281,7 +2281,7 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 				return val64 <= umax_64;
 
 			}
-
+			/*fallthrough*/
 		case Basic_u128:
 		case Basic_u128le:
 		case Basic_u128be:
