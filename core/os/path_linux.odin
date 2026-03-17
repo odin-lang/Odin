@@ -71,7 +71,7 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	if errno != .NONE {
 		return _get_platform_error(errno)
 	}
-	
+
 	has_created: bool
 	mkdirat(dfd, path_bytes, perm, &has_created) or_return
 	return nil if has_created else .Exist
@@ -147,13 +147,13 @@ _remove_all :: proc(path: string) -> Error {
 	return _get_platform_error(linux.rmdir(path_cstr))
 }
 
-_get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) {
+_get_working_directory :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
 	// The largest value I could find was 4096, so might as well use the page size.
 	// NOTE(jason): Avoiding libc, so just use 4096 directly
 	PATH_MAX :: 4096
-	buf := make([dynamic]u8, PATH_MAX, allocator)
+	buf := make([dynamic]u8, PATH_MAX, allocator) or_return
 	for {
 		#no_bounds_check n, errno := linux.getcwd(buf[:])
 		if errno == .NONE {
@@ -162,7 +162,7 @@ _get_working_directory :: proc(allocator: runtime.Allocator) -> (string, Error) 
 		if errno != .ERANGE {
 			return "", _get_platform_error(errno)
 		}
-		resize(&buf, len(buf)+PATH_MAX)
+		resize(&buf, len(buf)+PATH_MAX) or_return
 	}
 	unreachable()
 }
