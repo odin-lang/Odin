@@ -156,9 +156,12 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// NOTE(bill): The original_entity's scope may not be same scope that it was inserted into
 	// e.g. file entity inserted into its package scope
 	String original_name = original_entity->token.string;
+	auto original_intern = entity_interned_name(original_entity);
+	u32 hash = original_entity->interned_name_hash.load();
+
 	Scope *found_scope = nullptr;
 	Entity *found_entity = nullptr;
-	scope_lookup_parent(original_entity->scope, original_name, &found_scope, &found_entity);
+	scope_lookup_parent(original_entity->scope, original_intern, &found_scope, &found_entity, hash);
 	if (found_scope == nullptr) {
 		return;
 	}
@@ -170,9 +173,8 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	// Therefore two things can be done: the type can be assigned to state that it
 	// has been "evaluated" and the variant data can be copied across
 
-	u32 hash = string_hash(original_name);
 	rw_mutex_lock(&found_scope->mutex);
-	scope_map_insert(&found_scope->elements, original_name, hash, new_entity);
+	scope_map_insert(&found_scope->elements, original_intern, hash, new_entity);
 	rw_mutex_unlock(&found_scope->mutex);
 
 	original_entity->flags |= EntityFlag_Overridden;
@@ -993,7 +995,7 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 		error(ident, "foreign library names must be an identifier");
 	} else {
 		String name = ident->Ident.token.string;
-		Entity *found = scope_lookup(ctx->scope, name, ident->Ident.hash);
+		Entity *found = scope_lookup(ctx->scope, ident->Ident.interned, ident->Ident.hash);
 
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
@@ -1192,26 +1194,26 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 		if (!ac.objc_is_class_method) {
 			bool ok = true;
 			for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
-				if (entry.name == ac.objc_name) {
+				if (entry.interned.string() == ac.objc_name) {
 					error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
 					ok = false;
 					break;
 				}
 			}
 			if (ok) {
-				array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+				array_add(&md->value_entries, TypeNameObjCMetadataEntry{string_interner_insert(ac.objc_name), e});
 			}
 		} else {
 			bool ok = true;
 			for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
-				if (entry.name == ac.objc_name) {
+				if (entry.interned.string() == ac.objc_name) {
 					error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
 					ok = false;
 					break;
 				}
 			}
 			if (ok) {
-				array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+				array_add(&md->type_entries, TypeNameObjCMetadataEntry{string_interner_insert(ac.objc_name), e});
 			}
 		}
 	}

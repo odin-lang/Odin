@@ -141,7 +141,7 @@ enum ProcedureOptimizationMode : u8 {
 BlockingMutex global_type_name_objc_metadata_mutex;
 
 struct TypeNameObjCMetadataEntry {
-	String name;
+	InternedString interned;
 	Entity *entity;
 };
 struct TypeNameObjCMetadata {
@@ -169,6 +169,10 @@ struct Entity {
 	Scope *     scope;
 	Type *      type;
 	std::atomic<Ast *> identifier; // Can be nullptr
+
+	std::atomic<InternedString> interned_name;
+	std::atomic<u32> interned_name_hash;
+
 	DeclInfo *  decl_info;
 	std::atomic<DeclInfo *> parent_proc_decl; // nullptr if in file/global scope
 	AstFile *   file;
@@ -300,6 +304,16 @@ struct Entity {
 	};
 };
 
+gb_internal InternedString entity_interned_name(Entity *entity) {
+	auto name = entity->interned_name.load();
+	if (name.value == 0) {
+		name = string_interner_insert(entity->token.string);
+		entity->interned_name.store(name);
+		entity->interned_name_hash.store(name.hash());
+	}
+	return name;
+}
+
 gb_internal bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	switch (kind) {
 	case Entity_Builtin:
@@ -345,16 +359,17 @@ gb_internal bool entity_has_deferred_procedure(Entity *e) {
 gb_global std::atomic<u64> global_entity_id;
 
 // NOTE(bill): This exists to allow for bulk allocations of entities all at once to improve performance for type generation
-#define INTERNAL_ENTITY_INIT(entity, kind_, scope_, token_, type_) do {                  \
-	(entity)->kind   = (kind_);                                                      \
-	(entity)->state  = EntityState_Unresolved;                                       \
-	(entity)->scope  = (scope_);                                                     \
-	(entity)->token  = (token_);                                                     \
-	(entity)->type   = (type_);                                                      \
-	(entity)->id     = 1 + global_entity_id.fetch_add(1);                            \
-	if ((token_).pos.file_id) {                                                      \
-		entity->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
-	}                                                                                \
+#define INTERNAL_ENTITY_INIT(e_, kind_, scope_, token_, type_) do {                  \
+	(e_)->kind   = (kind_);                                                      \
+	(e_)->state  = EntityState_Unresolved;                                       \
+	(e_)->scope  = (scope_);                                                     \
+	(e_)->token  = (token_);                                                     \
+	(e_)->type   = (type_);                                                      \
+	(e_)->id     = 1 + global_entity_id.fetch_add(1);                            \
+	if ((token_).pos.file_id) {                                                  \
+		e_->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
+	}                                                                            \
+	entity_interned_name(e_);                                                    \
 } while (0)
 
 

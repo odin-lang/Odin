@@ -4362,9 +4362,9 @@ gb_internal lbAddr lb_get_soa_variable_addr(lbProcedure *p, Entity *e) {
 }
 gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Using);
-	String name = e->token.string;
+	InternedString interned = entity_interned_name(e);
 	Entity *parent = e->using_parent;
-	Selection sel = lookup_field(parent->type, name, false);
+	Selection sel = lookup_field(parent->type, interned, false);
 	GB_ASSERT(sel.entity != nullptr);
 	lbValue *pv = map_get(&p->module->values, parent);
 
@@ -4379,7 +4379,7 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 	} else if (pv != nullptr) {
 		v = *pv;
 	} else {
-		GB_ASSERT_MSG(e->using_expr != nullptr, "%.*s", LIT(name));
+		GB_ASSERT_MSG(e->using_expr != nullptr, "%.*s", LIT(e->token.string));
 		v = lb_build_addr_ptr(p, e->using_expr);
 	}
 	GB_ASSERT(v.value != nullptr);
@@ -5362,8 +5362,8 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 		for (Ast *elem : cl->elems) {
 			ast_node(fv, FieldValue, elem);
-			String name = fv->field->Ident.token.string;
-			Selection sel = lookup_field(bt, name, false);
+			InternedString interned = fv->field->Ident.interned;
+			Selection sel = lookup_field(bt, interned, false);
 			GB_ASSERT(sel.is_bit_field);
 			GB_ASSERT(!sel.indirect);
 			GB_ASSERT(sel.index.count == 1);
@@ -5556,8 +5556,8 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 				if (elem->kind == Ast_FieldValue) {
 					ast_node(fv, FieldValue, elem);
-					String name = fv->field->Ident.token.string;
-					Selection sel = lookup_field(bt, name, false);
+					InternedString interned = fv->field->Ident.interned;
+					Selection sel = lookup_field(bt, interned, false);
 					GB_ASSERT(!sel.indirect);
 
 					elem = fv->value;
@@ -5811,12 +5811,12 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 				if (elem->kind == Ast_FieldValue) {
 					ast_node(fv, FieldValue, elem);
-					Selection sel = lookup_field(bt, fv->field->Ident.token.string, false);
+					Selection sel = lookup_field(bt, fv->field->Ident.interned, false);
 					index = sel.index[0];
 					elem = fv->value;
 				} else {
 					TypeAndValue tav = type_and_value_of_expr(elem);
-					Selection sel = lookup_field(bt, field_names[field_index], false);
+					Selection sel = lookup_field(bt, string_interner_insert(field_names[field_index]), false);
 					index = sel.index[0];
 				}
 
@@ -5958,7 +5958,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(se, SelectorExpr, expr);
 		Ast *sel_node = unparen_expr(se->selector);
 		if (sel_node->kind == Ast_Ident) {
-			String selector = sel_node->Ident.token.string;
+			InternedString selector = sel_node->Ident.interned;
 			TypeAndValue tav = type_and_value_of_expr(se->expr);
 
 			if (tav.mode == Addressing_Invalid) {
@@ -5978,7 +5978,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(e->kind == Entity_Procedure);
 					return lb_addr(lb_find_value_from_entity(p->module, e));
 				}
-				GB_PANIC("Unreachable %.*s", LIT(selector));
+				GB_PANIC("Unreachable %s", selector.cstring());
 			}
 
 			if (se->swizzle_count > 0) {

@@ -10,8 +10,11 @@ struct InternedString {
 		return this->value == other.value;
 	}
 
-	String      load()         const;
-	char const *load_cstring() const;
+	String      string()  const;
+	char const *cstring() const;
+	u32         hash()    const;
+
+	bool is_blank() const;
 };
 struct alignas(STRING_INTERN_CACHE_LINE) StringInternCell {
 	std::atomic<u64>                hashes [STRING_INTERNER_CELL_WIDTH];
@@ -38,10 +41,11 @@ struct StringInterner {
 };
 
 gb_internal StringInterner *string_interner_create();
-gb_internal InternedString  string_interner_insert(String str, u32 hash=0);
+gb_internal InternedString  string_interner_insert(String str, u32 hash=0, u32 *new_hash_=nullptr);
 gb_internal String          string_interner_load(InternedString interned);
 
 gb_global StringInterner *g_string_interner;
+gb_global InternedString g_interned_blank_ident;
 
 struct StringInternerThreadLocalArena {
 	u8 *data;
@@ -52,7 +56,7 @@ gb_thread_local gb_global StringInternerThreadLocalArena g_interner_arena;
 gb_internal void  string_interner_thread_local_arena_init(StringInternerThreadLocalArena *tl_arena);
 gb_internal void *string_interner_thread_local_arena_alloc(StringInternerThreadLocalArena *tl_arena, isize size, isize alignment);
 
-gb_internal StringInterner *string_interner_create() {
+gb_internal void init_string_interner() {
 	StaticArena arena = {};
 	static_arena_init(&arena, 1<<30, STATIC_ARENA_DEFAULT_COMMIT_BLOCK_SIZE);
 
@@ -63,7 +67,10 @@ gb_internal StringInterner *string_interner_create() {
 	interner->cell_mask = cell_mask;
 	interner->cells = cast(StringInternCell *)static_arena_alloc(&interner->arena, cell_size * gb_size_of(StringInternCell), STRING_INTERN_CACHE_LINE);
 	interner->track_count = false;
-	return interner;
+
+	g_string_interner = interner;
+
+	g_interned_blank_ident = string_interner_insert(str_lit("_"));
 }
 
 gb_internal String string_interner_load(InternedString interned) {
@@ -89,22 +96,31 @@ gb_internal char const *string_interner_load_cstring(InternedString interned) {
 	return cast(char const *)text;
 }
 
-String InternedString::load() const {
+String InternedString::string() const {
 	return string_interner_load(*this);
 }
-char const *InternedString::load_cstring() const {
+char const *InternedString::cstring() const {
 	return string_interner_load_cstring(*this);
 }
+u32 InternedString::hash() const {
+	String s = string_interner_load(*this);
+	return string_hash(s);
+}
+bool InternedString::is_blank() const {
+	return this->value == g_interned_blank_ident.value;
+}
 
-gb_internal InternedString string_interner_insert(String str, u32 hash) {
+gb_internal InternedString string_interner_insert(String str, u32 hash, u32 *new_hash_) {
 	StringInterner* interner = g_string_interner;
 	if (str.len == 0) {
+		if (new_hash_) *new_hash_ = string_hash(String{});
 		return {};
 	}
 
 	if (hash == 0) {
 		hash = string_hash(str);
 	}
+	if (new_hash_) *new_hash_ = hash;
 
 	u64 cell_idx = hash & interner->cell_mask;
 	StringInternCell *cell = &interner->cells[cell_idx];
@@ -175,14 +191,14 @@ gb_internal InternedString string_interner_insert(String str, u32 hash) {
 	return offset;
 }
 
-gb_internal char const *string_intern_cstring(String str) {
-	InternedString i = string_interner_insert(str, 0);
+gb_internal char const *string_intern_cstring(String str, u32 *hash_=nullptr) {
+	InternedString i = string_interner_insert(str, 0, hash_);
 	return string_interner_load_cstring(i);
 }
 
 
-gb_internal String string_intern_string(String str) {
-	InternedString i = string_interner_insert(str, 0);
+gb_internal String string_intern_string(String str, u32 *hash_=nullptr) {
+	InternedString i = string_interner_insert(str, 0, hash_);
 	return string_interner_load(i);
 }
 

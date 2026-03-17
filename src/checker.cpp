@@ -372,10 +372,10 @@ gb_internal void check_close_scope(CheckerContext *c) {
 }
 
 
-gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash) {
+gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash) {
 	// Entity **found = string_map_get(&s->elements, name);
 	if (hash == 0) {
-		hash = string_hash(name);
+		hash = name.hash();
 	}
 	Entity *found = scope_map_get(&s->elements, name, hash);
 	if (found) {
@@ -387,13 +387,13 @@ gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash)
 
 gb_global std::atomic<bool> in_single_threaded_checker_stage;
 
-gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_, u32 hash) {
+gb_internal void scope_lookup_parent(Scope *scope, InternedString name, Scope **scope_, Entity **entity_, u32 hash) {
 	bool is_single_threaded = in_single_threaded_checker_stage.load(std::memory_order_relaxed);
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
 		bool gone_thru_package = false;
 		if (!hash) {
-			hash = string_hash(name);
+			hash = name.hash();
 		}
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity *found = nullptr;
@@ -434,14 +434,14 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 	if (scope_) *scope_ = nullptr;
 }
 
-gb_internal Entity *scope_lookup(Scope *s, String const &name, u32 hash) {
+gb_internal Entity *scope_lookup(Scope *s, InternedString interned, u32 hash) {
 	Entity *entity = nullptr;
-	scope_lookup_parent(s, name, nullptr, &entity, hash);
+	scope_lookup_parent(s, interned, nullptr, &entity, hash);
 	return entity;
 }
 
-gb_internal Entity *scope_insert_with_name_no_mutex(Scope *s, String const &name, u32 hash, Entity *entity) {
-	if (name == "") {
+gb_internal Entity *scope_insert_with_name_no_mutex(Scope *s, InternedString name, u32 hash, Entity *entity) {
+	if (name.value == 0) {
 		return nullptr;
 	}
 	Entity *found = nullptr;
@@ -476,8 +476,8 @@ end:;
 }
 
 
-gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, u32 hash, Entity *entity) {
-	if (name == "") {
+gb_internal Entity *scope_insert_with_name(Scope *s, InternedString name, u32 hash, Entity *entity) {
+	if (name.value == 0) {
 		return nullptr;
 	}
 	Entity *found = nullptr;
@@ -519,15 +519,9 @@ end:;
 }
 
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
-	String name = entity->token.string;
-	u32 hash = 0;
-	Ast *ident = entity->identifier.load(std::memory_order_relaxed);
-	if (ident != nullptr) {
-		hash = ident->Ident.hash;
-	}
-	if (hash == 0) {
-		hash = string_hash(name);
-	}
+	auto name = entity_interned_name(entity);
+	u32 hash = entity->interned_name_hash.load(std::memory_order_relaxed);
+	GB_ASSERT(hash != 0);
 	if (in_single_threaded_checker_stage.load(std::memory_order_relaxed)) {
 		return scope_insert_with_name_no_mutex(s, name, hash, entity);
 	} else {
@@ -536,15 +530,9 @@ gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 }
 
 gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
-	String name = entity->token.string;
-	u32 hash = 0;
-	Ast *ident = entity->identifier.load(std::memory_order_relaxed);
-	if (ident != nullptr) {
-		hash = ident->Ident.hash;
-	}
-	if (hash == 0) {
-		hash = string_hash(name);
-	}
+	auto name = string_interner_insert(entity->token.string);
+	u32 hash = entity->interned_name_hash.load(std::memory_order_relaxed);
+	GB_ASSERT(hash != 0);
 	return scope_insert_with_name_no_mutex(s, name, hash, entity);
 }
 
@@ -679,7 +667,7 @@ gb_internal bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		return false;
 	}
 
-	Entity *shadowed = scope_lookup(parent, name);
+	Entity *shadowed = scope_lookup(parent, entity_interned_name(e));
 	if (shadowed == nullptr) {
 		return false;
 	}
@@ -961,8 +949,9 @@ gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
 
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
+	InternedString key = string_interner_insert(n);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup(p->scope, n);
+	Entity *e = scope_lookup(p->scope, key);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
@@ -974,8 +963,9 @@ gb_internal void add_package_dependency(CheckerContext *c, char const *package_n
 
 gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);
+	InternedString key = string_interner_insert(n);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup(p->scope, n);
+	Entity *e = scope_lookup(p->scope, key);
 	if (e == nullptr) {
 		return;
 	}
@@ -1373,6 +1363,9 @@ gb_internal void init_universal(void) {
 		BuiltinProcId id = cast(BuiltinProcId)i;
 		String name = builtin_procs[i].name;
 		if (name != "") {
+			u32 hash = 0;
+			InternedString interned = string_interner_insert(name, 0, &hash);
+
 			Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
 			entity->Builtin.id = id;
 			switch (builtin_procs[i].pkg) {
@@ -1381,7 +1374,7 @@ gb_internal void init_universal(void) {
 				break;
 			case BuiltinProcPkg_intrinsics:
 				add_global_entity(entity, intrinsics_pkg->scope);
-				GB_ASSERT(scope_lookup_current(intrinsics_pkg->scope, name) != nullptr);
+				GB_ASSERT(scope_lookup_current(intrinsics_pkg->scope, interned, hash) != nullptr);
 				break;
 			}
 		}
@@ -2763,7 +2756,7 @@ gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity) {
 
 
 gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
-	Entity *e = scope_lookup(scope, name);
+	Entity *e = scope_lookup(scope, string_interner_insert(name));
 	if (e == nullptr) {
 		return;
 	}
@@ -2775,7 +2768,9 @@ gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String co
 gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *pkg) {
 	AstPackage *testing_package = get_core_package(&c->info, str_lit("testing"));
 	Scope *testing_scope = testing_package->scope;
-	Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(str_lit("Test_Signature"), 0, &hash);
+	Entity *test_signature = scope_lookup_current(testing_scope, interned, hash);
 
 	Scope *s = pkg->scope;
 	for (auto const &entry : s->elements) {
@@ -3229,7 +3224,9 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d);
 
 
 gb_internal Entity *find_core_entity(Checker *c, String name) {
-	Entity *e = scope_lookup_current(c->info.runtime_package->scope, name);
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
+	Entity *e = scope_lookup_current(c->info.runtime_package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
@@ -3239,7 +3236,9 @@ gb_internal Entity *find_core_entity(Checker *c, String name) {
 }
 
 gb_internal Type *find_core_type(Checker *c, String name) {
-	Entity *e = scope_lookup_current(c->info.runtime_package->scope, name);
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
+	Entity *e = scope_lookup_current(c->info.runtime_package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
@@ -3254,8 +3253,10 @@ gb_internal Type *find_core_type(Checker *c, String name) {
 
 
 gb_internal Entity *find_entity_in_pkg(CheckerInfo *info, String const &pkg, String const &name) {
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
 	AstPackage *package = get_core_package(info, pkg);
-	Entity *e = scope_lookup_current(package->scope, name);
+	Entity *e = scope_lookup_current(package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
@@ -3264,8 +3265,10 @@ gb_internal Entity *find_entity_in_pkg(CheckerInfo *info, String const &pkg, Str
 }
 
 gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String const &name) {
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
 	AstPackage *package = get_core_package(info, pkg);
-	Entity *e = scope_lookup_current(package->scope, name);
+	Entity *e = scope_lookup_current(package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
@@ -4558,7 +4561,9 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 			if (name == "builtin") {
 				mutex_lock(&ctx->info->builtin_mutex);
 				add_entity(ctx, builtin_pkg->scope, nullptr, e);
-				GB_ASSERT(scope_lookup(builtin_pkg->scope, e->token.string) != nullptr);
+				auto interned = entity_interned_name(e);
+				u32 hash = e->interned_name_hash.load();
+				GB_ASSERT(scope_lookup(builtin_pkg->scope, interned, hash) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
 				}
@@ -7514,7 +7519,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
 		GB_ASSERT(s->flags&ScopeFlag_Init);
-		Entity *e = scope_lookup_current(s, str_lit("main"));
+		Entity *e = scope_lookup_current(s, string_interner_insert(str_lit("main")));
 		if (e == nullptr) {
 			Token token = {};
 			token.pos.file_id = 0;

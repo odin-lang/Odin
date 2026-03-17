@@ -226,6 +226,7 @@ struct TypeNamed {
 	TYPE_KIND(Generic, struct {                               \
 		i64     id;                                       \
 		String  name;                                     \
+		InternedString interned_name;                     \
 		Type *  specialized;                              \
 		Scope * scope;                                    \
 		Entity *entity;                                   \
@@ -986,10 +987,11 @@ gb_internal Type *alloc_type(TypeKind kind) {
 }
 
 
-gb_internal Type *alloc_type_generic(Scope *scope, i64 id, String name, Type *specialized) {
+gb_internal Type *alloc_type_generic(Scope *scope, i64 id, InternedString interned_name, Type *specialized) {
 	Type *t = alloc_type(Type_Generic);
 	t->Generic.id = id;
-	t->Generic.name = name;
+	t->Generic.name = interned_name.string();
+	t->Generic.interned_name = interned_name;
 	t->Generic.specialized = specialized;
 	t->Generic.scope = scope;
 	return t;
@@ -3569,9 +3571,9 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 
 
 
-gb_internal Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident=false);
+gb_internal Selection lookup_field_with_selection(Type *type_, InternedString field_name, bool is_type, Selection sel, bool allow_blank_ident=false);
 
-gb_internal Selection lookup_field(Type *type_, String field_name, bool is_type, bool allow_blank_ident=false) {
+gb_internal Selection lookup_field(Type *type_, InternedString field_name, bool is_type, bool allow_blank_ident=false) {
 	return lookup_field_with_selection(type_, field_name, is_type, empty_selection, allow_blank_ident);
 }
 
@@ -3624,13 +3626,13 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	return empty_selection;
 }
 
-gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash=0);
+gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash=0);
 gb_internal bool has_type_got_objc_class_attribute(Type *t);
 
-gb_internal Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident) {
+gb_internal Selection lookup_field_with_selection(Type *type_, InternedString field_name, bool is_type, Selection sel, bool allow_blank_ident) {
 	GB_ASSERT(type_ != nullptr);
 
-	if (!allow_blank_ident && is_blank_ident(field_name)) {
+	if (!allow_blank_ident && field_name.is_blank()) {
 		return empty_selection;
 	}
 
@@ -3652,7 +3654,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
 					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
-					if (entry.name == field_name) {
+					if (entry.interned == field_name) {
 						sel.entity = entry.entity;
 						sel.pseudo_field = true;
 						return sel;
@@ -3679,7 +3681,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			for_array(i, type->Enum.fields) {
 				Entity *f = type->Enum.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
-				String str = f->token.string;
+				auto str = entity_interned_name(f);
 
 				if (field_name == str) {
 					sel.entity = f;
@@ -3730,7 +3732,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
 					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
-					if (entry.name == field_name) {
+					if (entry.interned == field_name) {
 						sel.entity = entry.entity;
 						sel.pseudo_field = true;
 						return sel;
@@ -3759,7 +3761,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
 				continue;
 			}
-			String str = f->token.string;
+			auto str = entity_interned_name(f);
 			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
@@ -3788,11 +3790,12 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		bool is_soa_of_array = is_soa && is_type_array(type->Struct.soa_elem);
 
 		if (is_soa_of_array) {
-			String mapped_field_name = {};
-			     if (field_name == "r") mapped_field_name = str_lit("x");
-			else if (field_name == "g") mapped_field_name = str_lit("y");
-			else if (field_name == "b") mapped_field_name = str_lit("z");
-			else if (field_name == "a") mapped_field_name = str_lit("w");
+			InternedString mapped_field_name = {};
+			String n = field_name.string();
+			     if (n == "r") mapped_field_name = string_interner_insert(str_lit("x"));
+			else if (n == "g") mapped_field_name = string_interner_insert(str_lit("y"));
+			else if (n == "b") mapped_field_name = string_interner_insert(str_lit("z"));
+			else if (n == "a") mapped_field_name = string_interner_insert(str_lit("w"));
 			return lookup_field_with_selection(type, mapped_field_name, is_type, sel, allow_blank_ident);
 		}
 	} else if (type->kind == Type_BitField) {
@@ -3801,7 +3804,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
 				continue;
 			}
-			String str = f->token.string;
+			auto str = entity_interned_name(f);
 			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
@@ -3819,11 +3822,12 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
 			gb_local_persist Entity *entity__any_id = alloc_entity_field(nullptr, make_token_ident(id_str), t_typeid, false, 1);
 
-			if (field_name == data_str) {
+			String n = field_name.string();
+			if (n == data_str) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_data;
 				return sel;
-			} else if (field_name == id_str) {
+			} else if (n == id_str) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__any_id;
 				return sel;
@@ -3841,19 +3845,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f16, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f16, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f16, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3870,19 +3876,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f32, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f32, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f32, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3899,19 +3907,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f64, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f64, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f64, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3928,19 +3938,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_untyped_float, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_untyped_float, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_untyped_float, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3955,7 +3967,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		String allocator_str = str_lit("allocator");
 		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
 
-		if (field_name == allocator_str) {
+		String n = field_name.string();
+		if (n == allocator_str) {
 			selection_add_index(&sel, 3);
 			sel.entity = entity__allocator;
 			return sel;
@@ -3965,7 +3978,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		String allocator_str = str_lit("allocator");
 		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 2);
 
-		if (field_name == allocator_str) {
+		String n = field_name.string();
+		if (n == allocator_str) {
 			selection_add_index(&sel, 2);
 			sel.entity = entity__allocator;
 			return sel;
@@ -3973,7 +3987,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 
 
 #define _ARRAY_FIELD_CASE_IF(_length, _name) \
-	if (field_name == (_name)) { \
+	if (n == (_name)) { \
 		selection_add_index(&sel, (_length)-1); \
 		sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), elem, (_length)-1); \
 		return sel; \
@@ -3986,7 +4000,7 @@ case (_length): \
 
 
 	} else if (type->kind == Type_Array) {
-
+		String n = field_name.string();
 		Type *elem = type->Array.elem;
 
 		if (type->Array.count <= 4) {
@@ -4001,8 +4015,9 @@ case (_length): \
 			}
 		}
 	} else if (type->kind == Type_SimdVector) {
-
+		String n = field_name.string();
 		Type *elem = type->SimdVector.elem;
+
 		if (type->SimdVector.count <= 4) {
 			// HACK(bill): Memory leak
 			switch (type->SimdVector.count) {

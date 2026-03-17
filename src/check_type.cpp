@@ -5,7 +5,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Array);
-	Entity *e = scope_lookup_current(ctx->scope, name);
+	InternedString interned = string_interner_insert(name);
+
+	Entity *e = scope_lookup_current(ctx->scope, interned);
 	if (e != nullptr) {
 		gbString str = nullptr;
 		defer (gb_string_free(str));
@@ -47,7 +49,8 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 		for (Entity *f : t->Struct.fields) {
 			GB_ASSERT(f->kind == Entity_Variable);
 			String name = f->token.string;
-			Entity *e = scope_lookup_current(ctx->scope, name);
+			InternedString interned = entity_interned_name(f);
+			Entity *e = scope_lookup_current(ctx->scope, interned);
 			if (e != nullptr && name != "_") {
 				gbString ot = type_to_string(original_type);
 				// TODO(bill): Better type error
@@ -423,7 +426,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						Ast *s = type_expr->TypeidType.specialization;
 						specialization = check_type(ctx, s);
 					}
-					type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+					type = alloc_type_generic(ctx->scope, 0, string_interner_insert(str_lit("")), specialization);
 				} else {
 					type = check_type(ctx, type_expr);
 					if (is_type_polymorphic(type)) {
@@ -981,7 +984,9 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		e->Constant.docs = docs;
 		e->Constant.comment = comment;
 
-		if (scope_lookup_current(ctx->scope, name) != nullptr) {
+		auto interned = entity_interned_name(e);
+
+		if (scope_lookup_current(ctx->scope, interned) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
 			add_entity(ctx, ctx->scope, nullptr, e);
@@ -1043,6 +1048,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		CommentGroup *comment = f->comment;
 
 		String name = f->name->Ident.token.string;
+		InternedString interned = f->name->Ident.interned;
 
 		if (f->type == nullptr) {
 			error(field, "A bit_field's field must have a type");
@@ -1093,7 +1099,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			gb_string_free(s);
 		}
 
-		if (scope_lookup_current(ctx->scope, name) != nullptr) {
+		if (scope_lookup_current(ctx->scope, interned) != nullptr) {
 			error(f->name, "'%.*s' is already declared in this bit_field", LIT(name));
 		} else {
 			i64 bit_size_i64 = exact_value_to_i64(bit_size);
@@ -1513,7 +1519,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
 				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.name);
+					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name);
 					GB_ASSERT(e != nullptr);
 					if (modify_type) {
 						e->kind = Entity_Constant;
@@ -1566,7 +1572,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
 				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.name);
+					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name);
 					GB_ASSERT(e != nullptr);
 					if (modify_type) {
 						e->kind = Entity_Constant;
@@ -1905,7 +1911,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						detemine_type_from_operand = true;
 						type = t_invalid;
 					} else {
-						type = alloc_type_generic(ctx->scope, 0, str_lit(""), specialization);
+						type = alloc_type_generic(ctx->scope, 0, string_interner_insert(str_lit("")), specialization);
 					}
 				} else {
 					type = t_typeid;
@@ -2330,8 +2336,7 @@ gb_internal bool ast_references_poly_params(Scope *scope, Ast *node) {
 	}
 	switch (node->kind) {
 	case Ast_Ident: {
-		String name = node->Ident.token.string;
-		Entity *e = scope_lookup(scope, name);
+		Entity *e = scope_lookup(scope, node->Ident.interned, node->Ident.hash);
 		if (e != nullptr && e->kind == Entity_TypeName && e->type != nullptr && e->type->kind == Type_Generic) {
 			return true;
 		}
@@ -2408,7 +2413,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false);
 		} else {
 			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
-				type = alloc_type_generic(ctx->scope, 0, str_lit("$deferred_return"), nullptr);
+				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(str_lit("$deferred_return")), nullptr);
 			} else {
 				type = check_type(ctx, field->type);
 			}
@@ -3534,7 +3539,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			Ast *s = pt->specialization;
 			specific = check_type(&c, s);
 		}
-		Type *t = alloc_type_generic(ctx->scope, 0, token.string, specific);
+		Type *t = alloc_type_generic(ctx->scope, 0, ident->Ident.interned, specific);
 		if (ctx->allow_polymorphic_types) {
 			if (ctx->disallow_polymorphic_return_types) {
 				error(ident, "Undeclared polymorphic parameter '%.*s' in return type", LIT(token.string));
