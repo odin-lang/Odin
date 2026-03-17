@@ -494,14 +494,14 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			valid_names := enum_type_info.names
 			underlying_values := enum_type_info.values
 
-			#no_bounds_check for name in names {
+			#no_bounds_check outer_loop: for name in names {
 				found: bool
 				#no_bounds_check for valid_name, index in valid_names {
 					if name == valid_name {
 						shift := u128(underlying_values[index]) - u128(specific_type_info.lower)
 						value |= u128(1 << shift)
 						found = true
-						continue
+						continue outer_loop
 					}
 				}
 				if !found {
