@@ -1086,7 +1086,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							char const *key = string_intern(name);
+							char const *key = string_intern_cstring(name);
 
 							if (map_get(&build_context.defined_values, key) != nullptr) {
 								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));
@@ -3588,7 +3588,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	MAIN_TIME_SECTION("initialization");
 
-	init_string_interner();
+	g_string_interner = string_interner_create();
 	init_global_error_collector();
 	init_keyword_hash_table();
 	init_terminal();

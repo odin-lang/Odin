@@ -40,6 +40,7 @@ struct MemoryBlock {
 	u8 *         base; 
 	isize        size;
 	isize        used;
+	isize        committed;
 };
 
 struct Arena {
@@ -48,13 +49,14 @@ struct Arena {
 	// BlockingMutex mutex;
 	isize         temp_count;
 	Thread *      parent_thread;
+	bool          custom_arena;
 };
 
 enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
 
 gb_global isize DEFAULT_PAGE_SIZE = 4096;
 
-gb_internal MemoryBlock *virtual_memory_alloc(isize size);
+gb_internal MemoryBlock *virtual_memory_alloc(isize size, bool commit);
 gb_internal void virtual_memory_dealloc(MemoryBlock *block);
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment);
 gb_internal void arena_free_all(Arena *arena);
@@ -82,7 +84,7 @@ gb_internal void thread_init_arenas(Thread *t) {
 
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
-	GB_ASSERT(arena->parent_thread == get_current_thread());
+	GB_ASSERT(arena->custom_arena || arena->parent_thread == get_current_thread());
 
 	isize size = 0;
 	if (arena->curr_block != nullptr) {
@@ -95,7 +97,7 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 		
 		isize block_size = gb_max(size, arena->minimum_block_size);
 		
-		MemoryBlock *new_block = virtual_memory_alloc(block_size);
+		MemoryBlock *new_block = virtual_memory_alloc(block_size, true);
 		new_block->prev = arena->curr_block;
 		arena->curr_block = new_block;
 	}
@@ -112,6 +114,62 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	// NOTE(bill): memory will be zeroed by default due to virtual memory 
 	return ptr;	
 }
+
+gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit);
+gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize commit_amount);
+
+struct StaticArena {
+	u8 *  data;
+	isize used;
+	isize committed;
+	isize reserved;
+	isize commit_block_size;
+};
+
+enum {STATIC_ARENA_DEFAULT_COMMIT_BLOCK_SIZE = 8<<20};
+
+gb_internal void static_arena_init(StaticArena *arena, isize reserve_size, isize commit_block_size) {
+	GB_ASSERT(gb_is_power_of_two(reserve_size));
+	GB_ASSERT(gb_is_power_of_two(commit_block_size));
+	GB_ASSERT(commit_block_size <= reserve_size);
+	arena->data = cast(u8 *)platform_virtual_memory_alloc_internal(reserve_size, false);
+	arena->reserved = reserve_size;
+	arena->commit_block_size = commit_block_size;
+}
+
+gb_internal void static_arena_commit_memory(StaticArena *arena, isize amount) {
+	isize blocks = (amount + arena->commit_block_size-1)/arena->commit_block_size;
+	isize total_amount = blocks * arena->commit_block_size;
+
+	if (total_amount > arena->reserved - arena->committed) {
+		total_amount = arena->reserved - arena->committed;
+	}
+
+	platform_virtual_memory_commit_internal(arena->data + arena->committed, total_amount);
+	arena->committed += total_amount;
+}
+
+gb_internal void *static_arena_alloc(StaticArena *arena, isize size, isize alignment) {
+	GB_ASSERT(gb_is_power_of_two(alignment));
+
+	size = align_formula_isize(size, alignment);
+
+	u8 *curr = arena->data + arena->used;
+	curr = cast(u8 *)align_formula_ptr(curr, alignment);
+
+	u8 *end = curr + size;
+	if (end-arena->data > arena->committed) {
+		isize needed = (end - arena->data) - arena->committed;
+		static_arena_commit_memory(arena, needed);
+	}
+	GB_ASSERT_MSG(end-arena->data <= arena->committed, "out of memory for the static arena");
+
+	arena->used = end - arena->data;
+
+	return curr;
+}
+
+
 
 
 template <typename T>
@@ -138,9 +196,12 @@ struct PlatformMemoryBlock {
 gb_global std::atomic<isize> global_platform_memory_total_usage;
 gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
 
-gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size);
+gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size, bool commit);
 gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block);
 gb_internal void platform_virtual_memory_protect(void *memory, isize size);
+
+gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit);
+gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize commit_amount);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	gb_internal void platform_virtual_memory_init(void) {
@@ -153,14 +214,20 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
 	}
 
-	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
-		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-		if (pmblock == nullptr) {
+	gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit) {
+		DWORD flags = commit ? MEM_RESERVE|MEM_COMMIT : MEM_RESERVE;
+		void *mem = VirtualAlloc(0, total_size, flags, PAGE_READWRITE);
+		if (mem == nullptr) {
 			gb_printf_err("Out of Virtual memory, oh no...\n");
 			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
 			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
-			GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+			GB_ASSERT_MSG(mem != nullptr, "Out of Virtual Memory, oh no...");
 		}
+		return mem;
+	}
+
+	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size, bool commit) {
+		PlatformMemoryBlock *pmblock = cast(PlatformMemoryBlock *)platform_virtual_memory_alloc_internal(total_size, commit);
 		global_platform_memory_total_usage.fetch_add(total_size);
 		return pmblock;
 	}
@@ -172,6 +239,16 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 		DWORD old_protect = 0;
 		BOOL is_protected = VirtualProtect(memory, size, PAGE_NOACCESS, &old_protect);
 		GB_ASSERT(is_protected);
+	}
+
+	gb_internal bool platform_virtual_memory_commit_internal(void *data, isize commit_amount) {
+		void *res = VirtualAlloc(data, commit_amount, MEM_COMMIT, PAGE_READWRITE);
+		if (res == nullptr) {
+			GB_PANIC("Out of Virtual Memory, oh no...\n");
+			GB_ASSERT_MSG(res != nullptr, "Out of Virtual Memory, oh no...");
+			return false;
+		}
+		return true;
 	}
 #else
 	#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
@@ -185,9 +262,20 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 		DEFAULT_PAGE_SIZE = gb_max(DEFAULT_PAGE_SIZE, cast(isize)sysconf(_SC_PAGE_SIZE));
 		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
 	}
+
+	gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit) {
+		void *mem = mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		if (mem == nullptr) {
+			gb_printf_err("Out of Virtual memory, oh no...\n");
+			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
+			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
+			GB_ASSERT_MSG(mem != nullptr, "Out of Virtual Memory, oh no...");
+		}
+		return mem;
+	}
 	
-	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
-		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size, bool commit) {
+		PlatformMemoryBlock *pmblock = cast(PlatformMemoryBlock *)platform_virtual_memory_alloc_internal(total_size, commit);
 		if (pmblock == nullptr) {
 			gb_printf_err("Out of Virtual memory, oh no...\n");
 			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
@@ -196,6 +284,9 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 		}
 		global_platform_memory_total_usage.fetch_add(total_size);
 		return pmblock;
+	}
+	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc_uncommited(isize total_size) {
+		return platform_virtual_memory_alloc(total_size);
 	}
 	gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block) {
 		isize size = block->total_size;
@@ -206,9 +297,19 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 		int err = mprotect(memory, size, PROT_NONE);
 		GB_ASSERT(err == 0);
 	}
+
+	gb_internal bool platform_virtual_memory_commit_internal(void *data, isize commit_amount) {
+		int err = mprotect(data, commit_amount, PROT_READ | PROT_WRITE)
+		if (err != 0) {
+			GB_PANIC("Out of Virtual Memory, oh no...\n");
+			GB_ASSERT_MSG(err == 0, "Out of Virtual Memory, oh no...");
+			return false;
+		}
+		return true;
+	}
 #endif
 
-gb_internal MemoryBlock *virtual_memory_alloc(isize size) {
+gb_internal MemoryBlock *virtual_memory_alloc(isize size, bool commit) {
 	isize const page_size = DEFAULT_PAGE_SIZE; 
 	
 	isize total_size     = size + gb_size_of(PlatformMemoryBlock);
@@ -224,7 +325,7 @@ gb_internal MemoryBlock *virtual_memory_alloc(isize size) {
 		do_protection  = true;
 	}
 	
-	PlatformMemoryBlock *pmblock = platform_virtual_memory_alloc(total_size);
+	PlatformMemoryBlock *pmblock = platform_virtual_memory_alloc(total_size, commit);
 	GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
 	
 	pmblock->block.base = cast(u8 *)pmblock + base_offset;

@@ -424,9 +424,10 @@ struct AstSplitArgs {
 
 #define AST_KINDS \
 	AST_KIND(Ident,          "identifier",      struct { \
-		Token   token;  \
-		std::atomic<Entity *> entity; \
-		u32     hash;   \
+		Token                 token;    \
+		std::atomic<Entity *> entity;   \
+		u32                   hash;     \
+		InternedString        interned; \
 	}) \
 	AST_KIND(Implicit,       "implicit",        Token) \
 	AST_KIND(Uninit,         "uninitialized value", Token) \
