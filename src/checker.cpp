@@ -6229,6 +6229,12 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	}
 }
 
+gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker_proc) {
+	Checker *c = cast(Checker *)data;
+	calculate_global_init_order(c);
+	return 0;
+}
+
 gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char const *from_msg) {
 	if (e == nullptr || e->kind != Entity_Procedure) {
 		return;
@@ -7497,8 +7503,6 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check objc context provider procedures");
 	check_objc_context_provider_procedures(c);
 
-	TIME_SECTION("calculate global init order");
-	calculate_global_init_order(c);
 
 	TIME_SECTION("add type info for type definitions");
 	add_type_info_for_type_definitions(c);
@@ -7506,6 +7510,13 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("update dependency tree for procedures");
 	check_update_dependency_tree_for_procedures(c);
+
+	TIME_SECTION("calculate global init order");
+	if (build_context.no_threaded_checker) {
+		calculate_global_init_order_worker_proc(c);
+	} else {
+		thread_pool_add_task(calculate_global_init_order_worker_proc, c);
+	}
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
