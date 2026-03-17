@@ -39,11 +39,6 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 	}
 	Type *original_type = t;
 	t = base_type(type_deref(t));
-	gbString str = nullptr;
-	defer (gb_string_free(str));
-	if (node != nullptr) {
-		str = expr_to_string(node);
-	}
 
 	if (t->kind == Type_Struct) {
 		for (Entity *f : t->Struct.fields) {
@@ -54,8 +49,10 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 			if (e != nullptr && name != "_") {
 				gbString ot = type_to_string(original_type);
 				// TODO(bill): Better type error
-				if (str != nullptr) {
+				if (node != nullptr) {
+					gbString str = expr_to_string(node);
 					error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
+					gb_string_free(str);
 				} else {
 					error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
 				}
