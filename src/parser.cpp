@@ -792,6 +792,7 @@ gb_internal Ast *ast_uninit(AstFile *f, Token token) {
 
 gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 	String s = token.string;
+	string_interner_insert(s);
 	switch (token.kind) {
 	case Token_Rune:
 		if (!unquote_string(ast_allocator(f), &s, 0)) {
@@ -848,6 +849,7 @@ gb_internal Ast *ast_basic_directive(AstFile *f, Token token, Token name) {
 	Ast *result = alloc_ast_node(f, Ast_BasicDirective);
 	result->BasicDirective.token = token;
 	result->BasicDirective.name = name;
+	string_interner_insert(name.string);
 	if (string_starts_with(name.string, str_lit("load"))) {
 		f->seen_load_directive_count++;
 	}

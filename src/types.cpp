@@ -3048,9 +3048,9 @@ gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
 		return false;
 	}
 
-	if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
-		return false;
-	}
+	// if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
+	// 	return false;
+	// }
 
 	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, true);
@@ -3066,9 +3066,9 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		return false;
 	}
 
-	if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
-		return false;
-	}
+	// if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
+	// 	return false;
+	// }
 
 	#if 0
 	if (x->kind == Type_Named) {
