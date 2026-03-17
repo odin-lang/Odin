@@ -286,7 +286,7 @@ gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize comm
 		return pmblock;
 	}
 	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc_uncommited(isize total_size) {
-		return platform_virtual_memory_alloc(total_size);
+		return platform_virtual_memory_alloc(total_size, false);
 	}
 	gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block) {
 		isize size = block->total_size;
@@ -299,7 +299,7 @@ gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize comm
 	}
 
 	gb_internal bool platform_virtual_memory_commit_internal(void *data, isize commit_amount) {
-		int err = mprotect(data, commit_amount, PROT_READ | PROT_WRITE)
+		int err = mprotect(data, commit_amount, PROT_READ | PROT_WRITE);
 		if (err != 0) {
 			GB_PANIC("Out of Virtual Memory, oh no...\n");
 			GB_ASSERT_MSG(err == 0, "Out of Virtual Memory, oh no...");
