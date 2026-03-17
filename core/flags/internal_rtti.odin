@@ -152,7 +152,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		}
 
 	case runtime.Type_Info_Bit_Set:
-		// Parse a string of 1's and 0's, from left to right,
+		// Parse a string of 1s and 0s, from left to right,
 		// least significant bit to most significant bit.
 		value: u128
 

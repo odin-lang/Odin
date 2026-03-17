@@ -25,7 +25,7 @@ Underscores (`_`) in a flag will be replaced with dashes (`-`).
 
 Bit sets may be set with a strictly comma-separated list of options.
 
-Bit sets may also be set with a binary string of 0's and 1's, and will be parsed from left to right, from least significant bit to most significant bit. Underscores are allowed and will be ignored. However, starting with an underscore is disallowed.
+Bit sets may also be set with a binary string of 0s and 1s, and will be parsed from left to right, from least significant bit to most significant bit. Underscores are allowed and will be ignored. However, starting with an underscore is disallowed.
 
 
 Unhandled Arguments:
