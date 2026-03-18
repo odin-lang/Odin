@@ -1767,13 +1767,13 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 			              "\n\tArgTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
 			              LLVMPrintTypeToString(arg.type),
 			              j, ft->args.count,
-			              LLVMGetTypeContext(arg.type), ft->ctx, LLVMGetGlobalContext());
+			              LLVMGetTypeContext(arg.type), ft->ctx);
 		}
 		GB_ASSERT_MSG(LLVMGetTypeContext(ft->ret.type) == ft->ctx,
 		              "\n\t%s"
 		              "\n\tRetTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
 		              LLVMPrintTypeToString(ft->ret.type),
-		              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
+		              LLVMGetTypeContext(ft->ret.type), ft->ctx);
 	}
 	for (unsigned i = 0; i < param_count; i++) {
 		if (params_by_ptr[i]) {
@@ -1791,7 +1791,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 
 	GB_ASSERT_MSG(LLVMGetTypeContext(new_abi_fn_type) == m->ctx,
 	              "\n\tFuncTypeCtx: %p\n\tCurrentCtx:  %p\n\tGlobalCtx:   %p",
-	              LLVMGetTypeContext(new_abi_fn_type), m->ctx, LLVMGetGlobalContext());
+	              LLVMGetTypeContext(new_abi_fn_type), m->ctx);
 
 	map_set(&m->func_raw_types, type, new_abi_fn_type);
 
