@@ -472,6 +472,14 @@ gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type_as_slice(OdinDocWriter 
 	return odin_write_item_as_slice(w, index);
 }
 
+gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type2_as_slice(OdinDocWriter *w, Type *type0, Type *type1, bool cache=true) {
+	OdinDocTypeIndex indices[2] = {};
+	indices[0] = odin_doc_type(w, type0, cache);
+	indices[1] = odin_doc_type(w, type1, cache);
+
+	return odin_write_slice(w, indices, gb_count_of(indices));
+}
+
 gb_internal OdinDocArray<OdinDocEntityIndex> odin_doc_add_entity_as_slice(OdinDocWriter *w, Entity *e) {
 	OdinDocEntityIndex index = odin_doc_add_entity(w, e);
 	return odin_write_item_as_slice(w, index);
@@ -555,7 +563,13 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 		doc_type.kind = OdinDocType_Array;
 		doc_type.elem_count_len = 1;
 		doc_type.elem_counts[0] = type->Array.count;
-		doc_type.types = odin_doc_type_as_slice(w, type->Array.elem);
+		if (type->Array.generic_count != nullptr) {
+			doc_type.types = odin_doc_type2_as_slice(w,
+				type->Array.elem,
+				type->Array.generic_count);
+		} else {
+			doc_type.types = odin_doc_type_as_slice(w, type->Array.elem);
+		}
 		break;
 	case Type_EnumeratedArray:
 		doc_type.kind = OdinDocType_EnumeratedArray;
@@ -575,6 +589,20 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 	case Type_DynamicArray:
 		doc_type.kind = OdinDocType_DynamicArray;
 		doc_type.types = odin_doc_type_as_slice(w, type->DynamicArray.elem);
+		break;
+	case Type_FixedCapacityDynamicArray:
+		doc_type.kind = OdinDocType_FixedCapacityDynamicArray;
+		doc_type.elem_count_len = 1;
+		doc_type.elem_counts[0] = type->FixedCapacityDynamicArray.capacity;
+
+		if (type->FixedCapacityDynamicArray.generic_capacity != nullptr) {
+			doc_type.types = odin_doc_type2_as_slice(w,
+				type->FixedCapacityDynamicArray.elem,
+				type->FixedCapacityDynamicArray.generic_capacity);
+
+		} else {
+			doc_type.types = odin_doc_type_as_slice(w, type->FixedCapacityDynamicArray.elem);
+		}
 		break;
 	case Type_Map:
 		doc_type.kind = OdinDocType_Map;
@@ -1022,7 +1050,8 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	defer (array_free(&entries));
 
 	for (auto const &element : pkg->scope->elements) {
-		String name = element.key;
+		u32 hash = element.hash;
+		auto interned = pkg->scope->elements.keys[hash & (pkg->scope->elements.cap-1)];
 		Entity *e = element.value;
 		switch (e->kind) {
 		case Entity_Invalid:
@@ -1051,7 +1080,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 		}
 
 		OdinDocScopeEntry entry = {};
-		entry.name = odin_doc_write_string(w, name);
+		entry.name = odin_doc_write_string(w, interned.string());
 		entry.entity = odin_doc_add_entity(w, e);
 		array_add(&entries, entry);
 	}

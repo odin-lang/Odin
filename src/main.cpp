@@ -411,6 +411,8 @@ enum BuildFlagKind {
 	BuildFlag_InternalByValue,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
+	BuildFlag_InternalLLVMMem2Reg,
+	BuildFlag_InternalEnableRVO,
 
 	BuildFlag_Tilde,
 
@@ -642,6 +644,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMMem2Reg,     str_lit("internal-llvm-mem2reg"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
@@ -1082,7 +1086,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							char const *key = string_intern(name);
+							char const *key = string_intern_cstring(name);
 
 							if (map_get(&build_context.defined_values, key) != nullptr) {
 								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));
@@ -1634,6 +1638,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalLLVMVerification:
 							build_context.internal_ignore_llvm_verification = true;
 							break;
+						case BuildFlag_InternalLLVMMem2Reg:
+							build_context.internal_llvm_mem2reg = true;
+							break;
+						case BuildFlag_InternalEnableRVO:
+							build_context.enable_rvo = true;
+							break;
+
 
 
 						case BuildFlag_Tilde:
@@ -4001,8 +4012,8 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
-	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
+	Parser * parser  = permanent_alloc_item<Parser>();
+	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
 
 	MAIN_TIME_SECTION("parse files");
@@ -4140,7 +4151,7 @@ int main(int arg_count, char const **arg_ptr) {
 	} else
 #endif
 	{
-		lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+		lbGenerator *gen = permanent_alloc_item<lbGenerator>();
 		if (!lb_init_generator(gen, checker)) {
 			return 1;
 		}

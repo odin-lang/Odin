@@ -250,7 +250,7 @@ struct DeclInfo {
 	i64 variadic_reuse_max_align;
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	struct lbModule *code_gen_module;
+	std::atomic<struct lbModule *> code_gen_module;
 };
 
 // ProcInfo stores the information needed for checking a procedure
@@ -266,6 +266,264 @@ struct ProcInfo {
 };
 
 
+enum { DEFAULT_SCOPE_CAPACITY = 32 };
+
+
+struct ScopeMapSlot {
+	u32     hash;
+	u32     _pad;
+	Entity *value;
+};
+
+enum { SCOPE_MAP_INLINE_CAP = 16 };
+
+struct ScopeMap {
+	InternedString  inline_keys [SCOPE_MAP_INLINE_CAP];
+	ScopeMapSlot    inline_slots[SCOPE_MAP_INLINE_CAP];
+	InternedString *keys;
+	ScopeMapSlot *  slots;
+	u32             count;
+	u32             cap;
+};
+
+gb_internal gb_inline u32 scope_map_max_load(u32 cap) {
+	return cap - (cap>>2); // 75%
+}
+
+gb_internal gb_inline void scope_map_init(ScopeMap *m) {
+	m->cap = SCOPE_MAP_INLINE_CAP;
+	m->slots = m->inline_slots;
+	m->keys = m->inline_keys;
+}
+
+
+gb_internal Entity *scope_map_insert_for_rehash(
+	InternedString *keys, ScopeMapSlot *slots, u32 mask,
+	InternedString key, u32 hash, Entity *value) {
+	u32 pos = hash & mask;
+	u32 dist = 0;
+
+	for (;;) {
+		ScopeMapSlot *s = &slots[pos];
+
+		if (s->hash == 0) {
+			keys[pos] = key;
+			s->hash   = hash;
+			s->value  = value;
+			return nullptr;
+		}
+
+		u32 existing_dist = (pos - s->hash) & mask;
+
+		if (dist > existing_dist) {
+			auto    tmp_key   = keys[pos];
+			u32     tmp_hash  = s->hash;
+			Entity *tmp_value = s->value;
+
+			keys[pos] = key;
+			s->hash   = hash;
+			s->value  = value;
+
+			hash  = tmp_hash;
+			value = tmp_value;
+			key   = tmp_key;
+			dist  = existing_dist;
+		}
+
+		dist += 1;
+		pos = (pos+1) & mask;
+	}
+}
+
+gb_internal gb_inline void scope_map_allocate_entries(u32 cap, InternedString **keys, ScopeMapSlot **slots) {
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	isize size = (gb_size_of(InternedString) + gb_size_of(ScopeMapSlot)) * cap;
+	u8 *data = cast(u8 *)arena_alloc(arena, size, 8);
+
+	*keys  = cast(InternedString *)data;
+	*slots = cast(ScopeMapSlot *)(*keys + cap);
+
+	// *keys  = permanent_alloc_array<String>(cap);
+	// *slots = permanent_alloc_array<ScopeMapSlot>(cap);
+}
+
+
+gb_internal void scope_map_grow(ScopeMap *m) {
+	u32 new_cap = m->cap << 1;
+	u32 new_mask = new_cap - 1;
+
+	InternedString *new_keys;
+	ScopeMapSlot *  new_slots;
+	scope_map_allocate_entries(new_cap, &new_keys, &new_slots);
+
+	if (m->count > 0) {
+		for (u32 i = 0; i < m->cap; i++) {
+			if (m->slots[i].hash) {
+				scope_map_insert_for_rehash(new_keys, new_slots, new_mask,
+				                            m->keys[i], m->slots[i].hash, m->slots[i].value);
+			}
+		}
+	}
+
+	m->slots = new_slots;
+	m->keys  = new_keys;
+	m->cap   = new_cap;
+}
+
+gb_internal void scope_map_reserve(ScopeMap *m, isize capacity) {
+	if (m->slots == nullptr) {
+		scope_map_init(m);
+	}
+	u32 new_cap = next_pow2_u32(cast(u32)capacity);
+	if (m->cap < new_cap && new_cap > SCOPE_MAP_INLINE_CAP) {
+		scope_map_allocate_entries(new_cap, &m->keys, &m->slots);
+		m->cap   = new_cap;
+	}
+}
+
+
+
+gb_internal Entity *scope_map_insert(ScopeMap *m, InternedString key, u32 hash, Entity *value) {
+	if (m->slots == nullptr) {
+		scope_map_init(m);
+	}
+	if (m->count >= scope_map_max_load(m->cap)) {
+		scope_map_grow(m);
+	}
+
+	u32 mask = m->cap-1;
+	u32 pos = hash & mask;
+	u32 dist = 0;
+
+	for (;;) {
+		ScopeMapSlot *s = &m->slots[pos];
+
+		if (s->hash == 0) {
+			m->keys[pos] = key;
+			s->hash  = hash;
+			s->value = value;
+			m->count += 1;
+			return nullptr;
+		}
+
+		if (s->hash == hash && m->keys[pos] == key) {
+			Entity *old = s->value;
+			s->value = value;
+			return old;
+		}
+
+		u32 existing_dist = (pos - s->hash) & mask;
+
+		if (dist > existing_dist) {
+			auto    tmp_key   = m->keys[pos];
+			u32     tmp_hash  = s->hash;
+			Entity *tmp_value = s->value;
+
+			m->keys[pos] = key;
+			s->hash      = hash;
+			s->value     = value;
+
+			key   = tmp_key;
+			hash  = tmp_hash;
+			value = tmp_value;
+			dist  = existing_dist;
+		}
+
+		dist += 1;
+		pos = (pos+1) & mask;
+	}
+}
+
+gb_internal Entity *scope_map_get(ScopeMap *m, InternedString key, u32 hash) {
+	u32 mask = m->cap-1;
+	u32 pos = hash & mask;
+	u32 dist = 0;
+	for (;;) {
+		ScopeMapSlot *s = &m->slots[pos];
+		u32 curr_hash = s->hash;
+		if (curr_hash == 0) {
+			return nullptr;
+		}
+
+		u32 existing_dist = (pos - curr_hash) & mask;
+		if (dist > existing_dist) {
+			return nullptr;
+		}
+		if (curr_hash == hash && m->keys[pos] == key) {
+			return s->value;
+		}
+
+		dist += 1;
+		pos = (pos + 1) & mask;
+	}
+}
+
+gb_internal void scope_map_clear(ScopeMap *m) {
+	gb_memset(m->slots, 0, gb_size_of(*m->slots) * m->cap);
+	m->count = 0;
+}
+
+struct ScopeMapIterator {
+	ScopeMap const *map;
+	u32 index;
+
+	ScopeMapIterator &operator++() noexcept {
+		for (;;) {
+			++index;
+			if (map->cap == index) {
+				return *this;
+			}
+			ScopeMapSlot *s = map->slots+index;
+			if (s->hash) {
+				return *this;
+			}
+		}
+	}
+
+	bool operator==(ScopeMapIterator const &other) const noexcept {
+		return this->map == other.map && this->index == other.index;
+	}
+
+	operator ScopeMapSlot *() const {
+		return map->slots+index;
+	}
+};
+
+
+gb_internal ScopeMapIterator end(ScopeMap &m) noexcept {
+	return ScopeMapIterator{&m, m.cap};
+}
+gb_internal ScopeMapIterator const end(ScopeMap const &m) noexcept {
+	return ScopeMapIterator{&m, m.cap};
+}
+gb_internal ScopeMapIterator begin(ScopeMap &m) noexcept {
+	if (m.count == 0) {
+		return end(m);
+	}
+
+	u32 index = 0;
+	while (index < m.cap) {
+		if (m.slots[index].hash) {
+			break;
+		}
+		index++;
+	}
+	return ScopeMapIterator{&m, index};
+}
+gb_internal ScopeMapIterator const begin(ScopeMap const &m) noexcept {
+	if (m.count == 0) {
+		return end(m);
+	}
+
+	u32 index = 0;
+	while (index < m.cap) {
+		if (m.slots[index].hash) {
+			break;
+		}
+		index++;
+	}
+	return ScopeMapIterator{&m, index};
+}
 
 enum ScopeFlag : i32 {
 	ScopeFlag_Pkg     = 1<<1,
@@ -281,7 +539,6 @@ enum ScopeFlag : i32 {
 	ScopeFlag_ContextDefined = 1<<16,
 };
 
-enum { DEFAULT_SCOPE_CAPACITY = 32 };
 
 struct Scope {
 	Ast *         node;
@@ -292,7 +549,7 @@ struct Scope {
 	i32 index; // within a procedure
 
 	RwMutex mutex;
-	StringMap<Entity *> elements;
+	ScopeMap elements;
 	PtrSet<Scope *> imported;
 
 	DeclInfo *decl_info;
@@ -625,9 +882,9 @@ gb_internal isize        type_info_index        (CheckerInfo *info, TypeInfoPair
 gb_internal Entity *entity_of_node(Ast *expr);
 
 
-gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
-gb_internal Entity *scope_lookup (Scope *s, String const &name, u32 hash=0);
-gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_, u32 hash=0);
+// gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash=0);
+gb_internal Entity *scope_lookup (Scope *s, InternedString interned, u32 hash);
+gb_internal void    scope_lookup_parent (Scope *s, InternedString name, Scope **scope_, Entity **entity_, u32 hash);
 gb_internal Entity *scope_insert (Scope *s, Entity *entity);
 
 
@@ -652,8 +909,8 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 gb_internal void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws);
 gb_internal void check_delayed_file_import_entity(CheckerContext *c, Ast *decl);
 
-gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator);
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator);
+gb_internal CheckerTypePath *new_checker_type_path();
+gb_internal void destroy_checker_type_path(CheckerTypePath *tp);
 
 gb_internal void    check_type_path_push(CheckerContext *c, Entity *e);
 gb_internal Entity *check_type_path_pop (CheckerContext *c);

@@ -368,8 +368,6 @@ refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width := 
 		if len(z.input_data) != 0 {
 			b = u64(z.input_data[0])
 			z.input_data = z.input_data[1:]
-		} else {
-			b = 0
 		}
 
 		z.code_buffer |= b << u8(z.num_bits)

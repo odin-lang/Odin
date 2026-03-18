@@ -718,7 +718,7 @@ quaternion256_eq :: #force_inline proc "contextless" (a, b: quaternion256) -> bo
 quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b) }
 
 
-string_decode_rune :: proc "contextless" (s: string) -> (rune, int) {
+string_decode_rune :: proc "contextless" (s: string) -> (rune, int) #no_bounds_check {
 	// NOTE(bill): Duplicated here to remove dependency on package unicode/utf8
 
 	@(static, rodata) accept_sizes := [256]u8{
@@ -797,7 +797,7 @@ string_decode_rune :: proc "contextless" (s: string) -> (rune, int) {
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
 
-string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
+string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) #no_bounds_check {
 	RUNE_ERROR :: '\ufffd'
 	RUNE_SELF  :: 0x80
 	UTF_MAX    :: 4
@@ -833,7 +833,7 @@ string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
 }
 
 
-string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) {
+string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) #no_bounds_check {
 	REPLACEMENT_CHAR :: '\ufffd'
 	_surr1           :: 0xd800
 	_surr2           :: 0xdc00
@@ -861,7 +861,7 @@ string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) {
 	return r, w
 }
 
-string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) {
+string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) #no_bounds_check {
 	REPLACEMENT_CHAR :: '\ufffd'
 	_surr1           :: 0xd800
 	_surr2           :: 0xdc00

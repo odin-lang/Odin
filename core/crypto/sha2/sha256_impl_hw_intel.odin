@@ -70,8 +70,7 @@ sha256_transf_hw :: proc "contextless" (ctx: ^Context_256, data: []byte) #no_bou
 	tmp = x86._mm_shuffle_epi32(tmp, 0xb1)            // CDAB
 	state_1 = x86._mm_shuffle_epi32(state_1, 0x1b)    // EFGH
 	state_0 := x86._mm_alignr_epi8(tmp, state_1, 8)   // ABEF
-	// state_1 = x86._mm_blend_epi16(state_1, tmp, 0xf0) // CDGH
-	state_1 = kludge_mm_blend_epi16_0xf0(state_1, tmp)
+	state_1 = x86._mm_blend_epi16(state_1, tmp, 0xf0) // CDGH
 
 	data := data
 	for len(data) >= BLOCK_SIZE_256 {
@@ -238,18 +237,9 @@ sha256_transf_hw :: proc "contextless" (ctx: ^Context_256, data: []byte) #no_bou
 	// Write back the updated state
 	tmp = x86._mm_shuffle_epi32(state_0, 0x1b)        // FEBA
 	state_1 = x86._mm_shuffle_epi32(state_1, 0xb1)    // DCHG
-	// state_0 = x86._mm_blend_epi16(tmp, state_1, 0xf0) // DCBA
-	state_0 = kludge_mm_blend_epi16_0xf0(tmp, state_1)
+	state_0 = x86._mm_blend_epi16(tmp, state_1, 0xf0) // DCBA
 	state_1 = x86._mm_alignr_epi8(state_1, tmp, 8)    // ABEF
 
 	intrinsics.unaligned_store((^x86.__m128i)(&ctx.h[0]), state_0)
 	intrinsics.unaligned_store((^x86.__m128i)(&ctx.h[4]), state_1)
-}
-
-@(private = "file")
-kludge_mm_blend_epi16_0xf0 :: #force_inline proc "contextless"(a, b: x86.__m128i) -> x86.__m128i {
-	// HACK HACK HACK: LLVM got rid of `llvm.x86.sse41.pblendw`.
-	a_ := simd.to_array(a)
-	b_ := simd.to_array(b)
-	return x86.__m128i{a_[0], b_[1]}
 }

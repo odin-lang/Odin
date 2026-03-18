@@ -146,7 +146,7 @@ gb_internal ExactValue exact_value_float(f64 f) {
 
 gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
 	ExactValue result = {ExactValue_Complex};
-	result.value_complex = gb_alloc_item(permanent_allocator(), Complex128);
+	result.value_complex = permanent_alloc_item<Complex128>();
 	result.value_complex->real = real;
 	result.value_complex->imag = imag;
 	return result;
@@ -154,7 +154,7 @@ gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
 
 gb_internal ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
 	ExactValue result = {ExactValue_Quaternion};
-	result.value_quaternion = gb_alloc_item(permanent_allocator(), Quaternion256);
+	result.value_quaternion = permanent_alloc_item<Quaternion256>();
 	result.value_quaternion->real = real;
 	result.value_quaternion->imag = imag;
 	result.value_quaternion->jmag = jmag;
@@ -438,7 +438,7 @@ gb_internal ExactValue exact_value_to_complex(ExactValue v) {
 		// return exact_value_complex(v.value_quaternion.real, v.value_quaternion.imag);
 	}
 	ExactValue r = {ExactValue_Invalid};
-	v.value_complex = gb_alloc_item(permanent_allocator(), Complex128);
+	v.value_complex = permanent_alloc_item<Complex128>();
 	return r;
 }
 gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
@@ -453,7 +453,7 @@ gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
 		return v;
 	}
 	ExactValue r = {ExactValue_Invalid};
-	v.value_quaternion = gb_alloc_item(permanent_allocator(), Quaternion256);
+	v.value_quaternion = permanent_alloc_item<Quaternion256>();
 	return r;
 }
 

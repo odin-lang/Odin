@@ -69,6 +69,7 @@ gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	case Type_BitField:        kind = Typeid_Bit_Field;        break;
+	case Type_FixedCapacityDynamicArray: kind = Typeid_Fixed_Capacity_Dynamic_Array; break;
 	}
 
 	return kind;
@@ -644,6 +645,21 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
 			break;
 		}
+		case Type_FixedCapacityDynamicArray: {
+			tag_type = t_type_info_fixed_capacity_dynamic_array;
+
+			i64 len_offset = type_offset_of(t, 1);
+
+			LLVMValueRef vals[4] = {
+				get_type_info_ptr(m, t->FixedCapacityDynamicArray.elem),
+				lb_const_int(m, t_int, type_size_of(t->FixedCapacityDynamicArray.elem)).value,
+				lb_const_int(m, t_int, t->FixedCapacityDynamicArray.capacity).value,
+				lb_const_int(m, t_uintptr, len_offset).value,
+			};
+
+			variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+			break;
+		}
 		case Type_Slice: {
 			tag_type = t_type_info_slice;
 
@@ -1048,7 +1064,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 		i64 tag_index = 0;
 		if (tag_type != nullptr) {
-			tag_index = union_variant_index(ut, tag_type);
+			tag_index = union_variant_index_checked(ut, tag_type);
 		}
 		GB_ASSERT(tag_index <= Typeid__COUNT);
 

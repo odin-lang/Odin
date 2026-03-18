@@ -439,8 +439,14 @@ _private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := contex
 		return _private_int_mul_high_comba(dest, a, b, digits)
 	}
 
-	internal_grow(dest, a.used + b.used + 1) or_return
-	dest.used = a.used + b.used + 1
+	/*
+		Set up temporary output `Int`, which we'll swap for `dest` when done.
+	*/
+
+	t := &Int{}
+
+	internal_grow(t, a.used + b.used + 1) or_return
+	t.used = a.used + b.used + 1
 
 	pa := a.used
 	pb := b.used
@@ -451,20 +457,23 @@ _private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := contex
 			/*
 				Calculate the double precision result.
 			*/
-			r := _WORD(dest.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + _WORD(carry)
+			r := _WORD(t.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + _WORD(carry)
 
 			/*
 				Get the lower part.
 			*/
-			dest.digit[ix + iy] = DIGIT(r & _WORD(_MASK))
+			t.digit[ix + iy] = DIGIT(r & _WORD(_MASK))
 
 			/*
 				Carry the carry.
 			*/
 			carry = DIGIT(r >> _WORD(_DIGIT_BITS))
 		}
-		dest.digit[ix + pb] = carry
+		t.digit[ix + pb] = carry
 	}
+
+	internal_swap(dest, t)
+	internal_destroy(t)
 	return internal_clamp(dest)
 }
 

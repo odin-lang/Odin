@@ -16,14 +16,25 @@ void MP_FREE(void *mem, size_t size) {
 #else
 
 void *MP_MALLOC(size_t size) {
-	return gb_alloc(permanent_allocator(), cast(isize)size);
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	return arena_alloc(arena, cast(isize)size, 16);
 }
 void *MP_REALLOC(void *mem, size_t oldsize, size_t newsize) {
-	return gb_resize(permanent_allocator(), mem, cast(isize)oldsize, cast(isize)newsize);
+	if (newsize < oldsize) {
+		return mem;
+	}
+	if (newsize == 0) {
+		return mem;
+	}
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	void *new_mem = arena_alloc(arena, cast(isize)newsize, 16);
+	gb_memcopy(new_mem, mem, oldsize);
+	return new_mem;
 }
 void *MP_CALLOC(size_t nmemb, size_t size) {
-	size_t total = nmemb*size;
-	return gb_alloc(permanent_allocator(), cast(isize)total);
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	isize total_size = cast(isize)(nmemb * size);
+	return arena_alloc(arena, total_size, 16);
 }
 void MP_FREE(void *mem, size_t size) {
 	// DO NOTHING
@@ -45,6 +56,8 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 gb_internal void big_int_dealloc(BigInt *dst) {
 	mp_clear(dst);
 }
+
+gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x);
 
 gb_internal BigInt big_int_make(BigInt const *b, bool abs=false);
 gb_internal BigInt big_int_make_abs(BigInt const *b);
@@ -281,6 +294,11 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 }
 
 
+
+gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x) {
+	int bits_used = (x->used-1) * MP_DIGIT_BIT;
+	return bits_used <= 64;
+}
 
 gb_internal u64 big_int_to_u64(BigInt const *x) {
 	GB_ASSERT(x->sign == 0);

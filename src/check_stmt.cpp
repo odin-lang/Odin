@@ -484,7 +484,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		}
 		if (ident_node != nullptr) {
 			ast_node(i, Ident, ident_node);
-			e = scope_lookup(ctx->scope, i->token.string, i->hash);
+			e = scope_lookup(ctx->scope, i->interned, i->hash);
 			if (e != nullptr && e->kind == Entity_Variable) {
 				used = (e->flags & EntityFlag_Used) != 0; // NOTE(bill): Make backup just in case
 			}
@@ -789,11 +789,12 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		defer (rw_mutex_unlock(&scope->mutex));
 
 		for (auto const &entry : scope->elements) {
-			String name = entry.key;
 			Entity *decl = entry.value;
 			if (!is_entity_exported(decl, true)) continue;
+			u32 hash = entry.hash;
+			auto interned = scope->elements.keys[hash & (scope->elements.cap-1)];
 
-			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
+			Entity *found = scope_insert_with_name(ctx->scope, interned, hash, decl);
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
@@ -1018,15 +1019,28 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 					inline_for_depth = exact_value_i64(unroll_count);
 				}
 				break;
+			case Type_FixedCapacityDynamicArray:
+				if (unroll_count > 0) {
+					val0 = t->FixedCapacityDynamicArray.elem;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(unroll_count);
+				}
+				break;
 			}
 		}
 
 		if (val0 == nullptr) {
+			ERROR_BLOCK();
 			gbString s = expr_to_string(operand.expr);
 			gbString t = type_to_string(operand.type);
+			defer (gb_string_free(s));
+			defer (gb_string_free(t));
 			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
-			gb_string_free(t);
-			gb_string_free(s);
+
+			if (is_type_slice(operand.type) || is_type_dynamic_array(operand.type) || is_type_fixed_capacity_dynamic_array(operand.type)) {
+				error_line("\tSuggestion: An unroll count `#unroll(N)` must be specified with an array of a runtime-known length\n");
+			}
+
 		} else if (operand.mode != Addressing_Constant && (
 				unroll_count <= 0 &&
 				compare_exact_values(Token_CmpEq, inline_for_depth, exact_value_i64(0)))) {
@@ -1053,7 +1067,7 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			Entity *found = nullptr;
 
 			if (!is_blank_ident(str)) {
-				found = scope_lookup_current(ctx->scope, str);
+				found = scope_lookup_current(ctx->scope, name->Ident.interned, name->Ident.hash);
 			}
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
@@ -1822,10 +1836,10 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				}
 				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
 					AstIdent *ident = &rs->vals[0]->Ident;
-					String name = ident->token.string;
-					Entity *found = scope_lookup(ctx->scope, name, ident->hash);
+					Entity *found = scope_lookup(ctx->scope, ident->interned, ident->hash);
 					if (found && are_types_identical(found->type, t->BitSet.elem)) {
 						ERROR_BLOCK();
+						String name = ident->token.string;
 						gbString s = expr_to_string(expr);
 						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
 						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
@@ -1843,6 +1857,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			case Type_Array:
 				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
 				array_add(&vals, t->Array.elem);
+				array_add(&vals, t_int);
+				break;
+
+			case Type_FixedCapacityDynamicArray:
+				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+				array_add(&vals, t->FixedCapacityDynamicArray.elem);
 				array_add(&vals, t_int);
 				break;
 
@@ -1868,10 +1888,10 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				}
 				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
 					AstIdent *ident = &rs->vals[0]->Ident;
-					String name = ident->token.string;
-					Entity *found = scope_lookup(ctx->scope, name, ident->hash);
+					Entity *found = scope_lookup(ctx->scope, ident->interned, ident->hash);
 					if (found && are_types_identical(found->type, t->Map.key)) {
 						ERROR_BLOCK();
+						String name = ident->token.string;
 						gbString s = expr_to_string(expr);
 						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
 						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
@@ -2012,7 +2032,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			Entity *found = nullptr;
 
 			if (!is_blank_ident(str)) {
-				found = scope_lookup_current(ctx->scope, str);
+				found = scope_lookup_current(ctx->scope, name->Ident.interned, name->Ident.hash);
 			}
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
@@ -2106,7 +2126,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			Entity *found = nullptr;
 			// NOTE(bill): Ignore assignments to '_'
 			if (!is_blank_ident(str)) {
-				found = scope_lookup_current(ctx->scope, str);
+				found = scope_lookup_current(ctx->scope, name->Ident.interned, name->Ident.hash);
 				new_name_count += 1;
 			}
 			if (found == nullptr) {
