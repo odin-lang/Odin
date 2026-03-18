@@ -2562,9 +2562,23 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
+	lbGenerator *gen = m->gen;
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
 		lb_generate_procedure(p->module, p);
 	}
+
+	// NOTE(bill): When the module has generated its procedures, then we can verify the procedures and module
+	// the exception to his being the `gen->default_module` which must be done AFTER everything else
+	if (m != &gen->default_module &&
+	    gen->do_threading && !build_context.ODIN_DEBUG) {
+		auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+		wd->m = m;
+		wd->target_machine = m->target_machine;
+		wd->do_threading = true;
+
+		thread_pool_add_task(lb_llvm_function_pass_per_module, wd);
+	}
+
 	return 0;
 }
 
@@ -2602,10 +2616,6 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 			}
 			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
 		}
-
-		thread_pool_wait();
-
-		lb_generate_procedures_worker_proc(&gen->default_module);
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -2615,6 +2625,10 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 }
 
 gb_internal void lb_generate_check_missing_procedures(lbGenerator *gen, bool do_threading) {
+	thread_pool_wait();
+
+	lb_generate_procedures_worker_proc(&gen->default_module);
+
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		GB_ASSERT_MSG(m->procedures_to_generate.count == 0, "%s, %td remaining", m->module_name, m->procedures_to_generate.count.load());
@@ -2631,16 +2645,20 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 }
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
-			wd->m = m;
-			wd->target_machine = m->target_machine;
-			wd->do_threading = true;
+	if (do_threading && !build_context.ODIN_DEBUG) {
+		// NOTE(bill): When the module has generated its procedures, then we can verify the procedures and module
+		// the exception to his being the `gen->default_module` which must be done AFTER everything else
+		//
+		// This is place where the default module gets analyzed
 
-			thread_pool_add_task(lb_llvm_function_pass_per_module, wd);
-		}
+		lbModule *m = &gen->default_module;
+		auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+		wd->m = m;
+		wd->target_machine = m->target_machine;
+		wd->do_threading = true;
+
+		lb_llvm_function_pass_per_module(wd);
+
 		thread_pool_wait();
 	} else {
 		for (auto const &entry : gen->modules) {
@@ -3725,11 +3743,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Function Pass (And Remove Unused) & Module Pass + Verification");
+	lb_llvm_function_passes(gen, do_threading);
+
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
-
-	TIME_SECTION("LLVM Function Pass (And Remove Unused) & Module Pass + Verification");
-	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
 	TIME_SECTION("LLVM Correct Entity Linkage");
 	lb_correct_entity_linkage(gen);

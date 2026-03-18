@@ -148,6 +148,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1;
 	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+	gen->do_threading = do_threading;
 
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
@@ -1801,7 +1802,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	              "\n\tFuncTypeCtx: %p\n\tCurrentCtx:  %p\n\tGlobalCtx:   %p",
 	              LLVMGetTypeContext(new_abi_fn_type), m->ctx, LLVMGetGlobalContext());
 
-	// map_set(&m->func_raw_types, type, new_abi_fn_type);
+	map_set(&m->func_raw_types, type, new_abi_fn_type);
 
 	return new_abi_fn_type;
 }
@@ -3327,8 +3328,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	e->Procedure.is_anonymous = true;
 	e->flags |= EntityFlag_ProcBodyChecked;
 
-	pl->decl->entity.store(e);
-
+	lbValue value = {};
 
 	if (target_module != m) {
 		GB_ASSERT_MSG(m == &gen->default_module, "%s %s", m->module_name, target_module->module_name);
@@ -3343,13 +3343,8 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		}
 
 		lbProcedure *proto = lb_create_procedure(m, e, true);
-
-		lbValue value = {};
 		value.value = proto->value;
 		value.type = proto->type;
-
-
-		return value;
 	} else {
 		lbProcedure *local = lb_create_procedure(m, e, false);
 
@@ -3360,13 +3355,13 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 			string_map_set(&m->members, name, {local->value, local->type});
 		}
 
-		lbValue value = {};
-
 		value.value = local->value;
 		value.type = local->type;
-
-		return value;
 	}
+
+	pl->decl->entity.store(e);
+
+	return value;
 }
 
 

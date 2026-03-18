@@ -220,6 +220,8 @@ struct lbObjCGlobal {
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
+	bool do_threading;
+
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
