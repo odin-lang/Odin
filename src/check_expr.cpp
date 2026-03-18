@@ -2911,37 +2911,13 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 	if (t == nullptr) {
 		return;
 	}
-	t = base_type(t);
+	t = core_type(t);
 	if (!is_type_comparable(t)) {
 		return;
 	}
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
-		case Basic_complex32:
-			add_package_dependency(c, "runtime", "complex32_eq");
-			add_package_dependency(c, "runtime", "complex32_ne");
-			break;
-		case Basic_complex64:
-			add_package_dependency(c, "runtime", "complex64_eq");
-			add_package_dependency(c, "runtime", "complex64_ne");
-			break;
-		case Basic_complex128:
-			add_package_dependency(c, "runtime", "complex128_eq");
-			add_package_dependency(c, "runtime", "complex128_ne");
-			break;
-		case Basic_quaternion64:
-			add_package_dependency(c, "runtime", "quaternion64_eq");
-			add_package_dependency(c, "runtime", "quaternion64_ne");
-			break;
-		case Basic_quaternion128:
-			add_package_dependency(c, "runtime", "quaternion128_eq");
-			add_package_dependency(c, "runtime", "quaternion128_ne");
-			break;
-		case Basic_quaternion256:
-			add_package_dependency(c, "runtime", "quaternion256_eq");
-			add_package_dependency(c, "runtime", "quaternion256_ne");
-			break;
 		case Basic_cstring:
 			add_package_dependency(c, "runtime", "cstring_eq");
 			add_package_dependency(c, "runtime", "cstring_ne");
@@ -2964,6 +2940,39 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 		for (Entity *field : t->Struct.fields) {
 			add_comparison_procedures_for_fields(c, field->type);
 		}
+		break;
+
+	case Type_Union:
+		for (Type *variant : t->Union.variants) {
+			add_comparison_procedures_for_fields(c, variant);
+		}
+		break;
+
+	case Type_Array:                     return add_comparison_procedures_for_fields(c, t->Array.elem);
+	case Type_EnumeratedArray:           return add_comparison_procedures_for_fields(c, t->EnumeratedArray.elem);
+	case Type_SimdVector:                return add_comparison_procedures_for_fields(c, t->SimdVector.elem);
+	case Type_Matrix:                    return add_comparison_procedures_for_fields(c, t->Matrix.elem);
+	case Type_FixedCapacityDynamicArray: return add_comparison_procedures_for_fields(c, t->FixedCapacityDynamicArray.elem);
+
+	case Type_Enum:
+	case Type_Tuple:
+		GB_PANIC("Unreachable");
+		break;
+
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
+		break;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Proc:
+	case Type_BitSet:
+	case Type_BitField:
+	case Type_SoaPointer:
+		break;
+
+	default:
 		break;
 	}
 }
@@ -3164,36 +3173,6 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 				case Token_Gt:    add_package_dependency(c, "runtime", "string_gt"); break;
 				case Token_LtEq:  add_package_dependency(c, "runtime", "string_le"); break;
 				case Token_GtEq:  add_package_dependency(c, "runtime", "string_gt"); break;
-				}
-			} else if (is_type_complex(x->type) || is_type_complex(y->type)) {
-				switch (op) {
-				case Token_CmpEq:
-					switch (8*size) {
-					case 64:  add_package_dependency(c, "runtime", "complex64_eq");  break;
-					case 128: add_package_dependency(c, "runtime", "complex128_eq"); break;
-					}
-					break;
-				case Token_NotEq:
-					switch (8*size) {
-					case 64:  add_package_dependency(c, "runtime", "complex64_ne");  break;
-					case 128: add_package_dependency(c, "runtime", "complex128_ne"); break;
-					}
-					break;
-				}
-			} else if (is_type_quaternion(x->type) || is_type_quaternion(y->type)) {
-				switch (op) {
-				case Token_CmpEq:
-					switch (8*size) {
-					case 128: add_package_dependency(c, "runtime", "quaternion128_eq");  break;
-					case 256: add_package_dependency(c, "runtime", "quaternion256_eq"); break;
-					}
-					break;
-				case Token_NotEq:
-					switch (8*size) {
-					case 128: add_package_dependency(c, "runtime", "quaternion128_ne");  break;
-					case 256: add_package_dependency(c, "runtime", "quaternion256_ne"); break;
-					}
-					break;
 				}
 			}
 		}
