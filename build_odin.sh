@@ -26,7 +26,7 @@ error() {
 	exit 1
 }
 
-SUPPORTED_LLVM_VERSIONS="21 20 19 18 17 14"
+SUPPORTED_LLVM_VERSIONS="22 21 20 19 18 17 14"
 
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
@@ -78,8 +78,8 @@ LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 14 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 21 ]; then
-	error "Invalid LLVM version $LLVM_VERSION: must be 14, 17, 18, 19, 20, or 21"
+if [ $LLVM_VERSION_MAJOR -lt 14 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 22 ]; then
+	error "Invalid LLVM version $LLVM_VERSION: must be 14, 17, 18, 19, 20, 21 or 22"
 fi
 
 case "$OS_NAME" in
