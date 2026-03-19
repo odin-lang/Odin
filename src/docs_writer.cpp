@@ -1042,10 +1042,12 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.count);
 	defer (array_free(&entries));
 
-	for (auto const &element : pkg->scope->elements) {
-		u32 hash = element.hash;
-		auto interned = pkg->scope->elements.keys[hash & (pkg->scope->elements.cap-1)];
-		Entity *e = element.value;
+	for (isize i = 0; i < pkg->scope->elements.cap; i++) {
+		if (!pkg->scope->elements.slots[i].hash) {
+			continue;
+		}
+		auto interned = pkg->scope->elements.keys[i];
+		Entity *e = pkg->scope->elements.slots[i].value;
 		switch (e->kind) {
 		case Entity_Invalid:
 		case Entity_Nil:
