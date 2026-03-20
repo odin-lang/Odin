@@ -203,12 +203,15 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		for (;;) {
 			String str = string_split_iterator(&it, ',');
 			if (str == "") break;
+			bool add_prefix = !(string_starts_with(str, '+') || string_starts_with(str, '-'));
 			if (!first) {
 				feature_str = gb_string_appendc(feature_str, ",");
 			}
 			first = false;
 
-			feature_str = gb_string_appendc(feature_str, "+");
+			if (add_prefix) {
+				feature_str = gb_string_appendc(feature_str, "+");
+			}
 			feature_str = gb_string_append_length(feature_str, str.text, str.len);
 		}
 

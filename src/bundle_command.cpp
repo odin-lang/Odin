@@ -186,7 +186,11 @@ i32 bundle_android(String original_init_directory) {
 		gb_string_clear(cmd);
 
 		cmd = gb_string_append_length(cmd, android_sdk_build_tools.text, android_sdk_build_tools.len);
+#if defined(GB_SYSTEM_WINDOWS)
+        cmd = gb_string_appendc(cmd, "apksigner.bat");
+#else
 		cmd = gb_string_appendc(cmd, "apksigner");
+#endif
 		cmd = gb_string_appendc(cmd, " sign");
 
 		String keystore = normalize_path(temporary_allocator(), build_context.android_keystore, NIX_SEPARATOR_STRING);

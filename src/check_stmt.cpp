@@ -788,11 +788,17 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		rw_mutex_lock(&scope->mutex);
 		defer (rw_mutex_unlock(&scope->mutex));
 
-		for (auto const &entry : scope->elements) {
-			Entity *decl = entry.value;
-			if (!is_entity_exported(decl, true)) continue;
-			u32 hash = entry.hash;
-			auto interned = scope->elements.keys[hash & (scope->elements.cap-1)];
+		for (u32 i = 0; i < scope->elements.cap; i++) {
+			if (!scope->elements.slots[i].hash) {
+				continue;
+			}
+
+			Entity *decl = scope->elements.slots[i].value;
+			if (!is_entity_exported(decl, true)) {
+				continue;
+			}
+			u32 hash = scope->elements.slots[i].hash;
+			auto interned = scope->elements.keys[i];
 
 			Entity *found = scope_insert_with_name(ctx->scope, interned, hash, decl);
 			if (found != nullptr) {

@@ -472,14 +472,6 @@ gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type_as_slice(OdinDocWriter 
 	return odin_write_item_as_slice(w, index);
 }
 
-gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type2_as_slice(OdinDocWriter *w, Type *type0, Type *type1, bool cache=true) {
-	OdinDocTypeIndex indices[2] = {};
-	indices[0] = odin_doc_type(w, type0, cache);
-	indices[1] = odin_doc_type(w, type1, cache);
-
-	return odin_write_slice(w, indices, gb_count_of(indices));
-}
-
 gb_internal OdinDocArray<OdinDocEntityIndex> odin_doc_add_entity_as_slice(OdinDocWriter *w, Entity *e) {
 	OdinDocEntityIndex index = odin_doc_add_entity(w, e);
 	return odin_write_item_as_slice(w, index);
@@ -564,9 +556,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 		doc_type.elem_count_len = 1;
 		doc_type.elem_counts[0] = type->Array.count;
 		if (type->Array.generic_count != nullptr) {
-			doc_type.types = odin_doc_type2_as_slice(w,
-				type->Array.elem,
-				type->Array.generic_count);
+			OdinDocTypeIndex types[2] = {};
+			types[0] = odin_doc_type(w, type->Array.elem);
+			types[1] = odin_doc_type(w, type->Array.generic_count);
+			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 		} else {
 			doc_type.types = odin_doc_type_as_slice(w, type->Array.elem);
 		}
@@ -596,10 +589,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 		doc_type.elem_counts[0] = type->FixedCapacityDynamicArray.capacity;
 
 		if (type->FixedCapacityDynamicArray.generic_capacity != nullptr) {
-			doc_type.types = odin_doc_type2_as_slice(w,
-				type->FixedCapacityDynamicArray.elem,
-				type->FixedCapacityDynamicArray.generic_capacity);
-
+			OdinDocTypeIndex types[2] = {};
+			types[0] = odin_doc_type(w, type->FixedCapacityDynamicArray.elem);
+			types[1] = odin_doc_type(w, type->FixedCapacityDynamicArray.generic_capacity);
+			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 		} else {
 			doc_type.types = odin_doc_type_as_slice(w, type->FixedCapacityDynamicArray.elem);
 		}
@@ -1049,10 +1042,12 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.count);
 	defer (array_free(&entries));
 
-	for (auto const &element : pkg->scope->elements) {
-		u32 hash = element.hash;
-		auto interned = pkg->scope->elements.keys[hash & (pkg->scope->elements.cap-1)];
-		Entity *e = element.value;
+	for (isize i = 0; i < pkg->scope->elements.cap; i++) {
+		if (!pkg->scope->elements.slots[i].hash) {
+			continue;
+		}
+		auto interned = pkg->scope->elements.keys[i];
+		Entity *e = pkg->scope->elements.slots[i].value;
 		switch (e->kind) {
 		case Entity_Invalid:
 		case Entity_Nil:

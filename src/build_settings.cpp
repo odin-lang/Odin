@@ -2160,8 +2160,15 @@ gb_internal bool check_target_feature_is_valid(String const &feature, TargetArch
 	String_Iterator it = {feature, 0};
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
-		if (!check_single_target_feature_is_valid(feature_list, str)) {
+		String feature_str = str;
+		if (string_starts_with(feature_str, '+') || string_starts_with(feature_str, '-')) {
+			feature_str = substring(feature_str, 1, feature_str.len);
+			if (feature_str == "") {
+				return false;
+			}
+		}
+		if (feature_str == "") break;
+		if (!check_single_target_feature_is_valid(feature_list, feature_str)) {
 			if (invalid) *invalid = str;
 			return false;
 		}
@@ -2201,20 +2208,26 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 	String_Iterator it = {feature, 0};
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
+		String feature_str = str;
+		bool want_enabled = true;
+		if (string_starts_with(feature_str, '+') || string_starts_with(feature_str, '-')) {
+			want_enabled = feature_str[0] == '+';
+			feature_str = substring(feature_str, 1, feature_str.len);
+		}
+		if (feature_str == "") break;
 
 		if (!string_set_exists(&build_context.target_features_set, str)) {
-			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), str);
+			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 
-			if (!string_set_exists(&build_context.target_features_set, plus_str)) {
+			if (want_enabled && !string_set_exists(&build_context.target_features_set, plus_str)) {
 				if (not_enabled) *not_enabled = str;
 				return false;
 			}
 		}
 
-		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), str);
+		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), feature_str);
 
-		if (string_set_exists(&build_context.target_features_set, minus_str)) {
+		if (!want_enabled && !string_set_exists(&build_context.target_features_set, minus_str)) {
 			if (not_enabled) *not_enabled = str;
 			return false;
 		}

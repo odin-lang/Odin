@@ -201,10 +201,10 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 		vtypes[0] = lb_type(m, t);
 		vtypes[1] = padding;
 		vtypes[2] = tag;
-		LLVMTypeRef variant_type = LLVMStructType(vtypes, gb_count_of(vtypes), true);
+		LLVMTypeRef variant_type = LLVMStructTypeInContext(m->ctx, vtypes, gb_count_of(vtypes), true);
 
 		stypes[variant_index] = variant_type;
-		LLVMTypeRef modified_type = LLVMStructType(stypes, cast(unsigned)(variant_index+1), false);
+		LLVMTypeRef modified_type = LLVMStructTypeInContext(m->ctx, stypes, cast(unsigned)(variant_index+1), false);
 
 		modified_types[i] = modified_type;
 	}

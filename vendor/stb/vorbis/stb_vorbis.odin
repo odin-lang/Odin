@@ -8,6 +8,7 @@ LIB :: (
 	     "../lib/stb_vorbis.lib"      when ODIN_OS == .Windows
 	else "../lib/stb_vorbis.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_vorbis.a" when ODIN_OS == .Darwin
+	else "../lib/stb_vorbis_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
 )
 
@@ -15,11 +16,17 @@ when LIB != "" {
 	when !#exists(LIB) {
 		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
 	}
+}
 
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib "../lib/stb_vorbis_wasm.o"
+} else when LIB != "" {
 	foreign import lib { LIB }
 } else {
 	foreign import lib "system:stb_vorbis"
 }
+
+NO_STDIO :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 ///////////   THREAD SAFETY
 
@@ -190,11 +197,13 @@ foreign lib {
 
 @(default_calling_convention="c", link_prefix="stb_vorbis_")
 foreign lib {
-	// decode an entire file and output the data interleaved into a malloc()ed
-	// buffer stored in *output. The return value is the number of samples
-	// decoded, or -1 if the file could not be opened or was not an ogg vorbis file.
-	// When you're done with it, just free() the pointer returned in *output.
-	decode_filename :: proc(filename: cstring, channels, sample_rate: ^c.int, output: ^[^]c.short) -> c.int ---
+	when !NO_STDIO {
+		// decode an entire file and output the data interleaved into a malloc()ed
+		// buffer stored in *output. The return value is the number of samples
+		// decoded, or -1 if the file could not be opened or was not an ogg vorbis file.
+		// When you're done with it, just free() the pointer returned in *output.
+		decode_filename :: proc(filename: cstring, channels, sample_rate: ^c.int, output: ^[^]c.short) -> c.int ---
+	}
 	decode_memory :: proc(mem: [^]byte, len: c.int, channels, sample_rate: ^c.int, output: ^[^]c.short) -> c.int ---
 	
 	
@@ -204,28 +213,30 @@ foreign lib {
 	open_memory :: proc(data: [^]byte, len: c.int,
 	                    error: ^Error, alloc_buffer: ^vorbis_alloc) -> ^vorbis ---
 
-	// create an ogg vorbis decoder from a filename via fopen(). on failure,
-	// returns NULL and sets *error (possibly to VORBIS_file_open_failure).
-	open_filename :: proc(filename: cstring,
-	                      error: ^Error, alloc_buffer: ^vorbis_alloc) -> ^vorbis ---
+	when !NO_STDIO {
+		// create an ogg vorbis decoder from a filename via fopen(). on failure,
+		// returns NULL and sets *error (possibly to VORBIS_file_open_failure).
+		open_filename :: proc(filename: cstring,
+							  error: ^Error, alloc_buffer: ^vorbis_alloc) -> ^vorbis ---
 
-	// create an ogg vorbis decoder from an open FILE *, looking for a stream at
-	// the _current_ seek point (ftell). on failure, returns NULL and sets *error.
-	// note that stb_vorbis must "own" this stream; if you seek it in between
-	// calls to stb_vorbis, it will become confused. Moreover, if you attempt to
-	// perform stb_vorbis_seek_*() operations on this file, it will assume it
-	// owns the _entire_ rest of the file after the start point. Use the next
-	// function, stb_vorbis_open_file_section(), to limit it.
-	open_file :: proc(f: ^c.FILE, close_handle_on_close: b32,
-	                  error: ^Error, alloc_buffer: ^vorbis_alloc) -> ^vorbis ---
+		// create an ogg vorbis decoder from an open FILE *, looking for a stream at
+		// the _current_ seek point (ftell). on failure, returns NULL and sets *error.
+		// note that stb_vorbis must "own" this stream; if you seek it in between
+		// calls to stb_vorbis, it will become confused. Moreover, if you attempt to
+		// perform stb_vorbis_seek_*() operations on this file, it will assume it
+		// owns the _entire_ rest of the file after the start point. Use the next
+		// function, stb_vorbis_open_file_section(), to limit it.
+		open_file :: proc(f: ^c.FILE, close_handle_on_close: b32,
+						  error: ^Error, alloc_buffer: ^vorbis_alloc) -> ^vorbis ---
 
-	// create an ogg vorbis decoder from an open FILE *, looking for a stream at
-	// the _current_ seek point (ftell); the stream will be of length 'len' bytes.
-	// on failure, returns NULL and sets *error. note that stb_vorbis must "own"
-	// this stream; if you seek it in between calls to stb_vorbis, it will become
-	// confused.
-	open_file_section :: proc(f: ^c.FILE, close_handle_on_close: b32,
-	                          error: ^Error, alloc_buffer: ^vorbis_alloc, len: c.uint) -> ^vorbis ---
+		// create an ogg vorbis decoder from an open FILE *, looking for a stream at
+		// the _current_ seek point (ftell); the stream will be of length 'len' bytes.
+		// on failure, returns NULL and sets *error. note that stb_vorbis must "own"
+		// this stream; if you seek it in between calls to stb_vorbis, it will become
+		// confused.
+		open_file_section :: proc(f: ^c.FILE, close_handle_on_close: b32,
+								  error: ^Error, alloc_buffer: ^vorbis_alloc, len: c.uint) -> ^vorbis ---
+	}
 
 	// these functions seek in the Vorbis file to (approximately) 'sample_number'.
 	// after calling seek_frame(), the next call to get_frame_*() will include

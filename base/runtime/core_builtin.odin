@@ -258,6 +258,7 @@ pop_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, loc := #cal
 	end := rawptr(uintptr(array) + uintptr(elem_size*(len(array)-1)))
 	intrinsics.mem_copy_non_overlapping(&res, end, elem_size)
 	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+	return res
 }
 
 
