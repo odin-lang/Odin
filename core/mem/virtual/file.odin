@@ -10,7 +10,14 @@ map_file :: proc{
 }
 
 map_file_from_path :: proc(filename: string, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
-	f, err := os.open(filename, os.O_RDWR)
+	open_flags : os.File_Flags
+	if .Read in flags {
+		open_flags += {.Read}
+	}
+	if .Write in flags {
+		open_flags += {.Write}
+	}
+	f, err := os.open(filename, open_flags)
 	if err != nil {
 		return nil, .Open_Failure
 	}
