@@ -4,7 +4,7 @@ package directx_d3d12
 foreign import "system:d3d12.lib"
 
 import "../dxgi"
-import "../d3d_compiler"
+import "../d3d_common"
 import win32 "core:sys/windows"
 
 IUnknown        :: dxgi.IUnknown
@@ -23,11 +23,10 @@ BOOL    :: dxgi.BOOL
 
 RECT :: dxgi.RECT
 
+LPCSTR  :: win32.LPCSTR
 LPCWSTR :: win32.LPCWSTR
 
-IModuleInstance :: d3d_compiler.ID3D11ModuleInstance
-IBlob           :: d3d_compiler.ID3DBlob
-IModule         :: d3d_compiler.ID3D11Module
+IBlob   :: d3d_common.ID3DBlob
 
 @(default_calling_convention="system", link_prefix="D3D12")
 foreign d3d12 {
@@ -175,19 +174,20 @@ PRIMITIVE :: enum i32 {
 }
 
 SRV_DIMENSION :: enum i32 {
-	UNKNOWN          = 0,
-	BUFFER           = 1,
-	TEXTURE1D        = 2,
-	TEXTURE1DARRAY   = 3,
-	TEXTURE2D        = 4,
-	TEXTURE2DARRAY   = 5,
-	TEXTURE2DMS      = 6,
-	TEXTURE2DMSARRAY = 7,
-	TEXTURE3D        = 8,
-	TEXTURECUBE      = 9,
-	TEXTURECUBEARRAY = 10,
-	BUFFEREX         = 11,
+	UNKNOWN                           = 0,
+	BUFFER                            = 1,
+	TEXTURE1D                         = 2,
+	TEXTURE1DARRAY                    = 3,
+	TEXTURE2D                         = 4,
+	TEXTURE2DARRAY                    = 5,
+	TEXTURE2DMS                       = 6,
+	TEXTURE2DMSARRAY                  = 7,
+	TEXTURE3D                         = 8,
+	TEXTURECUBE                       = 9,
+	TEXTURECUBEARRAY                  = 10,
+	BUFFEREX                          = 11,
 	RAYTRACING_ACCELERATION_STRUCTURE = 11,
+	BUFFER_BYTE_OFFSET                = 12,
 }
 
 PFN_DESTRUCTION_CALLBACK :: #type proc "c" (a0: rawptr)
@@ -467,7 +467,7 @@ INPUT_CLASSIFICATION :: enum i32 {
 }
 
 INPUT_ELEMENT_DESC :: struct {
-	SemanticName:         cstring,
+	SemanticName:         LPCSTR,
 	SemanticIndex:        u32,
 	Format:               dxgi.FORMAT,
 	InputSlot:            u32,
@@ -489,7 +489,7 @@ CULL_MODE :: enum i32 {
 
 SO_DECLARATION_ENTRY :: struct {
 	Stream:         u32,
-	SemanticName:   cstring,
+	SemanticName:   LPCSTR,
 	SemanticIndex:  u32,
 	StartComponent: u8,
 	ComponentCount: u8,
@@ -859,6 +859,8 @@ FEATURE :: enum i32 {
 	APPLICATION_SPECIFIC_DRIVER_STATE	  = 56,
 	BYTECODE_BYPASS_HASH_SUPPORTED	      = 57,
 	SHADER_CACHE_ABI_SUPPORT	          = 61,
+	BARRIER_LAYOUT	                      = 64,
+	OPTIONS22                             = 65,
 }
 
 SHADER_MIN_PRECISION_SUPPORT :: distinct bit_set[SHADER_MIN_PRECISION_SUPPORT_FLAG; u32]
@@ -1235,7 +1237,7 @@ TRI_STATE :: enum i32 {
 	UNKNOWN	= -1,
 	FALSE   = 0,
 	TRUE    = 1,
-}		
+}
 
 FEATURE_DATA_OPTIONS12 :: struct {
 	MSPrimitivesPipelineStatisticIncludesCulledPrimitives: TRI_STATE,
@@ -1310,6 +1312,13 @@ FEATURE_DATA_OPTIONS21 :: struct {
 	ExecuteIndirectTier:               EXECUTE_INDIRECT_TIER,
 	SampleCmpGradientAndBiasSupported: BOOL,
 	ExtendedCommandInfoSupported:      BOOL,
+}
+
+FEATURE_DATA_OPTIONS22 :: struct {
+	ShaderExecutionReorderingActuallyReorders: BOOL,
+	CreateByteOffsetViewsSupported:            BOOL,
+	Max1DDispatchSize:                         u32,
+	Max1DDispatchMeshSize:                     u32,
 }
 
 TIGHT_ALIGNMENT_TIER :: enum i32 {
@@ -1810,6 +1819,13 @@ RAYTRACING_ACCELERATION_STRUCTURE_SRV :: struct {
 	Location: GPU_VIRTUAL_ADDRESS,
 }
 
+BUFFER_SRV_BYTE_OFFSET :: struct {
+	Offset:              u64,
+	Size:                u64,
+	StructureByteStride: u32,
+	Flags:               BUFFER_SRV_FLAGS,
+}
+
 SHADER_RESOURCE_VIEW_DESC :: struct {
 	Format:                  dxgi.FORMAT,
 	ViewDimension:           SRV_DIMENSION,
@@ -1826,6 +1842,7 @@ SHADER_RESOURCE_VIEW_DESC :: struct {
 		TextureCube:                     TEXCUBE_SRV,
 		TextureCubeArray:                TEXCUBE_ARRAY_SRV,
 		RaytracingAccelerationStructure: RAYTRACING_ACCELERATION_STRUCTURE_SRV,
+		BufferByteOffset:                BUFFER_SRV_BYTE_OFFSET,
 	},
 }
 
@@ -1947,26 +1964,36 @@ TEX3D_UAV :: struct {
 	WSize:       u32,
 }
 
+BUFFER_UAV_BYTE_OFFSET :: struct {
+	Offset:               u64,
+	Size:                 u32,
+	StructureByteStride:  u32,
+	CounterOffsetInBytes: u64,
+	Flags:                BUFFER_UAV_FLAGS,
+}
+
 UAV_DIMENSION :: enum i32 {
-	UNKNOWN        = 0,
-	BUFFER         = 1,
-	TEXTURE1D      = 2,
-	TEXTURE1DARRAY = 3,
-	TEXTURE2D      = 4,
-	TEXTURE2DARRAY = 5,
-	TEXTURE3D      = 8,
+	UNKNOWN            = 0,
+	BUFFER             = 1,
+	TEXTURE1D          = 2,
+	TEXTURE1DARRAY     = 3,
+	TEXTURE2D          = 4,
+	TEXTURE2DARRAY     = 5,
+	TEXTURE3D          = 8,
+	BUFFER_BYTE_OFFSET = 9,
 }
 
 UNORDERED_ACCESS_VIEW_DESC :: struct {
 	Format:        dxgi.FORMAT,
 	ViewDimension: UAV_DIMENSION,
 	using _: struct #raw_union {
-		Buffer:         BUFFER_UAV,
-		Texture1D:      TEX1D_UAV,
-		Texture1DArray: TEX1D_ARRAY_UAV,
-		Texture2D:      TEX2D_UAV,
-		Texture2DArray: TEX2D_ARRAY_UAV,
-		Texture3D:      TEX3D_UAV,
+		Buffer:           BUFFER_UAV,
+		Texture1D:        TEX1D_UAV,
+		Texture1DArray:   TEX1D_ARRAY_UAV,
+		Texture2D:        TEX2D_UAV,
+		Texture2DArray:   TEX2D_ARRAY_UAV,
+		Texture3D:        TEX3D_UAV,
+		BufferByteOffset: BUFFER_UAV_BYTE_OFFSET,
 	},
 }
 
@@ -2596,7 +2623,7 @@ IDescriptorHeap_VTable :: struct {
 	GetDesc:                            proc "system" (this: ^IDescriptorHeap, desc: ^DESCRIPTOR_HEAP_DESC),
 	GetCPUDescriptorHandleForHeapStart: proc "system" (this: ^IDescriptorHeap, handle: ^CPU_DESCRIPTOR_HANDLE),
 	GetGPUDescriptorHandleForHeapStart: proc "system" (this: ^IDescriptorHeap, handle: ^GPU_DESCRIPTOR_HANDLE),
-} 
+}
 
 IQueryHeap_UUID_STRING :: "0d9658ae-ed45-469e-a61d-970ec583cab4"
 IQueryHeap_UUID := &IID{0x0d9658ae, 0xed45, 0x469e, {0xa6, 0x1d, 0x97, 0x0e, 0xc5, 0x83, 0xca, 0xb4}}
@@ -3153,13 +3180,13 @@ EXISTING_COLLECTION_DESC :: struct {
 SUBOBJECT_TO_EXPORTS_ASSOCIATION :: struct {
 	pSubobjectToAssociate: ^STATE_SUBOBJECT,
 	NumExports:            u32,
-	pExports:              [^]cstring16 `fmt:"v,NumExports"`,
+	pExports:              [^]LPCWSTR `fmt:"v,NumExports"`,
 }
 
 DXIL_SUBOBJECT_TO_EXPORTS_ASSOCIATION :: struct {
-	SubobjectToAssociate: cstring16,
+	SubobjectToAssociate: LPCWSTR,
 	NumExports:           u32,
-	pExports:             [^]cstring16 `fmt:"v,NumExports"`,
+	pExports:             [^]LPCWSTR `fmt:"v,NumExports"`,
 }
 
 HIT_GROUP_TYPE :: enum i32 {
@@ -3168,11 +3195,11 @@ HIT_GROUP_TYPE :: enum i32 {
 }
 
 HIT_GROUP_DESC :: struct {
-	HitGroupExport:           cstring16,
+	HitGroupExport:           LPCWSTR,
 	Type:                     HIT_GROUP_TYPE,
-	AnyHitShaderImport:       cstring16,
-	ClosestHitShaderImport:   cstring16,
-	IntersectionShaderImport: cstring16,
+	AnyHitShaderImport:       LPCWSTR,
+	ClosestHitShaderImport:   LPCWSTR,
+	IntersectionShaderImport: LPCWSTR,
 }
 
 RAYTRACING_SHADER_CONFIG :: struct {
@@ -5222,8 +5249,8 @@ IInfoQueue_VTable :: struct {
 	PushRetrievalFilter:                          proc "system" (this: ^IInfoQueue, pFilter: ^INFO_QUEUE_FILTER) -> HRESULT,
 	PopRetrievalFilter:                           proc "system" (this: ^IInfoQueue),
 	GetRetrievalFilterStackSize:                  proc "system" (this: ^IInfoQueue) -> u32,
-	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring) -> HRESULT,
-	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: cstring) -> HRESULT,
+	AddMessage:                                   proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: LPCSTR) -> HRESULT,
+	AddApplicationMessage:                        proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, pDescription: LPCSTR) -> HRESULT,
 	SetBreakOnCategory:                           proc "system" (this: ^IInfoQueue, Category: MESSAGE_CATEGORY, bEnable: BOOL) -> HRESULT,
 	SetBreakOnSeverity:                           proc "system" (this: ^IInfoQueue, Severity: MESSAGE_SEVERITY, bEnable: BOOL) -> HRESULT,
 	SetBreakOnID:                                 proc "system" (this: ^IInfoQueue, ID: MESSAGE_ID, bEnable: BOOL) -> HRESULT,
@@ -5239,7 +5266,7 @@ MESSAGE_CALLBACK_FLAG :: enum {
 	IGNORE_FILTERS = 0,
 }
 
-PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring, pContext: rawptr)
+PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: LPCSTR, pContext: rawptr)
 
 IInfoQueue1_UUID_STRING :: "2852dd88-b484-4c0c-b6b1-67168500e600"
 IInfoQueue1_UUID := &IID{0x2852dd88, 0xb484, 0x4c0c, {0xb6, 0xb1, 0x67, 0x16, 0x85, 0x00, 0xe6, 0x00}}
@@ -5262,7 +5289,7 @@ ISDKConfiguration :: struct #raw_union {
 }
 ISDKConfiguration_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	SetSDKVersion: proc "system" (this: ^ISDKConfiguration, SDKVersion: u32, SDKPath: cstring) -> HRESULT,
+	SetSDKVersion: proc "system" (this: ^ISDKConfiguration, SDKVersion: u32, SDKPath: LPCSTR) -> HRESULT,
 }
 
 
@@ -5324,10 +5351,177 @@ IGraphicsCommandList6_VTable :: struct {
 	DispatchMesh: proc "system" (this: ^IGraphicsCommandList6, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
 }
 
+
+BARRIER_LAYOUT :: enum u32 {
+	UNDEFINED                                          = 0xffffffff,
+	COMMON                                             = 0,
+	PRESENT                                            = 0,
+	GENERIC_READ                                       = 1,
+	RENDER_TARGET                                      = 2,
+	UNORDERED_ACCESS                                   = 3,
+	DEPTH_STENCIL_WRITE                                = 4,
+	DEPTH_STENCIL_READ                                 = 5,
+	SHADER_RESOURCE                                    = 6,
+	COPY_SOURCE                                        = 7,
+	COPY_DEST                                          = 8,
+	RESOLVE_SOURCE                                     = 9,
+	RESOLVE_DEST                                       = 10,
+	SHADING_RATE_SOURCE                                = 11,
+	VIDEO_DECODE_READ                                  = 12,
+	VIDEO_DECODE_WRITE                                 = 13,
+	VIDEO_PROCESS_READ                                 = 14,
+	VIDEO_PROCESS_WRITE                                = 15,
+	VIDEO_ENCODE_READ                                  = 16,
+	VIDEO_ENCODE_WRITE                                 = 17,
+	DIRECT_QUEUE_COMMON                                = 18,
+	DIRECT_QUEUE_GENERIC_READ                          = 19,
+	DIRECT_QUEUE_UNORDERED_ACCESS                      = 20,
+	DIRECT_QUEUE_SHADER_RESOURCE                       = 21,
+	DIRECT_QUEUE_COPY_SOURCE                           = 22,
+	DIRECT_QUEUE_COPY_DEST                             = 23,
+	COMPUTE_QUEUE_COMMON                               = 24,
+	COMPUTE_QUEUE_GENERIC_READ                         = 25,
+	COMPUTE_QUEUE_UNORDERED_ACCESS                     = 26,
+	COMPUTE_QUEUE_SHADER_RESOURCE                      = 27,
+	COMPUTE_QUEUE_COPY_SOURCE                          = 28,
+	COMPUTE_QUEUE_COPY_DEST                            = 29,
+	DIRECT_QUEUE_GENERIC_READ_COMPUTE_QUEUE_ACCESSIBLE = 31,
+}
+
+BARRIER_SYNC_FLAG :: enum u32 {
+	ALL                                                   = 0, // 0x1
+	DRAW                                                  = 1, // 0x2
+	INDEX_INPUT                                           = 2, // 0x4
+	VERTEX_SHADING                                        = 3, // 0x8
+	PIXEL_SHADING                                         = 4, // 0x10
+	DEPTH_STENCIL                                         = 5, // 0x20
+	RENDER_TARGET                                         = 6, // 0x40
+	COMPUTE_SHADING                                       = 7, // 0x80
+	RAYTRACING                                            = 8, // 0x100
+	COPY                                                  = 9, // 0x200
+	RESOLVE                                               = 10, // 0x400
+	EXECUTE_INDIRECT                                      = 11, // 0x800
+	PREDICATION                                           = 11, // 0x800
+	ALL_SHADING                                           = 12, // 0x1000
+	NON_PIXEL_SHADING                                     = 13, // 0x2000
+	EMIT_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO = 14, // 0x4000
+	CLEAR_UNORDERED_ACCESS_VIEW                           = 15, // 0x8000
+	VIDEO_DECODE                                          = 20, // 0x100000
+	VIDEO_PROCESS                                         = 21, // 0x200000
+	VIDEO_ENCODE                                          = 22, // 0x400000
+	BUILD_RAYTRACING_ACCELERATION_STRUCTURE               = 23, // 0x800000
+	COPY_RAYTRACING_ACCELERATION_STRUCTURE                = 24, // 0x1000000
+	SPLIT                                                 = 31, // 0x80000000
+}
+
+BARRIER_SYNC_FLAGS :: bit_set[BARRIER_SYNC_FLAG; u32]
+
+BARRIER_ACCESS_FLAG :: enum u32 {
+	VERTEX_BUFFER                           = 0, // 0x1
+	CONSTANT_BUFFER                         = 1, // 0x2
+	INDEX_BUFFER                            = 2, // 0x4
+	RENDER_TARGET                           = 3, // 0x8
+	UNORDERED_ACCESS                        = 4, // 0x10
+	DEPTH_STENCIL_WRITE                     = 5, // 0x20
+	DEPTH_STENCIL_READ                      = 6, // 0x40
+	SHADER_RESOURCE                         = 7, // 0x80
+	STREAM_OUTPUT                           = 8, // 0x100
+	INDIRECT_ARGUMENT                       = 9, // 0x200
+	PREDICATION                             = 9, // 0x200
+	COPY_DEST                               = 10, // 0x400
+	COPY_SOURCE                             = 11, // 0x800
+	RESOLVE_DEST                            = 12, // 0x1000
+	RESOLVE_SOURCE                          = 13, // 0x2000
+	RAYTRACING_ACCELERATION_STRUCTURE_READ  = 14, // 0x4000
+	RAYTRACING_ACCELERATION_STRUCTURE_WRITE = 15, // 0x8000
+	SHADING_RATE_SOURCE                     = 16, // 0x10000
+	VIDEO_DECODE_READ                       = 17, // 0x20000
+	VIDEO_DECODE_WRITE                      = 18, // 0x40000
+	VIDEO_PROCESS_READ                      = 19, // 0x80000
+	VIDEO_PROCESS_WRITE                     = 20, // 0x100000
+	VIDEO_ENCODE_READ                       = 21, // 0x200000
+	VIDEO_ENCODE_WRITE                      = 22, // 0x400000
+	NO_ACCESS                               = 31, // 0x80000000
+}
+
+BARRIER_ACCESS_FLAGS :: bit_set[BARRIER_ACCESS_FLAG; u32]
+
+BARRIER_TYPE :: enum i32 {
+	GLOBAL,
+	TEXTURE,
+	BUFFER,
+}
+
+TEXTURE_BARRIER_FLAGS :: enum i32 {
+	NONE    = 0x0,
+	DISCARD = 0x1,
+}
+
+BARRIER_SUBRESOURCE_RANGE :: struct {
+	IndexOrFirstMipLevel: uint,
+	NumMipLevels:         uint,
+	FirstArraySlice:      uint,
+	NumArraySlices:       uint,
+	FirstPlane:           uint,
+	NumPlanes:            uint,
+}
+
+GLOBAL_BARRIER :: struct {
+	SyncBefore:   BARRIER_SYNC_FLAGS,
+	SyncAfter:    BARRIER_SYNC_FLAGS,
+	AccessBefore: BARRIER_ACCESS_FLAGS,
+	AccessAfter:  BARRIER_ACCESS_FLAGS,
+}
+
+TEXTURE_BARRIER :: struct {
+	SyncBefore:   BARRIER_SYNC_FLAGS,
+	SyncAfter:    BARRIER_SYNC_FLAGS,
+	AccessBefore: BARRIER_ACCESS_FLAGS,
+	AccessAfter:  BARRIER_ACCESS_FLAGS,
+	LayoutBefore: BARRIER_LAYOUT,
+	LayoutAfter:  BARRIER_LAYOUT,
+	pResource:    ^IResource,
+	Subresources: BARRIER_SUBRESOURCE_RANGE,
+	Flags: TEXTURE_BARRIER_FLAGS,
+}
+
+BUFFER_BARRIER :: struct {
+	SyncBefore:   BARRIER_SYNC_FLAGS,
+	SyncAfter:    BARRIER_SYNC_FLAGS,
+	AccessBefore: BARRIER_ACCESS_FLAGS,
+	AccessAfter:  BARRIER_ACCESS_FLAGS,
+	pRessource:   ^IResource,
+	Offset:       u64,
+	Size:         u64,
+}
+
+BARRIER_GROUP :: struct {
+	Type:        BARRIER_TYPE,
+	NumBarriers: u32,
+	using _: struct #raw_union {
+		pGlobalBarriers:  [^]GLOBAL_BARRIER  `raw_union_tag:"Type=GLOBAL"`,
+		pTextureBarriers: [^]TEXTURE_BARRIER `raw_union_tag:"Type=TEXTURE"`,
+		pBufferBarriers:  [^]BUFFER_BARRIER  `raw_union_tag:"Type=BARRIER"`,
+	},
+}
+
+
+IGraphicsCommandList7_UUID_STRING :: "dd171223-8b61-4769-90e3-160ccde4e2c1"
+IGraphicsCommandList7_UUID := &IID{0xdd171223, 0x8b61, 0x4769, {0x90, 0xe3, 0x16, 0x0c, 0xcd, 0xe4, 0xe2, 0xc1}}
+IGraphicsCommandList7 :: struct #raw_union {
+	#subtype id3d12graphicscommandlist6: IGraphicsCommandList6,
+	using id3d12graphicscommandlist7_vtable: ^IGraphicsCommandList7_VTable,
+}
+IGraphicsCommandList7_VTable :: struct {
+	using id3d12graphicscommandlist6_vtable: IGraphicsCommandList6_VTable,
+	Barrier: proc "system" (this: ^IGraphicsCommandList7, NumBarrierGroups: u32, pBarrierGroups: [^]BARRIER_GROUP),
+}
+
+
 SHADER_VERSION_TYPE :: enum u32 {
 	PIXEL_SHADER          = 0,
 	VERTEX_SHADER         = 1,
-	GEOMETRY_SHADER       = 2,    
+	GEOMETRY_SHADER       = 2,
 
 	HULL_SHADER           = 3,
 	DOMAIN_SHADER         = 4,
@@ -5361,7 +5555,7 @@ shver_get_minor :: proc "contextless" (version: u32) -> u8 {
 }
 
 SIGNATURE_PARAMETER_DESC :: struct {
-	SemanticName:    cstring,
+	SemanticName:    LPCSTR,
 	SemanticIndex:   u32,
 	Register:        u32,
 	SystemValueType: NAME,
@@ -5375,7 +5569,7 @@ SIGNATURE_PARAMETER_DESC :: struct {
 }
 
 SHADER_BUFFER_DESC :: struct {
-	Name:      cstring,
+	Name:      LPCSTR,
 	Type:      CBUFFER_TYPE,
 	Variables: u32,
 	Size:      u32,
@@ -5383,7 +5577,7 @@ SHADER_BUFFER_DESC :: struct {
 }
 
 SHADER_VARIABLE_DESC :: struct {
-	Name:         cstring,
+	Name:         LPCSTR,
 	StartOffset:  u32,
 	Size:         u32,
 	uFlags:       u32,
@@ -5402,12 +5596,12 @@ SHADER_TYPE_DESC :: struct {
 	Elements: u32,
 	Members:  u32,
 	Offset:   u32,
-	Name:     cstring,
+	Name:     LPCSTR,
 }
 
 SHADER_DESC :: struct {
 	Version:                     u32,
-	Creator:                     cstring,
+	Creator:                     LPCSTR,
 	Flags:                       u32,
 
 	ConstantBuffers:             u32,
@@ -5450,7 +5644,7 @@ SHADER_DESC :: struct {
 }
 
 SHADER_INPUT_BIND_DESC :: struct {
-	Name:       cstring,
+	Name:       LPCSTR,
 	Type:       SHADER_INPUT_TYPE,
 	BindPoint:  u32,
 	BindCount:  u32,
@@ -5497,14 +5691,14 @@ SHADER_REQUIRES :: enum u64 {
 }
 
 LIBRARY_DESC :: struct {
-	Creator:       cstring,
+	Creator:       LPCSTR,
 	Flags:         u32,
 	FunctionCount: u32,
 }
 
 FUNCTION_DESC :: struct {
 	Version:                     u32,
-	Creator:                     cstring,
+	Creator:                     LPCSTR,
 	Flags:                       u32,
 
 	ConstantBuffers:             u32,
@@ -5534,7 +5728,7 @@ FUNCTION_DESC :: struct {
 	MinFeatureLevel:             FEATURE_LEVEL,
 	RequiredFeatureFlags:        u64,
 
-	Name:                        cstring,
+	Name:                        LPCSTR,
 	FunctionParameterCount:      i32,
 	HasReturn:                   BOOL,
 	Has10Level9VertexShader:     BOOL,
@@ -5542,8 +5736,8 @@ FUNCTION_DESC :: struct {
 }
 
 PARAMETER_DESC :: struct {
-	Name:              cstring,
-	SemanticName:      cstring,
+	Name:              LPCSTR,
+	SemanticName:      LPCSTR,
 	Type:              SHADER_VARIABLE_TYPE,
 	Class:             SHADER_VARIABLE_CLASS,
 	Rows:              u32,
@@ -5565,8 +5759,8 @@ IShaderReflectionType :: struct {
 IShaderReflectionType_VTable :: struct {
 	GetDesc:              proc "system" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
 	GetMemberTypeByIndex: proc "system" (this: ^IShaderReflectionType, Index: u32) -> ^IShaderReflectionType,
-	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: cstring) -> ^IShaderReflectionType,
-	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> cstring,
+	GetMemberTypeByName:  proc "system" (this: ^IShaderReflectionType, Name: LPCSTR) -> ^IShaderReflectionType,
+	GetMemberTypeName:    proc "system" (this: ^IShaderReflectionType, Index: u32) -> LPCSTR,
 	IsEqual:              proc "system" (this: ^IShaderReflectionType, pType: ^IShaderReflectionType) -> HRESULT,
 	GetSubType:           proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
 	GetBaseClass:         proc "system" (this: ^IShaderReflectionType) -> ^IShaderReflectionType,
@@ -5596,7 +5790,7 @@ IShaderReflectionConstantBuffer :: struct {
 IShaderReflectionConstantBuffer_VTable :: struct {
 	GetDesc:            proc "system" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
 	GetVariableByIndex: proc "system" (this: ^IShaderReflectionConstantBuffer, Index: u32) -> ^IShaderReflectionVariable,
-	GetVariableByName:  proc "system" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
+	GetVariableByName:  proc "system" (this: ^IShaderReflectionConstantBuffer, Name: LPCSTR) -> ^IShaderReflectionVariable,
 }
 
 IShaderReflection_UUID_STRING :: "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E"
@@ -5609,13 +5803,13 @@ IShaderReflection_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	GetDesc:                       proc "system" (this: ^IShaderReflection, pDesc: ^SHADER_DESC) -> HRESULT,
 	GetConstantBufferByIndex:      proc "system" (this: ^IShaderReflection, Index: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:       proc "system" (this: ^IShaderReflection, Name: LPCSTR) -> ^IShaderReflectionConstantBuffer,
 	GetResourceBindingDesc:        proc "system" (this: ^IShaderReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetInputParameterDesc:         proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetOutputParameterDesc:        proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
 	GetPatchConstantParameterDesc: proc "system" (this: ^IShaderReflection, ParameterIndex: u32, pDesc: ^SIGNATURE_PARAMETER_DESC) -> HRESULT,
-	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:             proc "system" (this: ^IShaderReflection, Name: LPCSTR) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName:  proc "system" (this: ^IShaderReflection, Name: LPCSTR, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetMovInstructionCount:        proc "system" (this: ^IShaderReflection) -> u32,
 	GetMovcInstructionCount:       proc "system" (this: ^IShaderReflection) -> u32,
 	GetConversionInstructionCount: proc "system" (this: ^IShaderReflection) -> u32,
@@ -5648,10 +5842,10 @@ IFunctionReflection :: struct {
 IFunctionReflection_VTable :: struct {
 	GetDesc:                      proc "system" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
 	GetConstantBufferByIndex:     proc "system" (this: ^IFunctionReflection, BufferIndex: u32) -> ^IShaderReflectionConstantBuffer,
-	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionConstantBuffer,
+	GetConstantBufferByName:      proc "system" (this: ^IFunctionReflection, Name: LPCSTR) -> ^IShaderReflectionConstantBuffer,
 	GetResourceBindingDesc:       proc "system" (this: ^IFunctionReflection, ResourceIndex: u32, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
-	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: cstring) -> ^IShaderReflectionVariable,
-	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: cstring, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
+	GetVariableByName:            proc "system" (this: ^IFunctionReflection, Name: LPCSTR) -> ^IShaderReflectionVariable,
+	GetResourceBindingDescByName: proc "system" (this: ^IFunctionReflection, Name: LPCSTR, pDesc: ^SHADER_INPUT_BIND_DESC) -> HRESULT,
 	GetFunctionParameter:         proc "system" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 

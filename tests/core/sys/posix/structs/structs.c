@@ -74,6 +74,7 @@ int main(int argc, char *argv[])
 	printf("ai_canonname %zu\n", offsetof(struct addrinfo, ai_canonname));
 
 	printf("pollfd %zu %zu\n", sizeof(struct pollfd), _Alignof(struct pollfd));
+	printf("nfds_t %zu %zu\n", sizeof(nfds_t), _Alignof(nfds_t));
 
 	printf("passwd %zu %zu\n", sizeof(struct passwd), _Alignof(struct passwd));
 

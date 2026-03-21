@@ -376,6 +376,7 @@ matrix_cast :: proc "contextless" (v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -
 	return
 }
 
+@(require_results) to_f16  :: #force_inline proc(v: $A/[$N]$T) -> [N]f16  { return array_cast(v, f16)  }
 @(require_results) to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32)  }
 @(require_results) to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return array_cast(v, f64)  }
 

@@ -526,6 +526,9 @@ to_string_hms_12 :: proc(t: Time, buf: []u8, ampm: [2]string = {" am", " pm"}) -
 	h, m, s := clock(t)
 
 	_h := h % 12
+	if _h == 0 {
+		_h = 12
+	}
 	buf[7] = '0' + u8(s % 10); s /= 10
 	buf[6] = '0' + u8(s)
 	buf[5] = ':'
@@ -535,7 +538,7 @@ to_string_hms_12 :: proc(t: Time, buf: []u8, ampm: [2]string = {" am", " pm"}) -
 	buf[1] = '0' + u8(_h% 10); _h /= 10
 	buf[0] = '0' + u8(_h)
 
-	if h < 13 {
+	if h < 12 {
 		copy(buf[8:], ampm[0])
 		return string(buf[:MIN_HMS_LEN+len(ampm[0])])
 	} else {

@@ -139,6 +139,11 @@ Accept_Error :: enum i32 {
 	Unknown,
 }
 
+Recv_Error :: union #shared_nil {
+	TCP_Recv_Error,
+	UDP_Recv_Error,
+}
+
 TCP_Recv_Error :: enum i32 {
 	None,
 	// No network connection, or the network stack is not initialized.
@@ -149,7 +154,8 @@ TCP_Recv_Error :: enum i32 {
 	Invalid_Argument,
 	// The socket is not connected.
 	Not_Connected,
-	// Connection was closed/broken/shutdown while receiving data.
+	// Connection was closed due to an error or shutdown.
+	// NOTE: a graceful close is indicated by a `0, nil` (0 bytes received and no error) return.
 	Connection_Closed,
 	// Timed out before being able to receive any data.
 	Timeout,
@@ -170,7 +176,8 @@ UDP_Recv_Error :: enum i32 {
 	Insufficient_Resources,
 	// Invalid socket or buffer given.
 	Invalid_Argument,
-	// "Connection" was refused by remote, or closed/broken/shutdown while receiving data.
+	// "Connection" was refused, or closed due to an error.
+	// NOTE: a graceful close is indicated by a `0, nil` (0 bytes received and no error) return.
 	Connection_Refused,
 	// Timed out before being able to receive any data.
 	Timeout,
@@ -185,6 +192,11 @@ UDP_Recv_Error :: enum i32 {
 	Unknown,
 }
 
+Send_Error :: union #shared_nil {
+	TCP_Send_Error,
+	UDP_Send_Error,
+}
+
 TCP_Send_Error :: enum i32 {
 	None,
 	// No network connection, or the network stack is not initialized.
@@ -193,7 +205,7 @@ TCP_Send_Error :: enum i32 {
 	Insufficient_Resources,
 	// Invalid socket or buffer given.
 	Invalid_Argument,
-	// Connection was closed/broken/shutdown while receiving data.
+	// Connection was closed/broken/shutdown while sending data.
 	Connection_Closed,
 	// The socket is not connected.
 	Not_Connected,

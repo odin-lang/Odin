@@ -174,14 +174,14 @@ try_cross_linking:;
 		switch (build_context.linker_choice) {
 		case Linker_Default:  break;
 		case Linker_lld:      section_name = str_lit("lld-link"); break;
-	#if defined(GB_SYSTEM_LINUX)
+	#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_NETBSD)
 		case Linker_mold:     section_name = str_lit("mold-link"); break;
 	#endif
 	#if defined(GB_SYSTEM_WINDOWS)
 		case Linker_radlink:  section_name = str_lit("rad-link"); break;
 	#endif
 		default:
-			gb_printf_err("'%.*s' linker is not support for this platform\n", LIT(linker_choices[build_context.linker_choice]));
+			gb_printf_err("'%.*s' linker is not supported on this platform\n", LIT(linker_choices[build_context.linker_choice]));
 			return 1;
 		}
 
@@ -328,6 +328,12 @@ try_cross_linking:;
 			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
 			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
 
+			gbString lld_lto_flags = gb_string_make(heap_allocator(), "");
+			defer (gb_string_free(lld_lto_flags));
+			if (build_context.lto_kind != LTO_None) {
+				lld_lto_flags = gb_string_append_fmt(lld_lto_flags, "/opt:lldltojobs=%d ", build_context.thread_count);
+			}
+
 			switch (build_context.linker_choice) {
 			case Linker_lld:
 				result = system_exec_command_line_app("msvc-lld-link",
@@ -336,13 +342,15 @@ try_cross_linking:;
 					"%.*s "
 					"%.*s "
 					"%s "
+					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
 					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
 					LIT(build_context.extra_linker_flags),
-					lib_str
+					lib_str,
+					lld_lto_flags
 				);
 
 				if (result) {
@@ -668,7 +676,7 @@ try_cross_linking:;
 				defer (gb_string_free(glue));
 
 				glue = gb_string_append_fmt(glue, "bin/clang");
-				glue = gb_string_append_fmt(glue, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+				glue = gb_string_append_fmt(glue, " --target=%.*s%d ", LIT(build_context.metrics.target_triplet), ODIN_ANDROID_API_LEVEL);
 				glue = gb_string_appendc(glue, "-c \"");
 				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
 				glue = gb_string_appendc(glue, "sources/android/native_app_glue/android_native_app_glue.c");
@@ -689,8 +697,9 @@ try_cross_linking:;
 
 				glue = gb_string_appendc(glue, "\"-I");
 				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot/usr/include/aarch64-linux-android/");
-				glue = gb_string_appendc(glue, "\" ");
+				glue = gb_string_appendc(glue, "sysroot/usr/include/");
+				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len);
+				glue = gb_string_appendc(glue, "/\" ");
 
 
 				glue = gb_string_appendc(glue, "-Wno-macro-redefined ");
@@ -722,12 +731,12 @@ try_cross_linking:;
 					return result;
 				}
 
-				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(android_glue_static_lib));
+				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(android_glue_static_lib));
 			}
 
 
 			for (String object_path : gen->output_object_paths) {
-				object_files = gb_string_append_fmt(object_files, "\'%.*s\' ", LIT(object_path));
+				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 			}
 
 			gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
@@ -737,7 +746,21 @@ try_cross_linking:;
 			}
 
 			if (build_context.build_mode == BuildMode_StaticLibrary) {
-				compiler_error("TODO(bill): -build-mode:static on non-windows targets");
+				TIME_SECTION("Static Library Creation");
+
+				gbString ar_command = gb_string_make(heap_allocator(), "");
+				defer (gb_string_free(ar_command));
+
+				ar_command = gb_string_appendc(ar_command, "ar rcs ");
+				ar_command = gb_string_append_fmt(ar_command, "\"%.*s\" ", LIT(output_filename));
+				ar_command = gb_string_appendc(ar_command, object_files);
+
+				result = system_exec_command_line_app("ar", ar_command);
+				if (result) {
+					return result;
+				}
+
+				return result;
 			}
 
 			// NOTE(dweiler): We use clang as a frontend for the linker as there are
@@ -902,7 +925,10 @@ try_cross_linking:;
 				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len != 0);
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"-L");
-				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len);
+				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
+				platform_lib_str = gb_string_appendc(platform_lib_str, "usr/lib/");
+				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len);
+				platform_lib_str = gb_string_append_fmt(platform_lib_str, "/%d", ODIN_ANDROID_API_LEVEL);
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-landroid ");
@@ -947,11 +973,25 @@ try_cross_linking:;
 				gbString ndk_bin_directory = gb_string_make_length(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
 				link_command_line = gb_string_appendc(link_command_line, ndk_bin_directory);
 				link_command_line = gb_string_appendc(link_command_line, "bin/clang");
-				link_command_line = gb_string_append_fmt(link_command_line, " --target=aarch64-linux-android%d ", ODIN_ANDROID_API_LEVEL);
+				link_command_line = gb_string_append_fmt(link_command_line, " --target=%.*s%d ", LIT(build_context.metrics.target_triplet),  ODIN_ANDROID_API_LEVEL);
 			} else {
 				link_command_line = gb_string_appendc(link_command_line, clang_path);
 			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
+
+			if (build_context.lto_kind != LTO_None) {
+				link_command_line = gb_string_appendc(link_command_line, " -flto=thin");
+				link_command_line = gb_string_append_fmt(link_command_line, " -flto-jobs=%d ", build_context.thread_count);
+
+				if (build_context.ODIN_DEBUG) {
+					link_command_line = gb_string_appendc(link_command_line, " -g ");
+				}
+
+				if (is_osx && !build_context.minimum_os_version_string_given) {
+					link_command_line = gb_string_appendc(link_command_line, " -Wno-override-module ");
+				}
+			}
+
 			link_command_line = gb_string_appendc(link_command_line, object_files);
 			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);

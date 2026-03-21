@@ -34,6 +34,11 @@ MouseWheelDirection :: enum c.int {
 	FLIPPED,   /**< The scroll direction is flipped / natural */
 }
 
+CursorFrameInfo :: struct {
+	surface:  ^Surface,
+	duration: Uint32,
+}
+
 MouseButtonFlags :: distinct bit_set[MouseButtonFlag; Uint32]
 MouseButtonFlag :: enum Uint32 {
 	LEFT   = 1 - 1,
@@ -55,6 +60,8 @@ BUTTON_RMASK  :: MouseButtonFlags{.RIGHT}
 BUTTON_X1MASK :: MouseButtonFlags{.X1}
 BUTTON_X2MASK :: MouseButtonFlags{.X2}
 
+MouseMotionTransformCallback :: #type proc "c" (userdata: rawptr, timestamp: Uint64, window: ^Window, mouseID: MouseID, x, y: ^f32)
+
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
 	HasMouse                   :: proc() -> bool ---
@@ -66,11 +73,13 @@ foreign lib {
 	GetRelativeMouseState      :: proc(x, y: ^f32) -> MouseButtonFlags ---
 	WarpMouseInWindow          :: proc(window: ^Window, x, y: f32) ---
 	WarpMouseGlobal            :: proc(x, y: f32) -> bool ---
+	SetRelativeMouseTransform  :: proc(callback: MouseMotionTransformCallback, userdata: rawptr) -> bool ---
 	SetWindowRelativeMouseMode :: proc(window: ^Window, enabled: bool) -> bool ---
 	GetWindowRelativeMouseMode :: proc(window: ^Window) -> bool ---
 	CaptureMouse               :: proc(enabled: bool) -> bool ---
 	CreateCursor               :: proc(data: [^]byte, mask: [^]Uint8, w, h, hot_x, hot_y: c.int) -> ^Cursor ---
 	CreateColorCursor          :: proc(surface: ^Surface, hot_x, hot_y: c.int) -> ^Cursor ---
+	CreateAnimatedCursor       :: proc(frames: [^]CursorFrameInfo, frame_count, hot_x, hot_y: c.int) -> ^Cursor ---
 	CreateSystemCursor         :: proc(id: SystemCursor) -> ^Cursor ---
 	SetCursor                  :: proc(cursor: ^Cursor) -> bool ---
 	GetCursor                  :: proc() -> ^Cursor ---

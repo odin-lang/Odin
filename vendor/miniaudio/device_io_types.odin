@@ -93,16 +93,16 @@ device_notification :: struct {
 	data: struct #raw_union {
 		started: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.started"`,
 		stopped: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.stopped"`,
 		rerouted: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.rerouted"`,
 		interruption: struct {
 			_unused: c.int,
-		},
+		} `raw_union_tag:"type=.interruption_began,.interruption_ended,"`,
 	},
 }
 
@@ -698,6 +698,7 @@ context_type :: struct {
 			snd_pcm_hw_params_set_rate_resample:    proc "system" (),
 			snd_pcm_hw_params_set_rate:             proc "system" (),
 			snd_pcm_hw_params_set_rate_near:        proc "system" (),
+			snd_pcm_hw_params_set_rate_minmax:      proc "system" (),
 			snd_pcm_hw_params_set_buffer_size_near: proc "system" (),
 			snd_pcm_hw_params_set_periods_near:     proc "system" (),
 			snd_pcm_hw_params_set_access:           proc "system" (),
@@ -1202,6 +1203,7 @@ device :: struct {
 			/*AAudioStream**/ pStreamPlayback: rawptr,
 			/*AAudioStream**/ pStreamCapture: rawptr,
 			rerouteLock: mutex,
+			isTearingDown: b32,
 			usage: aaudio_usage,
 			contentType: aaudio_content_type,
 			inputPreset: aaudio_input_preset,

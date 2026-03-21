@@ -10,7 +10,7 @@ package xxhash
 		Jeroen van Rijn: Initial implementation.
 */
 
-import "core:mem"
+import "base:runtime"
 import "base:intrinsics"
 
 /*
@@ -121,7 +121,7 @@ XXH3_init_state :: proc(state: ^XXH3_state) {
 }
 
 XXH3_create_state :: proc(allocator := context.allocator) -> (res: ^XXH3_state, err: Error) {
-	state, mem_error := mem.new_aligned(XXH3_state, 64, allocator)
+	state, mem_error := runtime.new_aligned(XXH3_state, 64, allocator)
 	err = nil if mem_error == nil else .Error
 
 	XXH3_init_state(state)

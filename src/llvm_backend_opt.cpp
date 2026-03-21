@@ -309,7 +309,15 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 
 				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
 				switch (LLVMGetInstructionOpcode(curr_instr)) {
-				// case LLVMAlloca:
+				case LLVMAlloca:
+					if (map_get(&p->tuple_fix_map, curr_instr) != nullptr) {
+						// NOTE(bill, 2025-12-27): Remove temporary tuple fix alloca instructions
+						// if they are never used
+						removal_count += 1;
+						LLVMInstructionEraseFromParent(curr_instr);
+						was_dead_instructions = true;
+					}
+					break;
 				case LLVMLoad:
 					if (LLVMGetVolatile(curr_instr)) {
 						break;
@@ -504,8 +512,9 @@ gb_internal void llvm_delete_function(LLVMValueRef func) {
 	LLVMDeleteFunction(func);
 }
 
-gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef value) {
-	LLVMValueRef global = LLVMGetNamedGlobal(m->mod, "llvm.compiler.used");
+// Helper to append a value to an llvm metadata array global (llvm.used or llvm.compiler.used)
+gb_internal void lb_append_to_llvm_used_list(lbModule *m, LLVMValueRef value, char const *list_name) {
+	LLVMValueRef global = LLVMGetNamedGlobal(m->mod, list_name);
 
 	LLVMValueRef *constants;
 	int operands = 1;
@@ -535,33 +544,43 @@ gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef value) {
 	constants[operands - 1] = LLVMConstBitCast(value, Int8PtrTy);
 	LLVMValueRef initializer = LLVMConstArray(Int8PtrTy, constants, operands);
 
-	global = LLVMAddGlobal(m->mod, ATy, "llvm.compiler.used");
+	global = LLVMAddGlobal(m->mod, ATy, list_name);
 	LLVMSetLinkage(global, LLVMAppendingLinkage);
 	LLVMSetSection(global, "llvm.metadata");
 	LLVMSetInitializer(global, initializer);
+}
+
+gb_internal void lb_append_to_compiler_used(lbModule *m, LLVMValueRef value) {
+	lb_append_to_llvm_used_list(m, value, "llvm.compiler.used");
+}
+
+// llvm.used survives LTO linker optimizations (unlike llvm.compiler.used)
+gb_internal void lb_append_to_used(lbModule *m, LLVMValueRef value) {
+	lb_append_to_llvm_used_list(m, value, "llvm.used");
 }
 
 gb_internal void lb_run_remove_unused_function_pass(lbModule *m) {
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
-	// Custom remove dead function pass
+
+	// Custom remove dead function pass (for internal linkage functions)
 	for (; pass_count < max_pass_count; pass_count++) {
-		bool was_dead = false;	
+		bool was_dead = false;
 		for (LLVMValueRef func = LLVMGetFirstFunction(m->mod);
 		     func != nullptr;
 		     /**/
 		     ) {
 		     	LLVMValueRef curr_func = func;
 		     	func = LLVMGetNextFunction(func);
-		     	
+
 			LLVMUseRef first_use = LLVMGetFirstUse(curr_func);
 			if (first_use != nullptr)  {
 				continue;
 			}
 			String name = {};
 			name.text = cast(u8 *)LLVMGetValueName2(curr_func, cast(size_t *)&name.len);
-						
+
 			if (LLVMIsDeclaration(curr_func)) {
 				// Ignore for the time being
 				continue;
@@ -570,7 +589,7 @@ gb_internal void lb_run_remove_unused_function_pass(lbModule *m) {
 			if (linkage != LLVMInternalLinkage) {
 				continue;
 			}
-			
+
 			Entity **found = map_get(&m->procedure_values, curr_func);
 			if (found && *found) {
 				Entity *e = *found;
@@ -580,7 +599,7 @@ gb_internal void lb_run_remove_unused_function_pass(lbModule *m) {
 					continue;
 				}
 			}
-			
+
 			llvm_delete_function(curr_func);
 			was_dead = true;
 			removal_count += 1;

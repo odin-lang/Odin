@@ -410,7 +410,7 @@ foreign lib {
 	 *
 	 * Returns: NULL on failure, otherwise a CURL **array pointer
 	 */
-	multi_get_handles :: proc(multi_handle: ^CURLM) -> ^^CURL ---
+	multi_get_handles :: proc(multi_handle: ^CURLM) -> [^]^CURL ---
 
 	/*
 	 * Name:    curl_multi_get_offt()

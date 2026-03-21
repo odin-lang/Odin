@@ -10,7 +10,7 @@ function getElement(name) {
 }
 
 function stripNewline(str) {
-    return str.replace(/\n/, ' ')
+	return str.replace(/\n/, ' ')
 }
 
 class WasmMemoryInterface {
@@ -40,22 +40,14 @@ class WasmMemoryInterface {
 	}
 
 
-	loadF32Array(addr, len) {
-		let array = new Float32Array(this.memory.buffer, addr, len);
-		return array;
-	}
-	loadF64Array(addr, len) {
-		let array = new Float64Array(this.memory.buffer, addr, len);
-		return array;
-	}
-	loadU32Array(addr, len) {
-		let array = new Uint32Array(this.memory.buffer, addr, len);
-		return array;
-	}
-	loadI32Array(addr, len) {
-		let array = new Int32Array(this.memory.buffer, addr, len);
-		return array;
-	}
+	loadF32Array(addr, len) { return new Float32Array(this.memory.buffer, addr, len); }
+	loadF64Array(addr, len) { return new Float64Array(this.memory.buffer, addr, len); }
+	loadU32Array(addr, len) { return new Uint32Array(this.memory.buffer, addr, len); }
+	loadI32Array(addr, len) { return new Int32Array(this.memory.buffer, addr, len); }
+	loadU16Array(addr, len) { return new Uint16Array(this.memory.buffer, addr, len); }
+	loadI16Array(addr, len) { return new Int16Array(this.memory.buffer, addr, len); }
+	loadU8Array(addr, len) { return new Uint8Array(this.memory.buffer, addr, len); }
+	loadI8Array(addr, len) { return new Int8Array(this.memory.buffer, addr, len); }
 
 
 	loadU8(addr)  { return this.mem.getUint8  (addr); }
@@ -200,6 +192,7 @@ class WebGLInterface {
 		this.transformFeedbacks = [];
 		this.syncs              = [];
 		this.programInfos       = {};
+		this.extensions         = [];
 	}
 
 	get mem() {
@@ -225,6 +218,9 @@ class WebGLInterface {
 		} else {
 			this.ctxVersion = 1.0;
 		}
+
+		this.extensions = this.ctx.getSupportedExtensions();
+
 		return true;
 	}
 
@@ -281,6 +277,30 @@ class WebGLInterface {
 		return source;
 	}
 
+	loadTypedArrayFromTexelType(type, size, data) {
+		switch (type) {
+			case this.ctx.SHORT: return this.mem.loadI16Array(data, size/2);
+			case this.ctx.UNSIGNED_SHORT_5_5_5_1:
+			case this.ctx.UNSIGNED_SHORT_5_6_5:
+			case this.ctx.UNSIGNED_SHORT_4_4_4_4:
+			case this.ctx.UNSIGNED_SHORT:
+			case this.ctx.HALF_FLOAT: return this.mem.loadU16Array(data, size/2);
+			case this.ctx.FLOAT: return this.mem.loadF32Array(data, size/4);
+			case this.ctx.INT: return this.mem.loadI32Array(data, size/4)
+			case this.ctx.UNSIGNED_INT_24_8:
+			case this.ctx.UNSIGNED_INT_5_9_9_9_REV:
+			case this.ctx.UNSIGNED_INT_10F_11F_11F_REV:
+			case this.ctx.UNSIGNED_INT_2_10_10_10_REV:
+			case this.ctx.UNSIGNED_INT: return this.mem.loadU32Array(data, size/4)
+			case this.ctx.BYTE: return this.mem.loadI8Array(data, size);
+			case this.ctx.UNSIGNED_BYTE: return this.mem.loadU8Array(data, size);
+			case this.ctx.FLOAT_32_UNSIGNED_INT_24_8_REV:
+				throw new Error("Source data of type FLOAT_32_UNSIGNED_INT_24_8_REV must be null");
+		}
+	
+		throw new Error(`Unsupported texture data type: 0x${type.toString(16)}`);
+	}
+
 	getWebGL1Interface() {
 		return {
 			SetCurrentContextById: (name_ptr, name_len) => {
@@ -327,10 +347,30 @@ class WebGLInterface {
 
 			IsExtensionSupported: (name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
-				let extensions = this.ctx.getSupportedExtensions();
+				let extensions = this.extensions;
 				return extensions.indexOf(name) !== -1
 			},
 
+			GetSupportedExtensionFromIndex: (index, buf_ptr, buf_len, length_ptr) => {
+				let extensions = this.extensions;
+				if (index < 0 || index >= extensions.length) {
+					return false;
+				}
+
+				let ext = extensions[index];
+				const n = Math.min(buf_len, ext.length);
+				ext = ext.substring(0, n);
+				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(ext));
+
+				this.mem.storeInt(length_ptr, n);
+
+				return true;
+			},
+
+			GetExtension: (name_ptr, name_len) => {
+				let name = this.mem.loadString(name_ptr, name_len);
+				this.ctx.getExtension(name);
+			},
 
 			GetError: () => {
 				let err = this.lastError;
@@ -616,6 +656,9 @@ class WebGLInterface {
 			FramebufferTexture2D: (target, attachment, textarget, texture, level) => {
 				this.ctx.framebufferTexture2D(target, attachment, textarget, this.textures[texture], level);
 			},
+			CheckFramebufferStatus: (target) => {
+				return this.ctx.checkFramebufferStatus(target)
+			},
 			FrontFace: (mode) => {
 				this.ctx.frontFace(mode);
 			},
@@ -625,6 +668,52 @@ class WebGLInterface {
 				this.ctx.generateMipmap(target);
 			},
 
+			GetBufferParameter: (target, pname) => {
+				return this.ctx.getBufferParameter(target, pname);
+			},
+
+
+			GetActiveAttrib: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
+				const info = this.ctx.getActiveAttrib(this.programs[program], index);
+				
+				if (size_ptr) {
+					this.mem.storeInt(size_ptr, info.size);
+				}
+
+				if (type_ptr) {
+					this.mem.storeI32(type_ptr, info.type);
+				}
+
+				if (name_buf_ptr && name_buf_len > 0) {
+					let n = Math.min(name_buf_len, info.name.length);
+					let name = info.name.substring(0, n);
+					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
+					this.mem.storeInt(name_len_ptr, n);
+				} else if (name_len_ptr) {
+					this.mem.storeInt(name_len_ptr, info.name.length);
+				}
+			},
+
+			GetActiveUniform: (program, index, size_ptr, type_ptr, name_buf_ptr, name_buf_len, name_len_ptr) => {
+				let info = this.ctx.getActiveUniform(this.programs[program], index);
+				
+				if (size_ptr) {
+					this.mem.storeInt(size_ptr, info.size);
+				}
+
+				if (type_ptr) {
+					this.mem.storeI32(type_ptr, info.type);
+				}
+
+				if (name_buf_ptr && name_buf_len > 0) {
+					let n = Math.min(name_buf_len, info.name.length);
+					let name = info.name.substring(0, n);
+					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
+					this.mem.storeInt(name_len_ptr, n);
+				} else if (name_len_ptr) {
+					this.mem.storeInt(name_len_ptr, info.name.length);
+				}
+			},
 
 			GetAttribLocation: (program, name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
@@ -786,7 +875,8 @@ class WebGLInterface {
 
 			TexImage2D: (target, level, internalformat, width, height, border, format, type, size, data) => {
 				if (data) {
-					this.ctx.texImage2D(target, level, internalformat, width, height, border, format, type, this.mem.loadBytes(data, size));
+					const texelData = this.loadTypedArrayFromTexelType(type, size, data);
+					this.ctx.texImage2D(target, level, internalformat, width, height, border, format, type, texelData);
 				} else {
 					this.ctx.texImage2D(target, level, internalformat, width, height, border, format, type, null);
 				}
@@ -798,7 +888,8 @@ class WebGLInterface {
 				this.ctx.texParameteri(target, pname, param);
 			},
 			TexSubImage2D: (target, level, xoffset, yoffset, width, height, format, type, size, data) => {
-				this.ctx.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, this.mem.loadBytes(data, size));
+				const texelData = this.loadTypedArrayFromTexelType(type, size, data);
+				this.ctx.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, texelData);
 			},
 
 
@@ -932,7 +1023,10 @@ class WebGLInterface {
 			},
 
 			/* Texture objects */
-
+			TexStorage2D: (target, levels, internalformat, width, height) => {
+				this.assertWebGL2();
+				this.ctx.texStorage2D(target, levels, internalformat, width, height);
+			},
 			TexStorage3D: (target, levels, internalformat, width, height, depth) => {
 				this.assertWebGL2();
 				this.ctx.texStorage3D(target, levels, internalformat, width, height, depth);
@@ -940,14 +1034,16 @@ class WebGLInterface {
 			TexImage3D: (target, level, internalformat, width, height, depth, border, format, type, size, data) => {
 				this.assertWebGL2();
 				if (data) {
-					this.ctx.texImage3D(target, level, internalformat, width, height, depth, border, format, type, this.mem.loadBytes(data, size));
+					const texelData = this.loadTypedArrayFromTexelType(type, size, data);
+					this.ctx.texImage3D(target, level, internalformat, width, height, depth, border, format, type, texelData);
 				} else {
 					this.ctx.texImage3D(target, level, internalformat, width, height, depth, border, format, type, null);
 				}
 			},
 			TexSubImage3D: (target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, size, data) => {
 				this.assertWebGL2();
-				this.ctx.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, this.mem.loadBytes(data, size));
+				const texelData = this.loadTypedArrayFromTexelType(type, size, data);
+				this.ctx.texSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, texelData);
 			},
 			CompressedTexImage3D: (target, level, internalformat, width, height, depth, border, imageSize, data) => {
 				this.assertWebGL2();
@@ -1260,15 +1356,34 @@ class WebGLInterface {
 				this.assertWebGL2();
 				return this.ctx.getUniformBlockIndex(this.programs[program], this.mem.loadString(uniformBlockName_ptr, uniformBlockName_len));
 			},
-			// any getActiveUniformBlockParameter(WebGLProgram program, GLuint uniformBlockIndex, GLenum pname);
-			GetActiveUniformBlockName: (program, uniformBlockIndex, buf_ptr, buf_len, length_ptr) => {
+			GetActiveUniformBlockName: (program, uniformBlockIndex, name_buf_ptr, name_buf_len, name_length_ptr) => {
 				this.assertWebGL2();
 				let name = this.ctx.getActiveUniformBlockName(this.programs[program], uniformBlockIndex);
 
-				let n = Math.min(buf_len, name.length);
-				name = name.substring(0, n);
-				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder().encode(name))
-				this.mem.storeInt(length_ptr, n);
+				if (name_buf_ptr && name_buf_len > 0) {
+					let n = Math.min(name_buf_len, name.length);
+					name = name.substring(0, n);
+					this.mem.loadBytes(name_buf_ptr, name_buf_len).set(new TextEncoder().encode(name));
+					this.mem.storeInt(name_length_ptr, n);
+				} else if (name_length_ptr) {
+					this.mem.storeInt(name_length_ptr, name.length);
+				}
+			},
+			GetActiveUniforms: (program, uniformIndices_ptr, uniformIndices_len, pname, res_ptr) => {
+				this.assertWebGL2();
+				let indices = this.mem.loadU32Array(uniformIndices_ptr, uniformIndices_len);
+				this.ctx.getActiveUniforms(this.programs[program], indices, pname)
+				this.mem.loadI32Array(res_ptr, indices.length).set(indices)
+			},
+			GetActiveUniformBlockParameter: (program, uniformBlockIndex, pname, params_ptr) => {
+				this.assertWebGL2();
+				let res = this.ctx.getActiveUniformBlockParameter(this.programs[program], uniformBlockIndex, pname);
+
+				if (res instanceof Uint32Array) { // for pname GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES 
+					this.mem.loadU32Array(params_ptr, res.length).set(res)
+				} else {
+					this.mem.storeI32(params_ptr, res)
+				}
 			},
 			UniformBlockBinding: (program, uniformBlockIndex, uniformBlockBinding) => {
 				this.assertWebGL2();
@@ -1840,6 +1955,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				return false;
 			},
 
+			// Writes a struct of type `Gamepad_State`, see `core/sys/wasm/js/events.odin`
 			get_gamepad_state: (gamepad_id, ep) => {
 				let index = gamepad_id;
 				let gps = navigator.getGamepads();
@@ -1986,6 +2102,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 				}
 			},
 
+			set_document_title: (title_ptr, title_len) => {
+				let title = wasmMemoryInterface.loadString(title_ptr, title_len);
+				document.title = title;
+			},
+
 			get_element_key_f64: (id_ptr, id_len, key_ptr, key_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let key = wasmMemoryInterface.loadString(key_ptr, key_len);
@@ -2107,7 +2228,7 @@ async function runWasm(wasmPath, consoleElement, extraForeignImports, wasmMemory
 
 	if (exports.memory) {
 		if (wasmMemoryInterface.memory) {
-			console.warn("WASM module exports memory, but `runWasm` was given an interface with existing memory too");
+			console.warn('WASM module exports memory, but `runWasm` was given an interface with existing memory too. Did you mean to use `-extra-linker-flags:"--import-memory"` to tell the compiler not to export memory?');
 		}
 		wasmMemoryInterface.setMemory(exports.memory);
 	}

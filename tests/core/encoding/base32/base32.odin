@@ -1,4 +1,3 @@
-#+test
 package test_encoding_base32
 
 import "core:testing"
@@ -83,7 +82,16 @@ test_base32_decode_invalid :: proc(t: ^testing.T) {
 
 	// Section 3.2 - Padding requirements
 	{
-		// Padding must only be at end
+		// Padding in middle without trailing padding
+		input := "MZ===YTBMZXW6YTB" // '===' in middle, no trailing padding
+		output, err := base32.decode(input)
+		if output != nil {
+			defer delete(output)
+		}
+		testing.expect_value(t, err, Error.Malformed_Input)
+	}
+	{
+		// Padding must only be at end (with trailing padding)
 		input := "MZ=Q===="
 		output, err := base32.decode(input)
 		if output != nil {

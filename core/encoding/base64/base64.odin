@@ -9,8 +9,8 @@ truncate it from the encoded output.
 */
 package encoding_base64
 
+import "base:runtime"
 import "core:io"
-import "core:mem"
 import "core:strings"
 
 ENC_TABLE := [64]byte {
@@ -22,6 +22,18 @@ ENC_TABLE := [64]byte {
     'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
     'w', 'x', 'y', 'z', '0', '1', '2', '3',
     '4', '5', '6', '7', '8', '9', '+', '/',
+}
+
+// Encoding table for Base64url variant
+ENC_URL_TABLE := [64]byte {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+    'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+    'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+    'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+    'w', 'x', 'y', 'z', '0', '1', '2', '3',
+    '4', '5', '6', '7', '8', '9', '-', '_',
 }
 
 PADDING :: '='
@@ -61,7 +73,44 @@ DEC_TABLE := [256]u8 {
      0,  0,  0,  0,  0,  0,  0,  0,
 }
 
-encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: mem.Allocator_Error) #optional_allocator_error {
+// Decoding table for Base64url variant
+DEC_URL_TABLE := [256]u8 {
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0, 62,  0,  0,
+    52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61,  0,  0,  0,  0,  0,  0,
+     0,  0,  1,  2,  3,  4,  5,  6,
+     7,  8,  9, 10, 11, 12, 13, 14,
+    15, 16, 17, 18, 19, 20, 21, 22,
+    23, 24, 25,  0,  0,  0,  0, 63,
+     0, 26, 27, 28, 29, 30, 31, 32,
+    33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48,
+    49, 50, 51,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,  0,  0,  0,  0,  0,
+}
+
+
+encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	out_length := encoded_len(data)
 	if out_length == 0 {
 		return
@@ -112,7 +161,7 @@ encoded_len :: proc(data: []byte) -> int {
 	return ((4 * length / 3) + 3) &~ 3
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (decoded: []byte, err: mem.Allocator_Error) #optional_allocator_error {
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, allocator := context.allocator) -> (decoded: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	out_length := decoded_len(data)
 
 	out   := strings.builder_make(0, out_length, allocator) or_return

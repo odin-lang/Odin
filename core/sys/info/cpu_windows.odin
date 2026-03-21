@@ -2,30 +2,34 @@ package sysinfo
 
 import sys "core:sys/windows"
 import "base:intrinsics"
-import "base:runtime"
 
-@(init, private)
-init_cpu_core_count :: proc "contextless" () {
-	context = runtime.default_context()
+@(private)
+_cpu_core_count :: proc "contextless" () -> (physical: int, logical: int, ok: bool) {
+	// Reportedly, Windows Server supports a maximum of 256 logical cores.
+	// The most scratch memory we need therefore is 8192 bytes = 256 * size_of(sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION)
+	infos: [256]sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION
 
-	infos: []sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION
-	defer delete(infos)
-
-	returned_length: sys.DWORD
 	// Query for the required buffer size.
-	if ok := sys.GetLogicalProcessorInformation(raw_data(infos), &returned_length); !ok {
-		infos = make([]sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION, returned_length / size_of(sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION))
+	returned_length: sys.DWORD
+	sys.GetLogicalProcessorInformation(nil, &returned_length)
+
+	if int(returned_length) > size_of(infos) {
+		return 0, 0, false
 	}
+
+	count := int(returned_length) / size_of(sys.SYSTEM_LOGICAL_PROCESSOR_INFORMATION)
 
 	// If it still doesn't work, return
-	if ok := sys.GetLogicalProcessorInformation(raw_data(infos), &returned_length); !ok {
-		return
+	if ok := sys.GetLogicalProcessorInformation(raw_data(infos[:]), &returned_length); !ok {
+		return 0, 0, false
 	}
 
-	for info in infos {
+	for info in infos[:count] {
 		#partial switch info.Relationship {
-		case .RelationProcessorCore: cpu.physical_cores += 1
-		case .RelationNumaNode:      cpu.logical_cores  += int(intrinsics.count_ones(info.ProcessorMask))
+		case .RelationProcessorCore: physical += 1
+		case .RelationNumaNode:      logical  += int(intrinsics.count_ones(info.ProcessorMask))
 		}
 	}
+
+	return physical, logical, true
 }

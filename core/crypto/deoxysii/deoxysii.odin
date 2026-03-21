@@ -8,8 +8,8 @@ package deoxysii
 
 import "base:intrinsics"
 import "core:bytes"
+import "core:crypto"
 import "core:crypto/aes"
-import "core:mem"
 import "core:simd"
 
 // KEY_SIZE is the Deoxys-II-256 key size in bytes.
@@ -122,7 +122,7 @@ seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 
 // open authenticates the aad and ciphertext, and decrypts the ciphertext,
 // with the provided Context, iv, and tag, and stores the output in dst,
-// returning true iff the authentication was successful.  If authentication
+// returning true if and only if (⟺) the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
 // dst and plaintext MUST alias exactly or not at all.
@@ -142,7 +142,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 		ok = d_ref(ctx, dst, iv, aad, ciphertext, tag)
 	}
 	if !ok {
-		mem.zero_explicit(raw_data(dst), len(ciphertext))
+		crypto.zero_explicit(raw_data(dst), len(ciphertext))
 	}
 
 	return ok
@@ -151,7 +151,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 // reset sanitizes the Context.  The Context must be
 // re-initialized to be used again.
 reset :: proc "contextless" (ctx: ^Context) {
-	mem.zero_explicit(&ctx._subkeys, len(ctx._subkeys))
+	crypto.zero_explicit(&ctx._subkeys, len(ctx._subkeys))
 	ctx._is_initialized = false
 }
 

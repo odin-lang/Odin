@@ -7,10 +7,11 @@ import "base:intrinsics"
 IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
-RUNTIME_LINKAGE :: "strong" when (
-	ODIN_USE_SEPARATE_MODULES || 
-	ODIN_BUILD_MODE == .Dynamic ||
-	!ODIN_NO_CRT) else "internal"
+RUNTIME_LINKAGE :: "strong"   when ODIN_USE_SEPARATE_MODULES else
+                   "internal" when ODIN_NO_ENTRY_POINT && (ODIN_BUILD_MODE == .Static || ODIN_BUILD_MODE == .Dynamic || ODIN_BUILD_MODE == .Object) else
+                   "strong"   when ODIN_BUILD_MODE == .Dynamic else
+                   "strong"   when !ODIN_NO_CRT else
+                   "internal"
 RUNTIME_REQUIRE :: false // !ODIN_TILDE
 
 @(private)
@@ -147,6 +148,7 @@ mem_alloc_non_zeroed :: #force_no_inline proc(size: int, alignment: int = DEFAUL
 	return allocator.procedure(allocator.data, .Alloc_Non_Zeroed, size, alignment, nil, 0, loc)
 }
 
+@builtin
 mem_free :: #force_no_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if ptr == nil || allocator.procedure == nil {
 		return nil
@@ -171,7 +173,7 @@ mem_free_bytes :: #force_no_inline proc(bytes: []byte, allocator := context.allo
 	return err
 }
 
-
+@builtin
 mem_free_all :: #force_no_inline proc(allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
 	if allocator.procedure != nil {
 		_, err = allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, loc)
@@ -340,7 +342,7 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 	case y == nil: return +1
 	}
 	a, b := cast([^]byte)x, cast([^]byte)y
-	
+
 	n := uint(n)
 	i := uint(0)
 	m := uint(0)
@@ -716,7 +718,7 @@ quaternion256_eq :: #force_inline proc "contextless" (a, b: quaternion256) -> bo
 quaternion256_ne :: #force_inline proc "contextless" (a, b: quaternion256) -> bool { return real(a) != real(b) || imag(a) != imag(b) || jmag(a) != jmag(b) || kmag(a) != kmag(b) }
 
 
-string_decode_rune :: proc "contextless" (s: string) -> (rune, int) {
+string_decode_rune :: proc "contextless" (s: string) -> (rune, int) #no_bounds_check {
 	// NOTE(bill): Duplicated here to remove dependency on package unicode/utf8
 
 	@(static, rodata) accept_sizes := [256]u8{
@@ -795,7 +797,7 @@ string_decode_rune :: proc "contextless" (s: string) -> (rune, int) {
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
 
-string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
+string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) #no_bounds_check {
 	RUNE_ERROR :: '\ufffd'
 	RUNE_SELF  :: 0x80
 	UTF_MAX    :: 4
@@ -831,7 +833,7 @@ string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
 }
 
 
-string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) {
+string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) #no_bounds_check {
 	REPLACEMENT_CHAR :: '\ufffd'
 	_surr1           :: 0xd800
 	_surr2           :: 0xdc00
@@ -859,7 +861,7 @@ string16_decode_rune :: proc "contextless" (s: string16) -> (rune, int) {
 	return r, w
 }
 
-string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) {
+string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) #no_bounds_check {
 	REPLACEMENT_CHAR :: '\ufffd'
 	_surr1           :: 0xd800
 	_surr2           :: 0xdc00
@@ -1408,4 +1410,3 @@ when .Address in ODIN_SANITIZER_FLAGS {
 		__asan_unpoison_memory_region :: proc "system" (address: rawptr, size: uint) ---
 	}
 }
-

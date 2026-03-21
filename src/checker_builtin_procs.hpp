@@ -74,6 +74,8 @@ enum BuiltinProcId {
 	BuiltinProc_count_zeros,
 	BuiltinProc_count_trailing_zeros,
 	BuiltinProc_count_leading_zeros,
+	BuiltinProc_count_trailing_ones,
+	BuiltinProc_count_leading_ones,
 	BuiltinProc_reverse_bits,
 	BuiltinProc_byte_swap,
 
@@ -142,6 +144,8 @@ BuiltinProc__atomic_end,
 	BuiltinProc_fixed_point_div_sat,
 
 	BuiltinProc_expect,
+	BuiltinProc_likely,
+	BuiltinProc_unlikely,
 
 BuiltinProc__simd_begin,
 	BuiltinProc_simd_add,
@@ -295,6 +299,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_simd_vector,
 	BuiltinProc_type_is_matrix,
 	BuiltinProc_type_is_raw_union,
+	BuiltinProc_type_is_fixed_capacity_dynamic_array,
 
 
 	BuiltinProc_type_is_specialized_polymorphic_record,
@@ -339,6 +344,8 @@ BuiltinProc__type_simple_boolean_end,
 	BuiltinProc_type_is_superset_of,
 
 	BuiltinProc_type_field_index_of,
+
+	BuiltinProc_type_fixed_capacity_dynamic_array_len_offset,
 
 	BuiltinProc_type_bit_set_backing_type,
 
@@ -453,6 +460,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_trailing_zeros"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_leading_zeros"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_trailing_ones"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("count_leading_ones"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("reverse_bits"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("byte_swap"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -520,7 +529,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("fixed_point_mul_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("expect"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("expect"),   2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("likely"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("unlikely"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -670,6 +681,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_simd_vector"),       1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_raw_union"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_fixed_capacity_dynamic_array"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialized_polymorphic_record"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_unspecialized_polymorphic_record"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -712,6 +724,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_superset_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics },
 
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_fixed_capacity_dynamic_array_len_offset"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_bit_set_backing_type"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

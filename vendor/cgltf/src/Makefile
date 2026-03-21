@@ -8,7 +8,7 @@ endif
 
 wasm:
 	mkdir -p ../lib
-	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc cgltf.c -o ../lib/cgltf_wasm.o
+	$(CC) -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim cgltf.c -o ../lib/cgltf_wasm.o
 
 unix:
 	mkdir -p ../lib

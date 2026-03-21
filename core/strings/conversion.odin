@@ -1,7 +1,7 @@
 package strings
 
+import "base:runtime"
 import "core:io"
-import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -21,7 +21,7 @@ Returns:
 - res: A valid UTF-8 string with invalid sequences replaced by `replacement`.
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	if len(s) == 0 {
 		return "", nil
 	}
@@ -101,7 +101,7 @@ Output:
 	test
 
 */
-to_lower :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_lower :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
 	for r in s {
@@ -136,7 +136,7 @@ Output:
 	TEST
 
 */
-to_upper :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_upper :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	b: Builder
 	builder_init(&b, 0, len(s), allocator) or_return
 	for r in s {
@@ -260,7 +260,7 @@ Returns:
 - res: The converted string
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_camel_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_camel_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := s
 	s = trim_space(s)
 	b: Builder
@@ -296,7 +296,7 @@ Returns:
 - res: The converted string
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_pascal_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_pascal_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := s
 	s = trim_space(s)
 	b: Builder
@@ -355,7 +355,7 @@ to_delimiter_case :: proc(
 	delimiter: rune,
 	all_upper_case: bool,
 	allocator := context.allocator,
-) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := s
 	s = trim_space(s)
 	b: Builder
@@ -422,7 +422,7 @@ Output:
 	hello_world
 
 */
-to_snake_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_snake_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return to_delimiter_case(s, '_', false, allocator)
 }
 // Alias for `to_upper_snake_case`
@@ -454,7 +454,7 @@ Output:
 	HELLO_WORLD
 
 */
-to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return to_delimiter_case(s, '_', true, allocator)
 }
 /*
@@ -484,7 +484,7 @@ Output:
 	hello-world
 
 */
-to_kebab_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error  {
+to_kebab_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error  {
 	return to_delimiter_case(s, '-', false, allocator)
 }
 /*
@@ -514,7 +514,7 @@ Output:
 	HELLO-WORLD
 
 */
-to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error  {
+to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error  {
 	return to_delimiter_case(s, '-', true, allocator)
 }
 /*
@@ -544,7 +544,7 @@ Output:
 	Hello_World
 
 */
-to_ada_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error  {
+to_ada_case :: proc(s: string, allocator := context.allocator) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error  {
 	s := s
 	s = trim_space(s)
 	b: Builder

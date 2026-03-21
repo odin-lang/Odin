@@ -38,6 +38,8 @@ count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_sim
 count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_trailing_ones  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_leading_ones   :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
@@ -75,7 +77,9 @@ prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=
 prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
 
 // Compiler Hints
-expect :: proc(val, expected_val: $T) -> T ---
+expect   :: proc(val, expected_val: $T) -> T ---
+likely   :: proc(val: $T) -> T where type_is_boolean(T) ---
+unlikely :: proc(val: $T) -> T where type_is_boolean(T) ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
@@ -178,6 +182,7 @@ type_is_bit_set          :: proc($T: typeid) -> bool ---
 type_is_bit_field        :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_is_matrix           :: proc($T: typeid) -> bool ---
+type_is_fixed_capacity_dynamic_array :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
@@ -219,6 +224,8 @@ type_is_subtype_of  :: proc($T, $U: typeid) -> bool ---
 type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
+
+type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
 
 // "Contiguous" means that the set of enum constants, when sorted, have a difference of either 0 or 1 between consecutive values.
 // This is the exact opposite of "sparse".
@@ -355,7 +362,7 @@ has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is
 
 
 // Utility Calls
-concatentate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
+concatenate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
 
 // Returns the value of the procedure where `x` must be a call expression
 procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---

@@ -1,6 +1,12 @@
 *.odin linguist-language=Odin
 * text=auto
-
 # These files must always have *nix line-endings
 Makefile text eol=lf
 *.sh text eol=lf
+vendor/box2d/lib/box2d_windows_amd64_avx2.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/box2d_windows_amd64_sse2.lib filter=lfs diff=lfs merge=lfs -text
+vendor/miniaudio/lib/miniaudio.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/SDL3.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/SDL3.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/mixer/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/mixer/*.lib filter=lfs diff=lfs merge=lfs -text

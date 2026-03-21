@@ -2257,3 +2257,16 @@ XIRawEvent :: struct {
 	raw_values: [^]f64,
 }
 
+CursorUInt   :: u32
+CursorDim    :: u32
+CursorPixel  :: u32
+CursorImage  :: struct {
+	version: CursorDim,
+	size:    CursorDim,
+	width:   CursorDim,
+	height:  CursorDim,
+	xhot:    CursorDim,
+	yhot:    CursorDim,
+	delay:   CursorUInt,
+	pixels:  ^CursorPixel, // ARGB
+}

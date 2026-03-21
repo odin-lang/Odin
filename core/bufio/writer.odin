@@ -1,14 +1,14 @@
 package bufio
 
+import "base:runtime"
 import "core:io"
-import "core:mem"
 import "core:unicode/utf8"
 // import "core:bytes"
 
 // Writer is a buffered wrapper for an io.Writer
 Writer :: struct {
 	buf:            []byte,
-	buf_allocator:  mem.Allocator,
+	buf_allocator:  runtime.Allocator,
 
 	wr: io.Writer,
 	n: int,
@@ -35,7 +35,7 @@ writer_init_with_buf :: proc(b: ^Writer, wr: io.Writer, buf: []byte) {
 	b.buf = buf
 }
 
-// writer_destroy destroys the underlying buffer with its associated allocator IFF that allocator has been set
+// writer_destroy destroys the underlying buffer with its associated allocator if and only if (⟺) that allocator has been set
 writer_destroy :: proc(b: ^Writer) {
 	delete(b.buf, b.buf_allocator)
 	b^ = {}

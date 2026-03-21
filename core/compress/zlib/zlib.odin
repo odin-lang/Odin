@@ -1,4 +1,4 @@
-#+vet !using-param
+#+feature using-stmt
 package compress_zlib
 
 /*
@@ -326,7 +326,7 @@ decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bo
 			return 0, .Code_Buffer_Malformed
 		}
 		compress.refill_lsb(z)
-		if z.num_bits > 63 {
+		if z.code_buffer == 0 {
 			return 0, .Stream_Too_Short
 		}
 	}
@@ -491,7 +491,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 	*/
 	expected_output_size = max(max(expected_output_size, compress.COMPRESS_OUTPUT_ALLOCATE_MIN), 512)
 
-	// fmt.printf("\nZLIB: Expected Payload Size: %v\n\n", expected_output_size);
+	// fmt.printfln("ZLIB: Expected Payload Size: %v", expected_output_size)
 
 	if expected_output_size > 0 && expected_output_size <= compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
 		/*
@@ -522,11 +522,16 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 	final := u32(0)
 	type  := u32(0)
 
+	defer if int(z.bytes_written) != len(z.output.buf) {
+		resize(&z.output.buf, int(z.bytes_written))
+	}
+
 	for {
 		final = compress.read_bits_lsb(z, 1)
 		type  = compress.read_bits_lsb(z, 2)
 
-		// fmt.printf("Final: %v | Type: %v\n", final, type)
+		// fmt.printfln("len(z): %v", len(z.input_data))
+		// fmt.printfln("Final: %v | Type: %v", final, type)
 
 		switch type {
 		case 0:
@@ -561,7 +566,6 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 		case 3:
 			return .BType_3
 		case:
-			// fmt.printf("Err: %v | Final: %v | Type: %v\n", err, final, type)
 			if type == 1 {
 				// Use fixed code lengths.
 				build_huffman(z_repeat, Z_FIXED_LENGTH[:]) or_return
@@ -590,7 +594,6 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 
 				for n < ntot {
 					c = decode_huffman(z, codelength_ht) or_return
-
 					if c < 0 || c >= 19 {
 						return .Huffman_Bad_Code_Lengths
 					}
@@ -635,13 +638,10 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 			}
 			parse_huffman_block(z, z_repeat, z_offset) or_return
 		}
+
 		if final == 1 {
 			break
 		}
-	}
-
-	if int(z.bytes_written) != len(z.output.buf) {
-		resize(&z.output.buf, int(z.bytes_written)) or_return
 	}
 
 	return nil

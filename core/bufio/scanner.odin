@@ -1,10 +1,10 @@
 package bufio
 
-import "core:bytes"
-import "core:io"
-import "core:mem"
-import "core:unicode/utf8"
+import "base:runtime"
 import "base:intrinsics"
+import "core:io"
+import "core:bytes"
+import "core:unicode/utf8"
 
 // Extra errors returns by scanning procedures
 Scanner_Extra_Error :: enum i32 {
@@ -60,7 +60,15 @@ scanner_init_with_buffer :: proc(s: ^Scanner, r: io.Reader, buf: []byte) -> ^Sca
 	s.r = r
 	s.split = scan_lines
 	s.max_token_size = DEFAULT_MAX_SCAN_TOKEN_SIZE
-	s.buf = mem.buffer_from_slice(buf)
+	s.buf = transmute([dynamic]byte)runtime.Raw_Dynamic_Array{
+		data      = raw_data(buf),
+		len       = 0,
+		cap       = len(buf),
+		allocator = runtime.Allocator{
+			procedure = runtime.nil_allocator_proc,
+			data = nil,
+		},
+	}
 	resize(&s.buf, cap(s.buf))
 	return s
 }

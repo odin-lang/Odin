@@ -10,15 +10,14 @@ package _blake2
     Implementation of the BLAKE2 hashing algorithm, as defined in <https://datatracker.ietf.org/doc/html/rfc7693> and <https://www.blake2.net/>
 */
 
+import "base:intrinsics"
+import "core:crypto"
 import "core:encoding/endian"
-import "core:mem"
 
 BLAKE2S_BLOCK_SIZE :: 64
 BLAKE2S_SIZE :: 32
 BLAKE2B_BLOCK_SIZE :: 128
 BLAKE2B_SIZE :: 64
-
-MAX_SIZE :: 255
 
 Blake2s_Context :: struct {
 	h:            [8]u32,
@@ -26,9 +25,6 @@ Blake2s_Context :: struct {
 	f:            [2]u32,
 	x:            [BLAKE2S_BLOCK_SIZE]byte,
 	nx:           int,
-	ih:           [8]u32,
-	padded_key:   [BLAKE2S_BLOCK_SIZE]byte,
-	is_keyed:     bool,
 	size:         byte,
 	is_last_node: bool,
 
@@ -41,9 +37,6 @@ Blake2b_Context :: struct {
 	f:            [2]u64,
 	x:            [BLAKE2B_BLOCK_SIZE]byte,
 	nx:           int,
-	ih:           [8]u64,
-	padded_key:   [BLAKE2B_BLOCK_SIZE]byte,
-	is_keyed:     bool,
 	size:         byte,
 	is_last_node: bool,
 
@@ -86,11 +79,12 @@ BLAKE2B_IV := [8]u64 {
 
 init :: proc "contextless" (ctx: ^$T, cfg: ^Blake2_Config) {
 	when T == Blake2s_Context {
-		max_size :: BLAKE2S_SIZE
+		MAX_SIZE :: BLAKE2S_SIZE
 	} else when T == Blake2b_Context {
-		max_size :: BLAKE2B_SIZE
+		MAX_SIZE :: BLAKE2B_SIZE
 	}
-	ensure_contextless(cfg.size <= max_size, "blake2: requested output size exceeeds algorithm max")
+	ensure_contextless(cfg.size <= MAX_SIZE, "blake2: requested output size exceeeds algorithm max")
+	ensure_contextless(len(cfg.key) <= MAX_SIZE, "blake2: requested key size exceeeds algorithm max")
 
 	// To save having to allocate a scratch buffer, use the internal
 	// data buffer (`ctx.x`), as it is exactly the correct size.
@@ -133,7 +127,7 @@ init :: proc "contextless" (ctx: ^$T, cfg: ^Blake2_Config) {
 			p[17] = cfg.tree.(Blake2_Tree).inner_hash_size
 		}
 	} else {
-		p[2], p[3] = 1, 1
+		p[2], p[3], p[4], p[5], p[6], p[7] = 1, 1, 0, 0, 0, 0
 	}
 	ctx.size = cfg.size
 	for i := 0; i < 8; i += 1 {
@@ -145,23 +139,17 @@ init :: proc "contextless" (ctx: ^$T, cfg: ^Blake2_Config) {
 		}
 	}
 
-	mem.zero(&ctx.x, size_of(ctx.x)) // Done with the scratch space, no barrier.
+	intrinsics.mem_zero(&ctx.x, size_of(ctx.x)) // Done with the scratch space, no barrier.
 
 	if cfg.tree != nil && cfg.tree.(Blake2_Tree).is_last_node {
 		ctx.is_last_node = true
 	}
 	if len(cfg.key) > 0 {
-		copy(ctx.padded_key[:], cfg.key)
-		update(ctx, ctx.padded_key[:])
-		ctx.is_keyed = true
+		copy(ctx.x[:], cfg.key)
+		ctx.nx = len(ctx.x)
+	} else {
+		ctx.nx = 0
 	}
-	copy(ctx.ih[:], ctx.h[:])
-	copy(ctx.h[:], ctx.ih[:])
-	if ctx.is_keyed {
-		update(ctx, ctx.padded_key[:])
-	}
-
-	ctx.nx = 0
 
 	ctx.is_initialized = true
 }
@@ -171,22 +159,22 @@ update :: proc "contextless" (ctx: ^$T, p: []byte) {
 
 	p := p
 	when T == Blake2s_Context {
-		block_size :: BLAKE2S_BLOCK_SIZE
+		BLOCK_SIZE :: BLAKE2S_BLOCK_SIZE
 	} else when T == Blake2b_Context {
-		block_size :: BLAKE2B_BLOCK_SIZE
+		BLOCK_SIZE :: BLAKE2B_BLOCK_SIZE
 	}
 
-	left := block_size - ctx.nx
+	left := BLOCK_SIZE - ctx.nx
 	if len(p) > left {
 		copy(ctx.x[ctx.nx:], p[:left])
 		p = p[left:]
 		blocks(ctx, ctx.x[:])
 		ctx.nx = 0
 	}
-	if len(p) > block_size {
-		n := len(p) &~ (block_size - 1)
+	if len(p) > BLOCK_SIZE {
+		n := len(p) &~ (BLOCK_SIZE - 1)
 		if n == len(p) {
-			n -= block_size
+			n -= BLOCK_SIZE
 		}
 		blocks(ctx, p[:n])
 		p = p[n:]
@@ -222,17 +210,11 @@ reset :: proc "contextless" (ctx: ^$T) {
 		return
 	}
 
-	mem.zero_explicit(ctx, size_of(ctx^))
+	crypto.zero_explicit(ctx, size_of(ctx^))
 }
 
 @(private)
 blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
-	if ctx.is_keyed {
-		for i := 0; i < len(ctx.padded_key); i += 1 {
-			ctx.padded_key[i] = 0
-		}
-	}
-
 	dec := BLAKE2S_BLOCK_SIZE - u32(ctx.nx)
 	if ctx.t[0] < dec {
 		ctx.t[1] -= 1
@@ -244,23 +226,20 @@ blake2s_final :: proc "contextless" (ctx: ^Blake2s_Context, hash: []byte) {
 		ctx.f[1] = 0xffffffff
 	}
 
+	for i := ctx.nx; i < BLAKE2S_BLOCK_SIZE; i+= 1 {
+		ctx.x[i] = 0
+	}
 	blocks(ctx, ctx.x[:])
 
 	dst: [BLAKE2S_SIZE]byte
 	for i := 0; i < BLAKE2S_SIZE / 4; i += 1 {
 		endian.unchecked_put_u32le(dst[i * 4:], ctx.h[i])
 	}
-	copy(hash, dst[:])
+	copy(hash, dst[:ctx.size])
 }
 
 @(private)
 blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
-	if ctx.is_keyed {
-		for i := 0; i < len(ctx.padded_key); i += 1 {
-			ctx.padded_key[i] = 0
-		}
-	}
-
 	dec := BLAKE2B_BLOCK_SIZE - u64(ctx.nx)
 	if ctx.t[0] < dec {
 		ctx.t[1] -= 1
@@ -272,6 +251,9 @@ blake2b_final :: proc "contextless" (ctx: ^Blake2b_Context, hash: []byte) {
 		ctx.f[1] = 0xffffffffffffffff
 	}
 
+	for i := ctx.nx; i < BLAKE2B_BLOCK_SIZE; i+= 1 {
+		ctx.x[i] = 0
+	}
 	blocks(ctx, ctx.x[:])
 
 	dst: [BLAKE2B_SIZE]byte

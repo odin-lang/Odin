@@ -1,7 +1,7 @@
 #+build linux, freebsd, openbsd
 package xlib
 
-KeySym :: enum u32 {
+KeySym :: enum uint {
 	XK_BackSpace                     = 0xff08,  /* Back space, back char */
 	XK_Tab                           = 0xff09,
 	XK_Linefeed                      = 0xff0a,  /* Linefeed, LF */

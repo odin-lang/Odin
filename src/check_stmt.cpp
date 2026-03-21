@@ -484,7 +484,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		}
 		if (ident_node != nullptr) {
 			ast_node(i, Ident, ident_node);
-			e = scope_lookup(ctx->scope, i->token.string, i->hash);
+			e = scope_lookup(ctx->scope, i->interned, i->hash);
 			if (e != nullptr && e->kind == Entity_Variable) {
 				used = (e->flags & EntityFlag_Used) != 0; // NOTE(bill): Make backup just in case
 			}
@@ -788,12 +788,19 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		rw_mutex_lock(&scope->mutex);
 		defer (rw_mutex_unlock(&scope->mutex));
 
-		for (auto const &entry : scope->elements) {
-			String name = entry.key;
-			Entity *decl = entry.value;
-			if (!is_entity_exported(decl, true)) continue;
+		for (u32 i = 0; i < scope->elements.cap; i++) {
+			if (!scope->elements.slots[i].hash) {
+				continue;
+			}
 
-			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
+			Entity *decl = scope->elements.slots[i].value;
+			if (!is_entity_exported(decl, true)) {
+				continue;
+			}
+			u32 hash = scope->elements.slots[i].hash;
+			auto interned = scope->elements.keys[i];
+
+			Entity *found = scope_insert_with_name(ctx->scope, interned, hash, decl);
 			if (found != nullptr) {
 				gbString expr_str = expr_to_string(expr);
 				error(us->token,
@@ -1018,16 +1025,31 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 					inline_for_depth = exact_value_i64(unroll_count);
 				}
 				break;
+			case Type_FixedCapacityDynamicArray:
+				if (unroll_count > 0) {
+					val0 = t->FixedCapacityDynamicArray.elem;
+					val1 = t_int;
+					inline_for_depth = exact_value_i64(unroll_count);
+				}
+				break;
 			}
 		}
 
 		if (val0 == nullptr) {
+			ERROR_BLOCK();
 			gbString s = expr_to_string(operand.expr);
 			gbString t = type_to_string(operand.type);
+			defer (gb_string_free(s));
+			defer (gb_string_free(t));
 			error(operand.expr, "Cannot iterate over '%s' of type '%s' in an '#unroll for' statement", s, t);
-			gb_string_free(t);
-			gb_string_free(s);
-		} else if (operand.mode != Addressing_Constant && unroll_count <= 0) {
+
+			if (is_type_slice(operand.type) || is_type_dynamic_array(operand.type) || is_type_fixed_capacity_dynamic_array(operand.type)) {
+				error_line("\tSuggestion: An unroll count `#unroll(N)` must be specified with an array of a runtime-known length\n");
+			}
+
+		} else if (operand.mode != Addressing_Constant && (
+				unroll_count <= 0 &&
+				compare_exact_values(Token_CmpEq, inline_for_depth, exact_value_i64(0)))) {
 			error(operand.expr, "An '#unroll for' expression must be known at compile time");
 		}
 	}
@@ -1051,7 +1073,7 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			Entity *found = nullptr;
 
 			if (!is_blank_ident(str)) {
-				found = scope_lookup_current(ctx->scope, str);
+				found = scope_lookup_current(ctx->scope, name->Ident.interned, name->Ident.hash);
 			}
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
@@ -1703,10 +1725,16 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 	TEMPORARY_ALLOCATOR_GUARD();
 
-	u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 	check_open_scope(ctx, node);
 	check_label(ctx, rs->label, node);
+
+	Operand init = {};
+	if (rs->init != nullptr) {
+		check_stmt(ctx, rs->init, mod_flags);
+	}
+
+	u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 	auto vals = array_make<Type *>(temporary_allocator(), 0, 2);
 	auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
@@ -1722,6 +1750,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 	bool is_range = false;
 	bool is_possibly_addressable = true;
 	isize max_val_count = 2;
+
 	if (is_ast_range(expr)) {
 		ast_node(ie, BinaryExpr, expr);
 		Operand x = {};
@@ -1813,10 +1842,10 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				}
 				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
 					AstIdent *ident = &rs->vals[0]->Ident;
-					String name = ident->token.string;
-					Entity *found = scope_lookup(ctx->scope, name, ident->hash);
+					Entity *found = scope_lookup(ctx->scope, ident->interned, ident->hash);
 					if (found && are_types_identical(found->type, t->BitSet.elem)) {
 						ERROR_BLOCK();
+						String name = ident->token.string;
 						gbString s = expr_to_string(expr);
 						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
 						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
@@ -1834,6 +1863,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			case Type_Array:
 				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
 				array_add(&vals, t->Array.elem);
+				array_add(&vals, t_int);
+				break;
+
+			case Type_FixedCapacityDynamicArray:
+				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+				array_add(&vals, t->FixedCapacityDynamicArray.elem);
 				array_add(&vals, t_int);
 				break;
 
@@ -1859,10 +1894,10 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				}
 				if (rs->vals.count == 1 && rs->vals[0] && rs->vals[0]->kind == Ast_Ident) {
 					AstIdent *ident = &rs->vals[0]->Ident;
-					String name = ident->token.string;
-					Entity *found = scope_lookup(ctx->scope, name, ident->hash);
+					Entity *found = scope_lookup(ctx->scope, ident->interned, ident->hash);
 					if (found && are_types_identical(found->type, t->Map.key)) {
 						ERROR_BLOCK();
+						String name = ident->token.string;
 						gbString s = expr_to_string(expr);
 						error(rs->vals[0], "'%.*s' shadows a previous declaration which might be ambiguous with 'for (%.*s in %s)'", LIT(name), LIT(name), s);
 						error_line("\tSuggestion: Use a different identifier if iteration is wanted, or surround in parentheses if a normal for loop is wanted\n");
@@ -1882,7 +1917,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						error_line("\tMultiple return valued parameters in a range statement are limited to a minimum of 1 usable values with a trailing boolean for the conditional, got %td\n", count);
 						break;
 					}
-					enum : isize {MAXIMUM_COUNT = 100};
+					enum : isize {MAXIMUM_COUNT = 20};
 					if (count > MAXIMUM_COUNT) {
 						ERROR_BLOCK();
 						check_not_tuple(ctx, &operand);
@@ -1898,7 +1933,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						break;
 					}
 
-					max_val_count = count;
+					max_val_count = count-1;
 
 					for (Entity *e : t->Tuple.variables) {
 						array_add(&vals, e->type);
@@ -1917,6 +1952,20 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 
 					if (is_reverse) {
 						error(node, "#reverse for is not supported for multiple return valued parameters");
+					}
+
+					Ast *expr = unparen_expr(operand.expr);
+					if (expr->kind == Ast_CallExpr) {
+						Type *p = base_type(type_of_expr(expr->CallExpr.proc));
+						if (p != nullptr && p->kind == Type_Proc) {
+							if (p->Proc.require_results) {
+								if (rs->vals.count < max_val_count) {
+									TokenPos start = ast_token(rs->vals[0]).pos;
+									TokenPos end   = ast_end_pos(rs->vals[rs->vals.count-1]);
+									error_range(start, end, "Expected %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
+								}
+							}
+						}
 					}
 				}
 				break;
@@ -1989,7 +2038,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			Entity *found = nullptr;
 
 			if (!is_blank_ident(str)) {
-				found = scope_lookup_current(ctx->scope, str);
+				found = scope_lookup_current(ctx->scope, name->Ident.interned, name->Ident.hash);
 			}
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
@@ -2083,7 +2132,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			Entity *found = nullptr;
 			// NOTE(bill): Ignore assignments to '_'
 			if (!is_blank_ident(str)) {
-				found = scope_lookup_current(ctx->scope, str);
+				found = scope_lookup_current(ctx->scope, name->Ident.interned, name->Ident.hash);
 				new_name_count += 1;
 			}
 			if (found == nullptr) {
@@ -2943,10 +2992,12 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			error(us->token, "Empty 'using' list");
 			return;
 		}
-		if (check_vet_flags(node) & VetFlag_UsingStmt) {
+
+		u64 feature_flags = check_feature_flags(ctx, node);
+		if ((feature_flags & OptInFeatureFlag_UsingStmt) == 0) {
 			ERROR_BLOCK();
-			error(node, "'using' as a statement is not allowed when '-vet' or '-vet-using' is applied");
-			error_line("\t'using' is considered bad practice to use as a statement outside of immediate refactoring\n");
+			error(node, "'using' has been disallowed as it is considered bad practice to use as a statement outside of immediate refactoring");
+			error_line("\tIf you do require it for refactoring purposes or legacy code, it can be enabled on a per-file basis with '#+feature using-stmt'\n");
 		}
 
 		for (Ast *expr : us->list) {

@@ -69,6 +69,7 @@ gb_internal u64 lb_typeid_kind(lbModule *m, Type *type, u64 id=0) {
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	case Type_BitField:        kind = Typeid_Bit_Field;        break;
+	case Type_FixedCapacityDynamicArray: kind = Typeid_Fixed_Capacity_Dynamic_Array; break;
 	}
 
 	return kind;
@@ -200,10 +201,10 @@ gb_internal LLVMTypeRef *lb_setup_modified_types_for_type_info(lbModule *m, isiz
 		vtypes[0] = lb_type(m, t);
 		vtypes[1] = padding;
 		vtypes[2] = tag;
-		LLVMTypeRef variant_type = LLVMStructType(vtypes, gb_count_of(vtypes), true);
+		LLVMTypeRef variant_type = LLVMStructTypeInContext(m->ctx, vtypes, gb_count_of(vtypes), true);
 
 		stypes[variant_index] = variant_type;
-		LLVMTypeRef modified_type = LLVMStructType(stypes, cast(unsigned)(variant_index+1), false);
+		LLVMTypeRef modified_type = LLVMStructTypeInContext(m->ctx, stypes, cast(unsigned)(variant_index+1), false);
 
 		modified_types[i] = modified_type;
 	}
@@ -644,6 +645,21 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 			variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
 			break;
 		}
+		case Type_FixedCapacityDynamicArray: {
+			tag_type = t_type_info_fixed_capacity_dynamic_array;
+
+			i64 len_offset = type_offset_of(t, 1);
+
+			LLVMValueRef vals[4] = {
+				get_type_info_ptr(m, t->FixedCapacityDynamicArray.elem),
+				lb_const_int(m, t_int, type_size_of(t->FixedCapacityDynamicArray.elem)).value,
+				lb_const_int(m, t_int, t->FixedCapacityDynamicArray.capacity).value,
+				lb_const_int(m, t_uintptr, len_offset).value,
+			};
+
+			variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
+			break;
+		}
 		case Type_Slice: {
 			tag_type = t_type_info_slice;
 
@@ -923,15 +939,25 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 				GB_ASSERT(is_type_typed(t->BitSet.elem));
 
 
-				LLVMValueRef vals[4] = {
-					get_type_info_ptr(m, t->BitSet.elem),
-					LLVMConstNull(lb_type(m, t_type_info_ptr)),
-					lb_const_int(m, t_i64, t->BitSet.lower).value,
-					lb_const_int(m, t_i64, t->BitSet.upper).value,
+				LLVMValueRef vals[5] = {
+					get_type_info_ptr(m, t->BitSet.elem),          // ^Type_Info
+					nullptr,                                       // ^Type_Info
+					nullptr,                                       // bool
+					lb_const_int(m, t_i64, t->BitSet.lower).value, // i64
+					lb_const_int(m, t_i64, t->BitSet.upper).value, // i64
 				};
+				Type *underlying = nullptr;
+				bool explicit_underlying = false;
 				if (t->BitSet.underlying != nullptr) {
+					underlying = t->BitSet.underlying;
+					explicit_underlying = true;
 					vals[1] = get_type_info_ptr(m, t->BitSet.underlying);
+					vals[2] = lb_const_bool(m, t_bool, true).value;
+				} else {
+					underlying = bit_set_to_int(t);
 				}
+				vals[1] = get_type_info_ptr(m, underlying);
+				vals[2] = lb_const_bool(m, t_bool, explicit_underlying).value;
 
 				variant_value = llvm_const_named_struct(m, tag_type, vals, gb_count_of(vals));
 			}
@@ -1038,7 +1064,7 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 
 		i64 tag_index = 0;
 		if (tag_type != nullptr) {
-			tag_index = union_variant_index(ut, tag_type);
+			tag_index = union_variant_index_checked(ut, tag_type);
 		}
 		GB_ASSERT(tag_index <= Typeid__COUNT);
 

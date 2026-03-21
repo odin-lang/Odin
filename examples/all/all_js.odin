@@ -10,7 +10,7 @@ package all
 
 @(require) import "core:compress"
 @(require) import "core:compress/shoco"
-@(require) import "core:compress/gzip"
+// @(require) import "core:compress/gzip"
 @(require) import "core:compress/zlib"
 
 @(require) import "core:container/avl"
@@ -27,12 +27,15 @@ package all
 @(require) import "core:crypto/aead"
 @(require) import "core:crypto/aegis"
 @(require) import "core:crypto/aes"
+@(require) import "core:crypto/argon2id"
 @(require) import "core:crypto/blake2b"
 @(require) import "core:crypto/blake2s"
 @(require) import "core:crypto/chacha20"
 @(require) import "core:crypto/chacha20poly1305"
 @(require) import chash "core:crypto/hash"
 @(require) import "core:crypto/deoxysii"
+@(require) import "core:crypto/ecdh"
+@(require) import "core:crypto/ecdsa"
 @(require) import "core:crypto/ed25519"
 @(require) import "core:crypto/hkdf"
 @(require) import "core:crypto/hmac"
@@ -98,13 +101,13 @@ package all
 
 @(require) import "core:mem"
 @(require) import "core:mem/tlsf"
-@(require) import "core:mem/virtual"
+// Not supported on JS
+// @(require) import "core:mem/virtual"
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
 
 @(require) import "core:odin/tokenizer"
-@(require) import "core:os"
 @(require) import "core:path/slashpath"
 
 @(require) import "core:relative"
@@ -129,6 +132,7 @@ package all
 @(require) import "core:text/match"
 @(require) import "core:text/regex"
 @(require) import "core:text/scanner"
+// Not supported on JS, uses `core:mem/virtual`.
 @(require) import "core:text/table"
 
 @(require) import "core:thread"
@@ -139,6 +143,8 @@ package all
 
 @(require) import "core:sys/orca"
 @(require) import "core:sys/info"
+@(require) import "core:sys/wasm/js"
+@(require) import "core:sys/wasm/wasi"
 
 @(require) import "core:unicode"
 @(require) import "core:unicode/utf8"

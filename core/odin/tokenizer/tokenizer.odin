@@ -1,6 +1,7 @@
 // The tokenizer (lexer) for `Odin` files, used to create tooling.
 package odin_tokenizer
 
+import "base:intrinsics"
 import "core:fmt"
 import "core:unicode"
 import "core:unicode/utf8"
@@ -32,6 +33,68 @@ Tokenizer :: struct {
 	error_count: int,
 }
 
+
+Keyword_Hash_Entry :: struct {
+	hash: u32,
+	kind: Token_Kind,
+	name: string,
+}
+
+KEYWORD_LUT_LEN  :: 1<<9
+KEYWORD_LUT_MASK :: KEYWORD_LUT_LEN-1
+Keyword_LUT      :: [KEYWORD_LUT_LEN]Keyword_Hash_Entry
+
+global_keyword_lut: Keyword_LUT // protected by `_global_keyword_lut_spinlock`
+_global_keyword_lut_initialized: bool // atomic
+_global_keyword_lut_spinlock:    bool // atomic
+
+_global_keyword_spin_lock :: proc() {
+	for intrinsics.atomic_exchange_explicit(&_global_keyword_lut_spinlock, true, .Acquire) {
+		intrinsics.cpu_relax()
+	}
+}
+
+_global_keyword_spin_unlock :: proc() {
+	intrinsics.atomic_store_explicit(&_global_keyword_lut_spinlock, false, .Release)
+}
+
+@(require_results)
+keyword_hash :: proc(text: string) -> u32 #no_bounds_check {
+	h := u32(0x811c9dc5)
+	for i in 0..<len(text) {
+		h = (h ~ u32(text[i])) * 0x01000193
+	}
+	return h
+}
+
+keyword_lut_init :: proc(lut: ^Keyword_LUT) -> bool {
+	if lut == nil {
+		return false
+	}
+
+	max_keyword_size := 0
+
+	for kind in (Token_Kind.B_Keyword_Begin+Token_Kind(1))..<Token_Kind.B_Keyword_End {
+		name := tokens[kind]
+
+		max_keyword_size = max(max_keyword_size, len(name))
+
+		hash := keyword_hash(name)
+
+		entry := &lut[hash & KEYWORD_LUT_MASK]
+		assert(entry.kind == .Invalid, name)
+		entry.hash = hash
+		entry.kind = kind
+		entry.name = name
+	}
+
+	assert(max_keyword_size >  1)
+	assert(max_keyword_size < 16)
+
+	return true
+}
+
+
 init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = default_error_handler) {
 	t.src = src
 	t.err = err
@@ -43,6 +106,13 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 	t.insert_semicolon = false
 	t.error_count = 0
 	t.path = path
+
+	if !intrinsics.atomic_load(&_global_keyword_lut_initialized) {
+		_global_keyword_spin_lock()
+		ok := keyword_lut_init(&global_keyword_lut)
+		intrinsics.atomic_store(&_global_keyword_lut_initialized, ok)
+		_global_keyword_spin_unlock()
+	}
 
 	advance_rune(t)
 	if t.ch == utf8.RUNE_BOM {
@@ -502,12 +572,19 @@ scan :: proc(t: ^Tokenizer) -> Token {
 	case is_letter(ch):
 		lit = scan_identifier(t)
 		kind = .Ident
-		check_keyword: if len(lit) > 1 {
-			// TODO(bill): Maybe have a hash table lookup rather than this linear search
-			for i in Token_Kind.B_Keyword_Begin ..= Token_Kind.B_Keyword_End {
-				if lit == tokens[i] {
-					kind = Token_Kind(i)
+		check_keyword: if 1 < len(lit) && len(lit) < 16 {
+			if intrinsics.atomic_load(&_global_keyword_lut_initialized) {
+				entry := &global_keyword_lut[keyword_hash(lit) & KEYWORD_LUT_MASK]
+				if entry.kind != .Invalid && entry.name == lit {
+					kind = entry.kind
 					break check_keyword
+				}
+			} else {
+				for i in Token_Kind.B_Keyword_Begin ..= Token_Kind.B_Keyword_End {
+					if lit == tokens[i] {
+						kind = Token_Kind(i)
+						break check_keyword
+					}
 				}
 			}
 			for keyword, i in custom_keyword_tokens {
@@ -516,7 +593,6 @@ scan :: proc(t: ^Tokenizer) -> Token {
 					break check_keyword
 				}
 			}
-			break check_keyword
 		}
 	case '0' <= ch && ch <= '9':
 		kind, lit = scan_number(t, false)

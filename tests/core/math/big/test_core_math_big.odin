@@ -151,7 +151,7 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 			err := big.pow(res, a, int(power))
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected pow(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected pow(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Root:
 			n, n_ok := strconv.parse_i64_of_base(vec.b, 16)
@@ -160,7 +160,7 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 			err := big.root_n(res, a, int(n))
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected root_n(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected root_n(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Shl:
 			bits, bits_ok := strconv.parse_i64_of_base(vec.b, 16)
@@ -169,7 +169,7 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 			err := big.internal_int_shl(res, a, int(bits))
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected internal_int_shl(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected internal_int_shl(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Shr:
 			bits, bits_ok := strconv.parse_i64_of_base(vec.b, 16)
@@ -178,7 +178,7 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 			err := big.internal_int_shr(res, a, int(bits))
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected internal_int_shr(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected internal_int_shr(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Shr_Signed:
 			bits, bits_ok := strconv.parse_i64_of_base(vec.b, 16)
@@ -188,7 +188,7 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 			err := big.internal_int_shr_signed(res, res, int(bits))
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected internal_int_shr_signed(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected internal_int_shr_signed(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Factorial:
 			n, n_ok := strconv.parse_i64_of_base(vec.a, 16)
@@ -197,26 +197,26 @@ test_big_math_vectors :: proc(t: ^testing.T) {
 			err := big.factorial(res, int(n))
 			testing.expect(t, err == vec.err)
 
-			expect_a(t, "Expected factorial(%v) to be '%v', got %v", a, expected, res, err)
+			expect_a(t, "Expected factorial(%v) to be %q, got %q", a, expected, res, err)
 
 		case .Gcd:
 			err := big.internal_int_gcd_lcm(res, nil, a, b)
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected gcd(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected gcd(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Lcm:
 			err := big.internal_int_gcd_lcm(nil, res, a, b)
 			testing.expect(t, err == vec.err)
 
-			expect_ab(t, "Expected lcm(%v, %v) to be '%v', got %v", a, b, expected, res, err)
+			expect_ab(t, "Expected lcm(%v, %v) to be %q, got %q", a, b, expected, res, err)
 
 		case .Is_Square:
 			square, err := big.internal_int_is_square(a)
 			testing.expect(t, err == vec.err)
 
 			big.set(res, 1 if square else 0)
-			expect_a(t, "Expected is_square(%v) to be '%v', got %v", a, expected, res, err)
+			expect_a(t, "Expected is_square(%v) to be %q, got %q", a, expected, res, err)
 
 		case:
 			log.assertf(false, "Unhandled op: %v", vec.op)

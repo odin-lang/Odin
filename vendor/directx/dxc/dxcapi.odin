@@ -194,7 +194,7 @@ ICompiler :: struct #raw_union {
 ICompiler_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	Compile: proc "system" (
-		this: ^ICompiler, 
+		this: ^ICompiler,
 		pSource: ^IBlob,
 		pSourceName: wstring,
 		pEntryPoint: wstring,
@@ -206,7 +206,7 @@ ICompiler_VTable :: struct {
 		pIncludeHandler: ^IIncludeHandler,
 		ppResult: ^^IOperationResult) -> HRESULT,
 	Preprocess: proc "system" (
-		this: ^ICompiler, 
+		this: ^ICompiler,
 		pSource: ^IBlob,
 		pSourceName: wstring,
 		pArguments: [^]wstring,
@@ -303,7 +303,6 @@ DXC_OUT_KIND :: enum u32 {
 	REFLECTION      = 8,
 	ROOT_SIGNATURE  = 9,
 	EXTRA_OUTPUTS   = 10,
-	FORCE_DWORD     = 0xFFFFFFFF,
 }
 
 IResult_UUID_STRING :: "58346CDA-DDE7-4497-9461-6F87AF5E0659"

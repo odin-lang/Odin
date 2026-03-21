@@ -752,7 +752,6 @@ ALPHA_MODE :: enum i32 {
 	PREMULTIPLIED = 1,
 	STRAIGHT      = 2,
 	IGNORE        = 3,
-	FORCE_DWORD   = -1,
 }
 
 

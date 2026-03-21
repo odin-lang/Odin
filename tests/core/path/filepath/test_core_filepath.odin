@@ -33,7 +33,7 @@ test_split_list_windows :: proc(t: ^testing.T) {
 
 	for d, i in data {
 		assert(i == d.i, fmt.tprintf("wrong data index: i %d != d.i %d\n", i, d.i))
-		r := filepath.split_list(d.v)
+		r, _ := filepath.split_list(d.v, context.allocator)
 		defer delete_split(r)
 		testing.expect(t, len(r) == len(d.e), fmt.tprintf("i:%d %s(%s) len(r) %d != len(d.e) %d", i, #procedure, d.v, len(r), len(d.e)))
 		if len(r) == len(d.e) {
@@ -45,13 +45,13 @@ test_split_list_windows :: proc(t: ^testing.T) {
 
 	{
 		v := ""
-		r := filepath.split_list(v)
+		r, _ := filepath.split_list(v, context.allocator)
 		defer delete_split(r)
 		testing.expect(t, r == nil, fmt.tprintf("%s(%s) -> %v != nil", #procedure, v, r))
 	}
 	{
 		v := "a"
-		r := filepath.split_list(v)
+		r, _ := filepath.split_list(v, context.allocator)
 		defer delete_split(r)
 		testing.expect(t, len(r) == 1, fmt.tprintf("%s(%s) len(r) %d != 1", #procedure, v, len(r)))
 		if len(r) == 1 {
@@ -77,7 +77,7 @@ test_split_list_unix :: proc(t: ^testing.T) {
 	}
 
 	for d in data {
-		r := filepath.split_list(d.v)
+		r, _ := filepath.split_list(d.v, context.allocator)
 		defer delete_split(r)
 		testing.expectf(t, len(r) == len(d.e), "%s len(r) %d != len(d.e) %d", d.v, len(r), len(d.e))
 		if len(r) == len(d.e) {
@@ -89,12 +89,12 @@ test_split_list_unix :: proc(t: ^testing.T) {
 
 	{
 		v := ""
-		r := filepath.split_list(v)
+		r, _ := filepath.split_list(v, context.allocator)
 		testing.expectf(t, r == nil, "'%s' -> '%v' != nil", v, r)
 	}
 	{
 		v := "a"
-		r := filepath.split_list(v)
+		r, _ := filepath.split_list(v, context.allocator)
 		defer delete_split(r)
 		testing.expectf(t, len(r) == 1, "'%s' len(r) %d != 1", v, len(r))
 		if len(r) == 1 {
@@ -109,4 +109,46 @@ delete_split :: proc(s: []string) {
 		delete(part)
 	}
 	delete(s)
+}
+
+@(test)
+test_stem :: proc(t: ^testing.T) {
+	@static stem := [][2]string{
+		{"builder.tar.gz",   "builder.tar"},
+		{"./builder.tar.gz", "builder.tar"},
+		{"./builder/",       ""},
+	}
+
+	@static short_stem := [][2]string{
+		{"builder.tar",   "builder"},
+		{"./builder.tar", "builder"},
+		{"./builder/",    ""},
+	}
+
+	for d in stem {
+		testing.expect_value(t, filepath.stem(d[0]), d[1])
+	}
+
+	for d in short_stem {
+		testing.expect_value(t, filepath.short_stem(d[0]), d[1])
+	}
+}
+
+@(test)
+test_dir :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		@static dirs := [][2]string{
+			{"../bin/css",   "..\\bin"},
+			{"W:/Odin/odin", "W:\\Odin"},
+		}
+	} else {
+		@static dirs := [][2]string{
+			{"../bin/css", "../bin"},
+			{"/bin/usr/",  "/bin/usr"},
+		}
+	}
+
+	for d in dirs {
+		testing.expect_value(t, filepath.dir(d[0], context.temp_allocator), d[1])
+	}
 }

@@ -1,14 +1,14 @@
 package bufio
 
+import "base:runtime"
 import "core:io"
-import "core:mem"
 import "core:unicode/utf8"
 import "core:bytes"
 
 // Reader is a buffered wrapper for an io.Reader
 Reader :: struct {
 	buf:            []byte,
-	buf_allocator:  mem.Allocator,
+	buf_allocator:  runtime.Allocator,
 
 	rd:             io.Reader, // reader
 	r, w:           int, // read and write positions for buf
@@ -45,7 +45,7 @@ reader_init_with_buf :: proc(b: ^Reader, rd: io.Reader, buf: []byte) {
 	b.buf = buf
 }
 
-// reader_destroy destroys the underlying buffer with its associated allocator IFF that allocator has been set
+// reader_destroy destroys the underlying buffer with its associated allocator if and only if (⟺) that allocator has been set
 reader_destroy :: proc(b: ^Reader) {
 	delete(b.buf, b.buf_allocator)
 	b^ = {}

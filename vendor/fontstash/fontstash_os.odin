@@ -12,12 +12,11 @@ AddFontPath :: proc(
 	path: string,
 	fontIndex: int = 0,
 ) -> int {
-	data, ok := os.read_entire_file(path)
+	data, data_err := os.read_entire_file(path, context.allocator)
 
-	if !ok {
+	if data_err != nil {
 		log.panicf("FONT: failed to read font at %s", path)
 	}
 
 	return AddFontMem(ctx, name, data, true, fontIndex)
 }
-

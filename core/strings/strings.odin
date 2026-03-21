@@ -5,7 +5,6 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:bytes"
 import "core:io"
-import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -23,7 +22,7 @@ Returns:
 - res: The cloned string
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	c := make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
 	return string(c), nil
@@ -43,7 +42,7 @@ Returns:
 - res: A cloned cstring with an appended null-byte
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: cstring, err: mem.Allocator_Error) #optional_allocator_error {
+clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
 	c := make([]byte, len(s)+1, allocator, loc) or_return
 	copy(c, s)
 	c[len(s)] = 0
@@ -63,7 +62,7 @@ Returns:
 - res: A string created from the byte pointer and length
 */
 string_from_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
-	return transmute(string)mem.Raw_String{ptr, len}
+	return transmute(string)runtime.Raw_String{ptr, len}
 }
 
 /*
@@ -97,7 +96,7 @@ Returns:
 - res: The converted cstring
 */
 unsafe_string_to_cstring :: proc(str: string) -> (res: cstring) {
-	d := transmute(mem.Raw_String)str
+	d := transmute(runtime.Raw_String)str
 	return cstring(d.data)
 }
 
@@ -113,7 +112,7 @@ NOTE: Failure to find the byte results in returning the entire string.
 Returns:
 - res: The truncated string
 */
-truncate_to_byte :: proc "contextless" (str: string, b: byte) -> (res: string) {
+truncate_to_byte :: proc "contextless" (str: string, b: byte) -> (res: string) #no_bounds_check {
 	n := index_byte(str, b)
 	if n < 0 {
 		n = len(str)
@@ -131,7 +130,7 @@ Inputs:
 Returns:
 - res: The truncated string
 */
-truncate_to_rune :: proc(str: string, r: rune) -> (res: string) {
+truncate_to_rune :: proc(str: string, r: rune) -> (res: string) #no_bounds_check {
 	n := index_rune(str, r)
 	if n < 0 {
 		n = len(str)
@@ -153,7 +152,7 @@ Returns:
 - res: The cloned string from the byte array with a null-byte
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	c := make([]byte, len(s)+1, allocator, loc) or_return
 	copy(c, s)
 	c[len(s)] = 0
@@ -174,7 +173,7 @@ Returns:
 - res: The cloned string from the cstring
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return clone(string(s), allocator, loc)
 }
 
@@ -195,7 +194,7 @@ Returns:
 - res: The cloned string from the byte pointer and length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-clone_from_ptr :: proc(ptr: ^byte, len: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+clone_from_ptr :: proc(ptr: ^byte, len: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := string_from_ptr(ptr, len)
 	return clone(s, allocator, loc)
 }
@@ -225,7 +224,7 @@ Returns:
 - res: The cloned string from the null-terminated cstring and byte length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := string_from_ptr((^u8)(ptr), len)
 	s = truncate_to_byte(s, 0)
 	return clone(s, allocator, loc)
@@ -242,9 +241,7 @@ Inputs:
 Returns:
 - result: `-1` if `lhs` comes first, `1` if `rhs` comes first, or `0` if they are equal
 */
-compare :: proc "contextless" (lhs, rhs: string) -> (result: int) {
-	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
-}
+compare :: runtime.string_cmp
 
 /*
 Checks if rune `r` in the string `s`
@@ -401,7 +398,7 @@ Output:
 	false
 
 */
-equal_fold :: proc(u, v: string) -> (res: bool) {
+equal_fold :: proc(u, v: string) -> (res: bool) #no_bounds_check {
 	s, t := u, v
 	loop: for s != "" && t != "" {
 		sr, tr: rune
@@ -438,7 +435,7 @@ equal_fold :: proc(u, v: string) -> (res: bool) {
 
 		r := unicode.simple_fold(sr)
 		for r != sr && r < tr {
-			r = unicode.simple_fold(sr)
+			r = unicode.simple_fold(r)
 		}
 		if r == tr {
 			continue loop
@@ -486,7 +483,7 @@ prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
 
 	n    = runtime.memory_prefix_length(raw_data(a), raw_data(b), min(len(a), len(b)))
 	lim := max(n - UTF_MAX + 1, 0)
-	for l := n; l > lim; l -= 1 {
+	#no_bounds_check for l := n; l > lim; l -= 1 {
 		r, _ := runtime.string_decode_rune(a[l - 1:])
 		if r != RUNE_ERROR {
 			if l > 0 && (a[l - 1] & 0xc0 == 0xc0) {
@@ -595,7 +592,7 @@ Output:
 	true
 
 */
-has_suffix :: proc(s, suffix: string) -> (result: bool) {
+has_suffix :: proc(s, suffix: string) -> (result: bool) #no_bounds_check {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
 
@@ -634,7 +631,7 @@ Output:
 	a...b...c
 
 */
-join :: proc(a: []string, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+join :: proc(a: []string, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if len(a) == 0 {
 		return "", nil
 	}
@@ -681,7 +678,7 @@ Output:
 	abc
 
 */
-concatenate :: proc(a: []string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+concatenate :: proc(a: []string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if len(a) == 0 {
 		return "", nil
 	}
@@ -764,6 +761,7 @@ Inputs:
 - rune_offset: The starting rune index (default is 0). In runes, not bytes.
 - rune_length: The number of runes to include in the substring (default is 0, which returns the remainder of the string).  In runes, not bytes.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The substring
@@ -787,7 +785,7 @@ Output:
 	example
 
 */
-cut_clone :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+cut_clone :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	res = cut(s, rune_offset, rune_length)
 	return clone(res, allocator, loc)
 }
@@ -805,6 +803,7 @@ Inputs:
 - sep_save: A flag determining if the separator should be saved in the resulting substrings
 - n: The maximum number of substrings to return, returns `nil` without alloc when `n=0`
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 NOTE: Allocation occurs for the array, the splits are all views of the original string.
 
@@ -813,7 +812,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 @private
-_split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) {
+_split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #no_bounds_check {
 	s, n := s_, n_
 
 	if n == 0 {
@@ -869,6 +868,7 @@ Inputs:
 - s: The string to split.
 - sep: The separator string used to split the input string.
 - allocator: (default is context.allocator).
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice of strings, each representing a part of the split string.
@@ -892,8 +892,8 @@ Output:
 	["aaa", "bbb", "ccc", "ddd", "eee"]
 
 */
-split :: proc(s, sep: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
-	return _split(s, sep, 0, -1, allocator)
+split :: proc(s, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
+	return _split(s, sep, 0, -1, allocator, loc)
 }
 
 /*
@@ -906,6 +906,7 @@ Inputs:
 - sep: The separator string used to split the input string.
 - n: The maximum amount of parts to split the string into.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice of strings, each representing a part of the split string.
@@ -929,8 +930,8 @@ Output:
 	["aaa", "bbb", "ccc.ddd.eee"]
 
 */
-split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
-	return _split(s, sep, 0, n, allocator)
+split_n :: proc(s, sep: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
+	return _split(s, sep, 0, n, allocator, loc)
 }
 
 /*
@@ -942,6 +943,7 @@ Inputs:
 - s: The string to split.
 - sep: The separator string used to split the input string.
 - allocator: (default is context.allocator).
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice of strings, each representing a part of the split string after the separator
@@ -965,8 +967,8 @@ Output:
 	["aaa.", "bbb.", "ccc.", "ddd.", "eee"]
 
 */
-split_after :: proc(s, sep: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
-	return _split(s, sep, len(sep), -1, allocator)
+split_after :: proc(s, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
+	return _split(s, sep, len(sep), -1, allocator, loc)
 }
 
 /*
@@ -979,6 +981,7 @@ Inputs:
 - sep: The separator string used to split the input string.
 - n: The maximum number of parts to split the string into.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice of strings with `n` parts or fewer if there weren't
@@ -1002,8 +1005,8 @@ Output:
 	["aaa.", "bbb.", "ccc.ddd.eee"]
 
 */
-split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
-	return _split(s, sep, len(sep), n, allocator)
+split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
+	return _split(s, sep, len(sep), n, allocator, loc)
 }
 
 /*
@@ -1034,7 +1037,7 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 	} else {
 		m = index(s^, sep)
 	}
-	if m < 0 {
+	#no_bounds_check if m < 0 {
 		// not found
 		res = s[:]
 		ok = res != ""
@@ -1081,7 +1084,7 @@ Output:
 */
 split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 	m := index_byte(s^, sep)
-	if m < 0 {
+	#no_bounds_check if m < 0 {
 		// not found
 		res = s[:]
 		ok = res != ""
@@ -1178,7 +1181,7 @@ Returns:
 - res: The trimmed string as a slice of the original.
 */
 @(private)
-_trim_cr :: proc(s: string) -> (res: string) {
+_trim_cr :: proc(s: string) -> (res: string) #no_bounds_check {
 	n := len(s)
 	if n > 0 {
 		if s[n-1] == '\r' {
@@ -1196,6 +1199,7 @@ Splits the input string at every line break `\n`.
 Inputs:
 - s: The input string to split.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice (allocated) of the split string (slices into original string)
@@ -1217,9 +1221,9 @@ Output:
 	["a", "b", "c", "d", "e"]
 
 */
-split_lines :: proc(s: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
+split_lines :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
-	lines := _split(s, sep, 0, -1, allocator) or_return
+	lines := _split(s, sep, 0, -1, allocator, loc) or_return
 	for &line in lines {
 		line = _trim_cr(line)
 	}
@@ -1235,6 +1239,7 @@ Inputs:
 - s: The input string to split.
 - n: The number of parts to split into.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice (allocated) of the split string (slices into original string)
@@ -1258,9 +1263,9 @@ Output:
 	["a", "b", "c\nd\ne"]
 
 */
-split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
+split_lines_n :: proc(s: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
-	lines := _split(s, sep, 0, n, allocator) or_return
+	lines := _split(s, sep, 0, n, allocator, loc) or_return
 	for &line in lines {
 		line = _trim_cr(line)
 	}
@@ -1275,6 +1280,7 @@ Splits the input string at every line break `\n` leaving the `\n` in the resulti
 Inputs:
 - s: The input string to split.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice (allocated) of the split string (slices into original string), with `\n` included
@@ -1298,9 +1304,9 @@ Output:
 	["a\n", "b\n", "c\n", "d\n", "e"]
 
 */
-split_lines_after :: proc(s: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
+split_lines_after :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
-	lines := _split(s, sep, len(sep), -1, allocator) or_return
+	lines := _split(s, sep, len(sep), -1, allocator, loc) or_return
 	for &line in lines {
 		line = _trim_cr(line)
 	}
@@ -1317,6 +1323,7 @@ Inputs:
 - s: The input string to split.
 - n: The number of parts to split into.
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The slice (allocated) of the split string (slices into original string), with `\n` included
@@ -1340,9 +1347,9 @@ Output:
 	["a\n", "b\n", "c\nd\ne"]
 
 */
-split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
+split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
-	lines := _split(s, sep, len(sep), n, allocator) or_return
+	lines := _split(s, sep, len(sep), n, allocator, loc) or_return
 	for &line in lines {
 		line = _trim_cr(line)
 	}
@@ -1584,8 +1591,8 @@ Output:
 	-1
 
 */
-index :: proc "contextless" (s, substr: string) -> (res: int) {
-	hash_str_rabin_karp :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+index :: proc "contextless" (s, substr: string) -> (res: int) #no_bounds_check {
+	hash_str_rabin_karp :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) #no_bounds_check {
 		for i := 0; i < len(s); i += 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -1664,8 +1671,8 @@ Output:
 	-1
 
 */
-last_index :: proc(s, substr: string) -> (res: int) {
-	hash_str_rabin_karp_reverse :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+last_index :: proc(s, substr: string) -> (res: int) #no_bounds_check {
+	hash_str_rabin_karp_reverse :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) #no_bounds_check {
 		for i := len(s) - 1; i >= 0; i -= 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -1744,7 +1751,7 @@ Output:
 	-1
 
 */
-index_any :: proc(s, chars: string) -> (res: int) {
+index_any :: proc(s, chars: string) -> (res: int) #no_bounds_check {
 	if chars == "" {
 		return -1
 	}
@@ -1808,7 +1815,7 @@ Output:
 	-1
 
 */
-last_index_any :: proc(s, chars: string) -> (res: int) {
+last_index_any :: proc(s, chars: string) -> (res: int) #no_bounds_check {
 	if chars == "" {
 		return -1
 	}
@@ -1869,7 +1876,7 @@ Returns:
 - idx: the index of the first matching substring
 - width: the length of the found substring
 */
-index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
+index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) #no_bounds_check {
 	idx = -1
 	if s == "" || len(substrs) <= 0 {
 		return
@@ -1932,7 +1939,7 @@ Output:
 	0
 
 */
-count :: proc(s, substr: string) -> (res: int) {
+count :: proc(s, substr: string) -> (res: int) #no_bounds_check {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
 	}
@@ -1976,6 +1983,7 @@ Inputs:
 - s: The string to repeat
 - count: The number of times to repeat `s`
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The concatenated repeated string
@@ -1997,7 +2005,7 @@ Output:
 	abcabc
 
 */
-repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	if count < 0 {
 		panic("strings: negative repeat count")
 	} else if count > 0 && (len(s)*count)/count != len(s) {
@@ -2006,7 +2014,7 @@ repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #ca
 
 	b := make([]byte, len(s)*count, allocator, loc) or_return
 	i := copy(b, s)
-	for i < len(b) { // 2^N trick to reduce the need to copy
+	#no_bounds_check for i < len(b) { // 2^N trick to reduce the need to copy
 		copy(b[i:], b[:i])
 		i *= 2
 	}
@@ -2023,6 +2031,7 @@ Inputs:
 - old: The substring to replace
 - new: The substring to replace `old` with
 - allocator: The allocator to use for the new string (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - output: The modified string
@@ -2047,8 +2056,8 @@ Output:
 
 */
 
-replace_all :: proc(s, old, new: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
-	return replace(s, old, new, -1, allocator)
+replace_all :: proc(s, old, new: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
+	return replace(s, old, new, -1, allocator, loc)
 }
 
 /*
@@ -2062,6 +2071,7 @@ Inputs:
 - new: The replacement string
 - n: The number of instances to replace (if `n < 0`, no limit on the number of replacements)
 - allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - output: The modified string
@@ -2111,7 +2121,7 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator, loc
 
 	w := 0
 	start := 0
-	for i := 0; i < byte_count; i += 1 {
+	#no_bounds_check for i := 0; i < byte_count; i += 1 {
 		j := start
 		if len(old) == 0 {
 			if i > 0 {
@@ -2140,6 +2150,7 @@ Inputs:
 - key: The substring to be removed
 - n: The number of instances to remove (if `n < 0`, no limit on the number of removes)
 - allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - output: The modified string
@@ -2165,8 +2176,8 @@ Output:
 	abcabc false
 
 */
-remove :: proc(s, key: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
-	return replace(s, key, "", n, allocator)
+remove :: proc(s, key: string, n: int, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
+	return replace(s, key, "", n, allocator, loc)
 }
 
 /*
@@ -2178,6 +2189,7 @@ Inputs:
 - s: The input string
 - key: The substring to be removed
 - allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - output: The modified string
@@ -2201,8 +2213,8 @@ Output:
 	abcabc false
 
 */
-remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
-	return remove(s, key, -1, allocator)
+remove_all :: proc(s, key: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
+	return remove(s, key, -1, allocator, loc)
 }
 
 // Returns true if is an ASCII space character ('\t', '\n', '\v', '\f', '\r', ' ')
@@ -2426,7 +2438,7 @@ Output:
 	test
 
 */
-trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> (res: string) {
+trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> (res: string) #no_bounds_check {
 	i := last_index_proc(s, p, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
 		_, w := utf8.decode_rune_in_string(s[i:])
@@ -2448,7 +2460,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original, empty when no match
 */
-trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> (res: string) {
+trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> (res: string) #no_bounds_check {
 	i := last_index_proc_with_state(s, p, state, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
 		_, w := utf8.decode_rune_in_string(s[i:])
@@ -2623,7 +2635,7 @@ Output:
 	testing
 
 */
-trim_prefix :: proc(s, prefix: string) -> (res: string) {
+trim_prefix :: proc(s, prefix: string) -> (res: string) #no_bounds_check {
 	if has_prefix(s, prefix) {
 		return s[len(prefix):]
 	}
@@ -2656,7 +2668,7 @@ Output:
 	todo.doc
 
 */
-trim_suffix :: proc(s, suffix: string) -> (res: string) {
+trim_suffix :: proc(s, suffix: string) -> (res: string) #no_bounds_check {
 	if has_suffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
 	}
@@ -2672,6 +2684,7 @@ Inputs:
 - s: The input string
 - substrs: An array of substrings used for splitting
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: An array of strings, or nil on empty substring or no matches
@@ -2695,7 +2708,7 @@ Output:
 	["testing", "this", "out", "nice", "done", "last"]
 
 */
-split_multi :: proc(s: string, substrs: []string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+split_multi :: proc(s: string, substrs: []string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if s == "" || len(substrs) <= 0 {
 		return nil, nil
 	}
@@ -2805,6 +2818,7 @@ Inputs:
 - s: The input string
 - replacement: The string used to replace invalid UTF-8 characters
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A new string with invalid UTF-8 characters replaced
@@ -2825,16 +2839,16 @@ Output:
 	Hello?
 
 */
-scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+scrub :: proc(s: string, replacement: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	str := s
 	b: Builder
-	builder_init(&b, 0, len(s), allocator) or_return
+	builder_init(&b, 0, len(s), allocator, loc) or_return
 
 	has_error := false
 	cursor := 0
 	origin := str
 
-	for len(str) > 0 {
+	#no_bounds_check for len(str) > 0 {
 		r, w := utf8.decode_rune_in_string(str)
 
 		if r == utf8.RUNE_ERROR {
@@ -2865,6 +2879,7 @@ Reverses the input string `s`
 Inputs:
 - s: The input string
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A reversed version of the input string
@@ -2886,13 +2901,13 @@ Output:
 	abcxyz zyxcba
 
 */
-reverse :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+reverse :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	str := s
 	n := len(str)
 	buf := make([]byte, n, allocator, loc) or_return
 	i := n
 
-	for len(str) > 0 {
+	#no_bounds_check for len(str) > 0 {
 		_, w := utf8.decode_rune_in_string(str)
 		i -= w
 		copy(buf[i:], str[:w])
@@ -2910,6 +2925,7 @@ Inputs:
 - s: The input string
 - tab_size: The number of spaces to use for each tab character
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A new string with tab characters expanded to the specified tab size
@@ -2932,7 +2948,7 @@ Output:
 	abc1    abc2    abc3
 
 */
-expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	if tab_size <= 0 {
 		panic("tab size must be positive")
 	}
@@ -2942,12 +2958,12 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 	}
 
 	b: Builder
-	builder_init(&b, allocator) or_return
+	builder_init(&b, allocator, loc) or_return
 	writer := to_writer(&b)
 	str := s
 	column: int
 
-	for len(str) > 0 {
+	#no_bounds_check for len(str) > 0 {
 		r, w := utf8.decode_rune_in_string(str)
 
 		if r == '\t' {
@@ -3012,7 +3028,7 @@ Output:
 	true
 
 */
-partition :: proc(str, sep: string) -> (head, match, tail: string) {
+partition :: proc(str, sep: string) -> (head, match, tail: string) #no_bounds_check {
 	i := index(str, sep)
 	if i == -1 {
 		head = str
@@ -3038,22 +3054,23 @@ Inputs:
 - length: The desired length of the centered string, in runes
 - pad: The string used for padding on both sides
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A new string centered within a field of the specified length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
 	if n >= length || pad == "" {
-		return clone(str, allocator)
+		return clone(str, allocator, loc)
 	}
 
 	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
+	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
 
 	w := to_writer(&b)
 
@@ -3074,22 +3091,23 @@ Inputs:
 - length: The desired length of the left-justified string
 - pad: The string used for padding on the right side
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A new string left-justified within a field of the specified length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
 	if n >= length || pad == "" {
-		return clone(str, allocator)
+		return clone(str, allocator, loc)
 	}
 
 	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
+	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
 
 	w := to_writer(&b)
 
@@ -3109,22 +3127,23 @@ Inputs:
 - length: The desired length of the right-justified string
 - pad: The string used for padding on the left side
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A new string right-justified within a field of the specified length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) #optional_allocator_error {
+right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
 	if n >= length || pad == "" {
-		return clone(str, allocator)
+		return clone(str, allocator, loc)
 	}
 
 	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
-	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator) or_return
+	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
 
 	w := to_writer(&b)
 
@@ -3147,14 +3166,14 @@ Inputs:
 write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 	repeats := remains / pad_len
 
-	for i := 0; i < repeats; i += 1 {
+	for _ in 0..<repeats {
 		io.write_string(w, pad)
 	}
 
 	n := remains % pad_len
 	p := pad
 
-	for i := 0; i < n; i += 1 {
+	#no_bounds_check for _ in 0..<n {
 		r, width := utf8.decode_rune_in_string(p)
 		io.write_rune(w, r)
 		p = p[width:]
@@ -3169,12 +3188,13 @@ Splits a string into a slice of substrings at each instance of one or more conse
 Inputs:
 - s: The input string
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: A slice of substrings of the input string, or an empty slice if the input string only contains white space
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-fields :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+fields :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	n := 0
 	was_space := 1
 	set_bits := u8(0)
@@ -3232,6 +3252,7 @@ Inputs:
 - s: The input string
 - f: A predicate function to determine the split points
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 NOTE: fields_proc makes no guarantee about the order in which it calls `f(r)`, it assumes that `f` always returns the same value for a given `r`
 
@@ -3239,7 +3260,7 @@ Returns:
 - res: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error #no_bounds_check {
+fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	substrings := make([dynamic]string, 0, 32, allocator, loc) or_return
 
 	start, end := -1, -1
@@ -3276,7 +3297,7 @@ Returns:
 - field: The first non-space substring found
 - ok: A boolean indicating if a non-space substring was found
 */
-fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
+fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) #no_bounds_check {
 	start, end := -1, -1
 	for r, offset in s {
 		end = offset
@@ -3315,6 +3336,7 @@ NOTE: Does not perform internal allocation if length of string `b`, in runes, is
 Inputs:
 - a, b: The two strings to compare
 - allocator: (default is context.allocator)
+- loc: The caller location for debugging purposes (default: `#caller_location`)
 
 Returns:
 - res: The Levenshtein edit distance between the two strings
@@ -3322,7 +3344,7 @@ Returns:
 
 NOTE: This implementation is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
 */
-levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc := #caller_location) -> (res: int, err: mem.Allocator_Error) #optional_allocator_error {
+levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc := #caller_location) -> (res: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	LEVENSHTEIN_DEFAULT_COSTS: []int : {
 		0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
 		10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
@@ -3382,7 +3404,7 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc :
 }
 
 @(private)
-internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
+internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) #no_bounds_check {
 	sub = s
 	ok  = true
 
@@ -3398,7 +3420,9 @@ internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: s
 			}
 			rune_i += 1
 		}
-		if !ok { return }
+		if !ok {
+			sub = sub[rune_i:]
+		}
 	}
 
 	if rune_end >= rune_start {

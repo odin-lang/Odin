@@ -20,10 +20,28 @@ package net
 		Feoramund:       FreeBSD platform code
 */
 
-import "core:strings"
+import "base:runtime"
+
 import "core:mem"
+import "core:os"
+import "core:strings"
+import "core:sync"
 
 import win "core:sys/windows"
+
+/*
+	Replaces environment placeholders in `dns_configuration`. Only necessary on Windows.
+	Is automatically called, once, by `get_dns_records_*`.
+*/
+@(private)
+_init_dns_configuration :: proc() {
+	sync.once_do(&dns_config_initialized, proc() {
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+		val := os.replace_environment_placeholders(dns_configuration.hosts_file, context.temp_allocator)
+		copy(dns_configuration.hosts_file_buf[:], val)
+		dns_configuration.hosts_file = string(dns_configuration.hosts_file_buf[:len(val)])
+	})
+}
 
 @(private)
 _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {

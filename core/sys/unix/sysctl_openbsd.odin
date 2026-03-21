@@ -47,3 +47,4 @@ CTL_HW     :: 6
 	HW_SERIALNO  :: 17
 	HW_UUID      :: 18
 	HW_PHYSMEM64 :: 19
+	HW_USERMEM64 :: 20

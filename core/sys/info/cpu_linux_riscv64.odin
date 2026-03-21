@@ -3,14 +3,13 @@
 package sysinfo
 
 import "base:intrinsics"
-
+import "base:runtime"
 import "core:sys/linux"
+import "core:strconv"
+import "core:strings"
 
 @(init, private)
-init_cpu_features :: proc "contextless" () {
-	_features: CPU_Features
-	defer cpu.features = _features
-
+_init_cpu_features :: proc "contextless" () {
 	HWCAP_Bits :: enum u64 {
 		I = 'I' - 'A',
 		M = 'M' - 'A',
@@ -107,7 +106,43 @@ init_cpu_features :: proc "contextless" () {
 	}
 }
 
-@(init, private)
-init_cpu_name :: proc "contextless" () {
-	cpu.name = "RISCV64"
+@(private)
+_cpu_features :: proc "contextless" () -> (features: CPU_Features) {
+	return _features
+}
+
+@(private)
+_cpu_name :: proc() -> (name: string) {
+	return "RISCV64"
+}
+
+@(private)
+_cpu_core_count :: proc "contextless" () -> (physical: int, logical: int, ok: bool) {
+	context = runtime.default_context() // No allocations, only needed because `core:strings` wants it.
+	fd, err := linux.open("/proc/cpuinfo", {})
+	if err != .NONE { return }
+	defer linux.close(fd)
+
+	// This is probably enough right?
+	buf: [4096]byte
+	n, rerr := linux.read(fd, buf[:])
+	if rerr != .NONE || n == 0 { return }
+
+	physical_ok, logical_ok: bool
+
+	str := string(buf[:n])
+	for line in strings.split_lines_iterator(&str) {
+		key, _, value := strings.partition(line, ":")
+		key   = strings.trim_space(key)
+		value = strings.trim_space(value)
+
+		if key == "cpu cores" && !physical_ok{
+			physical, physical_ok = strconv.parse_int(value)
+		}
+
+		if key == "siblings" && !logical_ok{
+			logical, logical_ok = strconv.parse_int(value)
+		}
+	}
+	return physical, logical, physical_ok || logical_ok
 }

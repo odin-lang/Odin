@@ -7,10 +7,9 @@ import "core:sys/linux"
 import "core:strings"
 import "core:strconv"
 
-@(init, private)
-init_cpu_core_count :: proc "contextless" () {
+@(private)
+_cpu_core_count :: proc "contextless" () -> (physical: int, logical: int, ok: bool) {
 	context = runtime.default_context()
-
 	fd, err := linux.open("/proc/cpuinfo", {})
 	if err != .NONE { return }
 	defer linux.close(fd)
@@ -20,22 +19,21 @@ init_cpu_core_count :: proc "contextless" () {
 	n, rerr := linux.read(fd, buf[:])
 	if rerr != .NONE || n == 0 { return }
 
+	physical_ok, logical_ok: bool
+
 	str := string(buf[:n])
 	for line in strings.split_lines_iterator(&str) {
 		key, _, value := strings.partition(line, ":")
 		key   = strings.trim_space(key)
 		value = strings.trim_space(value)
 
-		if key == "cpu cores" {
-			if num_physical_cores, ok := strconv.parse_int(value); ok {
-				cpu.physical_cores = num_physical_cores
-			}
+		if key == "cpu cores" && !physical_ok{
+			physical, physical_ok = strconv.parse_int(value)
 		}
 
-		if key == "siblings" {
-			if num_logical_cores, ok := strconv.parse_int(value); ok {
-				cpu.logical_cores = num_logical_cores
-			}
+		if key == "siblings" && !logical_ok{
+			logical, logical_ok = strconv.parse_int(value)
 		}
 	}
+	return physical, logical, physical_ok || logical_ok
 }

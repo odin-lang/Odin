@@ -46,9 +46,10 @@ EventType :: enum Uint32 {
 	DISPLAY_MOVED,                 /**< Display has changed position */
 	DISPLAY_DESKTOP_MODE_CHANGED,  /**< Display has changed desktop mode */
 	DISPLAY_CURRENT_MODE_CHANGED,  /**< Display has changed current mode */
-	DISPLAY_CONTENT_SCALE_CHANGED, /**< Display has changed content scale */
+	DISPLAY_CONTENT_SCALE_CHANGED, /**< Display has changed usable bounds */
+	DISPLAY_USABLE_BOUNDS_CHANGED,
 	DISPLAY_FIRST = DISPLAY_ORIENTATION,
-	DISPLAY_LAST = DISPLAY_CONTENT_SCALE_CHANGED,
+	DISPLAY_LAST = DISPLAY_USABLE_BOUNDS_CHANGED,
 
 	/* Window events */
 	/* 0x200 was SDL_WINDOWEVENT, reserve the number for sdl2-compat */
@@ -94,6 +95,8 @@ EventType :: enum Uint32 {
 	KEYBOARD_ADDED,          /**< A new keyboard has been inserted into the system */
 	KEYBOARD_REMOVED,        /**< A keyboard has been removed */
 	TEXT_EDITING_CANDIDATES, /**< Keyboard text editing candidates */
+	SCREEN_KEYBOARD_SHOWN,   /**< The on-screen keyboard has been shown */
+	SCREEN_KEYBOARD_HIDDEN,  /**< The on-screen keyboard has been hidden */
 
 	/* Mouse events */
 	MOUSE_MOTION    = 0x400, /**< Mouse moved */
@@ -134,10 +137,15 @@ EventType :: enum Uint32 {
 	FINGER_MOTION,
 	FINGER_CANCELED,
 
+	/* Pinch events */
+	PINCH_BEGIN      = 0x710,     /**< Pinch gesture started */
+	PINCH_UPDATE,                 /**< Pinch gesture updated */
+	PINCH_END,                    /**< Pinch gesture ended */
+
 	/* 0x800, 0x801, and 0x802 were the Gesture events from SDL2. Do not reuse these values! sdl2-compat needs them! */
 
 	/* Clipboard events */
-	CLIPBOARD_UPDATE = 0x900, /**< The clipboard or primary selection changed */
+	CLIPBOARD_UPDATE = 0x900, /**< The clipboard changed */
 
 	/* Drag and drop events */
 	DROP_FILE        = 0x1000, /**< The system requests a file open */
@@ -431,6 +439,12 @@ TouchFingerEvent :: struct {
 	windowID: WindowID,  /**< The window underneath the finger, if any */
 }
 
+PinchFingerEvent :: struct {
+	using commonEvent: CommonEvent,
+	scale: f32,         /**< The scale change since the last SDL_EVENT_PINCH_UPDATE. Scale < 1 is "zoom out". Scale > 1 is "zoom in". */
+	windowID: WindowID, /**< The window underneath the finger, if any */
+}
+
 PenProximityEvent :: struct {
 	using commonEvent: CommonEvent, /**< SDL_EVENT_PEN_PROXIMITY_IN or SDL_EVENT_PEN_PROXIMITY_OUT */
 	windowID: WindowID,  /**< The window with pen focus, if any */
@@ -508,7 +522,7 @@ QuitEvent :: struct {
 }
 
 UserEvent :: struct {
-	using commonEvent: CommonEvent, /**< SDL_EVENT_USER through SDL_EVENT_LAST-1, Uint32 because these are not in the SDL_EventType enumeration */
+	using commonEvent: CommonEvent, /**< SDL_EVENT_USER through SDL_EVENT_LAST, Uint32 because these are not in the SDL_EventType enumeration */
 	windowID: WindowID,  /**< The associated window if any */
 	code:     Sint32,    /**< User defined event code */
 	data1:    rawptr,    /**< User defined data pointer */
@@ -519,44 +533,84 @@ UserEvent :: struct {
 
 
 Event :: struct #raw_union {
-	type:            EventType,                  /**< Event type, shared with all events, Uint32 to cover user events which are not in the SDL_EventType enumeration */
-	common:          CommonEvent,                /**< Common event data */
-	display:         DisplayEvent,               /**< Display event data */
-	window:          WindowEvent,                /**< Window event data */
-	kdevice:         KeyboardDeviceEvent,        /**< Keyboard device change event data */
-	key:             KeyboardEvent,              /**< Keyboard event data */
-	edit:            TextEditingEvent,           /**< Text editing event data */
-	edit_candidates: TextEditingCandidatesEvent, /**< Text editing candidates event data */
-	text:            TextInputEvent,             /**< Text input event data */
-	mdevice:         MouseDeviceEvent,           /**< Mouse device change event data */
-	motion:          MouseMotionEvent,           /**< Mouse motion event data */
-	button:          MouseButtonEvent,           /**< Mouse button event data */
-	wheel:           MouseWheelEvent,            /**< Mouse wheel event data */
-	jdevice:         JoyDeviceEvent,             /**< Joystick device change event data */
-	jaxis:           JoyAxisEvent,               /**< Joystick axis event data */
-	jball:           JoyBallEvent,               /**< Joystick ball event data */
-	jhat:            JoyHatEvent,                /**< Joystick hat event data */
-	jbutton:         JoyButtonEvent,             /**< Joystick button event data */
-	jbattery:        JoyBatteryEvent,            /**< Joystick battery event data */
-	gdevice:         GamepadDeviceEvent,         /**< Gamepad device event data */
-	gaxis:           GamepadAxisEvent,           /**< Gamepad axis event data */
-	gbutton:         GamepadButtonEvent,         /**< Gamepad button event data */
-	gtouchpad:       GamepadTouchpadEvent,       /**< Gamepad touchpad event data */
-	gsensor:         GamepadSensorEvent,         /**< Gamepad sensor event data */
-	adevice:         AudioDeviceEvent,           /**< Audio device event data */
-	cdevice:         CameraDeviceEvent,          /**< Camera device event data */
-	sensor:          SensorEvent,                /**< Sensor event data */
-	quit:            QuitEvent,                  /**< Quit request event data */
-	user:            UserEvent,                  /**< Custom event data */
-	tfinger:         TouchFingerEvent,           /**< Touch finger event data */
-	pproximity:      PenProximityEvent,          /**< Pen proximity event data */
-	ptouch:          PenTouchEvent,              /**< Pen tip touching event data */
-	pmotion:         PenMotionEvent,             /**< Pen motion event data */
-	pbutton:         PenButtonEvent,             /**< Pen button event data */
-	paxis:           PenAxisEvent,               /**< Pen axis event data */
-	render:          RenderEvent,                /**< Render event data */
-	drop:            DropEvent,                  /**< Drag and drop event data */
-	clipboard:       ClipboardEvent,             /**< Clipboard event data */
+	/**< Event type, shared with all events, Uint32 to cover user events which are not in the SDL_EventType enumeration */
+	type:            EventType                  `raw_union_tag:"type=FIRST"`,
+	/**< Common event data */
+	common:          CommonEvent                `raw_union_tag:"type=TERMINATE,LOW_MEMORY,WILL_ENTER_BACKGROUND,DID_ENTER_BACKGROUND,WILL_ENTER_FOREGROUND,DID_ENTER_FOREGROUND,LOCALE_CHANGED,SYSTEM_THEME_CHANGED,POLL_SENTINEL"`,
+	/**< Display event data */
+	display:         DisplayEvent               `raw_union_tag:"type=DISPLAY_ORIENTATION,DISPLAY_ADDED,DISPLAY_REMOVED,DISPLAY_MOVED,DISPLAY_DESKTOP_MODE_CHANGED,DISPLAY_CURRENT_MODE_CHANGED,DISPLAY_CONTENT_SCALE_CHANGED"`,
+	/**< Window event data */
+	window:          WindowEvent                `raw_union_tag:"type=WINDOW_SHOWN,WINDOW_HIDDEN,WINDOW_EXPOSED,WINDOW_MOVED,WINDOW_RESIZED,WINDOW_PIXEL_SIZE_CHANGED,WINDOW_METAL_VIEW_RESIZED,WINDOW_MINIMIZED,WINDOW_MAXIMIZED,WINDOW_RESTORED,WINDOW_MOUSE_ENTER,WINDOW_MOUSE_LEAVE,WINDOW_FOCUS_GAINED,WINDOW_FOCUS_LOST,WINDOW_CLOSE_REQUESTED,WINDOW_HIT_TEST,WINDOW_ICCPROF_CHANGED,WINDOW_DISPLAY_CHANGED,WINDOW_DISPLAY_SCALE_CHANGED,WINDOW_SAFE_AREA_CHANGED,WINDOW_OCCLUDED,WINDOW_ENTER_FULLSCREEN,WINDOW_LEAVE_FULLSCREEN,WINDOW_DESTROYED"`,
+	/**< Keyboard device change event data */
+	kdevice:         KeyboardDeviceEvent        `raw_union_tag:"type=KEYMAP_CHANGED,KEYBOARD_ADDED,KEYBOARD_REMOVED"`,
+	/**< Keyboard event data */
+	key:             KeyboardEvent              `raw_union_tag:"type=KEY_DOWN,KEY_UP"`,
+	/**< Text editing event data */
+	edit:            TextEditingEvent           `raw_union_tag:"type=TEXT_EDITING"`,
+	/**< Text editing candidates event data */
+	edit_candidates: TextEditingCandidatesEvent `raw_union_tag:"type=TEXT_EDITING_CANDIDATES"`,
+	/**< Text input event data */
+	text:            TextInputEvent             `raw_union_tag:"type=TEXT_INPUT"`,
+	/**< Mouse device change event data */
+	mdevice:         MouseDeviceEvent           `raw_union_tag:"type=MOUSE_ADDED,MOUSE_REMOVED"`,
+	/**< Mouse motion event data */
+	motion:          MouseMotionEvent           `raw_union_tag:"type=MOUSE_MOTION"`,
+	/**< Mouse button event data */
+	button:          MouseButtonEvent           `raw_union_tag:"type=MOUSE_BUTTON_DOWN,MOUSE_BUTTON_UP"`,
+	/**< Mouse wheel event data */
+	wheel:           MouseWheelEvent            `raw_union_tag:"type=MOUSE_WHEEL"`,
+	/**< Joystick device change event data */
+	jdevice:         JoyDeviceEvent             `raw_union_tag:"type=JOYSTICK_ADDED,JOYSTICK_REMOVED,JOYSTICK_UPDATE_COMPLETE"`,
+	/**< Joystick axis event data */
+	jaxis:           JoyAxisEvent               `raw_union_tag:"type=JOYSTICK_AXIS_MOTION"`,
+	/**< Joystick ball event data */
+	jball:           JoyBallEvent               `raw_union_tag:"type=JOYSTICK_BALL_MOTION"`,
+	/**< Joystick hat event data */
+	jhat:            JoyHatEvent                `raw_union_tag:"type=JOYSTICK_HAT_MOTION"`,
+	/**< Joystick button event data */
+	jbutton:         JoyButtonEvent             `raw_union_tag:"type=JOYSTICK_BUTTON_DOWN,JOYSTICK_BUTTON_UP"`,
+	/**< Joystick battery event data */
+	jbattery:        JoyBatteryEvent            `raw_union_tag:"type=JOYSTICK_BATTERY_UPDATED"`,
+	/**< Gamepad device event data */
+	gdevice:         GamepadDeviceEvent         `raw_union_tag:"type=GAMEPAD_ADDED,GAMEPAD_REMOVED,GAMEPAD_REMAPPED,GAMEPAD_UPDATE_COMPLETE,GAMEPAD_STEAM_HANDLE_UPDATED"`,
+	/**< Gamepad axis event data */
+	gaxis:           GamepadAxisEvent           `raw_union_tag:"type=GAMEPAD_AXIS_MOTION"`,
+	/**< Gamepad button event data */
+	gbutton:         GamepadButtonEvent         `raw_union_tag:"type=GAMEPAD_BUTTON_DOWN,GAMEPAD_BUTTON_UP"`,
+	/**< Gamepad touchpad event data */
+	gtouchpad:       GamepadTouchpadEvent       `raw_union_tag:"type=GAMEPAD_TOUCHPAD_DOWN,GAMEPAD_TOUCHPAD_MOTION,GAMEPAD_TOUCHPAD_UP"`,
+	/**< Gamepad sensor event data */
+	gsensor:         GamepadSensorEvent         `raw_union_tag:"type=GAMEPAD_SENSOR_UPDATE"`,
+	/**< Audio device event data */
+	adevice:         AudioDeviceEvent           `raw_union_tag:"type=AUDIO_DEVICE_ADDED,AUDIO_DEVICE_REMOVED,AUDIO_DEVICE_FORMAT_CHANGED"`,
+	/**< Camera device event data */
+	cdevice:         CameraDeviceEvent          `raw_union_tag:"type=CAMERA_DEVICE_ADDED,CAMERA_DEVICE_REMOVED,CAMERA_DEVICE_APPROVED,CAMERA_DEVICE_DENIED"`,
+	/**< Sensor event data */
+	sensor:          SensorEvent                `raw_union_tag:"type=SENSOR_UPDATE"`,
+	/**< Quit request event data */
+	quit:            QuitEvent                  `raw_union_tag:"type=QUIT"`,
+	/**< Custom event data */
+	user:            UserEvent                  `raw_union_tag:"type=USER"`,
+	/**< Touch finger event data */
+	tfinger:         TouchFingerEvent           `raw_union_tag:"type=FINGER_DOWN,FINGER_UP,FINGER_MOTION,FINGER_CANCELED"`,
+	/**< Pinch event data */
+	pinch:           PinchFingerEvent           `raw_union_tag:"type=PINCH_BEGIN,PINCH_UPDATE,PINCH_END"`,
+	/**< Pen proximity event data */
+	pproximity:      PenProximityEvent          `raw_union_tag:"type=PEN_PROXIMITY_IN,PEN_PROXIMITY_OUT"`,
+	/**< Pen tip touching event data */
+	ptouch:          PenTouchEvent              `raw_union_tag:"type=PEN_DOWN,PEN_UP"`,
+	/**< Pen motion event data */
+	pmotion:         PenMotionEvent             `raw_union_tag:"type=PEN_MOTION"`,
+	/**< Pen button event data */
+	pbutton:         PenButtonEvent             `raw_union_tag:"type=PEN_BUTTON_DOWN,PEN_BUTTON_UP"`,
+	/**< Pen axis event data */
+	paxis:           PenAxisEvent               `raw_union_tag:"type=PEN_AXIS"`,
+	/**< Render event data */
+	render:          RenderEvent                `raw_union_tag:"type=RENDER_TARGETS_RESET,RENDER_DEVICE_RESET,RENDER_DEVICE_LOST"`,
+	/**< Drag and drop event data */
+	drop:            DropEvent                  `raw_union_tag:"type=DROP_FILE,DROP_TEXT,DROP_BEGIN,DROP_COMPLETE,DROP_POSITION"`,
+	/**< Clipboard event data */
+	clipboard:       ClipboardEvent             `raw_union_tag:"type=CLIPBOARD_UPDATE"`,
 
 	/* This is necessary for ABI compatibility between Visual C++ and GCC.
 	   Visual C++ will respect the push pack pragma and use 52 bytes (size of
@@ -588,23 +642,24 @@ EventFilter :: proc "c" (userdata: rawptr, event: ^Event) -> bool
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
-	PumpEvents         :: proc() ---
-	PeepEvents         :: proc(events: [^]Event, numevents: c.int, action: EventAction, minType, maxType: EventType) -> int ---
-	HasEvent           :: proc(type: EventType) -> bool ---
-	HasEvents          :: proc(minType, maxType: EventType) -> bool ---
-	FlushEvent         :: proc(type: EventType) ---
-	FlushEvents        :: proc(minType, maxType: EventType) ---
-	PollEvent          :: proc(event: ^Event) -> bool ---
-	WaitEvent          :: proc(event: ^Event) -> bool ---
-	WaitEventTimeout   :: proc(event: ^Event, timeoutMS: Sint32) -> bool ---
-	PushEvent          :: proc(event: ^Event) -> bool ---
-	SetEventFilter     :: proc(filter: EventFilter, userdata: rawptr) ---
-	GetEventFilter     :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---
-	AddEventWatch      :: proc(filter: EventFilter, userdata: rawptr) -> bool ---
-	RemoveEventWatch   :: proc(filter: EventFilter, userdata: rawptr) ---
-	FilterEvents       :: proc(filter: EventFilter, userdata: rawptr) ---
-	SetEventEnabled    :: proc(type: EventType, enabled: bool) ---
-	EventEnabled       :: proc(type: EventType) -> bool ---
-	RegisterEvents     :: proc(numevents: c.int) -> Uint32 ---
-	GetWindowFromEvent :: proc(#by_ptr event: Event) -> ^Window ---
+	PumpEvents          :: proc() ---
+	PeepEvents          :: proc(events: [^]Event, numevents: c.int, action: EventAction, minType, maxType: EventType) -> int ---
+	HasEvent            :: proc(type: EventType) -> bool ---
+	HasEvents           :: proc(minType, maxType: EventType) -> bool ---
+	FlushEvent          :: proc(type: EventType) ---
+	FlushEvents         :: proc(minType, maxType: EventType) ---
+	PollEvent           :: proc(event: ^Event) -> bool ---
+	WaitEvent           :: proc(event: ^Event) -> bool ---
+	WaitEventTimeout    :: proc(event: ^Event, timeoutMS: Sint32) -> bool ---
+	PushEvent           :: proc(event: ^Event) -> bool ---
+	SetEventFilter      :: proc(filter: EventFilter, userdata: rawptr) ---
+	GetEventFilter      :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---
+	AddEventWatch       :: proc(filter: EventFilter, userdata: rawptr) -> bool ---
+	RemoveEventWatch    :: proc(filter: EventFilter, userdata: rawptr) ---
+	FilterEvents        :: proc(filter: EventFilter, userdata: rawptr) ---
+	SetEventEnabled     :: proc(type: EventType, enabled: bool) ---
+	EventEnabled        :: proc(type: EventType) -> bool ---
+	RegisterEvents      :: proc(numevents: c.int) -> Uint32 ---
+	GetWindowFromEvent  :: proc(#by_ptr event: Event) -> ^Window ---
+	GetEventDescription :: proc(#by_ptr event: Event, buf: [^]u8, buflen: c.int) -> c.int ---
 }

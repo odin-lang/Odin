@@ -11,7 +11,6 @@ package ed25519
 import "core:crypto"
 import grp "core:crypto/_edwards25519"
 import "core:crypto/sha2"
-import "core:mem"
 
 // PRIVATE_KEY_SIZE is the byte-encoded private key size.
 PRIVATE_KEY_SIZE :: 32
@@ -48,8 +47,27 @@ Public_Key :: struct {
 	_is_initialized: bool,
 }
 
+// private_key_generate uses the system entropy source to generate a new
+// Private_Key.  This will only fail if and only if (⟺) the system entropy source is
+// missing or broken.
+private_key_generate :: proc(priv_key: ^Private_Key) -> bool {
+	private_key_clear(priv_key)
+
+	if !crypto.HAS_RAND_BYTES {
+		return false
+	}
+
+	b: [PRIVATE_KEY_SIZE]byte
+	defer crypto.zero_explicit(&b, size_of(b))
+
+	crypto.rand_bytes(b[:])
+	private_key_set_bytes(priv_key, b[:])
+
+	return true
+}
+
 // private_key_set_bytes decodes a byte-encoded private key, and returns
-// true iff the operation was successful.
+// true if and only if (⟺) the operation was successful.
 private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 	if len(b) != PRIVATE_KEY_SIZE {
 		return false
@@ -89,7 +107,7 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
-	mem.zero_explicit(priv_key, size_of(Private_Key))
+	crypto.zero_explicit(priv_key, size_of(Private_Key))
 }
 
 // sign writes the signature by priv_key over msg to sig.
@@ -149,7 +167,7 @@ sign :: proc(priv_key: ^Private_Key, msg, sig: []byte) {
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
-// true iff the operation was successful.
+// true if and only if (⟺) the operation was successful.
 public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> bool {
 	if len(b) != PUBLIC_KEY_SIZE {
 		return false
@@ -170,7 +188,7 @@ public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> 
 
 // public_key_set_priv sets pub_key to the public component of priv_key.
 public_key_set_priv :: proc(pub_key: ^Public_Key, priv_key: ^Private_Key) {
-	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized public key")
+	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
 
 	src := &priv_key._pub_key
 	copy(pub_key._b[:], src._b[:])
@@ -187,14 +205,14 @@ public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
 	copy(dst, pub_key._b[:])
 }
 
-// public_key_equal returns true iff pub_key is equal to other.
+// public_key_equal returns true if and only if (⟺) pub_key is equal to other.
 public_key_equal :: proc(pub_key, other: ^Public_Key) -> bool {
 	ensure(pub_key._is_initialized && other._is_initialized, "crypto/ed25519: uninitialized public key")
 
 	return crypto.compare_constant_time(pub_key._b[:], other._b[:]) == 1
 }
 
-// verify returns true iff sig is a valid signature by pub_key over msg.
+// verify returns true if and only if (⟺) sig is a valid signature by pub_key over msg.
 //
 // The optional `allow_small_order_A` parameter will make this
 // implementation strictly compatible with FIPS 186-5, at the expense of

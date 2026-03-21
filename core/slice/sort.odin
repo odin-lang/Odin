@@ -54,9 +54,9 @@ sort :: proc(data: $T/[]$E) where ORD(E) {
 
 sort_by_indices :: proc{ sort_by_indices_allocate, _sort_by_indices}
 
-sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator) -> (sorted: T) {
+sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator, loc := #caller_location) -> (sorted: T) {
 	assert(len(data) == len(indices))
-	sorted = make(T, len(data), allocator)
+	sorted = make(T, len(data), allocator, loc)
 	for v, i in indices {
 		sorted[i] = data[v]
 	}
@@ -100,8 +100,8 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 
 // sort sorts a slice and returns a slice of the original indices
 // This sort is not guaranteed to be stable
-sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
-	indices = make([]int, len(data), allocator)
+sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (indices: []int) where ORD(E) {
+	indices = make([]int, len(data), allocator, loc)
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			for _, idx in indices {
@@ -173,8 +173,8 @@ sort_by_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) 
 
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
-sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocator := context.allocator) -> (indices : []int) {
-	indices = make([]int, len(data), allocator)
+sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocator := context.allocator, loc := #caller_location) -> (indices : []int) {
+	indices = make([]int, len(data), allocator, loc)
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			for _, idx in indices {
@@ -205,8 +205,8 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 	return indices
 }
 
-sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr, allocator := context.allocator) -> (indices : []int) {
-	indices = make([]int, len(data), allocator)
+sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) -> bool, user_data: rawptr, allocator := context.allocator, loc := #caller_location) -> (indices : []int) {
+	indices = make([]int, len(data), allocator, loc)
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			for _, idx in indices {
@@ -300,7 +300,9 @@ Example:
 	import "core:slice"
 	import "core:fmt"
 	
-	main :: proc() {
+	stable_sort_by_example :: proc() {
+		Example :: struct { n: int, s: string }
+
 		arr := []Example {
 			{2, "name"},
 			{3, "Bill"},
@@ -312,10 +314,9 @@ Example:
 		})
 		
 		for e in arr do  fmt.printf("%s ", e.s)
+		fmt.println()
 	}
 	
-	Example :: struct { n: int, s: string }
-
 Output:
 	My name is Bill 
 */
@@ -335,7 +336,9 @@ Example:
 	import "core:slice"
 	import "core:fmt"
 	
-	main :: proc() {
+	stable_sort_by_cmp_example :: proc() {
+		Example :: struct { n: int, s: string }
+
 		arr := []Example {
 			{2, "name"},
 			{3, "Bill"},
@@ -347,9 +350,9 @@ Example:
 		})
 		
 		for e in arr do  fmt.printf("%s ", e.s)
+		fmt.println()
 	}
 	
-	Example :: struct { n: int, s: string }
 Output:
 	My name is Bill 
 */
@@ -413,7 +416,7 @@ reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	sort_by_cmp_with_data(data, proc(i, j: E, user_data: rawptr) -> Ordering {
 		k := (proc(i, j: E) -> Ordering)(user_data)
 		return k(j, i)
-	}, rawptr(data))
+	}, rawptr(cmp))
 }
 
 

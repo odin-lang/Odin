@@ -518,7 +518,7 @@ Colorspace :: enum c.int {
 	                         SDL_CHROMA_LOCATION_LEFT), */
 
 	RGB_DEFAULT = SRGB, /**< The default colorspace for RGB surfaces if no colorspace is specified */
-	YUV_DEFAULT = JPEG, /**< The default colorspace for YUV surfaces if no colorspace is specified */
+	YUV_DEFAULT = BT601_LIMITED, /**< The default colorspace for YUV surfaces if no colorspace is specified */
 }
 
 Color  :: distinct [4]Uint8
@@ -561,6 +561,6 @@ foreign lib {
 	DestroyPalette         :: proc(palette: ^Palette) ---
 	MapRGB                 :: proc(format: ^PixelFormatDetails, palette: ^Palette, r, g, b: Uint8) -> Uint32 ---
 	MapRGBA                :: proc(format: ^PixelFormatDetails, palette: ^Palette, r, g, b, a: Uint8) -> Uint32 ---
-	GetRGB                 :: proc(pixel: Uint32, format: ^PixelFormatDetails, palette: ^Palette, r, g, b: ^Uint8) ---
-	GetRGBA                :: proc(pixel: Uint32, format: ^PixelFormatDetails, palette: ^Palette, r, g, b, a: ^Uint8) ---
+	GetRGB                 :: proc(pixelvalue: Uint32, format: ^PixelFormatDetails, palette: ^Palette, r, g, b: ^Uint8) ---
+	GetRGBA                :: proc(pixelvalue: Uint32, format: ^PixelFormatDetails, palette: ^Palette, r, g, b, a: ^Uint8) ---
 }

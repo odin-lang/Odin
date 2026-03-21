@@ -10,62 +10,63 @@ package testing
 		Feoramund:   Total rewrite.
 */
 
-import "base:intrinsics"
-import "base:runtime"
-import "core:bytes"
-@require import "core:encoding/base64"
-@require import "core:encoding/json"
-import "core:fmt"
-import "core:io"
-@require import "core:log"
-import "core:math/rand"
-import "core:mem"
-import "core:os"
-import "core:slice"
-@require import "core:strings"
-import "core:sync/chan"
-import "core:terminal"
-import "core:terminal/ansi"
-import "core:thread"
-import "core:time"
+import            "base:intrinsics"
+import            "base:runtime"
+import            "core:bytes"
+@(require) import "core:encoding/base64"
+@(require) import "core:encoding/json"
+import            "core:fmt"
+import            "core:io"
+@(require) import "core:log"
+import            "core:math/rand"
+import            "core:mem"
+import            "core:os"
+import            "core:slice"
+@(require) import "core:strings"
+import            "core:sync/chan"
+import            "core:terminal"
+import            "core:terminal/ansi"
+import            "core:thread"
+import            "core:time"
+import            "core:path/slashpath"
 
 // Specify how many threads to use when running tests.
-TEST_THREADS          : int    : #config(ODIN_TEST_THREADS, 0)
+TEST_THREADS          : int    : #config(ODIN_TEST_THREADS,              0)
 // Track the memory used by each test.
-TRACKING_MEMORY       : bool   : #config(ODIN_TEST_TRACK_MEMORY, true)
+TRACKING_MEMORY       : bool   : #config(ODIN_TEST_TRACK_MEMORY,         true)
 // Always report how much memory is used, even when there are no leaks or bad frees.
 ALWAYS_REPORT_MEMORY  : bool   : #config(ODIN_TEST_ALWAYS_REPORT_MEMORY, false)
 // Treat memory leaks and bad frees as errors.
-FAIL_ON_BAD_MEMORY    : bool   : #config(ODIN_TEST_FAIL_ON_BAD_MEMORY, false)
+FAIL_ON_BAD_MEMORY    : bool   : #config(ODIN_TEST_FAIL_ON_BAD_MEMORY,   false)
 // Specify how much memory each thread allocator starts with.
 PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
 // Each test is separated by a comma and may optionally include the package name.
 // This may be useful when running tests on multiple packages with `-all-packages`.
 // The format is: `package.test_name,test_name_only,...`
-TEST_NAMES            : string : #config(ODIN_TEST_NAMES, "")
+TEST_NAMES            : string : #config(ODIN_TEST_NAMES,                "")
 // Show the fancy animated progress report.
 // This requires terminal color support, as well as STDOUT to not be redirected to a file.
-FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY, true)
+FANCY_OUTPUT          : bool   : #config(ODIN_TEST_FANCY,                true)
 // Copy failed tests to the clipboard when done.
-USE_CLIPBOARD         : bool   : #config(ODIN_TEST_CLIPBOARD, false)
+USE_CLIPBOARD         : bool   : #config(ODIN_TEST_CLIPBOARD,            false)
 // How many test results to show at a time per package.
-PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH, 24)
+PROGRESS_WIDTH        : int    : #config(ODIN_TEST_PROGRESS_WIDTH,       24)
 // This is the random seed that will be sent to each test.
 // If it is unspecified, it will be set to the system cycle counter at startup.
-SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED, 0)
+SHARED_RANDOM_SEED    : u64    : #config(ODIN_TEST_RANDOM_SEED,          0)
 // Set the lowest log level for this test run.
 LOG_LEVEL_DEFAULT     : string : "debug" when ODIN_DEBUG else "info"
-LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL, LOG_LEVEL_DEFAULT)
+LOG_LEVEL             : string : #config(ODIN_TEST_LOG_LEVEL,            LOG_LEVEL_DEFAULT)
 // Report a message at the info level when a test has changed its state.
-LOG_STATE_CHANGES     : bool   : #config(ODIN_TEST_LOG_STATE_CHANGES, false)
+LOG_STATE_CHANGES     : bool   : #config(ODIN_TEST_LOG_STATE_CHANGES,    false)
 // Show only the most necessary logging information.
-USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS, false)
+USING_SHORT_LOGS      : bool   : #config(ODIN_TEST_SHORT_LOGS,           false)
 // Output a report of the tests to the given path.
-JSON_REPORT           : string : #config(ODIN_TEST_JSON_REPORT, "")
+JSON_REPORT           : string : #config(ODIN_TEST_JSON_REPORT,          "")
 // Print the full file path for failed test cases on a new line
 // in a way that's friendly to regex capture for an editor's "go to error".
-GO_TO_ERROR           : bool   : #config(ODIN_TEST_GO_TO_ERROR, false)
+GO_TO_ERROR           : bool   : #config(ODIN_TEST_GO_TO_ERROR,          false)
 
 get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 	when LOG_LEVEL == "debug"   { return .Debug   } else
@@ -196,6 +197,53 @@ run_test_task :: proc(task: thread.Task) {
 	})
 }
 
+Options :: struct {
+	// Equivalent to the TEST_NAMES compile-time definition, but used dynamically at runtime.
+	test_names: string,
+}
+
+parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Writer) {
+	test_names: strings.Builder
+
+	for arg in argv {
+		if strings.starts_with(arg, "-tests:") {
+			_, _, tests := strings.partition(arg, ":")
+			if len(tests) < 1 {
+				fmt.wprintln(stderr, "No test names specified for '-tests:'")
+				os.exit(-1)
+			}
+
+			if strings.builder_len(test_names) > 0 {
+				strings.write_byte(&test_names, ',')
+			}
+			strings.write_string(&test_names, tests)
+		} else if arg == "-help" {
+			exe_name := "test"
+			if path, err := os.get_executable_path(context.temp_allocator); err == nil {
+				exe_name = slashpath.base(path)
+			}
+
+			fmt.wprintfln(stdout, "Usage: %v [OPTIONS]", exe_name)
+			fmt.wprintfln(stdout, "OPTIONS:")
+			fmt.wprintln(stdout, "        -help:")
+			fmt.wprintln(stdout, "            Display this help text and exit.")
+			fmt.wprintln(stdout)
+			fmt.wprintln(stdout, "        -tests:<test_name[,...]>")
+			fmt.wprintln(stdout, "            Specify a specific set of tests to run by name.\n" +
+			                      "            Each test is separated by a comma and may optionally include the package name.\n" +
+			                      "            This may be useful when running tests on multiple packages with `-all-packages`.\n" +
+			                      "            The format is: `package.test_name,test_name_only,...`")
+			fmt.wprintln(stdout)
+			os.exit(0)
+		} else {
+			fmt.wprintfln(stderr, "Unknown argument encountered '%v'", arg)
+			os.exit(-1)
+		}
+	}
+
+	opts.test_names = strings.to_string(test_names)
+}
+
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	BATCH_BUFFER_SIZE     :: 32 * mem.Kilobyte
 	POOL_BLOCK_SIZE       :: 16 * mem.Kilobyte
@@ -219,8 +267,14 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
-	stdout := io.to_writer(os.stream_from_handle(os.stdout))
-	stderr := io.to_writer(os.stream_from_handle(os.stderr))
+
+	// `-vet` needs parameters to be shadowed by themselves first as an
+	// explicit declaration, to allow the next line to work.
+	// NOTE(@harold): Moved out of scope below as it's no longer under a `when` block, but under `if`.
+	internal_tests := internal_tests
+
+	stdout := os.to_stream(os.stdout)
+	stderr := os.to_stream(os.stderr)
 
 	// The animations are only ever shown through STDOUT;
 	// STDERR is used exclusively for logging regardless of error level.
@@ -229,54 +283,58 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	should_show_animations := FANCY_OUTPUT && terminal.color_enabled && !global_ansi_disabled
 
+	// -- Parse CLI options
+	opts: Options
+	parse_cli_options(os.args[1:], &opts, stdout, stderr)
+
+	test_names: string = TEST_NAMES
+	if len(opts.test_names) > 0 {
+		test_names = opts.test_names
+	}
+
 	// -- Prepare test data.
 
 	alloc_error: mem.Allocator_Error
 
-	when TEST_NAMES != "" {
-		select_internal_tests: [dynamic]Internal_Test
-		defer delete(select_internal_tests)
+	select_internal_tests: [dynamic]Internal_Test
+	defer delete(select_internal_tests)
 
-		{
-			index_list := TEST_NAMES
-			for selector in strings.split_iterator(&index_list, ",") {
-				// Temp allocator is fine since we just need to identify which test it's referring to.
-				split_selector := strings.split(selector, ".", context.temp_allocator)
+	if test_names != "" {
+		index_list := test_names
+		for selector in strings.split_iterator(&index_list, ",") {
+			// Temp allocator is fine since we just need to identify which test it's referring to.
+			split_selector := strings.split(selector, ".", context.temp_allocator)
 
-				found := false
-				switch len(split_selector) {
-				case 1:
-					// Only the test name?
-					#no_bounds_check name := split_selector[0]
-					find_test_by_name: for it in internal_tests {
-						if it.name == name {
-							found = true
-							_, alloc_error = append(&select_internal_tests, it)
-							fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
-							break find_test_by_name
-						}
-					}
-				case 2:
-					#no_bounds_check pkg  := split_selector[0]
-					#no_bounds_check name := split_selector[1]
-					find_test_by_pkg_and_name: for it in internal_tests {
-						if it.pkg == pkg && it.name == name {
-							found = true
-							_, alloc_error = append(&select_internal_tests, it)
-							fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
-							break find_test_by_pkg_and_name
-						}
+			found := false
+			switch len(split_selector) {
+			case 1:
+				// Only the test name?
+				#no_bounds_check name := split_selector[0]
+				find_test_by_name: for it in internal_tests {
+					if it.name == name {
+						found = true
+						_, alloc_error = append(&select_internal_tests, it)
+						fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
+						break find_test_by_name
 					}
 				}
-				if !found {
-					fmt.wprintfln(stderr, "No test found for the name: %q", selector)
+			case 2:
+				#no_bounds_check pkg  := split_selector[0]
+				#no_bounds_check name := split_selector[1]
+				find_test_by_pkg_and_name: for it in internal_tests {
+					if it.pkg == pkg && it.name == name {
+						found = true
+						_, alloc_error = append(&select_internal_tests, it)
+						fmt.assertf(alloc_error == nil, "Error appending to select internal tests: %v", alloc_error)
+						break find_test_by_pkg_and_name
+					}
 				}
+			}
+			if !found {
+				fmt.wprintfln(stderr, "No test found for the name: %q", selector)
 			}
 		}
 
-		// `-vet` needs parameters to be shadowed by themselves first as an
-		// explicit declaration, to allow the next line to work.
-		internal_tests := internal_tests
 		// Intentional shadow with user-specified tests.
 		internal_tests = select_internal_tests[:]
 	}
@@ -317,7 +375,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// -- Set thread count.
 
 	when TEST_THREADS == 0 {
-		thread_count := os.processor_core_count()
+		thread_count := os.get_processor_core_count()
 	} else {
 		thread_count := max(1, TEST_THREADS)
 	}
@@ -960,11 +1018,7 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 	when JSON_REPORT != "" {
 		json_report: JSON
 
-		mode: int
-		when ODIN_OS != .Windows {
-			mode = os.S_IRUSR|os.S_IWUSR|os.S_IRGRP|os.S_IROTH
-		}
-		json_fd, err := os.open(JSON_REPORT, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+		json_fd, err := os.open(JSON_REPORT, {.Write, .Create, .Trunc}, {.Read_User, .Write_User, .Read_Group, .Read_Other})
 		fmt.assertf(err == nil, "unable to open file %q for writing of JSON report, error: %v", JSON_REPORT, err)
 		defer os.close(json_fd)
 
@@ -983,7 +1037,7 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 		json_report.success  = total_success_count
 		json_report.duration = finished_in
 
-		json_err := json.marshal_to_writer(os.stream_from_handle(json_fd), json_report, &{ pretty = true })
+		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, &{ pretty = true })
 		fmt.assertf(json_err == nil, "Error writing JSON report: %v", json_err)
 	}
 

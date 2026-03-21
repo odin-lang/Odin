@@ -290,6 +290,7 @@ struct lbDefer {
 	isize       scope_index;
 	isize       context_stack_count;
 	lbBlock *   block;
+	TokenPos    pos;
 	union {
 		Ast *stmt;
 		struct {
@@ -345,6 +346,7 @@ struct lbProcedure {
 	Ast *        body;
 	u64          tags;
 	ProcInlining inlining;
+	ProcTailing  tailing;
 	bool         is_foreign;
 	bool         is_export;
 	bool         is_entry_point;
@@ -357,6 +359,7 @@ struct lbProcedure {
 	std::atomic<bool> is_done;
 
 	lbAddr           return_ptr;
+	Entity *         sret_rvo_entity; // Local aliases of `return_ptr`
 	Array<lbDefer>   defer_stmts;
 	Array<lbBlock *> blocks;
 	Array<lbBranchBlocks> branch_blocks;
@@ -484,7 +487,7 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node);
 gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
-gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none);
+gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, ProcTailing tailing = ProcTailing_none, lbValue *sret_dst = nullptr);
 gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x);
 
@@ -492,11 +495,10 @@ gb_internal void lb_emit_jump(lbProcedure *p, lbBlock *target_block);
 gb_internal void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *false_block);
 gb_internal void lb_start_block(lbProcedure *p, lbBlock *b);
 
-gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr);
+gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *sret_dst = nullptr);
 gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type);
 gb_internal void lb_begin_procedure_body(lbProcedure *p);
 gb_internal void lb_end_procedure_body(lbProcedure *p);
-gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining);
 
 gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p);
 gb_internal lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
@@ -531,6 +533,7 @@ gb_internal lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da);
+gb_internal lbValue lb_fixed_capacity_dynamic_array_len(lbProcedure *p, lbValue da);
 gb_internal lbValue lb_map_len(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_map_cap(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
@@ -618,7 +621,12 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, usize len, unsigned alignment, bool is_volatile);
 
 gb_internal gb_inline i64 lb_max_zero_init_size(void) {
-	return cast(i64)(4*build_context.int_size);
+	if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_arm64) {
+		// https://github.com/odin-lang/Odin/issues/6347
+		return cast(i64)(4*build_context.int_size);
+	} else {
+		return cast(i64)(8);
+	}
 }
 
 gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
@@ -639,6 +647,11 @@ gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t Elemen
 	return LLVMArrayType(ElementType, cast(unsigned)ElementCount);
 #endif
 }
+
+gb_internal lbValue lb_emit_struct_iv(lbProcedure *p, lbValue agg, lbValue field, i32 index);
+gb_internal lbValue lb_build_struct_value(lbProcedure *p, Type *type, lbValue *fields, isize count);
+gb_internal lbValue lb_make_slice_value(lbProcedure *p, Type *slice_type, lbValue elem, lbValue len);
+gb_internal lbValue lb_make_string_value(lbProcedure *p, Type *string_type, lbValue elem, lbValue len);
 
 
 gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type);
@@ -670,6 +683,7 @@ enum lbCallingConventionKind : unsigned {
 	lbCallingConvention_PreserveAll = 15,
 	lbCallingConvention_Swift = 16,
 	lbCallingConvention_CXX_FAST_TLS = 17,
+	lbCallingConvention_PreserveNone = 21,
 	lbCallingConvention_FirstTargetCC = 64,
 	lbCallingConvention_X86_StdCall = 64,
 	lbCallingConvention_X86_FastCall = 65,
@@ -722,6 +736,10 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 
 	lbCallingConvention_Win64,        // ProcCC_Win64,
 	lbCallingConvention_X86_64_SysV,  // ProcCC_SysV,
+
+	lbCallingConvention_PreserveNone,  // ProcCC_PreserveNone,
+	lbCallingConvention_PreserveMost,  // ProcCC_PreserveMost,
+	lbCallingConvention_PreserveAll,   // ProcCC_PreserveAll,
 
 };
 

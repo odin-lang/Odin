@@ -2,11 +2,11 @@ package sysinfo
 
 import "core:sys/unix"
 
-@(init, private)
-init_cpu_core_count :: proc "contextless" () {
-	physical, logical: i64
-	unix.sysctlbyname("hw.physicalcpu", &physical)
-	unix.sysctlbyname("hw.logicalcpu", &logical)
-	cpu.physical_cores = int(physical)
-	cpu.logical_cores  = int(logical)
+@(private)
+_cpu_core_count :: proc "contextless" () -> (physical: int, logical: int, ok: bool) {
+	_physical, _logical: i64
+	unix.sysctlbyname("hw.physicalcpu", &_physical)
+	unix.sysctlbyname("hw.logicalcpu",  &_logical)
+
+	return int(_physical), int(_logical), true
 }

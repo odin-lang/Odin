@@ -10,8 +10,6 @@ import "core:hash"
 N :: 1
 
 example :: proc() {
-	using fmt
-
 	docs:  [N]^xml.Document
 	errs:  [N]xml.Error
 	times: [N]time.Duration
@@ -59,23 +57,23 @@ example :: proc() {
 	fmt.printf("[Average]: %v bytes in %.2f ms (%.2f MiB/s).\n", len(input), average_ms, average_speed)
 
 	if errs[0] != .None {
-		printf("Load/Parse error: %v\n", errs[0])
+		fmt.eprintf("Load/Parse error: %v\n", errs[0])
 		if errs[0] == .File_Error {
-			println("\"unicode.xml\" not found. Did you run \"tests\\download_assets.py\"?")
+			fmt.eprintln("\"unicode.xml\" not found. Did you run \"tests\\download_assets.py\"?")
 		}
 		return
 	}
 
 	charlist, charlist_ok := xml.find_child_by_ident(docs[0], 0, "charlist")
 	if !charlist_ok {
-	 	eprintln("Could not locate top-level `<charlist>` tag.")
-	 	return
+		fmt.eprintln("Could not locate top-level `<charlist>` tag.")
+		return
 	}
 
-	printf("Found `<charlist>` with %v children, %v elements total\n", len(docs[0].elements[charlist].value), docs[0].element_count)
+	fmt.printf("Found `<charlist>` with %v children, %v elements total\n", len(docs[0].elements[charlist].value), docs[0].element_count)
 
 	crc32 := doc_hash(docs[0], false)
-	printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0x420dbac5 else "🤬", crc32)
+	fmt.printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0x420dbac5 else "🤬", crc32)
 
 	for round in 0..<N {
 		defer xml.destroy(docs[round])
@@ -94,8 +92,6 @@ doc_hash :: proc(doc: ^xml.Document, print := false) -> (crc32: u32) {
 }
 
 main :: proc() {
-	using fmt
-
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
@@ -103,10 +99,10 @@ main :: proc() {
 	example()
 
 	if len(track.allocation_map) > 0 {
-		println()
+		fmt.println()
 		for _, v in track.allocation_map {
-			printf("%v Leaked %v bytes.\n", v.location, v.size)
+			fmt.printf("%v Leaked %v bytes.\n", v.location, v.size)
 		}
 	}
-	println("Done and cleaned up!")
+	fmt.println("Done and cleaned up!")
 }

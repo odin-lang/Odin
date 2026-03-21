@@ -48,6 +48,7 @@ engine_node_config :: struct {
 	isPitchDisabled:             b8,      /* Pitching can be explicitly disable with MA_SOUND_FLAG_NO_PITCH to optimize processing. */
 	isSpatializationDisabled:    b8,      /* Spatialization can be explicitly disabled with MA_SOUND_FLAG_NO_SPATIALIZATION. */
 	pinnedListenerIndex:         u8,      /* The index of the listener this node should always use for spatialization. If set to MA_LISTENER_INDEX_CLOSEST the engine will use the closest listener. */
+	resampling:                  resampler_config,
 }
 
 /* Base node object for both ma_sound and ma_sound_group. */
@@ -58,7 +59,7 @@ engine_node :: struct {
 	volumeSmoothTimeInPCMFrames: u32,
 	monoExpansionMode:           mono_expansion_mode,
 	fader:                       fader,
-	resampler:                   linear_resampler,    /* For pitch shift. */
+	resampler:                   resampler,           /* For pitch shift. */
 	spatializer:                 spatializer,
 	panner:                      panner,
 	volumeGainer:                gainer,              /* This will only be used if volumeSmoothTimeInPCMFrames is > 0. */
@@ -117,6 +118,7 @@ sound_config :: struct {
 
 	endCallback:          sound_end_proc, /* Fired when the sound reaches the end. Will be fired from the audio thread. Do not restart, uninitialize or otherwise change the state of the sound from here. Instead fire an event or set a variable to indicate to a different thread to change the start of the sound. Will not be fired in response to a scheduled stop with ma_sound_set_stop_time_*(). */
 	pEndCallbackUserData: rawptr,
+	pitchResampling:      resampler_config,
 	
 	initNotifications: resource_manager_pipeline_notifications,
 
@@ -133,6 +135,10 @@ sound :: struct {
 
 	endCallback:          sound_end_proc,
 	pEndCallbackUserData: rawptr,
+
+	pProcessingCache:               ^f32,
+	processingCacheFramesRemaining: u32,
+	processingCacheMap:             u32,
 
 	ownsDataSource: b8,
 
@@ -166,8 +172,12 @@ foreign lib {
 	sound_get_data_source                    :: proc(pSound: ^sound) -> ^data_source ---
 	sound_start                              :: proc(pSound: ^sound) -> result ---
 	sound_stop                               :: proc(pSound: ^sound) -> result ---
-	sound_stop_with_fade_in_pcm_frames       :: proc(pSound: ^sound, fadeLengthInFrames: u64) --- /* Will overwrite any scheduled stop and fade. */
-	sound_stop_with_fade_in_milliseconds     :: proc(pSound: ^sound, fadeLengthInFrames: u64) --- /* Will overwrite any scheduled stop and fade. */
+	sound_stop_with_fade_in_pcm_frames       :: proc(pSound: ^sound, fadeLengthInFrames: u64) --- /* Will overwrite any scheduled stop and fade. If you want to restart the sound, first reset it with `ma_sound_reset_stop_time_and_fade()`. There are plans to make this less awkward in the future. */
+	sound_stop_with_fade_in_milliseconds     :: proc(pSound: ^sound, fadeLengthInFrames: u64) --- /* Will overwrite any scheduled stop and fade. If you want to restart the sound, first reset it with `ma_sound_reset_stop_time_and_fade()`. There are plans to make this less awkward in the future. */
+	sound_reset_start_time                   :: proc(pSound: ^sound) ---
+	sound_reset_stop_time                    :: proc(pSound: ^sound) ---
+	sound_reset_fade                         :: proc(pSound: ^sound) ---
+	sound_reset_stop_time_and_fade           :: proc(pSound: ^sound) --- /* Resets fades and scheduled stop time. Does not seek back to the start. */
 	sound_set_volume                         :: proc(pSound: ^sound, volume: f32) ---
 	sound_get_volume                         :: proc(pSound: ^sound) -> f32 ---
 	sound_set_pan                            :: proc(pSound: ^sound, pan: f32) ---
@@ -319,7 +329,7 @@ engine_config :: struct {
 	pLog:                         ^log,                   /* When set to NULL, will use the context's log. */
 	listenerCount:                u32,                    /* Must be between 1 and MA_ENGINE_MAX_LISTENERS. */
 	channels:                     u32,                    /* The number of channels to use when mixing and spatializing. When set to 0, will use the native channel count of the device. */
-	sampleRate:                   u32,                    /* The sample rate. When set to 0 will use the native channel count of the device. */
+	sampleRate:                   u32,                    /* The sample rate. When set to 0 will use the native sample rate of the device. */
 	periodSizeInFrames:           u32,                    /* If set to something other than 0, updates will always be exactly this size. The underlying device may be a different size, but from the perspective of the mixer that won't matter.*/
 	periodSizeInMilliseconds:     u32,                    /* Used if periodSizeInFrames is unset. */
 	gainSmoothTimeInFrames:       u32,                    /* The number of frames to interpolate the gain of spatialized sounds across. If set to 0, will use gainSmoothTimeInMilliseconds. */
@@ -335,6 +345,8 @@ engine_config :: struct {
 	pResourceManagerVFS:          ^vfs,                   /* A pointer to a pre-allocated VFS object to use with the resource manager. This is ignored if pResourceManager is not NULL. */
 	onProcess:                    engine_process_proc,    /* Fired at the end of each call to ma_engine_read_pcm_frames(). For engine's that manage their own internal device (the default configuration), this will be fired from the audio thread, and you do not need to call ma_engine_read_pcm_frames() manually in order to trigger this. */
 	pProcessUserData:             rawptr,                 /* User data that's passed into onProcess. */
+	resourceManagerResampling:    resampler_config,       /* The resampling config to use with the resource manager. */
+	pitchResampling:              resampler_config,       /* The resampling config for the pitch and Doppler effects. You will typically want this to be a fast resampler. For high quality stuff, it's recommended that you pre-sample. */
 }
 
 engine :: struct {
@@ -358,6 +370,8 @@ engine :: struct {
 	monoExpansionMode: mono_expansion_mode,
 	onProcess:         engine_process_proc,
 	pProcessUserData:  rawptr,
+
+	pitchResamplingConfig: resampler_config,
 }
 
 @(default_calling_convention="c", link_prefix="ma_")

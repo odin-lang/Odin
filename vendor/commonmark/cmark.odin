@@ -154,12 +154,12 @@ Node :: struct {
 	flags:        Node_Flags,
 
 	as: struct #raw_union {
-		list:    List,
-		code:    Code,
-		heading: Heading,
-		link:    Link,
-		custom:  Custom,
-		html_block_type: c.int,
+		list:    List          `raw_union_tag:"type=.List"`,
+		code:    Code          `raw_union_tag:"type=.Code"`,
+		heading: Heading       `raw_union_tag:"type=.Heading"`,
+		link:    Link          `raw_union_tag:"type=.Link"`,
+		custom:  Custom        `raw_union_tag:"type=.Custom"`,
+		html_block_type: c.int `raw_union_tag:"type=.HTML_Block"`,
 	},
 }
 

@@ -564,6 +564,10 @@ test_non_word_boundaries :: proc(t: ^testing.T) {
 		EXPR :: `.+\B`
 		check_expression(t, EXPR, "abc", "ab")
 	}
+	{
+		EXPR :: `\B'`
+		check_expression(t, EXPR, "'", "'")
+	}
 }
 
 @test
@@ -1268,6 +1272,16 @@ iterator_vectors := []Iterator_Test{
 		"a\nb\na\nb", `^ab?$?`, {.Multiline},
 		{
 			{pos = {{0, 2}}, groups = {"a\n"}},
+		},
+	},
+	// https://github.com/odin-lang/Odin/issues/6323
+	// Test `\b` in iterator
+	{
+		"can, can't, 'can't'", `\b[a-z0-9']+\b`, {},
+		{
+			{pos = {{0, 3}},   groups = {"can"}},
+			{pos = {{5, 10}},  groups = {"can't"}},
+			{pos = {{13, 18}}, groups = {"can't"}},
 		},
 	},
 }

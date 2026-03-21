@@ -1,38 +1,27 @@
 package sysinfo
 
+import     "base:intrinsics"
+import     "base:runtime"
+import     "core:strings"
+import     "core:unicode/utf16"
 import sys "core:sys/windows"
-import "base:intrinsics"
-import "core:strings"
-import "core:strconv"
-import "core:unicode/utf16"
-
-// import "core:fmt"
-import "base:runtime"
 
 @(private)
-version_string_buf: [1024]u8
-
-@(init, private)
-init_os_version :: proc "contextless" () {
-	context = runtime.default_context()
-
+_os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (res: OS_Version, ok: bool) {
 	/*
-		NOTE(Jeroen):
-			`GetVersionEx`  will return 6.2 for Windows 10 unless the program is manifested for Windows 10.
-			`RtlGetVersion` will return the true version.
+	NOTE(Jeroen):
+		`GetVersionEx`  will return 6.2 for Windows 10 unless the program is manifested for Windows 10.
+		`RtlGetVersion` will return the true version.
 
-			Rather than include the WinDDK, we ask the kernel directly.
-			`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion` is for the minor build version (Update Build Release)
-
+		Rather than include the WinDDK, we ask the kernel directly.
+		`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion` is for the minor build version (Update Build Release)
 	*/
-	os_version.platform = .Windows
+	res.platform = .Windows
 
 	osvi: sys.OSVERSIONINFOEXW
 	osvi.dwOSVersionInfoSize = size_of(osvi)
-	status := sys.RtlGetVersion(&osvi)
-
-	if status != 0 {
-		return
+	if status := sys.RtlGetVersion(&osvi); status != 0 {
+		return res, false
 	}
 
 	product_type: sys.Windows_Product_Type
@@ -42,12 +31,13 @@ init_os_version :: proc "contextless" () {
 		&product_type,
 	)
 
-	os_version.major    = int(osvi.dwMajorVersion)
-	os_version.minor    = int(osvi.dwMinorVersion)
-	os_version.build[0] = int(osvi.dwBuildNumber)
+	res.os.major     = int(osvi.dwMajorVersion)
+	res.os.minor     = int(osvi.dwMinorVersion)
+	res.kernel.major = int(osvi.dwMajorVersion)
+	res.kernel.minor = int(osvi.dwBuildNumber)
 
+	b := strings.builder_make_none(allocator = allocator, loc = loc)
 
-	b := strings.builder_from_bytes(version_string_buf[:])
 	strings.write_string(&b, "Windows ")
 
 	switch osvi.dwMajorVersion {
@@ -125,13 +115,13 @@ init_os_version :: proc "contextless" () {
 	}
 
 	// Grab DisplayVersion
-	os_version.version = format_display_version(&b)
+	res.release = format_display_version(&b)
 
 	// Grab build number and UBR
-	os_version.build[1]  = format_build_number(&b, int(osvi.dwBuildNumber))
+	res.kernel.patch = format_build_number(&b, int(osvi.dwBuildNumber))
 
 	// Finish the string
-	os_version.as_string = strings.to_string(b)
+	res.full = strings.to_string(b)
 
 	format_windows_product_type :: proc (b: ^strings.Builder, prod_type: sys.Windows_Product_Type) {
 		#partial switch prod_type {
@@ -226,14 +216,14 @@ init_os_version :: proc "contextless" () {
 
 	// Grab Windows DisplayVersion (like 20H02)
 	format_display_version :: proc (b: ^strings.Builder) -> (version: string) {
-		dv, ok := read_reg_string(
+		scratch: [512]u8
+
+		if dv, ok := read_reg_string(
 			sys.HKEY_LOCAL_MACHINE,
 			"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
 			"DisplayVersion",
-		)
-		defer delete(dv) // It'll be interned into `version_string_buf`
-
-		if ok {
+			scratch[:],
+		); ok {
 			strings.write_string(b, " (version: ")
 			l := strings.builder_len(b^)
 			strings.write_string(b, dv)
@@ -245,13 +235,11 @@ init_os_version :: proc "contextless" () {
 
 	// Grab build number and UBR
 	format_build_number :: proc (b: ^strings.Builder, major_build: int) -> (ubr: int) {
-		res, ok := read_reg_i32(
+		if res, ok := read_reg_i32(
 			sys.HKEY_LOCAL_MACHINE,
 			"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
 			"UBR",
-		)
-
-		if ok {
+		); ok {
 			ubr = int(res)
 			strings.write_string(b, ", build: ")
 			strings.write_int(b, major_build)
@@ -260,31 +248,32 @@ init_os_version :: proc "contextless" () {
 		}
 		return
 	}
+
+	return res, true
 }
 
-@(init, private)
-init_ram :: proc "contextless" () {
+@(private)
+_ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
 	state: sys.MEMORYSTATUSEX
 
 	state.dwLength = size_of(state)
-	ok := sys.GlobalMemoryStatusEx(&state)
-	if !ok {
+	if ok := sys.GlobalMemoryStatusEx(&state); !ok {
 		return
 	}
-	ram = RAM{
-		total_ram  = int(state.ullTotalPhys),
-		free_ram   = int(state.ullAvailPhys),
-		total_swap = int(state.ullTotalPageFil),
-		free_swap  = int(state.ullAvailPageFil),
-	}
+
+	total_ram  = i64(state.ullTotalPhys)
+	free_ram   = i64(state.ullAvailPhys)
+	total_swap = i64(state.ullTotalPageFil)
+	free_swap  = i64(state.ullAvailPageFil)
+	ok         = true
+
+	return
 }
 
-@(init, private)
-init_gpu_info :: proc "contextless" () {
+_iterate_gpus :: proc(it: ^GPU_Iterator, minimum_vram := i64(256 * 1024 * 1024)) -> (gpu: GPU, index: int, ok: bool) {
 	GPU_ROOT_KEY :: `SYSTEM\ControlSet001\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}`
 
-	context = runtime.default_context()
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	defer it.index += 1
 
 	gpu_key: sys.HKEY
 	if status := sys.RegOpenKeyExW(
@@ -294,83 +283,82 @@ init_gpu_info :: proc "contextless" () {
 		sys.KEY_ENUMERATE_SUB_KEYS,
 		&gpu_key,
 	); status != i32(sys.ERROR_SUCCESS) {
-		return
+		return {}, it.index, false
 	}
 	defer sys.RegCloseKey(gpu_key)
 
-	gpu_list: [dynamic]GPU
-	gpu: ^GPU
+	buf_wstring: [100]u16
+	buf_len := u32(len(buf_wstring))
+	buf_key:     [4 * len(buf_wstring)]u8
+	buf_leaf:    [100]u8
+	leaf:        string
 
-	index := sys.DWORD(0)
-	for {
-		defer index += 1
-
-		buf_wstring: [100]u16
-		buf_len := u32(len(buf_wstring))
-		buf_utf8: [4 * len(buf_wstring)]u8
+	gpu_loop: {
+		defer it._index += 1
 
 		if status := sys.RegEnumKeyW(
 			gpu_key,
-			index,
+			auto_cast it._index,
 			&buf_wstring[0],
 			&buf_len,
 		); status != i32(sys.ERROR_SUCCESS) {
-			break
+			return {}, it.index, false
 		}
 
-		utf16.decode_to_utf8(buf_utf8[:], buf_wstring[:])
-		leaf := string(cstring(&buf_utf8[0]))
+		utf16.decode_to_utf8(buf_leaf[:], buf_wstring[:])
+		leaf = string(cstring(&buf_leaf[0]))
 
-		// Skip leafs that are not of the form 000x
-		if _, is_integer := strconv.parse_int(leaf, 10); !is_integer {
-			continue
-		}
-
-		key := strings.concatenate({GPU_ROOT_KEY, "\\", leaf}, context.temp_allocator)
-
-		if vendor, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "ProviderName"); ok {
-			idx := append(&gpu_list, GPU{vendor_name = vendor})
-			gpu = &gpu_list[idx - 1]
-		} else {
-			continue
-		}
-
-		if desc, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "DriverDesc"); ok {
-			gpu.model_name = desc
-		}
-
-		if vram, ok := read_reg_i64(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize"); ok {
-			gpu.total_ram = int(vram)
+		// Skip leaves that are not of the form 000x
+		if is_integer(leaf) {
+			break gpu_loop
 		}
 	}
-	gpus = gpu_list[:]
+
+	n := copy(buf_key[:], GPU_ROOT_KEY)
+	buf_key[n] = '\\'
+	copy(buf_key[n+1:], leaf)
+
+	key_len := len(GPU_ROOT_KEY) + len(leaf) + 1
+
+	utf16.encode_string(buf_wstring[:], string(buf_key[:key_len]))
+	key := cstring16(&buf_wstring[0])
+
+	// Determine if this is a real GPU, or perhaps a screen mirroring or RDP driver
+	// Real devices tend to have more than 256 MiB of VRAM
+	gpu.vram, _ = read_reg_i64   (sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize")
+	if gpu.vram < minimum_vram {
+		return
+	}
+
+	// Real devices tend to have a matching PCI device
+	matching,   _ := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "MatchingDeviceId", it._buffer[:100])
+	if !strings.has_prefix(matching, "PCI\\VEN") {
+		return
+	}
+
+	gpu.vendor, _ = read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "ProviderName",  it._buffer[  0:][:100])
+	gpu.model,  _ = read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "DriverDesc",    it._buffer[100:][:100])
+	gpu.driver, _ = read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "DriverVersion", it._buffer[200:][:100])
+
+	return gpu, it.index, true
 }
 
 @(private)
-read_reg_string :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: string, ok: bool) {
+read_reg_string :: proc "contextless" (hkey: sys.HKEY, subkey, val: cstring16, res_buf: []u8) -> (res: string, ok: bool) {
 	if len(subkey) == 0 || len(val) == 0 {
 		return
 	}
 
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	buf_utf16: [1024]u16
 
-	BUF_SIZE :: 1024
-	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-
-	utf16.encode_string(key_name_wide, subkey)
-	utf16.encode_string(val_name_wide, val)
-
-	result_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-	result_size := sys.DWORD(BUF_SIZE * size_of(u16))
-
+	result_size := sys.DWORD(size_of(buf_utf16))
 	status := sys.RegGetValueW(
 		hkey,
-		cstring16(&key_name_wide[0]),
-		cstring16(&val_name_wide[0]),
+		subkey,
+		val,
 		sys.RRF_RT_REG_SZ,
 		nil,
-		raw_data(result_wide[:]),
+		raw_data(buf_utf16[:]),
 		&result_size,
 	)
 	if status != 0 {
@@ -378,31 +366,22 @@ read_reg_string :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: string, ok
 		return
 	}
 
-	// Result string will be allocated for the caller.
-	result_utf8 := make([]u8, BUF_SIZE * 4, context.temp_allocator)
-	utf16.decode_to_utf8(result_utf8, result_wide[:result_size])
-	return strings.clone_from_cstring(cstring(raw_data(result_utf8))), true
+	utf16.decode_to_utf8(res_buf[:result_size], buf_utf16[:])
+	res = string(cstring(&res_buf[0]))
+	return res, true
 }
+
 @(private)
-read_reg_i32 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i32, ok: bool) {
+read_reg_i32 :: proc "contextless" (hkey: sys.HKEY, subkey, val: cstring16) -> (res: i32, ok: bool) {
 	if len(subkey) == 0 || len(val) == 0 {
 		return
 	}
 
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	BUF_SIZE :: 1024
-	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-
-	utf16.encode_string(key_name_wide, subkey)
-	utf16.encode_string(val_name_wide, val)
-
 	result_size := sys.DWORD(size_of(i32))
 	status := sys.RegGetValueW(
 		hkey,
-		cstring16(&key_name_wide[0]),
-		cstring16(&val_name_wide[0]),
+		subkey,
+		val,
 		sys.RRF_RT_REG_DWORD,
 		nil,
 		&res,
@@ -410,30 +389,39 @@ read_reg_i32 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i32, ok: bool
 	)
 	return res, status == 0
 }
+
 @(private)
-read_reg_i64 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i64, ok: bool) {
+read_reg_i64 :: proc "contextless" (hkey: sys.HKEY, subkey, val: cstring16) -> (res: i64, ok: bool) {
 	if len(subkey) == 0 || len(val) == 0 {
 		return
 	}
 
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
-	BUF_SIZE :: 1024
-	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-
-	utf16.encode_string(key_name_wide, subkey)
-	utf16.encode_string(val_name_wide, val)
-
 	result_size := sys.DWORD(size_of(i64))
 	status := sys.RegGetValueW(
 		hkey,
-		cstring16(&key_name_wide[0]),
-		cstring16(&val_name_wide[0]),
+		subkey,
+		val,
 		sys.RRF_RT_REG_QWORD,
 		nil,
 		&res,
 		&result_size,
 	)
 	return res, status == 0
+}
+
+@(private)
+is_integer :: proc "contextless" (s: string) -> (ok: bool) {
+	if s == "" {
+		return
+	}
+
+	ok = true
+
+	for r in s {
+		switch r {
+		case '0'..='9': continue
+		case: return false
+		}
+	}
+	return
 }

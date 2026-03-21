@@ -1,7 +1,8 @@
 package field_curve25519
 
 import "core:crypto"
-import "core:mem"
+
+zero_explicit :: crypto.zero_explicit
 
 fe_relax_cast :: #force_inline proc "contextless" (
 	arg1: ^Tight_Field_Element,
@@ -18,7 +19,7 @@ fe_tighten_cast :: #force_inline proc "contextless" (
 fe_clear :: proc "contextless" (
 	arg1: $T,
 ) where T == ^Tight_Field_Element || T == ^Loose_Field_Element {
-	mem.zero_explicit(arg1, size_of(arg1^))
+	zero_explicit(arg1, size_of(arg1^))
 }
 
 fe_clear_vec :: proc "contextless" (
@@ -38,7 +39,7 @@ fe_from_bytes :: proc "contextless" (out1: ^Tight_Field_Element, arg1: ^[32]byte
 
 	_fe_from_bytes(out1, &tmp1)
 
-	mem.zero_explicit(&tmp1, size_of(tmp1))
+	zero_explicit(&tmp1, size_of(tmp1))
 }
 
 fe_is_negative :: proc "contextless" (arg1: ^Tight_Field_Element) -> int {
@@ -47,7 +48,7 @@ fe_is_negative :: proc "contextless" (arg1: ^Tight_Field_Element) -> int {
 	fe_to_bytes(&tmp1, arg1)
 	ret := tmp1[0] & 1
 
-	mem.zero_explicit(&tmp1, size_of(tmp1))
+	zero_explicit(&tmp1, size_of(tmp1))
 
 	return int(ret)
 }
@@ -59,8 +60,8 @@ fe_equal :: proc "contextless" (arg1, arg2: ^Tight_Field_Element) -> int {
 	fe_to_bytes(&tmp2, arg2)
 	ret := crypto.compare_constant_time(tmp1[:], tmp2[:])
 
-	mem.zero_explicit(&tmp1, size_of(tmp1))
-	mem.zero_explicit(&tmp2, size_of(tmp2))
+	zero_explicit(&tmp1, size_of(tmp1))
+	zero_explicit(&tmp2, size_of(tmp2))
 
 	return ret
 }
@@ -72,7 +73,7 @@ fe_equal_bytes :: proc "contextless" (arg1: ^Tight_Field_Element, arg2: ^[32]byt
 
 	ret := crypto.compare_constant_time(tmp1[:], arg2[:])
 
-	mem.zero_explicit(&tmp1, size_of(tmp1))
+	zero_explicit(&tmp1, size_of(tmp1))
 
 	return ret
 }
@@ -175,7 +176,7 @@ fe_carry_sqrt_ratio_m1 :: proc "contextless" (
 	fe_carry_abs(out1, r)
 
 	fe_clear_vec([]^Tight_Field_Element{&w, &tmp1, &tmp2, &tmp3})
-	mem.zero_explicit(&b, size_of(b))
+	zero_explicit(&b, size_of(b))
 
 	return correct_sign_sqrt | flipped_sign_sqrt
 }

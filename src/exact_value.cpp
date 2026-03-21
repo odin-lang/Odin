@@ -1,8 +1,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-gb_global BlockingMutex hash_exact_value_mutex;
-
 struct Ast;
 struct HashKey;
 struct Type;
@@ -54,9 +52,6 @@ struct ExactValue {
 gb_global ExactValue const empty_exact_value = {};
 
 gb_internal uintptr hash_exact_value(ExactValue v) {
-	mutex_lock(&hash_exact_value_mutex);
-	defer (mutex_unlock(&hash_exact_value_mutex));
-
 	uintptr res = 0;
 	
 	switch (v.kind) {
@@ -151,7 +146,7 @@ gb_internal ExactValue exact_value_float(f64 f) {
 
 gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
 	ExactValue result = {ExactValue_Complex};
-	result.value_complex = gb_alloc_item(permanent_allocator(), Complex128);
+	result.value_complex = permanent_alloc_item<Complex128>();
 	result.value_complex->real = real;
 	result.value_complex->imag = imag;
 	return result;
@@ -159,7 +154,7 @@ gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
 
 gb_internal ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
 	ExactValue result = {ExactValue_Quaternion};
-	result.value_quaternion = gb_alloc_item(permanent_allocator(), Quaternion256);
+	result.value_quaternion = permanent_alloc_item<Quaternion256>();
 	result.value_quaternion->real = real;
 	result.value_quaternion->imag = imag;
 	result.value_quaternion->jmag = jmag;
@@ -443,7 +438,7 @@ gb_internal ExactValue exact_value_to_complex(ExactValue v) {
 		// return exact_value_complex(v.value_quaternion.real, v.value_quaternion.imag);
 	}
 	ExactValue r = {ExactValue_Invalid};
-	v.value_complex = gb_alloc_item(permanent_allocator(), Complex128);
+	v.value_complex = permanent_alloc_item<Complex128>();
 	return r;
 }
 gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
@@ -458,7 +453,7 @@ gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
 		return v;
 	}
 	ExactValue r = {ExactValue_Invalid};
-	v.value_quaternion = gb_alloc_item(permanent_allocator(), Quaternion256);
+	v.value_quaternion = permanent_alloc_item<Quaternion256>();
 	return r;
 }
 
@@ -947,6 +942,8 @@ gb_internal gb_inline i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
 
+gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y);
+
 gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
@@ -1055,9 +1052,19 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		case Token_NotEq: return x.value_typeid != y.value_typeid;
 		}
 		break;
+
+	case ExactValue_Compound:
+		if (op != Token_CmpEq && op != Token_NotEq) {
+			return false;
+		}
+
+		if (x.kind != y.kind) {
+			return false;
+		}
+		return compare_exact_values_compound_lit(op, x, y);
 	}
 
-	GB_PANIC("Invalid comparison");
+	GB_PANIC("Invalid comparison: %d", x.kind);
 	return false;
 }
 

@@ -4,7 +4,6 @@ import "base:intrinsics"
 import "core:crypto"
 import aes "core:crypto/_aes/ct64"
 import "core:encoding/endian"
-import "core:mem"
 import "core:simd"
 
 // This uses the bitlsiced 64-bit general purpose register SWAR AES
@@ -149,8 +148,8 @@ bc_absorb :: proc "contextless" (
 
 	intrinsics.unaligned_store((^simd.u8x16)(raw_data(dst)), dst_)
 
-	mem.zero_explicit(&tweaks, size_of(tweaks))
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tweaks, size_of(tweaks))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 
 	return stk_block_nr
 }
@@ -214,8 +213,8 @@ bc_encrypt :: proc "contextless" (
 		nr_blocks -= n
 	}
 
-	mem.zero_explicit(&tweaks, size_of(tweaks))
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tweaks, size_of(tweaks))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 
 	return stk_block_nr
 }
@@ -295,13 +294,13 @@ e_ref :: proc "contextless" (ctx: ^Context, dst, tag, iv, aad, plaintext: []byte
 
 		copy(dst[n*BLOCK_SIZE:], m_star[:])
 
-		mem.zero_explicit(&m_star, size_of(m_star))
+		crypto.zero_explicit(&m_star, size_of(m_star))
 	}
 
 	copy(tag, auth[:])
 
-	mem.zero_explicit(&st.q_stk, size_of(st.q_stk))
-	mem.zero_explicit(&st.q_b, size_of(st.q_b))
+	crypto.zero_explicit(&st.q_stk, size_of(st.q_stk))
+	crypto.zero_explicit(&st.q_b, size_of(st.q_b))
 }
 
 @(private, require_results)
@@ -336,7 +335,7 @@ d_ref :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byt
 
 		copy(dst[n*BLOCK_SIZE:], m_star[:])
 
-		mem.zero_explicit(&m_star, size_of(m_star))
+		crypto.zero_explicit(&m_star, size_of(m_star))
 	}
 
 	// Associated data
@@ -382,7 +381,7 @@ d_ref :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byt
 
 		_ = bc_absorb(&st, auth[:], m_star[:], PREFIX_MSG_FINAL, n)
 
-		mem.zero_explicit(&m_star, size_of(m_star))
+		crypto.zero_explicit(&m_star, size_of(m_star))
 	}
 	bc_final(&st, auth[:], iv)
 
@@ -391,9 +390,9 @@ d_ref :: proc "contextless" (ctx: ^Context, dst, iv, aad, ciphertext, tag: []byt
 	// else return false
 	ok := crypto.compare_constant_time(auth[:], tag) == 1
 
-	mem.zero_explicit(&auth, size_of(auth))
-	mem.zero_explicit(&st.q_stk, size_of(st.q_stk))
-	mem.zero_explicit(&st.q_b, size_of(st.q_b))
+	crypto.zero_explicit(&auth, size_of(auth))
+	crypto.zero_explicit(&st.q_stk, size_of(st.q_stk))
+	crypto.zero_explicit(&st.q_b, size_of(st.q_b))
 
 	return ok
 }

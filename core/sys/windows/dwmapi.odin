@@ -47,9 +47,9 @@ DWM_WINDOW_CORNER_PREFERENCE :: enum c_int {
 
 @(default_calling_convention="system")
 foreign dwmapi {
-	DwmFlush :: proc() -> HRESULT ---
-	DwmIsCompositionEnabled :: proc(pfEnabled: ^BOOL) -> HRESULT ---
+	DwmFlush                     :: proc() -> HRESULT ---
+	DwmIsCompositionEnabled      :: proc(pfEnabled: ^BOOL) -> HRESULT ---
 	DwmExtendFrameIntoClientArea :: proc(hWnd: HWND, pMarInset: PMARGINS) -> HRESULT ---
-	DwmGetWindowAttribute :: proc(hWnd: HWND, dwAttribute: DWORD, pvAttribute: PVOID, cbAttribute: DWORD) -> HRESULT ---
-	DwmSetWindowAttribute :: proc(hWnd: HWND, dwAttribute: DWORD, pvAttribute: LPCVOID, cbAttribute: DWORD) -> HRESULT ---
+	DwmGetWindowAttribute        :: proc(hWnd: HWND, dwAttribute: DWORD, pvAttribute: PVOID, cbAttribute: DWORD) -> HRESULT ---
+	DwmSetWindowAttribute        :: proc(hWnd: HWND, dwAttribute: DWORD, pvAttribute: LPCVOID, cbAttribute: DWORD) -> HRESULT ---
 }

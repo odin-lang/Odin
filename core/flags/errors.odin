@@ -1,5 +1,7 @@
 package flags
 
+import "base:runtime"
+import "core:net"
 import "core:os"
 
 Parse_Error_Reason :: enum {
@@ -24,13 +26,19 @@ Parse_Error :: struct {
 	message: string,
 }
 
+Unified_Parse_Error_Reason :: union #shared_nil {
+	Parse_Error_Reason,
+	runtime.Allocator_Error,
+	net.Parse_Endpoint_Error,
+}
+
 // Raised during parsing.
 // Provides more granular information than what just a string could hold.
 Open_File_Error :: struct {
 	filename: string,
 	errno: os.Error,
-	mode: int,
-	perms: int,
+	flags: os.File_Flags,
+	perms: os.Permissions,
 }
 
 // Raised during parsing.

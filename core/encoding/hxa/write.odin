@@ -1,27 +1,9 @@
 package encoding_hxa
 
-import "core:os"
-import "core:mem"
-
 Write_Error :: enum {
 	None,
 	Buffer_Too_Small,
 	Failed_File_Write,
-}
-
-write_to_file :: proc(filepath: string, file: File) -> (err: Write_Error) {
-	required := required_write_size(file)
-	buf, alloc_err := make([]byte, required)
-	if alloc_err == .Out_Of_Memory {
-		return .Failed_File_Write
-	}
-	defer delete(buf)
-
-	write_internal(&Writer{data = buf}, file)
-	if !os.write_entire_file(filepath, buf) {
-		err =.Failed_File_Write
-	}
-	return
 }
 
 write :: proc(buf: []byte, file: File) -> (n: int, err: Write_Error) {
@@ -66,7 +48,7 @@ write_internal :: proc(w: ^Writer, file: File) {
 			remaining := len(w.data) - w.offset
 			assert(size_of(T)*len(array) <= remaining)
 			ptr := raw_data(w.data[w.offset:])
-			dst := mem.slice_ptr((^T)(ptr), len(array))
+			dst := ([^]T)(ptr)[:len(array)]
 			copy(dst, array)
 		}
 		w.offset += size_of(T)*len(array)
@@ -76,7 +58,7 @@ write_internal :: proc(w: ^Writer, file: File) {
 			remaining := len(w.data) - w.offset
 			assert(size_of(byte)*len(str) <= remaining)
 			ptr := raw_data(w.data[w.offset:])
-			dst := mem.slice_ptr((^byte)(ptr), len(str))
+			dst := ([^]byte)(ptr)[:len(str)]
 			copy(dst, str)
 		}
 		w.offset += size_of(byte)*len(str)

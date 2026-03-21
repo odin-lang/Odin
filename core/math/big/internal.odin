@@ -29,8 +29,8 @@ package math_big
 
 import "base:builtin"
 import "base:intrinsics"
-import "core:mem"
-import rnd "core:math/rand"
+import "base:runtime"
+@(require) import rnd "core:math/rand"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -989,7 +989,8 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 		Zero remainder. Special case, can't use `internal_zero_unused`.
 	*/
 	if zero_count > 0 {
-		mem.zero_slice(remainder.digit[zero_count:])
+		data := remainder.digit[zero_count:]
+		_zero(data)
 	}
 
 	/*
@@ -1015,7 +1016,7 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 	Assumes `a` not to be `nil`.
 */
 internal_int_allocated_cap :: #force_inline proc(a: ^Int) -> (cap: int) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit
+	raw := transmute(runtime.Raw_Dynamic_Array)a.digit
 	return raw.cap
 }
 
@@ -1177,6 +1178,8 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
+	internal_clamp(a)
+	internal_clamp(b)
 
 	// Compare based on used digits.
 	if a.used != b.used {
@@ -1449,6 +1452,7 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
+	internal_clamp(a)
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
 	return _private_int_log(a, base)
@@ -1684,7 +1688,7 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	*/
 	if n == 2 { return #force_inline internal_sqrt(dest, src) }
 
-	if n < 0 || n > int(_DIGIT_MAX) { return .Invalid_Argument }
+	if n < 0 || _WORD(n) > _WORD(_DIGIT_MAX) { return .Invalid_Argument }
 
 	if n & 1 == 0 && #force_inline internal_is_negative(src) { return .Invalid_Argument }
 
@@ -1845,7 +1849,7 @@ internal_int_destroy :: proc(integers: ..^Int) {
 
 	for &a in integers {
 		if internal_int_allocated_cap(a) > 0 {
-			mem.zero_slice(a.digit[:])
+			_zero(a.digit[:])
 			free(&a.digit[0])
 		}
 		a = &Int{}
@@ -2177,7 +2181,7 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
-		mem_err: mem.Allocator_Error
+		mem_err: runtime.Allocator_Error
 		a.digit, mem_err = make([dynamic]DIGIT, needed, allocator)
 		if mem_err != nil {
 			return cast(Error)mem_err
@@ -2208,9 +2212,9 @@ internal_grow :: proc { internal_int_grow, }
 	Assumes `a` not to be `nil`.
 */
 internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit
+	raw := transmute(runtime.Raw_Dynamic_Array)a.digit
 	if raw.cap != 0 {
-		mem.zero_slice(a.digit[:a.used])
+		_zero(a.digit[:a.used])
 	}
 	a.sign = .Zero_or_Positive
 	a.used = 0
@@ -2273,7 +2277,7 @@ internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allo
 	/*
 		Zero the entirety.
 	*/
-	mem.zero_slice(a.digit[:])
+	_zero(a.digit[:])
 
 	/*
 		Set the bit.
@@ -2819,9 +2823,9 @@ internal_platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
 internal_count_lsb :: proc { internal_int_count_lsb, internal_platform_count_lsb, }
 
 internal_int_random_digit :: proc() -> (res: DIGIT) {
-	when _DIGIT_BITS == 60 { // DIGIT = u64
+	when _DIGIT_TYPE_BITS == 64 { // DIGIT = u64
 		return DIGIT(rnd.uint64()) & _MASK
-	} else when _DIGIT_BITS == 28 { // DIGIT = u32
+	} else when _DIGIT_TYPE_BITS == 32 { // DIGIT = u32
 		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
@@ -2944,10 +2948,14 @@ internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 		Zero remainder.
 	*/
 	if zero_count > 0 && dest.used < len(dest.digit) {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count])
+		_zero(dest.digit[dest.used:][:zero_count])
 	}
 }
 internal_zero_unused :: proc { internal_int_zero_unused, }
+
+_zero :: proc(data: []DIGIT) {
+	intrinsics.mem_zero(raw_data(data), size_of(DIGIT)*len(data))
+}
 
 /*
 	==========================    End of low-level routines   ==========================

@@ -248,6 +248,13 @@ E_HANDLE       :: 0x80070006 // Handle that is not valid
 E_OUTOFMEMORY  :: 0x8007000E // Failed to allocate necessary memory
 E_INVALIDARG   :: 0x80070057 // One or more arguments are not valid
 
+SEC_E_INCOMPLETE_MESSAGE :: 0x80090318
+
+SEC_I_INCOMPLETE_CREDENTIALS :: 0x00090320
+SEC_I_CONTINUE_NEEDED        :: 0x00090312
+SEC_I_CONTEXT_EXPIRED        :: 0x00090317
+SEC_I_RENEGOTIATE            :: 0x00090321
+
 // Severity values
 SEVERITY :: enum DWORD {
 	SUCCESS = 0,

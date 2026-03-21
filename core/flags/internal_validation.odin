@@ -138,20 +138,20 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 		allowed_to_define_file_perms: bool = ---
 		#partial switch specific_type_info in field.type.variant {
 		case runtime.Type_Info_Map:
-			allowed_to_define_file_perms = specific_type_info.value.id == os.Handle
+			allowed_to_define_file_perms = specific_type_info.value.id == ^os.File
 		case runtime.Type_Info_Dynamic_Array:
-			allowed_to_define_file_perms = specific_type_info.elem.id == os.Handle
+			allowed_to_define_file_perms = specific_type_info.elem.id == ^os.File
 		case:
-			allowed_to_define_file_perms = field.type.id == os.Handle
+			allowed_to_define_file_perms = field.type.id == ^os.File
 		}
 
 		if _, has_file := get_struct_subtag(args_tag, SUBTAG_FILE); has_file {
-			fmt.assertf(allowed_to_define_file_perms, "%T.%s has `%s` defined, but it is not nor does it contain an `os.Handle` type.",
+			fmt.assertf(allowed_to_define_file_perms, "%T.%s has `%s` defined, but it is not nor does it contain an `^os.File` type.",
 				model_type, field.name, SUBTAG_FILE, loc = loc)
 		}
 
 		if _, has_perms := get_struct_subtag(args_tag, SUBTAG_PERMS); has_perms {
-			fmt.assertf(allowed_to_define_file_perms, "%T.%s has `%s` defined, but it is not nor does it contain an `os.Handle` type.",
+			fmt.assertf(allowed_to_define_file_perms, "%T.%s has `%s` defined, but it is not nor does it contain an `^os.File` type.",
 				model_type, field.name, SUBTAG_PERMS, loc = loc)
 		}
 

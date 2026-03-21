@@ -1,8 +1,9 @@
 package spall
 
+import    "base:intrinsics"
+
 import "core:os"
 import "core:time"
-import "base:intrinsics"
 
 // File Format
 
@@ -64,7 +65,9 @@ NAME_EVENT_MAX :: size_of(Name_Event) + 255
 Context :: struct {
 	precise_time:    bool,
 	timestamp_scale: f64,
-	fd:              os.Handle,
+
+	file:            ^os.File,
+	fd:              uintptr,
 }
 
 Buffer :: struct {
@@ -79,18 +82,20 @@ BUFFER_DEFAULT_SIZE :: 0x10_0000
 
 
 context_create_with_scale :: proc(filename: string, precise_time: bool, timestamp_scale: f64) -> (ctx: Context, ok: bool) #optional_ok {
-	fd, err := os.open(filename, os.O_WRONLY | os.O_APPEND | os.O_CREATE | os.O_TRUNC, 0o600)
+	file, err := os.open(filename, {.Write, .Append, .Create, .Trunc}, {.Read_User, .Write_User})
 	if err != nil {
 		return
 	}
 
-	ctx.fd = fd
+	ctx.file = file
+	ctx.fd = os.fd(file)
+
 	ctx.precise_time = precise_time
 	ctx.timestamp_scale = timestamp_scale
 
 	temp := [size_of(Manual_Stream_Header)]u8{}
 	_build_stream_header(temp[:], ctx.timestamp_scale)
-	os.write(ctx.fd, temp[:])
+	write(ctx.fd, temp[:])
 	ok = true
 	return
 }
@@ -109,7 +114,7 @@ context_destroy :: proc(ctx: ^Context) {
 		return
 	}
 
-	os.close(ctx.fd)
+	os.close(ctx.file)
 	ctx^ = Context{}
 }
 
@@ -288,12 +293,12 @@ _buffer_name_process :: proc "contextless" (ctx: ^Context, buffer: ^Buffer, name
 	buffer.head += _build_name_event(buffer.data[buffer.head:], name, .Name_Process)
 }
 
-@(no_instrumentation)
-write :: proc "contextless" (fd: os.Handle, buf: []byte) -> (n: int, err: os.Error) {
-	return _write(fd, buf)
+@(no_instrumentation, private="package")
+write :: proc "contextless" (fd: uintptr, buf: []byte) {
+	_write(fd, buf)
 }
 
-@(no_instrumentation)
+@(no_instrumentation, private="package")
 tick_now :: proc "contextless" () -> (ns: i64) {
 	return _tick_now()
 }

@@ -24,4 +24,5 @@ foreign lib {
 	HasLASX               :: proc() -> bool ---
 	GetSystemRAM          :: proc() -> c.int ---
 	GetSIMDAlignment      :: proc() -> uint ---
+	GetSystemPageSize     :: proc() -> c.int ---
 }

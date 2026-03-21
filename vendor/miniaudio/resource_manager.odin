@@ -198,6 +198,7 @@ resource_manager_config :: struct {
 	ppCustomDecodingBackendVTables: ^[^]decoding_backend_vtable,
 	customDecodingBackendCount:     u32,
 	pCustomDecodingBackendUserData: rawptr,
+	resampling:                     resampler_config,
 }
 
 resource_manager :: struct {

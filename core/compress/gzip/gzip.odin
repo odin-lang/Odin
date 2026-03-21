@@ -107,14 +107,10 @@ load :: proc{load_from_bytes, load_from_file, load_from_context}
 load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
-	data, ok := os.read_entire_file(filename)
-	defer delete(data)
+	file_data, file_err := os.read_entire_file(filename, allocator)
+	defer delete(file_data)
 
-	err = E_General.File_Not_Found
-	if ok {
-		err = load_from_bytes(data, buf, len(data), expected_output_size)
-	}
-	return
+	return load_from_bytes(file_data, buf, len(file_data), expected_output_size) if file_err == nil else E_General.File_Not_Found
 }
 
 load_from_bytes :: proc(data: []byte, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {

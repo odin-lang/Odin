@@ -2,9 +2,7 @@
 #+build js
 package terminal
 
-import "core:os"
-
-_is_terminal :: proc "contextless" (handle: os.Handle) -> bool {
+_is_terminal :: proc "contextless" (handle: any) -> bool {
 	return true
 }
 

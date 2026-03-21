@@ -9,13 +9,12 @@ package encoding_xml
 	- Jeroen van Rijn: Initial implementation.
 */
 
-import "core:bytes"
-import "core:encoding/entity"
-import "base:intrinsics"
-import "core:mem"
-import "core:os"
-import "core:strings"
-import "base:runtime"
+import    "base:runtime"
+import    "core:bytes"
+import    "core:encoding/entity"
+import    "base:intrinsics"
+import    "core:mem"
+import    "core:strings"
 
 likely :: intrinsics.expect
 
@@ -294,7 +293,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						if len(doc.elements) == 0 {
+						if doc.element_count == 0 {
 							append(&doc.comments, comment)
 						} else {
 							el := new_element(doc)
@@ -308,6 +307,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				case .Open_Bracket:
 					// This could be a CDATA tag part of a tag's body. Unread the `<![`
 					t.offset -= 3
+					t.read_offset = t.offset
 
 					// Instead of calling `parse_body` here, we could also `continue loop`
 					// and fall through to the `case:` at the bottom of the outer loop.
@@ -372,20 +372,8 @@ parse_string :: proc(data: string, options := DEFAULT_OPTIONS, path := "", error
 
 parse :: proc { parse_string, parse_bytes }
 
-// Load an XML file
-load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+destroy :: proc(doc: ^Document, allocator := context.allocator) {
 	context.allocator = allocator
-	options := options
-
-	data, data_ok := os.read_entire_file(filename)
-	if !data_ok { return {}, .File_Error }
-
-	options.flags += { .Input_May_Be_Modified }
-
-	return parse_bytes(data, options, filename, error_handler, allocator)
-}
-
-destroy :: proc(doc: ^Document) {
 	if doc == nil { return }
 
 	for el in doc.elements {

@@ -15,9 +15,9 @@ package sha2
         zhibog, dotbmp:  Initial implementation.
 */
 
+@(require) import "core:crypto"
 @(require) import "core:encoding/endian"
 import "core:math/bits"
-@(require) import "core:mem"
 
 // DIGEST_SIZE_224 is the SHA-224 digest size in bytes.
 DIGEST_SIZE_224 :: 28
@@ -44,7 +44,8 @@ Context_256 :: struct {
 	length:    u64,
 	md_bits:   int,
 
-	is_initialized: bool,
+	is_hw_accelerated: bool,
+	is_initialized:    bool,
 }
 
 // Context_512 is a SHA-384, SHA-512 or SHA-512/256 instance.
@@ -55,7 +56,8 @@ Context_512 :: struct {
 	length:    u64,
 	md_bits:   int,
 
-	is_initialized: bool,
+	is_hw_accelerated: bool,
+	is_initialized:    bool,
 }
 
 // init_224 initializes a Context_256 for SHA-224.
@@ -89,6 +91,9 @@ init_512_256 :: proc(ctx: ^Context_512) {
 }
 
 @(private)
+ERR_HW_NOT_SUPPORTED :: "crypto/sha2: hardware implementation unsupported"
+
+@(private)
 _init :: proc(ctx: ^$T) {
 	when T == Context_256 {
 		switch ctx.md_bits {
@@ -113,6 +118,8 @@ _init :: proc(ctx: ^$T) {
 		case:
 			panic("crypto/sha2: invalid digest output length")
 		}
+
+		ctx.is_hw_accelerated = is_hardware_accelerated_256()
 	} else when T == Context_512 {
 		switch ctx.md_bits {
 		case 256:
@@ -148,6 +155,8 @@ _init :: proc(ctx: ^$T) {
 		case:
 			panic("crypto/sha2: invalid digest output length")
 		}
+
+		ctx.is_hw_accelerated = is_hardware_accelerated_512()
 	}
 
 	ctx.length = 0
@@ -191,7 +200,7 @@ update :: proc(ctx: ^$T, data: []byte) {
 // final finalizes the Context, writes the digest to hash, and calls
 // reset on the Context.
 //
-// Iff finalize_clone is set, final will work on a copy of the Context,
+// If and only if (⟺) finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^$T, hash: []byte, finalize_clone: bool = false) {
 	ensure(ctx.is_initialized)
@@ -260,14 +269,14 @@ reset :: proc(ctx: ^$T) {
 		return
 	}
 
-	mem.zero_explicit(ctx, size_of(ctx^))
+	crypto.zero_explicit(ctx, size_of(ctx^))
 }
 
 /*
     SHA2 implementation
 */
 
-@(private, rodata)
+@(private = "file", rodata)
 SHA256_K := [64]u32 {
 	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 	0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -287,7 +296,7 @@ SHA256_K := [64]u32 {
 	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 }
 
-@(private, rodata)
+@(private = "file", rodata)
 SHA512_K := [80]u64 {
 	0x428a2f98d728ae22, 0x7137449123ef65cd,
 	0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,
@@ -336,70 +345,70 @@ SHA256_ROUNDS :: 64
 @(private)
 SHA512_ROUNDS :: 80
 
-@(private)
+@(private = "file")
 SHA256_CH :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
 	return (x & y) ~ (~x & z)
 }
 
-@(private)
+@(private = "file")
 SHA256_MAJ :: #force_inline proc "contextless" (x, y, z: u32) -> u32 {
 	return (x & y) ~ (x & z) ~ (y & z)
 }
 
-@(private)
+@(private = "file")
 SHA512_CH :: #force_inline proc "contextless" (x, y, z: u64) -> u64 {
 	return (x & y) ~ (~x & z)
 }
 
-@(private)
+@(private = "file")
 SHA512_MAJ :: #force_inline proc "contextless" (x, y, z: u64) -> u64 {
 	return (x & y) ~ (x & z) ~ (y & z)
 }
 
-@(private)
+@(private = "file")
 SHA256_F1 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 30) ~ bits.rotate_left32(x, 19) ~ bits.rotate_left32(x, 10)
 }
 
-@(private)
+@(private = "file")
 SHA256_F2 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 26) ~ bits.rotate_left32(x, 21) ~ bits.rotate_left32(x, 7)
 }
 
-@(private)
+@(private = "file")
 SHA256_F3 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 25) ~ bits.rotate_left32(x, 14) ~ (x >> 3)
 }
 
-@(private)
+@(private = "file")
 SHA256_F4 :: #force_inline proc "contextless" (x: u32) -> u32 {
 	return bits.rotate_left32(x, 15) ~ bits.rotate_left32(x, 13) ~ (x >> 10)
 }
 
-@(private)
+@(private = "file")
 SHA512_F1 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 36) ~ bits.rotate_left64(x, 30) ~ bits.rotate_left64(x, 25)
 }
 
-@(private)
+@(private = "file")
 SHA512_F2 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 50) ~ bits.rotate_left64(x, 46) ~ bits.rotate_left64(x, 23)
 }
 
-@(private)
+@(private = "file")
 SHA512_F3 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 63) ~ bits.rotate_left64(x, 56) ~ (x >> 7)
 }
 
-@(private)
+@(private = "file")
 SHA512_F4 :: #force_inline proc "contextless" (x: u64) -> u64 {
 	return bits.rotate_left64(x, 45) ~ bits.rotate_left64(x, 3) ~ (x >> 6)
 }
 
-@(private)
+@(private = "file")
 sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) #no_bounds_check {
 	when T == Context_256 {
-		if is_hardware_accelerated_256() {
+		if ctx.is_hw_accelerated {
 			sha256_transf_hw(ctx, data)
 			return
 		}
@@ -410,6 +419,11 @@ sha2_transf :: proc "contextless" (ctx: ^$T, data: []byte) #no_bounds_check {
 
 		CURR_BLOCK_SIZE :: BLOCK_SIZE_256
 	} else when T == Context_512 {
+		if ctx.is_hw_accelerated {
+			sha512_transf_hw(ctx, data)
+			return
+		}
+
 		w: [SHA512_ROUNDS]u64
 		wv: [8]u64
 		t1, t2: u64

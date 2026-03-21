@@ -105,8 +105,8 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, #any_int length, alignment: int, a
 	allocator := allocator
 	if allocator.procedure == nil {
 		allocator = context.allocator
+		assert(allocator.procedure != nil)
 	}
-	assert(allocator.procedure != nil)
 
 	new_bytes: []byte
 	new_bytes, err = allocator.procedure(
@@ -240,8 +240,8 @@ _reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, zero_memory: boo
 
 	if array.allocator.procedure == nil {
 		array.allocator = context.allocator
+		assert(array.allocator.procedure != nil)
 	}
-	assert(array.allocator.procedure != nil)
 
 	footer := raw_soa_footer(array)
 	if size_of(E) == 0 {
@@ -615,7 +615,7 @@ inject_at_elems_soa :: proc(array: ^$T/#soa[dynamic]$E, #any_int index: int, #no
 // `inject_at_soa` injects something into a dynamic SOA array at a specified index and moves the previous elements after that index "across"
 @builtin inject_at_soa :: proc{inject_at_elem_soa, inject_at_elems_soa}
 
-
+@builtin
 delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {
@@ -626,6 +626,7 @@ delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc
 	return nil
 }
 
+@builtin
 delete_soa_dynamic_array :: proc(array: $T/#soa[dynamic]$E, loc := #caller_location) -> Allocator_Error {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {
@@ -644,7 +645,7 @@ delete_soa :: proc{
 	delete_soa_dynamic_array,
 }
 
-
+@builtin
 clear_soa_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) {
 	field_count :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 	when field_count != 0 {

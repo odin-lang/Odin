@@ -280,9 +280,9 @@ create_iterator :: proc(
 ) -> (result: Match_Iterator, err: Error) {
 
 	result.regex         = create(pattern, flags, permanent_allocator, temporary_allocator) or_return
-	result.capture       = preallocate_capture()
+	result.capture       = preallocate_capture(permanent_allocator)
 	result.temp          = temporary_allocator
-	result.vm            = virtual_machine.create(result.regex.program, str)
+	result.vm            = virtual_machine.create(result.regex.program, str, permanent_allocator)
 	result.vm.class_data = result.regex.class_data
 	result.threads       = max(1, virtual_machine.opcode_count(result.vm.code) - 1)
 

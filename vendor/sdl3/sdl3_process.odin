@@ -13,6 +13,7 @@ ProcessIO :: enum c.int {
 
 PROP_PROCESS_CREATE_ARGS_POINTER                :: "SDL.process.create.args"
 PROP_PROCESS_CREATE_ENVIRONMENT_POINTER         :: "SDL.process.create.environment"
+PROP_PROCESS_CREATE_WORKING_DIRECTORY_STRING    :: "SDL.process.create.working_directory"
 PROP_PROCESS_CREATE_STDIN_NUMBER                :: "SDL.process.create.stdin_option"
 PROP_PROCESS_CREATE_STDIN_POINTER               :: "SDL.process.create.stdin_source"
 PROP_PROCESS_CREATE_STDOUT_NUMBER               :: "SDL.process.create.stdout_option"
@@ -21,6 +22,7 @@ PROP_PROCESS_CREATE_STDERR_NUMBER               :: "SDL.process.create.stderr_op
 PROP_PROCESS_CREATE_STDERR_POINTER              :: "SDL.process.create.stderr_source"
 PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN    :: "SDL.process.create.stderr_to_stdout"
 PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN          :: "SDL.process.create.background"
+PROP_PROCESS_CREATE_CMDLINE_STRING              :: "SDL.process.create.cmdline"
 
 PROP_PROCESS_PID_NUMBER         :: "SDL.process.pid"
 PROP_PROCESS_STDIN_POINTER      :: "SDL.process.stdin"

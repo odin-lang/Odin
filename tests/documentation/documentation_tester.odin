@@ -1,12 +1,11 @@
 package documentation_tester
 
-import "core:os"
-import "core:io"
-import "core:fmt"
-import "core:strings"
-import "core:odin/ast"
-import "core:odin/parser"
-import "core:c/libc"
+import     "core:os"
+import     "core:fmt"
+import     "core:strings"
+import     "core:odin/ast"
+import     "core:odin/parser"
+import     "core:c/libc"
 import doc "core:odin/doc-format"
 
 Example_Test :: struct {
@@ -63,10 +62,11 @@ main :: proc() {
 		errorf("expected path to odin executable")
 	}
 	g_path_to_odin = os.args[1]
-	data, ok := os.read_entire_file("all.odin-doc")
-	if !ok {
+	data, data_err := os.read_entire_file("all.odin-doc", context.allocator)
+	if data_err != nil {
 		errorf("unable to read file: all.odin-doc")
 	}
+	defer delete(data)
 	err: doc.Reader_Error
 	g_header, err = doc.read_from_bytes(data)
 	switch err {
@@ -257,8 +257,8 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 
 write_test_suite :: proc(example_tests: []Example_Test) {
 	TEST_SUITE_DIRECTORY :: "verify"
-	os.remove_directory(TEST_SUITE_DIRECTORY)
-	os.make_directory(TEST_SUITE_DIRECTORY)
+	os.remove_all(TEST_SUITE_DIRECTORY)
+	os.mkdir(TEST_SUITE_DIRECTORY)
 
 	example_build := strings.builder_make()
 	test_runner := strings.builder_make()
@@ -276,9 +276,11 @@ import "core:sync"
 import "base:intrinsics"
 
 @(private="file")
-_read_pipe: os.Handle
+_read_pipe:  ^os.File
 @(private="file")
-_write_pipe: os.Handle
+_write_pipe: ^os.File
+@(private="file")
+_old_stdout: ^os.File
 @(private="file")
 _pipe_reader_semaphore: sync.Sema
 @(private="file")
@@ -286,20 +288,20 @@ _out_data: string
 @(private="file")
 _out_buffer: [mem.Megabyte]byte
 @(private="file")
-_bad_test_found: bool
+_bad_count: int
+@(private="file")
+_good_count: int
 
 @(private="file")
 _spawn_pipe_reader :: proc() {
 	thread.run(proc() {
-		stream := os.stream_from_handle(_read_pipe)
-		reader := io.to_reader(stream)
 		sync.post(&_pipe_reader_semaphore) // notify thread is ready
 		for {
 			n_read := 0
 			read_to_null_byte := 0
 			finished_reading := false
 			for ! finished_reading {
-				just_read, err := io.read(reader, _out_buffer[n_read:], &n_read); if err != .None {
+				just_read, err := io.read(os.to_stream(_read_pipe), _out_buffer[n_read:], &n_read); if err != .None {
 					panic("We got an IO error!")
 				}
 				for b in _out_buffer[n_read - just_read: n_read] {
@@ -328,11 +330,14 @@ _check :: proc(test_name: string, expected: string) {
 	if expected != output {
 		fmt.eprintf("Test %q got unexpected output:\n%q\n", test_name, output)
 		fmt.eprintf("Expected:\n%q\n", expected)
-		_bad_test_found = true
+		_bad_count += 1
+	} else {
+		_good_count += 1
 	}
 }
 
 main :: proc() {
+	_old_stdout = os.stdout
 	_read_pipe, _write_pipe, _ = os.pipe()
 	os.stdout = _write_pipe
 	_spawn_pipe_reader()
@@ -445,24 +450,19 @@ main :: proc() {
 			continue
 		}
 		defer os.close(test_file_handle)
-		stream := os.stream_from_handle(test_file_handle)
-		writer, ok := io.to_writer(stream); if ! ok {
-			fmt.eprintf("We could not make the writer for the path %q\n", save_path)
-			g_bad_doc = true
-			continue
-		}
-		fmt.wprintf(writer, "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
+		fmt.wprintf(os.to_stream(test_file_handle), "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
 		fmt.println("Done")
 	}
 
 	strings.write_string(&test_runner,
 `
-	if _bad_test_found {
+	fmt.wprintfln(os.to_stream(_old_stdout), "Passes: %v. Fails: %v", _good_count, _bad_count)
+	if _bad_count > 0 {
 		fmt.eprintln("One or more tests failed")
 		os.exit(1)
 	}
 }`)
-	os.write_entire_file("verify/main.odin", transmute([]byte)strings.to_string(test_runner))
+	_ = os.write_entire_file("verify/main.odin", transmute([]byte)strings.to_string(test_runner))
 }
 
 run_test_suite :: proc() -> bool {

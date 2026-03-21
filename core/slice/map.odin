@@ -6,8 +6,8 @@ import "base:runtime"
 _ :: intrinsics
 _ :: runtime
 
-map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K, err: runtime.Allocator_Error) {
-	keys = make(type_of(keys), len(m), allocator) or_return
+map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller_location) -> (keys: []K, err: runtime.Allocator_Error) {
+	keys = make(type_of(keys), len(m), allocator, loc) or_return
 	i := 0
 	for key in m {
 		keys[i] = key
@@ -15,8 +15,8 @@ map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K,
 	}
 	return
 }
-map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: []V, err: runtime.Allocator_Error) {
-	values = make(type_of(values), len(m), allocator) or_return
+map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller_location) -> (values: []V, err: runtime.Allocator_Error) {
+	values = make(type_of(values), len(m), allocator, loc) or_return
 	i := 0
 	for _, value in m {
 		values[i] = value
@@ -37,8 +37,8 @@ Map_Entry_Info :: struct($Key, $Value: typeid) {
 }
 
 
-map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V), err: runtime.Allocator_Error) {
-	entries = make(type_of(entries), len(m), allocator) or_return
+map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller_location) -> (entries: []Map_Entry(K, V), err: runtime.Allocator_Error) {
+	entries = make(type_of(entries), len(m), allocator, loc) or_return
 	i := 0
 	for key, value in m {
 		entries[i].key   = key
@@ -48,13 +48,13 @@ map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries
 	return
 }
 
-map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V), err: runtime.Allocator_Error) #no_bounds_check {
+map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller_location) -> (entries: []Map_Entry_Info(K, V), err: runtime.Allocator_Error) #no_bounds_check {
 	m := m
 	rm := (^runtime.Raw_Map)(&m)
 
 	info := runtime.type_info_base(type_info_of(M)).variant.(runtime.Type_Info_Map)
 	if info.map_info != nil {
-		entries = make(type_of(entries), len(m), allocator) or_return
+		entries = make(type_of(entries), len(m), allocator, loc) or_return
 
 		map_cap := uintptr(cap(m))
 		ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(rm^, info.map_info)

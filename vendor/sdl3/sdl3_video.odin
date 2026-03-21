@@ -61,6 +61,7 @@ WindowFlag :: enum Uint64 {
 	TOOLTIP             = 18,
 	POPUP_MENU          = 19,
 	KEYBOARD_GRABBED    = 20,
+	FILL_DOCUMENT       = 21,
 
 	VULKAN              = 28,
 	METAL               = 29,
@@ -133,6 +134,15 @@ FlashOperation :: enum c.int {
 	UNTIL_FOCUSED,            /**< Flash the window until it gets focus */
 }
 
+ProgressState :: enum c.int {
+	INVALID = -1,    /**< An invalid progress state indicating an error; check SDL_GetError() */
+	NONE,            /**< No progress bar is shown */
+	INDETERMINATE,   /**< The progress bar is shown in a indeterminate state */
+	NORMAL,          /**< The progress bar is shown in a normal state */
+	PAUSED,          /**< The progress bar is shown in a paused state */
+	ERROR,           /**< The progress bar is shown in a state indicating the application had an error */
+}
+
 GLContextState :: struct {}
 GLContext      :: ^GLContextState
 EGLDisplay     :: distinct rawptr
@@ -167,7 +177,7 @@ GLAttr :: enum c.int {
 	CONTEXT_FLAGS,               /**< some combination of 0 or more of elements of the SDL_GLContextFlag enumeration; defaults to 0. */
 	CONTEXT_PROFILE_MASK,        /**< type of GL context (Core, Compatibility, ES). See SDL_GLProfile; default value depends on platform. */
 	SHARE_WITH_CURRENT_CONTEXT,  /**< OpenGL context sharing; defaults to 0. */
-	FRAMEBUFFER_SRGB_CAPABLE,    /**< requests sRGB capable visual; defaults to 0. */
+	FRAMEBUFFER_SRGB_CAPABLE,    /**< requests sRGB-capable visual if 1. Defaults to -1 ("don't care"). This is a request; GL drivers might not comply! */
 	CONTEXT_RELEASE_BEHAVIOR,    /**< sets context the release behavior. See SDL_GLContextReleaseFlag; defaults to FLUSH. */
 	CONTEXT_RESET_NOTIFICATION,  /**< set context reset notification. See SDL_GLContextResetNotification; defaults to NO_NOTIFICATION. */
 	CONTEXT_NO_ERROR,
@@ -275,12 +285,15 @@ PROP_WINDOW_CREATE_X_NUMBER                            :: "SDL.window.create.x"
 PROP_WINDOW_CREATE_Y_NUMBER                            :: "SDL.window.create.y"
 PROP_WINDOW_CREATE_COCOA_WINDOW_POINTER                :: "SDL.window.create.cocoa.window"
 PROP_WINDOW_CREATE_COCOA_VIEW_POINTER                  :: "SDL.window.create.cocoa.view"
+PROP_WINDOW_CREATE_WINDOWSCENE_POINTER                 :: "SDL.window.create.uikit.windowscene"
 PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN :: "SDL.window.create.wayland.surface_role_custom"
 PROP_WINDOW_CREATE_WAYLAND_CREATE_EGL_WINDOW_BOOLEAN   :: "SDL.window.create.wayland.create_egl_window"
 PROP_WINDOW_CREATE_WAYLAND_WL_SURFACE_POINTER          :: "SDL.window.create.wayland.wl_surface"
 PROP_WINDOW_CREATE_WIN32_HWND_POINTER                  :: "SDL.window.create.win32.hwnd"
 PROP_WINDOW_CREATE_WIN32_PIXEL_FORMAT_HWND_POINTER     :: "SDL.window.create.win32.pixel_format_hwnd"
 PROP_WINDOW_CREATE_X11_WINDOW_NUMBER                   :: "SDL.window.create.x11.window"
+PROP_WINDOW_CREATE_EMSCRIPTEN_CANVAS_ID_STRING         :: "SDL.window.create.emscripten.canvas_id"
+PROP_WINDOW_CREATE_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING  :: "SDL.window.create.emscripten.keyboard_element"
 
 PROP_WINDOW_SHAPE_POINTER                             :: "SDL.window.shape"
 PROP_WINDOW_HDR_ENABLED_BOOLEAN                       :: "SDL.window.HDR_enabled"
@@ -298,7 +311,7 @@ PROP_WINDOW_KMSDRM_DRM_FD_NUMBER                      :: "SDL.window.kmsdrm.drm_
 PROP_WINDOW_KMSDRM_GBM_DEVICE_POINTER                 :: "SDL.window.kmsdrm.gbm_dev"
 PROP_WINDOW_COCOA_WINDOW_POINTER                      :: "SDL.window.cocoa.window"
 PROP_WINDOW_COCOA_METAL_VIEW_TAG_NUMBER               :: "SDL.window.cocoa.metal_view_tag"
-PROP_WINDOW_OPENVR_OVERLAY_ID                         :: "SDL.window.openvr.overlay_id"
+PROP_WINDOW_OPENVR_OVERLAY_ID_NUMBER                  :: "SDL.window.openvr.overlay_id"
 PROP_WINDOW_VIVANTE_DISPLAY_POINTER                   :: "SDL.window.vivante.display"
 PROP_WINDOW_VIVANTE_WINDOW_POINTER                    :: "SDL.window.vivante.window"
 PROP_WINDOW_VIVANTE_SURFACE_POINTER                   :: "SDL.window.vivante.surface"
@@ -317,6 +330,8 @@ PROP_WINDOW_WAYLAND_XDG_POSITIONER_POINTER            :: "SDL.window.wayland.xdg
 PROP_WINDOW_X11_DISPLAY_POINTER                       :: "SDL.window.x11.display"
 PROP_WINDOW_X11_SCREEN_NUMBER                         :: "SDL.window.x11.screen"
 PROP_WINDOW_X11_WINDOW_NUMBER                         :: "SDL.window.x11.window"
+PROP_WINDOW_EMSCRIPTEN_CANVAS_ID_STRING               :: "SDL.window.emscripten.canvas_id"
+PROP_WINDOW_EMSCRIPTEN_KEYBOARD_ELEMENT_STRING        :: "SDL.window.emscripten.keyboard_element"
 
 WINDOW_SURFACE_VSYNC_DISABLED :: 0
 WINDOW_SURFACE_VSYNC_ADAPTIVE :: -1
@@ -377,6 +392,7 @@ foreign lib {
 	SetWindowBordered               :: proc(window: ^Window, bordered: bool) -> bool ---
 	SetWindowResizable              :: proc(window: ^Window, resizable: bool) -> bool ---
 	SetWindowAlwaysOnTop            :: proc(window: ^Window, on_top: bool) -> bool ---
+	SetWindowFillDocument           :: proc(window: ^Window, fill: bool) -> bool ---
 	ShowWindow                      :: proc(window: ^Window) -> bool ---
 	HideWindow                      :: proc(window: ^Window) -> bool ---
 	RaiseWindow                     :: proc(window: ^Window) -> bool ---
@@ -427,6 +443,10 @@ foreign lib {
 	SetWindowHitTest                :: proc(window: ^Window, callback: HitTest, callback_data: rawptr) -> bool ---
 	SetWindowShape                  :: proc(window: ^Window, shape: ^Surface) -> bool ---
 	FlashWindow                     :: proc(window: ^Window, operation: FlashOperation) -> bool ---
+	SetWindowProgressState          :: proc(window: ^Window, state: ProgressState) -> bool ---
+	GetWindowProgressState          :: proc(window: ^Window) -> ProgressState ---
+	SetWindowProgressValue           :: proc(window: ^Window, value: f32) -> bool ---
+	GetWindowProgressValue           :: proc(window: ^Window) -> f32 ---
 	DestroyWindow                   :: proc(window: ^Window) ---
 	ScreenSaverEnabled              :: proc() -> bool ---
 	EnableScreenSaver               :: proc() -> bool ---

@@ -37,7 +37,7 @@ gb_internal void mpsc_destroy(MPSCQueue<T> *q) {
 template <typename T>
 gb_internal MPSCNode<T> *mpsc_alloc_node(MPSCQueue<T> *q, T const &value) {
 	// auto new_node = gb_alloc_item(heap_allocator(), MPSCNode<T>);
-	auto new_node = gb_alloc_item(permanent_allocator(), MPSCNode<T>);
+	auto new_node = permanent_alloc_item<MPSCNode<T> >();
 	new_node->value = value;
 	return new_node;
 }

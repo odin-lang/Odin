@@ -4,6 +4,8 @@ import "core:c"
 
 PropertiesID :: distinct Uint32
 
+PROP_NAME_STRING :: "SDL.name"
+
 PropertyType :: enum c.int {
 	INVALID,
 	POINTER,

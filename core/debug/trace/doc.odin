@@ -19,7 +19,7 @@ Example:
 		}
 		runtime.print_byte('\n')
 
-		ctx := &trace_ctx
+		ctx := &global_trace_ctx
 		if !trace.in_resolve(ctx) {
 			buf: [64]trace.Frame
 			runtime.print_string("Debug Trace:\n")

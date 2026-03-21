@@ -263,10 +263,15 @@ struct ForeignFileWorkerData {
 
 
 
-enum ProcInlining {
-	ProcInlining_none = 0,
-	ProcInlining_inline = 1,
+enum ProcInlining : u8 {
+	ProcInlining_none      = 0,
+	ProcInlining_inline    = 1,
 	ProcInlining_no_inline = 2,
+};
+
+enum ProcTailing : u8 {
+	ProcTailing_none      = 0,
+	ProcTailing_must_tail = 1,
 };
 
 enum ProcTag {
@@ -296,6 +301,9 @@ enum ProcCallingConvention : i32 {
 	ProcCC_Win64       = 9,
 	ProcCC_SysV        = 10,
 
+	ProcCC_PreserveNone = 11,
+	ProcCC_PreserveMost = 12,
+	ProcCC_PreserveAll  = 13,
 
 	ProcCC_MAX,
 
@@ -315,6 +323,9 @@ gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"inlineasm",
 	"win64",
 	"sysv",
+	"preserve/none",
+	"preserve/most",
+	"preserve/all",
 };
 
 gb_internal ProcCallingConvention default_calling_convention(void) {
@@ -413,9 +424,10 @@ struct AstSplitArgs {
 
 #define AST_KINDS \
 	AST_KIND(Ident,          "identifier",      struct { \
-		Token   token;  \
-		Entity *entity; \
-		u32     hash;   \
+		Token                 token;    \
+		std::atomic<Entity *> entity;   \
+		u32                   hash;     \
+		InternedString        interned; \
 	}) \
 	AST_KIND(Implicit,       "implicit",        Token) \
 	AST_KIND(Uninit,         "uninitialized value", Token) \
@@ -441,6 +453,7 @@ struct AstSplitArgs {
 		Ast *body; \
 		u64  tags; \
 		ProcInlining inlining; \
+		ProcTailing  tailing; \
 		Token where_token; \
 		Slice<Ast *> where_clauses; \
 		DeclInfo *decl; \
@@ -486,6 +499,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        close; \
 		Token        ellipsis; \
 		ProcInlining inlining; \
+		ProcTailing  tailing; \
 		bool         optional_ok_one; \
 		bool         was_selector; \
 		AstSplitArgs *split_args; \
@@ -574,6 +588,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Scope *scope; \
 		Token token; \
 		Ast *label; \
+		Ast *init; \
 		Slice<Ast *> vals; \
 		Token in_token; \
 		Ast *expr; \
@@ -583,6 +598,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \
 		Token unroll_token; \
+		Ast *init; \
 		Slice<Ast *> args; \
 		Token for_token; \
 		Ast *val0; \
@@ -749,8 +765,14 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 	AST_KIND(DynamicArrayType, "dynamic array type", struct { \
 		Token token; \
-		Ast *elem; \
-		Ast *tag;  \
+		Ast *elem;   \
+		Ast *tag;    \
+	}) \
+	AST_KIND(FixedCapacityDynamicArrayType, "fixed capacity dynamic array type", struct { \
+		Token token;   \
+		Ast *capacity; \
+		Ast *elem;     \
+		Ast *tag;      \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
 		Scope *scope; \
@@ -767,6 +789,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		bool is_raw_union;          \
 		bool is_no_copy;            \
 		bool is_all_or_none;        \
+		bool is_simple;             \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
 		Scope *scope; \
@@ -842,19 +865,19 @@ gb_global isize const ast_variant_sizes[] = {
 };
 
 struct AstCommonStuff {
-	AstKind      kind; // u16
-	u8           state_flags;
-	u8           viral_state_flags;
-	i32          file_id;
-	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
+	AstKind         kind; // u16
+	u8              state_flags;
+	std::atomic<u8> viral_state_flags;
+	i32             file_id;
+	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
 };
 
 struct Ast {
-	AstKind      kind; // u16
-	u8           state_flags;
-	u8           viral_state_flags;
-	i32          file_id;
-	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
+	AstKind         kind; // u16
+	u8              state_flags;
+	std::atomic<u8> viral_state_flags;
+	i32             file_id;
+	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {

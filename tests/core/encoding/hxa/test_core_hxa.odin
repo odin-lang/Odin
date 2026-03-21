@@ -1,6 +1,3 @@
-// Tests "core:encoding:hxa".
-// Must be run with `-collection:tests=` flag, e.g.
-// ./odin run tests/core/encoding/hxa/test_core_hxa.odin -out=tests/core/test_core_hxa -collection:tests=./tests
 package test_core_hxa
 
 import "core:encoding/hxa"
@@ -13,13 +10,11 @@ import "core:os"
 
 @test
 test_read :: proc(t: ^testing.T) {
-	data, _ := os.read_entire_file(TEAPOT_PATH)
-	// file, err := hxa.read_from_file(TEAPOT_PATH)
+	data, _ := os.read_entire_file(TEAPOT_PATH, context.allocator)
 	file, err := hxa.read(data)
 	file.backing = data
 	file.allocator = context.allocator
 	hxa.file_destroy(file)
-	// fmt.printfln("%#v", file)
 
 	e :: hxa.Read_Error.None
 	testing.expectf(t, err == e, "read_from_file(%v) -> %v != %v", TEAPOT_PATH, err, e)

@@ -221,13 +221,14 @@ node_graph :: struct {
 foreign lib {
 	node_graph_config_init :: proc(channels: u32) -> node_graph_config ---
 
-	node_graph_init            :: proc(pConfig: ^node_graph_config, pAllocationCallbacks: ^allocation_callbacks, pNodeGraph: ^node_graph) -> result ---
-	node_graph_uninit          :: proc(pNodeGraph: ^node_graph, pAllocationCallbacks: ^allocation_callbacks) ---
-	node_graph_get_endpoint    :: proc(pNodeGraph: ^node_graph) -> ^node ---
-	node_graph_read_pcm_frames :: proc(pNodeGraph: ^node_graph, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result ---
-	node_graph_get_channels    :: proc(pNodeGraph: ^node_graph) -> u32 ---
-	node_graph_get_time        :: proc(pNodeGraph: ^node_graph) -> u64 ---
-	node_graph_set_time        :: proc(pNodeGraph: ^node_graph, globalTime: u64) -> result ---
+	node_graph_init                          :: proc(pConfig: ^node_graph_config, pAllocationCallbacks: ^allocation_callbacks, pNodeGraph: ^node_graph) -> result ---
+	node_graph_uninit                        :: proc(pNodeGraph: ^node_graph, pAllocationCallbacks: ^allocation_callbacks) ---
+	node_graph_get_endpoint                  :: proc(pNodeGraph: ^node_graph) -> ^node ---
+	node_graph_read_pcm_frames               :: proc(pNodeGraph: ^node_graph, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result ---
+	node_graph_get_channels                  :: proc(pNodeGraph: ^node_graph) -> u32 ---
+	node_graph_get_time                      :: proc(pNodeGraph: ^node_graph) -> u64 ---
+	node_graph_set_time                      :: proc(pNodeGraph: ^node_graph, globalTime: u64) -> result ---
+	node_graph_get_processing_size_in_frames :: proc(pNodeGraph: ^node_graph) -> u32 ---
 }
 
 

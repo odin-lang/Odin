@@ -8,8 +8,8 @@ package crypto_hash
 		zhibog, dotbmp:  Initial implementation.
 */
 
+import "core:crypto"
 import "core:io"
-import "core:mem"
 
 // hash_bytes will hash the given input and return the computed digest
 // in a newly allocated slice.
@@ -61,7 +61,7 @@ hash_stream :: proc(
 	ctx: Context
 
 	buf: [MAX_BLOCK_SIZE * 4]byte
-	defer mem.zero_explicit(&buf, size_of(buf))
+	defer crypto.zero_explicit(&buf, size_of(buf))
 
 	init(&ctx, algorithm)
 

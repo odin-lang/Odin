@@ -1,5 +1,5 @@
 #+vet !using-stmt !using-param
-#+feature dynamic-literals
+#+feature dynamic-literals using-stmt
 package main
 
 import "core:fmt"
@@ -751,6 +751,11 @@ union_type :: proc() {
 }
 
 using_statement :: proc() {
+	// IMPORTANT NOTE: `using` as a statement is an opt-in feature which can be abled
+	// by adding `#+feature using-stmt` to be beginning of the file
+	//
+	// `using` as a struct field modifier remains available always
+
 	fmt.println("\n# using statement")
 	// using can used to bring entities declared in a scope/namespace
 	// into the current scope. This can be applied to import names, struct
@@ -1601,7 +1606,7 @@ where_clauses :: proc() {
 			where intrinsics.type_is_numeric(E) {
 			x := a.y*b.z - a.z*b.y
 			y := a.z*b.x - a.x*b.z
-			z := a.x*b.y - a.y*b.z
+			z := a.x*b.y - a.y*b.x
 			return T{x, y, z}
 		}
 
@@ -2242,7 +2247,7 @@ arbitrary_precision_mathematics :: proc() {
 
 		cb := big.internal_count_bits(a)
 		if print_name {
-			fmt.printf(name)
+			fmt.print(name)
 		}
 		if err != nil {
 			fmt.printf(" (Error: %v) ", err)

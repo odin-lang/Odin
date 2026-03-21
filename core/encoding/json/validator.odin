@@ -5,10 +5,10 @@ import "core:mem"
 // NOTE(bill): is_valid will not check for duplicate keys
 is_valid :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> bool {
 	p := make_parser(data, spec, parse_integers, mem.nil_allocator())
-	
+
 	switch p.spec {
 	case .JSON:
-		return validate_object(&p)
+		return validate_value(&p)
 	case .JSON5:
 		return validate_value(&p)
 	case .MJSON:
@@ -52,7 +52,7 @@ validate_object :: proc(p: ^Parser) -> bool {
 	if err := expect_token(p, .Open_Brace); err != .None {
 		return false
 	}
-	
+
 	validate_object_body(p, .Close_Brace) or_return
 
 	if err := expect_token(p, .Close_Brace); err != .None {
@@ -102,7 +102,7 @@ validate_value :: proc(p: ^Parser) -> bool {
 
 	case .Open_Bracket:
 		return validate_array(p)
-		
+
 	case .Ident:
 		if p.spec == .MJSON {
 			advance_token(p)

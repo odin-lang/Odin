@@ -32,6 +32,7 @@ kevent :: proc(kq: KQ, change_list: []KEvent, event_list: []KEvent, timeout: ^po
 		timeout,
 	)
 	if n_events == -1 {
+		n_events = 0
 		err = posix.errno()
 	}
 	return
@@ -60,6 +61,7 @@ Filter :: enum _Filter_Backing {
 	Proc   = _FILTER_PROC,   // Check for changes to the subject process.
 	Signal = _FILTER_SIGNAL, // Check for signals delivered to the process.
 	Timer  = _FILTER_TIMER,  // Timers.
+	User   = _FILTER_USER,   // User events.
 }
 
 RW_Flag :: enum u32 {
@@ -82,17 +84,29 @@ Proc_Flag :: enum u32 {
 	Exit   = log2(0x80000000), // Process exited.
 	Fork   = log2(0x40000000), // Process forked.
 	Exec   = log2(0x20000000), // Process exec'd.
-	Signal = log2(0x08000000), // Shared with `Filter.Signal`.
 }
 Proc_Flags :: bit_set[Proc_Flag; u32]
 
 Timer_Flag :: enum u32 {
 	Seconds   = log2(0x00000001),     // Data is seconds.
-	USeconds  = log2(0x00000002),     // Data is microseconds.
-	NSeconds  = log2(_NOTE_NSECONDS), // Data is nanoseconds.
+	USeconds  = log2(_NOTE_USECONDS), // Data is microseconds.
 	Absolute  = log2(_NOTE_ABSOLUTE), // Absolute timeout.
 }
 Timer_Flags :: bit_set[Timer_Flag; u32]
+
+User_Flag :: enum u32 {
+	Trigger = log2(0x01000000),
+	FFAnd   = log2(0x40000000),
+	FFOr    = log2(0x80000000),
+}
+User_Flags :: bit_set[User_Flag; u32]
+
+USER_FLAGS_COPY         :: User_Flags{.FFOr, .FFAnd}
+USER_FLAGS_CONTROL_MASK :: transmute(User_Flags)u32(0xc0000000)
+USER_FLAGS_MASK         :: transmute(User_Flags)u32(0x00FFFFFF)
+
+// Data is nanoseconds.
+TIMER_FLAGS_NSECONDS :: _TIMER_FLAGS_NSECONDS
 
 when ODIN_OS == .Darwin {
 
@@ -106,9 +120,13 @@ when ODIN_OS == .Darwin {
 	_FILTER_PROC   :: -5
 	_FILTER_SIGNAL :: -6
 	_FILTER_TIMER  :: -7
+	_FILTER_USER   :: -10
 
+	_NOTE_USECONDS :: 0x00000002
 	_NOTE_NSECONDS :: 0x00000004
 	_NOTE_ABSOLUTE :: 0x00000008
+
+	_TIMER_FLAGS_NSECONDS :: Timer_Flags{Timer_Flag(log2(_NOTE_NSECONDS))}
 
 	KEvent :: struct #align(4) {
 		// Value used to identify this event. The exact interpretation is determined by the attached filter.
@@ -119,11 +137,12 @@ when ODIN_OS == .Darwin {
 		flags:  Flags,
 		// Filter specific flags.
 		fflags: struct #raw_union {
-			rw:    RW_Flags,
-			vnode: VNode_Flags,
-			fproc: Proc_Flags,
+			rw:    RW_Flags    `raw_union_tag:"filter=.Read, filter=.Write"`,
+			vnode: VNode_Flags `raw_union_tag:"filter=.VNode"`,
+			fproc: Proc_Flags  `raw_union_tag:"filter=.Proc"`,
 			// vm:    VM_Flags,
-			timer: Timer_Flags,
+			timer: Timer_Flags `raw_union_tag:"filter=.Timer"`,
+			user:  User_Flags `raw_union_tag:"filter=.User"`,
 		},
 		// Filter specific data.
 		data:   c.long /* intptr_t */,
@@ -143,9 +162,13 @@ when ODIN_OS == .Darwin {
 	_FILTER_PROC   :: -5
 	_FILTER_SIGNAL :: -6
 	_FILTER_TIMER  :: -7
+	_FILTER_USER   :: -11
 
-	_NOTE_NSECONDS :: 0x00000004
-	_NOTE_ABSOLUTE :: 0x00000008
+	_NOTE_USECONDS :: 0x00000004
+	_NOTE_NSECONDS :: 0x00000008
+	_NOTE_ABSOLUTE :: 0x00000010
+
+	_TIMER_FLAGS_NSECONDS :: Timer_Flags{Timer_Flag(log2(_NOTE_NSECONDS))}
 
 	KEvent :: struct {
 		// Value used to identify this event. The exact interpretation is determined by the attached filter.
@@ -156,11 +179,12 @@ when ODIN_OS == .Darwin {
 		flags:  Flags,
 		// Filter specific flags.
 		fflags: struct #raw_union {
-			rw:    RW_Flags,
-			vnode: VNode_Flags,
-			fproc: Proc_Flags,
+			rw:    RW_Flags    `raw_union_tag:"filter=.Read, filter=.Write"`,
+			vnode: VNode_Flags `raw_union_tag:"filter=.VNode"`,
+			fproc: Proc_Flags  `raw_union_tag:"filter=.Proc"`,
 			// vm:    VM_Flags,
-			timer: Timer_Flags,
+			timer: Timer_Flags `raw_union_tag:"filter=.Timer"`,
+			user:  User_Flags `raw_union_tag:"filter=.User"`,
 		},
 		// Filter specific data.
 		data:   i64,
@@ -181,11 +205,14 @@ when ODIN_OS == .Darwin {
 	_FILTER_PROC   :: 4
 	_FILTER_SIGNAL :: 5
 	_FILTER_TIMER  :: 6
+	_FILTER_USER   :: 8
 
-	_NOTE_NSECONDS :: 0x00000003
+	_NOTE_USECONDS :: 0x00000002
 	_NOTE_ABSOLUTE :: 0x00000010
 
-	KEvent :: struct #align(4) {
+	_TIMER_FLAGS_NSECONDS :: Timer_Flags{.Seconds, .USeconds}
+
+	KEvent :: struct {
 		// Value used to identify this event. The exact interpretation is determined by the attached filter.
 		ident:  uintptr,
 		// Filter for event.
@@ -194,18 +221,17 @@ when ODIN_OS == .Darwin {
 		flags:  Flags,
 		// Filter specific flags.
 		fflags: struct #raw_union {
-			rw:    RW_Flags,
-			vnode: VNode_Flags,
-			fproc: Proc_Flags,
+			rw:    RW_Flags    `raw_union_tag:"filter=.Read, filter=.Write"`,
+			vnode: VNode_Flags `raw_union_tag:"filter=.VNode"`,
+			fproc: Proc_Flags  `raw_union_tag:"filter=.Proc"`,
 			// vm:    VM_Flags,
-			timer: Timer_Flags,
+			timer: Timer_Flags `raw_union_tag:"filter=.Timer"`,
+			user:  User_Flags `raw_union_tag:"filter=.User"`,
 		},
 		// Filter specific data.
 		data:   i64,
 		// Opaque user data passed through the kernel unchanged.
 		udata:  rawptr,
-		// Extensions.
-		ext: [4]u64,
 	}
 } else when ODIN_OS == .OpenBSD {
 
@@ -219,9 +245,13 @@ when ODIN_OS == .Darwin {
 	_FILTER_PROC   :: -5
 	_FILTER_SIGNAL :: -6
 	_FILTER_TIMER  :: -7
+	_FILTER_USER   :: -10
 
-	_NOTE_NSECONDS :: 0x00000003
+	_NOTE_USECONDS :: 0x00000002
+	_NOTE_NSECONDS :: 0x00000004
 	_NOTE_ABSOLUTE :: 0x00000010
+
+	_TIMER_FLAGS_NSECONDS :: Timer_Flags{Timer_Flag(log2(_NOTE_NSECONDS))}
 
 	KEvent :: struct #align(4) {
 		// Value used to identify this event. The exact interpretation is determined by the attached filter.
@@ -232,11 +262,12 @@ when ODIN_OS == .Darwin {
 		flags:  Flags,
 		// Filter specific flags.
 		fflags: struct #raw_union {
-			rw:    RW_Flags,
-			vnode: VNode_Flags,
-			fproc: Proc_Flags,
+			rw:    RW_Flags    `raw_union_tag:"filter=.Read, filter=.Write"`,
+			vnode: VNode_Flags `raw_union_tag:"filter=.VNode"`,
+			fproc: Proc_Flags  `raw_union_tag:"filter=.Proc"`,
 			// vm:    VM_Flags,
-			timer: Timer_Flags,
+			timer: Timer_Flags `raw_union_tag:"filter=.Timer"`,
+			user:  User_Flags `raw_union_tag:"filter=.User"`,
 		},
 		// Filter specific data.
 		data:   i64,
@@ -245,12 +276,20 @@ when ODIN_OS == .Darwin {
 	}
 }
 
+when ODIN_OS == .NetBSD {
+	@(private)
+	LKEVENT :: "__kevent50"
+} else {
+	@(private)
+	LKEVENT :: "kevent"
+}
+
 @(private)
 log2 :: intrinsics.constant_log2
 
 foreign lib {
 	@(link_name="kqueue")
 	_kqueue :: proc() -> KQ ---
-	@(link_name="kevent")
+	@(link_name=LKEVENT)
 	_kevent :: proc(kq: KQ, change_list: [^]KEvent, n_changes: c.int, event_list: [^]KEvent, n_events: c.int, timeout: ^posix.timespec) -> c.int ---
 }

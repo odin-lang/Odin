@@ -1606,7 +1606,7 @@ foreign lib {
 	----------
 	pBackends (out, optional)
 			A pointer to the buffer that will receive the enabled backends. Set to NULL to retrieve the backend count. Setting
-			the capacity of the buffer to `MA_BUFFER_COUNT` will guarantee it's large enough for all backends.
+			the capacity of the buffer to `MA_BACKEND_COUNT` will guarantee it's large enough for all backends.
 
 	backendCap (in)
 			The capacity of the `pBackends` buffer.

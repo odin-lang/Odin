@@ -14,15 +14,6 @@ when ODIN_OS == .Windows {
 		"system:Ws2_32.lib",
 		"system:iphlpapi.lib",
 	}
-} else when ODIN_OS == .Linux {
-	@(export)
-	foreign import lib {
-		"system:curl",
-		"system:mbedtls",
-		"system:mbedx509",
-		"system:mbedcrypto",
-		"system:z",
-	}
 } else when ODIN_OS == .Darwin {
 	@(export)
 	foreign import lib {
@@ -31,6 +22,15 @@ when ODIN_OS == .Windows {
 		"system:mbedcrypto",
 		"system:z",
 		"system:SystemConfiguration.framework",
+	}
+} else {
+	@(export)
+	foreign import lib {
+		"system:curl",
+		"system:mbedtls",
+		"system:mbedx509",
+		"system:mbedcrypto",
+		"system:z",
 	}
 }
 
@@ -2502,7 +2502,7 @@ foreign lib {
 	 * Appends a string to a linked list. If no list exists, it will be created
 	 * first. Returns the new list, after appending.
 	 */
-	slist_append :: proc(list: ^slist, data: [^]byte) -> ^slist ---
+	slist_append :: proc(list: ^slist, data: cstring) -> ^slist ---
 
 	/*
 	 * NAME curl_slist_free_all()

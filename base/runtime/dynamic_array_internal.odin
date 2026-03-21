@@ -18,8 +18,8 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	// assuming that appending/reserving will set the allocator, if it is not already set.
 	if array.allocator.procedure == nil {
 		array.allocator = context.allocator
+		assert(array.allocator.procedure != nil)
 	}
-	assert(array.allocator.procedure != nil)
 
 	if cap <= array.cap {
 		return true
@@ -52,8 +52,8 @@ __dynamic_array_shrink :: proc(array_: rawptr, elem_size, elem_align: int, new_c
 	// assuming that appending/reserving will set the allocator, if it is not already set.
 	if array.allocator.procedure == nil {
 		array.allocator = context.allocator
+		assert(array.allocator.procedure != nil)
 	}
-	assert(array.allocator.procedure != nil)
 
 	if new_cap > array.cap {
 		return

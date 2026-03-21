@@ -29,12 +29,13 @@ Returns:
 make_permutation_iterator :: proc(
 	slice: []$T,
 	allocator := context.allocator,
+	loc := #caller_location,
 ) -> (
 	iter: Permutation_Iterator(T),
 	error: runtime.Allocator_Error,
 ) #optional_allocator_error {
 	iter.slice = slice
-	iter.counters = make([]int, len(iter.slice), allocator) or_return
+	iter.counters = make([]int, len(iter.slice), allocator, loc) or_return
 
 	return
 }

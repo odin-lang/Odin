@@ -2,7 +2,7 @@
 Bindings for [[ miniaudio ; https://miniaud.io/docs ]] audio playback and capture library.
 
 Choice of public domain or MIT-0. See license statements at the end of this file.
-miniaudio - v0.11.21 - 2023-11-15
+miniaudio - v0.11.24 - 2025-09-11
 
 David Reid - mackron@gmail.com
 
@@ -300,7 +300,7 @@ The engine encapsulates both the resource manager and the node graph to create a
 use high level API. The resource manager and node graph APIs are covered in more later sections of
 this manual.
 
-The code below shows how you can initialize an engine using it's default configuration.
+The code below shows how you can initialize an engine using its default configuration.
 
     ```c
     ma_result result;
@@ -388,7 +388,7 @@ Sounds are not started by default. Start a sound with `ma_sound_start()` and sto
 `ma_sound_stop()`. When a sound is stopped, it is not rewound to the start. Use
 `ma_sound_seek_to_pcm_frame(&sound, 0)` to seek back to the start of a sound. By default, starting
 and stopping sounds happens immediately, but sometimes it might be convenient to schedule the sound
-the be started and/or stopped at a specific time. This can be done with the following functions:
+to be started and/or stopped at a specific time. This can be done with the following functions:
 
     ```c
     ma_sound_set_start_time_in_pcm_frames()
@@ -460,6 +460,11 @@ is at the end, use `ma_sound_at_end()`. Looping of a sound can be controlled wit
 miniaudio should work cleanly out of the box without the need to download or install any
 dependencies. See below for platform-specific details.
 
+This library has been designed to be added directly to your source tree which is the preferred way
+of using it, but you can compile it as a normal library if that's your preference. Be careful if
+compiling as a shared object because miniaudio is not ABI compatible between any release, including
+bug fix releases. It's recommended you link statically
+
 Note that GCC and Clang require `-msse2`, `-mavx2`, etc. for SIMD optimizations.
 
 If you get errors about undefined references to `__sync_val_compare_and_swap_8`, `__atomic_load_8`,
@@ -529,7 +534,7 @@ you'll need to disable run-time linking with `MA_NO_RUNTIME_LINKING` and link wi
 The Emscripten build emits Web Audio JavaScript directly and should compile cleanly out of the box.
 You cannot use `-std=c*` compiler flags, nor `-ansi`.
 
-You can enable the use of AudioWorkets by defining `MA_ENABLE_AUDIO_WORKLETS` and then compiling
+You can enable the use of AudioWorklets by defining `MA_ENABLE_AUDIO_WORKLETS` and then compiling
 with the following options:
 
     -sAUDIO_WORKLET=1 -sWASM_WORKERS=1 -sASYNCIFY
@@ -878,7 +883,7 @@ read data within a certain range of the underlying data. To do this you can use 
 
 This is useful if you have a sound bank where many sounds are stored in the same file and you want
 the data source to only play one of those sub-sounds. Note that once the range is set, everything
-that takes a position, such as cursors and loop points, should always be relatvie to the start of
+that takes a position, such as cursors and loop points, should always be relative to the start of
 the range. When the range is set, any previously defined loop point will be reset.
 
 Custom loop points can also be used with data sources. By default, data sources will loop after
@@ -886,7 +891,7 @@ they reach the end of the data source, but if you need to loop at a specific loc
 the following:
 
     ```c
-    result = ma_data_set_loop_point_in_pcm_frames(pDataSource, loopBegInFrames, loopEndInFrames);
+    result = ma_data_source_set_loop_point_in_pcm_frames(pDataSource, loopBegInFrames, loopEndInFrames);
     if (result != MA_SUCCESS) {
         return result;  // Failed to set the loop point.
     }

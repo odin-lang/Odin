@@ -20,9 +20,9 @@ foreign import lib { LIB }
 
 BINDINGS_VERSION_MAJOR    :: 0
 BINDINGS_VERSION_MINOR    :: 11
-BINDINGS_VERSION_REVISION :: 22
+BINDINGS_VERSION_REVISION :: 24
 BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MINOR, BINDINGS_VERSION_REVISION}
-BINDINGS_VERSION_STRING   :: "0.11.22"
+BINDINGS_VERSION_STRING   :: "0.11.24"
 
 @(init)
 version_check :: proc "contextless" () {
@@ -114,9 +114,9 @@ channel :: enum u8 {
 	AUX_29                              = 49,
 	AUX_30                              = 50,
 	AUX_31                              = 51,
+	POSITION_COUNT,
 	LEFT                                = FRONT_LEFT,
 	RIGHT                               = FRONT_RIGHT,
-	POSITION_COUNT                      = AUX_31 + 1,
 }
 
 result :: enum c.int {
@@ -296,7 +296,7 @@ allocation_callbacks :: struct {
 }
 
 lcg :: struct {
-	state: i32,
+	state: u32,
 }
 
 

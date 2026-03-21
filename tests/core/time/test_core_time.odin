@@ -2,6 +2,7 @@ package test_core_time
 
 import "core:testing"
 import "core:time"
+@(require) import "core:log"
 import dt "core:time/datetime"
 import tz "core:time/timezone"
 
@@ -15,8 +16,8 @@ test_time_and_date_formatting :: proc(t: ^testing.T) {
 		d := time.Duration(now._nsec)
 
 		testing.expect_value(t, time.to_string_hms       (now, buf[:]),               "00:12:44")
-		testing.expect_value(t, time.to_string_hms_12    (now, buf[:]),               "00:12:44 am")
-		testing.expect_value(t, time.to_string_hms_12    (now, buf[:],  {"㏂", "㏘"}), "00:12:44㏂")
+		testing.expect_value(t, time.to_string_hms_12    (now, buf[:]),               "12:12:44 am")
+		testing.expect_value(t, time.to_string_hms_12    (now, buf[:],  {"㏂", "㏘"}), "12:12:44㏂")
 		testing.expect_value(t, time.to_string_hms       (d,   buf[:]),               "00:12:44")
 
 		testing.expect_value(t, time.to_string_yyyy_mm_dd(now, buf[:]),               "1677-09-21")
@@ -364,8 +365,9 @@ test_convert_timezone_roundtrip :: proc(t: ^testing.T) {
 	std_dt, _ := dt.components_to_datetime(2024, 11, 4, 23, 47, 0)
 
 	local_tz, local_load_ok := tz.region_load("local")
-	testing.expectf(t, local_load_ok, "Failed to load local timezone")
 	defer tz.region_destroy(local_tz)
+
+	testing.expectf(t, local_load_ok, "Failed to load local timezone")
 
 	edm_tz, edm_load_ok := tz.region_load("America/Edmonton")
 	testing.expectf(t, edm_load_ok, "Failed to load America/Edmonton timezone")

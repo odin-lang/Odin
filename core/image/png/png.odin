@@ -1,4 +1,6 @@
-#+vet !using-stmt
+#+feature using-stmt
+// Reader for `PNG` images.
+// The PNG specification is at [[ https://www.w3.org/TR/PNG/ ]].
 package png
 
 /*

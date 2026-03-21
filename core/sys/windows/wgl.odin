@@ -1,8 +1,6 @@
 #+build windows
 package sys_windows
 
-import "core:c"
-
 foreign import "system:Opengl32.lib"
 
 CONTEXT_MAJOR_VERSION_ARB             :: 0x2091
@@ -54,9 +52,9 @@ GLYPHMETRICSFLOAT :: struct {
 	gmfCellIncY:      f32,
 }
 
-CreateContextAttribsARBType :: #type proc "c" (hdc: HDC, hShareContext: rawptr, attribList: [^]c.int) -> HGLRC
-ChoosePixelFormatARBType    :: #type proc "c" (hdc: HDC, attribIList: [^]c.int, attribFList: [^]f32, maxFormats: DWORD, formats: [^]c.int, numFormats: [^]DWORD) -> BOOL
-SwapIntervalEXTType         :: #type proc "c" (interval: c.int) -> bool
+CreateContextAttribsARBType :: #type proc "c" (hdc: HDC, hShareContext: rawptr, attribList: [^]c_int) -> HGLRC
+ChoosePixelFormatARBType    :: #type proc "c" (hdc: HDC, attribIList: [^]c_int, attribFList: [^]f32, maxFormats: DWORD, formats: [^]c_int, numFormats: [^]DWORD) -> BOOL
+SwapIntervalEXTType         :: #type proc "c" (interval: c_int) -> bool
 GetExtensionsStringARBType  :: #type proc "c" (HDC) -> cstring
 
 // Procedures
@@ -73,18 +71,18 @@ foreign Opengl32 {
 	wglGetProcAddress         :: proc(c_str: cstring) -> rawptr ---
 	wglDeleteContext          :: proc(HGLRC: HGLRC) -> BOOL ---
 	wglCopyContext            :: proc(src, dst: HGLRC, mask: UINT) -> BOOL ---
-	wglCreateLayerContext     :: proc(hdc: HDC, layer_plane: c.int) -> HGLRC ---
-	wglDescribeLayerPlane     :: proc(hdc: HDC, pixel_format, layer_plane: c.int, bytes: UINT, pd: LPLAYERPLANEDESCRIPTOR) -> BOOL ---
+	wglCreateLayerContext     :: proc(hdc: HDC, layer_plane: c_int) -> HGLRC ---
+	wglDescribeLayerPlane     :: proc(hdc: HDC, pixel_format, layer_plane: c_int, bytes: UINT, pd: LPLAYERPLANEDESCRIPTOR) -> BOOL ---
 	wglGetCurrentContext      :: proc() -> HGLRC ---
 	wglGetCurrentDC           :: proc() -> HDC ---
-	wglGetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: c.int, cr: ^COLORREF) -> c.int ---
-	wglRealizeLayerPalette    :: proc(hdc: HDC, layer_plane: c.int, realize: BOOL) -> BOOL ---
-	wglSetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: c.int, cr: ^COLORREF) -> c.int ---
+	wglGetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: c_int, cr: ^COLORREF) -> c_int ---
+	wglRealizeLayerPalette    :: proc(hdc: HDC, layer_plane: c_int, realize: BOOL) -> BOOL ---
+	wglSetLayerPaletteEntries :: proc(hdc: HDC, layer_plane, start, entries: c_int, cr: ^COLORREF) -> c_int ---
 	wglShareLists             :: proc(HGLRC1, HGLRC2: HGLRC) -> BOOL ---
 	wglSwapLayerBuffers       :: proc(hdc: HDC, planes: DWORD) -> BOOL ---
 	wglUseFontBitmapsA        :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
 	wglUseFontBitmapsW        :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
-	wglUseFontOutlines        :: proc(hdc: HDC, first, count, list_base: DWORD, deviation, extrusion: f32, format: c.int, gmf: LPGLYPHMETRICSFLOAT) -> BOOL ---
+	wglUseFontOutlines        :: proc(hdc: HDC, first, count, list_base: DWORD, deviation, extrusion: f32, format: c_int, gmf: LPGLYPHMETRICSFLOAT) -> BOOL ---
 }
 
 // Used by vendor:OpenGL
@@ -93,7 +91,7 @@ gl_set_proc_address :: proc(p: rawptr, name: cstring) {
 	func := wglGetProcAddress(name)
 	switch uintptr(func) {
 	case 0, 1, 2, 3, ~uintptr(0):
-		module := LoadLibraryW(L("opengl32.dll"))
+		module := LoadLibraryW("opengl32.dll")
 		func = GetProcAddress(module, name)
 	}
 	(^rawptr)(p)^ = func

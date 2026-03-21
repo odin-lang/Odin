@@ -1,8 +1,10 @@
 package aes
 
+import "core:crypto"
 import "core:crypto/_aes/ct64"
-import "core:mem"
 import "core:reflect"
+
+zero_explicit :: crypto.zero_explicit
 
 @(private)
 Context_Impl :: union {
@@ -41,5 +43,5 @@ init_impl :: proc(ctx: ^Context_Impl, key: []byte, impl: Implementation) {
 
 @(private)
 reset_impl :: proc "contextless" (ctx: ^Context_Impl) {
-	mem.zero_explicit(ctx, size_of(Context_Impl))
+	zero_explicit(ctx, size_of(Context_Impl))
 }

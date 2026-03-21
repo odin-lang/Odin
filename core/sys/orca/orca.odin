@@ -1,15 +1,13 @@
 // Bindings for the Orca platform
 //
 // See: [[ https://orca-app.dev ]]
+
 package orca
 
 import "core:c"
 
 char :: c.char
 
-// currently missing in the api.json
-window :: distinct u64
-    
 // currently missing in the api.json
 pool :: struct {
 	arena: arena,
@@ -142,17 +140,6 @@ UNICODE_VARIATION_SELECTORS_SUPPLEMENT :: unicode_range { 0xe0100, 239 }
 UNICODE_SUPPLEMENTARY_PRIVATE_USE_AREA_A :: unicode_range { 0xf0000, 65533 }
 UNICODE_SUPPLEMENTARY_PRIVATE_USE_AREA_B  :: unicode_range { 0x100000, 65533 }
 
-clock_kind :: enum c.int {
-	MONOTONIC,
-	UPTIME,
-	DATE,
-}
-
-@(default_calling_convention="c", link_prefix="oc_")
-foreign {
-	clock_time :: proc(clock: clock_kind) -> f64 ---
-}
-
 file_write_slice :: proc(file: file, slice: []char) -> u64 {
 	return file_write(file, u64(len(slice)), raw_data(slice))
 }
@@ -204,6 +191,26 @@ foreign {
 	mat2x3_rotate :: proc(radians: f32) -> mat2x3 ---
 	// Return a 2x3 matrix representing a translation.
 	mat2x3_translate :: proc(x: f32, y: f32) -> mat2x3 ---
+	// Return a 2x3 matrix representing a scale.
+	mat2x3_scale :: proc(x: f32, y: f32) -> mat2x3 ---
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// API for sampling the system clock.
+////////////////////////////////////////////////////////////////////////////////
+
+clock_kind :: enum u32 {
+	// A clock incrementing monotonically.
+	MONOTONIC = 0,
+	// A clock incrementing monotonically during uptime.
+	UPTIME = 1,
+	// A clock driven by the platform time.
+	DATE = 2,
+}
+
+@(default_calling_convention="c", link_prefix="oc_")
+foreign {
+	clock_time :: proc(clock: clock_kind) -> f64 ---
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,10 +361,14 @@ foreign {
 	arena_init_with_options :: proc(arena: ^arena, options: ^arena_options) ---
 	// Release all resources allocated to a memory arena.
 	arena_cleanup :: proc(arena: ^arena) ---
-	// Allocate a block of memory from an arena.
+	// Allocate a zero initialized block of memory from an arena.
 	arena_push :: proc(arena: ^arena, size: u64) -> rawptr ---
-	// Allocate an aligned block of memory from an arena.
+	// Allocate an aligned, zero initialized block of memory from an arena.
 	arena_push_aligned :: proc(arena: ^arena, size: u64, alignment: u32) -> rawptr ---
+	// Allocate a block of memory from an arena.
+	arena_push_uninitialized :: proc(arena: ^arena, size: u64) -> rawptr ---
+	// Allocate an aligned block of memory from an arena.
+	arena_push_aligned_uninitialized :: proc(arena: ^arena, size: u64, alignment: u32) -> rawptr ---
 	// Reset an arena. All memory that was previously allocated from this arena is released to the arena, and can be reallocated by later calls to `oc_arena_push` and similar functions. No memory is actually released _to the system_.
 	arena_clear :: proc(arena: ^arena) ---
 	// Begin a memory scope. This creates an `oc_arena_scope` object that stores the current offset of the arena. The arena can later be reset to that offset by calling `oc_arena_scope_end`, releasing all memory that was allocated within the scope to the arena.
@@ -530,15 +541,15 @@ utf8_status :: enum u32 {
 	// The operation unexpectedly encountered the end of the utf8 sequence.
 	OUT_OF_BOUNDS = 1,
 	// A continuation byte was encountered where a leading byte was expected.
-	UNEXPECTED_CONTINUATION_BYTE = 3,
+	UNEXPECTED_CONTINUATION_BYTE = 2,
 	// A leading byte was encountered in the middle of the encoding of utf8 codepoint.
-	UNEXPECTED_LEADING_BYTE = 4,
+	UNEXPECTED_LEADING_BYTE = 3,
 	// The utf8 sequence contains an invalid byte.
-	INVALID_BYTE = 5,
+	INVALID_BYTE = 4,
 	// The operation encountered an invalid utf8 codepoint.
-	INVALID_CODEPOINT = 6,
+	INVALID_CODEPOINT = 5,
 	// The utf8 sequence contains an overlong encoding of a utf8 codepoint.
-	OVERLONG_ENCODING = 7,
+	OVERLONG_ENCODING = 6,
 }
 
 // A type representing the result of decoding of utf8-encoded codepoint.
@@ -1044,6 +1055,9 @@ file_dialog_result :: struct {
 	selection: str8_list,
 }
 
+// An opaque handle identifying a window.
+window :: distinct u64
+
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	// Set the title of the application's window.
@@ -1054,8 +1068,93 @@ foreign {
 	request_quit :: proc() ---
 	// Convert a scancode to a keycode, according to current keyboard layout.
 	scancode_to_keycode :: proc(scanCode: scan_code) -> key_code ---
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Application user input.
+////////////////////////////////////////////////////////////////////////////////
+
+key_state :: struct {
+	lastUpdate: u64,
+	transitionCount: u32,
+	repeatCount: u32,
+	down: bool,
+	sysClicked: bool,
+	sysDoubleClicked: bool,
+	sysTripleClicked: bool,
+}
+
+keyboard_state :: struct {
+	keys: [349]key_state,
+	mods: keymod_flags,
+}
+
+mouse_state :: struct {
+	lastUpdate: u64,
+	posValid: bool,
+	pos: vec2,
+	delta: vec2,
+	wheel: vec2,
+	using _: struct #raw_union {
+		buttons: [5]key_state,
+		using _: struct {
+			left: key_state,
+			right: key_state,
+			middle: key_state,
+			ext1: key_state,
+			ext2: key_state,
+		},
+	},
+}
+
+BACKING_SIZE :: 64
+
+text_state :: struct {
+	lastUpdate: u64,
+	backing: [64]utf32,
+	codePoints: str32,
+}
+
+clipboard_state :: struct {
+	lastUpdate: u64,
+	pastedText: str8,
+}
+
+input_state :: struct {
+	frameCounter: u64,
+	keyboard: keyboard_state,
+	mouse: mouse_state,
+	text: text_state,
+	clipboard: clipboard_state,
+}
+
+@(default_calling_convention="c", link_prefix="oc_")
+foreign {
+	input_process_event :: proc(arena: ^arena, state: ^input_state, event: ^event) ---
+	input_next_frame :: proc(state: ^input_state) ---
+	key_down :: proc(state: ^input_state, key: key_code) -> bool ---
+	key_press_count :: proc(state: ^input_state, key: key_code) -> u8 ---
+	key_release_count :: proc(state: ^input_state, key: key_code) -> u8 ---
+	key_repeat_count :: proc(state: ^input_state, key: key_code) -> u8 ---
+	key_down_scancode :: proc(state: ^input_state, key: scan_code) -> bool ---
+	key_press_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
+	key_release_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
+	key_repeat_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
+	mouse_down :: proc(state: ^input_state, button: mouse_button) -> bool ---
+	mouse_pressed :: proc(state: ^input_state, button: mouse_button) -> u8 ---
+	mouse_released :: proc(state: ^input_state, button: mouse_button) -> u8 ---
+	mouse_clicked :: proc(state: ^input_state, button: mouse_button) -> bool ---
+	mouse_double_clicked :: proc(state: ^input_state, button: mouse_button) -> bool ---
+	mouse_position :: proc(state: ^input_state) -> vec2 ---
+	mouse_delta :: proc(state: ^input_state) -> vec2 ---
+	mouse_wheel :: proc(state: ^input_state) -> vec2 ---
+	input_text_utf32 :: proc(arena: ^arena, state: ^input_state) -> str32 ---
+	input_text_utf8 :: proc(arena: ^arena, state: ^input_state) -> str8 ---
 	// Put a string in the clipboard.
 	clipboard_set_string :: proc(string: str8) ---
+	clipboard_pasted :: proc(state: ^input_state) -> bool ---
+	clipboard_pasted_text :: proc(state: ^input_state) -> str8 ---
+	key_mods :: proc(state: ^input_state) -> keymod_flags ---
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1073,7 +1172,7 @@ file :: distinct u64
 // Flags for the `oc_file_open()` function.
 file_open_flag :: enum u16 {
 	// Open the file in 'append' mode. All writes append data at the end of the file.
-	APPEND = 1,
+	APPEND = 0,
 	// Truncate the file to 0 bytes when opening.
 	TRUNCATE,
 	// Create the file if it does not exist.
@@ -1090,7 +1189,7 @@ file_open_flags :: bit_set[file_open_flag; u16]
 // This enum describes the access permissions of a file handle.
 file_access_flag :: enum u16 {
 	// The file handle can be used for reading from the file.
-	READ = 1,
+	READ = 0,
 	// The file handle can be used for writing to the file.
 	WRITE,
 }
@@ -1242,7 +1341,7 @@ file_type :: enum u32 {
 
 // A type describing file permissions.
 file_perm_flag :: enum u16 {
-	OTHER_EXEC = 1,
+	OTHER_EXEC = 0,
 	OTHER_WRITE,
 	OTHER_READ,
 	GROUP_EXEC,
@@ -1272,6 +1371,18 @@ file_status :: struct {
 	modificationDate: datestamp,
 }
 
+// An type describing a list of enumerated files in a given directory.
+file_list :: struct {
+	list: list,
+	eltCount: u64,
+}
+
+file_listdir_elt :: struct {
+	listElt: list_elt,
+	basename: str8,
+	type: file_type,
+}
+
 @(default_calling_convention="c", link_prefix="oc_")
 foreign {
 	// Send a single I/O request and wait for its completion.
@@ -1299,6 +1410,7 @@ foreign {
 	file_get_status :: proc(file: file) -> file_status ---
 	file_size :: proc(file: file) -> u64 ---
 	file_open_with_request :: proc(path: str8, rights: file_access, flags: file_open_flags) -> file ---
+	file_listdir :: proc(arena: ^arena, directory: str8) -> file_list ---
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1703,87 +1815,6 @@ foreign {
 // Graphical User Interface API.
 ////////////////////////////////////////////////////////////////////////////////
 
-key_state :: struct {
-	lastUpdate: u64,
-	transitionCount: u32,
-	repeatCount: u32,
-	down: bool,
-	sysClicked: bool,
-	sysDoubleClicked: bool,
-	sysTripleClicked: bool,
-}
-
-keyboard_state :: struct {
-	keys: [349]key_state,
-	mods: keymod_flags,
-}
-
-mouse_state :: struct {
-	lastUpdate: u64,
-	posValid: bool,
-	pos: vec2,
-	delta: vec2,
-	wheel: vec2,
-	using _: struct #raw_union {
-		buttons: [5]key_state,
-		using _: struct {
-			left: key_state,
-			right: key_state,
-			middle: key_state,
-			ext1: key_state,
-			ext2: key_state,
-		},
-	},
-}
-
-BACKING_SIZE :: 64
-
-text_state :: struct {
-	lastUpdate: u64,
-	backing: [64]utf32,
-	codePoints: str32,
-}
-
-clipboard_state :: struct {
-	lastUpdate: u64,
-	pastedText: str8,
-}
-
-input_state :: struct {
-	frameCounter: u64,
-	keyboard: keyboard_state,
-	mouse: mouse_state,
-	text: text_state,
-	clipboard: clipboard_state,
-}
-
-@(default_calling_convention="c", link_prefix="oc_")
-foreign {
-	input_process_event :: proc(arena: ^arena, state: ^input_state, event: ^event) ---
-	input_next_frame :: proc(state: ^input_state) ---
-	key_down :: proc(state: ^input_state, key: key_code) -> bool ---
-	key_press_count :: proc(state: ^input_state, key: key_code) -> u8 ---
-	key_release_count :: proc(state: ^input_state, key: key_code) -> u8 ---
-	key_repeat_count :: proc(state: ^input_state, key: key_code) -> u8 ---
-	key_down_scancode :: proc(state: ^input_state, key: scan_code) -> bool ---
-	key_press_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
-	key_release_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
-	key_repeat_count_scancode :: proc(state: ^input_state, key: scan_code) -> u8 ---
-	mouse_down :: proc(state: ^input_state, button: mouse_button) -> bool ---
-	mouse_pressed :: proc(state: ^input_state, button: mouse_button) -> u8 ---
-	mouse_released :: proc(state: ^input_state, button: mouse_button) -> u8 ---
-	mouse_clicked :: proc(state: ^input_state, button: mouse_button) -> bool ---
-	mouse_double_clicked :: proc(state: ^input_state, button: mouse_button) -> bool ---
-	mouse_position :: proc(state: ^input_state) -> vec2 ---
-	mouse_delta :: proc(state: ^input_state) -> vec2 ---
-	mouse_wheel :: proc(state: ^input_state) -> vec2 ---
-	input_text_utf32 :: proc(arena: ^arena, state: ^input_state) -> str32 ---
-	input_text_utf8 :: proc(arena: ^arena, state: ^input_state) -> str8 ---
-	clipboard_pasted :: proc(state: ^input_state) -> bool ---
-	clipboard_pasted_text :: proc(state: ^input_state) -> str8 ---
-	key_mods :: proc(state: ^input_state) -> keymod_flags ---
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // Graphical User Interface Core API.
 ////////////////////////////////////////////////////////////////////////////////
@@ -1857,11 +1888,11 @@ ui_attribute_mask :: enum u32 {
 	SIZE_WIDTH = 1,
 	SIZE_HEIGHT = 2,
 	LAYOUT_AXIS = 4,
-	LAYOUT_ALIGN_X = 64,
-	LAYOUT_ALIGN_Y = 128,
-	LAYOUT_SPACING = 32,
 	LAYOUT_MARGIN_X = 8,
 	LAYOUT_MARGIN_Y = 16,
+	LAYOUT_SPACING = 32,
+	LAYOUT_ALIGN_X = 64,
+	LAYOUT_ALIGN_Y = 128,
 	FLOATING_X = 256,
 	FLOATING_Y = 512,
 	FLOAT_TARGET_X = 1024,
@@ -1873,10 +1904,10 @@ ui_attribute_mask :: enum u32 {
 	COLOR = 65536,
 	BG_COLOR = 131072,
 	BORDER_COLOR = 262144,
-	BORDER_SIZE = 2097152,
-	ROUNDNESS = 4194304,
 	FONT = 524288,
 	FONT_SIZE = 1048576,
+	BORDER_SIZE = 2097152,
+	ROUNDNESS = 4194304,
 	DRAW_MASK = 8388608,
 	ANIMATION_TIME = 16777216,
 	ANIMATION_MASK = 33554432,
@@ -1898,6 +1929,7 @@ ui_box_size :: [2]ui_size
 
 ui_box_floating :: [2]bool
 
+// These bits *disable* the corresponding element when they're set.
 ui_draw_mask :: enum u32 {
 	BACKGROUND = 1,
 	BORDER = 2,

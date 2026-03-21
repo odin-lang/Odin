@@ -13,7 +13,8 @@ foreign xcursor {
 	cursorGetDefaultSize    :: proc(display: ^Display) -> i32 ---
 	cursorLibraryLoadCursor :: proc(display: ^Display, name: cstring) -> Cursor ---
 	cursorLibraryLoadImage  :: proc(name: cstring, theme: cstring, size: i32) -> rawptr ---
-	cursorImageLoadCursor   :: proc(display: ^Display, img: rawptr) -> Cursor ---
+	cursorImageCreate       :: proc(width: i32, height: i32) -> ^CursorImage ---
+	cursorImageLoadCursor   :: proc(display: ^Display, img: ^CursorImage) -> Cursor ---
 	cursorImageDestroy      :: proc(img: rawptr) ---
 }
 
@@ -234,14 +235,14 @@ foreign xlib {
 		display:   ^Display,
 		window:    Window,
 		attr_mask: WindowAttributeMask,
-		attr:      ^XWindowAttributes,
+		attr:      ^XSetWindowAttributes,
 		) ---
 	SetWindowBackground :: proc(
 		display:   ^Display,
 		window:    Window,
 		pixel:     uint,
 		) ---
-	SetWindowBackgroundMap :: proc(
+	SetWindowBackgroundPixmap :: proc(
 		display:   ^Display,
 		window:    Window,
 		pixmap:    Pixmap,
@@ -1112,15 +1113,15 @@ foreign xlib {
 	SetAfterFunction :: proc(
 		display:   ^Display,
 		procedure: #type proc "c" (display: ^Display) -> i32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display) -> i32 ---
 	Synchronize :: proc(
 		display: ^Display,
 		onoff: b32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display) -> i32 ---
 	// Error handling
 	SetErrorHandler :: proc(
 		handler: #type proc "c" (display: ^Display, event: ^XErrorEvent) -> i32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display, event: ^XErrorEvent) -> i32 ---
 	GetErrorText :: proc(
 		display: ^Display,
 		code: i32,
@@ -1138,7 +1139,7 @@ foreign xlib {
 	DisplayName :: proc(string: cstring) -> cstring ---
 	SetIOErrorHandler :: proc(
 		handler: #type proc "c" (display: ^Display) -> i32,
-		) -> i32 ---
+		) -> proc "c" (display: ^Display) -> i32 ---
 	// Pointer grabbing
 	GrabPointer :: proc(
 		display:       ^Display,
@@ -2068,7 +2069,7 @@ foreign xlib {
 	Xutf8LookupString :: proc(
 		ic: XIC,
 		event: ^XKeyPressedEvent,
-		buffer_return: ^cstring,
+		buffer_return: cstring,
 		bytes_buffer: i32,
 		keysym_return: ^KeySym,
 		status_return: ^LookupStringStatus,

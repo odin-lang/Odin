@@ -1,12 +1,28 @@
 package objc_Foundation
 
 import "core:strings"
+import CF "core:sys/darwin/CoreFoundation"
 import "base:runtime"
 import "base:intrinsics"
 
-Rect :: struct {
-	using origin: Point,
-	using size: Size,
+Rect :: CF.CGRect
+MaxX :: proc(aRect: Rect) -> Float {
+	return aRect.origin.x + aRect.size.width
+}
+MaxY :: proc(aRect: Rect) -> Float {
+	return aRect.origin.y + aRect.size.height
+}
+MidX :: proc(aRect: Rect) -> Float {
+	return aRect.origin.x + aRect.size.width*0.5
+}
+MidY :: proc(aRect: Rect) -> Float {
+	return aRect.origin.y + aRect.size.height*0.5
+}
+MinX :: proc(aRect: Rect) -> Float {
+	return aRect.origin.x
+}
+MinY :: proc(aRect: Rect) -> Float {
+	return aRect.origin.y
 }
 
 Depth :: enum UInteger {
@@ -643,6 +659,14 @@ Layer_setContentsScale :: proc "c" (self: ^Layer, scale: Float) {
 Layer_frame :: proc "c" (self: ^Layer) -> Rect {
 	return msgSend(Rect, self, "frame")
 }
+@(objc_type=Layer, objc_name="position")
+Layer_position :: proc "c" (self: ^Layer) -> Point {
+	return msgSend(Point, self, "position")
+}
+@(objc_type=Layer, objc_name="setPosition")
+Layer_setPosition :: proc "c" (self: ^Layer, position: Point) {
+	msgSend(nil, self, "setPosition:", position)
+}
 @(objc_type=Layer, objc_name="addSublayer")
 Layer_addSublayer :: proc "c" (self: ^Layer, layer: ^Layer) {
 	msgSend(nil, self, "addSublayer:", layer)
@@ -690,6 +714,14 @@ View_convertPointFromView :: proc "c" (self: ^View, point: Point, view: ^View) -
 @(objc_type=View, objc_name="addSubview")
 View_addSubview :: proc "c" (self: ^View, view: ^View) {
 	msgSend(nil, self, "addSubview:", view)
+}
+@(objc_type=View, objc_name="isFlipped")
+View_isFlipped :: proc "c" (self: ^View) -> BOOL {
+	return msgSend(BOOL, self, "isFlipped")
+}
+@(objc_type=View, objc_name="setIsFlipped")
+View_setIsFlipped :: proc "c" (self: ^View, flipped: BOOL) {
+	msgSend(nil, self, "setIsFlipped:", flipped)
 }
 
 @(objc_class="NSWindow")
@@ -783,6 +815,10 @@ Window_setAcceptsMouseMovedEvents :: proc "c" (self: ^Window, ok: BOOL) {
 @(objc_type=Window, objc_name="setStyleMask")
 Window_setStyleMask :: proc "c" (self: ^Window, style_mask: WindowStyleMask) {
 	msgSend(nil, self, "setStyleMask:", style_mask)
+}
+@(objc_type=Window, objc_name="performClose")
+Window_performClose :: proc "c" (self: ^Window, sender: id) {
+	msgSend(nil, self, "performClose:", sender)
 }
 @(objc_type=Window, objc_name="close")
 Window_close :: proc "c" (self: ^Window) {
@@ -916,6 +952,18 @@ Window_collectionBehavior :: proc "c" (self: ^Window) -> WindowCollectionBehavio
 Window_setLevel :: proc "c" (self: ^Window, level: WindowLevel) {
 	msgSend(nil, self, "setLevel:", level)
 }
+@(objc_type = Window, objc_name = "keyWindow")
+Window_keyWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isKeyWindow")
+}
+@(objc_type = Window, objc_name = "mainWindow")
+Window_mainWindow :: proc "c" (self: ^Window) -> BOOL {
+	return msgSend(BOOL, self, "isMainWindow")
+}
+@(objc_type = Window, objc_name = "parentWindow")
+Window_parentWindow :: proc "c" (self: ^Window) -> ^Window {
+	return msgSend(^Window, self, "parentWindow")
+}
 @(objc_type = Window, objc_name = "setReleasedWhenClosed")
 Window_setReleasedWhenClosed :: proc "c" (self: ^Window, flag: BOOL) {
 	msgSend(nil, self, "setReleasedWhenClosed:", flag)
@@ -935,4 +983,28 @@ Window_setTabbingMode :: proc "c" (self: ^Window, mode: WindowTabbingMode) {
 @(objc_type = Window, objc_name = "toggleFullScreen")
 Window_toggleFullScreen :: proc "c" (self: ^Window, sender: id) {
 	msgSend(nil, self, "toggleFullScreen:", sender)
+}
+@(objc_type = Window, objc_name = "contentRectForFrameRect", objc_is_class_method=true)
+Window_contentRectForFrameRectType :: proc "c" (frameRect: Rect, styleMask: WindowStyleMask) -> Rect {
+	return msgSend(Rect, Window, "contentRectForFrameRect:styleMask:", frameRect, styleMask)
+}
+@(objc_type = Window, objc_name = "frameRectForContentRect", objc_is_class_method=true)
+Window_frameRectForContentRectType :: proc "c" (contentRect: Rect, styleMask: WindowStyleMask) -> Rect {
+	return msgSend(Rect, Window, "frameRectForContentRect:styleMask:", contentRect, styleMask)
+}
+@(objc_type = Window, objc_name = "minFrameWidthWithTitle", objc_is_class_method=true)
+Window_minFrameWidthWithTitle :: proc "c" (title: ^String, styleMask: WindowStyleMask) -> Float {
+	return msgSend(Float, Window, "minFrameWidthWithTitle:styleMask:", title, styleMask)
+}
+@(objc_type = Window, objc_name = "contentRectForFrameRect")
+Window_contentRectForFrameRectInstance :: proc "c" (self: ^Window, frameRect: Rect) -> Rect {
+	return msgSend(Rect, self, "contentRectForFrameRect:", frameRect)
+}
+@(objc_type = Window, objc_name = "frameRectForContentRect")
+Window_frameRectForContentRectInstance :: proc "c" (self: ^Window, contentRect: Rect) -> Rect {
+	return msgSend(Rect, self, "frameRectForContentRect:", contentRect)
+}
+@(objc_type = Window, objc_name = "screen")
+Window_screen :: proc "c" (self: ^Window) -> ^Screen {
+	return msgSend(^Screen, self, "screen")
 }

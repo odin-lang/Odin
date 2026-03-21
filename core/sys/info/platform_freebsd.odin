@@ -2,21 +2,15 @@ package sysinfo
 
 import sys "core:sys/unix"
 import "core:strings"
-import "core:strconv"
 import "base:runtime"
 
 @(private)
-version_string_buf: [1024]u8
-
-@(init, private)
-init_os_version :: proc "contextless" () {
-	context = runtime.default_context()
-
-	os_version.platform = .FreeBSD
+_os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (res: OS_Version, ok: bool) {
+	res.platform = .FreeBSD
 
 	kernel_version_buf: [1024]u8
 
-	b := strings.builder_from_bytes(version_string_buf[:])
+	b := strings.builder_make_none(allocator = allocator, loc = loc)
 	// Retrieve kernel info using `sysctl`, e.g. FreeBSD 13.1-RELEASE-p2 GENERIC
 	mib := []i32{sys.CTL_KERN, sys.KERN_VERSION}
 	if !sys.sysctl(mib, &kernel_version_buf) {
@@ -27,21 +21,18 @@ init_os_version :: proc "contextless" () {
 	pretty_name  = strings.trim(pretty_name, "\n")
 	strings.write_string(&b, pretty_name)
 
-	// l := strings.builder_len(b)
-
 	// Retrieve kernel revision using `sysctl`, e.g. 199506
 	mib = []i32{sys.CTL_KERN, sys.KERN_OSREV}
 	revision: int
 	if !sys.sysctl(mib, &revision) {
 		return
 	}
-	os_version.patch = revision
 
 	strings.write_string(&b, ", revision ")
 	strings.write_int(&b, revision)
 
 	// Finalize pretty name.
-	os_version.as_string = strings.to_string(b)
+	res.full = strings.to_string(b)
 
 	// Retrieve kernel release using `sysctl`, e.g. 13.1-RELEASE-p2
 	mib = []i32{sys.CTL_KERN, sys.KERN_OSRELEASE}
@@ -49,32 +40,28 @@ init_os_version :: proc "contextless" () {
 		return
 	}
 
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-
 	// Parse kernel version
 	release := string(cstring(raw_data(kernel_version_buf[:])))
-	version_bits := strings.split_n(release, "-", 2, context.temp_allocator)
-	if len(version_bits) > 1 {
-		// Parse major, minor from KERN_OSRELEASE
-		triplet := strings.split(version_bits[0], ".", context.temp_allocator)
-		if len(triplet) == 2 {
-			major, major_ok := strconv.parse_int(triplet[0])
-			minor, minor_ok := strconv.parse_int(triplet[1])
+	version_bits, _, _ := strings.partition(release, "-")
+	res.kernel = _parse_version(version_bits)
+	res.kernel.patch = revision
 
-			if major_ok && minor_ok {
-				os_version.major = major
-				os_version.minor = minor
-			}
-		}
-	}
+	res.os = res.kernel
+
+	return res, true
 }
 
-@(init, private)
-init_ram :: proc "contextless" () {
+@(private)
+_ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
 	// Retrieve RAM info using `sysctl`
 	mib := []i32{sys.CTL_HW, sys.HW_PHYSMEM}
-	mem_size: u64
-	if sys.sysctl(mib, &mem_size) {
-		ram.total_ram = int(mem_size)
+	if sys.sysctl(mib, &total_ram) {
+		ok = true
 	}
+
+	mib = []i32{sys.CTL_HW, sys.HW_USERMEM}
+	if sys.sysctl(mib, &free_ram) {
+		ok = true
+	}
+	return
 }

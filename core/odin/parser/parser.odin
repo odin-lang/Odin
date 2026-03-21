@@ -881,7 +881,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	body: ^ast.Stmt
 	is_range := false
 
-	if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
+	general_conds: if p.curr_tok.kind != .Open_Brace && p.curr_tok.kind != .Do {
 		prev_level := p.expr_level
 		defer p.expr_level = prev_level
 		p.expr_level = -1
@@ -929,6 +929,17 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 				error(p, p.curr_tok.pos, "Expected ';', followed by a condition expression and post statement, got %s", tokenizer.tokens[p.curr_tok.kind])
 			} else {
 				if p.curr_tok.kind != .Semicolon {
+					if p.curr_tok.kind == .Ident {
+						next_token := peek_token(p)
+						if next_token.kind == .In || next_token.kind == .Comma {
+							cond = parse_simple_stmt(p, {.In})
+							as := cond.derived_stmt.(^ast.Assign_Stmt)
+							assert(as.op.kind == .In)
+							is_range = true
+							break general_conds
+						}
+					}
+
 					cond = parse_simple_stmt(p, nil)
 				}
 
@@ -967,6 +978,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		range_stmt := ast.new(ast.Range_Stmt, tok.pos, body)
 		range_stmt.for_pos = tok.pos
+		range_stmt.init = init
 		range_stmt.vals = vals
 		range_stmt.in_pos = assign_stmt.op.pos
 		range_stmt.expr = rhs
@@ -1528,8 +1540,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			es.expr = ce
 			return es
 
-		case "force_inline", "force_no_inline":
-			expr := parse_inlining_operand(p, true, tag)
+		case "force_inline", "force_no_inline", "must_tail":
+			expr := parse_inlining_or_tailing_operand(p, true, tag)
 			es := ast.new(ast.Expr_Stmt, expr.pos, expr)
 			es.expr = expr
 			return es
@@ -2235,10 +2247,11 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	return pt
 }
 
-parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
+parse_inlining_or_tailing_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^ast.Expr {
 	expr := parse_unary_expr(p, lhs)
 
 	pi := ast.Proc_Inlining.None
+	pt := ast.Proc_Tailing.None
 	#partial switch tok.kind {
 	case .Inline:
 		pi = .Inline
@@ -2250,6 +2263,8 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 			pi = .Inline
 		case "force_no_inline":
 			pi = .No_Inline
+		case "must_tail":
+			pt = .Must_Tail
 		}
 	}
 
@@ -2259,13 +2274,19 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 			if e.inlining != .None && e.inlining != pi {
 				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
 			}
+			if pt != .None {
+				error(p, expr.pos, "'#must_tail' can only be applied to a procedure call, not the procedure literal")
+			}
+
 			e.inlining = pi
+			e.tailing  = pt
 			return expr
 		case ^ast.Call_Expr:
 			if e.inlining != .None && e.inlining != pi {
 				error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call")
 			}
 			e.inlining = pi
+			e.tailing  = pt
 			return expr
 		}
 	}
@@ -2368,6 +2389,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			case ^ast.Array_Type:         t.tag = bd
 			case ^ast.Dynamic_Array_Type: t.tag = bd
 			case ^ast.Pointer_Type:       t.tag = bd
+			case ^ast.Fixed_Capacity_Dynamic_Array_Type: t.tag = bd
 			case:
 				error(p, original_type.pos, "expected an array or pointer type after #%s", name.text)
 			}
@@ -2451,7 +2473,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return rt
 
 		case "force_inline", "force_no_inline":
-			return parse_inlining_operand(p, lhs, name)
+			return parse_inlining_or_tailing_operand(p, lhs, name)
 		case:
 			expr := parse_expr(p, lhs)
 			end := expr.pos if expr != nil else end_pos(tok)
@@ -2464,7 +2486,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Inline, .No_Inline:
 		tok := advance_token(p)
-		return parse_inlining_operand(p, lhs, tok)
+		return parse_inlining_or_tailing_operand(p, lhs, tok)
 
 	case .Proc:
 		tok := expect_token(p, .Proc)
@@ -2605,6 +2627,20 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return t
 		case .Dynamic:
 			tok := expect_token(p, .Dynamic)
+			if allow_token(p, .Semicolon) {
+				capacity := parse_expr(p, false)
+				close := expect_token(p, .Close_Bracket)
+				elem := parse_type(p)
+
+				da := ast.new(ast.Fixed_Capacity_Dynamic_Array_Type, open.pos, elem)
+				da.open = open.pos
+				da.dynamic_pos = tok.pos
+				da.capacity = capacity
+				da.close = close.pos
+				da.elem = elem
+				return da
+			}
+
 			close := expect_token(p, .Close_Bracket)
 			elem := parse_type(p)
 			da := ast.new(ast.Dynamic_Array_Type, open.pos, elem)
@@ -2658,6 +2694,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		is_raw_union:    bool
 		is_no_copy:      bool
 		is_all_or_none:  bool
+		is_simple:       bool
 		fields:          ^ast.Field_List
 		name_count:      int
 
@@ -2686,6 +2723,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				is_all_or_none = true
+			case "simple":
+				if is_simple {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				is_simple = true
 			case "align":
 				if align != nil {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
@@ -2760,6 +2802,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		st.is_raw_union      = is_raw_union
 		st.is_no_copy        = is_no_copy
 		st.is_all_or_none    = is_all_or_none
+		st.is_simple         = is_simple
 		st.fields            = fields
 		st.name_count        = name_count
 		st.where_token       = where_token
@@ -3079,6 +3122,7 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		^ast.Union_Type,
 		^ast.Enum_Type,
 		^ast.Dynamic_Array_Type,
+		^ast.Fixed_Capacity_Dynamic_Array_Type,
 		^ast.Map_Type,
 		^ast.Bit_Set_Type,
 		^ast.Matrix_Type,

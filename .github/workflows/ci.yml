@@ -6,7 +6,7 @@ jobs:
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
     env:
-      PKGSRC_BRANCH: 2025Q2
+      PKGSRC_BRANCH: 2025Q4
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
@@ -93,8 +93,8 @@ jobs:
         if: matrix.os == 'macos-latest'
         run: |
           brew update
-          brew install llvm@20 wasmtime lua@5.4 lld
-          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
+          brew install llvm@22 wasmtime lua@5.4 lld
+          echo "$(brew --prefix llvm@22)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
@@ -139,8 +139,19 @@ jobs:
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Wycheproof tests
+
+        run: ./odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed
       - name: Vendor library tests
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+        if: matrix.os != 'macos-15-intel' && matrix.os != 'macos-latest'
+      - name: Vendor library tests (MacOS ARM)
+        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/opt/homebrew/opt/lua@5.4/lib"
+        if: matrix.os == 'macos-latest'
+      - name: Vendor library tests (MacOS Intel)
+        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/usr/local/opt/lua@5.4/lib"
+        if: matrix.os == 'macos-15-intel'
+
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: GitHub Issue tests
@@ -156,18 +167,14 @@ jobs:
 
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
+
       - name: Odin check examples/all for Linux i386
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_i386
-      - name: Odin check examples/all for Linux arm64
-        if: matrix.os == 'ubuntu-latest'
-        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_arm64
-      - name: Odin check examples/all for FreeBSD amd64
-        if: matrix.os == 'ubuntu-latest'
-        run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
       - name: Odin check examples/all for OpenBSD amd64
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:openbsd_amd64
+
       - name: Odin check examples/all for js_wasm32
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:js_wasm32
@@ -178,12 +185,6 @@ jobs:
       - name: Odin check examples/all/sdl3 for Linux i386
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:linux_i386
-      - name: Odin check examples/all/sdl3 for Linux arm64
-        if: matrix.os == 'ubuntu-latest'
-        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:linux_arm64
-      - name: Odin check examples/all/sdl3 for FreeBSD amd64
-        if: matrix.os == 'ubuntu-latest'
-        run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:freebsd_amd64
       - name: Odin check examples/all/sdl3 for OpenBSD amd64
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:openbsd_amd64
@@ -197,7 +198,7 @@ jobs:
       - name: build Odin
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           ./build.bat 1
       - name: Odin version
         run: ./odin version
@@ -206,70 +207,75 @@ jobs:
       - name: Odin check
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin check examples/demo -vet
       - name: Odin run
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin run examples/demo
       - name: Odin run -debug
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
       - name: Odin check examples/all
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
       - name: Odin check examples/all/sdl3
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Core library tests
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized core library tests
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Wycheproof tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed -microarch:native
       - name: Vendor library tests
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           copy vendor\lua\5.4\windows\*.dll .
           odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Odin internals tests
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Check issues
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests/issues
           call run.bat
       - name: Check benchmarks
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin check tests/benchmark -vet -strict-style -no-entry-point
       - name: Odin documentation tests
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests\documentation
           call build.bat
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin check examples/all -strict-style -target:windows_i386
 
   build_linux_riscv64:

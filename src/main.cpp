@@ -302,6 +302,7 @@ enum BuildFlagKind {
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
 	BuildFlag_ShowMoreTimings,
+	BuildFlag_ShowImportGraph,
 	BuildFlag_ExportTimings,
 	BuildFlag_ExportTimingsFile,
 	BuildFlag_ExportDependencies,
@@ -324,13 +325,12 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
-	BuildFlag_UseLLD,
-	BuildFlag_UseRADLink,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
+	BuildFlag_DidYouMeanLimit,
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
@@ -362,6 +362,8 @@ enum BuildFlagKind {
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
+
+	BuildFlag_DisableUnwind,
 
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
@@ -409,10 +411,13 @@ enum BuildFlagKind {
 	BuildFlag_InternalByValue,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
+	BuildFlag_InternalLLVMMem2Reg,
+	BuildFlag_InternalEnableRVO,
 
 	BuildFlag_Tilde,
 
 	BuildFlag_Sanitize,
+	BuildFlag_LTO,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -529,6 +534,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowImportGraph,         str_lit("show-import-graph"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimings,           str_lit("export-timings"),            BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportTimingsFile,       str_lit("export-timings-file"),       BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDependencies,      str_lit("export-dependencies"),       BuildFlagParam_String,  Command__does_build);
@@ -554,13 +560,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
-	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_UseRADLink,              str_lit("radlink"),                   BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_DidYouMeanLimit,         str_lit("did-you-mean-limit"),        BuildFlagParam_Integer, Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
@@ -591,6 +596,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_DisableUnwind,           str_lit("disable-unwind"),          BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
@@ -637,12 +644,15 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMMem2Reg,     str_lit("internal-llvm-mem2reg"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
 
 #if ALLOW_TILDE
 	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
 #endif
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
+	add_flag(&build_flags, BuildFlag_LTO,                     str_lit("lto"),                       BuildFlagParam_String,  Command__does_build);
 
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -868,6 +878,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.show_timings = true;
 							build_context.show_more_timings = true;
 							break;
+						case BuildFlag_ShowImportGraph:
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_import_graph = true;
+							break;
 						case BuildFlag_ExportTimings: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							/*
@@ -1072,7 +1086,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							char const *key = string_intern(name);
+							char const *key = string_intern_cstring(name);
 
 							if (map_get(&build_context.defined_values, key) != nullptr) {
 								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));
@@ -1252,14 +1266,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
 							break;
-						case BuildFlag_UseLLD:
-							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:lld\n");
-							build_context.linker_choice = Linker_lld;
-							break;
-						case BuildFlag_UseRADLink:
-							gb_printf_err("Warning: Use of -lld has been deprecated in favour of -linker:radlink\n");
-							build_context.linker_choice = Linker_radlink;
-							break;
 						case BuildFlag_Linker:
 							{
 								GB_ASSERT(value.kind == ExactValue_String);
@@ -1305,6 +1311,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowDebugMessages:
 							build_context.show_debug_messages = true;
 							break;
+
+						case BuildFlag_DidYouMeanLimit:
+							{
+								GB_ASSERT(value.kind == ExactValue_Integer);
+								isize count = cast(isize)big_int_to_i64(&value.value_integer);
+								if (count <= 0) {
+									gb_printf_err("%.*s expected a positive non-zero number, got %.*s\n", LIT(name), LIT(param));
+									build_context.did_you_mean_limit = DEFAULT_DID_YOU_MEAN_LIMIT;
+								} else {
+									build_context.did_you_mean_limit = (int)count;
+								}
+							}
+							break;
+
 						case BuildFlag_Vet:
 							build_context.vet_flags |= VetFlag_All;
 							break;
@@ -1424,6 +1444,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisableRedZone:
 							build_context.disable_red_zone = true;
 							break;
+						case BuildFlag_DisableUnwind:
+							build_context.disable_unwind = true;
+							break;
+
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
@@ -1614,6 +1638,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalLLVMVerification:
 							build_context.internal_ignore_llvm_verification = true;
 							break;
+						case BuildFlag_InternalLLVMMem2Reg:
+							build_context.internal_llvm_mem2reg = true;
+							break;
+						case BuildFlag_InternalEnableRVO:
+							build_context.enable_rvo = true;
+							break;
+
 
 
 						case BuildFlag_Tilde:
@@ -1636,6 +1667,38 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.sanitizer_flags |= SanitizerFlag_Thread;
 							} else {
 								gb_printf_err("-sanitize:<string> options are 'address', 'memory', and 'thread'\n");
+								bad_flags = true;
+							}
+							break;
+
+						case BuildFlag_LTO:
+							GB_ASSERT(value.kind == ExactValue_String);
+							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
+								build_context.lto_kind = LTO_Thin;
+								if (build_context.linker_choice == Linker_Invalid || build_context.linker_choice == Linker_Default) {
+									build_context.linker_choice = Linker_lld;
+								}
+								if (!build_context.use_separate_modules) {
+									build_context.use_separate_modules = true;
+									if (build_context.use_single_module) {
+										gb_printf_err("-linker:<string> cannot be used with -use-single-module\n");
+										bad_flags = true;
+									}
+								}
+							} else if (str_eq_ignore_case(value.value_string, str_lit("thin-files"))) {
+								build_context.lto_kind = LTO_Thin_Files;
+								if (build_context.linker_choice == Linker_Invalid) {
+									build_context.linker_choice = Linker_lld;
+								}
+								if (!build_context.use_separate_modules) {
+									build_context.use_separate_modules = true;
+									if (build_context.use_single_module) {
+										gb_printf_err("-linker:<string> cannot be used with -use-single-module\n");
+										bad_flags = true;
+									}
+								}
+							} else {
+								gb_printf_err("-lto:<string> options are 'thin' and 'thin-files'\n");
 								bad_flags = true;
 							}
 							break;
@@ -1816,6 +1879,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 		gb_printf_err("`-test-all-packages` can only be used with `odin build -build-mode:test`, `odin test`, or `odin doc`.\n");
 		bad_flags = true;
 	}
+
+	if (build_context.did_you_mean_limit == 0) build_context.did_you_mean_limit = DEFAULT_DID_YOU_MEAN_LIMIT;
 
 	return !bad_flags;
 }
@@ -2039,6 +2104,72 @@ gb_internal void show_defineables(Checker *c) {
 		}
 		gb_printf("%.*s :: %.*s\n\n", LIT(def->name), LIT(def->default_value_str));
 	}
+}
+
+gb_internal void show_import_graph(Checker *c) {
+	Parser *p = c->parser;
+
+	gb_printf("digraph odin_import_graph {\n\tnode [shape=box];\n");
+
+	int cluster_counter = 0;
+	for (LibraryCollections coll : library_collections) {
+		gb_printf("\tsubgraph cluster_%i {\n", cluster_counter);
+		gb_printf("\t\tlabel = \"%.*s\";\n", LIT(coll.name));
+		gb_printf("\t\tnode [style=filled, fillcolor=white];\n");
+		if (coll.name =="core") {
+			gb_printf("\t\tbgcolor = lightsalmon;\n");
+		} else if (coll.name =="vendor") {
+			gb_printf("\t\tbgcolor = lightblue;\n");
+		} else if (coll.name =="base") {
+			gb_printf("\t\tbgcolor = lightcoral;\n");
+			gb_printf("\t\tintrinsics;\n");
+			gb_printf("\t\tbuiltin;\n");
+		}
+		for (AstPackage *pkg : p->packages) {
+			if (string_starts_with(pkg->fullpath, coll.path)) {
+				gb_printf("\t\t\"%.*s\";\n", LIT(pkg->fullpath));
+			}
+		}
+		gb_printf("\t}\n");
+		cluster_counter += 1;
+	}
+
+	for (AstPackage *pkg : p->packages) {
+		for (int i = 0; i < pkg->files.count; i++) {
+			AstFile *file = pkg->files[i];
+			for(Ast *imp : file->imports) {
+				GB_ASSERT(imp->kind == Ast_ImportDecl);
+
+				bool exists = false;
+				for (int j = i + 1; j < pkg->files.count; j++) {
+					AstFile *other_file = pkg->files[j];
+					for(Ast *other_imp : other_file->imports) {
+						GB_ASSERT(other_imp->kind == Ast_ImportDecl);
+						if (0 == string_compare(imp->ImportDecl.fullpath, other_imp->ImportDecl.fullpath)) {
+							exists = true;
+							break;
+						}
+					}
+					if (exists) {
+						break;
+					}
+				}
+
+				if (exists) {
+					continue;
+				}
+
+				String path = imp->ImportDecl.fullpath;
+				if (imp->ImportDecl.package != nullptr) {
+					path = imp->ImportDecl.package->fullpath;
+				}
+
+				gb_printf("\t\"%.*s\" -> \"%.*s\";\n", LIT(pkg->fullpath), LIT(path));
+			}
+		}
+	}
+
+	gb_printf("}\n\n");
 }
 
 gb_internal void show_timings(Checker *c, Timings *t) {
@@ -2719,8 +2850,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			}
 		}
 
-		if (print_flag("-lld")) {
-			print_usage_line(2, "Uses the LLD linker rather than the default.");
+		if (print_flag("-lto:<string>")) {
+			print_usage_line(2, "States that the project is to be build with link-time optimizations.");
+			print_usage_line(2, "This also enables '-use-separate-modules' (if not already set) and `-linker:lld");
+			print_usage_line(2, "Choices:");
+			print_usage_line(3, "thin       (one module per package)");
+			print_usage_line(3, "thin-files (one module file)");
 		}
 	}
 
@@ -2729,6 +2864,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Sets the maximum number of errors that can be displayed before the compiler terminates.");
 			print_usage_line(2, "Must be an integer >0.");
 			print_usage_line(2, "If not set, the default max error count is %d.", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
+		}
+
+		if (print_flag("-did-you-mean-limit:<integer>")) {
+			print_usage_line(2, "Sets the maximum number of suggestions the compiler provides.");
+			print_usage_line(2, "Must be an integer >0.");
+			print_usage_line(2, "If not set, the default limit is %d.", DEFAULT_DID_YOU_MEAN_LIMIT);
 		}
 	}
 
@@ -2848,10 +2989,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
-		if (print_flag("-radlink")) {
-			print_usage_line(2, "Uses the RAD linker rather than the default.");
-		}
-
 		if (print_flag("-reloc-mode:<string>")) {
 			print_usage_line(2, "Specifies the reloc mode.");
 			print_usage_line(2, "Available options:");
@@ -2896,6 +3033,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 		if (print_flag("-show-system-calls")) {
 			print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler.");
+		}
+
+		if (print_flag("-show-import-graph")) {
+			print_usage_line(2, "Shows dot graph text format of the import graph of a project.");
 		}
 
 		if (print_flag("-show-timings")) {
@@ -2971,6 +3112,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (check) {
 		if (print_flag("-target:<string>")) {
 			print_usage_line(2, "Sets the target for the executable to be built in.");
+			print_usage_line(2, "Examples:");
+				print_usage_line(3, "-target:linux_amd64");
+				print_usage_line(3, "-target:windows_amd64");
+				print_usage_line(3, "-target:\"?\" for a list");
 		}
 
 		if (print_flag("-terse-errors")) {
@@ -3867,8 +4012,8 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
-	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
+	Parser * parser  = permanent_alloc_item<Parser>();
+	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
 
 	MAIN_TIME_SECTION("parse files");
@@ -3942,6 +4087,9 @@ int main(int arg_count, char const **arg_ptr) {
 		if (build_context.show_timings) {
 			show_timings(checker, &global_timings);
 		}
+		if (build_context.show_import_graph) {
+			show_import_graph(checker);
+		}
 		return 0;
 	}
 
@@ -3952,6 +4100,9 @@ int main(int arg_count, char const **arg_ptr) {
 
 		if (build_context.show_timings) {
 			show_timings(checker, &global_timings);
+		}
+		if (build_context.show_import_graph) {
+			show_import_graph(checker);
 		}
 
 		if (global_error_collector.count != 0) {
@@ -3986,6 +4137,9 @@ int main(int arg_count, char const **arg_ptr) {
 				if (build_context.show_timings) {
 					show_timings(checker, &global_timings);
 				}
+				if (build_context.show_import_graph) {
+					show_import_graph(checker);
+				}
 
 				if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
 					export_dependencies(checker);
@@ -3997,7 +4151,7 @@ int main(int arg_count, char const **arg_ptr) {
 	} else
 #endif
 	{
-		lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+		lbGenerator *gen = permanent_alloc_item<lbGenerator>();
 		if (!lb_init_generator(gen, checker)) {
 			return 1;
 		}
@@ -4017,6 +4171,9 @@ int main(int arg_count, char const **arg_ptr) {
 					if (build_context.show_timings) {
 						show_timings(checker, &global_timings);
 					}
+					if (build_context.show_import_graph) {
+						show_import_graph(checker);
+					}
 
 					if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
 						export_dependencies(checker);
@@ -4032,6 +4189,14 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		remove_temp_files(gen);
+	}
+
+	if (any_errors()) {
+		print_all_errors();
+		return 1;
+	}
+	if (any_warnings()) {
+		print_all_errors();
 	}
 
 end_of_code_gen:;
@@ -4053,6 +4218,9 @@ end_of_code_gen:;
 
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
+	}
+	if (build_context.show_import_graph) {
+		show_import_graph(checker);
 	}
 
 	if (run_output) {

@@ -45,3 +45,33 @@ resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> (r
 in_resolve :: proc "contextless" (ctx: ^Context) -> bool {
 	return intrinsics.atomic_load(&ctx.in_resolve)
 }
+
+_format_hex :: proc(buf: []byte, val: uintptr, allocator: runtime.Allocator) -> int {
+	_digits := "0123456789abcdef"
+
+	shift := (size_of(uintptr) * 8) - 4
+	offs := 0
+
+	for shift >= 0 {
+		d := (val >> uint(shift)) & 0xf
+		buf[offs] = _digits[d]
+		shift -= 4
+		offs += 1
+	}
+
+	return offs
+}
+
+_format_missing_proc :: proc(addr: uintptr, allocator: runtime.Allocator) -> string {
+	PREFIX :: "proc:0x"
+	buf, buf_err := make([]byte, len(PREFIX) + 16, allocator)
+	copy(buf, PREFIX)
+
+	if buf_err != nil {
+		return "OUT_OF_MEMORY"
+	}
+
+	offs := len(PREFIX)
+	offs += _format_hex(buf[offs:], uintptr(addr), allocator)
+	return string(buf[:offs])
+}

@@ -194,6 +194,8 @@ Benchmark_Options :: struct {
 	// `benchmark()` procedure will output the average number of megabytes
 	// processed per second, using the `processed` field of this struct.
 	megabytes_per_second: f64,
+	// For user specified data in the callbacks
+	user_data: rawptr,
 }
 
 /*
