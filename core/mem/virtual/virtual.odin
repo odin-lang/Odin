@@ -45,6 +45,17 @@ release :: proc "contextless" (data: rawptr, size: uint) {
 	_release(data, size)
 }
 
+get_page_size :: proc() -> int {
+	// NOTE(tetra): The page size never changes, so why do anything complicated
+	// if we don't have to.
+	@static page_size := -1
+	if page_size != -1 {
+		return page_size
+	}
+	page_size = _get_page_size()
+	return page_size
+}
+
 Protect_Flag :: enum u32 {
 	Read,
 	Write,
