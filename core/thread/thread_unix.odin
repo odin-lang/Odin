@@ -231,10 +231,10 @@ _set_name :: proc(thread: ^Thread) {
 	}
 
 	buf: [_MAX_PTHREAD_NAME_LENGTH]u8
-	copy(buf[:], name)
 
 	// _MAX_PTHREAD_NAME_LENGTH includes terminating null
-	buf[len(buf) - 1] = 0
+	copy(buf[:len(buf) - 1], name)
+
 
 	when ODIN_OS == .Darwin {
 		pthread_setname_np(raw_data(buf[:]))
