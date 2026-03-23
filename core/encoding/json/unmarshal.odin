@@ -60,8 +60,6 @@ Inputs:
 - unmarshaler: The `User_Unmarshaler` function for the custom type.
 
 Example:
-	package main
-
 	import "core:fmt"
 	import "core:encoding/json"
 	import "core:strconv"
