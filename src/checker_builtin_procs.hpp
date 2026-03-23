@@ -314,6 +314,9 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_has_field,
 	BuiltinProc_type_field_type,
+	
+	BuiltinProc_type_field_bit_offset,
+	BuiltinProc_type_field_bit_size,
 
 	BuiltinProc_type_is_specialization_of,
 
@@ -694,6 +697,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_has_field"),            2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_field_type"),           2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	
+	{STR_LIT("type_field_bit_offset"),     2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_field_bit_size"),       2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialization_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

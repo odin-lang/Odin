@@ -205,6 +205,11 @@ type_bit_set_underlying_type :: proc($T: typeid) -> typeid where type_is_bit_set
 type_has_field  :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
+type_field_bit_size :: proc($T: typeid, $name: string) -> int where type_is_bit_field(T) ---
+type_field_bit_offset :: proc($T: typeid, $name: string) -> int where type_is_bit_field(T) ---
+
+type_bit_field_size :: proc($T: typeid, $name: string) -> typeid ---
+
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 
