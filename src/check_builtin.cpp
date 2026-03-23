@@ -2821,9 +2821,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 		
-		if (is_type_array(type)) {
+		if (is_type_array(type) || is_type_bit_field(type)) {
 			gbString t = type_to_string(type);
-			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
+			error(field_arg, "Expected a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
