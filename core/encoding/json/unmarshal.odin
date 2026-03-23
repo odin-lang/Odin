@@ -65,7 +65,7 @@ Example:
 	import "core:strconv"
 
 	// Custom Unmarshaler for `int`
-	Some_Unmarshaler :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
+	some_unmarshaler :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
 		token := p.curr_token.text
 		i, ok := strconv.parse_i64_of_base(token, 2)
 		if !ok {
@@ -78,10 +78,10 @@ Example:
 		return nil
 	}
 
-	main :: proc() {
+	register_user_unmarshaler_example :: proc() {
 		// Ensure the `json._user_unmarshalers` map is initialized.
 		json.set_user_unmarshalers(new(map[typeid]json.User_Unmarshaler))
-		reg_err := json.register_user_unmarshaler(typeid_of(int), Some_Unmarshaler)
+		reg_err := json.register_user_unmarshaler(typeid_of(int), some_unmarshaler)
 		assert(reg_err == .None)
 
 		data := `{"value":101010}`
