@@ -20,6 +20,10 @@ _release :: proc "contextless" (data: rawptr, size: uint) {
 	posix.munmap(data, size)
 }
 
+_get_page_size :: proc() -> int {
+	return int(posix.sysconf(._PAGE_SIZE))
+}
+
 _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	#assert(i32(posix.Prot_Flag_Bits.READ)  == i32(Protect_Flag.Read))
 	#assert(i32(posix.Prot_Flag_Bits.WRITE) == i32(Protect_Flag.Write))

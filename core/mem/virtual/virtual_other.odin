@@ -21,6 +21,10 @@ _decommit :: proc "contextless" (data: rawptr, size: uint) {
 _release :: proc "contextless" (data: rawptr, size: uint) {
 }
 
+_get_page_size :: proc() -> int {
+	return 0
+}
+
 _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	return false
 }
