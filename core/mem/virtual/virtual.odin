@@ -6,7 +6,8 @@ import "base:intrinsics"
 import "base:runtime"
 _ :: runtime
 
-DEFAULT_PAGE_SIZE := uint(4096)
+// On platforms where we were able to retrieve a configurable size, we use that value instead.
+PAGE_SIZE := uint(4096)
 
 @(init, private)
 platform_memory_init :: proc "contextless" () {
@@ -79,7 +80,7 @@ align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 
 @(require_results, no_sanitize_address)
 memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags: Memory_Block_Flags = {}) -> (block: ^Memory_Block, err: Allocator_Error) {
-	page_size := DEFAULT_PAGE_SIZE
+	page_size := PAGE_SIZE
 	assert(mem.is_power_of_two(uintptr(page_size)))
 
 	committed := committed
@@ -144,7 +145,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 			// TODO(bill): determine a better heuristic for this behaviour
 			extra_size := max(size, block.committed>>1)
 			platform_total_commit := base_offset + block.used + extra_size
-			platform_total_commit = align_formula(platform_total_commit, DEFAULT_PAGE_SIZE)
+			platform_total_commit = align_formula(platform_total_commit, PAGE_SIZE)
 			platform_total_commit = min(max(platform_total_commit, default_commit_size), pmblock.reserved)
 
 			assert(pmblock.committed <= pmblock.reserved)

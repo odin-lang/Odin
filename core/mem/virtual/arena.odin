@@ -126,11 +126,11 @@ arena_alloc_unguarded :: proc(arena: ^Arena, size: uint, alignment: uint, loc :=
 		if err == .Out_Of_Memory {
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
-				arena.minimum_block_size = mem.align_forward_uint(arena.minimum_block_size, DEFAULT_PAGE_SIZE)
+				arena.minimum_block_size = mem.align_forward_uint(arena.minimum_block_size, PAGE_SIZE)
 			}
 			if arena.default_commit_size == 0 {
 				arena.default_commit_size = min(DEFAULT_ARENA_GROWING_COMMIT_SIZE, arena.minimum_block_size)
-				arena.default_commit_size = mem.align_forward_uint(arena.default_commit_size, DEFAULT_PAGE_SIZE)
+				arena.default_commit_size = mem.align_forward_uint(arena.default_commit_size, PAGE_SIZE)
 			}
 
 			if arena.default_commit_size != 0 {

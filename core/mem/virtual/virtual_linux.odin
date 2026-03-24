@@ -44,9 +44,9 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 }
 
 _platform_memory_init :: proc "contextless" () {
-	DEFAULT_PAGE_SIZE = 4096
+	PAGE_SIZE = 4096
 	// is power of two
-	assert_contextless(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
+	assert_contextless(PAGE_SIZE != 0 && (PAGE_SIZE & (PAGE_SIZE-1)) == 0)
 }
 
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
