@@ -52,3 +52,6 @@ package all
 
 
 @(require) import "vendor:kb_text_shape"
+
+@(require) import "vendor:fast_obj"
+

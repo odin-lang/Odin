@@ -11,3 +11,4 @@ package all
 @(require) import "vendor:stb/truetype"
 @(require) import "vendor:wgpu"
 @(require) import "vendor:wasm/WebGL"
+@(require) import "vendor:fast_obj"
