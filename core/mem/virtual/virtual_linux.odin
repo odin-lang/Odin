@@ -3,7 +3,6 @@
 package mem_virtual
 
 import "core:sys/linux"
-import "core:sys/posix"
 
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	addr, errno := linux.mmap(0, size, {}, {.PRIVATE, .ANONYMOUS})
@@ -32,10 +31,6 @@ _decommit :: proc "contextless" (data: rawptr, size: uint) {
 
 _release :: proc "contextless" (data: rawptr, size: uint) {
 	_ = linux.munmap(data, size)
-}
-
-_get_page_size :: proc() -> int {
-	return int(posix.sysconf(._PAGE_SIZE))
 }
 
 _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {

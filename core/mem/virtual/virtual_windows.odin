@@ -123,13 +123,6 @@ _release :: proc "contextless" (data: rawptr, size: uint) {
 	VirtualFree(data, 0, MEM_RELEASE)
 }
 
-_get_page_size :: proc() -> int {
-	info: SYSTEM_INFO
-	GetSystemInfo(&info)
-
-	return int(info.dwPageSize)
-}
-
 @(no_sanitize_address)
 _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	pflags: u32
