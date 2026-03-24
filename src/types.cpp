@@ -4922,6 +4922,42 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 	return 0;
 }
 
+gb_internal bool check_is_assignable_to_using_offset_zero_subtype(Type *src, Type *dst) {
+
+	Type *src_struct = base_type(src);
+	if (!is_type_struct(src_struct)) {
+		return false;
+	}
+
+	// We check multiple fields in case of #raw_union,
+	// but exit on the first field that is not at offset 0.
+	for_array(i, src_struct->Struct.fields) {
+		Entity *f = src_struct->Struct.fields[i];
+		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
+			continue;
+		}
+
+		Type *field_type = nullptr;
+		i64 offset = type_offset_of(src_struct, i, &field_type);
+
+		// Only allowed if the subtype field shared the same address as its container
+		if (offset != 0) {
+			return false;
+		}
+
+		if (are_types_identical(field_type, dst)) {
+			return true;
+		}
+
+		// Check parent if the field type is a struct
+		if (check_is_assignable_to_using_offset_zero_subtype(field_type, dst)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 gb_internal bool is_type_subtype_of(Type *src, Type *dst) {
 	if (are_types_identical(src, dst)) {
 		return true;

@@ -667,6 +667,7 @@ gb_internal bool find_or_generate_polymorphic_procedure_from_parameters(CheckerC
 gb_internal bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type *type, bool compound, bool modify_type);
 gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type);
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
+gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
 
 #define MAXIMUM_TYPE_DISTANCE 10
 
@@ -927,8 +928,12 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			add_entity_use(c, operand->expr, e);
 			return 4;
 		}
+
+		if (is_type_proc(src) && check_proc_params_assignable(c, dst, src)) {
+			return 4;
+		}
 	}
-	
+
 	if (is_type_complex_or_quaternion(dst)) {
 		Type *elem = base_complex_elem_type(dst);
 		if (are_types_identical(elem, base_type(src))) {
@@ -1051,6 +1056,51 @@ gb_internal bool internal_check_is_assignable_to(Type *src, Type *dst) {
 	x.mode = Addressing_Value;
 	return check_is_assignable_to(nullptr, &x, dst);
 }
+
+gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *dst, Type *src) {
+	GB_ASSERT(dst->kind == Type_Proc);
+	GB_ASSERT(src->kind == Type_Proc);
+
+	if (!dst->Proc.params || !src->Proc.params) {
+		return false;
+	}
+
+	if (!are_types_identical(src->Proc.results, dst->Proc.results)) {
+		return false;
+	}
+
+	auto& dst_tuple = dst->Proc.params->Tuple;
+	auto& src_tuple = src->Proc.params->Tuple;
+
+	if (dst_tuple.variables.count == src_tuple.variables.count && dst_tuple.is_packed == src_tuple.is_packed) {
+		for_array(i, dst_tuple.variables) {
+			Entity *edst = dst_tuple.variables[i];
+			Entity *esrc = src_tuple.variables[i];
+
+			if (edst->kind != esrc->kind || !are_types_identical(edst->type, esrc->type)) {
+
+				// Pointers to subtype fields that are at byte offset 0 are OK
+				if (edst->type->kind == Type_Pointer && esrc->type->kind == Type_Pointer &&
+					is_type_struct(esrc->type->Pointer.elem) &&
+					check_is_assignable_to_using_offset_zero_subtype(esrc->type->Pointer.elem, edst->type->Pointer.elem)) {
+						continue;
+				}
+
+				return false;
+			}
+
+			if (edst->kind == Entity_Constant && !compare_exact_values(Token_CmpEq, edst->Constant.value, esrc->Constant.value)) {
+				// NOTE(bill): This is needed for polymorphic procedures
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 
 gb_internal AstPackage *get_package_of_type(Type *type) {
 	for (;;) {
