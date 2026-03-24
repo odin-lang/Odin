@@ -929,7 +929,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			return 4;
 		}
 
-		if (is_type_proc(src) && check_proc_params_assignable(c, dst, src)) {
+		if (is_type_proc(src) && are_proc_properties_identical(dst,src) && check_proc_params_assignable(c, dst, src)) {
 			return 4;
 		}
 	}

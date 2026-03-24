@@ -3058,6 +3058,13 @@ gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
 	return are_types_identical_internal(x, y, true);
 }
 
+gb_internal bool are_proc_properties_identical(Type *x, Type *y) {
+	return x->Proc.calling_convention == y->Proc.calling_convention &&
+	       x->Proc.c_vararg    == y->Proc.c_vararg    &&
+	       x->Proc.variadic    == y->Proc.variadic    &&
+	       x->Proc.diverging   == y->Proc.diverging   &&
+	       x->Proc.optional_ok == y->Proc.optional_ok;
+}
 
 gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
@@ -3262,11 +3269,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		break;
 
 	case Type_Proc:
-		return x->Proc.calling_convention == y->Proc.calling_convention &&
-		       x->Proc.c_vararg    == y->Proc.c_vararg    &&
-		       x->Proc.variadic    == y->Proc.variadic    &&
-		       x->Proc.diverging   == y->Proc.diverging   &&
-		       x->Proc.optional_ok == y->Proc.optional_ok &&
+		return are_proc_properties_identical(x, y) &&
 		       are_types_identical_internal(x->Proc.params, y->Proc.params, check_tuple_names) &&
 		       are_types_identical_internal(x->Proc.results, y->Proc.results, check_tuple_names);
 
