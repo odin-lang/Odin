@@ -236,16 +236,6 @@ back_ptr :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
 }
 
 
-@(deprecated="Use `front_ptr` instead")
-peek_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
-	return front_ptr(q, loc)
-}
-
-@(deprecated="Use `back_ptr` instead")
-peek_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
-	return back_ptr(q, loc)
-}
-
 /*
 Push an element to the back of the queue.
 
