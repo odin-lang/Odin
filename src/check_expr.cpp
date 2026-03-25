@@ -11740,9 +11740,14 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 	case Type_EnumeratedArray:
 		{
+			ERROR_BLOCK();
+
 			gbString str = expr_to_string(o->expr);
 			gbString type_str = type_to_string(o->type);
 			error(o->expr, "Cannot slice '%s' of type '%s', as enumerated arrays cannot be sliced", str, type_str);
+
+			error_line("\tSuggestion: Slicing an enumerated array does not make much sense, but if you need such a construct, use 'slice.enumerated_array'\n");
+
 			gb_string_free(type_str);
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
