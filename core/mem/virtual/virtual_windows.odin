@@ -146,18 +146,6 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return bool(ok)
 }
 
-
-@(no_sanitize_address)
-_platform_memory_init :: proc "contextless" () {
-	sys_info: SYSTEM_INFO
-	GetSystemInfo(&sys_info)
-	PAGE_SIZE = max(PAGE_SIZE, uint(sys_info.dwPageSize))
-	
-	// is power of two
-	assert_contextless(PAGE_SIZE != 0 && (PAGE_SIZE & (PAGE_SIZE-1)) == 0)
-}
-
-
 @(no_sanitize_address)
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	page_flags: u32
