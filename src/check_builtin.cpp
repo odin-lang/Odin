@@ -2821,9 +2821,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 		
-		if (is_type_array(type)) {
+		if (is_type_array(type) || is_type_bit_field(type)) {
 			gbString t = type_to_string(type);
-			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
+			error(field_arg, "Expected a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
@@ -6877,6 +6877,68 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 			operand->mode = Addressing_Type;
 			operand->type = sel.entity->type;
+			break;
+		}
+		break;
+		
+	case BuiltinProc_type_field_bit_offset:
+	case BuiltinProc_type_field_bit_size:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			if (!is_type_bit_field(type)) {
+				error(operand->expr, "Expected a bit field type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Operand x = {};
+			check_expr(c, &x, ce->args[1]);
+
+			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
+				error(ce->args[1], "Expected a constant string for field argument");
+				return false;
+			}
+
+			InternedString field_name = string_interner_insert(x.value.value_string);
+
+			i64 bit_offset = 0;
+			i64 bit_size = 0;
+			for_array(i, type->BitField.fields) {
+				Entity *f = type->BitField.fields[i];
+				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+					continue;
+				}
+				auto str = entity_interned_name(f);
+				if (field_name == str) {
+					bit_offset = type->BitField.bit_offsets[i];
+					bit_size = type->BitField.bit_sizes[i];
+					break;
+				}
+			}
+
+			i64 value = 0;
+			switch (id) {
+			case BuiltinProc_type_field_bit_offset:
+				value = bit_offset;
+				break;
+			case BuiltinProc_type_field_bit_size:
+				value = bit_size;
+				break;
+			default:
+				GB_ASSERT(false);
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(value);
 			break;
 		}
 		break;
