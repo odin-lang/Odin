@@ -1472,6 +1472,17 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
+
+	case Type_SoaPointer:
+		if (source->kind == Type_SoaPointer) {
+			isize level = check_is_assignable_to_using_subtype(source->SoaPointer.elem, poly->SoaPointer.elem, /*level*/0, /*src_is_ptr*/false, /*allow_polymorphic*/true);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->SoaPointer.elem, source->SoaPointer.elem, true, modify_type);
+		}
+		return false;
+
 	case Type_Array:
 		if (source->kind == Type_Array) {
 			if (poly->Array.generic_count != nullptr) {
