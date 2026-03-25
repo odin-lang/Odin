@@ -163,7 +163,7 @@ to_string :: proc(x: $T/Fixed($Backing, $Fraction_Width), allocator := context.a
 }
 
 
-@(private)
+@(rodata, private)
 _power_of_two_table := [129]string{
 	"0.5",
 	"1",
@@ -294,9 +294,4 @@ _power_of_two_table := [129]string{
 	"42535295865117307932921825928971026432",
 	"85070591730234615865843651857942052864",
 	"170141183460469231731687303715884105728",
-}
-
-@(deprecated="Use write instead")
-append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
-	return write(dst, x)
 }
