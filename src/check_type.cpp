@@ -1621,11 +1621,18 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (show_error) {
+			ERROR_BLOCK();
+
 			gbString pts = type_to_string(poly_type);
 			gbString ots = type_to_string(operand.type, true);
 			defer (gb_string_free(pts));
 			defer (gb_string_free(ots));
 			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+
+			if (operand.mode == Addressing_Type) {
+				error_line("\tSuggestion: Are you trying to pass a type to a value parameter?\n");
+			}
+
 		}
 		return t_invalid;
 	}
