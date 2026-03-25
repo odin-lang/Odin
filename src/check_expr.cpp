@@ -8889,8 +8889,11 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 
 	case Type_FixedCapacityDynamicArray:
 		o->type = t->FixedCapacityDynamicArray.elem;
-		if (o->mode != Addressing_Constant) {
+		if (indirection) {
 			o->mode = Addressing_Variable;
+		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_Constant) {
+			o->mode = Addressing_Value;
 		}
 		return true;
 
