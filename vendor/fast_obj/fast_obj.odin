@@ -33,6 +33,7 @@ FAST_OBJ_VERSION       :: (FAST_OBJ_VERSION_MAJOR << 8) | FAST_OBJ_VERSION_MINOR
 Texture :: struct {
 	/* Texture name from .mtl file */
 	name: cstring,
+
 	/* Resolved path to texture */
 	path: cstring,
 }
@@ -51,7 +52,7 @@ Material :: struct {
 	Ni:       f32,     // Index of refraction 
 	Tf:       [3]f32,  // Transmission filter 
 	d:        f32,     // Disolve (alpha) 
-	illum:    c.int,       // Illumination model 
+	illum:    c.int,   // Illumination model 
 
 	/* Set for materials that don't come from the associated mtllib */
 	fallback: c.int,
@@ -90,7 +91,6 @@ Group :: struct {
 
 	/* First index in Mesh indices array */
 	index_offset: c.uint,
-
 }
 
 
