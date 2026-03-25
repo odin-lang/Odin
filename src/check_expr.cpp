@@ -11709,6 +11709,14 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 	case Type_FixedCapacityDynamicArray:
 		valid = true;
+		if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
+			gbString str = expr_to_string(node);
+			error(node, "Cannot slice a fixed capacity dynamic array '%s', value is not addressable", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
 		o->type = alloc_type_slice(t->FixedCapacityDynamicArray.elem);
 		break;
 
