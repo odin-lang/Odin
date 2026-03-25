@@ -8896,8 +8896,14 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 
 	case Type_Struct:
 		if (t->Struct.soa_kind != StructSoa_None) {
-			if (t->Struct.soa_kind == StructSoa_Fixed) {
+			switch (t->Struct.soa_kind) {
+			case StructSoa_Fixed:
 				*max_count = t->Struct.soa_count;
+				break;
+			case StructSoa_Slice:
+			case StructSoa_Dynamic:
+				indirection = o->mode != Addressing_Constant;
+				break;
 			}
 			o->type = t->Struct.soa_elem;
 			if (o->mode == Addressing_SoaVariable || o->mode == Addressing_Variable || indirection) {
