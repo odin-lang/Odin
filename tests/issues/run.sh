@@ -37,6 +37,8 @@ $ODIN test ../test_issue_6068.odin $COMMON
 $ODIN test ../test_issue_6101.odin $COMMON
 $ODIN test ../test_issue_6165.odin $COMMON
 $ODIN test ../test_issue_6396.odin $COMMON
+$ODIN test ../test_pr_unknown.odin $COMMON
+
 if [[ $($ODIN build ../test_issue_6240.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] ; then
 	echo "SUCCESSFUL 1/1"
 else
