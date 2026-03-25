@@ -166,15 +166,14 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 		t_handle = thread.win32_thread
 	}
 	
-	buf_16: win32.PWSTR
+	buf: win32.PWSTR
 
-	hr := win32.GetThreadDescription(t_handle, buf_16)
-	defer if win32.SUCCEEDED(hr) {
-		win32.LocalFree(rawptr(buf_16))
+	hr := win32.GetThreadDescription(t_handle, &buf)
+
+	if win32.SUCCEEDED(hr) {
+		defer win32.LocalFree(rawptr(buf))
+		name, err = win32.wstring_to_utf8(buf, -1, allocator)
 	}
-
-	name = win32.wstring_to_utf8(buf_16, -1, allocator) or_return
-
 	return
 }
 

@@ -206,17 +206,15 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 		tid = thread.unix_thread
 	}
 	
-	buf := make([]u8, _MAX_PTHREAD_NAME_LENGTH, allocator, loc) or_return
+	buf : [_MAX_PTHREAD_NAME_LENGTH]u8
 
 	when ODIN_OS == .Darwin || ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
-		pthread_getname_np(tid, raw_data(buf), len(buf))
+		pthread_getname_np(tid, raw_data(buf[:]), len(buf))
 	} else when ODIN_OS == .OpenBSD {
-		pthread_get_name_np(tid, raw_data(buf), len(buf))
+		pthread_get_name_np(tid, raw_data(buf[:]), len(buf))
 	}
 
-	name = transmute(string)buf
-	name = strings.truncate_to_byte(name, 0)
-	
+	name, err = strings.clone_from_cstring(cstring(raw_data(buf[:])), allocator, loc)
 	return
 }
 
