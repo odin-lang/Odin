@@ -2579,7 +2579,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		sel.index.allocator = temporary_allocator();
 		if (lookup_subtype_polymorphic_selection(t, src_type, &sel)) {
 			if (sel.entity == nullptr) {
-				GB_PANIC("invalid subtype cast  %s -> ", type_to_string(src_type), type_to_string(t));
+				GB_PANIC("invalid subtype cast  %s -> %s", type_to_string(src_type), type_to_string(t));
 			}
 			if (st_is_ptr) {
 				lbValue res = lb_emit_deep_field_gep(p, value, sel);
