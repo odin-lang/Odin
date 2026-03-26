@@ -611,32 +611,6 @@ reinterpret_copy :: proc "contextless" ($T: typeid, ptr: rawptr) -> (value: T) {
 }
 
 /*
-Dynamic array with a fixed capacity buffer.
-
-This type represents dynamic arrays with a fixed-size backing buffer. Upon
-allocating memory beyond reaching the maximum capacity, allocations from fixed
-byte buffers return `nil` and no error.
-*/
-Fixed_Byte_Buffer :: distinct [dynamic]byte
-
-/*
-Create a fixed byte buffer from a slice.
-*/
-@(require_results)
-make_fixed_byte_buffer :: proc "contextless" (backing: []byte) -> Fixed_Byte_Buffer {
-	s := transmute(Raw_Slice)backing
-	d: Raw_Dynamic_Array
-	d.data = s.data
-	d.len = 0
-	d.cap = s.len
-	d.allocator = Allocator{
-		procedure = nil_allocator_proc,
-		data = nil,
-	}
-	return transmute(Fixed_Byte_Buffer)d
-}
-
-/*
 General-purpose align formula.
 
 This procedure is equivalent to `align_forward`, but it does not require the
