@@ -813,7 +813,7 @@ gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, 
 				cgValue tag = cg_emit_transmute(p, x, t_rawptr);
 				return cg_emit_comp_against_nil(p, op_kind, tag);
 			} else {
-				GB_ASSERT("TODO(bill): cg_emit_union_tag_value");
+				GB_PANIC("TODO(bill): cg_emit_union_tag_value");
 				// cgValue tag = cg_emit_union_tag_value(p, x);
 				// return cg_emit_comp(p, op_kind, tag, cg_zero(p->module, tag.type));
 			}
