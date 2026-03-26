@@ -467,13 +467,7 @@ Check whether a number is a power of two.
 This procedure checks whether a given pointer-sized unsigned integer contains
 a power-of-two value.
 */
-@(require_results)
-is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
-	if x <= 0 {
-		return false
-	}
-	return (x & (x-1)) == 0
-}
+is_power_of_two :: runtime.is_power_of_two_uintptr
 
 /*
 Check if a pointer is aligned.
@@ -497,11 +491,7 @@ bytes, `ptr` is returned.
 
 The specified alignment must be a power of 2.
 */
-@(require_results)
-align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
-	assert(is_power_of_two(align))
-	return (ptr + align-1) & ~(align-1)
-}
+align_forward_uintptr :: runtime.align_forward_uintptr
 
 /*
 Align pointer forward.
@@ -526,10 +516,7 @@ bytes, `ptr` is returned.
 
 The specified alignment must be a power of 2.
 */
-@(require_results)
-align_forward_int :: proc(ptr, align: int) -> int {
-	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)))
-}
+align_forward_int :: runtime.align_forward_int
 
 /*
 Align uint forward.
@@ -540,10 +527,7 @@ bytes, `ptr` is returned.
 
 The specified alignment must be a power of 2.
 */
-@(require_results)
-align_forward_uint :: proc(ptr, align: uint) -> uint {
-	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)))
-}
+align_forward_uint :: runtime.align_forward_uint
 
 /*
 Align uintptr backwards.
