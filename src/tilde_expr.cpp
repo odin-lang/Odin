@@ -224,7 +224,7 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 		if (value.node->dt.raw != dt.raw) {
 			switch (value.node->dt.type) {
 			case TB_INT:
-				switch (value.node->dt.type) {
+				switch (dt.type) {
 				case TB_INT:
 					break;
 				case TB_FLOAT:
