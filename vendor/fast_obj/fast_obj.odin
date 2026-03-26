@@ -52,30 +52,30 @@ Material :: struct {
 	Ni:       f32,     // Index of refraction 
 	Tf:       [3]f32,  // Transmission filter 
 	d:        f32,     // Disolve (alpha) 
-	illum:    c.int,   // Illumination model 
+	illum:    i32,     // Illumination model 
 
 	/* Set for materials that don't come from the associated mtllib */
-	fallback: c.int,
+	fallback: i32,
 
 	/* Texture map indices in Mesh textures array */
-	map_Ka:   c.uint,
-	map_Kd:   c.uint,
-	map_Ks:   c.uint,
-	map_Ke:   c.uint,
-	map_Kt:   c.uint,
-	map_Ns:   c.uint,
-	map_Ni:   c.uint,
-	map_d:    c.uint,
-	map_bump: c.uint,
+	map_Ka:   u32,
+	map_Kd:   u32,
+	map_Ks:   u32,
+	map_Ke:   u32,
+	map_Kt:   u32,
+	map_Ns:   u32,
+	map_Ni:   u32,
+	map_d:    u32,
+	map_bump: u32,
 
 }
 
-// The orignal C libary allows for overriding the field type.
-// Here we're just using the default type.
+/* The orignal libary allows for overriding the field type.
+   Here we're just using the default type. */
 Index :: struct {
-	p: c.uint,
-	t: c.uint,
-	n: c.uint,
+	p: u32,
+	t: u32,
+	n: u32,
 }
 
 
@@ -84,13 +84,13 @@ Group :: struct {
 	name:         cstring,
 
 	/* Number of faces */
-	face_count:   c.uint,
+	face_count:   u32,
 
 	/* First face in Mesh face_* arrays */
-	face_offset:  c.uint,
+	face_offset:  u32,
 
 	/* First index in Mesh indices array */
-	index_offset: c.uint,
+	index_offset: u32,
 }
 
 
@@ -100,49 +100,49 @@ Group :: struct {
    indicating that the attribute is not present. */
 Mesh :: struct {
 	/* Vertex data */
-	position_count: c.uint,
+	position_count: u32,
 	positions:      [^]f32,
 
-	texcoord_count: c.uint,
+	texcoord_count: u32,
 	texcoords:      [^]f32,
 
-	normal_count:   c.uint,
+	normal_count:   u32,
 	normals:        [^]f32,
 
-	color_count:    c.uint,
+	color_count:    u32,
 	colors:         [^]f32,
 
 	/* Face data: one element for each face */
-	face_count:     c.uint,
-	face_vertices:  [^]c.uint,
-	face_materials: [^]c.uint,
-	face_lines:     [^]byte,
+	face_count:     u32,
+	face_vertices:  [^]u32,
+	face_materials: [^]u32,
+	face_lines:     [^]u8,
 
 	/* Index data: one element for each face vertex */
-	index_count:    c.uint,
+	index_count:    u32,
 	indices:        [^]Index,
 
 	/* Materials */
-	material_count: c.uint,
+	material_count: u32,
 	materials:      [^]Material,
 
 	/* Texture maps */
-	texture_count:  c.uint,
+	texture_count:  u32,
 	textures:       [^]Texture,
 
 	/* Mesh objects ('o' tag in .obj file) */
-	object_count:   c.uint,
+	object_count:   u32,
 	objects:        [^]Group,
 
 	/* Mesh groups ('g' tag in .obj file) */
-	group_count:    c.uint,
+	group_count:    u32,
 	groups:         [^]Group,
 }
 
 Callbacks :: struct {
 	file_open:  #type proc "c" (path: cstring, user_data: rawptr) -> rawptr,
 	file_close: #type proc "c" (file: rawptr,  user_data: rawptr),
-	file_read:  #type proc "c" (file: rawptr,  dst: rawptr, bytes: c.size_t, user_data: rawptr) -> c.size_t,
+	file_read:  #type proc "c" (file: rawptr,  dst: rawptr, bytes: uint, user_data: rawptr) -> uint,
 	file_size:  #type proc "c" (file: rawptr,  user_data: rawptr) -> c.ulong,
 }
 
