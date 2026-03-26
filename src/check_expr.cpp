@@ -3197,7 +3197,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 				case Token_Lt:    add_package_dependency(c, "runtime", "cstring_lt"); break;
 				case Token_Gt:    add_package_dependency(c, "runtime", "cstring_gt"); break;
 				case Token_LtEq:  add_package_dependency(c, "runtime", "cstring_le"); break;
-				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring_gt"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring_ge"); break;
 				}
 			} else if (is_type_cstring16(x->type) && is_type_cstring16(y->type)) {
 				switch (op) {
@@ -3206,7 +3206,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 				case Token_Lt:    add_package_dependency(c, "runtime", "cstring16_lt"); break;
 				case Token_Gt:    add_package_dependency(c, "runtime", "cstring16_gt"); break;
 				case Token_LtEq:  add_package_dependency(c, "runtime", "cstring16_le"); break;
-				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring16_gt"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "cstring16_ge"); break;
 				}
 			} else if (is_type_string16(x->type) || is_type_string16(y->type)) {
 				switch (op) {
@@ -3215,7 +3215,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 				case Token_Lt:    add_package_dependency(c, "runtime", "string16_lt"); break;
 				case Token_Gt:    add_package_dependency(c, "runtime", "string16_gt"); break;
 				case Token_LtEq:  add_package_dependency(c, "runtime", "string16_le"); break;
-				case Token_GtEq:  add_package_dependency(c, "runtime", "string16_gt"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "string16_ge"); break;
 				}
 			} else if (is_type_string(x->type) || is_type_string(y->type)) {
 				switch (op) {
@@ -3224,7 +3224,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 				case Token_Lt:    add_package_dependency(c, "runtime", "string_lt"); break;
 				case Token_Gt:    add_package_dependency(c, "runtime", "string_gt"); break;
 				case Token_LtEq:  add_package_dependency(c, "runtime", "string_le"); break;
-				case Token_GtEq:  add_package_dependency(c, "runtime", "string_gt"); break;
+				case Token_GtEq:  add_package_dependency(c, "runtime", "string_ge"); break;
 				}
 			} else if (is_type_complex(x->type) || is_type_complex(y->type)) {
 				switch (op) {
