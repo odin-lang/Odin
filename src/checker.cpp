@@ -6027,8 +6027,8 @@ gb_internal void check_import_entities(Checker *c) {
 	}
 
 	TIME_SECTION("check_import_entities - check delayed entities");
-	for_array(i, package_order) {
-		ImportGraphNode *node = package_order[i];
+	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
+		ImportGraphNode *node = package_order[pkg_index];
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 		AstPackage *pkg = node->scope->pkg;
 
@@ -6054,9 +6054,20 @@ gb_internal void check_import_entities(Checker *c) {
 			reset_checker_context(&ctx, f, &untyped);
 
 			ctx.collect_delayed_decls = true;
+
+			bool will_recheck_foreign_block = false;
 			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
-				check_add_foreign_block_decl(&ctx, decl);
+				if (check_add_foreign_block_decl(&ctx, decl)) {
+					pkg_index -= 1;    // Re-check package
+					will_recheck_foreign_block = true;
+					break;
+				}
 			}
+
+			if (will_recheck_foreign_block) {
+				break;
+			}
+
 			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
 		}
 
