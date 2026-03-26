@@ -536,15 +536,8 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		// we don't need to be so strict about every byte.
 		aligned_size += alignment - 1
 	}
-	if aligned_size <= len(s.data) {
-		offset := uintptr(0)
-		if s.curr_offset+aligned_size <= len(s.data) {
-			offset = uintptr(s.curr_offset)
-		} else {
-			// The allocation will cause an overflow past the boundary of the
-			// space available, so reset to the starting offset.
-			offset = 0
-		}
+	if s.curr_offset+aligned_size <= len(s.data) {
+		offset := uintptr(s.curr_offset)
 		start := uintptr(raw_data(s.data))
 		ptr := rawptr(offset+start)
 		// We keep track of the original base pointer without extra alignment
