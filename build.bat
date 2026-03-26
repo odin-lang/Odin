@@ -107,16 +107,6 @@ set libs= ^
 set odin_res=misc\odin.res
 set odin_rc=misc\odin.rc
 
-rem DO NOT TOUCH!
-rem THIS TILDE STUFF IS FOR DEVELOPMENT ONLY!
-set tilde_backend=0
-if %tilde_backend% EQU 1 (
-	set libs=%libs% src\tilde\tb.lib
-	set compiler_defines=%compiler_defines% -DODIN_TILDE_BACKEND
-)
-rem DO NOT TOUCH!
-
-
 set linker_flags= -incremental:no -opt:ref -subsystem:console -MANIFEST:EMBED
 
 if %release_mode% EQU 0 ( rem Debug
