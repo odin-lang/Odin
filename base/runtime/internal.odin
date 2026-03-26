@@ -29,6 +29,30 @@ byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byt
 	return ([^]byte)(data)[:max(len, 0)]
 }
 
+@(require_results)
+align_forward_uint :: #force_inline proc "odin" (ptr, align: uint) -> uint {
+	assert(is_power_of_two_uint(align))
+	return (ptr + align-1) & ~(align-1)
+}
+
+@(require_results)
+align_forward_int :: #force_inline proc "odin" (ptr, align: int) -> int {
+	assert(is_power_of_two_int(align))
+	return int(align_forward_uint(uint(ptr), uint(align)))
+}
+
+@(require_results)
+align_forward_uintptr :: #force_inline proc "odin" (ptr, align: uintptr) -> uintptr {
+	return uintptr(align_forward_uint(uint(ptr), uint(align)))
+}
+
+align_forward :: proc {
+	align_forward_int,
+	align_forward_uint,
+	align_forward_uintptr,
+}
+
+@(require_results)
 is_power_of_two_int :: #force_inline proc "contextless" (x: int) -> bool {
 	if x <= 0 {
 		return false
@@ -36,63 +60,23 @@ is_power_of_two_int :: #force_inline proc "contextless" (x: int) -> bool {
 	return (x & (x-1)) == 0
 }
 
-align_forward_int :: #force_inline proc "odin" (ptr, align: int) -> int {
-	assert(is_power_of_two_int(align))
-
-	p := ptr
-	modulo := p & (align-1)
-	if modulo != 0 {
-		p += align - modulo
-	}
-	return p
-}
-
+@(require_results)
 is_power_of_two_uint :: #force_inline proc "contextless" (x: uint) -> bool {
-	if x <= 0 {
+	if x == 0 {
 		return false
 	}
 	return (x & (x-1)) == 0
 }
 
-align_forward_uint :: #force_inline proc "odin" (ptr, align: uint) -> uint {
-	assert(is_power_of_two_uint(align))
-
-	p := ptr
-	modulo := p & (align-1)
-	if modulo != 0 {
-		p += align - modulo
-	}
-	return p
-}
-
+@(require_results)
 is_power_of_two_uintptr :: #force_inline proc "contextless" (x: uintptr) -> bool {
-	if x <= 0 {
-		return false
-	}
-	return (x & (x-1)) == 0
-}
-
-align_forward_uintptr :: #force_inline proc "odin" (ptr, align: uintptr) -> uintptr {
-	assert(is_power_of_two_uintptr(align))
-
-	p := ptr
-	modulo := p & (align-1)
-	if modulo != 0 {
-		p += align - modulo
-	}
-	return p
+	return is_power_of_two_uint(uint(x))
 }
 
 is_power_of_two :: proc {
 	is_power_of_two_int,
 	is_power_of_two_uint,
 	is_power_of_two_uintptr,
-}
-
-align_forward :: proc {
-	align_forward_int,
-	align_forward_uint,
-	align_forward_uintptr,
 }
 
 mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {

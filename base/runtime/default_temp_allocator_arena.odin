@@ -97,15 +97,6 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 
 @(require_results)
 arena_alloc :: proc(arena: ^Arena, size, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
-	align_forward_uint :: proc "contextless" (ptr, align: uint) -> uint {
-		p := ptr
-		modulo := p & (align-1)
-		if modulo != 0 {
-			p += align - modulo
-		}
-		return p
-	}
-
 	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
 
 	size := size
