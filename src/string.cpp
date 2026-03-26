@@ -495,15 +495,6 @@ gb_internal String filename_from_path(String s) {
 		s = substring(s, 0, i);
 		return s;
 	}
-	if (i > 0) {
-		isize j = 0;
-		for (j = s.len-1; j >= 0; j--) {
-			if (is_separator(s[j])) {
-				break;
-			}
-		}
-		return substring(s, j+1, s.len);
-	}
 	return make_string(nullptr, 0);
 }
 
