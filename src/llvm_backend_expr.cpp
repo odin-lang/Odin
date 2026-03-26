@@ -2150,7 +2150,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_cstring16(src) && is_type_u16_multi_ptr(dst)) {
 		return lb_emit_transmute(p, value, dst);
 	}
-	if (is_type_u8_multi_ptr(src) && is_type_cstring16(dst)) {
+	if (is_type_u16_multi_ptr(src) && is_type_cstring16(dst)) {
 		return lb_emit_transmute(p, value, dst);
 	}
 	if (is_type_cstring16(src) && is_type_rawptr(dst)) {
