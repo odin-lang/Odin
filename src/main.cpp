@@ -3772,6 +3772,19 @@ int main(int arg_count, char const **arg_ptr) {
 
 	init_filename = copy_string(permanent_allocator(), init_filename);
 
+	build_context.command = command;
+
+	string_set_init(&build_context.custom_attributes);
+	string_set_init(&build_context.vet_packages);
+
+	if (!parse_build_flags(args)) {
+		return 1;
+	}
+
+	if (build_context.show_help) {
+		return print_show_help(args[0], command);
+	}
+
 	if (init_filename.len > 0 && !build_context.show_help) {
 		// The command must be build, run, test, check, or another that takes a directory or filename.
 		if (!path_is_directory(init_filename)) {
@@ -3782,6 +3795,47 @@ int main(int arg_count, char const **arg_ptr) {
 					single_file_package = true;
 					break;
 				}
+			}
+			if (!single_file_package) {
+				isize colon_pos = -1;
+				for (isize j = 0; j < init_filename.len; j++) {
+					if (init_filename[j] == ':') {
+						colon_pos = j;
+						break;
+					}
+				}
+				if (colon_pos > 0) {
+					String collection_name = substring(init_filename, 0, colon_pos);
+					String file_str = substring(init_filename, colon_pos+1, init_filename.len);
+
+					if (collection_name == "core") {
+						bool replace_with_base = false;
+						if (string_starts_with(file_str, str_lit("runtime"))) {
+							replace_with_base = true;
+						} else if (string_starts_with(file_str, str_lit("intrinsics"))) {
+							replace_with_base = true;
+						} if (string_starts_with(file_str, str_lit("builtin"))) {
+							replace_with_base = true;
+						}
+
+						if (replace_with_base) {
+							collection_name = str_lit("base");
+						}
+					}
+
+					String base_dir = {};
+					if (find_library_collection_path(collection_name, &base_dir)) {
+						bool ok = false;
+						String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+						if (ok) {
+							init_filename = fullpath;
+							if (path_is_directory(init_filename)) {
+								goto filename_check_success;
+							}
+						}
+					}
+				}
+
 			}
 
 			if (!single_file_package) {
@@ -3809,20 +3863,9 @@ int main(int arg_count, char const **arg_ptr) {
 					return 1;
 				}
 			}
+
+		filename_check_success:;
 		}
-	}
-
-	build_context.command = command;
-
-	string_set_init(&build_context.custom_attributes);
-	string_set_init(&build_context.vet_packages);
-
-	if (!parse_build_flags(args)) {
-		return 1;
-	}
-
-	if (build_context.show_help) {
-		return print_show_help(args[0], command);
 	}
 
 	if (command == "bundle") {
