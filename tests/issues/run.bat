@@ -35,6 +35,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_pr_6470.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin test ..\test_pr_6476.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_6484.odin -no-entry-point %COMMON%  || exit /b
 
 @echo off
 

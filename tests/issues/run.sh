@@ -58,6 +58,8 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN check ../test_issue_6484.odin -no-entry-point $COMMON
+
 set +x
 
 popd
