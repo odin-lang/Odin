@@ -250,9 +250,10 @@ gb_global char const *odin_command_strings[32] = {
 
 
 enum CmdDocFlag : u32 {
-	CmdDocFlag_Short       = 1<<0,
-	CmdDocFlag_AllPackages = 1<<1,
-	CmdDocFlag_DocFormat   = 1<<2,
+	CmdDocFlag_Short         = 1<<0,
+	CmdDocFlag_InSourceOrder = 1<<1,
+	CmdDocFlag_AllPackages   = 1<<2,
+	CmdDocFlag_DocFormat     = 1<<3,
 };
 
 enum TimingsExportFormat : i32 {
@@ -2637,4 +2638,3 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	return true;
 }
-

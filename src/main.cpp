@@ -370,6 +370,7 @@ enum BuildFlagKind {
 	BuildFlag_GoToDefinitions,
 
 	BuildFlag_Short,
+	BuildFlag_InSourceOrder,
 	BuildFlag_AllPackages,
 	BuildFlag_DocFormat,
 
@@ -602,6 +603,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_SourceCodeLocations, 		str_lit("source-code-locations"), 		BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
+	add_flag(&build_flags, BuildFlag_InSourceOrder,           str_lit("in-source-order"),           BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc | Command_test | Command_build);
 	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
 
@@ -1490,6 +1492,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
+							break;
+						case BuildFlag_InSourceOrder:
+							build_context.cmd_doc_flags |= CmdDocFlag_InSourceOrder;
 							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
@@ -2999,6 +3004,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (doc) {
 		if (print_flag("-short")) {
 			print_usage_line(2, "Shows shortened documentation for the packages.");
+		}
+		if (print_flag("-in-source-order")) {
+			print_usage_line(2, "Shows documentation for the packages in source order within each file.");
 		}
 	}
 
