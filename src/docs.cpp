@@ -60,7 +60,7 @@ gb_internal GB_COMPARE_PROC(cmp_entities_for_printing_by_order_in_src) {
 	GB_ASSERT(b != nullptr);
 	Entity *x = *cast(Entity **)a;
 	Entity *y = *cast(Entity **)b;
-	u64 res = 0;
+	int res = 0;
 	if (x->pkg != y->pkg) {
 		if (x->pkg == nullptr) {
 			return -1;
