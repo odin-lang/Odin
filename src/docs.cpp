@@ -28,7 +28,7 @@ gb_global char const *print_entity_names[Entity_Count] = {
 };
 
 
-gb_internal GB_COMPARE_PROC(cmp_entities_for_printing_by_kind_order) {
+gb_internal GB_COMPARE_PROC(cmp_entities_for_printing) {
 	GB_ASSERT(a != nullptr);
 	GB_ASSERT(b != nullptr);
 	Entity *x = *cast(Entity **)a;
@@ -274,7 +274,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		if (in_src_order) {
 			array_sort(entities, cmp_entities_for_printing_by_order_in_src);
 		} else {
-			array_sort(entities, cmp_entities_for_printing_by_kind_order);
+			array_sort(entities, cmp_entities_for_printing);
 		}
 
 		bool show_docs = (build_context.cmd_doc_flags & CmdDocFlag_Short) == 0;

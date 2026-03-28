@@ -3287,7 +3287,7 @@ gb_internal void print_show_unused(Checker *c) {
 		array_add(&unused, e);
 	}
 
-	array_sort(unused, cmp_entities_for_printing_by_kind_order);
+	array_sort(unused, cmp_entities_for_printing);
 
 	print_usage_line(0, "Unused Package Declarations");
 
