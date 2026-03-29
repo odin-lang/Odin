@@ -349,6 +349,9 @@ _get_common_path_len :: proc(base, target: string) -> int {
 	end := min(len(base), len(target))
 	for j in 0..=end {
 		if j == end || _is_path_separator(base[j]) {
+			if i < end && _is_path_separator(base[i]) && _is_path_separator(target[i]) {
+				i += 1
+			}
 			if strings.equal_fold(base[i:j], target[i:j]) {
 				i = j
 			} else {
