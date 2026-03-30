@@ -4951,8 +4951,9 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 						Token next_token = peek_token(f);
 						if (next_token.kind == Token_in || next_token.kind == Token_Comma) {
 							cond = parse_simple_stmt(f, StmtAllowFlag_In);
-							GB_ASSERT(cond->kind == Ast_AssignStmt && cond->AssignStmt.op.kind == Token_in);
-							is_range = true;
+							if (cond->kind == Ast_AssignStmt && cond->AssignStmt.op.kind == Token_in) {
+								is_range = true;
+							}
 							goto range_skip;
 						}
 					}
