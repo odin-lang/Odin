@@ -501,6 +501,10 @@ gb_internal Arena *get_arena(ThreadArenaKind kind) {
 	return nullptr;
 }
 
+template <typename T>
+gb_internal T *arena_alloc_array(Arena *arena, isize count) {
+	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+}
 
 template <typename T>
 gb_internal T *permanent_alloc_item() {
@@ -511,13 +515,13 @@ gb_internal T *permanent_alloc_item() {
 template <typename T>
 gb_internal T *permanent_alloc_array(isize count) {
 	Arena *arena = get_arena(ThreadArena_Permanent);
-	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return arena_alloc_array<T>(arena, count);
 }
 
 template <typename T>
 gb_internal Slice<T> permanent_slice_make(isize count) {
 	Arena *arena = get_arena(ThreadArena_Permanent);
-	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	T *data = arena_alloc_array<T>(arena, count);
 	return {data, count};
 }
 
@@ -530,13 +534,13 @@ gb_internal T *temporary_alloc_item() {
 template <typename T>
 gb_internal T *temporary_alloc_array(isize count) {
 	Arena *arena = get_arena(ThreadArena_Temporary);
-	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return arena_alloc_array<T>(arena, count);
 }
 
 template <typename T>
 gb_internal Slice<T> temporary_slice_make(isize count) {
 	Arena *arena = get_arena(ThreadArena_Temporary);
-	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	T *data = arena_alloc_array<T>(arena, count);
 	return {data, count};
 }
 
