@@ -10,9 +10,6 @@ CFTimeInterval :: NS.TimeInterval
 
 IOSurfaceRef :: distinct rawptr
 
-dispatch_queue_t :: id
-dispatch_data_t  :: id
-
 @(private)
 msgSend :: intrinsics.objc_send
 

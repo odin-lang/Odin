@@ -3536,15 +3536,15 @@ SharedEventListener_alloc :: #force_inline proc "c" () -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, SharedEventListener, "alloc")
 }
 @(objc_type=SharedEventListener, objc_name="dispatchQueue")
-SharedEventListener_dispatchQueue :: #force_inline proc "c" (self: ^SharedEventListener) -> dispatch_queue_t {
-	return msgSend(dispatch_queue_t, self, "dispatchQueue")
+SharedEventListener_dispatchQueue :: #force_inline proc "c" (self: ^SharedEventListener) -> NS.dispatch_queue_t {
+	return msgSend(NS.dispatch_queue_t, self, "dispatchQueue")
 }
 @(objc_type=SharedEventListener, objc_name="init")
 SharedEventListener_init :: #force_inline proc "c" (self: ^SharedEventListener) -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, self, "init")
 }
 @(objc_type=SharedEventListener, objc_name="initWithDispatchQueue")
-SharedEventListener_initWithDispatchQueue :: #force_inline proc "c" (self: ^SharedEventListener, dispatchQueue: dispatch_queue_t) -> ^SharedEventListener {
+SharedEventListener_initWithDispatchQueue :: #force_inline proc "c" (self: ^SharedEventListener, dispatchQueue: NS.dispatch_queue_t) -> ^SharedEventListener {
 	return msgSend(^SharedEventListener, self, "initWithDispatchQueue:", dispatchQueue)
 }
 
@@ -5690,7 +5690,7 @@ Device_newIndirectCommandBuffer :: #force_inline proc "c" (self: ^Device, descri
 }
 
 @(objc_type=Device, objc_name="newLibraryWithData")
-Device_newLibraryWithData :: #force_inline proc "contextless" (self: ^Device, data: dispatch_data_t) -> (library: ^Library, error: ^NS.Error) {
+Device_newLibraryWithData :: #force_inline proc "contextless" (self: ^Device, data: NS.dispatch_data_t) -> (library: ^Library, error: ^NS.Error) {
 	library = msgSend(^Library, self, "newLibraryWithData:error:", data, &error)
 	return
 }
