@@ -492,17 +492,7 @@ gb_internal bool string_contains_string(String const &haystack, String const &ne
 gb_internal String filename_from_path(String s) {
 	isize i = string_extension_position(s);
 	if (i >= 0) {
-		s = substring(s, 0, i);
-		return s;
-	}
-	if (i > 0) {
-		isize j = 0;
-		for (j = s.len-1; j >= 0; j--) {
-			if (is_separator(s[j])) {
-				break;
-			}
-		}
-		return substring(s, j+1, s.len);
+		return substring(s, 0, i);
 	}
 	return make_string(nullptr, 0);
 }
