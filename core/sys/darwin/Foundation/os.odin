@@ -1,3 +1,4 @@
+#+build darwin
 package objc_Foundation
 
 os_workgroup_t  :: ^OS_os_workgroup
