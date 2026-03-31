@@ -35,6 +35,16 @@ import "core:testing"
 // - crypto/kmac
 //   - kmac128_no_customization_test.json
 //   - kmac256_no_customization_test.json
+// - crypto/mlkem
+//   - mlkem_512_keygen_seed_test.json
+//   - mlkem_512_encaps_test.json
+//   - mlkem_512_test.json
+//   - mlkem_768_keygen_seed_test.json
+//   - mlkem_768_encaps_test.json
+//   - mlkem_768_test.json
+//   - mlkem_1024_keygen_seed_test.json
+//   - mlkem_1024_encaps_test.json
+//   - mlkem_1024_test.json
 // - crypto/pbkdf2
 //   - pbkdf2_hmacsha1_test.json
 //   - pbkdf2_hmacsha224_test.json

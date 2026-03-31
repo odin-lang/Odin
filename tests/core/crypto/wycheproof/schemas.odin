@@ -64,6 +64,11 @@ Test_Vectors_Note :: struct {
 	links:       []string `json:"links"`,
 }
 
+Test_Group_Source :: struct {
+	name:    string `json:"name"`,
+	version: string `json:"version"`,
+}
+
 Aead_Test_Group :: struct {
 	iv_size:  int                `json:"ivSize"`,
 	key_size: int                `json:"keySize"`,
@@ -197,4 +202,24 @@ Pbkdf_Test_Vector :: struct {
 	dk:              common.Hex_Bytes `json:"dk"`,
 	result:          Result           `json:"result"`,
 	flags:           []string         `json:"flags"`,
+}
+
+Kem_Test_Group :: struct {
+	type:          string            `json:"type"`,
+	source:        Test_Group_Source `json:"source"`,
+	parameter_set: string            `json:"parameterSet"`,
+	tests:         []Kem_Test_Vector `json:"tests"`,
+}
+
+Kem_Test_Vector :: struct {
+	tc_id:           int              `json:"tcId"`,
+	flags:           []string         `json:"flags"`,
+	comment:         string           `json:"comment"`,
+	seed:            common.Hex_Bytes `json:"seed"`,
+	m:               common.Hex_Bytes `json:"m"`,
+	ek:              common.Hex_Bytes `json:"ek"`,
+	dk:              common.Hex_Bytes `json:"dk"`,
+	c:               common.Hex_Bytes `json:"c"`,
+	k:               common.Hex_Bytes `json:"K"`,
+	result:          Result           `json:"result"`,
 }
