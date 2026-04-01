@@ -796,11 +796,19 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
-			if (is_type_untyped(t) || is_type_empty_union(t)) {
+			if (is_type_untyped(t)) {
 				ok = false;
 				gbString str = type_to_string(t);
 				error(node, "Invalid variant type in union '%s'", str);
 				gb_string_free(str);
+			} else if (is_type_empty_union(t)) {
+				Type *base = base_type(t);
+				if (base == nullptr || base->kind != Type_Union || base->Union.node == nullptr) {
+					ok = false;
+					gbString str = type_to_string(t);
+					error(node, "Invalid variant type in union '%s'", str);
+					gb_string_free(str);
+				}
 			} else {
 				for_array(j, variants) {
 					if (union_variant_index_types_equal(t, variants[j])) {
