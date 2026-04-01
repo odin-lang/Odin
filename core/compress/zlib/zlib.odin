@@ -322,9 +322,6 @@ decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Erro
 @(optimization_mode="favor_size")
 decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	if z.num_bits < 16 {
-		if z.num_bits > 63 {
-			return 0, .Code_Buffer_Malformed
-		}
 		compress.refill_lsb(z)
 		if z.num_bits > 63 {
 			return 0, .Stream_Too_Short

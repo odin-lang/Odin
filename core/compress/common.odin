@@ -360,23 +360,26 @@ refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width := 
 	refill := u64(width)
 	b      := u64(0)
 
-	if z.num_bits > refill {
-		return
-	}
-
 	for {
+		if z.num_bits > refill {
+			break
+		}
+		if z.code_buffer == 0 && z.num_bits > 63 {
+			z.num_bits = 0
+		}
+		if z.code_buffer >= 1 << uint(z.num_bits) {
+			// Code buffer is malformed.
+			z.num_bits = max(u64)
+			return
+		}
 		if len(z.input_data) != 0 {
 			b = u64(z.input_data[0])
 			z.input_data = z.input_data[1:]
 		} else {
-			b = 0
+			return
 		}
-
 		z.code_buffer |= b << u8(z.num_bits)
 		z.num_bits += 8
-		if z.num_bits > refill {
-			break
-		}
 	}
 }
 
