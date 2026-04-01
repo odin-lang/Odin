@@ -127,6 +127,8 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 	i32 field_src_index = 0;
 	i32 field_group_index = -1;
 	for_array(i, params) {
+		*fields = slice_from_array(fields_array);
+		*tags = tags_array.data;
 		Ast *param = params[i];
 		if (param->kind != Ast_Field) {
 			continue;
