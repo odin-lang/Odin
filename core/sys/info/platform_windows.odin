@@ -300,7 +300,7 @@ _iterate_gpus :: proc(it: ^GPU_Iterator, minimum_vram := i64(256 * 1024 * 1024))
 			gpu_key,
 			auto_cast it._index,
 			&buf_wstring[0],
-			&buf_len,
+			buf_len,
 		); status != i32(sys.ERROR_SUCCESS) {
 			return {}, it.index, false
 		}
