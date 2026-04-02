@@ -465,7 +465,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 		return "", {}, false
 	}
 
-	cname_w := make([]u16, computer_name_size context.temp_allocator)
+	cname_w := make([]u16, computer_name_size, context.temp_allocator)
 
 	res = LookupAccountNameW(
 		nil,
