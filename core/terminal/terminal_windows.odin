@@ -17,7 +17,6 @@ old_modes: [2]struct{
 	{windows.STD_ERROR_HANDLE, 0},
 }
 
-@(init)
 _init_terminal :: proc "contextless" () {
 	vtp_enabled: bool
 
@@ -49,7 +48,6 @@ _init_terminal :: proc "contextless" () {
 	}
 }
 
-@(fini)
 _fini_terminal :: proc "contextless" () {
 	for v in old_modes {
 		handle := windows.GetStdHandle(v.handle)
