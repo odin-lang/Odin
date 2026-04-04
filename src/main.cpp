@@ -2663,7 +2663,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (run_or_build) {
 		if (print_flag("-debug")) {
-			print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
+			print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'. Sets -o:none by default.");
 		}
 	}
 
@@ -2928,7 +2928,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			if (LB_USE_NEW_PASS_SYSTEM) {
 				print_usage_line(3, "-o:aggressive (use this with caution)");
 			}
-			print_usage_line(2, "The default is -o:minimal.");
+			print_usage_line(2, "The default is -o:minimal. If -debug is set, the default is -o:none.");
 		}
 
 
