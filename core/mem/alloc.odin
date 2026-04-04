@@ -218,7 +218,7 @@ buffer is aligned to the boundary specified by `alignment`.
 	keeps track of the sizes of allocations, this parameter is optional.
 
 **Returns**:
-1. The slice of the  memory region after resize operation, if successfull,
+1. The slice of the  memory region after resize operation, if successful,
 	`nil` otherwise.
 2. An error, if the resize failed.
 
@@ -502,7 +502,7 @@ buffer is aligned to the boundary specified by `alignment`.
 - `allocator`: The owner of the memory region to resize.
 
 **Returns**:
-1. The pointer to the resized memory region, if successfull, `nil` otherwise.
+1. The pointer to the resized memory region, if successful, `nil` otherwise.
 2. Error, if resize failed.
 
 **Errors**:
@@ -562,7 +562,7 @@ memory.
 - `allocator`: The owner of the memory region to resize.
 
 **Returns**:
-1. The pointer to the resized memory region, if successfull, `nil` otherwise.
+1. The pointer to the resized memory region, if successful, `nil` otherwise.
 2. Error, if resize failed.
 
 **Errors**:
@@ -618,7 +618,7 @@ buffer is aligned to the boundary specified by `alignment`.
 - `allocator`: The owner of the memory region to resize.
 
 **Returns**:
-1. The resized memory region, if successfull, `nil` otherwise.
+1. The resized memory region, if successful, `nil` otherwise.
 2. Error, if resize failed.
 
 **Errors**:
@@ -675,7 +675,7 @@ any new memory.
 - `allocator`: The owner of the memory region to resize.
 
 **Returns**:
-1. The resized memory region, if successfull, `nil` otherwise.
+1. The resized memory region, if successful, `nil` otherwise.
 2. Error, if resize failed.
 
 **Errors**:
