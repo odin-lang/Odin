@@ -2,6 +2,25 @@
 #include <malloc.h>
 #endif
 
+#ifdef __ANDROID__
+
+// Bionic may not provide aligned_alloc.
+// Provide a fallback using posix_memalign and ensure the alignment
+// satisfies its requirement (multiple of pointer size).
+static void* android_aligned_alloc(size_t align, size_t size) {
+	void* allocated;
+
+	const size_t ptr_size = sizeof(void*);
+	align = (align + (ptr_size - 1)) / ptr_size * ptr_size;
+
+	if (posix_memalign(&allocated, align, size) != 0)
+		return NULL;
+	return allocated;
+}
+#define aligned_alloc android_aligned_alloc
+
+#endif
+
 template <typename U, typename V>
 gb_internal gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
