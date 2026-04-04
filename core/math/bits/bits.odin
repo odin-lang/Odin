@@ -485,66 +485,38 @@ to_le_uint :: proc "contextless" (i: uint) -> uint { when ODIN_ENDIAN == .Little
 // returns the minimum number of bits required to represent x
 @(require_results)
 len_u8 :: proc "contextless" (x: u8) -> int {
-	return int(len_u8_table[x])
+	return len(x)
 }
 
 // returns the minimum number of bits required to represent x
 @(require_results)
 len_u16 :: proc "contextless" (x: u16) -> (n: int) {
-	x := x
-	if x >= 1<<8 {
-		x >>= 8
-		n = 8
-	}
-	return n + int(len_u8_table[x])
+	return len(x)
 }
 
 // returns the minimum number of bits required to represent x
 @(require_results)
 len_u32 :: proc "contextless" (x: u32) -> (n: int) {
-	x := x
-	if x >= 1<<16 {
-		x >>= 16
-		n = 16
-	}
-	if x >= 1<<8 {
-		x >>= 8
-		n += 8
-	}
-	return n + int(len_u8_table[x])
+	return len(x)
 }
 
 // returns the minimum number of bits required to represent x
 @(require_results)
 len_u64 :: proc "contextless" (x: u64) -> (n: int) {
-	x := x
-	if x >= 1<<32 {
-		x >>= 32
-		n = 32
-	}
-	if x >= 1<<16 {
-		x >>= 16
-		n += 16
-	}
-	if x >= 1<<8 {
-		x >>= 8
-		n += 8
-	}
-	return n + int(len_u8_table[x])
+	return len(x)
 }
 
 // returns the minimum number of bits required to represent x
 @(require_results)
 len_uint :: proc "contextless" (x: uint) -> (n: int) {
-	when size_of(uint) == size_of(u64) {
-		return len_u64(u64(x))
-	} else {
-		return len_u32(u32(x))
-	}
+	return len(x)
 }
 
 // returns the minimum number of bits required to represent x
-len :: proc{len_u8, len_u16, len_u32, len_u64, len_uint}
+@(require_results)
+len :: proc "contextless" (x: $T) -> int where intrinsics.type_is_integer(T) {
+	return (size_of(T) << 3) - int(intrinsics.count_leading_zeros(x))
+}
 
 /*
 Add with carry
@@ -1026,20 +998,6 @@ is_power_of_two :: proc{
 	is_power_of_two_u32,  is_power_of_two_i32,
 	is_power_of_two_u64,  is_power_of_two_i64,
 	is_power_of_two_uint, is_power_of_two_int,
-}
-
-
-@private
-len_u8_table := [256]u8{
-	0         = 0,
-	1         = 1,
-	2..<4     = 2,
-	4..<8     = 3,
-	8..<16    = 4,
-	16..<32   = 5,
-	32..<64   = 6,
-	64..<128  = 7,
-	128..<256 = 8,
 }
 
 /*
