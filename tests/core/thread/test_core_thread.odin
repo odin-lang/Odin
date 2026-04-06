@@ -50,3 +50,39 @@ poly_data_test :: proc(_t: ^testing.T) {
 
 	thread.join_multiple(t1, t2, t3, t4)
 }
+
+@(test)
+name_test :: proc(_t: ^testing.T) {
+	@static name_test_t: ^testing.T
+	@static main_wait := true
+	@static child_wait := true
+	name_test_t = _t
+
+	t := thread.create_and_start(name = "test_name", fn = proc() {
+		main_wait = false
+
+		for (child_wait) {}
+
+		n, err  := thread.get_name()
+		defer if err != nil {
+			delete(n)
+		}
+		testing.expect(name_test_t, err == nil, "thread name allocation failed")
+		testing.expect(name_test_t, n == "test_name","thread name on self did not match")
+
+	})
+	defer free(t)
+
+	for (main_wait) {}
+
+	n, err := thread.get_name(t)
+	defer if err != nil {
+		delete(n)
+	}
+	testing.expect(name_test_t, err == nil, "thread name allocation failed")
+	testing.expect(name_test_t, n == "test_name","thread name on main did not match")
+
+	child_wait = false
+
+	thread.join(t)
+}
