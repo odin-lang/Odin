@@ -176,7 +176,7 @@ OS level errors are silently ignored.
 
 allocates memory for the returned string using provided allocator.
 */
-get_name :: proc(thread: ^Thread, allocator := context.temp_allocator, loc := #caller_location) -> (string, runtime.Allocator_Error) {
+get_name :: proc(thread: ^Thread = nil, allocator := context.temp_allocator, loc := #caller_location) -> (string, runtime.Allocator_Error) {
 	return _get_name(thread, allocator, loc)
 }
 
