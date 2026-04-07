@@ -208,6 +208,9 @@ BuiltinProc__simd_begin,
 
 	BuiltinProc_simd_sums_of_n,
 
+	BuiltinProc_simd_pairwise_add,
+	BuiltinProc_simd_pairwise_sub,
+
 	BuiltinProc_simd_ceil,
 	BuiltinProc_simd_floor,
 	BuiltinProc_simd_trunc,
@@ -605,6 +608,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_odd_even"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_sums_of_n"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_pairwise_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_pairwise_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_ceil") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

@@ -781,6 +781,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	case BuiltinProc_simd_div:
 	case BuiltinProc_simd_min:
 	case BuiltinProc_simd_max:
+	case BuiltinProc_simd_pairwise_add:
+	case BuiltinProc_simd_pairwise_sub:
 		{
 			Operand x = {};
 			Operand y = {};
@@ -1537,7 +1539,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
-				error(x.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
 			}
 			Type *bt = base_type(x.type);

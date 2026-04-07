@@ -2786,7 +2786,7 @@ signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where in
 }
 
 @(require_results)
-signbit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: type_of(intrinsics.simd_to_bits(T{}))) {
+sign_bit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: type_of(intrinsics.simd_to_bits(T{}))) {
 	BITS :: 8*size_of(E)
 	val  := to_bits(v)
 	mask := type_of(val)(1<<(BITS-1))
@@ -2877,3 +2877,6 @@ saturating_abs :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T 
 abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
 	return abs(sub(a, b))
 }
+
+pairwise_add :: intrinsics.simd_pairwise_add
+pairwise_sub :: intrinsics.simd_pairwise_add
