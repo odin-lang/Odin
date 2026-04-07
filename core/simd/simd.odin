@@ -2580,6 +2580,27 @@ Reverse the bit pattern of a SIMD vector.
 reverse_bits :: intrinsics.reverse_bits
 
 /*
+**Operation**
+
+	#assert(len(a) == len(b))
+	res := 0
+	N :: len(a)
+	for i in 0 ..< N/2 {
+		res[i] = a[2*i + 1]
+	}
+	for i in 0 ..< N/2 {
+		res[i + N/2] = b[2*i]
+	}
+	return res
+*/
+odd_even :: intrinsics.simd_odd_even
+
+@(require_results)
+add_sub :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return odd_even(add(a, b), sub(a, b))
+}
+
+/*
 Perform a FMA (Fused multiply-add) operation on each lane of SIMD vectors.
 
 A fused multiply-add is a ternary operation that for three operands, `a`, `b`
@@ -2605,6 +2626,41 @@ Returns:
 	return res
 */
 fused_mul_add :: intrinsics.fused_mul_add
+
+
+@(require_results)
+fused_neg_mul_add :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(neg(a), b, c)
+}
+
+@(require_results)
+fused_mul_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(a, b, neg(c))
+}
+
+@(require_results)
+fused_neg_mul_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(neg(a), b, neg(c))
+}
+
+@(require_results)
+fused_mul_add_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	odd  := fused_mul_add(a, b, c)
+	even := fused_mul_sub(a, b, c)
+	return odd_even(odd, even)
+}
+
+@(require_results)
+fused_mul_sub_add :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	odd  := fused_mul_sub(a, b, c)
+	even := fused_mul_add(a, b, c)
+	return odd_even(odd, even)
+}
+
+
+
+
+
 
 /*
 Perform a FMA (Fused multiply-add) operation on each lane of SIMD vectors.
@@ -2770,3 +2826,33 @@ Operation:
 	}
 */
 indices :: intrinsics.simd_indices
+
+/*
+Create a vector where each lane contains the index of that lane.
+Inputs:
+- `V`: The type of the vector to create.
+Result:
+- A vector of the given type, where each lane contains the index of that lane.
+Operation:
+	for i in 0 ..< N {
+		res[i] = i
+	}
+*/
+iota :: intrinsics.simd_indices
+
+
+
+@(require_results)
+saturating_neg :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return saturating_sub(T(0), v)
+}
+
+@(require_results)
+saturating_abs :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return max(v, saturating_sub(T(0), v))
+}
+
+@(require_results)
+abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return abs(sub(a, b))
+}
