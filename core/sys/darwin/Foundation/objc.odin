@@ -7,6 +7,8 @@ foreign import "system:Foundation.framework"
 import "base:intrinsics"
 import "core:c"
 
+SELECTOR :: intrinsics.objc_find_selector
+
 IMP :: proc "c" (object: id, sel: SEL, #c_vararg args: ..any) -> id
 
 @(default_calling_convention="c")

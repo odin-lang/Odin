@@ -17,6 +17,19 @@ Class_VTable_Info :: struct {
 	protocol_vtable: rawptr,
 }
 
+
+Selector_Variant :: union {
+	SEL,     // Selector
+	cstring, // Selector name
+}
+
+Method_Info :: struct {
+	method:    rawptr,
+	selector:  Selector_Variant,
+	type_code: string,
+}
+
+
 @(require_results)
 class_get_metaclass :: #force_inline proc "contextless" (cls: Class) -> Class {
 	return (^Class)(cls)^
@@ -25,6 +38,12 @@ class_get_metaclass :: #force_inline proc "contextless" (cls: Class) -> Class {
 @(require_results)
 object_get_vtable_info :: proc "contextless" (obj: id) -> ^Class_VTable_Info {
 	return (^Class_VTable_Info)(object_getIndexedIvars(obj))
+}
+
+@(require_results)
+object_get_protocol_vtable :: #force_inline proc "contextless" ($T: typeid, obj: id) -> ^T {
+	info := object_get_vtable_info(obj)
+	return (^T)(info.protocol_vtable)
 }
 
 @(require_results)
@@ -133,4 +152,18 @@ alloc_user_object :: proc "contextless" (cls: Class, _context: Maybe(runtime.Con
 		obj_info._context = _context.?
 	}
 	return obj
+}
+
+@(require_results)
+super_msg_send :: #force_inline proc "contextless" (self: ^$T, $R: typeid, selector: SEL) -> R
+	where intrinsics.type_is_subtype_of(T, intrinsics.objc_object) {
+
+	msg_sendSuper := (proc "c" (^objc_super, SEL) -> id)(objc_msgSendSuper)
+
+	super := objc_super{
+		receiver    = self,
+		super_class = self->superclass() ,
+	}
+
+	return R(msg_sendSuper(&super, selector))
 }

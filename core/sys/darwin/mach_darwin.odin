@@ -1,9 +1,48 @@
+#+build darwin
 package darwin
 
 foreign import mach "system:System"
 
 import "core:c"
 import "base:intrinsics"
+
+HOST_INFO_MAX                   :: 1024
+HOST_BASIC_INFO                 :: 1
+HOST_SCHED_INFO                 :: 3
+HOST_RESOURCE_SIZES             :: 4
+HOST_PRIORITY_INFO              :: 5
+HOST_SEMAPHORE_TRAPS            :: 7
+HOST_MACH_MSG_TRAP              :: 8
+HOST_VM_PURGABLE                :: 9
+HOST_DEBUG_INFO_INTERNAL        :: 10
+HOST_CAN_HAS_DEBUGGER           :: 11
+HOST_PREFERRED_USER_ARCH        :: 12
+HOST_CAN_HAS_DEBUGGER_COUNT     :: 1
+HOST_BASIC_INFO_COUNT           :: 12
+HOST_SCHED_INFO_COUNT           :: 2
+HOST_RESOURCE_SIZES_COUNT       :: 5
+HOST_PRIORITY_INFO_COUNT        :: 8
+HOST_LOAD_INFO                  :: 1
+HOST_VM_INFO                    :: 2
+HOST_CPU_LOAD_INFO              :: 3
+HOST_VM_INFO64                  :: 4
+HOST_EXTMOD_INFO64              :: 5
+HOST_EXPIRED_TASK_INFO          :: 6
+HOST_LOAD_INFO_COUNT            :: 6
+HOST_VM_PURGABLE_COUNT          :: 68
+HOST_VM_INFO64_COUNT            :: 38
+HOST_VM_INFO64_LATEST_COUNT     :: 38
+HOST_VM_INFO64_REV1_COUNT       :: 38
+HOST_VM_INFO64_REV0_COUNT       :: 24
+HOST_EXTMOD_INFO64_COUNT        :: 12
+HOST_EXTMOD_INFO64_LATEST_COUNT :: 12
+HOST_VM_INFO_COUNT              :: 15
+HOST_VM_INFO_LATEST_COUNT       :: 15
+HOST_VM_INFO_REV2_COUNT         :: 15
+HOST_VM_INFO_REV1_COUNT         :: 14
+HOST_VM_INFO_REV0_COUNT         :: 12
+HOST_CPU_LOAD_INFO_COUNT        :: 4
+HOST_PREFERRED_USER_ARCH_COUNT  :: 2
 
 mach_port_t :: distinct c.uint
 task_t :: mach_port_t
