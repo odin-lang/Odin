@@ -1584,12 +1584,14 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:
 	case BuiltinProc_simd_nearest:
+	case BuiltinProc_simd_approx_recip:
+	case BuiltinProc_simd_approx_recip_sqrt:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
-				error(x.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
 			}
 			Type *elem = base_array_type(x.type);

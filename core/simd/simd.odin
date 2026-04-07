@@ -2814,6 +2814,10 @@ recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where int
 }
 
 
+approx_recip      :: intrinsics.simd_approx_recip
+approx_recip_sqrt :: intrinsics.simd_approx_recip_sqrt
+
+
 /*
 Create a vector where each lane contains the index of that lane.
 Inputs:
