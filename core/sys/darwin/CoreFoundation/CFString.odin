@@ -5,6 +5,7 @@ import "core:c"
 foreign import CoreFoundation "system:CoreFoundation.framework"
 
 String :: distinct TypeRef // same as CFStringRef
+StringRef :: String
 
 StringEncoding :: distinct c.long
 

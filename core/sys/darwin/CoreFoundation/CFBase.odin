@@ -8,10 +8,12 @@ HashCode    :: distinct uint
 Index       :: distinct int
 TypeRef     :: distinct rawptr
 
-Range :: struct {
+// CFRange
+Range :: struct #align(8) {
 	location: Index,
 	length:   Index,
 }
+#assert(size_of(Range) == 16)
 
 foreign CoreFoundation {
 	// Releases a Core Foundation object.
