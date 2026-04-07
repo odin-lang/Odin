@@ -217,6 +217,7 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_approx_recip_sqrt,
 
 	BuiltinProc_simd_to_bits,
+	BuiltinProc_simd_to_bits_signed,
 
 	BuiltinProc_simd_lanes_reverse,
 	BuiltinProc_simd_lanes_rotate_left,
@@ -614,6 +615,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_approx_recip_sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_to_bits"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_to_bits_signed"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_lanes_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

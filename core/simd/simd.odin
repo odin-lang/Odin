@@ -2517,9 +2517,15 @@ Compute the nearest integer of each lane in a SIMD vector.
 nearest :: intrinsics.simd_nearest
 
 /*
-Transmute a SIMD vector into an integer vector.
+Transmute a SIMD vector into an unsigned integer vector.
 */
 to_bits :: intrinsics.simd_to_bits
+
+/*
+Transmute a SIMD vector into a signed integer vector.
+*/
+to_bits_signed :: intrinsics.simd_to_bits_signed
+
 
 /*
 Reverse the lanes of a SIMD vector.
@@ -2779,6 +2785,15 @@ signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where in
 	return select(is_nan, v, copysign(T(1), v))
 }
 
+@(require_results)
+signbit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: type_of(intrinsics.simd_to_bits(T{}))) {
+	BITS :: 8*size_of(E)
+	val  := to_bits(v)
+	mask := type_of(val)(1<<(BITS-1))
+	masked := bit_and(val, mask)
+	return to_bits(shr(to_bits_signed(masked), BITS-1))
+}
+
 /*
 Calculate reciprocals of SIMD lanes.
 
@@ -2846,7 +2861,6 @@ iota :: intrinsics.simd_indices
 
 
 sums_of_n :: intrinsics.simd_sums_of_n
-
 
 
 @(require_results)

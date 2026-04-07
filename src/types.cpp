@@ -1332,6 +1332,8 @@ gb_internal bool is_type_integer_or_float(Type *t) {
 	return false;
 }
 
+
+
 gb_internal bool is_type_numeric(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
@@ -1707,6 +1709,51 @@ gb_internal bool is_type_simd_vector(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	return t->kind == Type_SimdVector;
+}
+
+
+gb_internal Type *type_unsigned_equivalent(Type *t) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (is_type_simd_vector(t)) {
+		if (is_type_unsigned(t->SimdVector.elem)) {
+			return original_type;
+		}
+		return alloc_type_simd_vector(t->SimdVector.count, type_unsigned_equivalent(t->SimdVector.elem));
+	}
+
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1:  return t_u8;
+	case 2:  return t_u16;
+	case 4:  return t_u32;
+	case 8:  return t_u64;
+	case 16: return t_u128;
+	}
+	GB_PANIC("No known equivalent unsigned integer sized for %s", type_to_string(t));
+	return nullptr;
+}
+
+gb_internal Type *type_signed_equivalent(Type *t) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (is_type_simd_vector(t)) {
+		if (!is_type_unsigned(t->SimdVector.elem)) {
+			return original_type;
+		}
+		return alloc_type_simd_vector(t->SimdVector.count, type_signed_equivalent(t->SimdVector.elem));
+	}
+	;
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1:  return t_i8;
+	case 2:  return t_i16;
+	case 4:  return t_i32;
+	case 8:  return t_i64;
+	case 16: return t_i128;
+	}
+	GB_PANIC("No known equivalent signed integer sized for %s", type_to_string(t));
+	return nullptr;
 }
 
 gb_internal Type *base_array_type(Type *t) {

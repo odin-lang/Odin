@@ -887,14 +887,24 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			Operand x = {};
 			Operand y = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
-			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+			check_expr(c, &y, ce->args[1]); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
 			}
 			if (!is_type_simd_vector(y.type)) {
-				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				if (is_type_untyped(y.type) || is_type_unsigned(y.type)) {
+					Type *rhs_type = type_unsigned_equivalent(x.type);
+					convert_to_typed(c, &y, rhs_type); if (y.mode == Addressing_Invalid) return false;
+				} else {
+					convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+				}
+			}
+
+			if (!is_type_simd_vector(y.type)) {
+				gbString s = type_to_string(y.type);
+				error(y.expr, "'%.*s' expected a simd vector type or unsigned integer, got %s", LIT(builtin_name), s);
+				gb_string_free(s);
 				return false;
 			}
 			GB_ASSERT(x.type->kind == Type_SimdVector);
@@ -1706,15 +1716,25 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 			Type *elem = base_array_type(x.type);
 			i64 count = get_array_type_count(x.type);
-			i64 sz = type_size_of(elem);
-			Type *bit_elem = nullptr;
-			switch (sz) {
-			case 1: bit_elem = t_u8;  break;
-			case 2: bit_elem = t_u16; break;
-			case 4: bit_elem = t_u32; break;
-			case 8: bit_elem = t_u64; break;
+			Type *bit_elem = type_unsigned_equivalent(elem);
+
+			operand->type = alloc_type_simd_vector(count, bit_elem);
+			operand->mode = Addressing_Value;
+			return true;
+		}
+
+	case BuiltinProc_simd_to_bits_signed:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
 			}
-			GB_ASSERT(bit_elem != nullptr);
+			Type *elem = base_array_type(x.type);
+			i64 count = get_array_type_count(x.type);
+			Type *bit_elem = type_signed_equivalent(elem);
 
 			operand->type = alloc_type_simd_vector(count, bit_elem);
 			operand->mode = Addressing_Value;
