@@ -4197,22 +4197,22 @@ COMDLG_FILTERSPEC :: struct {
 }
 
 PERCEIVED :: enum c_int {
-    TYPE_FIRST       = -3,
-    TYPE_CUSTOM      = -3,
-    TYPE_UNSPECIFIED = -2,
-    TYPE_FOLDER      = -1,
-    TYPE_UNKNOWN     = 0,
-    TYPE_TEXT        = 1,
-    TYPE_IMAGE       = 2,
-    TYPE_AUDIO       = 3,
-    TYPE_VIDEO       = 4,
-    TYPE_COMPRESSED  = 5,
-    TYPE_DOCUMENT    = 6,
-    TYPE_SYSTEM      = 7,
-    TYPE_APPLICATION = 8,
-    TYPE_GAMEMEDIA   = 9,
-    TYPE_CONTACTS    = 10,
-    TYPE_LAST        = 10,
+	FIRST       = -3,
+	CUSTOM      = -3,
+	UNSPECIFIED = -2,
+	FOLDER      = -1,
+	UNKNOWN     = 0,
+	TEXT        = 1,
+	IMAGE       = 2,
+	AUDIO       = 3,
+	VIDEO       = 4,
+	COMPRESSED  = 5,
+	DOCUMENT    = 6,
+	SYSTEM      = 7,
+	APPLICATION = 8,
+	GAMEMEDIA   = 9,
+	CONTACTS    = 10,
+	LAST        = 10,
 }
 
 PERCEIVEDFLAG :: DWORD
