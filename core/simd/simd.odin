@@ -2841,6 +2841,9 @@ Operation:
 iota :: intrinsics.simd_indices
 
 
+sums_of_n :: intrinsics.simd_sums_of_n
+
+
 
 @(require_results)
 saturating_neg :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {

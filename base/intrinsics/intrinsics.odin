@@ -356,6 +356,12 @@ simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 
+// return {b[0], a[1], b[2], a[3], ...}
+simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+// Returns the sums of N consecutive lanes
+simd_sums_of_n :: proc(a: #simd[LANES]T, $N: uint) -> #simd[LANES/N]T where is_power_of_two(N) ---
+
 // Checks if the current target supports the given target features.
 //
 // Takes a constant comma-seperated string (eg: "sha512,sse4.1"), or a procedure type which has either

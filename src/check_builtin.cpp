@@ -1521,6 +1521,65 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_sums_of_n:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+				return false;
+			}
+			Type *bt = base_type(x.type);
+			u64 max_count = cast(u64)bt->SimdVector.count;
+			Type *elem = bt->SimdVector.elem;
+
+			u64 n = 0;
+
+			Operand y = {};
+			check_expr(c, &y, ce->args[1]); if (y.mode == Addressing_Invalid) return false;
+			{
+				Type *arg_type = base_type(y.type);
+				if (!is_type_integer(arg_type) || y.mode != Addressing_Constant) {
+					error(y.expr, "Indices to '%.*s' must be constant integers", LIT(builtin_name));
+					return false;
+				}
+
+				if (big_int_is_neg(&y.value.value_integer)) {
+					error(y.expr, "Negative '%.*s' index", LIT(builtin_name));
+					return false;
+				}
+
+				n = exact_value_to_u64(y.value);
+			}
+
+			if (!(is_power_of_two_u64(n) && n >= 2)) {
+				error(y.expr, "'%.*s' requires a power of two 'n' parameter >= 2, got %llu", LIT(builtin_name), cast(unsigned long long)n);
+				return false;
+			}
+
+			if (n > max_count) {
+				error(y.expr, "'%.*s' requires that the 'n' parameter is <= than the #simd length, got %llu vs %llu", LIT(builtin_name), cast(unsigned long long)n, cast(unsigned long long) max_count);
+				return false;
+			}
+
+			if (max_count % n != 0) {
+				error(y.expr, "'%.*s' requires the #simd length to be a multiple of the 'n' parameter, got #simd length=%llu, n=%llu", LIT(builtin_name), cast(unsigned long long) max_count, cast(unsigned long long)n);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+
+			u64 result_count = max_count/n;
+			if (result_count == 1) {
+				operand->type = elem;
+			} else {
+				operand->type = alloc_type_simd_vector(result_count, elem);
+			}
+			return true;
+
+		}
+
 	case BuiltinProc_simd_ceil:
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:

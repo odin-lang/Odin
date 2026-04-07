@@ -206,6 +206,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_runtime_swizzle,
 	BuiltinProc_simd_odd_even,
 
+	BuiltinProc_simd_sums_of_n,
+
 	BuiltinProc_simd_ceil,
 	BuiltinProc_simd_floor,
 	BuiltinProc_simd_trunc,
@@ -597,6 +599,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_runtime_swizzle"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_odd_even"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_sums_of_n"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_ceil") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
