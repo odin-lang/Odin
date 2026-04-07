@@ -51,9 +51,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(s
 				runtime.run_thread_local_cleaners()
 			}
 
-			when ODIN_OS != .Haiku {
-				_set_name(t)
-			}
+			_set_name(t)
 
 			t.procedure(t)
 		}
@@ -219,6 +217,10 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 }
 
 _set_name :: proc(thread: ^Thread) {
+	when ODIN_OS == .Haiku {
+		return
+	}
+
 	name, ok := thread.name.?
 	if !ok {
 		return
