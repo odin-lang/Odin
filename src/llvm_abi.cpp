@@ -131,6 +131,25 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 // }
 
 
+gb_internal void lb_add_function_calling_convention(LLVMValueRef fn, ProcCallingConvention calling_convention) {
+	lbCallingConventionKind cc_kind = lbCallingConvention_C;
+	// TODO(bill): Clean up this logic
+	if (!is_arch_wasm()) {
+		cc_kind = lb_calling_convention_map[calling_convention];
+	}
+	if (build_context.metrics.os == TargetOs_windows &&
+	    build_context.metrics.arch == TargetArch_amd64) {
+		switch (calling_convention) {
+		case ProcCC_Odin:
+		case ProcCC_Contextless:
+		    	cc_kind = lbCallingConvention_X86_VectorCall;
+		    	break;
+		}
+	}
+	LLVMSetFunctionCallConv(fn, cc_kind);
+}
+
+
 gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
 	if (ft == nullptr) {
 		return;
@@ -184,23 +203,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		LLVMAddAttributeAtIndex(fn, offset, noalias_attr);
 	}
 
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// TODO(bill): Clean up this logic
-	if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[calling_convention];
-	} 
-	// if (build_context.metrics.arch == TargetArch_amd64) {
-	// 	if (build_context.metrics.os == TargetOs_windows) {
-	// 		if (cc_kind == lbCallingConvention_C) {
-	// 			cc_kind = lbCallingConvention_Win64;
-	// 		}
-	// 	} else {
-	// 		if (cc_kind == lbCallingConvention_C) {
-	// 			cc_kind = lbCallingConvention_X86_64_SysV;
-	// 		}
-	// 	}
-	// } 
-	LLVMSetFunctionCallConv(fn, cc_kind);
+	lb_add_function_calling_convention(fn, calling_convention);
 	if (calling_convention == ProcCC_Odin) {
 		unsigned context_index = arg_index;
 		LLVMAddAttributeAtIndex(fn, context_index, noalias_attr);
@@ -498,6 +501,15 @@ namespace lbAbiAmd64Win64 {
 					args[i] = lb_arg_type_indirect(t, nullptr);
 					break;
 				}
+			}
+
+			if (kind == LLVMVectorTypeKind) {
+				i64 sz = lb_sizeof(t);
+				if (sz <= 32) {
+					args[i] = lb_arg_type_direct(t, t, nullptr, nullptr);
+				} else {
+					args[i] = lbAbi386::non_struct(c, t, false);
+				}
 			} else {
 				args[i] = lbAbi386::non_struct(c, t, false);
 			}
@@ -522,6 +534,16 @@ namespace lbAbiAmd64Win64 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
+
+		if (lb_is_type_kind(return_type, LLVMVectorTypeKind)) {
+			i64 sz = lb_sizeof(return_type);
+			if (sz <= 32) {
+				return lb_arg_type_direct(return_type, return_type, nullptr, nullptr);
+			}
+
+			return lb_arg_type_indirect(return_type, nullptr);
+		}
+
 		return lbAbi386::non_struct(c, return_type, true);
 	}
 };
