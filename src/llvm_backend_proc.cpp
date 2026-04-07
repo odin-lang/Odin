@@ -2189,6 +2189,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			auto alignment = cast(unsigned long long)type_align_of(base_array_type(arg1.type));
 			LLVMValueRef align = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), alignment, false);
 
+			i32 align_idx = -1;
+
 			unsigned arg_count = 4;
 			LLVMValueRef args[4] = {};
 			switch (builtin_id) {
@@ -2196,20 +2198,34 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				types[1] = lb_type(p->module, t_rawptr);
 				/*fallthrough*/
 			case BuiltinProc_simd_gather:
-				args[0] = ptr;
-				args[1] = align;
-				args[2] = mask;
-				args[3] = val;
+				if (LLVM_VERSION_MAJOR >= 22) {
+					arg_count = 3;
+					args[0] = ptr; align_idx = 0;
+					args[1] = mask;
+					args[2] = val;
+				} else {
+					args[0] = ptr;
+					args[1] = align;
+					args[2] = mask;
+					args[3] = val;
+				}
 				break;
 
 			case BuiltinProc_simd_masked_store:
 				types[1] = lb_type(p->module, t_rawptr);
 				/*fallthrough*/
 			case BuiltinProc_simd_scatter:
-				args[0] = val;
-				args[1] = ptr;
-				args[2] = align;
-				args[3] = mask;
+				if (LLVM_VERSION_MAJOR >= 22) {
+					arg_count = 3;
+					args[0] = val;
+					args[1] = ptr; align_idx = 1;
+					args[2] = mask;
+				} else {
+					args[0] = val;
+					args[1] = ptr;
+					args[2] = align;
+					args[3] = mask;
+				}
 				break;
 
 			case BuiltinProc_simd_masked_expand_load:
@@ -2230,6 +2246,10 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			}
 
 			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
+			if (align_idx >= 0) {
+				LLVMAttributeRef align_attr = lb_create_enum_attribute(p->module->ctx, "align", alignment);
+				LLVMAddAttributeAtIndex(res.value, align_idx, align_attr);
+			}
 			return res;
 
 		}
