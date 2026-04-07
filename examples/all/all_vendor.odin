@@ -33,6 +33,8 @@ package all
 @(require) import "core:sys/darwin/CoreFoundation"
 @(require) import "core:sys/darwin/CoreGraphics"
 @(require) import "core:sys/darwin/Security"
+@(require) import "core:sys/darwin/CoreText"
+@(require) import "core:sys/darwin/CoreAudio"
 @(require) import "vendor:darwin/CoreVideo"
 @(require) import "vendor:darwin/Metal"
 @(require) import "vendor:darwin/MetalKit"
