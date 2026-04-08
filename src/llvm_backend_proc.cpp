@@ -1321,6 +1321,105 @@ gb_internal LLVMValueRef llvm_splat_int(i64 count, LLVMTypeRef type, i64 value, 
 	return LLVMConstVector(values, cast(unsigned)count);
 }
 
+gb_internal bool lb_llvm_simd_bulk_op_unary(lbProcedure *p, lbValue arg, LLVMValueRef *result_, char const *intrinsic_name, unsigned default_width, LLVMValueRef *extra_args=nullptr, unsigned extra_args_count=0) {
+	if (intrinsic_name == nullptr || default_width == 0) {
+		return false;
+	}
+
+	auto do_call_intrinsic = [](lbProcedure *p, char const *intrinsic_name, LLVMValueRef val, LLVMValueRef *extra_args, unsigned extra_args_count) -> LLVMValueRef {
+		if (extra_args && extra_args_count > 0) {
+			LLVMValueRef *args = gb_alloc_array(temporary_allocator(), LLVMValueRef, extra_args_count+1);
+			args[0] = val;
+			gb_memcopy(args+1, extra_args, gb_size_of(extra_args[0]) * extra_args_count);
+
+			return lb_call_intrinsic(p, intrinsic_name, args, extra_args_count+1, nullptr, 0);
+		} else {
+			LLVMValueRef args[1] = {val};
+			return lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
+		}
+	};
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	Type *vt = base_type(arg.type);
+	GB_ASSERT(is_type_simd_vector(vt));
+
+	LLVMValueRef val = arg.value;
+	unsigned count = cast(unsigned)vt->SimdVector.count;
+	Type *elem = base_type(vt->SimdVector.elem);
+
+	if (count < default_width) {
+		LLVMValueRef *grow_indices   = gb_alloc_array(temporary_allocator(), LLVMValueRef, default_width);
+		LLVMValueRef *shrink_indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+
+		for (unsigned i = 0; i < count; i++) {
+			ExactValue idx = is_type_float(elem) ?
+				exact_value_float(cast(f64)i) :
+				exact_value_u64(i);
+			shrink_indices[i] = lb_const_value(p->module, elem, idx).value;
+			grow_indices[i]   = shrink_indices[i];
+		}
+		for (unsigned i = count; i < default_width; i++) {
+			grow_indices[i] = shrink_indices[0];
+		}
+
+		LLVMValueRef grow_mask   = LLVMConstVector(grow_indices, default_width);
+		LLVMValueRef shrink_mask = LLVMConstVector(shrink_indices, count);
+
+		val = LLVMBuildShuffleVector(p->builder, val, val, grow_mask, "");
+
+		val = do_call_intrinsic(p, intrinsic_name, val, extra_args, extra_args_count);
+		val = LLVMBuildShuffleVector(p->builder, val, val, shrink_mask, "");
+		*result_ = val;
+		return true;
+	} else if (count == default_width) {
+		val = do_call_intrinsic(p, intrinsic_name, val, extra_args, extra_args_count);
+		*result_ = val;
+		return true;
+	} else {
+		GB_ASSERT(count > default_width);
+		unsigned parts_count = count/default_width;
+		LLVMValueRef *parts = gb_alloc_array(temporary_allocator(), LLVMValueRef, parts_count);
+		for (unsigned i = 0; i < parts_count; i++) {
+			LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, default_width);
+			for (unsigned i = 0; i < default_width; i++) {
+				indices[i] = lb_const_value(p->module, t_u32, exact_value_u64(4*i+0)).value;
+			}
+
+			parts[i] = LLVMBuildShuffleVector(p->builder, val, val, LLVMConstVector(indices, default_width), "");
+		}
+
+		for (unsigned i = 0; i < parts_count; i++) {
+			parts[i] = do_call_intrinsic(p, intrinsic_name, parts[i], extra_args, extra_args_count);
+		}
+
+		LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+		for (unsigned j = 0; j < count; j++) {
+			indices[j] = lb_const_value(p->module, t_u32, exact_value_i64(j)).value;
+		}
+
+		u64 sub_parts_remaining = parts_count;
+
+		while (sub_parts_remaining > 1) {
+			for (unsigned i = 0; i < sub_parts_remaining; i += 2) {
+				unsigned indices_count = 2*cast(unsigned)(cast(u64)count/sub_parts_remaining);
+
+				parts[i] = LLVMBuildShuffleVector(p->builder, parts[i], parts[i+1], LLVMConstVector(indices, indices_count), "");
+			}
+
+			for (u64 i = 2; i < sub_parts_remaining; i += 2) {
+				parts[i/2] = parts[i];
+			}
+
+
+			sub_parts_remaining >>= 1;
+		}
+
+		*result_ = parts[0];
+		return true;
+	}
+}
+
 
 gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId builtin_id) {
 	ast_node(ce, CallExpr, expr);
@@ -2204,81 +2303,53 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			i64 count = vt->SimdVector.count;
 			Type *elem = base_type(vt->SimdVector.elem);
 
+			char const *intrinsic_name = nullptr;
+			unsigned default_width = 0;
+			LLVMValueRef *extra_args = nullptr;
+			unsigned extra_args_count = 0;
+
+			String features_to_enable = {};
+			String min_legal_vector_width = {};
+
 			// TODO(bill): Good optimizations for more than SSE
 			// e.g. AVX, ARM64, etc
-			if (are_types_identical(elem, t_f32) && (build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64)) {
-				char const *name_x86 = "llvm.x86.sse.rcp.ps";
+			if ((build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64)) {
+				if (are_types_identical(elem, t_f32)) {
+					intrinsic_name = "llvm.x86.sse.rcp.ps";
+					default_width = 4;
 
-				if (count < 4) {
-					GB_ASSERT(count == 2);
-
-					LLVMValueRef zero = lb_const_value(p->module, elem, exact_value_float(0)).value;
-					LLVMValueRef one  = lb_const_value(p->module, elem, exact_value_float(1)).value;
-
-
-					LLVMValueRef grow_indices[4]   = {zero, one, zero, zero};
-					LLVMValueRef shrink_indices[2] = {zero, one};
-					LLVMValueRef grow_mask   = LLVMConstVector(grow_indices, 4);
-					LLVMValueRef shrink_mask = LLVMConstVector(shrink_indices, 2);
-
-					val = LLVMBuildShuffleVector(p->builder, val, val, grow_mask, "");
-					LLVMValueRef args[1] = {val};
-					val = lb_call_intrinsic(p, name_x86, args, gb_count_of(args), nullptr, 0);
-					val = LLVMBuildShuffleVector(p->builder, val, val, shrink_mask, "");
-					res.value = val;
-					return res;
-				} else if (count == 4) {
-					LLVMValueRef args[1] = {val};
-					val = lb_call_intrinsic(p, name_x86, args, gb_count_of(args), nullptr, 0);
-					res.value = val;
-					return res;
-				} else {
-					GB_ASSERT(count > 4);
-					i64 parts_count = count/4;
-					LLVMValueRef *parts = gb_alloc_array(temporary_allocator(), LLVMValueRef, parts_count);
-					for (i64 i = 0; i < parts_count; i++) {
-						LLVMValueRef v0 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+0)).value;
-						LLVMValueRef v1 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+1)).value;
-						LLVMValueRef v2 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+2)).value;
-						LLVMValueRef v3 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+3)).value;
-
-						LLVMValueRef indices[4] = {v0, v1, v2, v3};
-
-						parts[i] = LLVMBuildShuffleVector(p->builder, val, val, LLVMConstVector(indices, 4), "");
-					}
-
-					for (i64 i = 0; i < parts_count; i++) {
-						LLVMValueRef args[1] = {parts[i]};
-						parts[i] = lb_call_intrinsic(p, name_x86, args, gb_count_of(args), nullptr, 0);
-					}
-
-					LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
-
-					u64 sub_parts_remaining = parts_count;
-
-					while (sub_parts_remaining > 1) {
-						for (u64 i = 0; i < sub_parts_remaining; i += 2) {
-							unsigned indices_count = 2*cast(unsigned)(cast(u64)count/sub_parts_remaining);
-							for (unsigned j = 0; j < indices_count; j++) {
-								indices[j] = lb_const_value(p->module, t_u32, exact_value_i64(j)).value;
-							}
-
-							parts[i] = LLVMBuildShuffleVector(p->builder, parts[i], parts[i+1], LLVMConstVector(indices, indices_count), "");
+					if (count >= 8) {
+						if (check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
+							intrinsic_name = "llvm.x86.avx.rcp.ps.256";
+							default_width = 8;
 						}
-
-						for (u64 i = 2; i < sub_parts_remaining; i += 2) {
-							parts[i/2] = parts[i];
-						}
-
-
-						sub_parts_remaining >>= 1;
 					}
 
-					res.value = parts[0];
-					return res;
+					if (count >= 16) {
+						if (check_target_feature_is_enabled(str_lit("avx512vl"), nullptr)) {
+							features_to_enable = str_lit("+avx512f,+evex512");
+							min_legal_vector_width = str_lit("512");
+
+							intrinsic_name = "llvm.x86.avx512.rcp14.ps.512";
+							default_width = 16;
+
+							extra_args_count = 2;
+							extra_args = gb_alloc_array(temporary_allocator(), LLVMValueRef, extra_args_count);
+
+							extra_args[0] = LLVMGetUndef(LLVMVectorType(lb_type(p->module, t_f32), 16));
+							extra_args[1] = LLVMConstInt(lb_type(p->module, t_i16), (1u<<16) - 1, true);
+						}
+					}
 				}
 			}
 
+
+			if (lb_llvm_simd_bulk_op_unary(p, arg0, &res.value, intrinsic_name, default_width, extra_args, extra_args_count)) {
+				if (features_to_enable.len > 0)     lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"),        features_to_enable);
+				if (min_legal_vector_width.len > 0) lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), min_legal_vector_width);
+
+				return res;
+			}
 
 			LLVMValueRef one = lb_const_value(p->module, vt->SimdVector.elem, exact_value_float(1)).value;
 			LLVMValueRef *ones = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
@@ -2294,19 +2365,11 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		{
 			auto const_broadcast_vector_float = [](lbProcedure *p, Type *elem_type, i64 count, f64 elem) -> LLVMValueRef {
 				LLVMValueRef val = lb_const_value(p->module, elem_type, exact_value_float(elem)).value;
-				LLVMValueRef *vals = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
-				for (i64 i = 0; i < count; i++) {
-					vals[i] = val;
-				}
-				return LLVMConstVector(vals, cast(unsigned)count);
+				return llvm_vector_broadcast(p, val, cast(unsigned)count);
 			};
 			auto const_broadcast_vector_unsigned = [](lbProcedure *p, Type *elem_type, i64 count, u64 elem) -> LLVMValueRef {
 				LLVMValueRef val = lb_const_value(p->module, elem_type, exact_value_u64(elem)).value;
-				LLVMValueRef *vals = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
-				for (i64 i = 0; i < count; i++) {
-					vals[i] = val;
-				}
-				return LLVMConstVector(vals, cast(unsigned)count);
+				return llvm_vector_broadcast(p, val, cast(unsigned)count);
 			};
 
 
@@ -2316,80 +2379,53 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			LLVMValueRef val = arg0.value;
 			i64 count = vt->SimdVector.count;
 
+			char const *intrinsic_name = nullptr;
+			unsigned default_width = 0;
+			LLVMValueRef *extra_args = nullptr;
+			unsigned extra_args_count = 0;
+
+			String features_to_enable = {};
+			String min_legal_vector_width = {};
+
 			// TODO(bill): Good optimizations for more than SSE
 			// e.g. AVX, ARM64, etc
-			if (are_types_identical(elem, t_f32) && (build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64)) {
-				char const *name_x86 = "llvm.x86.sse.rsqrt.ps";
+			if ((build_context.metrics.arch == TargetArch_i386 || build_context.metrics.arch == TargetArch_amd64)) {
+				if (are_types_identical(elem, t_f32)) {
+					intrinsic_name = "llvm.x86.sse.rsqrt.ps";
+					default_width = 4;
 
-				if (count < 4) {
-					GB_ASSERT(count == 2);
-
-					LLVMValueRef zero = lb_const_value(p->module, elem, exact_value_float(0)).value;
-					LLVMValueRef one  = lb_const_value(p->module, elem, exact_value_float(1)).value;
-
-
-					LLVMValueRef grow_indices[4]   = {zero, one, zero, zero};
-					LLVMValueRef shrink_indices[2] = {zero, one};
-					LLVMValueRef grow_mask   = LLVMConstVector(grow_indices, 4);
-					LLVMValueRef shrink_mask = LLVMConstVector(shrink_indices, 2);
-
-					val = LLVMBuildShuffleVector(p->builder, val, val, grow_mask, "");
-					LLVMValueRef args[1] = {val};
-					val = lb_call_intrinsic(p, name_x86, args, gb_count_of(args), nullptr, 0);
-					val = LLVMBuildShuffleVector(p->builder, val, val, shrink_mask, "");
-					res.value = val;
-					return res;
-				} else if (count == 4) {
-					LLVMValueRef args[1] = {val};
-					val = lb_call_intrinsic(p, name_x86, args, gb_count_of(args), nullptr, 0);
-					res.value = val;
-					return res;
-				} else {
-					GB_ASSERT(count > 4);
-					i64 parts_count = count/4;
-					LLVMValueRef *parts = gb_alloc_array(temporary_allocator(), LLVMValueRef, parts_count);
-					for (i64 i = 0; i < parts_count; i++) {
-						LLVMValueRef v0 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+0)).value;
-						LLVMValueRef v1 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+1)).value;
-						LLVMValueRef v2 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+2)).value;
-						LLVMValueRef v3 = lb_const_value(p->module, t_u32, exact_value_i64(4*i+3)).value;
-
-						LLVMValueRef indices[4] = {v0, v1, v2, v3};
-
-						parts[i] = LLVMBuildShuffleVector(p->builder, val, val, LLVMConstVector(indices, 4), "");
-					}
-
-					for (i64 i = 0; i < parts_count; i++) {
-						LLVMValueRef args[1] = {parts[i]};
-						parts[i] = lb_call_intrinsic(p, name_x86, args, gb_count_of(args), nullptr, 0);
-					}
-
-					LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
-
-					u64 sub_parts_remaining = parts_count;
-
-					while (sub_parts_remaining > 1) {
-						for (u64 i = 0; i < sub_parts_remaining; i += 2) {
-							unsigned indices_count = 2*cast(unsigned)(cast(u64)count/sub_parts_remaining);
-							for (unsigned j = 0; j < indices_count; j++) {
-								indices[j] = lb_const_value(p->module, t_u32, exact_value_i64(j)).value;
-							}
-
-							parts[i] = LLVMBuildShuffleVector(p->builder, parts[i], parts[i+1], LLVMConstVector(indices, indices_count), "");
+					if (count >= 8) {
+						if (check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
+							intrinsic_name = "llvm.x86.avx.rsqrt.ps.256";
+							default_width = 8;
 						}
-
-						for (u64 i = 2; i < sub_parts_remaining; i += 2) {
-							parts[i/2] = parts[i];
-						}
-
-
-						sub_parts_remaining >>= 1;
 					}
+					if (count >= 16) {
+						if (check_target_feature_is_enabled(str_lit("avx512vl"), nullptr)) {
+							features_to_enable = str_lit("+avx512f,+evex512");
+							min_legal_vector_width = str_lit("512");
 
-					res.value = parts[0];
-					return res;
+							intrinsic_name = "llvm.x86.avx512.rsqrt14.ps.512";
+							default_width = 16;
+
+							extra_args_count = 2;
+							extra_args = gb_alloc_array(temporary_allocator(), LLVMValueRef, extra_args_count);
+
+							extra_args[0] = LLVMGetUndef(LLVMVectorType(lb_type(p->module, t_f32), 16));
+							extra_args[1] = LLVMConstInt(lb_type(p->module, t_i16), (1u<<16) - 1, true);
+						}
+					}
 				}
-			} else if (are_types_identical(elem, t_f64)) {
+			}
+
+			if (lb_llvm_simd_bulk_op_unary(p, arg0, &res.value, intrinsic_name, default_width, extra_args, extra_args_count)) {
+				if (features_to_enable.len > 0)     lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"),        features_to_enable);
+				if (min_legal_vector_width.len > 0) lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), min_legal_vector_width);
+
+				return res;
+			}
+
+			if (are_types_identical(elem, t_f64)) {
 				LLVMValueRef half = const_broadcast_vector_float(p, elem, count, 0.5);
 				LLVMValueRef three_halfs = const_broadcast_vector_float(p, elem, count, 1.5);
 				LLVMValueRef unsigned_one_vector = const_broadcast_vector_unsigned(p, t_u64, count, 1);
