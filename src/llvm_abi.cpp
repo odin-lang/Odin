@@ -1,4 +1,5 @@
 #define ALLOW_SPLIT_MULTI_RETURNS true
+#define ALLOW_WIN64_VECTORCALL_ABI true
 
 enum lbArgKind {
 	lbArg_Direct,
@@ -142,7 +143,9 @@ gb_internal void lb_add_function_calling_convention(LLVMValueRef fn, ProcCalling
 		switch (calling_convention) {
 		case ProcCC_Odin:
 		case ProcCC_Contextless:
-		    	cc_kind = lbCallingConvention_X86_VectorCall;
+			if (ALLOW_WIN64_VECTORCALL_ABI) {
+			    	cc_kind = lbCallingConvention_X86_VectorCall;
+			}
 		    	break;
 		}
 	}
@@ -486,7 +489,7 @@ namespace lbAbiAmd64Win64 {
 		switch (calling_convention) {
 		case ProcCC_Odin:
 		case ProcCC_Contextless:
-			return true;
+			return ALLOW_WIN64_VECTORCALL_ABI;
 		case ProcCC_VectorCall:
 			return true;
 		}
