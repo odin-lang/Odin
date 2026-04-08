@@ -2691,7 +2691,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 
 
-	if (is_type_array_like(dst)) {
+	if (is_type_array_like(dst) && !is_type_array_like(src)) {
 		Type *elem = base_array_type(dst);
 		isize index_count = cast(isize)get_array_type_count(dst);
 
@@ -2731,6 +2731,41 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			for (isize i = 0; i < index_count; i++) {
 				lbValue elem = lb_emit_array_epi(p, v.addr, i);
 				lb_emit_store(p, elem, e);
+			}
+		}
+		return lb_addr_load(p, v);
+	}
+
+	if (is_type_array_like(dst) && is_type_array_like(src)) {
+		Type *elem = base_array_type(dst);
+		isize index_count = cast(isize)gb_min(get_array_type_count(src), get_array_type_count(dst));
+		isize inlineable = type_size_of(dst) <= build_context.max_simd_align;
+
+		// NOTE: Do fill with zero because the dst may be longer than src
+		lbAddr v = lb_add_local_generated(p, t, true);
+
+		lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+		lbValue pdst = v.addr;
+
+		if (!inlineable) {
+			auto loop_data = lb_loop_start(p, index_count, t_int);
+
+			lbValue sp = lb_emit_array_ep(p, psrc, loop_data.idx);
+			lbValue dp = lb_emit_array_ep(p, pdst, loop_data.idx);
+
+			lbValue s = lb_emit_load(p, sp);
+			s = lb_emit_conv(p, s, dst->Matrix.elem);
+			lb_emit_store(p, dp, s);
+
+			lb_loop_end(p, loop_data);
+		} else {
+			for (isize i = 0; i < index_count; i++) {
+				lbValue sp = lb_emit_array_epi(p, psrc, i);
+				lbValue dp = lb_emit_array_epi(p, pdst, i);
+
+				lbValue s = lb_emit_load(p, sp);
+				s = lb_emit_conv(p, s, dst->Matrix.elem);
+				lb_emit_store(p, dp, s);
 			}
 		}
 		return lb_addr_load(p, v);
