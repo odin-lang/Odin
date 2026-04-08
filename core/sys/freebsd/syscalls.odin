@@ -23,6 +23,7 @@ SYS_recvfrom   : uintptr : 29
 SYS_accept     : uintptr : 30
 SYS_getpeername: uintptr : 31
 SYS_getsockname: uintptr : 32
+SYS_ioctl      : uintptr : 54
 SYS_fcntl      : uintptr : 92
 SYS_fsync      : uintptr : 95
 SYS_socket     : uintptr : 97
@@ -634,3 +635,13 @@ accept4_nil :: proc "contextless" (s: Fd, flags: Socket_Flags = {}) -> (Fd, Errn
 }
 
 accept4 :: proc { accept4_nil, accept4_T }
+
+ioctl :: proc "contextless" (fd: Fd, request: c.ulong, arg: uintptr) -> (int, Errno) {
+	result, ok := intrinsics.syscall_bsd(SYS_ioctl, cast(uintptr)fd, arg)
+
+	if !ok {
+		return -1, cast(Errno)result		
+	}
+
+	return cast(int)result, nil
+}
