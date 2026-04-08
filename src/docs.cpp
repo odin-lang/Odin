@@ -289,7 +289,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 					}
 					curr_file = e->file;
 					String filename = remove_directory_from_path(curr_file->fullpath);
-					print_doc_line(1, "file: %s", filename);
+					print_doc_line(1, "file: %.*s", LIT(filename));
 				}
 			} else {
 				if (curr_entity_kind != e->kind) {
