@@ -305,7 +305,7 @@ enum ProcCallingConvention : i32 {
 	ProcCC_PreserveMost = 12,
 	ProcCC_PreserveAll  = 13,
 
-	ProcCC_VectorCall  = 14,
+	ProcCC_VectorCall   = 14,
 
 	ProcCC_MAX,
 

@@ -486,6 +486,7 @@ namespace lbAbiAmd64Win64 {
 		switch (calling_convention) {
 		case ProcCC_Odin:
 		case ProcCC_Contextless:
+			return true;
 		case ProcCC_VectorCall:
 			return true;
 		}
@@ -501,12 +502,27 @@ namespace lbAbiAmd64Win64 {
 
 			if (is_vectorcall(calling_convention)) {
 				if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+				#if 0
 					i64 sz = lb_sizeof(t);
 					if (sz <= 8) {
 						args[i] = lb_arg_type_direct(t, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
 					} else {
 						args[i] = lb_arg_type_indirect(t, nullptr);
 					}
+				#else
+					i64 sz = lb_sizeof(t);
+					switch (sz) {
+					case 1:
+					case 2:
+					case 4:
+					case 8:
+						args[i] = lb_arg_type_direct(t, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
+						break;
+					default:
+						args[i] = lb_arg_type_indirect(t, nullptr);
+						break;
+					}
+				#endif
 				}
 
 				if (kind == LLVMVectorTypeKind) {
