@@ -1063,6 +1063,7 @@ _mm256_lddqu_si256 :: #force_inline proc "c" (mem_addr: ^__m256i) -> __m256i {
 	return transmute(__m256i)llvm_vlddqu(mem_addr)
 }
 
+/*
 // Moves integer data from a 256-bit integer vector to a 32-byte
 // aligned memory location. To minimize caching, the data is flagged as
 // non-temporal (unlikely to be used again soon)
@@ -1120,6 +1121,7 @@ _mm256_stream_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m256d) {
 _mm256_stream_ps :: #force_inline proc "c" (mem_addr: ^f32, a: __m256) {
 	panic_contextless("TODO: _mm256_stream_ps")
 }
+*/
 
 // Computes the approximate reciprocal of packed single-precision (32-bit) floating-point elements in `a`, and returns the results. The maximum
 // relative error for this approximation is less than 1.5*2^-12.
