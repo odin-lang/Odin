@@ -773,7 +773,7 @@ foreign lib {
 	Body_GetLocalPointVelocity      :: proc(bodyId: BodyId, localPoint: Vec2) -> Vec2 ---
 
 	// Get the linear velocity of a world point attached to a body. Usually in meters per second.
-	GetWorldPointVelocity           :: proc(bodyId: BodyId, worldPoint: Vec2) -> Vec2 ---
+	Body_GetWorldPointVelocity      :: proc(bodyId: BodyId, worldPoint: Vec2) -> Vec2 ---
 
 	// Apply a force at a world point. If the force is not applied at the center of mass,
 	// it will generate a torque and affect the angular velocity. This optionally wakes up the body.

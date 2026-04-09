@@ -58,6 +58,7 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_simd_vector,
 	is_type_matrix,
 	is_type_raw_union,
+	is_type_fixed_capacity_dynamic_array,
 
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
@@ -780,6 +781,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	case BuiltinProc_simd_div:
 	case BuiltinProc_simd_min:
 	case BuiltinProc_simd_max:
+	case BuiltinProc_simd_pairwise_add:
+	case BuiltinProc_simd_pairwise_sub:
 		{
 			Operand x = {};
 			Operand y = {};
@@ -886,14 +889,24 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			Operand x = {};
 			Operand y = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
-			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+			check_expr(c, &y, ce->args[1]); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
 			}
 			if (!is_type_simd_vector(y.type)) {
-				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				if (is_type_untyped(y.type) || is_type_unsigned(y.type)) {
+					Type *rhs_type = type_unsigned_equivalent(x.type);
+					convert_to_typed(c, &y, rhs_type); if (y.mode == Addressing_Invalid) return false;
+				} else {
+					convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+				}
+			}
+
+			if (!is_type_simd_vector(y.type)) {
+				gbString s = type_to_string(y.type);
+				error(y.expr, "'%.*s' expected a simd vector type or unsigned integer, got %s", LIT(builtin_name), s);
+				gb_string_free(s);
 				return false;
 			}
 			GB_ASSERT(x.type->kind == Type_SimdVector);
@@ -1386,6 +1399,35 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
+	case BuiltinProc_simd_odd_even:
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(y.type)) {
+				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xs = type_to_string(x.type);
+				gbString ys = type_to_string(y.type);
+				error(x.expr, "'%.*s' expected 2 arguments of the same type, got '%s' vs '%s'", LIT(builtin_name), xs, ys);
+				gb_string_free(ys);
+				gb_string_free(xs);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
 	case BuiltinProc_simd_select:
 		{
 			Operand cond = {};
@@ -1491,16 +1533,77 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			return true;
 		}
 
-	case BuiltinProc_simd_ceil:
-	case BuiltinProc_simd_floor:
-	case BuiltinProc_simd_trunc:
-	case BuiltinProc_simd_nearest:
+	case BuiltinProc_simd_sums_of_n:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
-				error(x.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			Type *bt = base_type(x.type);
+			u64 max_count = cast(u64)bt->SimdVector.count;
+			Type *elem = bt->SimdVector.elem;
+
+			u64 n = 0;
+
+			Operand y = {};
+			check_expr(c, &y, ce->args[1]); if (y.mode == Addressing_Invalid) return false;
+			{
+				Type *arg_type = base_type(y.type);
+				if (!is_type_integer(arg_type) || y.mode != Addressing_Constant) {
+					error(y.expr, "Indices to '%.*s' must be constant integers", LIT(builtin_name));
+					return false;
+				}
+
+				if (big_int_is_neg(&y.value.value_integer)) {
+					error(y.expr, "Negative '%.*s' index", LIT(builtin_name));
+					return false;
+				}
+
+				n = exact_value_to_u64(y.value);
+			}
+
+			if (!(is_power_of_two_u64(n) && n >= 2)) {
+				error(y.expr, "'%.*s' requires a power of two 'n' parameter >= 2, got %llu", LIT(builtin_name), cast(unsigned long long)n);
+				return false;
+			}
+
+			if (n > max_count) {
+				error(y.expr, "'%.*s' requires that the 'n' parameter is <= than the #simd length, got %llu vs %llu", LIT(builtin_name), cast(unsigned long long)n, cast(unsigned long long) max_count);
+				return false;
+			}
+
+			if (max_count % n != 0) {
+				error(y.expr, "'%.*s' requires the #simd length to be a multiple of the 'n' parameter, got #simd length=%llu, n=%llu", LIT(builtin_name), cast(unsigned long long) max_count, cast(unsigned long long)n);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+
+			u64 result_count = max_count/n;
+			if (result_count == 1) {
+				operand->type = elem;
+			} else {
+				operand->type = alloc_type_simd_vector(result_count, elem);
+			}
+			return true;
+
+		}
+
+	case BuiltinProc_simd_ceil:
+	case BuiltinProc_simd_floor:
+	case BuiltinProc_simd_trunc:
+	case BuiltinProc_simd_nearest:
+	case BuiltinProc_simd_approx_recip:
+	case BuiltinProc_simd_approx_recip_sqrt:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
 			}
 			Type *elem = base_array_type(x.type);
@@ -1615,15 +1718,25 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 			Type *elem = base_array_type(x.type);
 			i64 count = get_array_type_count(x.type);
-			i64 sz = type_size_of(elem);
-			Type *bit_elem = nullptr;
-			switch (sz) {
-			case 1: bit_elem = t_u8;  break;
-			case 2: bit_elem = t_u16; break;
-			case 4: bit_elem = t_u32; break;
-			case 8: bit_elem = t_u64; break;
+			Type *bit_elem = type_unsigned_equivalent(elem);
+
+			operand->type = alloc_type_simd_vector(count, bit_elem);
+			operand->mode = Addressing_Value;
+			return true;
+		}
+
+	case BuiltinProc_simd_to_bits_signed:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
 			}
-			GB_ASSERT(bit_elem != nullptr);
+			Type *elem = base_array_type(x.type);
+			i64 count = get_array_type_count(x.type);
+			Type *bit_elem = type_signed_equivalent(elem);
 
 			operand->type = alloc_type_simd_vector(count, bit_elem);
 			operand->mode = Addressing_Value;
@@ -1706,7 +1819,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	}
 	defer ({
 		if (cache == nullptr) {
-			LoadFileCache *new_cache = gb_alloc_item(permanent_allocator(), LoadFileCache);
+			LoadFileCache *new_cache = permanent_alloc_item<LoadFileCache>();
 			new_cache->path = path;
 			new_cache->data = data;
 			new_cache->file_error = file_error;
@@ -1744,7 +1857,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 			case LoadFileTier_Contents: {
 				isize file_size = cast(isize)gb_file_size(&f);
 				if (file_size > 0) {
-					u8 *ptr = cast(u8 *)gb_alloc(permanent_allocator(), file_size+1);
+					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
 					gb_file_read_at(&f, ptr, file_size, 0);
 					ptr[file_size] = '\0';
 					data.text = ptr;
@@ -1949,7 +2062,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	}
 	defer ({
 		if (cache == nullptr) {
-			LoadDirectoryCache *new_cache = gb_alloc_item(permanent_allocator(), LoadDirectoryCache);
+			LoadDirectoryCache *new_cache = permanent_alloc_item<LoadDirectoryCache>();
 			new_cache->path = path;
 			new_cache->files = file_caches;
 			new_cache->file_error = file_error;
@@ -2412,13 +2525,14 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 
 		String name = arg->Ident.token.string;
+		auto interned = arg->Ident.interned;
 
 
 		operand->type = def.type;
 		operand->mode = def.mode;
 		operand->value = def.value;
 
-		Entity *found = scope_lookup_current(config_pkg->scope, name);
+		Entity *found = scope_lookup_current(config_pkg->scope, interned);
 		if (found != nullptr) {
 			if (found->kind != Entity_Constant) {
 				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
@@ -2634,6 +2748,16 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->Array.count);
 			type = t_untyped_integer;
+		} else if (is_type_fixed_capacity_dynamic_array(op_type)) {
+			Type *at = core_type(op_type);
+			if (id == BuiltinProc_cap) {
+				mode = Addressing_Constant;
+				value = exact_value_i64(at->FixedCapacityDynamicArray.capacity);
+				type = t_untyped_integer;
+			} else {
+				GB_ASSERT(id == BuiltinProc_len);
+				mode = Addressing_Value;
+			}
 		} else if (is_type_enumerated_array(op_type) && id == BuiltinProc_len) {
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;
@@ -2793,7 +2917,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		GB_ASSERT(type != nullptr);
 		
-		String field_name = {};
+		InternedString field_name = {};
 		
 		if (field_arg == nullptr) {
 			error(call, "Expected an identifier for field argument");
@@ -2801,17 +2925,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 
 		if (field_arg->kind == Ast_Ident) {
-			field_name = field_arg->Ident.token.string;
+			field_name = field_arg->Ident.interned;
 		}
-		if (field_name.len == 0) {
+		if (field_name.value == 0) {
 			error(field_arg, "Expected an identifier for field argument");
 			return false;
 		}
 
 		
-		if (is_type_array(type)) {
+		if (is_type_array(type) || is_type_bit_field(type)) {
 			gbString t = type_to_string(type);
-			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
+			error(field_arg, "Expected a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
@@ -2836,19 +2960,19 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+			      "'%s' has no field named '%s'", type_str, field_name.cstring());
 			gb_string_free(type_str);
 
 			Type *bt = base_type(type);
 			if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(field_name, bt->Struct.fields);
+				check_did_you_mean_type(field_name.string(), bt->Struct.fields);
 			}
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+			      "Field '%s' is embedded via a pointer in '%s'", field_name.cstring(), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -2880,7 +3004,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		GB_ASSERT(type != nullptr);
 		
-		String field_name = {};
+		InternedString field_name = {};
 		
 		if (field_arg == nullptr) {
 			error(call, "Expected a constant (not-empty) string for field argument");
@@ -2890,9 +3014,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Operand x = {};
 		check_expr(c, &x, field_arg);
 		if (x.mode == Addressing_Constant && x.value.kind == ExactValue_String) {
-			field_name = x.value.value_string;
+			field_name = string_interner_insert(x.value.value_string);
 		}
-		if (field_name.len == 0) {
+		if (field_name.value == 0) {
 			error(field_arg, "Expected a constant (non-empty) string for field argument");
 			return false;
 		}
@@ -2910,19 +3034,19 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			ERROR_BLOCK();
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+			      "'%s' has no field named '%s'", type_str, field_name.cstring());
 			gb_string_free(type_str);
 
 			Type *bt = base_type(type);
 			if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(field_name, bt->Struct.fields);
+				check_did_you_mean_type(field_name.string(), bt->Struct.fields);
 			}
 			return false;
 		}
 		if (sel.indirect) {
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+			      "Field '%s' is embedded via a pointer in '%s'", field_name.string(), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3594,18 +3718,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(type_str);
 			return false;
 		}
-		gbAllocator a = permanent_allocator();
 
 		Type *tuple = alloc_type_tuple();
 
 		if (is_type_struct(type)) {
 			isize variable_count = type->Struct.fields.count;
-			slice_init(&tuple->Tuple.variables, a, variable_count);
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
 			// NOTE(bill): don't copy the entities, this should be good enough
 			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 		} else if (is_type_array(type)) {
 			isize variable_count = cast(isize)type->Array.count;
-			slice_init(&tuple->Tuple.variables, a, variable_count);
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
 			for (isize i = 0; i < variable_count; i++) {
 				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
 			}
@@ -4426,7 +4549,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 			if (!fail && first_is_field_value) {
 				for_array(i, names) {
-					Selection sel = lookup_field(et, names[i], false);
+					Selection sel = lookup_field(et, string_interner_insert(names[i]), false);
 					if (sel.entity == nullptr) {
 						goto soa_zip_end;
 					}
@@ -5167,6 +5290,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					case Type_Array:
 					case Type_EnumeratedArray:
 					case Type_SimdVector:
+					case Type_FixedCapacityDynamicArray:
 						operand->type = alloc_type_multi_pointer(base_array_type(base));
 						break;
 					case Type_Matrix:
@@ -6245,6 +6369,33 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = x.type;
 		}
 		break;
+
+	case BuiltinProc_likely:
+	case BuiltinProc_unlikely:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_boolean(x.type)) {
+				gbString xt = type_to_string(x.type);
+				error(x.expr, "Expected a boolean expression to '%.*s', got %s", LIT(builtin_name), xt);
+				gb_string_free(xt);
+				*operand = x; // minimize error propagation
+				return true;
+			}
+
+			if (x.mode == Addressing_Constant) {
+				// NOTE(bill): just completely ignore this intrinsic entirely
+				*operand = x;
+				return true;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+		}
+		break;
 		
 	case BuiltinProc_prefetch_read_instruction:
 	case BuiltinProc_prefetch_read_data:
@@ -6747,7 +6898,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			String field_name = x.value.value_string;
+			InternedString field_name = string_interner_insert(x.value.value_string);
 
 			Selection sel = lookup_field(type, field_name, false);
 			operand->mode = Addressing_Constant;
@@ -6827,17 +6978,79 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			String field_name = x.value.value_string;
+			InternedString field_name = string_interner_insert(x.value.value_string);
 
 			Selection sel = lookup_field(type, field_name, false);
 			if (sel.index.count == 0) {
 				gbString t = type_to_string(type);
-				error(ce->args[1], "'%.*s' is not a field of type %s", LIT(field_name), t);
+				error(ce->args[1], "'%s' is not a field of type %s", field_name.cstring(), t);
 				gb_string_free(t);
 				return false;
 			}
 			operand->mode = Addressing_Type;
 			operand->type = sel.entity->type;
+			break;
+		}
+		break;
+		
+	case BuiltinProc_type_field_bit_offset:
+	case BuiltinProc_type_field_bit_size:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			if (!is_type_bit_field(type)) {
+				error(operand->expr, "Expected a bit field type for '%.*s'", LIT(builtin_name));
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Operand x = {};
+			check_expr(c, &x, ce->args[1]);
+
+			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
+				error(ce->args[1], "Expected a constant string for field argument");
+				return false;
+			}
+
+			InternedString field_name = string_interner_insert(x.value.value_string);
+
+			i64 bit_offset = 0;
+			i64 bit_size = 0;
+			for_array(i, type->BitField.fields) {
+				Entity *f = type->BitField.fields[i];
+				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+					continue;
+				}
+				auto str = entity_interned_name(f);
+				if (field_name == str) {
+					bit_offset = type->BitField.bit_offsets[i];
+					bit_size = type->BitField.bit_sizes[i];
+					break;
+				}
+			}
+
+			i64 value = 0;
+			switch (id) {
+			case BuiltinProc_type_field_bit_offset:
+				value = bit_offset;
+				break;
+			case BuiltinProc_type_field_bit_size:
+				value = bit_size;
+				break;
+			default:
+				GB_ASSERT(false);
+			}
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_integer;
+			operand->value = exact_value_i64(value);
 			break;
 		}
 		break;
@@ -7587,31 +7800,56 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			String field_name = x.value.value_string;
+			InternedString field_name = string_interner_insert(x.value.value_string);
 
 			Selection sel = lookup_field(type, field_name, false);
 			if (sel.entity == nullptr) {
 				ERROR_BLOCK();
 				gbString type_str = type_to_string(bt);
 				error(ce->args[0],
-				      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
+				      "'%s' has no field named '%s'", type_str, field_name.cstring());
 				gb_string_free(type_str);
 
 				if (bt->kind == Type_Struct) {
-					check_did_you_mean_type(field_name, bt->Struct.fields);
+					check_did_you_mean_type(field_name.string(), bt->Struct.fields);
 				}
 				return false;
 			}
 			if (sel.indirect) {
 				gbString type_str = type_to_string(bt);
 				error(ce->args[0],
-				      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
+				      "Field '%s' is embedded via a pointer in '%s'", field_name.cstring(), type_str);
 				gb_string_free(type_str);
 				return false;
 			}
 
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_u64(sel.index[0]);
+			operand->type = t_uintptr;
+			break;
+		}
+		break;
+
+	case BuiltinProc_type_fixed_capacity_dynamic_array_len_offset:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_fixed_capacity_dynamic_array(type)) {
+				error(ce->args[0], "Expected a fixed capacity dynamic array type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			i64 sz = type_size_of(type);
+			gb_unused(sz);
+			i64 offset = type_offset_of(type, 1);
+
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(cast(u64)offset);
 			operand->type = t_uintptr;
 			break;
 		}

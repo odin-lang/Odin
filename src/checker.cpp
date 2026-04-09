@@ -55,7 +55,8 @@ gb_internal bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *f
 
 
 gb_internal void scope_reserve(Scope *scope, isize count) {
-	string_map_reserve(&scope->elements, 2*count);
+	scope_map_reserve(&scope->elements, 2*count);
+	// string_map_reserve(&scope->elements, 2*count);
 }
 
 gb_internal void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
@@ -123,7 +124,7 @@ gb_internal void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNod
 // }
 
 gb_internal ImportGraphNode *import_graph_node_create(gbAllocator a, AstPackage *pkg) {
-	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
+	ImportGraphNode *n = permanent_alloc_item<ImportGraphNode>();
 	n->pkg = pkg;
 	n->scope = pkg->scope;
 	return n;
@@ -163,7 +164,6 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 
 
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
-	gb_zero_item(d);
 	if (parent) {
 		mutex_lock(&parent->next_mutex);
 		d->next_sibling = parent->next_child;
@@ -181,7 +181,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
-	DeclInfo *d = gb_alloc_item(permanent_allocator(), DeclInfo);
+	DeclInfo *d = permanent_alloc_item<DeclInfo>();
 	init_decl_info(d, scope, parent);
 	return d;
 }
@@ -214,7 +214,8 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 
 
 gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
-	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
+	Scope *s = permanent_alloc_item<Scope>();
+	scope_map_init(&s->elements);
 	s->parent = parent;
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -238,8 +239,7 @@ gb_internal Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*f->total_file_decl_count);
 	Scope *s = create_scope(info, f->pkg->scope);
-	string_map_init(&s->elements, init_elements_capacity);
-
+	scope_reserve(s, init_elements_capacity);
 
 	s->flags |= ScopeFlag_File;
 	s->file = f;
@@ -256,9 +256,10 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 		total_pkg_decl_count += file->total_file_decl_count;
 	}
 
-	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
+	// isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
 	Scope *s = create_scope(c->info, builtin_pkg->scope);
-	string_map_init(&s->elements, init_elements_capacity);
+	scope_map_reserve(&s->elements, 2*total_pkg_decl_count);
+	// string_map_init(&s->elements, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -285,7 +286,7 @@ gb_internal void destroy_scope(Scope *scope) {
 		destroy_scope(child);
 	}
 
-	string_map_destroy(&scope->elements);
+	// string_map_destroy(&scope->elements);
 	ptr_set_destroy(&scope->imported);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
@@ -371,10 +372,14 @@ gb_internal void check_close_scope(CheckerContext *c) {
 }
 
 
-gb_internal Entity *scope_lookup_current(Scope *s, String const &name) {
-	Entity **found = string_map_get(&s->elements, name);
+gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash) {
+	// Entity **found = string_map_get(&s->elements, name);
+	if (hash == 0) {
+		hash = name.hash();
+	}
+	Entity *found = scope_map_get(&s->elements, name, hash);
 	if (found) {
-		return *found;
+		return found;
 	}
 	return nullptr;
 }
@@ -382,25 +387,21 @@ gb_internal Entity *scope_lookup_current(Scope *s, String const &name) {
 
 gb_global std::atomic<bool> in_single_threaded_checker_stage;
 
-gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_, u32 hash) {
+gb_internal void scope_lookup_parent(Scope *scope, InternedString name, Scope **scope_, Entity **entity_, u32 hash) {
 	bool is_single_threaded = in_single_threaded_checker_stage.load(std::memory_order_relaxed);
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
 		bool gone_thru_package = false;
-		StringHashKey key = {};
-		if (hash) {
-			key.hash = hash;
-			key.string = name;
-		} else {
-			key = string_hash_string(name);
+		if (!hash) {
+			hash = name.hash();
 		}
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
-			Entity **found = nullptr;
+			Entity *found = nullptr;
 			if (!is_single_threaded) rw_mutex_shared_lock(&s->mutex);
-			found = string_map_get(&s->elements, key);
+			found = scope_map_get(&s->elements, name, hash);
 			if (!is_single_threaded) rw_mutex_shared_unlock(&s->mutex);
 			if (found) {
-				Entity *e = *found;
+				Entity *e = found;
 				if (gone_thru_proc) {
 					if (e->kind == Entity_Label) {
 						continue;
@@ -433,41 +434,40 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 	if (scope_) *scope_ = nullptr;
 }
 
-gb_internal Entity *scope_lookup(Scope *s, String const &name, u32 hash) {
+gb_internal Entity *scope_lookup(Scope *s, InternedString interned, u32 hash) {
 	Entity *entity = nullptr;
-	scope_lookup_parent(s, name, nullptr, &entity, hash);
+	scope_lookup_parent(s, interned, nullptr, &entity, hash);
 	return entity;
 }
 
-gb_internal Entity *scope_insert_with_name_no_mutex(Scope *s, String const &name, Entity *entity) {
-	if (name == "") {
+gb_internal Entity *scope_insert_with_name_no_mutex(Scope *s, InternedString name, u32 hash, Entity *entity) {
+	if (name.value == 0) {
 		return nullptr;
 	}
-	StringHashKey key = string_hash_string(name);
-	Entity **found = nullptr;
+	Entity *found = nullptr;
 	Entity *result = nullptr;
 
-	found = string_map_get(&s->elements, key);
+	found = scope_map_get(&s->elements, name, hash);
 
 	if (found) {
-		if (entity != *found) {
-			result = *found;
+		if (entity != found) {
+			result = found;
 		}
 		goto end;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
-		found = string_map_get(&s->parent->elements, key);
+		found = scope_map_get(&s->parent->elements, name, hash);
 		if (found) {
-			if ((*found)->flags & EntityFlag_Result) {
-				if (entity != *found) {
-					result = *found;
+			if (found->flags & EntityFlag_Result) {
+				if (entity != found) {
+					result = found;
 				}
 				goto end;
 			}
 		}
 	}
 
-	string_map_set(&s->elements, key, entity);
+	scope_map_insert(&s->elements, name, hash, entity);
 	if (entity->scope == nullptr) {
 		entity->scope = s;
 	}
@@ -476,31 +476,30 @@ end:;
 }
 
 
-gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
-	if (name == "") {
+gb_internal Entity *scope_insert_with_name(Scope *s, InternedString name, u32 hash, Entity *entity) {
+	if (name.value == 0) {
 		return nullptr;
 	}
-	StringHashKey key = string_hash_string(name);
-	Entity **found = nullptr;
+	Entity *found = nullptr;
 	Entity *result = nullptr;
 
 	rw_mutex_lock(&s->mutex);
 
-	found = string_map_get(&s->elements, key);
+	found = scope_map_get(&s->elements, name, hash);
 
 	if (found) {
-		if (entity != *found) {
-			result = *found;
+		if (entity != found) {
+			result = found;
 		}
 		goto end;
 	}
 	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
 		rw_mutex_shared_lock(&s->parent->mutex);
-		found = string_map_get(&s->parent->elements, key);
+		found = scope_map_get(&s->parent->elements, name, hash);
 		if (found) {
-			if ((*found)->flags & EntityFlag_Result) {
-				if (entity != *found) {
-					result = *found;
+			if (found->flags & EntityFlag_Result) {
+				if (entity != found) {
+					result = found;
 				}
 				rw_mutex_shared_unlock(&s->parent->mutex);
 				goto end;
@@ -509,7 +508,7 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 		rw_mutex_shared_unlock(&s->parent->mutex);
 	}
 
-	string_map_set(&s->elements, key, entity);
+	scope_map_insert(&s->elements, name, hash, entity);
 	if (entity->scope == nullptr) {
 		entity->scope = s;
 	}
@@ -520,17 +519,21 @@ end:;
 }
 
 gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
-	String name = entity->token.string;
+	auto name = entity_interned_name(entity);
+	u32 hash = entity->interned_name_hash.load(std::memory_order_relaxed);
+	GB_ASSERT(hash != 0);
 	if (in_single_threaded_checker_stage.load(std::memory_order_relaxed)) {
-		return scope_insert_with_name_no_mutex(s, name, entity);
+		return scope_insert_with_name_no_mutex(s, name, hash, entity);
 	} else {
-		return scope_insert_with_name(s, name, entity);
+		return scope_insert_with_name(s, name, hash, entity);
 	}
 }
 
 gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
-	String name = entity->token.string;
-	return scope_insert_with_name_no_mutex(s, name, entity);
+	auto name = string_interner_insert(entity->token.string);
+	u32 hash = entity->interned_name_hash.load(std::memory_order_relaxed);
+	GB_ASSERT(hash != 0);
+	return scope_insert_with_name_no_mutex(s, name, hash, entity);
 }
 
 
@@ -664,7 +667,8 @@ gb_internal bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 		return false;
 	}
 
-	Entity *shadowed = scope_lookup(parent, name);
+	auto interned = entity_interned_name(e);
+	Entity *shadowed = scope_lookup(parent, interned, e->interned_name_hash.load());
 	if (shadowed == nullptr) {
 		return false;
 	}
@@ -946,8 +950,10 @@ gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
 
 gb_internal void add_package_dependency(CheckerContext *c, char const *package_name, char const *name, bool required=false) {
 	String n = make_string_c(name);
+	u32 hash = 0;
+	InternedString key = string_interner_insert(n, 0, &hash);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup(p->scope, n);
+	Entity *e = scope_lookup(p->scope, key, hash);
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
@@ -959,8 +965,10 @@ gb_internal void add_package_dependency(CheckerContext *c, char const *package_n
 
 gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);
+	u32 hash = 0;
+	InternedString key = string_interner_insert(n, 0, &hash);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
-	Entity *e = scope_lookup(p->scope, n);
+	Entity *e = scope_lookup(p->scope, key, hash);
 	if (e == nullptr) {
 		return;
 	}
@@ -1019,7 +1027,7 @@ gb_internal void add_global_type_entity(String name, Type *type) {
 
 gb_internal AstPackage *create_builtin_package(char const *name) {
 	gbAllocator a = permanent_allocator();
-	AstPackage *pkg = gb_alloc_item(a, AstPackage);
+	AstPackage *pkg = permanent_alloc_item<AstPackage>();
 	pkg->name = make_string_c(name);
 	pkg->kind = Package_Builtin;
 
@@ -1287,7 +1295,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_RTTI",                    bc->no_rtti);
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",           bc->ODIN_VALGRIND_SUPPORT);
-	add_global_bool_constant("ODIN_TILDE",                      bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
@@ -1358,6 +1365,9 @@ gb_internal void init_universal(void) {
 		BuiltinProcId id = cast(BuiltinProcId)i;
 		String name = builtin_procs[i].name;
 		if (name != "") {
+			u32 hash = 0;
+			InternedString interned = string_interner_insert(name, 0, &hash);
+
 			Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
 			entity->Builtin.id = id;
 			switch (builtin_procs[i].pkg) {
@@ -1366,7 +1376,7 @@ gb_internal void init_universal(void) {
 				break;
 			case BuiltinProcPkg_intrinsics:
 				add_global_entity(entity, intrinsics_pkg->scope);
-				GB_ASSERT(scope_lookup_current(intrinsics_pkg->scope, name) != nullptr);
+				GB_ASSERT(scope_lookup_current(intrinsics_pkg->scope, interned, hash) != nullptr);
 				break;
 			}
 		}
@@ -1539,12 +1549,12 @@ gb_internal void init_checker_context(CheckerContext *ctx, Checker *c) {
 	ctx->scope     = builtin_pkg->scope;
 	ctx->pkg       = builtin_pkg;
 
-	ctx->type_path = new_checker_type_path(heap_allocator());
+	ctx->type_path = new_checker_type_path();
 	ctx->type_level = 0;
 }
 
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
-	destroy_checker_type_path(ctx->type_path, heap_allocator());
+	destroy_checker_type_path(ctx->type_path);
 }
 
 gb_internal bool add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
@@ -2241,7 +2251,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	case Type_BitSet:
 		add_type_info_type_internal(c, bt->BitSet.elem);
-		add_type_info_type_internal(c, bt->BitSet.underlying);
+		add_type_info_type_internal(c, bit_set_to_int(bt));
 		break;
 
 	case Type_Pointer:
@@ -2274,6 +2284,11 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	case Type_Slice:
 		add_type_info_type_internal(c, bt->Slice.elem);
 		add_type_info_type_internal(c, alloc_type_pointer(bt->Slice.elem));
+		add_type_info_type_internal(c, t_int);
+		break;
+
+	case Type_FixedCapacityDynamicArray:
+		add_type_info_type_internal(c, bt->FixedCapacityDynamicArray.elem);
 		add_type_info_type_internal(c, t_int);
 		break;
 
@@ -2408,7 +2423,7 @@ gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 }
 
 gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
-	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
+	ProcInfo *info = permanent_alloc_item<ProcInfo>();
 	info->file  = file;
 	info->token = token;
 	info->decl  = decl;
@@ -2480,7 +2495,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_BitSet:
 		add_min_dep_type_info(c, bt->BitSet.elem);
-		add_min_dep_type_info(c, bt->BitSet.underlying);
+		add_min_dep_type_info(c, bit_set_to_int(bt));
 		break;
 
 	case Type_Pointer:
@@ -2514,6 +2529,12 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, alloc_type_pointer(bt->Slice.elem));
 		add_min_dep_type_info(c, t_int);
 		break;
+
+	case Type_FixedCapacityDynamicArray:
+		add_min_dep_type_info(c, bt->FixedCapacityDynamicArray.elem);
+		add_min_dep_type_info(c, alloc_type_pointer(bt->FixedCapacityDynamicArray.elem));
+		add_min_dep_type_info(c, alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity));
+		add_min_dep_type_info(c, t_int);
 
 	case Type_Enum:
 		add_min_dep_type_info(c, bt->Enum.base_type);
@@ -2737,7 +2758,9 @@ gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity) {
 
 
 gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
-	Entity *e = scope_lookup(scope, name);
+	u32 hash = 0;
+	auto interned = string_interner_insert(name, 0, &hash);
+	Entity *e = scope_lookup(scope, interned, hash);
 	if (e == nullptr) {
 		return;
 	}
@@ -2749,7 +2772,9 @@ gb_internal void force_add_dependency_entity(Checker *c, Scope *scope, String co
 gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *pkg) {
 	AstPackage *testing_package = get_core_package(&c->info, str_lit("testing"));
 	Scope *testing_scope = testing_package->scope;
-	Entity *test_signature = scope_lookup_current(testing_scope, str_lit("Test_Signature"));
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(str_lit("Test_Signature"), 0, &hash);
+	Entity *test_signature = scope_lookup_current(testing_scope, interned, hash);
 
 	Scope *s = pkg->scope;
 	for (auto const &entry : s->elements) {
@@ -2983,7 +3008,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("aeabi_d2h")
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm() && !build_context.tilde_backend,
+	FORCE_ADD_RUNTIME_ENTITIES(is_arch_wasm(),
 	// 	// Extended data type internal procedures
 	// 	str_lit("umodti3"),
 	// 	str_lit("udivti3"),
@@ -3203,7 +3228,9 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d);
 
 
 gb_internal Entity *find_core_entity(Checker *c, String name) {
-	Entity *e = scope_lookup_current(c->info.runtime_package->scope, name);
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
+	Entity *e = scope_lookup_current(c->info.runtime_package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
@@ -3213,7 +3240,9 @@ gb_internal Entity *find_core_entity(Checker *c, String name) {
 }
 
 gb_internal Type *find_core_type(Checker *c, String name) {
-	Entity *e = scope_lookup_current(c->info.runtime_package->scope, name);
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
+	Entity *e = scope_lookup_current(c->info.runtime_package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
@@ -3228,8 +3257,10 @@ gb_internal Type *find_core_type(Checker *c, String name) {
 
 
 gb_internal Entity *find_entity_in_pkg(CheckerInfo *info, String const &pkg, String const &name) {
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
 	AstPackage *package = get_core_package(info, pkg);
-	Entity *e = scope_lookup_current(package->scope, name);
+	Entity *e = scope_lookup_current(package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
@@ -3238,8 +3269,10 @@ gb_internal Entity *find_entity_in_pkg(CheckerInfo *info, String const &pkg, Str
 }
 
 gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String const &name) {
+	u32 hash = 0;
+	InternedString interned = string_interner_insert(name, 0, &hash);
 	AstPackage *package = get_core_package(info, pkg);
-	Entity *e = scope_lookup_current(package->scope, name);
+	Entity *e = scope_lookup_current(package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
 		// NOTE(bill): This will exit the program as it's cannot continue without it!
@@ -3248,15 +3281,24 @@ gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String 
 	return e->type;
 }
 
-gb_internal CheckerTypePath *new_checker_type_path(gbAllocator allocator) {
-	auto *tp = gb_alloc_item(allocator, CheckerTypePath);
-	array_init(tp, allocator, 0, 16);
-	return tp;
+gb_internal gb_thread_local std::atomic<AtomicFreelist<CheckerTypePath> *> checker_type_path_free_list;
+
+gb_internal CheckerTypePath *new_checker_type_path() {
+	// TODO(bill): Cache to reuse `CheckerTypePath
+
+	auto *tp = atomic_freelist_get(checker_type_path_free_list);
+	if (tp == nullptr) {
+		tp = permanent_alloc_item<AtomicFreelist<CheckerTypePath> >();
+		array_init(&tp->value, permanent_allocator(), 0, 16);
+	}
+	return &tp->value;
 }
 
-gb_internal void destroy_checker_type_path(CheckerTypePath *tp, gbAllocator allocator) {
-	array_free(tp);
-	gb_free(allocator, tp);
+gb_internal void destroy_checker_type_path(CheckerTypePath *path) {
+	auto *tp = cast(AtomicFreelist<CheckerTypePath> *)path;
+	array_clear(&tp->value);
+
+	atomic_freelist_put(checker_type_path_free_list, tp);
 }
 
 gb_internal void check_type_path_push(CheckerContext *c, Entity *e) {
@@ -3351,6 +3393,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 	t_type_info_bit_field        = find_core_type(c, str_lit("Type_Info_Bit_Field"));
+	t_type_info_fixed_capacity_dynamic_array = find_core_type(c, str_lit("Type_Info_Fixed_Capacity_Dynamic_Array"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -3379,6 +3422,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
+	t_type_info_fixed_capacity_dynamic_array_ptr = alloc_type_pointer(t_type_info_fixed_capacity_dynamic_array);
 }
 
 gb_internal void init_mem_allocator(Checker *c) {
@@ -4270,6 +4314,20 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 			error(elem, "Expected a string or no value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "deprecated") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+
+		if (ev.kind == ExactValue_String) {
+			String msg = ev.value_string;
+			if (msg.len == 0) {
+				error(elem, "Deprecation message cannot be an empty string");
+			} else {
+				ac->deprecated_message = msg;
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	}
 	return false;
 }
@@ -4515,7 +4573,9 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 			if (name == "builtin") {
 				mutex_lock(&ctx->info->builtin_mutex);
 				add_entity(ctx, builtin_pkg->scope, nullptr, e);
-				GB_ASSERT(scope_lookup(builtin_pkg->scope, e->token.string) != nullptr);
+				auto interned = entity_interned_name(e);
+				u32 hash = e->interned_name_hash.load();
+				GB_ASSERT(scope_lookup(builtin_pkg->scope, interned, hash) != nullptr);
 				if (value != nullptr) {
 					error(value, "'builtin' cannot have a field value");
 				}
@@ -4857,9 +4917,9 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	bool correction = false;
 	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
-		auto const &entry = s->elements.entries[i];
-		Entity *e = entry.value;
-		if (entry.hash && e != nullptr) {
+		auto const &slot = s->elements.slots[i];
+		Entity *e = slot.value;
+		if (slot.hash && e != nullptr) {
 			correction |= correct_single_type_alias(c, e);
 		}
 	}
@@ -4990,7 +5050,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 }
 
 gb_internal CheckerContext *create_checker_context(Checker *c) {
-	CheckerContext *ctx = gb_alloc_item(permanent_allocator(), CheckerContext);
+	CheckerContext *ctx = permanent_alloc_item<CheckerContext>();
 	init_checker_context(ctx, c);
 	return ctx;
 }
@@ -5967,8 +6027,8 @@ gb_internal void check_import_entities(Checker *c) {
 	}
 
 	TIME_SECTION("check_import_entities - check delayed entities");
-	for_array(i, package_order) {
-		ImportGraphNode *node = package_order[i];
+	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
+		ImportGraphNode *node = package_order[pkg_index];
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 		AstPackage *pkg = node->scope->pkg;
 
@@ -5994,9 +6054,20 @@ gb_internal void check_import_entities(Checker *c) {
 			reset_checker_context(&ctx, f, &untyped);
 
 			ctx.collect_delayed_decls = true;
+
+			bool will_recheck_foreign_block = false;
 			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
-				check_add_foreign_block_decl(&ctx, decl);
+				if (check_add_foreign_block_decl(&ctx, decl)) {
+					pkg_index -= 1;    // Re-check package
+					will_recheck_foreign_block = true;
+					break;
+				}
 			}
+
+			if (will_recheck_foreign_block) {
+				break;
+			}
+
 			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
 		}
 
@@ -6202,7 +6273,7 @@ gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char c
 
 	GB_ASSERT(e->decl_info != nullptr);
 
-	ProcInfo *pi = gb_alloc_item(permanent_allocator(), ProcInfo);
+	ProcInfo *pi = permanent_alloc_item<ProcInfo>();
 	pi->file  = e->file;
 	pi->token = e->token;
 	pi->decl  = e->decl_info;
@@ -7471,7 +7542,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		Scope *s = c->info.init_scope;
 		GB_ASSERT(s != nullptr);
 		GB_ASSERT(s->flags&ScopeFlag_Init);
-		Entity *e = scope_lookup_current(s, str_lit("main"));
+		Entity *e = scope_lookup_current(s, string_interner_insert(str_lit("main")));
 		if (e == nullptr) {
 			Token token = {};
 			token.pos.file_id = 0;

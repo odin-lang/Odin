@@ -39,6 +39,10 @@ Calling_Convention :: enum u8 {
 
 	Win64       = 9,
 	SysV        = 10,
+
+	Preserve_None = 11,
+	Preserve_Most = 12,
+	Preserve_All  = 13,
 }
 
 Type_Info_Enum_Value :: distinct i64
@@ -137,7 +141,7 @@ Type_Info_Struct :: struct {
 
 	flags: Type_Info_Struct_Flags,
 
-	// These are only set iff this structure is an SOA structure
+	// These are only set if and only if (⟺) this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
 	soa_len:       i32,
 	soa_base_type: ^Type_Info,
@@ -166,10 +170,11 @@ Type_Info_Map :: struct {
 	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
-	elem:       ^Type_Info,
-	underlying: ^Type_Info, // Possibly nil
-	lower:      i64,
-	upper:      i64,
+	elem:                ^Type_Info,
+	underlying:          ^Type_Info,
+	explicit_underlying: bool, // false = bit_set[T], true = bit_set[T, U]
+	lower:               i64,
+	upper:               i64,
 }
 Type_Info_Simd_Vector :: struct {
 	elem:       ^Type_Info,
@@ -200,6 +205,14 @@ Type_Info_Bit_Field :: struct {
 	tags:         [^]string     `fmt:"v,field_count"`,
 	field_count:  int,
 }
+
+Type_Info_Fixed_Capacity_Dynamic_Array :: struct {
+	elem: ^Type_Info,
+	elem_size:  int,
+	capacity:   int,
+	len_offset: uintptr,
+}
+
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -241,6 +254,7 @@ Type_Info :: struct {
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
 		Type_Info_Bit_Field,
+		Type_Info_Fixed_Capacity_Dynamic_Array,
 	},
 }
 
@@ -418,6 +432,11 @@ Raw_Dynamic_Array :: struct {
 	len:       int,
 	cap:       int,
 	allocator: Allocator,
+}
+
+Raw_Fixed_Capacity_Dynamic_Array :: struct($Capacity: uint, $T: typeid) {
+	data: [Capacity]T,
+	len:  int,
 }
 
 // The raw, type-erased representation of a map.
@@ -654,9 +673,8 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	return base
 }
 
-
 // type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
-// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// returns the backing integer type of an enum `^Type_Info`.
 // This is also aliased as `type_info_base_without_enum`
 @(require_results)
 type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
@@ -676,11 +694,35 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	return base
 }
 
-// type_info_base_without_enum returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+
+
+// type_info_underlying returns the underlying (backing) type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum `^Type_Info` AND/OR the underlying integer type of a bit_set or bit_field.
+@(require_results)
+type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
+	if info == nil {
+		return nil
+	}
+
+	base := info
+	loop: for {
+		#partial switch i in base.variant {
+		case Type_Info_Named:     base = i.base
+		case Type_Info_Enum:      base = i.base
+		case Type_Info_Bit_Set:   base = i.underlying
+		case Type_Info_Bit_Field: base = i.backing_type
+		case: break loop
+		}
+	}
+	return base
+}
+
+// `type_info_base_without_enum` returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
 // returns the backing integer type of an enum or bit_set `^Type_Info`.
 // This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
+@(require_results)
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	n := u64(len(type_table))
 	i := transmute(u64)id % n
@@ -696,14 +738,16 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 
 when !ODIN_NO_RTTI {
 	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
+	@(require_results)
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
 		return ti.id
 	}
 	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
-	// returns the backing integer type of an enum or bit_set `typeid`.
+	// returns the backing integer type of an enum `typeid`.
 	// This is also aliased as `typeid_base_without_enum`
+	@(require_results)
 	typeid_core :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_core(type_info_of(id))
 		return ti.id
@@ -713,6 +757,12 @@ when !ODIN_NO_RTTI {
 	// returns the backing integer type of an enum or bit_set `typeid`.
 	// This is also aliased as `typeid_core`
 	typeid_base_without_enum :: typeid_core
+
+	@(require_results)
+	typeid_underlying :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_underlying(type_info_of(id))
+		return ti.id
+	}
 }
 
 

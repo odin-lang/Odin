@@ -933,9 +933,10 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 						next_token := peek_token(p)
 						if next_token.kind == .In || next_token.kind == .Comma {
 							cond = parse_simple_stmt(p, {.In})
-							as := cond.derived_stmt.(^ast.Assign_Stmt)
-							assert(as.op.kind == .In)
-							is_range = true
+							if as, ok := cond.derived_stmt.(^ast.Assign_Stmt); ok {
+								assert(as.op.kind == .In)
+								is_range = true
+							}
 							break general_conds
 						}
 					}
@@ -2389,6 +2390,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			case ^ast.Array_Type:         t.tag = bd
 			case ^ast.Dynamic_Array_Type: t.tag = bd
 			case ^ast.Pointer_Type:       t.tag = bd
+			case ^ast.Fixed_Capacity_Dynamic_Array_Type: t.tag = bd
 			case:
 				error(p, original_type.pos, "expected an array or pointer type after #%s", name.text)
 			}
@@ -2626,6 +2628,20 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return t
 		case .Dynamic:
 			tok := expect_token(p, .Dynamic)
+			if allow_token(p, .Semicolon) {
+				capacity := parse_expr(p, false)
+				close := expect_token(p, .Close_Bracket)
+				elem := parse_type(p)
+
+				da := ast.new(ast.Fixed_Capacity_Dynamic_Array_Type, open.pos, elem)
+				da.open = open.pos
+				da.dynamic_pos = tok.pos
+				da.capacity = capacity
+				da.close = close.pos
+				da.elem = elem
+				return da
+			}
+
 			close := expect_token(p, .Close_Bracket)
 			elem := parse_type(p)
 			da := ast.new(ast.Dynamic_Array_Type, open.pos, elem)
@@ -3107,6 +3123,7 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 		^ast.Union_Type,
 		^ast.Enum_Type,
 		^ast.Dynamic_Array_Type,
+		^ast.Fixed_Capacity_Dynamic_Array_Type,
 		^ast.Map_Type,
 		^ast.Bit_Set_Type,
 		^ast.Matrix_Type,

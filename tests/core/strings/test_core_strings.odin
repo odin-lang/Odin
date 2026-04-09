@@ -164,11 +164,16 @@ test_substring :: proc(t: ^testing.T) {
 		{s = "Hello", end = len("Hello"), sub = "Hello", ok = true},
 		{s = "Hello", start = 1, end = len("Hello"), sub = "ello", ok = true},
 		{s = "Hello", start = 1, end = len("Hello") - 1, sub = "ell", ok = true},
+		{s = "Hello", start = 0, end = 0, sub = "", ok = true},
+		{s = "Hello", start = 3, end = 3, sub = "", ok = true},
+		{s = "Hello", start = len("Hello"), end = len("Hello"), sub = "", ok = true},
 		{s = "Hello", end = len("Hello") + 1, sub = "Hello", ok = false},
 		{s = "小猫咪", start = 0, end = 3, sub = "小猫咪", ok = true},
 		{s = "小猫咪", start = 1, end = 3, sub = "猫咪", ok = true},
 		{s = "小猫咪", start = 1, end = 5, sub = "猫咪", ok = false},
 		{s = "小猫咪", start = 1, end = 1, sub = "", ok = true},
+		{s = "小猫咪", start = 1, end = 1, sub = "", ok = true},
+		{s = "小猫咪", start = 3, end = 3, sub = "", ok = true},
 	}
 
 	for tc in cases {

@@ -300,7 +300,7 @@ _iterate_gpus :: proc(it: ^GPU_Iterator, minimum_vram := i64(256 * 1024 * 1024))
 			gpu_key,
 			auto_cast it._index,
 			&buf_wstring[0],
-			&buf_len,
+			buf_len,
 		); status != i32(sys.ERROR_SUCCESS) {
 			return {}, it.index, false
 		}
@@ -366,7 +366,7 @@ read_reg_string :: proc "contextless" (hkey: sys.HKEY, subkey, val: cstring16, r
 		return
 	}
 
-	utf16.decode_to_utf8(res_buf[:result_size], buf_utf16[:])
+	utf16.decode_to_utf8(res_buf[:], buf_utf16[:result_size / size_of(u16)])
 	res = string(cstring(&res_buf[0]))
 	return res, true
 }

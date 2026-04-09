@@ -100,20 +100,20 @@ len :: proc "contextless" (t: ^$T/Tree($Value)) -> int {
 	return t._size
 }
 
-// first returns the first node in the tree (in-order) or nil iff
+// first returns the first node in the tree (in-order) or nil if and only if (⟺)
 // the tree is empty.
 first :: proc "contextless" (t: ^$T/Tree($Value)) -> ^Node(Value) {
 	return tree_first_or_last_in_order(t, Direction.Backward)
 }
 
-// last returns the last element in the tree (in-order) or nil iff
+// last returns the last element in the tree (in-order) or nil if and only if (⟺)
 // the tree is empty.
 last :: proc "contextless" (t: ^$T/Tree($Value)) -> ^Node(Value) {
 	return tree_first_or_last_in_order(t, Direction.Forward)
 }
 
 // find finds the value in the tree, and returns the corresponding
-// node or nil iff the value is not present.
+// node or nil if and only if (⟺) the value is not present.
 find :: proc(t: ^$T/Tree($Value), value: Value) -> ^Node(Value) {
 	cur := t._root
 	descend_loop: for cur != nil {
@@ -168,7 +168,7 @@ find_or_insert :: proc(
 	return
 }
 
-// remove removes a node or value from the tree, and returns true iff the
+// remove removes a node or value from the tree, and returns true if and only if (⟺) the
 // removal was successful.  While the node's value will be left intact,
 // the node itself will be freed via the tree's node allocator.
 remove :: proc {
@@ -176,7 +176,7 @@ remove :: proc {
 	remove_node,
 }
 
-// remove_value removes a value from the tree, and returns true iff the
+// remove_value removes a value from the tree, and returns true if and only if (⟺) the
 // removal was successful.  While the node's value will be left intact,
 // the node itself will be freed via the tree's node allocator.
 remove_value :: proc(t: ^$T/Tree($Value), value: Value, call_on_remove: bool = true) -> bool {
@@ -187,7 +187,7 @@ remove_value :: proc(t: ^$T/Tree($Value), value: Value, call_on_remove: bool = t
 	return remove_node(t, n, call_on_remove)
 }
 
-// remove_node removes a node from the tree, and returns true iff the
+// remove_node removes a node from the tree, and returns true if and only if (⟺) the
 // removal was successful.  While the node's value will be left intact,
 // the node itself will be freed via the tree's node allocator.
 remove_node :: proc(t: ^$T/Tree($Value), node: ^Node(Value), call_on_remove: bool = true) -> bool {
@@ -281,14 +281,14 @@ iterator_from_pos :: proc "contextless" (
 }
 
 // iterator_get returns the node currently pointed to by the iterator,
-// or nil iff the node has been removed, the tree is empty, or the end
+// or nil if and only if (⟺) the node has been removed, the tree is empty, or the end
 // of the tree has been reached.
 iterator_get :: proc "contextless" (it: ^$I/Iterator($Value)) -> ^Node(Value) {
 	return it._cur
 }
 
 // iterator_remove removes the node currently pointed to by the iterator,
-// and returns true iff the removal was successful.  Semantics are the
+// and returns true if and only if (⟺) the removal was successful.  Semantics are the
 // same as the Tree remove.
 iterator_remove :: proc(it: ^$I/Iterator($Value), call_on_remove: bool = true) -> bool {
 	if it._cur == nil {
@@ -304,7 +304,7 @@ iterator_remove :: proc(it: ^$I/Iterator($Value), call_on_remove: bool = true) -
 }
 
 // iterator_next advances the iterator and returns the (node, true) or
-// or (nil, false) iff the end of the tree has been reached.
+// or (nil, false) if and only if (⟺) the end of the tree has been reached.
 //
 // Note: The first call to iterator_next will return the first node instead
 // of advancing the iterator.

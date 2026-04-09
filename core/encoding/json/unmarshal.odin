@@ -34,35 +34,6 @@ Register_User_Unmarshaler_Error :: enum {
 	Unmarshaler_Previously_Found,
 }
 
-// Example User Unmarshaler:
-// Custom Unmarshaler for `int`
-// Some_Unmarshaler :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
-// 	token := p.curr_token.text
-// 	i, ok := strconv.parse_i64_of_base(token, 2)
-// 	if !ok {
-//		return .Invalid_Data
-//
-//	}
-//	(^int)(v.data)^ = int(i)
-//	return .None
-// }
-//
-// _main :: proc() {
-//	// Ensure the json._user_unmarshaler map is initialized
-//	json.set_user_unmarshalers(new(map[typeid]json.User_Unmarshaler))
-//	reg_err := json.register_user_unmarshaler(type_info_of(int).id, Some_Unmarshaler)
-//	assert(reg_err == .None)
-//
-//	data := `{"value":101010}`
-//	SomeType :: struct {
-//		value: int,
-//	}
-//	y: SomeType
-//
-//	unmarshal_err := json.unmarshal(transmute([]byte)data, &y)
-//	fmt.println(y, unmarshal_err)
-// }
-
 // NOTE(Jeroen): This is a pointer to prevent accidental additions
 // it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
 _user_unmarshalers: ^map[typeid]User_Unmarshaler
@@ -72,23 +43,60 @@ _user_unmarshalers: ^map[typeid]User_Unmarshaler
 // Inputs:
 // - m: A pointer to a map of typeids to User_Unmarshaler procs.
 //
-// NOTE: Must be called before using register_user_unmarshaler.
+// NOTE: Must be called before using `register_user_unmarshaler`.
 //
 set_user_unmarshalers :: proc(m: ^map[typeid]User_Unmarshaler) {
 	assert(_user_unmarshalers == nil, "set_user_unmarshalers must not be called more than once.")
 	_user_unmarshalers = m
 }
 
-// Registers a user-defined unmarshaler for a specific typeid
-//
-// Inputs:
-// - id: The typeid of the custom type.
-// - unmarshaler: The User_Unmarshaler function for the custom type.
-//
-// Returns: A Register_User_Unmarshaler_Error value indicating the success or failure of the operation.
-//
-// WARNING: set_user_unmarshalers must be called before using this procedure.
-//
+/*
+Registers a user-defined unmarshaler for a specific `typeid`.
+
+WARNING: set_user_unmarshalers must be called before using this procedure.
+
+Inputs:
+- id: The `typeid` of the custom type.
+- unmarshaler: The `User_Unmarshaler` function for the custom type.
+
+Example:
+	import "core:fmt"
+	import "core:encoding/json"
+	import "core:strconv"
+
+	// Custom Unmarshaler for `int`
+	some_unmarshaler :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
+		token := p.curr_token.text
+		i, ok := strconv.parse_i64_of_base(token, 2)
+		if !ok {
+			return .Invalid_Data
+		}
+
+		(^int)(v.data)^ = int(i)
+
+		json.advance_token(p)
+		return nil
+	}
+
+	register_user_unmarshaler_example :: proc() {
+		// Ensure the `json._user_unmarshalers` map is initialized.
+		json.set_user_unmarshalers(new(map[typeid]json.User_Unmarshaler))
+		reg_err := json.register_user_unmarshaler(typeid_of(int), some_unmarshaler)
+		assert(reg_err == .None)
+
+		data := `{"value":101010}`
+		SomeType :: struct {
+			value: int,
+		}
+		y: SomeType
+
+		unmarshal_err := json.unmarshal(transmute([]byte)data, &y)
+		fmt.println(y, unmarshal_err)
+	}
+
+Output:
+	SomeType{value = 42} nil
+*/
 register_user_unmarshaler :: proc(id: typeid, unmarshaler: User_Unmarshaler) -> Register_User_Unmarshaler_Error {
 	if _user_unmarshalers == nil {
 		return .No_User_Unmarshaler

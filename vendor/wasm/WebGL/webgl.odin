@@ -52,6 +52,7 @@ foreign webgl {
 	GetError :: proc() -> Enum ---
 	
 	IsExtensionSupported :: proc(name: string) -> bool ---
+	GetExtension :: proc(name: string) ---
 
 	ActiveTexture         :: proc(x: Enum) ---
 	AttachShader          :: proc(program: Program, shader: Shader) ---
@@ -118,6 +119,7 @@ foreign webgl {
 	
 	GenerateMipmap :: proc(target: Enum) ---
 	
+	GetBufferParameter    :: proc(target, name: Enum) -> int ---
 	GetAttribLocation     :: proc(program: Program, name: string) -> i32 ---
 	GetUniformLocation    :: proc(program: Program, name: string) -> i32 ---
 	GetVertexAttribOffset :: proc(index: i32, pname: Enum) -> uintptr ---
@@ -373,7 +375,21 @@ GetShaderInfoLog :: proc "contextless" (shader: Shader, buf: []byte) -> string {
 	return string(buf[:length])
 }
 
+IterateSupportedExtensions :: proc(index: ^int, buf: []byte) -> (string, bool) {
+	foreign webgl {
+		@(link_name="GetSupportedExtensionFromIndex")
+		_GetSupportedExtensionFromIndex :: proc "contextless" (index: int, buf: []byte, length: ^int) -> bool ---
+	}
 
+	length: int
+	if !_GetSupportedExtensionFromIndex(index^, buf[:], &length) {
+		return "", false
+	}
+
+	index^ += 1
+
+	return string(buf[:length]), true
+}
 
 BufferDataSlice :: proc "contextless" (target: Enum, slice: $S/[]$E, usage: Enum) {
 	BufferData(target, len(slice)*size_of(E), raw_data(slice), usage)

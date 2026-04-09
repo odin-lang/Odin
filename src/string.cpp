@@ -182,8 +182,9 @@ gb_internal isize string_index_byte(String const &s, u8 x) {
 }
 
 gb_internal gb_inline bool str_eq(String const &a, String const &b) {
-	if (a.len != b.len) return false;
-	if (a.len == 0) return true;
+	if (a.len != b.len)   return false;
+	if (a.len == 0)       return true;
+	if (a.text == b.text) return true;
 	return memcmp(a.text, b.text, a.len) == 0;
 }
 gb_internal gb_inline bool str_ne(String const &a, String const &b) { return !str_eq(a, b);                }
@@ -491,17 +492,7 @@ gb_internal bool string_contains_string(String const &haystack, String const &ne
 gb_internal String filename_from_path(String s) {
 	isize i = string_extension_position(s);
 	if (i >= 0) {
-		s = substring(s, 0, i);
-		return s;
-	}
-	if (i > 0) {
-		isize j = 0;
-		for (j = s.len-1; j >= 0; j--) {
-			if (is_separator(s[j])) {
-				break;
-			}
-		}
-		return substring(s, j+1, s.len);
+		return substring(s, 0, i);
 	}
 	return make_string(nullptr, 0);
 }

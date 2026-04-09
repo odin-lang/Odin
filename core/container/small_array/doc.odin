@@ -1,4 +1,6 @@
 /*
+Deprecation Notice: Prefer using `[dynamic; N]T` (fixed capacity dynamic arrays).
+
 A dynamic array-like interface on a stack-allocated, fixed-size array.
 
 The `Small_Array` type is optimal for scenarios where you need

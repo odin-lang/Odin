@@ -119,14 +119,14 @@ copy :: proc{copy_slice, copy_from_string, copy_from_string16}
 
 
 
-// `unordered_remove` removed the element at the specified `index`. It does so by replacing the current end value
+// `unordered_remove_dynamic_array` removed the element at the specified `index`. It does so by replacing the current end value
 // with the old value, and reducing the length of the dynamic array by 1.
 //
 // Note: This is an O(1) operation.
 // Note: If you want the elements to remain in their order, use `ordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-unordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+unordered_remove_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	n := len(array)-1
 	if index != n {
@@ -134,13 +134,13 @@ unordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #ca
 	}
 	(^Raw_Dynamic_Array)(array).len -= 1
 }
-// `ordered_remove` removed the element at the specified `index` whilst keeping the order of the other elements.
+// `ordered_remove_dynamic_array` removed the element at the specified `index` whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
 // Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
-ordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
+ordered_remove_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
 		copy(array[index:], array[index+1:])
@@ -148,12 +148,12 @@ ordered_remove :: proc(array: ^$D/[dynamic]$T, #any_int index: int, loc := #call
 	(^Raw_Dynamic_Array)(array).len -= 1
 }
 
-// `remove_range` removes a range of elements specified by the range `lo` and `hi`, whilst keeping the order of the other elements.
+// `remove_range_dynamic_array` removes a range of elements specified by the range `lo` and `hi`, whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
 // Note: If the range is out of bounds, this procedure will panic.
 @builtin
-remove_range :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
+remove_range_dynamic_array :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
 	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array))
 	n := max(hi-lo, 0)
 	if n > 0 {
@@ -164,29 +164,117 @@ remove_range :: proc(array: ^$D/[dynamic]$T, #any_int lo, hi: int, loc := #calle
 	}
 }
 
+// `unordered_remove_fixed_capacity_dynamic_array` removed the element at the specified `index`. It does so by replacing the current end value
+// with the old value, and reducing the length of the dynamic array by 1.
+//
+// Note: This is an O(1) operation.
+// Note: If you want the elements to remain in their order, use `ordered_remove`.
+// Note: If the index is out of bounds, this procedure will panic.
+@builtin
+unordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	n := len(array)-1
+	if index != n {
+		array[index] = array[n]
+	}
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+}
+// `ordered_remove_fixed_capacity_dynamic_array` removed the element at the specified `index` whilst keeping the order of the other elements.
+//
+// Note: This is an O(N) operation.
+// Note: If the elements do not have to remain in their order, prefer `unordered_remove`.
+// Note: If the index is out of bounds, this procedure will panic.
+@builtin
+ordered_remove_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
+	bounds_check_error_loc(loc, index, len(array))
+	if index+1 < len(array) {
+		copy(array[index:], array[index+1:])
+	}
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+}
 
-// `pop` will remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
+// `remove_range_fixed_capacity_dynamic_array` removes a range of elements specified by the range `lo` and `hi`, whilst keeping the order of the other elements.
+//
+// Note: This is an O(N) operation.
+// Note: If the range is out of bounds, this procedure will panic.
+@builtin
+remove_range_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #any_int lo, hi: int, loc := #caller_location) #no_bounds_check {
+	slice_expr_error_lo_hi_loc(loc, lo, hi, len(array))
+	n := max(hi-lo, 0)
+	if n > 0 {
+		if hi != len(array) {
+			copy(array[lo:], array[hi:])
+		}
+		(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= n
+	}
+}
+
+@builtin
+unordered_remove :: proc{
+	unordered_remove_dynamic_array,
+	unordered_remove_fixed_capacity_dynamic_array,
+}
+
+
+@builtin
+ordered_remove :: proc{
+	ordered_remove_dynamic_array,
+	ordered_remove_fixed_capacity_dynamic_array,
+}
+
+@builtin
+remove_range :: proc{
+	remove_range_dynamic_array,
+	remove_range_fixed_capacity_dynamic_array,
+}
+
+
+
+// `pop_dynamic_array` will remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
 //
 // Note: If the dynamic array has no elements (`len(array) == 0`), this procedure will panic.
 @builtin
-pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+pop_dynamic_array :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
 	assert(len(array) > 0, loc=loc)
-	_pop_type_erased(&res, (^Raw_Dynamic_Array)(array), size_of(E))
+	_pop_dynamic_array_type_erased(&res, (^Raw_Dynamic_Array)(array), size_of(E))
 	return res
 }
 
-_pop_type_erased :: proc(res: rawptr, array: ^Raw_Dynamic_Array, elem_size: int, loc := #caller_location) {
+_pop_dynamic_array_type_erased :: proc(res: rawptr, array: ^Raw_Dynamic_Array, elem_size: int) {
 	end := rawptr(uintptr(array.data) + uintptr(elem_size*(array.len-1)))
 	intrinsics.mem_copy_non_overlapping(res, end, elem_size)
 	array.len -= 1
 }
 
 
+// `pop_fixed_capacity_dynamic_array` will remove and return the end value of fixed capacity dynamic array `array` and reduces the length of `array` by 1.
+//
+// Note: If the fixed capacity dynamic array has no elements (`len(array) == 0`), this procedure will panic.
+@builtin
+pop_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, loc=loc)
 
-// `pop_safe` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
+	elem_size :: size_of(E)
+	end := rawptr(uintptr(array) + uintptr(elem_size*(len(array)-1)))
+	intrinsics.mem_copy_non_overlapping(&res, end, elem_size)
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+	return res
+}
+
+
+// `pop` will remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
+//
+// Note: If the dynamic array has no elements (`len(array) == 0`), this procedure will panic.
+@builtin
+pop :: proc{
+	pop_dynamic_array,
+	pop_fixed_capacity_dynamic_array,
+}
+
+// `pop_safe_dynamic_array` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
 // If the operation is not possible, it will return false.
 @builtin
-pop_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+pop_safe_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
 		return
 	}
@@ -195,11 +283,32 @@ pop_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #n
 	return
 }
 
-// `pop_front` will remove and return the first value of dynamic array `array` and reduces the length of `array` by 1.
+// `pop_safe_fixed_capacity_dynamic_array` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
+// If the operation is not possible, it will return false.
+@builtin
+pop_safe_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E) -> (res: E, ok: bool) #no_bounds_check {
+	if len(array) == 0 {
+		return
+	}
+	res, ok = array[len(array)-1], true
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+	return
+}
+
+// `pop_safe` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
+// If the operation is not possible, it will return false.
+@builtin
+pop_safe :: proc{
+	pop_safe_dynamic_array,
+	pop_safe_fixed_capacity_dynamic_array,
+}
+
+
+// `pop_front_dynamic_array` will remove and return the first value of dynamic array `array` and reduces the length of `array` by 1.
 //
 // Note: If the dynamic array as no elements (`len(array) == 0`), this procedure will panic.
 @builtin
-pop_front :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+pop_front_dynamic_array :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
 	assert(len(array) > 0, loc=loc)
 	res = array[0]
 	if len(array) > 1 {
@@ -209,10 +318,35 @@ pop_front :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #
 	return res
 }
 
-// `pop_front_safe` trys to return and remove the first value of dynamic array `array` and reduces the length of `array` by 1.
+// `pop_front_fixed_capacity_dynamic_array` will remove and return the first value of fixed capacity dynamic array `array` and reduces the length of `array` by 1.
+//
+// Note: If the fixed capacity dynamic array as no elements (`len(array) == 0`), this procedure will panic.
+@builtin
+pop_front_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, loc=loc)
+	res = array[0]
+	if len(array) > 1 {
+		copy(array[0:], array[1:])
+	}
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+	return res
+}
+
+
+// `pop_front` will remove and return the first value of dynamic array `array` and reduces the length of `array` by 1.
+//
+// Note: If the dynamic array as no elements (`len(array) == 0`), this procedure will panic.
+@builtin
+pop_front :: proc{
+	pop_front_dynamic_array,
+	pop_front_fixed_capacity_dynamic_array,
+}
+
+
+// `pop_front_safe_dynamic_array` trys to return and remove the first value of dynamic array `array` and reduces the length of `array` by 1.
 // If the operation is not possible, it will return false.
 @builtin
-pop_front_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+pop_front_safe_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
 	if len(array) == 0 {
 		return
 	}
@@ -224,12 +358,37 @@ pop_front_safe :: proc "contextless" (array: ^$T/[dynamic]$E) -> (res: E, ok: bo
 	return
 }
 
+// `pop_front_safe_fixed_capacity_dynamic_array` trys to return and remove the first value of dynamic array `array` and reduces the length of `array` by 1.
+// If the operation is not possible, it will return false.
+@builtin
+pop_front_safe_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E) -> (res: E, ok: bool) #no_bounds_check {
+	if len(array) == 0 {
+		return
+	}
+	res, ok = array[0], true
+	if len(array) > 1 {
+		copy(array[0:], array[1:])
+	}
+	(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len -= 1
+	return
+}
+
+// `pop_front_safe` trys to return and remove the first value of dynamic array `array` and reduces the length of `array` by 1.
+// If the operation is not possible, it will return false.
+@builtin
+pop_front_safe :: proc {
+	pop_front_safe_dynamic_array,
+	pop_front_safe_fixed_capacity_dynamic_array,
+}
+
+
 
 // `clear` will set the length of a passed dynamic array or map to `0`
 @builtin
 clear :: proc{
 	clear_dynamic_array,
 	clear_map,
+	clear_fixed_capacity_dynamic_array,
 
 	clear_soa_dynamic_array,
 }
@@ -254,6 +413,7 @@ non_zero_reserve :: proc{
 @builtin
 resize :: proc{
 	resize_dynamic_array,
+	resize_fixed_capacity_dynamic_array,
 
 	resize_soa,
 }
@@ -261,6 +421,7 @@ resize :: proc{
 @builtin
 non_zero_resize :: proc{
 	non_zero_resize_dynamic_array,
+	non_zero_resize_fixed_capacity_dynamic_array,
 
 	non_zero_resize_soa,
 }
@@ -532,6 +693,8 @@ shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bo
 
 // The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
 // If m is nil, or there is no such element, this procedure is a no-op
+// It is safe to use `delete_key` while iterating a map.
+// But if you iterate across a map and insert a new key, it could resize which means you are not iterating across all of the elements. 
 @builtin
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
@@ -669,6 +832,15 @@ non_zero_append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, l
 	return _append_elem_string(array, arg, false, loc)
 }
 
+// `non_zero_append_elem_fixed_capacity_string` appends a string to the end of a dynamic array of bytes, without zeroing any reserved memory
+//
+// Note: Prefer using the procedure group `non_zero_append`.
+@builtin
+non_zero_append_elem_fixed_capacity_string :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, arg: $A/string) -> (n: int) {
+	return append_fixed_capacity_elem(array, transmute([]byte)arg)
+}
+
+
 
 // The append_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
 //
@@ -686,12 +858,67 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 	return
 }
 
+
+// `append_fixed_capacity_elem` appends an element to the end of a fixed capacity dynamic array. Returns 0 on failure
+@builtin
+append_fixed_capacity_elem :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #no_broadcast arg: E) -> (n: int) {
+	Raw :: Raw_Fixed_Capacity_Dynamic_Array(N, E)
+
+	if (^Raw)(array).len >= N {
+		return 0
+	}
+
+	when size_of(E) != 0 {
+		#no_bounds_check (^Raw)(array).data[(^Raw)(array).len] = arg
+	}
+	(^Raw)(array).len += 1
+	return 1
+}
+
+
+// `append_fixed_capacity_elem` appends an element to the end of a fixed capacity dynamic array. Returns 0 on failure
+@builtin
+append_fixed_capacity_elems :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #no_broadcast args: ..E) -> (n: int) {
+	Raw :: Raw_Fixed_Capacity_Dynamic_Array(N, E)
+	raw := (^Raw)(array)
+
+	n = min(N - len(array), len(args))
+
+	#no_bounds_check when size_of(E) != 0 {
+		intrinsics.mem_copy(&raw.data[raw.len], raw_data(args), n*size_of(E))
+	}
+
+	raw.len += n
+	return n
+}
+
+// The append_fixed_capacity_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
+//
+// Note: Prefer using the procedure group `append`.
+@builtin
+append_fixed_capacity_string :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, args: ..string) -> (n: int) {
+	n_arg: int
+	for arg in args {
+		n_arg = append_fixed_capacity_elems(array, ..transmute([]E)(arg))
+		n += n_arg
+		if n_arg < len(arg) {
+			return
+		}
+	}
+	return
+}
+
+
 // The append built-in procedure appends elements to the end of a dynamic array
 @builtin
 append :: proc{
 	append_elem,
 	append_elems,
 	append_elem_string,
+
+	append_fixed_capacity_elem,
+	append_fixed_capacity_elems,
+	append_fixed_capacity_string,
 
 	append_soa_elem,
 	append_soa_elems,
@@ -703,6 +930,10 @@ non_zero_append :: proc{
 	non_zero_append_elems,
 	non_zero_append_elem_string,
 
+	append_fixed_capacity_elem,
+	append_fixed_capacity_elems,
+	non_zero_append_elem_fixed_capacity_string,
+
 	non_zero_append_soa_elem,
 	non_zero_append_soa_elems,
 }
@@ -711,13 +942,34 @@ non_zero_append :: proc{
 // `append_nothing` appends an empty value to a dynamic array. It returns `1, nil` if successful, and `0, err` when it was not possible,
 // whatever `err` happens to be.
 @builtin
-append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
+append_nothing_dynamic_array :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return 0, nil
 	}
 	prev_len := len(array)
 	resize(array, len(array)+1, loc) or_return
 	return len(array)-prev_len, nil
+}
+
+// `append_nothing` appends an empty value to a dynamic array. It returns `1, nil` if successful, and `0, err` when it was not possible,
+// whatever `err` happens to be.
+@builtin
+append_nothing_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E) -> (n: int, ok: bool) {
+	if array == nil {
+		return 0, true
+	}
+	prev_len := len(array)
+	resize_fixed_capacity_dynamic_array(array, len(array)+1) or_return
+	return len(array)-prev_len, true
+}
+
+
+// `append_nothing` appends an empty value to a dynamic array. It returns `1, nil` if successful, and `0, err` when it was not possible,
+// whatever `err` happens to be.
+@builtin
+append_nothing :: proc{
+	append_nothing_dynamic_array,
+	append_nothing_fixed_capacity_dynamic_array,
 }
 
 
@@ -795,16 +1047,92 @@ inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, ar
 	return
 }
 
+
+// `inject_at_elem_fixed_capacity_dynamic_array` injects an element in a dynamic array at a specified index and moves the previous elements after that index "across"
+@builtin
+inject_at_elem_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, #any_int index: int, #no_broadcast arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return false
+	}
+	n := max(len(array), index)
+	m :: 1
+	new_size := n + m
+
+	resize(array, new_size) or_return
+	when size_of(E) != 0 {
+		copy(array[index + m:], array[index:])
+		array[index] = arg
+	}
+	return true
+}
+
+// `inject_at_elems_fixed_capacity_dynamic_array` injects multiple elements in a dynamic array at a specified index and moves the previous elements after that index "across"
+@builtin
+inject_at_elems_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return false
+	}
+	if len(args) == 0 {
+		return true
+	}
+
+	n := max(len(array), index)
+	m := len(args)
+	new_size := n + m
+
+	resize(array, new_size) or_return
+	when size_of(E) != 0 {
+		copy(array[index + m:], array[index:])
+		copy(array[index:], args)
+	}
+	return true
+}
+
+// `inject_at_elem_string_fixed_capacity_dynamic_array` injects a string into a dynamic array at a specified index and moves the previous elements after that index "across"
+@builtin
+inject_at_elem_string_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E/u8, #any_int index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	when !ODIN_NO_BOUNDS_CHECK {
+		ensure(index >= 0, "Index must be positive.", loc)
+	}
+	if array == nil {
+		return false
+	}
+	if len(arg) == 0 {
+		return true
+	}
+
+	n := max(len(array), index)
+	m := len(arg)
+	new_size := n + m
+
+	resize(array, new_size) or_return
+	copy(array[index+m:], array[index:])
+	copy(array[index:], arg)
+	return true
+}
+
+
 // `inject_at` injects something into a dynamic array at a specified index and moves the previous elements after that index "across"
-@builtin inject_at :: proc{
+@builtin
+inject_at :: proc{
 	inject_at_elem,
 	inject_at_elems,
 	inject_at_elem_string,
+
+	inject_at_elem_fixed_capacity_dynamic_array,
+	inject_at_elems_fixed_capacity_dynamic_array,
+	inject_at_elem_string_fixed_capacity_dynamic_array,
 }
 
 
 
-// `assign_at_elem` assigns a value at a given index. If the requested index is smaller than the current
+// `assign_at_elem` assigns a value at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+1` and then assign as `index`.
 @builtin
 assign_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, arg: E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
@@ -820,7 +1148,7 @@ assign_at_elem :: proc(array: ^$T/[dynamic]$E, #any_int index: int, arg: E, loc 
 }
 
 
-// `assign_at_elems` assigns a values at a given index. If the requested index is smaller than the current
+// `assign_at_elems` assigns a values at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+len(args)` and then assign as `index`.
 @builtin
 assign_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadcast args: ..E, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
@@ -838,7 +1166,7 @@ assign_at_elems :: proc(array: ^$T/[dynamic]$E, #any_int index: int, #no_broadca
 	return
 }
 
-// `assign_at_elem_string` assigns a string at a given index. If the requested index is smaller than the current
+// `assign_at_elem_string` assigns a string at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+len(arg)` and then assign as `index`.
 @builtin
 assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, arg: string, loc := #caller_location) -> (ok: bool, err: Allocator_Error) #no_bounds_check #optional_allocator_error {
@@ -856,13 +1184,71 @@ assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, #any_int index: int, ar
 	return
 }
 
-// `assign_at` assigns a value at a given index. If the requested index is smaller than the current
+
+// `assign_at_elem_fixed_capacity_dynamic_array` assigns a value at a given index. If the requested index is past the end of the current
+// size of the dynamic array, it will attempt to `resize` the a new length of `index+1` and then assign as `index`.
+@builtin
+assign_at_elem_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #any_int index: int, arg: E) -> (ok: bool) #no_bounds_check {
+	if index < len(array) {
+		array[index] = arg
+		ok = true
+	} else {
+		resize(array, index+1, loc) or_return
+		array[index] = arg
+		ok = true
+	}
+	return
+}
+
+
+// `assign_at_elems_fixed_capacity_dynamic_array` assigns a values at a given index. If the requested index is past the end of the current
+// size of the dynamic array, it will attempt to `resize` the a new length of `index+len(args)` and then assign as `index`.
+@builtin
+assign_at_elems_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #any_int index: int, #no_broadcast args: ..E) -> (ok: bool) #no_bounds_check {
+	new_size := index + len(args)
+	if len(args) == 0 {
+		ok = true
+	} else if new_size < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else {
+		resize(array, new_size, loc) or_return
+		copy(array[index:], args)
+		ok = true
+	}
+	return
+}
+
+// `assign_at_elem_string_fixed_capacity_dynamic_array` assigns a string at a given index. If the requested index is past the end of the current
+// size of the dynamic array, it will attempt to `resize` the a new length of `index+len(arg)` and then assign as `index`.
+@builtin
+assign_at_elem_string_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, #any_int index: int, arg: string) -> (ok: bool) #no_bounds_check {
+	new_size := index + len(arg)
+	if len(arg) == 0 {
+		ok = true
+	} else if new_size < len(array) {
+		copy(array[index:], arg)
+		ok = true
+	} else {
+		resize(array, new_size, loc) or_return
+		copy(array[index:], arg)
+		ok = true
+	}
+	return
+}
+
+
+// `assign_at` assigns a value at a given index. If the requested index is past the end of the current
 // size of the dynamic array, it will attempt to `resize` the a new length of `index+size_needed` and then assign as `index`.
 @builtin
 assign_at :: proc{
 	assign_at_elem,
 	assign_at_elems,
 	assign_at_elem_string,
+
+	assign_at_elem_fixed_capacity_dynamic_array,
+	assign_at_elems_fixed_capacity_dynamic_array,
+	assign_at_elem_string_fixed_capacity_dynamic_array,
 }
 
 
@@ -874,6 +1260,16 @@ assign_at :: proc{
 clear_dynamic_array :: proc "contextless" (array: ^$T/[dynamic]$E) {
 	if array != nil {
 		(^Raw_Dynamic_Array)(array).len = 0
+	}
+}
+
+// `clear_fixed_capacity_dynamic_array` will set the length of a passed dynamic array to `0`
+//
+// Note: Prefer the procedure group `clear`.
+@builtin
+clear_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E) {
+	if array != nil {
+		(^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array).len = 0
 	}
 }
 
@@ -996,6 +1392,43 @@ non_zero_resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, #any_int length: i
 	return _resize_dynamic_array((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), length, false, loc=loc)
 }
 
+
+
+// `resize_fixed_capacity_dynamic_array` will try to resize memory of a passed fixed capacity dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
+//
+// Note: Prefer the procedure group `resize`
+@builtin
+resize_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #any_int length: int) -> bool {
+	if array == nil {
+		return false
+	}
+	if len(array) < length {
+		size_of_elem :: size_of(E)
+
+		num_reused := min(N, length) - len(array)
+		intrinsics.mem_zero(([^]byte)(array)[len(array)*size_of_elem:], num_reused*size_of_elem)
+	}
+
+	raw := (^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array)
+	new_length := clamp(length, 0, N)
+	raw.len = new_length
+	return true
+}
+
+// `non_zero_resize_fixed_capacity_dynamic_array` will try to resize memory of a passed fixed capacity dynamic array or map to the requested element count (setting the `len`, and possibly `cap`).
+//
+// Note: Prefer the procedure group `resize`
+@builtin
+non_zero_resize_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic; $N]$E, #any_int length: int) -> bool {
+	if array == nil {
+		return false
+	}
+	raw := (^Raw_Fixed_Capacity_Dynamic_Array(N, E))(array)
+	new_length := clamp(length, 0, N)
+	raw.len = new_length
+	return true
+}
+
 // Shrinks the capacity of a dynamic array down to the current length, or the given capacity.
 //
 // If `new_cap` is negative, then `len(array)` is used.
@@ -1094,7 +1527,7 @@ card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
 
 
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `context.assertion_failure_procedure` to assert.
 //
 // This routine will be ignored when `ODIN_DISABLE_ASSERT` is true.
@@ -1118,7 +1551,7 @@ assert :: proc(condition: bool, message := #caller_expression(condition), loc :=
 	}
 }
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `context.assertion_failure_procedure` to assert.
 // This routine ignores `ODIN_DISABLE_ASSERT`, and will always execute.
 @builtin
@@ -1158,7 +1591,7 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	p("not yet implemented", message, loc)
 }
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 //
 // This routine will be ignored when `ODIN_DISABLE_ASSERT` is true.
@@ -1178,7 +1611,7 @@ assert_contextless :: proc "contextless" (condition: bool, message := #caller_ex
 	}
 }
 
-// Evaluates the condition and panics the program iff the condition is false.
+// Evaluates the condition and panics the program if and only if (⟺) the condition is false.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 @builtin
 ensure_contextless :: proc "contextless" (condition: bool, message := #caller_expression(condition), loc := #caller_location) {

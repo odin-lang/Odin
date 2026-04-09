@@ -44,6 +44,15 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			index = it^
 			it^ += 1
 		}
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		count := (^int)(uintptr(val.data) + info.len_offset)^
+		if it^ < count {
+			elem.data = rawptr(uintptr(val.data) + uintptr(it^ * info.elem_size))
+			elem.id = info.elem.id
+			ok = true
+			index = it^
+			it^ += 1
+		}
 	}
 
 	return

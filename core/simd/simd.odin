@@ -493,7 +493,7 @@ Example:
 	   +-------+-------+-------+-------+
 	res:
 	   +-------+-------+-------+--------+
-	   |  0x04 |  0x2a |   0   |  0xff  |
+	   |  0x04 |  0x2a |   0   |  0x7f  |
 	   +-------+-------+-------+--------+
 */
 shr :: intrinsics.simd_shr
@@ -581,7 +581,7 @@ Example:
 	   +-------+-------+-------+-------+
 	res:
 	   +-------+-------+-------+--------+
-	   |  0x04 |  0x2a |  0x01 |  0xff  |
+	   |  0x04 |  0x2a |  0x01 |  0x7f  |
 	   +-------+-------+-------+--------+
 */
 shr_masked :: intrinsics.simd_shr_masked
@@ -2517,9 +2517,15 @@ Compute the nearest integer of each lane in a SIMD vector.
 nearest :: intrinsics.simd_nearest
 
 /*
-Transmute a SIMD vector into an integer vector.
+Transmute a SIMD vector into an unsigned integer vector.
 */
 to_bits :: intrinsics.simd_to_bits
+
+/*
+Transmute a SIMD vector into a signed integer vector.
+*/
+to_bits_signed :: intrinsics.simd_to_bits_signed
+
 
 /*
 Reverse the lanes of a SIMD vector.
@@ -2580,6 +2586,27 @@ Reverse the bit pattern of a SIMD vector.
 reverse_bits :: intrinsics.reverse_bits
 
 /*
+**Operation**
+
+	#assert(len(a) == len(b))
+	res := 0
+	N :: len(a)
+	for i in 0 ..< N/2 {
+		res[i] = a[2*i + 1]
+	}
+	for i in 0 ..< N/2 {
+		res[i + N/2] = b[2*i]
+	}
+	return res
+*/
+odd_even :: intrinsics.simd_odd_even
+
+@(require_results)
+add_sub :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return odd_even(add(a, b), sub(a, b))
+}
+
+/*
 Perform a FMA (Fused multiply-add) operation on each lane of SIMD vectors.
 
 A fused multiply-add is a ternary operation that for three operands, `a`, `b`
@@ -2605,6 +2632,41 @@ Returns:
 	return res
 */
 fused_mul_add :: intrinsics.fused_mul_add
+
+
+@(require_results)
+fused_neg_mul_add :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(neg(a), b, c)
+}
+
+@(require_results)
+fused_mul_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(a, b, neg(c))
+}
+
+@(require_results)
+fused_neg_mul_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(neg(a), b, neg(c))
+}
+
+@(require_results)
+fused_mul_add_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	odd  := fused_mul_add(a, b, c)
+	even := fused_mul_sub(a, b, c)
+	return odd_even(odd, even)
+}
+
+@(require_results)
+fused_mul_sub_add :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	odd  := fused_mul_sub(a, b, c)
+	even := fused_mul_add(a, b, c)
+	return odd_even(odd, even)
+}
+
+
+
+
+
 
 /*
 Perform a FMA (Fused multiply-add) operation on each lane of SIMD vectors.
@@ -2723,6 +2785,15 @@ signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where in
 	return select(is_nan, v, copysign(T(1), v))
 }
 
+@(require_results)
+sign_bit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: type_of(intrinsics.simd_to_bits(T{}))) {
+	BITS :: 8*size_of(E)
+	val  := to_bits(v)
+	mask := type_of(val)(1<<(BITS-1))
+	masked := bit_and(val, mask)
+	return to_bits(shr(to_bits_signed(masked), BITS-1))
+}
+
 /*
 Calculate reciprocals of SIMD lanes.
 
@@ -2758,6 +2829,10 @@ recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where int
 }
 
 
+approx_recip      :: intrinsics.simd_approx_recip
+approx_recip_sqrt :: intrinsics.simd_approx_recip_sqrt
+
+
 /*
 Create a vector where each lane contains the index of that lane.
 Inputs:
@@ -2770,3 +2845,38 @@ Operation:
 	}
 */
 indices :: intrinsics.simd_indices
+
+/*
+Create a vector where each lane contains the index of that lane.
+Inputs:
+- `V`: The type of the vector to create.
+Result:
+- A vector of the given type, where each lane contains the index of that lane.
+Operation:
+	for i in 0 ..< N {
+		res[i] = i
+	}
+*/
+iota :: intrinsics.simd_indices
+
+
+sums_of_n :: intrinsics.simd_sums_of_n
+
+
+@(require_results)
+saturating_neg :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return saturating_sub(T(0), v)
+}
+
+@(require_results)
+saturating_abs :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return max(v, saturating_sub(T(0), v))
+}
+
+@(require_results)
+abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return abs(sub(a, b))
+}
+
+pairwise_add :: intrinsics.simd_pairwise_add
+pairwise_sub :: intrinsics.simd_pairwise_add

@@ -1201,3 +1201,41 @@ void futex_wait(Futex *f, Footex val) {
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
+
+
+
+template <typename T>
+struct AtomicFreelist {
+	T value;
+	std::atomic<AtomicFreelist<T> *> next;
+};
+
+template <typename T>
+AtomicFreelist<T> *atomic_freelist_get(std::atomic<AtomicFreelist<T> *> &head) {
+	AtomicFreelist<T> *elem = nullptr;
+
+	for (;;) {
+		elem = head.load(std::memory_order_acquire);
+		if (elem == nullptr) {
+			return nullptr;
+		}
+
+		if (head.compare_exchange_weak(elem, elem->next.load(std::memory_order_acquire), std::memory_order_acquire, std::memory_order_relaxed)) {
+			elem->next.store(nullptr, std::memory_order_relaxed);
+			return elem;
+		}
+
+	}
+}
+
+template <typename T>
+void atomic_freelist_put(std::atomic<AtomicFreelist<T> *> &head_list, AtomicFreelist<T> *elem) {
+	for (;;) {
+		auto *head = head_list.load(std::memory_order_relaxed);
+		elem->next.store(head, std::memory_order_relaxed);
+		if (head_list.compare_exchange_weak(head, elem, std::memory_order_release, std::memory_order_relaxed)) {
+			return;
+		}
+
+	}
+}

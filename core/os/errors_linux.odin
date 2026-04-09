@@ -148,7 +148,7 @@ _get_platform_error :: proc(errno: linux.Errno) -> Error {
 	#partial switch errno {
 	case .NONE:
 		return nil
-	case .EPERM:
+	case .EPERM, .EACCES:
 		return .Permission_Denied
 	case .EEXIST:
 		return .Exist

@@ -45,7 +45,7 @@ reader_init_with_buf :: proc(b: ^Reader, rd: io.Reader, buf: []byte) {
 	b.buf = buf
 }
 
-// reader_destroy destroys the underlying buffer with its associated allocator IFF that allocator has been set
+// reader_destroy destroys the underlying buffer with its associated allocator if and only if (⟺) that allocator has been set
 reader_destroy :: proc(b: ^Reader) {
 	delete(b.buf, b.buf_allocator)
 	b^ = {}

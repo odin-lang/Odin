@@ -29,7 +29,8 @@ freelist_clear :: proc(x: ^$X/Freelist_Array($T, $SHIFT)) {
 freelist_push_with_index :: proc(x: ^$X/Freelist_Array($T, $SHIFT), value: T, loc := #caller_location) -> (ptr: ^T, index: int, err: runtime.Allocator_Error) {
 	if x.freelist != nil {
 		slot := x.freelist
-		idx, _ := freelist_linear_search(x, slot)
+		idx, found := freelist_linear_search(x, slot)
+		assert(found)
 		x.freelist = (^^T)(slot)^
 		slot^ = value
 		return slot, idx, nil

@@ -27,6 +27,7 @@ package all
 @(require) import "core:crypto/aead"
 @(require) import "core:crypto/aegis"
 @(require) import "core:crypto/aes"
+@(require) import "core:crypto/argon2id"
 @(require) import "core:crypto/blake2b"
 @(require) import "core:crypto/blake2s"
 @(require) import "core:crypto/chacha20"
@@ -142,6 +143,8 @@ package all
 
 @(require) import "core:sys/orca"
 @(require) import "core:sys/info"
+@(require) import "core:sys/wasm/js"
+@(require) import "core:sys/wasm/wasi"
 
 @(require) import "core:unicode"
 @(require) import "core:unicode/utf8"

@@ -384,6 +384,24 @@ base :: proc(path: string) -> string {
 }
 
 /*
+Gets the parent directory path from a path.
+
+e.g.
+	'/home/foo/bar.tar.gz' -> '/home/foo'
+	'path/to/name.tar.gz'  -> 'path/to'
+
+Returns "." if the path is an empty string.
+*/
+dir :: proc(path: string) -> string {
+	if path == "" {
+		return "."
+	}
+
+	d, _ := split_path(path)
+	return d
+}
+
+/*
 Gets the name of a file from a path.
 
 The stem of a file is such that `stem(path)` + `ext(path)` = `base(path)`.

@@ -101,7 +101,7 @@ internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.alloc
 		If the modulus is odd or dr != 0 use the montgomery method.
 	*/
 	if internal_int_is_odd(P) || dr != 0 {
-		return _private_int_exponent_mod(res, G, X, P, dr)
+		return _private_int_exponent_mod_fast(res, G, X, P, dr)
 	}
 
 	/*

@@ -35,7 +35,7 @@ writer_init_with_buf :: proc(b: ^Writer, wr: io.Writer, buf: []byte) {
 	b.buf = buf
 }
 
-// writer_destroy destroys the underlying buffer with its associated allocator IFF that allocator has been set
+// writer_destroy destroys the underlying buffer with its associated allocator if and only if (⟺) that allocator has been set
 writer_destroy :: proc(b: ^Writer) {
 	delete(b.buf, b.buf_allocator)
 	b^ = {}

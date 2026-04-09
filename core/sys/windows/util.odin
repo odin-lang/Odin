@@ -91,67 +91,149 @@ LANGIDFROMLCID :: #force_inline proc "contextless" (lcid: LCID) -> LANGID {
 
 @(require_results)
 utf8_to_utf16_alloc :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
-	if len(s) < 1 {
+	s_length := len(s)
+	if s_length < 1 {
+		return nil
+	}
+	if s_length > cast(int)max(c_int) {
+		// Unsupported (input string is excessively long).
 		return nil
 	}
 
 	b := transmute([]byte)s
 	cstr := raw_data(b)
-	n := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, c_int(len(s)), nil, 0)
-	if n == 0 {
+	n := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, c_int(s_length), nil, 0)
+	if n <= 0 || cast(int)n >= max(int) {
+		// If n is equal to or greater than max(int), then we will not be able
+		// to create a big enough slice with the null terminator.
+		// NOTE: This only affects 32-bit systems and is purely pedantic because
+		//       the system will never be able to allocate that much memory.
 		return nil
 	}
 
-	text := make([]u16, n+1, allocator)
+	text := make([]u16, cast(int)n + 1, allocator)
+	if text == nil {
+		return nil
+	}
 
-	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, c_int(len(s)), raw_data(text), n)
-	if n1 == 0 {
+	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, cstr, c_int(s_length), raw_data(text), n)
+	if n1 <= 0 {
 		delete(text, allocator)
 		return nil
 	}
 
+	// null-terminate the result here, even though the null element is not
+	// part of the slice. This is done to prevent callers which relied on
+	// this behavior, and is also expected by utf8_to_wstring_alloc.
 	text[n] = 0
-	for n >= 1 && text[n-1] == 0 {
-		n -= 1
-	}
 	return text[:n]
 }
 
 @(require_results)
 utf8_to_utf16_buf :: proc(buf: []u16, s: string) -> []u16 {
-	n1 := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), c_int(len(s)), nil, 0)
-	if n1 == 0 {
+	buf_length := len(buf)
+	if buf_length < 1 {
 		return nil
-	} else if int(n1) > len(buf) {
+	}
+	s_length := len(s)
+	if s_length == 0 {
+		return nil
+	}
+	if s_length > cast(int)max(c_int) {
+		// Unsupported (input string is excessively long).
+		return nil
+	}
+	if buf_length > cast(int)max(c_int) {
+		buf_length = cast(int)max(c_int)
+	}
+	elements_written := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), c_int(s_length), raw_data(buf), cast(c_int)buf_length)
+	if elements_written <= 0 {
+		// Insufficient buffer size, empty input string, or invalid characters. Contents of the buffer may have been modified.
 		return nil
 	}
 
-	n1 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(s), c_int(len(s)), raw_data(buf[:]), n1)
-	if n1 == 0 {
-		return nil
-	} else if int(n1) > len(buf) {
+	// To be consistent with utf8_to_utf16_alloc, the output string
+	// is null-terminated here in the buffer, even though the terminating null character
+	// is not part of the returned slice.
+	if buf_length <= cast(int)elements_written {
+		// The terminating null character does not fit.
+		// Need at least a length of (elements_written+1).
 		return nil
 	}
-	return buf[:n1]
+	buf[elements_written] = 0
+	return buf[:elements_written]
 }
+
+// Converts a regular UTF-8 `string` to UTF-16.
+//
+// The conversion includes any null characters present in the input string.
+//
+// Returns `nil` on conversion failure.
+//
+// Conversion may fail due to an invalid byte sequence in the input string,
+// or an insufficient buffer size (`utf8_to_utf16_buf` only),
+// or allocation failure (`utf8_to_utf16_alloc` only).
+//
+// The result of converting an empty string is indistinguishable from conversion failure.
 utf8_to_utf16 :: proc{utf8_to_utf16_alloc, utf8_to_utf16_buf}
 
 @(require_results)
 utf8_to_wstring_alloc :: proc(s: string, allocator := context.temp_allocator) -> wstring {
-	if res := utf8_to_utf16(s, allocator); len(res) > 0 {
-		return wstring(raw_data(res))
+	if len(s) == 0 {
+		// Empty string. Needs special care because an empty string
+		// is different from conversion failure.
+		buf := make([]u16, 1, allocator)
+		if buf == nil {
+			return nil
+		}
+		buf[0] = 0
+		return wstring(raw_data(buf))
 	}
-	return nil
+	// utf8_to_utf16 null-terminates the result in the allocated memory block,
+	// however, the null character is not part of the returned slice (it is just beyond).
+	// The conversion to wstring will bypass this implicit overrun.
+	res := utf8_to_utf16(s, allocator)
+	if len(res) > 0 {
+		return wstring(raw_data(res))
+	} else {
+		// Conversion failure.
+		return nil
+	}
 }
 
 @(require_results)
 utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
-	if res := utf8_to_utf16(buf, s); len(res) > 0 {
-		return wstring(raw_data(res))
+	buf_length := len(buf)
+	if buf_length == 0 {
+		// Insufficient buffer size, even for an empty string.
+		return nil
 	}
-	return nil
+	if len(s) == 0 {
+		// Empty string. Needs special care because an empty string
+		// is different from conversion failure.
+		buf[0] = 0
+		return wstring(raw_data(buf))
+	}
+	// utf8_to_utf16 null-terminates the result in the buffer,
+	// however, the null character is not part of the returned slice (it is just beyond).
+	// The conversion to wstring will bypass this implicit overrun.
+	res := utf8_to_utf16(buf[:], s)
+	if len(res) > 0 {
+		return wstring(raw_data(res))
+	} else {
+		// Conversion failure.
+		return nil
+	}
 }
 
+// Converts a regular UTF-8 `string` to UTF-16, and returns the result as a
+// null-terminated `wstring`, or `nil` on conversion failure.
+//
+// Conversion may fail due to an invalid byte sequence in the input string,
+// or an insufficient buffer size (`utf8_to_wstring_buf` only),
+// or allocation failure (`utf8_to_wstring_alloc` only).
+//
+// An empty string is valid, and results in a value distinct from `nil`.
 utf8_to_wstring :: proc{utf8_to_wstring_alloc, utf8_to_wstring_buf}
 
 @(require_results)
@@ -383,7 +465,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 		return "", {}, false
 	}
 
-	cname_w := make([]u16, min(computer_name_size, 1), context.temp_allocator)
+	cname_w := make([]u16, computer_name_size, context.temp_allocator)
 
 	res = LookupAccountNameW(
 		nil,
@@ -425,7 +507,7 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 		return false
 	}
 
-	cname_w := make([]u16, min(computer_name_size, 1), context.temp_allocator)
+	cname_w := make([]u16, computer_name_size, context.temp_allocator)
 
 	res = LookupAccountNameW(
 		nil,
@@ -625,7 +707,6 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 	}
 	si := STARTUPINFOW{}
 	si.cb = size_of(STARTUPINFOW)
-	pi := pi
 
 	ok = bool(CreateProcessAsUserW(
 		user_token,
@@ -656,7 +737,7 @@ ensure_winsock_initialized :: proc "contextless" () {
 	@static gate := false
 	@static initted := false
 
-	if initted {
+	if intrinsics.atomic_load(&initted) {
 		return
 	}
 
@@ -670,5 +751,5 @@ ensure_winsock_initialized :: proc "contextless" () {
 	res := WSAStartup(version_requested, &unused_info)
 	assert_contextless(res == 0, "unable to initialized Winsock2")
 
-	initted = true
+	intrinsics.atomic_store(&initted, true)
 }
