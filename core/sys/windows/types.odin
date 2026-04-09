@@ -5369,7 +5369,7 @@ Com_Error_Bits :: enum DWORD {
 }
 Com_Error :: distinct bit_set[Com_Error_Bits; DWORD]
 
-FILETYPEATTRIBUTEFLAGS_Bits :: enum DWORD {
+FILETYPEATTRIBUTEFLAG :: enum DWORD {
 	Exclude               = 0,
 	Show                  = 1,
 	HasExtension          = 2,
@@ -5391,7 +5391,7 @@ FILETYPEATTRIBUTEFLAGS_Bits :: enum DWORD {
 	SafeForElevation      = 21,
 	AlwaysUseDirectInvoke = 22,
 }
-FILETYPEATTRIBUTEFLAGS :: bit_set[FILETYPEATTRIBUTEFLAGS_Bits; DWORD]
+FILETYPEATTRIBUTEFLAGS :: bit_set[FILETYPEATTRIBUTEFLAG; DWORD]
 
 ASSOCCLASS :: enum c_int {
 	SHELL_KEY = 0,
