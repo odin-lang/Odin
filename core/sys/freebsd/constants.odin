@@ -16,4 +16,4 @@ STDOUT_FILENO :: Fd(1)
 /*
 	Standard error file descriptor
 */
-STDERR_FILENO :: Fd(3)
+STDERR_FILENO :: Fd(2)
