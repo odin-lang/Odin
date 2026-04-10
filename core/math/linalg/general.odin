@@ -45,7 +45,7 @@ scalar_dot :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T)
 }
 
 @(require_results)
-vector_dot :: #force_inline proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
+vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
 	ab := a * b
 	when N == 1 {
 		return ab.x
