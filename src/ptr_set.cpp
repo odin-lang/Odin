@@ -1,11 +1,14 @@
+enum {PTR_SET_INLINE_CAP = 16};
+
 template <typename T>
 struct PtrSet {
 	static_assert(TypeIsPointer<T>::value || TypeIsPtrSizedInteger<T>::value, "PtrSet::T must be a pointer");
 	static constexpr uintptr TOMBSTONE = ~(uintptr)(0ull);
 
-	T *   keys;
-	usize count;
-	usize capacity;
+	T * keys;
+	u32 count;
+	u32 capacity;
+	T   inline_keys[PTR_SET_INLINE_CAP];
 };
 
 template <typename T> gb_internal void ptr_set_init   (PtrSet<T> *s, isize capacity = 16);
@@ -19,24 +22,31 @@ template <typename T> gb_internal void ptr_set_clear  (PtrSet<T> *s);
 #define FOR_PTR_SET(element, set_) for (auto *it = &(set_).keys[0], element = it ? *it : nullptr; (set_).keys != nullptr && it < &(set_).keys[(set_).capacity]; it++) if (element = *it, (*it != nullptr && *it != cast(void *)~(uintptr)(0ull)))
 
 gb_internal gbAllocator ptr_set_allocator(void) {
-	return heap_allocator();
+	// return heap_allocator();
+	return permanent_allocator();
 }
 
 template <typename T>
 gb_internal void ptr_set_init(PtrSet<T> *s, isize capacity) {
 	GB_ASSERT(s->keys == nullptr);
 	if (capacity != 0) {
-		capacity = next_pow2_isize(gb_max(16, capacity));
-		s->keys = gb_alloc_array(ptr_set_allocator(), T, capacity);
+		capacity = next_pow2_isize(gb_max(PTR_SET_INLINE_CAP, capacity));
+		if (capacity > PTR_SET_INLINE_CAP) {
+			s->keys = gb_alloc_array(ptr_set_allocator(), T, capacity);
+		} else {
+			s->keys = s->inline_keys;
+		}
 		// This memory will be zeroed, no need to explicitly zero it
 	}
 	s->count = 0;
-	s->capacity = capacity;
+	s->capacity = cast(u32)capacity;
 }
 
 template <typename T>
 gb_internal void ptr_set_destroy(PtrSet<T> *s) {
-	gb_free(ptr_set_allocator(), s->keys);
+	if (s->keys != s->inline_keys) {
+		gb_free(ptr_set_allocator(), s->keys);
+	}
 	s->keys = nullptr;
 	s->count = 0;
 	s->capacity = 0;
@@ -46,16 +56,10 @@ template <typename T>
 gb_internal isize ptr_set__find(PtrSet<T> *s, T ptr) {
 	GB_ASSERT(ptr != 0);
 	if (s->count != 0) {
-	#if 0
-		for (usize i = 0; i < s->capacity; i++) {
-			if (s->keys[i] == ptr) {
-				return i;
-			}
-		}
-	#else
 		u32 hash = ptr_map_hash_key(ptr);
 		usize mask = s->capacity-1;
 		usize hash_index = cast(usize)hash & mask;
+
 		for (usize i = 0; i < s->capacity; i++) {
 			T key = s->keys[hash_index];
 			if (key == ptr) {
@@ -65,14 +69,14 @@ gb_internal isize ptr_set__find(PtrSet<T> *s, T ptr) {
 			}
 			hash_index = (hash_index+1)&mask;
 		}
-	#endif
 	}
 	return -1;
 }
 
 template <typename T>
 gb_internal bool ptr_set__full(PtrSet<T> *s) {
-	return 0.75f * s->capacity <= s->count;
+	usize grow_at = s->capacity - (s->capacity>>2);
+	return s->count >= grow_at;
 }
 
 template <typename T>
@@ -122,10 +126,11 @@ gb_internal bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it pre
 	usize hash_index = (cast(usize)hash) & mask;
 	GB_ASSERT(hash_index < s->capacity);
 	for (usize i = 0; i < s->capacity; i++) {
-		T *key = &s->keys[hash_index];
-		GB_ASSERT(*key != ptr);
-		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == 0) {
-			*key = ptr;
+		T *key_ptr = &s->keys[hash_index];
+		T key = *key_ptr;
+		GB_ASSERT(key != ptr);
+		if (key == (T)PtrSet<T>::TOMBSTONE || key == 0) {
+			*key_ptr = ptr;
 			s->count++;
 			return false;
 		}
@@ -160,10 +165,11 @@ gb_internal bool ptr_set_update_with_mutex(PtrSet<T> *s, T ptr, RWSpinLock *m) {
 	usize hash_index = (cast(usize)hash) & mask;
 	GB_ASSERT(hash_index < s->capacity);
 	for (usize i = 0; i < s->capacity; i++) {
-		T *key = &s->keys[hash_index];
-		GB_ASSERT(*key != ptr);
-		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == 0) {
-			*key = ptr;
+		T *key_ptr = &s->keys[hash_index];
+		T key = *key_ptr;
+		GB_ASSERT(key != ptr);
+		if (key == (T)PtrSet<T>::TOMBSTONE || key == 0) {
+			*key_ptr = ptr;
 			s->count++;
 			return false;
 		}
@@ -184,11 +190,36 @@ gb_internal T ptr_set_add(PtrSet<T> *s, T ptr) {
 template <typename T>
 gb_internal void ptr_set_remove(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr);
-	if (index >= 0) {
-		GB_ASSERT(s->count > 0);
-		s->keys[index] = (T)PtrSet<T>::TOMBSTONE;
-		s->count--;
+	if (index < 0) {
+		return;
 	}
+
+#if 0
+	u32 mask = s->capacity-1;
+	u32 i = cast(u32)index;
+	s->count -= 1;
+
+	for (;;) {
+		u32 next = (i + 1) & mask;
+		T key = s->keys[next];
+		if (key == 0) {
+			break;
+		}
+
+		u32 natural = ptr_map_hash_key(key) & mask;
+
+		if (((next - natural) & mask) == 0) {
+			break;
+		}
+		s->keys[i] = key;
+		i = next;
+	}
+	s->keys[i] = 0;
+#else
+	GB_ASSERT(s->count > 0);
+	s->keys[index] = (T)PtrSet<T>::TOMBSTONE;
+	s->count--;
+#endif
 }
 
 template <typename T>

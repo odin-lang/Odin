@@ -467,13 +467,7 @@ Check whether a number is a power of two.
 This procedure checks whether a given pointer-sized unsigned integer contains
 a power-of-two value.
 */
-@(require_results)
-is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
-	if x <= 0 {
-		return false
-	}
-	return (x & (x-1)) == 0
-}
+is_power_of_two :: runtime.is_power_of_two_uintptr
 
 /*
 Check if a pointer is aligned.
@@ -497,11 +491,7 @@ bytes, `ptr` is returned.
 
 The specified alignment must be a power of 2.
 */
-@(require_results)
-align_forward_uintptr :: proc(ptr, align: uintptr) -> uintptr {
-	assert(is_power_of_two(align))
-	return (ptr + align-1) & ~(align-1)
-}
+align_forward_uintptr :: runtime.align_forward_uintptr
 
 /*
 Align pointer forward.
@@ -526,10 +516,7 @@ bytes, `ptr` is returned.
 
 The specified alignment must be a power of 2.
 */
-@(require_results)
-align_forward_int :: proc(ptr, align: int) -> int {
-	return int(align_forward_uintptr(uintptr(ptr), uintptr(align)))
-}
+align_forward_int :: runtime.align_forward_int
 
 /*
 Align uint forward.
@@ -540,10 +527,7 @@ bytes, `ptr` is returned.
 
 The specified alignment must be a power of 2.
 */
-@(require_results)
-align_forward_uint :: proc(ptr, align: uint) -> uint {
-	return uint(align_forward_uintptr(uintptr(ptr), uintptr(align)))
-}
+align_forward_uint :: runtime.align_forward_uint
 
 /*
 Align uintptr backwards.
@@ -624,32 +608,6 @@ into a new stack-allocated value and returns that value.
 reinterpret_copy :: proc "contextless" ($T: typeid, ptr: rawptr) -> (value: T) {
 	copy(&value, ptr, size_of(T))
 	return
-}
-
-/*
-Dynamic array with a fixed capacity buffer.
-
-This type represents dynamic arrays with a fixed-size backing buffer. Upon
-allocating memory beyond reaching the maximum capacity, allocations from fixed
-byte buffers return `nil` and no error.
-*/
-Fixed_Byte_Buffer :: distinct [dynamic]byte
-
-/*
-Create a fixed byte buffer from a slice.
-*/
-@(require_results)
-make_fixed_byte_buffer :: proc "contextless" (backing: []byte) -> Fixed_Byte_Buffer {
-	s := transmute(Raw_Slice)backing
-	d: Raw_Dynamic_Array
-	d.data = s.data
-	d.len = 0
-	d.cap = s.len
-	d.allocator = Allocator{
-		procedure = nil_allocator_proc,
-		data = nil,
-	}
-	return transmute(Fixed_Byte_Buffer)d
 }
 
 /*

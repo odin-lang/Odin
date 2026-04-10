@@ -559,6 +559,8 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			// no prefix
 			return;
 		}
+		InternedString interned = entity_interned_name(e);
+
 		if (e->parent_proc_decl.load(std::memory_order_relaxed)) {
 			Entity *p = e->parent_proc_decl.load(std::memory_order_relaxed)->entity;
 			write_canonical_parent_prefix(w, p);
@@ -569,7 +571,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			}
 			type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
-		} else if (e->pkg && (scope_lookup_current(e->pkg->scope, e->token.string) == e)) {
+		} else if (e->pkg && (scope_lookup_current(e->pkg->scope, interned) == e)) {
 			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
 			if (e->pkg->name == "llvm") {
 				type_writer_appendc(w, "$");
@@ -748,8 +750,8 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		return;
 	}
 
-	type = default_type(type);
-	GB_ASSERT(!is_type_untyped(type));
+	// type = default_type(type);
+	// GB_ASSERT(!is_type_untyped(type));
 
 	switch (type->kind) {
 	case Type_Basic:
@@ -787,6 +789,10 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 	case Type_DynamicArray:
 		type_writer_appendc(w, "[dynamic]");
 		write_type_to_canonical_string(w, type->DynamicArray.elem);
+		return;
+	case Type_FixedCapacityDynamicArray:
+		type_writer_append_fmt(w, "[dynamic;%lld]", cast(long long)type->FixedCapacityDynamicArray.capacity);
+		write_type_to_canonical_string(w, type->FixedCapacityDynamicArray.elem);
 		return;
 	case Type_SimdVector:
 		type_writer_append_fmt(w, "#simd[%lld]", cast(long long)type->SimdVector.count);
@@ -838,7 +844,8 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		} else {
 			type_writer_append_fmt(w, "%lld", type->BitSet.lower);
 			type_writer_append_fmt(w, CANONICAL_RANGE_OPERATOR);
-			type_writer_append_fmt(w, "%lld", type->BitSet.upper);
+			write_type_to_canonical_string(w, type->BitSet.elem);
+			type_writer_append_fmt(w, "(%lld)", type->BitSet.upper);
 		}
 		if (type->BitSet.underlying != nullptr) {
 			type_writer_appendc(w, ";");

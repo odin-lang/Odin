@@ -39,7 +39,7 @@ ALWAYS_REPORT_MEMORY  : bool   : #config(ODIN_TEST_ALWAYS_REPORT_MEMORY, false)
 // Treat memory leaks and bad frees as errors.
 FAIL_ON_BAD_MEMORY    : bool   : #config(ODIN_TEST_FAIL_ON_BAD_MEMORY,   false)
 // Specify how much memory each thread allocator starts with.
-PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.   ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
+PER_THREAD_MEMORY     : int    : #config(ODIN_TEST_THREAD_MEMORY, mem.ROLLBACK_STACK_DEFAULT_BLOCK_SIZE)
 // Select a specific set of tests to run by name.
 // Each test is separated by a comma and may optionally include the package name.
 // This may be useful when running tests on multiple packages with `-all-packages`.

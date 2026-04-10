@@ -16,7 +16,7 @@ _get_platform_error_from_errno :: proc() -> Error {
 
 _get_platform_error_existing :: proc(errno: posix.Errno) -> Error {
 	#partial switch errno {
-	case .EPERM:
+	case .EPERM, .EACCES:
 		return .Permission_Denied
 	case .EEXIST:
 		return .Exist

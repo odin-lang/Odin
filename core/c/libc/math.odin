@@ -154,12 +154,12 @@ _nan_bit_pattern := ~u64(0)
 
 // On amd64 Windows and Linux, float_t and double_t are respectively both
 // their usual types. On x86 it's not possible to define these types correctly
-// since they would be long double which Odin does have support for.
+// since they would be long double which Odin does NOT have support for.
 float_t          :: float
 double_t         :: double
 
 NAN              := transmute(double)(_nan_bit_pattern)
-INFINITY         :: 1e5000
+INFINITY         :: 0h7ff00000_00000000 // +Inf
 
 HUGE_VALF        :: INFINITY
 HUGE_VAL         :: double(INFINITY)

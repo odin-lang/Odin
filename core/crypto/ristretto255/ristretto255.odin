@@ -360,7 +360,7 @@ ge_double_scalarmult_generator_vartime :: proc(
 	ge._is_initialized = true
 }
 
-// ge_cond_negate sets `ge = a` iff `ctrl == 0` and `ge = -a` iff `ctrl == 1`.
+// ge_cond_negate sets `ge = a` if and only if (⟺) `ctrl == 0` and `ge = -a` if and only if (⟺) `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 ge_cond_negate :: proc(ge, a: ^Group_Element, ctrl: int) {
 	_ge_ensure_initialized([]^Group_Element{a})
@@ -369,7 +369,7 @@ ge_cond_negate :: proc(ge, a: ^Group_Element, ctrl: int) {
 	ge._is_initialized = true
 }
 
-// ge_cond_assign sets `ge = ge` iff `ctrl == 0` and `ge = a` iff `ctrl == 1`.
+// ge_cond_assign sets `ge = ge` if and only if (⟺) `ctrl == 0` and `ge = a` if and only if (⟺) `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 ge_cond_assign :: proc(ge, a: ^Group_Element, ctrl: int) {
 	_ge_ensure_initialized([]^Group_Element{ge, a})
@@ -377,7 +377,7 @@ ge_cond_assign :: proc(ge, a: ^Group_Element, ctrl: int) {
 	grp.ge_cond_assign(&ge._p, &a._p, ctrl)
 }
 
-// ge_cond_select sets `ge = a` iff `ctrl == 0` and `ge = b` iff `ctrl == 1`.
+// ge_cond_select sets `ge = a` if and only if (⟺) `ctrl == 0` and `ge = b` if and only if (⟺) `ctrl == 1`.
 // Behavior for all other values of ctrl are undefined,
 ge_cond_select :: proc(ge, a, b: ^Group_Element, ctrl: int) {
 	_ge_ensure_initialized([]^Group_Element{a, b})
@@ -386,7 +386,7 @@ ge_cond_select :: proc(ge, a, b: ^Group_Element, ctrl: int) {
 	ge._is_initialized = true
 }
 
-// ge_equal returns 1 iff `a == b`, and 0 otherwise.
+// ge_equal returns 1 if and only if (⟺) `a == b`, and 0 otherwise.
 @(require_results)
 ge_equal :: proc(a, b: ^Group_Element) -> int {
 	_ge_ensure_initialized([]^Group_Element{a, b})
@@ -405,7 +405,7 @@ ge_equal :: proc(a, b: ^Group_Element) -> int {
 	return ret
 }
 
-// ge_is_identity returns 1 iff `ge` is the identity element, and 0 otherwise.
+// ge_is_identity returns 1 if and only if (⟺) `ge` is the identity element, and 0 otherwise.
 @(require_results)
 ge_is_identity :: proc(ge: ^Group_Element) -> int {
 	return ge_equal(ge, &GE_IDENTITY)

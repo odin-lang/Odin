@@ -94,6 +94,7 @@ if %release_mode% EQU 0 ( rem Debug
 set compiler_warnings= ^
 	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4146 ^
+	-wd4324 ^
 	-wd4505 ^
 	-wd4456 -wd4457
 
@@ -105,16 +106,6 @@ set libs= ^
 	bin\llvm\windows\LLVM-C.lib
 set odin_res=misc\odin.res
 set odin_rc=misc\odin.rc
-
-rem DO NOT TOUCH!
-rem THIS TILDE STUFF IS FOR DEVELOPMENT ONLY!
-set tilde_backend=0
-if %tilde_backend% EQU 1 (
-	set libs=%libs% src\tilde\tb.lib
-	set compiler_defines=%compiler_defines% -DODIN_TILDE_BACKEND
-)
-rem DO NOT TOUCH!
-
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console -MANIFEST:EMBED
 

@@ -2247,7 +2247,7 @@ arbitrary_precision_mathematics :: proc() {
 
 		cb := big.internal_count_bits(a)
 		if print_name {
-			fmt.printf(name)
+			fmt.print(name)
 		}
 		if err != nil {
 			fmt.printf(" (Error: %v) ", err)

@@ -250,9 +250,10 @@ gb_global char const *odin_command_strings[32] = {
 
 
 enum CmdDocFlag : u32 {
-	CmdDocFlag_Short       = 1<<0,
-	CmdDocFlag_AllPackages = 1<<1,
-	CmdDocFlag_DocFormat   = 1<<2,
+	CmdDocFlag_Short         = 1<<0,
+	CmdDocFlag_InSourceOrder = 1<<1,
+	CmdDocFlag_AllPackages   = 1<<2,
+	CmdDocFlag_DocFormat     = 1<<3,
 };
 
 enum TimingsExportFormat : i32 {
@@ -388,7 +389,7 @@ u64 get_feature_flag_from_name(String const &name) {
 	}
 	if (name == "using-stmt") {
 		return OptInFeatureFlag_UsingStmt;
-  }
+	}
 	if (name == "force-type-assert") {
 		return OptInFeatureFlag_ForceTypeAssert;
 	}
@@ -577,6 +578,9 @@ struct BuildContext {
 	bool internal_by_value;
 	bool internal_weak_monomorphization;
 	bool internal_ignore_llvm_verification;
+	bool internal_llvm_mem2reg;
+
+	bool   enable_rvo;
 
 	bool   no_threaded_checker;
 
@@ -603,8 +607,6 @@ struct BuildContext {
 	bool   disable_unwind;
 
 	isize max_error_count;
-
-	bool tilde_backend;
 
 
 	u32 cmd_doc_flags;
@@ -1683,7 +1685,20 @@ gb_internal void init_android_values(bool with_sdk) {
 		gb_exit(1);
 	}
 
-	bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = concatenate_strings(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("sysroot/usr/lib/aarch64-linux-android/"));
+	switch (bc->metrics.arch) {
+		case TargetArch_arm64:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("aarch64-linux-android");
+			break;
+		case TargetArch_arm32:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("arm-linux-androideabi");
+			break;
+		case TargetArch_amd64:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("x86_64-linux-android");
+			break;
+		case TargetArch_i386:
+			bc->ODIN_ANDROID_NDK_TOOLCHAIN_LIB = str_lit("i686-linux-android");
+			break;
+	}
 
 	char buf[32] = {};
 	gb_snprintf(buf, gb_size_of(buf), "%d/", bc->ODIN_ANDROID_API_LEVEL);
@@ -1958,9 +1973,22 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
 		switch (metrics->arch) {
 		case TargetArch_arm64:
-			bc->metrics.target_triplet = str_lit("aarch64-none-linux-android");
+			bc->metrics.target_triplet = str_lit("aarch64-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
+		case TargetArch_arm32:
+			bc->metrics.target_triplet = str_lit("armv7a-linux-androideabi");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		case TargetArch_amd64:
+			bc->metrics.target_triplet = str_lit("x86_64-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		case TargetArch_i386:
+			bc->metrics.target_triplet = str_lit("i686-linux-android");
+			bc->reloc_mode = RelocMode_PIC;
+			break;
+		
 		default:
 			GB_PANIC("Unknown architecture for -subtarget:android");
 		}
@@ -2131,8 +2159,15 @@ gb_internal bool check_target_feature_is_valid(String const &feature, TargetArch
 	String_Iterator it = {feature, 0};
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
-		if (!check_single_target_feature_is_valid(feature_list, str)) {
+		String feature_str = str;
+		if (string_starts_with(feature_str, '+') || string_starts_with(feature_str, '-')) {
+			feature_str = substring(feature_str, 1, feature_str.len);
+			if (feature_str == "") {
+				return false;
+			}
+		}
+		if (feature_str == "") break;
+		if (!check_single_target_feature_is_valid(feature_list, feature_str)) {
 			if (invalid) *invalid = str;
 			return false;
 		}
@@ -2172,20 +2207,26 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 	String_Iterator it = {feature, 0};
 	for (;;) {
 		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
-
-		if (!string_set_exists(&build_context.target_features_set, str)) {
-			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), str);
-
-			if (!string_set_exists(&build_context.target_features_set, plus_str)) {
-				if (not_enabled) *not_enabled = str;
-				return false;
-			}
+		String feature_str = str;
+		bool want_enabled = true;
+		if (string_starts_with(feature_str, '+') || string_starts_with(feature_str, '-')) {
+			want_enabled = feature_str[0] == '+';
+			feature_str = substring(feature_str, 1, feature_str.len);
 		}
+		if (feature_str == "") break;
 
-		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), str);
-
-		if (string_set_exists(&build_context.target_features_set, minus_str)) {
+		String plus_str  = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
+		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), feature_str);
+		
+		bool has_raw   = string_set_exists(&build_context.target_features_set, feature_str);
+		bool has_plus  = string_set_exists(&build_context.target_features_set, plus_str);
+		bool has_minus = string_set_exists(&build_context.target_features_set, minus_str);
+		
+		// NOTE(jakubtomsu): this way "feature" and "+feature" is ALWAYS equivalent,
+		// and also allows the minus sign to do a final override.
+		bool is_enabled = (has_plus || has_raw) && !has_minus;
+		
+		if (want_enabled != is_enabled) {
 			if (not_enabled) *not_enabled = str;
 			return false;
 		}
@@ -2597,4 +2638,3 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	return true;
 }
-

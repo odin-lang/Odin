@@ -389,7 +389,7 @@ namespace lbAbi386 {
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
@@ -471,7 +471,7 @@ namespace lbAbiAmd64Win64 {
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
@@ -617,7 +617,7 @@ namespace lbAbiAmd64SysV {
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
 
@@ -1128,7 +1128,7 @@ namespace lbAbiArm64 {
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
@@ -1349,7 +1349,7 @@ namespace lbAbiWasm {
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
@@ -1558,7 +1558,7 @@ namespace lbAbiArm32 {
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
 		ft->ret = compute_return_type(c, return_type, return_is_defined);
@@ -1867,7 +1867,7 @@ namespace lbAbiRiscv64 {
 	}
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = m->ctx;
 		ft->calling_convention = calling_convention;
 
@@ -1889,7 +1889,7 @@ gb_internal LB_ABI_INFO(lb_get_abi_info_internal) {
 	case ProcCC_None:
 	case ProcCC_InlineAsm:
 		{
-			lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
+			lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 			ft->ctx = c;
 			ft->args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 			for (unsigned i = 0; i < arg_count; i++) {

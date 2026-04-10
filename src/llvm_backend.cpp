@@ -66,6 +66,19 @@ gb_internal String get_final_microarchitecture() {
 gb_internal String get_default_features() {
 	BuildContext *bc = &build_context;
 
+	if (bc->microarch == str_lit("native")) {
+		String features = make_string_c(LLVMGetHostCPUFeatures());
+
+		// Update the features string so LLVM uses it later.
+		if (bc->target_features_string.len > 0) {
+			bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
+		} else {
+			bc->target_features_string = features;
+		}
+
+		return features;
+	}
+
 	int off = 0;
 	for (int i = 0; i < bc->metrics.arch; i += 1) {
 		off += target_microarch_counts[i];
@@ -2634,7 +2647,7 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
 			wd->m = m;
 			wd->target_machine = m->target_machine;
 			wd->do_threading = true;
@@ -2645,7 +2658,7 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
 			wd->m = m;
 			wd->target_machine = m->target_machine;
 			wd->do_threading = false;
@@ -2765,7 +2778,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
-			auto *wd = gb_alloc_item(permanent_allocator(), lbLLVMEmitWorker);
+			auto *wd = permanent_alloc_item<lbLLVMEmitWorker>();
 			wd->target_machine = m->target_machine;
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;
@@ -2933,7 +2946,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 			AstPackage *pkg = get_runtime_package(m->info);
 
 			String name = str_lit("exit");
-			Entity *e = scope_lookup_current(pkg->scope, name);
+			Entity *e = scope_lookup_current(pkg->scope, string_interner_insert(name));
 			if (e == nullptr) {
 				compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg->name), LIT(name));
 			}
@@ -3174,7 +3187,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			code_mode);
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
-		LLVMSetModuleDataLayout(m->mod, LLVMCreateTargetDataLayout(target_machine));
+		LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(target_machine);
+		LLVMSetModuleDataLayout(m->mod, data_layout);
+		LLVMDisposeTargetData(data_layout);
 
 	#if LLVM_VERSION_MAJOR >= 18
 		if (build_context.fast_isel) {
@@ -3406,7 +3421,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 						cc.link_section = e->Variable.link_section;
 
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, tav.type, v, cc);
+						lbValue init = lb_const_value(m, e->type, v, cc);
 
 						LLVMDeleteGlobal(g.value);
 						g.value = nullptr;
@@ -3583,6 +3598,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			lb_add_raddbg_string(m, "type_view: {type: \"[]?\",        expr: \"array(data, len)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"string\",     expr: \"array(data, len)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic;?]?\", expr: \"rows($, array(data, len), len)\"}");
 
 			// column major matrices
 			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}");

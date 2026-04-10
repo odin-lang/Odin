@@ -35,6 +35,7 @@ foreign webgl2 {
 	RenderbufferStorageMultisample :: proc(target: Enum, samples: i32, internalformat: Enum, width, height: i32) ---
 	
 	/* Texture objects */
+	TexStorage2D			:: proc(target: Enum, levels: i32, internalformat: Enum, width, height: i32) ---
 	TexStorage3D            :: proc(target: Enum, levels: i32, internalformat: Enum, width, height, depth: i32) ---
 	TexImage3D              :: proc(target: Enum, level: i32, internalformat: Enum, width, height, depth: i32, border: i32, format, type: Enum, size: int, data: rawptr) ---
 	TexSubImage3D           :: proc(target: Enum, level: i32, xoffset, yoffset, zoffset, width, height, depth: i32, format, type: Enum, size: int, data: rawptr) ---

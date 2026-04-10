@@ -76,16 +76,6 @@ gb_global Timings global_timings = {0};
 #include "linker.cpp"
 #include "bundle_command.cpp"
 
-#if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
-#define ALLOW_TILDE 1
-#else
-#define ALLOW_TILDE 0
-#endif
-
-#if ALLOW_TILDE
-#include "tilde.cpp"
-#endif
-
 #include "llvm_backend.cpp"
 
 #include "bug_report.cpp"
@@ -380,6 +370,7 @@ enum BuildFlagKind {
 	BuildFlag_GoToDefinitions,
 
 	BuildFlag_Short,
+	BuildFlag_InSourceOrder,
 	BuildFlag_AllPackages,
 	BuildFlag_DocFormat,
 
@@ -411,8 +402,8 @@ enum BuildFlagKind {
 	BuildFlag_InternalByValue,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
-
-	BuildFlag_Tilde,
+	BuildFlag_InternalLLVMMem2Reg,
+	BuildFlag_InternalEnableRVO,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -612,6 +603,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_SourceCodeLocations, 		str_lit("source-code-locations"), 		BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
+	add_flag(&build_flags, BuildFlag_InSourceOrder,           str_lit("in-source-order"),           BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc | Command_test | Command_build);
 	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
 
@@ -642,10 +634,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMMem2Reg,     str_lit("internal-llvm-mem2reg"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
 
-#if ALLOW_TILDE
-	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
-#endif
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
 	add_flag(&build_flags, BuildFlag_LTO,                     str_lit("lto"),                       BuildFlagParam_String,  Command__does_build);
@@ -1082,7 +1073,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							char const *key = string_intern(name);
+							char const *key = string_intern_cstring(name);
 
 							if (map_get(&build_context.defined_values, key) != nullptr) {
 								gb_printf_err("Defined constant '%.*s' already exists\n", LIT(name));
@@ -1502,6 +1493,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
+						case BuildFlag_InSourceOrder:
+							build_context.cmd_doc_flags |= CmdDocFlag_InSourceOrder;
+							break;
 						case BuildFlag_AllPackages:
 							build_context.cmd_doc_flags |= CmdDocFlag_AllPackages;
 				   			build_context.test_all_packages = true;
@@ -1634,11 +1628,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalLLVMVerification:
 							build_context.internal_ignore_llvm_verification = true;
 							break;
-
-
-						case BuildFlag_Tilde:
-							build_context.tilde_backend = true;
+						case BuildFlag_InternalLLVMMem2Reg:
+							build_context.internal_llvm_mem2reg = true;
 							break;
+						case BuildFlag_InternalEnableRVO:
+							build_context.enable_rvo = true;
+							break;
+
 
 						case BuildFlag_Sanitize:
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -2667,7 +2663,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (run_or_build) {
 		if (print_flag("-debug")) {
-			print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'.");
+			print_usage_line(2, "Enables debug information, and defines the global constant ODIN_DEBUG to be 'true'. Sets -o:none by default.");
 		}
 	}
 
@@ -2932,7 +2928,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			if (LB_USE_NEW_PASS_SYSTEM) {
 				print_usage_line(3, "-o:aggressive (use this with caution)");
 			}
-			print_usage_line(2, "The default is -o:minimal.");
+			print_usage_line(2, "The default is -o:minimal. If -debug is set, the default is -o:none.");
 		}
 
 
@@ -3008,6 +3004,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (doc) {
 		if (print_flag("-short")) {
 			print_usage_line(2, "Shows shortened documentation for the packages.");
+		}
+		if (print_flag("-in-source-order")) {
+			print_usage_line(2, "Shows documentation for the packages in source order within each file.");
 		}
 	}
 
@@ -3781,6 +3780,19 @@ int main(int arg_count, char const **arg_ptr) {
 
 	init_filename = copy_string(permanent_allocator(), init_filename);
 
+	build_context.command = command;
+
+	string_set_init(&build_context.custom_attributes);
+	string_set_init(&build_context.vet_packages);
+
+	if (!parse_build_flags(args)) {
+		return 1;
+	}
+
+	if (build_context.show_help) {
+		return print_show_help(args[0], command);
+	}
+
 	if (init_filename.len > 0 && !build_context.show_help) {
 		// The command must be build, run, test, check, or another that takes a directory or filename.
 		if (!path_is_directory(init_filename)) {
@@ -3791,6 +3803,47 @@ int main(int arg_count, char const **arg_ptr) {
 					single_file_package = true;
 					break;
 				}
+			}
+			if (!single_file_package) {
+				isize colon_pos = -1;
+				for (isize j = 0; j < init_filename.len; j++) {
+					if (init_filename[j] == ':') {
+						colon_pos = j;
+						break;
+					}
+				}
+				if (colon_pos > 0) {
+					String collection_name = substring(init_filename, 0, colon_pos);
+					String file_str = substring(init_filename, colon_pos+1, init_filename.len);
+
+					if (collection_name == "core") {
+						bool replace_with_base = false;
+						if (string_starts_with(file_str, str_lit("runtime"))) {
+							replace_with_base = true;
+						} else if (string_starts_with(file_str, str_lit("intrinsics"))) {
+							replace_with_base = true;
+						} if (string_starts_with(file_str, str_lit("builtin"))) {
+							replace_with_base = true;
+						}
+
+						if (replace_with_base) {
+							collection_name = str_lit("base");
+						}
+					}
+
+					String base_dir = {};
+					if (find_library_collection_path(collection_name, &base_dir)) {
+						bool ok = false;
+						String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+						if (ok) {
+							init_filename = fullpath;
+							if (path_is_directory(init_filename)) {
+								goto filename_check_success;
+							}
+						}
+					}
+				}
+
 			}
 
 			if (!single_file_package) {
@@ -3818,20 +3871,9 @@ int main(int arg_count, char const **arg_ptr) {
 					return 1;
 				}
 			}
+
+		filename_check_success:;
 		}
-	}
-
-	build_context.command = command;
-
-	string_set_init(&build_context.custom_attributes);
-	string_set_init(&build_context.vet_packages);
-
-	if (!parse_build_flags(args)) {
-		return 1;
-	}
-
-	if (build_context.show_help) {
-		return print_show_help(args[0], command);
 	}
 
 	if (command == "bundle") {
@@ -3931,15 +3973,16 @@ int main(int arg_count, char const **arg_ptr) {
 		for (;;) {
 			String item = string_split_iterator(&target_it, ',');
 			if (item == "") break;
-
-			if (*item.text == '+' || *item.text == '-') {
-				item.text++;
-				item.len--;
+			
+			String stripped_item = item;
+			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
+				stripped_item.text++;
+				stripped_item.len--;
 			}
 
 			String invalid;
-			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
-				if (item != str_lit("?")) {
+			if (!check_target_feature_is_valid_for_target_arch(stripped_item, &invalid) && stripped_item != str_lit("help")) {
+				if (stripped_item != str_lit("?")) {
 					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
 				}
 				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
@@ -3963,8 +4006,25 @@ int main(int arg_count, char const **arg_ptr) {
 
 				return 1;
 			}
-
-			string_set_add(&build_context.target_features_set, item);
+			
+			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
+			String feature_str = item;
+			if (*feature_str.text != '+' && *feature_str.text != '-') {
+				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
+			}
+			
+			// Ensure there is only a single entry for each feature in the target set.
+			// If the negative exists, override the existing value with the current one.
+			String neg_feature_str = clone_string(temporary_allocator(), feature_str);
+			switch (*neg_feature_str.text) {
+				case '+': *neg_feature_str.text = '-'; break;
+				case '-': *neg_feature_str.text = '+'; break;
+				default: GB_ASSERT(false); break;
+			}
+			
+			string_set_remove(&build_context.target_features_set, neg_feature_str);
+			
+			string_set_add(&build_context.target_features_set, feature_str);
 		}
 	}
 
@@ -4001,8 +4061,8 @@ int main(int arg_count, char const **arg_ptr) {
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
-	Parser *parser = gb_alloc_item(permanent_allocator(), Parser);
-	Checker *checker = gb_alloc_item(permanent_allocator(), Checker);
+	Parser * parser  = permanent_alloc_item<Parser>();
+	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
 
 	MAIN_TIME_SECTION("parse files");
@@ -4109,38 +4169,8 @@ int main(int arg_count, char const **arg_ptr) {
 		failed_to_cache_parsing = true;
 	}
 
-#if ALLOW_TILDE
-	if (build_context.tilde_backend) {
-		LinkerData linker_data = {};
-		MAIN_TIME_SECTION("Tilde Code Gen");
-		if (!cg_generate_code(checker, &linker_data)) {
-			return 1;
-		}
-
-		switch (build_context.build_mode) {
-		case BuildMode_Executable:
-		case BuildMode_StaticLibrary:
-		case BuildMode_DynamicLibrary:
-			i32 result = linker_stage(&linker_data);
-			if (result) {
-				if (build_context.show_timings) {
-					show_timings(checker, &global_timings);
-				}
-				if (build_context.show_import_graph) {
-					show_import_graph(checker);
-				}
-
-				if (build_context.export_dependencies_format != DependenciesExportUnspecified) {
-					export_dependencies(checker);
-				}
-				return result;
-			}
-			break;
-		}
-	} else
-#endif
 	{
-		lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+		lbGenerator *gen = permanent_alloc_item<lbGenerator>();
 		if (!lb_init_generator(gen, checker)) {
 			return 1;
 		}

@@ -16,14 +16,25 @@ void MP_FREE(void *mem, size_t size) {
 #else
 
 void *MP_MALLOC(size_t size) {
-	return gb_alloc(permanent_allocator(), cast(isize)size);
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	return arena_alloc(arena, cast(isize)size, 16);
 }
 void *MP_REALLOC(void *mem, size_t oldsize, size_t newsize) {
-	return gb_resize(permanent_allocator(), mem, cast(isize)oldsize, cast(isize)newsize);
+	if (newsize < oldsize) {
+		return mem;
+	}
+	if (newsize == 0) {
+		return mem;
+	}
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	void *new_mem = arena_alloc(arena, cast(isize)newsize, 16);
+	gb_memcopy(new_mem, mem, oldsize);
+	return new_mem;
 }
 void *MP_CALLOC(size_t nmemb, size_t size) {
-	size_t total = nmemb*size;
-	return gb_alloc(permanent_allocator(), cast(isize)total);
+	Arena *arena = get_arena(ThreadArena_Permanent);
+	isize total_size = cast(isize)(nmemb * size);
+	return arena_alloc(arena, total_size, 16);
 }
 void MP_FREE(void *mem, size_t size) {
 	// DO NOTHING
@@ -45,6 +56,8 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 gb_internal void big_int_dealloc(BigInt *dst) {
 	mp_clear(dst);
 }
+
+gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x);
 
 gb_internal BigInt big_int_make(BigInt const *b, bool abs=false);
 gb_internal BigInt big_int_make_abs(BigInt const *b);
@@ -197,7 +210,12 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 
 	BigInt b = {};
 	big_int_from_u64(&b, base);
+	defer (big_int_dealloc(&b));
+
 	mp_zero(dst);
+
+	BigInt digit = {};
+	defer (big_int_dealloc(&digit));
 
 	isize i = 0;
 	for (; i < len; i++) {
@@ -224,9 +242,10 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			}
 			break;
 		}
-		BigInt val = big_int_make_u64(v);
+
+		big_int_from_u64(&digit, v);
 		big_int_mul_eq(dst, &b);
-		big_int_add_eq(dst, &val);
+		big_int_add_eq(dst, &digit);
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
@@ -235,6 +254,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 		if (text[i] == '+') {
 			i += 1;
 		}
+
 		u64 exp = 0;
 		for (; i < len; i++) {
 			char r = cast(char)text[i];
@@ -251,8 +271,19 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			exp *= 10;
 			exp += v;
 		}
+
+		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).
+		//               As an integer, not even larger than `max(u128)` which has a base 10 exponent of 38.
+		//               But we also use this path to parse float literals like those in `core:math.pow10_f64`,
+		//               so we have to stick with 1e308.
+		if (exp > 308) {
+			*success = false;
+			return;
+		}
+
 		BigInt tmp = {};
 		mp_init(&tmp);
+		defer (big_int_dealloc(&tmp));
 		big_int_exp_u64(&tmp, &b, exp, success);
 		big_int_mul_eq(dst, &tmp);
 	}
@@ -263,6 +294,11 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 }
 
 
+
+gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x) {
+	int bits_used = (x->used-1) * MP_DIGIT_BIT;
+	return bits_used <= 64;
+}
 
 gb_internal u64 big_int_to_u64(BigInt const *x) {
 	GB_ASSERT(x->sign == 0);

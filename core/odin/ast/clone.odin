@@ -311,10 +311,16 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		case ^Multi_Pointer_Type:
 			r.elem = clone(r.elem)
 		case ^Array_Type:
+			r.tag  = clone(r.tag)
 			r.len  = clone(r.len)
 			r.elem = clone(r.elem)
 		case ^Dynamic_Array_Type:
+			r.tag  = clone(r.tag)
 			r.elem = clone(r.elem)
+		case ^Fixed_Capacity_Dynamic_Array_Type:
+			r.tag      = clone(r.tag)
+			r.capacity = clone(r.capacity)
+			r.elem     = clone(r.elem)
 		case ^Struct_Type:
 			r.poly_params = auto_cast clone(r.poly_params)
 			r.align = clone(r.align)

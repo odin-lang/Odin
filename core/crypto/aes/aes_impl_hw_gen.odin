@@ -1,10 +1,12 @@
 #+build !amd64
+#+build !arm64
+#+build !arm32
 package aes
 
 @(private = "file")
 ERR_HW_NOT_SUPPORTED :: "crypto/aes: hardware implementation unsupported"
 
-// is_hardware_accelerated returns true iff hardware accelerated AES
+// is_hardware_accelerated returns true if and only if (⟺) hardware accelerated AES
 // is supported.
 is_hardware_accelerated :: proc "contextless" () -> bool {
 	return false

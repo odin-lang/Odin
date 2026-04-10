@@ -1,4 +1,4 @@
-// This is purely for documentation
+7// This is purely for documentation
 #+build ignore
 package intrinsics
 
@@ -77,7 +77,9 @@ prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=
 prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
 
 // Compiler Hints
-expect :: proc(val, expected_val: $T) -> T ---
+expect   :: proc(val, expected_val: $T) -> T ---
+likely   :: proc(val: $T) -> T where type_is_boolean(T) ---
+unlikely :: proc(val: $T) -> T where type_is_boolean(T) ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
@@ -180,6 +182,7 @@ type_is_bit_set          :: proc($T: typeid) -> bool ---
 type_is_bit_field        :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_is_matrix           :: proc($T: typeid) -> bool ---
+type_is_fixed_capacity_dynamic_array :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
@@ -202,6 +205,9 @@ type_bit_set_underlying_type :: proc($T: typeid) -> typeid where type_is_bit_set
 type_has_field  :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
+type_field_bit_size :: proc($T: typeid, $name: string) -> int where type_is_bit_field(T) ---
+type_field_bit_offset :: proc($T: typeid, $name: string) -> int where type_is_bit_field(T) ---
+
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 
@@ -221,6 +227,8 @@ type_is_subtype_of  :: proc($T, $U: typeid) -> bool ---
 type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
+
+type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
 
 // "Contiguous" means that the set of enum constants, when sorted, have a difference of either 0 or 1 between consecutive values.
 // This is the exact opposite of "sparse".
@@ -340,13 +348,27 @@ simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 // rounding to the nearest integral value; if two values are equally near, rounds to the even one
 simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
-simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
+simd_approx_recip      :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T)) ---
+simd_approx_recip_sqrt :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T)) ---
+
+simd_to_bits        :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
+simd_to_bits_signed :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), !type_is_unsigned(Integer) ---
 
 // equivalent to a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
 simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
 simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+
+// return {b[0], a[1], b[2], a[3], ...}
+simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+// Returns the sums of N consecutive lanes
+simd_sums_of_n :: proc(a: #simd[LANES]T, $N: uint) -> #simd[LANES/N]T where is_power_of_two(N) ---
+
+simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
+simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
+
 
 // Checks if the current target supports the given target features.
 //

@@ -226,6 +226,7 @@ struct TypeNamed {
 	TYPE_KIND(Generic, struct {                               \
 		i64     id;                                       \
 		String  name;                                     \
+		InternedString interned_name;                     \
 		Type *  specialized;                              \
 		Scope * scope;                                    \
 		Entity *entity;                                   \
@@ -248,6 +249,12 @@ struct TypeNamed {
 	})                                                        \
 	TYPE_KIND(Slice,   struct { Type *elem; })                \
 	TYPE_KIND(DynamicArray, struct { Type *elem; })           \
+	TYPE_KIND(FixedCapacityDynamicArray, struct {             \
+		i64 capacity;                                     \
+		Type *generic_capacity;                           \
+		Type *elem;                                       \
+		i64 padding_needed; /*-1 if unknown*/             \
+	})                                                        \
 	TYPE_KIND(Map, struct {                                   \
 		Type *key;                                        \
 		Type *value;                                      \
@@ -378,6 +385,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Matrix,
 	Typeid_SoaPointer,
 	Typeid_Bit_Field,
+	Typeid_Fixed_Capacity_Dynamic_Array,
 
 	Typeid__COUNT
 
@@ -698,6 +706,7 @@ gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
 gb_global Type *t_type_info_soa_pointer          = nullptr;
 gb_global Type *t_type_info_bit_field            = nullptr;
+gb_global Type *t_type_info_fixed_capacity_dynamic_array = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -726,6 +735,7 @@ gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
 gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
 gb_global Type *t_type_info_bit_field_ptr        = nullptr;
+gb_global Type *t_type_info_fixed_capacity_dynamic_array_ptr = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -969,10 +979,7 @@ gb_internal void set_base_type(Type *t, Type *base) {
 
 
 gb_internal Type *alloc_type(TypeKind kind) {
-	// gbAllocator a = heap_allocator();
-	gbAllocator a = permanent_allocator();
-	Type *t = gb_alloc_item(a, Type);
-	gb_zero_item(t);
+	Type *t = permanent_alloc_item<Type>();
 	t->kind = kind;
 	t->cached_size  = -1;
 	t->cached_align = -1;
@@ -980,10 +987,11 @@ gb_internal Type *alloc_type(TypeKind kind) {
 }
 
 
-gb_internal Type *alloc_type_generic(Scope *scope, i64 id, String name, Type *specialized) {
+gb_internal Type *alloc_type_generic(Scope *scope, i64 id, InternedString interned_name, Type *specialized) {
 	Type *t = alloc_type(Type_Generic);
 	t->Generic.id = id;
-	t->Generic.name = name;
+	t->Generic.name = interned_name.string();
+	t->Generic.interned_name = interned_name;
 	t->Generic.specialized = specialized;
 	t->Generic.scope = scope;
 	return t;
@@ -1067,8 +1075,8 @@ gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValu
 	Type *t = alloc_type(Type_EnumeratedArray);
 	t->EnumeratedArray.elem = elem;
 	t->EnumeratedArray.index = index;
-	t->EnumeratedArray.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
-	t->EnumeratedArray.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	t->EnumeratedArray.min_value = permanent_alloc_item<ExactValue>();
+	t->EnumeratedArray.max_value = permanent_alloc_item<ExactValue>();
 	gb_memmove(t->EnumeratedArray.min_value, min_value, gb_size_of(ExactValue));
 	gb_memmove(t->EnumeratedArray.max_value, max_value, gb_size_of(ExactValue));
 	t->EnumeratedArray.op = op;
@@ -1094,6 +1102,23 @@ gb_internal Type *alloc_type_dynamic_array(Type *elem) {
 	return t;
 }
 
+gb_internal Type *alloc_type_fixed_capacity_dynamic_array(Type *elem, i64 capacity, Type *generic_capacity = nullptr) {
+	if (generic_capacity != nullptr) {
+		Type *t = alloc_type(Type_FixedCapacityDynamicArray);
+		t->FixedCapacityDynamicArray.elem = elem;
+		t->FixedCapacityDynamicArray.capacity = capacity;
+		t->FixedCapacityDynamicArray.generic_capacity = generic_capacity;
+		t->FixedCapacityDynamicArray.padding_needed = -1;
+		return t;
+	}
+	Type *t = alloc_type(Type_FixedCapacityDynamicArray);
+	t->FixedCapacityDynamicArray.elem = elem;
+	t->FixedCapacityDynamicArray.capacity = capacity;
+	t->FixedCapacityDynamicArray.padding_needed = -1;
+	return t;
+}
+
+
 
 gb_internal Type *alloc_type_struct() {
 	Type *t = alloc_type(Type_Struct);
@@ -1115,8 +1140,8 @@ gb_internal Type *alloc_type_union() {
 
 gb_internal Type *alloc_type_enum() {
 	Type *t = alloc_type(Type_Enum);
-	t->Enum.min_value = gb_alloc_item(permanent_allocator(), ExactValue);
-	t->Enum.max_value = gb_alloc_item(permanent_allocator(), ExactValue);
+	t->Enum.min_value = permanent_alloc_item<ExactValue>();
+	t->Enum.max_value = permanent_alloc_item<ExactValue>();
 	return t;
 }
 
@@ -1306,6 +1331,8 @@ gb_internal bool is_type_integer_or_float(Type *t) {
 	}
 	return false;
 }
+
+
 
 gb_internal bool is_type_numeric(Type *t) {
 	t = base_type(t);
@@ -1658,6 +1685,11 @@ gb_internal bool is_type_dynamic_array(Type *t) {
 	if (t == nullptr) { return false; }
 	return t->kind == Type_DynamicArray;
 }
+gb_internal bool is_type_fixed_capacity_dynamic_array(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	return t->kind == Type_FixedCapacityDynamicArray;
+}
 gb_internal bool is_type_slice(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
@@ -1679,6 +1711,51 @@ gb_internal bool is_type_simd_vector(Type *t) {
 	return t->kind == Type_SimdVector;
 }
 
+
+gb_internal Type *type_unsigned_equivalent(Type *t) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (is_type_simd_vector(t)) {
+		if (is_type_unsigned(t->SimdVector.elem)) {
+			return original_type;
+		}
+		return alloc_type_simd_vector(t->SimdVector.count, type_unsigned_equivalent(t->SimdVector.elem));
+	}
+
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1:  return t_u8;
+	case 2:  return t_u16;
+	case 4:  return t_u32;
+	case 8:  return t_u64;
+	case 16: return t_u128;
+	}
+	GB_PANIC("No known equivalent unsigned integer sized for %s", type_to_string(t));
+	return nullptr;
+}
+
+gb_internal Type *type_signed_equivalent(Type *t) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (is_type_simd_vector(t)) {
+		if (!is_type_unsigned(t->SimdVector.elem)) {
+			return original_type;
+		}
+		return alloc_type_simd_vector(t->SimdVector.count, type_signed_equivalent(t->SimdVector.elem));
+	}
+	;
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1:  return t_i8;
+	case 2:  return t_i16;
+	case 4:  return t_i32;
+	case 8:  return t_i64;
+	case 16: return t_i128;
+	}
+	GB_PANIC("No known equivalent signed integer sized for %s", type_to_string(t));
+	return nullptr;
+}
+
 gb_internal Type *base_array_type(Type *t) {
 	Type *bt = base_type(t);
 	if (is_type_array(bt)) {
@@ -1687,6 +1764,8 @@ gb_internal Type *base_array_type(Type *t) {
 		return bt->EnumeratedArray.elem;
 	} else if (is_type_simd_vector(bt)) {
 		return bt->SimdVector.elem;
+	} else if (is_type_fixed_capacity_dynamic_array(bt)) {
+		return bt->FixedCapacityDynamicArray.elem;
 	} else if (is_type_matrix(bt)) {
 		return bt->Matrix.elem;
 	}
@@ -1702,6 +1781,8 @@ gb_internal Type *base_any_array_type(Type *t) {
 		return bt->Slice.elem;
 	} else if (is_type_dynamic_array(bt)) {
 		return bt->DynamicArray.elem;
+	} else if (is_type_fixed_capacity_dynamic_array(bt)) {
+		return bt->FixedCapacityDynamicArray.elem;
 	} else if (is_type_enumerated_array(bt)) {
 		return bt->EnumeratedArray.elem;
 	} else if (is_type_simd_vector(bt)) {
@@ -2234,6 +2315,7 @@ gb_internal bool is_type_indexable(Type *t) {
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
+	case Type_FixedCapacityDynamicArray:
 	case Type_Map:
 		return true;
 	case Type_MultiPointer:
@@ -2254,6 +2336,7 @@ gb_internal bool is_type_sliceable(Type *t) {
 	case Type_Array:
 	case Type_Slice:
 	case Type_DynamicArray:
+	case Type_FixedCapacityDynamicArray:
 		return true;
 	case Type_EnumeratedArray:
 		return false;
@@ -2394,6 +2477,11 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		return is_type_polymorphic(t->SimdVector.elem, or_specialized);
 	case Type_DynamicArray:
 		return is_type_polymorphic(t->DynamicArray.elem, or_specialized);
+	case Type_FixedCapacityDynamicArray:
+		if (t->FixedCapacityDynamicArray.generic_capacity != nullptr) {
+			return true;
+		}
+		return is_type_polymorphic(t->FixedCapacityDynamicArray.elem, or_specialized);
 	case Type_Slice:
 		return is_type_polymorphic(t->Slice.elem, or_specialized);
 
@@ -2515,6 +2603,11 @@ gb_internal bool type_has_nil(Type *t) {
 	case Type_DynamicArray:
 	case Type_Map:
 		return true;
+
+	case Type_FixedCapacityDynamicArray:
+		// it's like a normal array, so no, similar to `#soa[N]T
+		return false;
+
 	case Type_Union:
 		return t->Union.kind != UnionType_no_nil;
 	case Type_Struct:
@@ -2642,6 +2735,9 @@ gb_internal bool is_type_comparable(Type *t) {
 	case Type_Matrix:
 		return is_type_comparable(t->Matrix.elem);
 
+	case Type_FixedCapacityDynamicArray:
+		return false;
+
 	case Type_BitSet:
 		return true;
 
@@ -2687,6 +2783,10 @@ gb_internal bool is_type_simple_compare(Type *t) {
 
 	case Type_EnumeratedArray:
 		return is_type_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_FixedCapacityDynamicArray:
+		return false;
+		// return is_type_simple_compare(t->FixedCapacityDynamicArray.elem);
 
 	case Type_Basic:
 		if (t->Basic.flags & BasicFlag_SimpleCompare) {
@@ -2757,6 +2857,10 @@ gb_internal bool is_type_nearly_simple_compare(Type *t) {
 
 	case Type_EnumeratedArray:
 		return is_type_nearly_simple_compare(t->EnumeratedArray.elem);
+
+	case Type_FixedCapacityDynamicArray:
+		return false;
+		// return is_type_nearly_simple_compare(t->FixedCapacityDynamicArray.elem);
 
 	case Type_Basic:
 		if (t->Basic.flags & (BasicFlag_SimpleCompare|BasicFlag_Numeric)) {
@@ -2838,6 +2942,7 @@ gb_internal bool is_type_load_safe(Type *type) {
 	case Type_DynamicArray:
 	case Type_Proc:
 	case Type_SoaPointer:
+	case Type_FixedCapacityDynamicArray:
 		return false;
 
 	case Type_Enum:
@@ -2992,10 +3097,21 @@ gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
 		return false;
 	}
 
+	// if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
+	// 	return false;
+	// }
+
 	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, true);
 }
 
+gb_internal bool are_proc_properties_identical(Type *x, Type *y) {
+	return x->Proc.calling_convention == y->Proc.calling_convention &&
+	       x->Proc.c_vararg    == y->Proc.c_vararg    &&
+	       x->Proc.variadic    == y->Proc.variadic    &&
+	       x->Proc.diverging   == y->Proc.diverging   &&
+	       x->Proc.optional_ok == y->Proc.optional_ok;
+}
 
 gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
@@ -3005,6 +3121,10 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 	if (!x | !y) {
 		return false;
 	}
+
+	// if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
+	// 	return false;
+	// }
 
 	#if 0
 	if (x->kind == Type_Named) {
@@ -3046,6 +3166,10 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_DynamicArray:
 		return are_types_identical(x->DynamicArray.elem, y->DynamicArray.elem);
+
+	case Type_FixedCapacityDynamicArray:
+		return (x->FixedCapacityDynamicArray.capacity == y->FixedCapacityDynamicArray.capacity) &&
+		       are_types_identical(x->FixedCapacityDynamicArray.elem, y->FixedCapacityDynamicArray.elem);
 
 	case Type_Slice:
 		return are_types_identical(x->Slice.elem, y->Slice.elem);
@@ -3192,11 +3316,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		break;
 
 	case Type_Proc:
-		return x->Proc.calling_convention == y->Proc.calling_convention &&
-		       x->Proc.c_vararg    == y->Proc.c_vararg    &&
-		       x->Proc.variadic    == y->Proc.variadic    &&
-		       x->Proc.diverging   == y->Proc.diverging   &&
-		       x->Proc.optional_ok == y->Proc.optional_ok &&
+		return are_proc_properties_identical(x, y) &&
 		       are_types_identical_internal(x->Proc.params, y->Proc.params, check_tuple_names) &&
 		       are_types_identical_internal(x->Proc.results, y->Proc.results, check_tuple_names);
 
@@ -3312,7 +3432,7 @@ gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
 	return false;
 }
 
-gb_internal i64 union_variant_index(Type *u, Type *v) {
+gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
 
@@ -3326,8 +3446,23 @@ gb_internal i64 union_variant_index(Type *u, Type *v) {
 			}
 		}
 	}
-	return 0;
+	GB_PANIC("unfound variant -> %s %s", type_to_string(u), type_to_string(v));
+	return -1;
 }
+
+gb_internal bool union_is_variant_of(Type *u, Type *v) {
+	u = base_type(u);
+	GB_ASSERT(u->kind == Type_Union);
+
+	for_array(i, u->Union.variants) {
+		Type *vt = u->Union.variants[i];
+		if (union_variant_index_types_equal(v, vt)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 
 gb_internal i64 union_tag_size(Type *u) {
 	u = base_type(u);
@@ -3486,9 +3621,9 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 
 
 
-gb_internal Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident=false);
+gb_internal Selection lookup_field_with_selection(Type *type_, InternedString field_name, bool is_type, Selection sel, bool allow_blank_ident=false);
 
-gb_internal Selection lookup_field(Type *type_, String field_name, bool is_type, bool allow_blank_ident=false) {
+gb_internal Selection lookup_field(Type *type_, InternedString field_name, bool is_type, bool allow_blank_ident=false) {
 	return lookup_field_with_selection(type_, field_name, is_type, empty_selection, allow_blank_ident);
 }
 
@@ -3541,13 +3676,13 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	return empty_selection;
 }
 
-gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
+gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash=0);
 gb_internal bool has_type_got_objc_class_attribute(Type *t);
 
-gb_internal Selection lookup_field_with_selection(Type *type_, String field_name, bool is_type, Selection sel, bool allow_blank_ident) {
+gb_internal Selection lookup_field_with_selection(Type *type_, InternedString field_name, bool is_type, Selection sel, bool allow_blank_ident) {
 	GB_ASSERT(type_ != nullptr);
 
-	if (!allow_blank_ident && is_blank_ident(field_name)) {
+	if (!allow_blank_ident && field_name.is_blank()) {
 		return empty_selection;
 	}
 
@@ -3569,7 +3704,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
 					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
-					if (entry.name == field_name) {
+					if (entry.interned == field_name) {
 						sel.entity = entry.entity;
 						sel.pseudo_field = true;
 						return sel;
@@ -3596,7 +3731,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			for_array(i, type->Enum.fields) {
 				Entity *f = type->Enum.fields[i];
 				GB_ASSERT(f->kind == Entity_Constant);
-				String str = f->token.string;
+				auto str = entity_interned_name(f);
 
 				if (field_name == str) {
 					sel.entity = f;
@@ -3647,7 +3782,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
 					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
-					if (entry.name == field_name) {
+					if (entry.interned == field_name) {
 						sel.entity = entry.entity;
 						sel.pseudo_field = true;
 						return sel;
@@ -3676,7 +3811,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
 				continue;
 			}
-			String str = f->token.string;
+			auto str = entity_interned_name(f);
 			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
@@ -3705,11 +3840,12 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		bool is_soa_of_array = is_soa && is_type_array(type->Struct.soa_elem);
 
 		if (is_soa_of_array) {
-			String mapped_field_name = {};
-			     if (field_name == "r") mapped_field_name = str_lit("x");
-			else if (field_name == "g") mapped_field_name = str_lit("y");
-			else if (field_name == "b") mapped_field_name = str_lit("z");
-			else if (field_name == "a") mapped_field_name = str_lit("w");
+			InternedString mapped_field_name = {};
+			String n = field_name.string();
+			     if (n == "r") mapped_field_name = string_interner_insert(str_lit("x"));
+			else if (n == "g") mapped_field_name = string_interner_insert(str_lit("y"));
+			else if (n == "b") mapped_field_name = string_interner_insert(str_lit("z"));
+			else if (n == "a") mapped_field_name = string_interner_insert(str_lit("w"));
 			return lookup_field_with_selection(type, mapped_field_name, is_type, sel, allow_blank_ident);
 		}
 	} else if (type->kind == Type_BitField) {
@@ -3718,7 +3854,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
 				continue;
 			}
-			String str = f->token.string;
+			auto str = entity_interned_name(f);
 			if (field_name == str) {
 				selection_add_index(&sel, i);  // HACK(bill): Leaky memory
 				sel.entity = f;
@@ -3736,11 +3872,12 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
 			gb_local_persist Entity *entity__any_id = alloc_entity_field(nullptr, make_token_ident(id_str), t_typeid, false, 1);
 
-			if (field_name == data_str) {
+			String n = field_name.string();
+			if (n == data_str) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__any_data;
 				return sel;
-			} else if (field_name == id_str) {
+			} else if (n == id_str) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__any_id;
 				return sel;
@@ -3758,19 +3895,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f16, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f16, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f16, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3787,19 +3926,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f32, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f32, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f32, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3816,19 +3957,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_f64, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f64, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f64, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3845,19 +3988,21 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 			gb_local_persist Entity *entity__x = alloc_entity_field(nullptr, make_token_ident(x), t_untyped_float, false, 0);
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_untyped_float, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_untyped_float, false, 2);
-			if (field_name == w) {
+
+			String n = field_name.string();
+			if (n == w) {
 				selection_add_index(&sel, 3);
 				sel.entity = entity__w;
 				return sel;
-			} else if (field_name == x) {
+			} else if (n == x) {
 				selection_add_index(&sel, 0);
 				sel.entity = entity__x;
 				return sel;
-			} else if (field_name == y) {
+			} else if (n == y) {
 				selection_add_index(&sel, 1);
 				sel.entity = entity__y;
 				return sel;
-			} else if (field_name == z) {
+			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
 				return sel;
@@ -3872,7 +4017,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		String allocator_str = str_lit("allocator");
 		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
 
-		if (field_name == allocator_str) {
+		String n = field_name.string();
+		if (n == allocator_str) {
 			selection_add_index(&sel, 3);
 			sel.entity = entity__allocator;
 			return sel;
@@ -3882,7 +4028,8 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		String allocator_str = str_lit("allocator");
 		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 2);
 
-		if (field_name == allocator_str) {
+		String n = field_name.string();
+		if (n == allocator_str) {
 			selection_add_index(&sel, 2);
 			sel.entity = entity__allocator;
 			return sel;
@@ -3890,7 +4037,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 
 
 #define _ARRAY_FIELD_CASE_IF(_length, _name) \
-	if (field_name == (_name)) { \
+	if (n == (_name)) { \
 		selection_add_index(&sel, (_length)-1); \
 		sel.entity = alloc_entity_array_elem(nullptr, make_token_ident(str_lit(_name)), elem, (_length)-1); \
 		return sel; \
@@ -3903,7 +4050,7 @@ case (_length): \
 
 
 	} else if (type->kind == Type_Array) {
-
+		String n = field_name.string();
 		Type *elem = type->Array.elem;
 
 		if (type->Array.count <= 4) {
@@ -3918,8 +4065,9 @@ case (_length): \
 			}
 		}
 	} else if (type->kind == Type_SimdVector) {
-
+		String n = field_name.string();
 		Type *elem = type->SimdVector.elem;
+
 		if (type->SimdVector.count <= 4) {
 			// HACK(bill): Memory leak
 			switch (type->SimdVector.count) {
@@ -4144,8 +4292,21 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_DynamicArray:
-		// data, count, capacity, allocator
+		// data, len, cap, allocator
 		return build_context.int_size;
+
+	case Type_FixedCapacityDynamicArray:
+		// data, len
+		{
+			Type *elem = t->FixedCapacityDynamicArray.elem;
+			bool pop = type_path_push(path, elem);
+			if (path->failure) {
+				return FAILURE_ALIGNMENT;
+			}
+			i64 align = type_align_of_internal(elem, path);
+			if (pop) type_path_pop(path);
+			return gb_max(build_context.int_size, align);
+		}
 
 	case Type_Slice:
 		return build_context.int_size;
@@ -4201,8 +4362,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.is_packed) {
 			return 1;
 		}
-
-		type_set_offsets(t);
+		// Avoid forcing offset computation here. The caller's type-path state must
+		// be able to detect recursive field cycles before any nested struct tries to
+		// re-enter this struct's offset mutex.
 
 		i64 max = 1;
 		for_array(i, t->Struct.fields) {
@@ -4417,6 +4579,31 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	case Type_DynamicArray:
 		// data + len + cap + allocator(procedure+data)
 		return 3*build_context.int_size + 2*build_context.ptr_size;
+
+	case Type_FixedCapacityDynamicArray:
+		{
+			// data + len
+			i64 capacity = t->FixedCapacityDynamicArray.capacity;
+			Type *elem = t->FixedCapacityDynamicArray.elem;
+			i64 align = type_align_of_internal(elem, path);
+			if (path->failure) {
+				return FAILURE_SIZE;
+			}
+			align = gb_max(build_context.int_size, align);
+
+			i64 size = type_size_of(elem);
+			size *= capacity;
+
+			i64 old_size = size;
+			size = align_formula(size, build_context.int_size);
+
+			i64 padding = size - old_size;
+			t->FixedCapacityDynamicArray.padding_needed = padding;
+
+			size += 1*build_context.int_size;
+			size = align_formula(size, align);
+			return size;
+		}
 
 	case Type_Map:
 		/*
@@ -4643,6 +4830,24 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 			return 3*build_context.int_size; // allocator
 		}
 		break;
+
+	case Type_FixedCapacityDynamicArray:
+		switch (index) {
+		case 0:
+			if (field_type_) *field_type_ = alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity);
+			return 0;                        // data
+
+		case 1: // len
+			if (field_type_) *field_type_ = t_int;
+			{
+				i64 elem_size = type_size_of(t->FixedCapacityDynamicArray.elem);
+				i64 offset = 0;
+				offset = elem_size * t->FixedCapacityDynamicArray.capacity;
+				offset = align_formula(offset, build_context.int_size);
+				return offset;
+			}
+		}
+		break;
 	case Type_Union:
 		if (!is_type_union_maybe_pointer(t)) {
 			/* i64 s = */ type_size_of(t);
@@ -4710,6 +4915,12 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 				case 3: t = t_allocator; break;
 				}
 				break;
+			case Type_FixedCapacityDynamicArray:
+				switch (index) {
+				case 0: t = alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity); break;
+				case 1: t = t_int; break;
+				}
+				break;
 			}
 		}
 	}
@@ -4759,6 +4970,42 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 	}
 
 	return 0;
+}
+
+gb_internal bool check_is_assignable_to_using_offset_zero_subtype(Type *src, Type *dst) {
+
+	Type *src_struct = base_type(src);
+	if (!is_type_struct(src_struct)) {
+		return false;
+	}
+
+	// We check multiple fields in case of #raw_union,
+	// but exit on the first field that is not at offset 0.
+	for_array(i, src_struct->Struct.fields) {
+		Entity *f = src_struct->Struct.fields[i];
+		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
+			continue;
+		}
+
+		Type *field_type = nullptr;
+		i64 offset = type_offset_of(src_struct, i, &field_type);
+
+		// Only allowed if the subtype field shared the same address as its container
+		if (offset != 0) {
+			return false;
+		}
+
+		if (are_types_identical(field_type, dst)) {
+			return true;
+		}
+
+		// Check parent if the field type is a struct
+		if (check_is_assignable_to_using_offset_zero_subtype(field_type, dst)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 gb_internal bool is_type_subtype_of(Type *src, Type *dst) {
@@ -4969,6 +5216,15 @@ gb_internal Type *type_internal_index(Type *t, isize index) {
 			default: GB_PANIC("invalid raw dynamic array index");
 			};
 		}
+
+	case Type_FixedCapacityDynamicArray:
+		{
+			switch (index) {
+			case 0: t = alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity); break;
+			case 1:  return t_int;
+			default: GB_PANIC("invalid raw fixed capacity dynamic array index");
+			};
+		}
 	case Type_Struct:
 		return get_struct_field_type(bt, index);
 	case Type_Union:
@@ -5065,6 +5321,13 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 	case Type_DynamicArray:
 		str = gb_string_appendc(str, "[dynamic]");
 		str = write_type_to_string(str, type->DynamicArray.elem, shorthand, allow_polymorphic);
+		break;
+
+	case Type_FixedCapacityDynamicArray:
+		str = gb_string_appendc(str, "[dynamic; ");
+		str = gb_string_appendc(str, gb_bprintf("%lld", cast(long long)type->FixedCapacityDynamicArray.capacity));
+		str = gb_string_appendc(str, "]");
+		str = write_type_to_string(str, type->FixedCapacityDynamicArray.elem, shorthand, allow_polymorphic);
 		break;
 
 	case Type_Enum:
