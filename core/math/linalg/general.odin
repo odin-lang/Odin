@@ -45,12 +45,24 @@ scalar_dot :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T)
 }
 
 @(require_results)
-vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
-	for i in 0..<N {
-		c += a[i] * b[i]
+vector_dot :: #force_inline proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
+	ab := a * b
+	when N == 1 {
+		return ab.x
+	} else when N == 2 {
+		return ab.x + ab.y
+	} else when N == 3 {
+		return ab.x + ab.y + ab.z
+	} else when N == 4 {
+		return ab.x + ab.y + ab.z + ab.w
+	} else {
+		for elem in ab {
+			c += elem
+		}
+		return c
 	}
-	return
 }
+
 @(require_results)
 quaternion64_dot :: proc "contextless" (a, b: $T/quaternion64) -> (c: f16) {
 	return a.w*b.w + a.x*b.x + a.y*b.y + a.z*b.z
@@ -86,11 +98,8 @@ vector_cross2 :: proc "contextless" (a, b: $T/[2]$E) -> E where IS_NUMERIC(E) {
 }
 
 @(require_results)
-vector_cross3 :: proc "contextless" (a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
-	c[0] = a[1]*b[2] - b[1]*a[2]
-	c[1] = a[2]*b[0] - b[2]*a[0]
-	c[2] = a[0]*b[1] - b[0]*a[1]
-	return
+vector_cross3 :: proc "contextless" (a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) #no_bounds_check {
+	return a.yzx*b.zxy - b.yzx*a.zxy
 }
 
 @(require_results)
@@ -130,12 +139,12 @@ normalize0 :: proc{vector_normalize0, quaternion_normalize0}
 
 @(require_results)
 vector_length :: proc "contextless" (v: $T/[$N]$E) -> E where IS_FLOAT(E) {
-	return math.sqrt(dot(v, v))
+	return #force_inline math.sqrt(#force_inline dot(v, v))
 }
 
 @(require_results)
 vector_length2 :: proc "contextless" (v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
-	return dot(v, v)
+	return #force_inline dot(v, v)
 }
 
 @(require_results)
