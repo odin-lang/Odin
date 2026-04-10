@@ -2,8 +2,8 @@ package wgpu
 
 import "base:runtime"
 
-BINDINGS_VERSION        :: [4]u8{27, 0, 2, 0}
-BINDINGS_VERSION_STRING :: "27.0.2.0"
+BINDINGS_VERSION        :: [4]u8{29, 0, 0, 0}
+BINDINGS_VERSION_STRING :: "29.0.0.0"
 
 LogLevel :: enum i32 {
 	Off,
@@ -19,21 +19,29 @@ InstanceBackend :: enum i32 {
 	GL,
 	Metal,
 	DX12,
-	DX11,
-	BrowserWebGPU,
+	// DX11,
+	BrowserWebGPU = 5,
 }
 InstanceBackendFlags :: bit_set[InstanceBackend; Flags]
 InstanceBackendFlags_All :: InstanceBackendFlags{}
 InstanceBackendFlags_Primary :: InstanceBackendFlags{ .Vulkan, .Metal, .DX12, .BrowserWebGPU }
-InstanceBackendFlags_Secondary :: InstanceBackendFlags{ .GL, .DX11 }
+InstanceBackendFlags_Secondary :: InstanceBackendFlags{ .GL }
 
 InstanceFlag :: enum i32 {
 	Debug,
 	Validation,
 	DiscardHalLabels,
+	AllowUnderlyingNoncompliantAdapter,
+	GPUBasedValidation,
+	ValidationIndirectCall,
+	AutomaticTimestampNormalization,
+	Default = 24,
+	Debugging,
+	AdvancedDebugging,
+	WithEnv,
 }
 InstanceFlags :: bit_set[InstanceFlag; Flags]
-InstanceFlags_Default :: InstanceFlags{}
+InstanceFlags_Empty :: InstanceFlags{}
 
 Dx12Compiler :: enum i32 {
 	Undefined,
@@ -72,6 +80,42 @@ GLFenceBehaviour :: enum i32 {
 	AutoFinish,
 }
 
+Dx12SwapchainKind :: enum i32 {
+	Undefined,
+	DxgiFromHwnd,
+	DxgiFromVisual,
+}
+
+NativeDisplayHandleType :: enum i32 {
+	None,
+	Xlib,
+	Xcb,
+	Wayland,
+}
+
+XlibDisplayHandle :: struct {
+	display: rawptr,
+	screen: i32,
+}
+
+XcbDisplayHandle :: struct {
+	connection: rawptr,
+	screen: i32,
+}
+
+WaylandDisplayHandle :: struct {
+	display: rawptr,
+}
+
+NativeDisplayHandle :: struct {
+	type: NativeDisplayHandleType,
+	using data: struct #raw_union {
+		xlib: XlibDisplayHandle,
+		xcb: XcbDisplayHandle,
+		wayland: WaylandDisplayHandle,
+	},
+}
+
 InstanceExtras :: struct {
 	using chain: ChainedStruct,
 	backends: InstanceBackendFlags,
@@ -81,8 +125,10 @@ InstanceExtras :: struct {
 	glFenceBehaviour: GLFenceBehaviour,
 	dxcPath: StringView,
 	dcxMaxShaderModel: DxcMaxShaderModel,
+	dx12PresentationSystem: Dx12SwapchainKind,
 	budgetForDeviceCreation: ^u8,
 	budgetForDeviceLoss: ^u8,
+	displayHandle: NativeDisplayHandle,
 }
 
 DeviceExtras :: struct {
@@ -91,21 +137,15 @@ DeviceExtras :: struct {
 }
 
 NativeLimits :: struct {
-	using chain: ChainedStructOut,
-	maxPushConstantSize: u32,
+	using chain: ChainedStruct,
+	maxImmediateSize: u32,
 	maxNonSamplerBindings: u32,
-}
-
-PushConstantRange :: struct {
-	stages: ShaderStageFlags,
-	start: u32,
-	end: u32,
+	maxBindingArrayElementsPerShaderStage: u32,
 }
 
 PipelineLayoutExtras :: struct {
 	using chain: ChainedStruct,
-	pushConstantRangeCount: uint,
-	pushConstantRanges: [^]PushConstantRange `fmt:"v,pushConstantRangeCount"`,
+	immediateDataSize: u32,
 }
 
 SubmissionIndex :: distinct u64

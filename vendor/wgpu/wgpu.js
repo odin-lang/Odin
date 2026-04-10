@@ -4,7 +4,7 @@ const STATUS_SUCCESS = 1;
 const STATUS_ERROR   = 2;
 
 const ENUMS = {
-	FeatureName: [undefined, "depth-clip-control", "depth32float-stencil8", "timestamp-query", "texture-compression-bc", "texture-compression-bc-sliced-3d", "texture-compression-etc2", "texture-compression-astc", "texture-compression-astc-sliced-3d", "indirect-first-instance", "shader-f16", "rg11b10ufloat-renderable", "bgra8unorm-storage", "float32-filterable", "float32-blendable", "clip-distances", "dual-source-blending" ],
+	FeatureName: [undefined, "core-features-and-limits", "depth-clip-control", "depth32float-stencil8", "texture-compression-bc", "texture-compression-bc-sliced-3d", "texture-compression-etc2", "texture-compression-astc", "texture-compression-astc-sliced-3d", "timestamp-query", "indirect-first-instance", "shader-f16", "rg11b10ufloat-renderable", "bgra8unorm-storage", "float32-filterable", "float32-blendable", "clip-distances", "dual-source-blending", "subgroups", "texture-formats-tier1", "texture-formats-tier2", "primitive-index", "texture-component-swizzle" ],
 	StoreOp: [undefined, "store", "discard", ],
 	LoadOp: [undefined, "load", "clear", ],
 	BufferBindingType: [null, undefined, "uniform", "storage", "read-only-storage", ],
@@ -12,9 +12,9 @@ const ENUMS = {
 	TextureSampleType: [null, undefined, "float", "unfilterable-float", "depth", "sint", "uint", ],
 	TextureViewDimension: [undefined, "1d", "2d", "2d-array", "cube", "cube-array", "3d", ],
 	StorageTextureAccess: [null, undefined, "write-only", "read-only", "read-write", ],
-	TextureFormat: [undefined, "r8unorm", "r8snorm", "r8uint", "r8sint", "r16uint", "r16sint", "r16float", "rg8unorm", "rg8snorm", "rg8uint", "rg8sint", "r32float", "r32uint", "r32sint", "rg16uint", "rg16sint", "rg16float", "rgba8unorm", "rgba8unorm-srgb", "rgba8snorm", "rgba8uint", "rgba8sint", "bgra8unorm", "bgra8unorm-srgb", "rgb10a2uint", "rgb10a2unorm", "rg11b10ufloat", "rgb9e5ufloat", "rg32float", "rg32uint", "rg32sint", "rgba16uint", "rgba16sint", "rgba16float", "rgba32float", "rgba32uint", "rgba32sint", "stencil8", "depth16unorm", "depth24plus", "depth24plus-stencil8", "depth32float", "depth32float-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-float", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb", "etc2-rgb8unorm", "etc2-rgb8unorm-srgb", "etc2-rgb8a1unorm", "etc2-rgb8a1unorm-srgb", "etc2-rgba8unorm", "etc2-rgba8unorm-srgb", "eac-r11unorm", "eac-r11snorm", "eac-rg11unorm", "eac-rg11snorm", "astc-4x4-unorm", "astc-4x4-unorm-srgb", "astc-5x4-unorm", "astc-5x4-unorm-srgb", "astc-5x5-unorm", "astc-5x5-unorm-srgb", "astc-6x5-unorm", "astc-6x5-unorm-srgb", "astc-6x6-unorm", "astc-6x6-unorm-srgb", "astc-8x5-unorm", "astc-8x5-unorm-srgb", "astc-8x6-unorm", "astc-8x6-unorm-srgb", "astc-8x8-unorm", "astc-8x8-unorm-srgb", "astc-10x5-unorm", "astc-10x5-unorm-srgb", "astc-10x6-unorm", "astc-10x6-unorm-srgb", "astc-10x8-unorm", "astc-10x8-unorm-srgb", "astc-10x10-unorm", "astc-10x10-unorm-srgb", "astc-12x10-unorm", "astc-12x10-unorm-srgb", "astc-12x12-unorm", "astc-12x12-unorm-srgb", ],
+	TextureFormat: [undefined, "r8unorm", "r8snorm", "r8uint", "r8sint", "r16unorm", "r16snorm", "r16uint", "r16sint", "r16float", "rg8unorm", "rg8snorm", "rg8uint", "rg8sint", "r32float", "r32uint", "r32sint", "rg16unorm", "rg16snorm", "rg16uint", "rg16sint", "rg16float", "rgba8unorm", "rgba8unorm-srgb", "rgba8snorm", "rgba8uint", "rgba8sint", "bgra8unorm", "bgra8unorm-srgb", "rgb10a2uint", "rgb10a2unorm", "rg11b10ufloat", "rgb9e5ufloat", "rg32float", "rg32uint", "rg32sint", "rgba16unorm", "rgba16snorm", "rgba16uint", "rgba16sint", "rgba16float", "rgba32float", "rgba32uint", "rgba32sint", "stencil8", "depth16unorm", "depth24plus", "depth24plus-stencil8", "depth32float", "depth32float-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-float", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb", "etc2-rgb8unorm", "etc2-rgb8unorm-srgb", "etc2-rgb8a1unorm", "etc2-rgb8a1unorm-srgb", "etc2-rgba8unorm", "etc2-rgba8unorm-srgb", "eac-r11unorm", "eac-r11snorm", "eac-rg11unorm", "eac-rg11snorm", "astc-4x4-unorm", "astc-4x4-unorm-srgb", "astc-5x4-unorm", "astc-5x4-unorm-srgb", "astc-5x5-unorm", "astc-5x5-unorm-srgb", "astc-6x5-unorm", "astc-6x5-unorm-srgb", "astc-6x6-unorm", "astc-6x6-unorm-srgb", "astc-8x5-unorm", "astc-8x5-unorm-srgb", "astc-8x6-unorm", "astc-8x6-unorm-srgb", "astc-8x8-unorm", "astc-8x8-unorm-srgb", "astc-10x5-unorm", "astc-10x5-unorm-srgb", "astc-10x6-unorm", "astc-10x6-unorm-srgb", "astc-10x8-unorm", "astc-10x8-unorm-srgb", "astc-10x10-unorm", "astc-10x10-unorm-srgb", "astc-12x10-unorm", "astc-12x10-unorm-srgb", "astc-12x12-unorm", "astc-12x12-unorm-srgb", ],
 	QueryType: [undefined, "occlusion", "timestamp", ],
-	VertexStepMode: [null, undefined, "vertex", "instance", ],
+	VertexStepMode: [undefined, "vertex", "instance", ],
 	VertexFormat: [undefined, "uint8", "uint8x2", "uint8x4", "sint8", "sint8x2", "sint8x4", "unorm8", "unorm8x2", "unorm8x4", "snorm8", "snorm8x2", "snorm8x4", "uint16", "uint16x2", "uint16x4", "sint16", "sint16x2", "sint16x4", "unorm16", "unorm16x2", "unorm16x4", "snorm16", "snorm16x2", "snorm16x4", "float16", "float16x2", "float16x4", "float32", "float32x2", "float32x3", "float32x4", "uint32", "uint32x2", "uint32x3", "uint32x4", "sint32", "sint32x2", "sint32x3", "sint32x4", "unorm10-10-2", "unorm8x4-bgra" ],
 	PrimitiveTopology: [undefined, "point-list", "line-list", "line-strip", "triangle-list", "triangle-strip", ],
 	IndexFormat: [undefined, "uint16", "uint32", ],
@@ -26,7 +26,7 @@ const ENUMS = {
 	CompareFunction: [undefined, "never", "less", "equal", "less-equal", "greater", "not-equal", "greater-equal", "always", ],
 	TextureDimension: [undefined, "1d", "2d", "3d", ],
 	ErrorType: [undefined, "no-error", "validation", "out-of-memory", "internal", "unknown", ],
-	WGSLLanguageFeatureName: [undefined, "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", ],
+	WGSLLanguageFeatureName: [undefined, "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", "uniform_buffer_standard_layout", "subgroup_id", "texture_and_sampler_let", "subgroup_uniformity", "texture_formats_tier1" ],
 	PowerPreference: [undefined, "low-power", "high-performance", ],
 	CompositeAlphaMode: ["auto", "opaque", "premultiplied", "unpremultiplied", "inherit", ],
 	StencilOperation: [undefined, "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap", ],
@@ -34,20 +34,25 @@ const ENUMS = {
 	BlendFactor: [undefined, "zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", "src1", "one-minus-src1", "src1-alpha", "one-minus-src1-alpha" ],
 	PresentMode: [undefined, "fifo", "fifo-relaxed", "immediate", "mailbox", ],
 	TextureAspect: [undefined, "all", "stencil-only", "depth-only"],
-	DeviceLostReason: [undefined, "unknown", "destroyed", "instance-dropped", "failed-creation"],
+	DeviceLostReason: [undefined, "unknown", "destroyed", "callback-cancelled", "failed-creation"],
 	BufferMapState: [undefined, "unmapped", "pending", "mapped"],
 	OptionalBool: [false, true, undefined],
+	ComponentSwizzle: [undefined, "0", "1", "r", "g", "b", "a"],
+	PredefinedColorSpace: [undefined, "srgb", "display-p3"],
+	ToneMappingMode: [undefined, "standard", "extended"],
+	FeatureLevel: [undefined, "compatibility", "core"],
+	TextureViewDimensions: [undefined, "1d", "2d", "2d-array", "cube", "cube-array", "3d"],
 
 	// WARN: used with indexOf to pass to WASM, if we would pass to JS, this needs to use official naming convention (not like Odin enums) like the ones above.
 	BackendType: [undefined, null, "WebGPU", "D3D11", "D3D12", "Metal", "Vulkan", "OpenGL", "OpenGLES"],
 	AdapterType: [undefined, "DiscreteGPU", "IntegratedGPU", "CPU", "Unknown"],
-	RequestDeviceStatus: [undefined, "Success", "InstanceDropped", "Error", "Unknown"],
-	MapAsyncStatus: [undefined, "Success", "InstanceDropped", "Error", "Aborted", "Unknown"],
-	CreatePipelineAsyncStatus: [undefined, "Success", "InstanceDropped", "ValidationError", "InternalError", "Unknown"],
-	PopErrorScopeStatus: [undefined, "Success", "InstanceDropped", "EmptyStack"],
-	RequestAdapterStatus: [undefined, "Success", "InstanceDropped", "Unavailable", "Error", "Unknown"],
-	QueueWorkDoneStatus: [undefined, "Success", "InstanceDropped", "Error", "Unknown"],
-	CompilationInfoRequestStatus: [undefined, "Success", "InstanceDropped", "Error", "Unknown"],
+	RequestDeviceStatus: [undefined, "Success", "CallbackCancelled", "Error"],
+	MapAsyncStatus: [undefined, "Success", "CallbackCancelled", "Error", "Aborted"],
+	CreatePipelineAsyncStatus: [undefined, "Success", "CallbackCancelled", "ValidationError", "InternalError"],
+	PopErrorScopeStatus: [undefined, "Success", "CallbackCancelled", "Error"],
+	RequestAdapterStatus: [undefined, "Success", "CallbackCancelled", "Unavailable", "Error"],
+	QueueWorkDoneStatus: [undefined, "Success", "CallbackCancelled", "Error"],
+	CompilationInfoRequestStatus: [undefined, "Success", "CallbackCancelled"],
 };
 
 /**
@@ -71,7 +76,7 @@ class WebGPUInterface {
 			StorageTextureBindingLayout: [16, 4],
 			StringView: [2*this.mem.intSize, this.mem.intSize],
 			ConstantEntry: [this.mem.intSize === 8 ? 32 : 24, 8],
-			ProgrammableStageDescriptor: [8 + this.mem.intSize*4, this.mem.intSize],
+			ComputeState: [8 + this.mem.intSize*4, this.mem.intSize],
 			VertexBufferLayout: [16 + this.mem.intSize*2, 8],
 			VertexAttribute: [24, 8],
 			VertexState: [8 + this.mem.intSize*6, this.mem.intSize],
@@ -87,7 +92,7 @@ class WebGPUInterface {
 			UncapturedErrorCallbackInfo: [16, 4],
 			RenderPassColorAttachment: [56, 8],
 			BindGroupEntry: [40, 8],
-			BindGroupLayoutEntry: [80, 8],
+			BindGroupLayoutEntry: [88, 8],
 			Extent3D: [12, 4],
 			CompilationMessage: [this.mem.intSize == 8 ? 64 : 48, 8],
 		};
@@ -157,6 +162,9 @@ class WebGPUInterface {
 
 		/** @type {WebGPUObjectManager<GPUTextureView>} */
 		this.textureViews = new WebGPUObjectManager("TextureView", this.mem);
+
+		/** @type {WebGPUObjectManager<GPUExternalTexture>} */
+		this.externalTextures = new WebGPUObjectManager("ExternalTexture", this.mem);
 
 		this.zeroMessageAddr = 0;
 	}
@@ -341,21 +349,38 @@ class WebGPUInterface {
 		return STATUS_SUCCESS;
 	}
 
-	genericGetAdapterInfo(infoPtr) {
+	/**
+	 * @param {number} infoPtr
+	 * @param {GPUAdapterInfo} info
+	 */
+	genericGetAdapterInfo(infoPtr, info) {
 		this.assert(infoPtr != 0);
 
 		const off = this.struct(infoPtr);
 		off(4); // nextInChain
-		off(this.sizes.StringView); // vendor
-		off(this.sizes.StringView); // architecture
-		off(this.sizes.StringView); // device
-		off(this.sizes.StringView); // description
+
+		const storeString = (start, str) => {
+			const len = new TextEncoder().encode(str).length;
+			const strAddr = this.mem.exports.wgpu_alloc(len);
+			this.mem.storeString(strAddr, str);
+
+			this.mem.storeI32(start, strAddr);
+			this.mem.storeUint(start + this.mem.intSize, len);
+		};
+
+		storeString(off(this.sizes.StringView), info.vendor);
+		storeString(off(this.sizes.StringView), info.architecture);
+		storeString(off(this.sizes.StringView), info.device);
+		storeString(off(this.sizes.StringView), info.description);
 
 		this.mem.storeI32(off(4), ENUMS.BackendType.indexOf("WebGPU"));
 		this.mem.storeI32(off(4), ENUMS.AdapterType.indexOf("Unknown"));
 
-		// NOTE: I don't think getting the other fields in this struct is possible.
-		// `adapter.requestAdapterInfo` is deprecated.
+		off(4); // vendorID
+		off(4); // deviceID
+
+		this.mem.storeI32(off(4), info.subGroupMinSize);
+		this.mem.storeI32(off(4), info.subGroupMaxSize);
 
 		return STATUS_SUCCESS;
 	}
@@ -461,15 +486,15 @@ class WebGPUInterface {
 
 	/**
 	 * @param {number} ptr
-	 * @returns {GPUComputePassTimestampWrites}
 	 */
-	ComputePassTimestampWritesPtr(ptr) {
+	PassTimestampWritesPtr(ptr) {
 		const start = this.mem.loadPtr(ptr);
 		if (start == 0) {
 			return undefined;
 		}
 
 		const off = this.struct(start);
+		off(4); // nextInChain
 		return {
 			querySet:                  this.querySets.get(this.mem.loadPtr(off(4))),
 			beginningOfPassWriteIndex: this.mem.loadU32(off(4)),
@@ -529,7 +554,7 @@ class WebGPUInterface {
 		}
 
 		const off = this.struct(start);
-
+		off(4); // nextInChain
 		return {
 			view:              this.textureViews.get(this.mem.loadPtr(off(4))),
 			depthLoadOp:       this.enumeration("LoadOp", off(4)),
@@ -556,14 +581,6 @@ class WebGPUInterface {
 		return this.querySets.get(ptr);
 	}
 
-	/**
-	 * @param {number} ptr
-	 * @returns {GPURenderPassTimestampWrites}
-	 */
-	RenderPassTimestampWritesPtr(ptr) {
-		return this.ComputePassTimestampWritesPtr(ptr);
-	}
-	
 	/**
 	 * @param {number} start
 	 * @returns {GPUOrigin3D}
@@ -626,12 +643,13 @@ class WebGPUInterface {
 		off(4);
 
 		const entry = {
-			binding:        this.mem.loadU32(off(4)),
-			visibility:     this.mem.loadU64(off(8)),
-			buffer:         this.BufferBindingLayout(off(this.sizes.BufferBindingLayout)),
-			sampler:        this.SamplerBindingLayout(off(this.sizes.SamplerBindingLayout)),
-			texture:        this.TextureBindingLayout(off(this.sizes.TextureBindingLayout)),
-			storageTexture: this.StorageTextureBindingLayout(off(this.sizes.StorageTextureBindingLayout)),
+			binding:          this.mem.loadU32(off(4)),
+			visibility:       this.mem.loadU64(off(8)),
+			bindingArraySize: this.mem.loadU32(off(4)),
+			buffer:           this.BufferBindingLayout(off(this.sizes.BufferBindingLayout)),
+			sampler:          this.SamplerBindingLayout(off(this.sizes.SamplerBindingLayout)),
+			texture:          this.TextureBindingLayout(off(this.sizes.TextureBindingLayout)),
+			storageTexture:   this.StorageTextureBindingLayout(off(this.sizes.StorageTextureBindingLayout)),
 		};
 		if (!entry.buffer.type) {
 			entry.buffer = undefined;
@@ -696,9 +714,9 @@ class WebGPUInterface {
 
 	/**
 	 * @param {number} start
-	 * @returns {GPUProgrammableStage}
+	 * @returns {GPUComputeState}
 	 */
-	ProgrammableStageDescriptor(start) {
+	ComputeState(start) {
 		const off = this.struct(start);
 		off(4);
 
@@ -749,7 +767,7 @@ class WebGPUInterface {
 		return {
 			label: label,
 			layout: layoutIdx > 0 ? this.pipelineLayouts.get(layoutIdx) : "auto",
-			compute: this.ProgrammableStageDescriptor(off(this.sizes.ProgrammableStageDescriptor)),
+			compute: this.ComputeState(off(this.sizes.ComputeState)),
 		};
 	}
 
@@ -793,11 +811,9 @@ class WebGPUInterface {
 	 */
 	VertexBufferLayout(start) {
 		const off = this.struct(start);
+		off(4); // nextInChain
 
 		const stepMode = this.enumeration("VertexStepMode", off(4));
-		if (stepMode == null) {
-			return null;
-		}
 
 		return {
 			arrayStride: this.mem.loadU64(off(8)),
@@ -817,6 +833,7 @@ class WebGPUInterface {
 	 */
 	VertexAttribute(start) {
 		const off = this.struct(start);
+		off(4); // nextInChain
 		return {
 			format:         this.enumeration("VertexFormat", off(4)),
 			offset:         this.mem.loadU64(off(8)),
@@ -1117,12 +1134,26 @@ class WebGPUInterface {
 			},
 
 			/**
-			 * @param {number} capabilitiesPtr
-			 * @returns {number}
+			 * @param {number} featuresPtr
 			 */
-			wgpuGetInstanceCapabilities: (capabilitiesPtr) => {
+			wgpuGetInstanceFeatures: (featuresPtr) => {
 				// TODO: implement (futures).
-				return STATUS_ERROR;
+			},
+
+			/**
+			 * @param {number} limitsPtr
+			 */
+			wgpuGetInstanceLimits: (limitsPtr) => {
+				// TODO: implement (futures).
+			},
+
+			/**
+			 * @param {number} feature
+			 * @returns {boolean}
+			 */
+			wgpuHasInstanceFeature: (feature) => {
+				// TODO: implement (futures).
+				return false;
 			},
 
 			/**
@@ -1391,6 +1422,30 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} bufferIdx
+			 * @param {number|BigInt} offset
+			 * @param {number} ptr
+			 * @param {number|BigInt} size
+			 * @return {number}
+			 */
+			wgpuBufferReadMappedRange: (bufferIdx, offset, ptr, size) => {
+				const buffer = this.buffers.get(bufferIdx);
+				offset = this.unwrapBigInt(offset);
+				size   = this.unwrapBigInt(size);
+
+				this.assert(!buffer.mapping, "buffer already mapped");
+
+				const range = buffer.buffer.getMappedRange(offset, size);
+
+				const mapping = new Uint8Array(this.mem.memory.buffer, ptr, size);
+				mapping.set(new Uint8Array(range));
+
+				buffer.mapping = { range: range, ptr: ptr, size: range.byteLength };
+
+				return STATUS_SUCCESS;
+			},
+
+			/**
+			 * @param {number} bufferIdx
 			 * @param {number} labelPtr
 			 * @param {number} labelLen
 			 */
@@ -1413,6 +1468,30 @@ class WebGPUInterface {
 
 				this.mem.exports.wgpu_free(buffer.mapping.ptr);
 				buffer.mapping = null;
+			},
+
+			/**
+			 * @param {number} bufferIdx
+			 * @param {number|BigInt} offset
+			 * @param {number} ptr
+			 * @param {number|BigInt} size
+			 * @return {number}
+			 */
+			wgpuBufferWriteMappedRange: (bufferIdx, offset, ptr, size) => {
+				const buffer = this.buffers.get(bufferIdx);
+				offset = this.unwrapBigInt(offset);
+				size   = this.unwrapBigInt(size);
+
+				this.assert(!buffer.mapping, "buffer already mapped");
+
+				const range = buffer.buffer.getMappedRange(offset, size);
+
+				const mapping = new Uint8Array(this.mem.memory.buffer, ptr, size);
+				(new Uint8Array(range)).set(mapping);
+
+				buffer.mapping = { range: range, ptr: ptr, size: range.byteLength };
+
+				return STATUS_SUCCESS;
 			},
 
 			...this.buffers.interface(),
@@ -1438,7 +1517,7 @@ class WebGPUInterface {
 					off(4);
 					descriptor = {
 						label:           this.StringView(off(this.sizes.StringView)),
-						timestampWrites: this.ComputePassTimestampWritesPtr(off(4)),
+						timestampWrites: this.PassTimestampWritesPtr(off(4)),
 					};
 				}
 
@@ -1478,7 +1557,7 @@ class WebGPUInterface {
 					),
 					depthStencilAttachment: this.RenderPassDepthStencilAttachmentPtr(off(4)),
 					occlusionQuerySet: this.QuerySet(off(4)),
-					timestampWrites: this.RenderPassTimestampWritesPtr(off(4)),
+					timestampWrites: this.PassTimestampWritesPtr(off(4)),
 					maxDrawCount: maxDrawCount,
 				};
 
@@ -1881,7 +1960,7 @@ class WebGPUInterface {
 				device.createComputePipelineAsync(this.ComputePipelineDescriptor(descriptorPtr))
 					.catch((e) => {
 						const messageAddr = this.makeMessageArg(e.message);
-						this.callCallback(callbackInfo, [ENUMS.CreatePipelineAsyncStatus.indexOf("Unknown"), 0, messageAddr]);
+						this.callCallback(callbackInfo, [ENUMS.CreatePipelineAsyncStatus.indexOf("ValidationError"), 0, messageAddr]);
 						this.mem.exports.wgpu_free(messageAddr);
 					})
 					.then((computePipeline) => {
@@ -2185,6 +2264,11 @@ class WebGPUInterface {
 
 				const callbackInfo = this.CallbackInfo(callbackInfoPtr);
 				device.popErrorScope()
+					.catch((e) => {
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.PopErrorScopeStatus.indexOf("Error"), ENUMS.ErrorType.indexOf("unknown"), messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
+					})
 					.then((error) => {
 						if (!error) {
 							this.callCallback(callbackInfo, [ENUMS.PopErrorScopeStatus.indexOf("Success"), ENUMS.ErrorType.indexOf("no-error"), this.zeroMessageArg()]);
@@ -2221,6 +2305,10 @@ class WebGPUInterface {
 			},
 
 			...this.devices.interface(true),
+
+			/* ---------------------- ExternalTexture ---------------------- */
+
+			...this.externalTextures.interface(true),
 
 			/* ---------------------- Instance ---------------------- */
 
@@ -2261,7 +2349,6 @@ class WebGPUInterface {
 			/**
 			 * @param {number} instanceIdx
 			 * @param {number} featurePtr
-			 * @returns {number}
 			 */
 			wgpuInstanceGetWGSLLanguageFeatures: (instanceIdx, featuresPtr) => {
 				this.assert(featuresPtr != 0);
@@ -2292,8 +2379,6 @@ class WebGPUInterface {
 				for (let i = 0; i < availableFeatures.length; i += 1) {
 					this.mem.storeI32(off(4), availableFeatures[i]);
 				}
-
-				return STATUS_SUCCESS;
 			},
 
 			/**
@@ -2325,11 +2410,22 @@ class WebGPUInterface {
 				let options;
 				if (optionsPtr != 0) {
 					const off = this.struct(optionsPtr);
-					off(4); // nextInChain
-					off(4); // featureLevel
+
+					let xrCompatible = undefined;
+					const nextInChain = this.mem.loadPtr(off(4));
+					if (nextInChain != 0) {
+						const nextInChainType = this.mem.loadI32(nextInChain + 4);
+						// RequestAdapterWebXROptions = 0x0000000B,
+						if (nextInChainType == 0x0000000B) {
+							xrCompatible = this.mem.loadB32(nextInChain + 8);
+						}
+					}
+
 					options = {
+						featureLevel: this.enumeration("FeatureLevel", off(4)),
 						powerPreference: this.enumeration("PowerPreference", off(4)),
 						forceFallbackAdapter: this.mem.loadB32(off(4)),
+						xrCompatible: xrCompatible,
 					};
 				}
 
@@ -2405,10 +2501,12 @@ class WebGPUInterface {
 				queue.onSubmittedWorkDone()
 					.catch((e) => {
 						console.warn(e);
-						this.callCallback(callbackInfo, [ENUMS.QueueWorkDoneStatus.indexOf("Error")]);
+						const messageAddr = this.makeMessageArg(e.message);
+						this.callCallback(callbackInfo, [ENUMS.QueueWorkDoneStatus.indexOf("Error"), messageAddr]);
+						this.mem.exports.wgpu_free(messageAddr);
 					})
 					.then(() => {
-						this.callCallback(callbackInfo, [ENUMS.QueueWorkDoneStatus.indexOf("Success")]);
+						this.callCallback(callbackInfo, [ENUMS.QueueWorkDoneStatus.indexOf("Success"), this.zeroMessageArg()]);
 					});
 
 				// TODO: futures?
@@ -2920,7 +3018,7 @@ class WebGPUInterface {
 				shaderModule.getCompilationInfo()
 					.catch((e) => {
 						console.warn(e);
-						this.callCallback(callbackInfo, [ENUMS.CompilationInfoRequestStatus.indexOf("Error"), null]);
+						this.callCallback(callbackInfo, [ENUMS.CompilationInfoRequestStatus.indexOf("CallbackCancelled"), null]);
 					})
 					.then((compilationInfo) => {
 						const ptrsToFree = [];
@@ -2975,6 +3073,11 @@ class WebGPUInterface {
 				this.mem.exports.wgpu_free(supportedFeaturesPtr);
 			},
 
+			/* ---------------------- SupportedInstanceFeatures ---------------------- */
+
+			wgpuSupportedInstanceFeaturesFreeMembers: (supportedFeaturesCount, supportedFeaturesPtr) => {
+			},
+
 			/* ---------------------- SupportedWGSLLanguageFeatures ---------------------- */
 
 			wgpuSupportedWGSLLanguageFeaturesFreeMembers: (supportedFeaturesCount, supportedFeaturesPtr) => {
@@ -2992,7 +3095,23 @@ class WebGPUInterface {
 				const context = surface.getContext("webgpu");
 
 				const off = this.struct(configPtr);
-				off(4);
+
+				let colorSpace = undefined;
+				let toneMapping = undefined;
+				const nextInChain = this.mem.loadPtr(off(4));
+				if (nextInChain != 0) {
+					const colorManagementOff = this.struct(nextInChain);
+					colorManagementOff(4); // next
+					const nextInChainType = this.mem.loadI32(colorManagementOff(4));
+					// SurfaceColorManagement = 0x0000000A,
+					if (nextInChainType == 0x0000000A) {
+						colorSpace = this.enumeration("PredefinedColorSpace", colorManagementOff(4)) ?? "srgb";
+						toneMapping = {
+							mode: this.enumeration("ToneMappingMode", colorManagementOff(4)) ?? "standard",
+						};
+					}
+				}
+
 				const device = this.devices.get(this.mem.loadPtr(off(4)));
 				const format = this.enumeration("TextureFormat", off(4));
 				const usage = this.mem.loadU64(off(8));
@@ -3019,6 +3138,8 @@ class WebGPUInterface {
 					viewFormats: viewFormats,
 					alphaMode: alphaMode,
 					presentMode: presentMode,
+					colorSpace: colorSpace,
+					toneMapping: toneMapping,
 				};
 
 				context.configure(config);
@@ -3071,7 +3192,7 @@ class WebGPUInterface {
 				const textureIdx = this.textures.create(texture);
 				this.mem.storeI32(texturePtr + 4, textureIdx);
 
-				// TODO: determine suboptimal and/or status.
+				// TODO: determine status somehow?
 			},
 
 			/**
@@ -3130,7 +3251,27 @@ class WebGPUInterface {
 				let descriptor;
 				if (descriptorPtr != 0) {
 					const off = this.struct(descriptorPtr);
-					off(4);
+
+					let swizzle = undefined;
+					const nextInChain = this.mem.loadPtr(off(4));
+					if (nextInChain != 0) {
+						const swizzleOff = this.struct(nextInChain);
+						swizzleOff(4); // next
+						const nextInChainType = this.mem.loadI32(swizzleOff(4));
+						// TextureComponentSwizzle = 0x00000016,
+						if (nextInChainType == 0x00000016) {
+							const r = this.enumeration("ComponentSwizzle", swizzleOff(4));
+							this.assert(r !== undefined);
+							const g = this.enumeration("ComponentSwizzle", swizzleOff(4));
+							this.assert(g !== undefined);
+							const b = this.enumeration("ComponentSwizzle", swizzleOff(4));
+							this.assert(b !== undefined);
+							const a = this.enumeration("ComponentSwizzle", swizzleOff(4));
+							this.assert(a !== undefined);
+							swizzle = r + g + b + a;
+						}
+					}
+
 					descriptor = {
 						label:           this.StringView(off(this.sizes.StringView)),
 						format:          this.enumeration("TextureFormat", off(4)),
@@ -3141,6 +3282,7 @@ class WebGPUInterface {
 						arrayLayerCount: this.mem.loadU32(off(4)),
 						aspect:          this.enumeration("TextureAspect", off(4)),
 						usage:           this.mem.loadU64(off(8)),
+						swizzle:         swizzle,
 					};
 					if (descriptor.arrayLayerCount == 0xFFFFFFFF) {
 						descriptor.arrayLayerCount = undefined;
@@ -3214,6 +3356,15 @@ class WebGPUInterface {
 			wgpuTextureGetSampleCount: (textureIdx) => {
 				const texture = this.textures.get(textureIdx);
 				return texture.sampleCount;
+			},
+
+			/**
+			 * @param {number} textureIdx
+			 * @returns {number}
+			 */
+			wgpuTextureGetTextureBindingViewDimension: (textureIdx) => {
+				const texture = this.textures.get(textureIdx);
+				return ENUMS.TextureViewDimension.indexOf(texture.textureBindingViewDimension);
 			},
 
 			/**
