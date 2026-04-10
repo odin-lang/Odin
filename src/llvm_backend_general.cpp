@@ -701,11 +701,18 @@ gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenP
 	arr[2] = lb_const_int(p->module, t_i32, col);
 }
 
-gb_internal bool lb_bounds_check_short_circuit(lbProcedure *p, lbValue index, lbValue len) {
+gb_internal bool lb_bounds_check_disabled(lbProcedure *p) {
 	if (build_context.no_bounds_check) {
 		return true;
 	}
 	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool lb_bounds_check_short_circuit(lbProcedure *p, lbValue index, lbValue len) {
+	if (lb_bounds_check_disabled(p)) {
 		return true;
 	}
 
@@ -757,10 +764,7 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 }
 
 gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
-	if (build_context.no_bounds_check) {
-		return;
-	}
-	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
+	if (lb_bounds_check_disabled(p)) {
 		return;
 	}
 
@@ -783,10 +787,7 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 
 
 gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high) {
-	if (build_context.no_bounds_check) {
-		return;
-	}
-	if ((p->state_flags & StateFlag_no_bounds_check) != 0) {
+	if (lb_bounds_check_disabled(p)) {
 		return;
 	}
 
@@ -811,6 +812,9 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 }
 
 gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
+	if (lb_bounds_check_disabled(p)) {
+		return;
+	}
 	if (!lower_value_used && lb_bounds_check_short_circuit(p, high, len)) {
 		return;
 	}
