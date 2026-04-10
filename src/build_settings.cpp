@@ -2218,21 +2218,14 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 		String plus_str  = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), feature_str);
 		
-		bool has_raw   = string_set_exists(&build_context.target_features_set, str);
+		bool has_raw   = string_set_exists(&build_context.target_features_set, feature_str);
 		bool has_plus  = string_set_exists(&build_context.target_features_set, plus_str);
 		bool has_minus = string_set_exists(&build_context.target_features_set, minus_str);
 		
+		// NOTE(jakubtomsu): this way "feature" and "+feature" is ALWAYS equivalent,
+		// and also allows the minus sign to do a final override.
 		bool is_enabled = (has_plus || has_raw) && !has_minus;
 		
-		if ((has_plus || has_raw) && has_minus) {
-			printf("ENTRIES for '%.*s' / '%.*s':\n", LIT(plus_str), LIT(minus_str));
-			for (StringSetEntry& str : build_context.target_features_set) {
-				printf("\thash: %i, next: %i, val: %.*s\n", str.hash, str.next, LIT(str.value));
-			}
-		}
-		
-		GB_ASSERT(!((has_plus || has_raw) && has_minus));
-
 		if (want_enabled != is_enabled) {
 			if (not_enabled) *not_enabled = str;
 			return false;
