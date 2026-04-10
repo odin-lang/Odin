@@ -1,6 +1,7 @@
 package linalg
 
 import "base:builtin"
+import "base:intrinsics"
 import "core:math"
 
 @(require_results)
@@ -413,26 +414,12 @@ pow :: proc "contextless" (x, e: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 
 @(require_results)
 ceil :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
-	when IS_ARRAY(T) {
-		for i in 0..<len(T) {
-			out[i] = #force_inline math.ceil(x[i])
-		}
-	} else {
-		out = #force_inline math.ceil(x)
-	}
-	return
+	return _from_simd4(T, intrinsics.simd_ceil(_to_simd4(x)))
 }
 
 @(require_results)
 floor :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
-	when IS_ARRAY(T) {
-		for i in 0..<len(T) {
-			out[i] = #force_inline math.floor(x[i])
-		}
-	} else {
-		out = #force_inline math.floor(x)
-	}
-	return
+	return _from_simd4(T, intrinsics.simd_floor(_to_simd4(x)))
 }
 
 @(require_results)
@@ -445,6 +432,11 @@ round :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 		out = #force_inline math.round(x)
 	}
 	return
+}
+
+@(require_results)
+trunc :: proc "contextless" (x: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+	return _from_simd4(T, intrinsics.simd_trunc(_to_simd4(x)))
 }
 
 @(require_results)
@@ -612,4 +604,47 @@ not :: proc "contextless" (x: $A/[$N]bool) -> (out: A) {
 		out[i] = !e
 	}
 	return
+}
+
+
+@(require_results)
+_to_simd4 :: #force_inline proc "contextless" (a: $T) -> (out: #simd[4]ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) #no_bounds_check {
+	when IS_ARRAY(T) {
+		when len(T) == 1 {
+			_a: [4]ELEM_TYPE(T)
+			_a.x = a.x
+			return transmute(#simd[4]ELEM_TYPE(T))_a
+		} else when len(T) == 2 {
+			_a: [4]ELEM_TYPE(T)
+			_a.xy = a
+			return transmute(#simd[4]ELEM_TYPE(T))_a
+		} else when len(T) == 3 {
+			_a: [4]ELEM_TYPE(T)
+			_a.xyz = a
+			return transmute(#simd[4]ELEM_TYPE(T))_a
+		} else {
+			return transmute(#simd[4]ELEM_TYPE(T))a
+		}
+	} else {
+		_a: [4]ELEM_TYPE(T)
+		_a.x = a
+		return transmute(#simd[4]ELEM_TYPE(T))_a
+	}
+}
+
+@(require_results)
+_from_simd4 :: #force_inline proc "contextless" ($T: typeid, a: $V/#simd[4]$E) -> T where IS_NUMERIC(ELEM_TYPE(T)) #no_bounds_check {
+	when IS_ARRAY(T) {
+		when len(T) == 1 {
+			return (transmute([4]ELEM_TYPE(T))a).x
+		} else when len(T) == 2 {
+			return (transmute([4]ELEM_TYPE(T))a).xy
+		} else when len(T) == 3 {
+			return (transmute([4]ELEM_TYPE(T))a).xyz
+		} else {
+			return transmute([4]ELEM_TYPE(T))a
+		}       
+	} else {
+		return (transmute([4]ELEM_TYPE(T))a).x
+	}
 }
