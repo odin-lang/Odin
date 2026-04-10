@@ -3973,15 +3973,16 @@ int main(int arg_count, char const **arg_ptr) {
 		for (;;) {
 			String item = string_split_iterator(&target_it, ',');
 			if (item == "") break;
-
-			if (*item.text == '+' || *item.text == '-') {
-				item.text++;
-				item.len--;
+			
+			String stripped_item = item;
+			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
+				stripped_item.text++;
+				stripped_item.len--;
 			}
 
 			String invalid;
-			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
-				if (item != str_lit("?")) {
+			if (!check_target_feature_is_valid_for_target_arch(stripped_item, &invalid) && stripped_item != str_lit("help")) {
+				if (stripped_item != str_lit("?")) {
 					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
 				}
 				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
@@ -4005,8 +4006,25 @@ int main(int arg_count, char const **arg_ptr) {
 
 				return 1;
 			}
-
-			string_set_add(&build_context.target_features_set, item);
+			
+			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
+			String feature_str = item;
+			if (*feature_str.text != '+' && *feature_str.text != '-') {
+				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
+			}
+			
+			// Ensure there is only a single entry for each feature in the target set.
+			// If the negative exists, override the existing value with the current one.
+			String neg_feature_str = clone_string(temporary_allocator(), feature_str);
+			switch (*neg_feature_str.text) {
+				case '+': *neg_feature_str.text = '-'; break;
+				case '-': *neg_feature_str.text = '+'; break;
+				default: GB_ASSERT(false); break;
+			}
+			
+			string_set_remove(&build_context.target_features_set, neg_feature_str);
+			
+			string_set_add(&build_context.target_features_set, feature_str);
 		}
 	}
 
