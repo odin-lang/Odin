@@ -508,6 +508,13 @@ gb_internal String filename_without_directory(String s) {
 	return substring(s, gb_max(j+1, 0), s.len);
 }
 
+gb_internal String clone_string(gbAllocator a, String const &x) {
+	u8 *data = gb_alloc_array(a, u8, x.len+1);
+	gb_memmove(data, x.text, x.len);
+	data[x.len] = 0;
+	return make_string(data, x.len);
+}
+
 gb_internal String concatenate_strings(gbAllocator a, String const &x, String const &y) {
 	isize len = x.len+y.len;
 	u8 *data = gb_alloc_array(a, u8, len+1);
