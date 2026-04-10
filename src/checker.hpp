@@ -855,6 +855,7 @@ struct Checker {
 	BlockingMutex nested_proc_lits_mutex;
 	Array<DeclInfo *> nested_proc_lits;
 
+	Array<Ast *> deferred_map_key_checks;
 
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
 	MPSCQueue<Type *> soa_types_to_complete;
