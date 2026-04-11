@@ -12,7 +12,7 @@
 			array_add(&passes, "forceattrs");
 			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,early-cse<>)");
 			array_add(&passes, "always-inline");
-			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instsimplify)");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instsimplify,simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>)");
 			// array_add(&passes, "verify");
 		}
 		array_add(&passes, "function(annotation-remarks)");
