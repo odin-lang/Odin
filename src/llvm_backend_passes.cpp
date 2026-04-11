@@ -7,9 +7,13 @@
 			// Old -o:minimal behavior
 			array_add(&passes, "always-inline");
 		} else {
-			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,early-cse)");
+			array_add(&passes, "annotation2metadata");
+			array_add(&passes, "inferattrs");
+			array_add(&passes, "forceattrs");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,early-cse<>)");
 			array_add(&passes, "always-inline");
-			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instcombine<max-iterations=1;no-verify-fixpoint>,simplifycfg)");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instsimplify)");
+			// array_add(&passes, "verify");
 		}
 		array_add(&passes, "function(annotation-remarks)");
 		break;
