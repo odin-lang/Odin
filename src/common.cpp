@@ -9,7 +9,9 @@
 
 #if defined(GB_SYSTEM_WINDOWS)
 
-#define NOMINMAX            1
+#define NOMINMAX
+#define WINDOWS_LEAN_AND_MEAN 1
+#define VC_EXTRALEAN 1
 #include <windows.h>
 #undef NOMINMAX
 #endif
