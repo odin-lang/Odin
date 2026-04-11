@@ -1130,8 +1130,8 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		}
 	}
 
-	check_stmt(ctx, irs->body, mod_flags);
-
+	u32 new_flags = mod_flags & ~Stmt_BreakAllowed & ~Stmt_ContinueAllowed;
+	check_stmt(ctx, irs->body, new_flags);
 }
 
 gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
