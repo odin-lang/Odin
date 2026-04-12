@@ -5458,12 +5458,12 @@ TEXTURE_BARRIER_FLAGS :: enum i32 {
 }
 
 BARRIER_SUBRESOURCE_RANGE :: struct {
-	IndexOrFirstMipLevel: uint,
-	NumMipLevels:         uint,
-	FirstArraySlice:      uint,
-	NumArraySlices:       uint,
-	FirstPlane:           uint,
-	NumPlanes:            uint,
+	IndexOrFirstMipLevel: u32,
+	NumMipLevels:         u32,
+	FirstArraySlice:      u32,
+	NumArraySlices:       u32,
+	FirstPlane:           u32,
+	NumPlanes:            u32,
 }
 
 GLOBAL_BARRIER :: struct {
