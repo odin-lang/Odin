@@ -375,7 +375,7 @@ array_pop_safe :: proc(x: ^$X/Array($T, $SHIFT)) -> (val: T, ok: bool) {
 
 	Example:
 
-		import "core:encoding/xar"
+		import "core:container/xar"
 
 		unordered_remove_example :: proc() {
 			x: xar.Array(int, 4)
