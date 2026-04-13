@@ -2740,7 +2740,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		Type *elem = base_array_type(dst);
 		isize index_count = cast(isize)gb_min(get_array_type_count(src), get_array_type_count(dst));
 
-		// NOTE: Do fill with zero because the dst may be longer than src
+		// NOTE: Fill with zero because dst may be longer than src
 		lbAddr v = lb_add_local_generated(p, t, true);
 
 		lbValue psrc = lb_address_from_load_or_generate_local(p, value);
