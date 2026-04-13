@@ -2,7 +2,7 @@ package mem_virtual
 
 import "core:sys/posix"
 
-_reserve :: proc "contextless" (size: uint, address_hint := uintptr(0)) -> (data: []byte, err: Allocator_Error) {
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
 
 	PROT_MAX :: proc "contextless" (flags: posix.Prot_Flags) -> posix.Prot_Flags {
 		_PROT_MAX_SHIFT :: 16

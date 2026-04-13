@@ -87,7 +87,7 @@ foreign Kernel32 {
 }
 
 @(no_sanitize_address)
-_reserve :: proc "contextless" (size: uint, address_hint := uintptr(0)) -> (data: []byte, err: Allocator_Error) {
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
 	result := VirtualAlloc(rawptr(address_hint), size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
 		err = .Out_Of_Memory

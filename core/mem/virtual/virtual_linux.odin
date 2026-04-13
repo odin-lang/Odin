@@ -4,7 +4,7 @@ package mem_virtual
 
 import "core:sys/linux"
 
-_reserve :: proc "contextless" (size: uint, address_hint := uintptr(0)) -> (data: []byte, err: Allocator_Error) {
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
 	addr, errno := linux.mmap(address_hint, size, {}, {.PRIVATE, .ANONYMOUS})
 	if errno == .ENOMEM {
 		return nil, .Out_Of_Memory
