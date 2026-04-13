@@ -134,7 +134,7 @@ This is a dire bug and should be reported to the Odin developers.
 			}
 			signal := local_test_expected_failures.signal
 			switch signal {
-			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION
+			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION || code == win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED
 			case libc.SIGSEGV: passed = code == win32.EXCEPTION_ACCESS_VIOLATION
 			case libc.SIGFPE:
 				switch code {
