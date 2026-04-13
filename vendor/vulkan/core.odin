@@ -7,8 +7,36 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 API_VERSION_1_4 :: (1<<22) | (4<<12) | (0)
 
+MAKE_API_VERSION :: proc "contextless" (variant, major, minor, patch: u32) -> u32 {
+	return (variant<<29) | (major<<22) | (minor<<12) | (patch)
+}
+
 MAKE_VERSION :: proc "contextless" (major, minor, patch: u32) -> u32 {
 	return (major<<22) | (minor<<12) | (patch)
+}
+
+API_VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+	return (version>>22) & 0x7F
+}
+
+VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+	return (version>>22)
+}
+
+API_VERSION_MINOR :: proc "contextless" (version: u32) -> u32 {
+	return (version>>12) & 0x7F
+}
+
+VERSION_MINOR :: API_VERSION_MINOR
+
+API_VERSION_PATCH :: proc "contextless" (version: u32) -> u32 {
+	return (version & 0xFFF)
+}
+
+VERSION_PATCH :: API_VERSION_PATCH
+
+API_VERSION_VARIANT :: proc "contextless" (version: u32) -> u32 {
+	return (version>>29)
 }
 
 // Base types
