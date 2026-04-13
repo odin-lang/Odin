@@ -24,7 +24,7 @@ VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
 }
 
 API_VERSION_MINOR :: proc "contextless" (version: u32) -> u32 {
-	return (version>>12) & 0x7F
+	return (version>>12) & 0x3FF
 }
 
 VERSION_MINOR :: API_VERSION_MINOR
