@@ -6,6 +6,7 @@ import "core:crypto/_aes"
 import aes_hw "core:crypto/_aes/hw"
 import "core:simd"
 
+
 @(private, enable_target_feature = aes_hw.TARGET_FEATURES)
 encrypt_block_hw :: proc(ctx: ^Context_Impl_Hardware, dst, src: []byte) {
 	blk := intrinsics.unaligned_load((^simd.u8x16)(raw_data(src)))
