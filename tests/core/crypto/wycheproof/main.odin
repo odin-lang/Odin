@@ -25,6 +25,8 @@ import "core:crypto/pbkdf2"
 import "core:crypto/siphash"
 import "core:crypto/deoxysii"
 
+import "../common"
+
 // Covered:
 // - crypto/aegis
 //   - aegis128L_test.json
@@ -94,8 +96,6 @@ SUFFIX_TEST_JSON :: "_test.json"
 print_test_vector_path :: proc(t: ^testing.T) {
 	log.infof("wycheproof path: %s", BASE_PATH)
 }
-
-test_proc :: proc(_: string) -> bool
 
 supported_aegis_impls :: proc() -> [dynamic]aes.Implementation {
 	impls := make([dynamic]aes.Implementation, 0, 2, context.temp_allocator)
@@ -167,12 +167,12 @@ test_aead_aegis_impl :: proc(
 				)
 			}
 
-			key := hexbytes_decode(test_vector.key)
-			iv := hexbytes_decode(test_vector.iv)
-			aad := hexbytes_decode(test_vector.aad)
-			msg := hexbytes_decode(test_vector.msg)
-			ct := hexbytes_decode(test_vector.ct)
-			tag := hexbytes_decode(test_vector.tag)
+			key := common.hexbytes_decode(test_vector.key)
+			iv := common.hexbytes_decode(test_vector.iv)
+			aad := common.hexbytes_decode(test_vector.aad)
+			msg := common.hexbytes_decode(test_vector.msg)
+			ct := common.hexbytes_decode(test_vector.ct)
+			tag := common.hexbytes_decode(test_vector.tag)
 
 			if len(iv) == 0 {
 				log.infof(
@@ -192,7 +192,7 @@ test_aead_aegis_impl :: proc(
 				tag_ := make([]byte, len(tag))
 				aegis.seal(&ctx, ct_, tag_, iv, aad, msg)
 
-				ok := hexbytes_compare(test_vector.ct, ct_)
+				ok := common.hexbytes_compare(test_vector.ct, ct_)
 				if !result_check(test_vector.result, ok) {
 					x := transmute(string)(hex.encode(ct_))
 					log.errorf(
@@ -206,7 +206,7 @@ test_aead_aegis_impl :: proc(
 					continue
 				}
 
-				ok = hexbytes_compare(test_vector.tag, tag_)
+				ok = common.hexbytes_compare(test_vector.tag, tag_)
 				if !result_check(test_vector.result, ok) {
 					x := transmute(string)(hex.encode(tag_))
 					log.errorf(
@@ -229,7 +229,7 @@ test_aead_aegis_impl :: proc(
 				continue
 			}
 
-			if ok && !hexbytes_compare(test_vector.msg, msg_) {
+			if ok && !common.hexbytes_compare(test_vector.msg, msg_) {
 				x := transmute(string)(hex.encode(msg_))
 				log.errorf(
 					"aead/aegis/%v/%d: decrypt msg: expected %s actual %s",
@@ -317,12 +317,12 @@ test_aead_aes_gcm_impl :: proc(
 				)
 			}
 
-			key := hexbytes_decode(test_vector.key)
-			iv := hexbytes_decode(test_vector.iv)
-			aad := hexbytes_decode(test_vector.aad)
-			msg := hexbytes_decode(test_vector.msg)
-			ct := hexbytes_decode(test_vector.ct)
-			tag := hexbytes_decode(test_vector.tag)
+			key := common.hexbytes_decode(test_vector.key)
+			iv := common.hexbytes_decode(test_vector.iv)
+			aad := common.hexbytes_decode(test_vector.aad)
+			msg := common.hexbytes_decode(test_vector.msg)
+			ct := common.hexbytes_decode(test_vector.ct)
+			tag := common.hexbytes_decode(test_vector.tag)
 
 			if len(iv) == 0 {
 				log.infof(
@@ -342,7 +342,7 @@ test_aead_aes_gcm_impl :: proc(
 				tag_ := make([]byte, len(tag))
 				aes.seal_gcm(&ctx, ct_, tag_, iv, aad, msg)
 
-				ok := hexbytes_compare(test_vector.ct, ct_)
+				ok := common.hexbytes_compare(test_vector.ct, ct_)
 				if !result_check(test_vector.result, ok) {
 					x := transmute(string)(hex.encode(ct_))
 					log.errorf(
@@ -356,7 +356,7 @@ test_aead_aes_gcm_impl :: proc(
 					continue
 				}
 
-				ok = hexbytes_compare(test_vector.tag, tag_)
+				ok = common.hexbytes_compare(test_vector.tag, tag_)
 				if !result_check(test_vector.result, ok) {
 					x := transmute(string)(hex.encode(tag_))
 					log.errorf(
@@ -379,7 +379,7 @@ test_aead_aes_gcm_impl :: proc(
 				continue
 			}
 
-			if ok && !hexbytes_compare(test_vector.msg, msg_) {
+			if ok && !common.hexbytes_compare(test_vector.msg, msg_) {
 				x := transmute(string)(hex.encode(msg_))
 				log.errorf(
 					"aead/aes-gcm/%v/%d: decrypt msg: expected %s actual %s",
@@ -488,12 +488,12 @@ test_aead_chacha20_poly1305_impl :: proc(
 				)
 			}
 
-			key := hexbytes_decode(test_vector.key)
-			iv := hexbytes_decode(test_vector.iv)
-			aad := hexbytes_decode(test_vector.aad)
-			msg := hexbytes_decode(test_vector.msg)
-			ct := hexbytes_decode(test_vector.ct)
-			tag := hexbytes_decode(test_vector.tag)
+			key := common.hexbytes_decode(test_vector.key)
+			iv := common.hexbytes_decode(test_vector.iv)
+			aad := common.hexbytes_decode(test_vector.aad)
+			msg := common.hexbytes_decode(test_vector.msg)
+			ct := common.hexbytes_decode(test_vector.ct)
+			tag := common.hexbytes_decode(test_vector.tag)
 
 			if slice.contains(test_vector.flags, FLAG_INVALID_NONCE_SIZE) {
 				log.infof(
@@ -519,7 +519,7 @@ test_aead_chacha20_poly1305_impl :: proc(
 				tag_ := make([]byte, len(tag))
 				chacha20poly1305.seal(&ctx, ct_, tag_, iv, aad, msg)
 
-				ok := hexbytes_compare(test_vector.ct, ct_)
+				ok := common.hexbytes_compare(test_vector.ct, ct_)
 				if !result_check(test_vector.result, ok) {
 					x := transmute(string)(hex.encode(ct_))
 					log.errorf(
@@ -534,7 +534,7 @@ test_aead_chacha20_poly1305_impl :: proc(
 					continue
 				}
 
-				ok = hexbytes_compare(test_vector.tag, tag_)
+				ok = common.hexbytes_compare(test_vector.tag, tag_)
 				if !result_check(test_vector.result, ok) {
 					x := transmute(string)(hex.encode(tag_))
 					log.errorf(
@@ -562,7 +562,7 @@ test_aead_chacha20_poly1305_impl :: proc(
 				continue
 			}
 
-			if ok && !hexbytes_compare(test_vector.msg, msg_) {
+			if ok && !common.hexbytes_compare(test_vector.msg, msg_) {
 				x := transmute(string)(hex.encode(msg_))
 				log.errorf(
 					"aead/%s/%v/%d: decrypt msg: expected %s actual %s",
@@ -628,7 +628,7 @@ test_eddsa_ed25519 :: proc(t: ^testing.T) {
 	num_ran, num_passed, num_failed, num_skipped: int
 	for &test_group, i in test_vectors.test_groups {
 		mem.free_all() // Probably don't need this, but be safe.
-		pk_bytes := hexbytes_decode(test_group.public_key.pk)
+		pk_bytes := common.hexbytes_decode(test_group.public_key.pk)
 
 		pk: ed25519.Public_Key
 		pk_ok := ed25519.public_key_set_bytes(&pk, pk_bytes)
@@ -652,8 +652,8 @@ test_eddsa_ed25519 :: proc(t: ^testing.T) {
 				log.debugf("eddsa/ed25519/%d: %+v", test_vector.tc_id, test_vector.flags)
 			}
 
-			msg := hexbytes_decode(test_vector.msg)
-			sig := hexbytes_decode(test_vector.sig)
+			msg := common.hexbytes_decode(test_vector.msg)
+			sig := common.hexbytes_decode(test_vector.sig)
 
 			verify_ok := ed25519.verify(&pk, msg, sig)
 			result_ok := result_check(test_vector.result, verify_ok)
@@ -747,7 +747,7 @@ test_ecdsa_impl :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Ecdsa_Test_Gr
 
 	num_ran, num_passed, num_failed, num_skipped: int
 	for &test_group, i in test_vectors.test_groups {
-		pk_bytes := hexbytes_decode(test_group.public_key.uncompressed)
+		pk_bytes := common.hexbytes_decode(test_group.public_key.uncompressed)
 
 		pk: ecdsa.Public_Key
 		pk_ok := ecdsa.public_key_set_bytes(&pk, curve_alg, pk_bytes)
@@ -773,8 +773,8 @@ test_ecdsa_impl :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Ecdsa_Test_Gr
 				log.debugf("ecdsa/%s/%s/%d: %+v", curve_str, hash_str, test_vector.tc_id, test_vector.flags)
 			}
 
-			msg := hexbytes_decode(test_vector.msg)
-			sig := hexbytes_decode(test_vector.sig)
+			msg := common.hexbytes_decode(test_vector.msg)
+			sig := common.hexbytes_decode(test_vector.sig)
 
 			verify_ok := ecdsa.verify_asn1(&pk, hash_alg, msg, sig)
 			result_ok := result_check(test_vector.result, verify_ok)
@@ -876,9 +876,9 @@ test_hkdf_impl :: proc(test_vectors: ^Test_Vectors(Hkdf_Test_Group)) -> bool {
 				log.debugf("hkdf/%s/%d: %+v", alg_str, test_vector.tc_id, test_vector.flags)
 			}
 
-			ikm := hexbytes_decode(test_vector.ikm)
-			salt := hexbytes_decode(test_vector.salt)
-			info := hexbytes_decode(test_vector.info)
+			ikm := common.hexbytes_decode(test_vector.ikm)
+			salt := common.hexbytes_decode(test_vector.salt)
+			info := common.hexbytes_decode(test_vector.info)
 
 			if slice.contains(test_vector.flags, FLAG_SIZE_TOO_LARGE) {
 				log.infof(
@@ -893,7 +893,7 @@ test_hkdf_impl :: proc(test_vectors: ^Test_Vectors(Hkdf_Test_Group)) -> bool {
 			okm_ := make([]byte, test_vector.size)
 			hkdf.extract_and_expand(alg, salt, ikm, info, okm_)
 
-			ok = hexbytes_compare(test_vector.okm, okm_)
+			ok = common.hexbytes_compare(test_vector.okm, okm_)
 			if !result_check(test_vector.result, ok) {
 				x := transmute(string)(hex.encode(okm_))
 				log.errorf(
@@ -1001,8 +1001,8 @@ test_mac_impl :: proc(test_vectors: ^Test_Vectors(Mac_Test_Group)) -> bool {
 				log.debugf("%s/%d: %+v", alg_str, test_vector.tc_id, test_vector.flags)
 			}
 
-			key := hexbytes_decode(test_vector.key)
-			msg := hexbytes_decode(test_vector.msg)
+			key := common.hexbytes_decode(test_vector.key)
+			msg := common.hexbytes_decode(test_vector.msg)
 
 			tag_ := make([]byte, len(test_vector.tag) / 2)
 
@@ -1037,7 +1037,7 @@ test_mac_impl :: proc(test_vectors: ^Test_Vectors(Mac_Test_Group)) -> bool {
 				siphash.sum_4_8(msg, key, tag_)
 			}
 
-			ok = hexbytes_compare(test_vector.tag, tag_)
+			ok = common.hexbytes_compare(test_vector.tag, tag_)
 			if !result_check(test_vector.result, ok) {
 				x := transmute(string)(hex.encode(tag_))
 				log.errorf(
@@ -1146,13 +1146,13 @@ test_pbkdf2_impl :: proc(
 				continue
 			}
 
-			password := hexbytes_decode(test_vector.password)
-			salt := hexbytes_decode(test_vector.salt)
+			password := common.hexbytes_decode(test_vector.password)
+			salt := common.hexbytes_decode(test_vector.salt)
 
 			dk_ := make([]byte, test_vector.dk_len)
 			pbkdf2.derive(alg, password, salt, test_vector.iteration_count, dk_)
 
-			ok = hexbytes_compare(test_vector.dk, dk_)
+			ok = common.hexbytes_compare(test_vector.dk, dk_)
 			if !result_check(test_vector.result, ok) {
 				x := transmute(string)(hex.encode(dk_))
 				log.errorf(
@@ -1255,8 +1255,8 @@ test_ecdh_impl :: proc(
 				log.debugf("ecdh/%s/%d: %+v", alg_str, test_vector.tc_id, test_vector.flags)
 			}
 
-			raw_pub := hexbytes_decode(test_vector.public)
-			raw_priv := hexbytes_decode(test_vector.private)
+			raw_pub := common.hexbytes_decode(test_vector.public)
+			raw_priv := common.hexbytes_decode(test_vector.private)
 
 			curve: ecdh.Curve
 			priv_key: ecdh.Private_Key
@@ -1366,7 +1366,7 @@ test_ecdh_impl :: proc(
 				continue
 			}
 
-			ok = hexbytes_compare(test_vector.shared, shared)
+			ok = common.hexbytes_compare(test_vector.shared, shared)
 			// "acceptable" results are fine from here because we have
 			// checked for the all-zero shared secret XDH case already.
 			if !result_check(test_vector.result, ok, false) {
