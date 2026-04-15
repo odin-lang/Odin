@@ -222,7 +222,7 @@ foreign zlib {
 @(default_calling_convention="c")
 foreign zlib {
 	deflateInit_         :: proc(strm: z_streamp, level: c.int, version: cstring, stream_size: c.int) -> c.int ---
-	inflateInit_         :: proc(strm: z_streamp, level: c.int, version: cstring, stream_size: c.int) -> c.int ---
+	inflateInit_         :: proc(strm: z_streamp, version: cstring, stream_size: c.int) -> c.int ---
 	deflateInit2_        :: proc(strm: z_streamp, level, method, windowBits, memLevel, strategy: c.int, version: cstring, stream_size: c.int) -> c.int ---
 	inflateInit2_        :: proc(strm: z_streamp, windowBits: c.int, version: cstring, stream_size: c.int) -> c.int ---
 	inflateBackInit_     :: proc(strm: z_streamp, windowBits: c.int, window: [^]c.uchar, version: cstring, stream_size: c.int) -> c.int ---
@@ -236,8 +236,8 @@ deflateInit :: #force_inline proc "c" (strm: z_streamp, level: c.int) -> c.int {
 	return deflateInit_(strm, level, VERSION, c.int(size_of(z_stream)))
 }
 
-inflateInit :: #force_inline proc "c" (strm: z_streamp, level: c.int) -> c.int {
-	return inflateInit_(strm, level, VERSION, c.int(size_of(z_stream)))
+inflateInit :: #force_inline proc "c" (strm: z_streamp) -> c.int {
+	return inflateInit_(strm, VERSION, c.int(size_of(z_stream)))
 }
 
 deflateInit2 :: #force_inline proc "c" (strm: z_streamp, level, method, windowBits, memLevel, strategy: c.int) -> c.int {
