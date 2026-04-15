@@ -9,7 +9,6 @@ import "core:crypto/hash"
 import "core:crypto/hkdf"
 import "core:encoding/endian"
 import "core:slice"
-import "core:strings"
 
 AEAD_KEY_SIZE :: 32
 
@@ -967,96 +966,11 @@ handshakestate_read_message :: proc(self: ^Handshake_State, message, dst: []byte
 
 @(require_results)
 protocol_from_string :: proc(self: ^Protocol, protocol_name: string) -> Status {
-	str := protocol_name
 	self^ = Protocol{}
 
-	if len(str) > 255 {
-		return .Invalid_Protocol_String
-	}
-
-	s, ok := strings.split_by_byte_iterator(&str, '_')
-	if !ok || s != "Noise" {
-		return .Invalid_Protocol_String
-	}
-
-	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
-		return .Invalid_Protocol_String
-	}
-	pattern: Handshake_Pattern
-	switch s {
-	case "N" : pattern = .N
-	case "K" : pattern = .K
-	case "X" : pattern = .X
-	case "XX": pattern = .XX
-	case "NK": pattern = .NK
-	case "NN": pattern = .NN
-	case "KN": pattern = .KN
-	case "KK": pattern = .KK
-	case "NX": pattern = .NX
-	case "KX": pattern = .KX
-	case "XN": pattern = .XN
-	case "IN": pattern = .IN
-	case "XK": pattern = .XK
-	case "IK": pattern = .IK
-	case "IX": pattern = .IX
-	case "Npsk0": pattern = .Npsk0
-	case "Kpsk0": pattern = .Kpsk0
-	case "Xpsk1": pattern = .Xpsk1
-	case "NNpsk0": pattern = .NNpsk0
-	case "NNpsk2": pattern = .NNpsk2
-	case "NKpsk0": pattern = .NKpsk0
-	case "NKpsk2": pattern = .NKpsk2
-	case "NXpsk2": pattern = .NXpsk2
-	case "XNpsk3": pattern = .XNpsk3
-	case "XKpsk3": pattern = .XKpsk3
-	case "XXpsk3": pattern = .XXpsk3
-	case "KNpsk0": pattern = .KNpsk0
-	case "KNpsk2": pattern = .KNpsk2
-	case "KKpsk0": pattern = .KKpsk0
-	case "KKpsk2": pattern = .KKpsk2
-	case "KXpsk2": pattern = .KXpsk2
-	case "INpsk1": pattern = .INpsk1
-	case "INpsk2": pattern = .INpsk2
-	case "IKpsk1": pattern = .IKpsk1
-	case "IKpsk2": pattern = .IKpsk2
-	case "IXpsk2": pattern = .IXpsk2
-	case: return .Invalid_Protocol_String
-	}
-
-	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
-		return .Invalid_Protocol_String
-	}
-	dh: ecdh.Curve
-	switch s {
-	case "25519": dh = .X25519
-	case "448": dh = .X448
-	case: return .Invalid_Protocol_String
-	}
-
-	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
-		return .Invalid_Protocol_String
-	}
-	cipher: aead.Algorithm
-	switch s {
-	case "AESGCM": cipher = .AES_GCM_256
-	case "ChaChaPoly": cipher = .CHACHA20POLY1305
-	case: return .Invalid_Protocol_String
-	}
-
-	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
-		return .Invalid_Protocol_String
-	}
-	hash: hash.Algorithm
-	switch s {
-	case "SHA512": hash = .SHA512
-	case "SHA256": hash = .SHA256
-	case "Blake2s": hash = .BLAKE2S
-	case "Blake2b": hash = .BLAKE2B
-	case: return .Invalid_Protocol_String
-	}
-
-	if len(str) != 0 {
-		return .Invalid_Protocol_String
+	pattern, dh, cipher, hash, status := split_protocol_string(protocol_name)
+	if status != .Ok {
+		return status
 	}
 
 	self.handshake_pattern = pattern

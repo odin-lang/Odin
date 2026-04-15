@@ -1,7 +1,10 @@
 package noise
 
 import "base:runtime"
+import "core:crypto/aead"
 import "core:crypto/ecdh"
+import "core:crypto/hash"
+import "core:strings"
 
 // MAX_PACKET_SIZE is the maximum Noise message size, including TAG_SIZE
 // if relevant (`seal_message`, `open_message`).

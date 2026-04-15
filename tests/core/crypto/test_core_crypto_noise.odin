@@ -1,10 +1,11 @@
-package noise
+package test_core_crypto
 
 import "core:bytes"
 import "core:crypto"
 import "core:crypto/aead"
 import "core:crypto/ecdh"
 import "core:crypto/hash"
+import "core:crypto/noise"
 import "core:fmt"
 import "core:log"
 import "core:math/rand"
@@ -36,7 +37,7 @@ test_supported_protocols :: proc(t: ^testing.T) {
 	}
 
 	protocol: Test_Protocol
-	for pattern in Handshake_Pattern {
+	for pattern in noise.Handshake_Pattern {
 		if pattern == .Invalid {
 			continue
 		}
@@ -68,13 +69,13 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 
 	log.debugf("crypto/noise: %s", protocol_name)
 
-	is_one_way := pattern_is_one_way(protocol.handshake_pattern)
+	is_one_way := noise.pattern_is_one_way(protocol.handshake_pattern)
 
 	initiator_s, responder_s: ecdh.Private_Key
 	ini_s, res_s: ^ecdh.Private_Key
 	ini_s_pub, res_s_pub: ^ecdh.Public_Key
 
-	pre, hs := pattern_requires_initiator_s(protocol.handshake_pattern)
+	pre, hs := noise.pattern_requires_initiator_s(protocol.handshake_pattern)
 	if pre || hs {
 		if !testing.expect(t, ecdh.private_key_generate(&initiator_s, protocol.dh), "failed to generate initiator s") {
 			return false
@@ -84,7 +85,7 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 			ini_s_pub = &initiator_s._pub_key
 		}
 	}
-	pre, hs = pattern_requires_responder_s(protocol.handshake_pattern)
+	pre, hs = noise.pattern_requires_responder_s(protocol.handshake_pattern)
 	if pre || hs {
 		if !testing.expect(t, ecdh.private_key_generate(&responder_s, protocol.dh), "failed to generate responder s") {
 			return false
@@ -97,32 +98,32 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 
 	psk_buf: [32]byte = ---
 	psk: []byte
-	if pattern_is_psk(protocol.handshake_pattern) {
+	if noise.pattern_is_psk(protocol.handshake_pattern) {
 		crypto.rand_bytes(psk_buf[:])
 		psk = psk_buf[:]
 	}
 
-	ini_hs, res_hs: Handshake_State
-	status := handshake_init(&ini_hs, true, nil, ini_s, res_s_pub, protocol_name, psk)
+	ini_hs, res_hs: noise.Handshake_State
+	status := noise.handshake_init(&ini_hs, true, nil, ini_s, res_s_pub, protocol_name, psk)
 	if !testing.expectf(t, status == .Ok, "failed to initialize initiator Handshake_State: %v", status) {
 		return false
 	}
-	status = handshake_init(&res_hs, false, nil, res_s, ini_s_pub, protocol_name, psk)
+	status = noise.handshake_init(&res_hs, false, nil, res_s, ini_s_pub, protocol_name, psk)
 	if !testing.expectf(t, status == .Ok, "failed to initialize responder Handshake_State: %v", status) {
 		return false
 	}
 
-	ini_status, res_status: Status
+	ini_status, res_status: noise.Status
 	ini_msg, res_msg: []byte
 	ini_payload, res_payload: []byte
-	hs_msg_buf: [MAX_STEP_MSG_SIZE]byte
-	for i := 0; ; i += 1{
+	hs_msg_buf: [noise.MAX_STEP_MSG_SIZE]byte
+	for i := 0; ; i += 1 {
 		if ini_status == .Handshake_Complete && res_status == .Handshake_Complete {
 			break
 		}
 
 		// Test the allocation path
-		res_msg, res_payload, ini_status = handshake_initiator_step(&ini_hs, ini_msg, allocator = allocator)
+		res_msg, res_payload, ini_status = noise.handshake_initiator_step(&ini_hs, ini_msg, allocator = allocator)
 		ini_msg = nil
 
 		if ini_status == .Handshake_Complete && res_status == .Handshake_Complete {
@@ -137,7 +138,7 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 		}
 
 		// Test the non-allocation path
-		ini_msg, ini_payload, res_status = handshake_responder_step(&res_hs, res_msg, nil, hs_msg_buf[:])
+		ini_msg, ini_payload, res_status = noise.handshake_responder_step(&res_hs, res_msg, nil, dst = hs_msg_buf[:])
 		delete(res_msg, allocator)
 		res_msg = nil
 
@@ -152,7 +153,7 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 
 	hs_pub: ^ecdh.Public_Key
 	if ini_s != nil {
-		hs_pub, status = handshake_peer_identity(&res_hs)
+		hs_pub, status = noise.handshake_peer_identity(&res_hs)
 		if !testing.expect(t, status == .Ok) {
 			return false
 		}
@@ -161,7 +162,7 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 		}
 	}
 	if res_s != nil {
-		hs_pub, status = handshake_peer_identity(&ini_hs)
+		hs_pub, status = noise.handshake_peer_identity(&ini_hs)
 		if !testing.expect(t, status == .Ok) {
 			return false
 		}
@@ -171,11 +172,11 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 	}
 
 	h1, h2: []byte
-	h1, status = handshake_hash(&ini_hs)
+	h1, status = noise.handshake_hash(&ini_hs)
 	if !testing.expect(t, status == .Ok) {
 		return false
 	}
-	h2, status = handshake_hash(&res_hs)
+	h2, status = noise.handshake_hash(&res_hs)
 	if !testing.expect(t, status == .Ok) {
 		return false
 	}
@@ -183,31 +184,31 @@ test_noise_one_protocol :: proc(t: ^testing.T, protocol: ^Test_Protocol, allocat
 		return false
 	}
 
-	ini_cs, res_cs: Cipher_States
-	if !testing.expectf(t, .Ok == handshake_split(&ini_hs, &ini_cs), "failed to split initiator: %v") {
+	ini_cs, res_cs: noise.Cipher_States
+	if !testing.expectf(t, .Ok == noise.handshake_split(&ini_hs, &ini_cs), "failed to split initiator: %v") {
 		return false
 	}
-	if !testing.expectf(t, .Ok == handshake_split(&res_hs, &res_cs), "failed to split responder: %v") {
+	if !testing.expectf(t, .Ok == noise.handshake_split(&res_hs, &res_cs), "failed to split responder: %v") {
 		return false
 	}
 
-	handshake_reset(&ini_hs)
-	handshake_reset(&res_hs)
+	noise.handshake_reset(&ini_hs)
+	noise.handshake_reset(&res_hs)
 
 	if !testing.expect(t, test_messages(t, &ini_cs, &res_cs, is_one_way, allocator), "message tests failed") {
 		return false
 	}
 
-	cipherstates_reset(&ini_cs)
-	cipherstates_reset(&res_cs)
+	noise.cipherstates_reset(&ini_cs)
+	noise.cipherstates_reset(&res_cs)
 
 	return true
 }
 
 @(private = "file")
-test_messages :: proc(t: ^testing.T, ini_cs, res_cs: ^Cipher_States, is_one_way: bool, allocator := context.allocator) -> bool {
+test_messages :: proc(t: ^testing.T, ini_cs, res_cs: ^noise.Cipher_States, is_one_way: bool, allocator := context.allocator) -> bool {
 	ad_buf: [256]byte = ---
-	payload_buf: [MAX_PACKET_SIZE-TAG_SIZE]byte = ---
+	payload_buf: [noise.MAX_PACKET_SIZE-noise.TAG_SIZE]byte = ---
 
 	for i in 0..<10 {
 		ad := ad_buf[:rand.int_max(len(ad_buf))]
@@ -217,14 +218,14 @@ test_messages :: proc(t: ^testing.T, ini_cs, res_cs: ^Cipher_States, is_one_way:
 		_ = rand.read(ad)
 
 		// Initiator -> Responder (allocate buffers)
-		tx_msg, status := seal_message(ini_cs, ad, payload, allocator = allocator)
+		tx_msg, status := noise.seal_message(ini_cs, ad, payload, allocator = allocator)
 		defer delete(tx_msg, allocator)
 		if !testing.expectf(t, status == .Ok, "i->r %d: seal failed: %v", i, status) {
 			return false
 		}
 
 		rx_dst: []byte
-		rx_dst, status = open_message(res_cs, ad, tx_msg, allocator = allocator)
+		rx_dst, status = noise.open_message(res_cs, ad, tx_msg, allocator = allocator)
 		defer delete(rx_dst, allocator)
 		if !testing.expectf(t, status == .Ok, "i->r %d: open failed: %v", i, status) {
 			return false
@@ -235,11 +236,11 @@ test_messages :: proc(t: ^testing.T, ini_cs, res_cs: ^Cipher_States, is_one_way:
 		}
 
 		if i == 5 {
-			status = cipherstates_rekey(ini_cs, true)
+			status = noise.cipherstates_rekey(ini_cs, true)
 			if !testing.expectf(t, status == .Ok, "i %d: rekey failed: %v", i, status) {
 				return false
 			}
-			status = cipherstates_rekey(res_cs, false)
+			status = noise.cipherstates_rekey(res_cs, false)
 			if !testing.expectf(t, status == .Ok, "r %d: rekey failed: %v", i, status) {
 				return false
 			}
@@ -250,12 +251,12 @@ test_messages :: proc(t: ^testing.T, ini_cs, res_cs: ^Cipher_States, is_one_way:
 		}
 
 		// Responder -> Initiator (reuse allocated buffers)
-		tx_msg, status = seal_message(res_cs, ad, payload, tx_msg)
+		tx_msg, status = noise.seal_message(res_cs, ad, payload, tx_msg)
 		if !testing.expectf(t, status == .Ok, "r->i %d: seal failed: %v", i, status) {
 			return false
 		}
 
-		_, status = open_message(ini_cs, ad, tx_msg, rx_dst)
+		_, status = noise.open_message(ini_cs, ad, tx_msg, rx_dst)
 		if !testing.expectf(t, status == .Ok, "r->i %d: open failed: %v", i, status) {
 			return false
 		}
@@ -270,7 +271,7 @@ test_messages :: proc(t: ^testing.T, ini_cs, res_cs: ^Cipher_States, is_one_way:
 
 @(private = "file")
 Test_Protocol :: struct {
-	handshake_pattern: Handshake_Pattern,
+	handshake_pattern: noise.Handshake_Pattern,
 	dh: ecdh.Curve,
 	cipher: aead.Algorithm,
 	hash: hash.Algorithm,
@@ -296,8 +297,8 @@ test_protocol_string :: proc(protocol: ^Test_Protocol, allocator := context.allo
 	#partial switch protocol.hash {
 	case .SHA256: hash = "SHA256"
 	case .SHA512: hash = "SHA512"
-	case .BLAKE2S: hash = "Blake2s"
-	case .BLAKE2B: hash = "Blake2b"
+	case .BLAKE2S: hash = "BLAKE2s"
+	case .BLAKE2B: hash = "BLAKE2b"
 	case: panic("crypto/noise: unsupported hash")
 	}
 
