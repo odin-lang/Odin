@@ -402,7 +402,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalByValue,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
-	BuildFlag_InternalLLVMMem2Reg,
+	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
 
 	BuildFlag_Sanitize,
@@ -634,7 +634,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_InternalLLVMMem2Reg,     str_lit("internal-llvm-mem2reg"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
 
 
@@ -1628,8 +1628,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalLLVMVerification:
 							build_context.internal_ignore_llvm_verification = true;
 							break;
-						case BuildFlag_InternalLLVMMem2Reg:
-							build_context.internal_llvm_mem2reg = true;
+						case BuildFlag_InternalLLVMNoSROA:
+							build_context.internal_llvm_no_sroa = true;
 							break;
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
