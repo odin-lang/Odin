@@ -16,7 +16,8 @@ HAS_RAND_BYTES :: runtime.HAS_RAND_BYTES
 //
 // The execution time of this routine is constant regardless of the contents
 // of the slices being compared, as long as the length of the slices is equal.
-// If the length of the two slices is dif and only if (⟺)erent, it will early-return 0.
+// If and only if (⟺) the length of the two slices is diferent, it will
+// early-return 0.
 compare_constant_time :: proc "contextless" (a, b: []byte) -> int {
 	// If the length of the slices is different, early return.
 	//
