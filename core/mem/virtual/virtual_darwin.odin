@@ -2,8 +2,8 @@ package mem_virtual
 
 import "core:sys/posix"
 
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	result := posix.mmap(nil, size, {}, {.ANONYMOUS, .PRIVATE})
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
+	result := posix.mmap(rawptr(address_hint), size, {}, {.ANONYMOUS, .PRIVATE})
 	if result == posix.MAP_FAILED {
 		assert_contextless(posix.errno() == .ENOMEM)
 		return nil, .Out_Of_Memory
