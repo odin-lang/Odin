@@ -2840,6 +2840,12 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 			error(e, "Array count too large, %.*s", LIT(str));
 			gb_free(a, str.text);
 			return 0;
+		} else if (o->value.kind == ExactValue_Float) {
+			u64 u = cast(u64)o->value.value_float;
+			f64 f = cast(f64)u;
+			if (f == o->value.value_float) {
+				return u;
+			}
 		}
 	}
 
