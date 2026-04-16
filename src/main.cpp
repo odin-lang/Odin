@@ -76,6 +76,10 @@ gb_global Timings global_timings = {0};
 #include "linker.cpp"
 #include "bundle_command.cpp"
 
+#if defined(ODIN_CODEGEN)
+#include "cg/cg.cpp"
+#endif
+
 #include "llvm_backend.cpp"
 
 #include "bug_report.cpp"
