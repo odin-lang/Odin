@@ -2,7 +2,7 @@ package sdl3_mixer
 
 import "core:c"
 
-import SDL "vendor:sdl3"
+import SDL ".."
 
 when ODIN_OS == .Windows {
 	foreign import lib "SDL3_mixer.lib"
