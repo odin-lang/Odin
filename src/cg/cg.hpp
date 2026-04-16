@@ -18,24 +18,63 @@ enum cgTypeKind : u8 {
 	cgType_i16,
 	cgType_i32,
 	cgType_i64,
-	// cgType_i128,
-	
 	cgType_ptr,
 	
 	cgType_f16,
 	cgType_f32,
 	cgType_f64,
 
+	cgType_v64,
+	cgType_v128,
+	cgType_v256,
+	cgType_v512,
 
 	cgType_control,
-
 	cgType_memory,
-
 	cgType_tuple,
 };
 
 struct cgType {
 	cgTypeKind kind;
+
+	bool is_int() const {
+		switch (this->kind) {
+		case cgType_i8:
+		case cgType_i16:
+		case cgType_i32:
+		case cgType_i64:
+			return true;
+		}
+		return false;
+	}
+
+	bool is_int_or_ptr() const {
+		switch (this->kind) {
+		case cgType_bool:
+		case cgType_i8:
+		case cgType_i16:
+		case cgType_i32:
+		case cgType_i64:
+		case cgType_ptr:
+			return true;
+		}
+		return false;
+	}
+
+	bool is_float() const {
+		switch (this->kind) {
+		case cgType_f16:
+		case cgType_f32:
+		case cgType_f64:
+			return true;
+		}
+		return false;
+	}
+
+	bool is_ptr() const {
+		return this->kind == cgType_ptr;
+	}
+
 };
 
 gb_internal gb_inline bool operator==(cgType x, cgType y) {
@@ -48,7 +87,6 @@ gb_global cgType const CG_TYPE_I8      = cgType{cgType_i8};
 gb_global cgType const CG_TYPE_I16     = cgType{cgType_i16};
 gb_global cgType const CG_TYPE_I32     = cgType{cgType_i32};
 gb_global cgType const CG_TYPE_I64     = cgType{cgType_i64};
-// gb_global cgType const CG_TYPE_I128    = cgType{cgType_i128};
 gb_global cgType const CG_TYPE_PTR     = cgType{cgType_ptr};
 gb_global cgType const CG_TYPE_F16     = cgType{cgType_f16};
 gb_global cgType const CG_TYPE_F32     = cgType{cgType_f32};
@@ -88,31 +126,6 @@ struct cgSymbol {
 	i64 ordinal;
 };
 
-enum cgCompareOp : u8 {
-	cgCompareOp_Unknown,
-	cgCompareOp_COUNT,
-};
-
-enum cgBinaryOpInt : u8 {
-	cgBinaryOpInt_Unknown,
-	cgBinaryOpInt_COUNT,
-};
-
-enum cgUnaryOp : u8 {
-	cgUnaryOp_Unknown,
-	cgUnaryOp_COUNT,
-};
-
-enum cgBinaryOpFloat : u8 {
-	cgBinaryOpFloat_Unknown,
-	cgBinaryOpFloat_COUNT,
-};
-
-enum cgCastOp : u8 {
-	cgCastOp_Unknown,
-	cgCastOp_COUNT,
-};
-
 struct cgUser {
 	cgNode *node;
 	i32     slot;
@@ -131,38 +144,143 @@ struct cgSafepoint {
 enum cgNodeKind : u8 {
 	cgNode_NULL,
 
-	cgNode_Branch,
-	cgNode_If,
-	cgNode_Proj,
-	cgNode_BranchProj,
-
-	cgNode_SymbolTable,
-	
-	cgNode_Local,
+	// Constants
 	cgNode_Int,
 	cgNode_Int128,
 	cgNode_F16,
 	cgNode_F32,
 	cgNode_F64,
-	cgNode_Symbol,
 
-	cgNode_Compare,
-	cgNode_BinaryOpInt,
+	// Projections
+	// extract a single field of a tuple
+	cgNode_Proj,
+	cgNode_BranchProj,
 
-	cgNode_MemAccess,
 
-	cgNode_DebugLoc,
-	cgNode_Atomic,
-
+	// Misc
+	cgNode_SymbolTable,
 	cgNode_Safepoint,
+	cgNode_FramePtr,
+	cgNode_Blackhole,
 
+	// Control
+	cgNode_Root,
+	cgNode_Return,
+	cgNode_Region,
+	cgNode_Phi,
+	cgNode_Branch,
+	cgNode_If,
+	cgNode_DebugBreak,
+	cgNode_Trap,
+	cgNode_Unreachable,
+	cgNode_Dead,
+	cgNode_DeadStore,
+
+	// Control + Memory
 	cgNode_Call,
-
+	cgNode_Syscall,
 	cgNode_Tailcall,
 
+	cgNode_DebugLocation,
+
+	// Memory
+	cgNode_Load,
+	cgNode_Store,
+	cgNode_Memcpy,
+	cgNode_Memmove,
+	cgNode_Memzero,
+	cgNode_SplitMem,
+	cgNode_MergeMem,
+
+	cgNode_AtomicLoad,
+	cgNode_AtomicStore,
+	cgNode_AtomicXchg,
+	cgNode_AtomicAdd,
+	cgNode_AtomicAnd,
+	cgNode_AtomicXor,
+	cgNode_AtomicOr,
+	cgNode_AtomicPtrOff,
+	cgNode_AtomicCas,
+
+	cgNode_VolatileBarrier,
+
+	// Pointers
+	cgNode_Local,
+	cgNode_Symbol,
+	cgNode_PtrOffset,
+
+	// Conversions
+	cgNode_Bitcast,
+	cgNode_Truncate,
+	cgNode_FloatTruncate,
+	cgNode_FloatExt,
+	cgNode_SignExt,
+	cgNode_ZeroExt,
+	cgNode_UintToFloat,
+	cgNode_IntToFloat,
+	cgNode_FloatToInt,
+	cgNode_FloatToUint,
+
+	// Select
+	cgNode_Select,
+
+	// Bitwise Operations
+	cgNode_ByteSwap,
+	cgNode_CountLeadingZeros,
+	cgNode_CountTrailingZeros,
+	cgNode_CountOnes,
+
+	// Unary Operation
+	cgNode_FNeg,
+
+	// Integer Arithmetic
+	cgNode_And,
+	cgNode_Or,
+	cgNode_Xor,
+	cgNode_Add,
+	cgNode_Sub,
+	cgNode_Mul,
+
+	cgNode_Shl,
+	cgNode_Shr,
+	cgNode_Ashr,
+	cgNode_ROL,
+	cgNode_ROR,
+	cgNode_UDiv,
+	cgNode_IDiv,
+	cgNode_UMod,
+	cgNode_IMod,
+
+	// Float Arithmetic
+	cgNode_FAdd,
+	cgNode_FSub,
+	cgNode_FMul,
+	cgNode_FDiv,
+	cgNode_FMin,
+	cgNode_FMax,
+
+	// Comparisons
+	cgNode_Cmp_EQ,
+	cgNode_Cmp_NE,
+	cgNode_Cmp_ULT,
+	cgNode_Cmp_ULE,
+	cgNode_Cmp_ILT,
+	cgNode_Cmp_ILE,
+	cgNode_Cmp_FLT,
+	cgNode_Cmp_FLE,
+
+	// Float Intrinsics
+	cgNode_FSqrt,
+	cgNode_FusedMulAdd,
+
+	// 128-bit operations
+	cgNode_UMul64Pair,
+	cgNode_IMul64Pair,
+
+	// Vector Operations
+	cgNode_VBroadcast,
 	cgNode_VShuffle,
 
-	cgNode_Region,
 
 	cgNode_COUNT,
 };
@@ -186,26 +304,16 @@ struct cgNode {
 	// ordered use-def edges
 	// after input_count (and up to input_capacity) goes an unordered set of nodes
 	// which act as extra deps, storing things like anti-deps and other scheduling related edges
-	cgNode **inputs_;
+	cgNode **inputs;
 	// def-use edges, unordered
-	cgUser * users_;
+	cgUser * users;
 
 	Type *odin_type; // usually `nullptr`
 
-	cgNode *inputs(isize index) {
-		GB_ASSERT(0 <= index && index < this->input_count);
-		return this->inputs_[index];
-	}
 
-	cgNode *unordered_inputs(isize index) {
-		GB_ASSERT(0 <= index && index < (this->input_capacity - this->input_count));
-		return this->inputs_[index+this->input_count];
-	}
+	template <typename T> T *      downcast()       { return reinterpret_cast<T *>(this); }
+	template <typename T> T const *downcast() const { return reinterpret_cast<T *>(this); }
 
-	cgUser &users(isize index) {
-		GB_ASSERT(0 <= index && index < this->user_count);
-		return this->users_[index];
-	}
 };
 
 struct cgNodeBranch : cgNode {
@@ -231,6 +339,11 @@ struct cgNodeBranchProj : cgNode {
 	u64 taken;
 	i64 key;
 };
+
+struct cgNodeSelect : cgNode {
+	cgNodeSelect() : cgNode{cgNode_Select} {}
+};
+
 struct cgNodeSymbolTable : cgNode {
 	cgNodeSymbolTable() : cgNode{cgNode_SymbolTable} {}
 
@@ -252,7 +365,7 @@ struct cgNodeLocal : cgNode {
 struct cgNodeInt : cgNode {
 	cgNodeInt() : cgNode{cgNode_Int} {}
 
-	u64 value;
+	u64 val;
 };
 struct cgNodeInt128 : cgNode {
 	cgNodeInt128() : cgNode{cgNode_Int128} {}
@@ -278,30 +391,31 @@ struct cgNodeF64 : cgNode {
 };
 struct cgNodeSymbol : cgNode {
 	cgNodeSymbol() : cgNode{cgNode_Symbol} {}
-};
-struct cgNodeCompare : cgNode {
-	cgNodeCompare() : cgNode{cgNode_Compare} {}
 
-	cgCompareOp op;
-	cgType      type;
+	cgSymbol *symbol;
 };
-struct cgNodeBinaryOpInt : cgNode {
-	cgNodeBinaryOpInt() : cgNode{cgNode_BinaryOpInt} {}
 
-	cgBinaryOpInt op;
+struct cgNodeCast : cgNode {
+	explicit cgNodeCast(cgNodeKind kind) : cgNode{kind} {}
+};
+struct cgNodeUnary : cgNode {
+	explicit cgNodeUnary(cgNodeKind kind) : cgNode{kind} {}
+};
+struct cgNodeBinary : cgNode {
+	explicit cgNodeBinary(cgNodeKind kind) : cgNode{kind} {}
 };
 struct cgNodeMemAccess : cgNode {
-	cgNodeMemAccess() : cgNode{cgNode_MemAccess} {}
+	explicit cgNodeMemAccess(cgNodeKind kind) : cgNode{kind} {}
 
 	u32 align;
 };
-struct cgNodeDebugLoc : cgNode {
-	cgNodeDebugLoc() : cgNode{cgNode_DebugLoc} {}
+struct cgNodeDebugLocation : cgNode {
+	cgNodeDebugLocation() : cgNode{cgNode_DebugLocation} {}
 
 	TokenPos pos;
 };
 struct cgNodeAtomic : cgNode {
-	cgNodeAtomic() : cgNode{cgNode_Atomic} {}
+	explicit cgNodeAtomic(cgNodeKind kind) : cgNode{kind} {}
 
 	cgMemoryOrder order;
 	cgMemoryOrder order_fail;
@@ -329,14 +443,37 @@ struct cgNodeRegion : cgNode {
 	String name;
 };
 
+struct cgNodePhi : cgNode {
+	cgNodePhi() : cgNode{cgNode_Phi} {}
+};
+
 
 template <typename T>
-gb_internal T *cg_alloc_node(cgProcedure *p, cgType type, isize input_count, isize input_capacity, Type *odin_type=nullptr);
+gb_internal T *cg_alloc_node(cgProcedure *p, cgType type, isize input_count, isize input_capacity=0, Type *odin_type=nullptr);
 
+template <typename T>
+gb_internal T *cg_alloc_node_with_kind(cgProcedure *p, cgNodeKind kind, cgType type, isize input_count, isize input_capacity=0, Type *odin_type=nullptr);
 
 /////////////////
 // Builder API //
 /////////////////
+
+#define CG_PEEP_PROC(name) cgNode *name(cgProcedure *p, cgNode *n)
+typedef CG_PEEP_PROC(cgPeepProc);
+
+struct cgGraphBuilder {
+	cgProcedure *p;
+	Arena *arena;
+
+	cgNode *curr;
+
+
+	cgNodeSymbolTable *start_symbol_table;
+
+	cgPeepProc *peep_callback;
+
+	Slice<cgNode *> params;
+};
 
 gb_internal cgGraphBuilder *cg_builder_enter(cgProcedure *p, Type *odin_signature);
 gb_internal void            cg_builder_exit(cgGraphBuilder *b);
@@ -352,20 +489,20 @@ gb_internal cgNode *cg_builder_symbol(cgGraphBuilder *b, cgSymbol *s);
 gb_internal cgNode *cg_builder_string_ptr(cgGraphBuilder *b, String str);
 
 
-gb_internal cgNode *cg_builder_binary_op_int(cgGraphBuilder *b, cgBinaryOpInt op, cgNode *x, cgNode *y);
-gb_internal cgNode *cg_builder_binary_op_float(cgGraphBuilder *b, cgBinaryOpInt op, cgNode *x, cgNode *y);
+gb_internal cgNode *cg_builder_binary_op_int(cgGraphBuilder *b, cgNodeKind op, cgNode *x, cgNode *y);
+gb_internal cgNode *cg_builder_binary_op_float(cgGraphBuilder *b, cgNodeKind op, cgNode *x, cgNode *y);
 
 gb_internal cgNode *cg_builder_select(cgGraphBuilder *b, cgNode *cond, cgNode *x, cgNode *y);
-gb_internal cgNode *cg_builder_cast(cgGraphBuilder *b, cgType type, cgCastOp op, cgNode *src);
+gb_internal cgNode *cg_builder_cast(cgGraphBuilder *b, cgType type, cgNodeKind op, cgNode *src);
 
-gb_internal cgNode *cg_builder_unary(cgGraphBuilder *b, cgUnaryOp op, cgNode *src);
+gb_internal cgNode *cg_builder_unary(cgGraphBuilder *b, cgNodeKind op, cgNode *src);
 gb_internal cgNode *cg_builder_neg(cgGraphBuilder *b, cgNode *src);
 gb_internal cgNode *cg_builder_not(cgGraphBuilder *b, cgNode *src);
 
-gb_internal cgNode *cg_builder_cmp(cgGraphBuilder *b, cgCompareOp op, cgNode *x, cgNode *y);
+gb_internal cgNode *cg_builder_cmp(cgGraphBuilder *b, cgNodeKind op, cgNode *x, cgNode *y);
 
 // base + index*stride
-gb_internal cgNode *cg_builder_ptr_array(cgGraphBuilder *b, cgNode *base, cgNode *index, i64 stride);
+gb_internal cgNode *cg_builder_ptr_array(cgGraphBuilder *b, cgNode *base, cgNode *index, u64 stride);
 // base + offset
 gb_internal cgNode *cg_builder_ptr_member(cgGraphBuilder *b, cgNode *base, i64 offset);
 
@@ -378,7 +515,7 @@ gb_internal cgNode *cg_builder_memzero(cgGraphBuilder *b, int mem_var, bool ctrl
 
 
 gb_internal cgNode *cg_builder_local(cgGraphBuilder *b, u32 size, u32 align);
-gb_internal cgNode *cg_builder_local_debug(cgGraphBuilder *b, cgNode *n, String name, Type *odin_type);
+gb_internal cgNode *cg_builder_local_debug(cgGraphBuilder *b, String name, Type *odin_type);
 
 gb_internal cgNode *cg_builder_frame_ptr(cgGraphBuilder *b);
 
@@ -386,13 +523,12 @@ gb_internal cgNode *cg_builder_frame_ptr(cgGraphBuilder *b);
 // Control Flow Primitives using Regions
 
 gb_internal cgNode *cg_builder_label(cgGraphBuilder *b, cgNode *label=nullptr, bool allow_backward_jumps=false);
-// Once a labe is complete, you can no longer insert jumps into it.
+// Once a label is complete, you can no longer insert jumps into it.
 // The phi nodes are placed and you can then insert code into the label's body.
-gb_internal cgNode *cg_builder_label_complete(cgGraphBuilder *b, cgNode *label);
-
+gb_internal void    cg_builder_label_complete(cgGraphBuilder *b, cgNode *label);
 gb_internal void    cg_builder_label_kill(cgGraphBuilder *b, cgNode *label);
 
-gb_internal cgNode *cg_builder_if(cgGraphBuilder *b, cgNode *cond, cgNode *x, cgNode *y);
+gb_internal cgNode *cg_builder_if(cgGraphBuilder *b, cgNode *cond, cgNode *paths[2]);
 gb_internal void    cg_builder_jump(cgGraphBuilder *b, cgNode *target);
 gb_internal cgNode *cg_builder_loop(cgGraphBuilder *b);
 gb_internal cgNode *cg_builder_phi(cgGraphBuilder *b, Slice<cgNode *> vals);
@@ -405,7 +541,7 @@ gb_internal cgNode *cg_builder_case_key(cgGraphBuilder *b, cgNode *br_syms, u64 
 gb_internal void cg_builder_ret(cgGraphBuilder *b, int mem_var, Slice<cgNode *> args);
 gb_internal void cg_builder_unreachable(cgGraphBuilder *b, int mem_var);
 gb_internal void cg_builder_trap(cgGraphBuilder *b, int mem_var);
-gb_internal void cg_builder_debug_trap(cgGraphBuilder *b, int mem_var);
+gb_internal void cg_builder_debug_break(cgGraphBuilder *b, int mem_var);
 // All the passed arguments have their lifetimes anchored to this points
 gb_internal void cg_builder_black_hole(cgGraphBuilder *b, Slice<cgNode *> args);
 
@@ -529,11 +665,19 @@ struct cgGlobal : cgSymbol {
 };
 
 
+struct cgWorklist {
+	Array<cgNode *> items;
+	Slice<u64> visited; // bit-array, with gvn as key
+};
+
 struct cgProcedure : cgSymbol {
 	Arena arena;
+	Arena temp_arena;
 
 	u32 flags;
 	u16 state_flags;
+
+	u32 node_count;
 
 	cgProcedure *parent;
 	Array<cgProcedure *> children;
@@ -553,6 +697,10 @@ struct cgProcedure : cgSymbol {
 	bool is_entry_point;
 	bool is_startup;
 
+	cgWorklist *worklist;
+
+	cgNode *root_node;
+
 	cgValue value;
 };
 
@@ -563,3 +711,22 @@ struct cgModule {
 
 	Array<cgProcedure *> procedures;
 };
+
+
+gb_internal void        cg_worklist_clear_visited(cgWorklist *wl);
+gb_internal void        cg_worklist_clear        (cgWorklist *wl);
+gb_internal void        cg_worklist_remove       (cgWorklist *wl, cgNode *n);
+gb_internal bool        cg_worklist_test         (cgWorklist *wl, cgNode *n);
+gb_internal bool        cg_worklist_test_and_set (cgWorklist *wl, cgNode *n);
+gb_internal void        cg_worklist_push         (cgWorklist *wl, cgNode *n);
+gb_internal cgNode *    cg_worklist_pop          (cgWorklist *wl);
+gb_internal void        cg_worklist_replace      (cgWorklist *wl, cgNode *n, cgNode *k);
+gb_internal void        cg_worklist_init         (cgWorklist *wl, isize capacity);
+gb_internal void        cg_worklist_deinit       (cgWorklist *wl);
+gb_internal cgWorklist *cg_worklist_create       ();
+gb_internal void        cg_worklist_destroy      (cgWorklist *wl);
+
+
+
+gb_internal u32 cg_type_bit_size(cgModule *m, cgTypeKind type);
+gb_internal u32 cg_type_bit_size(cgModule *m, cgType type) { return cg_type_bit_size(m, type.kind); }
