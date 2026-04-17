@@ -899,6 +899,7 @@ load_proc_addresses :: proc{
 with open("../core.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write(PACKAGE_LINE)
+    f.write("\n")
     f.write("""
 // Core API
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
@@ -907,8 +908,36 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 API_VERSION_1_4 :: (1<<22) | (4<<12) | (0)
 
+MAKE_API_VERSION :: proc "contextless" (variant, major, minor, patch: u32) -> u32 {
+\treturn (variant<<29) | (major<<22) | (minor<<12) | (patch)
+}
+
 MAKE_VERSION :: proc "contextless" (major, minor, patch: u32) -> u32 {
 \treturn (major<<22) | (minor<<12) | (patch)
+}
+
+API_VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>22) & 0x7F
+}
+
+VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>22)
+}
+
+API_VERSION_MINOR :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>12) & 0x3FF
+}
+
+VERSION_MINOR :: API_VERSION_MINOR
+
+API_VERSION_PATCH :: proc "contextless" (version: u32) -> u32 {
+\treturn (version & 0xFFF)
+}
+
+VERSION_PATCH :: API_VERSION_PATCH
+
+API_VERSION_VARIANT :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>29)
 }
 
 // Base types
@@ -973,12 +1002,13 @@ MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
     parse_flags_def(f)
 with open("../enums.odin", 'w', encoding='utf-8') as f:
     f.write(PACKAGE_LINE)
-    f.write("\n")
+    f.write("\n\n")
     parse_enums(f)
     parse_fake_enums(f)
     f.write("\n\n")
 with open("../structs.odin", 'w', encoding='utf-8') as f:
     f.write(PACKAGE_LINE)
+    f.write("\n")
     f.write("""
 import "core:c"
 
@@ -1040,7 +1070,7 @@ MTLCommandQueue_id :: rawptr
     f.write("\n\n")
 with open("../procedures.odin", 'w', encoding='utf-8') as f:
     f.write(PACKAGE_LINE)
-    f.write("\n")
+    f.write("\n\n")
     parse_procedures(f)
     f.write("\n")
     group_functions(f)
