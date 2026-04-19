@@ -1134,6 +1134,15 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 				error(f->bit_size, "A bit_field's specified bit size cannot exceed its type, got %lld, expect <=%lld", cast(long long)bit_size_i64, cast(long long)sz);
 				bit_size_i64 = sz;
 			}
+			if (is_type_bit_set(type)) {
+				Type *bit_set = base_type(type);
+				GB_ASSERT(bit_set->kind == Type_BitSet);
+				i64 required_bits = 1 + bit_set->BitSet.upper - bit_set->BitSet.lower;
+				if (bit_size_i64 < required_bits) {
+					error(f->bit_size, "A bit_set in a bit_field must have a large enough bit size, got %lld, expected >=%lld", cast(long long)bit_size_i64, cast(long long)required_bits);
+					bit_size_i64 = required_bits;
+				}
+			}
 
 			bit_size_u8 = cast(u8)bit_size_i64;
 
