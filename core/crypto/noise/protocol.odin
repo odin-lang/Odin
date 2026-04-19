@@ -747,7 +747,7 @@ handshakestate_WriteMessage :: proc(self: ^Handshake_State, payload, dst: []byte
 	pattern_len := len(pattern_buf)
 	payload_len := len(payload)
 	msg_len := pattern_len + payload_len
-	if payload_len != 0 && cipherstate_HasKey(&self.symmetric_state.cipher_state) {
+	if cipherstate_HasKey(&self.symmetric_state.cipher_state) {
 		msg_len += TAG_SIZE
 	}
 
@@ -771,15 +771,13 @@ handshakestate_WriteMessage :: proc(self: ^Handshake_State, payload, dst: []byte
 		}
 
 		copy(msg, pattern_buf[:])
-		if payload_len != 0 {
-			ciphertext := msg[pattern_len:]
-			if _, status := symmetricstate_EncryptAndHash(&self.symmetric_state, payload, ciphertext); status != .Ok {
-				if did_alloc {
-					delete(msg)
-				}
-				self.status = .Handshake_Failed
-				return nil, status
+		ciphertext := msg[pattern_len:]
+		if _, status := symmetricstate_EncryptAndHash(&self.symmetric_state, payload, ciphertext); status != .Ok {
+			if did_alloc {
+				delete(msg)
 			}
+			self.status = .Handshake_Failed
+			return nil, status
 		}
 	}
 
@@ -929,40 +927,38 @@ handshakestate_ReadMessage :: proc(self: ^Handshake_State, message, dst: []byte,
 	self.current_message += 1 // Advance after the current message is successful.
 
 	payload: []byte
-	if len(msg) > 0 {
-		payload_len := len(msg)
-		if cipherstate_HasKey(&self.symmetric_state.cipher_state) {
-			if payload_len < TAG_SIZE {
-				self.status = .Handshake_Failed
-				return nil, self.status
-			}
-			payload_len -= TAG_SIZE
-		}
-
-		did_alloc: bool
-		if dst != nil {
-			if len(dst) < payload_len {
-				self.status = .Handshake_Failed
-				return nil, .Out_Of_Memory
-			}
-			payload = dst[:payload_len]
-		} else {
-			err: runtime.Allocator_Error
-			payload, err = make([]byte, payload_len, allocator)
-			if err != nil {
-				self.status = .Handshake_Failed
-				return nil, .Out_Of_Memory
-			}
-			did_alloc = true
-		}
-
-		if _, status := symmetricstate_DecryptAndHash(&self.symmetric_state, msg, payload); status != .Ok {
-			if did_alloc {
-				delete(payload)
-			}
+	payload_len := len(msg)
+	if cipherstate_HasKey(&self.symmetric_state.cipher_state) {
+		if payload_len < TAG_SIZE {
 			self.status = .Handshake_Failed
 			return nil, self.status
 		}
+		payload_len -= TAG_SIZE
+	}
+
+	did_alloc: bool
+	if dst != nil {
+		if len(dst) < payload_len {
+			self.status = .Handshake_Failed
+			return nil, .Out_Of_Memory
+		}
+		payload = dst[:payload_len]
+	} else if payload_len > 0 {
+		err: runtime.Allocator_Error
+		payload, err = make([]byte, payload_len, allocator)
+		if err != nil {
+			self.status = .Handshake_Failed
+			return nil, .Out_Of_Memory
+		}
+		did_alloc = true
+	}
+
+	if _, status := symmetricstate_DecryptAndHash(&self.symmetric_state, msg, payload); status != .Ok {
+		if did_alloc {
+			delete(payload)
+		}
+		self.status = .Handshake_Failed
+		return nil, self.status
 	}
 
 	if self.current_message == len(self.message_pattern.messages) {

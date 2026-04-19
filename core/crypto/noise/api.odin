@@ -15,8 +15,8 @@ TAG_SIZE :: 16
 // excluding the optional payload.
 //
 // `e` is DH_LEN, `s` is either DH_LEN or DH_LEN + TAG_SIZE, and there
-// is a maximum of one per each message.
-MAX_STEP_MSG_SIZE :: (MAX_DH_SIZE*2)+TAG_SIZE
+// is a maximum of one per each message, and a possible mandatory tag.
+MAX_STEP_MSG_SIZE :: (MAX_DH_SIZE*2)+TAG_SIZE+TAG_SIZE
 
 // Status is the status of Noise protocol operation.
 Status :: enum {
