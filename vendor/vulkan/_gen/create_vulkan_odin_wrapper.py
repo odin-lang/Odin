@@ -616,11 +616,10 @@ class Bitfield:
         else:
             f.write("{}{} bit_field {} {{\n".format('\t' * indent, name + ' ::' if name else 'using _:', self.type))
             for field in self.fields:
-                type_ = field.type.replace("Flags", "Flag")
                 f.write("{}{} {} | {},\n".format(
                     '\t' * (indent + 1),
                     (field.name + ":").ljust(max_name + 1),
-                    type_.ljust(max_type),
+                    field.type.ljust(max_type),
                     field.bitsize))
             f.write(('\t' * indent) + "}" + ("," if name is None else "") + "\n")
 
