@@ -51,6 +51,31 @@ Handshake_Pattern :: enum {
 	IK,
 	IX,
 
+	// Deferred patterns
+	NK1,
+	NX1,
+	X1N,
+	X1K,
+	XK1,
+	X1K1,
+	X1X,
+	XX1,
+	X1X1,
+	K1N,
+	K1K,
+	KK1,
+	K1K1,
+	K1X,
+	KX1,
+	K1X1,
+	I1N,
+	I1K,
+	IK1,
+	I1K1,
+	I1X,
+	IX1,
+	I1X1,
+
 	// Recommended PSK patterns
 	Npsk0,
 	Kpsk0,
@@ -132,6 +157,7 @@ HANDSHAKE_PATTERNS := [Handshake_Pattern]^Message_Pattern {
 	.N = &PATTERN_N,
 	.K = &PATTERN_K,
 	.X = &PATTERN_X,
+
 	.XX = &PATTERN_XX,
 	.NK = &PATTERN_NK,
 	.NN = &PATTERN_NN,
@@ -144,6 +170,31 @@ HANDSHAKE_PATTERNS := [Handshake_Pattern]^Message_Pattern {
 	.XK = &PATTERN_XK,
 	.IK = &PATTERN_IK,
 	.IX = &PATTERN_IX,
+
+	.NK1 = &PATTERN_NK1,
+	.NX1 = &PATTERN_NX1,
+	.X1N = &PATTERN_X1N,
+	.X1K = &PATTERN_X1K,
+	.XK1 = &PATTERN_XK1,
+	.X1K1 = &PATTERN_X1K1,
+	.X1X = &PATTERN_X1X,
+	.XX1 = &PATTERN_XX1,
+	.X1X1 = &PATTERN_X1X1,
+	.K1N = &PATTERN_K1N,
+	.K1K = & PATTERN_K1K,
+	.KK1 = &PATTERN_KK1,
+	.K1K1 = &PATTERN_K1K1,
+	.K1X = &PATTERN_K1X,
+	.KX1 = &PATTERN_KX1,
+	.K1X1 = &PATTERN_K1X1,
+	.I1N = &PATTERN_I1N,
+	.I1K = &PATTERN_I1K,
+	.IK1 = &PATTERN_IK1,
+	.I1K1 = &PATTERN_I1K1,
+	.I1X = &PATTERN_I1X,
+	.IX1 = &PATTERN_IX1,
+	.I1X1 = &PATTERN_I1X1,
+
 	.Npsk0 = &PATTERN_Npsk0,
 	.Kpsk0 = &PATTERN_Kpsk0,
 	.Xpsk1 = &PATTERN_Xpsk1,
@@ -373,6 +424,367 @@ PATTERN_IX :  Message_Pattern = {
 	messages = {
 		{.e, .s},
 		{.e, .ee, .se, .s, .es},
+	},
+}
+
+// ----------------------------------------------------------------------------------------
+
+// ------------- DEFERRED PATTERNS --------------------------------------------------------
+
+// NK1:
+//   <- s
+//   ...
+//   -> e
+//   <- e, ee, es
+@(private,rodata)
+PATTERN_NK1 : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e},
+		{.e, .ee, .es},
+	},
+}
+
+// NX1:
+//   -> e
+//   <- e, ee, s
+//   -> es
+@(private,rodata)
+PATTERN_NX1 : Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e},
+		{.e, .ee, .s},
+		{.es},
+	},
+}
+
+// X1N:
+//   -> e
+//   <- e, ee
+//   -> s
+//   <- se
+@(private,rodata)
+PATTERN_X1N : Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e},
+		{.e, .ee},
+		{.s},
+		{.se},
+	},
+}
+
+// X1K:
+//   <- s
+//   ...
+//   -> e, es
+//   <- e, ee
+//   -> s
+//   <- se
+@(private,rodata)
+PATTERN_X1K : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e, .es},
+		{.e, .ee},
+		{.s},
+		{.se},
+	},
+}
+
+// XK1:
+//   <- s
+//   ...
+//   -> e
+//   <- e, ee, es
+//   -> s, se
+@(private,rodata)
+PATTERN_XK1 : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e},
+		{.e, .ee, .es},
+		{.s, .se},
+	},
+}
+
+// X1K1:
+//   <- s
+//   ...
+//   -> e
+//   <- e, ee, es
+//   -> s
+//   <- se
+@(private,rodata)
+PATTERN_X1K1 : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e},
+		{.e, .ee, .es},
+		{.s},
+		{.se},
+	},
+}
+
+// X1X:
+//   -> e
+//   <- e, ee, s, es
+//   -> s
+//   <- se
+@(private,rodata)
+PATTERN_X1X : Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e},
+		{.e, .ee, .s, .es},
+		{.s},
+		{.se},
+	},
+}
+
+// XX1:
+//   -> e
+//   <- e, ee, s
+//   -> es, s, se
+@(private,rodata)
+PATTERN_XX1 : Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e},
+		{.e, .ee, .s},
+		{.es, .s, .se},
+	},
+}
+
+// X1X1:
+//   -> e
+//   <- e, ee, s
+//   -> es, s
+//   <- se
+@(private,rodata)
+PATTERN_X1X1 : Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e},
+		{.e, .ee, .s},
+		{.es, .s},
+		{.se},
+	},
+}
+
+// K1N:
+//   -> s
+//   ...
+//   -> e
+//   <- e, ee
+//   -> se
+@(private,rodata)
+PATTERN_K1N : Message_Pattern = {
+	pre_messages = {.ini_s},
+	messages = {
+		{.e,},
+		{.e, .ee},
+		{.se},
+	},
+}
+
+// K1K:
+//   -> s
+//   <- s
+//   ...
+//   -> e, es
+//   <- e, ee
+//   -> se
+@(private,rodata)
+PATTERN_K1K : Message_Pattern = {
+	pre_messages = {.ini_s, .res_s},
+	messages = {
+		{.e, .es},
+		{.e, .ee},
+		{.se},
+	},
+}
+
+// KK1:
+//   -> s
+//   <- s
+//   ...
+//   -> e
+//   <- e, ee, se, es
+@(private,rodata)
+PATTERN_KK1 : Message_Pattern = {
+	pre_messages = {.ini_s, .res_s},
+	messages = {
+		{.e},
+		{.e, .ee, .se, .es},
+	},
+}
+
+// K1K1:
+//   -> s
+//   <- s
+//   ...
+//   -> e
+//   <- e, ee, es
+//   -> se
+@(private,rodata)
+PATTERN_K1K1 : Message_Pattern = {
+	pre_messages = {.ini_s, .res_s},
+	messages = {
+		{.e},
+		{.e, .ee, .es},
+		{.se},
+	},
+}
+
+// K1X:
+//   -> s
+//   ...
+//   -> e
+//   <- e, ee, s, es
+//   -> se
+@(private,rodata)
+PATTERN_K1X : Message_Pattern = {
+	pre_messages = {.ini_s},
+	messages = {
+		{.e},
+		{.e, .ee, .s, .es},
+		{.se},
+	},
+}
+
+// KX1:
+//   -> s
+//   ...
+//   -> e
+//   <- e, ee, se, s
+//   -> es
+@(private,rodata)
+PATTERN_KX1 : Message_Pattern = {
+	pre_messages = {.ini_s},
+	messages = {
+		{.e},
+		{.e, .ee, .se, .s},
+		{.es},
+	},
+}
+
+// K1X1:
+//   -> s
+//   ...
+//   -> e
+//   <- e, ee, s
+//   -> se, es
+@(private,rodata)
+PATTERN_K1X1 : Message_Pattern = {
+	pre_messages = {.ini_s},
+	messages = {
+		{.e},
+		{.e, .ee, .s},
+		{.se, .es},
+	},
+}
+
+// I1N:
+//   -> e, s
+//   <- e, ee
+//   -> se
+@(private,rodata)
+PATTERN_I1N : Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e, .s},
+		{.e, .ee},
+		{.se},
+	},
+}
+
+// I1K:
+//   <- s
+//   ...
+//   -> e, es, s
+//   <- e, ee
+//   -> se
+@(private,rodata)
+PATTERN_I1K : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e, .es, .s},
+		{.e, .ee},
+		{.se},
+	},
+}
+
+// IK1:
+//   <- s
+//   ...
+//   -> e, s
+//   <- e, ee, se, es
+@(private,rodata)
+PATTERN_IK1 : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e, .s},
+		{.e, .ee, .se, .es},
+	},
+}
+
+// I1K1:
+//   <- s
+//   ...
+//   -> e, s
+//   <- e, ee, es
+//   -> se
+@(private,rodata)
+PATTERN_I1K1 : Message_Pattern = {
+	pre_messages = {.res_s},
+	messages = {
+		{.e, .s},
+		{.e, .ee, .es},
+		{.se},
+	},
+}
+
+// I1X:
+//   -> e, s
+//   <- e, ee, s, es
+//   -> se
+@(private,rodata)
+PATTERN_I1X :  Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e, .s},
+		{.e, .ee, .s, .es},
+		{.se},
+	},
+}
+
+// IX1:
+//   -> e, s
+//   <- e, ee, se, s
+//   -> es
+@(private,rodata)
+PATTERN_IX1 :  Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e, .s},
+		{.e, .ee, .se, .s},
+		{.es},
+	},
+}
+
+// I1X1:
+//   -> e, s
+//   <- e, ee, s
+//   -> se, es
+@(private,rodata)
+PATTERN_I1X1 :  Message_Pattern = {
+	pre_messages = nil,
+	messages = {
+		{.e, .s},
+		{.e, .ee, .s},
+		{.se, .es},
 	},
 }
 

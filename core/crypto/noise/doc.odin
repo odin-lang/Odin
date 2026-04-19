@@ -1,7 +1,7 @@
 /*
 An implementation of the Noise Protocol Framework (Revision 34).
 
-The `fallback` modifier and deferred/multi-PSK patterns are not supported
+The `fallback` modifier and multi-PSK patterns are not supported
 for the sake of simplicity.
 
 See:

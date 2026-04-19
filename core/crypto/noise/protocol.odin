@@ -817,10 +817,6 @@ handshakestate_write_message :: proc(self: ^Handshake_State, payload, dst: []byt
 handshakestate_read_message :: proc(self: ^Handshake_State, message, dst: []byte, allocator := context.allocator)  -> ([]byte, Status) {
 	ensure(self.status == .Handshake_Pending, "crypto/noise: invalid state for ReadMessage")
 
-	if len(message) < MIN_DH_SIZE {
-		return nil, .Invalid_Handshake_Message
-	}
-
 	protocol := &self.symmetric_state.protocol
 	d_len := dh_len(&self.symmetric_state.protocol)
 

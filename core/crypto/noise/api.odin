@@ -459,3 +459,129 @@ cipherstates_cs :: proc(self: ^Cipher_States, seal_key: bool) -> ^Cipher_State {
 	}
 	unreachable()
 }
+
+// split_protocol_string splits a protocol string into individual components.
+@(require_results)
+split_protocol_string :: proc(protocol_name: string) -> (Handshake_Pattern, ecdh.Curve, aead.Algorithm, hash.Algorithm, Status) {
+	str := protocol_name
+
+	if len(str) > 255 {
+		return .Invalid, .Invalid, .Invalid, .Invalid, .Invalid_Protocol_String
+	}
+
+	s, ok := strings.split_by_byte_iterator(&str, '_')
+	if !ok || s != "Noise" {
+		return .Invalid, .Invalid, .Invalid, .Invalid, .Invalid_Protocol_String
+	}
+
+	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
+		return .Invalid, .Invalid, .Invalid, .Invalid, .Invalid_Protocol_String
+	}
+
+	pattern: Handshake_Pattern
+	switch s {
+	case "N" : pattern = .N
+	case "K" : pattern = .K
+	case "X" : pattern = .X
+	case "XX": pattern = .XX
+	case "NK": pattern = .NK
+	case "NN": pattern = .NN
+	case "KN": pattern = .KN
+	case "KK": pattern = .KK
+	case "NX": pattern = .NX
+	case "KX": pattern = .KX
+	case "XN": pattern = .XN
+	case "IN": pattern = .IN
+	case "XK": pattern = .XK
+	case "IK": pattern = .IK
+	case "IX": pattern = .IX
+	case "NK1": pattern = .NK1
+	case "NX1": pattern = .NX1
+	case "X1N": pattern = .X1N
+	case "X1K": pattern = .X1K
+	case "XK1": pattern = .XK1
+	case "X1K1": pattern = .X1K1
+	case "X1X": pattern = .X1X
+	case "XX1": pattern = .XX1
+	case "X1X1": pattern = .X1X1
+	case "K1N": pattern = .K1N
+	case "K1K": pattern = .K1K
+	case "KK1": pattern = .KK1
+	case "K1K1": pattern = .K1K1
+	case "K1X": pattern = .K1X
+	case "KX1": pattern = .KX1
+	case "K1X1": pattern = .K1X1
+	case "I1N": pattern = .I1N
+	case "I1K": pattern = .I1K
+	case "IK1": pattern = .IK1
+	case "I1K1": pattern = .I1K1
+	case "I1X": pattern = .I1X
+	case "IX1": pattern = .IX1
+	case "I1X1": pattern = .I1X1
+	case "Npsk0": pattern = .Npsk0
+	case "Kpsk0": pattern = .Kpsk0
+	case "Xpsk1": pattern = .Xpsk1
+	case "NNpsk0": pattern = .NNpsk0
+	case "NNpsk2": pattern = .NNpsk2
+	case "NKpsk0": pattern = .NKpsk0
+	case "NKpsk2": pattern = .NKpsk2
+	case "NXpsk2": pattern = .NXpsk2
+	case "XNpsk3": pattern = .XNpsk3
+	case "XKpsk3": pattern = .XKpsk3
+	case "XXpsk3": pattern = .XXpsk3
+	case "KNpsk0": pattern = .KNpsk0
+	case "KNpsk2": pattern = .KNpsk2
+	case "KKpsk0": pattern = .KKpsk0
+	case "KKpsk2": pattern = .KKpsk2
+	case "KXpsk2": pattern = .KXpsk2
+	case "INpsk1": pattern = .INpsk1
+	case "INpsk2": pattern = .INpsk2
+	case "IKpsk1": pattern = .IKpsk1
+	case "IKpsk2": pattern = .IKpsk2
+	case "IXpsk2": pattern = .IXpsk2
+	case: pattern = .Invalid
+	}
+
+	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
+		return .Invalid, .Invalid, .Invalid, .Invalid, .Invalid_Protocol_String
+	}
+	dh: ecdh.Curve
+	switch s {
+	case "25519": dh = .X25519
+	case "448": dh = .X448
+	case: dh = .Invalid
+	}
+
+	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
+		return .Invalid, .Invalid, .Invalid, .Invalid, .Invalid_Protocol_String
+	}
+	cipher: aead.Algorithm
+	switch s {
+	case "AESGCM": cipher = .AES_GCM_256
+	case "ChaChaPoly": cipher = .CHACHA20POLY1305
+	case: cipher = .Invalid
+	}
+
+	if s, ok = strings.split_by_byte_iterator(&str, '_'); !ok {
+		return .Invalid, .Invalid, .Invalid, .Invalid, .Invalid_Protocol_String
+	}
+	hash: hash.Algorithm
+	switch s {
+	case "SHA512": hash = .SHA512
+	case "SHA256": hash = .SHA256
+	case "BLAKE2s": hash = .BLAKE2S
+	case "BLAKE2b": hash = .BLAKE2B
+	case: hash = .Invalid
+	}
+
+	status: Status
+
+	if len(str) != 0 {
+		status = .Invalid_Protocol_String
+	}
+	if pattern == .Invalid || dh == .Invalid || cipher == .Invalid || hash == .Invalid {
+		status = .Invalid_Protocol_String
+	}
+
+	return pattern, dh, cipher, hash, status
+}
