@@ -96,7 +96,7 @@ handshake_init :: proc(
 	psk: []byte = nil,
 	_e: ^ecdh.Private_Key = nil, // Our ephemeral key (for testing/RNG-less systems)
 ) -> Status {
-	return handshakestate_Initialize(
+	return handshakestate_initialize(
 		self,
 		initiator,
 		prologue,
@@ -134,14 +134,14 @@ handshake_initiator_step :: proc(
 
 	dst := dst
 	if input_message == nil {
-		output_message, status = handshakestate_WriteMessage(self, payload, dst, allocator)
+		output_message, status = handshakestate_write_message(self, payload, dst, allocator)
 	} else {
-		payload_buffer, status = handshakestate_ReadMessage(self, input_message, dst, allocator)
+		payload_buffer, status = handshakestate_read_message(self, input_message, dst, allocator)
 		if status == .Handshake_Pending {
 			if dst != nil {
 				dst = dst[len(payload_buffer):]
 			}
-			output_message, status = handshakestate_WriteMessage(self, payload, dst, allocator)
+			output_message, status = handshakestate_write_message(self, payload, dst, allocator)
 		}
 	}
 
@@ -174,15 +174,47 @@ handshake_responder_step :: proc(
 	}
 
 	dst := dst
-	payload_buffer, status := handshakestate_ReadMessage(self, input_message, dst, allocator)
+	payload_buffer, status := handshakestate_read_message(self, input_message, dst, allocator)
 	if status == .Handshake_Pending {
 		if dst != nil {
 			dst = dst[len(payload_buffer):]
 		}
-		output_message, status = handshakestate_WriteMessage(self, payload, dst, allocator)
+		output_message, status = handshakestate_write_message(self, payload, dst, allocator)
 	}
 
 	return output_message, payload_buffer, status
+}
+
+// handshake_write_message calls the Noise HandshakeState's WriteMessage
+// function directly.  In most cases you are better off using
+// handshake_initiator_step or handshake_responder_step.
+//
+// If the dst parameter is provided, the message and payload will be written
+// to dst, otherwise new buffers will be allocated.
+@(require_results)
+handshake_write_message :: proc(
+	self: ^Handshake_State,
+	payload: []byte,
+	dst: []byte = nil,
+	allocator := context.allocator,
+) -> ([]byte, Status) {
+	return handshakestate_write_message(self, payload, dst, allocator)
+}
+
+// handshake_read_message calls the Noise HandshakeState's ReadMessage
+// function directly.  In most cases you are better off using
+// handshake_initiator_step or handshake_responder_step.
+//
+// If the dst parameter is provided, the message and payload will be written
+// to dst, otherwise new buffers will be allocated.
+@(require_results)
+handshake_read_message :: proc(
+	self: ^Handshake_State,
+	message: []byte,
+	dst: []byte = nil,
+	allocator := context.allocator,
+) -> ([]byte, Status) {
+	return handshakestate_read_message(self, message, dst, allocator)
 }
 
 // handshake_split initializes a Cipher_States instance from a completed
@@ -194,7 +226,7 @@ handshake_split :: proc(self: ^Handshake_State, cipher_states: ^Cipher_States) -
 		return self.status
 	}
 
-	symmetricstate_Split(&self.symmetric_state, cipher_states)
+	symmetricstate_split(&self.symmetric_state, cipher_states)
 	if self.message_pattern.is_one_way {
 		cipherstate_reset(&cipher_states.c2_r_to_i)
 		cipher_states.c2_r_to_i.is_invalid = true
@@ -241,7 +273,7 @@ handshake_hash :: proc(self: ^Handshake_State) -> ([]byte, Status) {
 		return nil, self.status
 	}
 
-	return symmetricstate_GetHandshakeHash(&self.symmetric_state), .Ok
+	return symmetricstate_get_handshake_hash(&self.symmetric_state), .Ok
 }
 
 // handshake_reset sanitizes the Handshake_State.  It is both safe and
@@ -281,9 +313,9 @@ seal_message :: proc(self: ^Cipher_States, aad, plaintext: []byte, dst: []byte =
 	status: Status
 	switch self.initiator {
 	case true:
-		dst, status = cipherstate_EncryptWithAd(&self.c1_i_to_r, aad, plaintext, dst)
+		dst, status = cipherstate_encrypt_with_ad(&self.c1_i_to_r, aad, plaintext, dst)
 	case false:
-		dst, status = cipherstate_EncryptWithAd(&self.c2_r_to_i, aad, plaintext, dst)
+		dst, status = cipherstate_encrypt_with_ad(&self.c2_r_to_i, aad, plaintext, dst)
 	}
 	if status != .Ok && did_alloc {
 		delete(dst, allocator)
@@ -328,9 +360,9 @@ open_message :: proc(self: ^Cipher_States, aad, ciphertext: []byte, dst: []byte 
 	status: Status
 	switch self.initiator {
 	case true:
-		dst, status = cipherstate_DecryptWithAd(&self.c2_r_to_i, aad, ciphertext, dst)
+		dst, status = cipherstate_decrypt_with_ad(&self.c2_r_to_i, aad, ciphertext, dst)
 	case false:
-		dst, status = cipherstate_DecryptWithAd(&self.c1_i_to_r, aad, ciphertext, dst)
+		dst, status = cipherstate_decrypt_with_ad(&self.c1_i_to_r, aad, ciphertext, dst)
 	}
 	if status != .Ok && did_alloc {
 		delete(dst, allocator)
@@ -351,11 +383,11 @@ cipherstates_rekey :: proc(self: ^Cipher_States, seal_key: bool) -> Status {
 	if cs.is_invalid {
 		return .Invalid_Cipher_State
 	}
-	if !cipherstate_HasKey(cs) {
+	if !cipherstate_has_key(cs) {
 		return .Handshake_Pending
 	}
 
-	cipherstate_Rekey(cs)
+	cipherstate_rekey(cs)
 
 	return .Ok
 }
@@ -372,7 +404,7 @@ cipherstates_set_n :: proc(self: ^Cipher_States, seal_key: bool, n: u64) -> Stat
 	if cs.is_invalid {
 		return .Invalid_Cipher_State
 	}
-	if !cipherstate_HasKey(cs) {
+	if !cipherstate_has_key(cs) {
 		return .Handshake_Pending
 	}
 
@@ -393,7 +425,7 @@ cipherstates_n :: proc(self: ^Cipher_States, seal_key: bool, n: u64) -> (u64, St
 	if cs.is_invalid {
 		return 0, .Invalid_Cipher_State
 	}
-	if !cipherstate_HasKey(cs) {
+	if !cipherstate_has_key(cs) {
 		return 0, .Handshake_Pending
 	}
 
