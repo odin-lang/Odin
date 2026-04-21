@@ -402,7 +402,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalByValue,
 	BuildFlag_InternalWeakMonomorphization,
 	BuildFlag_InternalLLVMVerification,
-	BuildFlag_InternalLLVMMem2Reg,
+	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
 
 	BuildFlag_Sanitize,
@@ -634,7 +634,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalByValue,         str_lit("internal-by-value"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalWeakMonomorphization, str_lit("internal-weak-monomorphization"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_InternalLLVMMem2Reg,     str_lit("internal-llvm-mem2reg"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
 
 
@@ -1628,8 +1628,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalLLVMVerification:
 							build_context.internal_ignore_llvm_verification = true;
 							break;
-						case BuildFlag_InternalLLVMMem2Reg:
-							build_context.internal_llvm_mem2reg = true;
+						case BuildFlag_InternalLLVMNoSROA:
+							build_context.internal_llvm_no_sroa = true;
 							break;
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
@@ -3973,15 +3973,16 @@ int main(int arg_count, char const **arg_ptr) {
 		for (;;) {
 			String item = string_split_iterator(&target_it, ',');
 			if (item == "") break;
-
-			if (*item.text == '+' || *item.text == '-') {
-				item.text++;
-				item.len--;
+			
+			String stripped_item = item;
+			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
+				stripped_item.text++;
+				stripped_item.len--;
 			}
 
 			String invalid;
-			if (!check_target_feature_is_valid_for_target_arch(item, &invalid) && item != str_lit("help")) {
-				if (item != str_lit("?")) {
+			if (!check_target_feature_is_valid_for_target_arch(stripped_item, &invalid) && stripped_item != str_lit("help")) {
+				if (stripped_item != str_lit("?")) {
 					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
 				}
 				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
@@ -4005,8 +4006,25 @@ int main(int arg_count, char const **arg_ptr) {
 
 				return 1;
 			}
-
-			string_set_add(&build_context.target_features_set, item);
+			
+			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
+			String feature_str = item;
+			if (*feature_str.text != '+' && *feature_str.text != '-') {
+				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
+			}
+			
+			// Ensure there is only a single entry for each feature in the target set.
+			// If the negative exists, override the existing value with the current one.
+			String neg_feature_str = clone_string(temporary_allocator(), feature_str);
+			switch (*neg_feature_str.text) {
+				case '+': *neg_feature_str.text = '-'; break;
+				case '-': *neg_feature_str.text = '+'; break;
+				default: GB_ASSERT(false); break;
+			}
+			
+			string_set_remove(&build_context.target_features_set, neg_feature_str);
+			
+			string_set_add(&build_context.target_features_set, feature_str);
 		}
 	}
 

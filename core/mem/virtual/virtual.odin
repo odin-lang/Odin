@@ -16,8 +16,8 @@ platform_memory_init :: proc "contextless" () {
 Allocator_Error :: mem.Allocator_Error
 
 @(require_results, no_sanitize_address)
-reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	return _reserve(size)
+reserve :: proc "contextless" (size: uint, address_hint := uintptr(0)) -> (data: []byte, err: Allocator_Error) {
+	return _reserve(size, address_hint)
 }
 
 @(no_sanitize_address)
@@ -115,7 +115,7 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	}
 	
 	pmblock.block.committed = committed
-	pmblock.block.reserved  = reserved
+	pmblock.block.reserved  = total_size - uint(base_offset)
 
 	
 	return &pmblock.block, nil

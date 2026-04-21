@@ -578,7 +578,7 @@ struct BuildContext {
 	bool internal_by_value;
 	bool internal_weak_monomorphization;
 	bool internal_ignore_llvm_verification;
-	bool internal_llvm_mem2reg;
+	bool internal_llvm_no_sroa;
 
 	bool   enable_rvo;
 
@@ -2215,18 +2215,18 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 		}
 		if (feature_str == "") break;
 
-		if (!string_set_exists(&build_context.target_features_set, str)) {
-			String plus_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
-
-			if (want_enabled && !string_set_exists(&build_context.target_features_set, plus_str)) {
-				if (not_enabled) *not_enabled = str;
-				return false;
-			}
-		}
-
+		String plus_str  = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), feature_str);
-
-		if (!want_enabled && !string_set_exists(&build_context.target_features_set, minus_str)) {
+		
+		bool has_raw   = string_set_exists(&build_context.target_features_set, feature_str);
+		bool has_plus  = string_set_exists(&build_context.target_features_set, plus_str);
+		bool has_minus = string_set_exists(&build_context.target_features_set, minus_str);
+		
+		// NOTE(jakubtomsu): this way "feature" and "+feature" is ALWAYS equivalent,
+		// and also allows the minus sign to do a final override.
+		bool is_enabled = (has_plus || has_raw) && !has_minus;
+		
+		if (want_enabled != is_enabled) {
 			if (not_enabled) *not_enabled = str;
 			return false;
 		}

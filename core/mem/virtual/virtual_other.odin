@@ -7,7 +7,7 @@
 #+build !windows
 package mem_virtual
 
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
 	return nil, nil
 }
 

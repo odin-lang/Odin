@@ -222,6 +222,40 @@ private_key_generate_public :: proc(priv_key: ^Private_Key) {
 	priv_key._pub_key._curve = priv_key._curve
 }
 
+// private_key_set sets priv_key to src.
+private_key_set :: proc(priv_key, src: ^Private_Key) {
+	if src == nil || src._curve == .Invalid {
+		private_key_clear(priv_key)
+		return
+	}
+
+	priv_key._curve = src._curve
+
+	reflect.set_union_variant_typeid(
+		priv_key._impl,
+		_PRIV_IMPL_IDS[priv_key._curve],
+	)
+
+	#partial switch priv_key._curve {
+	case .SECP256R1:
+		secec.sc_set(&priv_key._impl.(secec.Scalar_p256r1), &src._impl.(secec.Scalar_p256r1))
+	case .SECP384R1:
+		secec.sc_set(&priv_key._impl.(secec.Scalar_p384r1), &src._impl.(secec.Scalar_p384r1))
+	case .X25519:
+		priv_buf := &(priv_key._impl.(X25519_Buf))
+		src_buf := &(src._impl.(X25519_Buf))
+		copy(priv_buf[:], src_buf[:])
+	case .X448:
+		priv_buf := &(priv_key._impl.(X448_Buf))
+		src_buf := &(src._impl.(X448_Buf))
+		copy(priv_buf[:], src_buf[:])
+	case:
+		panic("crypto/ecdh: invalid curve")
+	}
+
+	public_key_set(&priv_key._pub_key, &src._pub_key)
+}
+
 // private_key_bytes sets dst to byte-encoding of priv_key.
 private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	ensure(priv_key._curve != .Invalid, "crypto/ecdh: uninitialized private key")
@@ -323,6 +357,16 @@ public_key_set_bytes :: proc(pub_key: ^Public_Key, curve: Curve, b: []byte) -> b
 	pub_key._curve = curve
 
 	return true
+}
+
+// public_key_set sets pub_key to src.
+public_key_set :: proc(pub_key, src: ^Public_Key) {
+	if src == nil || src._curve == .Invalid {
+		public_key_clear(pub_key)
+		return
+	}
+
+	pub_key^ = src^
 }
 
 // public_key_set_priv sets pub_key to the public component of priv_key.

@@ -743,6 +743,11 @@ poll_exec :: proc(op: ^Operation) -> Op_Result {
 		return .Done
 	}
 
+	if .EOF in op._impl.flags {
+		op.poll.result = .Ready
+		return .Done
+	}
+
 	filter: kq.Filter
 	switch op.poll.event {
 	case .Receive: filter = .Read

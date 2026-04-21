@@ -10,3 +10,7 @@ vendor/sdl3/SDL3.dll filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/SDL3.lib filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/mixer/*.dll filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/mixer/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll.lib filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.lib filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.pdb filter=lfs diff=lfs merge=lfs -text

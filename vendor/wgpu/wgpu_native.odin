@@ -11,6 +11,8 @@ foreign libwgpu {
 	@(link_name="wgpuQueueSubmitForIndex")
 	RawQueueSubmitForIndex :: proc(queue: Queue, commandCount: uint, commands: [^]CommandBuffer) -> SubmissionIndex ---
 
+	QueueGetTimestampPeriod :: proc(queue: Queue) -> f32 ---
+
 	// Returns true if the queue is empty, or false if there are more queue submissions still in flight.
 	DevicePoll :: proc(device: Device, wait: b32, /* NULLABLE */ submissionIndex: /* const */ ^SubmissionIndex = nil) -> b32 ---
 	DeviceCreateShaderModuleSpirV :: proc(device: Device, descriptor: ^ShaderModuleDescriptorSpirV) -> ShaderModule ---
@@ -21,9 +23,13 @@ foreign libwgpu {
 
 	GetVersion :: proc() -> u32 ---
 
-	RenderPassEncoderSetPushConstants :: proc(encoder: RenderPassEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
-	ComputePassEncoderSetPushConstants :: proc(encoder: ComputePassEncoder, offset: u32, sizeBytes: u32, data: rawptr) ---
-	RenderBundleEncoderSetPushConstants :: proc(encoder: RenderBundleEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
+	DeviceGetNativeMetalDevice :: proc(device: Device) -> rawptr ---
+	DeviceGetNativeMetalCommandQueue :: proc(device: Device) -> rawptr ---
+	DeviceGetNativeMetalTexture :: proc(device: Device) -> rawptr ---
+
+	RenderPassEncoderSetImmediates :: proc(encoder: RenderPassEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
+	ComputePassEncoderSetImmediates :: proc(encoder: ComputePassEncoder, offset: u32, sizeBytes: u32, data: rawptr) ---
+	RenderBundleEncoderSetImmediates :: proc(encoder: RenderBundleEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
 
 	RenderPassEncoderMultiDrawIndirect :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count: u32) ---
 	RenderPassEncoderMultiDrawIndexedIndirect :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count: u32) ---
@@ -38,6 +44,9 @@ foreign libwgpu {
 
 	ComputePassEncoderWriteTimestamp :: proc(computePassEncoder: ComputePassEncoder, querySet: QuerySet, queryIndex: u32) ---
 	RenderPassEncoderWriteTimestamp :: proc(renderPassEncoder: RenderPassEncoder, querySet: QuerySet, queryIndex: u32) ---
+
+	DeviceStartGraphicsDebuggerCapture :: proc(device: Device) -> b32 ---
+	DeviceStopGraphicsDebuggerCapture :: proc(device: Device) ---
 }
 
 GenerateReport :: proc "c" (instance: Instance) -> (report: GlobalReport) {

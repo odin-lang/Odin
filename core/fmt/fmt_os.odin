@@ -14,7 +14,6 @@ import "core:bufio"
 fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
-	defer bufio.writer_flush(&b)
 
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 	w := bufio.writer_to_writer(&b)
@@ -25,7 +24,6 @@ fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
-	defer bufio.writer_flush(&b)
 
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
@@ -36,7 +34,6 @@ fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline := false) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
-	defer bufio.writer_flush(&b)
 
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
@@ -50,7 +47,6 @@ fprintfln :: proc(f: ^os.File, fmt: string, args: ..any, flush := true) -> int {
 fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
-	defer bufio.writer_flush(&b)
 
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
@@ -60,7 +56,6 @@ fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n:
 fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (n: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
-	defer bufio.writer_flush(&b)
 
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 

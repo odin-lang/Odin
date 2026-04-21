@@ -134,7 +134,7 @@ This is a dire bug and should be reported to the Odin developers.
 			}
 			signal := local_test_expected_failures.signal
 			switch signal {
-			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION
+			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION || code == win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED
 			case libc.SIGSEGV: passed = code == win32.EXCEPTION_ACCESS_VIOLATION
 			case libc.SIGFPE:
 				switch code {
@@ -163,6 +163,7 @@ _setup_signal_handler :: proc() {
 	// For tests:
 	// Catch the following:
 	// - Asserts and panics;
+	// - Out of Bounds exeptions;
 	// - Arithmetic errors; and
 	// - Segmentation faults (illegal memory access).
 	win32.AddVectoredExceptionHandler(0, stop_test_callback)
@@ -194,10 +195,11 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 			reason = .Successful_Stop
 		} else {
 			switch intrinsics.atomic_load(&stop_test_signal) {
-			case win32.EXCEPTION_ILLEGAL_INSTRUCTION: reason = .Illegal_Instruction
-			case win32.EXCEPTION_ACCESS_VIOLATION:    reason = .Segmentation_Fault
-			case win32.EXCEPTION_BREAKPOINT:          reason = .Unhandled_Trap
-			case win32.EXCEPTION_SINGLE_STEP:         reason = .Unhandled_Trap
+			case win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED: reason = .Illegal_Instruction
+			case win32.EXCEPTION_ILLEGAL_INSTRUCTION:   reason = .Illegal_Instruction
+			case win32.EXCEPTION_ACCESS_VIOLATION:      reason = .Segmentation_Fault
+			case win32.EXCEPTION_BREAKPOINT:            reason = .Unhandled_Trap
+			case win32.EXCEPTION_SINGLE_STEP:           reason = .Unhandled_Trap
 
 			case win32.EXCEPTION_FLT_DENORMAL_OPERAND ..= win32.EXCEPTION_INT_OVERFLOW:
 				reason = .Arithmetic_Error

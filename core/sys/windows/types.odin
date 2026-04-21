@@ -132,6 +132,7 @@ LPSTARTUPINFOW        :: ^STARTUPINFOW
 LPTRACKMOUSEEVENT     :: ^TRACKMOUSEEVENT
 VOID                  :: rawptr
 PVOID                 :: rawptr
+PVOID64               :: rawptr
 LPVOID                :: rawptr
 PINT                  :: ^INT
 LPINT                 :: ^INT

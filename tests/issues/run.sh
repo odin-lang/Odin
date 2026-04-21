@@ -36,6 +36,8 @@ $ODIN test ../test_issue_5699.odin $COMMON
 $ODIN test ../test_issue_6068.odin $COMMON
 $ODIN test ../test_issue_6101.odin $COMMON
 $ODIN test ../test_issue_6165.odin $COMMON
+$ODIN test ../test_issue_6344.odin $COMMON
+$ODIN test ../test_issue_6344.odin $COMMON -o:speed
 $ODIN test ../test_issue_6396.odin $COMMON
 $ODIN test ../test_pr_6476.odin $COMMON
 

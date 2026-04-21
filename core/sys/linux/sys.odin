@@ -2207,7 +2207,7 @@ when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 	Available since Linux 1.0.
 */
 adjtimex :: proc "contextless" (buf: ^Timex) -> (Clock_State, Errno) {
-	ret := syscall(SYS_adjtimex)
+	ret := syscall(SYS_adjtimex, buf)
 	return errno_unwrap(ret, Clock_State)
 }
 

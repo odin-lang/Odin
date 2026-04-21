@@ -23,6 +23,12 @@ HAS_HARDWARE_SIMD :: false when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !
 	false when (ODIN_ARCH == .riscv64) && !intrinsics.has_target_feature("v") else
 	true
 
+// Size of a native SIMD register for the current compilation target
+NATIVE_SIMD_BIT_WIDTH :: 
+	512 when (ODIN_ARCH == .amd64) && intrinsics.has_target_feature("avx512f") else
+	256 when (ODIN_ARCH == .amd64) && (intrinsics.has_target_feature("avx2") || intrinsics.has_target_feature("avx")) else
+	// Fallback for no hardware SIMD, but also SSE, NEON, SVE, RVV and WASM SIMD128.
+	128
 
 @(private)
 byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {

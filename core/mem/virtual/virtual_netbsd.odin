@@ -2,13 +2,13 @@ package mem_virtual
 
 import "core:sys/posix"
 
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
 
 	PROT_MPROTECT :: proc "contextless" (flags: posix.Prot_Flags) -> posix.Prot_Flags {
 		return transmute(posix.Prot_Flags)(transmute(i32)flags << 3)
 	}
 
-	result := posix.mmap(nil, size, PROT_MPROTECT({.READ, .WRITE, .EXEC}), {.ANONYMOUS, .PRIVATE})
+	result := posix.mmap(rawptr(address_hint), size, PROT_MPROTECT({.READ, .WRITE, .EXEC}), {.ANONYMOUS, .PRIVATE})
 	if result == posix.MAP_FAILED {
 		assert_contextless(posix.errno() == .ENOMEM)
 		return nil, .Out_Of_Memory
