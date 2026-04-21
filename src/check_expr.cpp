@@ -891,7 +891,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			if (score >= 0) {
 				return score+2;
 			}
-		} else if (is_type_untyped(src)) {
+		} else if (is_type_untyped(src) || is_type_struct(type_deref(src))) { // allow for subtyping of structs
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
 			for (Type *vt : dst->Union.variants) {
