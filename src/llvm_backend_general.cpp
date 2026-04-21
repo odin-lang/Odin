@@ -119,6 +119,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
+	map_init(&m->struct_field_usage_masks, 0);
 
 	array_init(&m->pad_types, heap_allocator());
 
@@ -161,6 +162,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
+	map_init(&gen->struct_field_usage_indices, 0);
+	array_init(&gen->struct_field_usage_entries, heap_allocator());
 
 	if (USE_SEPARATE_MODULES) {
 		bool module_per_file = build_context.module_per_file && (build_context.optimization_level <= 0 || build_context.lto_kind != LTO_None);
@@ -257,6 +260,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	lb_init_module(&gen->default_module, do_threading);
 
 	thread_pool_wait();
+	lb_init_struct_field_usage_tracking(gen);
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
@@ -271,6 +275,168 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	mpsc_init(&gen->raddebug_section_strings, heap_allocator());
 
 	return true;
+}
+
+
+gb_internal String lb_struct_field_usage_report_name(Entity *owner_type, Entity *field) {
+	gbAllocator a = permanent_allocator();
+	gbString s = gb_string_make(a, "");
+	if (owner_type->pkg != nullptr && owner_type->pkg->name.len > 0) {
+		s = gb_string_append_length(s, cast(char const *)owner_type->pkg->name.text, owner_type->pkg->name.len);
+		s = gb_string_appendc(s, ".");
+	}
+	s = gb_string_append_length(s, cast(char const *)owner_type->token.string.text, owner_type->token.string.len);
+	s = gb_string_appendc(s, ".");
+	s = gb_string_append_length(s, cast(char const *)field->token.string.text, field->token.string.len);
+	return make_string(cast(u8 const *)s, gb_string_length(s));
+}
+
+gb_internal String lb_struct_field_usage_global_name(i32 index) {
+	gbAllocator a = permanent_allocator();
+	gbString s = gb_string_make(a, "__sfu$");
+	s = gb_string_append_fmt(s, "%d", index);
+	return make_string(cast(u8 const *)s, gb_string_length(s));
+}
+
+gb_internal void lb_init_struct_field_usage_tracking(lbGenerator *gen) {
+	if (!build_context.show_unused_struct_fields) {
+		return;
+	}
+
+	lbModule *m = &gen->default_module;
+	i32 next_index = 0;
+
+	for (Entity *e : gen->info->entities) {
+		if (e == nullptr || e->kind != Entity_TypeName || e->type == nullptr) {
+			continue;
+		}
+		if (e->pkg == nullptr || e->pkg->kind == Package_Builtin || e->pkg->kind == Package_Runtime) {
+			continue;
+		}
+		if (e->TypeName.is_type_alias) {
+			continue;
+		}
+		if (e->token.string.len == 0 || e->token.string == "_") {
+			continue;
+		}
+
+		Type *actual_type = base_type(e->type);
+		if (actual_type == nullptr || actual_type->kind != Type_Struct) {
+			continue;
+		}
+
+		Entity *owner_type = e;
+		Type *report_type = actual_type;
+		if (Entity *parent = type_get_polymorphic_parent(e->type, nullptr)) {
+			owner_type = parent;
+			report_type = base_type(parent->type);
+			if (report_type == nullptr || report_type->kind != Type_Struct) {
+				continue;
+			}
+		}
+
+		if (actual_type->Struct.fields.count != report_type->Struct.fields.count) {
+			gb_printf_err("[show-unused-struct-fields] skipping field tracking for %.*s.%.*s: field count mismatch with %.*s.%.*s (%td vs %td)\n",
+			              LIT(e->pkg->name), LIT(e->token.string),
+			              LIT(owner_type->pkg->name), LIT(owner_type->token.string),
+			              actual_type->Struct.fields.count, report_type->Struct.fields.count);
+			continue;
+		}
+		for_array(i, actual_type->Struct.fields) {
+			Entity *actual_field = actual_type->Struct.fields[i];
+			Entity *report_field = report_type->Struct.fields[i];
+			if (actual_field == nullptr || report_field == nullptr) {
+				continue;
+			}
+			if ((actual_field->flags & EntityFlag_Field) == 0 || (report_field->flags & EntityFlag_Field) == 0) {
+				continue;
+			}
+			if (report_field->token.string.len == 0 || report_field->token.string == "_") {
+				continue;
+			}
+
+			i32 *entry_index = map_get(&gen->struct_field_usage_indices, report_field);
+			if (entry_index == nullptr) {
+				lbStructFieldUsageEntry entry = {};
+				entry.owner_type = owner_type;
+				entry.field = report_field;
+				entry.report_name = lb_struct_field_usage_report_name(owner_type, report_field);
+				entry.global_name = lb_struct_field_usage_global_name(next_index);
+				entry.global_value = LLVMAddGlobal(m->mod, lb_type(m, t_u8), alloc_cstring(permanent_allocator(), entry.global_name));
+				LLVMSetInitializer(entry.global_value, LLVMConstInt(lb_type(m, t_u8), 0, false));
+				LLVMSetLinkage(entry.global_value, LLVMExternalLinkage);
+
+				array_add(&gen->struct_field_usage_entries, entry);
+
+				i32 idx = cast(i32)gen->struct_field_usage_entries.count-1;
+				map_set(&gen->struct_field_usage_indices, report_field, idx);
+				entry_index = map_get(&gen->struct_field_usage_indices, report_field);
+				next_index += 1;
+			}
+
+			map_set(&gen->struct_field_usage_indices, actual_field, *entry_index);
+		}
+	}
+}
+
+gb_internal Entity *lb_resolve_struct_field_usage_entity(lbModule *m, Entity *field) {
+	if (!build_context.show_unused_struct_fields || field == nullptr) {
+		return nullptr;
+	}
+	i32 *entry_index = map_get(&m->gen->struct_field_usage_indices, field);
+	if (entry_index == nullptr) {
+		return nullptr;
+	}
+	return m->gen->struct_field_usage_entries[*entry_index].field;
+}
+
+gb_internal lbValue lb_struct_field_usage_mask_ptr(lbModule *m, Entity *field) {
+	field = lb_resolve_struct_field_usage_entity(m, field);
+	if (field == nullptr) {
+		return {};
+	}
+
+	lbValue *found = map_get(&m->struct_field_usage_masks, field);
+	if (found != nullptr) {
+		return *found;
+	}
+
+	i32 entry_index = map_must_get(&m->gen->struct_field_usage_indices, field);
+	lbStructFieldUsageEntry const &entry = m->gen->struct_field_usage_entries[entry_index];
+
+	lbValue g = {};
+	g.type = alloc_type_pointer(t_u8);
+	if (m == &m->gen->default_module) {
+		g.value = entry.global_value;
+	} else {
+		g.value = LLVMAddGlobal(m->mod, lb_type(m, t_u8), alloc_cstring(permanent_allocator(), entry.global_name));
+		LLVMSetLinkage(g.value, LLVMExternalLinkage);
+	}
+
+	map_set(&m->struct_field_usage_masks, field, g);
+	return g;
+}
+
+gb_internal void lb_mark_struct_field_usage(lbProcedure *p, Entity *field, u8 usage_bits) {
+	if (usage_bits == 0) {
+		return;
+	}
+
+	lbValue mask_ptr = lb_struct_field_usage_mask_ptr(p->module, field);
+	if (mask_ptr.value == nullptr) {
+		return;
+	}
+
+	LLVMValueRef usage = LLVMConstInt(lb_type(p->module, t_u8), usage_bits, false);
+	LLVMValueRef instr = LLVMBuildAtomicRMW(
+		p->builder,
+		LLVMAtomicRMWBinOpOr,
+		mask_ptr.value,
+		usage,
+		LLVMAtomicOrderingMonotonic,
+		false
+	);
+	LLVMSetVolatile(instr, true);
 }
 
 
@@ -966,6 +1132,8 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		value.value = LLVMConstNull(lb_type(p->module, t));
 	}
 
+	lb_mark_struct_field_usage(p, addr.tracked_field, 1<<1);
+
 	if (addr.kind == lbAddr_BitField) {
 		lbValue dst = addr.addr;
 		if (is_type_endian_big(addr.bitfield.type)) {
@@ -1272,6 +1440,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 
 gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
+	lb_mark_struct_field_usage(p, addr.tracked_field, 1<<0);
 
 	if (addr.kind == lbAddr_BitField) {
 		Type *ct = core_type(addr.bitfield.type);

@@ -4629,18 +4629,35 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	ast_node(ie, IndexExpr, expr);
 
 	Type *t = base_type(type_of_expr(ie->expr));
+	TypeAndValue expr_tav = type_and_value_of_expr(ie->expr);
 
 	bool deref = is_type_pointer(t);
 	t = base_type(type_deref(t));
+
+	lbAddr base_addr = {};
+	Entity *tracked_field = nullptr;
+	switch (expr_tav.mode) {
+	case Addressing_Variable:
+	case Addressing_Context:
+	case Addressing_MapIndex:
+	case Addressing_SoaVariable:
+	case Addressing_SwizzleVariable:
+		base_addr = lb_build_addr(p, ie->expr);
+		tracked_field = base_addr.tracked_field;
+		break;
+	}
+
 	if (is_type_soa_struct(t)) {
 		// SOA STRUCTURES!!!!
-		lbValue val = lb_build_addr_ptr(p, ie->expr);
+		lbValue val = base_addr.addr.value ? lb_addr_get_ptr(p, base_addr) : lb_build_addr_ptr(p, ie->expr);
 		if (deref) {
 			val = lb_emit_load(p, val);
 		}
 
 		lbValue index = lb_build_expr(p, ie->index);
-		return lb_addr_soa_variable(val, index, ie->index);
+		lbAddr res = lb_addr_soa_variable(val, index, ie->index);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	if (ie->expr->tav.mode == Addressing_SoaVariable) {
@@ -4682,13 +4699,15 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue val = lb_emit_ptr_offset(p, field, index);
 		// make sure it's ^T and not [^]T
 		val.type = alloc_type_multi_pointer_to_pointer(val.type);
-		return lb_addr(val);
+		lbAddr res = lb_addr(val);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
 
 	if (is_type_map(t)) {
-		lbAddr map_addr = lb_build_addr(p, ie->expr);
+		lbAddr map_addr = base_addr.addr.value ? base_addr : lb_build_addr(p, ie->expr);
 		lbValue key = lb_build_expr(p, ie->index);
 		key = lb_emit_conv(p, key, t->Map.key);
 
@@ -4697,13 +4716,15 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		if (is_type_pointer(type_deref(map_ptr.type))) {
 			map_ptr = lb_emit_load(p, map_ptr);
 		}
-		return lb_addr_map(map_ptr, key, t, result_type);
+		lbAddr res = lb_addr_map(map_ptr, key, t, result_type);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	switch (t->kind) {
 	case Type_Array: {
 		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		array = base_addr.addr.value ? lb_addr_get_ptr(p, base_addr) : lb_build_addr_ptr(p, ie->expr);
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -4716,12 +4737,14 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_const_int(p->module, t_int, t->Array.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
-		return lb_addr(elem);
+		lbAddr res = lb_addr(elem);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	case Type_FixedCapacityDynamicArray: {
 		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		array = base_addr.addr.value ? lb_addr_get_ptr(p, base_addr) : lb_build_addr_ptr(p, ie->expr);
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -4735,12 +4758,14 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_emit_struct_ep(p, array, 1);
 		len = lb_emit_load(p, len);
 		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
-		return lb_addr(elem);
+		lbAddr res = lb_addr(elem);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	case Type_EnumeratedArray: {
 		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		array = base_addr.addr.value ? lb_addr_get_ptr(p, base_addr) : lb_build_addr_ptr(p, ie->expr);
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -4771,12 +4796,14 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_const_int(p->module, t_int, t->EnumeratedArray.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
-		return lb_addr(elem);
+		lbAddr res = lb_addr(elem);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	case Type_Slice: {
 		lbValue slice = {};
-		slice = lb_build_expr(p, ie->expr);
+		slice = base_addr.addr.value ? lb_addr_load(p, base_addr) : lb_build_expr(p, ie->expr);
 		if (deref) {
 			slice = lb_emit_load(p, slice);
 		}
@@ -4785,12 +4812,14 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_slice_len(p, slice);
 		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		lbValue v = lb_emit_ptr_offset(p, elem, index);
-		return lb_addr(v);
+		lbAddr res = lb_addr(v);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	case Type_MultiPointer: {
 		lbValue multi_ptr = {};
-		multi_ptr = lb_build_expr(p, ie->expr);
+		multi_ptr = base_addr.addr.value ? lb_addr_load(p, base_addr) : lb_build_expr(p, ie->expr);
 		if (deref) {
 			multi_ptr = lb_emit_load(p, multi_ptr);
 		}
@@ -4801,12 +4830,14 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		LLVMValueRef indices[1] = {index.value};
 		v.value = LLVMBuildGEP2(p->builder, lb_type(p->module, t->MultiPointer.elem), multi_ptr.value, indices, 1, "");
 		v.type = alloc_type_pointer(t->MultiPointer.elem);
-		return lb_addr(v);
+		lbAddr res = lb_addr(v);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	case Type_DynamicArray: {
 		lbValue dynamic_array = {};
-		dynamic_array = lb_build_expr(p, ie->expr);
+		dynamic_array = base_addr.addr.value ? lb_addr_load(p, base_addr) : lb_build_expr(p, ie->expr);
 		if (deref) {
 			dynamic_array = lb_emit_load(p, dynamic_array);
 		}
@@ -4815,12 +4846,14 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		lbValue v = lb_emit_ptr_offset(p, elem, index);
-		return lb_addr(v);
+		lbAddr res = lb_addr(v);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 	case Type_Matrix: {
 		lbValue matrix = {};
-		matrix = lb_build_addr_ptr(p, ie->expr);
+		matrix = base_addr.addr.value ? lb_addr_get_ptr(p, base_addr) : lb_build_addr_ptr(p, ie->expr);
 		if (deref) {
 			matrix = lb_emit_load(p, matrix);
 		}
@@ -4843,7 +4876,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_const_int(p->module, t_int, bounds_len);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
-		return lb_addr(elem);
+		lbAddr res = lb_addr(elem);
+		res.tracked_field = tracked_field;
+		return res;
 	}
 
 
@@ -4854,7 +4889,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue index;
 
 
-		str = lb_build_expr(p, ie->expr);
+		str = base_addr.addr.value ? lb_addr_load(p, base_addr) : lb_build_expr(p, ie->expr);
 		if (deref) {
 			str = lb_emit_load(p, str);
 		}
@@ -4864,7 +4899,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 
-		return lb_addr(lb_emit_ptr_offset(p, elem, index));
+		lbAddr res = lb_addr(lb_emit_ptr_offset(p, elem, index));
+		res.tracked_field = tracked_field;
+		return res;
 	}
 	}
 	return {};
@@ -5994,16 +6031,20 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					swizzle_indices[i] = index;
 				}
 				lbValue a = {};
+				Entity *tracked_field = nullptr;
 				if (is_type_pointer(tav.type)) {
 					a = lb_build_expr(p, se->expr);
 				} else {
 					lbAddr addr = lb_build_addr(p, se->expr);
+					tracked_field = addr.tracked_field;
 					a = lb_addr_get_ptr(p, addr);
 				}
 
 				Type *type = type_deref(expr->tav.type);
 				GB_ASSERT(is_type_array(type) || is_type_simd_vector(type));
-				return lb_addr_swizzle(a, type, swizzle_count, swizzle_indices);
+				lbAddr res = lb_addr_swizzle(a, type, swizzle_count, swizzle_indices);
+				res.tracked_field = tracked_field;
+				return res;
 			}
 
 			Selection sel = lookup_field(tav.type, selector, false);
@@ -6014,7 +6055,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
+			Entity *tracked_field = lb_resolve_struct_field_usage_entity(p->module, sel.entity);
 			lbAddr addr = lb_build_addr(p, se->expr);
+			lb_mark_struct_field_usage(p, addr.tracked_field, 1<<0);
 
 			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
 			//				 It is incoherent otherwise as Objective-C objects are zero-sized.
@@ -6050,7 +6093,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				u8 bit_size = bf_type->BitField.bit_sizes[index];
 				i64 bit_offset = bf_type->BitField.bit_offsets[index];
 
-				return lb_addr_bit_field(ptr, f->type, bit_offset, bit_size);
+				lbAddr res = lb_addr_bit_field(ptr, f->type, bit_offset, bit_size);
+				res.tracked_field = tracked_field;
+				return res;
 			}
 
 			{
@@ -6058,7 +6103,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					lbValue v = lb_addr_load(p, addr);
 					lbValue a = lb_address_from_load_or_generate_local(p, v);
 					a = lb_emit_deep_field_gep(p, a, sel);
-					return lb_addr(a);
+					lbAddr res = lb_addr(a);
+					res.tracked_field = tracked_field;
+					return res;
 				} else if (addr.kind == lbAddr_Context) {
 					GB_ASSERT(sel.index.count > 0);
 					if (addr.ctx.sel.index.count >= 0) {
@@ -6066,6 +6113,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					}
 					addr.ctx.sel = sel;
 					addr.kind = lbAddr_Context;
+					addr.tracked_field = tracked_field;
 					return addr;
 				} else if (addr.kind == lbAddr_SoaVariable) {
 					lbValue index = addr.soa.index;
@@ -6097,7 +6145,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				// make sure it's ^T and not [^]T
 				item.type = alloc_type_multi_pointer_to_pointer(item.type);
 
-					return lb_addr(item);
+					lbAddr res = lb_addr(item);
+					res.tracked_field = tracked_field;
+					return res;
 				} else if (addr.kind == lbAddr_Swizzle) {
 					GB_ASSERT(sel.index.count > 0);
 					// NOTE(bill): just patch the index in place
@@ -6115,7 +6165,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 				lbValue a = lb_addr_get_ptr(p, addr);
 				a = lb_emit_deep_field_gep(p, a, sel);
-				return lb_addr(a);
+				lbAddr res = lb_addr(a);
+				res.tracked_field = tracked_field;
+				return res;
 			}
 		} else {
 			GB_PANIC("Unsupported selector expression");
@@ -6374,4 +6426,3 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	return {};
 }
-
