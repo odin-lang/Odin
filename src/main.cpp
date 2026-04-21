@@ -291,6 +291,7 @@ enum BuildFlagKind {
 	BuildFlag_ShowTimings,
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
+	BuildFlag_ShowUnusedStructFields,
 	BuildFlag_ShowMoreTimings,
 	BuildFlag_ShowImportGraph,
 	BuildFlag_ExportTimings,
@@ -530,6 +531,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExportDependenciesFile,  str_lit("export-dependencies-file"),  BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowUnused,              str_lit("show-unused"),               BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation,  str_lit("show-unused-with-location"), BuildFlagParam_None,    Command_check);
+	add_flag(&build_flags, BuildFlag_ShowUnusedStructFields,  str_lit("show-unused-struct-fields"), BuildFlagParam_None,    Command__does_build | Command_test);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,         str_lit("show-system-calls"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ThreadCount,             str_lit("thread-count"),              BuildFlagParam_Integer, Command_all);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,           str_lit("keep-temp-files"),           BuildFlagParam_None,    Command__does_build | Command_strip_semicolon);
@@ -858,6 +860,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused = true;
 							build_context.show_unused_with_location = true;
+							break;
+						}
+						case BuildFlag_ShowUnusedStructFields: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.show_unused_struct_fields = true;
 							break;
 						}
 						case BuildFlag_ShowMoreTimings:
@@ -3058,6 +3065,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
+		if (print_flag("-show-unused-struct-fields")) {
+			print_usage_line(2, "At program exit, prints named struct fields that were never read and/or never written.");
+		}
 		if (print_flag("-strict-target-features")) {
 			print_usage_line(2, "Makes @(enable_target_features=\"...\") behave the same way as @(require_target_features=\"...\").");
 			print_usage_line(2, "This enforces that all generated code uses features supported by the combination of -target, -microarch, and -target-features.");

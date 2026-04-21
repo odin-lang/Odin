@@ -75,6 +75,7 @@ enum lbAddrKind {
 struct lbAddr {
 	lbAddrKind kind;
 	lbValue addr;
+	Entity *tracked_field;
 	union {
 		struct {
 			lbValue key;
@@ -115,6 +116,14 @@ struct lbIncompleteDebugType {
 };
 
 typedef Slice<i32> lbStructFieldRemapping;
+
+struct lbStructFieldUsageEntry {
+	Entity *owner_type;
+	Entity *field;
+	String report_name;
+	String global_name;
+	LLVMValueRef global_value;
+};
 
 enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_default,
@@ -198,6 +207,7 @@ struct lbModule {
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 
 	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
+	PtrMap<Entity *, lbValue> struct_field_usage_masks;
 
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 
@@ -239,6 +249,9 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<lbObjCGlobal> objc_classes;
 	MPSCQueue<lbObjCGlobal> objc_ivars;
 	MPSCQueue<String> raddebug_section_strings;
+
+	PtrMap<Entity *, i32> struct_field_usage_indices;
+	Array<lbStructFieldUsageEntry> struct_field_usage_entries;
 };
 
 
@@ -519,6 +532,9 @@ gb_internal void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *st
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
 
 gb_internal lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
+gb_internal void    lb_init_struct_field_usage_tracking(lbGenerator *gen);
+gb_internal Entity *lb_resolve_struct_field_usage_entity(lbModule *m, Entity *field);
+gb_internal void    lb_mark_struct_field_usage(lbProcedure *p, Entity *field, u8 usage_bits);
 
 
 gb_internal lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index);
