@@ -4516,9 +4516,9 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	GB_ASSERT(et != nullptr);
 
 
+	isize elem_index = 0;
 	// NOTE(bill): Separate value, gep, store into their own chunks
-	for_array(i, elems) {
-		Ast *elem = elems[i];
+	for (Ast *elem : elems) {
 		if (elem->kind == Ast_FieldValue) {
 			ast_node(fv, FieldValue, elem);
 			if (bt->kind != Type_DynamicArray && lb_is_elem_const(fv->value, et)) {
@@ -4588,22 +4588,39 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 
 		} else {
 			if (bt->kind != Type_DynamicArray && lb_is_elem_const(elem, et)) {
+				elem_index++;
 				continue;
 			}
 
 			lbValue field_expr = lb_build_expr(p, elem);
-			GB_ASSERT(!is_type_tuple(field_expr.type));
 
-			lbValue ev = lb_emit_conv(p, field_expr, et);
+			if (is_type_tuple(field_expr.type)) {
+				TypeTuple *tt = &field_expr.type->Tuple;
+				for_array(jj, tt->variables) {
+					lbValue sub_field_expr = lb_emit_struct_ev(p, field_expr, cast(i32)jj);
+					lbValue ev = lb_emit_conv(p, sub_field_expr, et);
 
-			lbCompoundLitElemTempData data = {};
-			data.value = ev;
-			if (bt->kind == Type_Matrix) {
-				data.elem_index = matrix_row_major_index_to_offset(bt, i);
+					lbCompoundLitElemTempData data = {};
+					data.value = ev;
+					if (bt->kind == Type_Matrix) {
+						data.elem_index = matrix_row_major_index_to_offset(bt, elem_index++);
+					} else {
+						data.elem_index = elem_index++;
+					}
+					array_add(temp_data, data);
+				}
 			} else {
-				data.elem_index = i;
+				lbValue ev = lb_emit_conv(p, field_expr, et);
+
+				lbCompoundLitElemTempData data = {};
+				data.value = ev;
+				if (bt->kind == Type_Matrix) {
+					data.elem_index = matrix_row_major_index_to_offset(bt, elem_index++);
+				} else {
+					data.elem_index = elem_index++;
+				}
+				array_add(temp_data, data);
 			}
-			array_add(temp_data, data);
 		}
 	}
 }
