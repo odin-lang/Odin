@@ -18,7 +18,7 @@ Float_Class :: enum {
 TAU          :: 6.28318530717958647692528676655900576
 PI           :: 3.14159265358979323846264338327950288
 
-E            :: 2.71828182845904523536
+E            :: 2.71828182845904523536 // Euler's number
 
 τ :: TAU
 π :: PI
@@ -28,8 +28,8 @@ SQRT_TWO     :: 1.41421356237309504880168872420969808
 SQRT_THREE   :: 1.73205080756887729352744634150587236
 SQRT_FIVE    :: 2.23606797749978969640917366873127623
 
-LN2          :: 0.693147180559945309417232121458176568
-LN10         :: 2.30258509299404568401799145468436421
+LN2          :: 0.693147180559945309417232121458176568 	// Logarithm of 2 in base e equivalent to ln(2)
+LN10         :: 2.30258509299404568401799145468436421 	// Logarithm of 10 in base e equivalent to ln(10)
 
 MAX_F64_PRECISION :: 16 // Maximum number of meaningful digits after the decimal point for 'f64'
 MAX_F32_PRECISION ::  8 // Maximum number of meaningful digits after the decimal point for 'f32'
