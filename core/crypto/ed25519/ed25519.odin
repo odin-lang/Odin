@@ -97,6 +97,21 @@ private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 	return true
 }
 
+// private_key_set sets priv_key to src.
+private_key_set :: proc(priv_key, src: ^Private_Key) {
+	if src == nil || !src._is_initialized {
+		private_key_clear(priv_key)
+		return
+	}
+
+	copy(priv_key._b[:], src._b[:])
+	grp.sc_set(&priv_key._s, &src._s)
+	copy(priv_key._hdigest2[:], src._hdigest2[:])
+	public_key_set(&priv_key._pub_key, &src._pub_key)
+
+	priv_key._is_initialized = true
+}
+
 // private_key_bytes sets dst to byte-encoding of priv_key.
 private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
@@ -186,6 +201,16 @@ public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> 
 	return true
 }
 
+// public_key_set sets pub_key to src.
+public_key_set :: proc(pub_key, src: ^Public_Key) {
+	if src == nil || !src._is_initialized {
+		public_key_clear(pub_key)
+		return
+	}
+
+	pub_key^ = src^
+}
+
 // public_key_set_priv sets pub_key to the public component of priv_key.
 public_key_set_priv :: proc(pub_key: ^Public_Key, priv_key: ^Private_Key) {
 	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
@@ -210,6 +235,11 @@ public_key_equal :: proc(pub_key, other: ^Public_Key) -> bool {
 	ensure(pub_key._is_initialized && other._is_initialized, "crypto/ed25519: uninitialized public key")
 
 	return crypto.compare_constant_time(pub_key._b[:], other._b[:]) == 1
+}
+
+// public_key_clear clears pub_key to the uninitialized state.
+public_key_clear :: proc "contextless" (pub_key: ^Public_Key) {
+	crypto.zero_explicit(pub_key, size_of(Public_Key))
 }
 
 // verify returns true if and only if (⟺) sig is a valid signature by pub_key over msg.
