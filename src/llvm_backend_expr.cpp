@@ -4516,9 +4516,9 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	GB_ASSERT(et != nullptr);
 
 
+	isize elem_index = 0;
 	// NOTE(bill): Separate value, gep, store into their own chunks
-	for_array(i, elems) {
-		Ast *elem = elems[i];
+	for (Ast *elem : elems) {
 		if (elem->kind == Ast_FieldValue) {
 			ast_node(fv, FieldValue, elem);
 			if (bt->kind != Type_DynamicArray && lb_is_elem_const(fv->value, et)) {
@@ -4588,22 +4588,39 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 
 		} else {
 			if (bt->kind != Type_DynamicArray && lb_is_elem_const(elem, et)) {
+				elem_index++;
 				continue;
 			}
 
 			lbValue field_expr = lb_build_expr(p, elem);
-			GB_ASSERT(!is_type_tuple(field_expr.type));
 
-			lbValue ev = lb_emit_conv(p, field_expr, et);
+			if (is_type_tuple(field_expr.type)) {
+				TypeTuple *tt = &field_expr.type->Tuple;
+				for_array(jj, tt->variables) {
+					lbValue sub_field_expr = lb_emit_struct_ev(p, field_expr, cast(i32)jj);
+					lbValue ev = lb_emit_conv(p, sub_field_expr, et);
 
-			lbCompoundLitElemTempData data = {};
-			data.value = ev;
-			if (bt->kind == Type_Matrix) {
-				data.elem_index = matrix_row_major_index_to_offset(bt, i);
+					lbCompoundLitElemTempData data = {};
+					data.value = ev;
+					if (bt->kind == Type_Matrix) {
+						data.elem_index = matrix_row_major_index_to_offset(bt, elem_index++);
+					} else {
+						data.elem_index = elem_index++;
+					}
+					array_add(temp_data, data);
+				}
 			} else {
-				data.elem_index = i;
+				lbValue ev = lb_emit_conv(p, field_expr, et);
+
+				lbCompoundLitElemTempData data = {};
+				data.value = ev;
+				if (bt->kind == Type_Matrix) {
+					data.elem_index = matrix_row_major_index_to_offset(bt, elem_index++);
+				} else {
+					data.elem_index = elem_index++;
+				}
+				array_add(temp_data, data);
 			}
-			array_add(temp_data, data);
 		}
 	}
 }
@@ -5319,6 +5336,157 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
+gb_internal void lb_build_struct_compound_lit_field_assignment(lbProcedure *p, lbValue comp_lit_ptr, Entity *field_entity, isize index, lbValue field_expr, bool is_raw_union) {
+	Type *ft = field_entity->type;
+
+	lbValue gep = {};
+	if (is_raw_union) {
+		gep = lb_emit_conv(p, comp_lit_ptr, alloc_type_pointer(ft));
+	} else {
+		gep = lb_emit_struct_ep(p, comp_lit_ptr, cast(i32)index);
+	}
+
+	Type *fet = field_expr.type;
+	GB_ASSERT(fet->kind != Type_Tuple);
+
+	if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
+		if (union_is_variant_of(ft, fet)) {
+			// NOTE(bill, 2026-03-15): If it's a direct assignment for a variant to the
+			// direct union we can just assign it directly to minimize wasted code generation
+			//
+			// TODO(bill): Allow this for deeply nested unions too e.g. union{union{T}}
+			GB_ASSERT_MSG(union_variant_index_checked(ft, fet) >= 0, "%s", type_to_string(fet));
+			GB_ASSERT(are_types_identical(type_deref(gep.type), ft));
+
+			lb_emit_store_union_variant(p, gep, field_expr, fet);
+		} else {
+			lbValue fv = lb_emit_conv(p, field_expr, ft);
+			lb_emit_store(p, gep, fv);
+		}
+	} else {
+		lbValue fv = lb_emit_conv(p, field_expr, ft);
+		lb_emit_store(p, gep, fv);
+	}
+}
+
+gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast *expr, Type *type, lbAddr v) {
+	ast_node(cl, CompoundLit, expr);
+
+	// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
+	// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
+	Type *bt = base_type(type);
+	GB_ASSERT(bt->kind == Type_Struct);
+	GB_ASSERT(bt->Struct.soa_kind == StructSoa_None);
+	TypeStruct *st = &bt->Struct;
+
+	if (cl->elems.count == 0) {
+		return;
+	}
+
+	bool is_raw_union = st->is_raw_union;
+
+	lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+	lbValue comp_lit_ptr = lb_addr_get_ptr(p, v);
+
+	if (cl->elems[0]->kind == Ast_FieldValue) {
+		for (Ast *elem : cl->elems) {
+			lbValue field_expr = {};
+			Entity *field = nullptr;
+
+			ast_node(fv, FieldValue, elem);
+			InternedString interned = fv->field->Ident.interned;
+			Selection sel = lookup_field(bt, interned, false);
+			GB_ASSERT(!sel.indirect);
+
+			elem = fv->value;
+			if (sel.index.count > 1) {
+				if (lb_is_nested_possibly_constant(type, sel, elem)) {
+					continue;
+				}
+				field_expr = lb_build_expr(p, elem);
+				field_expr = lb_emit_conv(p, field_expr, sel.entity->type);
+				if (sel.is_bit_field) {
+					Selection sub_sel = trim_selection(sel);
+					lbValue trimmed_dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sub_sel);
+					Type *bf = base_type(type_deref(trimmed_dst.type));
+					if (is_type_pointer(bf)) {
+						trimmed_dst = lb_emit_load(p, trimmed_dst);
+						bf = base_type(type_deref(trimmed_dst.type));
+					}
+					GB_ASSERT(bf->kind == Type_BitField);
+
+					isize idx = sel.index[sel.index.count-1];
+					lbAddr dst = lb_addr_bit_field(trimmed_dst, bf->BitField.fields[idx]->type, bf->BitField.bit_offsets[idx], bf->BitField.bit_sizes[idx]);
+					lb_addr_store(p, dst, field_expr);
+
+				} else {
+					lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
+					lb_emit_store(p, dst, field_expr);
+				}
+				continue;
+			}
+
+			isize index = sel.index[0];
+
+			field = st->fields[index];
+			Type *ft = field->type;
+			if (!is_raw_union && !is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
+				continue;
+			}
+
+			field_expr = lb_build_expr(p, elem);
+
+			lb_build_struct_compound_lit_field_assignment(p, comp_lit_ptr, field, index, field_expr, is_raw_union);
+		}
+
+		return;
+	}
+
+	GB_ASSERT(!is_raw_union);
+
+	isize field_index = 0;
+
+	for (Ast *elem : cl->elems) {
+		if (is_type_tuple(elem->tav.type)) {
+			lbValue tuple_field_expr = lb_build_expr(p, elem);
+			GB_ASSERT(is_type_tuple(tuple_field_expr.type));
+
+			TypeTuple *tt = &tuple_field_expr.type->Tuple;
+			for_array(jj, tt->variables) {
+				isize index = field_index++;
+				GB_ASSERT(st->fields[index]->Variable.field_index == index);
+				Selection sel = lookup_field_from_index(bt, index);
+				GB_ASSERT(sel.index.count == 1);
+				GB_ASSERT(!sel.indirect);
+				index = sel.index[0];
+
+				Entity *field = st->fields[index];
+				lbValue field_expr = lb_emit_struct_ev(p, tuple_field_expr, cast(i32)jj);
+
+				lb_build_struct_compound_lit_field_assignment(p, comp_lit_ptr, field, index, field_expr, is_raw_union);
+			}
+			continue;
+		}
+
+		isize index = field_index++;
+		GB_ASSERT(st->fields[index]->Variable.field_index == index);
+		Selection sel = lookup_field_from_index(bt, index);
+		GB_ASSERT(sel.index.count == 1);
+		GB_ASSERT(!sel.indirect);
+		index = sel.index[0];
+
+		Entity *field = st->fields[index];
+		Type *ft = field->type;
+		if (!is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
+			continue;
+		}
+
+		lbValue field_expr = lb_build_expr(p, elem);
+
+		lb_build_struct_compound_lit_field_assignment(p, comp_lit_ptr, field, index, field_expr, is_raw_union);
+	}
+}
+
 gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	ast_node(cl, CompoundLit, expr);
 
@@ -5539,105 +5707,9 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		return v;
 	}
 
-	case Type_Struct: {
-		// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
-		// NOTE(bill): This is due to the layout of the unions when printed to LLVM-IR
-		bool is_raw_union = is_type_raw_union(bt);
-		GB_ASSERT(is_type_struct(bt) || is_raw_union);
-		TypeStruct *st = &bt->Struct;
-		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
-			lbValue comp_lit_ptr = lb_addr_get_ptr(p, v);
-
-			for_array(field_index, cl->elems) {
-				Ast *elem = cl->elems[field_index];
-
-				lbValue field_expr = {};
-				Entity *field = nullptr;
-				isize index = field_index;
-
-				if (elem->kind == Ast_FieldValue) {
-					ast_node(fv, FieldValue, elem);
-					InternedString interned = fv->field->Ident.interned;
-					Selection sel = lookup_field(bt, interned, false);
-					GB_ASSERT(!sel.indirect);
-
-					elem = fv->value;
-					if (sel.index.count > 1) {
-						if (lb_is_nested_possibly_constant(type, sel, elem)) {
-							continue;
-						}
-						field_expr = lb_build_expr(p, elem);
-						field_expr = lb_emit_conv(p, field_expr, sel.entity->type);
-						if (sel.is_bit_field) {
-							Selection sub_sel = trim_selection(sel);
-							lbValue trimmed_dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sub_sel);
-							Type *bf = base_type(type_deref(trimmed_dst.type));
-							if (is_type_pointer(bf)) {
-								trimmed_dst = lb_emit_load(p, trimmed_dst);
-								bf = base_type(type_deref(trimmed_dst.type));
-							}
-							GB_ASSERT(bf->kind == Type_BitField);
-
-							isize idx = sel.index[sel.index.count-1];
-							lbAddr dst = lb_addr_bit_field(trimmed_dst, bf->BitField.fields[idx]->type, bf->BitField.bit_offsets[idx], bf->BitField.bit_sizes[idx]);
-							lb_addr_store(p, dst, field_expr);
-
-						} else {
-							lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
-							lb_emit_store(p, dst, field_expr);
-						}
-						continue;
-					}
-
-					index = sel.index[0];
-				} else {
-					Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_index);
-					GB_ASSERT(sel.index.count == 1);
-					GB_ASSERT(!sel.indirect);
-					index = sel.index[0];
-				}
-
-				field = st->fields[index];
-				Type *ft = field->type;
-				if (!is_raw_union && !is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
-					continue;
-				}
-
-				field_expr = lb_build_expr(p, elem);
-
-				lbValue gep = {};
-				if (is_raw_union) {
-					gep = lb_emit_conv(p, comp_lit_ptr, alloc_type_pointer(ft));
-				} else {
-					gep = lb_emit_struct_ep(p, comp_lit_ptr, cast(i32)index);
-				}
-
-				Type *fet = field_expr.type;
-				GB_ASSERT(fet->kind != Type_Tuple);
-
-				if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
-					if (union_is_variant_of(ft, fet)) {
-						// NOTE(bill, 2026-03-15): If it's a direct assignment for a variant to the
-						// direct union we can just assign it directly to minimize wasted code generation
-						//
-						// TODO(bill): Allow this for deeply nested unions too e.g. union{union{T}}
-						GB_ASSERT_MSG(union_variant_index_checked(ft, fet) >= 0, "%s", type_to_string(fet));
-						GB_ASSERT(are_types_identical(type_deref(gep.type), ft));
-
-						lb_emit_store_union_variant(p, gep, field_expr, fet);
-					} else {
-						lbValue fv = lb_emit_conv(p, field_expr, ft);
-						lb_emit_store(p, gep, fv);
-					}
-				} else {
-					lbValue fv = lb_emit_conv(p, field_expr, ft);
-					lb_emit_store(p, gep, fv);
-				}
-			}
-		}
+	case Type_Struct:
+		lb_build_addr_struct_compound_lit_populate(p, expr, type, v);
 		break;
-	}
 
 	case Type_Map: {
 		if (cl->elems.count == 0) {
@@ -5931,6 +6003,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	return v;
 }
+
 
 
 gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {

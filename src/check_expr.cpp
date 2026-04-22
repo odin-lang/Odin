@@ -10385,9 +10385,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			} else {
 				bool seen_field_value = false;
 
-				for_array(index, cl->elems) {
+				isize handled_elem_count = 0;
+				isize index = 0;
+				for (Ast *elem : cl->elems) {
+					defer (index += 1);
+
 					Entity *field = nullptr;
-					Ast *elem = cl->elems[index];
 					if (elem->kind == Ast_FieldValue) {
 						seen_field_value = true;
 						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
@@ -10406,23 +10409,46 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 
 					Operand o = {};
-					check_expr_or_type(c, &o, elem, field->type);
-
-					if (elem_cannot_be_constant(field->type)) {
+					check_multi_expr_with_type_hint(c, &o, elem, field->type);
+					if (is_type_tuple(o.type)) {
 						is_constant = false;
-					}
-					if (is_constant) {
-						is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
+
+						TypeTuple *tt = &o.type->Tuple;
+						isize jj = 0;
+						for (Entity *src_field : tt->variables) {
+							Operand src_o = o;
+							src_o.type = src_field->type;
+
+							field = t->Struct.fields[index + (jj++)];
+
+							check_assignment(c, &src_o, field->type, str_lit("structure literal"));
+						}
+
+						index += tt->variables.count-1;
+
+						handled_elem_count += tt->variables.count;
+					} else {
+						check_not_tuple(c, &o);
+
+						if (elem_cannot_be_constant(field->type)) {
+							is_constant = false;
+						}
+						if (is_constant) {
+							is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
+						}
+
+						check_assignment(c, &o, field->type, str_lit("structure literal"));
+
+						handled_elem_count += 1;
 					}
 
-					check_assignment(c, &o, field->type, str_lit("structure literal"));
 				}
 				if (cl->elems.count < field_count) {
 					if (min_field_count < field_count) {
-					    if (cl->elems.count < min_field_count) {
+						if (cl->elems.count < min_field_count) {
 							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
-					    }
-					} else {
+						}
+					} else if (handled_elem_count != field_count) {
 						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 					}
 				}
@@ -10604,8 +10630,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 			cl->max_count = max;
 		} else {
-			isize index = 0;
-			for (; index < cl->elems.count; index++) {
+			for (isize index = 0; index < cl->elems.count; index++) {
+				defer (max += 1);
+
 				Ast *e = cl->elems[index];
 				if (e == nullptr) {
 					error(node, "Invalid literal element");
@@ -10622,16 +10649,24 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 
 				Operand operand = {};
-				check_expr_with_type_hint(c, &operand, e, elem_type);
-				check_assignment(c, &operand, elem_type, context_name);
+				check_multi_expr_with_type_hint(c, &operand, e, elem_type);
+				if (is_type_tuple(operand.type)) {
+					is_constant = false;
+					TypeTuple *tt = &operand.type->Tuple;
+					for_array(jj, tt->variables) {
+						Operand oo = operand;
+						oo.type = tt->variables[jj]->type;
+						check_assignment(c, &oo, elem_type, context_name);
+					}
 
-				if (is_constant) {
-					is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					max += tt->variables.count-1;
+				} else {
+					check_assignment(c, &operand, elem_type, context_name);
+
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 				}
-			}
-
-			if (max < index) {
-				max = index;
 			}
 		}
 
@@ -10652,6 +10687,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				if (0 < max && max < t->Struct.soa_count) {
 					error(node, "Expected %lld values for this #soa array literal, got %lld", cast(long long)t->Struct.soa_count, cast(long long)max);
 				}
+			}
+		} else if (t->kind == Type_FixedCapacityDynamicArray) {
+			if (max > t->FixedCapacityDynamicArray.capacity) {
+				error(node, "Expected a maximum of %lld values for this fixed capacity dynamic array, got %lld",
+				      cast(long long)t->FixedCapacityDynamicArray.capacity,
+				      cast(long long)max);
 			}
 		}
 
@@ -10677,6 +10718,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 			}
 		}
+
+		cl->max_count = max;
 
 		break;
 	}
