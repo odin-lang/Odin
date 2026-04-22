@@ -35,8 +35,8 @@ MAX_F64_PRECISION :: 16 // Maximum number of meaningful digits after the decimal
 MAX_F32_PRECISION ::  8 // Maximum number of meaningful digits after the decimal point for 'f32'
 MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal point for 'f16'
 
-RAD_PER_DEG :: TAU/360.0
-DEG_PER_RAD :: 360.0/TAU
+RAD_PER_DEG :: TAU/360.0 // Ratio for conversion of degrees to radians. Multiply by a variable in degrees units to get the radians.
+DEG_PER_RAD :: 360.0/TAU // Ratio for conversion of radians to degrees. Multiply by a variable in radians units to get the degrees.
 
 abs :: builtin.abs
 min :: builtin.min
@@ -49,11 +49,64 @@ clamp :: builtin.clamp
 @(require_results) sqrt_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(sqrt_f32(f32(x))) }
 @(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
 @(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
+/*
+Returns square root of given number.
+
+Inputs:
+- `x`: number of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sqrt_example :: proc() {
+		x_float: f64   = 4.0 	//default float type
+		x_f16:   f16   = 30.90
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             // +0.0
+		x_neg_zero: f16 = -0.0;             // -0.0
+		x_pos_inf:  f16 = math.inf_f16(+1); // +Inf
+		x_zero_inf: f16 = math.inf_f32(0);  // Inf
+		x_neg_inf:  f16 = math.inf_f64(-1); // -Inf
+		x_nan:  	f16 = math.nan_f64be(); // NaN
+
+		fmt.println(math.sqrt(x_float))
+		fmt.println(math.sqrt(x_f16))
+
+		fmt.println(math.sqrt(x_pos_zero))
+		fmt.println(math.sqrt(x_neg_zero))
+		fmt.println(math.sqrt(x_pos_inf))
+		fmt.println(math.sqrt(x_zero_inf))
+		fmt.println(math.sqrt(x_neg_inf))
+		fmt.println(math.sqrt(x_nan))
+	}
+
+Output:
+	2 		// `f64`
+	5.559 	// `f16`
+
+	// special cases
+	+0 		// pos_zero
+	-0 		// neg_zero
+	+Inf 	// pos_inf
+	+Inf 	// zero_inf
+	Nan 	// neg_inf
+	NaN 	// nan
+
+*/
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
 	sqrt_f32, sqrt_f32le, sqrt_f32be,
 	sqrt_f64, sqrt_f64le, sqrt_f64be,
 }
+
 
 @(require_results) sin_f16le :: proc "contextless" (θ: f16le) -> f16le { return #force_inline f16le(sin_f16(f16(θ))) }
 @(require_results) sin_f16be :: proc "contextless" (θ: f16be) -> f16be { return #force_inline f16be(sin_f16(f16(θ))) }
@@ -61,12 +114,64 @@ sqrt :: proc{
 @(require_results) sin_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(sin_f32(f32(θ))) }
 @(require_results) sin_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(sin_f64(f64(θ))) }
 @(require_results) sin_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(sin_f64(f64(θ))) }
-// Return the sine of θ in radians.
+/*
+Returns the sin of a angle
+
+Inputs:
+- `θ`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sin_example :: proc() {
+		x_float: f16   = 30.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:  	f16be = math.nan_f16be(); 
+
+		
+		fmt.println(math.sin(x_float))
+		fmt.println(math.sin(math.to_radians(x_float)))
+
+		fmt.println(math.sin(x_pos_zero))
+		fmt.println(math.sin(x_neg_zero))
+		fmt.println(math.sin(x_pos_inf))
+		fmt.println(math.sin(x_zero_inf))
+		fmt.println(math.sin(x_neg_inf))
+		fmt.println(math.sin(x_nan))
+	}
+
+Output:
+	-0.9878 // accidentally using 30 degrees instead of radians
+	0.5005 	// adjusted with degrees to radians conversion
+
+	// special cases
+	+0 		// pos_zero
+	-0 		// neg_zero
+	Nan 	// pos_inf
+	Nan 	// zero_inf
+	Nan 	// neg_inf
+	NaN 	// nan
+
+*/
 sin :: proc{
 	sin_f16, sin_f16le, sin_f16be,
 	sin_f32, sin_f32le, sin_f32be,
 	sin_f64, sin_f64le, sin_f64be,
 }
+
 
 @(require_results) cos_f16le :: proc "contextless" (θ: f16le) -> f16le { return #force_inline f16le(cos_f16(f16(θ))) }
 @(require_results) cos_f16be :: proc "contextless" (θ: f16be) -> f16be { return #force_inline f16be(cos_f16(f16(θ))) }
@@ -74,7 +179,58 @@ sin :: proc{
 @(require_results) cos_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(cos_f32(f32(θ))) }
 @(require_results) cos_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(cos_f64(f64(θ))) }
 @(require_results) cos_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(cos_f64(f64(θ))) }
-// Return the cosine of θ in radians.
+/*
+Returns the cosine of a angle
+
+Inputs:
+- `θ`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	cos_example :: proc() {
+		x_float: f16   = 90.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:  	f16be = math.nan_f16be(); 
+
+		
+		fmt.println(math.cos(x_float))
+		fmt.println(math.cos(math.to_radians(x_float)))
+
+		fmt.println(math.cos(x_pos_zero))
+		fmt.println(math.cos(x_neg_zero))
+		fmt.println(math.cos(x_pos_inf))
+		fmt.println(math.cos(x_zero_inf))
+		fmt.println(math.cos(x_neg_inf))
+		fmt.println(math.cos(x_nan))
+	}
+
+Output:
+	-0.448 		// accidentally using 90 degrees instead of radians
+	-0.0004926 	// adjusted with degrees to radians conversion
+	
+	// special cases
+	+1 			// pos_zero
+	+1 			// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 cos :: proc{
 	cos_f16, cos_f16le, cos_f16be,
 	cos_f32, cos_f32le, cos_f32be,
@@ -87,6 +243,65 @@ cos :: proc{
 @(require_results) pow_f32be :: proc "contextless" (x, power: f32be) -> f32be { return #force_inline f32be(pow_f32(f32(x), f32(power))) }
 @(require_results) pow_f64le :: proc "contextless" (x, power: f64le) -> f64le { return #force_inline f64le(pow_f64(f64(x), f64(power))) }
 @(require_results) pow_f64be :: proc "contextless" (x, power: f64be) -> f64be { return #force_inline f64be(pow_f64(f64(x), f64(power))) }
+/*
+Returns x to the nth power
+
+NOTE: both input parameters have to be of same type i.e. f16 and f16
+
+Inputs:
+- `x`: a numerical
+- `power`: the power to raise x 
+
+
+Returns:
+- A float of matching type as the `power` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	pow_example :: proc() {
+		x_float:    f16 = 2.0
+		power:      f16 = 3.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.pow(x_float, power))
+
+		fmt.println(math.pow(x_float, x_pos_zero))
+		fmt.println(math.pow(x_float, x_neg_zero))
+		fmt.println(math.pow(x_float, x_pos_inf))
+		fmt.println(math.pow(x_float, x_zero_inf))
+		fmt.println(math.pow(x_float, x_neg_inf))
+		fmt.println(math.pow(x_float, x_nan))
+		fmt.println(math.pow(x_pos_zero, x_pos_zero))
+		fmt.println(math.pow(x_neg_inf, x_pos_inf))
+	}
+
+Output:
+	+8
+	
+	// special cases
+	+1 			// pos_zero
+	+1 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	0 			// neg_inf
+	NaN 		// nan
+	1 			// pos_zero | pos_zero
+	+Inf 		// neg_inf  | pos_inf
+
+*/
 pow :: proc{
 	pow_f16, pow_f16le, pow_f16be,
 	pow_f32, pow_f32le, pow_f32be,
@@ -381,7 +596,58 @@ log10 :: proc{
 @(require_results) tan_f64   :: proc "contextless" (θ: f64)   -> f64   { return sin(θ)/cos(θ) }
 @(require_results) tan_f64le :: proc "contextless" (θ: f64le) -> f64le { return f64le(tan_f64(f64(θ))) }
 @(require_results) tan_f64be :: proc "contextless" (θ: f64be) -> f64be { return f64be(tan_f64(f64(θ))) }
-// Return the tangent of θ in radians.
+/*
+Returns the tangent of a angle
+
+Inputs:
+- `θ`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	tan_example :: proc() {
+		x_float: f16   = 45.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.tan(x_float))
+		fmt.println(math.tan(math.to_radians(x_float)))
+
+		fmt.println(math.tan(x_pos_zero))
+		fmt.println(math.tan(x_neg_zero))
+		fmt.println(math.tan(x_pos_inf))
+		fmt.println(math.tan(x_zero_inf))
+		fmt.println(math.tan(x_neg_inf))
+		fmt.println(math.tan(x_nan))
+	}
+
+Output:
+	1.62 		// accidentally using 90 degrees instead of radians
+	1.001 		// adjusted with degrees to radians conversion
+
+	// special cases
+	+0 			// pos_zero
+	-0 			// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 tan :: proc{
 	tan_f16, tan_f16le, tan_f16be,
 	tan_f32, tan_f32le, tan_f32be,
@@ -569,11 +835,110 @@ copy_sign :: proc{
 @(require_results) to_degrees_f64   :: proc "contextless" (radians: f64)   -> f64   { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64le :: proc "contextless" (radians: f64le) -> f64le { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64be :: proc "contextless" (radians: f64be) -> f64be { return radians * DEG_PER_RAD }
+/*
+Converts the angle from degrees to radians
+
+Inputs:
+- `degrees`: angle in degrees of type float
+
+
+Returns:
+- A angle in radians float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	to_radians_example :: proc() {
+		x_float: f16   = 180.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+		fmt.println(math.to_radians(x_float))
+
+		fmt.println(math.to_radians(x_pos_zero))
+		fmt.println(math.to_radians(x_neg_zero))
+		fmt.println(math.to_radians(x_pos_inf))
+		fmt.println(math.to_radians(x_zero_inf))
+		fmt.println(math.to_radians(x_neg_inf))
+		fmt.println(math.to_radians(x_nan))
+	}
+
+Output:
+	3.143 		// approximates pi but is not math.PI
+
+	// special cases
+	+0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf 		// neg_inf
+	NaN 		// nan
+
+*/
 to_radians :: proc{
 	to_radians_f16, to_radians_f16le, to_radians_f16be,
 	to_radians_f32, to_radians_f32le, to_radians_f32be,
 	to_radians_f64, to_radians_f64le, to_radians_f64be,
 }
+
+/*
+Converts the angle from radians to degrees
+
+Inputs:
+- `radians`: angle in radians of type float
+
+
+Returns:
+- A angle in degrees float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	to_degrees_example :: proc() {
+		x_float: f16   = math.PI
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+		fmt.println(math.to_degrees(x_float))
+
+		fmt.println(math.to_degrees(x_pos_zero))
+		fmt.println(math.to_degrees(x_neg_zero))
+		fmt.println(math.to_degrees(x_pos_inf))
+		fmt.println(math.to_degrees(x_zero_inf))
+		fmt.println(math.to_degrees(x_neg_inf))
+		fmt.println(math.to_degrees(x_nan))
+	}
+
+Output:
+	179.88
+
+	// special cases
+	+0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf 		// neg_inf
+	NaN 		// nan
+
+*/
 to_degrees :: proc{
 	to_degrees_f16, to_degrees_f16le, to_degrees_f16be,
 	to_degrees_f32, to_degrees_f32le, to_degrees_f32be,
@@ -1823,7 +2188,59 @@ atan2 :: proc{
 	atan2_f16le, atan2_f16be,
 }
 
-// Return the arc tangent of x, in radians. Defined on the domain of [-∞, ∞] with a range of [-π/2, π/2]
+/*
+Returns the arc tangent of a angle, in radians. Defined on the domain of [-∞, ∞] with a range of [-π/2, π/2]
+
+
+Inputs:
+- `x`: a number of type float
+
+
+Returns:
+- A angle in radians of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	atan_example :: proc() {
+		x_float: f16   = 1.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.atan(x_float))
+		fmt.println(math.to_degrees(math.atan(x_float)))
+
+		fmt.println(math.atan(x_pos_zero))
+		fmt.println(math.atan(x_neg_zero))
+		fmt.println(math.to_degrees(math.atan(x_pos_inf)))
+		fmt.println(math.to_degrees(math.atan(x_zero_inf)))
+		fmt.println(math.to_degrees(math.atan(x_neg_inf)))
+		fmt.println(math.atan(x_nan))
+	}
+
+Output:
+	0.785 		// angle in radians
+	44.97 		// transformed to degrees
+
+	// special cases
+	+0 			// pos_zero
+	-0 			// neg_zero
+	+89.94 		// pos_inf
+	+89.94 		// zero_inf
+	-89.94 		// neg_inf
+	NaN 		// nan
+
+*/
 @(require_results)
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1)
@@ -1935,7 +2352,59 @@ asin_f16le :: proc "contextless" (x: f16le) -> f16le {
 asin_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(asin_f64(f64(x)))
 }
-// Return the arc sine of x, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
+/*
+Returns the arc sine of a angle, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
+
+
+Inputs:
+- `x`: a number of type float
+
+
+Returns:
+- A angle in radians of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	asin_example :: proc() {
+		x_float: f16   = 0.5
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.asin(x_float))
+		fmt.println(math.to_degrees(math.asin(x_float)))
+
+		fmt.println(math.asin(x_pos_zero))
+		fmt.println(math.asin(x_neg_zero))
+		fmt.println(math.to_degrees(math.asin(x_pos_inf)))
+		fmt.println(math.to_degrees(math.asin(x_zero_inf)))
+		fmt.println(math.to_degrees(math.asin(x_neg_inf)))
+		fmt.println(math.asin(x_nan))
+	}
+
+Output:
+	0.5234 		// angle in radians
+	29.98 		// transformed to degrees
+
+	// special cases
+	+0 			// pos_zero
+	-0 			// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 asin :: proc{
 	asin_f64, asin_f32, asin_f16,
 	asin_f64le, asin_f64be,
@@ -2050,7 +2519,59 @@ acos_f16le :: proc "contextless" (x: f16le) -> f16le {
 acos_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(acos_f64(f64(x)))
 }
-// Return the arc cosine of x, in radians. Defined on the domain of [-1, 1] with a range of [0, π].
+/*
+Returns the arc cosine of a angle, in radians. Defined on the domain of [-1, 1] with a range of [0, π]
+
+
+Inputs:
+- `x`: a number of type float
+
+
+Returns:
+- A angle in radians of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	acos_example :: proc() {
+		x_float: f16   = 0.5
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.acos(x_float))
+		fmt.println(math.to_degrees(math.acos(x_float)))
+
+		fmt.println(math.to_degrees(math.acos(x_pos_zero)))
+		fmt.println(math.to_degrees(math.acos(x_neg_zero)))
+		fmt.println(math.to_degrees(math.acos(x_pos_inf)))
+		fmt.println(math.to_degrees(math.acos(x_zero_inf)))
+		fmt.println(math.to_degrees(math.acos(x_neg_inf)))
+		fmt.println(math.acos(x_nan))
+	}
+
+Output:
+	1.0469 		// angle in radians
+	59.97 		// transformed to degrees
+
+	// special cases
+	+89.94 		// pos_zero
+	-89.94 		// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 acos :: proc{
 	acos_f64, acos_f32, acos_f16,
 	acos_f64le, acos_f64be,
