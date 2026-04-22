@@ -4229,6 +4229,7 @@ gb_internal DECL_ATTRIBUTE_PROC(const_decl_attribute) {
 	           name == "link_name" ||
 	           name == "link_prefix" ||
 	           name == "link_suffix" ||
+			   name == "rodata" ||
 	           false) {
 		error(elem, "@(%.*s) is not supported for compile time constant value declarations", LIT(name));
 		return true;
