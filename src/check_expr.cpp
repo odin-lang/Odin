@@ -2196,6 +2196,36 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 
 }
 
+gb_internal bool check_update_float_precision(ExactValue *value, Type *type) {
+	type = core_type(type);
+	if (type->kind != Type_Basic) {
+		return false;
+	}
+
+	switch (type->Basic.kind) {
+	case Basic_f16:
+	case Basic_f16le:
+	case Basic_f16be:
+		// TODO(bill): This is not technically correct for 16-bit floats, but it will be better than before
+		/*fallthrough*/
+	case Basic_f32:
+	case Basic_f32le:
+	case Basic_f32be:
+		{
+			f64 x_64 = exact_value_to_f64(*value);
+			f32 x_32 = cast(f32)x_64;
+			if (cast(f64)x_32 != x_64) {
+				// make sure there IS precision loss
+				*value = exact_value_float(cast(f64)x_32);
+				return true;
+			}
+		}
+		break;
+	}
+
+	return false;
+}
+
 
 gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
@@ -2362,18 +2392,20 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (v.kind != ExactValue_Float) {
 			return false;
 		}
+		check_update_float_precision(&v, type);
 		if (out_value) *out_value = v;
 
 		switch (type->Basic.kind) {
 		case Basic_f16:
-		case Basic_f32:
-		case Basic_f64:
-			return true;
-
 		case Basic_f16le:
 		case Basic_f16be:
+			/*fallthrough*/
+		case Basic_f32:
 		case Basic_f32le:
 		case Basic_f32be:
+			return true;
+
+		case Basic_f64:
 		case Basic_f64le:
 		case Basic_f64be:
 			return true;
@@ -4858,41 +4890,45 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			update_untyped_expr_value(c, operand->expr, operand->value);
 		}
 
-		{
-			switch (operand->type->Basic.kind) {
-			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type)) {
-					operand->mode = Addressing_Invalid;
-					convert_untyped_error(c, operand, target_type);
-					return;
-				}
-				break;
-			case Basic_UntypedInteger:
-			case Basic_UntypedFloat:
-			case Basic_UntypedComplex:
-			case Basic_UntypedQuaternion:
-			case Basic_UntypedRune:
-				if (!is_type_numeric(target_type)) {
-					operand->mode = Addressing_Invalid;
-					convert_untyped_error(c, operand, target_type);
-					return;
-				}
-				break;
-
-			case Basic_UntypedNil:
-				if (is_type_any(target_type)) {
-					// target_type = t_untyped_nil;
-				} else if (is_type_cstring(target_type)) {
-					// target_type = t_untyped_nil;
-				} else if (is_type_cstring16(target_type)) {
-					// target_type = t_untyped_nil;
-				} else if (!type_has_nil(target_type)) {
-					operand->mode = Addressing_Invalid;
-					convert_untyped_error(c, operand, target_type);
-					return;
-				}
-				break;
+		switch (operand->type->Basic.kind) {
+		case Basic_UntypedBool:
+			if (!is_type_boolean(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				return;
 			}
+			break;
+		case Basic_UntypedInteger:
+		case Basic_UntypedFloat:
+		case Basic_UntypedComplex:
+		case Basic_UntypedQuaternion:
+		case Basic_UntypedRune:
+			if (!is_type_numeric(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				return;
+			}
+			break;
+
+		case Basic_UntypedNil:
+			if (is_type_any(target_type)) {
+				// target_type = t_untyped_nil;
+			} else if (is_type_cstring(target_type)) {
+				// target_type = t_untyped_nil;
+			} else if (is_type_cstring16(target_type)) {
+				// target_type = t_untyped_nil;
+			} else if (!type_has_nil(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				return;
+			}
+			break;
+		}
+
+		switch (operand->type->Basic.kind) {
+		case Basic_UntypedFloat:
+			check_update_float_precision(&operand->value, t);
+			break;
 		}
 		break;
 
