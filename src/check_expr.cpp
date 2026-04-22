@@ -1919,6 +1919,16 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
 	}
+	switch (e->kind) {
+	case Entity_Constant:
+	case Entity_Variable:
+	case Entity_TypeName:
+		if (check_cycle(c, e, true)) {
+			o->type = t_invalid;
+			return e;
+		}
+		break;
+	}
 	if (e->type == nullptr) {
 		// TODO(bill): Which is correct? return or compiler_error?
 		// compiler_error("How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
