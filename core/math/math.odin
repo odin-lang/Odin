@@ -1642,7 +1642,61 @@ round :: proc{
 @(require_results) ceil_f64   :: proc "contextless" (x: f64)   -> f64   { return -floor(-x) }
 @(require_results) ceil_f64le :: proc "contextless" (x: f64le) -> f64le { return -floor(-x) }
 @(require_results) ceil_f64be :: proc "contextless" (x: f64be) -> f64be { return -floor(-x) }
+/*
+Rounds up `x`
 
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	ceil_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = -2.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.ceil(x_float))
+		fmt.println(math.ceil(x2_float))
+
+		fmt.println(math.ceil(x_pos_zero))
+		fmt.println(math.ceil(x_neg_zero))
+		fmt.println(math.ceil(x_pos_inf))
+		fmt.println(math.ceil(x_zero_inf))
+		fmt.println(math.ceil(x_neg_inf))
+		fmt.println(math.ceil(x_nan))
+	}
+
+Output:
+	+3
+	-2
+	
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf		// neg_inf
+	Nan 		// nan
+
+*/
 ceil :: proc{
 	ceil_f16, ceil_f16le, ceil_f16be,
 	ceil_f32, ceil_f32le, ceil_f32be,
@@ -1700,6 +1754,61 @@ floor_f64   :: proc "contextless" (x: f64)   -> f64 {
 }
 @(require_results) floor_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(floor_f64(f64(x))) }
 @(require_results) floor_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(floor_f64(f64(x))) }
+/*
+Rounds down `x`
+
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	floor_example :: proc() {
+		x_float:    f16 = 7.1
+		x2_float:    f16 = -32.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.floor(x_float))
+		fmt.println(math.floor(x2_float))
+
+		fmt.println(math.floor(x_pos_zero))
+		fmt.println(math.floor(x_neg_zero))
+		fmt.println(math.floor(x_pos_inf))
+		fmt.println(math.floor(x_zero_inf))
+		fmt.println(math.floor(x_neg_inf))
+		fmt.println(math.floor(x_nan))
+	}
+
+Output:
+	+7
+	-33
+	
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf		// neg_inf
+	Nan 		// nan
+
+*/
 floor :: proc{
 	floor_f16, floor_f16le, floor_f16be,
 	floor_f32, floor_f32le, floor_f32be,
@@ -2045,17 +2154,69 @@ frexp_f64be :: proc "contextless" (x: f64be) -> (significand: f64be, exponent: i
 	f, e := frexp_f64(f64(x))
 	return f64be(f), e
 }
+/*
+Breaks the value into a normalized fraction, and an integral power of two.
 
-// frexp breaks the value into a normalized fraction, and an integral power of two
-// It returns a significand and exponent satisfying x == significand * 2**exponent
-// with the absolute value of significand in the intervalue of [0.5, 1).
-//
-// Special cases: 
-// 	frexp(+0)   = +0,   0
-// 	frexp(-0)   = -0,   0
-// 	frexp(+inf) = +inf, 0
-// 	frexp(-inf) = -inf, 0
-// 	frexp(NaN)  = NaN,  0
+Satisfying x == significand * 2**exponent
+
+Its the inverse of ldexp
+
+
+Inputs:
+- `x`: float to be broken down to the normalized fraction
+
+
+Returns:
+- A tuple containing a significand float of matching type as the `x` input and a int exponent
+with the absolute value of significand in the intervalue of [0.5, 1)
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	frexp_example :: proc() {
+		x_float:     f16 = 2.0
+		x2_float:    f16 = 11.7
+		x3_float:    f16 = -32.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.frexp(x_float))
+		fmt.println(math.frexp(x2_float))
+		fmt.println(math.frexp(x3_float))
+
+		fmt.println(math.frexp(x_pos_zero))
+		fmt.println(math.frexp(x_neg_zero))
+		fmt.println(math.frexp(x_pos_inf))
+		fmt.println(math.frexp(x_zero_inf))
+		fmt.println(math.frexp(x_neg_inf))
+		fmt.println(math.frexp(x_nan))
+	}
+
+Output:
+	0.5 2
+	0.7314 4
+	-0.5049 6
+	
+	// special cases
+	0 0 		// pos_zero
+	0 0 		// neg_zero
+	+Inf 0 		// pos_inf
+	+Inf 0 		// zero_inf
+	-Inf 0		// neg_inf
+	NaN 0 		// nan
+
+*/
 frexp :: proc{
 	frexp_f16, frexp_f16le, frexp_f16be,
 	frexp_f32, frexp_f32le, frexp_f32be,
@@ -3367,14 +3528,68 @@ hypot_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
 @(require_results) hypot_f32be :: proc "contextless" (x, y: f32be) -> (r: f32be) { return f32be(hypot_f32(f32(x), f32(y))) }
 @(require_results) hypot_f64le :: proc "contextless" (x, y: f64le) -> (r: f64le) { return f64le(hypot_f64(f64(x), f64(y))) }
 @(require_results) hypot_f64be :: proc "contextless" (x, y: f64be) -> (r: f64be) { return f64be(hypot_f64(f64(x), f64(y))) }
+/*
+Calculates the hypotenuse of a rectangle of sides `x` and `y`
 
-// hypot returns Sqrt(p*p + q*q), taking care to avoid unnecessary overflow and underflow.
-//
-// Special cases:
-//	hypot(±Inf, q) = +Inf
-//	hypot(p, ±Inf) = +Inf
-//	hypot(NaN, q) = NaN
-//	hypot(p, NaN) = NaN
+returns Sqrt(p*p + q*q), taking care to avoid unnecessary overflow and underflow.
+
+
+Inputs:
+- `x`: float representing one side of the rectangle
+- `y`: float representing another side of the rectangle
+
+
+Returns:
+- A float of matching type as the inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	hypot_example :: proc() {
+		x_float:    f16 = 3.0
+		y_float:    f16 = 4.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.hypot(x_float, y_float))
+
+		fmt.println(math.hypot(x_pos_zero, y_float))
+		fmt.println(math.hypot(x_neg_zero, y_float))
+		fmt.println(math.hypot(x_neg_zero, x_pos_zero))
+		fmt.println(math.hypot(x_pos_inf, y_float))
+		fmt.println(math.hypot(y_float, x_zero_inf))
+		fmt.println(math.hypot(x_neg_inf, y_float))
+		fmt.println(math.hypot(x_neg_inf, x_pos_inf))
+		fmt.println(math.hypot(x_nan, y_float))
+		fmt.println(math.hypot(x_nan, x_pos_inf))
+	}
+
+Output:
+	+5
+
+	// special cases
+	+4 			// pos_zero | y
+	+4 			// neg_zero | y
+	0			// neg_zero | pos_zero
+	+Inf 		// pos_inf 	| y
+	+Inf 		// y 		| zero_inf
+	+Inf		// neg_inf 	| y
+	+Inf		// neg_inf 	| pos_inf
+	Nan 		// nan 		| y
+	+Inf 		// nan 		| pos_inf
+
+*/
 hypot :: proc{
 	hypot_f16, hypot_f16le, hypot_f16be,
 	hypot_f32, hypot_f32le, hypot_f32be,
