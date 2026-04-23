@@ -512,7 +512,8 @@ quaternion_angle_axis :: proc{
 @(require_results)
 angle_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
-		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		angle := math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		return q.w < 0 ? math.TAU - angle : angle
 	}
 
 	return math.acos(q.w) * 2
@@ -520,7 +521,8 @@ angle_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
 @(require_results)
 angle_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> f32 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
-		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		angle := math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		return q.w < 0 ? math.TAU - angle : angle
 	}
 
 	return math.acos(q.w) * 2
@@ -528,7 +530,8 @@ angle_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> f32 {
 @(require_results)
 angle_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> f64 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
-		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		angle := math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		return q.w < 0 ? math.TAU - angle : angle
 	}
 
 	return math.acos(q.w) * 2
