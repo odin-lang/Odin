@@ -2722,84 +2722,131 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			Type *de = core_type(dst_elem);
 			Type *se = core_type(src_elem);
 			if (count <= 64 && // TODO(bill): is this a sensible limit?
-			    is_simd_able_type(de) && is_simd_able_type(se)) {
+			    is_simd_able_type(se)) {
 				// NOTE(bill, 2026-04-23): These types are simd-able meaning you can use the direct vector operators
 				// But we need to be careful when it comes to alignment and tell LLVM that it is only aligned
 				// to the element type and not the natural vector size
 				//
 				// This is to give it a proper hint that this can be done as a vector even when `-o:speed` is not set
+			    	if (is_simd_able_type(de)) {
+					lbAddr v = lb_add_local_generated(p, t, false); // do not zero anything because it will be filled
 
-				lbAddr v = lb_add_local_generated(p, t, false); // do not zero anything because it will be filled
+					lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+					lbValue pdst = v.addr;
 
-				lbValue psrc = lb_address_from_load_or_generate_local(p, value);
-				lbValue pdst = v.addr;
+					i64 de_sz = type_size_of(de);
+					i64 se_sz = type_size_of(se);
 
-				i64 de_sz = type_size_of(de);
-				i64 se_sz = type_size_of(se);
+					LLVMOpcode op = cast(LLVMOpcode)0;
 
-				LLVMOpcode op = cast(LLVMOpcode)0;
-
-				if (is_type_float(se)) {
-					if (is_type_float(de)) {
-						if (de_sz == se_sz)     { op = LLVMBitCast; }
-						else if (de_sz < se_sz) { op = LLVMFPTrunc; }
-						else                    { op = LLVMFPExt;   }
-					} else {
-						GB_ASSERT(is_type_integer_like(de) || is_type_rune(de));
-						if (is_type_unsigned(de) || is_type_boolean(de)) { op = LLVMFPToUI; }
-						else                                             { op = LLVMFPToSI; }
-					}
-				} else {
-					GB_ASSERT(is_type_integer_like(se) || is_type_rune(se));
-
-					if (is_type_float(de)) {
-						if (is_type_unsigned(se) || is_type_boolean(se)) { op = LLVMUIToFP; }
-						else                                             { op = LLVMSIToFP; }
-					} else {
-						if (de_sz == se_sz) {
-							op = LLVMBitCast;
-						} else if (de_sz < se_sz) {
-							op = LLVMTrunc;
+					if (is_type_float(se)) {
+						if (is_type_float(de)) {
+							if (de_sz == se_sz)     { op = LLVMBitCast; }
+							else if (de_sz < se_sz) { op = LLVMFPTrunc; }
+							else                    { op = LLVMFPExt;   }
 						} else {
-							op = (is_type_unsigned(se) || is_type_boolean(se)) ? LLVMZExt : LLVMSExt; // zero extent
+							GB_ASSERT(is_type_integer_like(de) || is_type_rune(de));
+							if (is_type_unsigned(de) || is_type_boolean(de)) { op = LLVMFPToUI; }
+							else                                             { op = LLVMFPToSI; }
+						}
+					} else {
+						GB_ASSERT(is_type_integer_like(se) || is_type_rune(se));
+
+						if (is_type_float(de)) {
+							if (is_type_unsigned(se) || is_type_boolean(se)) { op = LLVMUIToFP; }
+							else                                             { op = LLVMSIToFP; }
+						} else {
+							if (de_sz == se_sz) {
+								op = LLVMBitCast;
+							} else if (de_sz < se_sz) {
+								op = LLVMTrunc;
+							} else {
+								op = (is_type_unsigned(se) || is_type_boolean(se)) ? LLVMZExt : LLVMSExt; // zero extent
+							}
 						}
 					}
+
+					GB_ASSERT(op != 0);
+
+					LLVMTypeRef src_vector_type = LLVMVectorType(lb_type(p->module, se), cast(unsigned)count);
+					LLVMTypeRef dst_vector_type = LLVMVectorType(lb_type(p->module, de), cast(unsigned)count);
+
+					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
+					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
+
+					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
+					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+
+					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
+
+					LLVMValueRef store = LLVMBuildStore(p->builder, dst_vector, dst_ptr);
+					LLVMSetAlignment(store, cast(unsigned)type_align_of(de));
+
+					return lb_addr_load(p, v);
+				} else if (is_type_complex(de)) {
+					GB_ASSERT(is_type_float(se));
+
+					Type *cde = base_complex_elem_type(de);
+
+					lbAddr v = lb_add_local_generated(p, t, false); // do not zero anything because it will be filled
+
+					i64 cde_sz = type_size_of(cde);
+					i64 se_sz  = type_size_of(se);
+
+					lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+					lbValue pdst = v.addr;
+
+					LLVMOpcode op = cast(LLVMOpcode)0;
+
+					if (cde_sz == se_sz)     { op = LLVMBitCast; }
+					else if (cde_sz < se_sz) { op = LLVMFPTrunc; }
+					else                     { op = LLVMFPExt;   }
+
+					LLVMTypeRef src_vector_type = LLVMVectorType(lb_type(p->module, se),  cast(unsigned)count);
+					LLVMTypeRef dst_vector_type = LLVMVectorType(lb_type(p->module, cde), cast(unsigned)count);
+
+					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
+					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
+
+					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
+					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+
+					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
+					LLVMValueRef dst_zero = LLVMConstNull(dst_vector_type);
+
+					LLVMValueRef *dst_mask_scalars = gb_alloc_array(temporary_allocator(), LLVMValueRef, count*2);
+					LLVMTypeRef llvm_i32 = lb_type(p->module, t_i32);
+					for (i64 i = 0; i < count; i++) {
+						dst_mask_scalars[i*2 + 0] = LLVMConstInt(llvm_i32, cast(u64)i,         false);
+						dst_mask_scalars[i*2 + 1] = LLVMConstInt(llvm_i32, cast(u64)(count+i), false);
+					}
+
+					LLVMValueRef dst_mask = LLVMConstVector(dst_mask_scalars, cast(unsigned)(count*2));
+					dst_vector = LLVMBuildShuffleVector(p->builder, dst_vector, dst_zero, dst_mask, "");
+
+
+					LLVMValueRef store = LLVMBuildStore(p->builder, dst_vector, dst_ptr);
+					LLVMSetAlignment(store, cast(unsigned)type_align_of(de));
+
+					return lb_addr_load(p, v);
 				}
-
-				GB_ASSERT(op != 0);
-
-				LLVMTypeRef src_vector_type = LLVMVectorType(lb_type(p->module, se), cast(unsigned)count);
-				LLVMTypeRef dst_vector_type = LLVMVectorType(lb_type(p->module, de), cast(unsigned)count);
-
-				LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
-				LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
-
-				LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-				LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
-
-				LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
-
-				LLVMValueRef store = LLVMBuildStore(p->builder, dst_vector, dst_ptr);
-				LLVMSetAlignment(store, cast(unsigned)type_align_of(de));
-
-				return lb_addr_load(p, v);
-			} else {
-				lbAddr v = lb_add_local_generated(p, t, true);
-
-				lbValue psrc = lb_address_from_load_or_generate_local(p, value);
-				lbValue pdst = v.addr;
-
-				for (i64 i = 0; i < count; i++) {
-					lbValue sp = lb_emit_array_epi(p, psrc, i);
-					lbValue dp = lb_emit_array_epi(p, pdst, i);
-
-					lbValue s = lb_emit_load(p, sp);
-					s = lb_emit_conv(p, s, dst_elem);
-					lb_emit_store(p, dp, s);
-				}
-
-				return lb_addr_load(p, v);
 			}
+
+			lbAddr v = lb_add_local_generated(p, t, true);
+
+			lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+			lbValue pdst = v.addr;
+
+			for (i64 i = 0; i < count; i++) {
+				lbValue sp = lb_emit_array_epi(p, psrc, i);
+				lbValue dp = lb_emit_array_epi(p, pdst, i);
+
+				lbValue s = lb_emit_load(p, sp);
+				s = lb_emit_conv(p, s, dst_elem);
+				lb_emit_store(p, dp, s);
+			}
+
+			return lb_addr_load(p, v);
 
 		}
 	}
