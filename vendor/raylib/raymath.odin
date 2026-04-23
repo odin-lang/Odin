@@ -849,7 +849,7 @@ MatrixCompose :: proc "c" (translation: Vector3, rotation: Quaternion, scale: Ve
 		right.x, up.x, forward.x, translation.x,
 		right.y, up.y, forward.y, translation.y,
 		right.z, up.z, forward.z, translation.z,
-		0, 0, 0, 1
+		0, 0, 0, 1,
 	}
 	
 	return result
