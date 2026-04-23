@@ -1243,7 +1243,7 @@ foreign lib {
 	DrawCircle                  :: proc(centerX, centerY: c.int, radius: f32, color: Color) ---                                                       // Draw a color-filled circle
 	DrawCircleSector            :: proc(center: Vector2, radius: f32, startAngle, endAngle: f32, segments: c.int, color: Color) ---                   // Draw a piece of a circle
 	DrawCircleSectorLines       :: proc(center: Vector2, radius: f32, startAngle, endAngle: f32, segments: c.int, color: Color) ---                   // Draw circle sector outline
-	DrawCircleGradient          :: proc(center: Vector2, radius: f32, inner, outer: Color) ---                                                // Draw a gradient-filled circle
+	DrawCircleGradient          :: proc(center: Vector2, radius: f32, inner, outer: Color) ---                                                        // Draw a gradient-filled circle
 	DrawCircleV                 :: proc(center: Vector2, radius: f32, color: Color) ---                                                               // Draw a color-filled circle (Vector version)
 	DrawCircleLines             :: proc(centerX, centerY: c.int, radius: f32, color: Color) ---                                                       // Draw circle outline
 	DrawCircleLinesV            :: proc(center: Vector2, radius: f32, color: Color) ---                                                               // Draw circle outline (Vector version)
@@ -1476,7 +1476,7 @@ foreign lib {
 	DrawTextEx         :: proc(font: Font, text: cstring, position: Vector2, fontSize: f32, spacing: f32, tint: Color) ---                        		// Draw text using font and additional parameters
 	DrawTextPro        :: proc(font: Font, text: cstring, position, origin: Vector2, rotation: f32, fontSize: f32, spacing: f32, tint: Color) --- 		// Draw text using Font and pro parameters (rotation)
 	DrawTextCodepoint  :: proc(font: Font, codepoint: rune, position: Vector2, fontSize: f32, tint: Color) ---                                    		// Draw one character (codepoint)
-	DrawTextCodepoints :: proc(font: Font, codepoints: [^]rune, codepointCount: c.int, position: Vector2, fontSize: f32, spacing: f32, tint: Color) ---     // Draw multiple character (codepoint)
+	DrawTextCodepoints :: proc(font: Font, codepoints: [^]rune, codepointCount: c.int, position: Vector2, fontSize: f32, spacing: f32, tint: Color) --- // Draw multiple character (codepoint)
 
 	// Text font info functions
 
