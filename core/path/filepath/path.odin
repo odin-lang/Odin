@@ -39,7 +39,7 @@ join :: proc(
 ) -> (
 	joined: string,
 	err: runtime.Allocator_Error,
-) {
+) #optional_allocator_error {
 	return os.join_path(elems, allocator)
 }
 
@@ -151,7 +151,7 @@ clean :: proc(
 ) -> (
 	cleaned: string,
 	err: runtime.Allocator_Error,
-) {
+) #optional_allocator_error {
 	return os.clean_path(path, allocator)
 }
 
