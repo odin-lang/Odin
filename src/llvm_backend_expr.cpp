@@ -330,6 +330,26 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 }
 
 
+gb_internal bool is_simd_able_type(Type *t) {
+	if (t->kind != Type_Basic) {
+		return false;
+	}
+
+	if (t->Basic.flags & (BasicFlag_Boolean|BasicFlag_Integer|BasicFlag_Float|BasicFlag_Rune)) {
+		TypeEndianKind kind = type_endian_kind_of(t);
+		switch (kind) {
+		case TypeEndian_Platform: return true;
+		case TypeEndian_Little:   return build_context.endian_kind == TypeEndian_Little;
+		case TypeEndian_Big:      return build_context.endian_kind == TypeEndian_Big;
+		}
+	}
+	return false;
+}
+
+// TODO(bill): is this a sensible limit?
+#define MAX_SIMD_ARRAY_COUNT_FOR_INLINING 64
+
+
 gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, lbValue *res_) {
 	GB_ASSERT(is_type_array_like(type));
 	Type *elem_type = base_array_type(type);
@@ -462,6 +482,121 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 		}
 	}
 
+
+	i64 count = get_array_type_count(type);
+	if (false &&
+	    count <= MAX_SIMD_ARRAY_COUNT_FOR_INLINING &&
+	    is_simd_able_type(elem_type) && is_simd_able_type(elem_type)) {
+		Type *integral_type = elem_type;
+
+		LLVMTypeRef vector_elem_type = lb_type(p->module, integral_type);
+		LLVMTypeRef vector_type = LLVMVectorType(vector_elem_type, cast(unsigned)count);
+
+		if (is_type_bit_set(integral_type)) {
+			switch (op) {
+			case Token_Add: op = Token_Or;     break;
+			case Token_Sub: op = Token_AndNot; break;
+			}
+			Type *u = bit_set_to_int(type);
+			if (is_type_array(u)) {
+				return false;
+			}
+		}
+
+		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
+		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
+		LLVMValueRef x = OdinLLVMBuildLoad(p, vector_type, lhs_vp);
+		LLVMValueRef y = OdinLLVMBuildLoad(p, vector_type, rhs_vp);
+		LLVMSetAlignment(x, cast(unsigned)type_align_of(integral_type));
+		LLVMSetAlignment(y, cast(unsigned)type_align_of(integral_type));
+
+		LLVMValueRef z = nullptr;
+
+		if (is_type_float(integral_type)) {
+			switch (op) {
+			case Token_Add:
+				z = LLVMBuildFAdd(p->builder, x, y, "");
+				break;
+			case Token_Sub:
+				z = LLVMBuildFSub(p->builder, x, y, "");
+				break;
+			case Token_Mul:
+				z = LLVMBuildFMul(p->builder, x, y, "");
+				break;
+			case Token_Quo:
+				z = LLVMBuildFDiv(p->builder, x, y, "");
+				break;
+			case Token_Mod:
+				z = LLVMBuildFRem(p->builder, x, y, "");
+				break;
+			default:
+				GB_PANIC("Unsupported vector operation %.*s", LIT(token_strings[op]));
+				break;
+			}
+
+		} else {
+			switch (op) {
+			case Token_Add:
+				z = LLVMBuildAdd(p->builder, x, y, "");
+				break;
+			case Token_Sub:
+				z = LLVMBuildSub(p->builder, x, y, "");
+				break;
+			case Token_Mul:
+				z = LLVMBuildMul(p->builder, x, y, "");
+				break;
+			case Token_Quo:
+				{
+					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
+					z = call(p->builder, x, y, "");
+				}
+				break;
+			case Token_Mod:
+				{
+					auto *call = is_type_unsigned(integral_type) ? LLVMBuildURem : LLVMBuildSRem;
+					z = call(p->builder, x, y, "");
+				}
+				break;
+			case Token_ModMod:
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildURem(p->builder, x, y, "");
+				} else {
+					LLVMValueRef a = LLVMBuildSRem(p->builder, x, y, "");
+					LLVMValueRef b = LLVMBuildAdd(p->builder, a, y, "");
+					z = LLVMBuildSRem(p->builder, b, y, "");
+				}
+				break;
+			case Token_And:
+				z = LLVMBuildAnd(p->builder, x, y, "");
+				break;
+			case Token_AndNot:
+				z = LLVMBuildAnd(p->builder, x, LLVMBuildNot(p->builder, y, ""), "");
+				break;
+			case Token_Or:
+				z = LLVMBuildOr(p->builder, x, y, "");
+				break;
+			case Token_Xor:
+				z = LLVMBuildXor(p->builder, x, y, "");
+				break;
+			default:
+				GB_PANIC("Unsupported vector operation");
+				break;
+			}
+		}
+
+
+		if (z != nullptr) {
+			lbAddr res = lb_add_local_generated_temp(p, type, lb_alignof(vector_type));
+
+			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, res.addr.value, LLVMPointerType(vector_type, 0), "");
+			LLVMValueRef store = LLVMBuildStore(p->builder, z, vp);
+			LLVMSetAlignment(store, cast(unsigned)type_align_of(type));
+			lbValue v = lb_addr_load(p, res);
+			if (res_) *res_ = v;
+			return true;
+		}
+	}
+
 	return false;
 }
 
@@ -486,7 +621,6 @@ gb_internal lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lh
 
 	bool inline_array_arith = lb_can_try_to_inline_array_arith(type);
 	if (inline_array_arith) {
-
 		auto dst_ptrs = slice_make<lbValue>(temporary_allocator(), n);
 
 		auto a_loads = slice_make<lbValue>(temporary_allocator(), n);
@@ -2692,23 +2826,6 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 
 	if (is_type_array(dst) && is_type_array(src)) {
-		auto is_simd_able_type = [](Type *t) -> bool {
-			if (t->kind != Type_Basic) {
-				return false;
-			}
-
-			if (t->Basic.flags & (BasicFlag_Boolean|BasicFlag_Integer|BasicFlag_Float|BasicFlag_Rune)) {
-				TypeEndianKind kind = type_endian_kind_of(t);
-				switch (kind) {
-				case TypeEndian_Platform: return true;
-				case TypeEndian_Little:   return build_context.endian_kind == TypeEndian_Little;
-				case TypeEndian_Big:      return build_context.endian_kind == TypeEndian_Big;
-				}
-			}
-			return false;
-		};
-
-
 		Type *dst_elem = base_array_type(dst);
 		Type *src_elem = base_array_type(src);
 		if (dst->Array.count == src->Array.count) {
@@ -2721,7 +2838,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 			Type *de = core_type(dst_elem);
 			Type *se = core_type(src_elem);
-			if (count <= 64 && // TODO(bill): is this a sensible limit?
+			if (count <= MAX_SIMD_ARRAY_COUNT_FOR_INLINING &&
 			    is_simd_able_type(se)) {
 				// NOTE(bill, 2026-04-23): These types are simd-able meaning you can use the direct vector operators
 				// But we need to be careful when it comes to alignment and tell LLVM that it is only aligned
