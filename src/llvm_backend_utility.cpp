@@ -1069,6 +1069,9 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 
 gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
+		if (t->Struct.is_raw_union) {
+			return 0;
+		}
 		auto field_remapping = lb_get_struct_remapping(m, t);
 		return field_remapping[index];
 	} else if (is_type_any(t) && build_context.ptr_size == 4) {
