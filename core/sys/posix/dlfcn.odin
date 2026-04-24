@@ -74,9 +74,11 @@ foreign lib {
 }
 
 RTLD_Flag_Bits :: enum c.int {
-	LAZY   = log2(RTLD_LAZY),
-	NOW    = log2(RTLD_NOW),
-	GLOBAL = log2(RTLD_GLOBAL),
+	LAZY     = log2(RTLD_LAZY),
+	NOW      = log2(RTLD_NOW),
+	GLOBAL   = log2(RTLD_GLOBAL),
+	NOLOAD   = log2(RTLD_NOLOAD),
+	NODELETE = log2(RTLD_NODELETE),
 
  	// NOTE: use with `posix.RTLD_LOCAL + { .OTHER_FLAG, .OTHER_FLAG }`, unfortunately can't be in
 	// this bit set enum because it is 0 on some platforms and a value on others.
@@ -90,39 +92,58 @@ Symbol_Table :: distinct rawptr
 
 when ODIN_OS == .Darwin {
 
-	RTLD_LAZY    :: 0x1
-	RTLD_NOW     :: 0x2
-	_RTLD_LOCAL  :: 0x4
-	RTLD_GLOBAL  :: 0x8
+	RTLD_LAZY     :: 0x1
+	RTLD_NOW      :: 0x2
+	_RTLD_LOCAL   :: 0x4
+	RTLD_GLOBAL   :: 0x8
+	RTLD_NOLOAD   :: 0x10
+	RTLD_NODELETE :: 0x80
 
-	RTLD_LOCAL   :: RTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_LOCAL))}
+	RTLD_LOCAL    :: RTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_LOCAL))}
 
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+} else when ODIN_OS == .FreeBSD {
 
-	RTLD_LAZY    :: 1
-	RTLD_NOW     :: 2
-	_RTLD_LOCAL  :: 0
-	RTLD_GLOBAL  :: 0x100
+	RTLD_LAZY     :: 1
+	RTLD_NOW      :: 2
+	RTLD_GLOBAL   :: 0x100
+	RTLD_NODELETE :: 0x1000
+	RTLD_NOLOAD   :: 0x2000
 
-	RTLD_LOCAL   :: RTLD_Flags{}
+	_RTLD_LOCAL   :: 0
+	RTLD_LOCAL    :: RTLD_Flags{}
+
+} else when ODIN_OS == .OpenBSD {
+
+	RTLD_LAZY     :: 1
+	RTLD_NOW      :: 2
+	RTLD_GLOBAL   :: 0x100
+	RTLD_NODELETE :: 0x400
+	RTLD_NOLOAD   :: 0x800
+
+	_RTLD_LOCAL   :: 0
+	RTLD_LOCAL    :: RTLD_Flags{}
 
 } else when ODIN_OS == .NetBSD {
 
-	RTLD_LAZY    :: 0x1
-	RTLD_NOW     :: 0x2
-	_RTLD_LOCAL  :: 0x200
-	RTLD_GLOBAL  :: 0x100
+	RTLD_LAZY     :: 0x1
+	RTLD_NOW      :: 0x2
+	_RTLD_LOCAL   :: 0x200
+	RTLD_GLOBAL   :: 0x100
+	RTLD_NODELETE :: 0x1000
+	RTLD_NOLOAD   :: 0x2000
 
-	RTLD_LOCAL   :: RTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_LOCAL))}
+	RTLD_LOCAL    :: RTLD_Flags{RTLD_Flag_Bits(log2(_RTLD_LOCAL))}
 
 } else when ODIN_OS == .Linux {
 
-	RTLD_LAZY    :: 0x001
-	RTLD_NOW     :: 0x002
-	RTLD_GLOBAL  :: 0x100
+	RTLD_LAZY     :: 0x0001
+	RTLD_NOW      :: 0x0002
+	RTLD_NOLOAD   :: 0x0004
+	RTLD_GLOBAL   :: 0x0100
+	RTLD_NODELETE :: 0x1000
 
-	_RTLD_LOCAL  :: 0
-	RTLD_LOCAL   :: RTLD_Flags{}
+	_RTLD_LOCAL   :: 0
+	RTLD_LOCAL    :: RTLD_Flags{}
 
 }
 
