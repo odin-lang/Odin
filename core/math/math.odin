@@ -15,8 +15,8 @@ Float_Class :: enum {
 	Neg_Inf,   // negative infinity
 }
 
-TAU          :: 6.28318530717958647692528676655900576
-PI           :: 3.14159265358979323846264338327950288
+TAU          :: 6.28318530717958647692528676655900576 // 2 times PI
+PI           :: 3.14159265358979323846264338327950288 // fundamental circle ratio of its circumference by its radius divided by 2; 2*PI*radius = circumference
 
 E            :: 2.71828182845904523536 // Euler's number
 
@@ -24,9 +24,9 @@ E            :: 2.71828182845904523536 // Euler's number
 π :: PI
 e :: E
 
-SQRT_TWO     :: 1.41421356237309504880168872420969808
-SQRT_THREE   :: 1.73205080756887729352744634150587236
-SQRT_FIVE    :: 2.23606797749978969640917366873127623
+SQRT_TWO     :: 1.41421356237309504880168872420969808 // precalculated square root of 2
+SQRT_THREE   :: 1.73205080756887729352744634150587236 // precalculated square root of 3
+SQRT_FIVE    :: 2.23606797749978969640917366873127623 // precalculated square root of 5
 
 LN2          :: 0.693147180559945309417232121458176568 	// Logarithm of 2 in base e equivalent to ln(2)
 LN10         :: 2.30258509299404568401799145468436421 	// Logarithm of 10 in base e equivalent to ln(10)
@@ -3710,9 +3710,9 @@ F16_MANT_DIG   :: 11
 F16_MAX        :: 65504.0
 F16_MAX_10_EXP :: 4
 F16_MAX_EXP    :: 15
-F16_MIN        :: 6.10351562e-5
+F16_MIN        :: 6.10351562e-5 // smallest positive normal for a 16bit float
 F16_MIN_10_EXP :: -4
-F16_MIN_EXP    :: -14
+F16_MIN_EXP    :: -14 			// smallest possible power of 2 for a 16bit float
 F16_NORMALIZE  :: 0
 F16_RADIX      :: 2
 F16_ROUNDS     :: 1
@@ -3725,9 +3725,9 @@ F32_MANT_DIG   :: 24
 F32_MAX        :: 3.402823466e+38
 F32_MAX_10_EXP :: 38
 F32_MAX_EXP    :: 128
-F32_MIN        :: 1.175494351e-38
+F32_MIN        :: 1.175494351e-38	// smallest positive normal for a 32bit float
 F32_MIN_10_EXP :: -37
-F32_MIN_EXP    :: -125
+F32_MIN_EXP    :: -125				// smallest possible power of 2 for a 32bit float
 F32_NORMALIZE  :: 0
 F32_RADIX      :: 2
 F32_ROUNDS     :: 1
