@@ -2079,7 +2079,84 @@ normalize_f64 :: proc "contextless" (x: f64) -> (y: f64, exponent: int) {
 @(require_results) normalize_f32be :: proc "contextless" (x: f32be) -> (y: f32be, exponent: int) { y0, e := normalize_f32(f32(x)); return f32be(y0), e }
 @(require_results) normalize_f64le :: proc "contextless" (x: f64le) -> (y: f64le, exponent: int) { y0, e := normalize_f64(f64(x)); return f64le(y0), e }
 @(require_results) normalize_f64be :: proc "contextless" (x: f64be) -> (y: f64be, exponent: int) { y0, e := normalize_f64(f64(x)); return f64be(y0), e }
+/*
+Decomposes a float type in a normalized float and a negative power of 2 in case it is subnormal
+i.e. smaller than the smallest normalized floats
 
+Otherwise returns the same number and a `0` exponent for a normal number
+
+This assures maximum precision for each float type is always used
+
+For 16bits follows: 1bit sign + 5bit expoent + 10bit significant
+So any number between `0x0` and `0b0_00000_1111111111` triggers a normalization, which
+consists in multiplying the number by the significant size (2**10) and keeping note of the
+factor (2**10) that should divide the number to get the original number
+
+
+Inputs:
+- `x`: float to be normalized
+
+
+Returns:
+- A tuple containing a normalized float of matching type as the `x` input and a exponent indicating 
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	normalize_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = -2.3
+		x3_float:    f16 = 6.091 * math.pow10(f16(-5)) // largest subnormal 3FF
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.normalize(x_float))
+		fmt.println(math.normalize(x2_float))
+		fmt.println(math.normalize(x3_float))
+
+		fmt.println(math.normalize(x_pos_zero))
+		fmt.println(math.normalize(x_neg_zero))
+		fmt.println(math.normalize(x_pos_inf))
+		fmt.println(math.normalize(x_zero_inf))
+		fmt.println(math.normalize(x_neg_inf))
+		fmt.println(math.normalize(x_nan))
+
+		fmt.printf("Integer Hex: %#h\n", x3_float) // 0x3ff
+		fmt.printf("Integer Hex: %.10f\n", x3_float) // 0x3ff
+		fmt.printf("Integer Hex: %#h, %d\n", math.normalize(x3_float))
+		fmt.printf("Integer Hex: %.10f, %d\n", math.normalize(x3_float))
+	}
+
+Output:
+	2.1 0
+	-2.3 0
+	0.06244 -10
+    
+    // special cases
+    0 -10           // pos_zero
+    -0 -10          // neg_zero
+    +Inf 0        // pos_inf
+    +Inf 0        // zero_inf
+    -Inf 0        // neg_inf
+    NaN 0         // nan
+
+	Integer Hex: 0h3ff
+	Integer Hex: 0.0000609756
+	Integer Hex: 0h2bfe, -10
+	Integer Hex: 0.0624389648, -10
+
+*/
 normalize :: proc{
 	normalize_f16,
 	normalize_f32,
