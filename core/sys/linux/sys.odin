@@ -1985,6 +1985,7 @@ personality :: proc "contextless" (personality: uint) -> (uint, Errno) {
 	return errno_unwrap(ret, uint)
 }
 
+// Deprecated syscall
 // TODO(flysand): ustat
 
 /*
@@ -2019,6 +2020,7 @@ fstatfs :: proc "contextless" (fd: Fd, statfs: ^Stat_FS) -> (Errno) {
 	}
 }
 
+// Deprecated syscall
 // TODO(flysand): sysfs
 
 /*
@@ -2633,7 +2635,24 @@ sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawpt
 	return errno_unwrap(ret, int)
 }
 
-// TODO(flysand): set_thread_area
+/*
+	Sets a TLS entry in the GDT (Global Descriptor Table).
+*/
+set_thread_area :: proc "contextless" (user_desc: ^User_Desc) -> (Errno) {
+	ret := syscall(SYS_set_thread_area, user_desc);
+	return Errno(-ret);
+}
+
+/*
+	Reads the GDT (Global Descriptor Table) entry indicated by u_info.entry_number and
+	fills in the rest of the fields in u_info.
+
+	This syscall only works in x86-32
+*/
+get_thread_area :: proc "contextless" (u_info: ^User_Desc) -> (Errno) {
+	ret := syscall(SYS_get_thread_area, u_info);
+	return Errno(-ret);
+}
 
 // TODO(flysand): io_setup
 
@@ -2644,8 +2663,6 @@ sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawpt
 // TODO(flysand): io_submit
 
 // TODO(flysand): io_cancel
-
-// TODO(flysand): get_thread_area
 
 // TODO(flysand): lookup_dcookie
 

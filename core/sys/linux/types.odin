@@ -73,6 +73,42 @@ Time_Val :: struct {
 }
 
 /*
+	User_Desc Struct
+*/
+when ODIN_ARCH == .amd64 {
+	User_Desc :: struct {
+		entry_number:    uint,
+		base_addr:       uint,
+		limit:           uint,
+
+		using _: bit_field u8 {
+			seg_32bit:         uint | 1,
+			contents:          uint | 2,
+			read_exec_only:    uint | 1,
+			limit_in_pages:    uint | 1,
+			seg_not_present:   uint | 1,
+			useable:           uint | 1,
+			lm:                uint | 1, // For x86-64
+		},
+	}
+} else {
+	User_Desc :: struct {
+		entry_number:    uint,
+		base_addr:       uint,
+		limit:           uint,
+
+		using _: bit_field u8 {
+			seg_32bit:         uint | 1,
+			contents:          uint | 2,
+			read_exec_only:    uint | 1,
+			limit_in_pages:    uint | 1,
+			seg_not_present:   uint | 1,
+			useable:           uint | 1,
+		},
+	}
+}
+
+/*
 	Access and modification times for files
 */
 UTim_Buf :: struct {
