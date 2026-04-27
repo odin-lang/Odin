@@ -3066,6 +3066,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		// check_assignment(c, operand, nullptr, str_lit("argument of 'type_of'"));
 		if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
+			Entity *e = entity_of_node(expr);
+			if (e != nullptr &&
+			    e->state == EntityState_InProgress &&
+			    e->type == nullptr) {
+				gbString s = expr_to_string(expr);
+				error(expr, "Invalid cyclic type usage from 'type_of', got '%s'", s);
+				gb_string_free(s);
+			}
 			return false;
 		}
 		if (o.type == nullptr || o.type == t_invalid || is_type_asm_proc(o.type)) {
