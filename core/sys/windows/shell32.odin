@@ -38,6 +38,8 @@ foreign shell32 {
 	DragQueryPoint  :: proc(hDrop: HDROP, ppt: ^POINT) -> BOOL ---
 	DragQueryFileW  :: proc(hDrop: HDROP, iFile: UINT, lpszFile: LPWSTR, cch: UINT) -> UINT ---
 	DragFinish      :: proc(hDrop: HDROP) --- // @New
+
+	AssocCreateForClasses :: proc (rgClasses: [^]ASSOCIATIONELEMENT, cClasses: ULONG, riid: REFIID, ppv: ^rawptr) -> HRESULT ---
 }
 
 APPBARDATA :: struct {

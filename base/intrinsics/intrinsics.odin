@@ -1,4 +1,4 @@
-7// This is purely for documentation
+// This is purely for documentation
 #+build ignore
 package intrinsics
 

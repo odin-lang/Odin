@@ -1771,6 +1771,12 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast 
 
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
+	if (check_vet_shadowing_assignment(ctx->checker, e, init_expr)) {
+		error(e->token, "Illegal declaration cycle of `%.*s`", LIT(e->token.string));
+		o.mode = Addressing_Invalid;
+		o.type = t_invalid;
+		e->type = t_invalid;
+	}
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
 	if (e->Variable.is_rodata && o.mode != Addressing_Constant) {
 		ERROR_BLOCK();
@@ -1980,6 +1986,20 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 		e->parent_proc_decl = c.curr_proc_decl;
 		e->state = EntityState_InProgress;
+		bool track_cycle_path = false;
+		switch (e->kind) {
+		case Entity_Variable:
+		case Entity_Constant:
+		case Entity_TypeName:
+			track_cycle_path = true;
+			break;
+		}
+		if (track_cycle_path) {
+			check_type_path_push(&c, e);
+		}
+		defer (if (track_cycle_path) {
+			check_type_path_pop(&c);
+		});
 
 		switch (e->kind) {
 		case Entity_Variable:

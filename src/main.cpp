@@ -62,6 +62,7 @@ gb_global Timings global_timings = {0};
 #else
 #include <llvm-c/Types.h>
 #include <signal.h>
+#include <sys/resource.h>
 #endif
 
 #include "parser.hpp"
@@ -153,6 +154,8 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	}
 	exit_code = system(cmd_line);
 	if (exit_on_err && WIFSIGNALED(exit_code)) {
+		struct rlimit limit = { 0, 0, };
+		setrlimit(RLIMIT_CORE, &limit);
 		raise(WTERMSIG(exit_code));
 	}
 	if (WIFEXITED(exit_code)) {

@@ -10,7 +10,9 @@ import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'Wycheproof']
+# The OpenSSL CLI tool installed can be used to easily generate digests:
+# $ openssl sha3-512 -mac HMAC -macopt key:"$HMAC_KEY" $FILE_NAME
+TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'Wycheproof', 'Noise']
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
 HMAC_HASH          = hashlib.sha3_512
@@ -625,6 +627,14 @@ HMAC_DIGESTS = {
 	'x448_pem_test.json':           "718ef327a5e8cc3a34467974193a051efe89323352f32f248c874457f28f6a2836cb6c2c15f40044df96428051591766fc0b44771236145a17835e714360ca51",
 	'x448_test.json':           "ca811349ede46fc253d656c26b058e2fe903aae8a225d7f6703bef3dec122df4c48af190a070df4c4066690f50ed4996d69089794b5484b57f2c4233216f98f5",
 	'xchacha20_poly1305_test.json':           "5debf381018af54fa2f9041044a257f8faff85b9a2eda314f21a05a55de2aacd2767a4962ecc58f69ed65404dc7d2b1eb8526038e7641610ce3a988456838fce",
+
+	'LICENSE-APACHE-snow.txt': "6d94a2c13b32d3c0db347511a19f71e5c2ec15025f3f3fdb333ae72e3c671b0b4d8796a9adf3e9b1ec941acea28a054e7108914ee93ebae673d894d2ac4a7cad",
+	'LICENSE-MIT-snow.txt':    "c0d9d5f399729560ffbabcb46a1e282e9a214d436a59b86dd8765556290a93c204c126234401f935f6a18aff50d69cc8af4decc6f0bb1574f899412c77fb9b31",
+	'LICENSE-cacophony.txt':   "cab56e8608950b3e9d5c0d8262f8c67e34254569726e78968896a964bab84e67fd66ccce43653118152fba5a3e670e0de23c725ecd85f65cacce4d987b1258e8",
+	'LICENSE-noise-c.txt':     "ca6ef9d13d0832659efa04f03d06998af3050b0f65886f1b4f33ef4bd9b6df639fcaac0c73a7c28bc47c502e7915e30608863340245eac7620ab50ee66e99ff6",
+	'cacophony.txt':           "d2c492f02287ee562a9cf43a4cd2a055f5235734779d091bc404aede4c37a552029e76c12e873632e52423804ad24b86138cd3d4fe54506108571d9f2f925033",
+	'noise-c-basic.txt':       "7e25c5d692c53dd045060f27a562332178ca030d17687fc2ab58216b4298fb577ddc9d703db11c920fb04c28604fdc1a30337f58aad3617e07201a62c3a9b295",
+	'snow.txt':                "35088303de90e6bac22656e1e0ac4a5ea73d8cdb5ada23a078d703e14714ffe19e08437bf46108e0419acd8b5be6fa797a68a621c20cdd063d94a4a970aa8634",
 }
 
 def try_download_file(url, out_file):
