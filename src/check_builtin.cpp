@@ -739,6 +739,131 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 	}
 }
 
+gb_internal bool check_builtin_c_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+	String const &builtin_name = builtin_procs[id].name;
+
+	ast_node(ce, CallExpr, call);
+	switch (id) {
+	default:
+		GB_PANIC("Implement objective built-in procedure: %.*s", LIT(builtin_name));
+		return false;
+
+	case BuiltinProc_c_va_start: {
+		Operand list = {};
+		check_expr(c, &list, ce->args[0]);
+		if (list.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(list.type, t_c_va_list_ptr)) {
+			gbString lpt = type_to_string(t_c_va_list_ptr);
+			gbString t = type_to_string(list.type);
+			error(list.expr, "'%.*s' expected a value of type %s, got type %s", LIT(builtin_name), lpt, t);
+			gb_string_free(t);
+			gb_string_free(lpt);
+			return false;
+		}
+
+		Operand args = {};
+		check_expr(c, &args, ce->args[1]);
+		if (list.mode == Addressing_Invalid) {
+			return false;
+		}
+		Entity *e = entity_of_node(args.expr);
+		if (e == nullptr || (e->flags & EntityFlag_CVarArg) == 0) {
+			error(list.expr, "'%.*s' expected a `#c_vararg` parameter", LIT(builtin_name));
+		}
+
+		operand->mode = Addressing_NoValue;
+		operand->type = nullptr;
+		return true;
+
+	} break;
+
+	case BuiltinProc_c_va_end: {
+		Operand list = {};
+		check_expr(c, &list, ce->args[0]);
+		if (list.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(list.type, t_c_va_list_ptr)) {
+			gbString lpt = type_to_string(t_c_va_list_ptr);
+			gbString t = type_to_string(list.type);
+			error(list.expr, "'%.*s' expected a value of type %s, got type %s", LIT(builtin_name), lpt, t);
+			gb_string_free(t);
+			gb_string_free(lpt);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
+		operand->type = nullptr;
+		return true;
+
+	} break;
+
+	case BuiltinProc_c_va_copy: {
+		Operand dst = {};
+		check_expr(c, &dst, ce->args[0]);
+		if (dst.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(dst.type, t_c_va_list_ptr)) {
+			gbString lpt = type_to_string(t_c_va_list_ptr);
+			gbString t = type_to_string(dst.type);
+			error(dst.expr, "'%.*s' expected a value of type %s, got type %s", LIT(builtin_name), lpt, t);
+			gb_string_free(t);
+			gb_string_free(lpt);
+			return false;
+		}
+
+		Operand src = {};
+		check_expr(c, &src, ce->args[1]);
+		if (src.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(src.type, t_c_va_list_ptr)) {
+			gbString lpt = type_to_string(t_c_va_list_ptr);
+			gbString t = type_to_string(src.type);
+			error(src.expr, "'%.*s' expected a value of type %s, got type %s", LIT(builtin_name), lpt, t);
+			gb_string_free(t);
+			gb_string_free(lpt);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
+		operand->type = nullptr;
+		return true;
+
+	} break;
+
+	case BuiltinProc_c_va_arg: {
+		Operand list = {};
+		check_expr(c, &list, ce->args[0]);
+		if (list.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(list.type, t_c_va_list_ptr)) {
+			gbString lpt = type_to_string(t_c_va_list_ptr);
+			gbString t = type_to_string(list.type);
+			error(list.expr, "'%.*s' expected a value of type %s, got type %s", LIT(builtin_name), lpt, t);
+			gb_string_free(t);
+			gb_string_free(lpt);
+			return false;
+		}
+
+
+		Type *type = check_type(c, ce->args[1]);
+		if (type == nullptr || type == t_invalid) {
+			error(ce->args[1], "'%.*s' expected a type as the second parameter to intrinsics.%.*s", LIT(builtin_name));
+			return false;
+		}
+
+		operand->mode = Addressing_Value;
+		operand->type = type;
+		return true;
+	} break;
+	}
+}
+
 gb_internal bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String const &builtin_name, OdinAtomicMemoryOrder *memory_order_, char const *extra_message = nullptr) {
 	Operand x = {};
 	check_expr_with_type_hint(c, &x, expr, t_atomic_memory_order);
@@ -2687,6 +2812,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_objc_block:
 	case BuiltinProc_objc_super:
 		return check_builtin_objc_procedure(c, operand, call, id, type_hint);
+
+	case BuiltinProc_c_va_start:
+	case BuiltinProc_c_va_end:
+	case BuiltinProc_c_va_copy:
+	case BuiltinProc_c_va_arg:
+		return check_builtin_c_procedure(c, operand, call, id, type_hint);
 
 	case BuiltinProc___entry_point:
 		operand->mode = Addressing_NoValue;

@@ -388,6 +388,11 @@ BuiltinProc__type_end,
 	BuiltinProc_objc_block,
 	BuiltinProc_objc_super,
 
+	BuiltinProc_c_va_start,
+	BuiltinProc_c_va_end,
+	BuiltinProc_c_va_copy,
+	BuiltinProc_c_va_arg,
+
 	BuiltinProc_constant_utf16_cstring,
 
 	BuiltinProc_wasm_memory_grow,
@@ -780,6 +785,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("objc_ivar_get"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 	{STR_LIT("objc_block"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_super"),             1, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("c_va_start"),             2, false,  Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("c_va_end"),               1, false,  Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("c_va_copy"),              2, false,  Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("c_va_arg"),               2, false,  Expr_Expr, BuiltinProcPkg_intrinsics},
+
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
