@@ -500,8 +500,48 @@ matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #
 	return
 }
 
+@(require_results)
+matrix_determinant_generic :: proc "contextless" (a: $M/matrix[$N, N]$T) -> T #no_bounds_check {
+	a := a
+	det: T = 1
 
+	for col in 0..<N {
+		pivot_row := col
+		pivot_val := abs(a[col, col])
+		for row in (col + 1)..<N {
+			val := abs(a[row, col])
+			if val > pivot_val {
+				pivot_val = val
+				pivot_row = row
+			}
+		}
 
+		if pivot_val == 0 {
+			return 0
+		}
+
+		if pivot_row != col {
+			for k in 0..<N {
+				t := a[col, k]
+				a[col, k] = a[pivot_row, k]
+				a[pivot_row, k] = t
+			}
+			det = -det
+		}
+
+		det *= a[col, col]
+
+		inv_pivot := 1.0 / a[col, col]
+		for row in (col + 1)..<N {
+			factor := a[row, col] * inv_pivot
+			for k in (col + 1)..<N {
+				a[row, k] -= factor * a[col, k]
+			}
+		}
+	}
+
+	return det
+}
 
 @(require_results)
 matrix1x1_adjugate :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
@@ -720,5 +760,144 @@ matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 			}
 		}
 	}
+	return
+}
+
+@(private="file")
+swap :: #force_inline proc "contextless" (a, b: ^$T) {
+	t := a^
+	a^ = b^
+	b^ = t
+}
+
+@(require_results)
+matrix_inverse_gauss_jordan :: proc "contextless" (A: $M/matrix[$N, N]$T) -> (b: M, non_singular: bool) #no_bounds_check {
+	a := A
+	b = 1
+
+	for col in 0..<N {
+		pivot_row := col
+		pivot_val := abs(a[col, col])
+		for row in (col + 1)..<N {
+			val := abs(a[row, col])
+			if val > pivot_val {
+				pivot_val = val
+				pivot_row = row
+			}
+		}
+
+		if pivot_val == 0 {
+			return
+		}
+
+		if pivot_row != col {
+			for k in 0..<N {
+				swap(&a[col, k], &a[pivot_row, k])
+				swap(&b[col, k], &b[pivot_row, k])
+			}
+		}
+
+		inv_pivot := 1.0 / a[col, col]
+		for k in 0..<N {
+			a[col, k] *= inv_pivot
+			b[col, k] *= inv_pivot
+		}
+
+		for row in 0..<N {
+			if row == col {
+				continue
+			}
+			factor := a[row, col]
+			for k in 0..<N {
+				a[row, k] -= factor * a[col, k]
+				b[row, k] -= factor * b[col, k]
+			}
+		}
+	}
+
+	non_singular = true
+	return
+}
+
+@(require_results)
+matrix_inverse_lu_decomposition :: proc "contextless" (A: $M/matrix[$N, N]$T) -> (b: M, non_singular: bool) #no_bounds_check {
+	// LU decomposition with partial pivoting
+	a := A
+	pivot: [N]int = ---
+	for i in 0..<N {
+		pivot[i] = i
+	}
+
+	for col in 0..<N {
+		pivot_row := col
+		pivot_val := abs(a[col, col])
+		for row in (col + 1)..<N {
+			val := abs(a[row, col])
+			if val > pivot_val {
+				pivot_val = val
+				pivot_row = row
+			}
+		}
+
+		if pivot_val == 0 {
+			return
+		}
+
+		// Swap pivot indices
+		if pivot_row != col {
+			t := pivot[col]
+			pivot[col] = pivot[pivot_row]
+			pivot[pivot_row] = t
+
+			for k in 0..<N {
+				swap(&a[col, k], &a[pivot_row, k])
+			}
+		}
+
+		// Compute L and U in place
+		inv_pivot := 1.0 / a[col, col]
+		for row in (col + 1)..<N {
+			a[row, col] *= inv_pivot
+			for k in (col + 1)..<N {
+				a[row, k] -= a[row, col] * a[col, k]
+			}
+		}
+	}
+
+	// Solve for each column of the inverse
+	b = 0
+	for col in 0..<N {
+		// Apply pivot permutation to identity column
+		x: [N]T = ---
+		for i in 0..<N {
+			x[i] = 1 if pivot[i] == col else 0
+		}
+
+		// Forward substitution (L * y = Pb)
+		for row in 1..<N {
+			sum: T = 0
+			for k in 0..<row {
+				sum += a[row, k] * x[k]
+			}
+			x[row] -= sum
+		}
+
+		// Back substitution (U * x = y)
+		for i in 0..<N {
+			row := N - 1 - i
+			sum: T = 0
+			for k in (row + 1)..<N {
+				sum += a[row, k] * x[k]
+			}
+			x[row] = (x[row] - sum) / a[row, row]
+		}
+
+		// Store result column
+		for row in 0..<N {
+			b[row, col] = x[row]
+		}
+	}
+
+	non_singular = true
 	return
 }
