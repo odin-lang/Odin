@@ -400,7 +400,7 @@ enum TypeInfoFlag : u32 {
 
 enum : int {
 	MATRIX_ELEMENT_COUNT_MIN = 1,
-	MATRIX_ELEMENT_COUNT_MAX = 16,
+	MATRIX_ELEMENT_COUNT_MAX = 64,
 	MATRIX_ELEMENT_MAX_SIZE = MATRIX_ELEMENT_COUNT_MAX * (2 * 8), // complex128
 
 	SIMD_ELEMENT_COUNT_MIN = 1,
@@ -775,6 +775,11 @@ gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
 gb_global Type *t_objc_Ivar  = nullptr;
 gb_global Type *t_objc_instancetype = nullptr; // Special distinct variant of t_objc_id used mimic auto-typing of instancetype* in Objective-C
+
+
+gb_global Type *t_c_va_list     = nullptr;
+gb_global Type *t_c_va_list_ptr = nullptr;
+
 
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered

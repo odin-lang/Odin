@@ -891,7 +891,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			if (score >= 0) {
 				return score+2;
 			}
-		} else if (is_type_untyped(src)) {
+		} else if (is_type_untyped(src) || is_type_struct(type_deref(src))) { // allow for subtyping of structs
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
 			for (Type *vt : dst->Union.variants) {
@@ -1919,6 +1919,16 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
 	}
+	switch (e->kind) {
+	case Entity_Constant:
+	case Entity_Variable:
+	case Entity_TypeName:
+		if (check_cycle(c, e, true)) {
+			o->type = t_invalid;
+			return e;
+		}
+		break;
+	}
 	if (e->type == nullptr) {
 		// TODO(bill): Which is correct? return or compiler_error?
 		// compiler_error("How did this happen? type: %s; identifier: %.*s\n", type_to_string(e->type), LIT(name));
@@ -2196,6 +2206,36 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 
 }
 
+gb_internal bool check_update_float_precision(ExactValue *value, Type *type) {
+	type = core_type(type);
+	if (type->kind != Type_Basic) {
+		return false;
+	}
+
+	switch (type->Basic.kind) {
+	case Basic_f16:
+	case Basic_f16le:
+	case Basic_f16be:
+		// TODO(bill): This is not technically correct for 16-bit floats, but it will be better than before
+		/*fallthrough*/
+	case Basic_f32:
+	case Basic_f32le:
+	case Basic_f32be:
+		{
+			f64 x_64 = exact_value_to_f64(*value);
+			f32 x_32 = cast(f32)x_64;
+			if (cast(f64)x_32 != x_64) {
+				// make sure there IS precision loss
+				*value = exact_value_float(cast(f64)x_32);
+				return true;
+			}
+		}
+		break;
+	}
+
+	return false;
+}
+
 
 gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
@@ -2362,18 +2402,20 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (v.kind != ExactValue_Float) {
 			return false;
 		}
+		check_update_float_precision(&v, type);
 		if (out_value) *out_value = v;
 
 		switch (type->Basic.kind) {
 		case Basic_f16:
-		case Basic_f32:
-		case Basic_f64:
-			return true;
-
 		case Basic_f16le:
 		case Basic_f16be:
+			/*fallthrough*/
+		case Basic_f32:
 		case Basic_f32le:
 		case Basic_f32be:
+			return true;
+
+		case Basic_f64:
 		case Basic_f64le:
 		case Basic_f64be:
 			return true;
@@ -3418,8 +3460,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
-		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
-			return dst->Array.count == src->Array.count;
+		if (dst->Array.count == src->Array.count) {
+			if (are_types_identical(dst->Array.elem, src->Array.elem)) {
+				return true;
+			}
+			Operand op = *operand;
+			op.type = src->Array.elem;
+			return check_is_castable_to(c, &op, dst->Array.elem);
 		}
 	}
 
@@ -4858,41 +4905,45 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			update_untyped_expr_value(c, operand->expr, operand->value);
 		}
 
-		{
-			switch (operand->type->Basic.kind) {
-			case Basic_UntypedBool:
-				if (!is_type_boolean(target_type)) {
-					operand->mode = Addressing_Invalid;
-					convert_untyped_error(c, operand, target_type);
-					return;
-				}
-				break;
-			case Basic_UntypedInteger:
-			case Basic_UntypedFloat:
-			case Basic_UntypedComplex:
-			case Basic_UntypedQuaternion:
-			case Basic_UntypedRune:
-				if (!is_type_numeric(target_type)) {
-					operand->mode = Addressing_Invalid;
-					convert_untyped_error(c, operand, target_type);
-					return;
-				}
-				break;
-
-			case Basic_UntypedNil:
-				if (is_type_any(target_type)) {
-					// target_type = t_untyped_nil;
-				} else if (is_type_cstring(target_type)) {
-					// target_type = t_untyped_nil;
-				} else if (is_type_cstring16(target_type)) {
-					// target_type = t_untyped_nil;
-				} else if (!type_has_nil(target_type)) {
-					operand->mode = Addressing_Invalid;
-					convert_untyped_error(c, operand, target_type);
-					return;
-				}
-				break;
+		switch (operand->type->Basic.kind) {
+		case Basic_UntypedBool:
+			if (!is_type_boolean(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				return;
 			}
+			break;
+		case Basic_UntypedInteger:
+		case Basic_UntypedFloat:
+		case Basic_UntypedComplex:
+		case Basic_UntypedQuaternion:
+		case Basic_UntypedRune:
+			if (!is_type_numeric(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				return;
+			}
+			break;
+
+		case Basic_UntypedNil:
+			if (is_type_any(target_type)) {
+				// target_type = t_untyped_nil;
+			} else if (is_type_cstring(target_type)) {
+				// target_type = t_untyped_nil;
+			} else if (is_type_cstring16(target_type)) {
+				// target_type = t_untyped_nil;
+			} else if (!type_has_nil(target_type)) {
+				operand->mode = Addressing_Invalid;
+				convert_untyped_error(c, operand, target_type);
+				return;
+			}
+			break;
+		}
+
+		switch (operand->type->Basic.kind) {
+		case Basic_UntypedFloat:
+			check_update_float_precision(&operand->value, t);
+			break;
 		}
 		break;
 
@@ -10385,9 +10436,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			} else {
 				bool seen_field_value = false;
 
-				for_array(index, cl->elems) {
+				isize handled_elem_count = 0;
+				isize index = 0;
+				for (Ast *elem : cl->elems) {
+					defer (index += 1);
+
 					Entity *field = nullptr;
-					Ast *elem = cl->elems[index];
 					if (elem->kind == Ast_FieldValue) {
 						seen_field_value = true;
 						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
@@ -10406,23 +10460,46 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 
 					Operand o = {};
-					check_expr_or_type(c, &o, elem, field->type);
-
-					if (elem_cannot_be_constant(field->type)) {
+					check_multi_expr_with_type_hint(c, &o, elem, field->type);
+					if (is_type_tuple(o.type)) {
 						is_constant = false;
-					}
-					if (is_constant) {
-						is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
+
+						TypeTuple *tt = &o.type->Tuple;
+						isize jj = 0;
+						for (Entity *src_field : tt->variables) {
+							Operand src_o = o;
+							src_o.type = src_field->type;
+
+							field = t->Struct.fields[index + (jj++)];
+
+							check_assignment(c, &src_o, field->type, str_lit("structure literal"));
+						}
+
+						index += tt->variables.count-1;
+
+						handled_elem_count += tt->variables.count;
+					} else {
+						check_not_tuple(c, &o);
+
+						if (elem_cannot_be_constant(field->type)) {
+							is_constant = false;
+						}
+						if (is_constant) {
+							is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
+						}
+
+						check_assignment(c, &o, field->type, str_lit("structure literal"));
+
+						handled_elem_count += 1;
 					}
 
-					check_assignment(c, &o, field->type, str_lit("structure literal"));
 				}
 				if (cl->elems.count < field_count) {
 					if (min_field_count < field_count) {
-					    if (cl->elems.count < min_field_count) {
+						if (cl->elems.count < min_field_count) {
 							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
-					    }
-					} else {
+						}
+					} else if (handled_elem_count != field_count) {
 						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
 					}
 				}
@@ -10604,8 +10681,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 			cl->max_count = max;
 		} else {
-			isize index = 0;
-			for (; index < cl->elems.count; index++) {
+			for (isize index = 0; index < cl->elems.count; index++) {
+				defer (max += 1);
+
 				Ast *e = cl->elems[index];
 				if (e == nullptr) {
 					error(node, "Invalid literal element");
@@ -10622,16 +10700,24 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 
 				Operand operand = {};
-				check_expr_with_type_hint(c, &operand, e, elem_type);
-				check_assignment(c, &operand, elem_type, context_name);
+				check_multi_expr_with_type_hint(c, &operand, e, elem_type);
+				if (is_type_tuple(operand.type)) {
+					is_constant = false;
+					TypeTuple *tt = &operand.type->Tuple;
+					for_array(jj, tt->variables) {
+						Operand oo = operand;
+						oo.type = tt->variables[jj]->type;
+						check_assignment(c, &oo, elem_type, context_name);
+					}
 
-				if (is_constant) {
-					is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					max += tt->variables.count-1;
+				} else {
+					check_assignment(c, &operand, elem_type, context_name);
+
+					if (is_constant) {
+						is_constant = check_is_operand_compound_lit_constant(c, &operand, elem_type);
+					}
 				}
-			}
-
-			if (max < index) {
-				max = index;
 			}
 		}
 
@@ -10652,6 +10738,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				if (0 < max && max < t->Struct.soa_count) {
 					error(node, "Expected %lld values for this #soa array literal, got %lld", cast(long long)t->Struct.soa_count, cast(long long)max);
 				}
+			}
+		} else if (t->kind == Type_FixedCapacityDynamicArray) {
+			if (max > t->FixedCapacityDynamicArray.capacity) {
+				error(node, "Expected a maximum of %lld values for this fixed capacity dynamic array, got %lld",
+				      cast(long long)t->FixedCapacityDynamicArray.capacity,
+				      cast(long long)max);
 			}
 		}
 
@@ -10677,6 +10769,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 			}
 		}
+
+		cl->max_count = max;
 
 		break;
 	}
@@ -12368,6 +12462,9 @@ gb_internal void check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, 
 		error_operand_no_value(o);
 		break;
 	case Addressing_Type:
+		if (type_hint != nullptr && is_type_typeid(type_hint)) {
+			break;
+		}
 		error_operand_not_expression(o);
 		break;
 	}

@@ -370,14 +370,14 @@ foreign kernel32 {
 		dwReserved: DWORD,
 		nNumberOfBytesToLockLow: DWORD,
 		nNumberOfBytesToLockHigh: DWORD,
-		lpOverlapped: ^LPOVERLAPPED,
+		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL ---
 	UnlockFileEx :: proc(
 		hFile: HANDLE,
 		dwReserved: DWORD,
 		nNumberOfBytesToUnlockLow: DWORD,
 		nNumberOfBytesToLockHigh: DWORD,
-		lpOverlapped: ^LPOVERLAPPED,
+		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL --- 
 
 	GetFileTime :: proc(

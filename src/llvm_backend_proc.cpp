@@ -625,6 +625,11 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					continue;
 				}
 
+				if (e->flags & EntityFlag_CVarArg) {
+					GB_ASSERT(i+1 == params->variables.count);
+					continue;
+				}
+
 				lbArgType *arg_type = &ft->args[param_index];
 				defer (param_index += 1);
 
@@ -4277,6 +4282,53 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
 	case BuiltinProc_objc_block:             return lb_handle_objc_block(p, expr);
 	case BuiltinProc_objc_super:             return lb_handle_objc_super(p, expr);
+
+
+	case BuiltinProc_c_va_start:
+		{
+			lbValue ptr  = lb_build_expr(p, ce->args[0]);
+			lbValue args = lb_build_expr(p, ce->args[1]);
+
+			gb_unused(args);
+
+			LLVMValueRef va_start_args[] = {ptr.value};
+			LLVMTypeRef  va_start_types[] = {lb_type(p->module, ptr.type)};
+			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_start", va_start_args, gb_count_of(va_start_args), va_start_types, gb_count_of(va_start_types));
+			gb_unused(res);
+
+			return {};
+		} break;
+	case BuiltinProc_c_va_end:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+
+			LLVMValueRef va_end_args[] = {ptr.value};
+			LLVMTypeRef  va_end_types[] = {lb_type(p->module, ptr.type)};
+			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_end", va_end_args, gb_count_of(va_end_args), va_end_types, gb_count_of(va_end_types));
+			gb_unused(res);
+
+			return {};
+		} break;
+	case BuiltinProc_c_va_copy:
+		{
+			lbValue dst = lb_build_expr(p, ce->args[0]);
+			lbValue src = lb_build_expr(p, ce->args[1]);
+
+			LLVMValueRef va_end_args[] = {dst.value, src.value};
+			LLVMTypeRef  va_end_types[] = {lb_type(p->module, dst.type)};
+			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_copy", va_end_args, gb_count_of(va_end_args), va_end_types, gb_count_of(va_end_types));
+			gb_unused(res);
+
+			return {};
+		} break;
+	case BuiltinProc_c_va_arg:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+			Type *type = type_of_expr(ce->args[1]);
+			LLVMValueRef value = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, type), "");
+
+			return {value, type};
+		} break;
 
 
 	case BuiltinProc_constant_utf16_cstring:

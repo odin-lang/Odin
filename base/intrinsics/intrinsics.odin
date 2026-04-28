@@ -1,4 +1,4 @@
-7// This is purely for documentation
+// This is purely for documentation
 #+build ignore
 package intrinsics
 
@@ -403,6 +403,14 @@ wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_u
 x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
+
+// C specific things
+c_va_list  :: struct{/*platform specific implementation*/}
+
+c_va_start :: proc(list: ^c_va_list, /*#c_vararg parameter*/ args: ..$T) ---
+c_va_end   :: proc(list: ^c_va_list)                                     ---
+c_va_copy  :: proc(dst, src: ^c_va_list)                                 ---
+c_va_arg   :: proc(list: ^c_va_list, $T: typeid) -> T                    ---
 
 
 // Darwin targets only
