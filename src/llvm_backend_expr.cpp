@@ -2954,17 +2954,31 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lbValue psrc = lb_address_from_load_or_generate_local(p, value);
 			lbValue pdst = v.addr;
 
-			for (i64 i = 0; i < count; i++) {
-				lbValue sp = lb_emit_array_epi(p, psrc, i);
-				lbValue dp = lb_emit_array_epi(p, pdst, i);
+			if (count > MAX_SIMD_ARRAY_COUNT_FOR_INLINING) {
+				auto loop_data = lb_loop_start(p, count, t_int);
+
+				lbValue sp = lb_emit_array_ep(p, psrc, loop_data.idx);
+				lbValue dp = lb_emit_array_ep(p, pdst, loop_data.idx);
 
 				lbValue s = lb_emit_load(p, sp);
 				s = lb_emit_conv(p, s, dst_elem);
 				lb_emit_store(p, dp, s);
+
+				lb_loop_end(p, loop_data);
+			} else {
+
+				for (i64 i = 0; i < count; i++) {
+					lbValue sp = lb_emit_array_epi(p, psrc, i);
+					lbValue dp = lb_emit_array_epi(p, pdst, i);
+
+					lbValue s = lb_emit_load(p, sp);
+					s = lb_emit_conv(p, s, dst_elem);
+					lb_emit_store(p, dp, s);
+				}
+
 			}
 
 			return lb_addr_load(p, v);
-
 		}
 	}
 
