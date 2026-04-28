@@ -4,29 +4,12 @@ package libc
 
 import "base:intrinsics"
 
-import "core:c"
+va_list :: intrinsics.va_list
 
-@(private="file")
-@(default_calling_convention="none")
-foreign _ {
-	@(link_name="llvm.va_start") _va_start :: proc(arglist: ^i8) ---
-	@(link_name="llvm.va_end")   _va_end   :: proc(arglist: ^i8) ---
-	@(link_name="llvm.va_copy")  _va_copy  :: proc(dst, src: ^i8) ---
-}
+va_start :: intrinsics.va_start
+va_end   :: intrinsics.va_end
+va_copy  :: intrinsics.va_copy
 
-va_list :: c.va_list
-
-va_start :: #force_inline proc(ap: ^va_list, _: any) {
-	_va_start(cast(^i8)ap)
-}
-
-va_end :: #force_inline proc(ap: ^va_list) {
-	_va_end(cast(^i8)ap)
-}
-
-va_copy :: #force_inline proc(dst, src: ^va_list) {
-	_va_copy(cast(^i8)dst, cast(^i8)src)
-}
 
 // We cannot provide va_arg as there is no way to create "C" style procedures
 // in Odin which take variable arguments the C way. The #c_vararg attribute only

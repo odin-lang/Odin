@@ -1,7 +1,8 @@
 // Defines the basic types used by `C` programs for foreign function and data structure interop.
 package c
 
-import builtin "base:builtin"
+import builtin    "base:builtin"
+import intrinsics "base:intrinsics"
 
 char           :: builtin.u8  // assuming -funsigned-char
 
@@ -115,14 +116,6 @@ NDEBUG         :: !ODIN_DEBUG
 
 CHAR_BIT :: 8
 
-// Since there are no types in C with an alignment larger than that of
-// max_align_t, which cannot be larger than sizeof(long double) as any other
-// exposed type wouldn't be valid C, the maximum alignment possible in a
-// strictly conformant C implementation is 16 on the platforms we care about.
-// The choice of 4096 bytes for storage of this type is more than enough on all
-// relevant platforms.
-va_list :: struct #align(16) {
-	_: [4096]u8,
-}
+va_list :: intrinsics.c_va_list
 
 FILE :: struct {}
