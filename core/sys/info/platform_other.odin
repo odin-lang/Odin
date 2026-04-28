@@ -1,4 +1,4 @@
-#+build essence, haiku
+#+build haiku
 package sysinfo
 
 import "base:runtime"

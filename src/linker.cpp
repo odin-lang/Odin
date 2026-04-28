@@ -133,17 +133,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 	bool is_cross_linking = false;
 	bool is_android = false;
 
-	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-#if defined(GB_SYSTEM_UNIX)
-		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
-#else
-		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
-			LIT(target_os_names[build_context.metrics.os]),
-			LIT(target_arch_names[build_context.metrics.arch])
-		);
-#endif
-	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
+	if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
 			is_cross_linking = true;

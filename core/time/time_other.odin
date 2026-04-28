@@ -1,5 +1,4 @@
 #+private
-#+build !essence
 #+build !js
 #+build !linux
 #+build !openbsd

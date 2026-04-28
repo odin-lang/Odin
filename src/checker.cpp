@@ -1170,7 +1170,6 @@ gb_internal void init_universal(void) {
 			{"Windows",      TargetOs_windows},
 			{"Darwin",       TargetOs_darwin},
 			{"Linux",        TargetOs_linux},
-			{"Essence",      TargetOs_essence},
 			{"FreeBSD",      TargetOs_freebsd},
 			{"Haiku",        TargetOs_haiku},
 			{"OpenBSD",      TargetOs_openbsd},

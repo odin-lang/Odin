@@ -19,8 +19,6 @@ freestanding)
 	;;
 
 rare)
-	echo Checking essence_amd64
-	odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:essence_amd64
 	echo Checking freebsd_i386
 	odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_i386
 	echo Checking haiku_amd64
