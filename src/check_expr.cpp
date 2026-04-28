@@ -12463,6 +12463,7 @@ gb_internal void check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, 
 		break;
 	case Addressing_Type:
 		if (type_hint != nullptr && is_type_typeid(type_hint)) {
+			add_type_info_type(c, o->type);
 			break;
 		}
 		error_operand_not_expression(o);
