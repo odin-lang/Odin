@@ -493,54 +493,75 @@ matrix3x3_determinant :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) #
 }
 @(require_results)
 matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #no_bounds_check {
-	c := cofactor(m)
-	for i in 0..<4 {
-		det += m[0, i] * c[0, i]
-	}
+	s0 := m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1]
+	s1 := m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2]
+	s2 := m[0, 0] * m[1, 3] - m[1, 0] * m[0, 3]
+	s3 := m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2]
+	s4 := m[0, 1] * m[1, 3] - m[1, 1] * m[0, 3]
+	s5 := m[0, 2] * m[1, 3] - m[1, 2] * m[0, 3]
+
+	c5 := m[2, 2] * m[3, 3] - m[3, 2] * m[2, 3]
+	c4 := m[2, 1] * m[3, 3] - m[3, 1] * m[2, 3]
+	c3 := m[2, 1] * m[3, 2] - m[3, 1] * m[2, 2]
+	c2 := m[2, 0] * m[3, 3] - m[3, 0] * m[2, 3]
+	c1 := m[2, 0] * m[3, 2] - m[3, 0] * m[2, 2]
+	c0 := m[2, 0] * m[3, 1] - m[3, 0] * m[2, 1]
+
+	det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0
 	return
 }
 
 @(require_results)
 matrix_determinant_generic :: proc "contextless" (a: $M/matrix[$N, N]$T) -> T #no_bounds_check {
-	a := a
-	det: T = 1
+	when N == 1 {
+		return matrix1x1_determinant(a)
+	} else when N == 2 {
+		return matrix2x2_determinant(a)
+	} else when N == 3 {
+		return matrix3x3_determinant(a)
+	} else when N == 4 {
+		return matrix4x4_determinant(a)
+	} else {
+		a := a
+		det: T = 1
 
-	for col in 0..<N {
-		pivot_row := col
-		pivot_val := abs(a[col, col])
-		for row in (col + 1)..<N {
-			val := abs(a[row, col])
-			if val > pivot_val {
-				pivot_val = val
-				pivot_row = row
+		for col in 0..<N {
+			pivot_row := col
+			pivot_val := abs(a[col, col])
+			for row in (col + 1)..<N {
+				val := abs(a[row, col])
+				if val > pivot_val {
+					pivot_val = val
+					pivot_row = row
+				}
+			}
+
+			if pivot_val == 0 {
+				return 0
+			}
+
+			if pivot_row != col {
+				for k in 0..<N {
+					t := a[col, k]
+					a[col, k] = a[pivot_row, k]
+					a[pivot_row, k] = t
+				}
+				det = -det
+			}
+
+			det *= a[col, col]
+
+			inv_pivot := 1.0 / a[col, col]
+			for row in (col + 1)..<N {
+				factor := a[row, col] * inv_pivot
+				for k in (col + 1)..<N {
+					a[row, k] -= factor * a[col, k]
+				}
 			}
 		}
 
-		if pivot_val == 0 {
-			return 0
-		}
-
-		if pivot_row != col {
-			for k in 0..<N {
-				t := a[col, k]
-				a[col, k] = a[pivot_row, k]
-				a[pivot_row, k] = t
-			}
-			det = -det
-		}
-
-		det *= a[col, col]
-
-		inv_pivot := 1.0 / a[col, col]
-		for row in (col + 1)..<N {
-			factor := a[row, col] * inv_pivot
-			for k in (col + 1)..<N {
-				a[row, k] -= factor * a[col, k]
-			}
-		}
+		return det
 	}
-
-	return det
 }
 
 @(require_results)
@@ -574,12 +595,40 @@ matrix3x3_adjugate :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bo
 
 @(require_results)
 matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
-	for i in 0..<4 {
-		for j in 0..<4 {
-			sign: T = 1 if (i + j) % 2 == 0 else -1
-			y[i, j] = sign * matrix_minor(x, j, i)
-		}
-	}
+	s0 := x[0, 0] * x[1, 1] - x[1, 0] * x[0, 1]
+	s1 := x[0, 0] * x[1, 2] - x[1, 0] * x[0, 2]
+	s2 := x[0, 0] * x[1, 3] - x[1, 0] * x[0, 3]
+	s3 := x[0, 1] * x[1, 2] - x[1, 1] * x[0, 2]
+	s4 := x[0, 1] * x[1, 3] - x[1, 1] * x[0, 3]
+	s5 := x[0, 2] * x[1, 3] - x[1, 2] * x[0, 3]
+
+	c5 := x[2, 2] * x[3, 3] - x[3, 2] * x[2, 3]
+	c4 := x[2, 1] * x[3, 3] - x[3, 1] * x[2, 3]
+	c3 := x[2, 1] * x[3, 2] - x[3, 1] * x[2, 2]
+	c2 := x[2, 0] * x[3, 3] - x[3, 0] * x[2, 3]
+	c1 := x[2, 0] * x[3, 2] - x[3, 0] * x[2, 2]
+	c0 := x[2, 0] * x[3, 1] - x[3, 0] * x[2, 1]
+
+	y[0, 0] =  x[1, 1] * c5 - x[1, 2] * c4 + x[1, 3] * c3
+	y[0, 1] = -x[0, 1] * c5 + x[0, 2] * c4 - x[0, 3] * c3
+	y[0, 2] =  x[3, 1] * s5 - x[3, 2] * s4 + x[3, 3] * s3
+	y[0, 3] = -x[2, 1] * s5 + x[2, 2] * s4 - x[2, 3] * s3
+
+	y[1, 0] = -x[1, 0] * c5 + x[1, 2] * c2 - x[1, 3] * c1
+	y[1, 1] =  x[0, 0] * c5 - x[0, 2] * c2 + x[0, 3] * c1
+	y[1, 2] = -x[3, 0] * s5 + x[3, 2] * s2 - x[3, 3] * s1
+	y[1, 3] =  x[2, 0] * s5 - x[2, 2] * s2 + x[2, 3] * s1
+
+	y[2, 0] =  x[1, 0] * c4 - x[1, 1] * c2 + x[1, 3] * c0
+	y[2, 1] = -x[0, 0] * c4 + x[0, 1] * c2 - x[0, 3] * c0
+	y[2, 2] =  x[3, 0] * s4 - x[3, 1] * s2 + x[3, 3] * s0
+	y[2, 3] = -x[2, 0] * s4 + x[2, 1] * s2 - x[2, 3] * s0
+
+	y[3, 0] = -x[1, 0] * c3 + x[1, 1] * c1 - x[1, 2] * c0
+	y[3, 1] =  x[0, 0] * c3 - x[0, 1] * c1 + x[0, 2] * c0
+	y[3, 2] = -x[3, 0] * s3 + x[3, 1] * s1 - x[3, 2] * s0
+	y[3, 3] =  x[2, 0] * s3 - x[2, 1] * s1 + x[2, 2] * s0
+
 	return
 }
 
@@ -616,12 +665,41 @@ matrix3x3_cofactor :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bo
 
 @(require_results)
 matrix4x4_cofactor :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
-	for i in 0..<4 {
-		for j in 0..<4 {
-			sign: T = 1 if (i + j) % 2 == 0 else -1
-			y[i, j] = sign * matrix_minor(x, i, j)
-		}
-	}
+	s0 := x[0, 0] * x[1, 1] - x[1, 0] * x[0, 1]
+	s1 := x[0, 0] * x[1, 2] - x[1, 0] * x[0, 2]
+	s2 := x[0, 0] * x[1, 3] - x[1, 0] * x[0, 3]
+	s3 := x[0, 1] * x[1, 2] - x[1, 1] * x[0, 2]
+	s4 := x[0, 1] * x[1, 3] - x[1, 1] * x[0, 3]
+	s5 := x[0, 2] * x[1, 3] - x[1, 2] * x[0, 3]
+
+	c5 := x[2, 2] * x[3, 3] - x[3, 2] * x[2, 3]
+	c4 := x[2, 1] * x[3, 3] - x[3, 1] * x[2, 3]
+	c3 := x[2, 1] * x[3, 2] - x[3, 1] * x[2, 2]
+	c2 := x[2, 0] * x[3, 3] - x[3, 0] * x[2, 3]
+	c1 := x[2, 0] * x[3, 2] - x[3, 0] * x[2, 2]
+	c0 := x[2, 0] * x[3, 1] - x[3, 0] * x[2, 1]
+
+	// Cofactor = transpose of adjugate
+	y[0, 0] =  x[1, 1] * c5 - x[1, 2] * c4 + x[1, 3] * c3
+	y[1, 0] = -x[0, 1] * c5 + x[0, 2] * c4 - x[0, 3] * c3
+	y[2, 0] =  x[3, 1] * s5 - x[3, 2] * s4 + x[3, 3] * s3
+	y[3, 0] = -x[2, 1] * s5 + x[2, 2] * s4 - x[2, 3] * s3
+
+	y[0, 1] = -x[1, 0] * c5 + x[1, 2] * c2 - x[1, 3] * c1
+	y[1, 1] =  x[0, 0] * c5 - x[0, 2] * c2 + x[0, 3] * c1
+	y[2, 1] = -x[3, 0] * s5 + x[3, 2] * s2 - x[3, 3] * s1
+	y[3, 1] =  x[2, 0] * s5 - x[2, 2] * s2 + x[2, 3] * s1
+
+	y[0, 2] =  x[1, 0] * c4 - x[1, 1] * c2 + x[1, 3] * c0
+	y[1, 2] = -x[0, 0] * c4 + x[0, 1] * c2 - x[0, 3] * c0
+	y[2, 2] =  x[3, 0] * s4 - x[3, 1] * s2 + x[3, 3] * s0
+	y[3, 2] = -x[2, 0] * s4 + x[2, 1] * s2 - x[2, 3] * s0
+
+	y[0, 3] = -x[1, 0] * c3 + x[1, 1] * c1 - x[1, 2] * c0
+	y[1, 3] =  x[0, 0] * c3 - x[0, 1] * c1 + x[0, 2] * c0
+	y[2, 3] = -x[3, 0] * s3 + x[3, 1] * s1 - x[3, 2] * s0
+	y[3, 3] =  x[2, 0] * s3 - x[2, 1] * s1 + x[2, 2] * s0
+
 	return
 }
 
