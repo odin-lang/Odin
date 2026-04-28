@@ -21,8 +21,6 @@ freestanding)
 rare)
 	echo Checking freebsd_i386
 	odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_i386
-	echo Checking haiku_amd64
-	odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:haiku_amd64
 	;;
 
 wasm)

@@ -20,7 +20,6 @@ enum TargetOsKind : u16 {
 	TargetOs_freebsd,
 	TargetOs_openbsd,
 	TargetOs_netbsd,
-	TargetOs_haiku,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -39,7 +38,6 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("freebsd"),
 	str_lit("openbsd"),
 	str_lit("netbsd"),
-	str_lit("haiku"),
 
 	str_lit("wasi"),
 	str_lit("js"),
@@ -774,12 +772,6 @@ gb_global TargetMetrics target_netbsd_arm64 = {
 	str_lit("aarch64-unknown-netbsd-elf"),
 };
 
-gb_global TargetMetrics target_haiku_amd64 = {
-	TargetOs_haiku,
-	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 32,
-	str_lit("x86_64-unknown-haiku"),
-};
 
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
@@ -906,7 +898,6 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("netbsd_arm64"),        &target_netbsd_arm64   },
 
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
-	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
@@ -1164,58 +1155,6 @@ gb_internal String internal_odin_root_dir(void) {
 
 
 	array_free(&path_buf);
-
-	return path;
-}
-
-#elif defined(GB_SYSTEM_HAIKU)
-
-#include <FindDirectory.h>
-
-gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
-
-gb_internal String internal_odin_root_dir(void) {
-	String path = global_module_path;
-	isize len, i;
-	u8 *text;
-
-	if (global_module_path_set) {
-		return global_module_path;
-	}
-
-	TEMPORARY_ALLOCATOR_GUARD();
-	auto path_buf = array_make<char>(temporary_allocator(), 300);
-
-	len = 0;
-	for (;;) {
-		u32 sz = path_buf.count;
-		int res = find_path(B_APP_IMAGE_SYMBOL, B_FIND_PATH_IMAGE_PATH, nullptr, &path_buf[0], sz);
-		if(res == B_OK) {
-			len = sz;
-			break;
-		} else {
-			array_resize(&path_buf, sz + 1);
-		}
-	}
-
-	mutex_lock(&string_buffer_mutex);
-	defer (mutex_unlock(&string_buffer_mutex));
-
-	text = permanent_alloc_array<u8>(len + 1);
-	gb_memmove(text, &path_buf[0], len);
-
-	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
-
-	for (i = path.len-1; i >= 0; i--) {
-		u8 c = path[i];
-		if (c == '/' || c == '\\') {
-			break;
-		}
-		path.len--;
-	}
-
-	global_module_path = path;
-	global_module_path_set = true;
 
 	return path;
 }
@@ -1825,8 +1764,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			#else
 				metrics = &target_netbsd_amd64;
 			#endif
-		#elif defined(GB_SYSTEM_HAIKU)
-			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#elif defined(GB_CPU_RISCV)
@@ -2593,7 +2530,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
-		case TargetOs_haiku:
 			gb_printf_err("-no-crt on Unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present, because the default allocator requires CRT\n");
 			no_crt_checks_failed = true;
 		}
@@ -2606,7 +2542,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
-		case TargetOs_haiku:
 			gb_printf_err("-no-crt on Unix systems requires the -no-thread-local flag to also be present, because the TLS is inaccessible without CRT\n");
 			no_crt_checks_failed = true;
 		}
