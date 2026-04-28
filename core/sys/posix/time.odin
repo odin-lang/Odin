@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -229,17 +229,6 @@ when ODIN_OS == .Darwin {
 	CLOCK_THREAD_CPUTIME_ID  :: 4
 
 	getdate_err: Errno = .ENOSYS // NOTE: looks like it's not a thing on OpenBSD.
-
-} else when ODIN_OS == .Haiku {
-
-	clockid_t :: distinct c.int32_t
-
-	CLOCK_MONOTONIC          :: 0
-	CLOCK_PROCESS_CPUTIME_ID :: -2
-	CLOCK_REALTIME           :: -1
-	CLOCK_THREAD_CPUTIME_ID  :: -3
-
-	getdate_err: Errno = .ENOSYS // NOTE: looks like it's not a thing on Haiku.
 
 } else when ODIN_OS == .Linux {
 
