@@ -415,6 +415,10 @@ determinant :: proc{
 	matrix2x2_determinant,
 	matrix3x3_determinant,
 	matrix4x4_determinant,
+	matrix5x5_determinant,
+	matrix6x6_determinant,
+	matrix7x7_determinant,
+	matrix8x8_determinant,
 }
 
 adjugate :: proc{
@@ -422,6 +426,10 @@ adjugate :: proc{
 	matrix2x2_adjugate,
 	matrix3x3_adjugate,
 	matrix4x4_adjugate,
+	matrix5x5_adjugate,
+	matrix6x6_adjugate,
+	matrix7x7_adjugate,
+	matrix8x8_adjugate,
 }
 
 cofactor :: proc{
@@ -429,6 +437,10 @@ cofactor :: proc{
 	matrix2x2_cofactor,
 	matrix3x3_cofactor,
 	matrix4x4_cofactor,
+	matrix5x5_cofactor,
+	matrix6x6_cofactor,
+	matrix7x7_cofactor,
+	matrix8x8_cofactor,
 }
 
 inverse_transpose :: proc{
@@ -436,14 +448,21 @@ inverse_transpose :: proc{
 	matrix2x2_inverse_transpose,
 	matrix3x3_inverse_transpose,
 	matrix4x4_inverse_transpose,
+	matrix5x5_inverse_transpose,
+	matrix6x6_inverse_transpose,
+	matrix7x7_inverse_transpose,
+	matrix8x8_inverse_transpose,
 }
-
 
 inverse :: proc{
 	matrix1x1_inverse,
 	matrix2x2_inverse,
 	matrix3x3_inverse,
 	matrix4x4_inverse,
+	matrix5x5_inverse,
+	matrix6x6_inverse,
+	matrix7x7_inverse,
+	matrix8x8_inverse,
 }
 
 @(require_results)
@@ -509,6 +528,26 @@ matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #
 
 	det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0
 	return
+}
+
+@(require_results)
+matrix5x5_determinant :: proc "contextless" (m: $M/matrix[5, 5]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
+
+@(require_results)
+matrix6x6_determinant :: proc "contextless" (m: $M/matrix[6, 6]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
+
+@(require_results)
+matrix7x7_determinant :: proc "contextless" (m: $M/matrix[7, 7]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
+
+@(require_results)
+matrix8x8_determinant :: proc "contextless" (m: $M/matrix[8, 8]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
 }
 
 @(require_results)
@@ -632,6 +671,58 @@ matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bo
 	return
 }
 
+@(require_results)
+matrix5x5_adjugate :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix6x6_adjugate :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix7x7_adjugate :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix8x8_adjugate :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix_adjugate_general :: proc "contextless" (x: $M/matrix[$N, N]$T) -> (y: M) where N >= 2 #no_bounds_check {
+	for row in 0..<N {
+		for col in 0..<N {
+			// Build (N-1)x(N-1) minor by excluding row and col
+			minor: matrix[N - 1, N - 1]T
+			mi := 0
+			for r in 0..<N {
+				if r == row {
+					continue
+				}
+				mj := 0
+				for c in 0..<N {
+					if c == col {
+						continue
+					}
+					minor[mi, mj] = x[r, c]
+					mj += 1
+				}
+				mi += 1
+			}
+
+			// Adjugate is the transpose of the cofactor matrix
+			// so cofactor[row, col] goes into y[col, row]
+			sign: T = -1 if (row + col) % 2 == 1 else 1
+			y[col, row] = sign * matrix_determinant_generic(minor)
+		}
+	}
+
+	return
+}
+
 
 @(require_results)
 matrix1x1_cofactor :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
@@ -704,6 +795,58 @@ matrix4x4_cofactor :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bo
 }
 
 @(require_results)
+matrix5x5_cofactor :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix6x6_cofactor :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix7x7_cofactor :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix8x8_cofactor :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix_cofactor_general :: proc "contextless" (x: $M/matrix[$N, N]$T) -> (y: M) where N >= 2 #no_bounds_check {
+	for row in 0..<N {
+		for col in 0..<N {
+			// Build (N-1)x(N-1) minor by excluding row and col
+			minor: matrix[N - 1, N - 1]T
+			mi := 0
+			for r in 0..<N {
+				if r == row {
+					continue
+				}
+				mj := 0
+				for c in 0..<N {
+					if c == col {
+						continue
+					}
+					minor[mi, mj] = x[r, c]
+					mj += 1
+				}
+				mi += 1
+			}
+
+			// Cofactor sign: (-1)^(row+col)
+			sign: T = -1 if (row + col) % 2 == 1 else 1
+			y[row, col] = sign * matrix_determinant_generic(minor)
+		}
+	}
+
+	return
+}
+
+
+@(require_results)
 matrix1x1_inverse_transpose :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
 	y[0, 0] = 1/x[0, 0]
 	return
@@ -773,9 +916,33 @@ matrix4x4_inverse_transpose :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: 
 }
 
 @(require_results)
+matrix5x5_inverse_transpose :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
+matrix6x6_inverse_transpose :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
+matrix7x7_inverse_transpose :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
+matrix8x8_inverse_transpose :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
 matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
 	y[0, 0] = 1/x[0, 0]
-	return
+	return transpose(y)
 }
 
 @(require_results)
@@ -841,6 +1008,30 @@ matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 	return
 }
 
+@(require_results)
+matrix5x5_inverse :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(require_results)
+matrix6x6_inverse :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(require_results)
+matrix7x7_inverse :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(require_results)
+matrix8x8_inverse :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
 @(private="file")
 swap :: #force_inline proc "contextless" (a, b: ^$T) {
 	t := a^
@@ -875,10 +1066,17 @@ matrix_inverse_gauss_jordan :: proc "contextless" (A: $M/matrix[$N, N]$T) -> (b:
 			}
 		}
 
-		inv_pivot := 1.0 / a[col, col]
-		for k in 0..<N {
-			a[col, k] *= inv_pivot
-			b[col, k] *= inv_pivot
+		when intrinsics.type_is_integer(T) {
+			for k in 0..<N {
+				a[col, k] /= a[col, col]
+				b[col, k] /= a[col, col]
+			}
+		} else {
+			inv_pivot := 1.0 / a[col, col]
+			for k in 0..<N {
+				a[col, k] *= inv_pivot
+				b[col, k] *= inv_pivot
+			}
 		}
 
 		for row in 0..<N {
@@ -933,11 +1131,20 @@ matrix_inverse_lu_decomposition :: proc "contextless" (A: $M/matrix[$N, N]$T) ->
 		}
 
 		// Compute L and U in place
-		inv_pivot := 1.0 / a[col, col]
-		for row in (col + 1)..<N {
-			a[row, col] *= inv_pivot
-			for k in (col + 1)..<N {
-				a[row, k] -= a[row, col] * a[col, k]
+		when intrinsics.type_is_integer(T) {
+			for row in (col + 1)..<N {
+				a[row, col] /= a[col, col]
+				for k in (col + 1)..<N {
+					a[row, k] -= a[row, col] * a[col, k]
+				}
+			}
+		} else {
+			inv_pivot := 1 / a[col, col]
+			for row in (col + 1)..<N {
+				a[row, col] *= inv_pivot
+				for k in (col + 1)..<N {
+					a[row, k] -= a[row, col] * a[col, k]
+				}
 			}
 		}
 	}
