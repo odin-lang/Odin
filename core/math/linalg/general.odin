@@ -1186,3 +1186,31 @@ matrix_inverse_lu_decomposition :: proc "contextless" (A: $M/matrix[$N, N]$T) ->
 	non_singular = true
 	return
 }
+
+pseudo_inverse :: proc{
+	matrix_pseudo_inverse,
+}
+
+// Moore-Penrose Pseudo-Inverse
+@(require_results)
+matrix_pseudo_inverse :: proc "contextless" (A: $M/matrix[$R, $C]$T) -> (B: matrix[C, R]T, not_singular: bool) #no_bounds_check {
+	At := transpose(A)
+
+	when R >= C {
+		// Overdetermined (tall):
+		// pseudo_inverse(A) = inverse(transpose(A)*A)*transpose(A)
+		AtA := At * A // [C, C]
+		AtA_inv := matrix_inverse_generic(AtA) or_return
+		B = AtA_inv * At
+		not_singular = true
+	} else {
+		// Underdetermined (wide):
+		// pseudo_inverse(A) = transpose(A)*inverse(A*transpose(A))
+		AAt := A * At // [R, R]
+		AAt_inv := matrix_inverse_generic(AAt) or_return
+		B = At * AAt_inv
+		not_singular = true
+	}
+
+	return
+}
