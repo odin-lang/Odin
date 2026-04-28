@@ -80,25 +80,6 @@ when ODIN_OS == .Darwin {
 	ERANGE :: 34
 }
 
-when ODIN_OS == .Haiku {
-	@(private="file")
-	@(default_calling_convention="c")
-	foreign libc {
-		@(link_name="_errnop")
-		_get_errno :: proc() -> ^int ---
-	}
-
-	_HAIKU_USE_POSITIVE_POSIX_ERRORS :: #config(HAIKU_USE_POSITIVE_POSIX_ERRORS, false)
-	_POSIX_ERROR_FACTOR              :: -1 when _HAIKU_USE_POSITIVE_POSIX_ERRORS else 1
-
-	@(private="file") _GENERAL_ERROR_BASE :: min(int)
-	@(private="file") _POSIX_ERROR_BASE   :: _GENERAL_ERROR_BASE + 0x7000
-
-	EDOM   :: _POSIX_ERROR_FACTOR * (_POSIX_ERROR_BASE + 16)
-	EILSEQ :: _POSIX_ERROR_FACTOR * (_POSIX_ERROR_BASE + 38)
-	ERANGE :: _POSIX_ERROR_FACTOR * (_POSIX_ERROR_BASE + 17)
-}
-
 when ODIN_OS == .JS {
 	_ :: libc
 	_get_errno :: proc "c" () -> ^int {
