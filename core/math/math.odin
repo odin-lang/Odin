@@ -3427,6 +3427,71 @@ ilogb_f64 :: proc "contextless" (val: f64) -> int {
 @(require_results) ilogb_f32be :: proc "contextless" (value: f32be) -> int { return ilogb_f32(f32(value)) }
 @(require_results) ilogb_f64le :: proc "contextless" (value: f64le) -> int { return ilogb_f64(f64(value)) }
 @(require_results) ilogb_f64be :: proc "contextless" (value: f64be) -> int { return ilogb_f64(f64(value)) }
+/*
+Reverts a float to the binary size of it always rounding down
+i.e. returns the position of the highest bit of a float, with the count starting at 0
+
+signal is not considered
+
+
+NOTE: this works even for sub-normal numbers without the need to normalize.
+
+
+
+Inputs:
+- `value`: float to calculate the whole binary size
+
+
+Returns:
+- A integer indicating the binary size of the float
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	ilogb_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = -4.3
+		x3_float:    f16 = 16.5
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.ilogb(x_float))
+		fmt.println(math.ilogb(x2_float))
+		fmt.println(math.ilogb(x3_float))
+
+		fmt.printf("Hex: %#h\n", x_pos_zero)
+		fmt.printf("Hex: %#h\n", x_neg_zero)
+		fmt.printf("Hex: %#h\n", x_pos_inf)
+		fmt.printf("Hex: %#h\n", x_zero_inf)
+		fmt.printf("Hex: %#h\n", x_neg_inf)
+		fmt.printf("Hex: %#h\n", x_nan)
+	}
+
+Output:
+	1
+	2
+	4
+    
+    // special cases
+    Hex: 0h0 			// pos_zero
+    Hex: 0h8000			// neg_zero
+    Hex: 0h7c00			// pos_inf
+    Hex: 0h7c00			// zero_inf
+    Hex: 0hfc00			// neg_inf
+    Hex: 0h7e00			// nan
+
+*/
 ilogb :: proc {
 	ilogb_f16,
 	ilogb_f32,
@@ -3745,8 +3810,8 @@ F64_RADIX      :: 2                        // Exponent radix.
 F64_ROUNDS     :: 1                        // Addition rounding: near.
 
 
-F16_MASK  :: 0x1f
-F16_SHIFT :: 16 - 6
+F16_MASK  :: 0x1f 				// mask with size of the expoent for 16bits floats i.e. 5 bits = 1
+F16_SHIFT :: 16 - 6 			// size of the significand for 16bits floats
 F16_BIAS  :: 0xf
 
 F32_MASK  :: 0xff
