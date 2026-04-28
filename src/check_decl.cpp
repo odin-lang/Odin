@@ -1556,9 +1556,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		if (is_foreign) {
 			error(pl->body, "A foreign procedure cannot have a body");
 		}
-		if (proc_type->Proc.c_vararg) {
-			error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
-		}
+		// if (proc_type->Proc.c_vararg) {
+		// 	error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
+		// }
 
 		d->scope = ctx->scope;
 

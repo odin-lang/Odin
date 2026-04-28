@@ -1449,6 +1449,72 @@ gb_internal void init_universal(void) {
 
 		t_objc_instancetype = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_instancetype"), t_objc_id);
 	}
+
+	// intrinsics types for C stuff
+	{
+		Scope *scope = create_scope(nullptr, nullptr);
+
+		auto dummy_field = [](Scope *scope, Type *type, i32 field_index, char const *name = nullptr) -> Entity * {
+			auto token = blank_token;
+			if (name) {
+				token.string = make_string_c(name);
+			}
+			return alloc_entity_field(scope, token, type, false, 0, EntityState_Resolved);
+		};
+
+		auto fields = array_make<Entity *>(permanent_allocator(), 0, 8);
+
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+			switch (build_context.metrics.os) {
+			case TargetOs_freestanding:
+				/*check*/
+			case TargetOs_linux:
+			case TargetOs_freebsd:
+			case TargetOs_netbsd:
+			case TargetOs_openbsd:
+				array_add(&fields, dummy_field(scope, t_u32,    0, "gp_offset"));
+				array_add(&fields, dummy_field(scope, t_u32,    1, "fp_offset"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 2, "overflow_arg_area"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 3, "reg_save_area"));
+				break;
+			}
+			break;
+
+		case TargetArch_arm64:
+			switch (build_context.metrics.os) {
+			case TargetOs_darwin:
+				// AARCH64 architecture is different to other arm64 platforms
+				array_add(&fields, dummy_field(scope, t_rawptr, 0));
+				break;
+
+			case TargetOs_freestanding:
+			case TargetOs_linux:
+			case TargetOs_freebsd:
+			case TargetOs_netbsd:
+			case TargetOs_openbsd: // Not sure if this is correct
+				array_add(&fields, dummy_field(scope, t_rawptr, 0, "__stack"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 1, "__gr_top"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 2, "__vr_top"));
+				array_add(&fields, dummy_field(scope, t_i32,    3, "__gr_offs"));
+				array_add(&fields, dummy_field(scope, t_i32,    4, "__vr_offs"));
+				break;
+			}
+			break;
+		}
+
+		if (fields.count == 0) {
+			array_add(&fields, dummy_field(scope, t_rawptr, 0));
+		}
+
+		Type *va_list_struct = alloc_type_struct_complete();
+		va_list_struct->Struct.scope  = scope;
+		va_list_struct->Struct.fields = slice_from_array(fields);
+		GB_ASSERT(type_size_of(va_list_struct) > 0);
+
+		t_c_va_list = add_global_type_name(intrinsics_pkg->scope, str_lit("c_va_list"), va_list_struct);
+		t_c_va_list_ptr = alloc_type_pointer(t_c_va_list);
+	}
 }
 
 
