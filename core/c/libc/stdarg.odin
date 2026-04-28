@@ -4,11 +4,11 @@ package libc
 
 import "base:intrinsics"
 
-va_list :: intrinsics.va_list
+va_list  :: intrinsics.c_va_list
 
-va_start :: intrinsics.va_start
-va_end   :: intrinsics.va_end
-va_copy  :: intrinsics.va_copy
+va_start :: intrinsics.c_va_start
+va_end   :: intrinsics.c_va_end
+va_copy  :: intrinsics.c_va_copy
 
 
 // We cannot provide va_arg as there is no way to create "C" style procedures
