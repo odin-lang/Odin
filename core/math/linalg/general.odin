@@ -382,28 +382,28 @@ matrix_cast :: proc "contextless" (v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -
 	return
 }
 
-@(require_results) to_f16  :: #force_inline proc(v: $A/[$N]$T) -> [N]f16  { return #force_inline array_cast(v, f16)  }
-@(require_results) to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return #force_inline array_cast(v, f32)  }
-@(require_results) to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return #force_inline array_cast(v, f64)  }
+@(require_results) to_f16  :: #force_inline proc(v: $A/[$N]$T) -> [N]f16  { return ([N]f16) (v) }
+@(require_results) to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return ([N]f32) (v) }
+@(require_results) to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return ([N]f64) (v) }
 
-@(require_results) to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return #force_inline array_cast(v, i8)   }
-@(require_results) to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return #force_inline array_cast(v, i16)  }
-@(require_results) to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return #force_inline array_cast(v, i32)  }
-@(require_results) to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return #force_inline array_cast(v, i64)  }
-@(require_results) to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return #force_inline array_cast(v, int)  }
+@(require_results) to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return ([N]i8)  (v) }
+@(require_results) to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return ([N]i16) (v) }
+@(require_results) to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return ([N]i32) (v) }
+@(require_results) to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return ([N]i64) (v) }
+@(require_results) to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return ([N]int) (v) }
 
-@(require_results) to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return #force_inline array_cast(v, u8)   }
-@(require_results) to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return #force_inline array_cast(v, u16)  }
-@(require_results) to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return #force_inline array_cast(v, u32)  }
-@(require_results) to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return #force_inline array_cast(v, u64)  }
-@(require_results) to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return #force_inline array_cast(v, uint) }
+@(require_results) to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return ([N]u8)  (v) }
+@(require_results) to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return ([N]u16) (v) }
+@(require_results) to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return ([N]u32) (v) }
+@(require_results) to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return ([N]u64) (v) }
+@(require_results) to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return ([N]uint)(v) }
 
-@(require_results) to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return #force_inline array_cast(v, complex32)     }
-@(require_results) to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return #force_inline array_cast(v, complex64)     }
-@(require_results) to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return #force_inline array_cast(v, complex128)    }
-@(require_results) to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return #force_inline array_cast(v, quaternion64)  }
-@(require_results) to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return #force_inline array_cast(v, quaternion128) }
-@(require_results) to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return #force_inline array_cast(v, quaternion256) }
+@(require_results) to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return ([N]complex32)    (v) }
+@(require_results) to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return ([N]complex64)    (v) }
+@(require_results) to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return ([N]complex128)   (v) }
+@(require_results) to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return ([N]quaternion64) (v) }
+@(require_results) to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return ([N]quaternion128)(v) }
+@(require_results) to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return ([N]quaternion256)(v) }
 
 
 hadamard_product :: intrinsics.hadamard_product
