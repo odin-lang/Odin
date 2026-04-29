@@ -419,7 +419,15 @@ dup :: proc "contextless" (fd: Fd) -> (Fd, Errno) {
 dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 		ret := syscall(SYS_dup3, old, new, 0)
-		return errno_unwrap(ret, Fd)
+
+		// Differences between dup2 and dup3 are:
+		//   - dup3 takes a flags argument
+		//   - dup2 does not return EINVAL
+		fd, errno := errno_unwrap(ret, Fd)
+		if errno == .EINVAL {
+			errno = .NONE
+		}
+		return fd, errno
 	} else {
 		ret := syscall(SYS_dup2, old, new)
 		return errno_unwrap(ret, Fd)
