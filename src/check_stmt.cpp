@@ -109,6 +109,7 @@ gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts,
 
 		ctx->stmt_flags = prev_stmt_flags;
 
+		if (!(check_vet_flags(ctx) & VetFlag_PrematureReturn)) { continue; }
 		if (i+1 < max_non_constant_declaration) {
 			switch (n->kind) {
 			case Ast_ReturnStmt:
