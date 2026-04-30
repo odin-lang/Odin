@@ -339,8 +339,8 @@ gb_internal bool is_simd_able_type(Type *t) {
 		TypeEndianKind kind = type_endian_kind_of(t);
 		switch (kind) {
 		case TypeEndian_Platform: return true;
-		case TypeEndian_Little:   return build_context.endian_kind == TypeEndian_Little;
-		case TypeEndian_Big:      return build_context.endian_kind == TypeEndian_Big;
+		case TypeEndian_Little:   return build_context.endian_kind == TargetEndian_Little;
+		case TypeEndian_Big:      return build_context.endian_kind == TargetEndian_Big;
 		}
 	}
 	return false;
