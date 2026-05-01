@@ -368,11 +368,8 @@ cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_ch
 
 
 @(require_results)
-array_cast :: proc "contextless" (v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bounds_check {
-	for i in 0..<N {
-		w[i] = Elem_Type(v[i])
-	}
-	return
+array_cast :: proc "contextless" (v: $A/[$N]$T, $Elem_Type: typeid) -> [N]Elem_Type #no_bounds_check {
+	return ([N]Elem_Type)(v)
 }
 
 @(require_results)
@@ -385,28 +382,28 @@ matrix_cast :: proc "contextless" (v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -
 	return
 }
 
-@(require_results) to_f16  :: #force_inline proc(v: $A/[$N]$T) -> [N]f16  { return array_cast(v, f16)  }
-@(require_results) to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32)  }
-@(require_results) to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return array_cast(v, f64)  }
+@(require_results) to_f16  :: #force_inline proc(v: $A/[$N]$T) -> [N]f16  { return ([N]f16) (v) }
+@(require_results) to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return ([N]f32) (v) }
+@(require_results) to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return ([N]f64) (v) }
 
-@(require_results) to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return array_cast(v, i8)   }
-@(require_results) to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return array_cast(v, i16)  }
-@(require_results) to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return array_cast(v, i32)  }
-@(require_results) to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return array_cast(v, i64)  }
-@(require_results) to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return array_cast(v, int)  }
+@(require_results) to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return ([N]i8)  (v) }
+@(require_results) to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return ([N]i16) (v) }
+@(require_results) to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return ([N]i32) (v) }
+@(require_results) to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return ([N]i64) (v) }
+@(require_results) to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return ([N]int) (v) }
 
-@(require_results) to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return array_cast(v, u8)   }
-@(require_results) to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return array_cast(v, u16)  }
-@(require_results) to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return array_cast(v, u32)  }
-@(require_results) to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return array_cast(v, u64)  }
-@(require_results) to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return array_cast(v, uint) }
+@(require_results) to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return ([N]u8)  (v) }
+@(require_results) to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return ([N]u16) (v) }
+@(require_results) to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return ([N]u32) (v) }
+@(require_results) to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return ([N]u64) (v) }
+@(require_results) to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return ([N]uint)(v) }
 
-@(require_results) to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return array_cast(v, complex32)     }
-@(require_results) to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return array_cast(v, complex64)     }
-@(require_results) to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return array_cast(v, complex128)    }
-@(require_results) to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return array_cast(v, quaternion64)  }
-@(require_results) to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128) }
-@(require_results) to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256) }
+@(require_results) to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return ([N]complex32)    (v) }
+@(require_results) to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return ([N]complex64)    (v) }
+@(require_results) to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return ([N]complex128)   (v) }
+@(require_results) to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return ([N]quaternion64) (v) }
+@(require_results) to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return ([N]quaternion128)(v) }
+@(require_results) to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return ([N]quaternion256)(v) }
 
 
 hadamard_product :: intrinsics.hadamard_product
@@ -418,6 +415,10 @@ determinant :: proc{
 	matrix2x2_determinant,
 	matrix3x3_determinant,
 	matrix4x4_determinant,
+	matrix5x5_determinant,
+	matrix6x6_determinant,
+	matrix7x7_determinant,
+	matrix8x8_determinant,
 }
 
 adjugate :: proc{
@@ -425,6 +426,10 @@ adjugate :: proc{
 	matrix2x2_adjugate,
 	matrix3x3_adjugate,
 	matrix4x4_adjugate,
+	matrix5x5_adjugate,
+	matrix6x6_adjugate,
+	matrix7x7_adjugate,
+	matrix8x8_adjugate,
 }
 
 cofactor :: proc{
@@ -432,6 +437,10 @@ cofactor :: proc{
 	matrix2x2_cofactor,
 	matrix3x3_cofactor,
 	matrix4x4_cofactor,
+	matrix5x5_cofactor,
+	matrix6x6_cofactor,
+	matrix7x7_cofactor,
+	matrix8x8_cofactor,
 }
 
 inverse_transpose :: proc{
@@ -439,14 +448,21 @@ inverse_transpose :: proc{
 	matrix2x2_inverse_transpose,
 	matrix3x3_inverse_transpose,
 	matrix4x4_inverse_transpose,
+	matrix5x5_inverse_transpose,
+	matrix6x6_inverse_transpose,
+	matrix7x7_inverse_transpose,
+	matrix8x8_inverse_transpose,
 }
-
 
 inverse :: proc{
 	matrix1x1_inverse,
 	matrix2x2_inverse,
 	matrix3x3_inverse,
 	matrix4x4_inverse,
+	matrix5x5_inverse,
+	matrix6x6_inverse,
+	matrix7x7_inverse,
+	matrix8x8_inverse,
 }
 
 @(require_results)
@@ -496,15 +512,96 @@ matrix3x3_determinant :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (det: T) #
 }
 @(require_results)
 matrix4x4_determinant :: proc "contextless" (m: $M/matrix[4, 4]$T) -> (det: T) #no_bounds_check {
-	c := cofactor(m)
-	for i in 0..<4 {
-		det += m[0, i] * c[0, i]
-	}
+	s0 := m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1]
+	s1 := m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2]
+	s2 := m[0, 0] * m[1, 3] - m[1, 0] * m[0, 3]
+	s3 := m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2]
+	s4 := m[0, 1] * m[1, 3] - m[1, 1] * m[0, 3]
+	s5 := m[0, 2] * m[1, 3] - m[1, 2] * m[0, 3]
+
+	c5 := m[2, 2] * m[3, 3] - m[3, 2] * m[2, 3]
+	c4 := m[2, 1] * m[3, 3] - m[3, 1] * m[2, 3]
+	c3 := m[2, 1] * m[3, 2] - m[3, 1] * m[2, 2]
+	c2 := m[2, 0] * m[3, 3] - m[3, 0] * m[2, 3]
+	c1 := m[2, 0] * m[3, 2] - m[3, 0] * m[2, 2]
+	c0 := m[2, 0] * m[3, 1] - m[3, 0] * m[2, 1]
+
+	det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0
 	return
 }
 
+@(require_results)
+matrix5x5_determinant :: proc "contextless" (m: $M/matrix[5, 5]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
 
+@(require_results)
+matrix6x6_determinant :: proc "contextless" (m: $M/matrix[6, 6]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
 
+@(require_results)
+matrix7x7_determinant :: proc "contextless" (m: $M/matrix[7, 7]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
+
+@(require_results)
+matrix8x8_determinant :: proc "contextless" (m: $M/matrix[8, 8]$T) -> (det: T) #no_bounds_check {
+	return matrix_determinant_generic(m)
+}
+
+@(require_results)
+matrix_determinant_generic :: proc "contextless" (a: $M/matrix[$N, N]$T) -> T #no_bounds_check {
+	when N == 1 {
+		return matrix1x1_determinant(a)
+	} else when N == 2 {
+		return matrix2x2_determinant(a)
+	} else when N == 3 {
+		return matrix3x3_determinant(a)
+	} else when N == 4 {
+		return matrix4x4_determinant(a)
+	} else {
+		a := a
+		det: T = 1
+
+		for col in 0..<N {
+			pivot_row := col
+			pivot_val := abs(a[col, col])
+			for row in (col + 1)..<N {
+				val := abs(a[row, col])
+				if val > pivot_val {
+					pivot_val = val
+					pivot_row = row
+				}
+			}
+
+			if pivot_val == 0 {
+				return 0
+			}
+
+			if pivot_row != col {
+				for k in 0..<N {
+					t := a[col, k]
+					a[col, k] = a[pivot_row, k]
+					a[pivot_row, k] = t
+				}
+				det = -det
+			}
+
+			det *= a[col, col]
+
+			inv_pivot := 1.0 / a[col, col]
+			for row in (col + 1)..<N {
+				factor := a[row, col] * inv_pivot
+				for k in (col + 1)..<N {
+					a[row, k] -= factor * a[col, k]
+				}
+			}
+		}
+
+		return det
+	}
+}
 
 @(require_results)
 matrix1x1_adjugate :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
@@ -537,12 +634,92 @@ matrix3x3_adjugate :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bo
 
 @(require_results)
 matrix4x4_adjugate :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
-	for i in 0..<4 {
-		for j in 0..<4 {
-			sign: T = 1 if (i + j) % 2 == 0 else -1
-			y[i, j] = sign * matrix_minor(x, j, i)
+	s0 := x[0, 0] * x[1, 1] - x[1, 0] * x[0, 1]
+	s1 := x[0, 0] * x[1, 2] - x[1, 0] * x[0, 2]
+	s2 := x[0, 0] * x[1, 3] - x[1, 0] * x[0, 3]
+	s3 := x[0, 1] * x[1, 2] - x[1, 1] * x[0, 2]
+	s4 := x[0, 1] * x[1, 3] - x[1, 1] * x[0, 3]
+	s5 := x[0, 2] * x[1, 3] - x[1, 2] * x[0, 3]
+
+	c5 := x[2, 2] * x[3, 3] - x[3, 2] * x[2, 3]
+	c4 := x[2, 1] * x[3, 3] - x[3, 1] * x[2, 3]
+	c3 := x[2, 1] * x[3, 2] - x[3, 1] * x[2, 2]
+	c2 := x[2, 0] * x[3, 3] - x[3, 0] * x[2, 3]
+	c1 := x[2, 0] * x[3, 2] - x[3, 0] * x[2, 2]
+	c0 := x[2, 0] * x[3, 1] - x[3, 0] * x[2, 1]
+
+	y[0, 0] =  x[1, 1] * c5 - x[1, 2] * c4 + x[1, 3] * c3
+	y[0, 1] = -x[0, 1] * c5 + x[0, 2] * c4 - x[0, 3] * c3
+	y[0, 2] =  x[3, 1] * s5 - x[3, 2] * s4 + x[3, 3] * s3
+	y[0, 3] = -x[2, 1] * s5 + x[2, 2] * s4 - x[2, 3] * s3
+
+	y[1, 0] = -x[1, 0] * c5 + x[1, 2] * c2 - x[1, 3] * c1
+	y[1, 1] =  x[0, 0] * c5 - x[0, 2] * c2 + x[0, 3] * c1
+	y[1, 2] = -x[3, 0] * s5 + x[3, 2] * s2 - x[3, 3] * s1
+	y[1, 3] =  x[2, 0] * s5 - x[2, 2] * s2 + x[2, 3] * s1
+
+	y[2, 0] =  x[1, 0] * c4 - x[1, 1] * c2 + x[1, 3] * c0
+	y[2, 1] = -x[0, 0] * c4 + x[0, 1] * c2 - x[0, 3] * c0
+	y[2, 2] =  x[3, 0] * s4 - x[3, 1] * s2 + x[3, 3] * s0
+	y[2, 3] = -x[2, 0] * s4 + x[2, 1] * s2 - x[2, 3] * s0
+
+	y[3, 0] = -x[1, 0] * c3 + x[1, 1] * c1 - x[1, 2] * c0
+	y[3, 1] =  x[0, 0] * c3 - x[0, 1] * c1 + x[0, 2] * c0
+	y[3, 2] = -x[3, 0] * s3 + x[3, 1] * s1 - x[3, 2] * s0
+	y[3, 3] =  x[2, 0] * s3 - x[2, 1] * s1 + x[2, 2] * s0
+
+	return
+}
+
+@(require_results)
+matrix5x5_adjugate :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix6x6_adjugate :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix7x7_adjugate :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix8x8_adjugate :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	return matrix_adjugate_general(x)
+}
+
+@(require_results)
+matrix_adjugate_general :: proc "contextless" (x: $M/matrix[$N, N]$T) -> (y: M) where N >= 2 #no_bounds_check {
+	for row in 0..<N {
+		for col in 0..<N {
+			// Build (N-1)x(N-1) minor by excluding row and col
+			minor: matrix[N - 1, N - 1]T
+			mi := 0
+			for r in 0..<N {
+				if r == row {
+					continue
+				}
+				mj := 0
+				for c in 0..<N {
+					if c == col {
+						continue
+					}
+					minor[mi, mj] = x[r, c]
+					mj += 1
+				}
+				mi += 1
+			}
+
+			// Adjugate is the transpose of the cofactor matrix
+			// so cofactor[row, col] goes into y[col, row]
+			sign: T = -1 if (row + col) % 2 == 1 else 1
+			y[col, row] = sign * matrix_determinant_generic(minor)
 		}
 	}
+
 	return
 }
 
@@ -579,14 +756,95 @@ matrix3x3_cofactor :: proc "contextless" (m: $M/matrix[3, 3]$T) -> (y: M) #no_bo
 
 @(require_results)
 matrix4x4_cofactor :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bounds_check {
-	for i in 0..<4 {
-		for j in 0..<4 {
-			sign: T = 1 if (i + j) % 2 == 0 else -1
-			y[i, j] = sign * matrix_minor(x, i, j)
-		}
-	}
+	s0 := x[0, 0] * x[1, 1] - x[1, 0] * x[0, 1]
+	s1 := x[0, 0] * x[1, 2] - x[1, 0] * x[0, 2]
+	s2 := x[0, 0] * x[1, 3] - x[1, 0] * x[0, 3]
+	s3 := x[0, 1] * x[1, 2] - x[1, 1] * x[0, 2]
+	s4 := x[0, 1] * x[1, 3] - x[1, 1] * x[0, 3]
+	s5 := x[0, 2] * x[1, 3] - x[1, 2] * x[0, 3]
+
+	c5 := x[2, 2] * x[3, 3] - x[3, 2] * x[2, 3]
+	c4 := x[2, 1] * x[3, 3] - x[3, 1] * x[2, 3]
+	c3 := x[2, 1] * x[3, 2] - x[3, 1] * x[2, 2]
+	c2 := x[2, 0] * x[3, 3] - x[3, 0] * x[2, 3]
+	c1 := x[2, 0] * x[3, 2] - x[3, 0] * x[2, 2]
+	c0 := x[2, 0] * x[3, 1] - x[3, 0] * x[2, 1]
+
+	// Cofactor = transpose of adjugate
+	y[0, 0] =  x[1, 1] * c5 - x[1, 2] * c4 + x[1, 3] * c3
+	y[1, 0] = -x[0, 1] * c5 + x[0, 2] * c4 - x[0, 3] * c3
+	y[2, 0] =  x[3, 1] * s5 - x[3, 2] * s4 + x[3, 3] * s3
+	y[3, 0] = -x[2, 1] * s5 + x[2, 2] * s4 - x[2, 3] * s3
+
+	y[0, 1] = -x[1, 0] * c5 + x[1, 2] * c2 - x[1, 3] * c1
+	y[1, 1] =  x[0, 0] * c5 - x[0, 2] * c2 + x[0, 3] * c1
+	y[2, 1] = -x[3, 0] * s5 + x[3, 2] * s2 - x[3, 3] * s1
+	y[3, 1] =  x[2, 0] * s5 - x[2, 2] * s2 + x[2, 3] * s1
+
+	y[0, 2] =  x[1, 0] * c4 - x[1, 1] * c2 + x[1, 3] * c0
+	y[1, 2] = -x[0, 0] * c4 + x[0, 1] * c2 - x[0, 3] * c0
+	y[2, 2] =  x[3, 0] * s4 - x[3, 1] * s2 + x[3, 3] * s0
+	y[3, 2] = -x[2, 0] * s4 + x[2, 1] * s2 - x[2, 3] * s0
+
+	y[0, 3] = -x[1, 0] * c3 + x[1, 1] * c1 - x[1, 2] * c0
+	y[1, 3] =  x[0, 0] * c3 - x[0, 1] * c1 + x[0, 2] * c0
+	y[2, 3] = -x[3, 0] * s3 + x[3, 1] * s1 - x[3, 2] * s0
+	y[3, 3] =  x[2, 0] * s3 - x[2, 1] * s1 + x[2, 2] * s0
+
 	return
 }
+
+@(require_results)
+matrix5x5_cofactor :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix6x6_cofactor :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix7x7_cofactor :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix8x8_cofactor :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	return matrix_cofactor_general(x)
+}
+
+@(require_results)
+matrix_cofactor_general :: proc "contextless" (x: $M/matrix[$N, N]$T) -> (y: M) where N >= 2 #no_bounds_check {
+	for row in 0..<N {
+		for col in 0..<N {
+			// Build (N-1)x(N-1) minor by excluding row and col
+			minor: matrix[N - 1, N - 1]T
+			mi := 0
+			for r in 0..<N {
+				if r == row {
+					continue
+				}
+				mj := 0
+				for c in 0..<N {
+					if c == col {
+						continue
+					}
+					minor[mi, mj] = x[r, c]
+					mj += 1
+				}
+				mi += 1
+			}
+
+			// Cofactor sign: (-1)^(row+col)
+			sign: T = -1 if (row + col) % 2 == 1 else 1
+			y[row, col] = sign * matrix_determinant_generic(minor)
+		}
+	}
+
+	return
+}
+
 
 @(require_results)
 matrix1x1_inverse_transpose :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
@@ -658,9 +916,33 @@ matrix4x4_inverse_transpose :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: 
 }
 
 @(require_results)
+matrix5x5_inverse_transpose :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
+matrix6x6_inverse_transpose :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
+matrix7x7_inverse_transpose :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
+matrix8x8_inverse_transpose :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return transpose(y)
+}
+
+@(require_results)
 matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
 	y[0, 0] = 1/x[0, 0]
-	return
+	return transpose(y)
 }
 
 @(require_results)
@@ -723,5 +1005,212 @@ matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 			}
 		}
 	}
+	return
+}
+
+@(require_results)
+matrix5x5_inverse :: proc "contextless" (x: $M/matrix[5, 5]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(require_results)
+matrix6x6_inverse :: proc "contextless" (x: $M/matrix[6, 6]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(require_results)
+matrix7x7_inverse :: proc "contextless" (x: $M/matrix[7, 7]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(require_results)
+matrix8x8_inverse :: proc "contextless" (x: $M/matrix[8, 8]$T) -> (y: M) #no_bounds_check {
+	y, _ = matrix_inverse_lu_decomposition(x)
+	return
+}
+
+@(private="file")
+swap :: #force_inline proc "contextless" (a, b: ^$T) {
+	t := a^
+	a^ = b^
+	b^ = t
+}
+
+@(require_results)
+matrix_inverse_gauss_jordan :: proc "contextless" (A: $M/matrix[$N, N]$T) -> (b: M, non_singular: bool) #no_bounds_check {
+	a := A
+	b = 1
+
+	for col in 0..<N {
+		pivot_row := col
+		pivot_val := abs(a[col, col])
+		for row in (col + 1)..<N {
+			val := abs(a[row, col])
+			if val > pivot_val {
+				pivot_val = val
+				pivot_row = row
+			}
+		}
+
+		if pivot_val == 0 {
+			return
+		}
+
+		if pivot_row != col {
+			for k in 0..<N {
+				swap(&a[col, k], &a[pivot_row, k])
+				swap(&b[col, k], &b[pivot_row, k])
+			}
+		}
+
+		when intrinsics.type_is_integer(T) {
+			for k in 0..<N {
+				a[col, k] /= a[col, col]
+				b[col, k] /= a[col, col]
+			}
+		} else {
+			inv_pivot := 1.0 / a[col, col]
+			for k in 0..<N {
+				a[col, k] *= inv_pivot
+				b[col, k] *= inv_pivot
+			}
+		}
+
+		for row in 0..<N {
+			if row == col {
+				continue
+			}
+			factor := a[row, col]
+			for k in 0..<N {
+				a[row, k] -= factor * a[col, k]
+				b[row, k] -= factor * b[col, k]
+			}
+		}
+	}
+
+	non_singular = true
+	return
+}
+
+@(require_results)
+matrix_inverse_lu_decomposition :: proc "contextless" (A: $M/matrix[$N, N]$T) -> (b: M, non_singular: bool) #no_bounds_check {
+	// LU decomposition with partial pivoting
+	a := A
+	pivot: [N]int = ---
+	for i in 0..<N {
+		pivot[i] = i
+	}
+
+	for col in 0..<N {
+		pivot_row := col
+		pivot_val := abs(a[col, col])
+		for row in (col + 1)..<N {
+			val := abs(a[row, col])
+			if val > pivot_val {
+				pivot_val = val
+				pivot_row = row
+			}
+		}
+
+		if pivot_val == 0 {
+			return
+		}
+
+		// Swap pivot indices
+		if pivot_row != col {
+			t := pivot[col]
+			pivot[col] = pivot[pivot_row]
+			pivot[pivot_row] = t
+
+			for k in 0..<N {
+				swap(&a[col, k], &a[pivot_row, k])
+			}
+		}
+
+		// Compute L and U in place
+		when intrinsics.type_is_integer(T) {
+			for row in (col + 1)..<N {
+				a[row, col] /= a[col, col]
+				for k in (col + 1)..<N {
+					a[row, k] -= a[row, col] * a[col, k]
+				}
+			}
+		} else {
+			inv_pivot := 1 / a[col, col]
+			for row in (col + 1)..<N {
+				a[row, col] *= inv_pivot
+				for k in (col + 1)..<N {
+					a[row, k] -= a[row, col] * a[col, k]
+				}
+			}
+		}
+	}
+
+	// Solve for each column of the inverse
+	b = 0
+	for col in 0..<N {
+		// Apply pivot permutation to identity column
+		x: [N]T = ---
+		for i in 0..<N {
+			x[i] = 1 if pivot[i] == col else 0
+		}
+
+		// Forward substitution (L * y = Pb)
+		for row in 1..<N {
+			sum: T = 0
+			for k in 0..<row {
+				sum += a[row, k] * x[k]
+			}
+			x[row] -= sum
+		}
+
+		// Back substitution (U * x = y)
+		for i in 0..<N {
+			row := N - 1 - i
+			sum: T = 0
+			for k in (row + 1)..<N {
+				sum += a[row, k] * x[k]
+			}
+			x[row] = (x[row] - sum) / a[row, row]
+		}
+
+		// Store result column
+		for row in 0..<N {
+			b[row, col] = x[row]
+		}
+	}
+
+	non_singular = true
+	return
+}
+
+pseudo_inverse :: proc{
+	matrix_pseudo_inverse,
+}
+
+// Moore-Penrose Pseudo-Inverse
+@(require_results)
+matrix_pseudo_inverse :: proc "contextless" (A: $M/matrix[$R, $C]$T) -> (B: matrix[C, R]T, not_singular: bool) #no_bounds_check {
+	At := transpose(A)
+
+	when R >= C {
+		// Overdetermined (tall):
+		// pseudo_inverse(A) = inverse(transpose(A)*A)*transpose(A)
+		AtA := At * A // [C, C]
+		AtA_inv := matrix_inverse_generic(AtA) or_return
+		B = AtA_inv * At
+		not_singular = true
+	} else {
+		// Underdetermined (wide):
+		// pseudo_inverse(A) = transpose(A)*inverse(A*transpose(A))
+		AAt := A * At // [R, R]
+		AAt_inv := matrix_inverse_generic(AAt) or_return
+		B = At * AAt_inv
+		not_singular = true
+	}
+
 	return
 }

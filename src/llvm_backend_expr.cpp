@@ -330,6 +330,26 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 }
 
 
+gb_internal bool is_simd_able_type(Type *t) {
+	if (t->kind != Type_Basic) {
+		return false;
+	}
+
+	if (t->Basic.flags & (BasicFlag_Boolean|BasicFlag_Integer|BasicFlag_Float|BasicFlag_Rune)) {
+		TypeEndianKind kind = type_endian_kind_of(t);
+		switch (kind) {
+		case TypeEndian_Platform: return true;
+		case TypeEndian_Little:   return build_context.endian_kind == TargetEndian_Little;
+		case TypeEndian_Big:      return build_context.endian_kind == TargetEndian_Big;
+		}
+	}
+	return false;
+}
+
+// TODO(bill): is this a sensible limit?
+#define MAX_SIMD_ARRAY_COUNT_FOR_INLINING 64
+
+
 gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, lbValue *res_) {
 	GB_ASSERT(is_type_array_like(type));
 	Type *elem_type = base_array_type(type);
@@ -462,6 +482,121 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 		}
 	}
 
+
+	i64 count = get_array_type_count(type);
+	if (false &&
+	    count <= MAX_SIMD_ARRAY_COUNT_FOR_INLINING &&
+	    is_simd_able_type(elem_type) && is_simd_able_type(elem_type)) {
+		Type *integral_type = elem_type;
+
+		LLVMTypeRef vector_elem_type = lb_type(p->module, integral_type);
+		LLVMTypeRef vector_type = LLVMVectorType(vector_elem_type, cast(unsigned)count);
+
+		if (is_type_bit_set(integral_type)) {
+			switch (op) {
+			case Token_Add: op = Token_Or;     break;
+			case Token_Sub: op = Token_AndNot; break;
+			}
+			Type *u = bit_set_to_int(type);
+			if (is_type_array(u)) {
+				return false;
+			}
+		}
+
+		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
+		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
+		LLVMValueRef x = OdinLLVMBuildLoad(p, vector_type, lhs_vp);
+		LLVMValueRef y = OdinLLVMBuildLoad(p, vector_type, rhs_vp);
+		LLVMSetAlignment(x, cast(unsigned)type_align_of(integral_type));
+		LLVMSetAlignment(y, cast(unsigned)type_align_of(integral_type));
+
+		LLVMValueRef z = nullptr;
+
+		if (is_type_float(integral_type)) {
+			switch (op) {
+			case Token_Add:
+				z = LLVMBuildFAdd(p->builder, x, y, "");
+				break;
+			case Token_Sub:
+				z = LLVMBuildFSub(p->builder, x, y, "");
+				break;
+			case Token_Mul:
+				z = LLVMBuildFMul(p->builder, x, y, "");
+				break;
+			case Token_Quo:
+				z = LLVMBuildFDiv(p->builder, x, y, "");
+				break;
+			case Token_Mod:
+				z = LLVMBuildFRem(p->builder, x, y, "");
+				break;
+			default:
+				GB_PANIC("Unsupported vector operation %.*s", LIT(token_strings[op]));
+				break;
+			}
+
+		} else {
+			switch (op) {
+			case Token_Add:
+				z = LLVMBuildAdd(p->builder, x, y, "");
+				break;
+			case Token_Sub:
+				z = LLVMBuildSub(p->builder, x, y, "");
+				break;
+			case Token_Mul:
+				z = LLVMBuildMul(p->builder, x, y, "");
+				break;
+			case Token_Quo:
+				{
+					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
+					z = call(p->builder, x, y, "");
+				}
+				break;
+			case Token_Mod:
+				{
+					auto *call = is_type_unsigned(integral_type) ? LLVMBuildURem : LLVMBuildSRem;
+					z = call(p->builder, x, y, "");
+				}
+				break;
+			case Token_ModMod:
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildURem(p->builder, x, y, "");
+				} else {
+					LLVMValueRef a = LLVMBuildSRem(p->builder, x, y, "");
+					LLVMValueRef b = LLVMBuildAdd(p->builder, a, y, "");
+					z = LLVMBuildSRem(p->builder, b, y, "");
+				}
+				break;
+			case Token_And:
+				z = LLVMBuildAnd(p->builder, x, y, "");
+				break;
+			case Token_AndNot:
+				z = LLVMBuildAnd(p->builder, x, LLVMBuildNot(p->builder, y, ""), "");
+				break;
+			case Token_Or:
+				z = LLVMBuildOr(p->builder, x, y, "");
+				break;
+			case Token_Xor:
+				z = LLVMBuildXor(p->builder, x, y, "");
+				break;
+			default:
+				GB_PANIC("Unsupported vector operation");
+				break;
+			}
+		}
+
+
+		if (z != nullptr) {
+			lbAddr res = lb_add_local_generated_temp(p, type, lb_alignof(vector_type));
+
+			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, res.addr.value, LLVMPointerType(vector_type, 0), "");
+			LLVMValueRef store = LLVMBuildStore(p->builder, z, vp);
+			LLVMSetAlignment(store, cast(unsigned)type_align_of(type));
+			lbValue v = lb_addr_load(p, res);
+			if (res_) *res_ = v;
+			return true;
+		}
+	}
+
 	return false;
 }
 
@@ -486,7 +621,6 @@ gb_internal lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lh
 
 	bool inline_array_arith = lb_can_try_to_inline_array_arith(type);
 	if (inline_array_arith) {
-
 		auto dst_ptrs = slice_make<lbValue>(temporary_allocator(), n);
 
 		auto a_loads = slice_make<lbValue>(temporary_allocator(), n);
@@ -2688,6 +2822,164 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 	if (is_type_string(src) && is_type_u8_slice(dst)) {
 		return lb_emit_transmute(p, value, t);
+	}
+
+
+	if (is_type_array(dst) && is_type_array(src)) {
+		Type *dst_elem = base_array_type(dst);
+		Type *src_elem = base_array_type(src);
+		if (dst->Array.count == src->Array.count) {
+			if (are_types_identical(dst_elem, src_elem)) {
+				lbValue v = value;
+				v.type = t;
+				return v;
+			}
+			i64 count = dst->Array.count;
+
+			Type *de = core_type(dst_elem);
+			Type *se = core_type(src_elem);
+			if (count <= MAX_SIMD_ARRAY_COUNT_FOR_INLINING &&
+			    is_simd_able_type(se)) {
+				// NOTE(bill, 2026-04-23): These types are simd-able meaning you can use the direct vector operators
+				// But we need to be careful when it comes to alignment and tell LLVM that it is only aligned
+				// to the element type and not the natural vector size
+				//
+				// This is to give it a proper hint that this can be done as a vector even when `-o:speed` is not set
+			    	if (is_simd_able_type(de)) {
+					lbAddr v = lb_add_local_generated(p, t, false); // do not zero anything because it will be filled
+
+					lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+					lbValue pdst = v.addr;
+
+					i64 de_sz = type_size_of(de);
+					i64 se_sz = type_size_of(se);
+
+					LLVMOpcode op = cast(LLVMOpcode)0;
+
+					if (is_type_float(se)) {
+						if (is_type_float(de)) {
+							if (de_sz == se_sz)     { op = LLVMBitCast; }
+							else if (de_sz < se_sz) { op = LLVMFPTrunc; }
+							else                    { op = LLVMFPExt;   }
+						} else {
+							GB_ASSERT(is_type_integer_like(de) || is_type_rune(de));
+							if (is_type_unsigned(de) || is_type_boolean(de)) { op = LLVMFPToUI; }
+							else                                             { op = LLVMFPToSI; }
+						}
+					} else {
+						GB_ASSERT(is_type_integer_like(se) || is_type_rune(se));
+
+						if (is_type_float(de)) {
+							if (is_type_unsigned(se) || is_type_boolean(se)) { op = LLVMUIToFP; }
+							else                                             { op = LLVMSIToFP; }
+						} else {
+							if (de_sz == se_sz) {
+								op = LLVMBitCast;
+							} else if (de_sz < se_sz) {
+								op = LLVMTrunc;
+							} else {
+								op = (is_type_unsigned(se) || is_type_boolean(se)) ? LLVMZExt : LLVMSExt; // zero extent
+							}
+						}
+					}
+
+					GB_ASSERT(op != 0);
+
+					LLVMTypeRef src_vector_type = LLVMVectorType(lb_type(p->module, se), cast(unsigned)count);
+					LLVMTypeRef dst_vector_type = LLVMVectorType(lb_type(p->module, de), cast(unsigned)count);
+
+					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
+					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
+
+					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
+					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+
+					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
+
+					LLVMValueRef store = LLVMBuildStore(p->builder, dst_vector, dst_ptr);
+					LLVMSetAlignment(store, cast(unsigned)type_align_of(de));
+
+					return lb_addr_load(p, v);
+				} else if (is_type_complex(de)) {
+					GB_ASSERT(is_type_float(se));
+
+					Type *cde = base_complex_elem_type(de);
+
+					lbAddr v = lb_add_local_generated(p, t, false); // do not zero anything because it will be filled
+
+					i64 cde_sz = type_size_of(cde);
+					i64 se_sz  = type_size_of(se);
+
+					lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+					lbValue pdst = v.addr;
+
+					LLVMOpcode op = cast(LLVMOpcode)0;
+
+					if (cde_sz == se_sz)     { op = LLVMBitCast; }
+					else if (cde_sz < se_sz) { op = LLVMFPTrunc; }
+					else                     { op = LLVMFPExt;   }
+
+					LLVMTypeRef src_vector_type = LLVMVectorType(lb_type(p->module, se),  cast(unsigned)count);
+					LLVMTypeRef dst_vector_type = LLVMVectorType(lb_type(p->module, cde), cast(unsigned)count);
+
+					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
+					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
+
+					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
+					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+
+					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
+					LLVMValueRef dst_zero = LLVMConstNull(dst_vector_type);
+
+					LLVMValueRef *dst_mask_scalars = gb_alloc_array(temporary_allocator(), LLVMValueRef, count*2);
+					LLVMTypeRef llvm_i32 = lb_type(p->module, t_i32);
+					for (i64 i = 0; i < count; i++) {
+						dst_mask_scalars[i*2 + 0] = LLVMConstInt(llvm_i32, cast(u64)i,         false);
+						dst_mask_scalars[i*2 + 1] = LLVMConstInt(llvm_i32, cast(u64)(count+i), false);
+					}
+
+					LLVMValueRef dst_mask = LLVMConstVector(dst_mask_scalars, cast(unsigned)(count*2));
+					dst_vector = LLVMBuildShuffleVector(p->builder, dst_vector, dst_zero, dst_mask, "");
+
+
+					LLVMValueRef store = LLVMBuildStore(p->builder, dst_vector, dst_ptr);
+					LLVMSetAlignment(store, cast(unsigned)type_align_of(de));
+
+					return lb_addr_load(p, v);
+				}
+			}
+
+			lbAddr v = lb_add_local_generated(p, t, true);
+
+			lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+			lbValue pdst = v.addr;
+
+			if (count > MAX_SIMD_ARRAY_COUNT_FOR_INLINING) {
+				auto loop_data = lb_loop_start(p, count, t_int);
+
+				lbValue sp = lb_emit_array_ep(p, psrc, loop_data.idx);
+				lbValue dp = lb_emit_array_ep(p, pdst, loop_data.idx);
+
+				lbValue s = lb_emit_load(p, sp);
+				s = lb_emit_conv(p, s, dst_elem);
+				lb_emit_store(p, dp, s);
+
+				lb_loop_end(p, loop_data);
+			} else {
+
+				for (i64 i = 0; i < count; i++) {
+					lbValue sp = lb_emit_array_epi(p, psrc, i);
+					lbValue dp = lb_emit_array_epi(p, pdst, i);
+
+					lbValue s = lb_emit_load(p, sp);
+					s = lb_emit_conv(p, s, dst_elem);
+					lb_emit_store(p, dp, s);
+				}
+
+			}
+
+			return lb_addr_load(p, v);
+		}
 	}
 
 

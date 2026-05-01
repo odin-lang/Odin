@@ -17,7 +17,6 @@ enum TargetOsKind : u16 {
 	TargetOs_windows,
 	TargetOs_darwin,
 	TargetOs_linux,
-	TargetOs_essence,
 	TargetOs_freebsd,
 	TargetOs_openbsd,
 	TargetOs_netbsd,
@@ -37,7 +36,6 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("windows"),
 	str_lit("darwin"),
 	str_lit("linux"),
-	str_lit("essence"),
 	str_lit("freebsd"),
 	str_lit("openbsd"),
 	str_lit("netbsd"),
@@ -783,14 +781,6 @@ gb_global TargetMetrics target_haiku_amd64 = {
 	str_lit("x86_64-unknown-haiku"),
 };
 
-gb_global TargetMetrics target_essence_amd64 = {
-	TargetOs_essence,
-	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 32,
-	str_lit("x86_64-pc-none-elf"),
-};
-
-
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
@@ -898,8 +888,6 @@ struct NamedTargetMetrics {
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
-
-	{ str_lit("essence_amd64"),       &target_essence_amd64  },
 
 	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
@@ -2260,9 +2248,6 @@ gb_internal String infer_object_extension_from_build_context() {
 		default:
 		case TargetOs_darwin:
 		case TargetOs_linux:
-		case TargetOs_essence:
-			output_extension = STR_LIT("o");
-			break;
 
 		case TargetOs_freestanding:
 			switch (build_context.metrics.abi) {
@@ -2387,9 +2372,6 @@ gb_internal bool init_build_paths(String init_filename) {
 			output_extension = STR_LIT("so");
 		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
-		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-			// Do nothing: we don't want the .bin extension
-			// when cross compiling
 		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
 			// Add .bin extension to avoid collision
 			// with package directory name
@@ -2608,7 +2590,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
 		case TargetOs_darwin:
-		case TargetOs_essence:
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
@@ -2622,7 +2603,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		switch (build_context.metrics.os) {
 		case TargetOs_linux:
 		case TargetOs_darwin:
-		case TargetOs_essence:
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:

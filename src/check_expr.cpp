@@ -3460,8 +3460,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
-		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
-			return dst->Array.count == src->Array.count;
+		if (dst->Array.count == src->Array.count) {
+			if (are_types_identical(dst->Array.elem, src->Array.elem)) {
+				return true;
+			}
+			Operand op = *operand;
+			op.type = src->Array.elem;
+			return check_is_castable_to(c, &op, dst->Array.elem);
 		}
 	}
 
@@ -12458,6 +12463,7 @@ gb_internal void check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, 
 		break;
 	case Addressing_Type:
 		if (type_hint != nullptr && is_type_typeid(type_hint)) {
+			add_type_info_type(c, o->type);
 			break;
 		}
 		error_operand_not_expression(o);
