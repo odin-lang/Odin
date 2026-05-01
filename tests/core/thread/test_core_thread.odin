@@ -3,6 +3,7 @@ package test_core_thread
 import "core:testing"
 import "core:thread"
 import "base:intrinsics"
+import "core:fmt"
 
 @(test)
 poly_data_test :: proc(_t: ^testing.T) {
@@ -68,7 +69,7 @@ name_test :: proc(_t: ^testing.T) {
 			delete(n)
 		}
 		testing.expect(name_test_t, err == nil, "thread name allocation failed")
-		testing.expect(name_test_t, n == "test_name","thread name on self did not match")
+		testing.expectf(name_test_t, n == "test_name","thread name on self did not match : got %v", n)
 
 	})
 	defer free(t)
@@ -80,7 +81,7 @@ name_test :: proc(_t: ^testing.T) {
 		delete(n)
 	}
 	testing.expect(name_test_t, err == nil, "thread name allocation failed")
-	testing.expect(name_test_t, n == "test_name","thread name on main did not match")
+	testing.expectf(name_test_t, n == "test_name","thread name on main did not match : got %v", n)
 
 	child_wait = false
 
