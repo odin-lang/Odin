@@ -7,6 +7,8 @@ import "core:c"
 
 foreign import pthread "system:pthread"
 
+_MAX_PTHREAD_NAME_LENGTH :: 20
+
 foreign pthread {
 	pthread_get_name_np :: proc(thread: posix.pthread_t, name: [^]u8, len: c.size_t) ---
 	pthread_set_name_np :: proc(thread: posix.pthread_t, name: [^]u8) ---

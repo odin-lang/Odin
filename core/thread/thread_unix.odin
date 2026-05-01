@@ -8,7 +8,6 @@ import "core:sys/posix"
 import "core:strings"
 
 _IS_SUPPORTED :: true
-_MAX_PTHREAD_NAME_LENGTH :: 16
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
 Thread_Os_Specific :: struct #align(16) {
@@ -230,11 +229,11 @@ _set_name :: proc(thread: ^Thread) {
 		tid := thread.unix_thread
 	}
 
-	buf: [_MAX_PTHREAD_NAME_LENGTH]u8
-
 	// _MAX_PTHREAD_NAME_LENGTH includes terminating null
+	buflen := len(name) + 1 < _MAX_PTHREAD_NAME_LENGTH ? len(name) + 1 : _MAX_PTHREAD_NAME_LENGTH
+	buf := make([]u8, buflen)
+	defer delete(buf)
 	copy(buf[:len(buf) - 1], name)
-
 
 	when ODIN_OS == .Darwin {
 		pthread_setname_np(raw_data(buf[:]))
@@ -245,5 +244,4 @@ _set_name :: proc(thread: ^Thread) {
 	} else {
 		pthread_setname_np(tid, raw_data(buf[:]))
 	}
-
 }

@@ -5,6 +5,8 @@ package thread
 import "core:sys/posix"
 import "core:c"
 
+_MAX_PTHREAD_NAME_LENGTH :: 32
+
 foreign import pthread "system:pthread"
 
 foreign pthread {

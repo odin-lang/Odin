@@ -9,8 +9,9 @@ import win32 "core:sys/windows"
 import "core:unicode/utf16"
 
 _IS_SUPPORTED :: true
-//NOTE(peperronii): not sure about the exact length but there must be a limit
-_THREAD_DESCRIPTION_LENGTH :: 128
+
+//NOTE(peperronii): this is the system limit for windows api call, not specific to thread description
+_THREAD_DESCRIPTION_LENGTH :: 32_767
 
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
@@ -185,8 +186,10 @@ _set_name :: proc(thread: ^Thread) {
 
 	t_handle := thread.win32_thread
 
-	buf: [_THREAD_DESCRIPTION_LENGTH]u16
 	// _THREAD_DESCRIPTION_LENGTH includes terminating null
+	buflen := len(name) + 1 < _THREAD_DESCRIPTION_LENGTH ? len(name) + 1 : _THREAD_DESCRIPTION_LENGTH
+	buf :=  make([]u16, buflen)
+	defer delete(buf)
 	utf16.encode_string(buf[:len(buf) - 1], name)
 	win32.SetThreadDescription(t_handle, cstring16(raw_data(buf[:])))
 }
