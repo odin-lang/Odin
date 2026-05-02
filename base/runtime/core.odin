@@ -279,7 +279,79 @@ when ODIN_OS == .Windows {
 	dll_instance: rawptr
 }
 
-// IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
+
+// This is safe to change. The log2 size of a cache-line. At minimum it has to
+// be six though. Higher cache line sizes are permitted.
+MAP_CACHE_LINE_LOG2 :: 6
+
+// The size of a cache-line.
+MAP_CACHE_LINE_SIZE :: 1 << MAP_CACHE_LINE_LOG2
+
+// The minimum cache-line size allowed by this implementation is 64 bytes since
+// we need 6 bits in the base pointer to store the integer log2 capacity, which
+// at maximum is 63. Odin uses signed integers to represent length and capacity,
+// so only 63 bits are needed in the maximum case.
+#assert(MAP_CACHE_LINE_SIZE >= 64)
+
+// Map_Cell type that packs multiple T in such a way to ensure that each T stays
+// aligned by align_of(T) and such that align_of(Map_Cell(T)) % MAP_CACHE_LINE_SIZE == 0
+//
+// This means a value of type T will never straddle a cache-line.
+//
+// When multiple Ts can fit in a single cache-line the data array will have more
+// than one element. When it cannot, the data array will have one element and
+// an array of Map_Cell(T) will be padded to stay a multiple of MAP_CACHE_LINE_SIZE.
+//
+// We rely on the type system to do all the arithmetic and padding for us here.
+//
+// The usual array[index] indexing for []T backed by a []Map_Cell(T) becomes a bit
+// more involved as there now may be internal padding. The indexing now becomes
+//
+//  N :: len(Map_Cell(T){}.data)
+//  i := index / N
+//  j := index % N
+//  cell[i].data[j]
+//
+// However, since len(Map_Cell(T){}.data) is a compile-time constant, there are some
+// optimizations we can do to eliminate the need for any divisions as N will
+// be bounded by [1, 64).
+//
+// In the optimal case, len(Map_Cell(T){}.data) = 1 so the cell array can be treated
+// as a regular array of T, which is the case for hashes.
+Map_Cell :: struct($T: typeid) #align(MAP_CACHE_LINE_SIZE) {
+	data: [MAP_CACHE_LINE_SIZE / size_of(T) when 0 < size_of(T) && size_of(T) < MAP_CACHE_LINE_SIZE else 1]T,
+}
+
+// So we can operate on a cell data structure at runtime without any type
+// information, we have a simple table that stores some traits about the cell.
+//
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
+Map_Cell_Info :: struct {
+	size_of_type:      uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+	align_of_type:     uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+	size_of_cell:      uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+	elements_per_cell: uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+}
+
+Map_Hash :: uintptr
+
+// When working with the type-erased structure at runtime we need information
+// about the map to make working with it possible. This info structure stores
+// that.
+//
+// `Map_Info` and `Map_Cell_Info` are read only data structures and cannot be
+// modified after creation
+//
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
+Map_Info :: struct {
+	ks: ^Map_Cell_Info, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	vs: ^Map_Cell_Info, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_hasher: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_equal:  proc "contextless" (lhs, rhs: rawptr) -> bool,                // 8-bytes on 64-bit, 4-bytes on 32-bit
+}
+
 
 
 Source_Code_Location :: struct {

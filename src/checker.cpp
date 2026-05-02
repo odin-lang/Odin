@@ -1118,6 +1118,14 @@ gb_internal void init_universal(void) {
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		String const &name = basic_types[i].Basic.name;
+	    	if (build_context.bedrock) {
+			if ((basic_types[i].Basic.flags & BasicFlag_Integer) != 0 &&
+			    basic_types[i].Basic.size == 16) {
+			    	// disallow 128-bit integers
+				continue;
+			}
+		}
+
 		add_global_type_entity(name, &basic_types[i]);
 	}
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
@@ -1143,6 +1151,8 @@ gb_internal void init_universal(void) {
 	add_global_string_constant("ODIN_VERSION",                  bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",                     bc->ODIN_ROOT);
 	add_global_string_constant("ODIN_BUILD_PROJECT_NAME",       bc->ODIN_BUILD_PROJECT_NAME);
+
+	add_global_bool_constant("ODIN_BEDROCK", bc->bedrock);
 
 	{
 		GlobalEnumValue values[Windows_Subsystem_COUNT] = {
@@ -7556,6 +7566,14 @@ gb_internal void check_parsed_files(Checker *c) {
 		Type *t = &basic_types[i];
 		if (t->Basic.size > 0 &&
 		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
+		    	if (build_context.bedrock) {
+				if ((t->Basic.flags & BasicFlag_Integer) != 0 &&
+				    t->Basic.size == 16) {
+				    	// disallow 128-bit integers
+					continue;
+				}
+			}
+
 			add_type_info_type(&c->builtin_ctx, t);
 		}
 	}

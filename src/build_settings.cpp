@@ -606,6 +606,8 @@ struct BuildContext {
 
 	isize max_error_count;
 
+	bool bedrock;
+
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
@@ -1900,8 +1902,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->no_entry_point = true;
 	} else {
 		if (bc->no_rtti) {
-			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
-			gb_exit(1);
+			if (!bc->bedrock) {
+				gb_printf_err("-no-rtti is only allowed on freestanding targets or '-bedrock'\n");
+				gb_exit(1);
+			}
 		}
 	}
 

@@ -1,3 +1,4 @@
+#+build !bedrock
 package runtime
 
 import "base:intrinsics"

@@ -1822,9 +1822,25 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 	PtrSet<Entity *> entity_set = {};
 	ptr_set_init(&entity_set, 2*pg->args.count);
 
-	for (Ast *arg : pg->args) {
+	for (Ast *arg_ : pg->args) {
+		Ast *arg = arg_;
 		Entity *e = nullptr;
 		Operand o = {};
+		if (arg->kind == Ast_BinaryExpr && arg->BinaryExpr.op.kind == Token_where) {
+			Ast *cond_expr = arg->BinaryExpr.right;
+			Operand cond = {};
+			check_expr(ctx, &cond, cond_expr);
+			if (cond.mode != Addressing_Invalid) {
+				if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type) || cond.value.kind != ExactValue_Bool) {
+					error(arg, "Expected a constant binary expression for the 'where' clause");
+				} else if (!cond.value.value_bool) {
+					continue;
+				}
+			}
+
+			arg = arg->BinaryExpr.left;
+		}
+
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
