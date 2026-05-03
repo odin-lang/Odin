@@ -1865,10 +1865,6 @@ gb_internal void expect_semicolon(AstFile *f) {
 	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
-	switch (f->curr_token.kind) {
-	case Token_EOF:
-		return;
-	}
 
 	if (f->curr_token.pos.line == f->prev_token.pos.line) {
 		String p = token_to_string(f->curr_token);
