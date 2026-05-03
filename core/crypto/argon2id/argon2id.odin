@@ -143,7 +143,7 @@ derive :: proc(
 	m_ := 4 * u64(p) * (m / u64(4 * p))
 	b := mem.alloc_bytes_non_zeroed(
 		int(m_) * BLOCK_SIZE_BYTES,
-		alignment = mem.DEFAULT_PAGE_SIZE,
+		alignment = mem.PAGE_SIZE,
 		allocator = allocator,
 	) or_return
 	defer delete(b, allocator)
