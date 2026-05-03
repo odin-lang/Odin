@@ -758,7 +758,7 @@ gb_internal Ast *ast_deref_expr(AstFile *f, Ast *expr, Token op) {
 }
 
 
-gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token close, Token interval, Ast *row, Ast *column) {
+gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token close, Ast *row, Ast *column) {
 	Ast *result = alloc_ast_node(f, Ast_MatrixIndexExpr);
 	result->MatrixIndexExpr.expr         = expr;
 	result->MatrixIndexExpr.row_index    = row;
@@ -3436,7 +3436,7 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 						syntax_error(open, "Matrix index expressions require both row and column indices");
 					}
 					parse_check_or_return(operand, "matrix index expression");
-					operand = ast_matrix_index_expr(f, operand, open, close, interval, indices[0], indices[1]);
+					operand = ast_matrix_index_expr(f, operand, open, close, indices[0], indices[1]);
 				} else {
 					parse_check_or_return(operand, "slice expression");
 					operand = ast_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
