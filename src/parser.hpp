@@ -822,7 +822,6 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 	AST_KIND(MapType, "map type", struct { \
 		Token token; \
-		Ast *count; \
 		Ast *key; \
 		Ast *value; \
 	}) \

@@ -488,7 +488,6 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->BitFieldType.fields = clone_ast_array(n->BitFieldType.fields, f);
 		break;
 	case Ast_MapType:
-		n->MapType.count = clone_ast(n->MapType.count, f);
 		n->MapType.key   = clone_ast(n->MapType.key, f);
 		n->MapType.value = clone_ast(n->MapType.value, f);
 		break;
