@@ -1509,10 +1509,6 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 	lb_open_scope(p, scope); // Open scope here
 
-	if (rs->init != nullptr) {
-		lb_build_stmt(p, rs->init);
-	}
-
 	Ast *val0 = lb_strip_and_prefix(rs->val0);
 	Ast *val1 = lb_strip_and_prefix(rs->val1);
 	Type *val0_type = nullptr;

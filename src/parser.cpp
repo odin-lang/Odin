@@ -360,7 +360,6 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		break;
 	case Ast_UnrollRangeStmt:
 		n->UnrollRangeStmt.args = clone_ast_array(n->UnrollRangeStmt.args, f);
-		n->UnrollRangeStmt.init = clone_ast(n->UnrollRangeStmt.init, f);
 		n->UnrollRangeStmt.val0 = clone_ast(n->UnrollRangeStmt.val0, f);
 		n->UnrollRangeStmt.val1 = clone_ast(n->UnrollRangeStmt.val1, f);
 		n->UnrollRangeStmt.expr = clone_ast(n->UnrollRangeStmt.expr, f);
@@ -1082,10 +1081,9 @@ gb_internal Ast *ast_range_stmt(AstFile *f, Token token, Ast *init, Slice<Ast *>
 	return result;
 }
 
-gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Ast *init, Slice<Ast *> args, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
+gb_internal Ast *ast_unroll_range_stmt(AstFile *f, Token unroll_token, Slice<Ast *> args, Token for_token, Ast *val0, Ast *val1, Token in_token, Ast *expr, Ast *body) {
 	Ast *result = alloc_ast_node(f, Ast_UnrollRangeStmt);
 	result->UnrollRangeStmt.unroll_token = unroll_token;
-	result->UnrollRangeStmt.init      = init;
 	result->UnrollRangeStmt.args      = args;
 	result->UnrollRangeStmt.for_token = for_token;
 	result->UnrollRangeStmt.val0      = val0;
@@ -5325,7 +5323,6 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	}
 
 	Token for_token = expect_token(f, Token_for);
-	Ast *init = nullptr;
 	Ast *val0 = nullptr;
 	Ast *val1 = nullptr;
 	Token in_token = {};
@@ -5368,7 +5365,7 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	if (bad_stmt) {
 		return ast_bad_stmt(f, unroll_token, f->curr_token);
 	}
-	return ast_unroll_range_stmt(f, unroll_token, init, slice_from_array(args), for_token, val0, val1, in_token, expr, body);
+	return ast_unroll_range_stmt(f, unroll_token, slice_from_array(args), for_token, val0, val1, in_token, expr, body);
 }
 
 gb_internal Ast *parse_stmt(AstFile *f) {
