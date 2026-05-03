@@ -339,8 +339,8 @@ gb_internal bool is_simd_able_type(Type *t) {
 		TypeEndianKind kind = type_endian_kind_of(t);
 		switch (kind) {
 		case TypeEndian_Platform: return true;
-		case TypeEndian_Little:   return build_context.endian_kind == TypeEndian_Little;
-		case TypeEndian_Big:      return build_context.endian_kind == TypeEndian_Big;
+		case TypeEndian_Little:   return build_context.endian_kind == TargetEndian_Little;
+		case TypeEndian_Big:      return build_context.endian_kind == TargetEndian_Big;
 		}
 	}
 	return false;
@@ -2828,7 +2828,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_array(dst) && is_type_array(src)) {
 		Type *dst_elem = base_array_type(dst);
 		Type *src_elem = base_array_type(src);
-		if (dst->Array.count == src->Array.count) {
+		if (dst->Array.count == src->Array.count &&
+		    !is_type_array_like(dst->Array.elem) &&
+		    !is_type_array_like(src->Array.elem)) {
 			if (are_types_identical(dst_elem, src_elem)) {
 				lbValue v = value;
 				v.type = t;
