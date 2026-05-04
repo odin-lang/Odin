@@ -429,11 +429,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
 	Type *pt = p->type;
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-	}
-	LLVMSetFunctionCallConv(p->value, cc_kind);
+	lb_add_function_calling_convention(p->value, pt->Proc.calling_convention);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);

@@ -4088,6 +4088,8 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	if (s == "none")        return ProcCC_None;
 	if (s == "naked")       return ProcCC_Naked;
 
+	if (s == "vectorcall")  return ProcCC_VectorCall;
+
 	if (s == "win64")	return ProcCC_Win64;
 	if (s == "sysv")        return ProcCC_SysV;
 
