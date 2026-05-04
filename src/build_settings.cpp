@@ -607,6 +607,7 @@ struct BuildContext {
 	isize max_error_count;
 
 	bool bedrock;
+	bool disable_non_constant_globals;
 
 
 	u32 cmd_doc_flags;

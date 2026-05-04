@@ -395,6 +395,7 @@ enum BuildFlagKind {
 	BuildFlag_BuildDiagnostics,
 
 	BuildFlag_Bedrock,
+	BuildFlag_DisableNonConstantGlobals,
 
 	// internal use only
 	BuildFlag_InternalFastISel,
@@ -630,6 +631,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_BuildDiagnostics,        str_lit("build-diagnostics"),         BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Bedrock,                 str_lit("bedrock"),                   BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableNonConstantGlobals, str_lit("disable-non-constant-globals"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -1606,6 +1608,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_Bedrock:
 							build_context.bedrock = true;
 							build_context.no_rtti = true;
+							build_context.disable_non_constant_globals = true;
+							break;
+
+						case BuildFlag_DisableNonConstantGlobals:
+							build_context.disable_non_constant_globals = true;
 							break;
 
 						case BuildFlag_InternalFastISel:

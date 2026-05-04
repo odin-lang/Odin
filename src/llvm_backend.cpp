@@ -2071,6 +2071,10 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 		}
 
 		var.is_initialized = true;
+
+		if (build_context.disable_non_constant_globals) {
+			error(e->token, "Non-constant initialization of a global variable is disallowed with '-disable_non_constant_globals'");
+		}
 	}
 	return false;
 }
