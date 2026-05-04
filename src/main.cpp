@@ -396,6 +396,7 @@ enum BuildFlagKind {
 
 	BuildFlag_Bedrock,
 	BuildFlag_DisableNonConstantGlobals,
+	BuildFlag_DisableInitFini,
 
 	// internal use only
 	BuildFlag_InternalFastISel,
@@ -632,6 +633,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_Bedrock,                 str_lit("bedrock"),                   BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableNonConstantGlobals, str_lit("disable-non-constant-globals"), BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableInitFini,         str_lit("disable-init-fini"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -1609,10 +1611,14 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.bedrock = true;
 							build_context.no_rtti = true;
 							build_context.disable_non_constant_globals = true;
+							build_context.disable_init_fini = true;
 							break;
 
 						case BuildFlag_DisableNonConstantGlobals:
 							build_context.disable_non_constant_globals = true;
+							break;
+						case BuildFlag_DisableInitFini:
+							build_context.disable_init_fini = true;
 							break;
 
 						case BuildFlag_InternalFastISel:

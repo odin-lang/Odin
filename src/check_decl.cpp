@@ -1334,6 +1334,10 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->flags |= EntityFlag_Fini;
 	}
 
+	if (build_context.disable_init_fini && (e->flags & (EntityFlag_Init|EntityFlag_Fini))) {
+		error(e->token, "@(init) and @(fini) have been disabled with '-disable-init-fini'");
+	}
+
 	if (ac.set_cold) {
 		e->flags |= EntityFlag_Cold;
 	}

@@ -608,6 +608,7 @@ struct BuildContext {
 
 	bool bedrock;
 	bool disable_non_constant_globals;
+	bool disable_init_fini;
 
 
 	u32 cmd_doc_flags;
