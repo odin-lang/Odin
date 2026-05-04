@@ -4,6 +4,9 @@ package runtime
 
 import "base:intrinsics"
 
+@(private="file")
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+
 @(link_name="__floattidf", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 floattidf :: proc "c" (a: i128) -> f64 {
 	DBL_MANT_DIG :: 53
