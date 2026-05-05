@@ -781,6 +781,9 @@ gb_global Type *t_c_va_list     = nullptr;
 gb_global Type *t_c_va_list_ptr = nullptr;
 
 
+gb_global Type *t_odin_calling_convention = nullptr;
+
+
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
 	OdinAtomicMemoryOrder_consume = 1, // monotonic

@@ -24,7 +24,9 @@ package runtime
 import "base:intrinsics"
 
 // NOTE(bill): This must match the compiler's
-Calling_Convention :: enum u8 {
+
+/*
+enum u8 {
 	Invalid     = 0,
 	Odin        = 1,
 	Contextless = 2,
@@ -44,6 +46,8 @@ Calling_Convention :: enum u8 {
 	Preserve_Most = 12,
 	Preserve_All  = 13,
 }
+*/
+Calling_Convention :: type_of(ODIN_DEFAULT_CALLING_CONVENTION)
 
 Type_Info_Enum_Value :: distinct i64
 

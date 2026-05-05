@@ -7699,6 +7699,28 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		break;
 
+	case BuiltinProc_type_proc_calling_convention:
+		if (operand->mode != Addressing_Type || !is_type_proc(operand->type)) {
+			error(operand->expr, "Expected a procedure type for '%.*s'", LIT(builtin_name));
+			return false;
+		} else {
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr, "Expected a non-polymorphic procedure type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			Type *pt = base_type(operand->type);
+			GB_ASSERT(pt->kind == Type_Proc);
+			ProcCallingConvention cc = pt->Proc.calling_convention;
+
+			operand->mode  = Addressing_Constant;
+			operand->type  = t_odin_calling_convention;
+			operand->value = exact_value_i64(cc);
+		}
+
+		break;
+
+
 	case BuiltinProc_type_polymorphic_record_parameter_count:
 		operand->value = exact_value_i64(0);
 		if (operand->mode != Addressing_Type) {

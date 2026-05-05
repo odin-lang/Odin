@@ -2,6 +2,8 @@ package runtime
 
 import "base:intrinsics"
 
+MAP_ENABLED :: !ODIN_BEDROCK
+
 @builtin
 Maybe :: union($T: typeid) {T}
 
@@ -65,7 +67,7 @@ when !NO_DEFAULT_TEMP_ALLOCATOR {
 // Initializes the global temporary allocator used as the default `context.temp_allocator`.
 // This is ignored when `NO_DEFAULT_TEMP_ALLOCATOR` is true.
 @(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)
-init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
+init_global_temporary_allocator :: proc "odin" (size: int, backup_allocator := context.allocator) {
 	when !NO_DEFAULT_TEMP_ALLOCATOR {
 		default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
 	}
@@ -387,7 +389,7 @@ pop_front_safe :: proc {
 @builtin
 clear :: proc{
 	clear_dynamic_array,
-	clear_map where !ODIN_BEDROCK,
+	clear_map where MAP_ENABLED,
 	clear_fixed_capacity_dynamic_array,
 
 	clear_soa_dynamic_array,
@@ -397,7 +399,7 @@ clear :: proc{
 @builtin
 reserve :: proc{
 	reserve_dynamic_array,
-	reserve_map where !ODIN_BEDROCK,
+	reserve_map where MAP_ENABLED,
 
 	reserve_soa,
 }
@@ -430,7 +432,7 @@ non_zero_resize :: proc{
 @builtin
 shrink :: proc{
 	shrink_dynamic_array,
-	shrink_map  where !ODIN_BEDROCK,
+	shrink_map where MAP_ENABLED,
 }
 
 // `free` will try to free the passed pointer, with the given `allocator` if the allocator supports this operation.
@@ -481,7 +483,7 @@ delete_cstring16 :: proc(str: cstring16, allocator := context.allocator, loc := 
 	return mem_free((^u16)(str), allocator, loc)
 }
 
-when !ODIN_BEDROCK {
+when MAP_ENABLED {
 	// `delete_map` will try to free the underlying data of the passed map, with the given `allocator` if the allocator supports this operation.
 	//
 	// Note: Prefer the procedure group `delete`.
@@ -500,7 +502,7 @@ delete :: proc{
 	delete_cstring,
 	delete_dynamic_array,
 	delete_slice,
-	delete_map where !ODIN_BEDROCK,
+	delete_map where MAP_ENABLED,
 	delete_soa_slice,
 	delete_soa_dynamic_array,
 	delete_string16,
@@ -599,7 +601,7 @@ _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, ali
 	return
 }
 
-when !ODIN_BEDROCK {
+when MAP_ENABLED {
 	// `make_map` initializes a map with an allocator. Like `new`, the first argument is a type, not a value.
 	// Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 	//
@@ -654,8 +656,8 @@ make :: proc{
 	make_dynamic_array,
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
-	make_map     where !ODIN_BEDROCK,
-	make_map_cap where !ODIN_BEDROCK,
+	make_map     where MAP_ENABLED,
+	make_map_cap where MAP_ENABLED,
 	make_multi_pointer,
 
 	make_soa_slice,
@@ -664,7 +666,7 @@ make :: proc{
 	make_soa_dynamic_array_len_cap,
 }
 
-when !ODIN_BEDROCK {
+when MAP_ENABLED {
 
 	// `clear_map` will set the length of a passed map to `0`
 	//
@@ -1476,7 +1478,7 @@ _shrink_dynamic_array :: proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem
 	return true, nil
 }
 
-when !ODIN_BEDROCK {
+when MAP_ENABLED {
 
 	@builtin
 	map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {

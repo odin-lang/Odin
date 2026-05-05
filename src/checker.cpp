@@ -1042,14 +1042,14 @@ struct GlobalEnumValue {
 	i64 value;
 };
 
-gb_internal Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr) {
+gb_internal Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr, Type *base_type = t_int) {
 	Scope *scope = create_scope(nullptr, builtin_pkg->scope);
 	Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
 
 	Type *enum_type = alloc_type_enum();
 	Type *named_type = alloc_type_named(type_name, enum_type, entity);
 	set_base_type(named_type, enum_type);
-	enum_type->Enum.base_type = t_int;
+	enum_type->Enum.base_type = base_type;
 	enum_type->Enum.scope = scope;
 	entity->type = named_type;
 
@@ -1274,6 +1274,32 @@ gb_internal void init_universal(void) {
 		add_global_enum_type(str_lit("Atomic_Memory_Order"), values, gb_count_of(values), &t_atomic_memory_order);
 		GB_ASSERT(t_atomic_memory_order->kind == Type_Named);
 		scope_insert(intrinsics_pkg->scope, t_atomic_memory_order->Named.type_name);
+	}
+
+	{
+		GlobalEnumValue values[ProcCC_MAX] = {
+			{"Invalid",       ProcCC_Invalid},
+			{"Odin",          ProcCC_Odin},
+			{"Contextless",   ProcCC_Contextless},
+			{"CDecl",         ProcCC_CDecl},
+			{"Std_Call",      ProcCC_StdCall},
+			{"Fast_Call",     ProcCC_FastCall},
+
+			{"None",          ProcCC_None},
+			{"Naked",         ProcCC_Naked},
+
+			{"_",             ProcCC_InlineAsm},
+
+			{"Win64",         ProcCC_Win64},
+			{"SysV",          ProcCC_SysV},
+
+			{"PreserveNone",  ProcCC_PreserveNone},
+			{"PreserveMost",  ProcCC_PreserveMost},
+			{"PreserveAll",   ProcCC_PreserveAll},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Calling_Convention"), values, gb_count_of(values), &t_odin_calling_convention, t_u8);
+		add_global_enum_constant(fields, "ODIN_DEFAULT_CALLING_CONVENTION", default_calling_convention());
 	}
 
 	{

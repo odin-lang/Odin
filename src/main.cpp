@@ -632,7 +632,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_BuildDiagnostics,        str_lit("build-diagnostics"),         BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_Bedrock,                 str_lit("bedrock"),                   BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_DisableNonConstantGlobals, str_lit("disable-non-constant-globals"), BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableNonConstantGlobals, str_lit("disable-non-constant-globals"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableInitFini,         str_lit("disable-init-fini"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
