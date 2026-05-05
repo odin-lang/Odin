@@ -2460,6 +2460,56 @@ classify :: proc{
 @(require_results) is_nan_f64   :: proc "contextless" (x: f64)   -> bool { return classify(x) == .NaN }
 @(require_results) is_nan_f64le :: proc "contextless" (x: f64le) -> bool { return classify(x) == .NaN }
 @(require_results) is_nan_f64be :: proc "contextless" (x: f64be) -> bool { return classify(x) == .NaN }
+/*
+Reports whether `x` is Not-A-Number, `NaN`
+
+NOTE: although `NaN` is basically 0x0_11111_10000_00000; trying to create a float with that number 
+triggers a auto-correction to the suitable float range, this can result in `NaN` or a corrected valid range
+depending on how the variable is created.
+i.e. for a f16 creating a variable equal `0x0_11111_10000_00000` results in 0h7C00 (+Infinity). But creating it with
+`0b0_11111_10000_00000` leads to the correct value 0h7E00 (NaN).
+As such this proc must be carefully used when doing `cast` and `transmute`
+
+
+Inputs:
+- `x`: float to be checked
+
+
+Returns:
+- A Boolean
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	is_nan_example :: proc() {
+		x_float:            f16 = 2.1
+		x_fullexp_int:      u16 = 0b0_11111_10000_00000 // integer of equivalent representation to NaN
+
+
+		// special cases           
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.is_nan(x_float))
+		fmt.println(math.is_nan(transmute(f16)x_fullexp_int))
+
+		fmt.println(math.is_nan(x_zero_inf))
+		fmt.println(math.is_nan(x_nan))
+	}
+
+Output:
+	false 		// normal number
+	true 		// int with all expoent bits and the most significant fraction bit enabled
+
+	// special cases
+	false       // zero_inf
+	true        // nan
+
+*/
 is_nan :: proc{
 	is_nan_f16, is_nan_f16le, is_nan_f16be,
 	is_nan_f32, is_nan_f32le, is_nan_f32be,
@@ -2529,6 +2579,72 @@ is_inf_f64le :: proc "contextless" (x: f64le, sign: int = 0) -> bool {
 is_inf_f64be :: proc "contextless" (x: f64be, sign: int = 0) -> bool {
 	return #force_inline is_inf_f64(f64(x), sign)
 }
+/*
+Reports whether `x` is an infinity, according to sign.
+
+If sign > 0, is_inf reports whether f is positive infinity.
+If sign < 0, is_inf reports whether f is negative infinity.
+If sign == 0, is_inf reports whether f is either infinity.
+
+
+Inputs:
+- `x`: float to be checked
+- `sign`: int to represent the infinity sign
+
+
+Returns:
+- A Boolean
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	is_inf_example :: proc() {
+		x_float:        f16 = 3.0
+		x_float_full:   f16 = 0xFFFF
+		sign_pos:       int = +1
+		sign_zero:      int = 0
+		sign_neg:       int = -1
+
+
+		// special cases
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.is_inf(x_float, sign_zero))
+		fmt.println(math.is_inf(x_float_full, sign_zero))
+
+		fmt.println(math.is_inf(x_zero_inf, sign_zero))
+		fmt.println(math.is_inf(x_zero_inf, sign_neg))
+
+		fmt.println(math.is_inf(x_neg_inf, sign_zero))
+		fmt.println(math.is_inf(x_neg_inf, sign_pos))
+
+		fmt.println(math.is_inf(x_nan, sign_pos))
+		fmt.println(math.is_inf(x_nan, sign_zero))
+		fmt.println(math.is_inf(x_nan, sign_neg))
+	}
+
+Output:
+	false 		// normal number
+	true 		// float with all bits enabled
+
+	// special cases
+	true         // zero_inf | 0sign
+	false        // zero_inf | +sign
+
+	true         // neg_inf | 0sign
+	false        // neg_inf | +sign
+
+	false        // nan | +sign
+	false        // nan | 0sign
+	false        // nan | -sign
+
+*/
 is_inf :: proc{
 	is_inf_f16, is_inf_f16le, is_inf_f16be,
 	is_inf_f32, is_inf_f32le, is_inf_f32be,
