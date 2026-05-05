@@ -539,6 +539,10 @@ struct BuildContext {
 	bool   keep_object_files;
 	bool   disallow_do;
 	bool   show_import_graph;
+	bool   dump_ast;
+	bool   dump_ast_omit_defaults;
+	bool   dump_ast_disregard_filetags;
+	StringMap<StringSet> ast_dump_packages;
 
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
