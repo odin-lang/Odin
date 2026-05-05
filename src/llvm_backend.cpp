@@ -2079,8 +2079,6 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedure *p) {
 	lb_begin_procedure_body(p);
 
-	lb_setup_type_info_data(m);
-
 	if (p->objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(m, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
 	}
@@ -2092,11 +2090,12 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			continue;
 		}
 
-		lbModule *entity_module = m;
-
 		Entity *e = var.decl->entity;
 		GB_ASSERT(e->kind == Entity_Variable);
-		e->code_gen_module = entity_module;
+
+		lbModule *entity_module = m;
+
+		e->code_gen_module.store(entity_module);
 		Ast *init_expr = var.decl->init_expr;
 
 		if (init_expr == nullptr && var.init.value == nullptr) {
@@ -2137,7 +2136,7 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 }
 
 
-gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> *global_variables) { // Startup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
@@ -2149,13 +2148,27 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
 	LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
 
-	p->global_variables = &global_variables;
-	p->objc_names       = objc_names;
-
-	lb_create_startup_runtime_generate_body(main_module, p);
+	p->objc_names = objc_names;
+	p->global_variables = global_variables;
 
 	return p;
 }
+
+gb_internal void lb_create_cleanup_runtime_generate_body(lbModule *m, lbProcedure *p) {
+	lb_begin_procedure_body(p);
+
+	CheckerInfo *info = m->gen->info;
+
+	for (Entity *e : info->fini_procedures) {
+		lbValue value = lb_find_procedure_value_from_entity(m, e);
+		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
+	}
+
+	lb_end_procedure_body(p);
+
+	lb_verify_function(m, p);
+}
+
 
 gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // Cleanup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
@@ -2168,19 +2181,6 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 	// Make sure shared libraries call their own runtime cleanup on Linux.
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
 	LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
-
-	lb_begin_procedure_body(p);
-
-	CheckerInfo *info = main_module->gen->info;
-
-	for (Entity *e : info->fini_procedures) {
-		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
-		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
-	}
-
-	lb_end_procedure_body(p);
-
-	lb_verify_function(main_module, p);
 	return p;
 }
 
@@ -2364,8 +2364,18 @@ gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, l
 	lb_run_function_pass_manager(pass_manager, p, pass_manager_kind);
 }
 
+struct lbLLVMModulePassWorkerData {
+	lbModule *m;
+	LLVMTargetMachineRef target_machine;
+	bool do_threading;
+};
+
+gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc);
+
+
 gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
-	lbModule *m = cast(lbModule *)data;
+	lbLLVMModulePassWorkerData *wd = cast(lbLLVMModulePassWorkerData *)data;
+	lbModule *m = wd->m;
 	{
 		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
@@ -2427,23 +2437,27 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		}
 	}
 
+	lb_run_remove_unused_function_pass(m);
+	lb_run_remove_unused_globals_pass(m);
+
+
+	if (wd->do_threading) {
+		thread_pool_add_task(lb_llvm_module_pass_worker_proc, wd);
+	} else {
+		lb_llvm_module_pass_worker_proc(wd);
+	}
+
 	return 0;
 }
 
 
-void lb_remove_unused_functions_and_globals(lbGenerator *gen) {
-	for (auto &entry : gen->modules) {
-		lbModule *m = entry.value;
-		lb_run_remove_unused_function_pass(m);
-		lb_run_remove_unused_globals_pass(m);
-	}
-}
-
-struct lbLLVMModulePassWorkerData {
-	lbModule *m;
-	LLVMTargetMachineRef target_machine;
-	bool do_threading;
-};
+// void lb_remove_unused_functions_and_globals(lbGenerator *gen) {
+// 	for (auto &entry : gen->modules) {
+// 		lbModule *m = entry.value;
+// 		lb_run_remove_unused_function_pass(m);
+// 		lb_run_remove_unused_globals_pass(m);
+// 	}
+// }
 
 gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
@@ -2548,20 +2562,60 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
+	lbGenerator *gen = m->gen;
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
 		lb_generate_procedure(p->module, p);
 	}
+
+	// NOTE(bill): When the module has generated its procedures, then we can verify the procedures and module
+	// the exception to his being the `gen->default_module` which must be done AFTER everything else
+	if (m != &gen->default_module &&
+	    gen->do_threading && !build_context.ODIN_DEBUG) {
+		auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+		wd->m = m;
+		wd->target_machine = m->target_machine;
+		wd->do_threading = true;
+
+		thread_pool_add_task(lb_llvm_function_pass_per_module, wd);
+	}
+
 	return 0;
 }
 
-gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
+gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc_new_one) {
+	lbGenerator *gen = cast(lbGenerator *)data;
+	static std::atomic<u32> index;
+
+	for (;;) {
+		u32 job_index = index.fetch_add(1, std::memory_order_relaxed);
+		if (job_index >= gen->modules.capacity) {
+			return 0;
 		}
 
-		thread_pool_wait();
+		lbModule *m = gen->modules.entries[job_index].value;
+		if (m == nullptr) {
+			continue;
+		}
+		for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
+			lb_generate_procedure(p->module, p);
+		}
+	}
+
+	// return 0;
+}
+
+
+gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
+	if (do_threading) {
+		lb_generate_procedures_worker_proc(&gen->default_module);
+
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
+			if (m == &gen->default_module) {
+				continue;
+			}
+			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
+		}
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -2570,51 +2624,14 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 	}
 }
 
-gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
-	lbModule *m = cast(lbModule *)data;
-	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->missing_procedures_to_check, &p); /**/) {
-		if (!p->is_done.load(std::memory_order_relaxed)) {
-			debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
-			lb_generate_procedure(m, p);
-		}
+gb_internal void lb_generate_check_missing_procedures(lbGenerator *gen, bool do_threading) {
+	thread_pool_wait();
 
-		for (lbProcedure *nested = nullptr; mpsc_dequeue(&m->procedures_to_generate, &nested); /**/) {
-			mpsc_enqueue(&m->missing_procedures_to_check, nested);
-		}
-	}
-	return 0;
-}
-
-gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_threading) {
-	isize retry_count = 0;
-retry:;
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			// NOTE(bill): procedures may be added during generation
-			thread_pool_add_task(lb_generate_missing_procedures_to_check_worker_proc, m);
-		}
-		thread_pool_wait();
-	} else {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			// NOTE(bill): procedures may be added during generation
-			lb_generate_missing_procedures_to_check_worker_proc(m);
-		}
-	}
+	lb_generate_procedures_worker_proc(&gen->default_module);
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		if (m->missing_procedures_to_check.count != 0) {
-			if (retry_count > gen->modules.count) {
-				GB_ASSERT(m->missing_procedures_to_check.count == 0);
-			}
-
-			retry_count += 1;
-			goto retry;
-		}
-		GB_ASSERT(m->missing_procedures_to_check.count == 0);
-		GB_ASSERT(m->procedures_to_generate.count == 0);
+		GB_ASSERT_MSG(m->procedures_to_generate.count == 0, "%s, %td remaining", m->module_name, m->procedures_to_generate.count.load());
 	}
 }
 
@@ -2628,16 +2645,30 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 }
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			thread_pool_add_task(lb_llvm_function_pass_per_module, m);
-		}
+	if (do_threading && !build_context.ODIN_DEBUG) {
+		// NOTE(bill): When the module has generated its procedures, then we can verify the procedures and module
+		// the exception to his being the `gen->default_module` which must be done AFTER everything else
+		//
+		// This is place where the default module gets analyzed
+
+		lbModule *m = &gen->default_module;
+		auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+		wd->m = m;
+		wd->target_machine = m->target_machine;
+		wd->do_threading = true;
+
+		lb_llvm_function_pass_per_module(wd);
+
 		thread_pool_wait();
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			lb_llvm_function_pass_per_module(m);
+			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
+			wd->m = m;
+			wd->target_machine = m->target_machine;
+			wd->do_threading = false;
+
+			lb_llvm_function_pass_per_module(wd);
 		}
 	}
 }
@@ -3028,6 +3059,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
 
+	gen->rtti_module = &gen->default_module;
+
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
 	case TargetArch_i386:
@@ -3253,10 +3286,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Global Variables");
+	TIME_SECTION("LLVM Global RTII Variables");
 
 	if (!build_context.no_rtti) {
-		lbModule *m = default_module;
+		lbModule *m = gen->rtti_module;
 
 		{ // Add type info data
 			// GB_ASSERT_MSG(info->minimum_dependency_type_info_index_map.count == info->type_info_types.count, "%tu vs %tu", info->minimum_dependency_type_info_index_map.count, info->type_info_types.count);
@@ -3336,7 +3369,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
 	isize global_variable_max_count = 0;
 	bool already_has_entry_point = false;
 
@@ -3369,6 +3401,24 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 
 	auto global_variables = array_make<lbGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
+
+
+	TIME_SECTION("LLVM Runtime Objective-C Names Creation");
+	gen->objc_names = lb_create_objc_names(default_module);
+
+
+	TIME_SECTION("LLVM Runtime Startup Creation Procedure");
+	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, &global_variables);
+
+	TIME_SECTION("LLVM Runtime Cleanup Creation Procedure");
+	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
+
+
+	TIME_SECTION("LLVM Global Procedures and Types");
+	lb_create_global_procedures_and_types(gen, info, do_threading);
+
+
+	TIME_SECTION("LLVM Global Variables");
 
 	for (DeclInfo *d : info->variable_init_order) {
 		Entity *e = d->entity;
@@ -3545,14 +3595,17 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	TIME_SECTION("LLVM Runtime Objective-C Names Creation");
-	gen->objc_names = lb_create_objc_names(default_module);
+	TIME_SECTION("LLVM Runtime Startup Body (Global Variables & @(init))");
+	lb_create_startup_runtime_generate_body(default_module, gen->startup_runtime);
+	TIME_SECTION("LLVM Runtime Cleanup Body");
+	lb_create_cleanup_runtime_generate_body(default_module, gen->cleanup_runtime);
 
-	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
-	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, global_variables);
-
-	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
-	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
+	TIME_SECTION("LLVM Runtime Type Information (RTTI)");
+	if (do_threading) {
+		thread_pool_add_task(lb_setup_type_info_data_worker, gen->rtti_module);
+	} else {
+		lb_setup_type_info_data_worker(gen->rtti_module);
+	}
 
 
 	if (build_context.ODIN_DEBUG) {
@@ -3566,9 +3619,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		do_threading = false;
 	}
 
-	TIME_SECTION("LLVM Global Procedures and Types");
-	lb_create_global_procedures_and_types(gen, info, do_threading);
-
 	TIME_SECTION("LLVM Procedure Generation");
 	lb_generate_procedures(gen, do_threading);
 
@@ -3577,8 +3627,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_create_main_procedure(default_module, gen->startup_runtime, gen->cleanup_runtime);
 	}
 
-	TIME_SECTION("LLVM Procedure Generation (missing)");
-	lb_generate_missing_procedures(gen, do_threading);
+	TIME_SECTION("LLVM Procedure Generation (check missing)");
+	lb_generate_check_missing_procedures(gen, do_threading);
 
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");
@@ -3693,17 +3743,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Function Pass (And Remove Unused) & Module Pass + Verification");
+	lb_llvm_function_passes(gen, do_threading);
+
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
-
-	TIME_SECTION("LLVM Function Pass");
-	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
-
-	TIME_SECTION("LLVM Remove Unused Functions and Globals");
-	lb_remove_unused_functions_and_globals(gen);
-
-	TIME_SECTION("LLVM Module Pass and Verification");
-	lb_llvm_module_passes_and_verification(gen, do_threading);
 
 	TIME_SECTION("LLVM Correct Entity Linkage");
 	lb_correct_entity_linkage(gen);

@@ -109,7 +109,6 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
-	mpsc_init(&m->missing_procedures_to_check, a);
 	map_init(&m->debug_values);
 
 	string_map_init(&m->objc_classes);
@@ -149,6 +148,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1;
 	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+	gen->do_threading = do_threading;
 
 	String init_fullpath = c->parser->init_fullpath;
 	linker_data_init(gen, &c->info, init_fullpath);
@@ -244,6 +244,15 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		if (LLVM_WEAK_MONOMORPHIZATION) {
 			lbModule *m = permanent_alloc_item<lbModule>();
 			gen->equal_module = m;
+			m->gen            = gen;
+			m->checker        = c;
+			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
+			lb_init_module(m, do_threading);
+		}
+
+		if (do_threading) {
+			lbModule *m = permanent_alloc_item<lbModule>();
+			gen->rtti_module = m;
 			m->gen            = gen;
 			m->checker        = c;
 			map_set(&gen->modules, cast(void *)m, m); // point to itself just add it to the list
@@ -495,7 +504,7 @@ gb_internal lbModule *lb_module_of_expr(lbGenerator *gen, Ast *expr) {
 	return &gen->default_module;
 }
 
-gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, lbModule *curr_module) {
+gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e) {
 	lbModule **found = nullptr;
 
 	if (e->kind == Entity_Procedure && e->decl_info) {
@@ -525,7 +534,7 @@ gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, 
 gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e, lbModule *curr_module) {
 	GB_ASSERT(e != nullptr);
 	GB_ASSERT(curr_module != nullptr);
-	lbModule *m = lb_module_of_entity_internal(gen, e, curr_module);
+	lbModule *m = lb_module_of_entity_internal(gen, e);
 
 	if (USE_SEPARATE_MODULES) {
 		if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic) {
@@ -2479,8 +2488,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Proc:
 		{
-			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
-			gb_unused(proc_raw_type);
+			if (m->internal_type_level == 0) {
+				LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
+				gb_unused(proc_raw_type);
+			}
 			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 		}
 		break;
@@ -2569,7 +2580,7 @@ gb_internal lbFunctionType *lb_get_function_type(lbModule *m, Type *pt) {
 	lbFunctionType **ft_found = nullptr;
 	ft_found = map_get(&m->function_type_map, pt);
 	if (!ft_found) {
-		LLVMTypeRef llvm_proc_type = lb_type(m, pt);
+		LLVMTypeRef llvm_proc_type = lb_type_internal_for_procedures_raw(m, pt);
 		gb_unused(llvm_proc_type);
 		ft_found = map_get(&m->function_type_map, pt);
 	}
@@ -3257,12 +3268,10 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
-			// THIS IS THE RACE CONDITION
-			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
-			mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
+			GB_PANIC("Missing procedure %.*s from module %s", LIT(e->token.string), other_module->module_name);
 		}
 	} else {
-		mpsc_enqueue(&m->missing_procedures_to_check, missing_proc);
+		GB_PANIC("Missing procedure %.*s from module %s %d", LIT(e->token.string), other_module->module_name, e->min_dep_count.load());
 	}
 
 	rw_mutex_shared_lock(&m->values_mutex);
@@ -3307,51 +3316,56 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	token.string = name;
 	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
 	e->file = expr->file();
+	if (e->file) {
+		e->pkg = e->file->pkg;
+	}
 	e->scope = e->file->scope;
 
-	lbModule *target_module = m;
+	// lbModule *target_module = m;
+	lbModule *target_module = lb_module_of_entity_internal(gen, e);
 	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	pl->decl->code_gen_module = target_module;
+	// pl->decl->code_gen_module.store(target_module);
 	e->decl_info = pl->decl;
 	e->parent_proc_decl = pl->decl->parent;
 	e->Procedure.is_anonymous = true;
 	e->flags |= EntityFlag_ProcBodyChecked;
 
-	pl->decl->entity.store(e);
-
+	lbValue value = {};
 
 	if (target_module != m) {
-		rw_mutex_shared_lock(&target_module->values_mutex);
-		lbValue *found = map_get(&target_module->values, e);
-		rw_mutex_shared_unlock(&target_module->values_mutex);
-		if (found == nullptr) {
-			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
-			mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
-		}
+		GB_ASSERT_MSG(m == &gen->default_module, "%s %s", m->module_name, target_module->module_name);
 
-		lbProcedure *p = lb_create_procedure(m, e, true);
+		lbProcedure *local = lb_create_procedure(target_module, e, false);
 
-		lbValue value = {};
-		value.value = p->value;
-		value.type = p->type;
-		return value;
-	} else {
-		lbProcedure *p = lb_create_procedure(m, e);
-
-		lbValue value = {};
-		value.value = p->value;
-		value.type = p->type;
-
-		mpsc_enqueue(&m->procedures_to_generate, p);
+		mpsc_enqueue(&m->procedures_to_generate, local);
 		if (parent != nullptr) {
-			array_add(&parent->children, p);
+			array_add(&parent->children, local);
 		} else {
-			string_map_set(&m->members, name, value);
+			string_map_set(&m->members, name, {local->value, local->type});
 		}
-		return value;
+
+		lbProcedure *proto = lb_create_procedure(m, e, true);
+		value.value = proto->value;
+		value.type = proto->type;
+	} else {
+		lbProcedure *local = lb_create_procedure(m, e, false);
+
+		mpsc_enqueue(&m->procedures_to_generate, local);
+		if (parent != nullptr) {
+			array_add(&parent->children, local);
+		} else {
+			string_map_set(&m->members, name, {local->value, local->type});
+		}
+
+		value.value = local->value;
+		value.type = local->type;
 	}
+
+	pl->decl->entity.store(e);
+
+	return value;
 }
 
 

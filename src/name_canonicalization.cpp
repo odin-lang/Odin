@@ -815,9 +815,9 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 	case Type_Enum:
 		type_writer_appendc(w, "enum");
 		if (type->Enum.base_type != nullptr) {
-			type_writer_appendb(w, ' ');
+			type_writer_appendb(w, '(');
 			write_type_to_canonical_string(w, type->Enum.base_type);
-			type_writer_appendb(w, ' ');
+			type_writer_appendb(w, ')');
 		}
 		type_writer_appendb(w, '{');
 		for_array(i, type->Enum.fields) {
@@ -932,8 +932,10 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 
 	case Type_BitField:
 		type_writer_appendc(w, "bit_field");
+		type_writer_appendb(w, '(');
 		write_type_to_canonical_string(w, type->BitField.backing_type);
-		type_writer_appendc(w, " {");
+		type_writer_appendb(w, ')');
+		type_writer_appendc(w, "{");
 		for (isize i = 0; i < type->BitField.fields.count; i++) {
 			Entity *f = type->BitField.fields[i];
 			if (i > 0) {
@@ -945,7 +947,7 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			type_writer_appendc(w, CANONICAL_BIT_FIELD_SEPARATOR);
 			type_writer_append_fmt(w, "%u", type->BitField.bit_sizes[i]);
 		}
-		type_writer_appendc(w, " }");
+		type_writer_appendc(w, "}");
 		return;
 
 	case Type_Proc:

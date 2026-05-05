@@ -3500,65 +3500,53 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 
 	if (is_type_complex(a)) {
-		char const *runtime_procedure = "";
-		i64 sz = 8*type_size_of(a);
-		switch (sz) {
-		case 32:
-			switch (op_kind) {
-			case Token_CmpEq: runtime_procedure = "complex32_eq"; break;
-			case Token_NotEq: runtime_procedure = "complex32_ne"; break;
-			}
-			break;
-		case 64:
-			switch (op_kind) {
-			case Token_CmpEq: runtime_procedure = "complex64_eq"; break;
-			case Token_NotEq: runtime_procedure = "complex64_ne"; break;
-			}
-			break;
-		case 128:
-			switch (op_kind) {
-			case Token_CmpEq: runtime_procedure = "complex128_eq"; break;
-			case Token_NotEq: runtime_procedure = "complex128_ne"; break;
-			}
-			break;
-		}
-		GB_ASSERT(runtime_procedure != nullptr);
+		// NOTE(bill): is this actually a fast comparison?
+		lbValue a0 = lb_emit_struct_ev(p, left, 0);
+		lbValue a1 = lb_emit_struct_ev(p, left, 1);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = left;
-		args[1] = right;
-		return lb_emit_runtime_call(p, runtime_procedure, args);
+		lbValue b0 = lb_emit_struct_ev(p, right, 0);
+		lbValue b1 = lb_emit_struct_ev(p, right, 1);
+
+		LLVMValueRef cmp0 = LLVMBuildFCmp(p->builder, LLVMRealOEQ, a0.value, b0.value, "");
+		LLVMValueRef cmp1 = LLVMBuildFCmp(p->builder, LLVMRealOEQ, a1.value, b1.value, "");
+		LLVMValueRef cmp = LLVMBuildAnd(p->builder, cmp0, cmp1, "");
+
+		if (op_kind == Token_NotEq) {
+			cmp = LLVMBuildNot(p->builder, cmp, "");
+		}
+
+		cmp = LLVMBuildZExtOrBitCast(p->builder, cmp, lb_type(p->module, t_bool), "");
+		return {cmp, t_bool};
 	}
 
 	if (is_type_quaternion(a)) {
-		char const *runtime_procedure = "";
-		i64 sz = 8*type_size_of(a);
-		switch (sz) {
-		case 64:
-			switch (op_kind) {
-			case Token_CmpEq: runtime_procedure = "quaternion64_eq"; break;
-			case Token_NotEq: runtime_procedure = "quaternion64_ne"; break;
-			}
-			break;
-		case 128:
-			switch (op_kind) {
-			case Token_CmpEq: runtime_procedure = "quaternion128_eq"; break;
-			case Token_NotEq: runtime_procedure = "quaternion128_ne"; break;
-			}
-			break;
-		case 256:
-			switch (op_kind) {
-			case Token_CmpEq: runtime_procedure = "quaternion256_eq"; break;
-			case Token_NotEq: runtime_procedure = "quaternion256_ne"; break;
-			}
-			break;
-		}
-		GB_ASSERT(runtime_procedure != nullptr);
+		// NOTE(bill): is this actually a fast comparison?
+		lbValue a0 = lb_emit_struct_ev(p, left, 0);
+		lbValue a1 = lb_emit_struct_ev(p, left, 1);
+		lbValue a2 = lb_emit_struct_ev(p, left, 2);
+		lbValue a3 = lb_emit_struct_ev(p, left, 3);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = left;
-		args[1] = right;
-		return lb_emit_runtime_call(p, runtime_procedure, args);
+		lbValue b0 = lb_emit_struct_ev(p, right, 0);
+		lbValue b1 = lb_emit_struct_ev(p, right, 1);
+		lbValue b2 = lb_emit_struct_ev(p, right, 2);
+		lbValue b3 = lb_emit_struct_ev(p, right, 3);
+
+		LLVMValueRef cmp0 = LLVMBuildFCmp(p->builder, LLVMRealOEQ, a0.value, b0.value, "");
+		LLVMValueRef cmp1 = LLVMBuildFCmp(p->builder, LLVMRealOEQ, a1.value, b1.value, "");
+		LLVMValueRef cmp2 = LLVMBuildFCmp(p->builder, LLVMRealOEQ, a2.value, b2.value, "");
+		LLVMValueRef cmp3 = LLVMBuildFCmp(p->builder, LLVMRealOEQ, a3.value, b3.value, "");
+
+		LLVMValueRef cmp4 = LLVMBuildAnd(p->builder, cmp0, cmp1, "");
+		LLVMValueRef cmp5 = LLVMBuildAnd(p->builder, cmp2, cmp3, "");
+
+		LLVMValueRef cmp = LLVMBuildAnd(p->builder, cmp4, cmp5, "");
+
+		if (op_kind == Token_NotEq) {
+			cmp = LLVMBuildNot(p->builder, cmp, "");
+		}
+
+		cmp = LLVMBuildZExtOrBitCast(p->builder, cmp, lb_type(p->module, t_bool), "");
+		return {cmp, t_bool};
 	}
 
 	if (is_type_bit_set(a)) {

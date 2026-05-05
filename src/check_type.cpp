@@ -904,9 +904,12 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		constant_type = named_type;
 	}
 
-	ExactValue iota = exact_value_i64(-1);
-	ExactValue min_value = exact_value_i64(0);
-	ExactValue max_value = exact_value_i64(0);
+	i64 iota = -1;
+	i64 min_value = 0;
+	i64 max_value = 0;
+	// ExactValue iota = exact_value_i64(-1);
+	// ExactValue min_value = exact_value_i64(0);
+	// ExactValue max_value = exact_value_i64(0);
 	isize min_value_index = 0;
 	isize max_value_index = 0;
 	bool min_value_set = false;
@@ -949,12 +952,18 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 				check_assignment(ctx, &o, constant_type, str_lit("enumeration"));
 			}
 			if (o.mode != Addressing_Invalid) {
-				iota = o.value;
+				if (o.value.kind == ExactValue_Integer) {
+					if (!big_int_can_be_represented_in_64_bits(&o.value.value_integer)) {
+						String s = big_int_to_string(temporary_allocator(), &o.value.value_integer, 10);
+						error(init, "An enum value must not exceed 64 bits, got %.*s", LIT(s));
+					}
+				iota = exact_value_to_i64(o.value);
+				}
 			} else {
-				iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
+				iota += 1;
 			}
 		} else {
-			iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
+			iota += 1;
 			entity_flags |= EntityConstantFlag_ImplicitEnumValue;
 		}
 
@@ -965,7 +974,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		}
 
 		if (min_value_set) {
-			if (compare_exact_values(Token_Gt, min_value, iota)) {
+			if (min_value > iota) {
 				min_value_index = i;
 				min_value = iota;
 			}
@@ -975,7 +984,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 			min_value_set = true;
 		}
 		if (max_value_set) {
-			if (compare_exact_values(Token_Lt, max_value, iota)) {
+			if (max_value < iota) {
 				max_value_index = i;
 				max_value = iota;
 			}
@@ -993,7 +1002,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		e->interned_name.store(ident->Ident.interned);
 		e->interned_name_hash.store(ident->Ident.hash);
 
-		e->Constant.value = iota;
+		e->Constant.value = exact_value_i64(iota);
 		e->identifier = ident;
 		e->flags |= EntityFlag_Visited;
 		e->state = EntityState_Resolved;
@@ -1001,9 +1010,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		e->Constant.docs = docs;
 		e->Constant.comment = comment;
 
-		auto interned = entity_interned_name(e);
-
-		if (scope_lookup_current(ctx->scope, interned) != nullptr) {
+		if (scope_lookup_current(ctx->scope, ident->Ident.interned, ident->Ident.hash) != nullptr) {
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
 			add_entity(ctx, ctx->scope, nullptr, e);
@@ -1016,8 +1023,8 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 
 
 	enum_type->Enum.fields = fields;
-	*enum_type->Enum.min_value = min_value;
-	*enum_type->Enum.max_value = max_value;
+	*enum_type->Enum.min_value = exact_value_i64(min_value);
+	*enum_type->Enum.max_value = exact_value_i64(max_value);
 
 	enum_type->Enum.min_value_index = min_value_index;
 	enum_type->Enum.max_value_index = max_value_index;
