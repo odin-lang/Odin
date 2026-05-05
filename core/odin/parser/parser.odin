@@ -378,7 +378,9 @@ advance_token :: proc(p: ^Parser) -> tokenizer.Token {
 	prev := p.prev_tok
 
 	if next_token0(p) {
-		consume_comment_groups(p, prev)
+		if p.curr_tok.kind == .Comment {
+			consume_comment_groups(p, prev)
+		}
 	}
 	return prev
 }
@@ -2327,10 +2329,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Open_Paren:
 		open := expect_token(p, .Open_Paren)
-		p.expr_level += 1
+		prev_level := p.expr_level
+		p.expr_level = max(p.expr_level, 0)+1
 		expr := parse_expr(p, false)
 		skip_possible_newline(p)
-		p.expr_level -= 1
+		p.expr_level = prev_level
 		close := expect_token(p, .Close_Paren)
 
 		pe := ast.new(ast.Paren_Expr, open.pos, end_pos(close))
@@ -3553,6 +3556,13 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 
 	for prec := token_precedence(p, p.curr_tok.kind); prec >= prec_in; prec -= 1 {
 		loop: for {
+			if tokenizer.is_newline(p.curr_tok) && p.expr_level > 0 {
+				next := peek_token(p)
+				if token_precedence(p, next.kind) > 0 {
+					advance_token(p)
+				}
+			}
+
 			op := p.curr_tok
 			op_prec := token_precedence(p, op.kind)
 			if op_prec != prec {
