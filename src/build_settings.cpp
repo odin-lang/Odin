@@ -366,7 +366,7 @@ enum OptInFeatureFlags : u64 {
 	                                             OptInFeatureFlag_IntegerDivisionByZero_AllBits,
 
 	OptInFeatureFlag_ForceTypeAssert = 1u<<6,
-  OptInFeatureFlag_UsingStmt       = 1u<<7,
+	OptInFeatureFlag_UsingStmt       = 1u<<7,
 };
 
 u64 get_feature_flag_from_name(String const &name) {
