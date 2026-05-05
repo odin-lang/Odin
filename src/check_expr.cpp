@@ -3449,10 +3449,23 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 	if (is_constant && is_type_untyped(src) && is_type_string(src)) {
 		if (is_type_u8_array(dst)) {
+			GB_ASSERT(operand->value.kind == ExactValue_String);
 			String s = operand->value.value_string;
 			return s.len == dst->Array.count;
 		}
+		if (is_type_u16_array(dst)) {
+			if (operand->value.kind == ExactValue_String16) {
+				String16 s = operand->value.value_string16;
+				return s.len == dst->Array.count;
+			}
+			GB_ASSERT(operand->value.kind == ExactValue_String);
+			String16 s = string_to_string16(heap_allocator(), operand->value.value_string);
+			defer (gb_free(heap_allocator(), s.text));
+
+			return s.len == dst->Array.count;
+		}
 		if (is_type_rune_array(dst)) {
+			GB_ASSERT(operand->value.kind == ExactValue_String);
 			String s = operand->value.value_string;
 			return gb_utf8_strnlen(s.text, s.len) == dst->Array.count;
 		}
@@ -4961,6 +4974,12 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				} else if (is_type_rune_array(t)) {
 					isize rune_count = gb_utf8_strnlen(s.text, s.len);
 					if (rune_count == t->Array.count) {
+						break;
+					}
+				} else if (is_type_u16_array(t)) {
+					String16 s = string_to_string16(heap_allocator(), operand->value.value_string);
+					defer (gb_free(heap_allocator(), s.text));
+					if (s.len == t->Array.count) {
 						break;
 					}
 				}
