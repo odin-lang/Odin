@@ -1909,7 +1909,8 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
-			if (p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
+			if (p->decl_info != nullptr && q->decl_info != nullptr &&
+			    p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
 				GB_ASSERT(p->decl_info->proc_lit->kind == Ast_ProcLit);
 				GB_ASSERT(q->decl_info->proc_lit->kind == Ast_ProcLit);
 				auto pl = &p->decl_info->proc_lit->ProcLit;
