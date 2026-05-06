@@ -394,6 +394,10 @@ enum BuildFlagKind {
 
 	BuildFlag_BuildDiagnostics,
 
+	BuildFlag_Bedrock,
+	BuildFlag_DisableNonConstantGlobals,
+	BuildFlag_DisableInitFini,
+
 	// internal use only
 	BuildFlag_InternalFastISel,
 	BuildFlag_InternalIgnoreLazy,
@@ -626,6 +630,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IntegerDivisionByZero,   str_lit("integer-division-by-zero"),  BuildFlagParam_String, Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_BuildDiagnostics,        str_lit("build-diagnostics"),         BuildFlagParam_None,    Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_Bedrock,                 str_lit("bedrock"),                   BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableNonConstantGlobals, str_lit("disable-non-constant-globals"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableInitFini,         str_lit("disable-init-fini"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -1597,6 +1605,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_BuildDiagnostics:
 							build_context.build_diagnostics = true;
+							break;
+
+						case BuildFlag_Bedrock:
+							build_context.bedrock = true;
+							build_context.no_rtti = true;
+							build_context.disable_non_constant_globals = true;
+							build_context.disable_init_fini = true;
+							break;
+
+						case BuildFlag_DisableNonConstantGlobals:
+							build_context.disable_non_constant_globals = true;
+							break;
+						case BuildFlag_DisableInitFini:
+							build_context.disable_init_fini = true;
 							break;
 
 						case BuildFlag_InternalFastISel:
@@ -3520,6 +3542,32 @@ gb_internal int strip_semicolons(Parser *parser) {
 	return cast(int)failed;
 }
 
+gb_internal void setup_bedrock_mode(void) {
+	if (!build_context.bedrock) {
+		return;
+	}
+
+	bool seen_core = false;
+	bool seen_vendor = false;
+	for (isize i = 0; i < library_collections.count; /**/) {
+		if (!seen_core && library_collections[i].name == "core") {
+			array_ordered_remove(&library_collections, i);
+			seen_core = true;
+			continue;
+		}
+
+		if (!seen_vendor && library_collections[i].name == "vendor") {
+			array_ordered_remove(&library_collections, i);
+			seen_vendor = true;
+			continue;
+		}
+
+		i += 1;
+	}
+
+	build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
+}
+
 gb_internal void init_terminal(void) {
 	TIME_SECTION("init terminal");
 	build_context.has_ansi_terminal_colours = false;
@@ -3794,6 +3842,10 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.show_help) {
 		return print_show_help(args[0], command);
+	}
+
+	if (build_context.bedrock) {
+		setup_bedrock_mode();
 	}
 
 	if (init_filename.len > 0 && !build_context.show_help) {

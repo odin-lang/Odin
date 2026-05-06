@@ -2579,8 +2579,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
 
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
+				}
+
+				array_add(&args, elem);
 				if (!allow_field_separator(f)) {
 					break;
 				}
@@ -6385,6 +6391,11 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			}
 			if (p == "ignore") {
 				this_kind_correct = false;
+				continue;
+			}
+
+			if (p == "bedrock") {
+				this_kind_correct = build_context.bedrock == !is_notted;
 				continue;
 			}
 

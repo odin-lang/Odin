@@ -3061,6 +3061,10 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
+
+	if (build_context.bedrock) {
+		error(node, "'map' is not a valid type when using '-bedrock'");
+	}
 }
 
 gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
@@ -3800,6 +3804,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			*type = alloc_type_dynamic_array(elem);
 		}
 		set_base_type(named_type, *type);
+
 		return true;
 	case_end;
 
