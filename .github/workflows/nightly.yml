@@ -101,6 +101,7 @@ jobs:
               musl-dev llvm20-dev clang20 git mold lz4 \
               libxml2-static llvm20-static zlib-static zstd-static \
               make &&
+            git config --global --add safe.directory /src &&
             ./ci/build_linux_static.sh
           '
       - name: Odin run
