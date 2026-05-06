@@ -1390,7 +1390,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	     .Pointer,
 	     .Asm, // Inline assembly
 	     // Unary Expressions
-	     .Add, .Sub, .Xor, .Not, .And:
+	     .Add, .Sub, .Xor, .Not, .And, .Increment, .Decrement:
 
 		s := parse_simple_stmt(p, {Stmt_Allow_Flag.Label})
 		expect_semicolon(p, s)
