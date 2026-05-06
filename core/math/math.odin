@@ -15,28 +15,28 @@ Float_Class :: enum {
 	Neg_Inf,   // negative infinity
 }
 
-TAU          :: 6.28318530717958647692528676655900576
-PI           :: 3.14159265358979323846264338327950288
+TAU          :: 6.28318530717958647692528676655900576 // 2 times PI
+PI           :: 3.14159265358979323846264338327950288 // fundamental circle ratio of its circumference by its radius divided by 2; 2*PI*radius = circumference
 
-E            :: 2.71828182845904523536
+E            :: 2.71828182845904523536 // Euler's number
 
 τ :: TAU
 π :: PI
 e :: E
 
-SQRT_TWO     :: 1.41421356237309504880168872420969808
-SQRT_THREE   :: 1.73205080756887729352744634150587236
-SQRT_FIVE    :: 2.23606797749978969640917366873127623
+SQRT_TWO     :: 1.41421356237309504880168872420969808 // precalculated square root of 2
+SQRT_THREE   :: 1.73205080756887729352744634150587236 // precalculated square root of 3
+SQRT_FIVE    :: 2.23606797749978969640917366873127623 // precalculated square root of 5
 
-LN2          :: 0.693147180559945309417232121458176568
-LN10         :: 2.30258509299404568401799145468436421
+LN2          :: 0.693147180559945309417232121458176568 	// Logarithm of 2 in base e equivalent to ln(2)
+LN10         :: 2.30258509299404568401799145468436421 	// Logarithm of 10 in base e equivalent to ln(10)
 
 MAX_F64_PRECISION :: 16 // Maximum number of meaningful digits after the decimal point for 'f64'
 MAX_F32_PRECISION ::  8 // Maximum number of meaningful digits after the decimal point for 'f32'
 MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal point for 'f16'
 
-RAD_PER_DEG :: TAU/360.0
-DEG_PER_RAD :: 360.0/TAU
+RAD_PER_DEG :: TAU/360.0 // Ratio for conversion of degrees to radians. Multiply by a variable in degrees units to get the radians.
+DEG_PER_RAD :: 360.0/TAU // Ratio for conversion of radians to degrees. Multiply by a variable in radians units to get the degrees.
 
 abs :: builtin.abs
 min :: builtin.min
@@ -49,11 +49,64 @@ clamp :: builtin.clamp
 @(require_results) sqrt_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(sqrt_f32(f32(x))) }
 @(require_results) sqrt_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(sqrt_f64(f64(x))) }
 @(require_results) sqrt_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(sqrt_f64(f64(x))) }
+/*
+Returns square root of given number.
+
+Inputs:
+- `x`: number of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sqrt_example :: proc() {
+		x_float: f64   = 4.0 	//default float type
+		x_f16:   f16   = 30.90
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             // +0.0
+		x_neg_zero: f16 = -0.0;             // -0.0
+		x_pos_inf:  f16 = math.inf_f16(+1); // +Inf
+		x_zero_inf: f16 = math.inf_f32(0);  // Inf
+		x_neg_inf:  f16 = math.inf_f64(-1); // -Inf
+		x_nan:  	f16 = math.nan_f64be(); // NaN
+
+		fmt.println(math.sqrt(x_float))
+		fmt.println(math.sqrt(x_f16))
+
+		fmt.println(math.sqrt(x_pos_zero))
+		fmt.println(math.sqrt(x_neg_zero))
+		fmt.println(math.sqrt(x_pos_inf))
+		fmt.println(math.sqrt(x_zero_inf))
+		fmt.println(math.sqrt(x_neg_inf))
+		fmt.println(math.sqrt(x_nan))
+	}
+
+Output:
+	2 		// `f64`
+	5.559 	// `f16`
+
+	// special cases
+	0 		// pos_zero
+	-0 		// neg_zero
+	+Inf 	// pos_inf
+	+Inf 	// zero_inf
+	Nan 	// neg_inf
+	NaN 	// nan
+
+*/
 sqrt :: proc{
 	sqrt_f16, sqrt_f16le, sqrt_f16be,
 	sqrt_f32, sqrt_f32le, sqrt_f32be,
 	sqrt_f64, sqrt_f64le, sqrt_f64be,
 }
+
 
 @(require_results) sin_f16le :: proc "contextless" (θ: f16le) -> f16le { return #force_inline f16le(sin_f16(f16(θ))) }
 @(require_results) sin_f16be :: proc "contextless" (θ: f16be) -> f16be { return #force_inline f16be(sin_f16(f16(θ))) }
@@ -61,12 +114,64 @@ sqrt :: proc{
 @(require_results) sin_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(sin_f32(f32(θ))) }
 @(require_results) sin_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(sin_f64(f64(θ))) }
 @(require_results) sin_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(sin_f64(f64(θ))) }
-// Return the sine of θ in radians.
+/*
+Returns the sin of a angle
+
+Inputs:
+- `θ`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sin_example :: proc() {
+		x_float: f16   = 30.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:  	f16be = math.nan_f16be(); 
+
+		
+		fmt.println(math.sin(x_float))
+		fmt.println(math.sin(math.to_radians(x_float)))
+
+		fmt.println(math.sin(x_pos_zero))
+		fmt.println(math.sin(x_neg_zero))
+		fmt.println(math.sin(x_pos_inf))
+		fmt.println(math.sin(x_zero_inf))
+		fmt.println(math.sin(x_neg_inf))
+		fmt.println(math.sin(x_nan))
+	}
+
+Output:
+	-0.9878 // accidentally using 30 degrees instead of radians
+	0.5005 	// adjusted with degrees to radians conversion
+
+	// special cases
+	0 		// pos_zero
+	-0 		// neg_zero
+	Nan 	// pos_inf
+	Nan 	// zero_inf
+	Nan 	// neg_inf
+	NaN 	// nan
+
+*/
 sin :: proc{
 	sin_f16, sin_f16le, sin_f16be,
 	sin_f32, sin_f32le, sin_f32be,
 	sin_f64, sin_f64le, sin_f64be,
 }
+
 
 @(require_results) cos_f16le :: proc "contextless" (θ: f16le) -> f16le { return #force_inline f16le(cos_f16(f16(θ))) }
 @(require_results) cos_f16be :: proc "contextless" (θ: f16be) -> f16be { return #force_inline f16be(cos_f16(f16(θ))) }
@@ -74,7 +179,58 @@ sin :: proc{
 @(require_results) cos_f32be :: proc "contextless" (θ: f32be) -> f32be { return #force_inline f32be(cos_f32(f32(θ))) }
 @(require_results) cos_f64le :: proc "contextless" (θ: f64le) -> f64le { return #force_inline f64le(cos_f64(f64(θ))) }
 @(require_results) cos_f64be :: proc "contextless" (θ: f64be) -> f64be { return #force_inline f64be(cos_f64(f64(θ))) }
-// Return the cosine of θ in radians.
+/*
+Returns the cosine of a angle
+
+Inputs:
+- `θ`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	cos_example :: proc() {
+		x_float: f16   = 90.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:  	f16be = math.nan_f16be(); 
+
+		
+		fmt.println(math.cos(x_float))
+		fmt.println(math.cos(math.to_radians(x_float)))
+
+		fmt.println(math.cos(x_pos_zero))
+		fmt.println(math.cos(x_neg_zero))
+		fmt.println(math.cos(x_pos_inf))
+		fmt.println(math.cos(x_zero_inf))
+		fmt.println(math.cos(x_neg_inf))
+		fmt.println(math.cos(x_nan))
+	}
+
+Output:
+	-0.448 		// accidentally using 90 degrees instead of radians
+	-0.0004926 	// adjusted with degrees to radians conversion
+	
+	// special cases
+	+1 			// pos_zero
+	+1 			// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 cos :: proc{
 	cos_f16, cos_f16le, cos_f16be,
 	cos_f32, cos_f32le, cos_f32be,
@@ -87,6 +243,65 @@ cos :: proc{
 @(require_results) pow_f32be :: proc "contextless" (x, power: f32be) -> f32be { return #force_inline f32be(pow_f32(f32(x), f32(power))) }
 @(require_results) pow_f64le :: proc "contextless" (x, power: f64le) -> f64le { return #force_inline f64le(pow_f64(f64(x), f64(power))) }
 @(require_results) pow_f64be :: proc "contextless" (x, power: f64be) -> f64be { return #force_inline f64be(pow_f64(f64(x), f64(power))) }
+/*
+Returns x to the nth power
+
+NOTE: both input parameters have to be of same type i.e. f16 and f16
+
+Inputs:
+- `x`: a numerical
+- `power`: the power to raise x 
+
+
+Returns:
+- A float of matching type as the `power` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	pow_example :: proc() {
+		x_float:    f16 = 2.0
+		power:      f16 = 3.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.pow(x_float, power))
+
+		fmt.println(math.pow(x_float, x_pos_zero))
+		fmt.println(math.pow(x_float, x_neg_zero))
+		fmt.println(math.pow(x_float, x_pos_inf))
+		fmt.println(math.pow(x_float, x_zero_inf))
+		fmt.println(math.pow(x_float, x_neg_inf))
+		fmt.println(math.pow(x_float, x_nan))
+		fmt.println(math.pow(x_pos_zero, x_pos_zero))
+		fmt.println(math.pow(x_neg_inf, x_pos_inf))
+	}
+
+Output:
+	+8
+	
+	// special cases
+	+1 			// pos_zero
+	+1 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	0 			// neg_inf
+	NaN 		// nan
+	1 			// pos_zero | pos_zero
+	+Inf 		// neg_inf  | pos_inf
+
+*/
 pow :: proc{
 	pow_f16, pow_f16le, pow_f16be,
 	pow_f32, pow_f32le, pow_f32be,
@@ -99,6 +314,66 @@ pow :: proc{
 @(require_results) fmuladd_f32be :: proc "contextless" (a, b, c: f32be) -> f32be { return #force_inline f32be(fmuladd_f32(f32(a), f32(b), f32(c))) }
 @(require_results) fmuladd_f64le :: proc "contextless" (a, b, c: f64le) -> f64le { return #force_inline f64le(fmuladd_f64(f64(a), f64(b), f64(c))) }
 @(require_results) fmuladd_f64be :: proc "contextless" (a, b, c: f64be) -> f64be { return #force_inline f64be(fmuladd_f64(f64(a), f64(b), f64(c))) }
+/*
+Multiplies a with b and adds c
+
+NOTE: both input parameters have to be of same type i.e. f16 and f16 and f16
+
+
+Inputs:
+- `a`: a float
+- `b`: a float
+- `c`: a float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	fmuladd_example :: proc() {
+		a_float:    f16 = 2.0
+		b_float:      f16 = 3.0
+		c_float:      f16 = 4.5
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.fmuladd(a_float, b_float, c_float))
+
+		fmt.println(math.fmuladd(a_float, x_pos_zero, x_pos_zero))
+		fmt.println(math.fmuladd(a_float, x_neg_zero, x_neg_zero))
+		fmt.println(math.fmuladd(a_float, x_neg_inf, x_pos_inf))
+		fmt.println(math.fmuladd(x_neg_inf, x_neg_inf, a_float))
+		fmt.println(math.fmuladd(x_neg_inf, x_zero_inf, a_float))
+		fmt.println(math.fmuladd(a_float, x_nan, b_float))
+		fmt.println(math.fmuladd(a_float, b_float, x_nan))
+	}
+
+Output:
+	+10.5
+	
+	// special cases
+	0 		// a_float 		| x_pos_zero 	| x_pos_zero
+	-0 		// a_float 		| x_neg_zero 	| x_neg_zero
+	NaN 	// a_float 		| x_neg_inf 	| x_pos_inf
+	+Inf 	// x_neg_inf 	| x_neg_inf 	| a_float
+	-Inf 	// x_neg_inf 	| x_zero_inf 	| a_float
+	NaN 	// a_float 		| x_nan 		| b_float
+	NaN 	// a_float 		| b_float 		| x_nan
+
+*/
 fmuladd :: proc{
 	fmuladd_f16, fmuladd_f16le, fmuladd_f16be,
 	fmuladd_f32, fmuladd_f32le, fmuladd_f32be,
@@ -111,6 +386,67 @@ fmuladd :: proc{
 @(require_results) exp_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(exp_f32(f32(x))) }
 @(require_results) exp_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(exp_f64(f64(x))) }
 @(require_results) exp_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(exp_f64(f64(x))) }
+/*
+Returns E raised to the nth power.
+E is the Euler number defined in math.E as a constant in untyped float
+
+NOTE: you must convert math.E to a specific floating type i.e. f16(math.E)
+
+
+Inputs:
+- `x`: the power to raise E
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	exp_example :: proc() {
+		x_float:    f16 = 2.0
+		x2_float:    f16 = -2.3
+		x3_float:    f16 = 12  	//note this goes over the 16bit precision
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.exp(x_float))
+		fmt.println(math.exp(x2_float))
+		fmt.println(math.exp(x3_float))
+
+		fmt.println(math.exp(x_pos_zero))
+		fmt.println(math.exp(x_neg_zero))
+		fmt.println(math.exp(x_pos_inf))
+		fmt.println(math.exp(x_zero_inf))
+		fmt.println(math.exp(x_neg_inf))
+		fmt.println(math.exp(x_nan))
+	}
+
+Output:
+	+7.39
+	+0.10016
+	+Inf
+	
+	// special cases
+	+1 			// pos_zero
+	+1 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	0 			// neg_inf
+	Nan 		// nan
+
+*/
 exp :: proc{
 	exp_f16, exp_f16le, exp_f16be,
 	exp_f32, exp_f32le, exp_f32be,
@@ -123,6 +459,65 @@ exp :: proc{
 @(require_results) pow10_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(pow10_f32(f32(x))) }
 @(require_results) pow10_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(pow10_f64(f64(x))) }
 @(require_results) pow10_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(pow10_f64(f64(x))) }
+/*
+Returns 10 raised to the nth power
+
+NOTE: this is limited between -7 to 4 powers, anything above 4 leads to infinity and anything below -7 leads to 0
+
+Inputs:
+- `x`: the power to raise 10
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	pow10_example :: proc() {
+		x_float:    f16 = 2.5
+		x2_float:    f16 = -2.3
+		x3_float:    f16 = 13
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.pow10(x_float))
+		fmt.println(math.pow10(x2_float))
+		fmt.println(math.pow10(x3_float))
+
+		fmt.println(math.pow10(x_pos_zero))
+		fmt.println(math.pow10(x_neg_zero))
+		fmt.println(math.pow10(x_pos_inf))
+		fmt.println(math.pow10(x_zero_inf))
+		fmt.println(math.pow10(x_neg_inf))
+		fmt.println(math.pow10(x_nan))
+	}
+
+Output:
+	+100
+	+0.01
+	+Inf
+	
+	// special cases
+	+1 			// pos_zero
+	+1 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	0 			// neg_inf
+	0 			// nan
+
+*/
 pow10 :: proc{
 	pow10_f16, pow10_f16le, pow10_f16be,
 	pow10_f32, pow10_f32le, pow10_f32be,
@@ -302,15 +697,60 @@ ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
 @(require_results) ldexp_f32be :: proc "contextless" (val: f32be, exp: int) -> f32be { return #force_inline f32be(ldexp_f32(f32(val), exp)) }
 @(require_results) ldexp_f64le :: proc "contextless" (val: f64le, exp: int) -> f64le { return #force_inline f64le(ldexp_f64(f64(val), exp)) }
 @(require_results) ldexp_f64be :: proc "contextless" (val: f64be, exp: int) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp)) }
-// ldexp is the inverse of frexp
-// it returns val * 2**exp.
-// 
-// Special cases:
-// 	ldexp(+0,   exp) = +0
-// 	ldexp(-0,   exp) = -0
-// 	ldexp(+inf, exp) = +inf
-// 	ldexp(-inf, exp) = -inf
-// 	ldexp(NaN,  exp) = NaN
+/*
+ldexp is the inverse of frexp
+it returns val * 2**exp.
+
+Inputs:
+- `val`: the scaling to 2**exp
+- `exp`: the power to raise 2
+
+
+Returns:
+- A float of matching type as the `val` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	ldexp_example :: proc() {
+		x_float:    f16 = 2.3
+		exp_float:    int = 3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.ldexp(x_float, exp_float))
+
+		fmt.println(math.ldexp(x_pos_zero, exp_float))
+		fmt.println(math.ldexp(x_neg_zero, exp_float))
+		fmt.println(math.ldexp(x_pos_inf, exp_float))
+		fmt.println(math.ldexp(x_zero_inf, exp_float))
+		fmt.println(math.ldexp(x_neg_inf, exp_float))
+		fmt.println(math.ldexp(x_nan, exp_float))
+	}
+
+Output:
+	+18.4
+
+	// Special cases:
+	0 		// pos_zero
+	-0 		// neg_zero
+	+Inf 	// pos_inf
+	+Inf 	// zero_inf
+	-Inf 	// neg_inf
+	NaN 	// nan
+
+*/
 ldexp :: proc{
 	ldexp_f16, ldexp_f16le, ldexp_f16be,
 	ldexp_f32, ldexp_f32le, ldexp_f32be,
@@ -329,6 +769,64 @@ ldexp :: proc{
 @(require_results) log_f64   :: proc "contextless" (x, base: f64)   -> f64   { return ln(x) / ln(base) }
 @(require_results) log_f64le :: proc "contextless" (x, base: f64le) -> f64le { return f64le(log_f64(f64(x), f64(base))) }
 @(require_results) log_f64be :: proc "contextless" (x, base: f64be) -> f64be { return f64be(log_f64(f64(x), f64(base))) }
+/*
+Returns the logarithm of `x` in base `base`
+
+NOTE: both arguments must be in the same float type
+
+Inputs:
+- `x`: the argument for the logarithm
+- `base`: the base for the logarithm
+
+
+Returns:
+- A float of matching type as the inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	log_example :: proc() {
+		x_float:    f16 = 1000.0
+		base:    f16 = 10.0
+		base2:    f16 = 2.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.log(x_float, base))
+		fmt.println(math.log(x_float, base2))
+
+		fmt.println(math.log(x_pos_zero, base))
+		fmt.println(math.log(x_neg_zero, base))
+		fmt.println(math.log(x_pos_inf, base))
+		fmt.println(math.log(x_zero_inf, base))
+		fmt.println(math.log(x_neg_inf, base))
+		fmt.println(math.log(x_nan, base))
+	}
+
+Output:
+	+3 			// base 10
+	+9.96 		// base 2
+
+	// special cases
+	-Inf 		// pos_zero
+	-Inf 		// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	NaN 		// neg_inf
+	NaN 		// nan
+
+*/
 log :: proc{
 	log_f16, log_f16le, log_f16be,
 	log_f32, log_f32le, log_f32be,
@@ -346,7 +844,7 @@ log :: proc{
 @(require_results) log2_f64   :: proc "contextless" (x: f64)   -> f64   { return log(f64(x), f64(2.0)) }
 @(require_results) log2_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log_f64(f64(x), f64(2.0))) }
 @(require_results) log2_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log_f64(f64(x), f64(2.0))) }
-
+// same as log(x, 2)
 log2 :: proc{
 	log2_f16, log2_f16le, log2_f16be,
 	log2_f32, log2_f32le, log2_f32be,
@@ -364,6 +862,7 @@ log2 :: proc{
 @(require_results) log10_f64   :: proc "contextless" (x: f64)   -> f64   { return ln(x)/LN10 }
 @(require_results) log10_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log10_f64(f64(x))) }
 @(require_results) log10_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log10_f64(f64(x))) }
+// also referred as the common logarithm, same as log(x, 10)
 log10 :: proc{
 	log10_f16, log10_f16le, log10_f16be,
 	log10_f32, log10_f32le, log10_f32be,
@@ -381,7 +880,58 @@ log10 :: proc{
 @(require_results) tan_f64   :: proc "contextless" (θ: f64)   -> f64   { return sin(θ)/cos(θ) }
 @(require_results) tan_f64le :: proc "contextless" (θ: f64le) -> f64le { return f64le(tan_f64(f64(θ))) }
 @(require_results) tan_f64be :: proc "contextless" (θ: f64be) -> f64be { return f64be(tan_f64(f64(θ))) }
-// Return the tangent of θ in radians.
+/*
+Returns the tangent of a angle
+
+Inputs:
+- `θ`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	tan_example :: proc() {
+		x_float: f16   = 45.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.tan(x_float))
+		fmt.println(math.tan(math.to_radians(x_float)))
+
+		fmt.println(math.tan(x_pos_zero))
+		fmt.println(math.tan(x_neg_zero))
+		fmt.println(math.tan(x_pos_inf))
+		fmt.println(math.tan(x_zero_inf))
+		fmt.println(math.tan(x_neg_inf))
+		fmt.println(math.tan(x_nan))
+	}
+
+Output:
+	1.62 		// accidentally using 90 degrees instead of radians
+	1.001 		// adjusted with degrees to radians conversion
+
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 tan :: proc{
 	tan_f16, tan_f16le, tan_f16be,
 	tan_f32, tan_f32le, tan_f32be,
@@ -476,6 +1026,65 @@ gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
 @(require_results) sign_i64   :: proc "contextless" (x: i64)   -> i64   { return i64(int(0 < x) - int(x < 0)) }
 @(require_results) sign_i64le :: proc "contextless" (x: i64le) -> i64le { return i64le(int(0 < x) - int(x < 0)) }
 @(require_results) sign_i64be :: proc "contextless" (x: i64be) -> i64be { return i64be(int(0 < x) - int(x < 0)) }
+/*
+Returns the sign of `x`, either +1 or -1.
+
+NOTE: for 0 and non defined values the return is `0` 
+
+Inputs:
+- `x`: a signed numerical type i.e. int or float
+
+
+Returns:
+- A numerical of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sign_example :: proc() {
+		x_float:    f16 = 1000.0
+		x2_float:    f16 = 3.44
+		x3_float:    f16 = -12.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.sign(x_float))
+		fmt.println(math.sign(x2_float))
+		fmt.println(math.sign(x3_float))
+
+		fmt.println(math.sign(x_pos_zero))
+		fmt.println(math.sign(x_neg_zero))
+		fmt.println(math.sign(x_pos_inf))
+		fmt.println(math.sign(x_zero_inf))
+		fmt.println(math.sign(x_neg_inf))
+		fmt.println(math.sign(x_nan))
+	}
+
+Output:
+	+1
+	+1
+	-1
+
+	// special cases
+	0 			// pos_zero
+	0 			// neg_zero
+	+1 			// pos_inf
+	+1 			// zero_inf
+	-1 			// neg_inf
+	0 			// nan
+
+*/
 sign :: proc{
 	sign_f16, sign_f16le, sign_f16be,
 	sign_f32, sign_f32le, sign_f32be,
@@ -505,6 +1114,67 @@ sign :: proc{
 @(require_results) sign_bit_i64   :: proc "contextless" (x: i64)   -> bool { return u64(x) & (1<<63) != 0 }
 @(require_results) sign_bit_i64le :: proc "contextless" (x: i64le) -> bool { return #force_inline sign_bit_i64(i64(x)) }
 @(require_results) sign_bit_i64be :: proc "contextless" (x: i64be) -> bool { return #force_inline sign_bit_i64(i64(x)) }
+/*
+Checks if the sign bit of `x` is present
+
+In other words it checks if `x` is negative
+
+NOTE: for non defined values the return is false 
+
+Inputs:
+- `x`: a signed numerical type i.e. int or float
+
+
+Returns:
+- A bolean
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sign_bit_example :: proc() {
+		x_float:    f16 = 1000.0
+		x2_float:    f16 = 3.44
+		x3_float:    f16 = -12.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.sign_bit(x_float))
+		fmt.println(math.sign_bit(x2_float))
+		fmt.println(math.sign_bit(x3_float))
+
+		fmt.println(math.sign_bit(x_pos_zero))
+		fmt.println(math.sign_bit(x_neg_zero))
+		fmt.println(math.sign_bit(x_pos_inf))
+		fmt.println(math.sign_bit(x_zero_inf))
+		fmt.println(math.sign_bit(x_neg_inf))
+		fmt.println(math.sign_bit(x_nan))
+	}
+
+Output:
+	false
+	false
+	true
+
+	// special cases
+	false 			// pos_zero
+	true 			// neg_zero
+	false 			// pos_inf
+	false 			// zero_inf
+	true 			// neg_inf
+	false 			// nan
+
+*/
 sign_bit :: proc{
 	sign_bit_f16, sign_bit_f16le, sign_bit_f16be,
 	sign_bit_f32, sign_bit_f32le, sign_bit_f32be,
@@ -569,11 +1239,110 @@ copy_sign :: proc{
 @(require_results) to_degrees_f64   :: proc "contextless" (radians: f64)   -> f64   { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64le :: proc "contextless" (radians: f64le) -> f64le { return radians * DEG_PER_RAD }
 @(require_results) to_degrees_f64be :: proc "contextless" (radians: f64be) -> f64be { return radians * DEG_PER_RAD }
+/*
+Converts the angle from degrees to radians
+
+Inputs:
+- `degrees`: angle in degrees of type float
+
+
+Returns:
+- A angle in radians float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	to_radians_example :: proc() {
+		x_float: f16   = 180.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+		fmt.println(math.to_radians(x_float))
+
+		fmt.println(math.to_radians(x_pos_zero))
+		fmt.println(math.to_radians(x_neg_zero))
+		fmt.println(math.to_radians(x_pos_inf))
+		fmt.println(math.to_radians(x_zero_inf))
+		fmt.println(math.to_radians(x_neg_inf))
+		fmt.println(math.to_radians(x_nan))
+	}
+
+Output:
+	3.143 		// approximates pi but is not math.PI
+
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf 		// neg_inf
+	NaN 		// nan
+
+*/
 to_radians :: proc{
 	to_radians_f16, to_radians_f16le, to_radians_f16be,
 	to_radians_f32, to_radians_f32le, to_radians_f32be,
 	to_radians_f64, to_radians_f64le, to_radians_f64be,
 }
+
+/*
+Converts the angle from radians to degrees
+
+Inputs:
+- `radians`: angle in radians of type float
+
+
+Returns:
+- A angle in degrees float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	to_degrees_example :: proc() {
+		x_float: f16   = math.PI
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+		fmt.println(math.to_degrees(x_float))
+
+		fmt.println(math.to_degrees(x_pos_zero))
+		fmt.println(math.to_degrees(x_neg_zero))
+		fmt.println(math.to_degrees(x_pos_inf))
+		fmt.println(math.to_degrees(x_zero_inf))
+		fmt.println(math.to_degrees(x_neg_inf))
+		fmt.println(math.to_degrees(x_nan))
+	}
+
+Output:
+	179.88
+
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf 		// neg_inf
+	NaN 		// nan
+
+*/
 to_degrees :: proc{
 	to_degrees_f16, to_degrees_f16le, to_degrees_f16be,
 	to_degrees_f32, to_degrees_f32le, to_degrees_f32be,
@@ -873,7 +1642,61 @@ round :: proc{
 @(require_results) ceil_f64   :: proc "contextless" (x: f64)   -> f64   { return -floor(-x) }
 @(require_results) ceil_f64le :: proc "contextless" (x: f64le) -> f64le { return -floor(-x) }
 @(require_results) ceil_f64be :: proc "contextless" (x: f64be) -> f64be { return -floor(-x) }
+/*
+Rounds up `x`
 
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	ceil_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = -2.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.ceil(x_float))
+		fmt.println(math.ceil(x2_float))
+
+		fmt.println(math.ceil(x_pos_zero))
+		fmt.println(math.ceil(x_neg_zero))
+		fmt.println(math.ceil(x_pos_inf))
+		fmt.println(math.ceil(x_zero_inf))
+		fmt.println(math.ceil(x_neg_inf))
+		fmt.println(math.ceil(x_nan))
+	}
+
+Output:
+	+3
+	-2
+	
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf		// neg_inf
+	Nan 		// nan
+
+*/
 ceil :: proc{
 	ceil_f16, ceil_f16le, ceil_f16be,
 	ceil_f32, ceil_f32le, ceil_f32be,
@@ -931,6 +1754,61 @@ floor_f64   :: proc "contextless" (x: f64)   -> f64 {
 }
 @(require_results) floor_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(floor_f64(f64(x))) }
 @(require_results) floor_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(floor_f64(f64(x))) }
+/*
+Rounds down `x`
+
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	floor_example :: proc() {
+		x_float:    f16 = 7.1
+		x2_float:    f16 = -32.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.floor(x_float))
+		fmt.println(math.floor(x2_float))
+
+		fmt.println(math.floor(x_pos_zero))
+		fmt.println(math.floor(x_neg_zero))
+		fmt.println(math.floor(x_pos_inf))
+		fmt.println(math.floor(x_zero_inf))
+		fmt.println(math.floor(x_neg_inf))
+		fmt.println(math.floor(x_nan))
+	}
+
+Output:
+	+7
+	-33
+	
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+Inf 		// pos_inf
+	+Inf 		// zero_inf
+	-Inf		// neg_inf
+	Nan 		// nan
+
+*/
 floor :: proc{
 	floor_f16, floor_f16le, floor_f16be,
 	floor_f32, floor_f32le, floor_f32be,
@@ -1201,7 +2079,84 @@ normalize_f64 :: proc "contextless" (x: f64) -> (y: f64, exponent: int) {
 @(require_results) normalize_f32be :: proc "contextless" (x: f32be) -> (y: f32be, exponent: int) { y0, e := normalize_f32(f32(x)); return f32be(y0), e }
 @(require_results) normalize_f64le :: proc "contextless" (x: f64le) -> (y: f64le, exponent: int) { y0, e := normalize_f64(f64(x)); return f64le(y0), e }
 @(require_results) normalize_f64be :: proc "contextless" (x: f64be) -> (y: f64be, exponent: int) { y0, e := normalize_f64(f64(x)); return f64be(y0), e }
+/*
+Decomposes a float type in a normalized float and a negative power of 2 in case it is subnormal
+i.e. smaller than the smallest normalized floats
 
+Otherwise returns the same number and a `0` exponent for a normal number
+
+This assures maximum precision for each float type is always used
+
+For 16bits follows: 1bit sign + 5bit expoent + 10bit significant
+So any number between `0x0` and `0b0_00000_1111111111` triggers a normalization, which
+consists in multiplying the number by the significant size (2**10) and keeping note of the
+factor (2**10) that should divide the number to get the original number
+
+
+Inputs:
+- `x`: float to be normalized
+
+
+Returns:
+- A tuple containing a normalized float of matching type as the `x` input and a exponent indicating 
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	normalize_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = -2.3
+		x3_float:    f16 = 6.091 * math.pow10(f16(-5)) // largest subnormal 3FF
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.normalize(x_float))
+		fmt.println(math.normalize(x2_float))
+		fmt.println(math.normalize(x3_float))
+
+		fmt.println(math.normalize(x_pos_zero))
+		fmt.println(math.normalize(x_neg_zero))
+		fmt.println(math.normalize(x_pos_inf))
+		fmt.println(math.normalize(x_zero_inf))
+		fmt.println(math.normalize(x_neg_inf))
+		fmt.println(math.normalize(x_nan))
+
+		fmt.printf("Integer Hex: %#h\n", x3_float) // 0x3ff
+		fmt.printf("Integer Hex: %.10f\n", x3_float) // 0x3ff
+		fmt.printf("Integer Hex: %#h, %d\n", math.normalize(x3_float))
+		fmt.printf("Integer Hex: %.10f, %d\n", math.normalize(x3_float))
+	}
+
+Output:
+	2.1 0
+	-2.3 0
+	0.06244 -10
+    
+    // special cases
+    0 -10           // pos_zero
+    -0 -10          // neg_zero
+    +Inf 0        // pos_inf
+    +Inf 0        // zero_inf
+    -Inf 0        // neg_inf
+    NaN 0         // nan
+
+	Integer Hex: 0h3ff
+	Integer Hex: 0.0000609756
+	Integer Hex: 0h2bfe, -10
+	Integer Hex: 0.0624389648, -10
+
+*/
 normalize :: proc{
 	normalize_f16,
 	normalize_f32,
@@ -1276,17 +2231,69 @@ frexp_f64be :: proc "contextless" (x: f64be) -> (significand: f64be, exponent: i
 	f, e := frexp_f64(f64(x))
 	return f64be(f), e
 }
+/*
+Breaks the value into a normalized fraction, and an integral power of two.
 
-// frexp breaks the value into a normalized fraction, and an integral power of two
-// It returns a significand and exponent satisfying x == significand * 2**exponent
-// with the absolute value of significand in the intervalue of [0.5, 1).
-//
-// Special cases: 
-// 	frexp(+0)   = +0,   0
-// 	frexp(-0)   = -0,   0
-// 	frexp(+inf) = +inf, 0
-// 	frexp(-inf) = -inf, 0
-// 	frexp(NaN)  = NaN,  0
+Satisfying x == significand * 2**exponent
+
+Its the inverse of ldexp
+
+
+Inputs:
+- `x`: float to be broken down to the normalized fraction
+
+
+Returns:
+- A tuple containing a significand float of matching type as the `x` input and a int exponent
+with the absolute value of significand in the intervalue of [0.5, 1)
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	frexp_example :: proc() {
+		x_float:     f16 = 2.0
+		x2_float:    f16 = 11.7
+		x3_float:    f16 = -32.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.frexp(x_float))
+		fmt.println(math.frexp(x2_float))
+		fmt.println(math.frexp(x3_float))
+
+		fmt.println(math.frexp(x_pos_zero))
+		fmt.println(math.frexp(x_neg_zero))
+		fmt.println(math.frexp(x_pos_inf))
+		fmt.println(math.frexp(x_zero_inf))
+		fmt.println(math.frexp(x_neg_inf))
+		fmt.println(math.frexp(x_nan))
+	}
+
+Output:
+	0.5 2
+	0.7314 4
+	-0.5049 6
+	
+	// special cases
+	0 0 		// pos_zero
+	0 0 		// neg_zero
+	+Inf 0 		// pos_inf
+	+Inf 0 		// zero_inf
+	-Inf 0		// neg_inf
+	NaN 0 		// nan
+
+*/
 frexp :: proc{
 	frexp_f16, frexp_f16le, frexp_f16be,
 	frexp_f32, frexp_f32le, frexp_f32be,
@@ -1453,6 +2460,56 @@ classify :: proc{
 @(require_results) is_nan_f64   :: proc "contextless" (x: f64)   -> bool { return classify(x) == .NaN }
 @(require_results) is_nan_f64le :: proc "contextless" (x: f64le) -> bool { return classify(x) == .NaN }
 @(require_results) is_nan_f64be :: proc "contextless" (x: f64be) -> bool { return classify(x) == .NaN }
+/*
+Reports whether `x` is Not-A-Number, `NaN`
+
+NOTE: although `NaN` is basically 0x0_11111_10000_00000; trying to create a float with that number 
+triggers a auto-correction to the suitable float range, this can result in `NaN` or a corrected valid range
+depending on how the variable is created.
+i.e. for a f16 creating a variable equal `0x0_11111_10000_00000` results in 0h7C00 (+Infinity). But creating it with
+`0b0_11111_10000_00000` leads to the correct value 0h7E00 (NaN).
+As such this proc must be carefully used when doing `cast` and `transmute`
+
+
+Inputs:
+- `x`: float to be checked
+
+
+Returns:
+- A Boolean
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	is_nan_example :: proc() {
+		x_float:            f16 = 2.1
+		x_fullexp_int:      u16 = 0b0_11111_10000_00000 // integer of equivalent representation to NaN
+
+
+		// special cases           
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.is_nan(x_float))
+		fmt.println(math.is_nan(transmute(f16)x_fullexp_int))
+
+		fmt.println(math.is_nan(x_zero_inf))
+		fmt.println(math.is_nan(x_nan))
+	}
+
+Output:
+	false 		// normal number
+	true 		// int with all expoent bits and the most significant fraction bit enabled
+
+	// special cases
+	false       // zero_inf
+	true        // nan
+
+*/
 is_nan :: proc{
 	is_nan_f16, is_nan_f16le, is_nan_f16be,
 	is_nan_f32, is_nan_f32le, is_nan_f32be,
@@ -1522,6 +2579,72 @@ is_inf_f64le :: proc "contextless" (x: f64le, sign: int = 0) -> bool {
 is_inf_f64be :: proc "contextless" (x: f64be, sign: int = 0) -> bool {
 	return #force_inline is_inf_f64(f64(x), sign)
 }
+/*
+Reports whether `x` is an infinity, according to sign.
+
+If sign > 0, is_inf reports whether f is positive infinity.
+If sign < 0, is_inf reports whether f is negative infinity.
+If sign == 0, is_inf reports whether f is either infinity.
+
+
+Inputs:
+- `x`: float to be checked
+- `sign`: int to represent the infinity sign
+
+
+Returns:
+- A Boolean
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	is_inf_example :: proc() {
+		x_float:        f16 = 3.0
+		x_float_full:   f16 = 0xFFFF
+		sign_pos:       int = +1
+		sign_zero:      int = 0
+		sign_neg:       int = -1
+
+
+		// special cases
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.is_inf(x_float, sign_zero))
+		fmt.println(math.is_inf(x_float_full, sign_zero))
+
+		fmt.println(math.is_inf(x_zero_inf, sign_zero))
+		fmt.println(math.is_inf(x_zero_inf, sign_neg))
+
+		fmt.println(math.is_inf(x_neg_inf, sign_zero))
+		fmt.println(math.is_inf(x_neg_inf, sign_pos))
+
+		fmt.println(math.is_inf(x_nan, sign_pos))
+		fmt.println(math.is_inf(x_nan, sign_zero))
+		fmt.println(math.is_inf(x_nan, sign_neg))
+	}
+
+Output:
+	false 		// normal number
+	true 		// float with all bits enabled
+
+	// special cases
+	true         // zero_inf | 0sign
+	false        // zero_inf | +sign
+
+	true         // neg_inf | 0sign
+	false        // neg_inf | +sign
+
+	false        // nan | +sign
+	false        // nan | 0sign
+	false        // nan | -sign
+
+*/
 is_inf :: proc{
 	is_inf_f16, is_inf_f16le, is_inf_f16be,
 	is_inf_f32, is_inf_f32le, is_inf_f32be,
@@ -1823,7 +2946,59 @@ atan2 :: proc{
 	atan2_f16le, atan2_f16be,
 }
 
-// Return the arc tangent of x, in radians. Defined on the domain of [-∞, ∞] with a range of [-π/2, π/2]
+/*
+Returns the arc tangent of a angle, in radians. Defined on the domain of [-∞, ∞] with a range of [-π/2, π/2]
+
+
+Inputs:
+- `x`: a number of type float
+
+
+Returns:
+- A angle in radians of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	atan_example :: proc() {
+		x_float: f16   = 1.0
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.atan(x_float))
+		fmt.println(math.to_degrees(math.atan(x_float)))
+
+		fmt.println(math.atan(x_pos_zero))
+		fmt.println(math.atan(x_neg_zero))
+		fmt.println(math.to_degrees(math.atan(x_pos_inf)))
+		fmt.println(math.to_degrees(math.atan(x_zero_inf)))
+		fmt.println(math.to_degrees(math.atan(x_neg_inf)))
+		fmt.println(math.atan(x_nan))
+	}
+
+Output:
+	0.785 		// angle in radians
+	44.97 		// transformed to degrees
+
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	+89.94 		// pos_inf
+	+89.94 		// zero_inf
+	-89.94 		// neg_inf
+	NaN 		// nan
+
+*/
 @(require_results)
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1)
@@ -1935,7 +3110,59 @@ asin_f16le :: proc "contextless" (x: f16le) -> f16le {
 asin_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(asin_f64(f64(x)))
 }
-// Return the arc sine of x, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
+/*
+Returns the arc sine of a angle, in radians. Defined on the domain of [-1, 1] with a range of [-π/2, π/2]
+
+
+Inputs:
+- `x`: a number of type float
+
+
+Returns:
+- A angle in radians of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	asin_example :: proc() {
+		x_float: f16   = 0.5
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.asin(x_float))
+		fmt.println(math.to_degrees(math.asin(x_float)))
+
+		fmt.println(math.asin(x_pos_zero))
+		fmt.println(math.asin(x_neg_zero))
+		fmt.println(math.to_degrees(math.asin(x_pos_inf)))
+		fmt.println(math.to_degrees(math.asin(x_zero_inf)))
+		fmt.println(math.to_degrees(math.asin(x_neg_inf)))
+		fmt.println(math.asin(x_nan))
+	}
+
+Output:
+	0.5234 		// angle in radians
+	29.98 		// transformed to degrees
+
+	// special cases
+	0 			// pos_zero
+	-0 			// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 asin :: proc{
 	asin_f64, asin_f32, asin_f16,
 	asin_f64le, asin_f64be,
@@ -2050,7 +3277,59 @@ acos_f16le :: proc "contextless" (x: f16le) -> f16le {
 acos_f16be :: proc "contextless" (x: f16be) -> f16be {
 	return f16be(acos_f64(f64(x)))
 }
-// Return the arc cosine of x, in radians. Defined on the domain of [-1, 1] with a range of [0, π].
+/*
+Returns the arc cosine of a angle, in radians. Defined on the domain of [-1, 1] with a range of [0, π]
+
+
+Inputs:
+- `x`: a number of type float
+
+
+Returns:
+- A angle in radians of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	acos_example :: proc() {
+		x_float: f16   = 0.5
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.acos(x_float))
+		fmt.println(math.to_degrees(math.acos(x_float)))
+
+		fmt.println(math.to_degrees(math.acos(x_pos_zero)))
+		fmt.println(math.to_degrees(math.acos(x_neg_zero)))
+		fmt.println(math.to_degrees(math.acos(x_pos_inf)))
+		fmt.println(math.to_degrees(math.acos(x_zero_inf)))
+		fmt.println(math.to_degrees(math.acos(x_neg_inf)))
+		fmt.println(math.acos(x_nan))
+	}
+
+Output:
+	1.0469 		// angle in radians
+	59.97 		// transformed to degrees
+
+	// special cases
+	+89.94 		// pos_zero
+	-89.94 		// neg_zero
+	Nan 		// pos_inf
+	Nan 		// zero_inf
+	Nan 		// neg_inf
+	NaN 		// nan
+
+*/
 acos :: proc{
 	acos_f64, acos_f32, acos_f16,
 	acos_f64le, acos_f64be,
@@ -2264,6 +3543,71 @@ ilogb_f64 :: proc "contextless" (val: f64) -> int {
 @(require_results) ilogb_f32be :: proc "contextless" (value: f32be) -> int { return ilogb_f32(f32(value)) }
 @(require_results) ilogb_f64le :: proc "contextless" (value: f64le) -> int { return ilogb_f64(f64(value)) }
 @(require_results) ilogb_f64be :: proc "contextless" (value: f64be) -> int { return ilogb_f64(f64(value)) }
+/*
+Reverts a float to the binary size of it always rounding down
+i.e. returns the position of the highest bit of a float, with the count starting at 0
+
+signal is not considered
+
+
+NOTE: this works even for sub-normal numbers without the need to normalize.
+
+
+
+Inputs:
+- `value`: float to calculate the whole binary size
+
+
+Returns:
+- A integer indicating the binary size of the float
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	ilogb_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = -4.3
+		x3_float:    f16 = 16.5
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.ilogb(x_float))
+		fmt.println(math.ilogb(x2_float))
+		fmt.println(math.ilogb(x3_float))
+
+		fmt.printf("Hex: %#h\n", x_pos_zero)
+		fmt.printf("Hex: %#h\n", x_neg_zero)
+		fmt.printf("Hex: %#h\n", x_pos_inf)
+		fmt.printf("Hex: %#h\n", x_zero_inf)
+		fmt.printf("Hex: %#h\n", x_neg_inf)
+		fmt.printf("Hex: %#h\n", x_nan)
+	}
+
+Output:
+	1
+	2
+	4
+    
+    // special cases
+    Hex: 0h0 			// pos_zero
+    Hex: 0h8000			// neg_zero
+    Hex: 0h7c00			// pos_inf
+    Hex: 0h7c00			// zero_inf
+    Hex: 0hfc00			// neg_inf
+    Hex: 0h7e00			// nan
+
+*/
 ilogb :: proc {
 	ilogb_f16,
 	ilogb_f32,
@@ -2442,14 +3786,68 @@ hypot_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
 @(require_results) hypot_f32be :: proc "contextless" (x, y: f32be) -> (r: f32be) { return f32be(hypot_f32(f32(x), f32(y))) }
 @(require_results) hypot_f64le :: proc "contextless" (x, y: f64le) -> (r: f64le) { return f64le(hypot_f64(f64(x), f64(y))) }
 @(require_results) hypot_f64be :: proc "contextless" (x, y: f64be) -> (r: f64be) { return f64be(hypot_f64(f64(x), f64(y))) }
+/*
+Calculates the hypotenuse of a rectangle of sides `x` and `y`
 
-// hypot returns Sqrt(p*p + q*q), taking care to avoid unnecessary overflow and underflow.
-//
-// Special cases:
-//	hypot(±Inf, q) = +Inf
-//	hypot(p, ±Inf) = +Inf
-//	hypot(NaN, q) = NaN
-//	hypot(p, NaN) = NaN
+returns Sqrt(p*p + q*q), taking care to avoid unnecessary overflow and underflow.
+
+
+Inputs:
+- `x`: float representing one side of the rectangle
+- `y`: float representing another side of the rectangle
+
+
+Returns:
+- A float of matching type as the inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	hypot_example :: proc() {
+		x_float:    f16 = 3.0
+		y_float:    f16 = 4.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.hypot(x_float, y_float))
+
+		fmt.println(math.hypot(x_pos_zero, y_float))
+		fmt.println(math.hypot(x_neg_zero, y_float))
+		fmt.println(math.hypot(x_neg_zero, x_pos_zero))
+		fmt.println(math.hypot(x_pos_inf, y_float))
+		fmt.println(math.hypot(y_float, x_zero_inf))
+		fmt.println(math.hypot(x_neg_inf, y_float))
+		fmt.println(math.hypot(x_neg_inf, x_pos_inf))
+		fmt.println(math.hypot(x_nan, y_float))
+		fmt.println(math.hypot(x_nan, x_pos_inf))
+	}
+
+Output:
+	+5
+
+	// special cases
+	+4 			// pos_zero | y
+	+4 			// neg_zero | y
+	0			// neg_zero | pos_zero
+	+Inf 		// pos_inf 	| y
+	+Inf 		// y 		| zero_inf
+	+Inf		// neg_inf 	| y
+	+Inf		// neg_inf 	| pos_inf
+	Nan 		// nan 		| y
+	+Inf 		// nan 		| pos_inf
+
+*/
 hypot :: proc{
 	hypot_f16, hypot_f16le, hypot_f16be,
 	hypot_f32, hypot_f32le, hypot_f32be,
@@ -2493,9 +3891,9 @@ F16_MANT_DIG   :: 11
 F16_MAX        :: 65504.0
 F16_MAX_10_EXP :: 4
 F16_MAX_EXP    :: 15
-F16_MIN        :: 6.10351562e-5
+F16_MIN        :: 6.10351562e-5 // smallest positive normal for a 16bit float
 F16_MIN_10_EXP :: -4
-F16_MIN_EXP    :: -14
+F16_MIN_EXP    :: -14 			// smallest possible power of 2 for a 16bit float
 F16_NORMALIZE  :: 0
 F16_RADIX      :: 2
 F16_ROUNDS     :: 1
@@ -2508,9 +3906,9 @@ F32_MANT_DIG   :: 24
 F32_MAX        :: 3.402823466e+38
 F32_MAX_10_EXP :: 38
 F32_MAX_EXP    :: 128
-F32_MIN        :: 1.175494351e-38
+F32_MIN        :: 1.175494351e-38	// smallest positive normal for a 32bit float
 F32_MIN_10_EXP :: -37
-F32_MIN_EXP    :: -125
+F32_MIN_EXP    :: -125				// smallest possible power of 2 for a 32bit float
 F32_NORMALIZE  :: 0
 F32_RADIX      :: 2
 F32_ROUNDS     :: 1
@@ -2528,8 +3926,8 @@ F64_RADIX      :: 2                        // Exponent radix.
 F64_ROUNDS     :: 1                        // Addition rounding: near.
 
 
-F16_MASK  :: 0x1f
-F16_SHIFT :: 16 - 6
+F16_MASK  :: 0x1f 				// mask with size of the expoent for 16bits floats i.e. 5 bits = 1
+F16_SHIFT :: 16 - 6 			// size of the significand for 16bits floats
 F16_BIAS  :: 0xf
 
 F32_MASK  :: 0xff
