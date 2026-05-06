@@ -342,6 +342,7 @@ enum BuildFlagKind {
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
 	BuildFlag_VetPackages,
+	BuildFlag_VetUnreachableCode,
 
 	BuildFlag_CustomAttribute,
 	BuildFlag_IgnoreUnknownAttributes,
@@ -576,6 +577,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUnreachableCode,      str_lit("vet-unreachable-code"),      BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1330,6 +1332,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
+						case BuildFlag_VetUnreachableCode:  build_context.vet_flags |=  VetFlag_UnreachableCode;  break;
 
 						case BuildFlag_VetPackages:
 							{

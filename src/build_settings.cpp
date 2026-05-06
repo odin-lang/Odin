@@ -310,10 +310,11 @@ enum VetFlags : u64 {
 	VetFlag_Tabs            = 1u<<9,
 	VetFlag_UnusedProcedures = 1u<<10,
 	VetFlag_ExplicitAllocators = 1u<<11,
+	VetFlag_UnreachableCode    = 1u<<12,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast,
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast|VetFlag_UnreachableCode,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
