@@ -1658,7 +1658,7 @@ parse_type_or_ident :: proc(p: ^Parser) -> ^ast.Expr {
 	p.expr_level = -1
 
 	lhs := true
-	return parse_atom_expr(p, parse_operand(p, lhs), lhs)
+	return parse_atom_expr(p, parse_operand(p, lhs))
 }
 parse_type :: proc(p: ^Parser) -> ^ast.Expr {
 	type := parse_type_or_ident(p)
@@ -3275,7 +3275,7 @@ empty_selector_expr :: proc(tok: tokenizer.Token, operand: ^ast.Expr) -> ^ast.Se
 	return sel
 }
 
-parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^ast.Expr) {
+parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr) -> (operand: ^ast.Expr) {
 	operand = value
 	if operand == nil {
 		if p.allow_type {
@@ -3288,7 +3288,6 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 	}
 
 	loop := true
-	is_lhs := lhs
 	for loop {
 		#partial switch p.curr_tok.kind {
 		case:
@@ -3461,22 +3460,16 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 			operand = oe
 
 		case .Open_Brace:
-			if !is_lhs && is_literal_type(operand) && p.expr_level >= 0 {
+			if is_literal_type(operand) && p.expr_level >= 0 {
 				operand = parse_literal_value(p, operand)
 			} else {
 				loop = false
 			}
 
 		case .Increment, .Decrement:
-			if !lhs {
-				tok := advance_token(p)
-				error(p, tok.pos, "postfix '%s' operator is not supported", tok.text)
-			} else {
-				loop = false
-			}
+			tok := advance_token(p)
+			error(p, tok.pos, "postfix '%s' operator is not supported", tok.text)
 		}
-
-		is_lhs = false
 	}
 
 	return operand
@@ -3541,7 +3534,7 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		return ise
 
 	}
-	return parse_atom_expr(p, parse_operand(p, lhs), lhs)
+	return parse_atom_expr(p, parse_operand(p, lhs))
 }
 parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 	start_pos := p.curr_tok.pos
