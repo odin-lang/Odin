@@ -1,12 +1,10 @@
-#+build darwin, linux, freebsd, openbsd, netbsd, haiku
+#+build darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System"
-} else when ODIN_OS == .Haiku {
-	foreign import lib "system:network"
 } else {
 	foreign import lib "system:c"
 }

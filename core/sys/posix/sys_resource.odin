@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -96,21 +96,15 @@ when ODIN_OS == .NetBSD {
 	@(private) LGETRUSAGE :: "getrusage"
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	PRIO_PROCESS :: 0
 	PRIO_PGRP    :: 1
 	PRIO_USER    :: 2
 
-	when ODIN_OS == .Haiku {
-		rlim_t :: distinct c.ulong
-	} else {
-		rlim_t :: distinct c.uint64_t
-	}
+	rlim_t :: distinct c.uint64_t
 
-	when ODIN_OS == .Haiku {
-		RLIM_INFINITY :: rlim_t(0xFFFFFFFF)
-	} else when ODIN_OS == .Linux {
+	when ODIN_OS == .Linux {
 		RLIM_INFINITY :: ~rlim_t(0)
 	} else {
 		RLIM_INFINITY :: (rlim_t(1) << 63) - 1
@@ -151,29 +145,19 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		ru_nivcsw:   c.long, /* involuntary " */
 	}
 
-	when ODIN_OS == .Haiku {
-		RLIMIT_CORE   :: 0
-		RLIMIT_CPU    :: 1
-		RLIMIT_DATA   :: 2
-		RLIMIT_FSIZE  :: 3
-		RLIMIT_NOFILE :: 4
-		RLIMIT_STACK  :: 5
-		RLIMIT_AS     :: 6
-	} else {
-		RLIMIT_CORE   :: 4
-		RLIMIT_CPU    :: 0
-		RLIMIT_DATA   :: 2
-		RLIMIT_FSIZE  :: 1
-		RLIMIT_NOFILE :: 7 when ODIN_OS == .Linux else 8
-		RLIMIT_STACK  :: 3
+	RLIMIT_CORE   :: 4
+	RLIMIT_CPU    :: 0
+	RLIMIT_DATA   :: 2
+	RLIMIT_FSIZE  :: 1
+	RLIMIT_NOFILE :: 7 when ODIN_OS == .Linux else 8
+	RLIMIT_STACK  :: 3
 	
-		when ODIN_OS == .Linux {
-			RLIMIT_AS :: 9
-		} else when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
-			RLIMIT_AS :: 5
-		} else {
-			RLIMIT_AS :: 10
-		}
+	when ODIN_OS == .Linux {
+		RLIMIT_AS :: 9
+	} else when ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
+		RLIMIT_AS :: 5
+	} else {
+		RLIMIT_AS :: 10
 	}
 
 }

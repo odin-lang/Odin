@@ -1,5 +1,5 @@
 #+private
-#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd
 #+no-instrumentation
 package runtime
 

@@ -1,4 +1,4 @@
-#+build darwin, linux, freebsd, openbsd, netbsd, haiku
+#+build darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
@@ -225,17 +225,6 @@ when ODIN_OS == .Darwin {
 		d_reclen: u16,                     /* length of this record */
 		d_type:   D_Type,                  /* file type  */
 		d_name:   [256]c.char `fmt:"s,0"`, /* [PSX] entry name */
-	}
-
-} else when ODIN_OS == .Haiku {
-
-	dirent :: struct {
-		d_dev:    dev_t,                 /* device */
-		d_pdev:   dev_t,                 /* parent device (only for queries) */
-		d_ino:    ino_t,                 /* inode number */
-		d_pino:   ino_t,                 /* parent inode (only for queries) */
-		d_reclen: c.ushort,              /* length of this record, not the name */
-		d_name:   [0]c.char `fmt:"s,0"`, /* name of the entry (null byte terminated) */
 	}
 
 }

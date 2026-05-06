@@ -45,7 +45,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku || ODIN_OS == .JS  {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD || ODIN_OS == .JS  {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.27.2 Time manipulation functions
@@ -95,7 +95,7 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS =
 
 	time_t :: distinct i64
 
-	when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Haiku {
+	when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
 		clock_t :: distinct int32_t
 	} else {
 		clock_t :: distinct long

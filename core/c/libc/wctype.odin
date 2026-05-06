@@ -30,10 +30,6 @@ when ODIN_OS == .Windows {
 	wctrans_t :: distinct int
 	wctype_t  :: distinct ulong
 
-} else when ODIN_OS == .Haiku {
-	wctrans_t :: distinct i32
-	wctype_t  :: distinct i32
-
 }
 
 @(default_calling_convention="c")
