@@ -109,20 +109,19 @@ gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts,
 
 		ctx->stmt_flags = prev_stmt_flags;
 
-		if (!(check_vet_flags(ctx) & VetFlag_UnreachableCode)) { continue; }
 		if (i+1 < max_non_constant_declaration) {
 			switch (n->kind) {
 			case Ast_ReturnStmt:
-				error(n, "Statements after this 'return' are never executed");
+				warning(n, "Statements after this 'return' are never executed");
 				break;
 
 			case Ast_BranchStmt:
-				error(n, "Statements after this '%.*s' are never executed", LIT(n->BranchStmt.token.string));
+				warning(n, "Statements after this '%.*s' are never executed", LIT(n->BranchStmt.token.string));
 				break;
 
 			case Ast_ExprStmt:
 				if (is_diverging_stmt(n)) {
-					error(n, "Statements after a diverging procedure call are never executed");
+					warning(n, "Statements after a diverging procedure call are never executed");
 				}
 				break;
 			}
@@ -133,9 +132,9 @@ gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts,
 					if (stmt->kind == Ast_ValueDecl && !stmt->ValueDecl.is_mutable) {
 
 					} else if (stmt->kind == Ast_DeferStmt) {
-						error(stmt, "Unreachable defer statement due to diverging procedure call at the end of the current scope");
+						warning(stmt, "Unreachable defer statement due to diverging procedure call at the end of the current scope");
 					} else if (contains_deferred_call(stmt)) {
-						error(stmt, "Unreachable deferred procedure call due to a diverging procedure call at the end of the current scope");
+						warning(stmt, "Unreachable deferred procedure call due to a diverging procedure call at the end of the current scope");
 					}
 				}
 			}
