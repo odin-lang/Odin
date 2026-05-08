@@ -162,6 +162,11 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 				flag.type_description = fmt.tprintf("<%v>%s", specific_type_info.elem.id,
 					requirement_spec if len(requirement_spec) > 0 else ", multiple")
 			}
+		case runtime.Type_Info_Enum:
+			enum_names := strings.join(specific_type_info.names, ", ", context.temp_allocator)
+			flag.type_description = fmt.tprintf("{{%s}}%s",
+				enum_names,
+				", required" if flag.is_required else "")
 		case runtime.Type_Info_Named:
 			#partial switch base_type_info in specific_type_info.base.variant {
 			case runtime.Type_Info_Enum:
