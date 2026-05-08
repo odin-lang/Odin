@@ -214,6 +214,8 @@ type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 
+type_proc_calling_convention :: proc($T: typeid) -> Odin_Calling_Convention where type_is_proc(T) ---
+
 type_struct_field_count          :: proc($T: typeid) -> int  where type_is_struct(T) ---
 type_struct_has_implicit_padding :: proc($T: typeid) -> bool where type_is_struct(T) ---
 
@@ -247,6 +249,8 @@ type_integer_to_unsigned :: proc($T: typeid) -> type where type_is_integer(T), !
 type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), type_is_unsigned(T) ---
 
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
+
+
 
 // Returns the canonicalized name of the type, of which is used to produce the pseudo-unique 'typeid'
 type_canonical_name :: proc($T: typeid) -> string ---
