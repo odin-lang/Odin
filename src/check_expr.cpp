@@ -1140,6 +1140,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		return;
 	}
 
+	if (operand->mode == Addressing_Type && is_type_typeid(type)) {
+		add_type_info_type(c, operand->type);
+		add_type_and_value(c, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
+		return;
+	}
 
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
@@ -9122,9 +9127,11 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 	if (is_type_any(field_type)) {
 		return false;
 	}
-	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
-		add_type_info_type(c, o->type);
-		return true;
+	if (field_type != nullptr && is_type_typeid(field_type)) {
+		if (o->mode == Addressing_Type) {
+			add_type_info_type(c, o->type);
+			return true;
+		}
 	}
 
 	Ast *expr = unparen_expr(o->expr);
@@ -10582,6 +10589,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		} else {
 			GB_PANIC("unreachable");
 		}
+
 
 
 		i64 max = 0;
@@ -12483,7 +12491,7 @@ gb_internal void check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, 
 	case Addressing_Type:
 		if (type_hint != nullptr && is_type_typeid(type_hint)) {
 			add_type_info_type(c, o->type);
-			break;
+			return;
 		}
 		error_operand_not_expression(o);
 		break;
