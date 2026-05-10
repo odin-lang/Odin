@@ -7,7 +7,9 @@ Int_Flag :: enum {
 Int_Flags :: bit_set[Int_Flag]
 
 MAX_BASE :: 32
-digits := "0123456789abcdefghijklmnopqrstuvwxyz"
+
+@(rodata)
+DIGITS := "0123456789abcdefghijklmnopqrstuvwxyz"
 
 /*
 Determines whether the given unsigned 64-bit integer is a negative value by interpreting it as a signed integer with the specified bit size.
@@ -21,7 +23,7 @@ Determines whether the given unsigned 64-bit integer is a negative value by inte
 - u: The absolute value of the input integer
 - neg: A boolean indicating whether the input integer is negative
 */
-is_integer_negative :: proc(x: u64, is_signed: bool, bit_size: int) -> (u: u64, neg: bool) {
+is_integer_negative_64 :: proc(x: u64, is_signed: bool, bit_size: int) -> (u: u64, neg: bool) {
 	u = x
 	if is_signed {
 		switch bit_size {
@@ -42,7 +44,7 @@ is_integer_negative :: proc(x: u64, is_signed: bool, bit_size: int) -> (u: u64, 
 			neg = i < 0
 			u = u64(abs(i))
 		case:
-			panic("is_integer_negative: Unknown integer size")
+			panic("strconv.is_integer_negative_64: Unknown integer size")
 		}
 	}
 	return
@@ -62,9 +64,9 @@ Writes the string representation of an integer to a buffer with specified base, 
 **Returns**
 - The string containing the integer representation appended to the buffer
 */
-write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits_64 :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
-		panic("strconv: illegal base passed to write_bits")
+		panic("strconv.write_bits_64: illegal base passed to write_bits_64")
 	}
 
 	a: [129]byte
@@ -140,7 +142,7 @@ is_integer_negative_128 :: proc(x: u128, is_signed: bool, bit_size: int) -> (u: 
 			neg = i < 0
 			u = u128(abs(i))
 		case:
-			panic("is_integer_negative: Unknown integer size")
+			panic("strconv.is_integer_negative: Unknown integer size")
 		}
 	}
 	return
@@ -162,12 +164,12 @@ Writes the string representation of a 128-bit integer to a buffer with specified
 */
 write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
 	if base < 2 || base > MAX_BASE {
-		panic("strconv: illegal base passed to write_bits")
+		panic("strconv.write_bits_128: illegal base passed to write_bits_128")
 	}
 
 	a: [140]byte
 	i := len(a)
-	u, neg := is_integer_negative_128(x, is_signed, bit_size)
+	u, neg := is_integer_negative(x, is_signed, bit_size)
 	b := u128(base)
 	for u >= b && i >= 0 {
 		i-=1
@@ -208,3 +210,6 @@ write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_siz
 	copy(buf, out)
 	return string(buf[0:len(out)])
 }
+
+is_integer_negative :: proc{is_integer_negative_64, is_integer_negative_128}
+write_bits :: proc{write_bits_64, write_bits_128}
