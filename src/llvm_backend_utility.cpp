@@ -2048,6 +2048,15 @@ gb_internal LLVMValueRef llvm_mask_zero(lbModule *m, unsigned count) {
 	return LLVMConstNull(LLVMVectorType(lb_type(m, t_u32), count));
 }
 
+gb_internal LLVMValueRef llvm_mask_same(lbModule *m, unsigned value, unsigned count) {
+	auto iota = slice_make<LLVMValueRef>(temporary_allocator(), count);
+	for (unsigned i = 0; i < count; i++) {
+		iota[i] = lb_const_int(m, t_u32, value).value;
+	}
+	return LLVMConstVector(iota.data, count);
+}
+
+
 #define LLVM_VECTOR_DUMMY_VALUE(type) LLVMGetUndef((type))
 // #define LLVM_VECTOR_DUMMY_VALUE(type) LLVMConstNull((type))
 
