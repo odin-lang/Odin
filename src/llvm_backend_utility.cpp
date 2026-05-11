@@ -2293,6 +2293,7 @@ gb_internal LLVMValueRef llvm_vector_mul_add(lbProcedure *p, LLVMValueRef a, LLV
 	}
 }
 
+
 gb_internal LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, String const &clobbers, bool has_side_effects=true, bool is_align_stack=false, LLVMInlineAsmDialect dialect=LLVMInlineAsmDialectATT) {
 	return LLVMGetInlineAsm(func_type,
 		cast(char *)str.text, cast(size_t)str.len,
