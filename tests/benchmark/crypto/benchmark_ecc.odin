@@ -2,6 +2,7 @@ package benchmark_core_crypto
 
 import "base:runtime"
 import "core:encoding/hex"
+import "core:mem"
 import "core:log"
 import "core:testing"
 import "core:text/table"
@@ -161,7 +162,7 @@ bench_ed25519 :: proc() -> (sk, sig, verif: time.Duration) {
 @(private="file")
 bench_ecdsa :: proc(curve: ecdsa.Curve, hash: hash.Algorithm) -> (sk, sig, verif: time.Duration) {
 	priv_bytes := make([]byte, ecdsa.PRIVATE_KEY_SIZES[curve], context.temp_allocator)
-	crypto.set(raw_data(priv_bytes), 0x69, len(priv_bytes))
+	mem.set(raw_data(priv_bytes), 0x69, len(priv_bytes))
 	priv_key: ecdsa.Private_Key
 	start := time.tick_now()
 	for _ in  0 ..< DSA_ITERS {

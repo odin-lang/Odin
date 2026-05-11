@@ -5393,7 +5393,10 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-	case Token_Mul: // Used for error handling when people do C-like things
+	// Used for error handling when people do C-like things
+	case Token_Mul:
+	case Token_Increment:
+	case Token_Decrement:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f);
 		return s;

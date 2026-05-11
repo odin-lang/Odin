@@ -512,7 +512,6 @@ Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 		FreeBSD,
 		OpenBSD,
 		NetBSD,
-		Haiku,
 		WASI,
 		JS,
 		Orca,
@@ -564,7 +563,6 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 /*
 	// Defined internally by the compiler
 	Odin_Endian_Type :: enum int {
-		Unknown,
 		Little,
 		Big,
 	}
@@ -580,7 +578,6 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	.FreeBSD,
 	.OpenBSD,
 	.NetBSD,
-	.Haiku,
 	.WASI,
 	.JS,
 	.Orca,

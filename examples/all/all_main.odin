@@ -48,6 +48,7 @@ package all
 @(require) import "core:crypto/legacy/keccak"
 @(require) import "core:crypto/legacy/md5"
 @(require) import "core:crypto/legacy/sha1"
+@(require) import "core:crypto/mlkem"
 @(require) import cnoise "core:crypto/noise"
 @(require) import "core:crypto/pbkdf2"
 @(require) import "core:crypto/poly1305"

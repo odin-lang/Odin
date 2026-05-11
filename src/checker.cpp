@@ -1171,7 +1171,6 @@ gb_internal void init_universal(void) {
 			{"Darwin",       TargetOs_darwin},
 			{"Linux",        TargetOs_linux},
 			{"FreeBSD",      TargetOs_freebsd},
-			{"Haiku",        TargetOs_haiku},
 			{"OpenBSD",      TargetOs_openbsd},
 			{"NetBSD",       TargetOs_netbsd},
 			{"WASI",         TargetOs_wasi},
