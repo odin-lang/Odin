@@ -1447,7 +1447,33 @@ trunc_f64 :: proc "contextless" (x: f64) -> f64 {
 }
 @(require_results) trunc_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(trunc_f64(f64(x))) }
 @(require_results) trunc_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(trunc_f64(f64(x))) }
-// Removes the fractional part of the value, i.e. rounds towards zero.
+/*
+Removes the fractional part of `x`, i.e. rounds towards zero.
+
+
+Inputs:
+- `x`: float to be truncated
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	trunc_example :: proc() {
+		x_float:    f16 = 2.1
+
+		fmt.println(math.trunc(x_float))
+	}
+
+Output:
+    +2
+
+*/
 trunc :: proc{
 	trunc_f16, trunc_f16le, trunc_f16be,
 	trunc_f32, trunc_f32le, trunc_f32be, 
@@ -1624,6 +1650,36 @@ round_f64 :: proc "contextless" (x: f64) -> f64 {
 }
 @(require_results) round_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(round_f64(f64(x))) }
 @(require_results) round_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(round_f64(f64(x))) }
+/*
+Rounds `x` to the nearest integer
+
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input, but representing a integer
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	round_example :: proc() {
+		x_float:    f16 = 3.1
+		x2_float:    f16 = -2.5
+
+		fmt.println(math.round(x_float))
+		fmt.println(math.round(x2_float))
+	}
+
+Output:
+    +3
+    -3
+
+*/
 round :: proc{
 	round_f16, round_f16le, round_f16be,
 	round_f32, round_f32le, round_f32be,
@@ -2029,6 +2085,7 @@ modf :: proc{
 	modf_f32, modf_f32le, modf_f32be,
 	modf_f64, modf_f64le, modf_f64be,
 }
+// alias to `modf()`
 split_decimal :: modf
 
 @(require_results)
