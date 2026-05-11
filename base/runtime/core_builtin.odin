@@ -513,7 +513,7 @@ new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location)
 	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return))
 	return
 }
-@(require_results)
+@(builtin, require_results)
 new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
 	t = (^T)(raw_data(mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return))
 	return
@@ -530,7 +530,7 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 
 DEFAULT_DYNAMIC_ARRAY_CAPACITY :: 8
 
-@(require_results)
+@(builtin, require_results)
 make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (res: T, err: Allocator_Error) #optional_allocator_error {
 	err = _make_aligned_type_erased(&res, size_of(E), len, alignment, allocator, loc)
 	return
@@ -694,7 +694,7 @@ shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bo
 // The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
 // If m is nil, or there is no such element, this procedure is a no-op
 // It is safe to use `delete_key` while iterating a map.
-// But if you iterate across a map and insert a new key, it could resize which means you are not iterating across all of the elements. 
+// But if you iterate across a map and insert a new key, it could resize which means you are not iterating across all of the elements.
 @builtin
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
