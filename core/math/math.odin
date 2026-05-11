@@ -1447,7 +1447,33 @@ trunc_f64 :: proc "contextless" (x: f64) -> f64 {
 }
 @(require_results) trunc_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(trunc_f64(f64(x))) }
 @(require_results) trunc_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(trunc_f64(f64(x))) }
-// Removes the fractional part of the value, i.e. rounds towards zero.
+/*
+Removes the fractional part of `x`, i.e. rounds towards zero.
+
+
+Inputs:
+- `x`: float to be truncated
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	trunc_example :: proc() {
+		x_float:    f16 = 2.1
+
+		fmt.println(math.trunc(x_float))
+	}
+
+Output:
+    +2
+
+*/
 trunc :: proc{
 	trunc_f16, trunc_f16le, trunc_f16be,
 	trunc_f32, trunc_f32le, trunc_f32be, 
@@ -1624,6 +1650,36 @@ round_f64 :: proc "contextless" (x: f64) -> f64 {
 }
 @(require_results) round_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(round_f64(f64(x))) }
 @(require_results) round_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(round_f64(f64(x))) }
+/*
+Rounds `x` to the nearest integer
+
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input, but representing a integer
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	round_example :: proc() {
+		x_float:    f16 = 3.1
+		x2_float:    f16 = -2.5
+
+		fmt.println(math.round(x_float))
+		fmt.println(math.round(x2_float))
+	}
+
+Output:
+    +3
+    -3
+
+*/
 round :: proc{
 	round_f16, round_f16le, round_f16be,
 	round_f32, round_f32le, round_f32be,
@@ -1969,11 +2025,67 @@ modf_f64be :: proc "contextless" (x: f64be) -> (int: f64be, frac: f64be) {
 	i, f := #force_inline modf_f64(f64(x))
 	return f64be(i), f64be(f)
 }
+/*
+Breaks a float apart into its integer and fractional parts
+
+NOTE: this uses the same precision as the input type for the return, such that rounding errors are possible.
+As shown in the example this is almost always visible with 0.1 fractions when using f16
+
+
+Inputs:
+- `x`: float to be split
+
+
+Returns:
+- A tuple containing the integer and fractional parts of the input with matching type as the `x`
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	modf_example :: proc() {
+		x_float:    f16 = 3.1
+		x2_float:    f16 = -2.5
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.modf(x_float))
+		fmt.println(math.modf(x2_float))
+
+		fmt.println(math.modf(x_pos_zero))
+		fmt.println(math.modf(x_neg_zero))
+		fmt.println(math.modf(x_pos_inf))
+		fmt.println(math.modf(x_neg_inf))
+		fmt.println(math.modf(x_nan))
+	}
+
+Output:
+    +3 +0.0996
+    -2 -0.5
+    
+    // special cases
+    0 0           // pos_zero
+    -0 -0         // neg_zero
+    +Inf NaN      // pos_inf
+    -Inf NaN      // neg_inf
+    NaN NaN       // nan
+
+*/
 modf :: proc{
 	modf_f16, modf_f16le, modf_f16be,
 	modf_f32, modf_f32le, modf_f32be,
 	modf_f64, modf_f64le, modf_f64be,
 }
+// alias to `modf()`
 split_decimal :: modf
 
 @(require_results)
@@ -2013,6 +2125,65 @@ mod_f64 :: proc "contextless" (x, y: f64)   -> (n: f64) {
 mod_f64le :: proc "contextless" (x, y: f64le) -> (n: f64le) { return #force_inline f64le(mod_f64(f64(x), f64(y))) }
 @(require_results)
 mod_f64be :: proc "contextless" (x, y: f64be) -> (n: f64be) { return #force_inline f64be(mod_f64(f64(x), f64(y))) }
+/*
+Retrieves the remainder of `x` divided by `y` and sets the signal as the same as `x`.
+
+For positive numbers you can consider this the non-greedy calculation of the remainder, that is, it stops at the
+first non-divisible point.
+Using either infinities or `NaN` as any of the parameters results in `NaN` 
+
+NOTE: this is similar to `remainder()`, but it wraps only every `y` step instead of `y/2`
+
+
+Inputs:
+- `x`: float to be divided
+- `y`: float divider
+
+
+Returns:
+- A float of matching type as the inputs representing the remainder
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	mod_example :: proc() {
+		x_float:        f16 = 3.0
+		y_float:        f16 = -2.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;            
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.mod(x_float, y_float))
+		fmt.println(math.mod(y_float, x_float))
+
+		fmt.println(math.mod(y_float, x_pos_zero))
+		fmt.println(math.mod(x_zero_inf, y_float))
+		fmt.println(math.mod(x_neg_inf, y_float))
+		fmt.println(math.mod(y_float, x_zero_inf))
+
+		fmt.println(math.mod(x_nan, x_float))
+	}
+
+Output:
+    +1
+    -2
+    
+    // special cases
+    NaN        // division by zero
+    NaN        // zero_inf
+    NaN        // neg_inf
+    NaN        // zero_inf as mod
+    NaN        // nan
+
+*/
 mod :: proc{
 	mod_f16, mod_f16le, mod_f16be,
 	mod_f32, mod_f32le, mod_f32be,
@@ -2028,6 +2199,65 @@ mod :: proc{
 @(require_results) remainder_f64   :: proc "contextless" (x, y: f64  ) -> f64   { return x - round(x/y) * y }
 @(require_results) remainder_f64le :: proc "contextless" (x, y: f64le) -> f64le { return x - round(x/y) * y }
 @(require_results) remainder_f64be :: proc "contextless" (x, y: f64be) -> f64be { return x - round(x/y) * y }
+/*
+Calculates `x` divided by `y` rounded to the nearest integer and uses that value to get the remainder from the division
+
+This means that `remainder(x, y)` will be the same to `mod(x, y)` up to the middle point of `y` in absolute terms 
+after which remainder forces the result to wrap around, thus remainder(abs(y/2), y) is equal to -remainder(abs(y/2)+1, y)
+
+This shows that if we imagine a grid of step `y` then `remainder()` is getting us the distance to the nearest grid unit
+
+
+Using either infinities or `NaN` as any of the parameters results in `NaN` 
+
+
+NOTE: for a version that considers the distance to the start of the current grid step see `mod()`
+
+
+Inputs:
+- `x`: float to be divided
+- `y`: float divider
+
+
+Returns:
+- A float of matching type as the inputs representing the remainder
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	remainder_example :: proc() {
+		x_float:        f16 = 6.0
+		x2_float:        f16 = 7.0
+		y_float:        f16 = 13.0
+		y2_float:        f16 = -13.0
+
+
+		fmt.println(math.remainder(x_float, y_float))
+		fmt.println(math.remainder(y_float, x_float))
+		fmt.println(math.remainder(x_float, y2_float))
+		fmt.println(math.remainder(y2_float, x_float))
+
+		fmt.println(math.remainder(x2_float, y_float))
+		fmt.println(math.remainder(y_float, x2_float))
+		fmt.println(math.remainder(x2_float, y2_float))
+		fmt.println(math.remainder(y2_float, x2_float))
+	}
+
+Output:
+	6
+	1
+	6
+	-1
+
+	-6
+	-1
+	-6
+	1
+
+*/
 remainder :: proc{
 	remainder_f16, remainder_f16le, remainder_f16be,
 	remainder_f32, remainder_f32le, remainder_f32be,
@@ -3719,7 +3949,62 @@ nextafter_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
 @(require_results) nextafter_f32be :: proc "contextless" (x, y: f32be) -> (r: f32be) { return f32be(nextafter_f32(f32(x), f32(y))) }
 @(require_results) nextafter_f64le :: proc "contextless" (x, y: f64le) -> (r: f64le) { return f64le(nextafter_f64(f64(x), f64(y))) }
 @(require_results) nextafter_f64be :: proc "contextless" (x, y: f64be) -> (r: f64be) { return f64be(nextafter_f64(f64(x), f64(y))) }
+/*
+Fetches the next number after `x` in the direction of `y` considering the precision of the float used
 
+NOTE: 0 is a special case for `x` that will ignore the precision step and go to -1 or +1
+
+
+Inputs:
+- `x`: float as starting point
+- `y`: float indicating the end of the range i.e. direction
+
+
+Returns:
+- A float of matching type as the inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	nextafter_example :: proc() {
+		x_float:        f16 = 3.0
+		y_float:        f16 = -2.0
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.nextafter(x_float, y_float))
+		fmt.println(math.nextafter(y_float, x_float))
+
+		fmt.println(math.nextafter(x_pos_zero, x_float))
+		fmt.println(math.nextafter(f16(1), x_pos_zero))
+
+		fmt.println(math.nextafter(x_zero_inf, y_float))
+		fmt.println(math.nextafter(x_neg_inf, y_float))
+
+		fmt.println(math.nextafter(x_nan, x_float))
+	}
+
+Output:
+	2.998
+	-1.999
+    
+	// special cases
+	1           // pos_zero | x
+	0.9995      // F16(1) 	| pos_zero 
+	65500       // zero_inf | y
+	-65500      // neg_inf 	| y
+	Nan         // nan 		| x
+
+*/
 nextafter :: proc{
 	nextafter_f16, nextafter_f16le, nextafter_f16be,
 	nextafter_f32, nextafter_f32le, nextafter_f32be,
