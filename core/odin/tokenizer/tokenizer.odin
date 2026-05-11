@@ -107,10 +107,12 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 	t.error_count = 0
 	t.path = path
 
-	if !intrinsics.atomic_load(&_global_keyword_lut_initialized) {
+	if !intrinsics.atomic_load_explicit(&_global_keyword_lut_initialized, .Acquire) {
 		_global_keyword_spin_lock()
-		ok := keyword_lut_init(&global_keyword_lut)
-		intrinsics.atomic_store(&_global_keyword_lut_initialized, ok)
+		if !intrinsics.atomic_load_explicit(&_global_keyword_lut_initialized, .Acquire) {
+			ok := keyword_lut_init(&global_keyword_lut)
+			intrinsics.atomic_store_explicit(&_global_keyword_lut_initialized, ok, .Release)
+		}
 		_global_keyword_spin_unlock()
 	}
 
@@ -573,7 +575,7 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		lit = scan_identifier(t)
 		kind = .Ident
 		check_keyword: if 1 < len(lit) && len(lit) < 16 {
-			if intrinsics.atomic_load(&_global_keyword_lut_initialized) {
+			if intrinsics.atomic_load_explicit(&_global_keyword_lut_initialized, .Acquire) {
 				entry := &global_keyword_lut[keyword_hash(lit) & KEYWORD_LUT_MASK]
 				if entry.kind != .Invalid && entry.name == lit {
 					kind = entry.kind
