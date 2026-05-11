@@ -1544,7 +1544,7 @@ write_int :: proc(buf: []byte, i: i64, base: int) -> string {
 
 
 write_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
-	return write_bits_128(buf, u, base, false, 8*size_of(uint), DIGITS, nil)
+	return write_bits(buf, u, base, false, 8*size_of(uint), DIGITS, nil)
 }
 
 /*

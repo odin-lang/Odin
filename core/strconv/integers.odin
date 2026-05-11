@@ -64,7 +64,7 @@ Writes the string representation of an integer to a buffer with specified base, 
 **Returns**
 - The string containing the integer representation appended to the buffer
 */
-write_bits_64 :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits_64 :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string = DIGITS, flags: Int_Flags = {}) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv.write_bits_64: illegal base passed to write_bits_64")
 	}
@@ -162,7 +162,7 @@ Writes the string representation of a 128-bit integer to a buffer with specified
 **Returns**
 - The string containing the integer representation written to the buffer
 */
-write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string = DIGITS, flags: Int_Flags = {}) -> string {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv.write_bits_128: illegal base passed to write_bits_128")
 	}
