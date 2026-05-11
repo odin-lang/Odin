@@ -2230,6 +2230,30 @@ gb_internal LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMVal
 	return LLVMBuildFMul(p->builder, a, b, "");
 }
 
+gb_internal LLVMValueRef llvm_vector_mul_pairwise_reduce_add(lbProcedure *p, Slice<LLVMValueRef> const &a, Slice<LLVMValueRef> const &b) {
+	GB_ASSERT(a.count == b.count);
+
+	auto temps = slice_make<LLVMValueRef>(temporary_allocator(), a.count);
+	for (unsigned i = 0; i < a.count; i++) {
+		temps[i] = llvm_vector_mul(p, a[i], b[i]);
+	}
+
+	unsigned k = cast(unsigned)a.count;
+	while (k > 1) {
+		unsigned half = k/2;
+		for (unsigned j = 0; j < half; j++) {
+			temps[j] = llvm_vector_add(p, temps[2*j + 0], temps[2*j + 1]);
+		}
+
+		if ((k&1) != 0) {
+			temps[half] = temps[k-1];
+		}
+		k = (k+1)/2;
+	}
+
+	return temps[0];
+}
+
 
 gb_internal LLVMValueRef llvm_vector_dot(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	return llvm_vector_reduce_add(p, llvm_vector_mul(p, a, b));
