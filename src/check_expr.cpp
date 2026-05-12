@@ -12922,6 +12922,15 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = write_expr_to_string(str, at->elem, shorthand);
 	case_end;
 
+	case_ast_node(at, FixedCapacityDynamicArrayType, node);
+		if (at->tag) {
+			str = write_expr_to_string(str, at->tag, false);
+		}
+		str = gb_string_appendc(str, "[dynamic; ");
+		str = write_expr_to_string(str, at->capacity, false);
+		str = gb_string_append_rune(str, ']');
+		str = write_expr_to_string(str, at->elem, shorthand);
+	case_end;
 	case_ast_node(at, DynamicArrayType, node);
 		if (at->tag) {
 			str = write_expr_to_string(str, at->tag, false);
