@@ -6848,10 +6848,3 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
-st_strings[expr->kind]),
-	         token_pos_to_string(token_pos));
-
-
-	return {};
-}
-
