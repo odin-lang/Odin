@@ -670,8 +670,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool ca
 			auto tags = array_make<OdinDocString>(heap_allocator(), type->Struct.fields.count);
 			defer (array_free(&tags));
 
-			for_array(i, type->Struct.fields) {
-				tags[i] = odin_doc_write_string(w, type->Struct.tags[i]);
+			if (type->Struct.tags != nullptr) {
+				for_array(i, type->Struct.fields) {
+					tags[i] = odin_doc_write_string(w, type->Struct.tags[i]);
+				}
 			}
 
 			doc_type.tags = odin_write_slice(w, tags.data, tags.count);

@@ -2476,7 +2476,9 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false);
 		} else {
 			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
-				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(str_lit("$deferred_return")), nullptr);
+				gbString name = expr_to_string(field->type);
+				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(make_string_c(name)), nullptr);
+				gb_string_free(name);
 			} else {
 				type = check_type(ctx, field->type);
 			}
