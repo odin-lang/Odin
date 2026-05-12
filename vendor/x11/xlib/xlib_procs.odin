@@ -295,6 +295,7 @@ foreign xlib {
 		src_y:      i32,
 		dst_x:      ^i32,
 		dst_y:      ^i32,
+		dst_child:  ^Window,
 		) -> b32 ---
 	QueryPointer :: proc(
 		display: ^Display,
