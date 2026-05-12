@@ -819,6 +819,13 @@ gb_internal lbValue lb_emit_matrix_transpose(lbProcedure *p, lbValue m, Type *ty
 
 	Type *rt = base_type(type);
 	if (rt->kind == Type_Matrix && rt->Matrix.is_row_major != mt->Matrix.is_row_major) {
+		if (rt->Matrix.row_count    == mt->Matrix.column_count &&
+		    rt->Matrix.column_count == mt->Matrix.row_count) {
+			lbValue res = m;
+			res.type = type;
+			return res;
+		}
+
 		GB_PANIC("TODO: transpose with changing layout");
 	}
 
