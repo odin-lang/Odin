@@ -2048,6 +2048,15 @@ gb_internal LLVMValueRef llvm_mask_zero(lbModule *m, unsigned count) {
 	return LLVMConstNull(LLVMVectorType(lb_type(m, t_u32), count));
 }
 
+gb_internal LLVMValueRef llvm_mask_same(lbModule *m, unsigned value, unsigned count) {
+	auto iota = slice_make<LLVMValueRef>(temporary_allocator(), count);
+	for (unsigned i = 0; i < count; i++) {
+		iota[i] = lb_const_int(m, t_u32, value).value;
+	}
+	return LLVMConstVector(iota.data, count);
+}
+
+
 #define LLVM_VECTOR_DUMMY_VALUE(type) LLVMGetUndef((type))
 // #define LLVM_VECTOR_DUMMY_VALUE(type) LLVMConstNull((type))
 
@@ -2221,6 +2230,30 @@ gb_internal LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMVal
 	return LLVMBuildFMul(p->builder, a, b, "");
 }
 
+gb_internal LLVMValueRef llvm_vector_mul_pairwise_reduce_add(lbProcedure *p, Slice<LLVMValueRef> const &a, Slice<LLVMValueRef> const &b) {
+	GB_ASSERT(a.count == b.count);
+
+	auto temps = slice_make<LLVMValueRef>(temporary_allocator(), a.count);
+	for (unsigned i = 0; i < a.count; i++) {
+		temps[i] = llvm_vector_mul(p, a[i], b[i]);
+	}
+
+	unsigned k = cast(unsigned)a.count;
+	while (k > 1) {
+		unsigned half = k/2;
+		for (unsigned j = 0; j < half; j++) {
+			temps[j] = llvm_vector_add(p, temps[2*j + 0], temps[2*j + 1]);
+		}
+
+		if ((k&1) != 0) {
+			temps[half] = temps[k-1];
+		}
+		k = (k+1)/2;
+	}
+
+	return temps[0];
+}
+
 
 gb_internal LLVMValueRef llvm_vector_dot(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	return llvm_vector_reduce_add(p, llvm_vector_mul(p, a, b));
@@ -2259,6 +2292,7 @@ gb_internal LLVMValueRef llvm_vector_mul_add(lbProcedure *p, LLVMValueRef a, LLV
 		return y;
 	}
 }
+
 
 gb_internal LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, String const &clobbers, bool has_side_effects=true, bool is_align_stack=false, LLVMInlineAsmDialect dialect=LLVMInlineAsmDialectATT) {
 	return LLVMGetInlineAsm(func_type,

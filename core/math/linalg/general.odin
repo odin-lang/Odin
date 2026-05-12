@@ -46,18 +46,17 @@ scalar_dot :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T)
 
 @(require_results)
 vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
-	ab := a * b
 	when N == 1 {
-		return ab.x
+		return a.x*b.x
 	} else when N == 2 {
-		return ab.x + ab.y
+		return a.x*b.x + a.y*b.y
 	} else when N == 3 {
-		return ab.x + ab.y + ab.z
+		return a.x*b.x + a.y*b.y + a.z*b.z
 	} else when N == 4 {
-		return ab.x + ab.y + ab.z + ab.w
+		return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w
 	} else {
-		for elem in ab {
-			c += elem
+		#unroll for _, i in a {
+			c += a[i]*b[i]
 		}
 		return c
 	}
