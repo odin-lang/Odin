@@ -474,7 +474,10 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 			i += width
 
 			buf, buf_width := utf8.encode_rune(r)
-			assert(buf_width <= width)
+			// If we have an invalid utf8 character, width can be smaller than the width of RUNE_ERROR
+			if r != utf8.RUNE_ERROR {
+				assert(buf_width <= width)
+			}
 			copy(b[w:], buf[:buf_width])
 			w += buf_width
 		}
