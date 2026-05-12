@@ -1302,7 +1302,7 @@ foreign xlib {
 		dipslay:   ^Display,
 		window:    Window,
 		screen_no: i32,
-		) -> Status ---
+		) -> b32 ---
 	WithdrawWindow :: proc(
 		dipslay:   ^Display,
 		window:    Window,
