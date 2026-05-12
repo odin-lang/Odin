@@ -295,6 +295,7 @@ foreign xlib {
 		src_y:      i32,
 		dst_x:      ^i32,
 		dst_y:      ^i32,
+		dst_child:  ^Window,
 		) -> b32 ---
 	QueryPointer :: proc(
 		display: ^Display,
@@ -1301,7 +1302,7 @@ foreign xlib {
 		dipslay:   ^Display,
 		window:    Window,
 		screen_no: i32,
-		) -> Status ---
+		) -> b32 ---
 	WithdrawWindow :: proc(
 		dipslay:   ^Display,
 		window:    Window,
