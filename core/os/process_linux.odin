@@ -439,7 +439,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 
 			exe_path = strings.to_cstring(&exe_builder) or_return
 			stat: linux.Statx
-			if linux.statx(linux.AT_FDCWD, exe_path, {}, {.MODE}, &stat) == .NONE && .IFREG in stat.mode && .IXUSR in stat.mode {
+			if linux.statx(linux.AT_FDCWD, exe_path, {}, {.TYPE, .MODE}, &stat) == .NONE && .IFREG in stat.mode && .IXUSR in stat.mode {
 				found = true
 				break
 			}

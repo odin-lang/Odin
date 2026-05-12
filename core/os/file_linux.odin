@@ -280,7 +280,7 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error
 @(no_sanitize_memory)
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
 	s: linux.Statx = ---
-	errno := linux.statx(f.fd, "", {.EMPTY_PATH}, {.SIZE, .MODE}, &s)
+	errno := linux.statx(f.fd, "", {.EMPTY_PATH}, {.SIZE, .TYPE}, &s)
 	if errno != .NONE {
 		return 0, _get_platform_error(errno)
 	}
