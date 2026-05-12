@@ -1214,10 +1214,10 @@ gb_internal lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbVal
 
 		LLVMValueRef matrix_vector = lb_matrix_to_vector(p, lhs);
 
-		for (unsigned column_index = 0; column_index < column_count; column_index++) {
-			LLVMValueRef mask = llvm_mask_iota(p->module, stride*column_index, row_count);
+		for (unsigned i = 0; i < column_count; i++) {
+			LLVMValueRef mask = llvm_mask_iota(p->module, stride*i, row_count);
 			LLVMValueRef column = llvm_basic_shuffle(p, matrix_vector, mask);
-			m_columns[column_index] = column;
+			m_columns[i] = column;
 		}
 
 		if (LLVMIsALoadInst(rhs.value)) {
@@ -1310,15 +1310,13 @@ gb_internal lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbVal
 			v_rows[column_index] = row;
 		}
 
-		GB_ASSERT(row_count > 0);
-
 		LLVMValueRef vector = llvm_vector_mul_pairwise_reduce_add(p, v_rows, m_columns);
 
 		lbAddr res = llvm_add_local_generated_from_vector(p, type, vector);
 		return lb_addr_load(p, res);
 	}
 
-	lbAddr res = lb_add_local_generated(p, type, false);
+	lbAddr res = lb_add_local_generated(p, type, true);
 
 	Type *vector_elem_type = base_array_type(rhs.type);
 
@@ -4010,7 +4008,7 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 			}
 		}
 		break;
-	
+
 	case Type_SoaPointer:
 		{
 			// NOTE(bill): An SoaPointer is essentially just a pointer for nil comparison
@@ -4715,7 +4713,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(ie, IndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
-	
+
 	case_ast_node(ie, MatrixIndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
@@ -6742,7 +6740,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(ac, AutoCast, expr);
 		return lb_build_addr(p, ac->expr);
 	case_end;
-	
+
 	case_ast_node(te, TernaryIfExpr, expr);
 		LLVMValueRef incoming_values[2] = {};
 		LLVMBasicBlockRef incoming_blocks[2] = {};
@@ -6779,12 +6777,12 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 		return lb_addr(res);
 	case_end;
-	
+
 	case_ast_node(oe, OrElseExpr, expr);
 		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
 		return lb_addr(ptr);
 	case_end;
-	
+
 	case_ast_node(oe, OrReturnExpr, expr);
 		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
 		return lb_addr(ptr);
@@ -6844,6 +6842,13 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	         "\tAst: %.*s @ "
 	         "%s\n",
 	         LIT(ast_strings[expr->kind]),
+	         token_pos_to_string(token_pos));
+
+
+	return {};
+}
+
+st_strings[expr->kind]),
 	         token_pos_to_string(token_pos));
 
 
