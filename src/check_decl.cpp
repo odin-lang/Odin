@@ -1256,6 +1256,16 @@ gb_internal void check_foreign_procedure(CheckerContext *ctx, Entity *e, DeclInf
 	mutex_unlock(&ctx->info->foreign_mutex);
 }
 
+gb_internal bool proc_type_ast_has_results(Ast *proc_type_node) {
+	GB_ASSERT(proc_type_node != nullptr && proc_type_node->kind == Ast_ProcType);
+	Ast *results = proc_type_node->ProcType.results;
+	if (results == nullptr) {
+		return false;
+	}
+	GB_ASSERT(results->kind == Ast_FieldList);
+	return results->FieldList.list.count > 0;
+}
+
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != Ast_ProcLit) {
@@ -1277,50 +1287,76 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	defer (check_close_scope(ctx));
 	ctx->scope->procedure_entity = e;
 
-	Type *decl_type = nullptr;
-
-	if (d->type_expr != nullptr) {
-		decl_type = check_type(ctx, d->type_expr);
-		if (!is_type_proc(decl_type)) {
-			gbString str = type_to_string(decl_type);
-			error(d->type_expr, "Expected a procedure type, got '%s'", str);
-			gb_string_free(str);
-		}
-	}
-
-
-	auto tmp_ctx = *ctx;
-	tmp_ctx.allow_polymorphic_types = true;
-	if (decl_type != nullptr) {
-		tmp_ctx.type_hint = decl_type;
-	}
-	check_procedure_type(&tmp_ctx, proc_type, pl->type);
-
-	if (decl_type != nullptr) {
-		Operand x = {};
-		x.type = e->type;
-		x.mode = Addressing_Variable;
-		if (!check_is_assignable_to(ctx, &x, decl_type)) {
-			gbString expr_str = expr_to_string(d->proc_lit);
-			gbString op_type_str = type_to_string(e->type);
-			gbString type_str = type_to_string(decl_type);
-			error(e->token,
-			      "Cannot assign '%s' of type '%s' to '%s'",
-			      expr_str,
-			      op_type_str,
-			      type_str);
-
-			gb_string_free(type_str);
-			gb_string_free(op_type_str);
-			gb_string_free(expr_str);
-		}
-	}
-
 	TypeProc *pt = &proc_type->Proc;
 	AttributeContext ac = make_attribute_context(e->Procedure.link_prefix, e->Procedure.link_suffix);
-
 	if (d != nullptr) {
 		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
+	}
+
+	bool disabled_proc = ac.has_disabled_proc && ac.disabled_proc;
+
+	Type *decl_type = nullptr;
+	if (!disabled_proc) {
+		if (d->type_expr != nullptr) {
+			decl_type = check_type(ctx, d->type_expr);
+			if (!is_type_proc(decl_type)) {
+				gbString str = type_to_string(decl_type);
+				error(d->type_expr, "Expected a procedure type, got '%s'", str);
+				gb_string_free(str);
+			}
+		}
+
+		auto tmp_ctx = *ctx;
+		tmp_ctx.allow_polymorphic_types = true;
+		if (decl_type != nullptr) {
+			tmp_ctx.type_hint = decl_type;
+		}
+		check_procedure_type(&tmp_ctx, proc_type, pl->type);
+
+		if (decl_type != nullptr) {
+			Operand x = {};
+			x.type = e->type;
+			x.mode = Addressing_Variable;
+			if (!check_is_assignable_to(ctx, &x, decl_type)) {
+				gbString expr_str = expr_to_string(d->proc_lit);
+				gbString op_type_str = type_to_string(e->type);
+				gbString type_str = type_to_string(decl_type);
+				error(e->token,
+				      "Cannot assign '%s' of type '%s' to '%s'",
+				      expr_str,
+				      op_type_str,
+				      type_str);
+
+				gb_string_free(type_str);
+				gb_string_free(op_type_str);
+				gb_string_free(expr_str);
+			}
+		}
+	} else {
+		ast_node(proc_ast, ProcType, pl->type);
+		ProcCallingConvention cc = proc_ast->calling_convention;
+		if (cc == ProcCC_ForeignBlockDefault) {
+			cc = ProcCC_CDecl;
+			if (ctx->foreign_context.default_cc > 0) {
+				cc = ctx->foreign_context.default_cc;
+			}
+		}
+		if (cc == ProcCC_Invalid) {
+			cc = default_calling_convention();
+		}
+		pt->node = pl->type;
+		pt->scope = ctx->scope;
+		pt->params = nullptr;
+		pt->param_count = 0;
+		pt->results = nullptr;
+		pt->result_count = 0;
+		pt->variadic = false;
+		pt->variadic_index = -1;
+		pt->calling_convention = cc;
+		pt->is_polymorphic = false;
+		pt->specialization_count = 0;
+		pt->diverging = proc_ast->diverging;
+		pt->optional_ok = false;
 	}
 
 	if (ac.test) {
@@ -1494,9 +1530,15 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		if (ac.disabled_proc) {
 			e->flags |= EntityFlag_Disabled;
 		}
-		Type *t = base_type(e->type);
-		GB_ASSERT(t->kind == Type_Proc);
-		if (t->Proc.result_count != 0) {
+		bool has_results = false;
+		if (disabled_proc) {
+			has_results = proc_type_ast_has_results(pl->type);
+		} else {
+			Type *t = base_type(e->type);
+			GB_ASSERT(t->kind == Type_Proc);
+			has_results = t->Proc.result_count != 0;
+		}
+		if (has_results) {
 			error(e->token, "Procedure with the 'disabled' attribute may not have any return values");
 		}
 	}
@@ -1570,7 +1612,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		d->scope = ctx->scope;
 
 		GB_ASSERT(pl->body->kind == Ast_BlockStmt);
-		if (!pt->is_polymorphic) {
+		if (!pt->is_polymorphic && (e->flags & EntityFlag_Disabled) == 0) {
 			check_procedure_later(ctx->checker, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
 		}
 	} else if (!is_foreign && !e->Procedure.is_objc_impl_or_import) {
