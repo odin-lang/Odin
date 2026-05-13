@@ -339,10 +339,10 @@ foreign xlib {
 		long_len:    int,
 		delete:      b32,
 		req_type:    Atom,
-		act_type:    [^]Atom,
-		act_format:  [^]i32,
-		nitems:      [^]uint,
-		bytes_after: [^]uint,
+		act_type:    ^Atom,
+		act_format:  ^i32,
+		nitems:      ^uint,
+		bytes_after: ^uint,
 		props:       ^rawptr,
 	) -> i32 ---
 	ListProperties :: proc(
