@@ -713,7 +713,7 @@ AllHints :: WMHints{
 	.WindowGroupHint,
 }
 
-SizeHints :: bit_set[SizeHintsBits; uint]
+SizeHints :: bit_set[SizeHintsBits; int]
 SizeHintsBits :: enum {
 	USPosition  = 0,
 	USSize      = 1,
