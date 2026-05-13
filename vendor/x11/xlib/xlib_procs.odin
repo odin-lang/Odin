@@ -1367,7 +1367,7 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		) -> ^XWMHints ---
-	// Setting and reading MW_NORMAL_HINTS property
+	// Setting and reading WM_NORMAL_HINTS property
 	AllocSizeHints :: proc() -> ^XSizeHints ---
 	SetWMNormalHints :: proc(
 		display: ^Display,
