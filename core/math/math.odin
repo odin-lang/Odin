@@ -20,9 +20,9 @@ PI           :: 3.14159265358979323846264338327950288 // fundamental circle rati
 
 E            :: 2.71828182845904523536 // Euler's number
 
-τ :: TAU
-π :: PI
-e :: E
+τ :: TAU 	// alias to TAU
+π :: PI 	// alias to PI
+e :: E 		// alias to E
 
 SQRT_TWO     :: 1.41421356237309504880168872420969808 // precalculated square root of 2
 SQRT_THREE   :: 1.73205080756887729352744634150587236 // precalculated square root of 3
@@ -38,10 +38,10 @@ MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal
 RAD_PER_DEG :: TAU/360.0 // Ratio for conversion of degrees to radians. Multiply by a variable in degrees units to get the radians.
 DEG_PER_RAD :: 360.0/TAU // Ratio for conversion of radians to degrees. Multiply by a variable in radians units to get the degrees.
 
-abs :: builtin.abs
-min :: builtin.min
-max :: builtin.max
-clamp :: builtin.clamp
+abs :: builtin.abs 		// Returns the absolute of input
+min :: builtin.min 		// Returns the minimum of input
+max :: builtin.max 		// Returns the maximum of input
+clamp :: builtin.clamp 	// Returns the input limited by a range
 
 @(require_results) sqrt_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))) }
 @(require_results) sqrt_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))) }
