@@ -4169,38 +4169,38 @@ count_digits_of_base :: proc "contextless" (value: $T, $base: int) -> (digits: i
 	return
 }
 
-F16_DIG        :: 3
-F16_EPSILON    :: 0.00097656
-F16_GUARD      :: 0
-F16_MANT_DIG   :: 11
-F16_MAX        :: 65504.0
-F16_MAX_10_EXP :: 4
-F16_MAX_EXP    :: 15
-F16_MIN        :: 6.10351562e-5 // smallest positive normal for a 16bit float
-F16_MIN_10_EXP :: -4
-F16_MIN_EXP    :: -14 			// smallest possible power of 2 for a 16bit float
-F16_NORMALIZE  :: 0
-F16_RADIX      :: 2
-F16_ROUNDS     :: 1
+F16_DIG        :: 3 			// Number of decimal digits able to be represented for a 16bit float
+F16_EPSILON    :: 0.00097656 	// step when value is >1; 1/(2**10) == 1/(2**F16_SHIFT)
+F16_GUARD      :: 0 			// reserved (?)
+F16_MANT_DIG   :: 11 			// usable significative bits, including the ommited `1.` on normalized values, significand size +1
+F16_MAX        :: 65504.0 		// biggest positive normalized value for a 16bit float
+F16_MAX_10_EXP :: 4 			// biggest possible power of 10 for a 16bit float yielding normalized value.
+F16_MAX_EXP    :: 15 			// biggest possible power of 2 for a 16bit float yielding normalized value.
+F16_MIN        :: 6.10351562e-5 // smallest positive normalized value for a 16bit float
+F16_MIN_10_EXP :: -4 			// smallest possible power of 10 for a 16bit float yielding normalized value.
+F16_MIN_EXP    :: -14 			// smallest possible power of 2 for a 16bit float yielding normalized value.
+F16_NORMALIZE  :: 0 			// reserved (?)
+F16_RADIX      :: 2 			// exponent radix
+F16_ROUNDS     :: 1 			// Addition rounding: near (?)
 
 
-F32_DIG        :: 6
-F32_EPSILON    :: 1.192092896e-07
-F32_GUARD      :: 0
-F32_MANT_DIG   :: 24
-F32_MAX        :: 3.402823466e+38
-F32_MAX_10_EXP :: 38
-F32_MAX_EXP    :: 128
-F32_MIN        :: 1.175494351e-38	// smallest positive normal for a 32bit float
-F32_MIN_10_EXP :: -37
-F32_MIN_EXP    :: -125				// smallest possible power of 2 for a 32bit float
-F32_NORMALIZE  :: 0
-F32_RADIX      :: 2
-F32_ROUNDS     :: 1
+F32_DIG        :: 6 				// Number of decimal digits able to be represented for a 32bit float
+F32_EPSILON    :: 1.192092896e-07 	// step when value is >1; (1/2**23) == 1/(2**F32_SHIFT)
+F32_GUARD      :: 0 				// reserved (?)
+F32_MANT_DIG   :: 24 				// usable significative bits, including the ommited `1.` on normalized values, significand size +1
+F32_MAX        :: 3.402823466e+38 	// biggest positive normalized value for a 32bit float
+F32_MAX_10_EXP :: 38 				// biggest possible power of 10 for a 32bit float yielding normalized value.
+F32_MAX_EXP    :: 128 				// biggest possible power of 2 for a 32bit float yielding normalized value.
+F32_MIN        :: 1.175494351e-38	// smallest positive normalized value for a 32bit float
+F32_MIN_10_EXP :: -37 				// smallest possible power of 10 for a 32bit float yielding normalized value.
+F32_MIN_EXP    :: -125				// smallest possible power of 2 for a 32bit float yielding normalized value.
+F32_NORMALIZE  :: 0 				// reserved (?)
+F32_RADIX      :: 2 				// exponent radix
+F32_ROUNDS     :: 1 				// Addition rounding: near (?)
 
 F64_DIG        :: 15                       // Number of representable decimal digits.
-F64_EPSILON    :: 2.2204460492503131e-016  // Smallest number such that `1.0 + F64_EPSILON != 1.0`.
-F64_MANT_DIG   :: 53                       // Number of bits in the mantissa.
+F64_EPSILON    :: 2.2204460492503131e-016  // Smallest number such that `1.0 + F64_EPSILON != 1.0`. equals 1/(2**52) == 1/(2**F64_SHIFT)
+F64_MANT_DIG   :: 53                       // usable significative digits, including the ommited `1.` on normalized values, significand size +1
 F64_MAX        :: 1.7976931348623158e+308  // Maximum representable value.
 F64_MAX_10_EXP :: 308                      // Maximum base-10 exponent yielding normalized value.
 F64_MAX_EXP    :: 1024                     // One greater than the maximum possible base-2 exponent yielding normalized value.
@@ -4211,32 +4211,32 @@ F64_RADIX      :: 2                        // Exponent radix.
 F64_ROUNDS     :: 1                        // Addition rounding: near.
 
 
-F16_MASK  :: 0x1f 				// mask with size of the expoent for 16bits floats i.e. 5 bits = 1
-F16_SHIFT :: 16 - 6 			// size of the significand for 16bits floats
-F16_BIAS  :: 0xf
+F16_MASK  :: 0x1f 				// mask with size of the exponent for 16bit floats i.e. 5bits
+F16_SHIFT :: 16 - 6 			// size of the significand for 16bit floats i.e. 10bits
+F16_BIAS  :: 0xf 				// the zero offset for the exponent encoding (mask size -1) for 16bit floats i.e. 4bits
 
-F32_MASK  :: 0xff
-F32_SHIFT :: 32 - 9
-F32_BIAS  :: 0x7f
+F32_MASK  :: 0xff				// mask with size of the exponent for 32bit floats i.e. 8bits
+F32_SHIFT :: 32 - 9				// size of the significand for 32bit floats i.e. 23bits
+F32_BIAS  :: 0x7f 				// the zero offset for the exponent encoding (mask size -1) for 32bit floats i.e. 7bits
 
-F64_MASK  :: 0x7ff
-F64_SHIFT :: 64 - 12
-F64_BIAS  :: 0x3ff
+F64_MASK  :: 0x7ff				// mask with size of the exponent for 64bit floats i.e. 11bits
+F64_SHIFT :: 64 - 12			// size of the significand for 64bit floats i.e. 52bits
+F64_BIAS  :: 0x3ff 				// the zero offset for the exponent encoding (mask size -1) for 64bit floats i.e. 10bits
 
-INF_F16     :: f16(0h7C00)
-NEG_INF_F16 :: f16(0hFC00)
+INF_F16     :: f16(0h7C00)  					// representation of infinity for 16bit floats
+NEG_INF_F16 :: f16(0hFC00) 						// representation of negative infinity for 16bit floats
 
-SNAN_F16    :: f16(0h7C01)
-QNAN_F16    :: f16(0h7E01)
+SNAN_F16    :: f16(0h7C01)						// quiet representation of NaN for 16bit floats, propagates through arithmetic operations
+QNAN_F16    :: f16(0h7E01)						// signaling representation of NaN for 16bit floats, per IEEE754 should throw a exception on most operations
 
-INF_F32     :: f32(0h7F80_0000)
-NEG_INF_F32 :: f32(0hFF80_0000)
+INF_F32     :: f32(0h7F80_0000)					// representation of infinity for 32bit floats
+NEG_INF_F32 :: f32(0hFF80_0000)					// representation of negative infinity for 32bit floats
 
-SNAN_F32    :: f32(0hFF80_0001)
-QNAN_F32    :: f32(0hFFC0_0001)
+SNAN_F32    :: f32(0hFF80_0001)					// quiet representation of NaN for 32bit floats, propagates through arithmetic operations
+QNAN_F32    :: f32(0hFFC0_0001)					// signaling representation of NaN for 32bit floats, per IEEE754 should throw a exception on most operations
 
-INF_F64     :: f64(0h7FF0_0000_0000_0000)
-NEG_INF_F64 :: f64(0hFFF0_0000_0000_0000)
+INF_F64     :: f64(0h7FF0_0000_0000_0000)		// representation of infinity for 64bit floats
+NEG_INF_F64 :: f64(0hFFF0_0000_0000_0000)		// representation of negative infinity for 64bit floats
 
-SNAN_F64    :: f64(0h7FF0_0000_0000_0001)
-QNAN_F64    :: f64(0h7FF8_0000_0000_0001)
+SNAN_F64    :: f64(0h7FF0_0000_0000_0001)		// quiet representation of NaN for 64bit floats, propagates through arithmetic operations
+QNAN_F64    :: f64(0h7FF8_0000_0000_0001)		// signaling representation of NaN for 64bit floats, per IEEE754 should throw a exception on most operations
