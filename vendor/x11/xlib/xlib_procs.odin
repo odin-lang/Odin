@@ -181,11 +181,11 @@ foreign xlib {
 	DestroyWindow     :: proc(display: ^Display, window: Window) ---
 	DestroySubwindows :: proc(display: ^Display, window: Window) ---
 	// Windows: mapping/unmapping
-	MapWindow         :: proc(display: ^Display, window: Window) ---
-	MapRaised         :: proc(display: ^Display, window: Window) ---
-	MapSubwindows     :: proc(display: ^Display, window: Window) ---
-	UnmapWindow       :: proc(display: ^Display, window: Window) ---
-	UnmapSubwindows   :: proc(display: ^Display, window: Window) ---
+	MapWindow         :: proc(display: ^Display, window: Window) -> b32 ---
+	MapRaised         :: proc(display: ^Display, window: Window) -> b32 ---
+	MapSubwindows     :: proc(display: ^Display, window: Window) -> b32 ---
+	UnmapWindow       :: proc(display: ^Display, window: Window) -> b32 ---
+	UnmapSubwindows   :: proc(display: ^Display, window: Window) -> b32 ---
 	// Windows: configuring
 	ConfigureWindow :: proc(
 		display: ^Display,
