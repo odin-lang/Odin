@@ -316,9 +316,10 @@ foreign xlib {
 		) -> Atom ---
 	InternAtoms :: proc(
 		display: ^Display,
-		names:   [^]cstring,
-		count:   i32,
-		atoms:   [^]Atom,
+		names: [^]cstring,
+		count: i32,
+		only_if_exists: b32,
+		atoms_return: [^]Atom
 		) -> Status ---
 	GetAtomName :: proc(
 		display: ^Display,
@@ -657,12 +658,12 @@ foreign xlib {
 	SetGraphicsExposures :: proc(display: ^Display, gc: GC, exp: b32) ---
 	// Graphics functions
 	ClearArea :: proc(
-		display: ^Display, 
-		window:  Window, 
-		x:       i32, 
-		y:       i32, 
-		width:   u32, 
-		height:  u32, 
+		display: ^Display,
+		window:  Window,
+		x:       i32,
+		y:       i32,
+		width:   u32,
+		height:  u32,
 		exp:     b32,
 		) ---
 	ClearWindow :: proc(
