@@ -315,11 +315,11 @@ foreign xlib {
 		existing: b32,
 		) -> Atom ---
 	InternAtoms :: proc(
-		display: ^Display,
-		names: [^]cstring,
-		count: i32,
+		display:        ^Display,
+		names:          [^]cstring,
+		count:          i32,
 		only_if_exists: b32,
-		atoms_return: [^]Atom
+		atoms_return:   [^]Atom,
 		) -> Status ---
 	GetAtomName :: proc(
 		display: ^Display,
