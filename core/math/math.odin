@@ -2317,7 +2317,7 @@ Otherwise returns the same number and a `0` exponent for a normal number
 
 This assures maximum precision for each float type is always used
 
-For 16bits follows: 1bit sign + 5bit expoent + 10bit significant
+For 16bits follows: 1bit sign + 5bit exponent + 10bit significant
 So any number between `0x0` and `0b0_00000_1111111111` triggers a normalization, which
 consists in multiplying the number by the significant size (2**10) and keeping note of the
 factor (2**10) that should divide the number to get the original number
@@ -2733,7 +2733,7 @@ Example:
 
 Output:
 	false 		// normal number
-	true 		// int with all expoent bits and the most significant fraction bit enabled
+	true 		// int with all exponent bits and the most significant fraction bit enabled
 
 	// special cases
 	false       // zero_inf
