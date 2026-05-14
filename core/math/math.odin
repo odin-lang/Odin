@@ -3883,6 +3883,57 @@ logb_f64 :: proc "contextless" (val: f64) -> f64 {
 @(require_results) logb_f32be :: proc "contextless" (value: f32be) -> f32be { return f32be(logb_f32(f32(value))) }
 @(require_results) logb_f64le :: proc "contextless" (value: f64le) -> f64le { return f64le(logb_f64(f64(value))) }
 @(require_results) logb_f64be :: proc "contextless" (value: f64be) -> f64be { return f64be(logb_f64(f64(value))) }
+/*
+Calculates log in base 2 of `value`, result is always rounded down.
+
+Similar to `ilogb()` signal is not preserved
+
+
+Inputs:
+- `x`: float to be rounded
+
+
+Returns:
+- A float of matching type as the `x` input
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	logb_example :: proc() {
+		x_float:    f16 = 2.1
+		x2_float:    f16 = 8.1
+		x3_float:    f16 = -4.3
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;          
+		x_pos_inf:  f16 = math.inf_f16(+1);
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.logb(x_float))
+		fmt.println(math.logb(x2_float))
+		fmt.println(math.logb(x3_float))
+
+		fmt.println(math.logb(x_pos_zero))
+		fmt.println(math.logb(x_pos_inf))
+		fmt.println(math.logb(x_nan))
+	}
+
+Output:
+    +1
+    +3
+    +2
+    
+    // special cases
+    -Inf        // pos_zero
+    +Inf        // pos_inf
+    Nan         // nan
+
+*/
 logb :: proc {
 	logb_f16,
 	logb_f32,
