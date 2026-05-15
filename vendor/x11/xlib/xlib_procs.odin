@@ -181,11 +181,11 @@ foreign xlib {
 	DestroyWindow     :: proc(display: ^Display, window: Window) ---
 	DestroySubwindows :: proc(display: ^Display, window: Window) ---
 	// Windows: mapping/unmapping
-	MapWindow         :: proc(display: ^Display, window: Window) ---
-	MapRaised         :: proc(display: ^Display, window: Window) ---
-	MapSubwindows     :: proc(display: ^Display, window: Window) ---
-	UnmapWindow       :: proc(display: ^Display, window: Window) ---
-	UnmapSubwindows   :: proc(display: ^Display, window: Window) ---
+	MapWindow         :: proc(display: ^Display, window: Window) -> b32 ---
+	MapRaised         :: proc(display: ^Display, window: Window) -> b32 ---
+	MapSubwindows     :: proc(display: ^Display, window: Window) -> b32 ---
+	UnmapWindow       :: proc(display: ^Display, window: Window) -> b32 ---
+	UnmapSubwindows   :: proc(display: ^Display, window: Window) -> b32 ---
 	// Windows: configuring
 	ConfigureWindow :: proc(
 		display: ^Display,
@@ -340,10 +340,10 @@ foreign xlib {
 		long_len:    int,
 		delete:      b32,
 		req_type:    Atom,
-		act_type:    [^]Atom,
-		act_format:  [^]i32,
-		nitems:      [^]uint,
-		bytes_after: [^]uint,
+		act_type:    ^Atom,
+		act_format:  ^i32,
+		nitems:      ^uint,
+		bytes_after: ^uint,
 		props:       ^rawptr,
 	) -> i32 ---
 	ListProperties :: proc(
@@ -1028,7 +1028,7 @@ foreign xlib {
 	// Events
 	SelectInput   :: proc(display: ^Display, window: Window, mask: EventMask) ---
 	Flush         :: proc(display: ^Display) -> i32 ---
-	Sync          :: proc(display: ^Display, discard: bool) -> i32 ---
+	Sync          :: proc(display: ^Display, discard: b32) -> i32 ---
 	EventsQueued  :: proc(display: ^Display, mode: EventQueueMode) -> i32 ---
 	Pending       :: proc(display: ^Display) -> i32 ---
 	NextEvent     :: proc(display: ^Display, event: ^XEvent) ---
@@ -1368,7 +1368,7 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		) -> ^XWMHints ---
-	// Setting and reading MW_NORMAL_HINTS property
+	// Setting and reading WM_NORMAL_HINTS property
 	AllocSizeHints :: proc() -> ^XSizeHints ---
 	SetWMNormalHints :: proc(
 		display: ^Display,
