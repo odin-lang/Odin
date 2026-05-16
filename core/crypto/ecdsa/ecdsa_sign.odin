@@ -13,8 +13,8 @@ import secec "core:crypto/_weierstrass"
 // The signature format is ASN1. `SEQUECE `{ r INTEGER, s INTEGER }`.
 @(require_results)
 sign_asn1 :: proc(priv_key: ^Private_Key, hash_algo: hash.Algorithm, msg: []byte, allocator: runtime.Allocator, deterministic := !crypto.HAS_RAND_BYTES) -> ([]byte, bool) {
-	ensure(hash_algo != .Invalid, "crypto/edsa: invalid hash algorithm")
-	ensure(priv_key._curve != .Invalid, "crypto/edsa: invalid curve")
+	ensure(hash_algo != .Invalid, "crypto/ecdsa: invalid hash algorithm")
+	ensure(priv_key._curve != .Invalid, "crypto/ecdsa: invalid curve")
 
 	if !deterministic && !crypto.HAS_RAND_BYTES {
 		return nil, false
@@ -49,8 +49,8 @@ sign_asn1 :: proc(priv_key: ^Private_Key, hash_algo: hash.Algorithm, msg: []byte
 // The signature format is `r | s`.
 @(require_results)
 sign_raw :: proc(priv_key: ^Private_Key, hash_algo: hash.Algorithm, msg, sig: []byte, deterministic := !crypto.HAS_RAND_BYTES) -> bool {
-	ensure(hash_algo != .Invalid, "crypto/edsa: invalid hash algorithm")
-	ensure(priv_key._curve != .Invalid, "crypto/edsa: invalid curve")
+	ensure(hash_algo != .Invalid, "crypto/ecdsa: invalid hash algorithm")
+	ensure(priv_key._curve != .Invalid, "crypto/ecdsa: invalid curve")
 	ensure(len(sig) == RAW_SIGNATURE_SIZES[priv_key._curve], "crypto/ecdsa: invalid destination size")
 
 	if !deterministic && !crypto.HAS_RAND_BYTES {
