@@ -972,13 +972,113 @@ wrap :: proc "contextless" (x, y: $T) -> T where intrinsics.type_is_numeric(T), 
 	tmp := mod(x, y)
 	return y + tmp if tmp < 0 else tmp
 }
+/*
+Calculates the difference of `a` and `b` wrapping over `2*PI`
+
+The positive sign of the result indicates `b` bigger, else `a` is bigger
+
+NOTE: zero is always evaluated to +0
+
+
+Inputs:
+- `a`: numeric angle in radians
+- `b`: numeric angle in radians
+
+
+Returns:
+- A numeric of matching type as the inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	angle_diff_example :: proc() {
+		x_float:    f16 = math.PI
+		x2_float:    f16 = math.PI*2
+		x3_float:    f16 = -math.PI
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16 = math.nan_f16(); 
+
+
+		fmt.println(math.angle_diff(x_float, x2_float))
+		fmt.println(math.angle_diff(x3_float, x_float))
+
+		fmt.println(math.angle_diff(x_neg_zero, x_float))
+		fmt.println(math.angle_diff(x_pos_inf, x_float))
+	}
+
+Output:
+	-3.14
+	+0
+    
+    // special cases
+    -3.14 		// neg_zero | x
+    NaN 		// pos_inf | x
+
+*/
 @(require_results)
 angle_diff :: proc "contextless" (a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 
 	dist := wrap(b - a, TAU)
 	return wrap(dist*2, TAU) - dist
 }
+/*
+Translates the angle `a` by the difference with `b`, `t` times over
 
+
+Inputs:
+- `a`: a numeric representing an angle in radians
+- `b`: a numeric representing an angle in radians
+- `t`: a numeric number of times to translate the angle difference
+
+
+Returns:
+- A numeric of matching type as the inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	angle_lerp_example :: proc() {
+		x_float:    f16 = math.PI/2
+		x2_float:    f16 = math.PI
+		x3_float:    f16 = math.PI*2
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0;              
+		x_zero_inf: f16 = math.inf_f16(0);  
+
+
+		fmt.println(math.angle_lerp(x_float, x2_float, 0))
+		fmt.println(math.angle_lerp(x_float, x2_float, 1))
+		fmt.println(math.angle_lerp(x2_float, x3_float, 2))
+
+		fmt.println(math.angle_lerp(x_zero_inf, x_float, 0))
+		fmt.println(math.angle_lerp(x_pos_zero, x_float, x_zero_inf))
+	}
+
+Output:
+	+1.57 		// x  | x2 | 0 	same as just x
+	+3.14 		// x  | x2 | 1 	
+	-3.14 		// x2 | x3 | 2 	note the negative step
+    
+    // special cases
+    NaN           // zero_inf | x | 0
+    +Inf          // pos_zero | x | zero_inf
+
+*/
 @(require_results)
 angle_lerp :: proc "contextless" (a, b, t: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	return a + angle_diff(a, b) * t
@@ -3612,7 +3712,55 @@ tanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	}
 	return T(z)
 }
+/*
+Calculates hyperbolic arc sine of `y`, the inverse of the hyperbolic sine
 
+
+Inputs:
+- `y`: float representing a sine
+
+
+Returns:
+- A float of matching type as the `y` input
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	asinh_example :: proc() {
+		x_float: f16   = 0.5
+		x2_float: f16   = 3
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+
+
+		fmt.println(math.asinh(x_float))
+		fmt.println(math.asinh(x2_float))
+		fmt.println(math.to_degrees(math.asinh(x2_float)))
+
+		fmt.println(math.to_degrees(math.asinh(x_pos_zero)))
+		fmt.println(math.to_degrees(math.asinh(x_zero_inf)))
+		fmt.println(math.to_degrees(math.asinh(x_neg_inf)))
+	}
+
+Output:
+	0.4812 		// x1 <1
+	1.818 		// x2 rad
+	104.19 		// x2 degrees
+
+    // special cases
+    0 			// pos_zero
+    +Inf 		// zero_inf
+    -Inf 		// neg_inf
+
+*/
 @(require_results)
 asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// The original C code, the long comment, and the constants
@@ -3659,7 +3807,58 @@ asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	}
 	return T(temp)
 }
+/*
+Calculates hyperbolic arc cosine of `y`, the inverse of the hyperbolic cosine
 
+
+Inputs:
+- `y`: float representing a cosine
+
+
+Returns:
+- A float of matching type as the `y` input
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	acosh_example :: proc() {
+		x_float: f16   = 0.5
+		x2_float: f16   = 3
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+		x_nan:      f16be = math.nan_f16be(); 
+
+
+		fmt.println(math.acosh(x_float))
+		fmt.println(math.acosh(x2_float))
+		fmt.println(math.to_degrees(math.acosh(x2_float)))
+
+		fmt.println(math.to_degrees(math.acosh(x_pos_zero)))
+		fmt.println(math.to_degrees(math.acosh(x_zero_inf)))
+		fmt.println(math.to_degrees(math.acosh(x_neg_inf)))
+		fmt.println(math.acosh(x_nan))
+	}
+
+Output:
+	NaN 		// x1 <1
+	1.7627 		// x2 rad
+	101 		// x2 degrees
+    
+    // special cases
+    NaN 		// pos_zero
+    +Inf 		// zero_inf
+    NaN 		// neg_inf
+    Nan 		// nan
+
+*/
 @(require_results)
 acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// The original C code, the long comment, and the constants
@@ -3691,7 +3890,53 @@ acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	t := x-1
 	return T(log1p(t + sqrt(2*t + t*t)))
 }
+/*
+Calculates hyperbolic arc tangent of `y`, the inverse of the hyperbolic tangent
 
+
+Inputs:
+- `y`: float representing a tangent
+
+
+Returns:
+- A float of matching type as the `y` input
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	atanh_example :: proc() {
+		x_float: f16   = 0.5
+		x2_float: f16   = 3
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_zero_inf: f16 = math.inf_f16(0);  
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+
+
+		fmt.println(math.atanh(x_float))
+		fmt.println(math.atanh(x2_float))
+
+		fmt.println(math.to_degrees(math.atanh(x_pos_zero)))
+		fmt.println(math.to_degrees(math.atanh(x_zero_inf)))
+		fmt.println(math.to_degrees(math.atanh(x_neg_inf)))
+	}
+
+Output:
+	0.5493 		// x1 <1
+	NaN 		// x2 rad
+
+    // special cases
+    0 			// pos_zero
+    NaN 		// zero_inf
+    NaN 		// neg_inf
+
+*/
 @(require_results)
 atanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	// The original C code, the long comment, and the constants
