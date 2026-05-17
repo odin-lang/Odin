@@ -6674,6 +6674,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					if (!context_allocator_error) {
 						ordered_operands[i].mode = Addressing_Value;
 						ordered_operands[i].type = e->type;
+						if (e->Variable.param_value.kind == ParameterValue_Nil)
+							ordered_operands[i].type = t_untyped_nil;
 						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
 
 						dummy_argument_count += 1;
