@@ -75,6 +75,7 @@ COMMENT          = "//" { ANY_CHAR } NEWLINE
          This grammar is simplified to represent minimize the need for "#" "partial"
 */
 
+/* Source File Structure */
 
 File            = { FileTag } PackageDecl ";" { TopLevelStmt } ;
 FileTag         = "#+" IDENT [ TagValue ] NEWLINE ;           /* #+build, #+private, #+feature, … */
@@ -88,12 +89,15 @@ TopLevelStmt    = ImportDecl ";"
                 | Decl ";" ;
 
 
+/* Import Declarations */
+
 ImportDecl         = { Attribute } "import" [ IDENT ] STRING_LIT ;
 
 ForeignImportDecl  = { Attribute } "foreign" "import" [ IDENT ] ( STRING_LIT | "{" ForeignImportPathList "}" ) ;
 
 ForeignImportPathList = Expr { "," Expr } [ "," ] ;
 
+/* Value Declarations */
 
 Decl             = { Attribute } ValueDecl ;
 
@@ -103,6 +107,15 @@ ValueDecl        = IdentList ":" Type
 
 IdentList        = IDENT { "," IDENT } ;
 ExprList         = Expr { "," Expr } ;
+
+/* Foreign Block Declaration */
+
+ForeignBlock     = { Attribute } "foreign" [ IDENT ] "{" { ForeignDecl ";" } "}" ;
+
+ForeignDecl      = { Attribute } ValueDecl ;
+
+
+/* Statements */
 
 Stmt             = EmptyStmt
                  | Decl ";"
@@ -126,12 +139,21 @@ Stmt             = EmptyStmt
 
 EmptyStmt        = ";" ;
 
+/* Directive Statements */
+
+DirectiveStmt    = "#assert" "(" Expr [ "," STRING_LIT ] ")"
+                 | "#panic"  "(" STRING_LIT ")"
+                 | "#force_inline"    CallBody
+                 | "#force_no_inline" CallBody
+                 | "#must_tail"       CallBody ;
+
+/* Block Statement */
 
 BlockStmt        = [ Label ] "{" StmtList "}" ;
 StmtList         = { Stmt } ;
 Label            = IDENT ":" ;
 
-
+/* Assignment Statements */
 
 ExprStmt         = Expr ;
 
@@ -141,7 +163,7 @@ AssignOp         = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "%%="
                  | "|=" | "~=" | "&=" | "&~="
                  | "<<=" | ">>=" | "&&=" | "||=" ;
 
-
+/* Control Flow */
 
 IfStmt           = "if" [ SimpleStmt ";" ] Expr StmtBody
                    { "else" "if" [ SimpleStmt ";" ] Expr StmtBody }
@@ -184,6 +206,7 @@ TypeCaseClause   = "case" [ TypeList ] ":" StmtList ;
 TypeList         = Type { "," Type } ;
 
 
+/* Branch & Defer */
 
 BranchStmt       = "break" [ IDENT ]
                  | "continue" [ IDENT ]
@@ -194,18 +217,24 @@ DeferStmt        = "defer" ( Stmt | ( "{" StmtList "}" ) ) ;
 ReturnStmt       = [ ReturnStmtDirectivePrefix ] "return" [ ExprList ] ;
 ReturnStmtDirectivePrefix = "#force_inline" | "#force_no_inline" | "#must_tail" ;
 
+/* Using Statement */
 
 UsingStmt        = "using" ( IdentList | Expr ) ;
 
+/* Simple Statement (used in control flow init) */
 
 SimpleStmt       = ExprStmt | AssignStmt | ValueDecl ;
 
+/* Body for Control Flow */
 
 StmtBody         = "{" StmtList "}"
                  | "do" Stmt ; /* must be on the same line as the initial token of the statement */
 
+/* Expressions */
 
-/* Binary Expressions */
+/* Binary Expressions
+   Operator Precedence (low -> high)
+*/
 
 Expr             = OrElseExpr ;
 
@@ -242,6 +271,7 @@ UnaryExpr        = PostfixExpr
 UnaryOp          = "+" | "-" | "~" | "&" | "!" ;
 
 
+/* Postfix / Operand Expressions */
 
 PostfixExpr      = Operand { PostfixOp } ;
 
@@ -283,6 +313,8 @@ Operand          = IDENT
 DirectiveExpr    = "#" IDENT ; /* Used as the catch all */
 
 
+/* Literals */
+
 Literal          = INT_LIT
                  | FLOAT_LIT
                  | IMAGINARY_LIT
@@ -298,6 +330,8 @@ ElementList      = Element { "," Element } [ "," ] ;
 
 Element          = Expr [ "=" Expr ]
                  | ( Expr "..<" Expr | Expr "..=" Expr ) "=" Expr ;
+
+/* Types */
 
 Type             = TypeName
                  | TypeLit
@@ -453,14 +487,3 @@ Attribute        = "@" "(" AttrElemList ")"
 
 AttrElemList     = AttrElem { "," AttrElem } [ "," ] ;
 AttrElem         = IDENT [ "=" Expr ] ;
-
-ForeignBlock     = { Attribute } "foreign" [ IDENT ] "{" { ForeignDecl ";" } "}" ;
-
-ForeignDecl      = { Attribute } ValueDecl ;
-
-
-DirectiveStmt    = "#assert" "(" Expr [ "," STRING_LIT ] ")"
-                 | "#panic"  "(" STRING_LIT ")"
-                 | "#force_inline"    CallBody
-                 | "#force_no_inline" CallBody
-                 | "#must_tail"       CallBody ;
