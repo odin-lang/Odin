@@ -1296,6 +1296,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
+					add_type_to_seen_map(ctx, &seen, y);
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
