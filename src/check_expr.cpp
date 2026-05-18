@@ -9412,7 +9412,6 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	multi_map_insert(seen, key, tap);
 }
 
-
 gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Operand const &x, Operand const &lhs, Operand const &rhs) {
 	if (is_type_enum(x.type)) {
 		// TODO(bill): Fix this logic so it's fast!!!
@@ -9441,8 +9440,48 @@ gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind u
 		}
 	}
 }
+
 gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, Operand const &x) {
 	add_constant_switch_case(ctx, seen, x);
+}
+
+gb_internal void add_type_switch_case(CheckerContext *ctx, SeenMap *seen, Operand operand) {
+	if (operand.mode != Addressing_Type) {
+		return ;
+	}
+
+	uintptr key = type_hash_canonical_type(operand.type);
+	GB_ASSERT(key != 0);
+
+	isize count = multi_map_count(seen, key);
+	if (count) {
+		TEMPORARY_ALLOCATOR_GUARD();
+		TypeAndToken *taps = temporary_alloc_array<TypeAndToken>(count);
+
+		multi_map_get_all(seen, key, taps);
+		for (isize i = 0; i < count; i++) {
+			TypeAndToken tap = taps[i];
+			if (!are_types_identical(tap.type, operand.type)) {
+				continue;
+			}
+
+			TokenPos pos = tap.token.pos;
+			gbString expr_str = expr_to_string(operand.expr);
+			error(operand.expr,
+				  "Duplicate case '%s'\n"
+				  "\tprevious case at %s",
+				  expr_str,
+				  token_pos_to_string(pos));
+			gb_string_free(expr_str);
+		}
+	}
+
+	TypeAndToken tap = { operand.type, ast_token(operand.expr) };
+	multi_map_insert(seen, key, tap);
+}
+
+gb_internal void add_type_to_seen_map(CheckerContext *ctx, SeenMap *seen, Operand const &x) {
+	add_type_switch_case(ctx, seen, x);
 }
 
 gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
