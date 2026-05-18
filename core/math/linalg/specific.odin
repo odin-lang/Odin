@@ -2790,19 +2790,19 @@ matrix3_orthonormalize :: proc{
 matrix3_gram_schmidt :: proc "contextless" (m: matrix[3, 3]$E, $A, $B, $C: int) -> (r: matrix[3, 3]E)
 	where A != B, A != C, B != C #no_bounds_check
 {
-    r = m
-    r[A] = normalize(m[A])
+	r = m
+	r[A] = normalize(m[A])
 
-    d0 := dot(r[A], r[B])
-    r[B] -= r[A] * d0
-    r[B] = normalize(r[B])
+	d0 := dot(r[A], r[B])
+	r[B] -= r[A] * d0
+	r[B] = normalize(r[B])
 
-    d1 := dot(r[B], r[C])
-    d0 = dot(r[A], r[C])
-    r[C] -= r[A]*d0 + r[B]*d1
-    r[C] = normalize(r[C])
+	d1 := dot(r[B], r[C])
+	d0 = dot(r[A], r[C])
+	r[C] -= r[A]*d0 + r[B]*d1
+	r[C] = normalize(r[C])
 
-    return
+	return
 }
 
 
