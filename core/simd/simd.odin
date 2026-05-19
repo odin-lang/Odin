@@ -2791,7 +2791,7 @@ sign_bit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: ty
 	val  := to_bits(v)
 	mask := type_of(val)(1<<(BITS-1))
 	masked := bit_and(val, mask)
-	return to_bits(shr(to_bits_signed(masked), BITS-1))
+	return to_bits(shr_masked(to_bits_signed(masked), BITS-1))
 }
 
 /*
