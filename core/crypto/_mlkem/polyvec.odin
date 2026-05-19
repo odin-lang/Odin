@@ -75,7 +75,7 @@ polyvec_compress :: proc "contextless" (r: []byte, a: ^Polyvec, kay: int) #no_bo
 			}
 		}
 	case:
-		panic_contextless("crypto/mlkem: invalid POLYVECCOMPRESSEDBYTES")
+		unreachable()
 	}
 }
 
@@ -123,7 +123,7 @@ polyvec_decompress :: proc "contextless" (r: ^Polyvec, a: []byte, kay: int) #no_
 			}
 		}
 	case:
-		panic_contextless("crypto/mlkem: invalid POLYVECCOMPRESSEDBYTES")
+		unreachable()
 	}
 }
 
