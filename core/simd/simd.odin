@@ -2586,6 +2586,12 @@ Reverse the bit pattern of a SIMD vector.
 reverse_bits :: intrinsics.reverse_bits
 
 /*
+Swap the bytes of the elements of a SIMD vector.
+*/
+byte_swap :: intrinsics.byte_swap
+
+
+/*
 **Operation**
 
 	#assert(len(a) == len(b))

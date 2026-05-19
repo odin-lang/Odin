@@ -5610,7 +5610,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
+			if (is_type_simd_vector(x.type)) {
+				Type *elem = base_array_type(x.type);
+				if (!is_type_integer_like(elem)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "#simd values passed to '%.*s' must have an element of an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_name), xts);
+					gb_string_free(xts);
+				}
+			} else if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
 				gbString xts = type_to_string(x.type);
 				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
