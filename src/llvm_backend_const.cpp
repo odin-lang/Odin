@@ -1028,6 +1028,27 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
 		return res;
+	} else if (is_type_u16_array(type) && (value.kind == ExactValue_String || value.kind == ExactValue_String16) && !is_type_u8(core_array_type(type))) {
+		i64 count  = type->Array.count;
+		Type *elem = type->Array.elem;
+		LLVMTypeRef et = lb_type(m, elem);
+
+		String16 s = {};
+		if (value.kind == ExactValue_String16) {
+			s = value.value_string16;
+		} else {
+			s = string_to_string16(temporary_allocator(), value.value_string);
+		}
+
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+
+		for (isize i = 0; i < s.len; i++) {
+			elems[i] = LLVMConstInt(et, s.text[i], false);
+
+		}
+
+		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
+		return res;
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
 		GB_ASSERT(type->Array.count == value.value_string.len);
 		LLVMValueRef data = LLVMConstStringInContext(ctx,

@@ -29,10 +29,6 @@ result_is_invalid :: proc(r: Result) -> bool {
 	return r == "invalid"
 }
 
-
-// The type namings are not following Odin convention, to better match
-// the schema, though the fields do.
-
 load :: proc(tvs: ^$T/Test_Vectors, fn: string) -> bool {
 	raw_json, err := os.read_entire_file_from_path(fn, context.allocator)
 	if err != os.ERROR_NONE {
@@ -62,6 +58,11 @@ Test_Vectors_Note :: struct {
 	bug_type:    string   `json:"bugType"`,
 	description: string   `json:"description"`,
 	links:       []string `json:"links"`,
+}
+
+Test_Group_Source :: struct {
+	name:    string `json:"name"`,
+	version: string `json:"version"`,
 }
 
 Aead_Test_Group :: struct {
@@ -197,4 +198,45 @@ Pbkdf_Test_Vector :: struct {
 	dk:              common.Hex_Bytes `json:"dk"`,
 	result:          Result           `json:"result"`,
 	flags:           []string         `json:"flags"`,
+}
+
+Kem_Test_Group :: struct {
+	type:          string            `json:"type"`,
+	source:        Test_Group_Source `json:"source"`,
+	parameter_set: string            `json:"parameterSet"`,
+	tests:         []Kem_Test_Vector `json:"tests"`,
+}
+
+Kem_Test_Vector :: struct {
+	tc_id:           int              `json:"tcId"`,
+	flags:           []string         `json:"flags"`,
+	comment:         string           `json:"comment"`,
+	seed:            common.Hex_Bytes `json:"seed"`,
+	m:               common.Hex_Bytes `json:"m"`,
+	ek:              common.Hex_Bytes `json:"ek"`,
+	dk:              common.Hex_Bytes `json:"dk"`,
+	c:               common.Hex_Bytes `json:"c"`,
+	k:               common.Hex_Bytes `json:"K"`,
+	result:          Result           `json:"result"`,
+}
+
+Mldsa_Test_Group :: struct {
+	type:              string              `json:"type"`,
+	private_seed:      common.Hex_Bytes    `json:"privateSeed"`,
+	private_key_pkcs8: common.Hex_Bytes    `json:"privateKeyPkcs8"`,
+	public_key:        common.Hex_Bytes    `json:"publicKey"`,
+	public_key_der:    common.Hex_Bytes    `json:"publicKeyDer"`,
+	source:            Test_Group_Source   `json:"source"`,
+	tests:             []Mldsa_Test_Vector `json:"tests"`,
+}
+
+Mldsa_Test_Vector :: struct {
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	ctx:     common.Hex_Bytes `json:"ctx"`,
+	mu:      common.Hex_Bytes `json:"mu"`,
+	sig:     common.Hex_Bytes `json:"sig"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
 }

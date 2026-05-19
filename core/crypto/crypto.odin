@@ -85,18 +85,6 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	return data
 }
 
-/*
-Set each byte of a memory range to a specific value.
-
-This procedure copies value specified by the `value` parameter into each of the
-`len` bytes of a memory range, located at address `data`.
-
-This procedure returns the pointer to `data`.
-*/
-set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
-	return runtime.memset(data, i32(value), len)
-}
-
 // rand_bytes fills the dst buffer with cryptographic entropy taken from
 // the system entropy source.  This routine will block if the system entropy
 // source is not ready yet.  All system entropy source failures are treated

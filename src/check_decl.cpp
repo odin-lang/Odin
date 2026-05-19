@@ -1480,6 +1480,8 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.no_sanitize_memory  = ac.no_sanitize_memory;
 	e->Procedure.no_sanitize_thread  = ac.no_sanitize_thread;
 
+	e->Procedure.fast_math_flags = ac.fast_math_flags;
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
@@ -1556,9 +1558,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		if (is_foreign) {
 			error(pl->body, "A foreign procedure cannot have a body");
 		}
-		if (proc_type->Proc.c_vararg) {
-			error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
-		}
+		// if (proc_type->Proc.c_vararg) {
+		// 	error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
+		// }
 
 		d->scope = ctx->scope;
 
@@ -1889,7 +1891,8 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
-			if (p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
+			if (p->decl_info != nullptr && q->decl_info != nullptr &&
+			    p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
 				GB_ASSERT(p->decl_info->proc_lit->kind == Ast_ProcLit);
 				GB_ASSERT(q->decl_info->proc_lit->kind == Ast_ProcLit);
 				auto pl = &p->decl_info->proc_lit->ProcLit;

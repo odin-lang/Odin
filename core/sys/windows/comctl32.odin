@@ -8,6 +8,7 @@ foreign Comctl32 {
 	InitCommonControlsEx  :: proc(picce: ^INITCOMMONCONTROLSEX) -> BOOL ---
 	LoadIconWithScaleDown :: proc(hinst: HINSTANCE, pszName: PCWSTR, cx: c_int, cy: c_int, phico: ^HICON) -> HRESULT ---
 	SetWindowSubclass     :: proc(hwnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR, dwRefData: DWORD_PTR) ---
+	DefSubclassProc       :: proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT ---
 }
 
 ICC_LISTVIEW_CLASSES   :: 0x00000001

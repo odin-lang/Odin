@@ -1,4 +1,4 @@
-#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd
 #+private
 package thread
 
@@ -83,7 +83,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	res = posix.pthread_attr_setdetachstate(&attrs, .CREATE_JOINABLE)
 	assert(res == nil)
-	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
+	when ODIN_OS != .NetBSD {
 		res = posix.pthread_attr_setinheritsched(&attrs, .EXPLICIT_SCHED)
 		assert(res == nil)
 	}
@@ -96,7 +96,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// Set thread priority.
 	policy: posix.Sched_Policy
-	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
+	when ODIN_OS != .NetBSD {
 		res = posix.pthread_attr_getschedpolicy(&attrs, &policy)
 		assert(res == nil)
 	}

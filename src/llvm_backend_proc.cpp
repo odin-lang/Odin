@@ -625,6 +625,11 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					continue;
 				}
 
+				if (e->flags & EntityFlag_CVarArg) {
+					GB_ASSERT(i+1 == params->variables.count);
+					continue;
+				}
+
 				lbArgType *arg_type = &ft->args[param_index];
 				defer (param_index += 1);
 
@@ -1440,7 +1445,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		Type *elem = type->SimdVector.elem;
 
 		i64 count = type->SimdVector.count;
-		LLVMValueRef *scalars = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+		LLVMValueRef *scalars = temporary_alloc_array<LLVMValueRef>(count);
 		for (i64 i = 0; i < count; i++) {
 			scalars[i] = lb_const_value(m, elem, exact_value_i64(i)).value;
 		}
@@ -1448,6 +1453,55 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		res.value = LLVMConstVector(scalars, cast(unsigned)count);
 		return res;
 	}
+
+	case BuiltinProc_simd_interleave:
+		{
+			int n = cast(int)ce->args.count;
+
+			if (n == 1) {
+				lbValue arg = lb_build_expr(p, ce->args[0]);
+				res.value = arg.value;
+				return res;
+			}
+
+			Type *vector_type = type_of_expr(ce->args[0]);
+
+			LLVMValueRef *args = temporary_alloc_array<LLVMValueRef>(n);
+			for (int i = 0; i < n; i++) {
+				lbValue arg = lb_build_expr(p, ce->args[i]);
+				arg = lb_emit_conv(p, arg, vector_type);
+				args[i] = arg.value;
+			}
+
+			gbString name = gb_string_make(heap_allocator(), "");
+			name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
+			defer (gb_string_free(name));
+
+			LLVMTypeRef types[1] = {lb_type(m, tv.type)};
+			res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
+			return res;
+		}
+
+	case BuiltinProc_simd_deinterleave:
+		{
+			lbValue arg0 = lb_build_expr(p, ce->args[0]);
+			LLVMTypeRef types[1] = {lb_type(m, arg0.type)};
+
+			GB_ASSERT(ce->args[1]->tav.value.kind == ExactValue_Integer);
+			int n = cast(int)exact_value_to_i64(ce->args[1]->tav.value);
+
+			if (n == 1) {
+				res.value = arg0.value;
+				return res;
+			}
+
+			gbString name = gb_string_make(heap_allocator(), "");
+			name = gb_string_append_fmt(name, "llvm.vector.deinterleave%d", n);
+			defer (gb_string_free(name));
+
+			res.value = lb_call_intrinsic(p, name, &arg0.value, 1, types, gb_count_of(types));
+			return res;
+		}
 	}
 
 	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
@@ -1784,6 +1838,12 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			LLVMValueRef args[1] = { arg0.value };
 
 			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			res.type  = base_array_type(arg0.type);
+
+			if (!is_type_boolean(res.type)) {
+				res = lb_emit_conv(p, res, tv.type);
+			}
+
 			return res;
 		}
 
@@ -4277,6 +4337,53 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_objc_ivar_get:          return lb_handle_objc_ivar_get(p, expr);
 	case BuiltinProc_objc_block:             return lb_handle_objc_block(p, expr);
 	case BuiltinProc_objc_super:             return lb_handle_objc_super(p, expr);
+
+
+	case BuiltinProc_c_va_start:
+		{
+			lbValue ptr  = lb_build_expr(p, ce->args[0]);
+			lbValue args = lb_build_expr(p, ce->args[1]);
+
+			gb_unused(args);
+
+			LLVMValueRef va_start_args[] = {ptr.value};
+			LLVMTypeRef  va_start_types[] = {lb_type(p->module, ptr.type)};
+			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_start", va_start_args, gb_count_of(va_start_args), va_start_types, gb_count_of(va_start_types));
+			gb_unused(res);
+
+			return {};
+		} break;
+	case BuiltinProc_c_va_end:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+
+			LLVMValueRef va_end_args[] = {ptr.value};
+			LLVMTypeRef  va_end_types[] = {lb_type(p->module, ptr.type)};
+			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_end", va_end_args, gb_count_of(va_end_args), va_end_types, gb_count_of(va_end_types));
+			gb_unused(res);
+
+			return {};
+		} break;
+	case BuiltinProc_c_va_copy:
+		{
+			lbValue dst = lb_build_expr(p, ce->args[0]);
+			lbValue src = lb_build_expr(p, ce->args[1]);
+
+			LLVMValueRef va_end_args[] = {dst.value, src.value};
+			LLVMTypeRef  va_end_types[] = {lb_type(p->module, dst.type)};
+			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_copy", va_end_args, gb_count_of(va_end_args), va_end_types, gb_count_of(va_end_types));
+			gb_unused(res);
+
+			return {};
+		} break;
+	case BuiltinProc_c_va_arg:
+		{
+			lbValue ptr = lb_build_expr(p, ce->args[0]);
+			Type *type = type_of_expr(ce->args[1]);
+			LLVMValueRef value = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, type), "");
+
+			return {value, type};
+		} break;
 
 
 	case BuiltinProc_constant_utf16_cstring:

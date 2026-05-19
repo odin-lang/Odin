@@ -1140,6 +1140,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		return;
 	}
 
+	if (operand->mode == Addressing_Type && is_type_typeid(type)) {
+		add_type_info_type(c, operand->type);
+		add_type_and_value(c, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
+		return;
+	}
 
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
@@ -3314,13 +3319,24 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 	if (y_is_untyped) {
 		convert_to_typed(c, y, t_untyped_integer);
 		if (y->mode == Addressing_Invalid) {
+			if (is_type_simd_vector(x->type)) {
+				char const *s = be->op.kind == Token_Shl ? "shl" : "shr";
+				error_line("\tSuggestion: Use 'simd.%s' or 'simd.%s_masked'\n", s, s);
+			}
 			x->mode = Addressing_Invalid;
 			return;
 		}
 	} else if (!is_type_unsigned(y->type)) {
+		ERROR_BLOCK();
+
 		gbString y_str = expr_to_string(y->expr);
 		error(y->expr, "Shift amount '%s' must be an unsigned integer", y_str);
 		gb_string_free(y_str);
+		if (is_type_simd_vector(x->type)) {
+			char const *s = be->op.kind == Token_Shl ? "shl" : "shr";
+			error_line("\tSuggestion: Use 'simd.%s' or 'simd.%s_masked'\n", s, s);
+		}
+
 		x->mode = Addressing_Invalid;
 		return;
 	}
@@ -3449,10 +3465,23 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 	if (is_constant && is_type_untyped(src) && is_type_string(src)) {
 		if (is_type_u8_array(dst)) {
+			GB_ASSERT(operand->value.kind == ExactValue_String);
 			String s = operand->value.value_string;
 			return s.len == dst->Array.count;
 		}
+		if (is_type_u16_array(dst)) {
+			if (operand->value.kind == ExactValue_String16) {
+				String16 s = operand->value.value_string16;
+				return s.len == dst->Array.count;
+			}
+			GB_ASSERT(operand->value.kind == ExactValue_String);
+			String16 s = string_to_string16(heap_allocator(), operand->value.value_string);
+			defer (gb_free(heap_allocator(), s.text));
+
+			return s.len == dst->Array.count;
+		}
 		if (is_type_rune_array(dst)) {
+			GB_ASSERT(operand->value.kind == ExactValue_String);
 			String s = operand->value.value_string;
 			return gb_utf8_strnlen(s.text, s.len) == dst->Array.count;
 		}
@@ -3460,8 +3489,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 
 
 	if (dst->kind == Type_Array && src->kind == Type_Array) {
-		if (are_types_identical(dst->Array.elem, src->Array.elem)) {
-			return dst->Array.count == src->Array.count;
+		if (dst->Array.count == src->Array.count) {
+			if (are_types_identical(dst->Array.elem, src->Array.elem)) {
+				return true;
+			}
+			Operand op = *operand;
+			op.type = src->Array.elem;
+			return check_is_castable_to(c, &op, dst->Array.elem);
 		}
 	}
 
@@ -4956,6 +4990,12 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				} else if (is_type_rune_array(t)) {
 					isize rune_count = gb_utf8_strnlen(s.text, s.len);
 					if (rune_count == t->Array.count) {
+						break;
+					}
+				} else if (is_type_u16_array(t)) {
+					String16 s = string_to_string16(heap_allocator(), operand->value.value_string);
+					defer (gb_free(heap_allocator(), s.text));
+					if (s.len == t->Array.count) {
 						break;
 					}
 				}
@@ -6645,6 +6685,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					if (!context_allocator_error) {
 						ordered_operands[i].mode = Addressing_Value;
 						ordered_operands[i].type = e->type;
+						if (e->Variable.param_value.kind == ParameterValue_Nil)
+							ordered_operands[i].type = t_untyped_nil;
 						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
 
 						dummy_argument_count += 1;
@@ -9098,9 +9140,11 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 	if (is_type_any(field_type)) {
 		return false;
 	}
-	if (field_type != nullptr && is_type_typeid(field_type) && o->mode == Addressing_Type) {
-		add_type_info_type(c, o->type);
-		return true;
+	if (field_type != nullptr && is_type_typeid(field_type)) {
+		if (o->mode == Addressing_Type) {
+			add_type_info_type(c, o->type);
+			return true;
+		}
 	}
 
 	Ast *expr = unparen_expr(o->expr);
@@ -9381,7 +9425,6 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	multi_map_insert(seen, key, tap);
 }
 
-
 gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Operand const &x, Operand const &lhs, Operand const &rhs) {
 	if (is_type_enum(x.type)) {
 		// TODO(bill): Fix this logic so it's fast!!!
@@ -9410,8 +9453,48 @@ gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind u
 		}
 	}
 }
+
 gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, Operand const &x) {
 	add_constant_switch_case(ctx, seen, x);
+}
+
+gb_internal void add_type_switch_case(CheckerContext *ctx, SeenMap *seen, Operand operand) {
+	if (operand.mode != Addressing_Type) {
+		return ;
+	}
+
+	uintptr key = type_hash_canonical_type(operand.type);
+	GB_ASSERT(key != 0);
+
+	isize count = multi_map_count(seen, key);
+	if (count) {
+		TEMPORARY_ALLOCATOR_GUARD();
+		TypeAndToken *taps = temporary_alloc_array<TypeAndToken>(count);
+
+		multi_map_get_all(seen, key, taps);
+		for (isize i = 0; i < count; i++) {
+			TypeAndToken tap = taps[i];
+			if (!are_types_identical(tap.type, operand.type)) {
+				continue;
+			}
+
+			TokenPos pos = tap.token.pos;
+			gbString expr_str = expr_to_string(operand.expr);
+			error(operand.expr,
+				  "Duplicate case '%s'\n"
+				  "\tprevious case at %s",
+				  expr_str,
+				  token_pos_to_string(pos));
+			gb_string_free(expr_str);
+		}
+	}
+
+	TypeAndToken tap = { operand.type, ast_token(operand.expr) };
+	multi_map_insert(seen, key, tap);
+}
+
+gb_internal void add_type_to_seen_map(CheckerContext *ctx, SeenMap *seen, Operand const &x) {
+	add_type_switch_case(ctx, seen, x);
 }
 
 gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
@@ -9598,7 +9681,11 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 	node->viral_state_flags |= te->cond->viral_state_flags;
 
 	if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
+		ERROR_BLOCK();
 		error(te->cond, "Non-boolean condition in ternary if expression");
+		if (is_type_simd_vector(cond.type)) {
+			error_line("\tSuggestion: Use 'simd.select' a ternary-like operation is required\n");
+		}
 	}
 
 	Operand x = {Addressing_Invalid};
@@ -10558,6 +10645,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		} else {
 			GB_PANIC("unreachable");
 		}
+
 
 
 		i64 max = 0;
@@ -11660,6 +11748,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 	}
 
 	if (!valid) {
+		ERROR_BLOCK();
+
 		gbString str = expr_to_string(o->expr);
 		gbString type_str = type_to_string(o->type);
 		defer (gb_string_free(str));
@@ -11669,6 +11759,10 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 		} else {
 			error(o->expr, "Cannot index '%s' of type '%s'", str, type_str);
 		}
+		if (is_type_simd_vector(o->type)) {
+			error_line("\tSuggestion: Use 'simd.extract' or 'simd.replace' instead depending on the situation\n");
+		}
+
 		o->mode = Addressing_Invalid;
 		o->expr = node;
 		return kind;
@@ -12457,6 +12551,10 @@ gb_internal void check_multi_expr_with_type_hint(CheckerContext *c, Operand *o, 
 		error_operand_no_value(o);
 		break;
 	case Addressing_Type:
+		if (type_hint != nullptr && is_type_typeid(type_hint)) {
+			add_type_info_type(c, o->type);
+			return;
+		}
 		error_operand_not_expression(o);
 		break;
 	}
@@ -12886,6 +12984,15 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = write_expr_to_string(str, at->elem, shorthand);
 	case_end;
 
+	case_ast_node(at, FixedCapacityDynamicArrayType, node);
+		if (at->tag) {
+			str = write_expr_to_string(str, at->tag, false);
+		}
+		str = gb_string_appendc(str, "[dynamic; ");
+		str = write_expr_to_string(str, at->capacity, false);
+		str = gb_string_append_rune(str, ']');
+		str = write_expr_to_string(str, at->elem, shorthand);
+	case_end;
 	case_ast_node(at, DynamicArrayType, node);
 		if (at->tag) {
 			str = write_expr_to_string(str, at->tag, false);

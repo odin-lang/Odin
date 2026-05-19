@@ -1,0 +1,489 @@
+/* The Odin Programming Language Expressed as in EBNF */
+
+/*
+EBNF representation of itself:
+
+Production  = name "=" [ Expression ] "." ;
+Expression  = Alternative { "|" Alternative } ;
+Alternative = Term { Term } ;
+Term        = name | token [ "…" token ] | Group | Option | Repetition ;
+Group       = "(" Expression ")" ;
+Option      = "[" Expression "]" ;
+Repetition  = "{" Expression "}" ;
+*/
+
+
+/* Tokens for Lexical Grammar */
+
+IDENT            = ( LETTER | "_" ) { LETTER | DIGIT | "_" } ;
+LETTER           = "a".."z" | "A".."Z" | "_" | UNICODE_LETTER ;
+
+INT_LIT          = DECIMAL_LIT | BINARY_LIT | OCTAL_LIT | DOZENAL_LIT | HEX_LIT ;
+DECIMAL_LIT      = DIGIT { [ "_" ] DIGIT } ;
+BINARY_LIT       = "0b" BIN_DIGIT { [ "_" ] BIN_DIGIT } ;
+OCTAL_LIT        = "0o" OCT_DIGIT { [ "_" ] OCT_DIGIT } ;
+DOZENAL_LIT      = "0z" DOZ_DIGIT { [ "_" ] DOZ_DIGIT } ;
+HEX_LIT          = "0x" HEX_DIGIT { [ "_" ] HEX_DIGIT } ;
+
+FLOAT_LIT        = DIGIT { DIGIT } "." DIGIT { DIGIT } [ EXPONENT ]
+                 | DIGIT { DIGIT } EXPONENT
+                 | "0h" HEX_DIGIT { [ "_" HEX_DIGIT ]} ;
+
+EXPONENT         = ( "e" | "E" ) [ "+" | "-" ] DIGIT { DIGIT } ;
+
+IMAGINARY_LIT    = ( INT_LIT | FLOAT_LIT ) ( "i" | "j" | "k" ) ;
+
+RUNE_LIT         = "'" ( CHAR | ESCAPE_SEQ ) "'" ;
+
+STRING_LIT       = '"' { CHAR | ESCAPE_SEQ } '"' ;
+RAW_STRING_LIT   = "`" { ANY_CHAR } "`" ;
+
+ESCAPE_SEQ       = "\" ( "a" | "b" | "e" | "f" | "n" | "r" | "t" | "v"
+                       | "\\" | '"' | "'"
+                       | OCT_DIGIT OCT_DIGIT OCT_DIGIT
+                       | "x" HEX_DIGIT HEX_DIGIT
+                       | "u" HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+                       | "U" HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT
+                             HEX_DIGIT HEX_DIGIT HEX_DIGIT HEX_DIGIT ) ;
+
+DIGIT            = "0".."9" ;
+BIN_DIGIT        = "0" | "1" ;
+OCT_DIGIT        = "0".."7" ;
+DOZ_DIGIT        = "0".."9" | "a"| "b"  | "A" | "B" ;
+HEX_DIGIT        = "0".."9" | "a".."f" | "A".."F" ;
+
+COMMENT          = "//" { ANY_CHAR } NEWLINE
+                 | "/*" { ANY_CHAR | COMMENT } "*/" /* nestable */
+                 | "#!" { ANY_CHAR } NEWLINE ;
+
+/* Odin uses automatic semicolon insertion similar to Go/Python:
+   a newline acts as ";" after certain tokens such as IDENT,
+   literals, ")", "]", "}", "^", "---", "break", "continue",
+   "fallthrough", "return", "or_return", "or_break", "or_continue".
+
+   During parsing, ";" will be ignored with matching brackets in expressions similar to Python:
+   "(" ")"
+   "[" "]"
+   "{" "}"
+*/
+
+
+
+/* Syntax Grammar */
+
+/* NOTE: Any directive such as "#partial" can also be written with any number of whitespace after the "#"
+         This grammar is simplified to represent minimize the need for "#" "partial"
+*/
+
+/* Source File Structure */
+
+File            = { FileTag } PackageDecl ";" { TopLevelStmt } ;
+FileTag         = "#+" IDENT [ TagValue ] NEWLINE ;           /* #+build, #+private, #+feature, … */
+TagValue        = { ANY_CHAR } ;
+PackageDecl     = "package" IDENT ;
+
+TopLevelStmt    = ImportDecl ";"
+                | ForeignImportDecl ";"
+                | ForeignBlock ";"
+                | WhenStmt
+                | Decl ";" ;
+
+
+/* Import Declarations */
+
+ImportDecl         = { Attribute } "import" [ IDENT ] STRING_LIT ;
+
+ForeignImportDecl  = { Attribute } "foreign" "import" [ IDENT ] ( STRING_LIT | "{" ForeignImportPathList "}" ) ;
+
+ForeignImportPathList = Expr { "," Expr } [ "," ] ;
+
+/* Value Declarations */
+
+Decl             = { Attribute } ValueDecl ;
+
+ValueDecl        = IdentList ":" Type
+                 | IdentList ":" [ Type ] "=" ExprList
+                 | IdentList ":" [ Type ] ":" ExprList ;
+
+IdentList        = IDENT { "," IDENT } ;
+ExprList         = Expr { "," Expr } ;
+
+/* Foreign Block Declaration */
+
+ForeignBlock     = { Attribute } "foreign" [ IDENT ] "{" { ForeignDecl ";" } "}" ;
+
+ForeignDecl      = { Attribute } ValueDecl ;
+
+
+/* Statements */
+
+Stmt             = EmptyStmt
+                 | Decl ";"
+                 | ExprStmt ";"
+                 | AssignStmt ";"
+                 | BlockStmt
+                 | IfStmt
+                 | WhenStmt
+                 | ForStmt
+                 | SwitchStmt
+                 | TypeSwitchStmt
+                 | DeferStmt
+                 | ReturnStmt ";"
+                 | BranchStmt ";"
+                 | UsingStmt ";"
+                 | Attribute Stmt
+                 | Label Stmt
+                 | ForeignBlock
+                 | DirectiveStmt ;
+
+
+EmptyStmt        = ";" ;
+
+/* Directive Statements */
+
+DirectiveStmt    = "#assert" "(" Expr [ "," STRING_LIT ] ")"
+                 | "#panic"  "(" STRING_LIT ")"
+                 | "#force_inline"    CallBody
+                 | "#force_no_inline" CallBody
+                 | "#must_tail"       CallBody ;
+
+/* Block Statement */
+
+BlockStmt        = [ Label ] "{" StmtList "}" ;
+StmtList         = { Stmt } ;
+Label            = IDENT ":" ;
+
+/* Assignment Statements */
+
+ExprStmt         = Expr ;
+
+AssignStmt       = ExprList AssignOp ExprList ;
+
+AssignOp         = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "%%="
+                 | "|=" | "~=" | "&=" | "&~="
+                 | "<<=" | ">>=" | "&&=" | "||=" ;
+
+/* Control Flow */
+
+IfStmt           = "if" [ SimpleStmt ";" ] Expr StmtBody
+                   { "else" "if" [ SimpleStmt ";" ] Expr StmtBody }
+                   [ "else" StmtBody ] ;
+
+WhenStmt         = "when" Expr StmtBody
+                   { "else" "when" Expr StmtBody }
+                   [ "else" StmtBody ] ;
+
+ForStmt          = [ Label ] [ ForDirectivePrefix ]
+                   "for" [ ForHead ] StmtBody ;
+
+ForDirectivePrefix = "#reverse"
+                   | "#unroll" [ CallBody ] ;
+
+ForHead          = RangeClause
+                 | ForCondition
+                 | ForCClause ;
+
+ForCondition     = Expr ;
+
+ForCClause       = [ SimpleStmt ] ";" [ Expr ] ";" [ SimpleStmt ] ;
+
+RangeClause      = [ [ SimpleStmt ] ";" ] [ [ "&" ] IDENT { "," [ "&" ] IDENT } "in" ] RangeExpr ;
+
+RangeExpr        = Expr
+                 | Expr "..<" Expr
+                 | Expr "..=" Expr ;
+
+SwitchStmt       = [ Label ] [ "#partial" ] "switch" [ SimpleStmt ";" ] [ Expr ]
+                   "{" { CaseClause } "}" ;
+
+CaseClause       = "case" [ ExprList ] ":" StmtList ;
+
+TypeSwitchStmt   = [ Label ] [ "#partial" ] "switch" IDENT "in" Expr
+                   "{" { TypeCaseClause } "}" ;
+
+TypeCaseClause   = "case" [ TypeList ] ":" StmtList ;
+
+TypeList         = Type { "," Type } ;
+
+
+/* Branch & Defer */
+
+BranchStmt       = "break" [ IDENT ]
+                 | "continue" [ IDENT ]
+                 | "fallthrough" ;
+
+DeferStmt        = "defer" ( Stmt | ( "{" StmtList "}" ) ) ;
+
+ReturnStmt       = [ ReturnStmtDirectivePrefix ] "return" [ ExprList ] ;
+ReturnStmtDirectivePrefix = "#force_inline" | "#force_no_inline" | "#must_tail" ;
+
+/* Using Statement */
+
+UsingStmt        = "using" ( IdentList | Expr ) ;
+
+/* Simple Statement (used in control flow init) */
+
+SimpleStmt       = ExprStmt | AssignStmt | ValueDecl ;
+
+/* Body for Control Flow */
+
+StmtBody         = "{" StmtList "}"
+                 | "do" Stmt ; /* must be on the same line as the initial token of the statement */
+
+/* Expressions */
+
+/* Binary Expressions
+   Operator Precedence (low -> high)
+*/
+
+Expr             = OrElseExpr ;
+
+OrElseExpr       = TernaryExpr { "or_else" TernaryExpr } ;
+
+TernaryExpr      = RangeExprLvl
+                 | RangeExprLvl "?"    RangeExprLvl ":"    TernaryExpr
+                 | RangeExprLvl "if"   RangeExprLvl "else" TernaryExpr
+                 | RangeExprLvl "when" RangeExprLvl "else" TernaryExpr ;
+
+RangeExprLvl     =  LogicalOrExpr [ "..<" | "..=" ] LogicalOrExpr ;
+
+LogicalOrExpr    = LogicalAndExpr { "||" LogicalAndExpr } ;
+LogicalAndExpr   = ComparisonExpr { "&&" ComparisonExpr } ;
+
+ComparisonExpr   = AddExpr { CompareOp AddExpr } ;
+CompareOp        = "==" | "!=" | "<" | "<=" | ">" | ">=" ;
+
+AddExpr          = MulExpr { AddOp MulExpr } ;
+AddOp            = "+" | "-" | "|" | "~" | "in" | "not_in" ;
+
+MulExpr          = UnaryExpr { MulOp UnaryExpr } ;
+MulOp            = "*" | "/" | "%" | "%%" | "&" | "&~" | "<<" | ">>" ;
+
+/* Unary Expression */
+
+UnaryExpr        = PostfixExpr
+                 | UnaryOp UnaryExpr
+                 | "cast" "(" Type ")" UnaryExpr
+                 | "transmute" "(" Type ")" UnaryExpr
+                 | "auto_cast" UnaryExpr
+                 | "." IDENT                            /* implicit selector */;
+
+UnaryOp          = "+" | "-" | "~" | "&" | "!" ;
+
+
+/* Postfix / Operand Expressions */
+
+PostfixExpr      = Operand { PostfixOp } ;
+
+PostfixOp        = CallBody                                     /* call                    */
+                 | "->" IDENT CallBody                          /* selector call           */
+                 | "." IDENT                                    /* field selector          */
+                 | "." "?"                                      /* inferred type assertion */
+                 | "." "(" Type ")"                             /* type assertion          */
+                 | "[" Expr "]"                                 /* index                   */
+                 | "[" [ Expr ] ":" [ Expr ] "]"                /* slice                   */
+                 | "[" Expr "," Expr "]"                        /* matrix index            */
+                 | "^"                                          /* pointer deref           */
+                 | PostfixOrOp ;
+
+CallBody         = "(" [ ArgList ] ")" ;
+
+
+PostfixOrOp      = "or_return"
+                 | "or_break"    [ IDENT ]
+                 | "or_continue" [ IDENT ] ;
+
+ArgList          = Arg { "," Arg } [ "," ] ;
+Arg              = [ IDENT "=" ] Expr
+                 | ".." Expr ;                                  /* spread */
+
+
+Operand          = IDENT
+                 | "---"                                        /* unintialized expression */
+                 | "context"
+                 | "typeid"
+                 | Literal
+                 | "(" Expr ")"
+                 | ProcLiteral
+                 | ProcGroup
+                 | [ "#partial" ] CompoundLiteral
+                 | DirectiveExpr
+                 | Type ;
+
+DirectiveExpr    = "#" IDENT ; /* Used as the catch all */
+
+
+/* Literals */
+
+Literal          = INT_LIT
+                 | FLOAT_LIT
+                 | IMAGINARY_LIT
+                 | RUNE_LIT
+                 | STRING_LIT
+                 | RAW_STRING_LIT ;
+
+
+
+CompoundLiteral  = [ Type ] "{" [ ElementList ] "}" ;
+
+ElementList      = Element { "," Element } [ "," ] ;
+
+Element          = Expr [ "=" Expr ]
+                 | ( Expr "..<" Expr | Expr "..=" Expr ) "=" Expr ;
+
+/* Types */
+
+Type             = TypeName
+                 | TypeLit
+                 | "(" Type ")"
+                 | "distinct" Type
+                 | "typeid"
+                 | "#type" Type ;
+
+TypeName         = IDENT
+                 | QualifiedIdent
+                 | PolyType ;
+
+QualifiedIdent   = IDENT "." IDENT ;
+
+PolyType         = "$" IDENT [ "/" Type ] ;
+
+TypeLit          = PointerType
+                 | MultiPointerType
+                 | ArrayType
+                 | SliceType
+                 | DynArrayType
+                 | FixedCapDynArrayType
+                 | MapType
+                 | StructType
+                 | UnionType
+                 | EnumType
+                 | BitSetType
+                 | BitFieldType
+                 | ProcType
+                 | MatrixType
+                 | SimdType
+                 | SOAType ;
+
+
+PointerType         = "^" Type ;
+MultiPointerType    = "[^]" Type ;
+
+
+
+ArrayType           = "[" Expr "]" Type                          /* fixed-length or enumerated array */
+                    | "[" "?" "]"  Type                          /* infer-length array       */
+                    | "[" EnumType "]" Type ;                    /* enumerated array         */
+
+SliceType           = "[" "]" Type ;
+
+DynArrayType        = "[" "dynamic" "]" Type ;
+
+FixedCapDynArrayType = "[" "dynamic" ";" Expr "]" Type ;        /* [dynamic; N]T            */
+
+MapType             = "map" "[" Type "]" Type ;
+
+
+StructType       = "struct"
+                   [ "(" PolyParamList ")" ]
+                   [ StructDirectives ]
+                   [ WhereClause ]
+                   "{" [ FieldList ] "}" ;
+
+StructDirectives = { "#packed"
+                   | "#raw_union"
+                   | "#align" "(" Expr ")"
+                   | "#min_field_align" "(" Expr ")"
+                   | "#max_field_align" "(" Expr ")"
+                   | "#simple"
+                   | "#all_or_none" } ;
+
+FieldList        = Field { "," Field } [ "," ] ;
+
+Field            = FieldNameList ":" Type [ FieldTag ] ;
+
+FieldNameList    = FieldName { "," FieldName } ;
+FieldName        = [ "using" | "#subtype" ] IDENT ;
+
+FieldTag         = STRING_LIT | RAW_STRING_LIT ;
+
+UnionType        = "union"
+                   [ "(" PolyParamList ")" ]
+                   [ UnionDirectives ]
+                   [ WhereClause ]
+                   "{" [ TypeList ] "}" ;
+
+UnionDirectives  = { "#no_nil"
+                   | "#shared_nil"
+                   | "#align" "(" Expr ")" } ;
+
+
+EnumType         = "enum" [ Type ] "{" [ EnumFieldList ] "}" ;
+
+EnumFieldList    = EnumField { "," EnumField } [ "," ] ;
+EnumField        = IDENT [ "=" Expr ] ;
+
+
+BitSetType       = "bit_set" "[" ( Type | RangeExpr ) [ ";" Type ] "]" ;
+
+BitFieldType     = "bit_field" Type "{" [ BitFieldList ] "}" ;
+
+BitFieldList     = BitFieldField { "," BitFieldField } [ "," ] ;
+BitFieldField    = IDENT ":" Type "|" Expr ;
+
+
+ProcType         = "proc" [ CallingConvention ] "(" [ ProcParamList ] ")"
+                   [ "->" ProcResults ] ;
+
+ProcLiteral      = ProcType [ WhereClause ] ( ProcBody | "---" ) ; /* --- = no body / foreign  */
+ProcGroup        = "proc" "{" ProcGroupList "}" ;                  /* procedure group          */
+
+
+ProcBody         = "{" { Stmt } "}"
+ProcGroupList    = Expr { "," Expr } [ "," ] ;
+
+CallingConvention = STRING_LIT ;                                /* "odin", "c", "std", "contextless", "fast", "none", etc. */
+
+ProcParamList    = ProcParam { "," ProcParam } [ "," ] ;
+
+ProcParam        = [ ParamPrefix ] PolyIdentList ":" [ ParamModifier ] ProcParamType [ "=" Expr ] ;
+
+ProcParamType    = Type
+                 | "typeid" "/" ProcParamType ;
+
+PolyIdent        = [ "$" ] IDENT ;
+PolyIdentList    = PolyIdent { "," PolyIdent } ;
+
+ParamPrefix      = "using"
+                 | "#no_alias"
+                 | "#any_int"
+                 | "#by_ptr"
+                 | "#c_vararg"
+                 | "#no_broadcast" ;
+
+ParamModifier    = ".." ;                                       /* variadic */
+
+ProcResults      = Type
+                 | "(" [ FieldList ] ")" ;
+
+MatrixType       = [ "#row_major" | "#column_major" ] "matrix" "[" Expr "," Expr "]" Type ;
+
+
+SimdType         = "#simd" "[" Expr "]" Type ;
+
+
+SOAType          = "#soa" ( ArrayType | SliceType | DynArrayType | FixedCapDynArrayType ) ;
+
+
+PolyParamList    = PolyParam { "," PolyParam } ;
+PolyParam        = PolyIdent ":" Type ;
+
+WhereClause      = "where" ConstraintExpr { "," ConstraintExpr } ;
+ConstraintExpr   = Expr ;
+
+
+Attribute        = "@" "(" AttrElemList ")"
+                 | "@" IDENT ;                                  /* shorthand: @private */
+
+AttrElemList     = AttrElem { "," AttrElem } [ "," ] ;
+AttrElem         = IDENT [ "=" Expr ] ;

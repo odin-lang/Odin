@@ -2586,6 +2586,12 @@ Reverse the bit pattern of a SIMD vector.
 reverse_bits :: intrinsics.reverse_bits
 
 /*
+Swap the bytes of the elements of a SIMD vector.
+*/
+byte_swap :: intrinsics.byte_swap
+
+
+/*
 **Operation**
 
 	#assert(len(a) == len(b))
@@ -2791,7 +2797,7 @@ sign_bit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: ty
 	val  := to_bits(v)
 	mask := type_of(val)(1<<(BITS-1))
 	masked := bit_and(val, mask)
-	return to_bits(shr(to_bits_signed(masked), BITS-1))
+	return to_bits(shr_masked(to_bits_signed(masked), BITS-1))
 }
 
 /*
@@ -2880,3 +2886,6 @@ abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T whe
 
 pairwise_add :: intrinsics.simd_pairwise_add
 pairwise_sub :: intrinsics.simd_pairwise_add
+
+interleave   :: intrinsics.simd_interleave
+deinterleave :: intrinsics.simd_deinterleave

@@ -58,7 +58,9 @@ generate_keypair :: proc(protocol: ^Protocol, private_key: ^ecdh.Private_Key) {
 	case: panic("crypto/noise: unsupported DH curve in protocol")
 	}
 
-	ecdh.private_key_generate(private_key, protocol.dh)
+	if !ecdh.private_key_generate(private_key, protocol.dh) {
+		panic("crypto/noise: entropy source unavailable")
+	}
 }
 
 // Performs a Diffie-Hellman calculation between the private key in key_pair
@@ -552,7 +554,7 @@ handshakestate_initialize :: proc(
 
 			if initiator {
 				if slice.contains(message_pattern.pre_messages, Pre_Token.ini_s) {
-					ecdh.public_key_bytes(&s._pub_key, dst)
+					ecdh.private_key_public_bytes(s, dst)
 					symmetricstate_mix_hash(symmetric_state, dst)
 				}
 				if slice.contains(message_pattern.pre_messages, Pre_Token.res_s) {
@@ -565,7 +567,7 @@ handshakestate_initialize :: proc(
 					symmetricstate_mix_hash(symmetric_state, dst)
 				}
 				if slice.contains(message_pattern.pre_messages, Pre_Token.res_s) {
-					ecdh.public_key_bytes(&s._pub_key, dst)
+					ecdh.private_key_public_bytes(s, dst)
 					symmetricstate_mix_hash(symmetric_state, dst)
 				}
 			}
@@ -663,7 +665,7 @@ handshakestate_write_message :: proc(self: ^Handshake_State, payload, dst: []byt
 				generate_keypair(protocol, &self.e)
 			}
 			e_public := dh_buf[:d_len]
-			ecdh.public_key_bytes(&self.e._pub_key, e_public)
+			ecdh.private_key_public_bytes(&self.e, e_public)
 			n := append(&pattern_buf, ..e_public)
 			ensure(n == d_len, "crypto/noise: truncated append `e`")
 
@@ -674,7 +676,7 @@ handshakestate_write_message :: proc(self: ^Handshake_State, payload, dst: []byt
 
 		case .s:
 			s_public := dh_buf[:d_len]
-			ecdh.public_key_bytes(&self.s._pub_key, s_public)
+			ecdh.private_key_public_bytes(&self.s, s_public)
 
 			tmp: [MAX_DH_SIZE+TAG_SIZE]byte = ---
 			dh_buf := tmp[:d_len+TAG_SIZE]
@@ -837,7 +839,9 @@ handshakestate_read_message :: proc(self: ^Handshake_State, message, dst: []byte
 				panic("crypto/noise: re was not empty when processing token 'e' during ReadMessage")
 			}
 
-			ecdh.public_key_set_bytes(&self.re, protocol.dh, re)
+			if !ecdh.public_key_set_bytes(&self.re, protocol.dh, re) {
+				return nil, .Invalid_Handshake_Message
+			}
 			symmetricstate_mix_hash(&self.symmetric_state, re)
 			if self.message_pattern.is_psk {
 				symmetricstate_mix_key(&self.symmetric_state, re)
@@ -864,7 +868,10 @@ handshakestate_read_message :: proc(self: ^Handshake_State, message, dst: []byte
 				panic("crypto/noise: rs was not empty when processing token 's' during ReadMessage")
 			}
 
-			ecdh.public_key_set_bytes(&self.rs, protocol.dh, rs)
+			if !ecdh.public_key_set_bytes(&self.rs, protocol.dh, rs) {
+				self.status = .Handshake_Failed
+				return nil, .Invalid_Handshake_Message
+			}
 			msg = msg[rs_len:]
 
 		case .ee:

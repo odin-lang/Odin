@@ -1296,6 +1296,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
+					add_type_to_seen_map(ctx, &seen, y);
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -2260,7 +2261,9 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 					error(e->token, "'thread_local' variables cannot be declared within a defer statement");
 				}
 			}
-			e->Variable.thread_local_model = ac.thread_local_model;
+			if (!build_context.no_thread_local) {
+				e->Variable.thread_local_model = ac.thread_local_model;
+			}
 		}
 
 		if (ac.is_static && ac.thread_local_model != "") {

@@ -4,6 +4,7 @@ package intrinsics
 
 import "base:runtime"
 
+
 // Package-Related
 is_package_imported :: proc(package_name: string) -> bool ---
 
@@ -366,8 +367,11 @@ simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 // Returns the sums of N consecutive lanes
 simd_sums_of_n :: proc(a: #simd[LANES]T, $N: uint) -> #simd[LANES/N]T where is_power_of_two(N) ---
 
-simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
-simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
+simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+
+simd_interleave   :: proc(a, ..#simd[LANES/N]T)       -> #simd[LANES]T where N >= 1 ---
+simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (#simd[LANES/N]T, #simd[LANES/N]T, ..., #simd[LANES/N]T) where N >= 1, LANES % N == 0 ---
 
 
 // Checks if the current target supports the given target features.
@@ -403,6 +407,14 @@ wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_u
 x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
+
+// C specific things
+c_va_list  :: struct{/*platform specific implementation*/}
+
+c_va_start :: proc(list: ^c_va_list, /*#c_vararg parameter*/ args: ..$T) ---
+c_va_end   :: proc(list: ^c_va_list)                                     ---
+c_va_copy  :: proc(dst, src: ^c_va_list)                                 ---
+c_va_arg   :: proc(list: ^c_va_list, $T: typeid) -> T                    ---
 
 
 // Darwin targets only

@@ -1,5 +1,5 @@
 #+private
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package terminal
 
 import "base:runtime"

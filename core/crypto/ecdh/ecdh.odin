@@ -106,6 +106,7 @@ Public_Key :: struct {
 // private_key_generate uses the system entropy source to generate a new
 // Private_Key.  This will only fail if and only if (⟺) the system entropy source is
 // missing or broken.
+@(require_results)
 private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 	private_key_clear(priv_key)
 
@@ -143,6 +144,7 @@ private_key_generate :: proc(priv_key: ^Private_Key, curve: Curve) -> bool {
 
 // private_key_set_bytes decodes a byte-encoded private key, and returns
 // true if and only if (⟺) the operation was successful.
+@(require_results)
 private_key_set_bytes :: proc(priv_key: ^Private_Key, curve: Curve, b: []byte) -> bool {
 	private_key_clear(priv_key)
 
@@ -279,8 +281,15 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	}
 }
 
+// private_key_public_bytes sets dst to the byte-encoding of the public
+// key corresponding to priv_key.
+private_key_public_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
+	public_key_bytes(&priv_key._pub_key, dst)
+}
+
 // private_key_equal returns true if and only if (⟺) the private keys are equal,
 // in constant time.
+@(require_results)
 private_key_equal :: proc(p, q: ^Private_Key) -> bool {
 	if p._curve != q._curve {
 		return false
@@ -311,6 +320,7 @@ private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
 // true if and only if (⟺) the operation was successful.
+@(require_results)
 public_key_set_bytes :: proc(pub_key: ^Public_Key, curve: Curve, b: []byte) -> bool {
 	public_key_clear(pub_key)
 
@@ -411,6 +421,7 @@ public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
 
 // public_key_equal returns true if and only if (⟺) the public keys are equal,
 // in constant time.
+@(require_results)
 public_key_equal :: proc(p, q: ^Public_Key) -> bool {
 	if p._curve != q._curve {
 		return false
@@ -479,12 +490,14 @@ ecdh :: proc(priv_key: ^Private_Key, pub_key: ^Public_Key, dst: []byte) -> bool 
 }
 
 // curve returns the Curve used by a Private_Key or Public_Key instance.
-curve :: proc(k: ^$T) -> Curve where(T == Private_Key || T == Public_Key) {
+@(require_results)
+curve :: proc(k: ^$T) -> Curve where (T == Private_Key || T == Public_Key) {
 	return k._curve
 }
 
 // key_size returns the key size of a Private_Key or Public_Key in bytes.
-key_size :: proc(k: ^$T) -> int where(T == Private_Key || T == Public_Key) {
+@(require_results)
+key_size :: proc(k: ^$T) -> int where (T == Private_Key || T == Public_Key) {
 	when T == Private_Key {
 		return PRIVATE_KEY_SIZES[k._curve]
 	} else {
@@ -494,6 +507,7 @@ key_size :: proc(k: ^$T) -> int where(T == Private_Key || T == Public_Key) {
 
 // shared_secret_size returns the shared secret size of a key exchange
 // in bytes.
-shared_secret_size :: proc(k: ^$T) -> int  where(T == Private_Key || T == Public_Key) {
+@(require_results)
+shared_secret_size :: proc(k: ^$T) -> int where (T == Private_Key || T == Public_Key) {
 	return SHARED_SECRET_SIZES[k._curve]
 }
