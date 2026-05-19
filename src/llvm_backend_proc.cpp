@@ -1789,6 +1789,12 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			LLVMValueRef args[1] = { arg0.value };
 
 			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			res.type  = base_array_type(arg0.type);
+
+			if (!is_type_boolean(res.type)) {
+				res = lb_emit_conv(p, res, tv.type);
+			}
+
 			return res;
 		}
 
