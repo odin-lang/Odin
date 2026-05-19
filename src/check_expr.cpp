@@ -3323,9 +3323,16 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 			return;
 		}
 	} else if (!is_type_unsigned(y->type)) {
+		ERROR_BLOCK();
+
 		gbString y_str = expr_to_string(y->expr);
 		error(y->expr, "Shift amount '%s' must be an unsigned integer", y_str);
 		gb_string_free(y_str);
+		if (is_type_simd_vector(x->type)) {
+			char const *s = be->op.kind == Token_Shl ? "shl" : "shr";
+			error_line("\tSuggestion: Use 'simd.%s' or 'simd.%s_masked'\n", s, s);
+		}
+
 		x->mode = Addressing_Invalid;
 		return;
 	}
