@@ -11733,6 +11733,8 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 	}
 
 	if (!valid) {
+		ERROR_BLOCK();
+
 		gbString str = expr_to_string(o->expr);
 		gbString type_str = type_to_string(o->type);
 		defer (gb_string_free(str));
@@ -11742,6 +11744,10 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 		} else {
 			error(o->expr, "Cannot index '%s' of type '%s'", str, type_str);
 		}
+		if (is_type_simd_vector(o->type)) {
+			error_line("\tSuggestion: Use 'simd.extract' or 'simd.replace' instead depending on the situation\n");
+		}
+
 		o->mode = Addressing_Invalid;
 		o->expr = node;
 		return kind;
