@@ -1403,9 +1403,9 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 			Type *elem = base_array_type(x.type);
-			if (!is_type_boolean(elem)) {
+			if (!is_type_boolean(elem) && !is_type_integer(elem)) {
 				gbString xs = type_to_string(x.type);
-				error(x.expr, "'%.*s' expected a #simd type with a boolean element, got '%s'", LIT(builtin_name), xs);
+				error(x.expr, "'%.*s' expected a #simd type with a boolean or an integer element, got '%s'", LIT(builtin_name), xs);
 				gb_string_free(xs);
 				return false;
 			}
@@ -1572,8 +1572,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[1]); if (x.mode == Addressing_Invalid) return false;
-			check_expr_with_type_hint(c, &y, ce->args[2], x.type); if (y.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &x, ce->args[1], type_hint); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[2], x.type);    if (y.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));

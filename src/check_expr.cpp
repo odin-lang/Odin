@@ -9681,7 +9681,11 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 	node->viral_state_flags |= te->cond->viral_state_flags;
 
 	if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
+		ERROR_BLOCK();
 		error(te->cond, "Non-boolean condition in ternary if expression");
+		if (is_type_simd_vector(cond.type)) {
+			error_line("\tSuggestion: Use 'simd.select' a ternary-like operation is required\n");
+		}
 	}
 
 	Operand x = {Addressing_Invalid};
