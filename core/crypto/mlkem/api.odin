@@ -253,6 +253,28 @@ decaps :: proc(dk: ^Decapsulation_Key, ciphertext, shared_secret: []byte) -> boo
 	return true
 }
 
+// params returns the Parameters used by a Decapsulation_Key or
+// Encapsulation_Key instance.
+@(require_results)
+params :: proc(k: ^$T) -> Parameters where (T == Encapsulation_Key || T == Decapsulation_Key) {
+	when T == Encapsulation_Key {
+		return k_to_params(k.pke_ek.k)
+	} else {
+		return k_to_params(k.pke_dk.k)
+	}
+}
+
+// key_size returns the key size of a Decapsulation_Key or Encapsulation_Key
+// in bytes.
+@(require_results)
+key_size :: proc(k: ^$T) -> int where (T == Encapsulation_Key || T == Decapsulation_Key) {
+	when T == Encapsulation_Key {
+		return ENCAPSULATION_KEY_SIZES[k.pke_ek.k]
+	} else {
+		return DECAPSULATION_KEY_SEED_SIZE
+	}
+}
+
 @(private="file")
 params_to_k :: #force_inline proc "contextless" (params: Parameters) -> int {
 	#partial switch params {
@@ -265,4 +287,18 @@ params_to_k :: #force_inline proc "contextless" (params: Parameters) -> int {
 	}
 
 	return 0
+}
+
+@(private="file")
+k_to_params :: #force_inline proc "contextless" (k: int) -> Parameters {
+	switch k {
+	case _mlkem.K_512:
+		return .ML_KEM_512
+	case _mlkem.K_768:
+		return .ML_KEM_768
+	case _mlkem.K_1024:
+		return .ML_KEM_1024
+	}
+
+	return .Invalid
 }

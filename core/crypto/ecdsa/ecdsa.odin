@@ -2,7 +2,6 @@ package ecdsa
 
 import "core:crypto"
 import secec "core:crypto/_weierstrass"
-import "core:mem"
 import "core:reflect"
 
 // Curve the curve identifier associated with a given Private_Key
@@ -196,6 +195,12 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	}
 }
 
+// private_key_public_bytes sets dst to the byte-encoding of the public
+// key corresponding to priv_key.
+private_key_public_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
+	public_key_bytes(&priv_key._pub_key, dst)
+}
+
 // private_key_set sets priv_key to src.
 private_key_set :: proc(priv_key, src: ^Private_Key) {
 	if src == nil || src._curve == .Invalid {
@@ -244,7 +249,7 @@ private_key_equal :: proc(p, q: ^Private_Key) -> bool {
 
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
-	mem.zero_explicit(priv_key, size_of(Private_Key))
+	crypto.zero_explicit(priv_key, size_of(Private_Key))
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
@@ -358,5 +363,21 @@ public_key_equal :: proc(p, q: ^Public_Key) -> bool {
 
 // public_key_clear clears pub_key to the uninitialized state.
 public_key_clear :: proc "contextless" (pub_key: ^Public_Key) {
-	mem.zero_explicit(pub_key, size_of(Public_Key))
+	crypto.zero_explicit(pub_key, size_of(Public_Key))
+}
+
+// curve returns the Curve used by a Private_Key or Public_Key instance.
+@(require_results)
+curve :: proc(k: ^$T) -> Curve where (T == Private_Key || T == Public_Key) {
+	return k._curve
+}
+
+// key_size returns the key size of a Private_Key or Public_Key in bytes.
+@(require_results)
+key_size :: proc(k: ^$T) -> int where (T == Private_Key || T == Public_Key) {
+	when T == Private_Key {
+		return PRIVATE_KEY_SIZES[k._curve]
+	} else {
+		return PUBLIC_KEY_SIZES[k._curve]
+	}
 }

@@ -120,6 +120,12 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	copy(dst, priv_key._b[:])
 }
 
+// private_key_public_bytes sets dst to the byte-encoding of the public
+// key corresponding to priv_key.
+private_key_public_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
+	public_key_bytes(&priv_key._pub_key, dst)
+}
+
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
 	crypto.zero_explicit(priv_key, size_of(Private_Key))

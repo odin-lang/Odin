@@ -2768,58 +2768,43 @@ matrix2_orthonormalize :: proc{
 
 
 @(require_results)
-matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f16) #no_bounds_check {
-	r = m
-	r[0] = normalize(m[0])
-
-	d0 := dot(r[0], r[1])
-	r[1] -= r[0] * d0
-	r[1] = normalize(r[1])
-
-	d1 := dot(r[1], r[2])
-	d0 = dot(r[0], r[2])
-	r[2] -= r[0]*d0 + r[1]*d1
-	r[2] = normalize(r[2])
-
-	return
+matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> Matrix3f16 #no_bounds_check {
+	return matrix3_gram_schmidt(m, 0, 1, 2)
 }
 @(require_results)
-matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f32) #no_bounds_check {
-	r = m
-	r[0] = normalize(m[0])
-
-	d0 := dot(r[0], r[1])
-	r[1] -= r[0] * d0
-	r[1] = normalize(r[1])
-
-	d1 := dot(r[1], r[2])
-	d0 = dot(r[0], r[2])
-	r[2] -= r[0]*d0 + r[1]*d1
-	r[2] = normalize(r[2])
-
-	return
+matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> Matrix3f32 #no_bounds_check {
+	return matrix3_gram_schmidt(m, 0, 1, 2)
 }
 @(require_results)
-matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix3f64) #no_bounds_check {
-	r = m
-	r[0] = normalize(m[0])
-
-	d0 := dot(r[0], r[1])
-	r[1] -= r[0] * d0
-	r[1] = normalize(r[1])
-
-	d1 := dot(r[1], r[2])
-	d0 = dot(r[0], r[2])
-	r[2] -= r[0]*d0 + r[1]*d1
-	r[2] = normalize(r[2])
-
-	return
+matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> Matrix3f64 #no_bounds_check {
+	return matrix3_gram_schmidt(m, 0, 1, 2)
 }
 matrix3_orthonormalize :: proc{
 	matrix3_orthonormalize_f16,
 	matrix3_orthonormalize_f32,
 	matrix3_orthonormalize_f64,
 }
+
+
+@(require_results)
+matrix3_gram_schmidt :: proc "contextless" (m: matrix[3, 3]$E, $A, $B, $C: int) -> (r: matrix[3, 3]E)
+	where A != B, A != C, B != C #no_bounds_check
+{
+	r = m
+	r[A] = normalize(m[A])
+
+	d0 := dot(r[A], r[B])
+	r[B] -= r[A] * d0
+	r[B] = normalize(r[B])
+
+	d1 := dot(r[B], r[C])
+	d0 = dot(r[A], r[C])
+	r[C] -= r[A]*d0 + r[B]*d1
+	r[C] = normalize(r[C])
+
+	return
+}
+
 
 
 @(require_results)

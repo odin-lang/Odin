@@ -163,7 +163,7 @@ test_ecdsa_impl :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Ecdsa_Test_Gr
 
 			if comment := test_vector.comment; comment != "" {
 				log.debugf(
-					"ecda/%s/%s/%d: %s: %+v",
+					"ecdsa/%s/%s/%d: %s: %+v",
 					curve_str,
 					hash_str,
 					test_vector.tc_id,
