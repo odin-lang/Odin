@@ -367,8 +367,11 @@ simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 // Returns the sums of N consecutive lanes
 simd_sums_of_n :: proc(a: #simd[LANES]T, $N: uint) -> #simd[LANES/N]T where is_power_of_two(N) ---
 
-simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
-simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
+simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+
+simd_interleave   :: proc(a, ..#simd[LANES/N]T)       -> #simd[LANES]T where N >= 1 ---
+simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (#simd[LANES/N]T, #simd[LANES/N]T, ..., #simd[LANES/N]T) where N >= 1, LANES % N == 0 ---
 
 
 // Checks if the current target supports the given target features.

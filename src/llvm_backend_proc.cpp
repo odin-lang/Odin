@@ -1445,7 +1445,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		Type *elem = type->SimdVector.elem;
 
 		i64 count = type->SimdVector.count;
-		LLVMValueRef *scalars = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+		LLVMValueRef *scalars = temporary_alloc_array<LLVMValueRef>(count);
 		for (i64 i = 0; i < count; i++) {
 			scalars[i] = lb_const_value(m, elem, exact_value_i64(i)).value;
 		}
@@ -1453,6 +1453,55 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		res.value = LLVMConstVector(scalars, cast(unsigned)count);
 		return res;
 	}
+
+	case BuiltinProc_simd_interleave:
+		{
+			int n = cast(int)ce->args.count;
+
+			if (n == 1) {
+				lbValue arg = lb_build_expr(p, ce->args[0]);
+				res.value = arg.value;
+				return res;
+			}
+
+			Type *vector_type = type_of_expr(ce->args[0]);
+
+			LLVMValueRef *args = temporary_alloc_array<LLVMValueRef>(n);
+			for (int i = 0; i < n; i++) {
+				lbValue arg = lb_build_expr(p, ce->args[i]);
+				arg = lb_emit_conv(p, arg, vector_type);
+				args[i] = arg.value;
+			}
+
+			gbString name = gb_string_make(heap_allocator(), "");
+			name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
+			defer (gb_string_free(name));
+
+			LLVMTypeRef types[1] = {lb_type(m, tv.type)};
+			res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
+			return res;
+		}
+
+	case BuiltinProc_simd_deinterleave:
+		{
+			lbValue arg0 = lb_build_expr(p, ce->args[0]);
+			LLVMTypeRef types[1] = {lb_type(m, arg0.type)};
+
+			GB_ASSERT(ce->args[1]->tav.value.kind == ExactValue_Integer);
+			int n = cast(int)exact_value_to_i64(ce->args[1]->tav.value);
+
+			if (n == 1) {
+				res.value = arg0.value;
+				return res;
+			}
+
+			gbString name = gb_string_make(heap_allocator(), "");
+			name = gb_string_append_fmt(name, "llvm.vector.deinterleave%d", n);
+			defer (gb_string_free(name));
+
+			res.value = lb_call_intrinsic(p, name, &arg0.value, 1, types, gb_count_of(types));
+			return res;
+		}
 	}
 
 	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
