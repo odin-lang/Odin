@@ -287,8 +287,12 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	}
 
 	bool is_simd_vector_bitcastable = false;
-	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
-		if (!is_type_internally_pointer_like(src->SimdVector.elem) && !is_type_internally_pointer_like(dst->SimdVector.elem)) {
+	if (is_type_simd_vector(src)) {
+		if (is_type_simd_vector(dst)) {
+			if (!is_type_internally_pointer_like(src->SimdVector.elem) && !is_type_internally_pointer_like(dst->SimdVector.elem)) {
+				is_simd_vector_bitcastable = true;
+			}
+		} else if (is_type_integer(dst) && is_type_endian_platform(dst)) {
 			is_simd_vector_bitcastable = true;
 		}
 	}
