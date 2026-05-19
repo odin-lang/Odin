@@ -3319,6 +3319,10 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 	if (y_is_untyped) {
 		convert_to_typed(c, y, t_untyped_integer);
 		if (y->mode == Addressing_Invalid) {
+			if (is_type_simd_vector(x->type)) {
+				char const *s = be->op.kind == Token_Shl ? "shl" : "shr";
+				error_line("\tSuggestion: Use 'simd.%s' or 'simd.%s_masked'\n", s, s);
+			}
 			x->mode = Addressing_Invalid;
 			return;
 		}
