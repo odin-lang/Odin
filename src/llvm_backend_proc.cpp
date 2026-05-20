@@ -2096,16 +2096,17 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
 						}
 						
-						// Call appropriate ARM64 tbl intrinsic
+						// Call appropriate ARM64 tbl intrinsic (overloaded on result type)
+						LLVMTypeRef overload_types[1] = { LLVMTypeOf(indices) };
 						if (count == 32) {
 							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, overload_types, 1);
 						} else if (count == 48) {
 							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, overload_types, 1);
 						} else if (count == 64) {
 							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, overload_types, 1);
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm32 && count > 8) {
 						// ARM32 VTBL2/VTBL3/VTBL4: Split src into multiple 8-byte vectors
@@ -2138,7 +2139,13 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					} else {
 						// Single runtime swizzle case (x86, WebAssembly, ARM single-table)
 						LLVMValueRef args[2] = { src, indices };
-						res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
+						if (build_context.metrics.arch == TargetArch_arm64) {
+							// ARM64 tbl1 is overloaded on result type; others are fixed
+							LLVMTypeRef overload_types[1] = { LLVMTypeOf(indices) };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), overload_types, 1);
+						} else {
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
+						}
 					}
 					return res;
 				} else {
