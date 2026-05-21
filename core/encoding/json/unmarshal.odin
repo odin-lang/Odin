@@ -808,6 +808,16 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		raw.allocator = p.allocator
 		
 		return assign_array(p, raw.data, t.elem, length)
+
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		if int(length) > t.capacity {
+			return UNSUPPORTED_TYPE
+		}
+		base_ptr := cast(uintptr)v.data
+		len_ptr := base_ptr + t.len_offset
+		len_val := cast(^int)len_ptr
+		len_val^ = int(length)
+		return assign_array(p, rawptr(base_ptr), t.elem, length)
 		
 	case reflect.Type_Info_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array
