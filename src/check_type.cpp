@@ -1491,6 +1491,22 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 }
 
 
+// If `specialization` is a polymorphic-record specialization that has been published into
+// its originating record's `gen_types` cache, return that cache's `GenTypesData`. Its
+// `RecursiveMutex` guards concurrent `find_polymorphic_record_entity` reads, so the
+// in-place finalization below must hold it. Returns nullptr otherwise.
+gb_internal GenTypesData *gen_types_data_of_specialization(Type *specialization) {
+	if (specialization != nullptr &&
+	    specialization->kind == Type_Named &&
+	    specialization->Named.type_name != nullptr) {
+		Type *orig = specialization->Named.type_name->TypeName.original_type_for_parapoly;
+		if (orig != nullptr && orig->kind == Type_Named) {
+			return orig->Named.gen_types_data;
+		}
+	}
+	return nullptr;
+}
+
 gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type) {
 	if (type == nullptr ||
 	    type == t_invalid) {
@@ -1559,8 +1575,14 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			}
 
 			if (modify_type) {
-				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
+				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
+				// `specialization` may already be published in a polymorphic record's gen_types cache;
+				// finalize it under that record's (recursive) gen_types mutex so a concurrent
+				// find_polymorphic_record_entity on another thread cannot observe a torn Type.
+				GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
+				if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
 				gb_memmove(specialization, type, gb_size_of(Type));
+				if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
 			}
 
 			return true;
@@ -1606,8 +1628,12 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 			}
 
 			if (modify_type) {
-				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
+				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
+				// See the struct branch above: finalize under the originating record's gen_types mutex.
+				GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
+				if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
 				gb_memmove(specialization, type, gb_size_of(Type));
+				if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
 			}
 
 			return true;
