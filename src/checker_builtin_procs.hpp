@@ -235,6 +235,9 @@ BuiltinProc__simd_begin,
 
 	BuiltinProc_simd_indices,
 
+	BuiltinProc_simd_interleave,
+	BuiltinProc_simd_deinterleave,
+
 
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
@@ -640,6 +643,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_masked_compress_store"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_indices"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_interleave"),   1, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_deinterleave"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 

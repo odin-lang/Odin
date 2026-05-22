@@ -1042,14 +1042,14 @@ struct GlobalEnumValue {
 	i64 value;
 };
 
-gb_internal Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr) {
+gb_internal Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr, Type *backing_type = nullptr) {
 	Scope *scope = create_scope(nullptr, builtin_pkg->scope);
 	Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
 
 	Type *enum_type = alloc_type_enum();
 	Type *named_type = alloc_type_named(type_name, enum_type, entity);
 	set_base_type(named_type, enum_type);
-	enum_type->Enum.base_type = t_int;
+	enum_type->Enum.base_type = backing_type ? backing_type : t_int;
 	enum_type->Enum.scope = scope;
 	entity->type = named_type;
 
@@ -1248,6 +1248,41 @@ gb_internal void init_universal(void) {
 
 		auto fields = add_global_enum_type(str_lit("Odin_Error_Pos_Style_Type"), values, gb_count_of(values));
 		add_global_enum_constant(fields, "ODIN_ERROR_POS_STYLE", build_context.ODIN_ERROR_POS_STYLE);
+	}
+
+	{
+		GlobalEnumValue values[OdinFastMath_COUNT] = {};
+		for (unsigned i = 0; i < OdinFastMath_COUNT; i++) {
+			values[i] = {OdinFastMathFlag_strings[i], i};
+		}
+
+		auto fields = add_global_enum_type(str_lit("Fast_Math_Flag"), values, gb_count_of(values), &t_fast_math_flag, t_u8);
+
+		GB_ASSERT(t_fast_math_flag->kind == Type_Named);
+		scope_insert(intrinsics_pkg->scope, t_fast_math_flag->Named.type_name);
+
+		Type *bs = alloc_type_bit_set();
+		bs->BitSet.elem = t_fast_math_flag;
+		bs->BitSet.underlying = t_u32;
+		bs->BitSet.lower = 0;
+		bs->BitSet.upper = OdinFastMath_COUNT-1;
+		bs->BitSet.node = nullptr;
+
+
+		{
+			String type_name = str_lit("Fast_Math_Flags");
+
+			Scope *scope = create_scope(nullptr, builtin_pkg->scope);
+			Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+
+			Type *named_type = alloc_type_named(type_name, bs, entity);
+			set_base_type(named_type, bs);
+			entity->type = named_type;
+
+			t_fast_math_flags = named_type;
+
+			scope_insert(intrinsics_pkg->scope, entity);
+		}
 	}
 
 	{
@@ -3554,11 +3589,17 @@ gb_internal void init_preload(Checker *c) {
 	init_core_objc_c(c);
 }
 
-gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
+gb_internal void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t);
+
+gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value, Type *type_hint = nullptr) {
 	ExactValue ev = {};
 	if (value != nullptr) {
 		Operand op = {};
-		check_expr(c, &op, value);
+		if (type_hint != nullptr) {
+			check_expr_with_type_hint(c, &op, value, type_hint);
+		} else {
+			check_expr(c, &op, value);
+		}
 		if (op.mode) {
 			if (op.mode == Addressing_Constant) {
 				ev = op.value;
@@ -4125,6 +4166,18 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(value, "'%.*s' expects no parameter", LIT(name));
 		}
 		ac->no_sanitize_thread = true;
+		return true;
+	} else if (name == "fast_math") {
+		if (value == nullptr) {
+			error(elem, "Expected a constant bit_set of type 'intrinsics.Fast_Math_Flags' for '%.*s'", LIT(name));
+		} else {
+			ExactValue ev = check_decl_attribute_value(c, value, t_fast_math_flags);
+			if (ev.kind != ExactValue_Integer) {
+				error(elem, "Expected a constant bit_set of type 'intrinsics.Fast_Math_Flags' for '%.*s'", LIT(name));
+			} else {
+				ac->fast_math_flags = exact_value_to_u64(ev);
+			}
+		}
 		return true;
 	}
 	return false;

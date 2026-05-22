@@ -2441,40 +2441,55 @@ Graphically, the operation looks as follows. The `t` and `f` represent the
 select :: intrinsics.simd_select
 
 /*
-Runtime Equivalent to Shuffle.
+Hardware-level dynamic swizzle / table lookup.
 
-Performs element-wise table lookups using runtime indices.
-Each element in the indices vector selects an element from the table vector.
-The indices are automatically masked to prevent out-of-bounds access.
-
-This operation is hardware-accelerated on most platforms when using 8-bit
-integer vectors. For other element types or unsupported vector sizes, it
-falls back to software emulation.
+For each output lane `i`, picks an element from `table` using `indices[i]`
+as the source position. Maps directly onto hardware table-lookup instructions
+where available (`tbl` on ARM, `pshufb` on x86, `swizzle` on WASM). This is
+the runtime counterpart of `simd.shuffle`.
 
 Inputs:
-- `table`: The lookup table vector (should be power-of-2 size for correct masking).
-- `indices`: The indices vector (automatically masked to valid range).
+- `table`:   a `#simd[N]T` lookup table, where `T` is an integer type and
+            `N` is a power of two (enforced by `#simd`).
+- `indices`: a `#simd[N]T` of source positions. Must have the exact same
+            type as `table`.
 
 Returns:
-- A vector where `result[i] = table[indices[i] & (table_size-1)]`.
+- A `#simd[N]T`. For `indices[i]` in `[0, N-1]`, `result[i] = table[indices[i]]`
+  on ARM, on WebAssembly (16-byte), and on the scalar emulation fallback.
+  On x86 vectors larger than 16 bytes, the operation is lane-local; see Notes.
 
-Operation:
+Operation (in-range indices, non-lane-local platforms):
 
-	for i in 0 ..< len(indices) {
-		masked_index := indices[i] & (len(table) - 1)
-		result[i] = table[masked_index]
+	for i in 0 ..< N {
+		result[i] = table[indices[i]]   // indices[i] assumed to be in [0, N-1]
 	}
-	return result
+
+Notes:
+- **Out-of-range indices** (`indices[i] >= N`) are platform-defined:
+  most hardware paths return 0; the scalar fallback wraps via
+  `indices[i] & (N-1)`. Mask explicitly if you need portable behavior.
+- **x86 wide vectors are lane-local.** `vpshufb` treats a 256-bit AVX2
+  register as two independent 128-bit lanes; `pshufb.b.512` treats a
+  512-bit AVX-512 register as four. An index in lane `k` can only address
+  table entries in that same lane. AVX2 Example: Lane 0 is [0..15], Lane 1
+  is [16..31]. Accessing `indices[20] = 5` yields `table[21]`, not `table[5]`.
+  ARM `tbl` and the emulation fallback are cross-lane across the full table.
+- **Hardware acceleration is conditional.** It requires 8-bit integer
+  elements, a vector size supported by the target, and the relevant
+  target features enabled (`ssse3` / `avx2` / `avx512f`+`avx512bw` on x86,
+  `neon` on ARM). Otherwise this falls back to scalar emulation. Non-byte
+  element types always use the scalar fallback.
 
 Implementation:
 
-	| Platform    | Lane Size                                 | Implementation      |
-	|-------------|-------------------------------------------|---------------------|
-	| x86-64      | pshufb (16B), vpshufb (32B), AVX512 (64B) | Single vector       |
-	| ARM64       | tbl1 (16B), tbl2 (32B), tbl4 (64B)        | Automatic splitting |
-	| ARM32       | vtbl1 (8B), vtbl2 (16B), vtbl4 (32B)      | Automatic splitting |
-	| WebAssembly | i8x16.swizzle (16B), Emulation (>16B)     | Mixed               |
-	| Other       | Emulation                                 | Software            |
+	| Platform    | Hardware path (8-bit elements)                  | Notes                         |
+	|-------------|-------------------------------------------------|-------------------------------|
+	| x86-64      | pshufb (16B), vpshufb (32B), pshufb.b.512 (64B) | 32 / 64 B are lane-local      |
+	| ARM64       | tbl1 (16B), tbl2 (32B), tbl4 (64B)              | >16 B: split into 16-B chunks |
+	| ARM32       | vtbl1 (8B), vtbl2 (16B), vtbl4 (32B)            | >8 B: split into 8-B chunks   |
+	| WebAssembly | i8x16.swizzle (16B)                             | Other sizes: emulated         |
+	| Other       | Scalar emulation                                |                               |
 
 Example:
 
@@ -2482,12 +2497,11 @@ Example:
 	import "core:fmt"
 
 	runtime_swizzle_example :: proc() {
-		table := simd.u8x16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+		table   := simd.u8x16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 		indices := simd.u8x16{15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
-		result := simd.runtime_swizzle(table, indices)
-		fmt.println(result) // Expected: {15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+		result  := simd.runtime_swizzle(table, indices)
+		fmt.println(result) // {15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
 	}
-
 */
 runtime_swizzle :: intrinsics.simd_runtime_swizzle
 
@@ -2584,6 +2598,12 @@ count_leading_zeros :: intrinsics.count_leading_zeros
 Reverse the bit pattern of a SIMD vector.
 */
 reverse_bits :: intrinsics.reverse_bits
+
+/*
+Swap the bytes of the elements of a SIMD vector.
+*/
+byte_swap :: intrinsics.byte_swap
+
 
 /*
 **Operation**
@@ -2791,7 +2811,7 @@ sign_bit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: ty
 	val  := to_bits(v)
 	mask := type_of(val)(1<<(BITS-1))
 	masked := bit_and(val, mask)
-	return to_bits(shr(to_bits_signed(masked), BITS-1))
+	return to_bits(shr_masked(to_bits_signed(masked), BITS-1))
 }
 
 /*
@@ -2880,3 +2900,6 @@ abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T whe
 
 pairwise_add :: intrinsics.simd_pairwise_add
 pairwise_sub :: intrinsics.simd_pairwise_add
+
+interleave   :: intrinsics.simd_interleave
+deinterleave :: intrinsics.simd_deinterleave

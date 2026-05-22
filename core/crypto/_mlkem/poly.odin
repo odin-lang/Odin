@@ -58,7 +58,7 @@ poly_compress :: proc "contextless" (r: []byte, a: ^Poly) #no_bounds_check {
 			r = r[5:]
 		}
 	case:
-		panic_contextless("crypto/mlkem: invalid POLYCOMPRESSEDBYTES")
+		unreachable()
 	}
 }
 
@@ -91,7 +91,7 @@ poly_decompress :: proc "contextless" (r: ^Poly, a: []byte) {
 			}
 		}
 	case:
-		panic_contextless("crypto/mlkem: invalid POLYCOMPRESSEDBYTES")
+		unreachable()
 	}
 }
 
@@ -236,6 +236,6 @@ poly_compressed_bytes :: #force_inline proc "contextless" (k: int) -> int {
 	case K_1024:
 		return POLYCOMPRESSEDBYTES_1024
 	case:
-		panic_contextless("crypto/mlkem: invalid k")
+		unreachable()
 	}
 }

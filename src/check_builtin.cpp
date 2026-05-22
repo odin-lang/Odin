@@ -1403,9 +1403,9 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 			Type *elem = base_array_type(x.type);
-			if (!is_type_boolean(elem)) {
+			if (!is_type_boolean(elem) && !is_type_integer(elem)) {
 				gbString xs = type_to_string(x.type);
-				error(x.expr, "'%.*s' expected a #simd type with a boolean element, got '%s'", LIT(builtin_name), xs);
+				error(x.expr, "'%.*s' expected a #simd type with a boolean or an integer element, got '%s'", LIT(builtin_name), xs);
 				gb_string_free(xs);
 				return false;
 			}
@@ -1572,8 +1572,8 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[1]); if (x.mode == Addressing_Invalid) return false;
-			check_expr_with_type_hint(c, &y, ce->args[2], x.type); if (y.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &x, ce->args[1], type_hint); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[2], x.type);    if (y.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -1867,6 +1867,90 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			operand->mode = Addressing_Value;
 			return true;
 		}
+
+	case BuiltinProc_simd_interleave:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+
+			for (isize i = 1; i < ce->args.count; i++) {
+				Operand y = {};
+				check_expr_with_type_hint(c, &y, ce->args[i], x.type); if (y.mode == Addressing_Invalid) return false;
+				if (!is_type_simd_vector(y.type)) {
+					error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+					return false;
+				}
+				if (!are_types_identical(x.type, y.type)) {
+					gbString a = type_to_string(x.type);
+					gbString b = type_to_string(y.type);
+					error(y.expr, "'%.*s' all argument types must match, expected %s, got %s", LIT(builtin_name), a, b);
+					gb_string_free(b);
+					gb_string_free(a);
+					return false;
+				}
+			}
+
+			Type *elem = base_array_type(x.type);
+			i64 base_count = get_array_type_count(x.type);
+			i64 count = base_count * cast(i64)ce->args.count;
+
+			i64 max_count = 64;
+			if (count > max_count) {
+				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", cast(long long)max_count, cast(long long)count);
+				return false;
+			}
+
+			operand->type = alloc_type_simd_vector(count, elem);
+			operand->mode = Addressing_Value;
+			return true;
+		}
+
+	case BuiltinProc_simd_deinterleave:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+
+			Type *elem = base_array_type(x.type);
+			i64 max_count = get_array_type_count(x.type);
+
+			Operand n = {};
+			check_expr(c, &n, ce->args[1]); if (n.mode == Addressing_Invalid) return false;
+			if (n.mode != Addressing_Constant) {
+				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector", LIT(builtin_name));
+				return false;
+			}
+			if (n.value.kind != ExactValue_Integer) {
+				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector", LIT(builtin_name));
+				return false;
+			}
+			i64 divisor = exact_value_to_i64(n.value);
+			if (divisor < 1 || divisor > max_count || (max_count % divisor != 0)) {
+				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector , got %lld, which must have been divisible by %lld", LIT(builtin_name), cast(long long)divisor, cast(long long)max_count);
+				return false;
+			}
+
+			Type *base_vector = alloc_type_simd_vector(max_count / divisor, elem);
+
+			Type **field_types = temporary_alloc_array<Type *>(cast(isize)divisor);
+			for (i64 i = 0; i < divisor; i++) {
+				field_types[i] = base_vector;
+			}
+
+			operand->type = alloc_type_tuple_from_field_types(field_types, divisor, false, false);
+			operand->mode = Addressing_Value;
+			return true;
+		}
+		break;
+
 
 	case BuiltinProc_simd_x86__MM_SHUFFLE:
 		{
@@ -5610,7 +5694,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
+			if (is_type_simd_vector(x.type)) {
+				Type *elem = base_array_type(x.type);
+				if (!is_type_integer_like(elem)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "#simd values passed to '%.*s' must have an element of an integer-like type (integer, boolean, enum, bit_set), got %s", LIT(builtin_name), xts);
+					gb_string_free(xts);
+				}
+			} else if (!is_type_integer_like(x.type) && !is_type_float(x.type)) {
 				gbString xts = type_to_string(x.type);
 				error(x.expr, "Values passed to '%.*s' must be an integer-like type (integer, boolean, enum, bit_set) or float, got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
