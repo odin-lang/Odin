@@ -1094,11 +1094,53 @@ smoothstep :: proc "contextless" (edge0, edge1, x: $T) -> T where intrinsics.typ
 	t := clamp((x - edge0) / (edge1 - edge0), 0, 1)
 	return t * t * (3 - 2*t)
 }
+/*
+Calculates the Schlick's Fast Bias function
 
+helps creating easing functions that are fast to calculate and are easily parametrizeable
+
+When b = 0.5: The equation simplifies down to standard linear interpolation y = t. The output directly matches the input.
+When b < 0.5: The curve sags downward. Most of the scaling happens in the end of the range towards t=1
+When b > 0.5: The curve arches upward. Most of the scaling happens in the start of the range towards t=0
+
+Another application is using over perlin noise to reduce the smoothness of surfaces
+
+for details see: https://arxiv.org/pdf/2010.09714
+
+Inputs:
+- `t`: a numeric in the range of [0, 1]
+- `b`: a numeric in the range of [0, 1]
+
+Returns:
+- A numeric of the same type as the inputs
+
+*/
 @(require_results)
 bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_numeric(T) {
 	return t / (((1/b) - 2) * (1 - t) + 1)
 }
+/*
+Calculates the Schlick's Gain function
+
+the mapping consists of 2 Schlick Bias curves forming an "S" shaped curve where the midpoint(0.5, 0.5) connects both halves.
+The points where t={0, 0.5, 1} remain fixed.
+
+helps creating easing functions that both ease on start and on end
+
+When b = 0.5: The equation simplifies down to standard linear interpolation y = t. The output directly matches the input.
+When b < 0.5: The curve starts saggings downward then arches upward. Most of the scaling happens around the midpoint t=0.5
+When b > 0.5: The curve arches upward then saggs downward. Most of the scaling happens around the start and end of the range towards t=0 and t=1
+
+Another application is using over perlin noise to get more jagged surfaces and flat valleys
+
+Inputs:
+- `t`: a float in the range of [0, 1]
+- `g`: a float in the range of [0, 1]
+
+Returns:
+- A float of the same type as the inputs
+
+*/
 @(require_results)
 gain :: proc "contextless" (t, g: $T) -> T where intrinsics.type_is_float(T) {
 	if t < 0.5 {
@@ -2630,9 +2672,7 @@ frexp :: proc{
 	frexp_f64, frexp_f64le, frexp_f64be, 
 }
 
-
-
-
+// Calculates the Binomial based on the coefficients `n` as the upper part and `k` as the lower part
 @(require_results)
 binomial :: proc "contextless" (n, k: int) -> int {
 	switch {
@@ -2646,7 +2686,15 @@ binomial :: proc "contextless" (n, k: int) -> int {
 	}
 	return b
 }
+/*
+Calculates the factorial of `n`
 
+uses static precomputed values, only valid up to n=20 in most targets (where `int` size is same as `i64`).
+Using `n` > 20 results in an exception
+
+In the other targets the maximum value for `n` is 12
+
+*/
 @(require_results)
 factorial :: proc "contextless" (n: int) -> int {
 	when size_of(int) == size_of(i64) {
@@ -3058,12 +3106,13 @@ nan_f64le :: proc "contextless" () -> f64le {
 nan_f64be :: proc "contextless" () -> f64be {
 	return f64be(nan_f64())
 }
-
+// Checks if `x` is a power of 2 and returns a `bool`
 @(require_results)
 is_power_of_two :: proc "contextless" (x: int) -> bool {
 	return x > 0 && (x & (x-1)) == 0
 }
-
+// Fetches the next power of 2 bigger than `x`
+// if `x` is a power of 2 then returns itself
 @(require_results)
 next_power_of_two :: proc "contextless" (x: int) -> int {
 	k := x -1
@@ -3078,7 +3127,16 @@ next_power_of_two :: proc "contextless" (x: int) -> int {
 	k += 1 + int(x <= 0)
 	return k
 }
+/*
+Sums all elements of a slice
 
+Inputs:
+- `x` a slice of numerics to be summed
+
+Returns:
+- A numeric of type equal to the slice element type
+
+*/
 @(require_results)
 sum :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	where intrinsics.type_is_numeric(E) {
@@ -4434,7 +4492,14 @@ hypot :: proc{
 	hypot_f32, hypot_f32le, hypot_f32be,
 	hypot_f64, hypot_f64le, hypot_f64be,
 }
+/*
+Counts the number of digits of `value` when represented on `base`
 
+Inputs:
+- `value` an integer
+- `base` an integer constant
+
+*/
 @(require_results)
 count_digits_of_base :: proc "contextless" (value: $T, $base: int) -> (digits: int) where intrinsics.type_is_integer(T) {
 	#assert(base >= 2, "base must be 2 or greater.")
