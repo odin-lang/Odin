@@ -3724,17 +3724,131 @@ acos :: proc{
 	acos_f32le, acos_f32be,
 	acos_f16le, acos_f16be,
 }
+/*
+Returns the hyperbolic sine of a angle
 
+Inputs:
+- `x`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	sinh_example :: proc() {
+		x_float: f16    = 30.0
+		x2_float: f16   = math.PI/4
+
+		fmt.println(math.sinh(x2_float))
+		fmt.println(math.sinh(x_float))
+		fmt.println(math.sinh(math.to_radians(x_float)))
+	}
+
+Output:
+	+0.8987 	// using PI/4
+	+Inf 		// accidentally using 90 degrees instead of radians
+	+0.5483 	// adjusted with degrees to radians conversion
+
+*/
 @(require_results)
 sinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return copy_sign(((exp(x) - exp(-x))*0.5), x)
 }
+/*
+Returns the hyperbolic cosine of a angle
 
+Inputs:
+- `x`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	cosh_example :: proc() {
+		x_float: f16   = 90.0
+		x2_float: f16   = math.PI/4
+
+		// special cases
+		x_pos_zero: f16 = +0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+
+
+		fmt.println(math.cosh(x2_float))
+		fmt.println(math.cosh(x_float))
+		fmt.println(math.cosh(math.to_radians(x_float)))
+
+		fmt.println(math.cosh(x_pos_zero))
+		fmt.println(math.cosh(x_pos_inf))
+	}
+
+Output:
+	+1.325 		// using PI/4
+	+Inf 		// accidentally using 90 degrees instead of radians
+	+2.51 		// adjusted with degrees to radians conversion
+
+	// special cases
+	1 			// pos_zero
+	+Inf 		// pos_inf
+
+*/
 @(require_results)
 cosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return ((exp(x) + exp(-x))*0.5)
 }
+/*
+Returns the hyperbolic tangent of a angle
 
+Inputs:
+- `y`: angle in radians of type float
+
+
+Returns:
+- A float of matching type as the input
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	tanh_example :: proc() {
+		x_float: f16   = 90.0
+
+		// special cases            
+		x_neg_zero: f16 = -0.0;             
+		x_pos_inf:  f16 = math.inf_f16(+1); 
+		x_neg_inf:  f16 = math.inf_f16(-1); 
+
+
+		fmt.println(math.tanh(x_float))
+		fmt.println(math.tanh(math.to_radians(x_float)))
+
+		fmt.println(math.tanh(x_neg_zero))
+		fmt.println(math.tanh(x_pos_inf))
+		fmt.println(math.tanh(x_neg_inf))
+	}
+
+Output:
+	+1.62 		// accidentally using 90 degrees instead of radians
+	+0.917 		// adjusted with degrees to radians conversion
+
+	// special cases
+	-0 		// neg_zero
+	+1 		// pos_inf
+	-1 		// neg_inf
+
+*/
 @(require_results)
 tanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
 	P0 :: -9.64399179425052238628e-1
