@@ -135,13 +135,13 @@ when ODIN_OS == .Windows {
 		// multiple copies of raylib.so, but since these bindings are for
 		// particular version of the library, I better specify it. Ideally,
 		// though, it's best specified in terms of major (.so.4)
-		"../linux/libraylib.so.550" when RAYLIB_SHARED else "../linux/libraylib.a",
+		"../linux/libraylib.so.600" when RAYLIB_SHARED else "../linux/libraylib.a",
 		"system:dl",
 		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"../macos/libraylib.550.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
+		"../macos/libraylib.600.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
