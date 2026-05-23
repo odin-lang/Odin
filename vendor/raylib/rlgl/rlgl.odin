@@ -1,26 +1,27 @@
 /**********************************************************************************************
 *
-*   rlgl v5.0 - A multi-OpenGL abstraction layer with an immediate-mode style API
+*   rlgl v6.0 - A multi-OpenGL abstraction layer with an immediate-mode style API
 *
 *   DESCRIPTION:
-*       An abstraction layer for multiple OpenGL versions (1.1, 2.1, 3.3 Core, 4.3 Core, ES 2.0)
+*       An abstraction layer for multiple OpenGL versions (1.1, 2.1, 3.3 Core, 4.3 Core, ES 2.0, ES 3.0)
 *       that provides a pseudo-OpenGL 1.1 immediate-mode style API (rlVertex, rlTranslate, rlRotate...)
 *
 *   ADDITIONAL NOTES:
-*       When choosing an OpenGL backend different than OpenGL 1.1, some internal buffer are
-*       initialized on rlglInit() to accumulate vertex data.
+*       When choosing an OpenGL backend different than OpenGL 1.1, some internal buffers are
+*       initialized on rlglInit() to accumulate vertex data
 *
-*       When an internal state change is required all the stored vertex data is renderer in batch,
-*       additionally, rlDrawRenderBatchActive() could be called to force flushing of the batch.
+*       When an internal state change is required all the stored vertex data is rendered in a batch,
+*       additionally, rlDrawRenderBatchActive() could be called to force flushing of the batch
 *
 *       Some resources are also loaded for convenience, here the complete list:
 *          - Default batch (RLGL.defaultBatch): RenderBatch system to accumulate vertex data
 *          - Default texture (RLGL.defaultTextureId): 1x1 white pixel R8G8B8A8
 *          - Default shader (RLGL.State.defaultShaderId, RLGL.State.defaultShaderLocs)
 *
-*       Internal buffer (and resources) must be manually unloaded calling rlglClose().
+*       Internal buffer (and resources) must be manually unloaded calling rlglClose()
 *
 *   CONFIGURATION:
+*       #define GRAPHICS_API_OPENGL_SOFTWARE
 *       #define GRAPHICS_API_OPENGL_11
 *       #define GRAPHICS_API_OPENGL_21
 *       #define GRAPHICS_API_OPENGL_33
@@ -28,52 +29,51 @@
 *       #define GRAPHICS_API_OPENGL_ES2
 *       #define GRAPHICS_API_OPENGL_ES3
 *           Use selected OpenGL graphics backend, should be supported by platform
-*           Those preprocessor defines are only used on rlgl module, if OpenGL version is
+*           Those preprocessor defines are only used on the rlgl module, if OpenGL version is
 *           required by any other module, use rlGetVersion() to check it
 *
 *       #define RLGL_IMPLEMENTATION
-*           Generates the implementation of the library into the included file.
+*           Generates the implementation of the library into the included file
 *           If not defined, the library is in header only mode and can be included in other headers
-*           or source files without problems. But only ONE file should hold the implementation.
+*           or source files without problems. But only ONE file should hold the implementation
 *
-*       #define RLGL_RENDER_TEXTURES_HINT
-*           Enable framebuffer objects (fbo) support (enabled by default)
-*           Some GPUs could not support them despite the OpenGL version
-*
-*       #define RLGL_SHOW_GL_DETAILS_INFO
+*       #if RLGL_SHOW_GL_DETAILS_INFO
 *           Show OpenGL extensions and capabilities detailed logs on init
 *
-*       #define RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
+*       #if RLGL_ENABLE_OPENGL_DEBUG_CONTEXT
 *           Enable debug context (only available on OpenGL 4.3)
 *
-*       rlgl capabilities could be customized just defining some internal
+*       rlgl capabilities could be customized defining some internal
 *       values before library inclusion (default values listed):
 *
 *       #define RL_DEFAULT_BATCH_BUFFER_ELEMENTS   8192    // Default internal render batch elements limits
 *       #define RL_DEFAULT_BATCH_BUFFERS              1    // Default number of batch buffers (multi-buffering)
 *       #define RL_DEFAULT_BATCH_DRAWCALLS          256    // Default number of batch draw calls (by state changes: mode, texture)
-*       #define RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS    4    // Maximum number of textures units that can be activated on batch drawing (SetShaderValueTexture())
+*       #define RL_DEFAULT_BATCH_MAX_TEXTURE_UNITS    4    // Maximum number of texture units that can be activated on batch drawing (SetShaderValueTexture())
 *
 *       #define RL_MAX_MATRIX_STACK_SIZE             32    // Maximum size of internal Matrix stack
 *       #define RL_MAX_SHADER_LOCATIONS              32    // Maximum number of shader locations supported
-*       #define RL_CULL_DISTANCE_NEAR              0.01    // Default projection matrix near cull distance
-*       #define RL_CULL_DISTANCE_FAR             1000.0    // Default projection matrix far cull distance
+*       #define RL_CULL_DISTANCE_NEAR              0.05    // Default projection matrix near cull distance
+*       #define RL_CULL_DISTANCE_FAR             4000.0    // Default projection matrix far cull distance
 *
 *       When loading a shader, the following vertex attributes and uniform
 *       location names are tried to be set automatically:
 *
-*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"    // Bound by default to shader location: 0
-*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"    // Bound by default to shader location: 1
-*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"      // Bound by default to shader location: 2
-*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"       // Bound by default to shader location: 3
-*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"     // Bound by default to shader location: 4
-*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"   // Bound by default to shader location: 5
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_POSITION     "vertexPosition"    // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD     "vertexTexCoord"    // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_NORMAL       "vertexNormal"      // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_NORMAL
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_COLOR        "vertexColor"       // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TANGENT      "vertexTangent"     // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_TANGENT
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_TEXCOORD2    "vertexTexCoord2"   // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD2
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEINDICES  "vertexBoneIndices" // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEINDICES
+*       #define RL_DEFAULT_SHADER_ATTRIB_NAME_BONEWEIGHTS  "vertexBoneWeights" // Bound by default to shader location: RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEWEIGHTS
 *       #define RL_DEFAULT_SHADER_UNIFORM_NAME_MVP         "mvp"               // model-view-projection matrix
 *       #define RL_DEFAULT_SHADER_UNIFORM_NAME_VIEW        "matView"           // view matrix
 *       #define RL_DEFAULT_SHADER_UNIFORM_NAME_PROJECTION  "matProjection"     // projection matrix
 *       #define RL_DEFAULT_SHADER_UNIFORM_NAME_MODEL       "matModel"          // model matrix
-*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL      "matNormal"         // normal matrix (transpose(inverse(matModelView))
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_NORMAL      "matNormal"         // normal matrix (transpose(inverse(matModelView)))
 *       #define RL_DEFAULT_SHADER_UNIFORM_NAME_COLOR       "colDiffuse"        // color diffuse (base tint color, multiplied by texture color)
+*       #define RL_DEFAULT_SHADER_UNIFORM_NAME_BONEMATRICES "boneMatrices"     // bone matrices
 *       #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE0  "texture0"          // texture0 (texture slot active 0)
 *       #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE1  "texture1"          // texture1 (texture slot active 1)
 *       #define RL_DEFAULT_SHADER_SAMPLER2D_NAME_TEXTURE2  "texture2"          // texture2 (texture slot active 2)
@@ -85,7 +85,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2014-2023 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2014-2026 Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -110,7 +110,7 @@ package rlgl
 import "core:c"
 import rl "../."
 
-VERSION :: "5.0"
+VERSION :: "6.0"
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "../wasm/libraylib.a")
@@ -137,6 +137,7 @@ when ODIN_OS == .Windows {
 		// though, it's best specified in terms of major (.so.4)
 		"../linux/libraylib.so.600" when RAYLIB_SHARED else "../linux/libraylib.a",
 		"system:dl",
+		"system:X11",
 		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
@@ -187,8 +188,8 @@ MAX_MATRIX_STACK_SIZE          :: 32                   // Maximum size of Matrix
 MAX_SHADER_LOCATIONS           :: 32                   // Maximum number of shader locations supported
 
 // Projection matrix culling
-CULL_DISTANCE_NEAR          :: 0.01                 // Default near cull distance
-CULL_DISTANCE_FAR           :: 1000.0               // Default far cull distance
+CULL_DISTANCE_NEAR          :: 0.05                 // Default near cull distance
+CULL_DISTANCE_FAR           :: 4000.0               // Default far cull distance
 
 // Texture parameters (equivalent to OpenGL defines)
 TEXTURE_WRAP_S                       :: 0x2802      // GL_TEXTURE_WRAP_S
@@ -292,7 +293,7 @@ VertexBuffer :: struct {
 
 // Draw call type
 // NOTE: Only texture changes register a new draw, other state-change-related elements are not
-// used at this moment (vaoId, shaderId, matrices), raylib just forces a batch draw call if any
+// used at this moment (vaoId, shaderId, matrices), raylib forces a batch draw call if any
 // of those state-change happens (this is done in core module)
 DrawCall :: struct {
 	mode:            c.int,        // Drawing mode: LINES, TRIANGLES, QUADS
@@ -314,7 +315,8 @@ RenderBatch :: struct {
 
 // OpenGL version
 GlVersion :: enum c.int {
-	OPENGL_11 = 1,           // OpenGL 1.1
+	OPENGL_SOFTWARE = 0,     // Software rendering
+	OPENGL_11,               // OpenGL 1.1
 	OPENGL_21,               // OpenGL 2.1 (GLSL 120)
 	OPENGL_33,               // OpenGL 3.3 (GLSL 330)
 	OPENGL_43,               // OpenGL 4.3 (using GLSL 330)
@@ -411,18 +413,16 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Vertex buffers state
-	EnableVertexArray          :: proc(vaoId: c.uint) -> bool --- // Enable vertex array (VAO, if supported)
-	DisableVertexArray         :: proc() ---                      // Disable vertex array (VAO, if supported)
-	EnableVertexBuffer         :: proc(id: c.uint) ---            // Enable vertex buffer (VBO)
-	DisableVertexBuffer        :: proc() ---                      // Disable vertex buffer (VBO)
-	EnableVertexBufferElement  :: proc(id: c.uint) ---            // Enable vertex buffer element (VBO element)
-	DisableVertexBufferElement :: proc() ---                      // Disable vertex buffer element (VBO element)
-	EnableVertexAttribute      :: proc(index: c.uint) ---         // Enable vertex attribute index
-	DisableVertexAttribute     :: proc(index: c.uint) ---         // Disable vertex attribute index
-	when GRAPHICS_API_OPENGL_11 {
-		EnableStatePointer :: proc(vertexAttribType: c.int, buffer: rawptr) ---
-		DisableStatePointer :: proc(vertexAttribType: c.int) ---
-	}
+	EnableVertexArray          :: proc(vaoId: c.uint) -> bool ---             // Enable vertex array (VAO, if supported)
+	DisableVertexArray         :: proc() ---                                  // Disable vertex array (VAO, if supported)
+	EnableVertexBuffer         :: proc(id: c.uint) ---                        // Enable vertex buffer (VBO)
+	DisableVertexBuffer        :: proc() ---                                  // Disable vertex buffer (VBO)
+	EnableVertexBufferElement  :: proc(id: c.uint) ---                        // Enable vertex buffer element (VBO element)
+	DisableVertexBufferElement :: proc() ---                                  // Disable vertex buffer element (VBO element)
+	EnableVertexAttribute      :: proc(index: c.uint) ---                     // Enable vertex attribute index
+	DisableVertexAttribute     :: proc(index: c.uint) ---                     // Disable vertex attribute index
+	EnableStatePointer :: proc(vertexAttribType: c.int, buffer: rawptr) ---   // Enable attribute state pointer
+	DisableStatePointer :: proc(vertexAttribType: c.int) ---                  // Disable attribute state pointer
 
 	// Textures state
 	ActiveTextureSlot     :: proc(slot: c.int) ---                            // Select and active a texture slot
@@ -456,8 +456,11 @@ foreign lib {
 	EnableScissorTest      :: proc() ---                           // Enable scissor test
 	DisableScissorTest     :: proc() ---                           // Disable scissor test
 	Scissor                :: proc(x, y, width, height: c.int) --- // Scissor test
+	EnablePointMode        :: proc() ---                           // Enable point mode
+	DisablePointMode       :: proc() ---                           // Disable point mode
+	SetPointSize           :: proc(size: f32) ---                  // Set the point drawing size
+	GetPointSize           :: proc() -> f32 ---                    // Get the point drawing size
 	EnableWireMode         :: proc() ---                           // Enable wire mode
-	EnablePointMode        :: proc() --- 							 // Enable point mode
 	DisableWireMode        :: proc() ---                           // Disable wire and point modes
 	SetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
 	GetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
@@ -480,15 +483,16 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 	// rlgl initialization functions
 	@(link_prefix="rlgl")
-	Init                 :: proc(width, height: c.int) --- // Initialize rlgl (buffers, shaders, textures, states)
+	Init                 :: proc(width, height: c.int) ---            // Initialize rlgl (buffers, shaders, textures, states)
 	@(link_prefix="rlgl")
-	Close                :: proc() ---                     // De-initialize rlgl (buffers, shaders, textures)
-	LoadExtensions       :: proc(loader: rawptr) ---       // Load OpenGL extensions (loader function required)
-	GetVersion           :: proc() -> GlVersion ---        // Get current OpenGL version
-	SetFramebufferWidth  :: proc(width: c.int) ---         // Set current framebuffer width
-	GetFramebufferWidth  :: proc() -> c.int ---            // Get default framebuffer width
-	SetFramebufferHeight :: proc(height: c.int) ---        // Set current framebuffer height
-	GetFramebufferHeight :: proc() -> c.int ---            // Get default framebuffer height
+	Close                :: proc() ---                                // De-initialize rlgl (buffers, shaders, textures)
+	LoadExtensions       :: proc(loader: rawptr) ---                  // Load OpenGL extensions (loader function required)
+	GetProcAddress       :: proc(procName: cstring) -> rawptr ---     // Get OpenGL procedure address
+	GetVersion           :: proc() -> GlVersion ---                   // Get current OpenGL version
+	SetFramebufferWidth  :: proc(width: c.int) ---                    // Set current framebuffer width
+	GetFramebufferWidth  :: proc() -> c.int ---                       // Get default framebuffer width
+	SetFramebufferHeight :: proc(height: c.int) ---                   // Set current framebuffer height
+	GetFramebufferHeight :: proc() -> c.int ---                       // Get default framebuffer height
 
 
 	GetTextureIdDefault  :: proc() -> c.uint ---   // Get default texture id
@@ -538,25 +542,30 @@ foreign lib {
 	ReadScreenPixels    :: proc(width, height: c.int) -> [^]byte ---                                                        // Read screen pixel data (color buffer)
 
 	// Framebuffer management (fbo)
-	LoadFramebuffer     :: proc() -> c.uint ---                                           // Load an empty framebuffer
-	FramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
+	LoadFramebuffer     :: proc() -> c.uint ---                                                               // Load an empty framebuffer
+	FramebufferAttach   :: proc(id, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) ---    // Attach texture/renderbuffer to a framebuffer
 	FramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
 	UnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU
-
+	// WARNING: Copy and resize framebuffer functionality only defined for software backend
+	CopyFramebuffer     :: proc(x, y, width, height: c.int, format: PixelFormat, pixels: rawptr) ---                // Copy framebuffer pixel data to internal buffer
+	ResizeFramebuffer   :: proc(width, height: c.int) ---                                                     // Resize internal framebuffer
+	
 	// Shaders management
-	LoadShaderCode      :: proc(vsCode, fsCode: cstring) -> c.uint ---                                // Load shader from code strings
+	LoadShader          :: proc(code: cstring, type: c.int) -> c.uint ---                             // Load (compile) shader and return shader id (type: VERTEX_SHADER, FRAGMENT_SHADER, COMPUTE_SHADER)
 	CompileShader       :: proc(shaderCode: cstring, type: c.int) -> c.uint ---                       // Compile custom shader and return shader id (type: VERTEX_SHADER, FRAGMENT_SHADER, COMPUTE_SHADER)
-	LoadShaderProgram   :: proc(vShaderId, fShaderId: c.uint) -> c.uint ---                           // Load custom shader program
+	LoadShaderProgram   :: proc(vsCode, fsCode: cstring) -> c.uint ---                                // Load custom shader program
+	LoadShaderProgramEx :: proc(vsId, fsId: c.uint) -> c.uint ---                                     // Load shader program, using already loaded shader ids
+	LoadShaderProgramCompute :: proc(csId: c.uint) -> c.uint ---                                      // Load compute shader program
+	UnloadShader        :: proc(id: c.uint) ---                                                       // Unload shader, loaded with LoadShader()
 	UnloadShaderProgram :: proc(id: c.uint) ---                                                       // Unload shader program
-	GetLocationUniform  :: proc(shaderId: c.uint, uniformName: cstring) -> c.int ---                  // Get shader location uniform
-	GetLocationAttrib   :: proc(shaderId: c.uint, attribName: cstring) -> c.int ---                   // Get shader location attribute
+	GetLocationUniform  :: proc(id: c.uint, uniformName: cstring) -> c.int ---                        // Get shader location uniform
+	GetLocationAttrib   :: proc(id: c.uint, attribName: cstring) -> c.int ---                         // Get shader location attribute
 	SetUniform          :: proc(locIndex: c.int, value: rawptr, uniformType: c.int, count: c.int) --- // Set shader value uniform
 	SetUniformMatrix    :: proc(locIndex: c.int, mat: Matrix) ---                                     // Set shader value matrix
 	SetUniformSampler   :: proc(locIndex: c.int, textureId: c.uint) ---                               // Set shader value sampler
 	SetShader           :: proc(id: c.uint, locs: [^]c.int) ---                                       // Set shader currently active (id and locations)
 
 	// Compute shader management
-	LoadComputeShaderProgram :: proc(shaderId: c.uint) -> c.uint ---     // Load compute shader program
 	ComputeShaderDispatch    :: proc(groupX, groupY, groupZ: c.uint) --- // Dispatch compute shader (equivalent to *draw* for graphics pipeline)
 
 	// Shader buffer storage object management (ssbo)
