@@ -354,7 +354,7 @@ BoneInfo :: struct {
 ModelSkeleton :: struct {
 	boneCount: c.int,          // Number of bones
 	bones: [^]BoneInfo,        // Bones information (skeleton)
-	bindPose: ModelAnimPose    // Bones base transformation (Transform[])
+	bindPose: ModelAnimPose,   // Bones base transformation (Transform[])
 }
 
 // Model type
@@ -370,7 +370,7 @@ Model :: struct #align(align_of(uintptr)) {
 	// Animation data
 	skeleton: ModelSkeleton,      // Skeleton for animation
 	currentPose: ModelAnimPose,   // Current animation poise (Transform[])
-	boneMatrices: [^]Matrix       // Bones animated transformation matrices
+	boneMatrices: [^]Matrix,      // Bones animated transformation matrices
 }
 
 // Model animation
@@ -378,7 +378,7 @@ ModelAnimation :: struct {
 	name:       [32]byte `fmt:"s,0"`, // Animation name
 	boneCount:  c.int,                // Number of bones (per pose)
 	keyFrameCount: c.int,             // Number of animation key frames
-	keyFramePoses: [^]ModelAnimPose   // Animation sequence keyframe poses [keyframe][pose]
+	keyFramePoses: [^]ModelAnimPose,  // Animation sequence keyframe poses [keyframe][pose]
 }
 
 // Ray type (useful for raycast)
@@ -719,36 +719,36 @@ MaterialMapIndex :: enum c.int {
 // NOTE: Some locations are tried to be set automatically on shader loading,
 // but only if default attributes/uniforms names are found
 ShaderLocationIndex :: enum c.int {
-	VERTEX_POSITION = 0,     // Shader location: vertex attribute: position
-	VERTEX_TEXCOORD01,       // Shader location: vertex attribute: texcoord01
-	VERTEX_TEXCOORD02,       // Shader location: vertex attribute: texcoord02
-	VERTEX_NORMAL,           // Shader location: vertex attribute: normal
-	VERTEX_TANGENT,          // Shader location: vertex attribute: tangent
-	VERTEX_COLOR,            // Shader location: vertex attribute: color
-	MATRIX_MVP,              // Shader location: matrix uniform: model-view-projection
-	MATRIX_VIEW,             // Shader location: matrix uniform: view (camera transform)
-	MATRIX_PROJECTION,       // Shader location: matrix uniform: projection
-	MATRIX_MODEL,            // Shader location: matrix uniform: model (transform)
-	MATRIX_NORMAL,           // Shader location: matrix uniform: normal
-	VECTOR_VIEW,             // Shader location: vector uniform: view
-	COLOR_DIFFUSE,           // Shader location: vector uniform: diffuse color
-	COLOR_SPECULAR,          // Shader location: vector uniform: specular color
-	COLOR_AMBIENT,           // Shader location: vector uniform: ambient color
-	MAP_ALBEDO,              // Shader location: sampler2d texture: albedo (same as: SHADER_LOC_MAP_DIFFUSE)
-	MAP_METALNESS,           // Shader location: sampler2d texture: metalness (same as: SHADER_LOC_MAP_SPECULAR)
-	MAP_NORMAL,              // Shader location: sampler2d texture: normal
-	MAP_ROUGHNESS,           // Shader location: sampler2d texture: roughness
-	MAP_OCCLUSION,           // Shader location: sampler2d texture: occlusion
-	MAP_EMISSION,            // Shader location: sampler2d texture: emission
-	MAP_HEIGHT,              // Shader location: sampler2d texture: heightmap
-	MAP_CUBEMAP,             // Shader location: samplerCube texture: cubemap
-	MAP_IRRADIANCE,          // Shader location: samplerCube texture: irradiance
-	MAP_PREFILTER,           // Shader location: samplerCube texture: prefilter
-	MAP_BRDF,                // Shader location: sampler2d texture: brdf
-	VERTEX_BONEIDS,          // Shader location: vertex attribute: bone indices
-	VERTEX_BONEWEIGHTS,      // Shader location: vertex attribute: bone weights
-	MATRIX_BONETRANSFORMS,   // Shader location: matrix attribute: bone transforms (animation)
-	VERTEX_INSTANCETRANSFORM // Shader location: vertex attribute: instance transforms
+	VERTEX_POSITION = 0,      // Shader location: vertex attribute: position
+	VERTEX_TEXCOORD01,        // Shader location: vertex attribute: texcoord01
+	VERTEX_TEXCOORD02,        // Shader location: vertex attribute: texcoord02
+	VERTEX_NORMAL,            // Shader location: vertex attribute: normal
+	VERTEX_TANGENT,           // Shader location: vertex attribute: tangent
+	VERTEX_COLOR,             // Shader location: vertex attribute: color
+	MATRIX_MVP,               // Shader location: matrix uniform: model-view-projection
+	MATRIX_VIEW,              // Shader location: matrix uniform: view (camera transform)
+	MATRIX_PROJECTION,        // Shader location: matrix uniform: projection
+	MATRIX_MODEL,             // Shader location: matrix uniform: model (transform)
+	MATRIX_NORMAL,            // Shader location: matrix uniform: normal
+	VECTOR_VIEW,              // Shader location: vector uniform: view
+	COLOR_DIFFUSE,            // Shader location: vector uniform: diffuse color
+	COLOR_SPECULAR,           // Shader location: vector uniform: specular color
+	COLOR_AMBIENT,            // Shader location: vector uniform: ambient color
+	MAP_ALBEDO,               // Shader location: sampler2d texture: albedo (same as: SHADER_LOC_MAP_DIFFUSE)
+	MAP_METALNESS,            // Shader location: sampler2d texture: metalness (same as: SHADER_LOC_MAP_SPECULAR)
+	MAP_NORMAL,               // Shader location: sampler2d texture: normal
+	MAP_ROUGHNESS,            // Shader location: sampler2d texture: roughness
+	MAP_OCCLUSION,            // Shader location: sampler2d texture: occlusion
+	MAP_EMISSION,             // Shader location: sampler2d texture: emission
+	MAP_HEIGHT,               // Shader location: sampler2d texture: heightmap
+	MAP_CUBEMAP,              // Shader location: samplerCube texture: cubemap
+	MAP_IRRADIANCE,           // Shader location: samplerCube texture: irradiance
+	MAP_PREFILTER,            // Shader location: samplerCube texture: prefilter
+	MAP_BRDF,                 // Shader location: sampler2d texture: brdf
+	VERTEX_BONEIDS,           // Shader location: vertex attribute: bone indices
+	VERTEX_BONEWEIGHTS,       // Shader location: vertex attribute: bone weights
+	MATRIX_BONETRANSFORMS,    // Shader location: matrix attribute: bone transforms (animation)
+	VERTEX_INSTANCETRANSFORM, // Shader location: vertex attribute: instance transforms
 }
 
 
