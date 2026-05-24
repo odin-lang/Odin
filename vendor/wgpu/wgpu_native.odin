@@ -27,9 +27,9 @@ foreign libwgpu {
 	DeviceGetNativeMetalCommandQueue :: proc(device: Device) -> rawptr ---
 	DeviceGetNativeMetalTexture :: proc(device: Device) -> rawptr ---
 
-	RenderPassEncoderSetImmediates :: proc(encoder: RenderPassEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
+	RenderPassEncoderSetImmediates :: proc(encoder: RenderPassEncoder, offset: u32, sizeBytes: u32, data: rawptr) ---
 	ComputePassEncoderSetImmediates :: proc(encoder: ComputePassEncoder, offset: u32, sizeBytes: u32, data: rawptr) ---
-	RenderBundleEncoderSetImmediates :: proc(encoder: RenderBundleEncoder, stages: ShaderStageFlags, offset: u32, sizeBytes: u32, data: rawptr) ---
+	RenderBundleEncoderSetImmediates :: proc(encoder: RenderBundleEncoder, offset: u32, sizeBytes: u32, data: rawptr) ---
 
 	RenderPassEncoderMultiDrawIndirect :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count: u32) ---
 	RenderPassEncoderMultiDrawIndexedIndirect :: proc(encoder: RenderPassEncoder, buffer: Buffer, offset: u64, count: u32) ---
