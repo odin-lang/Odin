@@ -2271,25 +2271,66 @@ gb_internal void lb_emit_cleanup_runtime_struct_field_access_counts_report(lbPro
 
 	lb_emit_runtime_print_string(p, str_lit("\nStruct Field Access Counts:\n"));
 
-	for (auto const &entry : entries) {
-		lbValue read_ptr = {};
-		read_ptr.value = entry.global_read_value;
-		read_ptr.type = alloc_type_pointer(t_u64);
+	LLVMValueRef zero = LLVMConstInt(lb_type(p->module, t_u64), 0, false);
 
-		lbValue write_ptr = {};
-		write_ptr.value = entry.global_write_value;
-		write_ptr.type = alloc_type_pointer(t_u64);
+	isize i = 0;
+	while (i < entries.count) {
+		Entity *owner = entries[i].owner_type;
+		isize start = i;
+		while (i < entries.count && entries[i].owner_type == owner) {
+			i++;
+		}
+		isize end = i;
 
-		lbValue reads = lb_emit_load(p, read_ptr);
-		lbValue writes = lb_emit_load(p, write_ptr);
+		LLVMValueRef total_accesses = zero;
 
-		lb_emit_runtime_print_string(p, str_lit("  "));
-		lb_emit_runtime_print_string(p, entry.report_name);
-		lb_emit_runtime_print_string(p, str_lit(": "));
-		lb_emit_runtime_print_u64(p, reads);
-		lb_emit_runtime_print_string(p, str_lit(" reads, "));
-		lb_emit_runtime_print_u64(p, writes);
-		lb_emit_runtime_print_string(p, str_lit(" writes\n"));
+		auto reads_vals = array_make<lbValue>(temporary_allocator(), end - start);
+		auto writes_vals = array_make<lbValue>(temporary_allocator(), end - start);
+
+		for (isize j = start; j < end; j++) {
+			auto const &entry = entries[j];
+			lbValue read_ptr = {};
+			read_ptr.value = entry.global_read_value;
+			read_ptr.type = alloc_type_pointer(t_u64);
+
+			lbValue write_ptr = {};
+			write_ptr.value = entry.global_write_value;
+			write_ptr.type = alloc_type_pointer(t_u64);
+
+			lbValue reads = lb_emit_load(p, read_ptr);
+			lbValue writes = lb_emit_load(p, write_ptr);
+
+			reads_vals[j - start] = reads;
+			writes_vals[j - start] = writes;
+
+			total_accesses = LLVMBuildAdd(p->builder, total_accesses, reads.value, "");
+			total_accesses = LLVMBuildAdd(p->builder, total_accesses, writes.value, "");
+		}
+
+		lbValue is_accessed = {};
+		is_accessed.value = LLVMBuildICmp(p->builder, LLVMIntNE, total_accesses, zero, "");
+		is_accessed.type = t_bool;
+
+		lbBlock *print_block = lb_create_block(p, "sac.print");
+		lbBlock *skip_block = lb_create_block(p, "sac.skip");
+		lb_emit_if(p, is_accessed, print_block, skip_block);
+
+		lb_start_block(p, print_block);
+		{
+			for (isize j = start; j < end; j++) {
+				auto const &entry = entries[j];
+				lb_emit_runtime_print_string(p, str_lit("  "));
+				lb_emit_runtime_print_string(p, entry.report_name);
+				lb_emit_runtime_print_string(p, str_lit(": "));
+				lb_emit_runtime_print_u64(p, reads_vals[j - start]);
+				lb_emit_runtime_print_string(p, str_lit(" reads, "));
+				lb_emit_runtime_print_u64(p, writes_vals[j - start]);
+				lb_emit_runtime_print_string(p, str_lit(" writes\n"));
+			}
+			lb_emit_jump(p, skip_block);
+		}
+
+		lb_start_block(p, skip_block);
 	}
 }
 
