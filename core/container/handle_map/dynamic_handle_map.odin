@@ -90,13 +90,13 @@ dynamic_is_valid :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Ty
 
 // Returns the number of possibly valid items in the handle map.
 @(require_results)
-dynamic_len :: proc "contextless" (m: $D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
+dynamic_len :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
 	n := xar.len(m.items) - xar.len(m.unused_items)
 	return uint(n-1 if n > 0 else 0)
 }
 
 @(require_results)
-dynamic_cap :: proc "contextless" (m: $D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
+dynamic_cap :: proc "contextless" (m: ^$D/Dynamic_Handle_Map($T, $Handle_Type)) -> uint {
 	n := xar.cap(m.items)
 	return uint(n-1 if n > 0 else 0)
 }

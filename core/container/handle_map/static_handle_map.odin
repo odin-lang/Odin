@@ -115,13 +115,13 @@ static_remove :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Ty
 
 // Returns true when the handle `h` is valid relating to the handle map.
 @(require_results)
-static_is_valid :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> bool {
+static_is_valid :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type), h: Handle_Type) -> bool {
 	return h.idx > 0 && u32(h.idx) < m.used_len && m.items[h.idx].handle == h
 }
 
 // Returns the number of possibly valid items in the handle map.
 @(require_results)
-static_len :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type)) -> uint {
+static_len :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type)) -> uint {
 	n := uint(m.used_len) - uint(m.unused_len)
 	return n-1 if n > 0 else 0
 }
@@ -129,7 +129,7 @@ static_len :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type))
 // Returns the capacity of the items in a handle map.
 // This is equivalent to `N-1` as the zero value is reserved for the zero-value sentinel.
 @(require_results)
-static_cap :: proc "contextless" (m: $H/Static_Handle_Map($N, $T, $Handle_Type)) -> uint {
+static_cap :: proc "contextless" (m: ^$H/Static_Handle_Map($N, $T, $Handle_Type)) -> uint {
 	// We could just return `N` but I am doing this for clarity
 	return builtin.len(m.items)-1
 }
