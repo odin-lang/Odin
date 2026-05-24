@@ -2163,6 +2163,12 @@ gb_internal void lb_emit_runtime_print_string(lbProcedure *p, String const &str)
 	lb_emit_runtime_call(p, "print_string", args);
 }
 
+gb_internal void lb_emit_runtime_print_u64(lbProcedure *p, lbValue val) {
+	auto args = array_make<lbValue>(temporary_allocator(), 1);
+	args[0] = val;
+	lb_emit_runtime_call(p, "print_u64", args);
+}
+
 gb_internal String lb_struct_field_usage_report_line(String const &report_name, char const *suffix) {
 	gbAllocator a = permanent_allocator();
 	gbString s = gb_string_make(a, "  ");
@@ -2253,6 +2259,40 @@ gb_internal void lb_emit_cleanup_runtime_struct_field_report(lbProcedure *p) {
 	}
 }
 
+gb_internal void lb_emit_cleanup_runtime_struct_field_access_counts_report(lbProcedure *p) {
+	if (!build_context.struct_access_counts) {
+		return;
+	}
+
+	auto const &entries = p->module->gen->struct_field_usage_entries;
+	if (entries.count == 0) {
+		return;
+	}
+
+	lb_emit_runtime_print_string(p, str_lit("\nStruct Field Access Counts:\n"));
+
+	for (auto const &entry : entries) {
+		lbValue read_ptr = {};
+		read_ptr.value = entry.global_read_value;
+		read_ptr.type = alloc_type_pointer(t_u64);
+
+		lbValue write_ptr = {};
+		write_ptr.value = entry.global_write_value;
+		write_ptr.type = alloc_type_pointer(t_u64);
+
+		lbValue reads = lb_emit_load(p, read_ptr);
+		lbValue writes = lb_emit_load(p, write_ptr);
+
+		lb_emit_runtime_print_string(p, str_lit("  "));
+		lb_emit_runtime_print_string(p, entry.report_name);
+		lb_emit_runtime_print_string(p, str_lit(": "));
+		lb_emit_runtime_print_u64(p, reads);
+		lb_emit_runtime_print_string(p, str_lit(" reads, "));
+		lb_emit_runtime_print_u64(p, writes);
+		lb_emit_runtime_print_string(p, str_lit(" writes\n"));
+	}
+}
+
 gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // Cleanup Runtime
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
@@ -2275,6 +2315,7 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 	}
 
 	lb_emit_cleanup_runtime_struct_field_report(p);
+	lb_emit_cleanup_runtime_struct_field_access_counts_report(p);
 
 	lb_end_procedure_body(p);
 

@@ -519,6 +519,7 @@ struct BuildContext {
 	bool   show_unused;
 	bool   show_unused_with_location;
 	bool   show_unused_struct_fields;
+	bool   struct_access_counts;
 	bool   show_more_timings;
 	bool   show_defineables;
 	String export_defineables_file;

@@ -295,6 +295,7 @@ enum BuildFlagKind {
 	BuildFlag_ShowUnused,
 	BuildFlag_ShowUnusedWithLocation,
 	BuildFlag_ShowUnusedStructFields,
+	BuildFlag_StructAccessCounts,
 	BuildFlag_ShowMoreTimings,
 	BuildFlag_ShowImportGraph,
 	BuildFlag_ExportTimings,
@@ -535,6 +536,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowUnused,              str_lit("show-unused"),               BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation,  str_lit("show-unused-with-location"), BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_ShowUnusedStructFields,  str_lit("show-unused-struct-fields"), BuildFlagParam_None,    Command__does_build | Command_test);
+	add_flag(&build_flags, BuildFlag_StructAccessCounts,      str_lit("struct-access-counts"),      BuildFlagParam_None,    Command__does_build | Command_test);
 	add_flag(&build_flags, BuildFlag_ShowSystemCalls,         str_lit("show-system-calls"),         BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ThreadCount,             str_lit("thread-count"),              BuildFlagParam_Integer, Command_all);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,           str_lit("keep-temp-files"),           BuildFlagParam_None,    Command__does_build | Command_strip_semicolon);
@@ -868,6 +870,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ShowUnusedStructFields: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.show_unused_struct_fields = true;
+							break;
+						}
+						case BuildFlag_StructAccessCounts: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.struct_access_counts = true;
 							break;
 						}
 						case BuildFlag_ShowMoreTimings:
@@ -3070,6 +3077,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (run_or_build) {
 		if (print_flag("-show-unused-struct-fields")) {
 			print_usage_line(2, "At program exit, prints named struct fields that were never read and/or never written.");
+		}
+		if (print_flag("-struct-access-counts")) {
+			print_usage_line(2, "At program exit, prints how many times each struct field was read and written to.");
 		}
 		if (print_flag("-strict-target-features")) {
 			print_usage_line(2, "Makes @(enable_target_features=\"...\") behave the same way as @(require_target_features=\"...\").");
