@@ -2199,6 +2199,57 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 	return
 }
 
+is_expr_generic :: proc(expr : ^ast.Expr) -> bool {
+	is_generic := false
+	if expr != nil {
+		#partial switch e in expr.derived_expr {
+		case ^ast.Typeid_Type:
+			is_generic = e.specialization != nil
+		case ^ast.Poly_Type:
+			is_generic = true
+		case ^ast.Proc_Type:
+			is_generic = e.generic
+		case ^ast.Pointer_Type:
+			is_generic = is_expr_generic(e.elem)
+		case ^ast.Multi_Pointer_Type:
+			is_generic = is_expr_generic(e.elem)
+		case ^ast.Array_Type:
+			is_generic = is_expr_generic(e.len) || is_expr_generic(e.elem)
+		case ^ast.Dynamic_Array_Type:
+			is_generic = is_expr_generic(e.elem)
+		case ^ast.Fixed_Capacity_Dynamic_Array_Type:
+			is_generic = is_expr_generic(e.capacity) || is_expr_generic(e.elem)
+		case ^ast.Bit_Set_Type:
+			is_generic = is_expr_generic(e.elem)
+		case ^ast.Map_Type:
+			is_generic = is_expr_generic(e.key) || is_expr_generic(e.value)
+		case ^ast.Matrix_Type:
+			is_generic = is_expr_generic(e.row_count) || is_expr_generic(e.column_count) || is_expr_generic(e.elem)
+		}
+	}
+	return is_generic
+}
+
+is_field_list_generic :: proc(field_list : ^ast.Field_List, check_names : bool) -> bool {
+	is_generic := false
+	loop: for param in field_list.list {
+		if is_expr_generic(param.type) {
+			is_generic = true
+			break loop
+		}
+		if !check_names || param.type == nil {
+			continue
+		}
+		for name in param.names {
+			if _, ok := name.derived.(^ast.Poly_Type); ok {
+				is_generic = true
+				break loop
+			}
+		}
+	}
+	return is_generic
+}
+
 parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	cc: ast.Proc_Calling_Convention
 	if p.curr_tok.kind == .String {
@@ -2220,21 +2271,9 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 	expect_closing_parentheses_of_field_list(p)
 	results, diverging := parse_results(p)
 
-	is_generic := false
-
-	loop: for param in params.list {
-		if param.type != nil {
-			if _, ok := param.type.derived.(^ast.Poly_Type); ok {
-				is_generic = true
-				break loop
-			}
-			for name in param.names {
-				if _, ok := name.derived.(^ast.Poly_Type); ok {
-					is_generic = true
-					break loop
-				}
-			}
-		}
+	is_generic := is_field_list_generic(params, true)
+	if !is_generic && results != nil {
+		is_generic = is_field_list_generic(results, false)
 	}
 
 	end := end_pos(p.prev_tok)
