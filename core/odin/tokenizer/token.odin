@@ -67,7 +67,7 @@ Token_Kind :: enum u32 {
 		Cmp_And,  // &&
 		Cmp_Or,   // ||
 
-		Cmp_MulMul, // **
+		MulMul,   // **
 
 	B_Assign_Op_Begin,
 		Add_Eq,     // +=
@@ -203,6 +203,8 @@ tokens := [Token_Kind.COUNT]string {
 
 	"&&",
 	"||",
+
+	"**",
 
 	"",
 	"+=",
