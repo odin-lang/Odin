@@ -2946,6 +2946,43 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 
 		return;
 	}
+
+	case Token_MulMul: { // 'expand_values' operator
+		if (!o->type) {
+			return;
+		}
+
+		Type *type = base_type(o->type);
+		if (!is_type_struct(type) && !is_type_array(type)) {
+			gbString type_str = type_to_string(o->type);
+			error(node, "Expected a struct or array type to 'expand_values', got '%s'", type_str);
+			gb_string_free(type_str);
+			return;
+		}
+
+		Type *tuple = alloc_type_tuple();
+
+		if (is_type_struct(type)) {
+			isize variable_count = type->Struct.fields.count;
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
+			// NOTE(bill): don't copy the entities, this should be good enough
+			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
+		} else if (is_type_array(type)) {
+			isize variable_count = cast(isize)type->Array.count;
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
+			for (isize i = 0; i < variable_count; i++) {
+				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
+			}
+		}
+		o->type = tuple;
+		o->mode = Addressing_Value;
+
+		if (tuple->Tuple.variables.count == 1) {
+			o->type = tuple->Tuple.variables[0]->type;
+		}
+
+		return;
+	}
 	}
 
 	if (!check_unary_op(c, o, op)) {

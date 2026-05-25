@@ -3553,7 +3553,8 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Add, .Sub,
 	     .Not, .Xor,
-	     .And:
+	     .And,
+	     .Mul_Mul:
 		op := advance_token(p)
 		expr := parse_unary_expr(p, lhs)
 		

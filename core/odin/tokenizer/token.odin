@@ -67,6 +67,8 @@ Token_Kind :: enum u32 {
 		Cmp_And,  // &&
 		Cmp_Or,   // ||
 
+		Cmp_MulMul, // **
+
 	B_Assign_Op_Begin,
 		Add_Eq,     // +=
 		Sub_Eq,     // -=
