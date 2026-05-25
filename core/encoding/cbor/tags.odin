@@ -308,13 +308,13 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		if t.is_cstring {
 			length  := base64.decoded_len(bytes)
 			builder := strings.builder_make(0, length+1)
-			base64.decode_into(strings.to_stream(&builder), bytes) or_return
+			b64_decode_into(strings.to_stream(&builder), bytes) or_return
 
 			raw  := (^cstring)(v.data)
 			raw^  = cstring(raw_data(builder.buf))
 		} else {
 			raw  := (^string)(v.data)
-			raw^  = string(base64.decode(bytes) or_return)
+			raw^  = string(b64_decode(bytes) or_return)
 		}
 
 		return
@@ -325,16 +325,16 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
 		raw  := (^[]byte)(v.data)
-		raw^  = base64.decode(bytes) or_return
+		raw^  = b64_decode(bytes) or_return
 		return
-		
+
 	case reflect.Type_Info_Dynamic_Array:
 		elem_base := reflect.type_info_base(t.elem)
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
-		decoded := base64.decode(bytes) or_return
-		
+		decoded := b64_decode(bytes) or_return
+
 		raw           := (^mem.Raw_Dynamic_Array)(v.data)
 		raw.data       = raw_data(decoded)
 		raw.len        = len(decoded)
@@ -348,9 +348,9 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
 		if base64.decoded_len(bytes) > t.count { return _unsupported(v, hdr) }
-		
+
 		slice := ([^]byte)(v.data)[:len(bytes)]
-		copy(slice, base64.decode(bytes) or_return)
+		copy(slice, b64_decode(bytes) or_return)
 		return
 	}
 
@@ -383,4 +383,34 @@ tag_base64_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marsha
 	out_len := base64.encoded_len(bytes)
 	err_conv(_encode_u64(e, u64(out_len), .Text)) or_return
 	return base64.encode_into(e.writer, bytes)
+}
+
+@(private="file")
+err_from_b64 :: proc(err: base64.Error) -> Unmarshal_Error {
+	switch e in err {
+	case runtime.Allocator_Error:
+		return e
+	case io.Error:
+		return e
+	case base64.Decode_Error:
+		return Decode_Data_Error.Bad_Tag_Value
+	}
+
+	// Should NEVER happen, but fail gracefully.
+	return io.Error.Unknown
+}
+
+@(private="file")
+b64_decode :: proc(data: string) -> ([]byte, Unmarshal_Error) {
+	decoded, err := base64.decode(data)
+	if err == nil {
+		return decoded, nil
+	}
+
+	return nil, err_from_b64(err)
+}
+
+@(private="file")
+b64_decode_into :: proc(w: io.Writer, data: string) -> Unmarshal_Error {
+	return err_from_b64(base64.decode_into(w, data))
 }
