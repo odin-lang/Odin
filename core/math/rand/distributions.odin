@@ -399,7 +399,7 @@ zipf_uint64 :: proc(z: Zipf) -> u64 {
 		r := float64(z.gen) // [0, 1)
 		ur := r * z.hx0_minus_hxm + z.hxm
 		x := zipf_hinv(z, ur)
-		k := math.floor(x + 0.5)
+		k = math.floor(x + 0.5)
 		if k-x <= z.s {
 			break
 		}
