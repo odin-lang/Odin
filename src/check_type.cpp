@@ -1,6 +1,7 @@
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
 gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
+gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level);
 
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
@@ -33,6 +34,30 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 	}
 }
 
+gb_internal void populate_using_entity_scope_field(CheckerContext *ctx, Ast *node, AstField *parent_field, Type *original_type, isize level, Entity* field_entity) {
+	GB_ASSERT(field_entity->kind == Entity_Variable);
+	String name = field_entity->token.string;
+	InternedString interned = entity_interned_name(field_entity);
+	Entity *e = scope_lookup_current(ctx->scope, interned);
+	if (e != nullptr && name != "_") {
+		gbString ot = type_to_string(original_type);
+		// TODO(bill): Better type error
+		if (node != nullptr) {
+			gbString str = expr_to_string(node);
+			error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
+			gb_string_free(str);
+		} else {
+			error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
+		}
+		gb_string_free(ot);
+	} else {
+		add_entity(ctx, ctx->scope, nullptr, field_entity);
+		if (field_entity->flags & EntityFlag_Using) {
+			populate_using_entity_scope(ctx, node, parent_field, field_entity->type, level+1);
+		}
+	}
+}
+
 gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level) {
 	if (t == nullptr) {
 		return;
@@ -42,27 +67,11 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 
 	if (t->kind == Type_Struct) {
 		for (Entity *f : t->Struct.fields) {
-			GB_ASSERT(f->kind == Entity_Variable);
-			String name = f->token.string;
-			InternedString interned = entity_interned_name(f);
-			Entity *e = scope_lookup_current(ctx->scope, interned);
-			if (e != nullptr && name != "_") {
-				gbString ot = type_to_string(original_type);
-				// TODO(bill): Better type error
-				if (node != nullptr) {
-					gbString str = expr_to_string(node);
-					error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
-					gb_string_free(str);
-				} else {
-					error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
-				}
-				gb_string_free(ot);
-			} else {
-				add_entity(ctx, ctx->scope, nullptr, f);
-				if (f->flags & EntityFlag_Using) {
-					populate_using_entity_scope(ctx, node, field, f->type, level+1);
-				}
-			}
+			populate_using_entity_scope_field(ctx, node, field, original_type, level, f);
+		}
+	} else if (t->kind == Type_BitField) {
+		for (Entity *f : t->BitField.fields) {
+			populate_using_entity_scope_field(ctx, node, field, original_type, level, f);
 		}
 	} else if (t->kind == Type_Array && t->Array.count <= 4) {
 		switch (t->Array.count) {
