@@ -121,6 +121,21 @@ sqrt_f64 :: proc "contextless" (x: f64) -> f64 {
 }
 
 
+@(require_results)
+cbrt_f16 :: proc "contextless" (x: f16) -> f16 {
+	return sign(x) * _pow_f16(abs(x), 1.0/3.0)
+}
+@(require_results)
+cbrt_f32 :: proc "contextless" (x: f32) -> f32 {
+	return sign(x) * _pow_f32(abs(x), 1.0/3.0)
+}
+@(require_results)
+cbrt_f64 :: proc "contextless" (x: f64) -> f64 {
+	return sign(x) * _pow_f64(abs(x), 1.0/3.0)
+}
+
+cbrt :: proc{cbrt_f16, cbrt_f32, cbrt_f64}
+
 
 @(require_results)
 ln_f64 :: proc "contextless" (x: f64) -> f64 {
