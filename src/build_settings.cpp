@@ -1698,6 +1698,32 @@ gb_internal String normalize_minimum_os_version_string(String version) {
 	return make_string_c(normalized);
 }
 
+gb_internal void init_build_context_error_pos_style() {
+	build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
+	
+	char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
+	if (found) {
+		ErrorPosStyle kind = ErrorPosStyle_Default;
+		String style = make_string_c(found);
+		style = string_trim_whitespace(style);
+		if (style == "" || style == "default" || style == "odin") {
+			kind = ErrorPosStyle_Default;
+		} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
+			kind = ErrorPosStyle_Unix;
+		} else {
+			gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
+			gb_printf_err("Valid formats:\n");
+			gb_printf_err("\t\"default\" or \"odin\"\n");
+			gb_printf_err("\t\tpath(line:column) message\n");
+			gb_printf_err("\t\"unix\"\n");
+			gb_printf_err("\t\tpath:line:column: message\n");
+			gb_exit(1);
+		}
+
+		build_context.ODIN_ERROR_POS_STYLE = kind;
+	}
+}
+
 gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
 	BuildContext *bc = &build_context;
 
@@ -1712,30 +1738,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->max_error_count <= 0) {
 		bc->max_error_count = DEFAULT_MAX_ERROR_COLLECTOR_COUNT;
-	}
-
-	{
-		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
-		if (found) {
-			ErrorPosStyle kind = ErrorPosStyle_Default;
-			String style = make_string_c(found);
-			style = string_trim_whitespace(style);
-			if (style == "" || style == "default" || style == "odin") {
-				kind = ErrorPosStyle_Default;
-			} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
-				kind = ErrorPosStyle_Unix;
-			} else {
-				gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
-				gb_printf_err("Valid formats:\n");
-				gb_printf_err("\t\"default\" or \"odin\"\n");
-				gb_printf_err("\t\tpath(line:column) message\n");
-				gb_printf_err("\t\"unix\"\n");
-				gb_printf_err("\t\tpath:line:column: message\n");
-				gb_exit(1);
-			}
-
-			build_context.ODIN_ERROR_POS_STYLE = kind;
-		}
 	}
 
 	bc->copy_file_contents = true;

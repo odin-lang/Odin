@@ -3607,6 +3607,8 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
+	
+	init_build_context_error_pos_style();
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
