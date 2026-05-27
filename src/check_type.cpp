@@ -1507,6 +1507,52 @@ gb_internal GenTypesData *gen_types_data_of_specialization(Type *specialization)
 	return nullptr;
 }
 
+gb_internal bool check_type_specialization_to_internal(CheckerContext *ctx, Type *specialization, Type *type, TypeTuple *s_tuple, TypeTuple *t_tuple, bool modify_type) {
+	GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
+	for_array(i, s_tuple->variables) {
+		Entity *s_e = s_tuple->variables[i];
+		Entity *t_e = t_tuple->variables[i];
+		Type *st = s_e->type;
+		Type *tt = t_e->type;
+
+		// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
+		if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
+			Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
+			GB_ASSERT(e != nullptr);
+			if (modify_type) {
+				e->kind = Entity_Constant;
+				e->Constant.value = t_e->Constant.value;
+				e->type = t_e->type;
+			}
+		} else {
+			if (st->kind == Type_Basic && tt->kind == Type_Basic &&
+				s_e->kind == Entity_Constant && t_e->kind == Entity_Constant) {
+				if (!compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value))
+					return false;
+			} else {
+				bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+				if (!ok) {
+					// TODO(bill, 2021-08-19): is this logic correct?
+					return false;
+				}
+			}
+		}
+	}
+
+	if (modify_type) {
+		// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
+		// `specialization` may already be published in a polymorphic record's gen_types cache;
+		// finalize it under that record's (recursive) gen_types mutex so a concurrent
+		// find_polymorphic_record_entity on another thread cannot observe a torn Type.
+		GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
+		if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
+		gb_memmove(specialization, type, gb_size_of(Type));
+		if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
+	}
+
+	return true;
+}
+
 gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type) {
 	if (type == nullptr ||
 	    type == t_invalid) {
@@ -1543,49 +1589,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 			TypeTuple *s_tuple = get_record_polymorphic_params(s);
 			TypeTuple *t_tuple = get_record_polymorphic_params(t);
-			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
-			for_array(i, s_tuple->variables) {
-				Entity *s_e = s_tuple->variables[i];
-				Entity *t_e = t_tuple->variables[i];
-				Type *st = s_e->type;
-				Type *tt = t_e->type;
-
-				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
-				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
-					GB_ASSERT(e != nullptr);
-					if (modify_type) {
-						e->kind = Entity_Constant;
-						e->Constant.value = t_e->Constant.value;
-						e->type = t_e->type;
-					}
-				} else {
-					if (st->kind == Type_Basic && tt->kind == Type_Basic &&
-						s_e->kind == Entity_Constant && t_e->kind == Entity_Constant) {
-						if (!compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value))
-							return false;
-					} else {
-						bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
-						if (!ok) {
-							// TODO(bill, 2021-08-19): is this logic correct?
-							return false;
-						}
-					}
-				}
-			}
-
-			if (modify_type) {
-				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
-				// `specialization` may already be published in a polymorphic record's gen_types cache;
-				// finalize it under that record's (recursive) gen_types mutex so a concurrent
-				// find_polymorphic_record_entity on another thread cannot observe a torn Type.
-				GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
-				if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
-				gb_memmove(specialization, type, gb_size_of(Type));
-				if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
-			}
-
-			return true;
+			return check_type_specialization_to_internal(ctx, specialization, type, s_tuple, t_tuple, modify_type);
 		}
 	} else if (t->kind == Type_Union) {
 		if (t->Union.polymorphic_parent == nullptr &&
@@ -1602,41 +1606,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 			TypeTuple *s_tuple = get_record_polymorphic_params(s);
 			TypeTuple *t_tuple = get_record_polymorphic_params(t);
-			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
-			for_array(i, s_tuple->variables) {
-				Entity *s_e = s_tuple->variables[i];
-				Entity *t_e = t_tuple->variables[i];
-				Type *st = s_e->type;
-				Type *tt = t_e->type;
-
-				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
-				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
-					GB_ASSERT(e != nullptr);
-					if (modify_type) {
-						e->kind = Entity_Constant;
-						e->Constant.value = t_e->Constant.value;
-						e->type = t_e->type;
-					}
-				} else {
-					bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
-					if (!ok) {
-						// TODO(bill, 2021-08-19): is this logic correct?
-						return false;
-					}
-				}
-			}
-
-			if (modify_type) {
-				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
-				// See the struct branch above: finalize under the originating record's gen_types mutex.
-				GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
-				if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
-				gb_memmove(specialization, type, gb_size_of(Type));
-				if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
-			}
-
-			return true;
+			return check_type_specialization_to_internal(ctx, specialization, type, s_tuple, t_tuple, modify_type);
 		}
 	}
 
