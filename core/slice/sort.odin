@@ -37,7 +37,12 @@ cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 // sort sorts a slice
 // This sort is not guaranteed to be stable
 sort :: proc(data: $T/[]$E) where ORD(E) {
-	when size_of(E) != 0 {
+	Core :: intrinsics.type_core_type(E)
+	when intrinsics.type_is_integer(Core) || intrinsics.type_is_float(Core) {
+		// Only use quick sort on basic types not to bloat the executable code size.
+		// Devs who need the performance can call quick_sort explicitly.
+		quick_sort(data)
+	} else when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
 			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
