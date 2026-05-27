@@ -291,9 +291,9 @@ Keep in mind calling this polymorphic procedure instantiates an entire quicksort
 quick_sort :: proc(data: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
-			// NOTE(jakub): using the base type allows for one implementation to be shared by multiple
+			// NOTE(jakub): using the backing type allows for one implementation to be shared by multiple
 			// distinct types. That's especially useful for built-in float and integer types.
-			_quick_sort_general(transmute([]intrinsics.type_base_type(E))data, 0, n, _quick_sort_max_depth(n), struct{}{}, .Ordered)
+			_quick_sort_general(transmute([]intrinsics.type_core_type(E))data, 0, n, _quick_sort_max_depth(n), struct{}{}, .Ordered)
 		}
 	}
 }
