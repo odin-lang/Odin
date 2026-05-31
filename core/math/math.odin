@@ -2074,7 +2074,7 @@ floor_div :: proc "contextless" (x, y: $T) -> T
 /*
 Calculates the remainder of the floored integer division of `x` by `y`
 
-Sign is always taken from `y`.
+Similarly to `floor_div()` rounding is towards -infinity, thus sign is always taken from `y`.
 This procedure assures that when you perform a mod operation, the return is consistent across negative numbers
 See example for remainder when `y=3` and `y=-3`
 
@@ -2180,6 +2180,61 @@ divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 	return
 }
 
+/*
+Calculates the floored division products of `x` by `y`, giving both the integer division and the remainder
+
+combines both `floor_div()` and `floor_mod()`, with the advantage that is more performant than 2 separate calls
+
+useful if you You need to convert a serialized pixel coordinate into two values:
+Quotient > Which Chunk of a grid(of size `y`) is it located?
+Remainder > What is the local pixel position(offset) inside that specific chunk?
+
+
+NOTE: doing a division by zero (`y=0`) will silently exit a function immediatly
+
+
+Inputs:
+- `x`: an integer
+- `y`: an integer
+
+
+Returns:
+- `div`: an integer of same type as the inputs
+- `mod`: an integer of same type as the inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	floor_divmod_example :: proc() {
+		x_float:    int = 1
+		x2_float:   int = 2
+		x3_float:   int = -3
+
+
+		// special cases
+		x_pos_zero: int = +0.0;
+
+
+		fmt.println(math.floor_divmod(x_float, x2_float))
+		fmt.println(math.floor_divmod(x2_float, x_float))
+		fmt.println(math.floor_divmod(x3_float, x2_float))
+
+		// fmt.println(math.floor_divmod(x_float, x_pos_zero)) // currently silently exits the function
+		fmt.println(math.floor_divmod(x_pos_zero, x_float))
+	}
+
+Output:
+	0 1
+	2 0
+	-2 1 	// note that this differs from divmod
+
+    // special cases
+	0 0				// zero divided by anything
+
+*/
 @(require_results)
 floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 	where intrinsics.type_is_integer(T) {
