@@ -4051,6 +4051,19 @@ IDevice9_VTable :: struct {
 	CreateCommandQueue1:      proc "system" (this: ^IDevice9, pDesc: ^COMMAND_QUEUE_DESC, CreatorID: ^IID, riid: ^IID, ppCommandQueue: ^rawptr) -> HRESULT,
 }
 
+IDevice10_UUID_STRING :: "517F8718-AA66-49F9-B02B-A7AB89C06031"
+IDevice10_UUID := &IID{0x517F8718, 0xAA66, 0x49F9, {0xB0, 0x2B, 0xA7, 0xAB, 0x89, 0xC0, 0x60, 0x31}}
+IDevice10 :: struct #raw_union {
+	#subtype id3d12device9: IDevice9,
+	using id3d12device10_vtable: ^IDevice10_VTable,
+}
+IDevice10_VTable :: struct {
+	using id3d12device9_vtable: IDevice9_VTable,
+	CreateCommittedResource3: proc "system" (this: ^IDevice10, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialLayout: BARRIER_LAYOUT, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, NumCastableFormats: u32, pCastableFormats: [^]dxgi.FORMAT, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreatePlacedResource2:    proc "system" (this: ^IDevice10, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialLayout: BARRIER_LAYOUT, pOptimizedClearValue: ^CLEAR_VALUE, NumCastableFormats: u32, pCastableFormats: [^]dxgi.FORMAT, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+	CreateReservedResource2:  proc "system" (this: ^IDevice10, pDesc: ^RESOURCE_DESC, InitialLayout: BARRIER_LAYOUT, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, NumCastableFormats: u32, pCastableFormats: [^]dxgi.FORMAT , riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
+}
+
 
 ITools_UUID_STRING :: "7071e1f0-e84b-4b33-974f-12fa49de65c5"
 ITools_UUID := &IID{0x7071e1f0, 0xe84b, 0x4b33, {0x97, 0x4f, 0x12, 0xfa, 0x49, 0xde, 0x65, 0xc5}}
