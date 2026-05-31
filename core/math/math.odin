@@ -2013,7 +2013,53 @@ floor :: proc{
 	floor_f64, floor_f64le, floor_f64be,
 }
 
+/*
+Performs integer division of `x` by `y`, if the signs differ then rounds towards -infinity
 
+NOTE: doing a division by zero (`y=0`) will silently exit a function immediatly
+
+
+Inputs:
+- `x`: an integer
+- `y`: an integer
+
+
+Returns:
+- An integer of same type as inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	floor_div_example :: proc() {
+		x_int:    int = 1
+		x2_int:   int = 2
+		x3_int:   int = -3
+
+
+		// special cases
+		x_pos_zero: int = +0.0;
+
+
+		fmt.println(math.floor_div(x_int, x2_int))
+		fmt.println(math.floor_div(x2_int, x_int))
+		fmt.println(math.floor_div(x3_int, x2_int))
+
+		// fmt.println(math.floor_div(x_int, x_pos_zero)) // currently silently exits the function
+		fmt.println(math.floor_div(x_pos_zero, x_int))
+	}
+
+Output:
+	+0
+	+2
+	-2 		// note that here since x3 is negative and x2 positive the division is floored
+
+    // special cases
+	0 		// zero divided by anything
+
+*/
 @(require_results)
 floor_div :: proc "contextless" (x, y: $T) -> T
 	where intrinsics.type_is_integer(T) {
@@ -2025,6 +2071,50 @@ floor_div :: proc "contextless" (x, y: $T) -> T
 	return a
 }
 
+/*
+Calculates the remainder of the floored integer division of `x` by `y`
+
+Sign is always taken from `y`.
+This procedure assures that when you perform a mod operation, the return is consistent across negative numbers
+See example for remainder when `y=3` and `y=-3`
+
+NOTE: doing a division by zero (`y=0`) will silently exit a function immediatly
+
+
+Inputs:
+- `x`: an integer
+- `y`: an integer
+
+
+Returns:
+- An integer of same type as inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	floor_mod_example2 :: proc() {
+		x_int:[9]int = {-4,-3,-2,-1,0,1,2,3,4}
+		x2_int:[9]int = {-4,-3,-2,-1,0,1,2,3,4}
+
+		y_int:int = 3
+		y2_int:int = -3
+
+		for x, idx in x_int {
+		    x_int[idx]=math.floor_mod(x, y_int)
+		    x2_int[idx]=math.floor_mod(x, y2_int)
+		}
+		fmt.println(x_int)
+		fmt.println(x2_int)    
+	}
+
+Output:
+	[2, 0, 1, 2, 0, 1, 2, 0, 1]
+	[-1, 0, -2, -1, 0, -2, -1, 0, -2]
+
+*/
 @(require_results)
 floor_mod :: proc "contextless" (x, y: $T) -> T
 	where intrinsics.type_is_integer(T) {
@@ -2035,7 +2125,7 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 	return r
 }
 /*
-Calculates the division products of `x` by `y`, giving both the remainder and the integer division
+Calculates the division products of `x` by `y`, giving both the integer division and the remainder
 
 NOTE: doing a division by zero (`y=0`) will silently exit a function immediatly
 
