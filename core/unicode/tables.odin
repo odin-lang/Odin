@@ -540,6 +540,7 @@ to_upper_ranges := [?]i32{
 
 @(rodata)
 to_upper_singlets := [?]i32{
+	0x00df, 8115,
 	0x00ff, 621,
 	0x0101, 499,
 	0x0103, 499,
@@ -1204,6 +1205,7 @@ to_lower_singlets := [?]i32{
 	0x1e90, 501,
 	0x1e92, 501,
 	0x1e94, 501,
+	0x1e9e, -7115,
 	0x1ea0, 501,
 	0x1ea2, 501,
 	0x1ea4, 501,

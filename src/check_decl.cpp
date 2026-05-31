@@ -1480,6 +1480,8 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.no_sanitize_memory  = ac.no_sanitize_memory;
 	e->Procedure.no_sanitize_thread  = ac.no_sanitize_thread;
 
+	e->Procedure.fast_math_flags = ac.fast_math_flags;
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);

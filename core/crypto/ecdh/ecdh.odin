@@ -281,6 +281,12 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	}
 }
 
+// private_key_public_bytes sets dst to the byte-encoding of the public
+// key corresponding to priv_key.
+private_key_public_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
+	public_key_bytes(&priv_key._pub_key, dst)
+}
+
 // private_key_equal returns true if and only if (⟺) the private keys are equal,
 // in constant time.
 @(require_results)
@@ -485,13 +491,13 @@ ecdh :: proc(priv_key: ^Private_Key, pub_key: ^Public_Key, dst: []byte) -> bool 
 
 // curve returns the Curve used by a Private_Key or Public_Key instance.
 @(require_results)
-curve :: proc(k: ^$T) -> Curve where(T == Private_Key || T == Public_Key) {
+curve :: proc(k: ^$T) -> Curve where (T == Private_Key || T == Public_Key) {
 	return k._curve
 }
 
 // key_size returns the key size of a Private_Key or Public_Key in bytes.
 @(require_results)
-key_size :: proc(k: ^$T) -> int where(T == Private_Key || T == Public_Key) {
+key_size :: proc(k: ^$T) -> int where (T == Private_Key || T == Public_Key) {
 	when T == Private_Key {
 		return PRIVATE_KEY_SIZES[k._curve]
 	} else {
@@ -502,6 +508,6 @@ key_size :: proc(k: ^$T) -> int where(T == Private_Key || T == Public_Key) {
 // shared_secret_size returns the shared secret size of a key exchange
 // in bytes.
 @(require_results)
-shared_secret_size :: proc(k: ^$T) -> int  where(T == Private_Key || T == Public_Key) {
+shared_secret_size :: proc(k: ^$T) -> int where (T == Private_Key || T == Public_Key) {
 	return SHARED_SECRET_SIZES[k._curve]
 }

@@ -1445,7 +1445,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		Type *elem = type->SimdVector.elem;
 
 		i64 count = type->SimdVector.count;
-		LLVMValueRef *scalars = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+		LLVMValueRef *scalars = temporary_alloc_array<LLVMValueRef>(count);
 		for (i64 i = 0; i < count; i++) {
 			scalars[i] = lb_const_value(m, elem, exact_value_i64(i)).value;
 		}
@@ -1453,6 +1453,55 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		res.value = LLVMConstVector(scalars, cast(unsigned)count);
 		return res;
 	}
+
+	case BuiltinProc_simd_interleave:
+		{
+			int n = cast(int)ce->args.count;
+
+			if (n == 1) {
+				lbValue arg = lb_build_expr(p, ce->args[0]);
+				res.value = arg.value;
+				return res;
+			}
+
+			Type *vector_type = type_of_expr(ce->args[0]);
+
+			LLVMValueRef *args = temporary_alloc_array<LLVMValueRef>(n);
+			for (int i = 0; i < n; i++) {
+				lbValue arg = lb_build_expr(p, ce->args[i]);
+				arg = lb_emit_conv(p, arg, vector_type);
+				args[i] = arg.value;
+			}
+
+			gbString name = gb_string_make(heap_allocator(), "");
+			name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
+			defer (gb_string_free(name));
+
+			LLVMTypeRef types[1] = {lb_type(m, tv.type)};
+			res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
+			return res;
+		}
+
+	case BuiltinProc_simd_deinterleave:
+		{
+			lbValue arg0 = lb_build_expr(p, ce->args[0]);
+			LLVMTypeRef types[1] = {lb_type(m, arg0.type)};
+
+			GB_ASSERT(ce->args[1]->tav.value.kind == ExactValue_Integer);
+			int n = cast(int)exact_value_to_i64(ce->args[1]->tav.value);
+
+			if (n == 1) {
+				res.value = arg0.value;
+				return res;
+			}
+
+			gbString name = gb_string_make(heap_allocator(), "");
+			name = gb_string_append_fmt(name, "llvm.vector.deinterleave%d", n);
+			defer (gb_string_free(name));
+
+			res.value = lb_call_intrinsic(p, name, &arg0.value, 1, types, gb_count_of(types));
+			return res;
+		}
 	}
 
 	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
@@ -1789,6 +1838,12 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			LLVMValueRef args[1] = { arg0.value };
 
 			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+			res.type  = base_array_type(arg0.type);
+
+			if (!is_type_boolean(res.type)) {
+				res = lb_emit_conv(p, res, tv.type);
+			}
+
 			return res;
 		}
 
@@ -2023,67 +2078,79 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
 					}
 					
-					// Handle ARM's multi-swizzle intrinsics by splitting the src vector
-					if (build_context.metrics.arch == TargetArch_arm64 && count > 16) {
-						// ARM64 TBL2/TBL3/TBL4: Split src into multiple 16-byte vectors
-						int num_tables = cast(int)(count / 16);
-						GB_ASSERT_MSG(count % 16 == 0, "ARM64 src size must be multiple of 16 bytes, got %lld bytes", count);
-						GB_ASSERT_MSG(num_tables <= 4, "ARM64 NEON supports maximum 4 tables (tbl4), got %d tables for %lld-byte vector", num_tables, count);
-						
-						LLVMValueRef src_parts[4]; // Max 4 tables for tbl4
+					// Handle ARM's multi-swizzle intrinsics by splitting the src vector.
+					// tbl[N]/vtbl[N] only produce <16 x i8>/<8 x i8>, so we issue one call
+					// per output chunk and concat the results.
+					if ((build_context.metrics.arch == TargetArch_arm64 && count > 16) ||
+					    (build_context.metrics.arch == TargetArch_arm32 && count > 8)) {
+						bool is_arm64 = build_context.metrics.arch == TargetArch_arm64;
+						i64 lane = is_arm64 ? 16 : 8;
+						int num_tables = cast(int)(count / lane);
+						GB_ASSERT_MSG(count % lane == 0, "ARM src size must be multiple of %lld bytes, got %lld bytes", lane, count);
+						GB_ASSERT_MSG(num_tables <= 4, "ARM NEON supports maximum 4 tables, got %d tables for %lld-byte vector", num_tables, count);
+
+						LLVMTypeRef i32_type = LLVMInt32TypeInContext(p->module->ctx);
+						LLVMTypeRef i8_type  = LLVMInt8TypeInContext(p->module->ctx);
+						LLVMTypeRef vN_type  = LLVMVectorType(i8_type, cast(unsigned)lane);
+
+						// Split src/indices into N lane-sized chunks
+						LLVMValueRef src_parts[4];
+						LLVMValueRef idx_parts[4];
 						for (int i = 0; i < num_tables; i++) {
-							// Extract 16-byte slice from the larger src
-							LLVMValueRef indices_for_extract[16];
-							for (int j = 0; j < 16; j++) {
-								indices_for_extract[j] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), i * 16 + j, false);
+							LLVMValueRef mask[16];
+							for (int j = 0; j < lane; j++) {
+								mask[j] = LLVMConstInt(i32_type, cast(unsigned)(i * lane + j), false);
 							}
-							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 16);
-							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
+							LLVMValueRef shuffle_mask = LLVMConstVector(mask, cast(unsigned)lane);
+							src_parts[i] = LLVMBuildShuffleVector(p->builder, src,     LLVMGetUndef(LLVMTypeOf(src)),     shuffle_mask, "");
+							idx_parts[i] = LLVMBuildShuffleVector(p->builder, indices, LLVMGetUndef(LLVMTypeOf(indices)), shuffle_mask, "");
 						}
-						
-						// Call appropriate ARM64 tbl intrinsic
-						if (count == 32) {
-							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
-						} else if (count == 48) {
-							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
-						} else if (count == 64) {
-							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
+
+						// One tbl/vtbl call per output chunk; same N tables, different indices.
+						// ARM64 tbl[N] is overloaded on result type; ARM32 vtbl[N] has fixed <8 x i8>.
+						LLVMTypeRef overload_types[1] = { vN_type };
+						LLVMTypeRef *overloads_arg = is_arm64 ? overload_types : nullptr;
+						unsigned overloads_count   = is_arm64 ? 1 : 0;
+						LLVMValueRef out_parts[4];
+						for (int c = 0; c < num_tables; c++) {
+							LLVMValueRef args[5];
+							for (int i = 0; i < num_tables; i++) args[i] = src_parts[i];
+							args[num_tables] = idx_parts[c];
+							out_parts[c] = lb_call_intrinsic(p, intrinsic_name, args, num_tables + 1, overloads_arg, overloads_count);
 						}
-					} else if (build_context.metrics.arch == TargetArch_arm32 && count > 8) {
-						// ARM32 VTBL2/VTBL3/VTBL4: Split src into multiple 8-byte vectors
-						int num_tables = cast(int)count / 8;
-						GB_ASSERT_MSG(count % 8 == 0, "ARM32 src size must be multiple of 8 bytes, got %lld bytes", count);
-						GB_ASSERT_MSG(num_tables <= 4, "ARM32 NEON supports maximum 4 tables (vtbl4), got %d tables for %lld-byte vector", num_tables, count);
-						
-						LLVMValueRef src_parts[4]; // Max 4 tables for vtbl4
-						for (int i = 0; i < num_tables; i++) {
-							// Extract 8-byte slice from the larger src
-							LLVMValueRef indices_for_extract[8];
-							for (int j = 0; j < 8; j++) {
-								indices_for_extract[j] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), i * 8 + j, false);
+
+						// Concat out_parts[0..num_tables) into <count x i8> by pair-wise
+						// shufflevector. shufflevector requires equal-sized operands, so we
+						// pad the right-hand chunk to acc_size with undef on each step.
+						LLVMValueRef acc = out_parts[0];
+						i64 acc_size = lane;
+						for (int c = 1; c < num_tables; c++) {
+							LLVMValueRef rhs = out_parts[c];
+							if (acc_size > lane) {
+								LLVMValueRef pad[64];
+								for (i64 k = 0; k < acc_size; k++) {
+									pad[k] = (k < lane) ? LLVMConstInt(i32_type, cast(unsigned)k, false) : LLVMGetUndef(i32_type);
+								}
+								rhs = LLVMBuildShuffleVector(p->builder, rhs, LLVMGetUndef(LLVMTypeOf(rhs)), LLVMConstVector(pad, cast(unsigned)acc_size), "");
 							}
-							LLVMValueRef extract_mask = LLVMConstVector(indices_for_extract, 8);
-							src_parts[i] = LLVMBuildShuffleVector(p->builder, src, LLVMGetUndef(LLVMTypeOf(src)), extract_mask, "");
+							i64 new_size = acc_size + lane;
+							LLVMValueRef concat[64];
+							for (i64 k = 0; k < acc_size; k++) concat[k]            = LLVMConstInt(i32_type, cast(unsigned)k,            false);
+							for (i64 k = 0; k < lane;     k++) concat[acc_size + k] = LLVMConstInt(i32_type, cast(unsigned)(acc_size+k), false);
+							acc = LLVMBuildShuffleVector(p->builder, acc, rhs, LLVMConstVector(concat, cast(unsigned)new_size), "");
+							acc_size = new_size;
 						}
-						
-						// Call appropriate ARM32 vtbl intrinsic
-						if (count == 16) {
-							LLVMValueRef args[3] = { src_parts[0], src_parts[1], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 3, nullptr, 0);
-						} else if (count == 24) {
-							LLVMValueRef args[4] = { src_parts[0], src_parts[1], src_parts[2], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 4, nullptr, 0);
-						} else if (count == 32) {
-							LLVMValueRef args[5] = { src_parts[0], src_parts[1], src_parts[2], src_parts[3], indices };
-							res.value = lb_call_intrinsic(p, intrinsic_name, args, 5, nullptr, 0);
-						}
+						res.value = acc;
 					} else {
 						// Single runtime swizzle case (x86, WebAssembly, ARM single-table)
 						LLVMValueRef args[2] = { src, indices };
-						res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
+						if (build_context.metrics.arch == TargetArch_arm64) {
+							// ARM64 tbl1 is overloaded on result type; others are fixed
+							LLVMTypeRef overload_types[1] = { LLVMTypeOf(indices) };
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), overload_types, 1);
+						} else {
+							res.value = lb_call_intrinsic(p, intrinsic_name, args, gb_count_of(args), nullptr, 0);
+						}
 					}
 					return res;
 				} else {

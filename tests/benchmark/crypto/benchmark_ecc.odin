@@ -18,8 +18,8 @@ import "core:crypto/hash"
 ECDH_ITERS :: 10000
 @(private = "file")
 DSA_ITERS :: 10000
-@(private = "file")
-MSG : string : "Got a job for you, 621."
+@(private)
+SIG_MSG : string : "Got a job for you, 621."
 
 @(test)
 benchmark_crypto_ecc :: proc(t: ^testing.T) {
@@ -126,8 +126,8 @@ bench_dsa :: proc() {
 
 @(private = "file")
 bench_ed25519 :: proc() -> (sk, sig, verif: time.Duration) {
-	priv_str := "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
-	priv_bytes, _ := hex.decode(transmute([]byte)(priv_str), context.temp_allocator)
+	SEED : string : "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+	priv_bytes, _ := hex.decode(transmute([]byte)(SEED), context.temp_allocator)
 	priv_key: ed25519.Private_Key
 	start := time.tick_now()
 	for _ in  0 ..< DSA_ITERS {
@@ -136,13 +136,11 @@ bench_ed25519 :: proc() -> (sk, sig, verif: time.Duration) {
 	}
 	sk = time.tick_since(start) / DSA_ITERS
 
-	pub_bytes := priv_key._pub_key._b[:] // "I know what I am doing"
 	pub_key: ed25519.Public_Key
-	ok := ed25519.public_key_set_bytes(&pub_key, pub_bytes[:])
-	assert(ok, "public key should deserialize")
+	ed25519.public_key_set_priv(&pub_key, &priv_key)
 
 	sig_bytes: [ed25519.SIGNATURE_SIZE]byte
-	msg_bytes := transmute([]byte)(MSG)
+	msg_bytes := transmute([]byte)(SIG_MSG)
 	start = time.tick_now()
 	for _ in  0 ..< DSA_ITERS {
 		ed25519.sign(&priv_key, msg_bytes, sig_bytes[:])
@@ -151,7 +149,7 @@ bench_ed25519 :: proc() -> (sk, sig, verif: time.Duration) {
 
 	start = time.tick_now()
 	for _ in  0 ..< DSA_ITERS {
-		ok = ed25519.verify(&pub_key, msg_bytes, sig_bytes[:])
+		ok := ed25519.verify(&pub_key, msg_bytes, sig_bytes[:])
 		assert(ok, "signature should validate")
 	}
 	verif = time.tick_since(start) / DSA_ITERS
@@ -175,7 +173,7 @@ bench_ecdsa :: proc(curve: ecdsa.Curve, hash: hash.Algorithm) -> (sk, sig, verif
 	ecdsa.public_key_set_priv(&pub_key, &priv_key)
 
 	sig_bytes := make([]byte, ecdsa.RAW_SIGNATURE_SIZES[curve], context.temp_allocator)
-	msg_bytes := transmute([]byte)(MSG)
+	msg_bytes := transmute([]byte)(SIG_MSG)
 	start = time.tick_now()
 	for _ in  0 ..< DSA_ITERS {
 		ok := ecdsa.sign_raw(&priv_key, hash, msg_bytes, sig_bytes, true)

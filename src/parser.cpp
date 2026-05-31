@@ -4106,6 +4106,71 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	return ProcCC_Invalid;
 }
 
+gb_internal bool is_ast_generic(Ast *a) {
+	bool is_generic = false;
+	if (a != nullptr) {
+		switch (a->kind) {
+		case Ast_TypeidType:
+			is_generic = a->TypeidType.specialization != nullptr;
+			break;
+		case Ast_PolyType:
+			is_generic = true;
+			break;
+		case Ast_ProcType:
+			is_generic = a->ProcType.generic;
+			break;
+		case Ast_PointerType:
+			is_generic = is_ast_generic(a->PointerType.type);
+			break;
+		case Ast_MultiPointerType:
+			is_generic = is_ast_generic(a->MultiPointerType.type);
+			break;
+		case Ast_ArrayType:
+			is_generic = is_ast_generic(a->ArrayType.elem) || is_ast_generic(a->ArrayType.count);
+			break;
+		case Ast_DynamicArrayType:
+			is_generic = is_ast_generic(a->DynamicArrayType.elem);
+			break;
+		case Ast_FixedCapacityDynamicArrayType:
+			is_generic = is_ast_generic(a->FixedCapacityDynamicArrayType.elem) || is_ast_generic(a->FixedCapacityDynamicArrayType.capacity);
+			break;
+		case Ast_BitSetType:
+			is_generic = is_ast_generic(a->BitSetType.elem);
+			break;
+		case Ast_MapType:
+			is_generic = is_ast_generic(a->MapType.key) || is_ast_generic(a->MapType.value);
+			break;
+		case Ast_MatrixType:
+			is_generic = is_ast_generic(a->MatrixType.row_count) || is_ast_generic(a->MatrixType.column_count) || is_ast_generic(a->MatrixType.elem);
+			break;
+		}
+	}
+	return is_generic;
+}
+
+gb_internal bool is_field_list_generic(AstFieldList *field_list, bool check_names) {
+	bool is_generic = false;
+
+	for (Ast *param : field_list->list) {
+		ast_node(field, Field, param);
+		if (is_ast_generic(field->type)) {
+			is_generic = true;
+			goto end;
+		}
+		if (!check_names || field->type == nullptr) {
+			continue;
+		}
+		for (Ast *name : field->names) {
+			if (name->kind == Ast_PolyType) {
+				is_generic = true;
+				goto end;
+			}
+		}
+	}
+end:
+	return is_generic;
+}
+
 gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	Ast *params = nullptr;
 	Ast *results = nullptr;
@@ -4141,24 +4206,11 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	results = parse_results(f, &diverging);
 
 	u64 tags = 0;
-	bool is_generic = false;
-
-	for (Ast *param : params->FieldList.list) {
-		ast_node(field, Field, param);
-		if (field->type != nullptr) {
-		    if (field->type->kind == Ast_PolyType) {
-				is_generic = true;
-				goto end;
-			}
-			for (Ast *name : field->names) {
-				if (name->kind == Ast_PolyType) {
-					is_generic = true;
-					goto end;
-				}
-			}
-		}
+	bool is_generic = is_field_list_generic(&params->FieldList, true);
+	if (!is_generic && (results != nullptr)) {
+		is_generic = is_field_list_generic(&results->FieldList, false);
 	}
-end:
+
 	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic, diverging);
 }
 
