@@ -3163,7 +3163,57 @@ cumsum_inplace :: proc "contextless" (x: $T/[]$E)
 	}
 }
 
+/*
+Calculates the cumulative sum across an array `src` and puts it in the output array `dst`
 
+The zeroeth output term is always copied from `src` zeroeth element.
+The `dst` array is always overwritten.
+
+NOTE: if any of the 2 inputs is a empty array then an empty array is returned
+NOTE2: if there are abnormals in `src` the abnormals will propagate to all subsequent items on the output array
+
+Inputs:
+- `dst`: an array of numerics
+- `src`: an array of numerics
+
+
+Returns:
+- An array of numerics of matching type as the inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	cumsum_example :: proc() {
+		x_arr:      []f16 = {0,0,0}
+		y_arr:      []f16 = {1,2,3,4}
+
+		// special cases
+		x_zero_inf: f16 = math.inf_f16(0);
+		x_nan:      f16 = math.nan_f16(); 
+
+		empty_arr:  []f16 = {}
+		nan_arr:    []f16 = {3,x_nan,5}
+		inf_arr:    []f16 = {3,x_zero_inf,5}
+
+		fmt.println(math.cumsum(x_arr, y_arr))
+
+		fmt.println(math.cumsum(empty_arr, y_arr))
+		fmt.println(math.cumsum(x_arr, nan_arr))
+		fmt.println(math.cumsum(x_arr, inf_arr))
+	}
+
+Output:
+    [1, 3, 6]
+
+    // special cases
+	[]				// empty_arr
+	[3, NaN, NaN] 	// nan_arr
+	[3, +Inf, +Inf] // inf_arr
+
+*/
 @(require_results)
 cumsum :: proc "contextless" (dst, src: $T/[]$E) -> T
 	where intrinsics.type_is_numeric(E) {
