@@ -2034,7 +2034,54 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 	}
 	return r
 }
+/*
+Calculates the division products of `x` by `y`, giving both the remainder and the integer division
 
+NOTE: doing a division by zero (`y=0`) will silently exit a function immediatly
+
+
+Inputs:
+- `x`: an integer
+- `y`: an integer
+
+
+Returns:
+- `div`: an integer of same type as the inputs
+- `mod`: an integer of same type as the inputs
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	divmod_example :: proc() {
+		x_float:    int = 1
+		x2_float:   int = 2
+		x3_float:   int = 3
+
+
+		// special cases
+		x_pos_zero: int = +0.0;
+
+
+		fmt.println(math.divmod(x_float, x2_float))
+		fmt.println(math.divmod(x2_float, x_float))
+		fmt.println(math.divmod(x3_float, x2_float))
+
+		// fmt.println(math.divmod(x_float, x_pos_zero)) // currently silently exits the function
+		fmt.println(math.divmod(x_pos_zero, x_float))
+	}
+
+Output:
+	0 1
+	2 0
+	1 1
+
+    // special cases
+	0 0				// zero divided by anything
+
+*/
 @(require_results)
 divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 	where intrinsics.type_is_integer(T) {
