@@ -717,7 +717,7 @@ Example:
 
 	ldexp_example :: proc() {
 		x_float:    f16 = 2.3
-		exp_float:    int = 3
+		exp_int:    int = 3
 
 
 		// special cases
@@ -729,14 +729,14 @@ Example:
 		x_nan:      f16 = math.nan_f16(); 
 
 
-		fmt.println(math.ldexp(x_float, exp_float))
+		fmt.println(math.ldexp(x_float, exp_int))
 
-		fmt.println(math.ldexp(x_pos_zero, exp_float))
-		fmt.println(math.ldexp(x_neg_zero, exp_float))
-		fmt.println(math.ldexp(x_pos_inf, exp_float))
-		fmt.println(math.ldexp(x_zero_inf, exp_float))
-		fmt.println(math.ldexp(x_neg_inf, exp_float))
-		fmt.println(math.ldexp(x_nan, exp_float))
+		fmt.println(math.ldexp(x_pos_zero, exp_int))
+		fmt.println(math.ldexp(x_neg_zero, exp_int))
+		fmt.println(math.ldexp(x_pos_inf, exp_int))
+		fmt.println(math.ldexp(x_zero_inf, exp_int))
+		fmt.println(math.ldexp(x_neg_inf, exp_int))
+		fmt.println(math.ldexp(x_nan, exp_int))
 	}
 
 Output:
@@ -2146,21 +2146,21 @@ Example:
     import math "core:math"
 
 	divmod_example :: proc() {
-		x_float:    int = 1
-		x2_float:   int = 2
-		x3_float:   int = 3
+		x_int:    int = 1
+		x2_int:   int = 2
+		x3_int:   int = 3
 
 
 		// special cases
 		x_pos_zero: int = +0.0;
 
 
-		fmt.println(math.divmod(x_float, x2_float))
-		fmt.println(math.divmod(x2_float, x_float))
-		fmt.println(math.divmod(x3_float, x2_float))
+		fmt.println(math.divmod(x_int, x2_int))
+		fmt.println(math.divmod(x2_int, x_int))
+		fmt.println(math.divmod(x3_int, x2_int))
 
-		// fmt.println(math.divmod(x_float, x_pos_zero)) // currently silently exits the function
-		fmt.println(math.divmod(x_pos_zero, x_float))
+		// fmt.println(math.divmod(x_int, x_pos_zero)) // currently silently exits the function
+		fmt.println(math.divmod(x_pos_zero, x_int))
 	}
 
 Output:
@@ -2209,21 +2209,21 @@ Example:
     import math "core:math"
 
 	floor_divmod_example :: proc() {
-		x_float:    int = 1
-		x2_float:   int = 2
-		x3_float:   int = -3
+		x_int:    int = 1
+		x2_int:   int = 2
+		x3_int:   int = -3
 
 
 		// special cases
 		x_pos_zero: int = +0.0;
 
 
-		fmt.println(math.floor_divmod(x_float, x2_float))
-		fmt.println(math.floor_divmod(x2_float, x_float))
-		fmt.println(math.floor_divmod(x3_float, x2_float))
+		fmt.println(math.floor_divmod(x_int, x2_int))
+		fmt.println(math.floor_divmod(x2_int, x_int))
+		fmt.println(math.floor_divmod(x3_int, x2_int))
 
-		// fmt.println(math.floor_divmod(x_float, x_pos_zero)) // currently silently exits the function
-		fmt.println(math.floor_divmod(x_pos_zero, x_float))
+		// fmt.println(math.floor_divmod(x_int, x_pos_zero)) // currently silently exits the function
+		fmt.println(math.floor_divmod(x_pos_zero, x_int))
 	}
 
 Output:
