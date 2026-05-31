@@ -3155,7 +3155,56 @@ prod :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	}
 	return
 }
+/*
+Calculates the cumulative sum across an array `x` while updating its elements
 
+similar to `cumsum()` but works updating the inputs own elements inline
+NOTE: if there are abnormals in the array, the abnormals will propagate to all subsequent items when updating
+
+Inputs:
+- `x`: an array of numerics
+
+
+Returns:
+- This function does not return anything
+
+
+Example:
+
+    import "core:fmt"
+    import math "core:math"
+
+	cumsum_inplace_example :: proc() {
+		y_arr:      []f16 = {1,2,3,4}
+
+		// special cases
+		x_zero_inf: f16 = math.inf_f16(0);
+		x_nan:      f16 = math.nan_f16(); 
+
+		empty_arr:  []f16 = {}
+		nan_arr:    []f16 = {3,x_nan,5}
+		inf_arr:    []f16 = {3,x_zero_inf,5}
+
+		math.cumsum_inplace(y_arr)
+		fmt.println(y_arr)
+
+		math.cumsum_inplace(empty_arr)
+		fmt.println(empty_arr)
+		math.cumsum_inplace(nan_arr)
+		fmt.println(nan_arr)
+		math.cumsum_inplace(inf_arr)
+		fmt.println(inf_arr)
+	}
+
+Output:
+    [1, 3, 6, 10]
+
+    // special cases
+	[]				// empty_arr
+	[3, NaN, NaN] 	// nan_arr
+	[3, +Inf, +Inf] // inf_arr
+
+*/
 cumsum_inplace :: proc "contextless" (x: $T/[]$E)
 	where intrinsics.type_is_numeric(E) {
 	for i in 1..<len(x) {
