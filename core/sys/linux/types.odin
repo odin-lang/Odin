@@ -1780,3 +1780,23 @@ Sched_Attr :: struct {
 Sched_Attr_Flags :: bit_set[Sched_Attr_Flag_Bits; u32]
 
 Memfd_Create_Flags :: bit_set[Memfd_Create_Flag_Bits; u32]
+
+/*
+	Structs for ioctl(2).
+*/
+Win_Size :: struct {
+	row:    u16,
+	col:    u16,
+	xpixel: u16,
+	ypixel: u16,
+}
+
+NCC :: 8
+Term_IO :: struct  {
+	iflag: u16,     /* input mode flags */
+	oflag: u16,     /* output mode flags */
+	cflag: u16,     /* control mode flags */
+	lflag: u16,     /* local mode flags */
+	line:  u8,      /* line discipline */
+	cc:    [NCC]u8, /* control characters */
+}
