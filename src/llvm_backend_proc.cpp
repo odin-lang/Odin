@@ -253,6 +253,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		lb_set_wasm_procedure_import_attributes(p->value, entity, p->name);
 	}
 
+	if (entity->Procedure.link_section.len > 0) {
+		LLVMSetSection(p->value, alloc_cstring(permanent_allocator(), entity->Procedure.link_section));
+	}
 
 	// NOTE(bill): offset==0 is the return value
 	isize offset = 1;
