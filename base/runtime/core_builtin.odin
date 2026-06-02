@@ -1624,14 +1624,14 @@ ensure_contextless :: proc "contextless" (condition: bool, message := #caller_ex
 	}
 }
 
-// Panics the program with a message to indicate something has yet to be implemented.
+// Panics the program with a message.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 @builtin
 panic_contextless :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 	default_assertion_contextless_failure_proc("panic", message, loc)
 }
 
-// Panics the program with a message.
+// Panics the program with a message to indicate something has yet to be implemented.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 @builtin
 unimplemented_contextless :: proc "contextless" (message := "", loc := #caller_location) -> ! {
