@@ -99,7 +99,7 @@ Darwin)
 	darwin_sysroot=
 	if [ -n "$(command -v xcrun)" ]; then
 		darwin_sysroot="--sysroot $(xcrun --sdk macosx --show-sdk-path)"
-	elif [[ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]]; then
+	elif [ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]; then
 		darwin_sysroot="--sysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
 	else
 		echo "Warning: MacOSX.sdk not found."
