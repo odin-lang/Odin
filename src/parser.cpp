@@ -2039,9 +2039,6 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 }
 
 gb_internal Ast *parse_value(AstFile *f) {
-	if (f->curr_token.kind == Token_OpenBrace) {
-		return parse_literal_value(f, nullptr);
-	}
 	Ast *value;
 	bool prev_allow_range = f->allow_range;
 	f->allow_range = true;
