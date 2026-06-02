@@ -2057,54 +2057,6 @@ gb_internal void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTa
 	*tags |= tag;
 }
 
-gb_internal bool is_foreign_name_valid(String const &name) {
-	if (name.len == 0) {
-		return false;
-	}
-	isize offset = 0;
-	while (offset < name.len) {
-		Rune rune;
-		isize remaining = name.len - offset;
-		isize width = utf8_decode(name.text+offset, remaining, &rune);
-		if (rune == GB_RUNE_INVALID && width == 1) {
-			return false;
-		} else if (rune == GB_RUNE_BOM && remaining > 0) {
-			return false;
-		}
-
-		if (offset == 0) {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alpha(cast(char)rune))
-					return false;
-				break;
-			}
-		} else {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alphanumeric(cast(char)rune)) {
-					return false;
-				}
-				break;
-			}
-		}
-
-		offset += width;
-	}
-
-	return true;
-}
-
 gb_internal void parse_proc_tags(AstFile *f, u64 *tags) {
 	GB_ASSERT(tags != nullptr);
 

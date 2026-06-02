@@ -3611,6 +3611,52 @@ gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value,
 	return ev;
 }
 
+gb_internal bool is_foreign_name_valid(String const &name) {
+	if (name.len == 0) {
+		return false;
+	}
+	isize offset = 0;
+	while (offset < name.len) {
+		Rune rune;
+		isize remaining = name.len - offset;
+		isize width = utf8_decode(name.text+offset, remaining, &rune);
+		if (rune == GB_RUNE_INVALID && width == 1) {
+			return false;
+		} else if (rune == GB_RUNE_BOM && remaining > 0) {
+			return false;
+		}
+
+		// TODO(bill, 2026-06-02): This entire logic needs to be completely figured out
+		// as to what should be allowed or not
+		// The original limitations of `-$._ +` and alphanumeric was more of an assumption
+		// than the actual technical limitations of all linkers.
+		if (offset == 0) {
+			switch (rune) {
+			case '-':
+			case '$':
+			case '.':
+			case '_':
+			case ':':
+				break;
+			default:
+				if (!gb_char_is_alpha(cast(char)rune))
+					return false;
+				break;
+			}
+		} else {
+			int n = utf8proc_charwidth(rune);
+			if (n <= 0) {
+				// not a printable character
+				return false;
+			}
+		}
+
+		offset += width;
+	}
+
+	return true;
+}
+
 
 #define ATTRIBUTE_USER_TAG_NAME "tag"
 
@@ -4177,17 +4223,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			} else {
 				ac->fast_math_flags = exact_value_to_u64(ev);
 			}
-		}
-		return true;
-	} else if (name == "link_section") {
-		ExactValue ev = check_decl_attribute_value(c, value);
-		if (ev.kind == ExactValue_String) {
-			ac->link_section = ev.value_string;
-			if (!is_foreign_name_valid(ac->link_section)) {
-				error(elem, "Invalid link section: %.*s", LIT(ac->link_section));
-			}
-		} else {
-			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	}
