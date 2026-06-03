@@ -433,6 +433,9 @@ fill :: proc "contextless" (array: $T/[]$E, value: E) #no_bounds_check {
 }
 
 rotate_left :: proc "contextless" (array: $T/[]$E, mid: int) {
+	if len(a) == 0 {
+		return
+	}
 	n := len(array)
 	m := mid %% n
 	k := n - m
@@ -442,6 +445,9 @@ rotate_left :: proc "contextless" (array: $T/[]$E, mid: int) {
 	ptr_rotate(m, ptr_add(p, m), k)
 }
 rotate_right :: proc "contextless" (array: $T/[]$E, k: int) {
+	if len(a) == 0 {
+		return
+	}
 	rotate_left(array, -k)
 }
 
