@@ -162,7 +162,7 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 	}
 
 	if free_ram == 0 || free_ram > total_ram {
-		// We opt to return MemFree here if MemAvailable is not found or is broken to come degree.
+		// We opt to return MemFree here if MemAvailable is not found or is broken to some degree.
 		// This will act as a predictable fallback, but shouldn't ever really occur unless the user
 		// is on Linux < 3.14
 		free_ram = mem_free
