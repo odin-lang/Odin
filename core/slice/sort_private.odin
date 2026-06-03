@@ -87,9 +87,13 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		return from
 	}
 	stable_merge :: proc(arr: $T/[]$E, left, right: int, call: $P) {
-		if left == 0 || right == 0 do return
+		if left == 0 || right == 0 {
+			return
+		}
 		if left + right == 2 {
-			if less(arr[1],arr[0],call) do swap(arr,0,1)
+			if less(arr[1],arr[0],call) {
+				swap(arr,0,1)
+			}
 			return
 		} 
 		first_cut, second_cut : int
