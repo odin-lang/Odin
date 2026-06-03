@@ -2,6 +2,7 @@ package sysinfo
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 
@@ -79,17 +80,71 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 }
 
 @(private)
-_ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
-	// Retrieve RAM info using `sysinfo`
-	sys_info: linux.Sys_Info
-	errno := linux.sysinfo(&sys_info)
-	assert_contextless(errno == .NONE, "Good luck to whoever's debugging this, something's seriously cucked up!")
+_ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
+	fd, errno := linux.open("/proc/meminfo", {})
+	if errno != .NONE {
+		// This should never happen since something would be wrong with the system
+		// if /proc/meminfo wasn't able to be opened for any reason
+		return 0, 0, 0, 0, false
+	}
 
-	total_ram  = i64(sys_info.totalram)  * i64(sys_info.mem_unit)
-	free_ram   = i64(sys_info.freeram)   * i64(sys_info.mem_unit)
-	total_swap = i64(sys_info.totalswap) * i64(sys_info.mem_unit)
-	free_swap  = i64(sys_info.freeswap)  * i64(sys_info.mem_unit)
-	ok         = true
+	defer linux.close(fd)
+
+	// We need a relatively large size to store all the info
+	meminfo_buf: [4096]u8
+	n, read_errno := linux.read(fd, meminfo_buf[:])
+	if read_errno != .NONE {
+		return 0, 0, 0, 0, false
+	}
+	meminfo := string(meminfo_buf[:n])
+
+	// Stuff needed as a failsafe for later in the event MemAvailable is being broken
+	mem_free, buffers, cached, shmem, s_reclaimable: i64
+
+	for line in strings.split_lines_iterator(&meminfo) {
+		if len(line) == 0 do continue
+
+		colon_idx := strings.index(line, ":")
+		if colon_idx < 0 do continue
+
+		key := strings.trim_space(line[:colon_idx])
+		value_str := strings.trim_space(strings.trim_suffix(line[colon_idx + 1:], "kB"))
+
+		value, conv_ok := strconv.parse_i64(value_str, 10)
+		if !conv_ok do continue
+
+		switch key {
+		case "MemTotal":
+			total_ram = value
+		case "MemFree":
+			mem_free = value
+		case "MemAvailable":
+			free_ram = value
+		case "SwapTotal":
+			total_swap = value
+		case "SwapFree":
+			free_swap = value
+		case "Buffers":
+			buffers = value
+		case "Cached":
+			cached = value
+		case "Shmem":
+			shmem = value
+		case "SReclaimable":
+			s_reclaimable = value
+		}
+	}
+
+	if free_ram == 0 || free_ram > total_ram {
+		free_ram = mem_free + buffers + cached + s_reclaimable - shmem
+	}
+
+	mem_unit :: 1024
+	total_ram *= mem_unit
+	free_ram *= mem_unit
+	total_swap *= mem_unit
+	free_swap *= mem_unit
+	ok = true
 
 	return
 }
