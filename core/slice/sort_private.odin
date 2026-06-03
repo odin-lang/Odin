@@ -25,16 +25,98 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 			#panic("unhandled Sort_Kind")
 		}
 	}
-	
+
+	stable_sort(data, call)
+
 	// insertion sort
-	// TODO(bill): use a different algorithm as insertion sort is O(n^2)
-	n := len(data)
-	for i in 1..<n {
-		for j := i; j > 0 && less(data[j], data[j-1], call); j -= 1 {
-			swap(data, j, j-1)
-		}
+	insertion_sort :: proc(data: $T/[]$E, call: $P){
+        for i in 1..<len(data) {
+            for j := i; j > 0 && less(data[j], data[j-1], call); j -= 1 {
+                swap(data, j, j-1)
+            }
+        }
+    }
+
+	// inplace, stable, O(nlog²n)
+	stable_sort :: proc(arr: $T/[]$E, call: $P){
+        if len(arr) < 64 {
+            insertion_sort(arr, call)
+            return
+        }
+
+		mid := len(arr) >> 1
+		stable_sort(arr[:mid], call)
+		stable_sort(arr[mid:], call)
+
+		stable_merge(arr, mid, len(arr) - mid, call)
 	}
+
+	bin_search_left :: proc(arr: $A/[]$T, value: T,  call: $P) -> int{
+		from := 0
+		len := len(arr)
+
+		for len > 0 {
+			half := len / 2
+			mid := from + half
+
+			if less(arr[mid], value, call){
+				from = mid + 1
+				len -= half + 1
+			} else {
+				len = half
+			}
+		}
+		return from
+	}
+
+	bin_search_right :: proc(arr: $A/[]$T, value: T, call: $P) -> int {
+		from := 0
+		len := len(arr)
+
+		for len > 0 {
+			half := len / 2
+			mid := from + half
+
+			if less(value, arr[mid], call){
+				len = half
+			} else {
+				from = mid + 1
+				len -= half + 1
+			}
+		}
+		return from
+	}
+	stable_merge :: proc(arr: $T/[]$E, left, right: int, call: $P) {
+		if left == 0 || right == 0 do return
+		if left + right == 2 {
+			if less(arr[1],arr[0],call) do swap(arr,0,1)
+			return
+		} 
+		first_cut, second_cut : int
+		left2, right2 : int
+		if left > right {
+			left2 = left >> 1
+			first_cut = left2
+
+			second_cut = left + bin_search_left(arr[left:], arr[first_cut], call)
+			right2 = second_cut - left
+		} else {
+			right2 = right >> 1
+			second_cut = left + right2
+
+			first_cut = bin_search_right(arr[:left], arr[second_cut],call)
+			left2 = first_cut
+		}
+		
+		rotate_left(arr[first_cut:second_cut], left - first_cut)
+		new_mid := first_cut + right2
+
+		stable_merge(arr[:new_mid], left2, 		right2,		  call)
+		stable_merge(arr[new_mid:], left-left2, right-right2, call)
+	}
+    
 }
+
 
 @(private)
 _smoothsort :: proc(base: [^]byte, nel: uint, width: uint, cmp: Generic_Cmp, arg: rawptr) {
