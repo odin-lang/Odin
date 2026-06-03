@@ -86,8 +86,21 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 	fd, errno := linux.open("/proc/meminfo", {})
 	if errno != .NONE {
 		// This should never happen since something would be wrong with the system
-		// if /proc/meminfo wasn't able to be opened for any reason
-		return 0, 0, 0, 0, false
+		// if /proc/meminfo wasn't able to be opened for any reason. But, in the
+		// event that this _does_ happen, let's just try to recover through the
+		// syscall
+		sys_info: linux.Sys_Info
+		sysinfo_errno := linux.sysinfo(&sys_info)
+		assert_contextless(sysinfo_errno == .NONE, "If this has failed, there is no recovery from this")
+
+		total_ram = i64(sys_info.totalram) * i64(sys_info.mem_unit)
+		free_ram = i64(sys_info.freeram) * i64(sys_info.mem_unit)
+		total_swap = i64(sys_info.totalswap) * i64(sys_info.mem_unit)
+		free_swap = i64(sys_info.freeswap) * i64(sys_info.mem_unit)
+
+		ok = true
+
+		return
 	}
 
 	defer linux.close(fd)
@@ -96,7 +109,18 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 	meminfo_buf: [4096]u8
 	n, read_errno := linux.read(fd, meminfo_buf[:])
 	if read_errno != .NONE {
-		return 0, 0, 0, 0, false
+		sys_info: linux.Sys_Info
+		sysinfo_errno := linux.sysinfo(&sys_info)
+		assert_contextless(sysinfo_errno == .NONE, "If this has failed, there is no recovery from this")
+
+		total_ram = i64(sys_info.totalram) * i64(sys_info.mem_unit)
+		free_ram = i64(sys_info.freeram) * i64(sys_info.mem_unit)
+		total_swap = i64(sys_info.totalswap) * i64(sys_info.mem_unit)
+		free_swap = i64(sys_info.freeswap) * i64(sys_info.mem_unit)
+
+		ok = true
+
+		return
 	}
 	meminfo := string(meminfo_buf[:n])
 
