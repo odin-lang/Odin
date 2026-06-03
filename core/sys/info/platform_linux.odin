@@ -81,8 +81,10 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 
 @(private)
 _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
-	// The approach is to read /proc/meminfo for the memory information _over_ sysinfo(),
-	// since sysinfo() just returns MemFree over the value we actually want, MemAvailable.
+	// The approach is to read /proc/meminfo for the memory information. We do this over
+	// reading sysinfo() since sysinfo() only returns MemFree, which is based on the amount
+	// of free pages. The value we actually want is MemAvailable inside meminfo since it is
+	// estimated around being about to evict things out of the page cache.
 	fd, errno := linux.open("/proc/meminfo", {})
 	if errno != .NONE {
 		// This should never happen since something would be wrong with the system
