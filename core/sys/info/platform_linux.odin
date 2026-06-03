@@ -102,16 +102,22 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 	mem_free, buffers, cached, shmem, s_reclaimable: i64
 
 	for line in strings.split_lines_iterator(&meminfo) {
-		if len(line) == 0 do continue
+		if len(line) == 0 {
+			continue
+		}
 
 		colon_idx := strings.index(line, ":")
-		if colon_idx < 0 do continue
+		if colon_idx < 0 {
+			continue
+		}
 
 		key := strings.trim_space(line[:colon_idx])
 		value_str := strings.trim_space(strings.trim_suffix(line[colon_idx + 1:], "kB"))
 
 		value, conv_ok := strconv.parse_i64(value_str, 10)
-		if !conv_ok do continue
+		if !conv_ok {
+			continue
+		}
 
 		switch key {
 		case "MemTotal":
