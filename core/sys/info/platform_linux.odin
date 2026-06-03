@@ -100,8 +100,8 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 	}
 	meminfo := string(meminfo_buf[:n])
 
-	// Stuff needed as a failsafe for later in the event MemAvailable is being broken
-	mem_free, buffers, cached, shmem, s_reclaimable: i64
+	// Fallback in the event MemAvailable is not found or is invalid in its value
+	mem_free: i64
 
 	for line in strings.split_lines_iterator(&meminfo) {
 		if len(line) == 0 {
@@ -132,19 +132,14 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 			total_swap = value
 		case "SwapFree":
 			free_swap = value
-		case "Buffers":
-			buffers = value
-		case "Cached":
-			cached = value
-		case "Shmem":
-			shmem = value
-		case "SReclaimable":
-			s_reclaimable = value
 		}
 	}
 
 	if free_ram == 0 || free_ram > total_ram {
-		free_ram = mem_free + buffers + cached + s_reclaimable - shmem
+		// We opt to return MemFree here if MemAvailable is not found or is broken to come degree.
+		// This will act as a predictable fallback, but shouldn't ever really occur unless the user
+		// is on Linux < 3.14
+		free_ram = mem_free
 	}
 
 	mem_unit :: 1024
@@ -152,6 +147,7 @@ _ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bo
 	free_ram *= mem_unit
 	total_swap *= mem_unit
 	free_swap *= mem_unit
+
 	ok = true
 
 	return
