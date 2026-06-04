@@ -3450,6 +3450,11 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 	if (is_type_array_like(a)) {
 		Type *tl = base_type(a);
+		bool inline_array_arith = lb_can_try_to_inline_array_arith(tl);
+		if (inline_array_arith && is_type_bit_field(left.type)) {
+			left = lb_emit_transmute(p, left, tl);
+			right = lb_emit_transmute(p, right, tl);
+		}
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
 		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
 
@@ -3464,7 +3469,6 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			cmp_op = Token_And;
 		}
 
-		bool inline_array_arith = lb_can_try_to_inline_array_arith(tl);
 		i32 count = 0;
 		switch (tl->kind) {
 		case Type_Array:           count = cast(i32)tl->Array.count;           break;
