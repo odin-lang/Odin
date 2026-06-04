@@ -132,6 +132,7 @@ _ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_sw
 	// Fallback in the event MemAvailable is not found or is invalid in its value
 	mem_free: i64
 
+	mem_unit :: 1024
 	for line in strings.split_lines_iterator(&meminfo) {
 		if len(line) == 0 {
 			continue
@@ -152,15 +153,15 @@ _ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_sw
 
 		switch key {
 		case "MemTotal":
-			total_ram = value
+			total_ram = value * mem_unit
 		case "MemFree":
-			mem_free = value
+			mem_free = value * mem_unit
 		case "MemAvailable":
-			free_ram = value
+			free_ram = value * mem_unit
 		case "SwapTotal":
-			total_swap = value
+			total_swap = value * mem_unit
 		case "SwapFree":
-			free_swap = value
+			free_swap = value * mem_unit
 		}
 	}
 
@@ -170,12 +171,6 @@ _ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_sw
 		// is on Linux < 3.14
 		free_ram = mem_free
 	}
-
-	mem_unit :: 1024
-	total_ram *= mem_unit
-	free_ram *= mem_unit
-	total_swap *= mem_unit
-	free_swap *= mem_unit
 
 	ok = true
 
