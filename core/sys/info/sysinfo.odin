@@ -59,7 +59,7 @@ Returns:
 - free_swap:  Free SWAP reported by the operating system, in bytes
 - ok:         `true` when we could retrieve RAM statistics, `false` otherwise
 */
-ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
+ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
 	return _ram_stats()
 }
 

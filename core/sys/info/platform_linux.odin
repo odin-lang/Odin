@@ -80,7 +80,10 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 }
 
 @(private)
-_ram_stats :: proc() -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
+_ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
+	// This is here for some of the strings procedures
+	context = runtime.default_context()
+
 	// The approach is to read /proc/meminfo for the memory information. We do this over
 	// reading sysinfo() since sysinfo() only returns MemFree, which is based on the amount
 	// of free pages. The value we actually want is MemAvailable inside meminfo since it is
