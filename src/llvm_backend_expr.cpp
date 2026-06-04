@@ -3450,6 +3450,10 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 	if (is_type_array_like(a)) {
 		Type *tl = base_type(a);
+		if (is_type_bit_field(left.type)) {
+			left = lb_emit_transmute(p, left, tl);
+			right = lb_emit_transmute(p, right, tl);
+		}
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
 		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
 
