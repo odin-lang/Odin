@@ -1,5 +1,6 @@
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise);
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr);
+gb_internal lbValue lb_expand_values(lbProcedure *p, lbValue val, Type *type);
 
 gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
 	GB_ASSERT(bit_count <= 64);
@@ -4668,6 +4669,11 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		switch (ue->op.kind) {
 		case Token_And:
 			return lb_build_unary_and(p, expr);
+		case Token_MulMul:
+			{
+				lbValue val = lb_build_expr(p, ue->expr);
+				return lb_expand_values(p, val, type);
+			}
 		default:
 			{
 				lbValue v = lb_build_expr(p, ue->expr);

@@ -1324,6 +1324,48 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 	return result;
 }
 
+gb_internal lbValue lb_expand_values(lbProcedure *p, lbValue val, Type *type) {
+	Type *t = base_type(val.type);
+
+	if (!is_type_tuple(type)) {
+		if (t->kind == Type_Struct) {
+			GB_ASSERT(t->Struct.fields.count == 1);
+			return lb_emit_struct_ev(p, val, 0);
+		} else if (t->kind == Type_Array) {
+			GB_ASSERT(t->Array.count == 1);
+			return lb_emit_struct_ev(p, val, 0);
+		} else {
+			GB_PANIC("Unknown type of expand_values");
+		}
+
+	}
+
+	GB_ASSERT(is_type_tuple(type));
+	// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+	lbValue tuple = lb_addr_get_ptr(p, lb_add_local_generated(p, type, false));
+	if (t->kind == Type_Struct) {
+		for_array(src_index, t->Struct.fields) {
+			Entity *field = t->Struct.fields[src_index];
+			i32 field_index = field->Variable.field_index;
+			lbValue f = lb_emit_struct_ev(p, val, field_index);
+			lbValue ep = lb_emit_struct_ep(p, tuple, cast(i32)src_index);
+			lb_emit_store(p, ep, f);
+		}
+	} else if (is_type_array_like(t)) {
+		// TODO(bill): Clean-up this code
+		lbValue ap = lb_address_from_load_or_generate_local(p, val);
+		i32 n = cast(i32)get_array_type_count(t);
+		for (i32 i = 0; i < n; i++) {
+			lbValue f = lb_emit_load(p, lb_emit_array_epi(p, ap, i));
+			lbValue ep = lb_emit_struct_ep(p, tuple, i);
+			lb_emit_store(p, ep, f);
+		}
+	} else {
+		GB_PANIC("Unknown type of expand_values");
+	}
+	return lb_emit_load(p, tuple);
+}
+
 gb_internal LLVMValueRef llvm_splat_int(i64 count, LLVMTypeRef type, i64 value, bool is_signed=false) {
 	LLVMValueRef v = LLVMConstInt(type, value, is_signed);
 	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
@@ -3054,45 +3096,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	case BuiltinProc_expand_values: {
 		lbValue val = lb_build_expr(p, ce->args[0]);
-		Type *t = base_type(val.type);
-
-		if (!is_type_tuple(tv.type)) {
-			if (t->kind == Type_Struct) {
-				GB_ASSERT(t->Struct.fields.count == 1);
-				return lb_emit_struct_ev(p, val, 0);
-			} else if (t->kind == Type_Array) {
-				GB_ASSERT(t->Array.count == 1);
-				return lb_emit_struct_ev(p, val, 0);
-			} else {
-				GB_PANIC("Unknown type of expand_values");
-			}
-
-		}
-
-		GB_ASSERT(is_type_tuple(tv.type));
-		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-		lbValue tuple = lb_addr_get_ptr(p, lb_add_local_generated(p, tv.type, false));
-		if (t->kind == Type_Struct) {
-			for_array(src_index, t->Struct.fields) {
-				Entity *field = t->Struct.fields[src_index];
-				i32 field_index = field->Variable.field_index;
-				lbValue f = lb_emit_struct_ev(p, val, field_index);
-				lbValue ep = lb_emit_struct_ep(p, tuple, cast(i32)src_index);
-				lb_emit_store(p, ep, f);
-			}
-		} else if (is_type_array_like(t)) {
-			// TODO(bill): Clean-up this code
-			lbValue ap = lb_address_from_load_or_generate_local(p, val);
-			i32 n = cast(i32)get_array_type_count(t);
-			for (i32 i = 0; i < n; i++) {
-				lbValue f = lb_emit_load(p, lb_emit_array_epi(p, ap, i));
-				lbValue ep = lb_emit_struct_ep(p, tuple, i);
-				lb_emit_store(p, ep, f);
-			}
-		} else {
-			GB_PANIC("Unknown type of expand_values");
-		}
-		return lb_emit_load(p, tuple);
+		return lb_expand_values(p, val, tv.type);
 	}
 
 	case BuiltinProc_compress_values: {
