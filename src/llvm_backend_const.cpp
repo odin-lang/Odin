@@ -678,13 +678,13 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 }
 #endif
 
-gb_internal void lb_const_array_spread(lbModule *m, lbConstContext cc, Type *array, ExactValue value, lbValue *res) {
+gb_internal void lb_const_array_spread(lbModule *m, lbConstContext cc, Type *array, ExactValue value, lbValue *res, Type *value_type) {
 	GB_ASSERT(array->kind == Type_Array);
 	
 	i64 count  = array->Array.count;
 	Type *elem = array->Array.elem;
 
-	lbValue single_elem = lb_const_value(m, elem, value, cc);
+	lbValue single_elem = lb_const_value(m, elem, value, cc, value_type);
 
 	LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 	for (i64 i = 0; i < count; i++) {
@@ -1061,7 +1061,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		value.kind != ExactValue_Invalid &&
 		value.kind != ExactValue_Compound) {
 			
-		lb_const_array_spread(m, cc, type, value, &res);
+		lb_const_array_spread(m, cc, type, value, &res, value_type);
 		return res;
 	} else if (is_type_matrix(type) &&
 		value.kind != ExactValue_Invalid &&
