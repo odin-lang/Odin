@@ -10,7 +10,9 @@ import "core:bufio"
 
 // NOTE(Jeroen): The other option is to deprecate `fprint*` and make it an alias for `wprint*`, using File.stream directly.
 
-// fprint formats using the default print settings and writes to fd
+// Formats using the default print settings and writes to ^os.File.
+//
+// Returns the number of bytes written.
 fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
@@ -20,7 +22,9 @@ fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	return wprint(w, ..args, sep=sep, flush=flush)
 }
 
-// fprintln formats using the default print settings and writes to fd
+// Formats using the default print settings and writes to ^os.File.
+//
+// Returns the number of bytes written.
 fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
@@ -30,7 +34,10 @@ fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> int {
 	w := bufio.writer_to_writer(&b)
 	return wprintln(w, ..args, sep=sep, flush=flush)
 }
-// fprintf formats according to the specified format string and writes to fd
+
+// Formats according to the specified format string and writes to ^os.File.
+//
+// Returns the number of bytes written.
 fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline := false) -> int {
 	buf: [1024]byte
 	b: bufio.Writer
@@ -40,10 +47,17 @@ fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline :=
 	w := bufio.writer_to_writer(&b)
 	return wprintf(w, fmt, ..args, flush=flush, newline=newline)
 }
-// fprintfln formats according to the specified format string and writes to fd, followed by a newline.
+
+// Formats according to the specified format string and writes to ^os.File, followed by a newline.
+//
+// Returns the number of bytes written.
 fprintfln :: proc(f: ^os.File, fmt: string, args: ..any, flush := true) -> int {
 	return fprintf(f, fmt, ..args, flush=flush, newline=true)
 }
+
+// Writes a ^runtime.Type_Info value to a ^os.File.
+//
+// Returns: The number of bytes written and an io.Error if encountered
 fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
@@ -53,6 +67,10 @@ fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n:
 	w := bufio.writer_to_writer(&b)
 	return wprint_type(w, info, flush=flush)
 }
+
+// Writes a typeid value to a ^os.File.
+//
+// Returns: The number of bytes written and an io.Error if encountered
 fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (n: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
@@ -63,20 +81,42 @@ fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (n: int, err: i
 	return wprint_typeid(w, id, flush=flush)
 }
 
-// print formats using the default print settings and writes to os.stdout
-print    :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(os.stdout, ..args, sep=sep, flush=flush) }
-// println formats using the default print settings and writes to os.stdout
-println  :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(os.stdout, ..args, sep=sep, flush=flush) }
-// printf formats according to the specified format string and writes to os.stdout
-printf   :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stdout, fmt, ..args, flush=flush) }
-// printfln formats according to the specified format string and writes to os.stdout, followed by a newline.
+// Formats using the default print settings and writes to os.stdout.
+//
+// Returns the number of bytes written.
+print :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(os.stdout, ..args, sep=sep, flush=flush) }
+
+// Formats using the default print settings and writes to os.stdout.
+//
+// Returns the number of bytes written.
+println :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(os.stdout, ..args, sep=sep, flush=flush) }
+
+// Formats according to the specified format string and writes to os.stdout.
+//
+// Returns the number of bytes written.
+printf :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stdout, fmt, ..args, flush=flush) }
+
+// Formats according to the specified format string and writes to os.stdout, followed by a newline.
+//
+// Returns the number of bytes written.
 printfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stdout, fmt, ..args, flush=flush, newline=true) }
 
-// eprint formats using the default print settings and writes to os.stderr
-eprint    :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(os.stderr, ..args, sep=sep, flush=flush) }
-// eprintln formats using the default print settings and writes to os.stderr
-eprintln  :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(os.stderr, ..args, sep=sep, flush=flush) }
-// eprintf formats according to the specified format string and writes to os.stderr
-eprintf   :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush) }
-// eprintfln formats according to the specified format string and writes to os.stderr, followed by a newline.
+// Formats using the default print settings and writes to os.stderr.
+//
+// Returns the number of bytes written.
+eprint :: proc(args: ..any, sep := " ", flush := true) -> int { return fprint(os.stderr, ..args, sep=sep, flush=flush) }
+
+// Formats using the default print settings and writes to os.stderr.
+//
+// Returns the number of bytes written.
+eprintln :: proc(args: ..any, sep := " ", flush := true) -> int { return fprintln(os.stderr, ..args, sep=sep, flush=flush) }
+
+// Formats according to the specified format string and writes to os.stderr.
+//
+// Returns the number of bytes written.
+eprintf :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush) }
+
+// Formats according to the specified format string and writes to os.stderr, followed by a newline.
+//
+// Returns the number of bytes written.
 eprintfln :: proc(fmt: string, args: ..any, flush := true) -> int { return fprintf(os.stderr, fmt, ..args, flush=flush, newline=true) }
