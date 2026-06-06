@@ -1256,6 +1256,319 @@ gb_internal void check_foreign_procedure(CheckerContext *ctx, Entity *e, DeclInf
 	mutex_unlock(&ctx->info->foreign_mutex);
 }
 
+gb_internal void check_mark_referenced_imports_used(CheckerContext *ctx, Ast *node) {
+	if (node == nullptr) {
+		return;
+	}
+
+	#define WALK(field_)       check_mark_referenced_imports_used(ctx, node->field_)
+	#define WALK_ARRAY(field_) for (Ast *child_ : node->field_) check_mark_referenced_imports_used(ctx, child_)
+
+	switch (node->kind) {
+	case Ast_Ident: {
+		AstFile *file = node->file();
+		Scope *file_scope = file ? file->scope : (ctx->file ? ctx->file->scope : ctx->scope);
+		Entity *e = scope_lookup(file_scope, node->Ident.interned, node->Ident.hash);
+		if (e != nullptr && (e->kind == Entity_ImportName || e->kind == Entity_LibraryName)) {
+			add_entity_use(ctx, nullptr, e);
+		}
+		break;
+	}
+
+	case Ast_PolyType:
+		WALK(PolyType.type);
+		WALK(PolyType.specialization);
+		break;
+	case Ast_Ellipsis:
+		WALK(Ellipsis.expr);
+		break;
+	case Ast_ProcGroup:
+		WALK_ARRAY(ProcGroup.args);
+		break;
+	case Ast_ProcLit:
+		WALK(ProcLit.type);
+		WALK(ProcLit.body);
+		WALK_ARRAY(ProcLit.where_clauses);
+		break;
+	case Ast_CompoundLit:
+		WALK(CompoundLit.type);
+		WALK_ARRAY(CompoundLit.elems);
+		break;
+
+	case Ast_TagExpr:
+		WALK(TagExpr.expr);
+		break;
+	case Ast_UnaryExpr:
+		WALK(UnaryExpr.expr);
+		break;
+	case Ast_BinaryExpr:
+		WALK(BinaryExpr.left);
+		WALK(BinaryExpr.right);
+		break;
+	case Ast_ParenExpr:
+		WALK(ParenExpr.expr);
+		break;
+	case Ast_SelectorExpr:
+		WALK(SelectorExpr.expr);
+		WALK(SelectorExpr.selector);
+		break;
+	case Ast_ImplicitSelectorExpr:
+		WALK(ImplicitSelectorExpr.selector);
+		break;
+	case Ast_SelectorCallExpr:
+		WALK(SelectorCallExpr.expr);
+		WALK(SelectorCallExpr.call);
+		break;
+	case Ast_IndexExpr:
+		WALK(IndexExpr.expr);
+		WALK(IndexExpr.index);
+		break;
+	case Ast_MatrixIndexExpr:
+		WALK(MatrixIndexExpr.expr);
+		WALK(MatrixIndexExpr.row_index);
+		WALK(MatrixIndexExpr.column_index);
+		break;
+	case Ast_DerefExpr:
+		WALK(DerefExpr.expr);
+		break;
+	case Ast_SliceExpr:
+		WALK(SliceExpr.expr);
+		WALK(SliceExpr.low);
+		WALK(SliceExpr.high);
+		break;
+	case Ast_CallExpr:
+		WALK(CallExpr.proc);
+		WALK_ARRAY(CallExpr.args);
+		break;
+	case Ast_FieldValue:
+		WALK(FieldValue.field);
+		WALK(FieldValue.value);
+		break;
+	case Ast_EnumFieldValue:
+		WALK(EnumFieldValue.name);
+		WALK(EnumFieldValue.value);
+		break;
+	case Ast_TernaryIfExpr:
+		WALK(TernaryIfExpr.x);
+		WALK(TernaryIfExpr.cond);
+		WALK(TernaryIfExpr.y);
+		break;
+	case Ast_TernaryWhenExpr:
+		WALK(TernaryWhenExpr.x);
+		WALK(TernaryWhenExpr.cond);
+		WALK(TernaryWhenExpr.y);
+		break;
+	case Ast_OrElseExpr:
+		WALK(OrElseExpr.x);
+		WALK(OrElseExpr.y);
+		break;
+	case Ast_OrReturnExpr:
+		WALK(OrReturnExpr.expr);
+		break;
+	case Ast_OrBranchExpr:
+		WALK(OrBranchExpr.label);
+		WALK(OrBranchExpr.expr);
+		break;
+	case Ast_TypeAssertion:
+		WALK(TypeAssertion.expr);
+		WALK(TypeAssertion.type);
+		break;
+	case Ast_TypeCast:
+		WALK(TypeCast.type);
+		WALK(TypeCast.expr);
+		break;
+	case Ast_AutoCast:
+		WALK(AutoCast.expr);
+		break;
+	case Ast_InlineAsmExpr:
+		WALK_ARRAY(InlineAsmExpr.param_types);
+		WALK(InlineAsmExpr.return_type);
+		WALK(InlineAsmExpr.asm_string);
+		WALK(InlineAsmExpr.constraints_string);
+		break;
+
+	case Ast_ExprStmt:
+		WALK(ExprStmt.expr);
+		break;
+	case Ast_AssignStmt:
+		WALK_ARRAY(AssignStmt.lhs);
+		WALK_ARRAY(AssignStmt.rhs);
+		break;
+	case Ast_BlockStmt:
+		WALK(BlockStmt.label);
+		WALK_ARRAY(BlockStmt.stmts);
+		break;
+	case Ast_IfStmt:
+		WALK(IfStmt.label);
+		WALK(IfStmt.init);
+		WALK(IfStmt.cond);
+		WALK(IfStmt.body);
+		WALK(IfStmt.else_stmt);
+		break;
+	case Ast_WhenStmt:
+		WALK(WhenStmt.cond);
+		WALK(WhenStmt.body);
+		WALK(WhenStmt.else_stmt);
+		break;
+	case Ast_ReturnStmt:
+		WALK_ARRAY(ReturnStmt.results);
+		break;
+	case Ast_ForStmt:
+		WALK(ForStmt.label);
+		WALK(ForStmt.init);
+		WALK(ForStmt.cond);
+		WALK(ForStmt.post);
+		WALK(ForStmt.body);
+		break;
+	case Ast_RangeStmt:
+		WALK(RangeStmt.label);
+		WALK(RangeStmt.init);
+		WALK_ARRAY(RangeStmt.vals);
+		WALK(RangeStmt.expr);
+		WALK(RangeStmt.body);
+		break;
+	case Ast_UnrollRangeStmt:
+		WALK_ARRAY(UnrollRangeStmt.args);
+		WALK(UnrollRangeStmt.init);
+		WALK(UnrollRangeStmt.val0);
+		WALK(UnrollRangeStmt.val1);
+		WALK(UnrollRangeStmt.expr);
+		WALK(UnrollRangeStmt.body);
+		break;
+	case Ast_CaseClause:
+		WALK_ARRAY(CaseClause.list);
+		WALK_ARRAY(CaseClause.stmts);
+		break;
+	case Ast_SwitchStmt:
+		WALK(SwitchStmt.label);
+		WALK(SwitchStmt.init);
+		WALK(SwitchStmt.tag);
+		WALK(SwitchStmt.body);
+		break;
+	case Ast_TypeSwitchStmt:
+		WALK(TypeSwitchStmt.label);
+		WALK(TypeSwitchStmt.tag);
+		WALK(TypeSwitchStmt.body);
+		break;
+	case Ast_DeferStmt:
+		WALK(DeferStmt.stmt);
+		break;
+	case Ast_BranchStmt:
+		WALK(BranchStmt.label);
+		break;
+	case Ast_UsingStmt:
+		WALK_ARRAY(UsingStmt.list);
+		break;
+
+	case Ast_ForeignBlockDecl:
+		WALK(ForeignBlockDecl.foreign_library);
+		WALK(ForeignBlockDecl.body);
+		WALK_ARRAY(ForeignBlockDecl.attributes);
+		break;
+	case Ast_Label:
+		WALK(Label.name);
+		break;
+	case Ast_ValueDecl:
+		WALK_ARRAY(ValueDecl.names);
+		WALK(ValueDecl.type);
+		WALK_ARRAY(ValueDecl.values);
+		WALK_ARRAY(ValueDecl.attributes);
+		break;
+	case Ast_Attribute:
+		WALK_ARRAY(Attribute.elems);
+		break;
+	case Ast_Field:
+		WALK_ARRAY(Field.names);
+		WALK(Field.type);
+		break;
+	case Ast_BitFieldField:
+		WALK(BitFieldField.name);
+		WALK(BitFieldField.type);
+		WALK(BitFieldField.bit_size);
+		break;
+	case Ast_FieldList:
+		WALK_ARRAY(FieldList.list);
+		break;
+
+	case Ast_TypeidType:
+		WALK(TypeidType.specialization);
+		break;
+	case Ast_HelperType:
+		WALK(HelperType.type);
+		break;
+	case Ast_DistinctType:
+		WALK(DistinctType.type);
+		break;
+	case Ast_ProcType:
+		WALK(ProcType.params);
+		WALK(ProcType.results);
+		break;
+	case Ast_RelativeType:
+		WALK(RelativeType.tag);
+		WALK(RelativeType.type);
+		break;
+	case Ast_PointerType:
+		WALK(PointerType.type);
+		WALK(PointerType.tag);
+		break;
+	case Ast_MultiPointerType:
+		WALK(MultiPointerType.type);
+		break;
+	case Ast_ArrayType:
+		WALK(ArrayType.count);
+		WALK(ArrayType.elem);
+		WALK(ArrayType.tag);
+		break;
+	case Ast_DynamicArrayType:
+		WALK(DynamicArrayType.elem);
+		WALK(DynamicArrayType.tag);
+		break;
+	case Ast_FixedCapacityDynamicArrayType:
+		WALK(FixedCapacityDynamicArrayType.elem);
+		WALK(FixedCapacityDynamicArrayType.capacity);
+		WALK(FixedCapacityDynamicArrayType.tag);
+		break;
+	case Ast_StructType:
+		WALK_ARRAY(StructType.fields);
+		WALK(StructType.polymorphic_params);
+		WALK(StructType.align);
+		WALK(StructType.min_field_align);
+		WALK(StructType.max_field_align);
+		WALK_ARRAY(StructType.where_clauses);
+		break;
+	case Ast_UnionType:
+		WALK_ARRAY(UnionType.variants);
+		WALK(UnionType.polymorphic_params);
+		WALK_ARRAY(UnionType.where_clauses);
+		break;
+	case Ast_EnumType:
+		WALK(EnumType.base_type);
+		WALK_ARRAY(EnumType.fields);
+		break;
+	case Ast_BitSetType:
+		WALK(BitSetType.elem);
+		WALK(BitSetType.underlying);
+		break;
+	case Ast_BitFieldType:
+		WALK(BitFieldType.backing_type);
+		WALK_ARRAY(BitFieldType.fields);
+		break;
+	case Ast_MapType:
+		WALK(MapType.count);
+		WALK(MapType.key);
+		WALK(MapType.value);
+		break;
+	case Ast_MatrixType:
+		WALK(MatrixType.row_count);
+		WALK(MatrixType.column_count);
+		WALK(MatrixType.elem);
+		break;
+	}
+
+	#undef WALK
+	#undef WALK_ARRAY
+}
+
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != Ast_ProcLit) {
@@ -1572,6 +1885,11 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		GB_ASSERT(pl->body->kind == Ast_BlockStmt);
 		if (!pt->is_polymorphic) {
 			check_procedure_later(ctx->checker, ctx->file, e->token, d, proc_type, pl->body, pl->tags);
+		} else {
+			AstFile *body_file = pl->body->file();
+			if (body_file != nullptr && (ast_file_vet_flags(body_file) & VetFlag_UnusedImports) != 0) {
+				check_mark_referenced_imports_used(ctx, pl->body);
+			}
 		}
 	} else if (!is_foreign && !e->Procedure.is_objc_impl_or_import) {
 		if (e->Procedure.is_export) {
