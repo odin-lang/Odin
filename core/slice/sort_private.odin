@@ -13,6 +13,7 @@ Sort_Kind :: enum {
 	Cmp,
 }
 
+
 _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (ORD(E) && KIND == .Ordered) || (KIND != .Ordered) #no_bounds_check {
 	less :: #force_inline proc(a, b: E, call: P) -> bool {
 		when KIND == .Ordered {
@@ -25,33 +26,37 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 			#panic("unhandled Sort_Kind")
 		}
 	}
-
-	stable_sort(data, call)
-
-	// insertion sort
-	insertion_sort :: proc(data: $T/[]$E, call: $P){
-        for i in 1..<len(data) {
-            for j := i; j > 0 && less(data[j], data[j-1], call); j -= 1 {
-                swap(data, j, j-1)
-            }
-        }
-    }
-
-	// inplace, stable, O(nlog²n)
-	stable_sort :: proc(arr: $T/[]$E, call: $P){
-        if len(arr) < 64 {
+	if len(data) < 1000 {
+		insertion_sort(data, call)
+		return
+	}
+	rotate_merge(data, call)
+	// O(nlog²n)
+	rotate_merge :: proc(arr: $T/[]$E, call: $P){
+        if len(arr) < 32 {
             insertion_sort(arr, call)
             return
         }
-
 		mid := len(arr) >> 1
-		stable_sort(arr[:mid], call)
-		stable_sort(arr[mid:], call)
+
+		rotate_merge(arr[:mid], call)
+		rotate_merge(arr[mid:], call)
 
 		stable_merge(arr, mid, len(arr) - mid, call)
 	}
 
-	bin_search_left :: proc(arr: $A/[]$T, value: T,  call: $P) -> int{
+	insertion_sort :: #force_inline proc(arr: $A/[]$T, call: $P) #no_bounds_check {
+		for i in 1..<len(arr) {
+			x := arr[i]
+			j := i
+			for ; j > 0 && less(x, arr[j - 1], call); j -= 1 {
+				arr[j] = arr[j - 1]
+			}
+			arr[j] = x
+		}
+	}
+
+	bin_search_left :: #force_inline proc(arr: $A/[]$T, value: T,  call: $P) -> int #no_bounds_check {
 		from := 0
 		len := len(arr)
 
@@ -69,7 +74,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		return from
 	}
 
-	bin_search_right :: proc(arr: $A/[]$T, value: T, call: $P) -> int {
+	bin_search_right :: #force_inline proc(arr: $A/[]$T, value: T,  call: $P) -> int #no_bounds_check {
 		from := 0
 		len := len(arr)
 
@@ -86,7 +91,8 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		}
 		return from
 	}
-	stable_merge :: proc(arr: $T/[]$E, left, right: int, call: $P) {
+
+	stable_merge :: proc(arr: $T/[]$E, left, right: int, call: $P) #no_bounds_check {
 		if left == 0 || right == 0 {
 			return
 		}
@@ -118,9 +124,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		stable_merge(arr[:new_mid], left2, 		right2,		  call)
 		stable_merge(arr[new_mid:], left-left2, right-right2, call)
 	}
-    
 }
-
 
 @(private)
 _smoothsort :: proc(base: [^]byte, nel: uint, width: uint, cmp: Generic_Cmp, arg: rawptr) {
