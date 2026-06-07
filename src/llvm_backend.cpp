@@ -3156,16 +3156,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	switch (build_context.reloc_mode) {
 	case RelocMode_Default:
-		if (build_context.metrics.os == TargetOs_openbsd) {
-			// Always use PIC for OpenBSD: it defaults to PIE
-			reloc_mode = LLVMRelocPIC;
-		}
-
-		if (build_context.metrics.arch == TargetArch_riscv64) {
-			// NOTE(laytan): didn't seem to work without this.
-			reloc_mode = LLVMRelocPIC;
-		}
-
 		break;
 	case RelocMode_Static:
 		reloc_mode = LLVMRelocStatic;
