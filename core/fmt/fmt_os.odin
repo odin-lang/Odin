@@ -48,7 +48,7 @@ fprintfln :: proc(f: ^os.File, fmt: string, args: ..any, flush := true) -> (byte
 }
 
 // Writes a ^runtime.Type_Info value to a ^os.File.
-fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n: int, err: io.Error) {
+fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (bytes_written: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
 
@@ -59,7 +59,7 @@ fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (n:
 }
 
 // Writes a typeid value to a ^os.File.
-fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (n: int, err: io.Error) {
+fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (bytes_written: int, err: io.Error) {
 	buf: [1024]byte
 	b: bufio.Writer
 

@@ -125,7 +125,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 // 	- sep: An optional separator string (default is a single space).
 // 	- allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string. 
+// 	Returns: A formatted string.
 //
 @(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
@@ -523,7 +523,7 @@ sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string
 //
 // Returns: The number of bytes written
 //
-wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
+wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
 	fi: Info
 	fi.writer = w
 
@@ -564,7 +564,7 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 //
 // Returns: The number of bytes written
 //
-wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
+wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
 	fi: Info
 	fi.writer = w
 
@@ -591,7 +591,7 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> int {
+wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) {
 	MAX_CHECKED_ARGS :: 64
 	assert(len(args) <= MAX_CHECKED_ARGS, "number of args > 64 is unsupported")
 
@@ -859,7 +859,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 //
 // Returns: The number of bytes written.
 //
-wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> int {
+wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> (bytes_written: int) {
 	return wprintf(w, format, ..args, flush=flush, newline=true)
 }
 // Writes a ^runtime.Type_Info value to an io.Writer
@@ -870,7 +870,7 @@ wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> i
 //
 // Returns: The number of bytes written and an io.Error if encountered
 //
-wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (int, io.Error) {
+wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (bytes_written: int, err: io.Error) {
 	n, err := reflect.write_type(w, info)
 	if flush {
 		io.flush(w)
@@ -885,7 +885,7 @@ wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (i
 //
 // Returns: The number of bytes written and an io.Error if encountered
 //
-wprint_typeid :: proc(w: io.Writer, id: typeid, flush := true) -> (int, io.Error) {
+wprint_typeid :: proc(w: io.Writer, id: typeid, flush := true) -> (bytes_written: int, err: io.Error) {
 	n, err := reflect.write_type(w, type_info_of(id))
 	if flush {
 		io.flush(w)
