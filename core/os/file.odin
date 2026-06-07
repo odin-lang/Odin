@@ -65,10 +65,8 @@ File_Flag :: enum {
 	Excl,
 	Sync,
 	Trunc,
-	Sparse,
 	Inheritable,
 	Non_Blocking,
-	Unbuffered_IO,
 }
 
 O_RDONLY  :: File_Flags{.Read}
@@ -79,7 +77,6 @@ O_CREATE  :: File_Flags{.Create}
 O_EXCL    :: File_Flags{.Excl}
 O_SYNC    :: File_Flags{.Sync}
 O_TRUNC   :: File_Flags{.Trunc}
-O_SPARSE  :: File_Flags{.Sparse}
 
 /*
 	If specified, the file handle is inherited upon the creation of a child
