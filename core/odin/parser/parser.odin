@@ -898,7 +898,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			if allow_token(p, .Do) {
 				body = convert_stmt_to_body(p, parse_stmt(p))
 				if tok.pos.line != body.pos.line {
-					error(p, body.pos, "the body of a 'do' must be on the same line as 'else'")
+					error(p, body.pos, "the body of a 'do' must be on the same line as 'for'")
 				}
 
 			} else {
