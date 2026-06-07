@@ -164,6 +164,12 @@ cl_device_info :: enum cl_uint {
     DEVICE_ENQUEUE_CAPABILITIES             = 0x1070,
     PIPE_SUPPORT                            = 0x1071,
     LATEST_CONFORMANCE_VERSION_PASSED       = 0x1072,
+    // intel USM extension
+    HOST_MEM_CAPABILITIES_INTEL                 = 0x4190,
+    DEVICE_MEM_CAPABILITIES_INTEL               = 0x4191,
+    SINGLE_DEVICE_SHARED_MEM_CAPABILITIES_INTEL = 0x4192,
+    CROSS_DEVICE_SHARED_MEM_CAPABILITIES_INTEL  = 0x4193,
+    SHARED_SYSTEM_MEM_CAPABILITIES_INTEL        = 0x4194,
 }
 cl_device_fp_config_bits :: enum cl_bitfield {
     DENORM,
@@ -780,7 +786,7 @@ foreign opencl {
     clRetainKernel :: proc(kernel: cl_kernel) -> cl_error ---
     clReleaseKernel :: proc(kernel: cl_kernel) -> cl_error ---
     clSetKernelArg :: proc(kernel: cl_kernel, arg_index: cl_uint, arg_size: size_t, arg_value: rawptr) -> cl_error ---
-    clSetKernelArgSVMPointer :: proc(kernel: cl_kernel, arg_index: cl_uint, arg_value: rawptr) -> cl_error ---
+    clSetKernelArgSVMPointer :: proc(kernel: cl_kernel, arg_index: cl_uint, arg_value: svm_pointer) -> cl_error ---
     clSetKernelExecInfo :: proc(kernel: cl_kernel, param_name: cl_kernel_exec_info, param_value_size: size_t, param_value: rawptr) -> cl_error ---
     clGetKernelInfo :: proc(kernel: cl_kernel, param_name: cl_kernel_info, param_value_size: size_t, param_value: rawptr, param_value_size_ret: ^size_t) -> cl_error ---
     clGetKernelArgInfo :: proc(kernel: cl_kernel, arg_index: cl_uint, param_name: cl_kernel_arg_info, param_value_size: size_t, param_value: rawptr, param_value_size_ret: ^size_t) -> cl_error ---
@@ -984,4 +990,103 @@ getFnClCreateEventFromGLsyncKHR :: proc "c"(platform: cl_platform_id) -> clCreat
 }
 getFnClGetSupportedGLTextureFormatsINTEL :: proc "c"(platform: cl_platform_id) -> clGetSupportedGLTextureFormatsINTEL_fn {
     return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clGetSupportedGLTextureFormatsINTEL")
+}
+
+// intel USM extension
+cl_mem_properties_intel_bits :: enum cl_bitfield {
+    ACCESS_INTEL                   = 0,
+    ATOMIC_ACCESS_INTEL            = 1,
+    CONCURRENT_ACCESS_INTEL        = 2,
+    CONCURRENT_ATOMIC_ACCESS_INTEL = 3,
+}
+cl_mem_properties_intel :: bit_set[cl_mem_properties_intel_bits; cl_bitfield]
+cl_mem_allocation_info :: enum cl_uint {
+    ALLOC_FLAGS_INTEL = 0x4195,
+}
+cl_mem_alloc_flags_intel_bits :: enum cl_bitfield {
+    WRITE_COMBINED_INTEL           = 0,
+    INITIAL_PLACEMENT_DEVICE_INTEL = 1,
+    INITIAL_PLACEMENT_HOST_INTEL   = 2,
+}
+cl_mem_alloc_flags_intel :: bit_set[cl_mem_alloc_flags_intel_bits; cl_bitfield]
+cl_mem_info_intel :: enum cl_uint {
+    CL_MEM_ALLOC_TYPE_INTEL     = 0x419A,
+    CL_MEM_ALLOC_BASE_PTR_INTEL = 0x419B,
+    CL_MEM_ALLOC_SIZE_INTEL     = 0x419C,
+    CL_MEM_ALLOC_DEVICE_INTEL   = 0x419D,
+}
+cl_usm_type_intel :: enum cl_uint {
+    UNKNOWN_INTEL = 0x4196,
+    HOST_INTEL    = 0x4197,
+    DEVICE_INTEL  = 0x4198,
+    SHARED_INTEL  = 0x4199,
+}
+cl_usm_kernel_exec_access_info_intel :: enum cl_uint {
+    INDIRECT_HOST_ACCESS_INTEL   = 0x4200,
+    INDIRECT_DEVICE_ACCESS_INTEL = 0x4201,
+    INDIRECT_SHARED_ACCESS_INTEL = 0x4202,
+}
+cl_usm_kernel_exec_access_property_intel :: enum cl_uint {
+    USM_PTRS_INTEL = 0x4203
+}
+cl_usm_create_properties_intel :: struct #raw_union {
+    key: cl_mem_allocation_info,
+    value: cl_mem_properties_intel,
+    property: cl_properties,
+}
+cl_mem_advice_intel :: enum cl_uint {
+    // these are either unused or undocumented
+    something_0 = 0x4208,
+    something_1 = 0x4209,
+    something_2 = 0x420A,
+    something_3 = 0x420B,
+    something_4 = 0x420C,
+    something_5 = 0x420D,
+    something_6 = 0x420E,
+    something_7 = 0x420F,
+}
+
+clHostMemAllocINTEL_fn :: #type proc "c" (ctx: cl_context, properties: [^]cl_usm_create_properties_intel, size: size_t, alignment: cl_uint, errcode_ret: ^cl_error) -> rawptr
+getFnClHostMemAllocINTEL :: proc "c"(platform: cl_platform_id) -> clHostMemAllocINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clHostMemAllocINTEL")
+}
+clDeviceMemAllocINTEL_fn :: #type proc "c" (ctx: cl_context, device: cl_device_id, properties: [^]cl_usm_create_properties_intel, size: size_t, alignment: cl_uint, errcode_ret: ^cl_error) -> rawptr
+getFnClDeviceMemAllocINTEL :: proc "c"(platform: cl_platform_id) -> clDeviceMemAllocINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clDeviceMemAllocINTEL")
+}
+clSharedMemAllocINTEL_fn :: #type proc "c" (ctx: cl_context, device: cl_device_id, properties: [^]cl_usm_create_properties_intel, size: size_t, alignment: cl_uint, errcode_ret: ^cl_error) -> rawptr
+getFnClSharedMemAllocINTEL :: proc "c"(platform: cl_platform_id) -> clSharedMemAllocINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clSharedMemAllocINTEL")
+}
+clMemFreeINTEL_fn :: #type proc "c" (ctx: cl_context, ptr: rawptr) -> cl_error
+getFnClMemFreeINTEL :: proc "c"(platform: cl_platform_id) -> clMemFreeINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clMemFreeINTEL")
+}
+clMemBlockingFreeINTEL_fn :: #type proc "c" (ctx: cl_context, ptr: rawptr) -> cl_error
+getFnClMemBlockingFreeINTEL :: proc "c"(platform: cl_platform_id) -> clMemBlockingFreeINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clMemBlockingFreeINTEL")
+}
+clGetMemAllocInfoINTEL_fn :: #type proc "c" (ctx: cl_context, ptr: rawptr, param_name: cl_mem_info_intel, param_value_size: size_t, param_value: rawptr, param_value_size_ret: ^size_t) -> cl_error
+getFnClGetMemAllocInfoINTEL :: proc "c"(platform: cl_platform_id) -> clGetMemAllocInfoINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clGetMemAllocInfoINTEL")
+}
+clSetKernelArgMemPointerINTEL_fn :: #type proc "c" (kernel: cl_kernel, arg_index: cl_uint, arg_value: rawptr) -> cl_error
+getFnClSetKernelArgMemPointerINTEL :: proc "c"(platform: cl_platform_id) -> clSetKernelArgMemPointerINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clSetKernelArgMemPointerINTEL")
+}
+clEnqueueMemFillINTEL_fn :: #type proc "c" (command_queue: cl_command_queue, dst_ptr: rawptr, pattern: rawptr, pattern_size: size_t, size: size_t, num_events_in_wait_list: cl_uint, event_wait_list: [^]cl_event, event: ^cl_event) -> cl_error
+getFnClEnqueueMemFillINTEL :: proc "c"(platform: cl_platform_id) -> clEnqueueMemFillINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clEnqueueMemFillINTEL")
+}
+clEnqueueMemcpyINTEL_fn :: #type proc "c" (command_queue: cl_command_queue, blocking: cl_bool, dst_ptr: rawptr, src_ptr: rawptr, size: size_t, num_events_in_wait_list: cl_uint, event_wait_list: [^]cl_event, event: ^cl_event) -> cl_error
+getFnClEnqueueMemcpyINTEL :: proc "c"(platform: cl_platform_id) -> clEnqueueMemcpyINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clEnqueueMemcpyINTEL")
+}
+clEnqueueMigrateMemINTEL_fn :: #type proc "c" (command_queue: cl_command_queue, ptr: rawptr, size: size_t, flags: cl_mem_migration_flags, num_events_in_wait_list: cl_uint, event_wait_list: [^]cl_event, event: ^cl_event) -> cl_error
+getFnClEnqueueMigrateMemINTEL :: proc "c"(platform: cl_platform_id) -> clEnqueueMigrateMemINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clEnqueueMigrateMemINTEL")
+}
+clEnqueueMemAdviseINTEL_fn :: #type proc "c" (command_queue: cl_command_queue, ptr: rawptr, size: size_t, advice: cl_mem_advice_intel, num_events_in_wait_list: cl_uint, event_wait_list: [^]cl_event, event: ^cl_event) -> cl_error
+getFnClEnqueueMemAdviseINTEL :: proc "c"(platform: cl_platform_id) -> clEnqueueMemAdviseINTEL_fn {
+    return auto_cast clGetExtensionFunctionAddressForPlatform(platform, "clEnqueueMemAdviseINTEL")
 }
