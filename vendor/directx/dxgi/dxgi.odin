@@ -30,9 +30,9 @@ SIZE                :: win32.SIZE
 WCHAR               :: win32.WCHAR
 DWORD               :: win32.DWORD
 
-IUnknown :: win32.IUnknown
+IUnknown        :: win32.IUnknown
 IUnknown_VTable :: win32.IUnknown_VTable
-LPUNKNOWN :: win32.LPUNKNOWN
+LPUNKNOWN       :: win32.LPUNKNOWN
 
 @(default_calling_convention="system")
 foreign dxgi {
@@ -841,7 +841,7 @@ SWAP_CHAIN_FULLSCREEN_DESC :: struct {
 PRESENT_PARAMETERS :: struct {
 	DirtyRectsCount: u32,
 
-	pDirtyRects:     [^]RECT,
+	pDirtyRects:     [^]RECT `fmt:"v,DirtyRectsCount"`,
 	pScrollRect:     ^RECT,
 	pScrollOffset:   ^POINT,
 }

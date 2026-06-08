@@ -27,7 +27,7 @@ INFO_QUEUE_MESSAGE_CATEGORY :: enum u32 {
 	MISCELLANEOUS	        = UNKNOWN + 1,
 	INITIALIZATION	        = MISCELLANEOUS + 1,
 	CLEANUP                 = INITIALIZATION + 1,
-	COMPILATION	            = CLEANUP + 1,
+	COMPILATION	        = CLEANUP + 1,
 	STATE_CREATION          = COMPILATION + 1,
 	STATE_SETTING           = STATE_CREATION + 1,
 	STATE_GETTING           = STATE_SETTING + 1,
@@ -49,17 +49,17 @@ INFO_QUEUE_MESSAGE :: struct {
 	Category:              INFO_QUEUE_MESSAGE_CATEGORY,
 	Severity:              INFO_QUEUE_MESSAGE_SEVERITY,
 	ID:                    INFO_QUEUE_MESSAGE_ID,
-	pDescription:          [^]c.char,
+	pDescription:          [^]c.char `fmt:"q,DescriptionByteLength"`,
 	DescriptionByteLength: SIZE_T,
 }
 
 INFO_QUEUE_FILTER_DESC :: struct {
 	NumCategories: UINT,
-	pCategoryList: [^]INFO_QUEUE_MESSAGE_CATEGORY,
+	pCategoryList: [^]INFO_QUEUE_MESSAGE_CATEGORY `fmt:"v,NumCategories"`,
 	NumSeverities: UINT,
-	pSeverityList: [^]INFO_QUEUE_MESSAGE_SEVERITY,
+	pSeverityList: [^]INFO_QUEUE_MESSAGE_SEVERITY `fmt:"v,NumSeverities"`,
 	NumIDs:        UINT,
-	pIDList:       [^]INFO_QUEUE_MESSAGE_ID,
+	pIDList:       [^]INFO_QUEUE_MESSAGE_ID `fmt:"v,NumIDs"`,
 }
 
 INFO_QUEUE_FILTER :: struct {
