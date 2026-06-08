@@ -72,7 +72,7 @@ _unwrap_os_family :: proc "contextless" (family: Address_Family) -> linux.Addres
 	switch family {
 	case .IP4:  return .INET
 	case .IP6:  return .INET6
-	case .UNIX: return .UNSPEC
+	case .UNIX: return .UNIX
 	case:
 		unreachable()
 	}

@@ -105,7 +105,7 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 
 @(private)
 _dial_unix :: proc(path: string, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
-	assert(len(path) < freebsd.UNIX_PATH_MAX, "net.dial_unix_from_path(): path too long", loc = loc)
+	assert(len(path) < freebsd.SUNPATHLEN, "net.dial_unix_from_path(): path too long", loc = loc)
 
 	sock := _create_socket(.UNIX, .UNIX) or_return
 	socket = sock.(Unix_Socket)
@@ -158,7 +158,7 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := DEFAULT_LISTEN_BACK
 
 @(private)
 _listen_unix :: proc(path: string, backlog := DEFAULT_LISTEN_BACKLOG, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
-	assert(len(path) < freebsd.UNIX_PATH_MAX, "net.listen_unix(): path too long", loc = loc)
+	assert(len(path) < freebsd.SUNPATHLEN, "net.listen_unix(): path too long", loc = loc)
 
 	sock := _create_socket(.UNIX, .UNIX) or_return
 	socket = sock.(Unix_Socket)
