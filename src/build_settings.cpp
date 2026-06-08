@@ -1906,7 +1906,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		switch (metrics->arch) {
 		case TargetArch_arm64:
 		case TargetArch_amd64:
-			bc->no_plt = true;
+			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
 			break;
 		}
 	} else if (metrics->os == TargetOs_openbsd) {
