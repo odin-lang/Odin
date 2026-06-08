@@ -602,6 +602,7 @@ struct BuildContext {
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
 	bool   disable_unwind;
+	bool   no_plt;
 
 	isize max_error_count;
 
@@ -1901,6 +1902,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	} else if (metrics->os == TargetOs_linux) {
 		if (bc->reloc_mode == RelocMode_Default) {
 			bc->reloc_mode = RelocMode_PIC;
+		}
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+		case TargetArch_amd64:
+			bc->no_plt = true;
+			break;
 		}
 	} else if (metrics->os == TargetOs_openbsd) {
 		// Always use PIC for OpenBSD: it defaults to PIE
