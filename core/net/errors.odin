@@ -142,6 +142,7 @@ Accept_Error :: enum i32 {
 Recv_Error :: union #shared_nil {
 	TCP_Recv_Error,
 	UDP_Recv_Error,
+	Unix_Recv_Error,
 }
 
 TCP_Recv_Error :: enum i32 {
