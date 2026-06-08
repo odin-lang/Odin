@@ -330,10 +330,21 @@ Socket_Address_Basic :: struct #packed {
 	data: [14]c.char,
 }
 
-UNIX_PATH_MAX :: 104
+SUNPATHLEN :: 104
 Socket_Address_Unix :: struct #packed {
-	using _: Socket_Address_Basic,
-	path: [UNIX_PATH_MAX]byte,
+	len: c.uchar,           /* address length */
+	family: Address_Family, /* address family */
+	path: [SUNPATHLEN]byte,
+}
+
+SOCK_MAXADDRLEN :: 255
+_SS_MAXSIZE     :: 128
+Socket_Address_Storage :: struct {
+	ss_len: u8,
+	ss_family: sa_family_t,
+	__ss_pad1: [_SS_PAD1SIZE]byte,
+	__ss_align: i64,
+	__ss_pad2: [_SS_PAD2SIZE]byte,
 }
 
 /*
