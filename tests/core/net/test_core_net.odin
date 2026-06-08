@@ -595,11 +595,14 @@ machine to machine communication (such as defined by the network protocol.)
 	os.remove(SOCKET_PATH) // NOTE(tetra): remove old socket in case of previous crash
 	defer os.remove(SOCKET_PATH)
 
-	mu: sync.Sema
+	// NOTE(tetra, 2026-06-08): We want the threads to effectively to exchange a word,
+	// verify it's correct, then proceed together.
+	// The main thread uses this to block the worker until the round trip has been completed.
+	mu: sync.Parker
 
 	Worker_Data :: struct {
 		t:  ^testing.T,
-		mu: ^sync.Sema,
+		mu: ^sync.Parker,
 	}
 	worker_data: Worker_Data
 	worker_data.mu = &mu
@@ -618,8 +621,9 @@ machine to machine communication (such as defined by the network protocol.)
 		tmp: [64]byte
 		left := MSG
 		for len(left) > 0 {
+			sync.park(worker_data.mu)
+
 			word := next_word(&left)
-			sync.wait(worker_data.mu)
 			testing.expect_value(worker_data.t, send_full(client, word), nil)
 
 			num_recv, recv_err := net.recv_unix(client, tmp[:])
@@ -627,6 +631,7 @@ machine to machine communication (such as defined by the network protocol.)
 			testing.expect_value(worker_data.t, num_recv, len(word))
 			got := string(tmp[:num_recv])
 			testing.expect_value(worker_data.t, got, word)
+
 		}
 	})
 	defer thread.destroy(worker)
@@ -643,9 +648,9 @@ machine to machine communication (such as defined by the network protocol.)
 	tmp: [64]byte
 	left := MSG
 	for len(left) > 0 {
+		sync.unpark(&mu)
 		word := next_word(&left)
 
-		sync.post(&mu)
 		num_recv, recv_err := net.recv_unix(client, tmp[:])
 		if num_recv == 0 { break }
 		testing.expect_value(t, recv_err, nil)
