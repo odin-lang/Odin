@@ -2668,11 +2668,20 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
-	String path = concatenate3_strings(permanent_allocator(),
-		build_context.build_paths[BuildPath_Output].basename,
-		STR_LIT("/"),
-		build_context.build_paths[BuildPath_Output].name
-	);
+	String basename = build_context.build_paths[BuildPath_Output].basename;
+	String name     = build_context.build_paths[BuildPath_Output].name;
+
+	bool use_temporary_directory = false;
+	if (USE_SEPARATE_MODULES && build_context.build_mode == BuildMode_Executable) {
+		String dir = temporary_directory(permanent_allocator());
+		if (dir.len != 0) {
+			basename = dir;
+			use_temporary_directory = true;
+		}
+	}
+
+	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
+	path = gb_string_appendc(path, "/");
 
 	GB_ASSERT(m->module_name != nullptr);
 	String s = make_string_c(m->module_name);
@@ -2682,10 +2691,16 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s.len  -= prefix.len;
 	}
 
-	path = concatenate_strings(permanent_allocator(), path, s);
-	path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
+	path = gb_string_append_length(path, s.text, s.len);
 
-	return path;
+	if (use_temporary_directory) {
+		// NOTE(bill): this must be suffixed to ensure it is not conflicting with anything else in the temporary directory
+		path = gb_string_append_fmt(path, "-%p", m);
+	}
+
+	path = gb_string_appendc(path, ".ll");
+
+	return make_string(cast(u8 *)path, gb_string_length(path));
 }
 
 gb_internal String lb_filepath_obj_for_module(lbModule *m) {
