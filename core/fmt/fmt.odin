@@ -871,11 +871,11 @@ wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> (
 // Returns: The number of bytes written and an io.Error if encountered
 //
 wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (bytes_written: int, err: io.Error) {
-	n, err := reflect.write_type(w, info)
+	bytes_written, err = reflect.write_type(w, info)
 	if flush {
 		io.flush(w)
 	}
-	return n, err
+	return bytes_written, err
 }
 // Writes a typeid value to an io.Writer
 //
@@ -886,11 +886,11 @@ wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (b
 // Returns: The number of bytes written and an io.Error if encountered
 //
 wprint_typeid :: proc(w: io.Writer, id: typeid, flush := true) -> (bytes_written: int, err: io.Error) {
-	n, err := reflect.write_type(w, type_info_of(id))
+	bytes_written, err = reflect.write_type(w, type_info_of(id))
 	if flush {
 		io.flush(w)
 	}
-	return n, err
+	return bytes_written, err
 }
 // Parses an integer from a given string starting at a specified offset
 //
