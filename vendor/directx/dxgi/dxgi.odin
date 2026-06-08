@@ -39,9 +39,14 @@ foreign dxgi {
 	CreateDXGIFactory            :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
 	CreateDXGIFactory1           :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
 	CreateDXGIFactory2           :: proc(Flags: CREATE_FACTORY, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
-	DXGIGetDebugInterface1       :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
+}
+
+@(default_calling_convention="system", link_prefix="DXGI")
+foreign dxgi {
+	GetDebugInterface1       :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
 	DeclareAdapterRemovalSupport :: proc() -> HRESULT ---
 }
+
 
 STANDARD_MULTISAMPLE_QUALITY_PATTERN :: 0xffffffff
 CENTER_MULTISAMPLE_QUALITY_PATTERN :: 0xfffffffe
