@@ -188,7 +188,7 @@ debug :: proc(contents: ..Debuggable, location := #caller_location) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	b: strings.Builder
-	b.buf.allocator = context.temp_allocator
+	b.allocator = context.temp_allocator
 
 	strings.write_string(&b, "[nbio] ")
 

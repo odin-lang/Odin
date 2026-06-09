@@ -311,7 +311,7 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 			b64_decode_into(strings.to_stream(&builder), bytes) or_return
 
 			raw  := (^cstring)(v.data)
-			raw^  = cstring(raw_data(builder.buf))
+			raw^  = cstring(raw_data(builder))
 		} else {
 			raw  := (^string)(v.data)
 			raw^  = string(b64_decode(bytes) or_return)

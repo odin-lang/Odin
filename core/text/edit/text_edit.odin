@@ -94,7 +94,7 @@ begin :: proc(s: ^State, id: u64, builder: ^strings.Builder) {
 		end(s)
 	}
 	s.id = id
-	s.selection = {len(builder.buf), 0}
+	s.selection = {len(builder), 0}
 	s.builder = builder
 	update_time(s)
 	undo_clear(s, &s.undo)
@@ -118,7 +118,7 @@ update_time :: proc(s: ^State) {
 // setup the builder, selection and undo|redo state once allowing to retain selection
 setup_once :: proc(s: ^State, builder: ^strings.Builder) {
 	s.builder = builder
-	s.selection = { len(builder.buf), 0 }
+	s.selection = { len(builder), 0 }
 	undo_clear(s, &s.undo)
 	undo_clear(s, &s.redo)
 }
@@ -126,8 +126,8 @@ setup_once :: proc(s: ^State, builder: ^strings.Builder) {
 // returns true when the builder had content to be cleared
 // clear builder&selection and the undo|redo stacks
 clear_all :: proc(s: ^State) -> (cleared: bool) {
-	if s.builder != nil && len(s.builder.buf) > 0 {
-		clear(&s.builder.buf)
+	if s.builder != nil && len(s.builder) > 0 {
+		clear(s.builder)
 		s.selection = {}
 		cleared = true
 	}
@@ -142,7 +142,7 @@ undo_state_push :: proc(s: ^State, undo: ^[dynamic]^Undo_State) -> mem.Allocator
 	if s.builder == nil {
 		return nil
 	}
-	text := string(s.builder.buf[:])
+	text := string(s.builder[:])
 	item := (^Undo_State)(mem.alloc(size_of(Undo_State) + len(text), align_of(Undo_State), s.undo_text_allocator) or_return)
 	item.selection = s.selection
 	item.len = len(text)
@@ -234,13 +234,13 @@ input_rune :: proc(s: ^State, r: rune) {
 insert :: proc(s: ^State, at: int, text: string) -> int {
 	undo_check(s)
 	if s.builder != nil {
-		if ok, _ := inject_at(&s.builder.buf, at, text); !ok {
-			n := cap(s.builder.buf) - len(s.builder.buf)
+		if ok, _ := inject_at(s.builder, at, text); !ok {
+			n := cap(s.builder) - len(s.builder)
 			assert(n < len(text))
 			for is_continuation_byte(text[n]) {
 				n -= 1
 			}
-			if ok2, _ := inject_at(&s.builder.buf, at, text[:n]); !ok2 {
+			if ok2, _ := inject_at(s.builder, at, text[:n]); !ok2 {
 				n = 0
 			}
 			return n
@@ -254,7 +254,7 @@ insert :: proc(s: ^State, at: int, text: string) -> int {
 remove :: proc(s: ^State, lo, hi: int) {
 	undo_check(s)
 	if s.builder != nil {
-		remove_range(&s.builder.buf, lo, hi)
+		remove_range(s.builder, lo, hi)
 	}
 }
 
@@ -269,8 +269,8 @@ has_selection :: proc(s: ^State) -> bool {
 sorted_selection :: proc(s: ^State) -> (lo, hi: int) {
 	lo = min(s.selection[0], s.selection[1])
 	hi = max(s.selection[0], s.selection[1])
-	lo = clamp(lo, 0, len(s.builder.buf) if s.builder != nil else 0)
-	hi = clamp(hi, 0, len(s.builder.buf) if s.builder != nil else 0)
+	lo = clamp(lo, 0, len(s.builder) if s.builder != nil else 0)
+	hi = clamp(hi, 0, len(s.builder) if s.builder != nil else 0)
 	return
 }
 
@@ -293,7 +293,7 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 
 	buf: []byte
 	if s.builder != nil {
-		buf = s.builder.buf[:]
+		buf = s.builder[:]
 	}
 	pos := clamp(s.selection[0], 0, len(buf))
 
@@ -400,7 +400,7 @@ delete_to :: proc(s: ^State, t: Translation) {
 current_selected_text :: proc(s: ^State) -> string {
 	lo, hi := sorted_selection(s)
 	if s.builder != nil {
-		return string(s.builder.buf[lo:hi])
+		return string(s.builder[lo:hi])
 	}
 	return ""
 }
@@ -481,7 +481,7 @@ perform_command :: proc(s: ^State, cmd: Command) {
 	case .Cut:               cut(s)
 	case .Copy:              copy(s)
 	case .Paste:             paste(s)
-	case .Select_All:        s.selection = {len(s.builder.buf) if s.builder != nil else 0, 0}
+	case .Select_All:        s.selection = {len(s.builder) if s.builder != nil else 0, 0}
 	case .Backspace:         delete_to(s, .Left)
 	case .Delete:            delete_to(s, .Right)
 	case .Delete_Word_Left:  delete_to(s, .Word_Left)

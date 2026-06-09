@@ -68,9 +68,9 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 			build = string(cstring(raw_data(build_buf[:])))
 		}
 		ws(&b, " (build ")
-		build_start := len(b.buf)
+		build_start := len(b)
 		ws(&b, build)
-		res.release = string(b.buf[build_start:][:len(build)])
+		res.release = string(b[build_start:][:len(build)])
 	}
 
 	{

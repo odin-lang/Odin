@@ -161,7 +161,7 @@ decode :: proc(data: []byte, allocator := context.allocator) -> (blk: ^Block, re
 @(require_results)
 encode :: proc(label: string, data: []byte, newline := false, allocator := context.allocator) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	sanitize_sb := proc(sb: ^strings.Builder) {
-		buf := sb.buf[:]
+		buf := sb[:]
 		b, l := raw_data(buf), len(buf)
 		crypto.zero_explicit(b, l)
 		strings.builder_destroy(sb)
