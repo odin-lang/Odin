@@ -533,7 +533,7 @@ test_string_builder_stream :: proc(t: ^testing.T) {
 	results, _ := _test_stream(t, strings.to_stream(&sb), buf[:],
 		do_destroy = false)
 
-	testing.expectf(t, bytes.compare(sb.buf[:], expected_buf[:]) == 0, "string builder stream failed:\nbuilder<%q>\n!=\nbuffer <%q>", sb.buf[:], expected_buf[:])
+	testing.expectf(t, bytes.compare(sb[:], expected_buf[:]) == 0, "string builder stream failed:\nbuilder<%q>\n!=\nbuffer <%q>", sb.buf[:], expected_buf[:])
 
 	log.debugf("%#v", results)
 }
@@ -601,7 +601,7 @@ test_bufio_buffered_writer :: proc(t: ^testing.T) {
 	results, _ := _test_stream(t, bufio.writer_to_stream(&writer), buf[:],
 		do_destroy = false)
 
-	testing.expectf(t, bytes.compare(sb.buf[:], expected_buf[:]) == 0, "bufio buffered string builder stream failed:\nbuilder<%q>\n!=\nbuffer <%q>", sb.buf[:], expected_buf[:])
+	testing.expectf(t, bytes.compare(sb[:], expected_buf[:]) == 0, "bufio buffered string builder stream failed:\nbuilder<%q>\n!=\nbuffer <%q>", sb.buf[:], expected_buf[:])
 
 	log.debugf("%#v", results)
 }
