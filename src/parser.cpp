@@ -1463,7 +1463,7 @@ gb_internal bool next_token0(AstFile *f) {
 }
 
 
-gb_internal Token consume_comment(AstFile *f, isize *end_line_) {
+gb_internal Token consume_comment_internal(AstFile *f, isize *end_line_) {
 	Token tok = f->curr_token;
 	GB_ASSERT(tok.kind == Token_Comment);
 	isize end_line = tok.pos.line;
@@ -1483,6 +1483,17 @@ gb_internal Token consume_comment(AstFile *f, isize *end_line_) {
 
 
 gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
+#if 0
+	if (build_context.command_kind != Command_doc) {
+		isize end_line = f->curr_token.pos.line;
+		while (f->curr_token.kind == Token_Comment &&
+		       f->curr_token.pos.line <= end_line+n) {
+			next_token0(f);
+		}
+		return nullptr;
+	}
+#endif
+
 	Array<Token> list = {};
 	list.allocator = ast_allocator(f);
 	isize end_line = f->curr_token.pos.line;
@@ -1494,7 +1505,7 @@ gb_internal CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_
 	}
 	while (f->curr_token.kind == Token_Comment &&
 	       f->curr_token.pos.line <= end_line+n) {
-		array_add(&list, consume_comment(f, &end_line));
+		array_add(&list, consume_comment_internal(f, &end_line));
 	}
 
 	if (end_line_) *end_line_ = end_line;

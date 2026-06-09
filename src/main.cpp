@@ -2198,7 +2198,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 		}
 		{
 			f64 time = total_tokenizing_time;
-			gb_printf_err("Tokenization Only\n");
+			gb_printf_err("Tokenization Only per thread\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
@@ -2211,7 +2211,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 		}
 		{
 			f64 time = total_parsing_time;
-			gb_printf_err("Parsing Only\n");
+			gb_printf_err("Parsing Only per thread\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
@@ -2233,7 +2233,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			GB_ASSERT(ts.label == "parse files");
 
 			f64 parse_time = time_stamp_as_s(ts, t->freq);
-			gb_printf_err("Parse pass\n");
+			gb_printf_err("Parse pass (all threads)\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
