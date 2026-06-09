@@ -1558,7 +1558,7 @@ gb_internal Token advance_token(AstFile *f) {
 	f->line_comment = nullptr;
 
 	f->prev_token_index = f->curr_token_index;
-	Token prev = f->prev_token = f->curr_token;
+	Token prev = (f->prev_token = f->curr_token);
 
 	bool ok = next_token0(f);
 	if (ok) {
@@ -5826,7 +5826,7 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, Tok
 	token_cap = ((token_cap + pow2_cap-1)/pow2_cap) * pow2_cap;
 
 	// force it always to be true to minimize duplicate tokenization errors
-	f->use_cached_tokens = true;
+	f->use_cached_tokens = false;
 	switch (build_context.command_kind) {
 	case Command_strip_semicolon:
 		f->use_cached_tokens = true;
