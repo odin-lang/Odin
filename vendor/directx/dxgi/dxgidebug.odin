@@ -4,10 +4,10 @@ import win32 "core:sys/windows"
 import "core:c"
 
 DEBUG_RLO_FLAGS :: enum u32 { // TODO: convert to bit_set
-	SUMMARY	        = 0x1,
-	DETAIL	        = 0x2,
-	IGNORE_INTERNAL	= 0x4,
-	ALL	            = 0x7,
+	SUMMARY         = 0x1,
+	DETAIL          = 0x2,
+	IGNORE_INTERNAL = 0x4,
+	ALL             = 0x7,
 }
 
 UINT :: win32.UINT
@@ -24,10 +24,10 @@ DEBUG_APP  := DEBUG_ID{0x6cd6e01, 0x4219, 0x4ebd, {0x87, 0x9, 0x27, 0xed, 0x23, 
 
 INFO_QUEUE_MESSAGE_CATEGORY :: enum u32 {
 	UNKNOWN                 = 0,
-	MISCELLANEOUS	        = UNKNOWN + 1,
-	INITIALIZATION	        = MISCELLANEOUS + 1,
+	MISCELLANEOUS           = UNKNOWN + 1,
+	INITIALIZATION          = MISCELLANEOUS + 1,
 	CLEANUP                 = INITIALIZATION + 1,
-	COMPILATION	        	= CLEANUP + 1,
+	COMPILATION             = CLEANUP + 1,
 	STATE_CREATION          = COMPILATION + 1,
 	STATE_SETTING           = STATE_CREATION + 1,
 	STATE_GETTING           = STATE_SETTING + 1,
