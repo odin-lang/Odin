@@ -774,8 +774,7 @@ gb_internal Ast *ast_matrix_index_expr(AstFile *f, Ast *expr, Token open, Token 
 gb_internal Ast *ast_ident(AstFile *f, Token token) {
 	Ast *result = alloc_ast_node(f, Ast_Ident);
 	result->Ident.token    = token;
-	result->Ident.hash     = string_hash(token.string);
-	result->Ident.interned = string_interner_insert(token.string);
+	result->Ident.interned = string_interner_insert(token.string, 0, &result->Ident.hash);
 	return result;
 }
 
@@ -1905,37 +1904,29 @@ gb_internal Token expect_closing(AstFile *f, TokenKind kind, String const &conte
 }
 
 gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
-	if (!((build_context.command_kind == Command_strip_semicolon) ||
-	      (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)))) {
-		return;
-	}
+	// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
 
-	GB_ASSERT(f->prev_token.kind == Token_Semicolon);
-	if (f->prev_token.string != ";") {
-		return;
-	}
-	if (f->curr_token.pos.line > f->prev_token.pos.line) {
-		return;
-	}
-
-	Token *prev_token;
-	Token curr_token;
+	Token *prev_token = nullptr;
+	Token *curr_token = nullptr;
 
 	if (f->use_cached_tokens) {
-		// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
-		prev_token = &f->cached_tokens.data[f->prev_token_index];
-		curr_token = f->cached_tokens.data[f->curr_token_index];
+		prev_token = &f->cached_tokens[f->prev_token_index];
+		curr_token = &f->cached_tokens[f->curr_token_index];
 	} else {
 		Token prev_token_ = f->prev_token;
-
+		Token curr_token_ = f->curr_token;
 		prev_token = &prev_token_;
-		curr_token = f->curr_token;
+		curr_token = &curr_token_;
+	}
+	GB_ASSERT(prev_token->kind == Token_Semicolon);
+	if (prev_token->string != ";") {
+		return;
 	}
 
-	if (curr_token.pos.line > prev_token->pos.line) {
+	if (curr_token->pos.line >= prev_token->pos.line) {
 		return;
-	} else if (curr_token.pos.line == prev_token->pos.line) {
-		switch (curr_token.kind) {
+	} else if (curr_token->pos.line == prev_token->pos.line) {
+		switch (curr_token->kind) {
 		case Token_CloseBrace:
 		case Token_CloseParen:
 		case Token_EOF:
@@ -1946,7 +1937,10 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
 		syntax_error(*prev_token, "Found unneeded semicolon");
 	}
-	prev_token->flags |= TokenFlag_Remove;
+
+	if (build_context.command_kind == Command_strip_semicolon) {
+		prev_token->flags |= TokenFlag_Remove;
+	}
 }
 
 gb_internal void expect_semicolon(AstFile *f) {
@@ -1998,18 +1992,24 @@ gb_internal Ast *        parse_block_stmt(AstFile *f, b32 is_when);
 
 gb_internal Ast *parse_ident(AstFile *f, bool allow_poly_names=false) {
 	Token token = f->curr_token;
-	if (token.kind == Token_Ident) {
+	switch (token.kind) {
+	case Token_Ident:
 		advance_token(f);
-	} else if (allow_poly_names && token.kind == Token_Dollar) {
-		Token dollar = expect_token(f, Token_Dollar);
-		Ast *name = ast_ident(f, expect_token(f, Token_Ident));
-		if (is_blank_ident(name)) {
-			syntax_error(name, "Invalid polymorphic type definition with a blank identifier");
+		break;
+	case Token_Dollar:
+		if (allow_poly_names) {
+			Token dollar = expect_token(f, Token_Dollar);
+			Ast *name = ast_ident(f, expect_token(f, Token_Ident));
+			if (is_blank_ident(name)) {
+				syntax_error(name, "Invalid polymorphic type definition with a blank identifier");
+			}
+			return ast_poly_type(f, dollar, name, nullptr);
 		}
-		return ast_poly_type(f, dollar, name, nullptr);
-	} else {
+		/*fallthrough*/
+	default:
 		token.string = str_lit("_");
 		expect_token(f, Token_Ident);
+		break;
 	}
 	return ast_ident(f, token);
 }
