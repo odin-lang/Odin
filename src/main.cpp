@@ -2200,6 +2200,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			f64 time = total_tokenizing_time;
 			gb_printf_err("Tokenization Only per thread\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
+			gb_printf_err("MLOC/s       - %.3f\n", (cast(f64)lines/time)/1.0e6);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
 			gb_printf_err("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
@@ -2213,6 +2214,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			f64 time = total_parsing_time;
 			gb_printf_err("Parsing Only per thread\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
+			gb_printf_err("MLOC/s       - %.3f\n", (cast(f64)lines/time)/1.0e6);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
 			gb_printf_err("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
@@ -2235,6 +2237,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			f64 parse_time = time_stamp_as_s(ts, t->freq);
 			gb_printf_err("Parse pass (all threads)\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
+			gb_printf_err("MLOC/s       - %.3f\n", (cast(f64)lines/parse_time)/1.0e6);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
 			gb_printf_err("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
@@ -2262,21 +2265,23 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 
 			ts.finish = ts_end.finish;
 
-			f64 parse_time = time_stamp_as_s(ts, t->freq);
+			f64 checker_time = time_stamp_as_s(ts, t->freq);
 			gb_printf_err("Checker pass\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/parse_time);
-			gb_printf_err("MiB/s        - %.3f\n", (cast(f64)total_file_size/parse_time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*parse_time/cast(f64)total_file_size);
+			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/checker_time);
+			gb_printf_err("MLOC/s       - %.3f\n", (cast(f64)lines/checker_time)/1.0e6);
+			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*checker_time/cast(f64)lines);
+			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/checker_time);
+			gb_printf_err("us/Token     - %.3f\n", 1.0e6*checker_time/cast(f64)tokens);
+			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/checker_time);
+			gb_printf_err("MiB/s        - %.3f\n", (cast(f64)total_file_size/checker_time)/(1024*1024));
+			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*checker_time/cast(f64)total_file_size);
 			gb_printf_err("\n");
 		}
 		{
 			f64 total_time = t->total_time_seconds;
 			gb_printf_err("Total pass\n");
 			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/total_time);
+			gb_printf_err("MLOC/s       - %.3f\n", (cast(f64)lines/total_time)/1.0e6);
 			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*total_time/cast(f64)lines);
 			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/total_time);
 			gb_printf_err("us/Token     - %.3f\n", 1.0e6*total_time/cast(f64)tokens);
