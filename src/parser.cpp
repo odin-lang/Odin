@@ -1918,7 +1918,9 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 		prev_token = &prev_token_;
 		curr_token = &curr_token_;
 	}
-	GB_ASSERT_MSG(prev_token->kind == Token_Semicolon, "got: %.*s", LIT(prev_token->string));
+	if (prev_token->kind != Token_Semicolon) {
+		GB_PANIC("Expected a semicolon, got %.*s", LIT(prev_token->string));
+	}
 	if (prev_token->string != ";") {
 		return;
 	}
