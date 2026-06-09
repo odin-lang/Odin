@@ -792,17 +792,20 @@ gb_internal Ast *ast_uninit(AstFile *f, Token token) {
 
 gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 	String s = token.string;
-	string_interner_insert(s);
 	switch (token.kind) {
 	case Token_Rune:
 		if (!unquote_string(ast_allocator(f), &s, 0)) {
 			syntax_error(token, "Invalid rune literal");
+			return {};
 		}
+		string_interner_insert(s);
 		break;
 	case Token_String:
 		if (!unquote_string(ast_allocator(f), &s, 0, s.text[0] == '`')) {
 			syntax_error(token, "Invalid string literal");
+			return {};
 		}
+		string_interner_insert(s);
 		break;
 	}
 	ExactValue value = exact_value_from_basic_literal(token.kind, s);
