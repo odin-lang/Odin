@@ -5826,7 +5826,7 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, Tok
 	token_cap = ((token_cap + pow2_cap-1)/pow2_cap) * pow2_cap;
 
 	// force it always to be true to minimize duplicate tokenization errors
-	f->use_cached_tokens = false;
+	f->use_cached_tokens = true;
 	switch (build_context.command_kind) {
 	case Command_strip_semicolon:
 		f->use_cached_tokens = true;
