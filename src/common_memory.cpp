@@ -80,16 +80,6 @@ gb_internal void virtual_memory_dealloc(MemoryBlock *block);
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment);
 gb_internal void arena_free_all(Arena *arena);
 
-gb_internal isize arena_align_forward_offset(Arena *arena, isize alignment) {
-	isize alignment_offset = 0;
-	isize ptr = cast(isize)(arena->curr_block->base + arena->curr_block->used);
-	isize mask = alignment-1;
-	if (ptr & mask) {
-		alignment_offset = alignment - (ptr & mask);
-	}
-	return alignment_offset;
-}
-
 gb_internal void thread_init_arenas(Thread *t) {
 	t->permanent_arena = gb_alloc_item(heap_allocator(), Arena);
 	t->temporary_arena = gb_alloc_item(heap_allocator(), Arena);
@@ -102,37 +92,41 @@ gb_internal void thread_init_arenas(Thread *t) {
 }
 
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
-	GB_ASSERT(gb_is_power_of_two(alignment));
+	usize u_alignment = cast(usize)alignment;
+	GB_ASSERT(!(u_alignment & (u_alignment-1)));
 	GB_ASSERT(arena->custom_arena || arena->parent_thread == get_current_thread());
 
-	isize size = 0;
-	if (arena->curr_block != nullptr) {
-		size = min_size + arena_align_forward_offset(arena, alignment);
+	isize const mask = alignment - 1;
+	MemoryBlock *block = arena->curr_block;
+
+	// NOTE(bill): Fast path, allocation fits in the current block.
+	if (block != nullptr) {
+		isize offset = (-cast(isize)(block->base + block->used)) & mask;
+		isize size   = min_size + offset;
+		if (block->used + size <= block->size) {
+			u8 *ptr = block->base + block->used + offset;
+			block->used += size;
+			return ptr; // pre-zeroed by virtual_memory_alloc
+		}
 	}
 
-	if (arena->curr_block == nullptr || (arena->curr_block->used + size) > arena->curr_block->size) {
-		size = align_formula_isize(min_size, alignment);
-		arena->minimum_block_size = gb_max(DEFAULT_MINIMUM_BLOCK_SIZE, arena->minimum_block_size);
-		
-		isize block_size = gb_max(size, arena->minimum_block_size);
-		
-		MemoryBlock *new_block = virtual_memory_alloc(block_size, true);
-		new_block->prev = arena->curr_block;
-		arena->curr_block = new_block;
-	}
-	
-	MemoryBlock *curr_block = arena->curr_block;
-	GB_ASSERT((curr_block->used + size) <= curr_block->size);
-	
-	u8 *ptr = curr_block->base + curr_block->used;
-	ptr += arena_align_forward_offset(arena, alignment);
-	
-	curr_block->used += size;
-	GB_ASSERT(curr_block->used <= curr_block->size);
+	// NOTE(bill): Slow path: grow the arena with a fresh block.
+	isize size = align_formula_isize(min_size, alignment);
+	arena->minimum_block_size = gb_max(DEFAULT_MINIMUM_BLOCK_SIZE, arena->minimum_block_size);
+	isize block_size = gb_max(size, arena->minimum_block_size);
 
-	// NOTE(bill): memory will be zeroed by default due to virtual memory 
-	return ptr;	
+	MemoryBlock *new_block = virtual_memory_alloc(block_size, true);
+	new_block->prev   = arena->curr_block;
+	arena->curr_block = new_block;
+
+	isize offset = (-cast(isize)(new_block->base + new_block->used)) & mask;
+	u8 *ptr = new_block->base + new_block->used + offset;
+	new_block->used += size;
+
+	GB_ASSERT(new_block->used <= new_block->size);
+	return ptr; // pre-zeroed by virtual_memory_alloc
 }
+
 
 gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit);
 gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize commit_amount);
