@@ -1919,6 +1919,7 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 		curr_token = &curr_token_;
 	}
 	if (prev_token->kind != Token_Semicolon) {
+		gb_printf_err("Expected a semicolon, got %.*s\n", LIT(prev_token->string));
 		GB_PANIC("Expected a semicolon, got %.*s", LIT(prev_token->string));
 	}
 	if (prev_token->string != ";") {
