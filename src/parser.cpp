@@ -1918,21 +1918,24 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 		prev_token = &prev_token_;
 		curr_token = &curr_token_;
 	}
-	GB_ASSERT(prev_token->kind == Token_Semicolon);
+	GB_ASSERT_MSG(prev_token->kind == Token_Semicolon, "got: %.*s", LIT(prev_token->string));
 	if (prev_token->string != ";") {
 		return;
 	}
 
-	if (curr_token->pos.line >= prev_token->pos.line) {
-		return;
+	if (curr_token->pos.line > prev_token->pos.line) {
+		goto do_check;
 	} else if (curr_token->pos.line == prev_token->pos.line) {
 		switch (curr_token->kind) {
 		case Token_CloseBrace:
 		case Token_CloseParen:
 		case Token_EOF:
-			return;
+			goto do_check;
 		}
+		return;
 	}
+
+do_check:;
 
 	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
 		syntax_error(*prev_token, "Found unneeded semicolon");
