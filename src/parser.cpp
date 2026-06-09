@@ -1905,38 +1905,42 @@ gb_internal Token expect_closing(AstFile *f, TokenKind kind, String const &conte
 }
 
 gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
-	Token *prev_token = nullptr;
-	Token *curr_token = nullptr;
+	if (!((build_context.command_kind == Command_strip_semicolon) ||
+	      (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)))) {
+		return;
+	}
+
+	GB_ASSERT(f->prev_token.kind == Token_Semicolon);
+	if (f->prev_token.string != ";") {
+		return;
+	}
+	if (f->curr_token.pos.line > f->prev_token.pos.line) {
+		return;
+	}
+
+	Token *prev_token;
+	Token curr_token;
 
 	if (f->use_cached_tokens) {
 		// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
 		prev_token = &f->cached_tokens.data[f->prev_token_index];
-		curr_token = &f->cached_tokens.data[f->curr_token_index];
+		curr_token = f->cached_tokens.data[f->curr_token_index];
 	} else {
 		Token prev_token_ = f->prev_token;
-		Token curr_token_ = f->curr_token;
 
 		prev_token = &prev_token_;
-		curr_token = &curr_token_;
+		curr_token = f->curr_token;
 	}
-	GB_ASSERT(prev_token->kind == Token_Semicolon);
-	if (prev_token->string != ";") {
+
+	if (curr_token.pos.line > prev_token->pos.line) {
 		return;
-	}
-	bool ok = false;
-	if (curr_token->pos.line > prev_token->pos.line) {
-		ok = true;
-	} else if (curr_token->pos.line == prev_token->pos.line) {
-		switch (curr_token->kind) {
+	} else if (curr_token.pos.line == prev_token->pos.line) {
+		switch (curr_token.kind) {
 		case Token_CloseBrace:
 		case Token_CloseParen:
 		case Token_EOF:
-			ok = true;
-			break;
+			return;
 		}
-	}
-	if (!ok) {
-		return;
 	}
 
 	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
@@ -1946,8 +1950,6 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 }
 
 gb_internal void expect_semicolon(AstFile *f) {
-	Token prev_token = {};
-
 	if (allow_token(f, Token_Semicolon)) {
 		assign_removal_flag_to_semicolon(f);
 		return;
@@ -1961,7 +1963,7 @@ gb_internal void expect_semicolon(AstFile *f) {
 		break;
 	}
 
-	prev_token = f->prev_token;
+	Token prev_token = f->prev_token;
 	if (prev_token.kind == Token_Semicolon) {
 		assign_removal_flag_to_semicolon(f);
 		return;
