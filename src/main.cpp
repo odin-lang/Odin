@@ -2173,7 +2173,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 		files += pkg->files.count;
 		for (AstFile *file : pkg->files) {
 			total_tokenizing_time += file->time_to_tokenize;
-			total_parsing_time += file->time_to_parse;
+			total_parsing_time += file->time_to_parse - file->time_to_tokenize;
 			total_file_size += file->tokenizer.end - file->tokenizer.start;
 		}
 	}
@@ -3351,7 +3351,7 @@ gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file
 	u8 const *file_data = file->tokenizer.start;
 	i32 prev_offset = 0;
 	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
-	for (Token const &token : file->tokens) {
+	for (Token const &token : file->cached_tokens) {
 		if (token.flags & (TokenFlag_Remove|TokenFlag_Replace)) {
 			i32 offset = token.pos.offset;
 			i32 to_write = offset-prev_offset;
@@ -3395,7 +3395,7 @@ gb_internal int strip_semicolons(Parser *parser) {
 	for (AstPackage *pkg : parser->packages) {
 		for (AstFile *file : pkg->files) {
 			bool nothing_to_change = true;
-			for (Token const &token : file->tokens) {
+			for (Token const &token : file->cached_tokens) {
 				if (token.flags) {
 					nothing_to_change = false;
 					break;

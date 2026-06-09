@@ -309,6 +309,7 @@ struct Tokenizer {
 
 	i32 error_count;
 
+	bool ignore_errors;
 	bool insert_semicolon;
 	
 	LoadedFile loaded_file;
@@ -316,6 +317,9 @@ struct Tokenizer {
 
 
 gb_internal void tokenizer_err(Tokenizer *t, char const *msg, ...) {
+	if (t->ignore_errors) {
+		return;
+	}
 	va_list va;
 	i32 column = t->column_minus_one+1;
 	if (column < 1) {
@@ -335,6 +339,9 @@ gb_internal void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 }
 
 gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
+	if (t->ignore_errors) {
+		return;
+	}
 	va_list va;
 	i32 column = t->column_minus_one+1;
 	if (column < 1) {
@@ -349,6 +356,10 @@ gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *ms
 }
 
 gb_internal void advance_to_next_rune(Tokenizer *t) {
+	if (t->curr_rune == GB_RUNE_EOF && t->curr == t->end) {
+		return;
+	}
+
 	if (t->curr_rune == '\n') {
 		t->column_minus_one = -1;
 		t->line_count++;
