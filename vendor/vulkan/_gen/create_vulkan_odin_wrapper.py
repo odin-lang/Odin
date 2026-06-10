@@ -943,7 +943,7 @@ API_VERSION_VARIANT :: proc "contextless" (version: u32) -> u32 {
 // Base types
 Flags         :: distinct u32
 Flags64       :: distinct u64
-DeviceSize    :: distinct u64
+DeviceSize    :: u64
 DeviceAddress :: distinct u64
 SampleMask    :: distinct u32
 
