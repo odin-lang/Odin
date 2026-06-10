@@ -98,7 +98,7 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/src" -w /src arm64v8/alpine sh -c '
             apk add --no-cache \
-              musl-dev llvm20-dev clang20 git mold lz4 \
+              musl-dev llvm20-dev clang20 build-base git mold lz4 \
               libxml2-static llvm20-static zlib-static zstd-static \
               make &&
             git config --global --add safe.directory /src &&
