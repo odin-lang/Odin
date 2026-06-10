@@ -621,7 +621,7 @@ machine to machine communication (such as defined by the network protocol.)
 		tmp: [64]byte
 		left := MSG
 		for len(left) > 0 {
-			sync.park(worker_data.mu)
+			sync.unpark(worker_data.mu)
 
 			word := next_word(&left)
 			testing.expect_value(worker_data.t, send_full(client, word), nil)
@@ -648,7 +648,7 @@ machine to machine communication (such as defined by the network protocol.)
 	tmp: [64]byte
 	left := MSG
 	for len(left) > 0 {
-		sync.unpark(&mu)
+		sync.park(&mu)
 		word := next_word(&left)
 
 		num_recv, recv_err := net.recv_unix(client, tmp[:])
