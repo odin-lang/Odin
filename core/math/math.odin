@@ -937,10 +937,117 @@ tan :: proc{
 	tan_f32, tan_f32le, tan_f32be,
 	tan_f64, tan_f64le, tan_f64be,
 }
+/*
+Linearly interpolates between `a` and `b`, with `t` weight
 
+`t=0` means only `a`
+`t=0.5` means the midpoint of `a` and `b`
+`t=1` means only `b`
+
+
+Inputs:
+- `a`: a float representing the start
+- `b`: a float representing the end
+- `t`: a float to control the preference weighting
+
+
+Returns:
+- A float of matching type as the `a` and `b` inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	lerp_example :: proc() {
+		x_float:  f16 = 4
+		x2_float: f16 = 6
+		p1_float: f16 = 0.0
+		p2_float: f16 = 0.5
+		p3_float: f16 = 1.0
+
+
+		// special cases
+		x_neg_zero: f16 = -0.0;
+		x_pos_inf:  f16 = math.inf_f16(+1);
+		x_nan:      f16 = math.nan_f16(); 
+
+		fmt.println(math.lerp(x_float, x2_float, p1_float))
+		fmt.println(math.lerp(x_float, x2_float, p2_float))
+		fmt.println(math.lerp(x_float, x2_float, p3_float))
+
+		fmt.println(math.lerp(x_neg_zero, x_float, p1_float))
+		fmt.println(math.lerp(x_float, x_pos_inf, p1_float))
+		fmt.println(math.lerp(x_float, x_nan, p1_float))
+	}
+
+Output:
+	+4 		// x | x2 | 0 	same as just x
+	+5 		// x | x2 | 0.5 	
+	+6 		// x | x2 | 1 	same as just x2
+
+	// special cases
+	0 			// neg_zero | x 		| 0
+	NaN 		// x 		| pos_inf 	| 0
+	Nan 		// x 		| nan 		| 0
+
+*/
 @(require_results) lerp :: proc "contextless" (a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t }
 @(require_results) saturate :: proc "contextless" (a: $T) -> (x: T) { return clamp(a, 0, 1) }
 
+/*
+Calculates the weighting of a linear interpolation of `a` and `b`, given `x` number
+
+This is similar to `lerp()` but instead of calculating the actual value interpolated,
+it calculates how much that `x` value sits percentage-wise in the `[a,b]` range
+
+NOTE: a result >1 or <0 means `x` is outside the range
+
+
+Inputs:
+- `a`: a float representing the start
+- `b`: a float representing the end
+- `x`: a float value to be compared with the range [a,b]
+
+
+Returns:
+- A float of matching type as the inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	unlerp_example :: proc() {
+		x_float:  f16 = 4
+		x2_float: f16 = 6
+		y_float: f16 = 5
+		y2_float: f16 = 7
+
+
+		// special cases
+		x_neg_zero: f16 = -0.0;
+		x_pos_inf:  f16 = math.inf_f16(+1);
+		x_nan:      f16 = math.nan_f16(); 
+
+		fmt.println(math.unlerp(x_float, x2_float, y_float))
+		fmt.println(math.unlerp(x_float, x2_float, y2_float))
+
+		fmt.println(math.unlerp(x_float, y2_float, x_neg_zero))
+		fmt.println(math.unlerp(x_float, x_pos_inf, y_float))
+	}
+
+Output:
+	+0.5 		// x | x2 | y
+	+1.5 		// x | x2 | y2
+
+	// special cases
+	-1.333 		// x | y2 		| neg_zero
+	0 			// x | pos_inf 	| y
+
+*/
 @(require_results)
 unlerp :: proc "contextless" (a, b, x: $T) -> (t: T) where intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
 	return (x-a)/(b-a)
