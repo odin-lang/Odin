@@ -293,7 +293,7 @@ when crypto.COMPACT_IMPLS == false {
 		// conditionally select the right result.
 		pt_add_mixed(tmp, point, &tmp.x, &tmp.y)
 
-		ctrl := subtle.u64_is_non_zero(idx)
+		ctrl := subtle.neq0(idx)
 		pt_cond_select(point, point, tmp, int(ctrl))
 	}
 }
