@@ -2648,7 +2648,49 @@ gcd :: proc "contextless" (x, y: $T) -> T
 	}
 	return abs(x)
 }
+/*
+Finds the least common multiple between 2 numbers
 
+NOTE: the result sign indicates if the signs of `x` and `y` were opposite
+
+Inputs:
+- `x`: a int type
+- `y`: a int type
+
+
+Returns:
+- A numeric of matching type as the inputs
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	lcm_example :: proc() {
+		x_int:    int = 4
+		x2_int:   int = 6
+		x3_int:   int = -12
+
+
+		// special cases
+		x_pos_zero: int = +0.0;
+
+		fmt.println(math.lcm(x_int, x2_int))
+		fmt.println(math.lcm(x3_int, x2_int))
+		fmt.println(math.lcm(x3_int, x3_int))
+
+		fmt.println(math.lcm(x_int, x_pos_zero))
+	}
+
+Output:
+	+12
+	-12
+	+12
+
+	// special cases
+	0           // pos_zero
+
+*/
 @(require_results)
 lcm :: proc "contextless" (x, y: $T) -> T
 	where intrinsics.type_is_ordered_numeric(T) {
