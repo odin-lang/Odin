@@ -1,4 +1,5 @@
 #define ALLOW_SPLIT_MULTI_RETURNS true
+#define ALLOW_WIN64_VECTORCALL_ABI true
 
 enum lbArgKind {
 	lbArg_Direct,
@@ -27,6 +28,11 @@ gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type
 }
 gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type) {
 	return lb_arg_type_direct(type, nullptr, nullptr, nullptr);
+}
+
+gb_internal lbArgType lb_arg_type_direct_inreg(LLVMContextRef c, LLVMTypeRef type) {
+	LLVMAttributeRef inreg_attr = lb_create_enum_attribute_with_type(c, "inreg", type);
+	return lb_arg_type_direct(type, nullptr, nullptr, inreg_attr);
 }
 
 gb_internal lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef attr) {
@@ -131,6 +137,27 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 // }
 
 
+gb_internal void lb_add_function_calling_convention(LLVMValueRef fn, ProcCallingConvention calling_convention) {
+	lbCallingConventionKind cc_kind = lbCallingConvention_C;
+	// TODO(bill): Clean up this logic
+	if (!is_arch_wasm()) {
+		cc_kind = lb_calling_convention_map[calling_convention];
+	}
+	if (build_context.metrics.os == TargetOs_windows &&
+	    build_context.metrics.arch == TargetArch_amd64) {
+		switch (calling_convention) {
+		case ProcCC_Odin:
+		case ProcCC_Contextless:
+			if (ALLOW_WIN64_VECTORCALL_ABI) {
+			    	// cc_kind = lbCallingConvention_X86_VectorCall;
+			}
+		    	break;
+		}
+	}
+	LLVMSetFunctionCallConv(fn, cc_kind);
+}
+
+
 gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
 	if (ft == nullptr) {
 		return;
@@ -184,23 +211,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		LLVMAddAttributeAtIndex(fn, offset, noalias_attr);
 	}
 
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// TODO(bill): Clean up this logic
-	if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[calling_convention];
-	} 
-	// if (build_context.metrics.arch == TargetArch_amd64) {
-	// 	if (build_context.metrics.os == TargetOs_windows) {
-	// 		if (cc_kind == lbCallingConvention_C) {
-	// 			cc_kind = lbCallingConvention_Win64;
-	// 		}
-	// 	} else {
-	// 		if (cc_kind == lbCallingConvention_C) {
-	// 			cc_kind = lbCallingConvention_X86_64_SysV;
-	// 		}
-	// 	}
-	// } 
-	LLVMSetFunctionCallConv(fn, cc_kind);
+	lb_add_function_calling_convention(fn, calling_convention);
 	if (calling_convention == ProcCC_Odin) {
 		unsigned context_index = arg_index;
 		LLVMAddAttributeAtIndex(fn, context_index, noalias_attr);
@@ -466,39 +477,205 @@ namespace lbAbi386 {
 };
 
 namespace lbAbiAmd64Win64 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
+		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		return ft;
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal bool is_vectorcall(ProcCallingConvention calling_convention) {
+		switch (calling_convention) {
+		case ProcCC_Odin:
+		case ProcCC_Contextless:
+			return ALLOW_WIN64_VECTORCALL_ABI;
+		case ProcCC_VectorCall:
+			return true;
+		}
+		return false;
+	}
+
+	enum RegClass {
+		RegClass_Other,
+		RegClass_Memory,
+		RegClass_Int,
+		RegClass_Half,
+		RegClass_Float,
+		RegClass_Double,
+	};
+
+	gb_internal void vectorcall_classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off) {
+		i64 t_align = lb_alignof(t);
+
+		i64 misalign = off % t_align;
+		if (misalign != 0) {
+			array_add(cls, RegClass_Memory);
+			return;
+		}
+
+		switch (LLVMGetTypeKind(t)) {
+		case LLVMIntegerTypeKind: {
+			array_add(cls, RegClass_Int);
+			break;
+		}
+		case LLVMPointerTypeKind:
+			array_add(cls, RegClass_Int);
+			break;
+		case LLVMHalfTypeKind:
+			array_add(cls, RegClass_Half);
+			break;
+		case LLVMFloatTypeKind:
+			array_add(cls, RegClass_Float);
+			break;
+		case LLVMDoubleTypeKind:
+			array_add(cls, RegClass_Double);
+			break;
+		case LLVMStructTypeKind:
+			{
+				LLVMBool packed = LLVMIsPackedStruct(t);
+				unsigned field_count = LLVMCountStructElementTypes(t);
+
+				i64 field_off = off;
+				for (unsigned field_index = 0; field_index < field_count; field_index++) {
+					LLVMTypeRef field_type = LLVMStructGetTypeAtIndex(t, field_index);
+					if (!packed) {
+						field_off = llvm_align_formula(field_off, lb_alignof(field_type));
+					}
+					vectorcall_classify_with(field_type, cls, ix, field_off);
+					field_off += lb_sizeof(field_type);
+				}
+			}
+			break;
+		case LLVMArrayTypeKind:
+			{
+				i64 len = LLVMGetArrayLength(t);
+				LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
+				i64 elem_sz = lb_sizeof(elem);
+				for (i64 i = 0; i < len; i++) {
+					vectorcall_classify_with(elem, cls, ix, off + i*elem_sz);
+				}
+			}
+			break;
+		case LLVMVectorTypeKind:
+			{
+				i64 len = LLVMGetVectorSize(t);
+				LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
+				i64 elem_sz = lb_sizeof(elem);
+				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
+				switch (elem_kind) {
+				case LLVMIntegerTypeKind: {
+					unsigned elem_width = LLVMGetIntTypeWidth(elem);
+					if (elem_width > 64) {
+						for (i64 i = 0; i < len; i++) {
+							vectorcall_classify_with(elem, cls, ix, off + i*elem_sz);
+						}
+						break;
+					} else {
+						array_add(cls, RegClass_Int);
+					}
+					break;
+				};
+				case LLVMHalfTypeKind:
+					array_add(cls, RegClass_Half);
+					break;
+				case LLVMFloatTypeKind:
+					array_add(cls, RegClass_Float);
+					break;
+				case LLVMDoubleTypeKind:
+					array_add(cls, RegClass_Double);
+					break;
+				default:
+					GB_PANIC("Unhandled vector element type");
+				}
+			}
+			break;
+		default:
+			GB_PANIC("Unhandled type");
+			break;
+		}
+	}
+
+	gb_internal Array<RegClass> vectorcall_classify(LLVMTypeRef t) {
+		i64 sz = lb_sizeof(t);
+		i64 words = (sz + 7)/8;
+		auto reg_classes = array_make<RegClass>(heap_allocator(), 0, cast(isize)words);
+		vectorcall_classify_with(t, &reg_classes, 0, 0);
+		return reg_classes;
+	}
+
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
-			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
-				i64 sz = lb_sizeof(t);
-				switch (sz) {
-				case 1:
-				case 2:
-				case 4:
-				case 8:
-					args[i] = lb_arg_type_direct(t, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
-					break;
-				default:
-					args[i] = lb_arg_type_indirect(t, nullptr);
-					break;
+
+			if (is_vectorcall(calling_convention)) {
+				if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind || kind == LLVMVectorTypeKind) {
+					i64 sz = lb_sizeof(t);
+					auto cls = vectorcall_classify(t);
+					defer (array_free(&cls));
+
+					if (sz <= 32 &&
+					    cls.count > 0 &&
+					    cls.data[0] >= RegClass_Float) {
+						bool is_inreg = true;
+						auto first = cls.data[0];
+						for (isize i = 1; i < cls.count; i++) {
+							if (cls.data[i] != first) {
+								is_inreg = false;
+								break;
+							}
+						}
+						if (is_inreg) {
+							if (first == RegClass_Float && sz <= 16) {
+								args[i] = lb_arg_type_direct_inreg(c, t);
+								continue;
+							} else if (first == RegClass_Double && sz <= 32) {
+								args[i] = lb_arg_type_direct_inreg(c, t);
+								continue;
+							}
+
+						}
+					}
+
+					switch (sz) {
+					case 1:
+					case 2:
+					case 4:
+					case 8:
+						args[i] = lb_arg_type_direct(t, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
+						break;
+					default:
+						args[i] = lb_arg_type_indirect(t, nullptr);
+						break;
+					}
 				}
+
+
+				args[i] = lbAbi386::non_struct(c, t, false);
 			} else {
+				if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind || kind == LLVMVectorTypeKind) {
+					i64 sz = lb_sizeof(t);
+					switch (sz) {
+					case 1:
+					case 2:
+					case 4:
+					case 8:
+						args[i] = lb_arg_type_direct(t, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
+						break;
+					default:
+						args[i] = lb_arg_type_indirect(t, nullptr);
+						break;
+					}
+				}
+
 				args[i] = lbAbi386::non_struct(c, t, false);
 			}
 		}
@@ -508,13 +685,42 @@ namespace lbAbiAmd64Win64 {
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
-		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
-			i64 sz = lb_sizeof(return_type);
+		}
+		LLVMTypeKind kind = LLVMGetTypeKind(return_type);
+
+		i64 sz = lb_sizeof(return_type);
+
+		if (is_vectorcall(ft->calling_convention)) {
+			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind || kind == LLVMVectorTypeKind) {
+				auto cls = vectorcall_classify(return_type);
+				defer (array_free(&cls));
+
+				if (sz <= 32 &&
+				    cls.count > 0 &&
+				    cls.data[0] >= RegClass_Float) {
+					bool is_inreg = true;
+					auto first = cls.data[0];
+					for (isize i = 1; i < cls.count; i++) {
+						if (cls.data[i] != first) {
+							is_inreg = false;
+							break;
+						}
+					}
+					if (is_inreg) {
+						if (first == RegClass_Float && sz <= 16) {
+							return lb_arg_type_direct(return_type);
+						} else if (first == RegClass_Double && sz <= 32) {
+							return lb_arg_type_direct(return_type);
+						}
+					}
+				}
+			}
+		}
+
+		if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind || kind == LLVMVectorTypeKind) {
 			switch (sz) {
-			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c,  8), nullptr, nullptr);
-			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
-			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
-			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+			case 1: case 2: case 4: case 8:
+				return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
 			}
 
 			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
@@ -522,6 +728,7 @@ namespace lbAbiAmd64Win64 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
+
 		return lbAbi386::non_struct(c, return_type, true);
 	}
 };
