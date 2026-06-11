@@ -406,13 +406,18 @@ exec :: proc(op: ^Operation, trigger_wake_up := true) {
 	if op.l == &_tls_event_loop {
 		_exec(op)
 	} else {
-		for !mpsc_enqueue(&op.l.queue, op) {
+		// Capture the loop pointer before the enqueue publishes `op`: the
+		// target loop can complete the operation and return it to the
+		// operation pool before `op.l` is re-read below, and `l` is in a
+		// raw union with the pool's free-list link.
+		l := op.l
+		for !mpsc_enqueue(&l.queue, op) {
 			warn("operation queue on event loop filled up")
-			wake_up(op.l)
+			wake_up(l)
 			_yield()
 		}
 		if trigger_wake_up {
-			wake_up(op.l)
+			wake_up(l)
 		}
 	}
 }
