@@ -994,7 +994,7 @@ Output:
 
 */
 @(require_results) lerp :: proc "contextless" (a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t }
-@(require_results) saturate :: proc "contextless" (a: $T) -> (x: T) { return clamp(a, 0, 1) }
+@(require_results) saturate :: proc "contextless" (a: $T) -> (x: T) { return clamp(a, 0, 1) } // Clamps the value of `a` between 0 and 1
 
 /*
 Calculates the weighting of a linear interpolation of `a` and `b`, given `x` number
@@ -1262,11 +1262,35 @@ angle_lerp :: proc "contextless" (a, b, t: $T) -> T where intrinsics.type_is_num
 	return a + angle_diff(a, b) * t
 }
 
+/*
+Transforms `x` into 0 if less than `edge`, else turns 1
+
+Inputs:
+- `x`: a numeric
+
+Returns:
+- A numeric of matching type as the input
+
+*/
 @(require_results)
 step :: proc "contextless" (edge, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	return 0 if x < edge else 1
 }
 
+/*
+Performs a S-curve interpolation `x` between `edge0` and `edge1` clamping the value between 0 and 1
+
+for a direct linear interpolation see `lerp()`
+
+Inputs:
+- `x`: a numeric to be interpolated 
+- `edge0`: a numeric representing start of the range 
+- `edge1`: a numeric representing end of the range 
+
+Returns:
+- A numeric of matching type as the inputs
+
+*/
 @(require_results)
 smoothstep :: proc "contextless" (edge0, edge1, x: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	t := clamp((x - edge0) / (edge1 - edge0), 0, 1)
