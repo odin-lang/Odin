@@ -562,6 +562,19 @@ try_cross_linking:;
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);
+						} else if (build_context.metrics.arch == TargetArch_arm64) {
+							result = system_exec_command_line_app("clang",
+								"%s \"%.*s\" "
+								"-c -o \"%.*s\" "
+								"-target %.*s "
+								"%.*s "
+								"",
+								clang_path,
+								LIT(asm_file),
+								LIT(obj_file),
+								LIT(build_context.metrics.target_triplet),
+								LIT(build_context.extra_assembler_flags)
+							);
 						} else {
 							// Note(bumbread): I'm assuming nasm is installed on the host machine.
 							// Shipping binaries on unix-likes gets into the weird territorry of
