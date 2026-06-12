@@ -520,6 +520,8 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 	type_writer_make_hasher(&w, &w.hash_ctx);
 	write_type_to_canonical_string(&w, type);
 	u64 hash = typeid_hash_context_fini(&w.hash_ctx);
+	hash &= 0x7fffffffffffffffull;
+	hash = hash ? hash : 1;
 
 	type->canonical_hash.store(hash, std::memory_order_relaxed);
 
