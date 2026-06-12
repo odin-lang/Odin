@@ -2,6 +2,9 @@ gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLV
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
 	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, type_count);
+	if (build_context.no_plt) {
+		lb_add_attribute_to_proc(p->module, ip, "nonlazybind");
+	}
 	LLVMTypeRef call_type = LLVMIntrinsicGetType(p->module->ctx, id, types, type_count);
 	return LLVMBuildCall2(p->builder, call_type, ip, args, arg_count, "");
 }
@@ -152,6 +155,10 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
+
+	if (build_context.no_plt) {
+		lb_add_attribute_to_proc(m, p->value, "nonlazybind");
+	}
 
 	if (build_context.disable_unwind) {
 		lb_add_attribute_to_proc(m, p->value, "nounwind");
