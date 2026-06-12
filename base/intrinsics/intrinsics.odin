@@ -371,7 +371,7 @@ simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 
 simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
 
 simd_interleave   :: proc(a, ..#simd[LANES/N]T)       -> #simd[LANES]T where N >= 1 ---
-simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (#simd[LANES/N]T, #simd[LANES/N]T, ..., #simd[LANES/N]T) where N >= 1, LANES % N == 0 ---
+simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (..#simd[LANES/N]T) where N >= 1, LANES % N == 0 --- // returns N multiple vectors
 
 
 // Checks if the current target supports the given target features.

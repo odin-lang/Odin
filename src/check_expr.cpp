@@ -2131,6 +2131,10 @@ gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		/*fallthrough*/
 	case Token_Mul:
 	case Token_MulEq:
+		if (is_type_bit_set(type)) {
+			error(op, "Operator '%.*s' is not allowed with bit sets", LIT(op.string));
+			return false;
+		}
 	case Token_AddEq:
 		if (is_type_bit_set(type)) {
 			return true;
@@ -2942,6 +2946,43 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 		default:
 			o->mode = Addressing_Value;
 			break;
+		}
+
+		return;
+	}
+
+	case Token_MulMul: { // 'expand_values' operator
+		if (!o->type) {
+			return;
+		}
+
+		Type *type = base_type(o->type);
+		if (!is_type_struct(type) && !is_type_array(type)) {
+			gbString type_str = type_to_string(o->type);
+			error(node, "Expected a struct or array type to 'expand_values', got '%s'", type_str);
+			gb_string_free(type_str);
+			return;
+		}
+
+		Type *tuple = alloc_type_tuple();
+
+		if (is_type_struct(type)) {
+			isize variable_count = type->Struct.fields.count;
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
+			// NOTE(bill): don't copy the entities, this should be good enough
+			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
+		} else if (is_type_array(type)) {
+			isize variable_count = cast(isize)type->Array.count;
+			tuple->Tuple.variables = permanent_slice_make<Entity *>(variable_count);
+			for (isize i = 0; i < variable_count; i++) {
+				tuple->Tuple.variables[i] = alloc_entity_array_elem(nullptr, blank_token, type->Array.elem, cast(i32)i);
+			}
+		}
+		o->type = tuple;
+		o->mode = Addressing_Value;
+
+		if (tuple->Tuple.variables.count == 1) {
+			o->type = tuple->Tuple.variables[0]->type;
 		}
 
 		return;
@@ -3944,7 +3985,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 			if (types_have_same_internal_endian(src_t, dst_t)) {
 				ExactValue src_v = exact_value_to_integer(o->value);
 				GB_ASSERT(src_v.kind == ExactValue_Integer || src_v.kind == ExactValue_Invalid);
-				BigInt v = src_v.value_integer;
+				BigInt v = big_int_make(&src_v.value_integer);
 
 				BigInt smax = {};
 				BigInt umax = {};

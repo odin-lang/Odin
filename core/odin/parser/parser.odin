@@ -898,7 +898,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			if allow_token(p, .Do) {
 				body = convert_stmt_to_body(p, parse_stmt(p))
 				if tok.pos.line != body.pos.line {
-					error(p, body.pos, "the body of a 'do' must be on the same line as 'else'")
+					error(p, body.pos, "the body of a 'do' must be on the same line as 'for'")
 				}
 
 			} else {
@@ -3550,7 +3550,8 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Add, .Sub,
 	     .Not, .Xor,
-	     .And:
+	     .And,
+	     .Mul_Mul:
 		op := advance_token(p)
 		expr := parse_unary_expr(p, lhs)
 		

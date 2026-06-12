@@ -71,6 +71,7 @@ package all
 @(require) import "core:encoding/hxa"
 @(require) import "core:encoding/ini"
 @(require) import "core:encoding/json"
+@(require) import "core:encoding/pem"
 @(require) import "core:encoding/varint"
 @(require) import "core:encoding/xml"
 @(require) import "core:encoding/uuid"

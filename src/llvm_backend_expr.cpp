@@ -1,5 +1,6 @@
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise);
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr);
+gb_internal lbValue lb_expand_values(lbProcedure *p, lbValue val, Type *type);
 
 gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
 	GB_ASSERT(bit_count <= 64);
@@ -3149,7 +3150,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		Type *elem = base_array_type(dst);
 		lbValue e = lb_emit_conv(p, value, elem);
 		lbAddr v = lb_add_local_generated(p, t, false);
-		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), elem, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 		for (i64 j = 0; j < dst->Matrix.column_count; j++) {
 			for (i64 i = 0; i < dst->Matrix.row_count; i++) {
 				lbValue ptr = lb_emit_matrix_epi(p, v.addr, i, j);
@@ -3186,7 +3187,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 						lb_emit_store(p, d, s);
 					} else if (i == j) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
-						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), dst->Matrix.elem, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 						lb_emit_store(p, d, s);
 					}
 				}
@@ -3450,6 +3451,11 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 	if (is_type_array_like(a)) {
 		Type *tl = base_type(a);
+		bool inline_array_arith = lb_can_try_to_inline_array_arith(tl);
+		if (inline_array_arith && is_type_bit_field(left.type)) {
+			left = lb_emit_transmute(p, left, tl);
+			right = lb_emit_transmute(p, right, tl);
+		}
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
 		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
 
@@ -3464,7 +3470,6 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			cmp_op = Token_And;
 		}
 
-		bool inline_array_arith = lb_can_try_to_inline_array_arith(tl);
 		i32 count = 0;
 		switch (tl->kind) {
 		case Type_Array:           count = cast(i32)tl->Array.count;           break;
@@ -4421,7 +4426,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	if (tv.value.kind != ExactValue_Invalid) {
 		Type *original_type = lb_build_expr_original_const_type(expr);
 		// NOTE(bill): Short on constant values
-		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL, original_type);
+		return lb_const_value(p->module, type, tv.value, original_type, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 	} else if (tv.mode == Addressing_Type) {
 		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
 		return lb_typeid(m, tv.type);
@@ -4502,7 +4507,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode == Addressing_Constant);
 
-		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL, tv.type);
+		return lb_const_value(p->module, type, tv.value, tv.type, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, expr);
@@ -4664,6 +4669,11 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		switch (ue->op.kind) {
 		case Token_And:
 			return lb_build_unary_and(p, expr);
+		case Token_MulMul:
+			{
+				lbValue val = lb_build_expr(p, ue->expr);
+				return lb_expand_values(p, val, type);
+			}
 		default:
 			{
 				lbValue v = lb_build_expr(p, ue->expr);
@@ -4808,7 +4818,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Constant) {
 		Type *t = default_type(type_of_expr(expr));
-		lbValue v = lb_const_value(p->module, t, e->Constant.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL, e->type);
+		lbValue v = lb_const_value(p->module, t, e->Constant.value, e->type, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
 		if (LLVMIsConstant(v.value)) {
 			lbAddr g = lb_add_global_generated_from_procedure(p, t, v);
 			return g;
