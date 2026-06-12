@@ -1053,6 +1053,40 @@ unlerp :: proc "contextless" (a, b, x: $T) -> (t: T) where intrinsics.type_is_fl
 	return (x-a)/(b-a)
 }
 
+/*
+Remaps `old_value` in a range defined by [`old_min`,`old_max`] to a new range defined by [`new_min`,`new_max`]
+
+Inputs:
+- `old_value` a value in the old range
+- `old_min` a numeric for the minimum value of the old range
+- `old_max` a numeric for the maximum value of the old range
+- `new_min` a numeric for the minimum value of the new range
+- `new_max` a numeric for the maximum value of the new range
+
+Returns:
+- A numeric of type equal to the inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	remap_example :: proc() {
+		x_float:  f16 = 5
+		range_float: [2]f16 = {0,9}
+		range2_float: [2]f16 = {22, 31}
+		range3_float: [2]f16 = {10, 11}
+
+		fmt.println(math.remap(x_float, range_float[0], range_float[1], range2_float[0], range2_float[1] ))
+		fmt.println(math.remap(x_float, range_float[0], range_float[1], range3_float[0], range3_float[1] ))
+	}
+
+Output:
+	+27
+	-10.555
+
+*/
 @(require_results)
 remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) -> (x: T) where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
 	old_range := old_max - old_min
@@ -3526,7 +3560,16 @@ sum :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	}
 	return
 }
+/*
+Multiplies all elements of a slice
 
+Inputs:
+- `x` a slice of numerics to be summed
+
+Returns:
+- A numeric of type equal to the slice element type
+
+*/
 @(require_results)
 prod :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	where intrinsics.type_is_numeric(E) {
