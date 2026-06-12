@@ -1145,6 +1145,56 @@ remap_clamped :: proc "contextless" (old_value, old_min, old_max, new_min, new_m
 	return clamp(remapped, new_min, new_max)
 }
 
+/*
+Wraps `x` around `y` creating a repeating pattern
+
+NOTE: `y` cannot be equal 0
+
+Inputs:
+- `x`: a float
+- `y`: a float limit to wrap around
+
+Returns:
+- A float of matching type as the inputs
+
+
+Example:
+
+	import "core:fmt"
+	import math "core:math"
+
+	wrap_example :: proc() {
+		x_float:    f16 = 4
+		x2_float:   f16 = 8
+		x3_float:   f16 = -12
+		y_float:   f16 = 7
+
+
+		// special cases
+		x_pos_zero: f16 = +0.0
+		x_pos_inf:  f16 = math.inf_f16(+1)
+
+		fmt.println(math.wrap(x_float, y_float))
+		fmt.println(math.wrap(x2_float, y_float))
+		fmt.println(math.wrap(x3_float, y_float))
+
+		fmt.println(math.wrap(x2_float, x3_float))
+
+		fmt.println(math.wrap(x_float, x_pos_zero))
+		fmt.println(math.wrap(x_float, x_pos_inf))
+	}
+
+Output:
+	+4
+	+1
+	+2
+	+8
+
+	// special cases
+	NaN 		// x | pos_zero
+	NaN 		// x | pos_inf
+
+*/
 @(require_results)
 wrap :: proc "contextless" (x, y: $T) -> T where intrinsics.type_is_numeric(T), intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
 	tmp := mod(x, y)
