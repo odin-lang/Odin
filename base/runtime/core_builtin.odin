@@ -1471,9 +1471,10 @@ _shrink_dynamic_array :: proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem
 }
 
 @builtin
-map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
+map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (value_ptr: ^V, err: Allocator_Error) #optional_allocator_error {
 	key, value := key, value
-	return (^V)(__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc))
+	value_ptr_raw, err_set :=__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
+	return (^V)(value_ptr_raw), err_set
 }
 
 // Explicitly inserts a key and value into a map `m`, the same as `map_insert`, but the return values differ.
