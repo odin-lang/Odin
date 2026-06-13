@@ -349,8 +349,8 @@ simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 // rounding to the nearest integral value; if two values are equally near, rounds to the even one
 simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
-simd_approx_recip      :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T)) ---
-simd_approx_recip_sqrt :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T)) ---
+simd_approx_recip      :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
+simd_approx_recip_sqrt :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
 
 simd_to_bits        :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
 simd_to_bits_signed :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), !type_is_unsigned(Integer) ---
