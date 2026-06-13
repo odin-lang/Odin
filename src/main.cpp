@@ -312,6 +312,7 @@ enum BuildFlagKind {
 	BuildFlag_Debug,
 	BuildFlag_DisableAssert,
 	BuildFlag_NoBoundsCheck,
+	BuildFlag_WebkitSwitchWorkaround,
 	BuildFlag_NoTypeAssert,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_DynamicLiterals,
@@ -545,6 +546,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_WebkitSwitchWorkaround,  str_lit("webkit-switch-workaround"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoTypeAssert,            str_lit("no-type-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
@@ -1234,6 +1236,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoBoundsCheck:
 							build_context.no_bounds_check = true;
+							break;
+						case BuildFlag_WebkitSwitchWorkaround:
+							build_context.webkit_switch_workaround = true;
 							break;
 						case BuildFlag_NoTypeAssert:
 							build_context.no_type_assert = true;
@@ -2889,6 +2894,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (run_or_build) {
 		if (print_flag("-no-bounds-check")) {
 			print_usage_line(2, "Disables bounds checking program wide.");
+		}
+
+		if (print_flag("-webkit-switch-workaround")) {
+			print_usage_line(2, "Constrains 'typeid' values to 63 bits to avoid an OMG JIT crash in WebKit when running WASM builds.");
+			print_usage_line(2, "Only needed for 'js_wasm32'/'js_wasm64p32' targets run in Safari/WebKit. See: https://github.com/odin-lang/Odin/issues/6810");
 		}
 
 		if (print_flag("-no-crt")) {
