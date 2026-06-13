@@ -539,6 +539,8 @@ struct BuildContext {
 	bool   disallow_do;
 	bool   show_import_graph;
 
+	bool   webkit_switch_workaround;
+
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
 	LinkerChoice linker_choice;
