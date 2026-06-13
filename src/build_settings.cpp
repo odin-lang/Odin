@@ -1952,13 +1952,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		}
 	}
 
-	// note: there are some stack protection toolchain issues on non-intel 
+	// note: there are some stack protection toolchain issues on arm
 	// platforms that will clash with PIC/PIE:
 	// `unresolvable R_AARCH64_ADR_PREL_PG_HI21 relocation against symbol`
-	if (metrics->os == TargetOs_linux && (
-			metrics->arch == TargetArch_amd64 ||
-			metrics->arch == TargetArch_i386
-	)) {
+	if (metrics->os == TargetOs_linux &&
+			metrics->arch != TargetArch_arm32 &&
+			metrics->arch != TargetArch_arm64
+	) {
 		if (bc->stack_protector == StackProtector_Default) {
 			bc->stack_protector = StackProtector_Ssp;
 		}
