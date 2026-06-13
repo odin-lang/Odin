@@ -8,6 +8,15 @@ import "core:mem"
 import "core:testing"
 
 @(test)
+test_fmt_string::proc(t: ^testing.T) {
+    check(t, "12345", "%s", "12345")
+    check(t, "1234", "%.4s", "12345")
+    check(t, " 1234", "%5.4s", "12345")
+    check(t, "1234 ", "%+5.4s", "12345")
+   
+}
+
+@(test)
 test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "5b",        "%m",    5)
 	check(t, "5B",        "%M",    5)

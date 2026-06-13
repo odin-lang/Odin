@@ -1487,7 +1487,10 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	s, verb := s, verb
 	if ol, ok := fi.optional_len.?; ok {
 		s = s[:clamp(ol, 0, len(s))]
-	}
+	} else if fi.prec_set {
+        s = s[:clamp(fi.prec, 0, len(s))]
+    }
+        
 	if !fi.in_bad && fi.record_level > 0 && verb == 'v' {
 		verb = 'q'
 	}
