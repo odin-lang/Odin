@@ -114,7 +114,7 @@ Linux)
 	;;
 OpenBSD)
 	CXXFLAGS="$CXXFLAGS -I/usr/local/include $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -lstdc++ -L/usr/local/lib -liconv"
+	LDFLAGS="$LDFLAGS -lstdc++ -L/usr/local/lib -Wl,-rpath,$($LLVM_CONFIG --libdir) -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 *)
