@@ -309,6 +309,7 @@ struct Tokenizer {
 
 	i32 error_count;
 
+	bool ignore_errors;
 	bool insert_semicolon;
 	
 	LoadedFile loaded_file;
@@ -316,6 +317,9 @@ struct Tokenizer {
 
 
 gb_internal void tokenizer_err(Tokenizer *t, char const *msg, ...) {
+	if (t->ignore_errors) {
+		return;
+	}
 	va_list va;
 	i32 column = t->column_minus_one+1;
 	if (column < 1) {
@@ -335,6 +339,9 @@ gb_internal void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 }
 
 gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
+	if (t->ignore_errors) {
+		return;
+	}
 	va_list va;
 	i32 column = t->column_minus_one+1;
 	if (column < 1) {
@@ -349,31 +356,38 @@ gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *ms
 }
 
 gb_internal void advance_to_next_rune(Tokenizer *t) {
+	if (t->curr_rune == GB_RUNE_EOF && t->curr == t->end) {
+		return;
+	}
+
 	if (t->curr_rune == '\n') {
 		t->column_minus_one = -1;
 		t->line_count++;
 	}
-	if (t->read_curr < t->end) {
-		t->curr = t->read_curr;
-		Rune rune = *t->read_curr;
-		if (rune == 0) {
-			tokenizer_err(t, "Illegal character NUL");
-			t->read_curr++;
-		} else if (rune & 0x80) { // not ASCII
-			isize width = utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
-			t->read_curr += width;
+
+	u8 *read_curr = t->read_curr;
+	u8 *end       = t->end;
+	if (read_curr < end) {
+		Rune rune = *read_curr;
+		t->curr = read_curr;
+		if (cast(u32)(rune - 1) < 0x7f) {            // 0x01..0x7F: ordinary ASCII (hot path)
+			t->read_curr = read_curr + 1;
+		} else if (rune & 0x80) {                    // multi-byte UTF-8
+			isize width = utf8_decode(read_curr, end - read_curr, &rune);
+			t->read_curr = read_curr + width;
 			if (rune == GB_RUNE_INVALID && width == 1) {
 				tokenizer_err(t, "Illegal UTF-8 encoding");
-			} else if (rune == GB_RUNE_BOM && t->curr-t->start > 0){
+			} else if (rune == GB_RUNE_BOM && read_curr != t->start) {
 				tokenizer_err(t, "Illegal byte order mark");
 			}
-		} else {
-			t->read_curr++;
+		} else {                                     // rune == 0 (NUL)
+			t->read_curr = read_curr + 1;
+			tokenizer_err(t, "Illegal character NUL");
 		}
 		t->curr_rune = rune;
 		t->column_minus_one++;
 	} else {
-		t->curr = t->end;
+		t->curr = end;
 		t->curr_rune = GB_RUNE_EOF;
 	}
 }
