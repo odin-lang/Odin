@@ -36,6 +36,8 @@ file_and_urls = [
     ("vulkan_video_codec_h265std.h",        'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
     ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
     ("vulkan_video_codec_h265std_encode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_encode.h', False),
+    ("vulkan_video_codec_vp9std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_vp9std_decode.h', False),
+    ("vulkan_video_codec_vp9std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_vp9std.h', False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -98,6 +100,7 @@ def convert_type(t, prev_name, curr_name):
         "const AccelerationStructureGeometryKHR* const*": "^[^]AccelerationStructureGeometryKHR",
         "const AccelerationStructureBuildRangeInfoKHR* const*": "^[^]AccelerationStructureBuildRangeInfoKHR",
         "const MicromapUsageEXT* const*": "^[^]MicromapUsageEXT",
+        "const MicromapUsageKHR* const*": "^[^]MicromapUsageKHR",
         "struct BaseOutStructure": "BaseOutStructure",
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
@@ -162,7 +165,7 @@ def to_snake_case(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE", "KHX"]
+ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE", "KHX", "ARM", "QCOM"]
 ext_suffixes_title = [ext.title() for ext in ext_suffixes]
 
 
@@ -373,10 +376,17 @@ def parse_enums(f):
 
         names_and_values = re.findall(r"VK_(\w+?) = (.*?)(?:,|})", fields, re.S)
 
+        ignore_names = set([
+            "HOST_IMAGE_COPY_MEMCPY_EXT",
+            "PIPELINE_CREATE_DISPATCH_BASE_KHR"
+        ])
         groups = []
         flags = {}
 
         for name, value in names_and_values:
+            if name in ignore_names:
+                continue
+
             n = fix_enum_name(name, prefix, suffix, is_flag_bit)
             try:
                 v = fix_enum_value(value, prefix, suffix, is_flag_bit)

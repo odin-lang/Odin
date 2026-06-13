@@ -92,75 +92,6 @@ BaseOutStructure :: struct {
 	pNext: ^BaseOutStructure,
 }
 
-BufferMemoryBarrier :: struct {
-	sType:               StructureType,
-	pNext:               rawptr,
-	srcAccessMask:       AccessFlags,
-	dstAccessMask:       AccessFlags,
-	srcQueueFamilyIndex: u32,
-	dstQueueFamilyIndex: u32,
-	buffer:              Buffer,
-	offset:              DeviceSize,
-	size:                DeviceSize,
-}
-
-DispatchIndirectCommand :: struct {
-	x: u32,
-	y: u32,
-	z: u32,
-}
-
-DrawIndexedIndirectCommand :: struct {
-	indexCount:    u32,
-	instanceCount: u32,
-	firstIndex:    u32,
-	vertexOffset:  i32,
-	firstInstance: u32,
-}
-
-DrawIndirectCommand :: struct {
-	vertexCount:   u32,
-	instanceCount: u32,
-	firstVertex:   u32,
-	firstInstance: u32,
-}
-
-ImageSubresourceRange :: struct {
-	aspectMask:     ImageAspectFlags,
-	baseMipLevel:   u32,
-	levelCount:     u32,
-	baseArrayLayer: u32,
-	layerCount:     u32,
-}
-
-ImageMemoryBarrier :: struct {
-	sType:               StructureType,
-	pNext:               rawptr,
-	srcAccessMask:       AccessFlags,
-	dstAccessMask:       AccessFlags,
-	oldLayout:           ImageLayout,
-	newLayout:           ImageLayout,
-	srcQueueFamilyIndex: u32,
-	dstQueueFamilyIndex: u32,
-	image:               Image,
-	subresourceRange:    ImageSubresourceRange,
-}
-
-MemoryBarrier :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	srcAccessMask: AccessFlags,
-	dstAccessMask: AccessFlags,
-}
-
-PipelineCacheHeaderVersionOne :: struct {
-	headerSize:        u32,
-	headerVersion:     PipelineCacheHeaderVersion,
-	vendorID:          u32,
-	deviceID:          u32,
-	pipelineCacheUUID: [UUID_SIZE]u8,
-}
-
 AllocationCallbacks :: struct {
 	pUserData:             rawptr,
 	pfnAllocation:         ProcAllocationFunction,
@@ -483,6 +414,41 @@ MemoryRequirements :: struct {
 	memoryTypeBits: u32,
 }
 
+ImageSubresource :: struct {
+	aspectMask: ImageAspectFlags,
+	mipLevel:   u32,
+	arrayLayer: u32,
+}
+
+SparseImageFormatProperties :: struct {
+	aspectMask:       ImageAspectFlags,
+	imageGranularity: Extent3D,
+	flags:            SparseImageFormatFlags,
+}
+
+SparseImageMemoryBind :: struct {
+	subresource:  ImageSubresource,
+	offset:       Offset3D,
+	extent:       Extent3D,
+	memory:       DeviceMemory,
+	memoryOffset: DeviceSize,
+	flags:        SparseMemoryBindFlags,
+}
+
+SparseImageMemoryBindInfo :: struct {
+	image:     Image,
+	bindCount: u32,
+	pBinds:    [^]SparseImageMemoryBind,
+}
+
+SparseImageMemoryRequirements :: struct {
+	formatProperties:     SparseImageFormatProperties,
+	imageMipTailFirstLod: u32,
+	imageMipTailSize:     DeviceSize,
+	imageMipTailOffset:   DeviceSize,
+	imageMipTailStride:   DeviceSize,
+}
+
 SparseMemoryBind :: struct {
 	resourceOffset: DeviceSize,
 	size:           DeviceSize,
@@ -503,27 +469,6 @@ SparseImageOpaqueMemoryBindInfo :: struct {
 	pBinds:    [^]SparseMemoryBind,
 }
 
-ImageSubresource :: struct {
-	aspectMask: ImageAspectFlags,
-	mipLevel:   u32,
-	arrayLayer: u32,
-}
-
-SparseImageMemoryBind :: struct {
-	subresource:  ImageSubresource,
-	offset:       Offset3D,
-	extent:       Extent3D,
-	memory:       DeviceMemory,
-	memoryOffset: DeviceSize,
-	flags:        SparseMemoryBindFlags,
-}
-
-SparseImageMemoryBindInfo :: struct {
-	image:     Image,
-	bindCount: u32,
-	pBinds:    [^]SparseImageMemoryBind,
-}
-
 BindSparseInfo :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
@@ -539,20 +484,6 @@ BindSparseInfo :: struct {
 	pSignalSemaphores:    [^]Semaphore,
 }
 
-SparseImageFormatProperties :: struct {
-	aspectMask:       ImageAspectFlags,
-	imageGranularity: Extent3D,
-	flags:            SparseImageFormatFlags,
-}
-
-SparseImageMemoryRequirements :: struct {
-	formatProperties:     SparseImageFormatProperties,
-	imageMipTailFirstLod: u32,
-	imageMipTailSize:     DeviceSize,
-	imageMipTailOffset:   DeviceSize,
-	imageMipTailStride:   DeviceSize,
-}
-
 FenceCreateInfo :: struct {
 	sType: StructureType,
 	pNext: rawptr,
@@ -563,12 +494,6 @@ SemaphoreCreateInfo :: struct {
 	sType: StructureType,
 	pNext: rawptr,
 	flags: SemaphoreCreateFlags,
-}
-
-EventCreateInfo :: struct {
-	sType: StructureType,
-	pNext: rawptr,
-	flags: EventCreateFlags,
 }
 
 QueryPoolCreateInfo :: struct {
@@ -589,16 +514,6 @@ BufferCreateInfo :: struct {
 	sharingMode:           SharingMode,
 	queueFamilyIndexCount: u32,
 	pQueueFamilyIndices:   [^]u32,
-}
-
-BufferViewCreateInfo :: struct {
-	sType:  StructureType,
-	pNext:  rawptr,
-	flags:  BufferViewCreateFlags,
-	buffer: Buffer,
-	format: Format,
-	offset: DeviceSize,
-	range:  DeviceSize,
 }
 
 ImageCreateInfo :: struct {
@@ -634,6 +549,14 @@ ComponentMapping :: struct {
 	a: ComponentSwizzle,
 }
 
+ImageSubresourceRange :: struct {
+	aspectMask:     ImageAspectFlags,
+	baseMipLevel:   u32,
+	levelCount:     u32,
+	baseArrayLayer: u32,
+	layerCount:     u32,
+}
+
 ImageViewCreateInfo :: struct {
 	sType:            StructureType,
 	pNext:            rawptr,
@@ -643,6 +566,131 @@ ImageViewCreateInfo :: struct {
 	format:           Format,
 	components:       ComponentMapping,
 	subresourceRange: ImageSubresourceRange,
+}
+
+CommandPoolCreateInfo :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	flags:            CommandPoolCreateFlags,
+	queueFamilyIndex: u32,
+}
+
+CommandBufferAllocateInfo :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	commandPool:        CommandPool,
+	level:              CommandBufferLevel,
+	commandBufferCount: u32,
+}
+
+CommandBufferInheritanceInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	renderPass:           RenderPass,
+	subpass:              u32,
+	framebuffer:          Framebuffer,
+	occlusionQueryEnable: b32,
+	queryFlags:           QueryControlFlags,
+	pipelineStatistics:   QueryPipelineStatisticFlags,
+}
+
+CommandBufferBeginInfo :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	flags:            CommandBufferUsageFlags,
+	pInheritanceInfo: ^CommandBufferInheritanceInfo,
+}
+
+BufferCopy :: struct {
+	srcOffset: DeviceSize,
+	dstOffset: DeviceSize,
+	size:      DeviceSize,
+}
+
+ImageSubresourceLayers :: struct {
+	aspectMask:     ImageAspectFlags,
+	mipLevel:       u32,
+	baseArrayLayer: u32,
+	layerCount:     u32,
+}
+
+BufferImageCopy :: struct {
+	bufferOffset:      DeviceSize,
+	bufferRowLength:   u32,
+	bufferImageHeight: u32,
+	imageSubresource:  ImageSubresourceLayers,
+	imageOffset:       Offset3D,
+	imageExtent:       Extent3D,
+}
+
+ImageCopy :: struct {
+	srcSubresource: ImageSubresourceLayers,
+	srcOffset:      Offset3D,
+	dstSubresource: ImageSubresourceLayers,
+	dstOffset:      Offset3D,
+	extent:         Extent3D,
+}
+
+BufferMemoryBarrier :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	srcAccessMask:       AccessFlags,
+	dstAccessMask:       AccessFlags,
+	srcQueueFamilyIndex: u32,
+	dstQueueFamilyIndex: u32,
+	buffer:              Buffer,
+	offset:              DeviceSize,
+	size:                DeviceSize,
+}
+
+ImageMemoryBarrier :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	srcAccessMask:       AccessFlags,
+	dstAccessMask:       AccessFlags,
+	oldLayout:           ImageLayout,
+	newLayout:           ImageLayout,
+	srcQueueFamilyIndex: u32,
+	dstQueueFamilyIndex: u32,
+	image:               Image,
+	subresourceRange:    ImageSubresourceRange,
+}
+
+MemoryBarrier :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	srcAccessMask: AccessFlags,
+	dstAccessMask: AccessFlags,
+}
+
+DispatchIndirectCommand :: struct {
+	x: u32,
+	y: u32,
+	z: u32,
+}
+
+PipelineCacheHeaderVersionOne :: struct {
+	headerSize:        u32,
+	headerVersion:     PipelineCacheHeaderVersion,
+	vendorID:          u32,
+	deviceID:          u32,
+	pipelineCacheUUID: [UUID_SIZE]u8,
+}
+
+EventCreateInfo :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: EventCreateFlags,
+}
+
+BufferViewCreateInfo :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  BufferViewCreateFlags,
+	buffer: Buffer,
+	format: Format,
+	offset: DeviceSize,
+	range:  DeviceSize,
 }
 
 ShaderModuleCreateInfo :: struct {
@@ -692,168 +740,6 @@ ComputePipelineCreateInfo :: struct {
 	layout:             PipelineLayout,
 	basePipelineHandle: Pipeline,
 	basePipelineIndex:  i32,
-}
-
-VertexInputBindingDescription :: struct {
-	binding:   u32,
-	stride:    u32,
-	inputRate: VertexInputRate,
-}
-
-VertexInputAttributeDescription :: struct {
-	location: u32,
-	binding:  u32,
-	format:   Format,
-	offset:   u32,
-}
-
-PipelineVertexInputStateCreateInfo :: struct {
-	sType:                           StructureType,
-	pNext:                           rawptr,
-	flags:                           PipelineVertexInputStateCreateFlags,
-	vertexBindingDescriptionCount:   u32,
-	pVertexBindingDescriptions:      [^]VertexInputBindingDescription,
-	vertexAttributeDescriptionCount: u32,
-	pVertexAttributeDescriptions:    [^]VertexInputAttributeDescription,
-}
-
-PipelineInputAssemblyStateCreateInfo :: struct {
-	sType:                  StructureType,
-	pNext:                  rawptr,
-	flags:                  PipelineInputAssemblyStateCreateFlags,
-	topology:               PrimitiveTopology,
-	primitiveRestartEnable: b32,
-}
-
-PipelineTessellationStateCreateInfo :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	flags:              PipelineTessellationStateCreateFlags,
-	patchControlPoints: u32,
-}
-
-Viewport :: struct {
-	x:        f32,
-	y:        f32,
-	width:    f32,
-	height:   f32,
-	minDepth: f32,
-	maxDepth: f32,
-}
-
-PipelineViewportStateCreateInfo :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	flags:         PipelineViewportStateCreateFlags,
-	viewportCount: u32,
-	pViewports:    [^]Viewport,
-	scissorCount:  u32,
-	pScissors:     [^]Rect2D,
-}
-
-PipelineRasterizationStateCreateInfo :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	flags:                   PipelineRasterizationStateCreateFlags,
-	depthClampEnable:        b32,
-	rasterizerDiscardEnable: b32,
-	polygonMode:             PolygonMode,
-	cullMode:                CullModeFlags,
-	frontFace:               FrontFace,
-	depthBiasEnable:         b32,
-	depthBiasConstantFactor: f32,
-	depthBiasClamp:          f32,
-	depthBiasSlopeFactor:    f32,
-	lineWidth:               f32,
-}
-
-PipelineMultisampleStateCreateInfo :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	flags:                 PipelineMultisampleStateCreateFlags,
-	rasterizationSamples:  SampleCountFlags,
-	sampleShadingEnable:   b32,
-	minSampleShading:      f32,
-	pSampleMask:           ^SampleMask,
-	alphaToCoverageEnable: b32,
-	alphaToOneEnable:      b32,
-}
-
-StencilOpState :: struct {
-	failOp:      StencilOp,
-	passOp:      StencilOp,
-	depthFailOp: StencilOp,
-	compareOp:   CompareOp,
-	compareMask: u32,
-	writeMask:   u32,
-	reference:   u32,
-}
-
-PipelineDepthStencilStateCreateInfo :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	flags:                 PipelineDepthStencilStateCreateFlags,
-	depthTestEnable:       b32,
-	depthWriteEnable:      b32,
-	depthCompareOp:        CompareOp,
-	depthBoundsTestEnable: b32,
-	stencilTestEnable:     b32,
-	front:                 StencilOpState,
-	back:                  StencilOpState,
-	minDepthBounds:        f32,
-	maxDepthBounds:        f32,
-}
-
-PipelineColorBlendAttachmentState :: struct {
-	blendEnable:         b32,
-	srcColorBlendFactor: BlendFactor,
-	dstColorBlendFactor: BlendFactor,
-	colorBlendOp:        BlendOp,
-	srcAlphaBlendFactor: BlendFactor,
-	dstAlphaBlendFactor: BlendFactor,
-	alphaBlendOp:        BlendOp,
-	colorWriteMask:      ColorComponentFlags,
-}
-
-PipelineColorBlendStateCreateInfo :: struct {
-	sType:           StructureType,
-	pNext:           rawptr,
-	flags:           PipelineColorBlendStateCreateFlags,
-	logicOpEnable:   b32,
-	logicOp:         LogicOp,
-	attachmentCount: u32,
-	pAttachments:    [^]PipelineColorBlendAttachmentState,
-	blendConstants:  [4]f32,
-}
-
-PipelineDynamicStateCreateInfo :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	flags:             PipelineDynamicStateCreateFlags,
-	dynamicStateCount: u32,
-	pDynamicStates:    [^]DynamicState,
-}
-
-GraphicsPipelineCreateInfo :: struct {
-	sType:               StructureType,
-	pNext:               rawptr,
-	flags:               PipelineCreateFlags,
-	stageCount:          u32,
-	pStages:             [^]PipelineShaderStageCreateInfo,
-	pVertexInputState:   ^PipelineVertexInputStateCreateInfo,
-	pInputAssemblyState: ^PipelineInputAssemblyStateCreateInfo,
-	pTessellationState:  ^PipelineTessellationStateCreateInfo,
-	pViewportState:      ^PipelineViewportStateCreateInfo,
-	pRasterizationState: ^PipelineRasterizationStateCreateInfo,
-	pMultisampleState:   ^PipelineMultisampleStateCreateInfo,
-	pDepthStencilState:  ^PipelineDepthStencilStateCreateInfo,
-	pColorBlendState:    ^PipelineColorBlendStateCreateInfo,
-	pDynamicState:       ^PipelineDynamicStateCreateInfo,
-	layout:              PipelineLayout,
-	renderPass:          RenderPass,
-	subpass:             u32,
-	basePipelineHandle:  Pipeline,
-	basePipelineIndex:   i32,
 }
 
 PushConstantRange :: struct {
@@ -968,6 +854,189 @@ WriteDescriptorSet :: struct {
 	pTexelBufferView: ^BufferView,
 }
 
+ClearColorValue :: struct #raw_union {
+	float32: [4]f32,
+	int32:   [4]i32,
+	uint32:  [4]u32,
+}
+
+DrawIndexedIndirectCommand :: struct {
+	indexCount:    u32,
+	instanceCount: u32,
+	firstIndex:    u32,
+	vertexOffset:  i32,
+	firstInstance: u32,
+}
+
+DrawIndirectCommand :: struct {
+	vertexCount:   u32,
+	instanceCount: u32,
+	firstVertex:   u32,
+	firstInstance: u32,
+}
+
+StencilOpState :: struct {
+	failOp:      StencilOp,
+	passOp:      StencilOp,
+	depthFailOp: StencilOp,
+	compareOp:   CompareOp,
+	compareMask: u32,
+	writeMask:   u32,
+	reference:   u32,
+}
+
+VertexInputAttributeDescription :: struct {
+	location: u32,
+	binding:  u32,
+	format:   Format,
+	offset:   u32,
+}
+
+VertexInputBindingDescription :: struct {
+	binding:   u32,
+	stride:    u32,
+	inputRate: VertexInputRate,
+}
+
+Viewport :: struct {
+	x:        f32,
+	y:        f32,
+	width:    f32,
+	height:   f32,
+	minDepth: f32,
+	maxDepth: f32,
+}
+
+PipelineColorBlendAttachmentState :: struct {
+	blendEnable:         b32,
+	srcColorBlendFactor: BlendFactor,
+	dstColorBlendFactor: BlendFactor,
+	colorBlendOp:        BlendOp,
+	srcAlphaBlendFactor: BlendFactor,
+	dstAlphaBlendFactor: BlendFactor,
+	alphaBlendOp:        BlendOp,
+	colorWriteMask:      ColorComponentFlags,
+}
+
+PipelineColorBlendStateCreateInfo :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	flags:           PipelineColorBlendStateCreateFlags,
+	logicOpEnable:   b32,
+	logicOp:         LogicOp,
+	attachmentCount: u32,
+	pAttachments:    [^]PipelineColorBlendAttachmentState,
+	blendConstants:  [4]f32,
+}
+
+PipelineDepthStencilStateCreateInfo :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	flags:                 PipelineDepthStencilStateCreateFlags,
+	depthTestEnable:       b32,
+	depthWriteEnable:      b32,
+	depthCompareOp:        CompareOp,
+	depthBoundsTestEnable: b32,
+	stencilTestEnable:     b32,
+	front:                 StencilOpState,
+	back:                  StencilOpState,
+	minDepthBounds:        f32,
+	maxDepthBounds:        f32,
+}
+
+PipelineDynamicStateCreateInfo :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	flags:             PipelineDynamicStateCreateFlags,
+	dynamicStateCount: u32,
+	pDynamicStates:    [^]DynamicState,
+}
+
+PipelineInputAssemblyStateCreateInfo :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	flags:                  PipelineInputAssemblyStateCreateFlags,
+	topology:               PrimitiveTopology,
+	primitiveRestartEnable: b32,
+}
+
+PipelineMultisampleStateCreateInfo :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	flags:                 PipelineMultisampleStateCreateFlags,
+	rasterizationSamples:  SampleCountFlags,
+	sampleShadingEnable:   b32,
+	minSampleShading:      f32,
+	pSampleMask:           ^SampleMask,
+	alphaToCoverageEnable: b32,
+	alphaToOneEnable:      b32,
+}
+
+PipelineRasterizationStateCreateInfo :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	flags:                   PipelineRasterizationStateCreateFlags,
+	depthClampEnable:        b32,
+	rasterizerDiscardEnable: b32,
+	polygonMode:             PolygonMode,
+	cullMode:                CullModeFlags,
+	frontFace:               FrontFace,
+	depthBiasEnable:         b32,
+	depthBiasConstantFactor: f32,
+	depthBiasClamp:          f32,
+	depthBiasSlopeFactor:    f32,
+	lineWidth:               f32,
+}
+
+PipelineTessellationStateCreateInfo :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	flags:              PipelineTessellationStateCreateFlags,
+	patchControlPoints: u32,
+}
+
+PipelineVertexInputStateCreateInfo :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	flags:                           PipelineVertexInputStateCreateFlags,
+	vertexBindingDescriptionCount:   u32,
+	pVertexBindingDescriptions:      [^]VertexInputBindingDescription,
+	vertexAttributeDescriptionCount: u32,
+	pVertexAttributeDescriptions:    [^]VertexInputAttributeDescription,
+}
+
+PipelineViewportStateCreateInfo :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	flags:         PipelineViewportStateCreateFlags,
+	viewportCount: u32,
+	pViewports:    [^]Viewport,
+	scissorCount:  u32,
+	pScissors:     [^]Rect2D,
+}
+
+GraphicsPipelineCreateInfo :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	flags:               PipelineCreateFlags,
+	stageCount:          u32,
+	pStages:             [^]PipelineShaderStageCreateInfo,
+	pVertexInputState:   ^PipelineVertexInputStateCreateInfo,
+	pInputAssemblyState: ^PipelineInputAssemblyStateCreateInfo,
+	pTessellationState:  ^PipelineTessellationStateCreateInfo,
+	pViewportState:      ^PipelineViewportStateCreateInfo,
+	pRasterizationState: ^PipelineRasterizationStateCreateInfo,
+	pMultisampleState:   ^PipelineMultisampleStateCreateInfo,
+	pDepthStencilState:  ^PipelineDepthStencilStateCreateInfo,
+	pColorBlendState:    ^PipelineColorBlendStateCreateInfo,
+	pDynamicState:       ^PipelineDynamicStateCreateInfo,
+	layout:              PipelineLayout,
+	renderPass:          RenderPass,
+	subpass:             u32,
+	basePipelineHandle:  Pipeline,
+	basePipelineIndex:   i32,
+}
+
 AttachmentDescription :: struct {
 	flags:          AttachmentDescriptionFlags,
 	format:         Format,
@@ -997,6 +1066,16 @@ FramebufferCreateInfo :: struct {
 	layers:          u32,
 }
 
+SubpassDependency :: struct {
+	srcSubpass:      u32,
+	dstSubpass:      u32,
+	srcStageMask:    PipelineStageFlags,
+	dstStageMask:    PipelineStageFlags,
+	srcAccessMask:   AccessFlags,
+	dstAccessMask:   AccessFlags,
+	dependencyFlags: DependencyFlags,
+}
+
 SubpassDescription :: struct {
 	flags:                   SubpassDescriptionFlags,
 	pipelineBindPoint:       PipelineBindPoint,
@@ -1008,16 +1087,6 @@ SubpassDescription :: struct {
 	pDepthStencilAttachment: ^AttachmentReference,
 	preserveAttachmentCount: u32,
 	pPreserveAttachments:    [^]u32,
-}
-
-SubpassDependency :: struct {
-	srcSubpass:      u32,
-	dstSubpass:      u32,
-	srcStageMask:    PipelineStageFlags,
-	dstStageMask:    PipelineStageFlags,
-	srcAccessMask:   AccessFlags,
-	dstAccessMask:   AccessFlags,
-	dependencyFlags: DependencyFlags,
 }
 
 RenderPassCreateInfo :: struct {
@@ -1032,70 +1101,15 @@ RenderPassCreateInfo :: struct {
 	pDependencies:   [^]SubpassDependency,
 }
 
-CommandPoolCreateInfo :: struct {
-	sType:            StructureType,
-	pNext:            rawptr,
-	flags:            CommandPoolCreateFlags,
-	queueFamilyIndex: u32,
-}
-
-CommandBufferAllocateInfo :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	commandPool:        CommandPool,
-	level:              CommandBufferLevel,
-	commandBufferCount: u32,
-}
-
-CommandBufferInheritanceInfo :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	renderPass:           RenderPass,
-	subpass:              u32,
-	framebuffer:          Framebuffer,
-	occlusionQueryEnable: b32,
-	queryFlags:           QueryControlFlags,
-	pipelineStatistics:   QueryPipelineStatisticFlags,
-}
-
-CommandBufferBeginInfo :: struct {
-	sType:            StructureType,
-	pNext:            rawptr,
-	flags:            CommandBufferUsageFlags,
-	pInheritanceInfo: ^CommandBufferInheritanceInfo,
-}
-
-BufferCopy :: struct {
-	srcOffset: DeviceSize,
-	dstOffset: DeviceSize,
-	size:      DeviceSize,
-}
-
-ImageSubresourceLayers :: struct {
-	aspectMask:     ImageAspectFlags,
-	mipLevel:       u32,
-	baseArrayLayer: u32,
-	layerCount:     u32,
-}
-
-BufferImageCopy :: struct {
-	bufferOffset:      DeviceSize,
-	bufferRowLength:   u32,
-	bufferImageHeight: u32,
-	imageSubresource:  ImageSubresourceLayers,
-	imageOffset:       Offset3D,
-	imageExtent:       Extent3D,
-}
-
-ClearColorValue :: struct #raw_union {
-	float32: [4]f32,
-	int32:   [4]i32,
-	uint32:  [4]u32,
-}
-
 ClearDepthStencilValue :: struct {
 	depth:   f32,
 	stencil: u32,
+}
+
+ClearRect :: struct {
+	rect:           Rect2D,
+	baseArrayLayer: u32,
+	layerCount:     u32,
 }
 
 ClearValue :: struct #raw_union {
@@ -1109,25 +1123,11 @@ ClearAttachment :: struct {
 	clearValue:      ClearValue,
 }
 
-ClearRect :: struct {
-	rect:           Rect2D,
-	baseArrayLayer: u32,
-	layerCount:     u32,
-}
-
 ImageBlit :: struct {
 	srcSubresource: ImageSubresourceLayers,
 	srcOffsets:     [2]Offset3D,
 	dstSubresource: ImageSubresourceLayers,
 	dstOffsets:     [2]Offset3D,
-}
-
-ImageCopy :: struct {
-	srcSubresource: ImageSubresourceLayers,
-	srcOffset:      Offset3D,
-	dstSubresource: ImageSubresourceLayers,
-	dstOffset:      Offset3D,
-	extent:         Extent3D,
 }
 
 ImageResolve :: struct {
@@ -1148,15 +1148,6 @@ RenderPassBeginInfo :: struct {
 	pClearValues:    [^]ClearValue,
 }
 
-PhysicalDeviceSubgroupProperties :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	subgroupSize:              u32,
-	supportedStages:           ShaderStageFlags,
-	supportedOperations:       SubgroupFeatureFlags,
-	quadOperationsInAllStages: b32,
-}
-
 BindBufferMemoryInfo :: struct {
 	sType:        StructureType,
 	pNext:        rawptr,
@@ -1171,15 +1162,6 @@ BindImageMemoryInfo :: struct {
 	image:        Image,
 	memory:       DeviceMemory,
 	memoryOffset: DeviceSize,
-}
-
-PhysicalDevice16BitStorageFeatures :: struct {
-	sType:                              StructureType,
-	pNext:                              rawptr,
-	storageBuffer16BitAccess:           b32,
-	uniformAndStorageBuffer16BitAccess: b32,
-	storagePushConstant16:              b32,
-	storageInputOutput16:               b32,
 }
 
 MemoryDedicatedRequirements :: struct {
@@ -1201,14 +1183,6 @@ MemoryAllocateFlagsInfo :: struct {
 	pNext:      rawptr,
 	flags:      MemoryAllocateFlags,
 	deviceMask: u32,
-}
-
-DeviceGroupRenderPassBeginInfo :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	deviceMask:            u32,
-	deviceRenderAreaCount: u32,
-	pDeviceRenderAreas:    [^]Rect2D,
 }
 
 DeviceGroupCommandBufferBeginInfo :: struct {
@@ -1358,68 +1332,10 @@ PhysicalDeviceSparseImageFormatInfo2 :: struct {
 	tiling:  ImageTiling,
 }
 
-PhysicalDevicePointClippingProperties :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	pointClippingBehavior: PointClippingBehavior,
-}
-
-InputAttachmentAspectReference :: struct {
-	subpass:              u32,
-	inputAttachmentIndex: u32,
-	aspectMask:           ImageAspectFlags,
-}
-
-RenderPassInputAttachmentAspectCreateInfo :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	aspectReferenceCount: u32,
-	pAspectReferences:    [^]InputAttachmentAspectReference,
-}
-
 ImageViewUsageCreateInfo :: struct {
 	sType: StructureType,
 	pNext: rawptr,
 	usage: ImageUsageFlags,
-}
-
-PipelineTessellationDomainOriginStateCreateInfo :: struct {
-	sType:        StructureType,
-	pNext:        rawptr,
-	domainOrigin: TessellationDomainOrigin,
-}
-
-RenderPassMultiviewCreateInfo :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	subpassCount:         u32,
-	pViewMasks:           [^]u32,
-	dependencyCount:      u32,
-	pViewOffsets:         [^]i32,
-	correlationMaskCount: u32,
-	pCorrelationMasks:    [^]u32,
-}
-
-PhysicalDeviceMultiviewFeatures :: struct {
-	sType:                       StructureType,
-	pNext:                       rawptr,
-	multiview:                   b32,
-	multiviewGeometryShader:     b32,
-	multiviewTessellationShader: b32,
-}
-
-PhysicalDeviceMultiviewProperties :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	maxMultiviewViewCount:     u32,
-	maxMultiviewInstanceIndex: u32,
-}
-
-PhysicalDeviceVariablePointersFeatures :: struct {
-	sType:                         StructureType,
-	pNext:                         rawptr,
-	variablePointersStorageBuffer: b32,
-	variablePointers:              b32,
 }
 
 PhysicalDeviceProtectedMemoryFeatures :: struct {
@@ -1448,25 +1364,6 @@ ProtectedSubmitInfo :: struct {
 	protectedSubmit: b32,
 }
 
-SamplerYcbcrConversionCreateInfo :: struct {
-	sType:                       StructureType,
-	pNext:                       rawptr,
-	format:                      Format,
-	ycbcrModel:                  SamplerYcbcrModelConversion,
-	ycbcrRange:                  SamplerYcbcrRange,
-	components:                  ComponentMapping,
-	xChromaOffset:               ChromaLocation,
-	yChromaOffset:               ChromaLocation,
-	chromaFilter:                Filter,
-	forceExplicitReconstruction: b32,
-}
-
-SamplerYcbcrConversionInfo :: struct {
-	sType:      StructureType,
-	pNext:      rawptr,
-	conversion: SamplerYcbcrConversion,
-}
-
 BindImagePlaneMemoryInfo :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
@@ -1477,40 +1374,6 @@ ImagePlaneMemoryRequirementsInfo :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
 	planeAspect: ImageAspectFlags,
-}
-
-PhysicalDeviceSamplerYcbcrConversionFeatures :: struct {
-	sType:                  StructureType,
-	pNext:                  rawptr,
-	samplerYcbcrConversion: b32,
-}
-
-SamplerYcbcrConversionImageFormatProperties :: struct {
-	sType:                               StructureType,
-	pNext:                               rawptr,
-	combinedImageSamplerDescriptorCount: u32,
-}
-
-DescriptorUpdateTemplateEntry :: struct {
-	dstBinding:      u32,
-	dstArrayElement: u32,
-	descriptorCount: u32,
-	descriptorType:  DescriptorType,
-	offset:          int,
-	stride:          int,
-}
-
-DescriptorUpdateTemplateCreateInfo :: struct {
-	sType:                      StructureType,
-	pNext:                      rawptr,
-	flags:                      DescriptorUpdateTemplateCreateFlags,
-	descriptorUpdateEntryCount: u32,
-	pDescriptorUpdateEntries:   [^]DescriptorUpdateTemplateEntry,
-	templateType:               DescriptorUpdateTemplateType,
-	descriptorSetLayout:        DescriptorSetLayout,
-	pipelineBindPoint:          PipelineBindPoint,
-	pipelineLayout:             PipelineLayout,
-	set:                        u32,
 }
 
 ExternalMemoryProperties :: struct {
@@ -1613,6 +1476,53 @@ ExternalSemaphoreProperties :: struct {
 	externalSemaphoreFeatures:     ExternalSemaphoreFeatureFlags,
 }
 
+PhysicalDeviceSubgroupProperties :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	subgroupSize:              u32,
+	supportedStages:           ShaderStageFlags,
+	supportedOperations:       SubgroupFeatureFlags,
+	quadOperationsInAllStages: b32,
+}
+
+PhysicalDevice16BitStorageFeatures :: struct {
+	sType:                              StructureType,
+	pNext:                              rawptr,
+	storageBuffer16BitAccess:           b32,
+	uniformAndStorageBuffer16BitAccess: b32,
+	storagePushConstant16:              b32,
+	storageInputOutput16:               b32,
+}
+
+PhysicalDeviceVariablePointersFeatures :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	variablePointersStorageBuffer: b32,
+	variablePointers:              b32,
+}
+
+DescriptorUpdateTemplateEntry :: struct {
+	dstBinding:      u32,
+	dstArrayElement: u32,
+	descriptorCount: u32,
+	descriptorType:  DescriptorType,
+	offset:          int,
+	stride:          int,
+}
+
+DescriptorUpdateTemplateCreateInfo :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	flags:                      DescriptorUpdateTemplateCreateFlags,
+	descriptorUpdateEntryCount: u32,
+	pDescriptorUpdateEntries:   [^]DescriptorUpdateTemplateEntry,
+	templateType:               DescriptorUpdateTemplateType,
+	descriptorSetLayout:        DescriptorSetLayout,
+	pipelineBindPoint:          PipelineBindPoint,
+	pipelineLayout:             PipelineLayout,
+	set:                        u32,
+}
+
 PhysicalDeviceMaintenance3Properties :: struct {
 	sType:                   StructureType,
 	pNext:                   rawptr,
@@ -1626,10 +1536,116 @@ DescriptorSetLayoutSupport :: struct {
 	supported: b32,
 }
 
+SamplerYcbcrConversionCreateInfo :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	format:                      Format,
+	ycbcrModel:                  SamplerYcbcrModelConversion,
+	ycbcrRange:                  SamplerYcbcrRange,
+	components:                  ComponentMapping,
+	xChromaOffset:               ChromaLocation,
+	yChromaOffset:               ChromaLocation,
+	chromaFilter:                Filter,
+	forceExplicitReconstruction: b32,
+}
+
+SamplerYcbcrConversionInfo :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	conversion: SamplerYcbcrConversion,
+}
+
+PhysicalDeviceSamplerYcbcrConversionFeatures :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	samplerYcbcrConversion: b32,
+}
+
+SamplerYcbcrConversionImageFormatProperties :: struct {
+	sType:                               StructureType,
+	pNext:                               rawptr,
+	combinedImageSamplerDescriptorCount: u32,
+}
+
+DeviceGroupRenderPassBeginInfo :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	deviceMask:            u32,
+	deviceRenderAreaCount: u32,
+	pDeviceRenderAreas:    [^]Rect2D,
+}
+
+PhysicalDevicePointClippingProperties :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	pointClippingBehavior: PointClippingBehavior,
+}
+
+InputAttachmentAspectReference :: struct {
+	subpass:              u32,
+	inputAttachmentIndex: u32,
+	aspectMask:           ImageAspectFlags,
+}
+
+RenderPassInputAttachmentAspectCreateInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	aspectReferenceCount: u32,
+	pAspectReferences:    [^]InputAttachmentAspectReference,
+}
+
+PipelineTessellationDomainOriginStateCreateInfo :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	domainOrigin: TessellationDomainOrigin,
+}
+
+RenderPassMultiviewCreateInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	subpassCount:         u32,
+	pViewMasks:           [^]u32,
+	dependencyCount:      u32,
+	pViewOffsets:         [^]i32,
+	correlationMaskCount: u32,
+	pCorrelationMasks:    [^]u32,
+}
+
+PhysicalDeviceMultiviewFeatures :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	multiview:                   b32,
+	multiviewGeometryShader:     b32,
+	multiviewTessellationShader: b32,
+}
+
+PhysicalDeviceMultiviewProperties :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	maxMultiviewViewCount:     u32,
+	maxMultiviewInstanceIndex: u32,
+}
+
 PhysicalDeviceShaderDrawParametersFeatures :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
 	shaderDrawParameters: b32,
+}
+
+ConformanceVersion :: struct {
+	major:    u8,
+	minor:    u8,
+	subminor: u8,
+	patch:    u8,
+}
+
+PhysicalDeviceDriverProperties :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	driverID:           DriverId,
+	driverName:         [MAX_DRIVER_NAME_SIZE]byte,
+	driverInfo:         [MAX_DRIVER_INFO_SIZE]byte,
+	conformanceVersion: ConformanceVersion,
 }
 
 PhysicalDeviceVulkan11Features :: struct {
@@ -1721,13 +1737,6 @@ PhysicalDeviceVulkan12Features :: struct {
 	subgroupBroadcastDynamicId:                         b32,
 }
 
-ConformanceVersion :: struct {
-	major:    u8,
-	minor:    u8,
-	subminor: u8,
-	patch:    u8,
-}
-
 PhysicalDeviceVulkan12Properties :: struct {
 	sType:                                                StructureType,
 	pNext:                                                rawptr,
@@ -1792,80 +1801,94 @@ ImageFormatListCreateInfo :: struct {
 	pViewFormats:    [^]Format,
 }
 
-AttachmentDescription2 :: struct {
+PhysicalDeviceVulkanMemoryModelFeatures :: struct {
+	sType:                                         StructureType,
+	pNext:                                         rawptr,
+	vulkanMemoryModel:                             b32,
+	vulkanMemoryModelDeviceScope:                  b32,
+	vulkanMemoryModelAvailabilityVisibilityChains: b32,
+}
+
+PhysicalDeviceHostQueryResetFeatures :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
-	flags:          AttachmentDescriptionFlags,
-	format:         Format,
-	samples:        SampleCountFlags,
-	loadOp:         AttachmentLoadOp,
-	storeOp:        AttachmentStoreOp,
-	stencilLoadOp:  AttachmentLoadOp,
-	stencilStoreOp: AttachmentStoreOp,
-	initialLayout:  ImageLayout,
-	finalLayout:    ImageLayout,
+	hostQueryReset: b32,
 }
 
-AttachmentReference2 :: struct {
-	sType:      StructureType,
-	pNext:      rawptr,
-	attachment: u32,
-	layout:     ImageLayout,
-	aspectMask: ImageAspectFlags,
+PhysicalDeviceTimelineSemaphoreFeatures :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	timelineSemaphore: b32,
 }
 
-SubpassDescription2 :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	flags:                   SubpassDescriptionFlags,
-	pipelineBindPoint:       PipelineBindPoint,
-	viewMask:                u32,
-	inputAttachmentCount:    u32,
-	pInputAttachments:       [^]AttachmentReference2,
-	colorAttachmentCount:    u32,
-	pColorAttachments:       [^]AttachmentReference2,
-	pResolveAttachments:     [^]AttachmentReference2,
-	pDepthStencilAttachment: ^AttachmentReference2,
-	preserveAttachmentCount: u32,
-	pPreserveAttachments:    [^]u32,
+PhysicalDeviceTimelineSemaphoreProperties :: struct {
+	sType:                               StructureType,
+	pNext:                               rawptr,
+	maxTimelineSemaphoreValueDifference: u64,
 }
 
-SubpassDependency2 :: struct {
-	sType:           StructureType,
-	pNext:           rawptr,
-	srcSubpass:      u32,
-	dstSubpass:      u32,
-	srcStageMask:    PipelineStageFlags,
-	dstStageMask:    PipelineStageFlags,
-	srcAccessMask:   AccessFlags,
-	dstAccessMask:   AccessFlags,
-	dependencyFlags: DependencyFlags,
-	viewOffset:      i32,
+SemaphoreTypeCreateInfo :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	semaphoreType: SemaphoreType,
+	initialValue:  u64,
 }
 
-RenderPassCreateInfo2 :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	flags:                   RenderPassCreateFlags,
-	attachmentCount:         u32,
-	pAttachments:            [^]AttachmentDescription2,
-	subpassCount:            u32,
-	pSubpasses:              [^]SubpassDescription2,
-	dependencyCount:         u32,
-	pDependencies:           [^]SubpassDependency2,
-	correlatedViewMaskCount: u32,
-	pCorrelatedViewMasks:    [^]u32,
+TimelineSemaphoreSubmitInfo :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	waitSemaphoreValueCount:   u32,
+	pWaitSemaphoreValues:      [^]u64,
+	signalSemaphoreValueCount: u32,
+	pSignalSemaphoreValues:    [^]u64,
 }
 
-SubpassBeginInfo :: struct {
-	sType:    StructureType,
-	pNext:    rawptr,
-	contents: SubpassContents,
+SemaphoreWaitInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	flags:          SemaphoreWaitFlags,
+	semaphoreCount: u32,
+	pSemaphores:    [^]Semaphore,
+	pValues:        [^]u64,
 }
 
-SubpassEndInfo :: struct {
-	sType: StructureType,
-	pNext: rawptr,
+SemaphoreSignalInfo :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	semaphore: Semaphore,
+	value:     u64,
+}
+
+PhysicalDeviceBufferDeviceAddressFeatures :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	bufferDeviceAddress:              b32,
+	bufferDeviceAddressCaptureReplay: b32,
+	bufferDeviceAddressMultiDevice:   b32,
+}
+
+BufferDeviceAddressInfo :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	buffer: Buffer,
+}
+
+BufferOpaqueCaptureAddressCreateInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	opaqueCaptureAddress: u64,
+}
+
+MemoryOpaqueCaptureAddressAllocateInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	opaqueCaptureAddress: u64,
+}
+
+DeviceMemoryOpaqueCaptureAddressInfo :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	memory: DeviceMemory,
 }
 
 PhysicalDevice8BitStorageFeatures :: struct {
@@ -1874,15 +1897,6 @@ PhysicalDevice8BitStorageFeatures :: struct {
 	storageBuffer8BitAccess:           b32,
 	uniformAndStorageBuffer8BitAccess: b32,
 	storagePushConstant8:              b32,
-}
-
-PhysicalDeviceDriverProperties :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	driverID:           DriverId,
-	driverName:         [MAX_DRIVER_NAME_SIZE]byte,
-	driverInfo:         [MAX_DRIVER_INFO_SIZE]byte,
-	conformanceVersion: ConformanceVersion,
 }
 
 PhysicalDeviceShaderAtomicInt64Features :: struct {
@@ -1994,6 +2008,113 @@ DescriptorSetVariableDescriptorCountLayoutSupport :: struct {
 	maxVariableDescriptorCount: u32,
 }
 
+PhysicalDeviceScalarBlockLayoutFeatures :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	scalarBlockLayout: b32,
+}
+
+SamplerReductionModeCreateInfo :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	reductionMode: SamplerReductionMode,
+}
+
+PhysicalDeviceSamplerFilterMinmaxProperties :: struct {
+	sType:                              StructureType,
+	pNext:                              rawptr,
+	filterMinmaxSingleComponentFormats: b32,
+	filterMinmaxImageComponentMapping:  b32,
+}
+
+PhysicalDeviceUniformBufferStandardLayoutFeatures :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	uniformBufferStandardLayout: b32,
+}
+
+PhysicalDeviceShaderSubgroupExtendedTypesFeatures :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	shaderSubgroupExtendedTypes: b32,
+}
+
+AttachmentDescription2 :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	flags:          AttachmentDescriptionFlags,
+	format:         Format,
+	samples:        SampleCountFlags,
+	loadOp:         AttachmentLoadOp,
+	storeOp:        AttachmentStoreOp,
+	stencilLoadOp:  AttachmentLoadOp,
+	stencilStoreOp: AttachmentStoreOp,
+	initialLayout:  ImageLayout,
+	finalLayout:    ImageLayout,
+}
+
+AttachmentReference2 :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	attachment: u32,
+	layout:     ImageLayout,
+	aspectMask: ImageAspectFlags,
+}
+
+SubpassDescription2 :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	flags:                   SubpassDescriptionFlags,
+	pipelineBindPoint:       PipelineBindPoint,
+	viewMask:                u32,
+	inputAttachmentCount:    u32,
+	pInputAttachments:       [^]AttachmentReference2,
+	colorAttachmentCount:    u32,
+	pColorAttachments:       [^]AttachmentReference2,
+	pResolveAttachments:     [^]AttachmentReference2,
+	pDepthStencilAttachment: ^AttachmentReference2,
+	preserveAttachmentCount: u32,
+	pPreserveAttachments:    [^]u32,
+}
+
+SubpassDependency2 :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	srcSubpass:      u32,
+	dstSubpass:      u32,
+	srcStageMask:    PipelineStageFlags,
+	dstStageMask:    PipelineStageFlags,
+	srcAccessMask:   AccessFlags,
+	dstAccessMask:   AccessFlags,
+	dependencyFlags: DependencyFlags,
+	viewOffset:      i32,
+}
+
+SubpassBeginInfo :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	contents: SubpassContents,
+}
+
+SubpassEndInfo :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+RenderPassCreateInfo2 :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	flags:                   RenderPassCreateFlags,
+	attachmentCount:         u32,
+	pAttachments:            [^]AttachmentDescription2,
+	subpassCount:            u32,
+	pSubpasses:              [^]SubpassDescription2,
+	dependencyCount:         u32,
+	pDependencies:           [^]SubpassDependency2,
+	correlatedViewMaskCount: u32,
+	pCorrelatedViewMasks:    [^]u32,
+}
+
 SubpassDescriptionDepthStencilResolve :: struct {
 	sType:                          StructureType,
 	pNext:                          rawptr,
@@ -2011,37 +2132,10 @@ PhysicalDeviceDepthStencilResolveProperties :: struct {
 	independentResolve:           b32,
 }
 
-PhysicalDeviceScalarBlockLayoutFeatures :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	scalarBlockLayout: b32,
-}
-
 ImageStencilUsageCreateInfo :: struct {
 	sType:        StructureType,
 	pNext:        rawptr,
 	stencilUsage: ImageUsageFlags,
-}
-
-SamplerReductionModeCreateInfo :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	reductionMode: SamplerReductionMode,
-}
-
-PhysicalDeviceSamplerFilterMinmaxProperties :: struct {
-	sType:                              StructureType,
-	pNext:                              rawptr,
-	filterMinmaxSingleComponentFormats: b32,
-	filterMinmaxImageComponentMapping:  b32,
-}
-
-PhysicalDeviceVulkanMemoryModelFeatures :: struct {
-	sType:                                         StructureType,
-	pNext:                                         rawptr,
-	vulkanMemoryModel:                             b32,
-	vulkanMemoryModelDeviceScope:                  b32,
-	vulkanMemoryModelAvailabilityVisibilityChains: b32,
 }
 
 PhysicalDeviceImagelessFramebufferFeatures :: struct {
@@ -2062,13 +2156,6 @@ FramebufferAttachmentImageInfo :: struct {
 	pViewFormats:    [^]Format,
 }
 
-FramebufferAttachmentsCreateInfo :: struct {
-	sType:                    StructureType,
-	pNext:                    rawptr,
-	attachmentImageInfoCount: u32,
-	pAttachmentImageInfos:    [^]FramebufferAttachmentImageInfo,
-}
-
 RenderPassAttachmentBeginInfo :: struct {
 	sType:           StructureType,
 	pNext:           rawptr,
@@ -2076,16 +2163,11 @@ RenderPassAttachmentBeginInfo :: struct {
 	pAttachments:    [^]ImageView,
 }
 
-PhysicalDeviceUniformBufferStandardLayoutFeatures :: struct {
-	sType:                       StructureType,
-	pNext:                       rawptr,
-	uniformBufferStandardLayout: b32,
-}
-
-PhysicalDeviceShaderSubgroupExtendedTypesFeatures :: struct {
-	sType:                       StructureType,
-	pNext:                       rawptr,
-	shaderSubgroupExtendedTypes: b32,
+FramebufferAttachmentsCreateInfo :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	attachmentImageInfoCount: u32,
+	pAttachmentImageInfos:    [^]FramebufferAttachmentImageInfo,
 }
 
 PhysicalDeviceSeparateDepthStencilLayoutsFeatures :: struct {
@@ -2105,88 +2187,6 @@ AttachmentDescriptionStencilLayout :: struct {
 	pNext:                rawptr,
 	stencilInitialLayout: ImageLayout,
 	stencilFinalLayout:   ImageLayout,
-}
-
-PhysicalDeviceHostQueryResetFeatures :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	hostQueryReset: b32,
-}
-
-PhysicalDeviceTimelineSemaphoreFeatures :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	timelineSemaphore: b32,
-}
-
-PhysicalDeviceTimelineSemaphoreProperties :: struct {
-	sType:                               StructureType,
-	pNext:                               rawptr,
-	maxTimelineSemaphoreValueDifference: u64,
-}
-
-SemaphoreTypeCreateInfo :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	semaphoreType: SemaphoreType,
-	initialValue:  u64,
-}
-
-TimelineSemaphoreSubmitInfo :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	waitSemaphoreValueCount:   u32,
-	pWaitSemaphoreValues:      [^]u64,
-	signalSemaphoreValueCount: u32,
-	pSignalSemaphoreValues:    [^]u64,
-}
-
-SemaphoreWaitInfo :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	flags:          SemaphoreWaitFlags,
-	semaphoreCount: u32,
-	pSemaphores:    [^]Semaphore,
-	pValues:        [^]u64,
-}
-
-SemaphoreSignalInfo :: struct {
-	sType:     StructureType,
-	pNext:     rawptr,
-	semaphore: Semaphore,
-	value:     u64,
-}
-
-PhysicalDeviceBufferDeviceAddressFeatures :: struct {
-	sType:                            StructureType,
-	pNext:                            rawptr,
-	bufferDeviceAddress:              b32,
-	bufferDeviceAddressCaptureReplay: b32,
-	bufferDeviceAddressMultiDevice:   b32,
-}
-
-BufferDeviceAddressInfo :: struct {
-	sType:  StructureType,
-	pNext:  rawptr,
-	buffer: Buffer,
-}
-
-BufferOpaqueCaptureAddressCreateInfo :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	opaqueCaptureAddress: u64,
-}
-
-MemoryOpaqueCaptureAddressAllocateInfo :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	opaqueCaptureAddress: u64,
-}
-
-DeviceMemoryOpaqueCaptureAddressInfo :: struct {
-	sType:  StructureType,
-	pNext:  rawptr,
-	memory: DeviceMemory,
 }
 
 PhysicalDeviceVulkan13Features :: struct {
@@ -2259,25 +2259,6 @@ PhysicalDeviceVulkan13Properties :: struct {
 	maxBufferSize:                                                                 DeviceSize,
 }
 
-PipelineCreationFeedback :: struct {
-	flags:    PipelineCreationFeedbackFlags,
-	duration: u64,
-}
-
-PipelineCreationFeedbackCreateInfo :: struct {
-	sType:                              StructureType,
-	pNext:                              rawptr,
-	pPipelineCreationFeedback:          ^PipelineCreationFeedback,
-	pipelineStageCreationFeedbackCount: u32,
-	pPipelineStageCreationFeedbacks:    [^]PipelineCreationFeedback,
-}
-
-PhysicalDeviceShaderTerminateInvocationFeatures :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	shaderTerminateInvocation: b32,
-}
-
 PhysicalDeviceToolProperties :: struct {
 	sType:       StructureType,
 	pNext:       rawptr,
@@ -2286,12 +2267,6 @@ PhysicalDeviceToolProperties :: struct {
 	purposes:    ToolPurposeFlags,
 	description: [MAX_DESCRIPTION_SIZE]byte,
 	layer:       [MAX_EXTENSION_NAME_SIZE]byte,
-}
-
-PhysicalDeviceShaderDemoteToHelperInvocationFeatures :: struct {
-	sType:                          StructureType,
-	pNext:                          rawptr,
-	shaderDemoteToHelperInvocation: b32,
 }
 
 PhysicalDevicePrivateDataFeatures :: struct {
@@ -2310,12 +2285,6 @@ PrivateDataSlotCreateInfo :: struct {
 	sType: StructureType,
 	pNext: rawptr,
 	flags: PrivateDataSlotCreateFlags,
-}
-
-PhysicalDevicePipelineCreationCacheControlFeatures :: struct {
-	sType:                        StructureType,
-	pNext:                        rawptr,
-	pipelineCreationCacheControl: b32,
 }
 
 MemoryBarrier2 :: struct {
@@ -2402,18 +2371,6 @@ PhysicalDeviceSynchronization2Features :: struct {
 	synchronization2: b32,
 }
 
-PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures :: struct {
-	sType:                               StructureType,
-	pNext:                               rawptr,
-	shaderZeroInitializeWorkgroupMemory: b32,
-}
-
-PhysicalDeviceImageRobustnessFeatures :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	robustImageAccess: b32,
-}
-
 BufferCopy2 :: struct {
 	sType:     StructureType,
 	pNext:     rawptr,
@@ -2483,46 +2440,86 @@ CopyImageToBufferInfo2 :: struct {
 	pRegions:       [^]BufferImageCopy2,
 }
 
-ImageBlit2 :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	srcSubresource: ImageSubresourceLayers,
-	srcOffsets:     [2]Offset3D,
-	dstSubresource: ImageSubresourceLayers,
-	dstOffsets:     [2]Offset3D,
+PhysicalDeviceTextureCompressionASTCHDRFeatures :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	textureCompressionASTC_HDR: b32,
 }
 
-BlitImageInfo2 :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	srcImage:       Image,
-	srcImageLayout: ImageLayout,
-	dstImage:       Image,
-	dstImageLayout: ImageLayout,
-	regionCount:    u32,
-	pRegions:       [^]ImageBlit2,
-	filter:         Filter,
+FormatProperties3 :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	linearTilingFeatures:  FormatFeatureFlags2,
+	optimalTilingFeatures: FormatFeatureFlags2,
+	bufferFeatures:        FormatFeatureFlags2,
 }
 
-ImageResolve2 :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	srcSubresource: ImageSubresourceLayers,
-	srcOffset:      Offset3D,
-	dstSubresource: ImageSubresourceLayers,
-	dstOffset:      Offset3D,
-	extent:         Extent3D,
+PhysicalDeviceMaintenance4Features :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	maintenance4: b32,
 }
 
-ResolveImageInfo2 :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	srcImage:       Image,
-	srcImageLayout: ImageLayout,
-	dstImage:       Image,
-	dstImageLayout: ImageLayout,
-	regionCount:    u32,
-	pRegions:       [^]ImageResolve2,
+PhysicalDeviceMaintenance4Properties :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	maxBufferSize: DeviceSize,
+}
+
+DeviceBufferMemoryRequirements :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	pCreateInfo: ^BufferCreateInfo,
+}
+
+DeviceImageMemoryRequirements :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	pCreateInfo: ^ImageCreateInfo,
+	planeAspect: ImageAspectFlags,
+}
+
+PipelineCreationFeedback :: struct {
+	flags:    PipelineCreationFeedbackFlags,
+	duration: u64,
+}
+
+PipelineCreationFeedbackCreateInfo :: struct {
+	sType:                              StructureType,
+	pNext:                              rawptr,
+	pPipelineCreationFeedback:          ^PipelineCreationFeedback,
+	pipelineStageCreationFeedbackCount: u32,
+	pPipelineStageCreationFeedbacks:    [^]PipelineCreationFeedback,
+}
+
+PhysicalDeviceShaderTerminateInvocationFeatures :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	shaderTerminateInvocation: b32,
+}
+
+PhysicalDeviceShaderDemoteToHelperInvocationFeatures :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	shaderDemoteToHelperInvocation: b32,
+}
+
+PhysicalDevicePipelineCreationCacheControlFeatures :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	pipelineCreationCacheControl: b32,
+}
+
+PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures :: struct {
+	sType:                               StructureType,
+	pNext:                               rawptr,
+	shaderZeroInitializeWorkgroupMemory: b32,
+}
+
+PhysicalDeviceImageRobustnessFeatures :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	robustImageAccess: b32,
 }
 
 PhysicalDeviceSubgroupSizeControlFeatures :: struct {
@@ -2577,10 +2574,96 @@ DescriptorPoolInlineUniformBlockCreateInfo :: struct {
 	maxInlineUniformBlockBindings: u32,
 }
 
-PhysicalDeviceTextureCompressionASTCHDRFeatures :: struct {
-	sType:                      StructureType,
-	pNext:                      rawptr,
-	textureCompressionASTC_HDR: b32,
+PhysicalDeviceShaderIntegerDotProductFeatures :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	shaderIntegerDotProduct: b32,
+}
+
+PhysicalDeviceShaderIntegerDotProductProperties :: struct {
+	sType:                                                                         StructureType,
+	pNext:                                                                         rawptr,
+	integerDotProduct8BitUnsignedAccelerated:                                      b32,
+	integerDotProduct8BitSignedAccelerated:                                        b32,
+	integerDotProduct8BitMixedSignednessAccelerated:                               b32,
+	integerDotProduct4x8BitPackedUnsignedAccelerated:                              b32,
+	integerDotProduct4x8BitPackedSignedAccelerated:                                b32,
+	integerDotProduct4x8BitPackedMixedSignednessAccelerated:                       b32,
+	integerDotProduct16BitUnsignedAccelerated:                                     b32,
+	integerDotProduct16BitSignedAccelerated:                                       b32,
+	integerDotProduct16BitMixedSignednessAccelerated:                              b32,
+	integerDotProduct32BitUnsignedAccelerated:                                     b32,
+	integerDotProduct32BitSignedAccelerated:                                       b32,
+	integerDotProduct32BitMixedSignednessAccelerated:                              b32,
+	integerDotProduct64BitUnsignedAccelerated:                                     b32,
+	integerDotProduct64BitSignedAccelerated:                                       b32,
+	integerDotProduct64BitMixedSignednessAccelerated:                              b32,
+	integerDotProductAccumulatingSaturating8BitUnsignedAccelerated:                b32,
+	integerDotProductAccumulatingSaturating8BitSignedAccelerated:                  b32,
+	integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated:         b32,
+	integerDotProductAccumulatingSaturating4x8BitPackedUnsignedAccelerated:        b32,
+	integerDotProductAccumulatingSaturating4x8BitPackedSignedAccelerated:          b32,
+	integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated: b32,
+	integerDotProductAccumulatingSaturating16BitUnsignedAccelerated:               b32,
+	integerDotProductAccumulatingSaturating16BitSignedAccelerated:                 b32,
+	integerDotProductAccumulatingSaturating16BitMixedSignednessAccelerated:        b32,
+	integerDotProductAccumulatingSaturating32BitUnsignedAccelerated:               b32,
+	integerDotProductAccumulatingSaturating32BitSignedAccelerated:                 b32,
+	integerDotProductAccumulatingSaturating32BitMixedSignednessAccelerated:        b32,
+	integerDotProductAccumulatingSaturating64BitUnsignedAccelerated:               b32,
+	integerDotProductAccumulatingSaturating64BitSignedAccelerated:                 b32,
+	integerDotProductAccumulatingSaturating64BitMixedSignednessAccelerated:        b32,
+}
+
+PhysicalDeviceTexelBufferAlignmentProperties :: struct {
+	sType:                                        StructureType,
+	pNext:                                        rawptr,
+	storageTexelBufferOffsetAlignmentBytes:       DeviceSize,
+	storageTexelBufferOffsetSingleTexelAlignment: b32,
+	uniformTexelBufferOffsetAlignmentBytes:       DeviceSize,
+	uniformTexelBufferOffsetSingleTexelAlignment: b32,
+}
+
+ImageBlit2 :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	srcSubresource: ImageSubresourceLayers,
+	srcOffsets:     [2]Offset3D,
+	dstSubresource: ImageSubresourceLayers,
+	dstOffsets:     [2]Offset3D,
+}
+
+BlitImageInfo2 :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	srcImage:       Image,
+	srcImageLayout: ImageLayout,
+	dstImage:       Image,
+	dstImageLayout: ImageLayout,
+	regionCount:    u32,
+	pRegions:       [^]ImageBlit2,
+	filter:         Filter,
+}
+
+ImageResolve2 :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	srcSubresource: ImageSubresourceLayers,
+	srcOffset:      Offset3D,
+	dstSubresource: ImageSubresourceLayers,
+	dstOffset:      Offset3D,
+	extent:         Extent3D,
+}
+
+ResolveImageInfo2 :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	srcImage:       Image,
+	srcImageLayout: ImageLayout,
+	dstImage:       Image,
+	dstImageLayout: ImageLayout,
+	regionCount:    u32,
+	pRegions:       [^]ImageResolve2,
 }
 
 RenderingAttachmentInfo :: struct {
@@ -2635,89 +2718,6 @@ CommandBufferInheritanceRenderingInfo :: struct {
 	depthAttachmentFormat:   Format,
 	stencilAttachmentFormat: Format,
 	rasterizationSamples:    SampleCountFlags,
-}
-
-PhysicalDeviceShaderIntegerDotProductFeatures :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	shaderIntegerDotProduct: b32,
-}
-
-PhysicalDeviceShaderIntegerDotProductProperties :: struct {
-	sType:                                                                         StructureType,
-	pNext:                                                                         rawptr,
-	integerDotProduct8BitUnsignedAccelerated:                                      b32,
-	integerDotProduct8BitSignedAccelerated:                                        b32,
-	integerDotProduct8BitMixedSignednessAccelerated:                               b32,
-	integerDotProduct4x8BitPackedUnsignedAccelerated:                              b32,
-	integerDotProduct4x8BitPackedSignedAccelerated:                                b32,
-	integerDotProduct4x8BitPackedMixedSignednessAccelerated:                       b32,
-	integerDotProduct16BitUnsignedAccelerated:                                     b32,
-	integerDotProduct16BitSignedAccelerated:                                       b32,
-	integerDotProduct16BitMixedSignednessAccelerated:                              b32,
-	integerDotProduct32BitUnsignedAccelerated:                                     b32,
-	integerDotProduct32BitSignedAccelerated:                                       b32,
-	integerDotProduct32BitMixedSignednessAccelerated:                              b32,
-	integerDotProduct64BitUnsignedAccelerated:                                     b32,
-	integerDotProduct64BitSignedAccelerated:                                       b32,
-	integerDotProduct64BitMixedSignednessAccelerated:                              b32,
-	integerDotProductAccumulatingSaturating8BitUnsignedAccelerated:                b32,
-	integerDotProductAccumulatingSaturating8BitSignedAccelerated:                  b32,
-	integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated:         b32,
-	integerDotProductAccumulatingSaturating4x8BitPackedUnsignedAccelerated:        b32,
-	integerDotProductAccumulatingSaturating4x8BitPackedSignedAccelerated:          b32,
-	integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated: b32,
-	integerDotProductAccumulatingSaturating16BitUnsignedAccelerated:               b32,
-	integerDotProductAccumulatingSaturating16BitSignedAccelerated:                 b32,
-	integerDotProductAccumulatingSaturating16BitMixedSignednessAccelerated:        b32,
-	integerDotProductAccumulatingSaturating32BitUnsignedAccelerated:               b32,
-	integerDotProductAccumulatingSaturating32BitSignedAccelerated:                 b32,
-	integerDotProductAccumulatingSaturating32BitMixedSignednessAccelerated:        b32,
-	integerDotProductAccumulatingSaturating64BitUnsignedAccelerated:               b32,
-	integerDotProductAccumulatingSaturating64BitSignedAccelerated:                 b32,
-	integerDotProductAccumulatingSaturating64BitMixedSignednessAccelerated:        b32,
-}
-
-PhysicalDeviceTexelBufferAlignmentProperties :: struct {
-	sType:                                        StructureType,
-	pNext:                                        rawptr,
-	storageTexelBufferOffsetAlignmentBytes:       DeviceSize,
-	storageTexelBufferOffsetSingleTexelAlignment: b32,
-	uniformTexelBufferOffsetAlignmentBytes:       DeviceSize,
-	uniformTexelBufferOffsetSingleTexelAlignment: b32,
-}
-
-FormatProperties3 :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	linearTilingFeatures:  FormatFeatureFlags2,
-	optimalTilingFeatures: FormatFeatureFlags2,
-	bufferFeatures:        FormatFeatureFlags2,
-}
-
-PhysicalDeviceMaintenance4Features :: struct {
-	sType:        StructureType,
-	pNext:        rawptr,
-	maintenance4: b32,
-}
-
-PhysicalDeviceMaintenance4Properties :: struct {
-	sType:         StructureType,
-	pNext:         rawptr,
-	maxBufferSize: DeviceSize,
-}
-
-DeviceBufferMemoryRequirements :: struct {
-	sType:       StructureType,
-	pNext:       rawptr,
-	pCreateInfo: ^BufferCreateInfo,
-}
-
-DeviceImageMemoryRequirements :: struct {
-	sType:       StructureType,
-	pNext:       rawptr,
-	pCreateInfo: ^ImageCreateInfo,
-	planeAspect: ImageAspectFlags,
 }
 
 PhysicalDeviceVulkan14Features :: struct {
@@ -2795,77 +2795,6 @@ QueueFamilyGlobalPriorityProperties :: struct {
 	priorities:    [MAX_GLOBAL_PRIORITY_SIZE]QueueGlobalPriority,
 }
 
-PhysicalDeviceShaderSubgroupRotateFeatures :: struct {
-	sType:                         StructureType,
-	pNext:                         rawptr,
-	shaderSubgroupRotate:          b32,
-	shaderSubgroupRotateClustered: b32,
-}
-
-PhysicalDeviceShaderFloatControls2Features :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	shaderFloatControls2: b32,
-}
-
-PhysicalDeviceShaderExpectAssumeFeatures :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	shaderExpectAssume: b32,
-}
-
-PhysicalDeviceLineRasterizationFeatures :: struct {
-	sType:                    StructureType,
-	pNext:                    rawptr,
-	rectangularLines:         b32,
-	bresenhamLines:           b32,
-	smoothLines:              b32,
-	stippledRectangularLines: b32,
-	stippledBresenhamLines:   b32,
-	stippledSmoothLines:      b32,
-}
-
-PhysicalDeviceLineRasterizationProperties :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	lineSubPixelPrecisionBits: u32,
-}
-
-PipelineRasterizationLineStateCreateInfo :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	lineRasterizationMode: LineRasterizationMode,
-	stippledLineEnable:    b32,
-	lineStippleFactor:     u32,
-	lineStipplePattern:    u16,
-}
-
-PhysicalDeviceVertexAttributeDivisorProperties :: struct {
-	sType:                        StructureType,
-	pNext:                        rawptr,
-	maxVertexAttribDivisor:       u32,
-	supportsNonZeroFirstInstance: b32,
-}
-
-VertexInputBindingDivisorDescription :: struct {
-	binding: u32,
-	divisor: u32,
-}
-
-PipelineVertexInputDivisorStateCreateInfo :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	vertexBindingDivisorCount: u32,
-	pVertexBindingDivisors:    [^]VertexInputBindingDivisorDescription,
-}
-
-PhysicalDeviceVertexAttributeDivisorFeatures :: struct {
-	sType:                                  StructureType,
-	pNext:                                  rawptr,
-	vertexAttributeInstanceRateDivisor:     b32,
-	vertexAttributeInstanceRateZeroDivisor: b32,
-}
-
 PhysicalDeviceIndexTypeUint8Features :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
@@ -2905,14 +2834,10 @@ PhysicalDeviceMaintenance5Properties :: struct {
 	nonStrictWideLinesUseParallelogram:                  b32,
 }
 
-RenderingAreaInfo :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	viewMask:                u32,
-	colorAttachmentCount:    u32,
-	pColorAttachmentFormats: [^]Format,
-	depthAttachmentFormat:   Format,
-	stencilAttachmentFormat: Format,
+SubresourceLayout2 :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	subresourceLayout: SubresourceLayout,
 }
 
 ImageSubresource2 :: struct {
@@ -2928,50 +2853,10 @@ DeviceImageSubresourceInfo :: struct {
 	pSubresource: ^ImageSubresource2,
 }
 
-SubresourceLayout2 :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	subresourceLayout: SubresourceLayout,
-}
-
-PipelineCreateFlags2CreateInfo :: struct {
-	sType: StructureType,
-	pNext: rawptr,
-	flags: PipelineCreateFlags2,
-}
-
 BufferUsageFlags2CreateInfo :: struct {
 	sType: StructureType,
 	pNext: rawptr,
 	usage: BufferUsageFlags2,
-}
-
-PhysicalDevicePushDescriptorProperties :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	maxPushDescriptors: u32,
-}
-
-PhysicalDeviceDynamicRenderingLocalReadFeatures :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	dynamicRenderingLocalRead: b32,
-}
-
-RenderingAttachmentLocationInfo :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	colorAttachmentCount:      u32,
-	pColorAttachmentLocations: [^]u32,
-}
-
-RenderingInputAttachmentIndexInfo :: struct {
-	sType:                        StructureType,
-	pNext:                        rawptr,
-	colorAttachmentCount:         u32,
-	pColorAttachmentInputIndices: [^]u32,
-	pDepthInputAttachmentIndex:   ^u32,
-	pStencilInputAttachmentIndex: ^u32,
 }
 
 PhysicalDeviceMaintenance6Features :: struct {
@@ -2992,77 +2877,6 @@ BindMemoryStatus :: struct {
 	sType:   StructureType,
 	pNext:   rawptr,
 	pResult: ^Result,
-}
-
-BindDescriptorSetsInfo :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	stageFlags:         ShaderStageFlags,
-	layout:             PipelineLayout,
-	firstSet:           u32,
-	descriptorSetCount: u32,
-	pDescriptorSets:    [^]DescriptorSet,
-	dynamicOffsetCount: u32,
-	pDynamicOffsets:    [^]u32,
-}
-
-PushConstantsInfo :: struct {
-	sType:      StructureType,
-	pNext:      rawptr,
-	layout:     PipelineLayout,
-	stageFlags: ShaderStageFlags,
-	offset:     u32,
-	size:       u32,
-	pValues:    rawptr,
-}
-
-PushDescriptorSetInfo :: struct {
-	sType:                StructureType,
-	pNext:                rawptr,
-	stageFlags:           ShaderStageFlags,
-	layout:               PipelineLayout,
-	set:                  u32,
-	descriptorWriteCount: u32,
-	pDescriptorWrites:    [^]WriteDescriptorSet,
-}
-
-PushDescriptorSetWithTemplateInfo :: struct {
-	sType:                    StructureType,
-	pNext:                    rawptr,
-	descriptorUpdateTemplate: DescriptorUpdateTemplate,
-	layout:                   PipelineLayout,
-	set:                      u32,
-	pData:                    rawptr,
-}
-
-PhysicalDevicePipelineProtectedAccessFeatures :: struct {
-	sType:                   StructureType,
-	pNext:                   rawptr,
-	pipelineProtectedAccess: b32,
-}
-
-PhysicalDevicePipelineRobustnessFeatures :: struct {
-	sType:              StructureType,
-	pNext:              rawptr,
-	pipelineRobustness: b32,
-}
-
-PhysicalDevicePipelineRobustnessProperties :: struct {
-	sType:                           StructureType,
-	pNext:                           rawptr,
-	defaultRobustnessStorageBuffers: PipelineRobustnessBufferBehavior,
-	defaultRobustnessUniformBuffers: PipelineRobustnessBufferBehavior,
-	defaultRobustnessVertexInputs:   PipelineRobustnessBufferBehavior,
-	defaultRobustnessImages:         PipelineRobustnessImageBehavior,
-}
-
-PipelineRobustnessCreateInfo :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	storageBuffers: PipelineRobustnessBufferBehavior,
-	uniformBuffers: PipelineRobustnessBufferBehavior,
-	vertexInputs:   PipelineRobustnessBufferBehavior,
-	images:         PipelineRobustnessImageBehavior,
 }
 
 PhysicalDeviceHostImageCopyFeatures :: struct {
@@ -3156,6 +2970,192 @@ HostImageCopyDevicePerformanceQuery :: struct {
 	pNext:                 rawptr,
 	optimalDeviceAccess:   b32,
 	identicalMemoryLayout: b32,
+}
+
+PhysicalDeviceShaderSubgroupRotateFeatures :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	shaderSubgroupRotate:          b32,
+	shaderSubgroupRotateClustered: b32,
+}
+
+PhysicalDeviceShaderFloatControls2Features :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	shaderFloatControls2: b32,
+}
+
+PhysicalDeviceShaderExpectAssumeFeatures :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	shaderExpectAssume: b32,
+}
+
+PipelineCreateFlags2CreateInfo :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: PipelineCreateFlags2,
+}
+
+PhysicalDevicePushDescriptorProperties :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	maxPushDescriptors: u32,
+}
+
+BindDescriptorSetsInfo :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	stageFlags:         ShaderStageFlags,
+	layout:             PipelineLayout,
+	firstSet:           u32,
+	descriptorSetCount: u32,
+	pDescriptorSets:    [^]DescriptorSet,
+	dynamicOffsetCount: u32,
+	pDynamicOffsets:    [^]u32,
+}
+
+PushConstantsInfo :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	layout:     PipelineLayout,
+	stageFlags: ShaderStageFlags,
+	offset:     u32,
+	size:       u32,
+	pValues:    rawptr,
+}
+
+PushDescriptorSetInfo :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	stageFlags:           ShaderStageFlags,
+	layout:               PipelineLayout,
+	set:                  u32,
+	descriptorWriteCount: u32,
+	pDescriptorWrites:    [^]WriteDescriptorSet,
+}
+
+PushDescriptorSetWithTemplateInfo :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	descriptorUpdateTemplate: DescriptorUpdateTemplate,
+	layout:                   PipelineLayout,
+	set:                      u32,
+	pData:                    rawptr,
+}
+
+PhysicalDevicePipelineProtectedAccessFeatures :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	pipelineProtectedAccess: b32,
+}
+
+PhysicalDevicePipelineRobustnessFeatures :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	pipelineRobustness: b32,
+}
+
+PhysicalDevicePipelineRobustnessProperties :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	defaultRobustnessStorageBuffers: PipelineRobustnessBufferBehavior,
+	defaultRobustnessUniformBuffers: PipelineRobustnessBufferBehavior,
+	defaultRobustnessVertexInputs:   PipelineRobustnessBufferBehavior,
+	defaultRobustnessImages:         PipelineRobustnessImageBehavior,
+}
+
+PipelineRobustnessCreateInfo :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	storageBuffers: PipelineRobustnessBufferBehavior,
+	uniformBuffers: PipelineRobustnessBufferBehavior,
+	vertexInputs:   PipelineRobustnessBufferBehavior,
+	images:         PipelineRobustnessImageBehavior,
+}
+
+PhysicalDeviceLineRasterizationFeatures :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	rectangularLines:         b32,
+	bresenhamLines:           b32,
+	smoothLines:              b32,
+	stippledRectangularLines: b32,
+	stippledBresenhamLines:   b32,
+	stippledSmoothLines:      b32,
+}
+
+PhysicalDeviceLineRasterizationProperties :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	lineSubPixelPrecisionBits: u32,
+}
+
+PipelineRasterizationLineStateCreateInfo :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	lineRasterizationMode: LineRasterizationMode,
+	stippledLineEnable:    b32,
+	lineStippleFactor:     u32,
+	lineStipplePattern:    u16,
+}
+
+PhysicalDeviceVertexAttributeDivisorProperties :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	maxVertexAttribDivisor:       u32,
+	supportsNonZeroFirstInstance: b32,
+}
+
+VertexInputBindingDivisorDescription :: struct {
+	binding: u32,
+	divisor: u32,
+}
+
+PipelineVertexInputDivisorStateCreateInfo :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	vertexBindingDivisorCount: u32,
+	pVertexBindingDivisors:    [^]VertexInputBindingDivisorDescription,
+}
+
+PhysicalDeviceVertexAttributeDivisorFeatures :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	vertexAttributeInstanceRateDivisor:     b32,
+	vertexAttributeInstanceRateZeroDivisor: b32,
+}
+
+RenderingAreaInfo :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	viewMask:                u32,
+	colorAttachmentCount:    u32,
+	pColorAttachmentFormats: [^]Format,
+	depthAttachmentFormat:   Format,
+	stencilAttachmentFormat: Format,
+}
+
+PhysicalDeviceDynamicRenderingLocalReadFeatures :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	dynamicRenderingLocalRead: b32,
+}
+
+RenderingAttachmentLocationInfo :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	colorAttachmentCount:      u32,
+	pColorAttachmentLocations: [^]u32,
+}
+
+RenderingInputAttachmentIndexInfo :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	colorAttachmentCount:         u32,
+	pColorAttachmentInputIndices: [^]u32,
+	pDepthInputAttachmentIndex:   ^u32,
+	pStencilInputAttachmentIndex: ^u32,
 }
 
 SurfaceCapabilitiesKHR :: struct {
@@ -4005,6 +4005,14 @@ DisplayPlaneCapabilities2KHR :: struct {
 	capabilities: DisplayPlaneCapabilitiesKHR,
 }
 
+PhysicalDeviceShaderBfloat16FeaturesKHR :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	shaderBFloat16Type:              b32,
+	shaderBFloat16DotProduct:        b32,
+	shaderBFloat16CooperativeMatrix: b32,
+}
+
 PhysicalDeviceShaderClockFeaturesKHR :: struct {
 	sType:               StructureType,
 	pNext:               rawptr,
@@ -4115,6 +4123,31 @@ RenderingFragmentShadingRateAttachmentInfoKHR :: struct {
 	imageView:                      ImageView,
 	imageLayout:                    ImageLayout,
 	shadingRateAttachmentTexelSize: Extent2D,
+}
+
+PhysicalDeviceShaderConstantDataFeaturesKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	shaderConstantData: b32,
+}
+
+PhysicalDeviceShaderAbortFeaturesKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	shaderAbort: b32,
+}
+
+DeviceFaultShaderAbortMessageInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	messageDataSize: u64,
+	pMessageData:    rawptr,
+}
+
+PhysicalDeviceShaderAbortPropertiesKHR :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	maxShaderAbortMessageSize: u64,
 }
 
 PhysicalDeviceShaderQuadControlFeaturesKHR :: struct {
@@ -4301,6 +4334,154 @@ VideoEncodeSessionParametersFeedbackInfoKHR :: struct {
 	hasOverrides: b32,
 }
 
+DeviceAddressRangeKHR :: struct {
+	address: DeviceAddress,
+	size:    DeviceSize,
+}
+
+StridedDeviceAddressRangeKHR :: struct {
+	address: DeviceAddress,
+	size:    DeviceSize,
+	stride:  DeviceSize,
+}
+
+DeviceMemoryCopyKHR :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	srcRange: DeviceAddressRangeKHR,
+	srcFlags: AddressCommandFlagsKHR,
+	dstRange: DeviceAddressRangeKHR,
+	dstFlags: AddressCommandFlagsKHR,
+}
+
+CopyDeviceMemoryInfoKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	regionCount: u32,
+	pRegions:    [^]DeviceMemoryCopyKHR,
+}
+
+DeviceMemoryImageCopyKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	addressRange:       DeviceAddressRangeKHR,
+	addressFlags:       AddressCommandFlagsKHR,
+	addressRowLength:   u32,
+	addressImageHeight: u32,
+	imageSubresource:   ImageSubresourceLayers,
+	imageLayout:        ImageLayout,
+	imageOffset:        Offset3D,
+	imageExtent:        Extent3D,
+}
+
+CopyDeviceMemoryImageInfoKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	image:       Image,
+	regionCount: u32,
+	pRegions:    [^]DeviceMemoryImageCopyKHR,
+}
+
+MemoryRangeBarrierKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	srcStageMask:        PipelineStageFlags2,
+	srcAccessMask:       AccessFlags2,
+	dstStageMask:        PipelineStageFlags2,
+	dstAccessMask:       AccessFlags2,
+	srcQueueFamilyIndex: u32,
+	dstQueueFamilyIndex: u32,
+	addressRange:        DeviceAddressRangeKHR,
+	addressFlags:        AddressCommandFlagsKHR,
+}
+
+MemoryRangeBarriersInfoKHR :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	memoryRangeBarrierCount: u32,
+	pMemoryRangeBarriers:    [^]MemoryRangeBarrierKHR,
+}
+
+PhysicalDeviceDeviceAddressCommandsFeaturesKHR :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	deviceAddressCommands: b32,
+}
+
+BindIndexBuffer3InfoKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	addressRange: DeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+	indexType:    IndexType,
+}
+
+BindVertexBuffer3InfoKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	setStride:    b32,
+	addressRange: StridedDeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+}
+
+DrawIndirect2InfoKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	addressRange: StridedDeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+	drawCount:    u32,
+}
+
+DrawIndirectCount2InfoKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	addressRange:      StridedDeviceAddressRangeKHR,
+	addressFlags:      AddressCommandFlagsKHR,
+	countAddressRange: DeviceAddressRangeKHR,
+	countAddressFlags: AddressCommandFlagsKHR,
+	maxDrawCount:      u32,
+}
+
+DispatchIndirect2InfoKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	addressRange: DeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+}
+
+ConditionalRenderingBeginInfo2EXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	addressRange: DeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+	flags:        ConditionalRenderingFlagsEXT,
+}
+
+BindTransformFeedbackBuffer2InfoEXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	addressRange: DeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+}
+
+MemoryMarkerInfoAMD :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	stage:    PipelineStageFlags2KHR,
+	dstRange: DeviceAddressRangeKHR,
+	dstFlags: AddressCommandFlagsKHR,
+	marker:   u32,
+}
+
+AccelerationStructureCreateInfo2KHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	createFlags:  AccelerationStructureCreateFlagsKHR,
+	addressRange: DeviceAddressRangeKHR,
+	addressFlags: AddressCommandFlagsKHR,
+	type:         AccelerationStructureTypeKHR,
+}
+
 PhysicalDeviceFragmentShaderBarycentricFeaturesKHR :: struct {
 	sType:                     StructureType,
 	pNext:                     rawptr,
@@ -4352,10 +4533,54 @@ TraceRaysIndirectCommand2KHR :: struct {
 	depth:                             u32,
 }
 
+PhysicalDeviceShaderUntypedPointersFeaturesKHR :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	shaderUntypedPointers: b32,
+}
+
 PhysicalDeviceShaderMaximalReconvergenceFeaturesKHR :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	shaderMaximalReconvergence: b32,
+}
+
+SurfaceCapabilitiesPresentId2KHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	presentId2Supported: b32,
+}
+
+PresentId2KHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	swapchainCount: u32,
+	pPresentIds:    [^]u64,
+}
+
+PhysicalDevicePresentId2FeaturesKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	presentId2: b32,
+}
+
+SurfaceCapabilitiesPresentWait2KHR :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	presentWait2Supported: b32,
+}
+
+PhysicalDevicePresentWait2FeaturesKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	presentWait2: b32,
+}
+
+PresentWait2InfoKHR :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	presentId: u64,
+	timeout:   u64,
 }
 
 PhysicalDeviceRayTracingPositionFetchFeaturesKHR :: struct {
@@ -4441,6 +4666,78 @@ PipelineBinaryHandlesInfoKHR :: struct {
 	pNext:               rawptr,
 	pipelineBinaryCount: u32,
 	pPipelineBinaries:   [^]PipelineBinaryKHR,
+}
+
+SurfacePresentModeKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	presentMode: PresentModeKHR,
+}
+
+SurfacePresentScalingCapabilitiesKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	supportedPresentScaling:  PresentScalingFlagsKHR,
+	supportedPresentGravityX: PresentGravityFlagsKHR,
+	supportedPresentGravityY: PresentGravityFlagsKHR,
+	minScaledImageExtent:     Extent2D,
+	maxScaledImageExtent:     Extent2D,
+}
+
+SurfacePresentModeCompatibilityKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	presentModeCount: u32,
+	pPresentModes:    [^]PresentModeKHR,
+}
+
+PhysicalDeviceSwapchainMaintenance1FeaturesKHR :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	swapchainMaintenance1: b32,
+}
+
+SwapchainPresentFenceInfoKHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	swapchainCount: u32,
+	pFences:        [^]Fence,
+}
+
+SwapchainPresentModesCreateInfoKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	presentModeCount: u32,
+	pPresentModes:    [^]PresentModeKHR,
+}
+
+SwapchainPresentModeInfoKHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	swapchainCount: u32,
+	pPresentModes:  [^]PresentModeKHR,
+}
+
+SwapchainPresentScalingCreateInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	scalingBehavior: PresentScalingFlagsKHR,
+	presentGravityX: PresentGravityFlagsKHR,
+	presentGravityY: PresentGravityFlagsKHR,
+}
+
+ReleaseSwapchainImagesInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	swapchain:       SwapchainKHR,
+	imageIndexCount: u32,
+	pImageIndices:   [^]u32,
+}
+
+PhysicalDeviceInternallySynchronizedQueuesFeaturesKHR :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	internallySynchronizedQueues: b32,
 }
 
 CooperativeMatrixPropertiesKHR :: struct {
@@ -4656,6 +4953,34 @@ VideoEncodeAV1RateControlLayerInfoKHR :: struct {
 	maxFrameSize:    VideoEncodeAV1FrameSizeKHR,
 }
 
+PhysicalDeviceVideoDecodeVP9FeaturesKHR :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	videoDecodeVP9: b32,
+}
+
+VideoDecodeVP9ProfileInfoKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	stdProfile: VideoVP9Profile,
+}
+
+VideoDecodeVP9CapabilitiesKHR :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	maxLevel: VideoVP9Level,
+}
+
+VideoDecodeVP9PictureInfoKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	pStdPictureInfo:          ^VideoDecodeVP9PictureInfo,
+	referenceNameSlotIndices: [MAX_VIDEO_VP9_REFERENCES_PER_FRAME_KHR]i32,
+	uncompressedHeaderOffset: u32,
+	compressedHeaderOffset:   u32,
+	tilesOffset:              u32,
+}
+
 PhysicalDeviceVideoMaintenance1FeaturesKHR :: struct {
 	sType:             StructureType,
 	pNext:             rawptr,
@@ -4668,6 +4993,19 @@ VideoInlineQueryInfoKHR :: struct {
 	queryPool:  QueryPool,
 	firstQuery: u32,
 	queryCount: u32,
+}
+
+PhysicalDeviceUnifiedImageLayoutsFeaturesKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	unifiedImageLayouts:      b32,
+	unifiedImageLayoutsVideo: b32,
+}
+
+AttachmentFeedbackLoopInfoEXT :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	feedbackLoopEnable: b32,
 }
 
 CalibratedTimestampInfoKHR :: struct {
@@ -4693,6 +5031,89 @@ BindDescriptorBufferEmbeddedSamplersInfoEXT :: struct {
 	stageFlags: ShaderStageFlags,
 	layout:     PipelineLayout,
 	set:        u32,
+}
+
+CopyMemoryIndirectCommandKHR :: struct {
+	srcAddress: DeviceAddress,
+	dstAddress: DeviceAddress,
+	size:       DeviceSize,
+}
+
+CopyMemoryIndirectInfoKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	srcCopyFlags:     AddressCopyFlagsKHR,
+	dstCopyFlags:     AddressCopyFlagsKHR,
+	copyCount:        u32,
+	copyAddressRange: StridedDeviceAddressRangeKHR,
+}
+
+CopyMemoryToImageIndirectCommandKHR :: struct {
+	srcAddress:        DeviceAddress,
+	bufferRowLength:   u32,
+	bufferImageHeight: u32,
+	imageSubresource:  ImageSubresourceLayers,
+	imageOffset:       Offset3D,
+	imageExtent:       Extent3D,
+}
+
+CopyMemoryToImageIndirectInfoKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	srcCopyFlags:       AddressCopyFlagsKHR,
+	copyCount:          u32,
+	copyAddressRange:   StridedDeviceAddressRangeKHR,
+	dstImage:           Image,
+	dstImageLayout:     ImageLayout,
+	pImageSubresources: [^]ImageSubresourceLayers,
+}
+
+PhysicalDeviceCopyMemoryIndirectFeaturesKHR :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	indirectMemoryCopy:        b32,
+	indirectMemoryToImageCopy: b32,
+}
+
+PhysicalDeviceCopyMemoryIndirectPropertiesKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	supportedQueues: QueueFlags,
+}
+
+VideoEncodeIntraRefreshCapabilitiesKHR :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	intraRefreshModes:                       VideoEncodeIntraRefreshModeFlagsKHR,
+	maxIntraRefreshCycleDuration:            u32,
+	maxIntraRefreshActiveReferencePictures:  u32,
+	partitionIndependentIntraRefreshRegions: b32,
+	nonRectangularIntraRefreshRegions:       b32,
+}
+
+VideoEncodeSessionIntraRefreshCreateInfoKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	intraRefreshMode: VideoEncodeIntraRefreshModeFlagsKHR,
+}
+
+VideoEncodeIntraRefreshInfoKHR :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	intraRefreshCycleDuration: u32,
+	intraRefreshIndex:         u32,
+}
+
+VideoReferenceIntraRefreshInfoKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	dirtyIntraRefreshRegions: u32,
+}
+
+PhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	videoEncodeIntraRefresh: b32,
 }
 
 VideoEncodeQuantizationMapCapabilitiesKHR :: struct {
@@ -4806,10 +5227,63 @@ PhysicalDeviceLayeredApiVulkanPropertiesKHR :: struct {
 	properties: PhysicalDeviceProperties2,
 }
 
-PhysicalDeviceMaintenance8FeaturesKHR :: struct {
-	sType:        StructureType,
-	pNext:        rawptr,
-	maintenance8: b32,
+PhysicalDeviceFaultFeaturesKHR :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	deviceFault:                   b32,
+	deviceFaultVendorBinary:       b32,
+	deviceFaultReportMasked:       b32,
+	deviceFaultDeviceLostOnMasked: b32,
+}
+
+PhysicalDeviceFaultPropertiesKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	maxDeviceFaultCount: u32,
+}
+
+DeviceFaultAddressInfoKHR :: struct {
+	addressType:      DeviceFaultAddressTypeKHR,
+	reportedAddress:  DeviceAddress,
+	addressPrecision: DeviceSize,
+}
+
+DeviceFaultVendorInfoKHR :: struct {
+	description:     [MAX_DESCRIPTION_SIZE]byte,
+	vendorFaultCode: u64,
+	vendorFaultData: u64,
+}
+
+DeviceFaultInfoKHR :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	flags:                  DeviceFaultFlagsKHR,
+	groupId:                u64,
+	description:            [MAX_DESCRIPTION_SIZE]byte,
+	faultAddressInfo:       DeviceFaultAddressInfoKHR,
+	instructionAddressInfo: DeviceFaultAddressInfoKHR,
+	vendorInfo:             DeviceFaultVendorInfoKHR,
+}
+
+DeviceFaultDebugInfoKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	vendorBinarySize:  u32,
+	pVendorBinaryData: rawptr,
+}
+
+DeviceFaultVendorBinaryHeaderVersionOneKHR :: struct {
+	headerSize:            u32,
+	headerVersion:         DeviceFaultVendorBinaryHeaderVersionKHR,
+	vendorID:              u32,
+	deviceID:              u32,
+	driverVersion:         u32,
+	pipelineCacheUUID:     [UUID_SIZE]u8,
+	applicationNameOffset: u32,
+	applicationVersion:    u32,
+	engineNameOffset:      u32,
+	engineVersion:         u32,
+	apiVersion:            u32,
 }
 
 MemoryBarrierAccessFlags3KHR :: struct {
@@ -4817,6 +5291,39 @@ MemoryBarrierAccessFlags3KHR :: struct {
 	pNext:          rawptr,
 	srcAccessMask3: AccessFlags3KHR,
 	dstAccessMask3: AccessFlags3KHR,
+}
+
+PhysicalDeviceMaintenance8FeaturesKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	maintenance8: b32,
+}
+
+PhysicalDeviceShaderFmaFeaturesKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	shaderFmaFloat16: b32,
+	shaderFmaFloat32: b32,
+	shaderFmaFloat64: b32,
+}
+
+PhysicalDeviceMaintenance9FeaturesKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	maintenance9: b32,
+}
+
+PhysicalDeviceMaintenance9PropertiesKHR :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	image2DViewOf3DSparse:       b32,
+	defaultVertexAttributeValue: DefaultVertexAttributeValueKHR,
+}
+
+QueueFamilyOwnershipTransferPropertiesKHR :: struct {
+	sType:                               StructureType,
+	pNext:                               rawptr,
+	optimalImageTransferToQueueFamilies: u32,
 }
 
 PhysicalDeviceVideoMaintenance2FeaturesKHR :: struct {
@@ -4846,10 +5353,188 @@ VideoDecodeAV1InlineSessionParametersInfoKHR :: struct {
 	pStdSequenceHeader: ^VideoAV1SequenceHeader,
 }
 
+PhysicalDeviceVideoEncodeFeedback2FeaturesKHR :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	videoEncodeFeedback2: b32,
+}
+
+VideoEncodeFeedback2CapabilitiesKHR :: struct {
+	sType:                                    StructureType,
+	pNext:                                    rawptr,
+	maxPerPartitionFeedbackEntries:           u32,
+	supportedPerPartitionEncodeFeedbackFlags: VideoEncodePerPartitionFeedbackFlagsKHR,
+}
+
+QueryPoolVideoEncodePerPartitionFeedbackCreateInfoKHR :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	maxPerPartitionFeedbackEntries:  u32,
+	perPartitionEncodeFeedbackFlags: VideoEncodePerPartitionFeedbackFlagsKHR,
+}
+
 PhysicalDeviceDepthClampZeroOneFeaturesKHR :: struct {
 	sType:             StructureType,
 	pNext:             rawptr,
 	depthClampZeroOne: b32,
+}
+
+PhysicalDeviceRobustness2FeaturesKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	robustBufferAccess2: b32,
+	robustImageAccess2:  b32,
+	nullDescriptor:      b32,
+}
+
+PhysicalDeviceRobustness2PropertiesKHR :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	robustStorageBufferAccessSizeAlignment: DeviceSize,
+	robustUniformBufferAccessSizeAlignment: DeviceSize,
+}
+
+PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	presentModeFifoLatestReady: b32,
+}
+
+MicromapUsageKHR :: struct {
+	count:            u32,
+	subdivisionLevel: u32,
+	format:           OpacityMicromapFormatKHR,
+}
+
+AccelerationStructureGeometryMicromapDataKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	usageCountsCount:    u32,
+	pUsageCounts:        [^]MicromapUsageKHR,
+	ppUsageCounts:       ^[^]MicromapUsageKHR,
+	data:                DeviceAddress,
+	triangleArray:       DeviceAddress,
+	triangleArrayStride: DeviceSize,
+}
+
+PhysicalDeviceOpacityMicromapFeaturesKHR :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	micromap: b32,
+}
+
+PhysicalDeviceOpacityMicromapPropertiesKHR :: struct {
+	sType:                                 StructureType,
+	pNext:                                 rawptr,
+	maxOpacity2StateSubdivisionLevel:      u32,
+	maxOpacity4StateSubdivisionLevel:      u32,
+	maxOpacityLossy4StateSubdivisionLevel: u32,
+	maxMicromapTriangles:                  u64,
+}
+
+MicromapTriangleKHR :: struct {
+	dataOffset:       u32,
+	subdivisionLevel: u16,
+	format:           u16,
+}
+
+AccelerationStructureTrianglesOpacityMicromapKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	indexType:    IndexType,
+	indexBuffer:  DeviceAddress,
+	indexStride:  DeviceSize,
+	baseTriangle: u32,
+	micromap:     AccelerationStructureKHR,
+}
+
+PhysicalDeviceMaintenance10FeaturesKHR :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	maintenance10: b32,
+}
+
+PhysicalDeviceMaintenance10PropertiesKHR :: struct {
+	sType:                                            StructureType,
+	pNext:                                            rawptr,
+	rgba4OpaqueBlackSwizzled:                         b32,
+	resolveSrgbFormatAppliesTransferFunction:         b32,
+	resolveSrgbFormatSupportsTransferFunctionControl: b32,
+}
+
+RenderingEndInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+RenderingAttachmentFlagsInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: RenderingAttachmentFlagsKHR,
+}
+
+ResolveImageModeInfoKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	flags:              ResolveImageFlagsKHR,
+	resolveMode:        ResolveModeFlags,
+	stencilResolveMode: ResolveModeFlags,
+}
+
+PhysicalDeviceMaintenance11FeaturesKHR :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	maintenance11: b32,
+}
+
+QueueFamilyOptimalImageTransferGranularityPropertiesKHR :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	optimalImageTransferGranularity: Extent3D,
+}
+
+FormatProperties4KHR :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	linearTilingFeatures:  FormatFeatureFlags4KHR,
+	optimalTilingFeatures: FormatFeatureFlags4KHR,
+	bufferFeatures:        FormatFeatureFlags4KHR,
+}
+
+ImageUsageFlags2CreateInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	usage: ImageUsageFlags2KHR,
+}
+
+ImageCreateFlags2CreateInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: ImageCreateFlags2KHR,
+}
+
+ImageViewUsage2CreateInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	usage: ImageUsageFlags2KHR,
+}
+
+PhysicalDeviceExtendedFlagsFeaturesKHR :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	extendedFlags: b32,
+}
+
+ImageStencilUsage2CreateInfoKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	stencilUsage: ImageUsageFlags2KHR,
+}
+
+SharedPresentSurfaceCapabilities2KHR :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	sharedPresentSupportedUsageFlags: ImageUsageFlags2KHR,
 }
 
 DebugReportCallbackCreateInfoEXT :: struct {
@@ -5309,6 +5994,332 @@ DebugUtilsObjectTagInfoEXT :: struct {
 	pTag:         rawptr,
 }
 
+GpaPerfBlockPropertiesAMD :: struct {
+	blockType:               GpaPerfBlockAMD,
+	flags:                   GpaPerfBlockPropertiesFlagsAMD,
+	instanceCount:           u32,
+	maxEventID:              u32,
+	maxGlobalOnlyCounters:   u32,
+	maxGlobalSharedCounters: u32,
+	maxStreamingCounters:    u32,
+}
+
+PhysicalDeviceGpaFeaturesAMD :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	perfCounters:          b32,
+	streamingPerfCounters: b32,
+	sqThreadTracing:       b32,
+	clockModes:            b32,
+}
+
+PhysicalDeviceGpaPropertiesAMD :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	flags:               PhysicalDeviceGpaPropertiesFlagsAMD,
+	maxSqttSeBufferSize: DeviceSize,
+	shaderEngineCount:   u32,
+	perfBlockCount:      u32,
+	pPerfBlocks:         [^]GpaPerfBlockPropertiesAMD,
+}
+
+PhysicalDeviceGpaProperties2AMD :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	revisionId: u32,
+}
+
+GpaPerfCounterAMD :: struct {
+	blockType:     GpaPerfBlockAMD,
+	blockInstance: u32,
+	eventID:       u32,
+}
+
+GpaSampleBeginInfoAMD :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	sampleType:                             GpaSampleTypeAMD,
+	sampleInternalOperations:               b32,
+	cacheFlushOnCounterCollection:          b32,
+	sqShaderMaskEnable:                     b32,
+	sqShaderMask:                           GpaSqShaderStageFlagsAMD,
+	perfCounterCount:                       u32,
+	pPerfCounters:                          [^]GpaPerfCounterAMD,
+	streamingPerfTraceSampleInterval:       u32,
+	perfCounterDeviceMemoryLimit:           DeviceSize,
+	sqThreadTraceEnable:                    b32,
+	sqThreadTraceSuppressInstructionTokens: b32,
+	sqThreadTraceDeviceMemoryLimit:         DeviceSize,
+	timingPreSample:                        PipelineStageFlags,
+	timingPostSample:                       PipelineStageFlags,
+}
+
+GpaDeviceClockModeInfoAMD :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	clockMode:              GpaDeviceClockModeAMD,
+	memoryClockRatioToPeak: f32,
+	engineClockRatioToPeak: f32,
+}
+
+GpaDeviceGetClockInfoAMD :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	memoryClockRatioToPeak: f32,
+	engineClockRatioToPeak: f32,
+	memoryClockFrequency:   u32,
+	engineClockFrequency:   u32,
+}
+
+GpaSessionCreateInfoAMD :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	secondaryCopySource: GpaSessionAMD,
+}
+
+HostAddressRangeEXT :: struct {
+	address: rawptr,
+	size:    int,
+}
+
+HostAddressRangeConstEXT :: struct {
+	address: rawptr,
+	size:    int,
+}
+
+TexelBufferDescriptorInfoEXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	format:       Format,
+	addressRange: DeviceAddressRangeEXT,
+}
+
+ImageDescriptorInfoEXT :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	pView:  ^ImageViewCreateInfo,
+	layout: ImageLayout,
+}
+
+TensorViewCreateInfoARM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  TensorViewCreateFlagsARM,
+	tensor: TensorARM,
+	format: Format,
+}
+
+ResourceDescriptorDataEXT :: struct #raw_union {
+	pImage:        ^ImageDescriptorInfoEXT,
+	pTexelBuffer:  ^TexelBufferDescriptorInfoEXT,
+	pAddressRange: ^DeviceAddressRangeEXT,
+	pTensorARM:    ^TensorViewCreateInfoARM,
+}
+
+ResourceDescriptorInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	type:  DescriptorType,
+	data:  ResourceDescriptorDataEXT,
+}
+
+BindHeapInfoEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	heapRange:           DeviceAddressRangeEXT,
+	reservedRangeOffset: DeviceSize,
+	reservedRangeSize:   DeviceSize,
+}
+
+PushDataInfoEXT :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	offset: u32,
+	data:   HostAddressRangeConstEXT,
+}
+
+DescriptorMappingSourceConstantOffsetEXT :: struct {
+	heapOffset:             u32,
+	heapArrayStride:        u32,
+	pEmbeddedSampler:       ^SamplerCreateInfo,
+	samplerHeapOffset:      u32,
+	samplerHeapArrayStride: u32,
+}
+
+DescriptorMappingSourcePushIndexEXT :: struct {
+	heapOffset:                   u32,
+	pushOffset:                   u32,
+	heapIndexStride:              u32,
+	heapArrayStride:              u32,
+	pEmbeddedSampler:             ^SamplerCreateInfo,
+	useCombinedImageSamplerIndex: b32,
+	samplerHeapOffset:            u32,
+	samplerPushOffset:            u32,
+	samplerHeapIndexStride:       u32,
+	samplerHeapArrayStride:       u32,
+}
+
+DescriptorMappingSourceIndirectIndexEXT :: struct {
+	heapOffset:                   u32,
+	pushOffset:                   u32,
+	addressOffset:                u32,
+	heapIndexStride:              u32,
+	heapArrayStride:              u32,
+	pEmbeddedSampler:             ^SamplerCreateInfo,
+	useCombinedImageSamplerIndex: b32,
+	samplerHeapOffset:            u32,
+	samplerPushOffset:            u32,
+	samplerAddressOffset:         u32,
+	samplerHeapIndexStride:       u32,
+	samplerHeapArrayStride:       u32,
+}
+
+DescriptorMappingSourceHeapDataEXT :: struct {
+	heapOffset: u32,
+	pushOffset: u32,
+}
+
+DescriptorMappingSourceIndirectAddressEXT :: struct {
+	pushOffset:    u32,
+	addressOffset: u32,
+}
+
+DescriptorMappingSourceShaderRecordIndexEXT :: struct {
+	heapOffset:                   u32,
+	shaderRecordOffset:           u32,
+	heapIndexStride:              u32,
+	heapArrayStride:              u32,
+	pEmbeddedSampler:             ^SamplerCreateInfo,
+	useCombinedImageSamplerIndex: b32,
+	samplerHeapOffset:            u32,
+	samplerShaderRecordOffset:    u32,
+	samplerHeapIndexStride:       u32,
+	samplerHeapArrayStride:       u32,
+}
+
+DescriptorMappingSourceIndirectIndexArrayEXT :: struct {
+	heapOffset:                   u32,
+	pushOffset:                   u32,
+	addressOffset:                u32,
+	heapIndexStride:              u32,
+	pEmbeddedSampler:             ^SamplerCreateInfo,
+	useCombinedImageSamplerIndex: b32,
+	samplerHeapOffset:            u32,
+	samplerPushOffset:            u32,
+	samplerAddressOffset:         u32,
+	samplerHeapIndexStride:       u32,
+}
+
+DescriptorMappingSourceDataEXT :: struct #raw_union {
+	constantOffset:            DescriptorMappingSourceConstantOffsetEXT,
+	pushIndex:                 DescriptorMappingSourcePushIndexEXT,
+	indirectIndex:             DescriptorMappingSourceIndirectIndexEXT,
+	indirectIndexArray:        DescriptorMappingSourceIndirectIndexArrayEXT,
+	heapData:                  DescriptorMappingSourceHeapDataEXT,
+	pushDataOffset:            u32,
+	pushAddressOffset:         u32,
+	indirectAddress:           DescriptorMappingSourceIndirectAddressEXT,
+	shaderRecordIndex:         DescriptorMappingSourceShaderRecordIndexEXT,
+	shaderRecordDataOffset:    u32,
+	shaderRecordAddressOffset: u32,
+}
+
+DescriptorSetAndBindingMappingEXT :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	descriptorSet: u32,
+	firstBinding:  u32,
+	bindingCount:  u32,
+	resourceMask:  SpirvResourceTypeFlagsEXT,
+	source:        DescriptorMappingSourceEXT,
+	sourceData:    DescriptorMappingSourceDataEXT,
+}
+
+ShaderDescriptorSetAndBindingMappingInfoEXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	mappingCount: u32,
+	pMappings:    [^]DescriptorSetAndBindingMappingEXT,
+}
+
+OpaqueCaptureDataCreateInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	pData: ^HostAddressRangeConstEXT,
+}
+
+PhysicalDeviceDescriptorHeapFeaturesEXT :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	descriptorHeap:              b32,
+	descriptorHeapCaptureReplay: b32,
+}
+
+PhysicalDeviceDescriptorHeapPropertiesEXT :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	samplerHeapAlignment:                    DeviceSize,
+	resourceHeapAlignment:                   DeviceSize,
+	maxSamplerHeapSize:                      DeviceSize,
+	maxResourceHeapSize:                     DeviceSize,
+	minSamplerHeapReservedRange:             DeviceSize,
+	minSamplerHeapReservedRangeWithEmbedded: DeviceSize,
+	minResourceHeapReservedRange:            DeviceSize,
+	samplerDescriptorSize:                   DeviceSize,
+	imageDescriptorSize:                     DeviceSize,
+	bufferDescriptorSize:                    DeviceSize,
+	samplerDescriptorAlignment:              DeviceSize,
+	imageDescriptorAlignment:                DeviceSize,
+	bufferDescriptorAlignment:               DeviceSize,
+	maxPushDataSize:                         DeviceSize,
+	imageCaptureReplayOpaqueDataSize:        int,
+	maxDescriptorHeapEmbeddedSamplers:       u32,
+	samplerYcbcrConversionCount:             u32,
+	sparseDescriptorHeaps:                   b32,
+	protectedDescriptorHeaps:                b32,
+}
+
+CommandBufferInheritanceDescriptorHeapInfoEXT :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	pSamplerHeapBindInfo:  ^BindHeapInfoEXT,
+	pResourceHeapBindInfo: ^BindHeapInfoEXT,
+}
+
+SamplerCustomBorderColorIndexCreateInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	index: u32,
+}
+
+SamplerCustomBorderColorCreateInfoEXT :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	customBorderColor: ClearColorValue,
+	format:            Format,
+}
+
+IndirectCommandsLayoutPushDataTokenNV :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	pushDataOffset: u32,
+	pushDataSize:   u32,
+}
+
+SubsampledImageFormatPropertiesEXT :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	subsampledImageDescriptorCount: u32,
+}
+
+PhysicalDeviceDescriptorHeapTensorPropertiesARM :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	tensorDescriptorSize:              DeviceSize,
+	tensorDescriptorAlignment:         DeviceSize,
+	tensorCaptureReplayOpaqueDataSize: int,
+}
+
 AttachmentSampleCountInfoAMD :: struct {
 	sType:                         StructureType,
 	pNext:                         rawptr,
@@ -5614,7 +6625,7 @@ AccelerationStructureInfoNV :: struct {
 	sType:         StructureType,
 	pNext:         rawptr,
 	type:          AccelerationStructureTypeNV,
-	flags:         BuildAccelerationStructureFlagsNV,
+	flags:         BuildAccelerationStructureFlagsKHR,
 	instanceCount: u32,
 	geometryCount: u32,
 	pGeometries:   [^]GeometryNV,
@@ -5713,6 +6724,18 @@ FilterCubicImageViewImageFormatPropertiesEXT :: struct {
 	pNext:             rawptr,
 	filterCubic:       b32,
 	filterCubicMinmax: b32,
+}
+
+PhysicalDeviceCooperativeMatrixConversionFeaturesQCOM :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	cooperativeMatrixConversion: b32,
+}
+
+PhysicalDeviceElapsedTimerQueryFeaturesQCOM :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	elapsedTimerQuery: b32,
 }
 
 ImportMemoryHostPointerInfoEXT :: struct {
@@ -5844,6 +6867,96 @@ CheckpointData2NV :: struct {
 	pNext:             rawptr,
 	stage:             PipelineStageFlags2,
 	pCheckpointMarker: rawptr,
+}
+
+PhysicalDevicePresentTimingFeaturesEXT :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	presentTiming:         b32,
+	presentAtAbsoluteTime: b32,
+	presentAtRelativeTime: b32,
+}
+
+PresentTimingSurfaceCapabilitiesEXT :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	presentTimingSupported:         b32,
+	presentAtAbsoluteTimeSupported: b32,
+	presentAtRelativeTimeSupported: b32,
+	presentStageQueries:            PresentStageFlagsEXT,
+}
+
+SwapchainCalibratedTimestampInfoEXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	swapchain:    SwapchainKHR,
+	presentStage: PresentStageFlagsEXT,
+	timeDomainId: u64,
+}
+
+SwapchainTimingPropertiesEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	refreshDuration: u64,
+	refreshInterval: u64,
+}
+
+SwapchainTimeDomainPropertiesEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	timeDomainCount: u32,
+	pTimeDomains:    [^]TimeDomainKHR,
+	pTimeDomainIds:  [^]u64,
+}
+
+PastPresentationTimingInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	flags:     PastPresentationTimingFlagsEXT,
+	swapchain: SwapchainKHR,
+}
+
+PresentStageTimeEXT :: struct {
+	stage: PresentStageFlagsEXT,
+	time:  u64,
+}
+
+PastPresentationTimingEXT :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	presentId:         u64,
+	targetTime:        u64,
+	presentStageCount: u32,
+	pPresentStages:    [^]PresentStageTimeEXT,
+	timeDomain:        TimeDomainKHR,
+	timeDomainId:      u64,
+	reportComplete:    b32,
+}
+
+PastPresentationTimingPropertiesEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	timingPropertiesCounter: u64,
+	timeDomainsCounter:      u64,
+	presentationTimingCount: u32,
+	pPresentationTimings:    [^]PastPresentationTimingEXT,
+}
+
+PresentTimingInfoEXT :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	flags:                        PresentTimingInfoFlagsEXT,
+	targetTime:                   u64,
+	timeDomainId:                 u64,
+	presentStageQueries:          PresentStageFlagsEXT,
+	targetTimeDomainPresentStage: PresentStageFlagsEXT,
+}
+
+PresentTimingsInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	swapchainCount: u32,
+	pTimingInfos:   [^]PresentTimingInfoEXT,
 }
 
 PhysicalDeviceShaderIntegerFunctions2FeaturesINTEL :: struct {
@@ -6169,72 +7282,6 @@ PhysicalDeviceShaderAtomicFloat2FeaturesEXT :: struct {
 	sparseImageFloat32AtomicMinMax:  b32,
 }
 
-SurfacePresentModeEXT :: struct {
-	sType:       StructureType,
-	pNext:       rawptr,
-	presentMode: PresentModeKHR,
-}
-
-SurfacePresentScalingCapabilitiesEXT :: struct {
-	sType:                    StructureType,
-	pNext:                    rawptr,
-	supportedPresentScaling:  PresentScalingFlagsEXT,
-	supportedPresentGravityX: PresentGravityFlagsEXT,
-	supportedPresentGravityY: PresentGravityFlagsEXT,
-	minScaledImageExtent:     Extent2D,
-	maxScaledImageExtent:     Extent2D,
-}
-
-SurfacePresentModeCompatibilityEXT :: struct {
-	sType:            StructureType,
-	pNext:            rawptr,
-	presentModeCount: u32,
-	pPresentModes:    [^]PresentModeKHR,
-}
-
-PhysicalDeviceSwapchainMaintenance1FeaturesEXT :: struct {
-	sType:                 StructureType,
-	pNext:                 rawptr,
-	swapchainMaintenance1: b32,
-}
-
-SwapchainPresentFenceInfoEXT :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	swapchainCount: u32,
-	pFences:        [^]Fence,
-}
-
-SwapchainPresentModesCreateInfoEXT :: struct {
-	sType:            StructureType,
-	pNext:            rawptr,
-	presentModeCount: u32,
-	pPresentModes:    [^]PresentModeKHR,
-}
-
-SwapchainPresentModeInfoEXT :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	swapchainCount: u32,
-	pPresentModes:  [^]PresentModeKHR,
-}
-
-SwapchainPresentScalingCreateInfoEXT :: struct {
-	sType:           StructureType,
-	pNext:           rawptr,
-	scalingBehavior: PresentScalingFlagsEXT,
-	presentGravityX: PresentGravityFlagsEXT,
-	presentGravityY: PresentGravityFlagsEXT,
-}
-
-ReleaseSwapchainImagesInfoEXT :: struct {
-	sType:           StructureType,
-	pNext:           rawptr,
-	swapchain:       SwapchainKHR,
-	imageIndexCount: u32,
-	pImageIndices:   [^]u32,
-}
-
 PhysicalDeviceDeviceGeneratedCommandsPropertiesNV :: struct {
 	sType:                                    StructureType,
 	pNext:                                    rawptr,
@@ -6437,28 +7484,6 @@ DeviceDeviceMemoryReportCreateInfoEXT :: struct {
 	pUserData:       rawptr,
 }
 
-PhysicalDeviceRobustness2FeaturesEXT :: struct {
-	sType:               StructureType,
-	pNext:               rawptr,
-	robustBufferAccess2: b32,
-	robustImageAccess2:  b32,
-	nullDescriptor:      b32,
-}
-
-PhysicalDeviceRobustness2PropertiesEXT :: struct {
-	sType:                                  StructureType,
-	pNext:                                  rawptr,
-	robustStorageBufferAccessSizeAlignment: DeviceSize,
-	robustUniformBufferAccessSizeAlignment: DeviceSize,
-}
-
-SamplerCustomBorderColorCreateInfoEXT :: struct {
-	sType:             StructureType,
-	pNext:             rawptr,
-	customBorderColor: ClearColorValue,
-	format:            Format,
-}
-
 PhysicalDeviceCustomBorderColorPropertiesEXT :: struct {
 	sType:                        StructureType,
 	pNext:                        rawptr,
@@ -6470,6 +7495,12 @@ PhysicalDeviceCustomBorderColorFeaturesEXT :: struct {
 	pNext:                          rawptr,
 	customBorderColors:             b32,
 	customBorderColorWithoutFormat: b32,
+}
+
+PhysicalDeviceTextureCompressionASTC3DFeaturesEXT :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	textureCompressionASTC_3D: b32,
 }
 
 PhysicalDevicePresentBarrierFeaturesNV :: struct {
@@ -6502,48 +7533,105 @@ DeviceDiagnosticsConfigCreateInfoNV :: struct {
 	flags: DeviceDiagnosticsConfigFlagsNV,
 }
 
-CudaModuleCreateInfoNV :: struct {
-	sType:    StructureType,
-	pNext:    rawptr,
-	dataSize: int,
-	pData:    rawptr,
+PerfHintInfoQCOM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	type:  PerfHintTypeQCOM,
+	scale: u32,
 }
 
-CudaFunctionCreateInfoNV :: struct {
-	sType:  StructureType,
-	pNext:  rawptr,
-	module: CudaModuleNV,
-	pName:  cstring,
+PhysicalDeviceQueuePerfHintFeaturesQCOM :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	queuePerfHint: b32,
 }
 
-CudaLaunchInfoNV :: struct {
-	sType:          StructureType,
-	pNext:          rawptr,
-	function:       CudaFunctionNV,
-	gridDimX:       u32,
-	gridDimY:       u32,
-	gridDimZ:       u32,
-	blockDimX:      u32,
-	blockDimY:      u32,
-	blockDimZ:      u32,
-	sharedMemBytes: u32,
-	paramCount:     int,
-	pParams:        [^]rawptr,
-	extraCount:     int,
-	pExtras:        [^]rawptr,
+PhysicalDeviceQueuePerfHintPropertiesQCOM :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	supportedQueues: QueueFlags,
 }
 
-PhysicalDeviceCudaKernelLaunchFeaturesNV :: struct {
+PhysicalDeviceImageProcessing3FeaturesQCOM :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	imageGatherLinear:             b32,
+	imageGatherExtendedModes:      b32,
+	blockMatchExtendedClampToEdge: b32,
+}
+
+PhysicalDeviceShaderMultipleWaitQueuesFeaturesQCOM :: struct {
 	sType:                    StructureType,
 	pNext:                    rawptr,
-	cudaKernelLaunchFeatures: b32,
+	shaderMultipleWaitQueues: b32,
 }
 
-PhysicalDeviceCudaKernelLaunchPropertiesNV :: struct {
-	sType:                  StructureType,
-	pNext:                  rawptr,
-	computeCapabilityMinor: u32,
-	computeCapabilityMajor: u32,
+PhysicalDeviceShaderMultipleWaitQueuesPropertiesQCOM :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	maxShaderWaitQueues: u32,
+}
+
+PhysicalDeviceShaderSplitBarrierFeaturesEXT :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	shaderSplitBarrier: b32,
+}
+
+PhysicalDeviceShaderSplitBarrierPropertiesEXT :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	splitBarrierReservedSharedMemory: u32,
+}
+
+PhysicalDeviceTileShadingFeaturesQCOM :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	tileShading:                   b32,
+	tileShadingFragmentStage:      b32,
+	tileShadingColorAttachments:   b32,
+	tileShadingDepthAttachments:   b32,
+	tileShadingStencilAttachments: b32,
+	tileShadingInputAttachments:   b32,
+	tileShadingSampledAttachments: b32,
+	tileShadingPerTileDraw:        b32,
+	tileShadingPerTileDispatch:    b32,
+	tileShadingDispatchTile:       b32,
+	tileShadingApron:              b32,
+	tileShadingAnisotropicApron:   b32,
+	tileShadingAtomicOps:          b32,
+	tileShadingImageProcessing:    b32,
+}
+
+PhysicalDeviceTileShadingPropertiesQCOM :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	maxApronSize:       u32,
+	preferNonCoherent:  b32,
+	tileGranularity:    Extent2D,
+	maxTileShadingRate: Extent2D,
+}
+
+RenderPassTileShadingCreateInfoQCOM :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	flags:         TileShadingRenderPassFlagsQCOM,
+	tileApronSize: Extent2D,
+}
+
+PerTileBeginInfoQCOM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+PerTileEndInfoQCOM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+DispatchTileInfoQCOM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
 }
 
 QueryLowLatencySupportNV :: struct {
@@ -6588,12 +7676,6 @@ PhysicalDeviceDescriptorBufferPropertiesEXT :: struct {
 	samplerDescriptorBufferAddressSpaceSize:              DeviceSize,
 	resourceDescriptorBufferAddressSpaceSize:             DeviceSize,
 	descriptorBufferAddressSpaceSize:                     DeviceSize,
-}
-
-PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT :: struct {
-	sType:                                        StructureType,
-	pNext:                                        rawptr,
-	combinedImageSamplerDensityMapDescriptorSize: int,
 }
 
 PhysicalDeviceDescriptorBufferFeaturesEXT :: struct {
@@ -6681,6 +7763,12 @@ AccelerationStructureCaptureDescriptorDataInfoEXT :: struct {
 	pNext:                   rawptr,
 	accelerationStructure:   AccelerationStructureKHR,
 	accelerationStructureNV: AccelerationStructureNV,
+}
+
+PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT :: struct {
+	sType:                                        StructureType,
+	pNext:                                        rawptr,
+	combinedImageSamplerDensityMapDescriptorSize: int,
 }
 
 PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT :: struct {
@@ -6890,39 +7978,13 @@ DeviceFaultCountsEXT :: struct {
 	vendorBinarySize: DeviceSize,
 }
 
-DeviceFaultAddressInfoEXT :: struct {
-	addressType:      DeviceFaultAddressTypeEXT,
-	reportedAddress:  DeviceAddress,
-	addressPrecision: DeviceSize,
-}
-
-DeviceFaultVendorInfoEXT :: struct {
-	description:     [MAX_DESCRIPTION_SIZE]byte,
-	vendorFaultCode: u64,
-	vendorFaultData: u64,
-}
-
 DeviceFaultInfoEXT :: struct {
 	sType:             StructureType,
 	pNext:             rawptr,
 	description:       [MAX_DESCRIPTION_SIZE]byte,
-	pAddressInfos:     [^]DeviceFaultAddressInfoEXT,
-	pVendorInfos:      [^]DeviceFaultVendorInfoEXT,
+	pAddressInfos:     [^]DeviceFaultAddressInfoKHR,
+	pVendorInfos:      [^]DeviceFaultVendorInfoKHR,
 	pVendorBinaryData: rawptr,
-}
-
-DeviceFaultVendorBinaryHeaderVersionOneEXT :: struct {
-	headerSize:            u32,
-	headerVersion:         DeviceFaultVendorBinaryHeaderVersionEXT,
-	vendorID:              u32,
-	deviceID:              u32,
-	driverVersion:         u32,
-	pipelineCacheUUID:     [UUID_SIZE]u8,
-	applicationNameOffset: u32,
-	applicationVersion:    u32,
-	engineNameOffset:      u32,
-	engineVersion:         u32,
-	apiVersion:            u32,
 }
 
 PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT :: struct {
@@ -7024,12 +8086,6 @@ PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT :: struct {
 	pNext:                             rawptr,
 	primitiveTopologyListRestart:      b32,
 	primitiveTopologyPatchListRestart: b32,
-}
-
-PhysicalDevicePresentModeFifoLatestReadyFeaturesEXT :: struct {
-	sType:                      StructureType,
-	pNext:                      rawptr,
-	presentModeFifoLatestReady: b32,
 }
 
 SubpassShadingPipelineCreateInfoHUAWEI :: struct {
@@ -7148,6 +8204,36 @@ PhysicalDevicePrimitivesGeneratedQueryFeaturesEXT :: struct {
 	primitivesGeneratedQuery:                      b32,
 	primitivesGeneratedQueryWithRasterizerDiscard: b32,
 	primitivesGeneratedQueryWithNonZeroStreams:    b32,
+}
+
+PhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	videoEncodeRgbConversion: b32,
+}
+
+VideoEncodeRgbConversionCapabilitiesVALVE :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	rgbModels:      VideoEncodeRgbModelConversionFlagsVALVE,
+	rgbRanges:      VideoEncodeRgbRangeCompressionFlagsVALVE,
+	xChromaOffsets: VideoEncodeRgbChromaOffsetFlagsVALVE,
+	yChromaOffsets: VideoEncodeRgbChromaOffsetFlagsVALVE,
+}
+
+VideoEncodeProfileRgbConversionInfoVALVE :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	performEncodeRgbConversion: b32,
+}
+
+VideoEncodeSessionRgbConversionCreateInfoVALVE :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	rgbModel:      VideoEncodeRgbModelConversionFlagsVALVE,
+	rgbRange:      VideoEncodeRgbRangeCompressionFlagsVALVE,
+	xChromaOffset: VideoEncodeRgbChromaOffsetFlagsVALVE,
+	yChromaOffset: VideoEncodeRgbChromaOffsetFlagsVALVE,
 }
 
 PhysicalDeviceImageViewMinLodFeaturesEXT :: struct {
@@ -7312,12 +8398,6 @@ AccelerationStructureTrianglesOpacityMicromapEXT :: struct {
 	micromap:         MicromapEXT,
 }
 
-MicromapTriangleEXT :: struct {
-	dataOffset:       u32,
-	subdivisionLevel: u16,
-	format:           u16,
-}
-
 PhysicalDeviceClusterCullingShaderFeaturesHUAWEI :: struct {
 	sType:                         StructureType,
 	pNext:                         rawptr,
@@ -7384,6 +8464,22 @@ PhysicalDeviceSchedulingControlsPropertiesARM :: struct {
 	sType:                   StructureType,
 	pNext:                   rawptr,
 	schedulingControlsFlags: PhysicalDeviceSchedulingControlsFlagsARM,
+}
+
+DispatchParametersARM :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	workGroupBatchSize:        u32,
+	maxQueuedWorkGroupBatches: u32,
+	maxWarpsPerShaderCore:     u32,
+}
+
+PhysicalDeviceSchedulingControlsDispatchParametersPropertiesARM :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	schedulingControlsMaxWarpsCount:         u32,
+	schedulingControlsMaxQueuedBatchesCount: u32,
+	schedulingControlsMaxWorkGroupBatchSize: u32,
 }
 
 PhysicalDeviceImageSlicedViewOf3DFeaturesEXT :: struct {
@@ -7458,38 +8554,23 @@ RenderPassStripeSubmitInfoARM :: struct {
 	pStripeSemaphoreInfos:    [^]SemaphoreSubmitInfo,
 }
 
-PhysicalDeviceFragmentDensityMapOffsetFeaturesQCOM :: struct {
+PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT :: struct {
 	sType:                    StructureType,
 	pNext:                    rawptr,
 	fragmentDensityMapOffset: b32,
 }
 
-PhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM :: struct {
+PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT :: struct {
 	sType:                            StructureType,
 	pNext:                            rawptr,
 	fragmentDensityOffsetGranularity: Extent2D,
 }
 
-SubpassFragmentDensityMapOffsetEndInfoQCOM :: struct {
+RenderPassFragmentDensityMapOffsetEndInfoEXT :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	fragmentDensityOffsetCount: u32,
 	pFragmentDensityOffsets:    [^]Offset2D,
-}
-
-CopyMemoryIndirectCommandNV :: struct {
-	srcAddress: DeviceAddress,
-	dstAddress: DeviceAddress,
-	size:       DeviceSize,
-}
-
-CopyMemoryToImageIndirectCommandNV :: struct {
-	srcAddress:        DeviceAddress,
-	bufferRowLength:   u32,
-	bufferImageHeight: u32,
-	imageSubresource:  ImageSubresourceLayers,
-	imageOffset:       Offset3D,
-	imageExtent:       Extent3D,
 }
 
 PhysicalDeviceCopyMemoryIndirectFeaturesNV :: struct {
@@ -7498,30 +8579,24 @@ PhysicalDeviceCopyMemoryIndirectFeaturesNV :: struct {
 	indirectCopy: b32,
 }
 
-PhysicalDeviceCopyMemoryIndirectPropertiesNV :: struct {
-	sType:           StructureType,
-	pNext:           rawptr,
-	supportedQueues: QueueFlags,
-}
-
 DecompressMemoryRegionNV :: struct {
 	srcAddress:          DeviceAddress,
 	dstAddress:          DeviceAddress,
 	compressedSize:      DeviceSize,
 	decompressedSize:    DeviceSize,
-	decompressionMethod: MemoryDecompressionMethodFlagsNV,
+	decompressionMethod: MemoryDecompressionMethodFlagsEXT,
 }
 
-PhysicalDeviceMemoryDecompressionFeaturesNV :: struct {
+PhysicalDeviceMemoryDecompressionFeaturesEXT :: struct {
 	sType:               StructureType,
 	pNext:               rawptr,
 	memoryDecompression: b32,
 }
 
-PhysicalDeviceMemoryDecompressionPropertiesNV :: struct {
+PhysicalDeviceMemoryDecompressionPropertiesEXT :: struct {
 	sType:                         StructureType,
 	pNext:                         rawptr,
-	decompressionMethods:          MemoryDecompressionMethodFlagsNV,
+	decompressionMethods:          MemoryDecompressionMethodFlagsEXT,
 	maxDecompressionIndirectCount: u64,
 }
 
@@ -7754,6 +8829,192 @@ DirectDriverLoadingListLUNARG :: struct {
 	pDrivers:    [^]DirectDriverLoadingInfoLUNARG,
 }
 
+TensorDescriptionARM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	tiling:         TensorTilingARM,
+	format:         Format,
+	dimensionCount: u32,
+	pDimensions:    [^]i64,
+	pStrides:       [^]i64,
+	usage:          TensorUsageFlagsARM,
+}
+
+TensorCreateInfoARM :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	flags:                 TensorCreateFlagsARM,
+	pDescription:          ^TensorDescriptionARM,
+	sharingMode:           SharingMode,
+	queueFamilyIndexCount: u32,
+	pQueueFamilyIndices:   [^]u32,
+}
+
+TensorMemoryRequirementsInfoARM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	tensor: TensorARM,
+}
+
+BindTensorMemoryInfoARM :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	tensor:       TensorARM,
+	memory:       DeviceMemory,
+	memoryOffset: DeviceSize,
+}
+
+WriteDescriptorSetTensorARM :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	tensorViewCount: u32,
+	pTensorViews:    [^]TensorViewARM,
+}
+
+TensorFormatPropertiesARM :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	optimalTilingTensorFeatures: FormatFeatureFlags2,
+	linearTilingTensorFeatures:  FormatFeatureFlags2,
+}
+
+PhysicalDeviceTensorPropertiesARM :: struct {
+	sType:                                              StructureType,
+	pNext:                                              rawptr,
+	maxTensorDimensionCount:                            u32,
+	maxTensorElements:                                  u64,
+	maxPerDimensionTensorElements:                      u64,
+	maxTensorStride:                                    i64,
+	maxTensorSize:                                      u64,
+	maxTensorShaderAccessArrayLength:                   u32,
+	maxTensorShaderAccessSize:                          u32,
+	maxDescriptorSetStorageTensors:                     u32,
+	maxPerStageDescriptorSetStorageTensors:             u32,
+	maxDescriptorSetUpdateAfterBindStorageTensors:      u32,
+	maxPerStageDescriptorUpdateAfterBindStorageTensors: u32,
+	shaderStorageTensorArrayNonUniformIndexingNative:   b32,
+	shaderTensorSupportedStages:                        ShaderStageFlags,
+}
+
+TensorMemoryBarrierARM :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	srcStageMask:        PipelineStageFlags2,
+	srcAccessMask:       AccessFlags2,
+	dstStageMask:        PipelineStageFlags2,
+	dstAccessMask:       AccessFlags2,
+	srcQueueFamilyIndex: u32,
+	dstQueueFamilyIndex: u32,
+	tensor:              TensorARM,
+}
+
+TensorDependencyInfoARM :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	tensorMemoryBarrierCount: u32,
+	pTensorMemoryBarriers:    [^]TensorMemoryBarrierARM,
+}
+
+PhysicalDeviceTensorFeaturesARM :: struct {
+	sType:                                         StructureType,
+	pNext:                                         rawptr,
+	tensorNonPacked:                               b32,
+	shaderTensorAccess:                            b32,
+	shaderStorageTensorArrayDynamicIndexing:       b32,
+	shaderStorageTensorArrayNonUniformIndexing:    b32,
+	descriptorBindingStorageTensorUpdateAfterBind: b32,
+	tensors:                                       b32,
+}
+
+DeviceTensorMemoryRequirementsARM :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	pCreateInfo: ^TensorCreateInfoARM,
+}
+
+TensorCopyARM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	dimensionCount: u32,
+	pSrcOffset:     ^u64,
+	pDstOffset:     ^u64,
+	pExtent:        ^u64,
+}
+
+CopyTensorInfoARM :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	srcTensor:   TensorARM,
+	dstTensor:   TensorARM,
+	regionCount: u32,
+	pRegions:    [^]TensorCopyARM,
+}
+
+MemoryDedicatedAllocateInfoTensorARM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	tensor: TensorARM,
+}
+
+PhysicalDeviceExternalTensorInfoARM :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	flags:        TensorCreateFlagsARM,
+	pDescription: ^TensorDescriptionARM,
+	handleType:   ExternalMemoryHandleTypeFlags,
+}
+
+ExternalTensorPropertiesARM :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	externalMemoryProperties: ExternalMemoryProperties,
+}
+
+ExternalMemoryTensorCreateInfoARM :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	handleTypes: ExternalMemoryHandleTypeFlags,
+}
+
+PhysicalDeviceDescriptorBufferTensorFeaturesARM :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	descriptorBufferTensorDescriptors: b32,
+}
+
+PhysicalDeviceDescriptorBufferTensorPropertiesARM :: struct {
+	sType:                                     StructureType,
+	pNext:                                     rawptr,
+	tensorCaptureReplayDescriptorDataSize:     int,
+	tensorViewCaptureReplayDescriptorDataSize: int,
+	tensorDescriptorSize:                      int,
+}
+
+DescriptorGetTensorInfoARM :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	tensorView: TensorViewARM,
+}
+
+TensorCaptureDescriptorDataInfoARM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	tensor: TensorARM,
+}
+
+TensorViewCaptureDescriptorDataInfoARM :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	tensorView: TensorViewARM,
+}
+
+FrameBoundaryTensorsARM :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	tensorCount: u32,
+	pTensors:    [^]TensorARM,
+}
+
 PhysicalDeviceShaderModuleIdentifierFeaturesEXT :: struct {
 	sType:                  StructureType,
 	pNext:                  rawptr,
@@ -7942,7 +9203,7 @@ PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM :: struct {
 PhysicalDeviceRayTracingInvocationReorderPropertiesNV :: struct {
 	sType:                                     StructureType,
 	pNext:                                     rawptr,
-	rayTracingInvocationReorderReorderingHint: RayTracingInvocationReorderModeNV,
+	rayTracingInvocationReorderReorderingHint: RayTracingInvocationReorderModeEXT,
 }
 
 PhysicalDeviceRayTracingInvocationReorderFeaturesNV :: struct {
@@ -8135,6 +9396,185 @@ LatencySurfaceCapabilitiesNV :: struct {
 	pPresentModes:    [^]PresentModeKHR,
 }
 
+PhysicalDeviceDataGraphFeaturesARM :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	dataGraph:                        b32,
+	dataGraphUpdateAfterBind:         b32,
+	dataGraphSpecializationConstants: b32,
+	dataGraphDescriptorBuffer:        b32,
+	dataGraphShaderModule:            b32,
+}
+
+DataGraphPipelineConstantARM :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	id:            u32,
+	pConstantData: rawptr,
+}
+
+DataGraphPipelineResourceInfoARM :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	descriptorSet: u32,
+	binding:       u32,
+	arrayElement:  u32,
+}
+
+DataGraphPipelineCompilerControlCreateInfoARM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	pVendorOptions: cstring,
+}
+
+DataGraphPipelineCreateInfoARM :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	flags:             PipelineCreateFlags2,
+	layout:            PipelineLayout,
+	resourceInfoCount: u32,
+	pResourceInfos:    [^]DataGraphPipelineResourceInfoARM,
+}
+
+DataGraphPipelineShaderModuleCreateInfoARM :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	module:              ShaderModule,
+	pName:               cstring,
+	pSpecializationInfo: ^SpecializationInfo,
+	constantCount:       u32,
+	pConstants:          [^]DataGraphPipelineConstantARM,
+}
+
+DataGraphPipelineSessionCreateInfoARM :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	flags:             DataGraphPipelineSessionCreateFlagsARM,
+	dataGraphPipeline: Pipeline,
+}
+
+DataGraphPipelineSessionBindPointRequirementsInfoARM :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	session: DataGraphPipelineSessionARM,
+}
+
+DataGraphPipelineSessionBindPointRequirementARM :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	bindPoint:     DataGraphPipelineSessionBindPointARM,
+	bindPointType: DataGraphPipelineSessionBindPointTypeARM,
+	numObjects:    u32,
+}
+
+DataGraphPipelineSessionMemoryRequirementsInfoARM :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	session:     DataGraphPipelineSessionARM,
+	bindPoint:   DataGraphPipelineSessionBindPointARM,
+	objectIndex: u32,
+}
+
+BindDataGraphPipelineSessionMemoryInfoARM :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	session:      DataGraphPipelineSessionARM,
+	bindPoint:    DataGraphPipelineSessionBindPointARM,
+	objectIndex:  u32,
+	memory:       DeviceMemory,
+	memoryOffset: DeviceSize,
+}
+
+DataGraphPipelineInfoARM :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	dataGraphPipeline: Pipeline,
+}
+
+DataGraphPipelinePropertyQueryResultARM :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	property: DataGraphPipelinePropertyARM,
+	isText:   b32,
+	dataSize: int,
+	pData:    rawptr,
+}
+
+DataGraphPipelineIdentifierCreateInfoARM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	identifierSize: u32,
+	pIdentifier:    ^u8,
+}
+
+DataGraphPipelineDispatchInfoARM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: DataGraphPipelineDispatchFlagsARM,
+}
+
+PhysicalDeviceDataGraphProcessingEngineARM :: struct {
+	type:      PhysicalDeviceDataGraphProcessingEngineTypeARM,
+	isForeign: b32,
+}
+
+PhysicalDeviceDataGraphOperationSupportARM :: struct {
+	operationType: PhysicalDeviceDataGraphOperationTypeARM,
+	name:          [MAX_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_SET_NAME_SIZE_ARM]byte,
+	version:       u32,
+}
+
+QueueFamilyDataGraphPropertiesARM :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	engine:    PhysicalDeviceDataGraphProcessingEngineARM,
+	operation: PhysicalDeviceDataGraphOperationSupportARM,
+}
+
+DataGraphProcessingEngineCreateInfoARM :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	processingEngineCount: u32,
+	pProcessingEngines:    [^]PhysicalDeviceDataGraphProcessingEngineARM,
+}
+
+PhysicalDeviceQueueFamilyDataGraphProcessingEngineInfoARM :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	queueFamilyIndex: u32,
+	engineType:       PhysicalDeviceDataGraphProcessingEngineTypeARM,
+}
+
+QueueFamilyDataGraphProcessingEnginePropertiesARM :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	foreignSemaphoreHandleTypes: ExternalSemaphoreHandleTypeFlags,
+	foreignMemoryHandleTypes:    ExternalMemoryHandleTypeFlags,
+}
+
+DataGraphPipelineConstantTensorSemiStructuredSparsityInfoARM :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	dimension: u32,
+	zeroCount: u32,
+	groupSize: u32,
+}
+
+DataGraphTOSANameQualityARM :: struct {
+	name:         [MAX_DATA_GRAPH_TOSA_NAME_SIZE_ARM]byte,
+	qualityFlags: DataGraphTOSAQualityFlagsARM,
+}
+
+QueueFamilyDataGraphTOSAPropertiesARM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	profileCount:   u32,
+	pProfiles:      [^]DataGraphTOSANameQualityARM,
+	extensionCount: u32,
+	pExtensions:    [^]DataGraphTOSANameQualityARM,
+	level:          DataGraphTOSALevelARM,
+}
+
 PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM :: struct {
 	sType:                       StructureType,
 	pNext:                       rawptr,
@@ -8229,6 +9669,53 @@ PhysicalDeviceDescriptorPoolOverallocationFeaturesNV :: struct {
 	descriptorPoolOverallocation: b32,
 }
 
+PhysicalDeviceTileMemoryHeapFeaturesQCOM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	tileMemoryHeap: b32,
+}
+
+PhysicalDeviceTileMemoryHeapPropertiesQCOM :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	queueSubmitBoundary: b32,
+	tileBufferTransfers: b32,
+}
+
+TileMemoryRequirementsQCOM :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	size:      DeviceSize,
+	alignment: DeviceSize,
+}
+
+TileMemoryBindInfoQCOM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	memory: DeviceMemory,
+}
+
+TileMemorySizeInfoQCOM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	size:  DeviceSize,
+}
+
+DecompressMemoryRegionEXT :: struct {
+	srcAddress:       DeviceAddress,
+	dstAddress:       DeviceAddress,
+	compressedSize:   DeviceSize,
+	decompressedSize: DeviceSize,
+}
+
+DecompressMemoryInfoEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	decompressionMethod: MemoryDecompressionMethodFlagsEXT,
+	regionCount:         u32,
+	pRegions:            [^]DecompressMemoryRegionEXT,
+}
+
 DisplaySurfaceStereoCreateInfoNV :: struct {
 	sType:      StructureType,
 	pNext:      rawptr,
@@ -8247,6 +9734,31 @@ PhysicalDeviceRawAccessChainsFeaturesNV :: struct {
 	shaderRawAccessChains: b32,
 }
 
+ExternalComputeQueueDeviceCreateInfoNV :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	reservedExternalQueues: u32,
+}
+
+ExternalComputeQueueCreateInfoNV :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	preferredQueue: Queue,
+}
+
+ExternalComputeQueueDataParamsNV :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	deviceIndex: u32,
+}
+
+PhysicalDeviceExternalComputeQueuePropertiesNV :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	externalDataSize:  u32,
+	maxExternalQueues: u32,
+}
+
 PhysicalDeviceCommandBufferInheritanceFeaturesNV :: struct {
 	sType:                    StructureType,
 	pNext:                    rawptr,
@@ -8263,6 +9775,13 @@ PhysicalDeviceShaderReplicatedCompositesFeaturesEXT :: struct {
 	sType:                      StructureType,
 	pNext:                      rawptr,
 	shaderReplicatedComposites: b32,
+}
+
+PhysicalDeviceShaderFloat8FeaturesEXT :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	shaderFloat8:                  b32,
+	shaderFloat8CooperativeMatrix: b32,
 }
 
 PhysicalDeviceRayTracingValidationFeaturesNV :: struct {
@@ -8427,6 +9946,10 @@ ClusterAccelerationStructureInstantiateClusterInfoNV :: struct {
 	},
 	clusterTemplateAddress: DeviceAddress,
 	vertexBuffer:           StridedDeviceAddressNV,
+}
+
+ClusterAccelerationStructureGetTemplateIndicesInfoNV :: struct {
+	clusterTemplateAddress: DeviceAddress,
 }
 
 AccelerationStructureBuildSizesInfoKHR :: struct {
@@ -8709,6 +10232,40 @@ ImageAlignmentControlCreateInfoMESA :: struct {
 	maximumRequestedAlignment: u32,
 }
 
+PushConstantBankInfoNV :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	bank:  u32,
+}
+
+PhysicalDevicePushConstantBankFeaturesNV :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	pushConstantBank: b32,
+}
+
+PhysicalDevicePushConstantBankPropertiesNV :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	maxGraphicsPushConstantBanks: u32,
+	maxComputePushConstantBanks:  u32,
+	maxGraphicsPushDataBanks:     u32,
+	maxComputePushDataBanks:      u32,
+}
+
+PhysicalDeviceRayTracingInvocationReorderPropertiesEXT :: struct {
+	sType:                                     StructureType,
+	pNext:                                     rawptr,
+	rayTracingInvocationReorderReorderingHint: RayTracingInvocationReorderModeEXT,
+	maxShaderBindingTableRecordIndex:          u32,
+}
+
+PhysicalDeviceRayTracingInvocationReorderFeaturesEXT :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	rayTracingInvocationReorder: b32,
+}
+
 PhysicalDeviceDepthClampControlFeaturesEXT :: struct {
 	sType:             StructureType,
 	pNext:             rawptr,
@@ -8776,10 +10333,105 @@ PhysicalDevicePipelineOpacityMicromapFeaturesARM :: struct {
 	pipelineOpacityMicromap: b32,
 }
 
+PhysicalDevicePerformanceCountersByRegionFeaturesARM :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	performanceCountersByRegion: b32,
+}
+
+PhysicalDevicePerformanceCountersByRegionPropertiesARM :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	maxPerRegionPerformanceCounters: u32,
+	performanceCounterRegionSize:    Extent2D,
+	rowStrideAlignment:              u32,
+	regionAlignment:                 u32,
+	identityTransformOrder:          b32,
+}
+
+PerformanceCounterARM :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	counterID: u32,
+}
+
+PerformanceCounterDescriptionARM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: PerformanceCounterDescriptionFlagsARM,
+	name:  [MAX_DESCRIPTION_SIZE]byte,
+}
+
+RenderPassPerformanceCountersByRegionBeginInfoARM :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	counterAddressCount: u32,
+	pCounterAddresses:   [^]DeviceAddress,
+	serializeRegions:    b32,
+	counterIndexCount:   u32,
+	pCounterIndices:     [^]u32,
+}
+
+PhysicalDeviceShaderInstrumentationFeaturesARM :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	shaderInstrumentation: b32,
+}
+
+PhysicalDeviceShaderInstrumentationPropertiesARM :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	numMetrics:               u32,
+	perBasicBlockGranularity: b32,
+}
+
+ShaderInstrumentationCreateInfoARM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+ShaderInstrumentationMetricDescriptionARM :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	name:        [MAX_DESCRIPTION_SIZE]byte,
+	description: [MAX_DESCRIPTION_SIZE]byte,
+}
+
+ShaderInstrumentationMetricDataHeaderARM :: struct {
+	resultIndex:     u32,
+	resultSubIndex:  u32,
+	stages:          ShaderStageFlags,
+	basicBlockIndex: u32,
+}
+
 PhysicalDeviceVertexAttributeRobustnessFeaturesEXT :: struct {
 	sType:                     StructureType,
 	pNext:                     rawptr,
 	vertexAttributeRobustness: b32,
+}
+
+PhysicalDeviceFormatPackFeaturesARM :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	formatPack: b32,
+}
+
+PhysicalDeviceFragmentDensityMapLayeredFeaturesVALVE :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	fragmentDensityMapLayered: b32,
+}
+
+PhysicalDeviceFragmentDensityMapLayeredPropertiesVALVE :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	maxFragmentDensityMapLayers: u32,
+}
+
+PipelineFragmentDensityMapLayeredCreateInfoVALVE :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	maxFragmentDensityMapLayers: u32,
 }
 
 SetPresentConfigNV :: struct {
@@ -8793,6 +10445,239 @@ PhysicalDevicePresentMeteringFeaturesNV :: struct {
 	sType:           StructureType,
 	pNext:           rawptr,
 	presentMetering: b32,
+}
+
+PhysicalDeviceMultisampledRenderToSwapchainFeaturesEXT :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	multisampledRenderToSwapchain: b32,
+}
+
+SwapchainFlagsSurfaceCapabilitiesEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	swapchainSupportedFlags: SwapchainCreateFlagsKHR,
+}
+
+PhysicalDeviceZeroInitializeDeviceMemoryFeaturesEXT :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	zeroInitializeDeviceMemory: b32,
+}
+
+PhysicalDeviceShader64BitIndexingFeaturesEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	shader64BitIndexing: b32,
+}
+
+PhysicalDeviceCustomResolveFeaturesEXT :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	customResolve: b32,
+}
+
+BeginCustomResolveInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+CustomResolveCreateInfoEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	customResolve:           b32,
+	colorAttachmentCount:    u32,
+	pColorAttachmentFormats: [^]Format,
+	depthAttachmentFormat:   Format,
+	stencilAttachmentFormat: Format,
+}
+
+PipelineCacheHeaderVersionDataGraphQCOM :: struct {
+	headerSize:       u32,
+	headerVersion:    PipelineCacheHeaderVersion,
+	cacheType:        DataGraphModelCacheTypeQCOM,
+	cacheVersion:     u32,
+	toolchainVersion: [DATA_GRAPH_MODEL_TOOLCHAIN_VERSION_LENGTH_QCOM]u32,
+}
+
+DataGraphPipelineBuiltinModelCreateInfoQCOM :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	pOperation: ^PhysicalDeviceDataGraphOperationSupportARM,
+}
+
+PhysicalDeviceDataGraphModelFeaturesQCOM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	dataGraphModel: b32,
+}
+
+PhysicalDeviceDataGraphOpticalFlowFeaturesARM :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	dataGraphOpticalFlow: b32,
+}
+
+QueueFamilyDataGraphOpticalFlowPropertiesARM :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	supportedOutputGridSizes: DataGraphOpticalFlowGridSizeFlagsARM,
+	supportedHintGridSizes:   DataGraphOpticalFlowGridSizeFlagsARM,
+	hintSupported:            b32,
+	costSupported:            b32,
+	minWidth:                 u32,
+	minHeight:                u32,
+	maxWidth:                 u32,
+	maxHeight:                u32,
+}
+
+DataGraphPipelineOpticalFlowCreateInfoARM :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	width:            u32,
+	height:           u32,
+	imageFormat:      Format,
+	flowVectorFormat: Format,
+	costFormat:       Format,
+	outputGridSize:   DataGraphOpticalFlowGridSizeFlagsARM,
+	hintGridSize:     DataGraphOpticalFlowGridSizeFlagsARM,
+	performanceLevel: DataGraphOpticalFlowPerformanceLevelARM,
+	flags:            DataGraphOpticalFlowCreateFlagsARM,
+}
+
+DataGraphOpticalFlowImageFormatPropertiesARM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	format: Format,
+}
+
+DataGraphOpticalFlowImageFormatInfoARM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	usage: DataGraphOpticalFlowImageUsageFlagsARM,
+}
+
+DataGraphPipelineOpticalFlowDispatchInfoARM :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	flags:              DataGraphOpticalFlowExecuteFlagsARM,
+	meanFlowL1NormHint: u32,
+}
+
+DataGraphPipelineResourceInfoImageLayoutARM :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	layout: ImageLayout,
+}
+
+DataGraphPipelineSingleNodeConnectionARM :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	set:        u32,
+	binding:    u32,
+	connection: DataGraphPipelineNodeConnectionTypeARM,
+}
+
+DataGraphPipelineSingleNodeCreateInfoARM :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	nodeType:        DataGraphPipelineNodeTypeARM,
+	connectionCount: u32,
+	pConnections:    [^]DataGraphPipelineSingleNodeConnectionARM,
+}
+
+PhysicalDeviceShaderLongVectorFeaturesEXT :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	longVector: b32,
+}
+
+PhysicalDeviceShaderLongVectorPropertiesEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	maxVectorComponents: u32,
+}
+
+PhysicalDevicePipelineCacheIncrementalModeFeaturesSEC :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	pipelineCacheIncrementalMode: b32,
+}
+
+PhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	shaderUniformBufferUnsizedArray: b32,
+}
+
+ComputeOccupancyPriorityParametersNV :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	occupancyPriority:   f32,
+	occupancyThrottling: f32,
+}
+
+PhysicalDeviceComputeOccupancyPriorityFeaturesNV :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	computeOccupancyPriority: b32,
+}
+
+PhysicalDeviceShaderSubgroupPartitionedFeaturesEXT :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	shaderSubgroupPartitioned: b32,
+}
+
+PhysicalDeviceShaderMixedFloatDotProductFeaturesVALVE :: struct {
+	sType:                                       StructureType,
+	pNext:                                       rawptr,
+	shaderMixedFloatDotProductFloat16AccFloat32: b32,
+	shaderMixedFloatDotProductFloat16AccFloat16: b32,
+	shaderMixedFloatDotProductBFloat16Acc:       b32,
+	shaderMixedFloatDotProductFloat8AccFloat32:  b32,
+}
+
+ThrottleHintSubmitInfoSEC :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	throttleHint: ThrottleHintTypeSEC,
+}
+
+PhysicalDeviceThrottleHintFeaturesSEC :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	throttleHint: b32,
+}
+
+PhysicalDeviceDataGraphNeuralAcceleratorStatisticsFeaturesARM :: struct {
+	sType:                                StructureType,
+	pNext:                                rawptr,
+	dataGraphNeuralAcceleratorStatistics: b32,
+}
+
+DataGraphPipelineNeuralStatisticsCreateInfoARM :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	allowNeuralStatistics: b32,
+}
+
+DataGraphPipelineSessionNeuralStatisticsCreateInfoARM :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	mode:  NeuralAcceleratorStatisticsModeARM,
+}
+
+PhysicalDevicePrimitiveRestartIndexFeaturesEXT :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	primitiveRestartIndex: b32,
+}
+
+PhysicalDeviceCooperativeMatrixDecodeVectorFeaturesNV :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	cooperativeMatrixDecodeVector: b32,
 }
 
 AccelerationStructureBuildRangeInfoKHR :: struct {
@@ -9440,6 +11325,50 @@ PipelineShaderStageNodeCreateInfoAMDX :: struct {
 	index: u32,
 }
 
+CudaModuleCreateInfoNV :: struct {
+	sType:    StructureType,
+	pNext:    rawptr,
+	dataSize: int,
+	pData:    rawptr,
+}
+
+CudaFunctionCreateInfoNV :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	module: CudaModuleNV,
+	pName:  cstring,
+}
+
+CudaLaunchInfoNV :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	function:       CudaFunctionNV,
+	gridDimX:       u32,
+	gridDimY:       u32,
+	gridDimZ:       u32,
+	blockDimX:      u32,
+	blockDimY:      u32,
+	blockDimZ:      u32,
+	sharedMemBytes: u32,
+	paramCount:     int,
+	pParams:        [^]rawptr,
+	extraCount:     int,
+	pExtras:        [^]rawptr,
+}
+
+PhysicalDeviceCudaKernelLaunchFeaturesNV :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	cudaKernelLaunchFeatures: b32,
+}
+
+PhysicalDeviceCudaKernelLaunchPropertiesNV :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	computeCapabilityMinor: u32,
+	computeCapabilityMajor: u32,
+}
+
 PhysicalDeviceDisplacementMicromapFeaturesNV :: struct {
 	sType:                StructureType,
 	pNext:                rawptr,
@@ -9471,6 +11400,24 @@ AccelerationStructureTrianglesDisplacementMicromapNV :: struct {
 	pUsageCounts:                          [^]MicromapUsageEXT,
 	ppUsageCounts:                         ^[^]MicromapUsageEXT,
 	micromap:                              MicromapEXT,
+}
+
+PhysicalDeviceDenseGeometryFormatFeaturesAMDX :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	denseGeometryFormat: b32,
+}
+
+AccelerationStructureDenseGeometryFormatTrianglesDataAMDX :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	compressedData:    DeviceOrHostAddressConstKHR,
+	dataSize:          DeviceSize,
+	numTriangles:      u32,
+	numVertices:       u32,
+	maxPrimitiveIndex: u32,
+	maxGeometryIndex:  u32,
+	format:            CompressedTriangleFormatAMDX,
 }
 
 VideoAV1ColorConfigFlags :: distinct bit_set[VideoAV1ColorConfigFlag; u32]
@@ -10595,6 +12542,85 @@ VideoEncodeH265ReferenceInfo :: struct {
 	TemporalId:     u8,
 }
 
+VideoDecodeVP9PictureInfoFlags :: distinct bit_set[VideoDecodeVP9PictureInfoFlag; u32]
+VideoDecodeVP9PictureInfoFlag :: enum u32 {
+	error_resilient_mode,
+	intra_only,
+	allow_high_precision_mv,
+	refresh_frame_context,
+	frame_parallel_decoding_mode,
+	segmentation_enabled,
+	show_frame,
+	UsePrevFrameMvs,
+}
+
+VideoDecodeVP9PictureInfo :: struct {
+	flags:                    VideoDecodeVP9PictureInfoFlags,
+	profile:                  VideoVP9Profile,
+	frame_type:               VideoVP9FrameType,
+	frame_context_idx:        u8,
+	reset_frame_context:      u8,
+	refresh_frame_flags:      u8,
+	ref_frame_sign_bias_mask: u8,
+	interpolation_filter:     VideoVP9InterpolationFilter,
+	base_q_idx:               u8,
+	delta_q_y_dc:             i8,
+	delta_q_uv_dc:            i8,
+	delta_q_uv_ac:            i8,
+	tile_cols_log2:           u8,
+	tile_rows_log2:           u8,
+	reserved1:                [3]u16,
+	pColorConfig:             ^VideoVP9ColorConfig,
+	pLoopFilter:              ^VideoVP9LoopFilter,
+	pSegmentation:            ^VideoVP9Segmentation,
+}
+
+VideoVP9ColorConfigFlags :: distinct bit_set[VideoVP9ColorConfigFlag; u32]
+VideoVP9ColorConfigFlag :: enum u32 {
+	color_range,
+}
+
+VideoVP9ColorConfig :: struct {
+	flags:         VideoVP9ColorConfigFlags,
+	BitDepth:      u8,
+	subsampling_x: u8,
+	subsampling_y: u8,
+	reserved1:     u8,
+	color_space:   VideoVP9ColorSpace,
+}
+
+VideoVP9LoopFilterFlags :: distinct bit_set[VideoVP9LoopFilterFlag; u32]
+VideoVP9LoopFilterFlag :: enum u32 {
+	loop_filter_delta_enabled,
+	loop_filter_delta_update,
+}
+
+VideoVP9LoopFilter :: struct {
+	flags:                   VideoVP9LoopFilterFlags,
+	loop_filter_level:       u8,
+	loop_filter_sharpness:   u8,
+	update_ref_delta:        u8,
+	loop_filter_ref_deltas:  [VIDEO_VP9_MAX_REF_FRAMES]i8,
+	update_mode_delta:       u8,
+	loop_filter_mode_deltas: [VIDEO_VP9_LOOP_FILTER_ADJUSTMENTS]i8,
+}
+
+VideoVP9SegmentationFlags :: distinct bit_set[VideoVP9SegmentationFlag; u32]
+VideoVP9SegmentationFlag :: enum u32 {
+	segmentation_update_map,
+	segmentation_temporal_update,
+	segmentation_update_data,
+	segmentation_abs_or_delta_update,
+}
+
+VideoVP9Segmentation :: struct {
+	flags:                   VideoVP9SegmentationFlags,
+	segmentation_tree_probs: [VIDEO_VP9_MAX_SEGMENTATION_TREE_PROBS]u8,
+	segmentation_pred_prob:  [VIDEO_VP9_MAX_SEGMENTATION_PRED_PROB]u8,
+	FeatureEnabled:          [VIDEO_VP9_MAX_SEGMENTS]u8,
+	FeatureData:             [VIDEO_VP9_MAX_SEGMENTS][VIDEO_VP9_SEG_LVL_MAX]i16,
+}
+
 // Opaque structs
 
 wl_surface       :: struct {} // Opaque struct defined by Wayland
@@ -10830,6 +12856,12 @@ PushDescriptorSetInfoKHR                                    :: PushDescriptorSet
 PushDescriptorSetWithTemplateInfoKHR                        :: PushDescriptorSetWithTemplateInfo
 AccessFlags3KHR                                             :: Flags64
 AccessFlag3KHR                                              :: Flags64
+FormatFeatureFlags4KHR                                      :: Flags64
+FormatFeatureFlag4KHR                                       :: Flags64
+ImageUsageFlags2KHR                                         :: Flags64
+ImageUsageFlag2KHR                                          :: Flags64
+ImageCreateFlags2KHR                                        :: Flags64
+ImageCreateFlag2KHR                                         :: Flags64
 PhysicalDeviceTextureCompressionASTCHDRFeaturesEXT          :: PhysicalDeviceTextureCompressionASTCHDRFeatures
 PipelineRobustnessBufferBehaviorEXT                         :: PipelineRobustnessBufferBehavior
 PipelineRobustnessImageBehaviorEXT                          :: PipelineRobustnessImageBehavior
@@ -10839,6 +12871,9 @@ PipelineRobustnessCreateInfoEXT                             :: PipelineRobustnes
 SamplerReductionModeEXT                                     :: SamplerReductionMode
 SamplerReductionModeCreateInfoEXT                           :: SamplerReductionModeCreateInfo
 PhysicalDeviceSamplerFilterMinmaxPropertiesEXT              :: PhysicalDeviceSamplerFilterMinmaxProperties
+TensorViewCreateFlagsARM                                    :: Flags64
+TensorViewCreateFlagARM                                     :: Flags64
+DeviceAddressRangeEXT                                       :: DeviceAddressRangeKHR
 PhysicalDeviceInlineUniformBlockFeaturesEXT                 :: PhysicalDeviceInlineUniformBlockFeatures
 PhysicalDeviceInlineUniformBlockPropertiesEXT               :: PhysicalDeviceInlineUniformBlockProperties
 WriteDescriptorSetInlineUniformBlockEXT                     :: WriteDescriptorSetInlineUniformBlock
@@ -10859,8 +12894,8 @@ GeometryFlagsNV                                             :: GeometryFlagsKHR
 GeometryFlagNV                                              :: GeometryFlagKHR
 GeometryInstanceFlagsNV                                     :: GeometryInstanceFlagsKHR
 GeometryInstanceFlagNV                                      :: GeometryInstanceFlagKHR
-BuildAccelerationStructureFlagsNV                           :: BuildAccelerationStructureFlagsKHR
 BuildAccelerationStructureFlagNV                            :: BuildAccelerationStructureFlagKHR
+BuildAccelerationStructureFlagsNV                           :: BuildAccelerationStructureFlagsKHR
 TransformMatrixNV                                           :: TransformMatrixKHR
 AabbPositionsNV                                             :: AabbPositionsKHR
 AccelerationStructureInstanceNV                             :: AccelerationStructureInstanceKHR
@@ -10910,8 +12945,23 @@ SubresourceHostMemcpySizeEXT                                :: SubresourceHostMe
 HostImageCopyDevicePerformanceQueryEXT                      :: HostImageCopyDevicePerformanceQuery
 SubresourceLayout2EXT                                       :: SubresourceLayout2
 ImageSubresource2EXT                                        :: ImageSubresource2
+PresentScalingFlagEXT                                       :: PresentScalingFlagKHR
+PresentScalingFlagsEXT                                      :: PresentScalingFlagsKHR
+PresentGravityFlagEXT                                       :: PresentGravityFlagKHR
+PresentGravityFlagsEXT                                      :: PresentGravityFlagsKHR
+SurfacePresentModeEXT                                       :: SurfacePresentModeKHR
+SurfacePresentScalingCapabilitiesEXT                        :: SurfacePresentScalingCapabilitiesKHR
+SurfacePresentModeCompatibilityEXT                          :: SurfacePresentModeCompatibilityKHR
+PhysicalDeviceSwapchainMaintenance1FeaturesEXT              :: PhysicalDeviceSwapchainMaintenance1FeaturesKHR
+SwapchainPresentFenceInfoEXT                                :: SwapchainPresentFenceInfoKHR
+SwapchainPresentModesCreateInfoEXT                          :: SwapchainPresentModesCreateInfoKHR
+SwapchainPresentModeInfoEXT                                 :: SwapchainPresentModeInfoKHR
+SwapchainPresentScalingCreateInfoEXT                        :: SwapchainPresentScalingCreateInfoKHR
+ReleaseSwapchainImagesInfoEXT                               :: ReleaseSwapchainImagesInfoKHR
 PhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT     :: PhysicalDeviceShaderDemoteToHelperInvocationFeatures
 PhysicalDeviceTexelBufferAlignmentPropertiesEXT             :: PhysicalDeviceTexelBufferAlignmentProperties
+PhysicalDeviceRobustness2FeaturesEXT                        :: PhysicalDeviceRobustness2FeaturesKHR
+PhysicalDeviceRobustness2PropertiesEXT                      :: PhysicalDeviceRobustness2PropertiesKHR
 PrivateDataSlotEXT                                          :: PrivateDataSlot
 PrivateDataSlotCreateFlagsEXT                               :: PrivateDataSlotCreateFlags
 PhysicalDevicePrivateDataFeaturesEXT                        :: PhysicalDevicePrivateDataFeatures
@@ -10919,19 +12969,48 @@ DevicePrivateDataCreateInfoEXT                              :: DevicePrivateData
 PrivateDataSlotCreateInfoEXT                                :: PrivateDataSlotCreateInfo
 PhysicalDevicePipelineCreationCacheControlFeaturesEXT       :: PhysicalDevicePipelineCreationCacheControlFeatures
 PhysicalDeviceImageRobustnessFeaturesEXT                    :: PhysicalDeviceImageRobustnessFeatures
+DeviceFaultAddressTypeEXT                                   :: DeviceFaultAddressTypeKHR
+DeviceFaultVendorBinaryHeaderVersionEXT                     :: DeviceFaultVendorBinaryHeaderVersionKHR
+DeviceFaultAddressInfoEXT                                   :: DeviceFaultAddressInfoKHR
+DeviceFaultVendorInfoEXT                                    :: DeviceFaultVendorInfoKHR
+DeviceFaultVendorBinaryHeaderVersionOneEXT                  :: DeviceFaultVendorBinaryHeaderVersionOneKHR
 PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesARM :: PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
 PhysicalDeviceMutableDescriptorTypeFeaturesVALVE            :: PhysicalDeviceMutableDescriptorTypeFeaturesEXT
 MutableDescriptorTypeListVALVE                              :: MutableDescriptorTypeListEXT
 MutableDescriptorTypeCreateInfoVALVE                        :: MutableDescriptorTypeCreateInfoEXT
+PhysicalDevicePresentModeFifoLatestReadyFeaturesEXT         :: PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR
 PipelineInfoEXT                                             :: PipelineInfoKHR
 PhysicalDeviceGlobalPriorityQueryFeaturesEXT                :: PhysicalDeviceGlobalPriorityQueryFeatures
 QueueFamilyGlobalPriorityPropertiesEXT                      :: QueueFamilyGlobalPriorityProperties
+OpacityMicromapFormatEXT                                    :: OpacityMicromapFormatKHR
+OpacityMicromapSpecialIndexEXT                              :: OpacityMicromapSpecialIndexKHR
+MicromapTriangleEXT                                         :: MicromapTriangleKHR
 PhysicalDeviceSchedulingControlsFlagsARM                    :: Flags64
 PhysicalDeviceSchedulingControlsFlagARM                     :: Flags64
 PhysicalDeviceDepthClampZeroOneFeaturesEXT                  :: PhysicalDeviceDepthClampZeroOneFeaturesKHR
-MemoryDecompressionMethodFlagNV                             :: Flags64
-MemoryDecompressionMethodFlagsNV                            :: Flags64
+PhysicalDeviceFragmentDensityMapOffsetFeaturesQCOM          :: PhysicalDeviceFragmentDensityMapOffsetFeaturesEXT
+PhysicalDeviceFragmentDensityMapOffsetPropertiesQCOM        :: PhysicalDeviceFragmentDensityMapOffsetPropertiesEXT
+SubpassFragmentDensityMapOffsetEndInfoQCOM                  :: RenderPassFragmentDensityMapOffsetEndInfoEXT
+CopyMemoryIndirectCommandNV                                 :: CopyMemoryIndirectCommandKHR
+CopyMemoryToImageIndirectCommandNV                          :: CopyMemoryToImageIndirectCommandKHR
+PhysicalDeviceCopyMemoryIndirectPropertiesNV                :: PhysicalDeviceCopyMemoryIndirectPropertiesKHR
+MemoryDecompressionMethodFlagEXT                            :: Flags64
+MemoryDecompressionMethodFlagNV                             :: MemoryDecompressionMethodFlagEXT
+MemoryDecompressionMethodFlagsEXT                           :: Flags64
+MemoryDecompressionMethodFlagsNV                            :: MemoryDecompressionMethodFlagsEXT
+PhysicalDeviceMemoryDecompressionFeaturesNV                 :: PhysicalDeviceMemoryDecompressionFeaturesEXT
+PhysicalDeviceMemoryDecompressionPropertiesNV               :: PhysicalDeviceMemoryDecompressionPropertiesEXT
+TensorCreateFlagsARM                                        :: Flags64
+TensorCreateFlagARM                                         :: Flags64
+TensorUsageFlagsARM                                         :: Flags64
+TensorUsageFlagARM                                          :: Flags64
 PhysicalDevicePipelineProtectedAccessFeaturesEXT            :: PhysicalDevicePipelineProtectedAccessFeatures
 ShaderRequiredSubgroupSizeCreateInfoEXT                     :: PipelineShaderStageRequiredSubgroupSizeCreateInfo
+RayTracingInvocationReorderModeNV                           :: RayTracingInvocationReorderModeEXT
+DataGraphPipelineSessionCreateFlagsARM                      :: Flags64
+DataGraphPipelineSessionCreateFlagARM                       :: Flags64
+DataGraphPipelineDispatchFlagsARM                           :: Flags64
+DataGraphPipelineDispatchFlagARM                            :: Flags64
+RenderingEndInfoEXT                                         :: RenderingEndInfoKHR
 
 
