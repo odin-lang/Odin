@@ -1909,16 +1909,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 				}
 				break;
 		}
-	} else if (metrics->os == TargetOs_linux) {
-		if (bc->reloc_mode == RelocMode_Default) {
-			bc->reloc_mode = RelocMode_PIC;
-		}
-		switch (metrics->arch) {
-		case TargetArch_arm64:
-		case TargetArch_amd64:
-			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
-			break;
-		}
 	} else if (metrics->os == TargetOs_openbsd) {
 		// Always use PIC for OpenBSD: it defaults to PIE
 		if (bc->reloc_mode == RelocMode_Default) {
@@ -1947,9 +1937,36 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->metrics.target_triplet = str_lit("i686-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
-		
 		default:
 			GB_PANIC("Unknown architecture for -subtarget:android");
+		}
+	} else if (metrics->os == TargetOs_linux) {
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_PIC;
+		}
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+		case TargetArch_amd64:
+			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
+			break;
+		}
+	}
+
+	if (metrics->os == TargetOs_windows ||
+			metrics->os == TargetOs_darwin ||
+			metrics->os == TargetOs_linux ||
+			metrics->os == TargetOs_freebsd ||
+			metrics->os == TargetOs_openbsd ||
+			metrics->os == TargetOs_netbsd) {
+		if (bc->stack_protector == StackProtector_Default) {
+			bc->stack_protector = StackProtector_Ssp;
+		}
+	} else {
+		if (bc->stack_protector == StackProtector_Default) {
+			bc->stack_protector = StackProtector_None;
+		} else {
+			gb_printf_err("-stack-protector is not supported on this target\n");
+			gb_exit(1);
 		}
 	}
 
