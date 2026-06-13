@@ -278,6 +278,14 @@ enum RelocMode : u8 {
 	RelocMode_DynamicNoPIC,
 };
 
+enum StackProtector : u8 {
+	StackProtector_Default,
+	StackProtector_None,
+	StackProtector_Ssp,
+	StackProtector_SspReq,
+	StackProtector_SspStrong,
+};
+
 enum BuildPath : u8 {
 	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
 	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
@@ -599,7 +607,9 @@ struct BuildContext {
 
 	bool   print_linker_flags;
 
-	RelocMode reloc_mode;
+	RelocMode      reloc_mode;
+	StackProtector stack_protector;
+
 	bool   disable_red_zone;
 	bool   disable_unwind;
 	bool   no_plt;

@@ -354,6 +354,7 @@ enum BuildFlagKind {
 	BuildFlag_NoThreadLocal,
 
 	BuildFlag_RelocMode,
+	BuildFlag_StackProtector,
 	BuildFlag_DisableRedZone,
 
 	BuildFlag_DisableUnwind,
@@ -587,6 +588,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_bundle_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_StackProtector,          str_lit("stack-protector"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_DisableUnwind,           str_lit("disable-unwind"),          BuildFlagParam_None,    Command__does_build);
@@ -1430,6 +1432,29 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 
 							break;
+						}
+						case BuildFlag_StackProtector: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String v = value.value_string;
+							if (v == "default") {
+								build_context.stack_protector = StackProtector_Default;
+							} else if (v == "none") {
+								build_context.stack_protector = StackProtector_None;
+							} else if (v == "base") {
+								build_context.stack_protector = StackProtector_Ssp;
+							} else if (v == "all") {
+								build_context.stack_protector = StackProtector_SspReq;
+							} else if (v == "strong") {
+								build_context.stack_protector = StackProtector_SspStrong;
+							} else {
+								gb_printf_err("-stack-protector flag expected one of the following\n");
+								gb_printf_err("\tdefault\n");
+								gb_printf_err("\tnone\n");
+								gb_printf_err("\tbase\n");
+								gb_printf_err("\tall\n");
+								gb_printf_err("\tstrong\n");
+								bad_flags = true;
+							}
 						}
 						case BuildFlag_DisableRedZone:
 							build_context.disable_red_zone = true;
@@ -2984,6 +3009,16 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-reloc-mode:static");
 				print_usage_line(3, "-reloc-mode:pic");
 				print_usage_line(3, "-reloc-mode:dynamic-no-pic");
+		}
+
+		if (print_flag("-stack-protector:<string>")) {
+			print_usage_line(2, "Specifies the stack protector.");
+			print_usage_line(2, "Available options:");
+				print_usage_line(3, "-stack-protector:default");
+				print_usage_line(3, "-stack-protector:none");
+				print_usage_line(3, "-stack-protector:base");
+				print_usage_line(3, "-stack-protector:all");
+				print_usage_line(3, "-stack-protector:strong");
 		}
 
 	#if defined(GB_SYSTEM_WINDOWS)
