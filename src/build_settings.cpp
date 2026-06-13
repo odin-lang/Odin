@@ -1952,9 +1952,18 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		}
 	}
 
-	if (metrics->os == TargetOs_windows ||
+	// note: there are some stack protection toolchain issues on non-intel 
+	// platforms that will clash with PIC/PIE:
+	// `unresolvable R_AARCH64_ADR_PREL_PG_HI21 relocation against symbol`
+	if (metrics->os == TargetOs_linux && (
+			metrics->arch == TargetArch_amd64 ||
+			metrics->arch == TargetArch_i386
+	)) {
+		if (bc->stack_protector == StackProtector_Default) {
+			bc->stack_protector = StackProtector_Ssp;
+		}
+	} else if (metrics->os == TargetOs_windows ||
 			metrics->os == TargetOs_darwin ||
-			metrics->os == TargetOs_linux ||
 			metrics->os == TargetOs_freebsd ||
 			metrics->os == TargetOs_openbsd ||
 			metrics->os == TargetOs_netbsd) {
