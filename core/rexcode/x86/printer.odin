@@ -298,20 +298,19 @@ sbprint :: proc(
 		}
 	}
 
-	for instruction_index in 0..<len(instructions) {
-		inst := &instructions[instruction_index]
+	for &inst, instruction_index in instructions {
 		info := &inst_info[instruction_index]
 
 		// Check if there's a label at this offset
-		for label_id in 0..<u32(len(label_defs)) {
-			if label_defs[label_id] != LABEL_UNDEFINED && u32(label_defs[label_id]) == info.offset {
+		for label_def, label_id in label_defs {
+			if label_def != LABEL_UNDEFINED && u32(label_def) == info.offset {
 				// Print label definition
 				start := strings.builder_len(sb^)
-				if name, ok := label_names^[label_id]; ok {
+				if name, ok := label_names^[u32(label_id)]; ok {
 					strings.write_string(sb, name)
 				} else {
 					strings.write_string(sb, options.label_prefix)
-					print_decimal(sb, label_id)
+					print_decimal(sb, u32(label_id))
 				}
 				strings.write_byte(sb, ':')
 				emit_token(tokens, sb, .LABEL_DEF, 0xFFFF, start)
@@ -342,7 +341,7 @@ sbprint :: proc(
 		// Print mnemonic
 		{
 			start := strings.builder_len(sb^)
-			write_mnemonic(sb, inst, &options)
+			write_mnemonic(sb, &inst, &options)
 			emit_token(tokens, sb, .MNEMONIC, u16(instruction_index), start)
 		}
 
@@ -364,7 +363,9 @@ sbprint :: proc(
 			}
 
 			op := &inst.ops[i]
-			#partial switch op.kind {
+			switch op.kind {
+			case .NONE:
+				//
 			case .REGISTER:
 				start := strings.builder_len(sb^)
 				write_register(sb, op.reg, &options)

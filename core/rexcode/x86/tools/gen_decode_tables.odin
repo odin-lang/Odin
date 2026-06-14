@@ -51,14 +51,14 @@ generate_header :: proc(sb: ^strings.Builder) {
 // =============================================================================
 // ModR/M Lookup Table
 // =============================================================================
-// Precomputed extraction of mod, reg, rm fields from ModR/M byte
 
+// Precomputed extraction of mod, reg, rm fields from ModR/M byte
 ModRM_Info :: struct #packed {
-	mod: u8,        // bits [7:6] - addressing mode
-	reg: u8,        // bits [5:3] - register or opcode extension
-	rm: u8,         // bits [2:0] - register or memory
-	has_sib: bool,  // rm==4 && mod!=3 (SIB byte follows)
-	disp_size: u8,  // displacement size: 0, 1, or 4 bytes
+	mod:       u8,   // bits [7:6] - addressing mode
+	reg:       u8,   // bits [5:3] - register or opcode extension
+	rm:        u8,   // bits [2:0] - register or memory
+	has_sib:   bool, // rm==4 && mod!=3 (SIB byte follows)
+	disp_size: u8,   // displacement size: 0, 1, or 4 bytes
 }
 
 `)
@@ -99,12 +99,12 @@ generate_sib_table :: proc(sb: ^strings.Builder) {
 	strings.write_string(sb, `// =============================================================================
 // SIB Lookup Table
 // =============================================================================
-// Precomputed extraction of scale, index, base fields from SIB byte
 
+// Precomputed extraction of scale, index, base fields from SIB byte
 SIB_Info :: struct #packed {
-	scale: u8,      // 1, 2, 4, or 8
-	index: u8,      // index register (0-7, or 0xFF if none when index==4)
-	base: u8,       // base register (0-7, or 0xFF for special cases)
+	scale: u8, // 1, 2, 4, or 8
+	index: u8, // index register (0-7, or 0xFF if none when index==4)
+	base:  u8, // base register (0-7, or 0xFF for special cases)
 }
 
 `)
@@ -200,17 +200,17 @@ generate_opcode_tables :: proc(sb: ^strings.Builder) {
 	strings.write_string(sb, `// =============================================================================
 // Decode Entry
 // =============================================================================
-// Information needed to decode an instruction given its opcode bytes
 
+// Information needed to decode an instruction given its opcode bytes
 Decode_Entry :: struct {
-	esc: Escape,           // escape sequence used to find this entry
-	prefix: u8,         // mandatory prefix (0=none, 1=66, 2=F3, 3=F2)
-	opcode: u8,         // primary opcode byte
-	ext: u8,            // ModR/M reg extension (0-7) or 0xFF if not used
+	esc:      Escape,              // escape sequence used to find this entry
+	prefix:   u8,                  // mandatory prefix (0=none, 1=66, 2=F3, 3=F2)
+	opcode:   u8,                  // primary opcode byte
+	ext:      u8,                  // ModR/M reg extension (0-7) or 0xFF if not used
 	mnemonic: Mnemonic,
-	ops: [4]Operand_Type,         // operand types
-	enc: [4]Operand_Encoding,      // operand encodings
-	flags: Encoding_Flags,
+	ops:      [4]Operand_Type,     // operand types
+	enc:      [4]Operand_Encoding, // operand encodings
+	flags:    Encoding_Flags,
 }
 
 `)
@@ -230,16 +230,16 @@ Decode_Entry :: struct {
 // =============================================================================
 
 VEX_Decode_Entry :: struct {
-	esc: Escape,
-	prefix: u8,
-	opcode: u8,
-	ext: u8,
-	vex_w: VEX_W,
-	vex_l: VEX_L,
+	esc:      Escape,
+	prefix:   u8,
+	opcode:   u8,
+	ext:      u8,
+	vex_w:    VEX_W,
+	vex_l:    VEX_L,
 	mnemonic: Mnemonic,
-	ops: [4]Operand_Type,
-	enc: [4]Operand_Encoding,
-	flags: Encoding_Flags,
+	ops:      [4]Operand_Type,
+	enc:      [4]Operand_Encoding,
+	flags:    Encoding_Flags,
 }
 
 `)
@@ -389,8 +389,8 @@ generate_vex_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Ent
 	strings.write_string(sb, fmt.tprintf(`// =============================================================================
 // %s Index Tables for O(1) Opcode Lookup
 // =============================================================================
-// Indexed by [esc_idx][prefix][opcode] where esc_idx: 0=0F, 1=0F38, 2=0F3A
 
+// Indexed by [esc_idx][prefix][opcode] where esc_idx: 0=0F, 1=0F38, 2=0F3A
 `, name))
 
 	for esc_idx in 0..<3 {
@@ -432,13 +432,11 @@ generate_vex_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Ent
 				}
 
 				if count > 0 {
-					strings.write_string(sb, fmt.tprintf("\t\t{{%d, %d}}, // 0x%02X\n", start, count, opcode))
-				} else {
-					strings.write_string(sb, fmt.tprintf("\t\t{{0, 0}}, // 0x%02X\n", opcode))
+					fmt.sbprintfln(sb, "\t\t0x%02X = {{%d, %d}},", opcode, start, count)
 				}
 			}
 
-			strings.write_string(sb, "    },\n")
+			strings.write_string(sb, "\t},\n")
 		}
 
 		strings.write_string(sb, "}\n\n")
@@ -452,9 +450,9 @@ generate_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Entry) 
 	strings.write_string(sb, `// =============================================================================
 // Index Tables for O(1) Opcode Lookup
 // =============================================================================
+
 // Each entry contains (start_index, count) into LEGACY_DECODE_ENTRIES
 // Indexed by [esc][prefix][opcode]
-
 Decode_Index :: struct {
 	start: u16,     // start index in LEGACY_DECODE_ENTRIES
 	count: u8,      // number of entries
@@ -504,9 +502,7 @@ Decode_Index :: struct {
 				}
 
 				if count > 0 {
-					strings.write_string(sb, fmt.tprintf("\t\t{{%d, %d}}, // 0x%02X\n", start, count, opcode))
-				} else {
-					strings.write_string(sb, fmt.tprintf("\t\t{{0, 0}}, // 0x%02X\n", opcode))
+					fmt.sbprintfln(sb, "\t\t0x%02X = {{%d, %d}},", opcode, start, count)
 				}
 			}
 
