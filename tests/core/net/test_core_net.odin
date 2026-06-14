@@ -139,6 +139,13 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	{ .IP4, "[10.0.128.31] :80",       "", ""},
 	{ .IP4, "[255.255.255.255]:65536", "", ""},
 
+	// "]:" with no opening '[' is not a bracketed host:port; it parses
+	// as a plain host (no port) and so is not a valid address here.
+	{ .IP4, "]:80",                    "", ""},
+	{ .IP4, "]:",                      "", ""},
+	{ .IP6, "]:1",                     "", ""},
+	{ .IP4, "foo]:80",                 "", ""},
+
 
 	// numbers-and-dots notation, but not dotted-decimal
 	{ .IP4_Alt, "1.2.03.4",                "01020304", ""},
