@@ -6,7 +6,7 @@ import "core:fmt"
 import "core:time"
 import "core:slice"
 import "core:strings"
-import "core:sys/posix"
+import "core:mem/virtual"
 import "core:math"
 
 // SIMD vector type aliases
@@ -58,13 +58,14 @@ log_header :: proc(title: string) {
 // =============================================================================
 
 alloc_exec :: proc(size: uint) -> []u8 {
-	ptr := posix.mmap(nil, size, {.READ, .WRITE, .EXEC}, {.PRIVATE, .ANONYMOUS}, posix.FD(-1), 0)
-	if ptr == posix.MAP_FAILED { return nil }
-	return slice.from_ptr(cast(^u8)ptr, int(size))
+	data, _ := virtual.reserve_and_commit(size)
+	return data
 }
 
 free_exec :: proc(buf: []u8) {
-	if buf != nil { posix.munmap(raw_data(buf), len(buf)) }
+	if buf != nil {
+		virtual.release(raw_data(buf), len(buf))
+	}
 }
 
 // =============================================================================
