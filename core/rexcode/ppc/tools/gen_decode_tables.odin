@@ -34,6 +34,7 @@ import "core:fmt"
 import "core:os"
 import "core:slice"
 import "core:strings"
+import "core:reflect"
 import "core:math/bits"
 
 import p ".."
@@ -238,21 +239,75 @@ Decode_Index :: struct #packed {
 	_:     u16,
 }
 
-DECODE_SUB_BUCKETS :: 256   // per primary
+DECODE_SUB_BUCKETS :: 256 // per primary
+
 `)
+}
+
+
+print_enum_buffered :: proc(sb: ^strings.Builder, x: $T, max_name: int, comma: bool) {
+	fmt.sbprintf(sb, ".%v", x)
+	if comma {
+		strings.write_string(sb, ", ")
+	} else {
+		return
+	}
+	for n := max_name-len(reflect.enum_string(x)); n > 0; n -= 1 {
+		strings.write_byte(sb, ' ')
+	}
+}
+
+print_enum_space :: proc(sb: ^strings.Builder, x: $T, max_name: int) {
+	for n := max_name-len(reflect.enum_string(x)); n > 0; n -= 1 {
+		strings.write_byte(sb, ' ')
+	}
+}
+
+
+max_enum_name_len :: proc($T: typeid) -> int {
+	max_len := 0
+	for name in reflect.enum_field_names(T) {
+		max_len = max(max_len, len(name))
+	}
+	return max_len
 }
 
 emit_entries :: proc(sb: ^strings.Builder, entries: []Entry) {
 	fmt.sbprintfln(sb, "@(rodata)")
 	fmt.sbprintfln(sb, "DECODE_ENTRIES := [%d]Decode_Entry{{", len(entries))
+
+	max_mnemonic_len := max_enum_name_len(p.Mnemonic)
+	max_op_len       := max_enum_name_len(p.Operand_Type)
+	max_enc_len      := max_enum_name_len(p.Operand_Encoding)
+	max_feature_len  := max_enum_name_len(p.Feature)
+	max_mode_len     := max_enum_name_len(p.Mode)
+
 	for e in entries {
+		strings.write_string(sb, "\t{")
+		defer strings.write_string(sb, "},\n")
+
+		print_enum_buffered(sb, e.mnemonic, max_mnemonic_len, true)
+
 		flags_str := encode_flags_literal(e.flags)
-		fmt.sbprintfln(sb,
-			"\t{{ .%v, {{.%v, .%v, .%v, .%v}}, {{.%v, .%v, .%v, .%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}} }},",
-			e.mnemonic,
-			e.ops[0], e.ops[1], e.ops[2], e.ops[3],
-			e.enc[0], e.enc[1], e.enc[2], e.enc[3],
-			e.bits, e.mask, e.feature, e.mode, flags_str)
+
+		strings.write_string(sb, "{")
+		for op_type, i in e.ops {
+			print_enum_buffered(sb, op_type, max_op_len, i+1 < len(e.ops))
+		}
+		strings.write_string(sb, "}, ")
+		print_enum_space(sb, e.ops[len(e.ops)-1], max_op_len)
+
+		strings.write_string(sb, "{")
+		for enc_type, i in e.enc {
+			print_enum_buffered(sb, enc_type, max_enc_len, i+1 < len(e.enc))
+		}
+		strings.write_string(sb, "}, ")
+		print_enum_space(sb, e.enc[len(e.enc)-1], max_enc_len)
+
+		fmt.sbprintf(sb, "0x%08X, 0x%08X, ", e.bits, e.mask)
+		print_enum_buffered(sb, e.feature, max_feature_len, true)
+		print_enum_buffered(sb, e.mode, max_mode_len, true)
+		fmt.sbprintf(sb, "{{%s}}", flags_str)
 	}
 	strings.write_string(sb, "}\n\n")
 }
@@ -284,7 +339,7 @@ emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 	for r, i in ranges {
 		if r.count != 0 {
 			if amount_set % 16 == 0 { strings.write_string(sb, "\n\t") }
-			fmt.sbprintf(sb, "0x%04X = {{%d, % 2d, 0}}, ", i, r.start, r.count)
+			fmt.sbprintf(sb, "0x%04X = {{% 5d, % 4d, 0}}, ", i, r.start, r.count)
 			amount_set += 1
 		}
 	}
@@ -293,12 +348,23 @@ emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 
 emit_form_idx :: proc(sb: ^strings.Builder, entries: []Entry) {
 	fmt.sbprintfln(sb, "@(rodata)")
-	fmt.sbprintf(sb, "DECODE_FORM_IDX := [%d]u16{{", len(entries))
-	for e, i in entries {
-		if i % 64 == 0 { strings.write_string(sb, "\n\t") }
-		fmt.sbprintf(sb, "%d, ", e.form_idx)
+	all_zero := true
+	for e in entries {
+		if e.form_idx != 0 {
+			all_zero = false
+			break
+		}
 	}
-	strings.write_string(sb, "\n}\n\n")
+	if all_zero {
+		fmt.sbprintf(sb, "DECODE_FORM_IDX: [%d]u16\n\n", len(entries))
+	} else {
+		fmt.sbprintf(sb, "DECODE_FORM_IDX := [%d]u16{{", len(entries))
+		for e, i in entries {
+			if i % 64 == 0 { strings.write_string(sb, "\n\t") }
+			fmt.sbprintf(sb, "%d, ", e.form_idx)
+		}
+		strings.write_string(sb, "\n}\n\n")
+	}
 }
 
 emit_bucket_list :: proc(sb: ^strings.Builder, items: []u16) {
