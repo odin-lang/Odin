@@ -248,7 +248,7 @@ emit_entries :: proc(sb: ^strings.Builder, entries: []Entry) {
 	for e in entries {
 		flags_str := encode_flags_literal(e.flags)
 		fmt.sbprintfln(sb,
-			"\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}} }},",
+			"\t{{ .%v, {{.%v, .%v, .%v, .%v}}, {{.%v, .%v, .%v, .%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}} }},",
 			e.mnemonic,
 			e.ops[0], e.ops[1], e.ops[2], e.ops[3],
 			e.enc[0], e.enc[1], e.enc[2], e.enc[3],
@@ -279,13 +279,13 @@ encode_flags_literal :: proc(f: p.Encoding_Flags) -> string {
 
 emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 	fmt.sbprintfln(sb, "@(rodata)")
-	fmt.sbprintfln(sb, "%s := [%d]Decode_Index{{", name, len(ranges))
+	fmt.sbprintf(sb, "%s := [%d]Decode_Index{{", name, len(ranges))
+	amount_set := 0
 	for r, i in ranges {
-		if r.count == 0 {
-			if i % 16 == 0 { strings.write_string(sb, "\n") }
-			strings.write_string(sb, "{0,0,0},")
-		} else {
-			fmt.sbprintf(sb, "{{%d,%d,0}},", r.start, r.count)
+		if r.count != 0 {
+			if amount_set % 16 == 0 { strings.write_string(sb, "\n\t") }
+			fmt.sbprintf(sb, "0x%04X = {{%d, % 2d, 0}}, ", i, r.start, r.count)
+			amount_set += 1
 		}
 	}
 	strings.write_string(sb, "\n}\n\n")
@@ -293,20 +293,20 @@ emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 
 emit_form_idx :: proc(sb: ^strings.Builder, entries: []Entry) {
 	fmt.sbprintfln(sb, "@(rodata)")
-	fmt.sbprintfln(sb, "DECODE_FORM_IDX := [%d]u16{{", len(entries))
+	fmt.sbprintf(sb, "DECODE_FORM_IDX := [%d]u16{{", len(entries))
 	for e, i in entries {
-		if i > 0 && i % 16 == 0 { strings.write_string(sb, "\n") }
-		fmt.sbprintf(sb, " %d,", e.form_idx)
+		if i % 64 == 0 { strings.write_string(sb, "\n\t") }
+		fmt.sbprintf(sb, "%d, ", e.form_idx)
 	}
 	strings.write_string(sb, "\n}\n\n")
 }
 
 emit_bucket_list :: proc(sb: ^strings.Builder, items: []u16) {
 	fmt.sbprintfln(sb, "@(rodata)")
-	fmt.sbprintfln(sb, "DECODE_BUCKET_LIST := [%d]u16{{", len(items))
+	fmt.sbprintf(sb, "DECODE_BUCKET_LIST := [%d]u16{{", len(items))
 	for v, i in items {
-		if i > 0 && i % 16 == 0 { strings.write_string(sb, "\n") }
-		fmt.sbprintf(sb, " %d,", v)
+		if i % 64 == 0 { strings.write_string(sb, "\n\t") }
+		fmt.sbprintf(sb, "% 4d, ", v)
 	}
 	strings.write_string(sb, "\n}\n\n")
 }

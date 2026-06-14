@@ -30,7 +30,7 @@ package rexcode_ppc
 //   §13 Power ISA 3.1 prefixed (POWER10)
 //   §14 Aliases (printed differently, encoded as their underlying form)
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	.INVALID = {},
 
 	// =========================================================================
