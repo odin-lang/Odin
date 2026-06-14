@@ -10168,7 +10168,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 
 	String assignment_str = str_lit("structure literal");
 	if (bt->kind == Type_BitField) {
-		assignment_str = str_lit("bit_field literal");
+		assignment_str = str_lit("'bit_field' literal");
 	}
 
 	for (Ast *elem : elems) {
@@ -10180,14 +10180,14 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		Ast *ident = fv->field;
 		if (ident->kind == Ast_ImplicitSelectorExpr) {
 			gbString expr_str = expr_to_string(ident);
-			error(ident, "Field names do not start with a '.', remove the '.' in structure literal", expr_str);
+			error(ident, "Field names do not start with a '.', remove the '.' in %.*s", expr_str, LIT(assignment_str));
 			gb_string_free(expr_str);
 
 			ident = ident->ImplicitSelectorExpr.selector;
 		}
 		if (ident->kind != Ast_Ident) {
 			gbString expr_str = expr_to_string(ident);
-			error(elem, "Invalid field name '%s' in structure literal", expr_str);
+			error(elem, "Invalid field name '%s' in %.*s", expr_str, LIT(assignment_str));
 			gb_string_free(expr_str);
 			continue;
 		}
@@ -10197,7 +10197,9 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		Selection sel = lookup_field(type, interned, o->mode == Addressing_Type);
 		bool is_unknown = sel.entity == nullptr;
 		if (is_unknown) {
-			error(ident, "Unknown field '%.*s' in structure literal", LIT(name));
+			gbString s = type_to_string(type);
+			error(ident, "Unknown field '%.*s' in %.*s", LIT(name), LIT(assignment_str));
+			gb_string_free(s);
 			continue;
 		}
 
@@ -10251,7 +10253,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 						ft = bt->Array.elem;
 						break;
 					case Type_BitField:
-						is_constant = false;
+						// is_constant = false;
 						ft = bt->BitField.fields[index]->type;
 						break;
 					default:
@@ -10300,6 +10302,12 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		if (is_constant) {
 			is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
 		}
+		if (bt->kind == Type_BitField) {
+			if (is_type_different_to_arch_endianness(field->type)) {
+				is_constant = false;
+			}
+		}
+
 
 		u8 prev_bit_field_bit_size = c->bit_field_bit_size;
 		if (field->kind == Entity_Variable && field->Variable.bit_field_bit_size) {
@@ -11351,7 +11359,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		if (cl->elems.count == 0) {
 			break; // NOTE(bill): No need to init
 		}
-		is_constant = false;
+		// is_constant = false;
 		if (cl->elems[0]->kind != Ast_FieldValue) {
 			gbString type_str = type_to_string(type);
 			error(node, "%s ('bit_field') compound literals are only allowed to contain 'field = value' elements", type_str);
@@ -11753,11 +11761,11 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
 		}
 		check_assignment(c, &key, t->Map.key, str_lit("map index"));
-		if (key.mode == Addressing_Invalid) {
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
+		// if (key.mode == Addressing_Invalid) {
+		// 	o->mode = Addressing_Invalid;
+		// 	o->expr = node;
+		// 	return kind;
+		// }
 		o->mode = Addressing_MapIndex;
 		o->type = t->Map.value;
 		o->expr = node;

@@ -2,15 +2,6 @@ gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue l
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr);
 gb_internal lbValue lb_expand_values(lbProcedure *p, lbValue val, Type *type);
 
-gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
-	GB_ASSERT(bit_count <= 64);
-	if (bit_count == 0) {
-		return LLVMConstInt(type, 0, false);
-	}
-	u64 mask = bit_count == 64 ? ~0ull : (1ull<<bit_count)-1;
-	return LLVMConstInt(type, mask, false);
-}
-
 gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *final_type) {
 	lbModule *m = p->module;
 
@@ -4420,7 +4411,6 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	Type *type = type_of_expr(expr);
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
-
 
 
 	if (tv.value.kind != ExactValue_Invalid) {

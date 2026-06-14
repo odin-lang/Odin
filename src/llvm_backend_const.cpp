@@ -1,3 +1,12 @@
+gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
+	GB_ASSERT(bit_count <= 64);
+	if (bit_count == 0) {
+		return LLVMConstInt(type, 0, false);
+	}
+	u64 mask = bit_count == 64 ? ~0ull : (1ull<<bit_count)-1;
+	return LLVMConstInt(type, mask, false);
+}
+
 gb_internal bool lb_is_const(lbValue value) {
 	LLVMValueRef v = value.value;
 	if (is_type_untyped_nil(value.type)) {
@@ -716,6 +725,173 @@ gb_internal LLVMValueRef lb_fill_fixed_capacity_dynamic_array(lbModule *m, i64 e
 	return llvm_const_named_struct(m, original_type, svalues, svalue_count);
 }
 
+gb_internal lbValue lb_const_value_bit_field(lbModule *m, Type *type, Ast *value_compound) {
+	ast_node(cl, CompoundLit, value_compound);
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	Type *bt = base_type(type);
+
+	// Type *backing_type = core_type(bt->BitField.backing_type);
+
+	struct FieldData {
+		Type *field_type;
+		u64 bit_offset;
+		u64 bit_size;
+	};
+	auto values = array_make<lbValue>(temporary_allocator(), 0, cl->elems.count);
+	auto fields = array_make<FieldData>(temporary_allocator(), 0, cl->elems.count);
+
+	for (Ast *elem : cl->elems) {
+		ast_node(fv, FieldValue, elem);
+		InternedString interned = fv->field->Ident.interned;
+		Selection sel = lookup_field(bt, interned, false);
+		GB_ASSERT(sel.is_bit_field);
+		GB_ASSERT(!sel.indirect);
+		GB_ASSERT(sel.index.count == 1);
+		GB_ASSERT(sel.entity != nullptr);
+
+		i64 index = sel.index[0];
+		Entity *f = bt->BitField.fields[index];
+		GB_ASSERT(f == sel.entity);
+		i64 bit_offset = bt->BitField.bit_offsets[index];
+		i64 bit_size   = bt->BitField.bit_sizes[index];
+		GB_ASSERT(bit_size > 0);
+
+		Type *field_type = sel.entity->type;
+		if (fv->value->tav.mode != Addressing_Constant) {
+			continue;
+		}
+		lbValue field_expr = lb_const_value(m, field_type, fv->value->tav.value, field_type);
+		array_add(&values, field_expr);
+		array_add(&fields, FieldData{field_type, cast(u64)bit_offset, cast(u64)bit_size});
+	}
+
+	// NOTE(bill): inline insertion sort should be good enough, right?
+	for (isize i = 1; i < values.count; i++) {
+		for (isize j = i;
+		     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+		     j--) {
+			auto vtmp = values[j];
+			values[j] = values[j-1];
+			values[j-1] = vtmp;
+
+			auto ftmp = fields[j];
+			fields[j] = fields[j-1];
+			fields[j-1] = ftmp;
+		}
+	}
+
+	bool any_fields_different_endian = false;
+	for (auto const &f : fields) {
+		if (is_type_different_to_arch_endianness(f.field_type)) {
+			// NOTE(bill): Just be slow for this, to be correct
+			any_fields_different_endian = true;
+			break;
+		}
+	}
+	GB_ASSERT(!any_fields_different_endian);
+
+
+	Type *backing_type = core_type(bt->BitField.backing_type);
+	GB_ASSERT(is_type_integer(backing_type) ||
+	          (is_type_array(backing_type) && is_type_integer(backing_type->Array.elem)));
+
+	if (is_type_integer(backing_type)) {
+		// SINGLE INTEGER BACKING ONLY
+
+		LLVMTypeRef lit = lb_type(m, backing_type);
+
+		LLVMValueRef res = LLVMConstInt(lit, 0, false);
+
+		for (isize i = 0; i < fields.count; i++) {
+			auto const &f = fields[i];
+
+			LLVMValueRef mask = lb_const_low_bits_mask(lit, f.bit_size);
+
+			LLVMValueRef elem = values[i].value;
+			if (lb_sizeof(lit) < lb_sizeof(LLVMTypeOf(elem))) {
+				elem = LLVMBuildTrunc(m->const_dummy_builder, elem, lit, "");
+			} else {
+				elem = LLVMBuildZExt(m->const_dummy_builder, elem, lit, "");
+			}
+			elem = LLVMBuildAnd(m->const_dummy_builder, elem, mask, "");
+
+			elem = LLVMBuildShl(m->const_dummy_builder, elem, LLVMConstInt(lit, f.bit_offset, false), "");
+
+			res = LLVMBuildOr(m->const_dummy_builder, res, elem, "");
+		}
+
+		return {res, type};
+	} else if (is_type_array(backing_type)) {
+		// ARRAY OF INTEGER BACKING
+
+		i64 array_count = backing_type->Array.count;
+		LLVMTypeRef lit = lb_type(m, core_type(backing_type->Array.elem));
+
+		LLVMValueRef *elems = gb_alloc_array(temporary_allocator(), LLVMValueRef, array_count);
+		for (i64 i = 0; i < array_count; i++) {
+			elems[i] = LLVMConstInt(lit, 0, false);
+		}
+
+		u64 elem_bit_size = cast(u64)(8*type_size_of(backing_type->Array.elem));
+		u64 curr_bit_offset = 0;
+		for (isize i = 0; i < fields.count; i++) {
+			auto const &f = fields[i];
+
+			LLVMValueRef val = values[i].value;
+			LLVMTypeRef vt = lb_type(m, values[i].type);
+
+			curr_bit_offset = f.bit_offset;
+
+			for (u64 bits_to_set = f.bit_size;
+			     bits_to_set > 0;
+			     /**/) {
+				i64 elem_idx = curr_bit_offset/elem_bit_size;
+				u64 elem_bit_offset = curr_bit_offset%elem_bit_size;
+
+				u64 mask_width = gb_min(bits_to_set, elem_bit_size-elem_bit_offset);
+				GB_ASSERT(mask_width > 0);
+				bits_to_set -= mask_width;
+
+				LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
+
+				LLVMValueRef to_set = LLVMBuildAnd(m->const_dummy_builder, val, mask, "");
+
+				if (elem_bit_offset != 0) {
+					to_set = LLVMBuildShl(m->const_dummy_builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+				}
+				to_set = LLVMBuildTrunc(m->const_dummy_builder, to_set, lit, "");
+
+				if (LLVMIsNull(elems[elem_idx])) {
+					elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
+				} else {
+					elems[elem_idx] = LLVMBuildOr(m->const_dummy_builder, elems[elem_idx], to_set, "");
+				}
+
+				if (mask_width != 0) {
+					val = LLVMBuildLShr(m->const_dummy_builder, val, LLVMConstInt(vt, mask_width, false), "");
+				}
+				curr_bit_offset += mask_width;
+			}
+
+			GB_ASSERT_MSG(curr_bit_offset == f.bit_offset + f.bit_size, "%llu == %llu + %llu",
+			              cast(unsigned long long)curr_bit_offset,
+			              cast(unsigned long long)f.bit_offset,
+			              cast(unsigned long long)f.bit_size
+			);
+		}
+
+		LLVMValueRef res = LLVMConstArray(lit, elems, cast(unsigned)array_count);
+		return {res, type};
+	} else {
+		// SLOW STORAGE
+		GB_PANIC("TODO(bill): bit_field storage of an unknown kind");
+		return {};
+	}
+}
+
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Type *value_type, lbConstContext cc) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -728,8 +904,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 
 	lbValue res = {};
 	res.type = original_type;
-	type = core_type(type);
-	value = convert_exact_value_for_type(value, type);
+	if (!is_type_bit_field(original_type)) {
+		type = core_type(type);
+		value = convert_exact_value_for_type(value, type);
+	}
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
@@ -1278,7 +1456,9 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 		return res;
 
 	case ExactValue_Compound:
-		if (is_type_slice(type)) {
+		if (is_type_bit_field(original_type)) {
+			return lb_const_value_bit_field(m, original_type, value.value_compound);
+		} else if (is_type_slice(type)) {
 			return lb_const_value(m, type, value, value_type, cc);
 		} else if (is_type_soa_struct(type)) {
 			GB_ASSERT(type->kind == Type_Struct);

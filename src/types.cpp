@@ -3829,8 +3829,22 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			}
 		} else if (type->kind == Type_BitSet) {
 			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel, allow_blank_ident);
-		}
+		} else if (type->kind == Type_BitField) {
+			for_array(i, type->BitField.fields) {
+				Entity *f = type->BitField.fields[i];
+				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+					continue;
+				}
+				auto str = entity_interned_name(f);
+				if (field_name == str) {
+					selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+					sel.entity = f;
+					sel.is_bit_field = true;
+					return sel;
+				}
+			}
 
+		}
 
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
@@ -3929,7 +3943,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 				return sel;
 			}
 		}
-
 	} else if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
