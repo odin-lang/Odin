@@ -17,16 +17,16 @@ REG_FPR  :: 0x0200   // f0..f31
 
 NONE :: Register(0xFFFF)
 
-reg_hw    :: #force_inline proc "contextless" (r: Register) -> u8  { return u8(r) & 0x1F }
-reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xFF00 }
+@(require_results) reg_hw    :: #force_inline proc "contextless" (r: Register) -> u8  { return u8(r) & 0x1F }
+@(require_results) reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xFF00 }
 
-reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
-reg_is_fpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_FPR }
+@(require_results) reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
+@(require_results) reg_is_fpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_FPR }
 
-gpr_from_num :: #force_inline proc "contextless" (n: u8) -> Register {
+@(require_results) gpr_from_num :: #force_inline proc "contextless" (n: u8) -> Register {
 	return n < 32 ? Register(REG_GPR | u16(n)) : NONE
 }
-fpr_from_num :: #force_inline proc "contextless" (n: u8) -> Register {
+@(require_results) fpr_from_num :: #force_inline proc "contextless" (n: u8) -> Register {
 	return n < 32 ? Register(REG_FPR | u16(n)) : NONE
 }
 

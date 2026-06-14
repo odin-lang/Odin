@@ -35,13 +35,13 @@ REG_P    :: 0x0C00   // P0..P15 SVE predicate
 
 NONE :: Register(0xFFFF)
 
-reg_hw    :: #force_inline proc "contextless" (r: Register) -> u8  { return u8(r) & 0x1F }
-reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xFF00 }
+@(require_results) reg_hw    :: #force_inline proc "contextless" (r: Register) -> u8  { return u8(r) & 0x1F }
+@(require_results) reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xFF00 }
 
-reg_is_x   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_X   }
-reg_is_w   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_W   }
-reg_is_xsp :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_XSP }
-reg_is_wsp :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_WSP }
+@(require_results) reg_is_x   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_X   }
+@(require_results) reg_is_w   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_W   }
+@(require_results) reg_is_xsp :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_XSP }
+@(require_results) reg_is_wsp :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_WSP }
 
 // -----------------------------------------------------------------------------
 // 64-bit GPRs (X0..X30, XZR, SP)
@@ -91,11 +91,11 @@ V24 :: Register(REG_V | 24); V25 :: Register(REG_V | 25); V26 :: Register(REG_V 
 V28 :: Register(REG_V | 28); V29 :: Register(REG_V | 29); V30 :: Register(REG_V | 30); V31 :: Register(REG_V | 31)
 
 // Scalar view constructors -- the hw number is the same V register.
-b_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_B | u16(n & 0x1F)) }
-h_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_H | u16(n & 0x1F)) }
-s_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_S | u16(n & 0x1F)) }
-d_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_D | u16(n & 0x1F)) }
-q_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_Q | u16(n & 0x1F)) }
-v_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_V | u16(n & 0x1F)) }
-x_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_X | u16(n & 0x1F)) }
-w_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_W | u16(n & 0x1F)) }
+@(require_results) b_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_B | u16(n & 0x1F)) }
+@(require_results) h_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_H | u16(n & 0x1F)) }
+@(require_results) s_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_S | u16(n & 0x1F)) }
+@(require_results) d_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_D | u16(n & 0x1F)) }
+@(require_results) q_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_Q | u16(n & 0x1F)) }
+@(require_results) v_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_V | u16(n & 0x1F)) }
+@(require_results) x_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_X | u16(n & 0x1F)) }
+@(require_results) w_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_W | u16(n & 0x1F)) }

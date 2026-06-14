@@ -17,12 +17,12 @@ REG_SPR  :: 0x6000
 
 NONE :: Register(0xFFFF)
 
-reg_hw    :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0x0FFF }
-reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xF000 }
+@(require_results) reg_hw    :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0x0FFF }
+@(require_results) reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xF000 }
 
-reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
-reg_is_cr  :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_CR  }
-reg_is_spr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_SPR }
+@(require_results) reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
+@(require_results) reg_is_cr  :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_CR  }
+@(require_results) reg_is_spr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_SPR }
 
 R0  :: Register(REG_GPR | 0);  R1  :: Register(REG_GPR | 1);  R2  :: Register(REG_GPR | 2);  R3  :: Register(REG_GPR | 3)
 R4  :: Register(REG_GPR | 4);  R5  :: Register(REG_GPR | 5);  R6  :: Register(REG_GPR | 6);  R7  :: Register(REG_GPR | 7)
@@ -38,7 +38,7 @@ CR1 :: Register(REG_CR | 1)
 CR2 :: Register(REG_CR | 2)
 CR3 :: Register(REG_CR | 3)
 
-spr_reg :: #force_inline proc "contextless" (n: u16) -> Register { return Register(REG_SPR) | Register(n & 0x3FF) }
+@(require_results) spr_reg :: #force_inline proc "contextless" (n: u16) -> Register { return Register(REG_SPR) | Register(n & 0x3FF) }
 
 // Common SPRs
 XER   :: Register(REG_SPR | 1)

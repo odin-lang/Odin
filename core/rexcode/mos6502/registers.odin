@@ -33,14 +33,17 @@ PC :: Register(REG_SYS | 2)
 
 GP :: enum u8 { A = 0, X = 1, Y = 2 }
 
+@(require_results)
 reg_hw :: #force_inline proc "contextless" (r: Register) -> u8 {
 	return u8(r) & 0xFF
 }
 
+@(require_results)
 reg_class :: #force_inline proc "contextless" (r: Register) -> u16 {
 	return u16(r) & 0xFF00
 }
 
+@(require_results)
 reg_is_gp :: #force_inline proc "contextless" (r: Register) -> bool {
 	return reg_class(r) == REG_GP
 }

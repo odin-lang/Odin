@@ -40,20 +40,20 @@ REG_VR128 :: 0x7000   // VMX128 vector register (vr0..vr127, 7-bit hw index)
 
 NONE :: Register(0xFFFF)
 
-reg_hw    :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0x0FFF }
-reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xF000 }
+@(require_results) reg_hw    :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0x0FFF }
+@(require_results) reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xF000 }
 
-reg_is_gpr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
-reg_is_fpr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_FPR }
-reg_is_vr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_VR  }
-reg_is_vsr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_VSR }
-reg_is_cr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_CR  }
-reg_is_spr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_SPR }
-reg_is_vr128 :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_VR128 }
+@(require_results) reg_is_gpr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
+@(require_results) reg_is_fpr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_FPR }
+@(require_results) reg_is_vr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_VR  }
+@(require_results) reg_is_vsr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_VSR }
+@(require_results) reg_is_cr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_CR  }
+@(require_results) reg_is_spr   :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_SPR }
+@(require_results) reg_is_vr128 :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_VR128 }
 
 // VMX128: vr0..vr127, 7-bit hw index. Constructor for the Xenon-specific
 // extended vector register file.
-vr128_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_VR128 | u16(n & 0x7F)) }
+@(require_results) vr128_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_VR128 | u16(n & 0x7F)) }
 
 // -----------------------------------------------------------------------------
 // GPRs
@@ -105,7 +105,7 @@ V28 :: Register(REG_VR | 28); V29 :: Register(REG_VR | 29); V30 :: Register(REG_
 // VSX (64 registers; vs0..vs31 alias f0..f31, vs32..vs63 alias v0..v31)
 // -----------------------------------------------------------------------------
 
-vs_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_VSR | u16(n & 0x3F)) }
+@(require_results) vs_reg :: #force_inline proc "contextless" (n: u8) -> Register { return Register(REG_VSR | u16(n & 0x3F)) }
 
 // -----------------------------------------------------------------------------
 // CR (condition register) — 8 4-bit fields cr0..cr7
@@ -124,7 +124,7 @@ CR7 :: Register(REG_CR | 7)
 // SPRs (selected, see Power ISA Book III §4 for the full numbered set)
 // -----------------------------------------------------------------------------
 
-spr_reg :: #force_inline proc "contextless" (n: u16) -> Register { return Register(REG_SPR) | Register(n & 0x3FF) }
+@(require_results) spr_reg :: #force_inline proc "contextless" (n: u16) -> Register { return Register(REG_SPR) | Register(n & 0x3FF) }
 
 XER     :: Register(REG_SPR | 1)
 LR      :: Register(REG_SPR | 8)

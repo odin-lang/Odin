@@ -154,42 +154,52 @@ LO1 :: Register(REG_HILO | 3)
 // Utility
 // -----------------------------------------------------------------------------
 
+@(require_results)
 reg_hw :: #force_inline proc "contextless" (r: Register) -> u8 {
 	return u8(r) & 0x1F
 }
 
+@(require_results)
 reg_class :: #force_inline proc "contextless" (r: Register) -> u16 {
 	return u16(r) & 0xFF00
 }
 
+@(require_results)
 reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool {
 	return reg_class(r) == REG_GPR
 }
 
+@(require_results)
 reg_is_fpr :: #force_inline proc "contextless" (r: Register) -> bool {
 	return reg_class(r) == REG_FPR
 }
 
+@(require_results)
 gpr_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_GPR | u16(num)) : NONE
 }
 
+@(require_results)
 fpr_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_FPR | u16(num)) : NONE
 }
 
+@(require_results)
 cp0_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_CP0 | u16(num)) : NONE
 }
 
+@(require_results)
 cp2d_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_CP2D | u16(num)) : NONE
 }
 
+@(require_results)
 cp2c_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_CP2C | u16(num)) : NONE
 }
 
+@(require_results)
 msa_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_MSA | u16(num)) : NONE
 }
@@ -198,19 +208,23 @@ msa_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 // the byte (bit 7) is reserved for future use as an orientation flag if
 // needed. Callers requesting a VFPU.s/.p/.t/.q operand bake the format
 // into the mnemonic.
+@(require_results)
 vfpu_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 128 ? Register(REG_VFPU | u16(num)) : NONE
 }
 
+@(require_results)
 reg_is_vfpu :: #force_inline proc "contextless" (r: Register) -> bool {
 	return reg_class(r) == REG_VFPU
 }
 
 // VFPU hardware-id accessor (7 bits vs the standard reg_hw's 5).
+@(require_results)
 reg_vfpu_hw :: #force_inline proc "contextless" (r: Register) -> u8 {
 	return u8(r) & 0x7F
 }
 
+@(require_results)
 reg_is_msa :: #force_inline proc "contextless" (r: Register) -> bool {
 	return reg_class(r) == REG_MSA
 }

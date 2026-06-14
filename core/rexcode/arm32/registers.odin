@@ -166,21 +166,25 @@ MVFR0 :: Register(REG_FPSC | 7)
 FPEXC :: Register(REG_FPSC | 8)
 
 // ---- Helpers ----------------------------------------------------------------
+@(require_results)
 reg_class :: #force_inline proc "contextless" (r: Register) -> u16 {
 	return u16(r) & REG_CLASS_MASK
 }
 
+@(require_results)
 reg_hw :: #force_inline proc "contextless" (r: Register) -> u16 {
 	return u16(r) & REG_HW_MASK
 }
 
-is_gpr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
-is_spr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_SPR }
-is_dpr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_DPR }
-is_qpr    :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_QPR }
+@(require_results) is_gpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_GPR }
+@(require_results) is_spr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_SPR }
+@(require_results) is_dpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_DPR }
+@(require_results) is_qpr :: #force_inline proc "contextless" (r: Register) -> bool { return reg_class(r) == REG_QPR }
+@(require_results)
 is_fp_scalar :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r); return c == REG_SPR || c == REG_DPR
 }
+@(require_results)
 is_simd   :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r); return c == REG_SPR || c == REG_DPR || c == REG_QPR
 }

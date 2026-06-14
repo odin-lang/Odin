@@ -116,12 +116,14 @@ CP0_Reg :: enum u8 {
 	DP_TMEM      = 15,
 }
 
-reg_hw    :: #force_inline proc "contextless" (r: Register) -> u8  { return u8(r) & 0x1F }
-reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xFF00 }
+@(require_results) reg_hw    :: #force_inline proc "contextless" (r: Register) -> u8  { return u8(r) & 0x1F }
+@(require_results) reg_class :: #force_inline proc "contextless" (r: Register) -> u16 { return u16(r) & 0xFF00 }
 
+@(require_results)
 gpr_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_GPR | u16(num)) : NONE
 }
+@(require_results)
 vr_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_VR | u16(num)) : NONE
 }
