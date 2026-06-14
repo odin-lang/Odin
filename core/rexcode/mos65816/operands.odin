@@ -60,24 +60,24 @@ Memory :: bit_field u32 {
 }
 #assert(size_of(Memory) == 4)
 
-mem_dp           :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP            } }
-mem_dp_x         :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_X          } }
-mem_dp_y         :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_Y          } }
-mem_dp_ind       :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND        } }
-mem_dp_ind_x     :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_X      } }
-mem_dp_ind_y     :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_Y      } }
-mem_dp_ind_long  :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_LONG   } }
-mem_dp_ind_long_y:: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_LONG_Y } }
-mem_abs          :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS           } }
-mem_abs_x        :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_X         } }
-mem_abs_y        :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_Y         } }
-mem_abs_ind      :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_IND       } }
-mem_abs_ind_long :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_IND_LONG  } }
-mem_abs_ind_x    :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_IND_X     } }
-mem_long         :: #force_inline proc "contextless" (a: u32) -> Memory { return Memory{address = a & 0xFFFFFF, mode = .LONG    } }
-mem_long_x       :: #force_inline proc "contextless" (a: u32) -> Memory { return Memory{address = a & 0xFFFFFF, mode = .LONG_X  } }
-mem_sr           :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .SR            } }
-mem_sr_ind_y     :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .SR_IND_Y      } }
+@(require_results) mem_dp           :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP            } }
+@(require_results) mem_dp_x         :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_X          } }
+@(require_results) mem_dp_y         :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_Y          } }
+@(require_results) mem_dp_ind       :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND        } }
+@(require_results) mem_dp_ind_x     :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_X      } }
+@(require_results) mem_dp_ind_y     :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_Y      } }
+@(require_results) mem_dp_ind_long  :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_LONG   } }
+@(require_results) mem_dp_ind_long_y:: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .DP_IND_LONG_Y } }
+@(require_results) mem_abs          :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS           } }
+@(require_results) mem_abs_x        :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_X         } }
+@(require_results) mem_abs_y        :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_Y         } }
+@(require_results) mem_abs_ind      :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_IND       } }
+@(require_results) mem_abs_ind_long :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_IND_LONG  } }
+@(require_results) mem_abs_ind_x    :: #force_inline proc "contextless" (a: u16) -> Memory { return Memory{address = u32(a), mode = .ABS_IND_X     } }
+@(require_results) mem_long         :: #force_inline proc "contextless" (a: u32) -> Memory { return Memory{address = a & 0xFFFFFF, mode = .LONG    } }
+@(require_results) mem_long_x       :: #force_inline proc "contextless" (a: u32) -> Memory { return Memory{address = a & 0xFFFFFF, mode = .LONG_X  } }
+@(require_results) mem_sr           :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .SR            } }
+@(require_results) mem_sr_ind_y     :: #force_inline proc "contextless" (a: u8)  -> Memory { return Memory{address = u32(a), mode = .SR_IND_Y      } }
 
 Operand :: struct #packed {
 	using _: struct #raw_union {
@@ -92,10 +92,12 @@ Operand :: struct #packed {
 }
 #assert(size_of(Operand) == 16)
 
-op_reg    :: #force_inline proc "contextless" (r: Register) -> Operand { return Operand{reg = r, kind = .REGISTER, size = 1} }
-op_imm8   :: #force_inline proc "contextless" (v: i64)      -> Operand { return Operand{immediate = v, kind = .IMMEDIATE, size = 1} }
-op_imm16  :: #force_inline proc "contextless" (v: i64)      -> Operand { return Operand{immediate = v, kind = .IMMEDIATE, size = 2} }
-op_mem    :: #force_inline proc "contextless" (m: Memory)   -> Operand {
+@(require_results) op_reg    :: #force_inline proc "contextless" (r: Register) -> Operand { return Operand{reg = r, kind = .REGISTER, size = 1} }
+@(require_results) op_imm8   :: #force_inline proc "contextless" (v: i64)      -> Operand { return Operand{immediate = v, kind = .IMMEDIATE, size = 1} }
+@(require_results) op_imm16  :: #force_inline proc "contextless" (v: i64)      -> Operand { return Operand{immediate = v, kind = .IMMEDIATE, size = 2} }
+
+@(require_results)
+op_mem :: #force_inline proc "contextless" (m: Memory)   -> Operand {
 	// Operand size = width of the address literal as encoded.
 	size: u8 = 2
 	switch m.mode {
@@ -110,9 +112,12 @@ op_mem    :: #force_inline proc "contextless" (m: Memory)   -> Operand {
 	return Operand{mem = m, kind = .MEMORY, size = size}
 }
 
+@(require_results)
 op_label   :: #force_inline proc "contextless" (label_id: u32, size: u8 = 1) -> Operand {
 	return Operand{relative = i64(label_id), kind = .RELATIVE, size = size}
 }
+
+@(require_results)
 op_rel_offset :: #force_inline proc "contextless" (off: i64) -> Operand {
 	return Operand{relative = off, kind = .RELATIVE, size = 1}
 }

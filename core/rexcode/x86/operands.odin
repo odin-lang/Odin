@@ -37,6 +37,7 @@ Memory :: bit_field u64 {
 	index_class:        u8   | 5,
 }
 
+@(require_results)
 mem_make :: proc "contextless" (base: Register, index: Register, scale: u8, disp: i32, segment: Register) -> Memory {
 	mem: Memory = ---
 	mem.base_hw = MEM_BASE_NONE

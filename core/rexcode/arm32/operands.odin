@@ -66,18 +66,23 @@ Memory :: struct #packed {
 }
 #assert(size_of(Memory) == 12)
 
+@(require_results)
 mem_imm     :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 	return Memory{base = base, disp = disp, sign = 1, mode = .OFFSET}
 }
+@(require_results)
 mem_imm_pre :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 	return Memory{base = base, disp = disp, sign = 1, mode = .PRE_INDEX}
 }
+@(require_results)
 mem_imm_post :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 	return Memory{base = base, disp = disp, sign = 1, mode = .POST_INDEX}
 }
+@(require_results)
 mem_reg :: #force_inline proc "contextless" (base, index: Register, sign: i8 = 1) -> Memory {
 	return Memory{base = base, index = index, sign = sign, mode = .OFFSET}
 }
+@(require_results)
 mem_reg_shift :: #force_inline proc "contextless" (
 	base, index: Register, st: Shift_Type, amt: u8, sign: i8 = 1,
 ) -> Memory {
@@ -106,32 +111,41 @@ Operand :: struct #packed {
 
 // ---- Operand builders ------------------------------------------------------
 
+@(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = 4, cond = 14}
 }
+@(require_results)
 op_reg_shifted :: #force_inline proc "contextless" (
 	r: Register, st: Shift_Type, amt: u8,
 ) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = 4, shift_type = st, shift_amt = amt, cond = 14}
 }
+@(require_results)
 op_imm :: #force_inline proc "contextless" (v: i64, size: u8 = 4) -> Operand {
 	return Operand{immediate = v, kind = .IMMEDIATE, size = size, cond = 14}
 }
+@(require_results)
 op_mem :: #force_inline proc "contextless" (m: Memory) -> Operand {
 	return Operand{mem = m, kind = .MEMORY, size = 4, cond = 14}
 }
+@(require_results)
 op_label :: #force_inline proc "contextless" (label_id: u32, size: u8 = 4) -> Operand {
 	return Operand{relative = i64(label_id), kind = .RELATIVE, size = size, cond = 14}
 }
+@(require_results)
 op_rel_offset :: #force_inline proc "contextless" (off: i64) -> Operand {
 	return Operand{relative = off, kind = .RELATIVE, size = 4, cond = 14}
 }
+@(require_results)
 op_reg_list :: #force_inline proc "contextless" (mask: u16) -> Operand {
 	return Operand{immediate = i64(mask), kind = .REG_LIST, size = 2, cond = 14}
 }
+@(require_results)
 op_dpr_lane :: #force_inline proc "contextless" (d: Register, idx: u8) -> Operand {
 	return Operand{reg = d, kind = .REGISTER, size = 4, lane = idx, cond = 14}
 }
+@(require_results)
 op_qpr_lane :: #force_inline proc "contextless" (q: Register, idx: u8) -> Operand {
 	return Operand{reg = q, kind = .REGISTER, size = 4, lane = idx, cond = 14}
 }

@@ -28,6 +28,7 @@ Memory :: struct #packed {
 }
 #assert(size_of(Memory) == 8)
 
+@(require_results)
 mem :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 	return Memory{base = base, disp = disp}
 }
@@ -35,14 +36,18 @@ mem :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 // Convenience aliases that mirror x86's naming convention so cross-arch
 // helper code reads the same.
 mem_base_disp :: mem
+
+@(require_results)
 mem_base_only :: #force_inline proc "contextless" (base: Register) -> Memory {
 	return Memory{base = base, disp = 0}
 }
 
+@(require_results)
 mem_base :: #force_inline proc "contextless" (m: Memory) -> Register {
 	return m.base
 }
 
+@(require_results)
 mem_disp :: #force_inline proc "contextless" (m: Memory) -> i32 {
 	return m.disp
 }
@@ -65,29 +70,35 @@ Operand :: struct #packed {
 // Generic operand constructors
 // -----------------------------------------------------------------------------
 
+@(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = 4}
 }
 
+@(require_results)
 op_reg_sized :: #force_inline proc "contextless" (r: Register, size: u8) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = size}
 }
 
+@(require_results)
 op_mem :: #force_inline proc "contextless" (m: Memory, size: u8) -> Operand {
 	return Operand{mem = m, kind = .MEMORY, size = size}
 }
 
+@(require_results)
 op_imm :: #force_inline proc "contextless" (v: i64, size: u8) -> Operand {
 	return Operand{immediate = v, kind = .IMMEDIATE, size = size}
 }
 
 // Branch/jump target operand. `label_id` indexes a Label_Definition
 // array (resolved by the encoder during pass 2 -- same model as x86).
+@(require_results)
 op_label :: #force_inline proc "contextless" (label_id: u32) -> Operand {
 	return Operand{relative = i64(label_id), kind = .RELATIVE, size = 4}
 }
 
 // Raw offset (skip label resolution).
+@(require_results)
 op_rel_offset :: #force_inline proc "contextless" (offset: i64) -> Operand {
 	return Operand{relative = offset, kind = .RELATIVE, size = 4}
 }
@@ -96,22 +107,27 @@ op_rel_offset :: #force_inline proc "contextless" (offset: i64) -> Operand {
 // Typed register operand constructors (compile-time class safety)
 // -----------------------------------------------------------------------------
 
+@(require_results)
 op_gpr :: #force_inline proc "contextless" (g: GPR) -> Operand {
 	return Operand{reg = Register(REG_GPR | u16(g)), kind = .REGISTER, size = 4}
 }
 
+@(require_results)
 op_fpr :: #force_inline proc "contextless" (f: FPR) -> Operand {
 	return Operand{reg = Register(REG_FPR | u16(f)), kind = .REGISTER, size = 4}
 }
 
+@(require_results)
 op_cp0 :: #force_inline proc "contextless" (c: CP0_Reg) -> Operand {
 	return Operand{reg = Register(REG_CP0 | u16(c)), kind = .REGISTER, size = 4}
 }
 
+@(require_results)
 op_gte_data :: #force_inline proc "contextless" (r: GTE_DataReg) -> Operand {
 	return Operand{reg = Register(REG_CP2D | u16(r)), kind = .REGISTER, size = 4}
 }
 
+@(require_results)
 op_gte_ctrl :: #force_inline proc "contextless" (r: GTE_CtrlReg) -> Operand {
 	return Operand{reg = Register(REG_CP2C | u16(r)), kind = .REGISTER, size = 4}
 }

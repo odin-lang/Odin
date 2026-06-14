@@ -28,6 +28,7 @@ Memory :: struct #packed {
 }
 #assert(size_of(Memory) == 8)
 
+@(require_results)
 mem :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 	return Memory{base = base, disp = disp}
 }
@@ -45,20 +46,27 @@ Operand :: struct #packed {
 }
 #assert(size_of(Operand) == 16)
 
+@(require_results)
 op_reg    :: #force_inline proc "contextless" (r: Register)        -> Operand { return Operand{reg = r, kind = .REGISTER, size = 4} }
+@(require_results)
 op_imm    :: #force_inline proc "contextless" (v: i64, size: u8)   -> Operand { return Operand{immediate = v, kind = .IMMEDIATE, size = size} }
+@(require_results)
 op_mem    :: #force_inline proc "contextless" (m: Memory)          -> Operand { return Operand{mem = m,     kind = .MEMORY,    size = 4} }
+@(require_results)
 op_label  :: #force_inline proc "contextless" (label_id: u32, size: u8 = 2) -> Operand {
 	return Operand{relative = i64(label_id), kind = .RELATIVE, size = size}
 }
+@(require_results)
 op_rel_offset :: #force_inline proc "contextless" (off: i64) -> Operand {
 	return Operand{relative = off, kind = .RELATIVE, size = 2}
 }
 
 // Typed constructors
+@(require_results)
 op_gpr :: #force_inline proc "contextless" (g: GPR) -> Operand {
 	return Operand{reg = Register(REG_GPR | u16(g)), kind = .REGISTER, size = 4}
 }
+@(require_results)
 op_fpr :: #force_inline proc "contextless" (f: FPR) -> Operand {
 	return Operand{reg = Register(REG_FPR | u16(f)), kind = .REGISTER, size = 4}
 }

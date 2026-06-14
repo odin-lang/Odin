@@ -34,10 +34,12 @@ Vector_Mem :: struct #packed {
 }
 #assert(size_of(Vector_Mem) == 8)
 
+@(require_results)
 mem :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
 	return Memory{base = base, disp = disp}
 }
 
+@(require_results)
 vmem :: #force_inline proc "contextless" (base: Register, element: u8, offset: i32) -> Vector_Mem {
 	return Vector_Mem{base = base, element = element, offset = offset}
 }
@@ -58,26 +60,32 @@ Operand :: struct #packed {
 }
 #assert(size_of(Operand) == 16)
 
+@(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = 4}
 }
 
+@(require_results)
 op_vr :: #force_inline proc "contextless" (r: Register, element: u8 = 0) -> Operand {
 	return Operand{reg = r, kind = .VECTOR_REG, size = 16, element = element}
 }
 
+@(require_results)
 op_mem :: #force_inline proc "contextless" (m: Memory, size: u8) -> Operand {
 	return Operand{mem = m, kind = .MEMORY, size = size}
 }
 
+@(require_results)
 op_vmem :: #force_inline proc "contextless" (m: Vector_Mem, size: u8) -> Operand {
 	return Operand{vmem = m, kind = .VECTOR_MEM, size = size}
 }
 
+@(require_results)
 op_imm :: #force_inline proc "contextless" (v: i64, size: u8) -> Operand {
 	return Operand{immediate = v, kind = .IMMEDIATE, size = size}
 }
 
+@(require_results)
 op_label :: #force_inline proc "contextless" (label_id: u32) -> Operand {
 	return Operand{relative = i64(label_id), kind = .RELATIVE, size = 4}
 }
