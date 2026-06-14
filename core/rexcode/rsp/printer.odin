@@ -27,7 +27,7 @@ Print_Options         :: isa.Print_Options
 Print_Result          :: isa.Print_Result
 DEFAULT_PRINT_OPTIONS :: isa.DEFAULT_PRINT_OPTIONS
 
-@(private="file")
+@(rodata, private="file")
 GPR_NAMES_ABI := [32]string{
 	"zero", "at",
 	"v0", "v1",
@@ -39,7 +39,7 @@ GPR_NAMES_ABI := [32]string{
 	"gp", "sp", "fp", "ra",
 }
 
-@(private="file")
+@(rodata, private="file")
 CP0_NAMES := [16]string{
 	"sp_mem_addr",  "sp_dram_addr", "sp_rd_len",   "sp_wr_len",
 	"sp_status",    "sp_dma_full",  "sp_dma_busy", "sp_semaphore",

@@ -33,7 +33,7 @@ Print_Options         :: isa.Print_Options
 Print_Result          :: isa.Print_Result
 DEFAULT_PRINT_OPTIONS :: isa.DEFAULT_PRINT_OPTIONS
 
-@(private="file")
+@(rodata, private="file")
 GPR_ABI := [32]string{
 	"zero", "ra", "sp", "gp", "tp",
 	"t0", "t1", "t2",
@@ -43,7 +43,7 @@ GPR_ABI := [32]string{
 	"t3", "t4", "t5", "t6",
 }
 
-@(private="file")
+@(rodata, private="file")
 FPR_ABI := [32]string{
 	"ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7",
 	"fs0", "fs1",

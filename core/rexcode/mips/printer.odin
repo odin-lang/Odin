@@ -30,7 +30,7 @@ DEFAULT_PRINT_OPTIONS :: isa.DEFAULT_PRINT_OPTIONS
 
 // ---- ABI register name tables ----------------------------------------------
 
-@(private="file")
+@(rodata, private="file")
 GPR_NAMES_ABI := [32]string{
 	"zero", "at",
 	"v0", "v1",
