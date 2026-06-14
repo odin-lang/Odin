@@ -39,9 +39,9 @@ infer_labels_from_branches :: proc(
 ) {
 	offset_to_label: map[u32]u32
 	defer delete(offset_to_label)
-	for id in 0..<u32(len(label_defs)) {
+	for _, id in label_defs {
 		if label_defs[id] != LABEL_UNDEFINED {
-			offset_to_label[u32(label_defs[id])] = id
+			offset_to_label[u32(label_defs[id])] = u32(id)
 		}
 	}
 

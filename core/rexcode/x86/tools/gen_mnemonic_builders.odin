@@ -116,13 +116,22 @@ main :: proc() {
 		return int(a) < int(b)
 	})
 
+	max_name_padding := 0
 	for mnemonic in mnemonic_list {
 		procs := procs_by_mnemonic[mnemonic]
 		for entry in procs {
-			generate_proc(&sb, entry)
+			max_name_padding = max(max_name_padding, len(entry.proc_name))
+		}
+	}
+
+
+	for mnemonic in mnemonic_list {
+		procs := procs_by_mnemonic[mnemonic]
+		for entry in procs {
+			generate_proc(&sb, entry, max_name_padding)
 		}
 		for entry in procs {
-			generate_emit_proc(&sb, entry)
+			generate_emit_proc(&sb, entry, max_name_padding)
 		}
 	}
 
@@ -143,28 +152,47 @@ main :: proc() {
 		// inst_ overload group
 		strings.write_string(&sb, "inst_")
 		strings.write_string(&sb, mnemonic_lower)
-		strings.write_string(&sb, " :: proc{ ")
-
-		for entry, i in procs {
-			if i > 0 { strings.write_string(&sb, ", ") }
-			strings.write_string(&sb, entry.proc_name)
+		for n := max_name_padding-len(mnemonic_lower); n > 0; n -= 1 {
+			strings.write_byte(&sb, ' ')
 		}
-
-		strings.write_string(&sb, " }\n")
+		if len(procs) == 1 {
+			strings.write_string(&sb, " :: ")
+			strings.write_string(&sb, procs[0].proc_name)
+			strings.write_string(&sb, "\n")
+		} else {
+			strings.write_string(&sb, " :: proc{ ")
+			for entry, i in procs {
+				if i > 0 { strings.write_string(&sb, ", ") }
+				strings.write_string(&sb, entry.proc_name)
+			}
+			strings.write_string(&sb, " }\n")
+		}
 
 		// emit_ overload group
 		strings.write_string(&sb, "emit_")
 		strings.write_string(&sb, mnemonic_lower)
-		strings.write_string(&sb, " :: proc{ ")
-
-		for entry, i in procs {
-			if i > 0 { strings.write_string(&sb, ", ") }
-			// Replace "inst_" prefix with "emit_"
-			emit_name := strings.concatenate({"emit_", entry.proc_name[5:]})
-			strings.write_string(&sb, emit_name)
+		for n := max_name_padding-len(mnemonic_lower); n > 0; n -= 1 {
+			strings.write_byte(&sb, ' ')
 		}
 
-		strings.write_string(&sb, " }\n")
+		if len(procs) == 1 {
+			emit_name := strings.concatenate({"emit_", procs[0].proc_name[5:]})
+
+			strings.write_string(&sb, " :: ")
+			strings.write_string(&sb, emit_name)
+			strings.write_string(&sb, "\n")
+		} else {
+			strings.write_string(&sb, " :: proc{ ")
+
+			for entry, i in procs {
+				if i > 0 { strings.write_string(&sb, ", ") }
+				// Replace "inst_" prefix with "emit_"
+				emit_name := strings.concatenate({"emit_", entry.proc_name[5:]})
+				strings.write_string(&sb, emit_name)
+			}
+			strings.write_string(&sb, " }\n")
+		}
+
 	}
 
 	output := strings.to_string(sb)
@@ -215,30 +243,37 @@ Mem256 :: distinct struct { mem: Memory }
 Mem512 :: distinct struct { mem: Memory }
 
 // Memory wrapper constructors
+@(require_results)
 mem8 :: #force_inline proc "contextless" (m: Memory) -> Mem8 {
 	return Mem8{ mem = m }
 }
 
+@(require_results)
 mem16 :: #force_inline proc "contextless" (m: Memory) -> Mem16 {
 	return Mem16{ mem = m }
 }
 
+@(require_results)
 mem32 :: #force_inline proc "contextless" (m: Memory) -> Mem32 {
 	return Mem32{ mem = m }
 }
 
+@(require_results)
 mem64 :: #force_inline proc "contextless" (m: Memory) -> Mem64 {
 	return Mem64{ mem = m }
 }
 
+@(require_results)
 mem128 :: #force_inline proc "contextless" (m: Memory) -> Mem128 {
 	return Mem128{ mem = m }
 }
 
+@(require_results)
 mem256 :: #force_inline proc "contextless" (m: Memory) -> Mem256 {
 	return Mem256{ mem = m }
 }
 
+@(require_results)
 mem512 :: #force_inline proc "contextless" (m: Memory) -> Mem512 {
 	return Mem512{ mem = m }
 }
@@ -1299,7 +1334,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 }
 
 // Generate a single inst_ procedure (compact one-line format)
-generate_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
+generate_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, max_name_padding: int) {
 	sig := entry.sig
 	names := param_names(sig)
 
@@ -1319,6 +1354,9 @@ generate_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 
 	// Write compact one-line procedure using helper call
 	strings.write_string(sb, entry.proc_name)
+	for n := max_name_padding - len(entry.proc_name); n > 0; n -= 1 {
+		strings.write_byte(sb, ' ')
+	}
 	strings.write_string(sb, " :: #force_inline proc \"contextless\" (")
 	strings.write_string(sb, params)
 	strings.write_string(sb, ") -> Instruction { return ")
@@ -1328,7 +1366,7 @@ generate_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 
 // Generate a single emit_ procedure (compact one-line format)
 // Note: emit procedures are NOT contextless because append requires context
-generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
+generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, max_name_padding: int) {
 	sig := entry.sig
 	names := param_names(sig)
 
@@ -1353,6 +1391,9 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 	// Write compact one-line procedure using emit helper call
 	// NOT contextless - append requires context
 	strings.write_string(sb, emit_name)
+	for n := max_name_padding - len(entry.proc_name); n > 0; n -= 1 {
+		strings.write_byte(sb, ' ')
+	}
 	strings.write_string(sb, " :: #force_inline proc(")
 	strings.write_string(sb, params)
 	strings.write_string(sb, ") { ")
