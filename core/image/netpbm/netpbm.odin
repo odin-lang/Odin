@@ -120,11 +120,11 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 	switch header.format {
 	// Compressed binary
 	case .P4:
-		header_buf := data.buf[:]
+		header_buf := data[:]
 		pixels := img.pixels.buf[:]
 
 		p4_buffer_size := (img.width / 8 + 1) * img.height
-		reserve(&data.buf, len(header_buf) + p4_buffer_size)
+		reserve(&data, len(header_buf) + p4_buffer_size)
 
 		// we build up a byte value until it is completely filled
 		// or we reach the end the row
@@ -138,39 +138,39 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 				b |= (v << bit)
 
 				if bit == 0 {
-					append(&data.buf, b)
+					append(&data, b)
 					b = 0
 				}
 			}
 
 			if b != 0 {
-				append(&data.buf, b)
+				append(&data, b)
 				b = 0
 			}
 		}
 
 	// Simple binary
 	case .P5, .P6, .P7, .Pf, .PF:
-		header_buf := data.buf[:]
+		header_buf := data[:]
 		pixels := img.pixels.buf[:]
 
-		resize(&data.buf, len(header_buf) + len(pixels))
-		mem.copy(raw_data(data.buf[len(header_buf):]), raw_data(pixels), len(pixels))
+		resize(&data, len(header_buf) + len(pixels))
+		mem.copy(raw_data(data[len(header_buf):]), raw_data(pixels), len(pixels))
 
 		// convert from native endianness
 		if img.depth == 16 {
-			pixels := mem.slice_data_cast([]u16be, data.buf[len(header_buf):])
+			pixels := mem.slice_data_cast([]u16be, data[len(header_buf):])
 			for &p in pixels {
 				p = u16be(transmute(u16) p)
 			}
 		} else if header.format in PFM {
 			if header.little_endian {
-				pixels := mem.slice_data_cast([]f32le, data.buf[len(header_buf):])
+				pixels := mem.slice_data_cast([]f32le, data[len(header_buf):])
 				for &p in pixels {
 					p = f32le(transmute(f32) p)
 				}
 			} else {
-				pixels := mem.slice_data_cast([]f32be, data.buf[len(header_buf):])
+				pixels := mem.slice_data_cast([]f32be, data[len(header_buf):])
 				for &p in pixels {
 					p = f32be(transmute(f32) p)
 				}
@@ -183,9 +183,9 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 		for y in 0 ..< img.height {
 			for x in 0 ..< img.width {
 				i := y * img.width + x
-				append(&data.buf, '0' if pixels[i] == 0 else '1')
+				append(&data, '0' if pixels[i] == 0 else '1')
 			}
-			append(&data.buf, '\n')
+			append(&data, '\n')
 		}
 
 	// Token ASCII
@@ -220,14 +220,14 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 			}
 
 		case:
-			return data.buf[:], .Invalid_Image_Depth
+			return data[:], .Invalid_Image_Depth
 		}
 
 	case:
-		return data.buf[:], .Invalid_Format
+		return data[:], .Invalid_Format
 	}
 
-	return data.buf[:], Format_Error.None
+	return data[:], Format_Error.None
 }
 
 parse_header :: proc(data: []byte, allocator := context.allocator) -> (header: Header, length: int, err: Error) {
@@ -405,7 +405,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 				return
 			}
 
-			if len(tupltype.buf) == 0 {
+			if len(tupltype) == 0 {
 				fmt.sbprint(&tupltype, value)
 			} else {
 				fmt.sbprint(&tupltype, "", value)

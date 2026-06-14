@@ -6021,6 +6021,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 
+		defer({
+			gb_string_free(sel_str);
+			gb_string_free(type_str);
+			gb_string_free(op_str);
+		});
+
 		if (operand->mode == Addressing_Type) {
 			if (is_type_polymorphic(operand->type, true)) {
 				error(op_expr, "Type '%s' has no field nor polymorphic parameter '%s'", op_str, sel_str);
@@ -6035,6 +6041,41 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			if (operand->type != nullptr && selector->kind == Ast_Ident) {
 				String const &name = selector->Ident.token.string;
 				Type *bt = base_type(operand->type);
+				Type *dt = type_deref(operand->type);
+				if (dt->kind == Type_Named &&
+				    dt->Named.name == "Builder" &&
+				    dt->Named.type_name != nullptr &&
+				    dt->Named.type_name->pkg != nullptr &&
+				    dt->Named.type_name->pkg->name == "strings" &&
+				    name == "buf") {
+					error_line("\tNote: 'strings.Builder' is now 'distinct [dynamic]byte' rather than a wrapper 'struct' containing a 'buf' field\n");
+
+					// NOTE(bill): Propagate the value and type to minimize possible errors
+					operand->expr = node;
+					operand->type = dt;
+					if (is_type_pointer(operand->type)) {
+						operand->mode = Addressing_Variable;
+					} else if (operand->mode == Addressing_Context) {
+						// Do nothing
+					} else if (operand->mode == Addressing_MapIndex) {
+						operand->mode = Addressing_Value;
+					} else if (operand->mode == Addressing_OptionalOk || operand->mode == Addressing_OptionalOkPtr) {
+						operand->mode = Addressing_Value;
+					} else if (operand->mode == Addressing_SoaVariable) {
+						operand->mode = Addressing_Variable;
+					} else if (operand->mode != Addressing_Value) {
+						operand->mode = Addressing_Variable;
+					} else {
+						operand->mode = Addressing_Value;
+					}
+
+					Entity *e = dt->Named.type_name;
+					Token token = e->token;
+					token.string = str_lit("buf");
+					Entity *dummy_entity = alloc_entity_field(e->scope, token, dt, false, 0, EntityState_Resolved);
+					return dummy_entity;
+				}
+
 				if (operand->type->kind == Type_Named &&
 				    operand->type->Named.type_name &&
 				    operand->type->Named.type_name->kind == Entity_TypeName &&
@@ -6048,9 +6089,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			}
 		}
 
-		gb_string_free(sel_str);
-		gb_string_free(type_str);
-		gb_string_free(op_str);
+
 		operand->mode = Addressing_Invalid;
 		operand->expr = node;
 		return nullptr;

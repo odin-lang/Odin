@@ -19,9 +19,8 @@ A dynamic byte buffer / string builder with helper procedures
 The dynamic array is wrapped inside the struct to be more opaque
 You can use `fmt.sbprint*` procedures with a `^strings.Builder` directly
 */
-Builder :: struct {
-	buf: [dynamic]byte,
-}
+Builder :: distinct [dynamic]byte
+
 /*
 Produces an empty Builder
 
@@ -35,7 +34,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 builder_make_none :: proc(allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
-	return Builder{buf=make([dynamic]byte, allocator, loc) or_return }, nil
+	return Builder(make([dynamic]byte, allocator, loc) or_return), nil
 }
 /*
 Produces a Builder with specified length and capacity `len`.
@@ -51,7 +50,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 builder_make_len :: proc(len: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
-	return Builder{buf=make([dynamic]byte, len, allocator, loc) or_return }, nil
+	return Builder(make([dynamic]byte, len, allocator, loc) or_return), nil
 }
 /*
 Produces a Builder with specified length `len` and capacity `cap`.
@@ -68,7 +67,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
-	return Builder{buf=make([dynamic]byte, len, cap, allocator, loc) or_return }, nil
+	return Builder(make([dynamic]byte, len, cap, allocator, loc) or_return), nil
 }
 /*
 Produces a String Builder
@@ -116,7 +115,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 builder_init_none :: proc(b: ^Builder, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: runtime.Allocator_Error) #optional_allocator_error {
-	b.buf = make([dynamic]byte, allocator, loc) or_return
+	b^ = make(Builder, allocator, loc) or_return
 	return b, nil
 }
 /*
@@ -135,7 +134,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: runtime.Allocator_Error) #optional_allocator_error {
-	b.buf = make([dynamic]byte, len, allocator, loc) or_return
+	b^ = make(Builder, len, allocator, loc) or_return
 	return b, nil
 }
 /*
@@ -153,7 +152,7 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: runtime.Allocator_Error) #optional_allocator_error {
-	b.buf = make([dynamic]byte, len, cap, allocator, loc) or_return
+	b^ = make(Builder, len, cap, allocator, loc) or_return
 	return b, nil
 }
 // Overload simple `builder_init_*` with or without len / ap parameters
@@ -173,7 +172,7 @@ _builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byt
 		}
 		return
 	case .Size:
-		n = i64(len(b.buf))
+		n = i64(len(b))
 		return
 	case .Destroy:
 		builder_destroy(b)
@@ -215,8 +214,8 @@ Inputs:
 - b: A pointer to the Builder
 */
 builder_destroy :: proc(b: ^Builder) {
-	delete(b.buf)
-	b.buf = nil
+	delete(b^)
+	b^ = nil
 }
 /*
 Reserves the Builder byte buffer to a specific capacity, when it's higher than before
@@ -226,7 +225,7 @@ Inputs:
 - cap: The desired capacity for the Builder's buffer
 */
 builder_grow :: proc(b: ^Builder, cap: int) {
-	reserve(&b.buf, cap)
+	reserve(b, cap)
 }
 /*
 Clears the Builder byte buffer content (sets len to zero)
@@ -235,7 +234,7 @@ Inputs:
 - b: A pointer to the Builder
 */
 builder_reset :: proc(b: ^Builder) {
-	clear(&b.buf)
+	clear(b)
 }
 /*
 Creates a Builder from a slice of bytes with the same slice length as its capacity. Used in fmt.bprint*
@@ -268,15 +267,13 @@ Output:
 
 */
 builder_from_bytes :: proc(backing: []byte) -> (res: Builder) {
-	return Builder{
-		buf = transmute([dynamic]byte)runtime.Raw_Dynamic_Array{
-			data      = raw_data(backing),
-			len       = 0,
-			cap       = len(backing),
-			allocator = runtime.Allocator{
-				procedure = runtime.nil_allocator_proc,
-				data = nil,
-			},
+	return transmute(Builder)runtime.Raw_Dynamic_Array{
+		data      = raw_data(backing),
+		len       = 0,
+		cap       = len(backing),
+		allocator = runtime.Allocator{
+			procedure = runtime.nil_allocator_proc,
+			data = nil,
 		},
 	}
 }
@@ -293,7 +290,7 @@ Returns:
 - res: The contents of the Builder's buffer, as a string
 */
 to_string :: proc(b: Builder) -> (res: string) {
-	return string(b.buf[:])
+	return string(b[:])
 }
 /*
 Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
@@ -307,9 +304,9 @@ Returns:
 - res: A cstring of the Builder's buffer
 */
 unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
-	append(&b.buf, 0, loc)
-	pop(&b.buf)
-	return cstring(raw_data(b.buf))
+	append(b, 0, loc)
+	pop(b)
+	return cstring(raw_data(b^))
 }
 /*
 Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
@@ -322,15 +319,15 @@ Returns:
 - err: An optional allocator error if one occured, `nil` otherwise
 */
 to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
-	n := append(&b.buf, 0, loc) or_return
+	n := append(b, 0, loc) or_return
 	if n != 1 {
 		return nil, .Out_Of_Memory
 	}
-	pop(&b.buf)
+	pop(b)
 	#no_bounds_check {
-		assert(b.buf[len(b.buf)] == 0)
+		assert(b[len(b)] == 0)
 	}
-	return cstring(raw_data(b.buf)), nil
+	return cstring(raw_data(b^)), nil
 }
 /*
 Returns the length of the Builder's buffer, in bytes
@@ -342,7 +339,7 @@ Returns:
 - res: The length of the Builder's buffer
 */
 builder_len :: proc(b: Builder) -> (res: int) {
-	return len(b.buf)
+	return len(b)
 }
 /*
 Returns the capacity of the Builder's buffer, in bytes
@@ -354,7 +351,7 @@ Returns:
 - res: The capacity of the Builder's buffer
 */
 builder_cap :: proc(b: Builder) -> (res: int) {
-	return cap(b.buf)
+	return cap(b)
 }
 /*
 The free space left in the Builder's buffer, in bytes
@@ -366,7 +363,7 @@ Returns:
 - res: The available space left in the Builder's buffer
 */
 builder_space :: proc(b: Builder) -> (res: int) {
-	return cap(b.buf) - len(b.buf)
+	return cap(b) - len(b)
 }
 /*
 Appends a byte to the Builder and returns the number of bytes appended
@@ -398,9 +395,9 @@ Output:
 
 */
 write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int) {
-	n0 := len(b.buf)
-	append(&b.buf, x, loc)
-	n1 := len(b.buf)
+	n0 := len(b)
+	append(b, x, loc)
+	n1 := len(b)
 	return n1-n0
 }
 /*
@@ -428,9 +425,9 @@ Returns:
 - n: The number of bytes appended
 */
 write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int) {
-	n0 := len(b.buf)
-	append(&b.buf, ..x, loc=loc)
-	n1 := len(b.buf)
+	n0 := len(b)
+	append(b, ..x, loc=loc)
+	n1 := len(b)
 	return n1-n0
 }
 /*
@@ -529,9 +526,9 @@ Output:
 
 */
 write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int) {
-	n0 := len(b.buf)
-	append(&b.buf, s, loc)
-	n1 := len(b.buf)
+	n0 := len(b)
+	append(b, s, loc)
+	n1 := len(b)
 	return n1-n0
 }
 /*
@@ -544,12 +541,12 @@ Returns:
 - r: The last byte in the Builder or 0 if empty
 */
 pop_byte :: proc(b: ^Builder) -> (r: byte) {
-	if len(b.buf) == 0 {
+	if len(b) == 0 {
 		return 0
 	}
 
-	r = b.buf[len(b.buf)-1]
-	d := (^runtime.Raw_Dynamic_Array)(&b.buf)
+	r = b[len(b)-1]
+	d := (^runtime.Raw_Dynamic_Array)(b)
 	d.len = max(d.len-1, 0)
 	return
 }
@@ -564,12 +561,12 @@ Returns:
 - width: The rune width or 0 if the builder was empty
 */
 pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
-	if len(b.buf) == 0 {
+	if len(b) == 0 {
 		return 0, 0
 	}
 
-	r, width = utf8.decode_last_rune(b.buf[:])
-	d := (^runtime.Raw_Dynamic_Array)(&b.buf)
+	r, width = utf8.decode_last_rune(b[:])
+	d := (^runtime.Raw_Dynamic_Array)(b)
 	d.len = max(d.len-width, 0)
 	return
 }
@@ -892,7 +889,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 	if len(old) == 0 {
 		// NOTE(bill): reserve the necessary memory
 		found := 0
-		for i := 0; i <= len(b.buf); i += len(new)+1 {
+		for i := 0; i <= len(b); i += len(new)+1 {
 			if n > 0 && found == n {
 				break
 			}
@@ -901,29 +898,29 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 		if found == 0 {
 			return
 		}
-		reserve(&b.buf, len(b.buf) + len(new)*found) or_return
+		reserve(b, len(b) + len(new)*found) or_return
 
 
-		for i := 0; i <= len(b.buf); i += len(new)+1 {
+		for i := 0; i <= len(b); i += len(new)+1 {
 			if n > 0 && replaced == n {
 				break
 			}
 
-			resize(&b.buf, len(b.buf)+len(new), loc) or_return
-			copy(b.buf[i+len(new):], b.buf[i:])
-			copy(b.buf[i:], new)
+			resize(b, len(b)+len(new), loc) or_return
+			copy(b[i+len(new):], b[i:])
+			copy(b[i:], new)
 			replaced += 1
 		}
 	} else {
 		if len(new) > len(old) {
 			// NOTE(bill): reserve the necessary memory
 			found := 0
-			for i := 0; i < len(b.buf); /**/ {
+			for i := 0; i < len(b); /**/ {
 				if n > 0 && found == n {
 					break
 				}
 
-				j := index(string(b.buf[i:]), old)
+				j := index(string(b[i:]), old)
 				if j < 0 {
 					break
 				}
@@ -933,24 +930,24 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 			if found == 0 {
 				return
 			}
-			reserve(&b.buf, len(b.buf) + (len(new)-len(old))*found) or_return
+			reserve(b, len(b) + (len(new)-len(old))*found) or_return
 		}
 
-		for i := 0; i < len(b.buf); /**/ {
+		for i := 0; i < len(b); /**/ {
 			if n > 0 && replaced == n {
 				break
 			}
 
-			j := index(string(b.buf[i:]), old)
+			j := index(string(b[i:]), old)
 			if j < 0 {
 				break
 			}
 
 			if len(new) > len(old) {
-				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+				resize(b, len(b) + len(new)-len(old)) or_return
 			}
 
-			cur := b.buf[i+j:]
+			cur := b[i+j:]
 			src := cur[len(old):]
 			dst := cur[len(new):]
 			copy(dst, src)
@@ -961,7 +958,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 			replaced += 1
 
 			if len(new) < len(old) {
-				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+				resize(b, len(b) + len(new)-len(old)) or_return
 			}
 		}
 	}

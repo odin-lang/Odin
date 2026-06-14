@@ -58,7 +58,7 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 		return
 	}
 
-	return b.buf[:], nil
+	return b[:], nil
 }
 
 // Marshals the given value into a CBOR byte stream written to the given builder.
@@ -379,7 +379,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 
 				err := _encode_u64(e, u64(len(str)), .Text)
 				assert(err == nil)
-				res[9] = u8(len(builder.buf))
+				res[9] = u8(len(builder))
 				assert(res[9] < 10)
 				return
 			}
@@ -476,7 +476,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 					key := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
 					key_builder := strings.builder_make(0, 8, e.temp_allocator) or_return
 					marshal_into(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, any{ key, info.key.id }) or_return
-					append(&entries, Encoded_Entry{ &key_builder.buf, bucket_index }) or_return
+					append(&entries, Encoded_Entry{ (^[dynamic]byte)(&key_builder), bucket_index }) or_return
 				}
 
 				slice.sort_by_cmp(entries[:], proc(a, b: Encoded_Entry) -> slice.Ordering {
@@ -555,7 +555,7 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 
 				key_builder := strings.builder_make(e.temp_allocator) or_return
 				err_conv(_encode_text(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, fname)) or_return
-				append(&entries, Name{key_builder.buf[:], i}) or_return
+				append(&entries, Name{key_builder[:], i}) or_return
 			}
 
 			// Sort lexicographic on the bytes of the key.
