@@ -183,7 +183,7 @@ emit_entries :: proc(sb: ^strings.Builder, entries: []Entry) {
 	for e in entries {
 		flags_str := encode_flags_literal(e.flags)
 		fmt.sbprintfln(sb,
-			"\t{{ .%v, {{.%v, .%v, .%v, .%v}}, {{.%v, .%v, .%v, .%v}}, 0x%08X, 0x%08X, .%v, {{%s}} }},",
+			"\t{{.%v, {{.%v, .%v, .%v, .%v}}, {{.%v, .%v, .%v, .%v}}, 0x%08X, 0x%08X, .%v, {{%s}}}},",
 			e.mnemonic,
 			e.ops[0], e.ops[1], e.ops[2], e.ops[3],
 			e.enc[0], e.enc[1], e.enc[2], e.enc[3],
@@ -212,10 +212,8 @@ emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 	fmt.sbprintfln(sb, "@(rodata)")
 	fmt.sbprintfln(sb, "%s := [%d]Decode_Index{{", name, len(ranges))
 	for r, i in ranges {
-		if r.count == 0 {
-			fmt.sbprintf(sb, "    /* %02X */ {{0, 0}},\n", i)
-		} else {
-			fmt.sbprintf(sb, "    /* %02X */ {{%d, %d}},\n", i, r.start, r.count)
+		if r.count != 0 {
+			fmt.sbprintfln(sb, "\t0x%02X = {{%d, %d}},", i, r.start, r.count)
 		}
 	}
 	strings.write_string(sb, "}\n\n")

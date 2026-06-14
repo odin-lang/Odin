@@ -17,7 +17,7 @@ package rexcode_riscv
 //   §5  F extension (single-precision FP)
 //   §6  D extension (double-precision FP)
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	.INVALID = {},
 
 	// =========================================================================
