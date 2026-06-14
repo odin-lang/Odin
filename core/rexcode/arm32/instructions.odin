@@ -19,13 +19,13 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand,         // 4 * 17 = 68
-	mnemonic:      Mnemonic,           // 2
-	cond:          u8,                 // 0..15 (AL=14)
-	operand_count: u8,                 // 0..4
-	flags:         Instruction_Flags,  // 1
-	mode:          Mode,               // 1 (A32 or T32)
-	length:        u8,                 // 2 or 4 bytes
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 17 = 68
+	mnemonic:      Mnemonic,                           // 2
+	cond:          u8,                                 // 0..15 (AL=14)
+	operand_count: u8,                                 // 0..4
+	flags:         Instruction_Flags,                  // 1
+	mode:          Mode,                               // 1 (A32 or T32)
+	length:        u8,                                 // 2 or 4 bytes
 	// Form-id hint: when non-zero, this is (1 + the index into
 	// ENCODING_TABLE[mnemonic]) of the form the decoder produced. The encoder
 	// uses it as a tie-breaker for shape-ambiguous entries (NEON size variants

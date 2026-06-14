@@ -13,12 +13,12 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand,         // 64 bytes
-	mnemonic:      Mnemonic,           // 2
-	operand_count: u8,                 // 1
-	flags:         Instruction_Flags,  // 1
-	length:        u8,                 // 1 -- always 4 for non-C
-	_:             [3]u8,              // 3
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 64 bytes
+	mnemonic:      Mnemonic,                           // 2
+	operand_count: u8,                                 // 1
+	flags:         Instruction_Flags,                  // 1
+	length:        u8,                                 // 1 -- always 4 for non-C
+	_:             [3]u8,                              // 3
 }
 #assert(size_of(Instruction) == 72)
 

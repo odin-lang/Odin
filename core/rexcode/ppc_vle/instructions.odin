@@ -16,7 +16,7 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand,
+	ops:           [4]Operand `fmt:"v,operand_count"`,
 	mnemonic:      Mnemonic,
 	operand_count: u8,
 	flags:         Instruction_Flags,

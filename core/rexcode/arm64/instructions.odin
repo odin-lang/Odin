@@ -9,12 +9,12 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand,         // 4 * size_of(Operand)
-	mnemonic:      Mnemonic,           // 2
-	operand_count: u8,                 // 1
-	flags:         Instruction_Flags,  // 1
-	length:        u8,                 // 1 -- always 4
-	_:             [3]u8,              // 3
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * size_of(Operand)
+	mnemonic:      Mnemonic,                           // 2
+	operand_count: u8,                                 // 1
+	flags:         Instruction_Flags,                  // 1
+	length:        u8,                                 // 1 -- always 4
+	_:             [3]u8,                              // 3
 }
 
 // =============================================================================
