@@ -211,10 +211,8 @@ emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 	fmt.sbprintfln(sb, "@(rodata)")
 	fmt.sbprintfln(sb, "%s := [%d]Decode_Index{{", name, len(ranges))
 	for r, i in ranges {
-		if r.count == 0 {
-			fmt.sbprintfln(sb, "    /* [%2d] */ {{0, 0}},", i)
-		} else {
-			fmt.sbprintfln(sb, "    /* [%2d] */ {{%d, %d}},", i, r.start, r.count)
+		if r.count != 0 {
+			fmt.sbprintfln(sb, "\t0x%02X = {{%d, %d}},", i, r.start, r.count)
 		}
 	}
 	strings.write_string(sb, "}\n\n")

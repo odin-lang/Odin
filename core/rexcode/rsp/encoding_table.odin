@@ -12,7 +12,7 @@ package rexcode_rsp
 //   Vector L/S — opcode 0x32 (LWC2) or 0x3A (SWC2) with op2 selector
 //     at bits 15-11 and 7-bit signed offset at 6-0.
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	.INVALID = {},
 
 	// =========================================================================
