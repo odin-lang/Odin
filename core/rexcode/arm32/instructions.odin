@@ -40,39 +40,47 @@ Instruction :: struct #packed {
 // Builders
 // =============================================================================
 
+@(require_results)
 inst_none :: #force_inline proc "contextless" (m: Mnemonic, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 0, length = mode == .A32 ? 4 : 2, mode = mode, cond = 14}
 }
 
 // 1-operand
+@(require_results)
 inst_r :: #force_inline proc "contextless" (m: Mnemonic, r: Register, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(r), {}, {}, {}}}
 }
+@(require_results)
 inst_i :: #force_inline proc "contextless" (m: Mnemonic, v: i64, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_imm(v), {}, {}, {}}}
 }
 
 // 2-operand
+@(require_results)
 inst_r_r :: #force_inline proc "contextless" (m: Mnemonic, rd, rm: Register, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(rd), op_reg(rm), {}, {}}}
 }
+@(require_results)
 inst_r_i :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, v: i64, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(rd), op_imm(v), {}, {}}}
 }
 
 // 3-operand data-proc (ADD/SUB/AND/etc.)
+@(require_results)
 inst_r_r_r :: #force_inline proc "contextless" (m: Mnemonic, rd, rn, rm: Register, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), {}}}
 }
+@(require_results)
 inst_r_r_i :: #force_inline proc "contextless" (m: Mnemonic, rd, rn: Register, v: i64, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(rd), op_reg(rn), op_imm(v), {}}}
 }
+@(require_results)
 inst_r_r_r_shifted :: #force_inline proc "contextless" (
 	m: Mnemonic, rd, rn, rm: Register, st: Shift_Type, amt: u8, mode: Mode = .A32,
 ) -> Instruction {
@@ -81,33 +89,39 @@ inst_r_r_r_shifted :: #force_inline proc "contextless" (
 }
 
 // 4-operand MLA / MLS / SMLAL etc.
+@(require_results)
 inst_r_r_r_r :: #force_inline proc "contextless" (m: Mnemonic, rd, rn, rm, ra: Register, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 4, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), op_reg(ra)}}
 }
 
 // Memory load/store
+@(require_results)
 inst_load :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, mm: Memory, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(rd), op_mem(mm), {}, {}}}
 }
+@(require_results)
 inst_store :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, mm: Memory, mode: Mode = .A32) -> Instruction {
 	return inst_load(m, rd, mm, mode)
 }
 
 // LDM/STM/PUSH/POP block move
+@(require_results)
 inst_block :: #force_inline proc "contextless" (m: Mnemonic, base: Register, mask: u16, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_reg(base), op_reg_list(mask), {}, {}}}
 }
 
 // Branches with label
+@(require_results)
 inst_branch :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32, mode: Mode = .A32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = mode == .A32 ? 4 : 4, mode = mode, cond = 14,
 					   ops = {op_label(label_id), {}, {}, {}}}
 }
 
 // Set condition code on any builder
+@(require_results)
 inst_set_cond :: #force_inline proc "contextless" (inst: Instruction, cond: u8) -> Instruction {
 	out := inst
 	out.cond = cond
@@ -115,6 +129,7 @@ inst_set_cond :: #force_inline proc "contextless" (inst: Instruction, cond: u8) 
 }
 
 // Set S flag (sets APSR.NZCV)
+@(require_results)
 inst_set_flags :: #force_inline proc "contextless" (inst: Instruction) -> Instruction {
 	out := inst
 	out.flags.sets_flags = true

@@ -18,35 +18,42 @@ Instruction :: struct #packed {
 }
 #assert(size_of(Instruction) == 40)
 
+@(require_results)
 inst_none :: #force_inline proc "contextless" (m: Mnemonic) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 0, length = 1}
 }
 
+@(require_results)
 inst_a :: #force_inline proc "contextless" (m: Mnemonic) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 1,
 					   ops = {op_reg(A), {}}}
 }
 
+@(require_results)
 inst_i8 :: #force_inline proc "contextless" (m: Mnemonic, v: i64) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 2,
 					   ops = {op_imm8(v), {}}}
 }
 
+@(require_results)
 inst_i16 :: #force_inline proc "contextless" (m: Mnemonic, v: i64) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 3,
 					   ops = {op_imm16(v), {}}}
 }
 
+@(require_results)
 inst_m :: #force_inline proc "contextless" (m: Mnemonic, mm: Memory) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 0,
 					   ops = {op_mem(mm), {}}}
 }
 
+@(require_results)
 inst_rel :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 2,
 					   ops = {op_label(label_id, 1), {}}}
 }
 
+@(require_results)
 inst_rel_long :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 3,
 					   ops = {op_label(label_id, 2), {}}}
@@ -54,6 +61,7 @@ inst_rel_long :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32) -
 
 // MVN/MVP src, dst -- caller writes "natural" order; encoder reverses to
 // the WDC-specified opcode | dst_bank | src_bank byte layout.
+@(require_results)
 inst_block_move :: #force_inline proc "contextless" (m: Mnemonic, src_bank, dst_bank: u8) -> Instruction {
 	return Instruction{
 		mnemonic = m, operand_count = 2, length = 3,

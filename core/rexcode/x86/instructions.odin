@@ -42,6 +42,7 @@ Instruction :: struct #packed {
 // -----------------------------------------------------------------------------
 
 // Convenient instruction builders for common patterns
+@(require_results)
 inst_r_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -50,6 +51,7 @@ inst_r_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, s
 	}
 }
 
+@(require_results)
 inst_r_m :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Register, source: Memory, size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -58,6 +60,7 @@ inst_r_m :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: R
 	}
 }
 
+@(require_results)
 inst_m_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Memory, size: u8, source: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -66,6 +69,7 @@ inst_m_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: M
 	}
 }
 
+@(require_results)
 inst_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Register, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -74,6 +78,7 @@ inst_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: R
 	}
 }
 
+@(require_results)
 inst_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, r: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -82,6 +87,7 @@ inst_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, r: Register) -> 
 	}
 }
 
+@(require_results)
 inst_m :: #force_inline proc "contextless" (mnemonic: Mnemonic, m: Memory, size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -90,6 +96,7 @@ inst_m :: #force_inline proc "contextless" (mnemonic: Mnemonic, m: Memory, size:
 	}
 }
 
+@(require_results)
 inst_none :: #force_inline proc "contextless" (mnemonic: Mnemonic) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -97,6 +104,7 @@ inst_none :: #force_inline proc "contextless" (mnemonic: Mnemonic) -> Instructio
 	}
 }
 
+@(require_results)
 inst_rel :: #force_inline proc "contextless" (mnemonic: Mnemonic, label_id: u32, size: u8 = 4) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -106,6 +114,7 @@ inst_rel :: #force_inline proc "contextless" (mnemonic: Mnemonic, label_id: u32,
 }
 
 // 3-operand register instructions (VEX/EVEX: VADDPS xmm0, xmm1, xmm2)
+@(require_results)
 inst_r_r_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source1, source2: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -115,6 +124,7 @@ inst_r_r_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination,
 }
 
 // 3-operand register-register-memory (VEX/EVEX: VADDPS xmm0, xmm1, [mem])
+@(require_results)
 inst_r_r_m :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source1: Register, source2: Memory, size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -124,6 +134,7 @@ inst_r_r_m :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination,
 }
 
 // 3-operand register-register-immediate (e.g., SHLD r64, r64, imm8)
+@(require_results)
 inst_r_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source: Register, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -133,6 +144,7 @@ inst_r_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination,
 }
 
 // Memoryory-immediate (MOV [mem], imm32)
+@(require_results)
 inst_m_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Memory, size: u8, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -142,6 +154,7 @@ inst_m_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: M
 }
 
 // Single immediate (PUSH imm32, RET imm16, INT imm8, etc.)
+@(require_results)
 inst_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -151,6 +164,7 @@ inst_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, immediate: i64, 
 }
 
 // 3-operand register-memory-immediate (IMUL r64, m64, imm32)
+@(require_results)
 inst_r_m_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Register, source: Memory, mem_size: u8, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -160,6 +174,7 @@ inst_r_m_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination:
 }
 
 // 3-operand memory-register-immediate (SHLD m64, r64, imm8)
+@(require_results)
 inst_m_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Memory, mem_size: u8, source: Register, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -169,6 +184,7 @@ inst_m_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination:
 }
 
 // Relative offset (JMP rel8, JCC rel32, etc.) - uses raw offset, not label
+@(require_results)
 inst_rel_offset :: #force_inline proc "contextless" (mnemonic: Mnemonic, offset: i64, offset_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -178,6 +194,7 @@ inst_rel_offset :: #force_inline proc "contextless" (mnemonic: Mnemonic, offset:
 }
 
 // 3-operand register-memory-register (BEXTR r64, m64, r64)
+@(require_results)
 inst_r_m_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination: Register, source1: Memory, mem_size: u8, source2: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -187,6 +204,7 @@ inst_r_m_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination:
 }
 
 // 4-operand register instructions (EVEX with 4 operands)
+@(require_results)
 inst_r_r_r_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source1, source2, source3: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -196,6 +214,7 @@ inst_r_r_r_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destinatio
 }
 
 // 4-operand: 3 registers + immediate (VCMPPS xmm, xmm, xmm, imm8)
+@(require_results)
 inst_r_r_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source1, source2: Register, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -205,6 +224,7 @@ inst_r_r_r_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destinatio
 }
 
 // 4-operand: 2 registers + memory + immediate (VCMPPS xmm, xmm, m128, imm8)
+@(require_results)
 inst_r_r_m_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source1: Register, source2: Memory, mem_size: u8, immediate: i64, immediate_size: u8) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
@@ -214,6 +234,7 @@ inst_r_r_m_i :: #force_inline proc "contextless" (mnemonic: Mnemonic, destinatio
 }
 
 // 4-operand: 2 registers + memory + register (VBLENDVPS xmm, xmm, m128, xmm)
+@(require_results)
 inst_r_r_m_r :: #force_inline proc "contextless" (mnemonic: Mnemonic, destination, source1: Register, source2: Memory, mem_size: u8, source3: Register) -> Instruction {
 	return Instruction{
 		mnemonic      = mnemonic,
