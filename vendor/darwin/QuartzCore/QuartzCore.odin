@@ -155,7 +155,7 @@ transaction_flush :: proc() {
 }
 
 
-FrameRateRange :: struct {
+FrameRateRange :: struct #packed {
 	minimum:   f32,
 	maximum:   f32,
 	preferred: f32,
