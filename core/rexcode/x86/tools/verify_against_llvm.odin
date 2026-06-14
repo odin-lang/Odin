@@ -166,8 +166,8 @@ main :: proc() {
 	defer strings.builder_destroy(&mismatch)
 
 	n_ok, n_alias, n_unknown, n_mismatch := 0, 0, 0, 0
-	for i in 0..<len(meta) {
-		fields := strings.split(meta[i], "\t", context.temp_allocator)
+	for meta, i in meta {
+		fields := strings.split(meta, "\t", context.temp_allocator)
 		if len(fields) < 5 { continue }
 		our_name := fields[0]
 		opcode   := fields[1]
@@ -199,15 +199,16 @@ main :: proc() {
 				return true
 			}
 			return strings.has_prefix(name, "vpscatter") ||
-				   strings.has_prefix(name, "vscatter")  ||
-				   strings.has_prefix(name, "vpgather")  ||
-				   strings.has_prefix(name, "vgather")
+			       strings.has_prefix(name, "vscatter")  ||
+			       strings.has_prefix(name, "vpgather")  ||
+			       strings.has_prefix(name, "vgather")
 		}
 		is_expected_mismatch :: proc(name, llvm_norm: string) -> bool {
 			return is_expected_unknown(name) && llvm_norm == "add"
 		}
 		status: string
-		if llvm_norm == "" {
+		switch {
+		case llvm_norm == "":
 			if is_expected_unknown(our_norm) {
 				status = "EXPECTED"
 				n_alias += 1
@@ -215,26 +216,26 @@ main :: proc() {
 				status = "UNKNOWN"
 				n_unknown += 1
 			}
-		} else if our_norm == llvm_norm {
+		case our_norm == llvm_norm:
 			status = "OK"
 			n_ok += 1
-		} else if is_known_alias(our_norm, llvm_norm) {
+		case is_known_alias(our_norm, llvm_norm):
 			status = "ALIAS"
 			n_alias += 1
-		} else if is_expected_mismatch(our_norm, llvm_norm) {
+		case is_expected_mismatch(our_norm, llvm_norm):
 			status = "EXPECTED"
 			n_alias += 1
-		} else {
+		case:
 			status = "MISMATCH"
 			n_mismatch += 1
 			fmt.sbprintf(&mismatch, "%-20s op=%s ext=%s ent=%s bc=%s  llvm=%q\n",
-						 our_name, opcode, ext, entry_ix, byte_ct, llvm_raw)
+			                         our_name, opcode, ext, entry_ix, byte_ct, llvm_raw)
 		}
 		fmt.sbprintf(&report, "[%s] %-20s op=%s ext=%s ent=%s bc=%s  llvm=%q\n",
-					 status, our_name, opcode, ext, entry_ix, byte_ct, llvm_raw)
+		                       status, our_name, opcode, ext, entry_ix, byte_ct, llvm_raw)
 	}
 
-	_ = os.write_entire_file("/tmp/rexcode_x86_verify_report.txt", report.buf[:])
+	_ = os.write_entire_file("/tmp/rexcode_x86_verify_report.txt",     report.buf[:])
 	_ = os.write_entire_file("/tmp/rexcode_x86_verify_mismatches.txt", mismatch.buf[:])
 
 	total := n_ok + n_alias + n_unknown + n_mismatch
