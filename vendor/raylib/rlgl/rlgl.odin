@@ -114,13 +114,16 @@ VERSION :: "5.0"
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "../wasm/libraylib.a")
+RAYLIB_SYSTEM :: #config(RAYLIB_SYSTEM, false)
 
 // Note: We pull in the full raylib library. If you want a truly stand-alone rlgl, then:
 // - Compile a separate rlgl library and use that in the foreign import blocks below.
 // - Remove the `import rl "../."` line
 // - Copy the code from raylib.odin for any types we alias from that package (see PixelFormat etc)
 
-when ODIN_OS == .Windows {
+when RAYLIB_SYSTEM {
+	foreign import lib "system:raylib"
+} else when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {
 		"../windows/raylibdll.lib" when RAYLIB_SHARED else "../windows/raylib.lib" ,
