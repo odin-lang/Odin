@@ -221,12 +221,12 @@ _MAX_SIG_CHECKS :: 100
 // opts.required_eku is set the leaf AND every intermediate must permit
 // that purpose (e.g. an email-only sub-CA cannot issue a TLS server leaf).
 //
-// The trust anchor is checked like any issuer (validity, CA /
-// keyCertSign, pathLenConstraint, no uninterpreted critical extension),
-// except that its own self-signature is not re-verified, since it is
-// trusted a priori. An expired or malformed root is therefore rejected;
-// resilience to that comes from the search trying every other available
-// anchor and intermediate.
+// The trust anchor is treated as trusted input, as in Go and OpenSSL: it
+// must be valid at opts.current_time and is name-chained + signature-checked
+// as the issuer below it, but its CA authorization (basicConstraints /
+// keyCertSign / pathLenConstraint) and its own self-signature are NOT
+// re-checked. An expired anchor is still rejected; resilience to that comes
+// from the search trying every other available anchor and intermediate.
 //
 @(require_results)
 verify_chain :: proc(
@@ -330,11 +330,13 @@ _build_to_anchor :: proc(
 	// Non-self-issued intermediates already beneath the next issuer, for the pathLenConstraint check (RFC 5280 section 6.1.4)
 	below := _non_self_issued_below(acc)
 
-	// Prefer terminating at a trust anchor. The anchor must have issued `cert` (name chaining + signature) and, 
-	// like any CA, be fit to act as an issuer: valid at `now`, a CA with keyCertSign, within its pathLenConstraint, 
-	// no uninterpreted critical extension. Its own self-signature is NOT re-verified; it is trusted a priori. 
+	// Prefer terminating at a trust anchor. The anchor must have issued `cert`
+	// (name chaining + signature) and be valid at `now`, but as TRUSTED INPUT
+	// its CA authorization (basicConstraints / keyCertSign / pathLenConstraint)
+	// and its own self-signature are NOT re-checked, matching how Go and
+	// OpenSSL treat roots. See _anchor_usable.
 	for root in opts.roots {
-		if !_is_issuer_of(root, cert) || !_issuer_usable(root, opts.current_time, below) {
+		if !_is_issuer_of(root, cert) || !_anchor_usable(root, opts.current_time) {
 			continue
 		}
 		if budget^ <= 0 {
@@ -444,6 +446,27 @@ _issuer_usable :: proc(issuer: ^Certificate, now: time.Time, below: int) -> bool
 		return false
 	}
 	if _check_validity(issuer, now) != .None {
+		return false
+	}
+	return true
+}
+
+// The anchor is trusted input, so unlike _issuer_usable its CA authorization 
+// (basicConstraints / keyCertSign / pathLenConstraint) and self-signature are 
+// NOT re-checked, matching Go and OpenSSL's treatment of roots. Still required: 
+// valid at `now` (Go and OpenSSL both enforce this; resilience to an expired 
+// anchor comes from the search trying other anchors/intermediates), no 
+// uninterpreted critical extension, and no name constraints (which we cannot 
+// enforce, so refuse rather than ignore).
+@(private)
+_anchor_usable :: proc(anchor: ^Certificate, now: time.Time) -> bool {
+	if anchor.unhandled_critical {
+		return false
+	}
+	if _has_extension(anchor, _OID_EXT_NAME_CONSTRAINTS) {
+		return false
+	}
+	if _check_validity(anchor, now) != .None {
 		return false
 	}
 	return true
