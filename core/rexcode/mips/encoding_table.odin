@@ -27,7 +27,7 @@ package rexcode_mips
 //  10. PS2 EE MMI                                       [§ MMI]
 //  11. PSP Allegrex VFPU                                [§ VFPU]
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .INVALID = {},
 
     // =========================================================================
