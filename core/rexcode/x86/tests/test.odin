@@ -313,9 +313,7 @@ run_test :: proc(t: Test) -> bool {
 
 		// Make mutable copy of labels
 		labels_copy: [256]x86.Label_Definition
-		for i in 0..<len(t.labels) {
-			labels_copy[i] = t.labels[i]
-		}
+		copy(labels_copy[:], t.labels)
 
 		relocs: [dynamic]x86.Relocation
 		defer delete(relocs)
@@ -379,9 +377,7 @@ run_test :: proc(t: Test) -> bool {
 		defer free_exec(exec_buf)
 
 		// Copy code
-		for i in 0..<len(code_to_decode) {
-			exec_buf[i] = code_to_decode[i]
-		}
+		copy(exec_buf, code_to_decode)
 
 		// Run all test cases
 		for tc, case_idx in t.cases {
@@ -559,7 +555,7 @@ run_test :: proc(t: Test) -> bool {
 			}
 
 			// Verify mnemonics
-			for i in 0..<len(t.instructions) {
+			for _, i in t.instructions {
 				if !mnemonics_eq(decoded_insts[i].mnemonic, t.instructions[i].mnemonic) {
 					fmt.printf("%s[FAIL]%s %s - inst %d mnemonic %v != expected %v\n",
 							   RED, RESET, t.name, i, decoded_insts[i].mnemonic, t.instructions[i].mnemonic)
@@ -2936,13 +2932,13 @@ run_prime_sieve_test :: proc() {
 
 run_decode_only_tests :: proc() {
 	tests := []Test{
-		{name = "decode: gcc prologue", test_type = .Decode_Only, input_code = {0x55, 0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC, 0x10}},
-		{name = "decode: xor zero idiom", test_type = .Decode_Only, input_code = {0x31, 0xC0}},
-		{name = "decode: rip-relative lea", test_type = .Decode_Only, input_code = {0x48, 0x8D, 0x05, 0x00, 0x00, 0x00, 0x00}},
+		{name = "decode: gcc prologue",       test_type = .Decode_Only, input_code = {0x55, 0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC, 0x10}},
+		{name = "decode: xor zero idiom",     test_type = .Decode_Only, input_code = {0x31, 0xC0}},
+		{name = "decode: rip-relative lea",   test_type = .Decode_Only, input_code = {0x48, 0x8D, 0x05, 0x00, 0x00, 0x00, 0x00}},
 		{name = "decode: conditional branch", test_type = .Decode_Only, input_code = {0x85, 0xC0, 0x74, 0x02, 0xFF, 0xC0, 0xC3}},
-		{name = "decode: sse", test_type = .Decode_Only, input_code = {0x0F, 0x57, 0xC0, 0x0F, 0x28, 0xC1, 0x0F, 0x58, 0xC2}},
-		{name = "decode: vex", test_type = .Decode_Only, input_code = {0xC5, 0xF8, 0x57, 0xC0, 0xC5, 0xF8, 0x28, 0xC1}},
-		{name = "decode: call/jmp", test_type = .Decode_Only, input_code = {0xE8, 0x00, 0x00, 0x00, 0x00, 0xEB, 0xF9}},
+		{name = "decode: sse",                test_type = .Decode_Only, input_code = {0x0F, 0x57, 0xC0, 0x0F, 0x28, 0xC1, 0x0F, 0x58, 0xC2}},
+		{name = "decode: vex",                test_type = .Decode_Only, input_code = {0xC5, 0xF8, 0x57, 0xC0, 0xC5, 0xF8, 0x28, 0xC1}},
+		{name = "decode: call/jmp",           test_type = .Decode_Only, input_code = {0xE8, 0x00, 0x00, 0x00, 0x00, 0xEB, 0xF9}},
 	}
 	for t in tests { run_test(t) }
 }
@@ -3071,22 +3067,18 @@ run_benchmarks :: proc() {
 	enc_start := time.now()
 	enc_bytes := 0
 	for _ in 0..<ITERATIONS {
-		relocs: [dynamic]x86.Relocation
-		errs: [dynamic]x86.Error
+		relocs: [dynamic]x86.Relocation; defer delete(relocs)
+		errs:   [dynamic]x86.Error;      defer delete(errs)
 		result := x86.encode(bench_insts, labels[:], code_buf[:], &relocs, &errs, true, 0)
 		enc_bytes += int(result.byte_count)
-		delete(relocs)
-		delete(errs)
 	}
 	enc_dur := time.duration_microseconds(time.since(enc_start))
 
 	// Get encoded length for decode
 	encoded_len: u32
 	{
-		relocs: [dynamic]x86.Relocation
-		errs: [dynamic]x86.Error
-		defer delete(relocs)
-		defer delete(errs)
+		relocs: [dynamic]x86.Relocation; defer delete(relocs)
+		errs:   [dynamic]x86.Error;      defer delete(errs)
 		result := x86.encode(bench_insts, labels[:], code_buf[:], &relocs, &errs, true, 0)
 		encoded_len = result.byte_count
 	}
@@ -3095,16 +3087,12 @@ run_benchmarks :: proc() {
 	dec_start := time.now()
 	dec_insts := 0
 	for _ in 0..<ITERATIONS {
-		insts: [dynamic]x86.Instruction
-		info: [dynamic]x86.Instruction_Info
-		lbls: [dynamic]x86.Label_Definition
-		errs: [dynamic]x86.Error
+		insts: [dynamic]x86.Instruction;      defer delete(insts)
+		info:  [dynamic]x86.Instruction_Info; defer delete(info)
+		lbls:  [dynamic]x86.Label_Definition; defer delete(lbls)
+		errs:  [dynamic]x86.Error;            defer delete(errs)
 		x86.decode(code_buf[:encoded_len], nil, &insts, &info, &lbls, &errs)
 		dec_insts += len(insts)
-		delete(insts)
-		delete(info)
-		delete(lbls)
-		delete(errs)
 	}
 	dec_dur := time.duration_microseconds(time.since(dec_start))
 

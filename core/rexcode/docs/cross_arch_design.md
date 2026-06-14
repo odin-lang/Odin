@@ -207,25 +207,25 @@ for an **opt-in** facade (§5.3) that only multi-target *tools* pay for.
 ```
 rexcode/
   isa/                     # shared, architecture-independent core
-    labels.odin            #   Label, Label_Definition, Label_Map, resolution
-    reloc.odin             #   Relocation (type field is generic/u8)
-    status.odin            #   Result, Error, shared Error_Code core
-    print.odin             #   Token, Token_Kind, Print_Options, sinks, num-fmt
-    register.odin          #   distinct-u16 layout convention + reg_hw/reg_class
-    pipeline.odin          #   parametric encode_stream/decode_stream (§7)
-    target.odin            #   optional runtime Target vtable (§5.3)
+	labels.odin            #   Label, Label_Definition, Label_Map, resolution
+	reloc.odin             #   Relocation (type field is generic/u8)
+	status.odin            #   Result, Error, shared Error_Code core
+	print.odin             #   Token, Token_Kind, Print_Options, sinks, num-fmt
+	register.odin          #   distinct-u16 layout convention + reg_hw/reg_class
+	pipeline.odin          #   parametric encode_stream/decode_stream (§7)
+	target.odin            #   optional runtime Target vtable (§5.3)
 
   x86/                     # exists today; refactor to import isa
-    registers.odin operands.odin instructions.odin mnemonics.odin
-    encoding_types.odin encoder.odin decoder.odin printer.odin
-    encoding_table.odin decoding_tables.odin mnemonic_builders.odin
-    tests/  tools/
+	registers.odin operands.odin instructions.odin mnemonics.odin
+	encoding_types.odin encoder.odin decoder.odin printer.odin
+	encoding_table.odin decoding_tables.odin mnemonic_builders.odin
+	tests/  tools/
 
   riscv/                   # next: same shape as x86/
-    registers.odin operands.odin instructions.odin mnemonics.odin
-    encoding_types.odin encoder.odin decoder.odin printer.odin
-    encoding_table.odin decoding_tables.odin mnemonic_builders.odin
-    tests/  tools/
+	registers.odin operands.odin instructions.odin mnemonics.odin
+	encoding_types.odin encoder.odin decoder.odin printer.odin
+	encoding_table.odin decoding_tables.odin mnemonic_builders.odin
+	tests/  tools/
 
   arm64/  mips/  …         # future, same template
 ```
@@ -269,11 +269,11 @@ provides a vtable populated by each arch:
 ```odin
 // isa/target.odin
 Target :: struct {
-    name:       string,
-    decode:     proc(data: []u8, out: ^Decoded) -> Result,   // bytes → generic Decoded
-    print:      proc(d: ^Decoded, opts: ^Print_Options) -> string,
-    inst_align: u32,   // 1 for x86, 4 for riscv/arm64/mips
-    max_inst:   u32,   // 15 for x86, 4 for riscv (8 for C-pairs), 4 for arm64
+	name:       string,
+	decode:     proc(data: []u8, out: ^Decoded) -> Result,   // bytes → generic Decoded
+	print:      proc(d: ^Decoded, opts: ^Print_Options) -> string,
+	inst_align: u32,   // 1 for x86, 4 for riscv/arm64/mips
+	max_inst:   u32,   // 15 for x86, 4 for riscv (8 for C-pairs), 4 for arm64
 }
 // each arch: x86.TARGET: isa.Target = { … }
 ```
@@ -323,7 +323,7 @@ Builder names spell out each operand kind separated by underscores
 ```
 inst_none / inst_r / inst_r_r / inst_r_i / inst_r_m / inst_m_r / …
 emit_none / emit_r / emit_rr / emit_ri / emit_rm / emit_mr / …
-            # NB: emit_* uses concatenated suffixes (legacy x86 spelling)
+			# NB: emit_* uses concatenated suffixes (legacy x86 spelling)
 inst_<mnemonic>(…) / emit_<mnemonic>(…)   # generated typed overloads
 ```
 
@@ -339,8 +339,8 @@ decode(data: []u8, relocs: []Relocation,
        label_defs: ^[dynamic]Label_Definition, errors: ^[dynamic]Error) -> Result
 
 print/println/aprint/tprint/bprint/fprint/wprint(+ln)(
-       instructions: []Instruction, inst_info: []Instruction_Info,
-       label_defs: []Label_Definition, tokens=nil, options=nil, label_names=nil)
+	instructions: []Instruction, inst_info: []Instruction_Info,
+	label_defs: []Label_Definition, tokens=nil, options=nil, label_names=nil)
 ```
 
 ### Register/label/print helpers
@@ -366,18 +366,19 @@ these at compile time → **no runtime cost, real code sharing.**
 ```odin
 // isa/pipeline.odin  (sketch)
 encode_stream :: proc(
-    instructions: []$I,
-    label_defs:   []Label_Definition,
-    code:         []u8,
-    relocs:       ^[dynamic]Relocation,
-    errors:       ^[dynamic]Error,
-    encode_one:   proc(inst: ^I, out: []u8, code_pos: u32,
-                       relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (n: u32, ok: bool),
-    resolve := true, base_address: u64 = 0,
+	instructions: []$I,
+	label_defs:   []Label_Definition,
+	code:         []u8,
+	relocs:       ^[dynamic]Relocation,
+	errors:       ^[dynamic]Error,
+	encode_one:   proc(inst: ^I, out: []u8, code_pos: u32,
+	relocs:       ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (n: u32, ok: bool),
+	resolve       := true,
+	base_address: u64 = 0,
 ) -> Result {
-    // PASS 1: for each inst → record offset, call encode_one, advance
-    // PASS 1.5: rewrite label_defs inst-index → byte-offset   (identical on every arch)
-    // PASS 2: resolve relocations / patch / spill unresolved   (identical on every arch)
+	// PASS 1: for each inst → record offset, call encode_one, advance
+	// PASS 1.5: rewrite label_defs inst-index → byte-offset   (identical on every arch)
+	// PASS 2: resolve relocations / patch / spill unresolved   (identical on every arch)
 }
 ```
 

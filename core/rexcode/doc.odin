@@ -52,9 +52,9 @@ Measured on AMD Ryzen 3950X.
 import "x86"
 
 instructions := []x86.Instruction{
-    x86.inst_r_r(.MOV, x86.RAX, x86.RDI),
-    x86.inst_r_r(.ADD, x86.RAX, x86.RSI),
-    x86.inst_none(.RET),
+	x86.inst_r_r(.MOV, x86.RAX, x86.RDI),
+	x86.inst_r_r(.ADD, x86.RAX, x86.RSI),
+	x86.inst_none(.RET),
 }
 
 code: [4096]u8
@@ -138,16 +138,16 @@ x86.print(decoded_insts[:], decoded_info[:], lm.labels[:], label_names = &id_to_
 Each package has its own test suite:
 
 ```sh
-odin test x86/tests
-odin test arm32/tests
-odin test arm64/tests
-odin test mips/tests
-odin test mos6502/tests
-odin test mos65816/tests
-odin test ppc/tests
-odin test ppc_vle/tests
-odin test riscv/tests
-odin test rsp/tests
+odin run x86/tests
+odin run arm32/tests
+odin run arm64/tests
+odin run mips/tests
+odin run mos6502/tests
+odin run mos65816/tests
+odin run ppc/tests
+odin run ppc_vle/tests
+odin run riscv/tests
+odin run rsp/tests
 ```
 
 ## Verification harnesses
@@ -162,37 +162,37 @@ Each arch has a verification harness under `<arch>/tools/`:
 
 ```
 rexcode/
-  isa/                # shared core: labels, status, print framework, label-inference
-  docs/               # cross-arch design + per-arch design docs
-  x86/                # x86-64 / i386
-  arm32/              # AArch32
-  arm64/              # AArch64
-  mips/               # MIPS (R1..R6 + ASEs + coprocessors)
-  mos6502/            # NMOS 6502 family
-  mos65816/           # W65C816S
-  ppc/                # PowerPC (Power ISA 3.1)
-  ppc_vle/            # Freescale VLE (sibling of ppc)
-  riscv/              # RISC-V
-  rsp/                # N64 RSP
+	isa/                # shared core: labels, status, print framework, label-inference
+	docs/               # cross-arch design + per-arch design docs
+	x86/                # x86-64 / i386
+	arm32/              # AArch32
+	arm64/              # AArch64
+	mips/               # MIPS (R1..R6 + ASEs + coprocessors)
+	mos6502/            # NMOS 6502 family
+	mos65816/           # W65C816S
+	ppc/                # PowerPC (Power ISA 3.1)
+	ppc_vle/            # Freescale VLE (sibling of ppc)
+	riscv/              # RISC-V
+	rsp/                # N64 RSP
 ```
 
 Per-package layout (canonical, enforced by the cross-arch contract):
 
 ```
 <arch>/
-  encoder.odin         # encode() — two-pass, label/reloc-aware
-  decoder.odin         # decode()
-  printer.odin         # sb/sbln/print/println/aprint/aprintln/tprint/tprintln/bprint/bprintln/fprint/fprintln/wprint/wprintln
-  registers.odin       # Register, REG_* classes, typed enums
-  operands.odin        # Operand, Memory, Operand_Kind, op_* constructors
-  instructions.odin    # Instruction, inst_* builders
-  encoding_types.odin  # Encoding, Encoding_Flags, isa re-exports
-  encoding_table.odin  # ENCODING_TABLE: [Mnemonic][]Encoding
-  decoding_tables.odin # generated dispatch tables
-  mnemonics.odin       # Mnemonic enum (u16, INVALID=0)
-  reloc.odin           # Relocation_Type + Relocation
-  tests/               # smoke, pipeline_smoke, sweep
-  tools/               # gen_decode_tables, dump_verify_input, verify_against_*
+	encoder.odin         # encode() — two-pass, label/reloc-aware
+	decoder.odin         # decode()
+	printer.odin         # sb/sbln/print/println/aprint/aprintln/tprint/tprintln/bprint/bprintln/fprint/fprintln/wprint/wprintln
+	registers.odin       # Register, REG_* classes, typed enums
+	operands.odin        # Operand, Memory, Operand_Kind, op_* constructors
+	instructions.odin    # Instruction, inst_* builders
+	encoding_types.odin  # Encoding, Encoding_Flags, isa re-exports
+	encoding_table.odin  # ENCODING_TABLE: [Mnemonic][]Encoding
+	decoding_tables.odin # generated dispatch tables
+	mnemonics.odin       # Mnemonic enum (u16, INVALID=0)
+	reloc.odin           # Relocation_Type + Relocation
+	tests/               # smoke, pipeline_smoke, sweep
+	tools/               # gen_decode_tables, dump_verify_input, verify_against_*
 ```
 
 ## Cross-architecture API design

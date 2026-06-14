@@ -110,16 +110,16 @@ Operand_Kind :: enum u8 { NONE, REGISTER, MEMORY, IMMEDIATE, RELATIVE }
 
 ```odin
 Memory :: bit_field u64 {
-    base_hw:            u8   | 5,
-    base_ext:           bool | 1,
-    index_hw:           u8   | 5,
-    index_ext:          bool | 1,
-    scale_enc:          u8   | 2,
-    displacement:       i32  | 32,
-    segment:            u8   | 3,
-    addr_size_override: bool | 1,
-    base_class:         u8   | 5,
-    index_class:        u8   | 5,
+	base_hw:            u8   | 5,
+	base_ext:           bool | 1,
+	index_hw:           u8   | 5,
+	index_ext:          bool | 1,
+	scale_enc:          u8   | 2,
+	displacement:       i32  | 32,
+	segment:            u8   | 3,
+	addr_size_override: bool | 1,
+	base_class:         u8   | 5,
+	index_class:        u8   | 5,
 }
 MEM_BASE_RIP :: 30   MEM_BASE_NONE :: 31   MEM_INDEX_NONE :: 31
 ```
@@ -143,25 +143,25 @@ MEM_BASE_RIP :: 30   MEM_BASE_NONE :: 31   MEM_INDEX_NONE :: 31
 
 ```odin
 Operand :: struct #packed {              // 16 bytes
-    using _: struct #raw_union {
-        reg:       Register,
-        mem:       Memory,
-        immediate: i64,
-        relative:  i64,      // offset or label id
-    },
-    kind:  Operand_Kind,
-    size:  u8,               // operand size in bytes (1,2,4,8,16,32,64)
-    flags: Operand_Flags,
-    _pad:  [4]u8,
+	using _: struct #raw_union {
+		reg:       Register,
+		mem:       Memory,
+		immediate: i64,
+		relative:  i64,      // offset or label id
+	},
+	kind:  Operand_Kind,
+	size:  u8,               // operand size in bytes (1,2,4,8,16,32,64)
+	flags: Operand_Flags,
+	_:     [4]u8,
 }
 
 Broadcast :: enum u8 { NONE, B1TO2, B1TO4, B1TO8, B1TO16 }   // EVEX
 
 Operand_Flags :: bit_field u16 {   // EVEX-specific
-    mask:      u8        | 3,   // opmask K1–K7
-    zeroing:   bool      | 1,   // merge vs zero masking
-    broadcast: Broadcast | 3,
-    er_sae:    u8        | 2,   // embedded rounding / SAE
+	mask:      u8        | 3,   // opmask K1–K7
+	zeroing:   bool      | 1,   // merge vs zero masking
+	broadcast: Broadcast | 3,
+	er_sae:    u8        | 2,   // embedded rounding / SAE
 }
 ```
 
@@ -189,12 +189,12 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {          // 72 bytes
-    ops:           [4]Operand,
-    mnemonic:      Mnemonic,
-    operand_count: u8,
-    flags:         Instruction_Flags,
-    length:        u8,        // filled by decoder
-    _pad:          [3]u8,
+	ops:           [4]Operand,
+	mnemonic:      Mnemonic,
+	operand_count: u8,
+	flags:         Instruction_Flags,
+	length:        u8,        // filled by decoder
+	_:             [3]u8,
 }
 ```
 
@@ -278,16 +278,16 @@ These describe **how** an instruction is encoded; they are the schema of
 
 ```odin
 Operand_Type :: enum u8 {            // ~70 values
-    NONE, R8,R16,R32,R64, RM8,RM16,RM32,RM64, M,M8..M512,
-    IMM8,IMM16,IMM32,IMM64, IMM8SX, REL8,REL32,
-    AL_IMPL,AX_IMPL,EAX_IMPL,RAX_IMPL,CL_IMPL,DX_IMPL,ONE_IMPL,
-    SREG, CR, DR, XMM,YMM,ZMM, XMM_M32,XMM_M64,XMM_M128,YMM_M256,ZMM_M512,
-    MM,MM_M64, ST0_IMPL,STI, XMM0_IMPL, K,K_M8..K_M64,
-    MOFFS8..MOFFS64, PTR16_16,PTR16_32,PTR16_64, M16_16,M16_32,M16_64,
+	NONE, R8,R16,R32,R64, RM8,RM16,RM32,RM64, M,M8..M512,
+	IMM8,IMM16,IMM32,IMM64, IMM8SX, REL8,REL32,
+	AL_IMPL,AX_IMPL,EAX_IMPL,RAX_IMPL,CL_IMPL,DX_IMPL,ONE_IMPL,
+	SREG, CR, DR, XMM,YMM,ZMM, XMM_M32,XMM_M64,XMM_M128,YMM_M256,ZMM_M512,
+	MM,MM_M64, ST0_IMPL,STI, XMM0_IMPL, K,K_M8..K_M64,
+	MOFFS8..MOFFS64, PTR16_16,PTR16_32,PTR16_64, M16_16,M16_32,M16_64,
 }
 
 Operand_Encoding :: enum u8 {        // where an operand's bits go
-    NONE, MR, REG, VVVV, OP_R, IB,IW,ID,IQ, IMPL, IS4, AAA,
+	NONE, MR, REG, VVVV, OP_R, IB,IW,ID,IQ, IMPL, IS4, AAA,
 }
 
 Escape   :: enum u8 { NONE, _0F, _0F38, _0F3A }
@@ -296,14 +296,26 @@ VEX_W    :: enum u8 { WIG, W0, W1 }
 VEX_L    :: enum u8 { LIG, L0, L1, L2 }
 
 Encoding_Flags :: bit_field u16 {
-    esc: Escape|2, prefix: u8|2, vex_type: VEX_Type|2, vex_w: VEX_W|2,
-    vex_l: VEX_L|2, default_64: bool|1, force_rex_w: bool|1, no_rex: bool|1,
-    lock_ok: bool|1, rep_ok: bool|1, modrm_reg_ext: bool|1,
+	esc:           Escape   | 2,
+	prefix:        u8       | 2,
+	vex_type:      VEX_Type | 2,
+	vex_w:         VEX_W    | 2,
+	vex_l:         VEX_L    | 2,
+	default_64:    bool     | 1,
+	force_rex_w:   bool     | 1,
+	no_rex:        bool     | 1,
+	lock_ok:       bool     | 1,
+	rep_ok:        bool     | 1,
+	modrm_reg_ext: bool     | 1,
 }
 
 Encoding :: struct #packed {         // 14 bytes — one encoding form
-    mnemonic: Mnemonic, ops: [4]Operand_Type, enc: [4]Operand_Encoding,
-    opcode: u8, ext: u8, flags: Encoding_Flags,
+	mnemonic: Mnemonic,
+	ops:      [4]Operand_Type,
+	enc:      [4]Operand_Encoding,
+	opcode:   u8,
+	ext:      u8,
+	flags:    Encoding_Flags,
 }
 PREFIX_66 :: 1   PREFIX_F3 :: 2   PREFIX_F2 :: 3
 ```
@@ -314,19 +326,19 @@ Helper: `encoding_flags(esc=…, prefix=…, …) -> Encoding_Flags`.
 ```odin
 Relocation_Type :: enum u8 { NONE, REL8, REL32, ABS32, ABS64 }
 Relocation :: struct #packed {       // 16 bytes (ELF-rela-like)
-    offset: u32, label_id: u32, addend: i32,
-    type: Relocation_Type, size: u8, inst_idx: u16,
+	offset: u32, label_id: u32, addend: i32,
+	type: Relocation_Type, size: u8, inst_idx: u16,
 }
 
 Error_Code :: enum u8 {
-    NONE,
-    // encode
-    INVALID_MNEMONIC, NO_MATCHING_ENCODING, OPERAND_MISMATCH,
-    IMMEDIATE_OUT_OF_RANGE, BUFFER_OVERFLOW, LABEL_OUT_OF_RANGE,
-    INVALID_OPERAND_COUNT,
-    // decode
-    BUFFER_TOO_SHORT, INVALID_OPCODE, INVALID_MODRM, INVALID_SIB,
-    INVALID_PREFIX, INVALID_VEX, INVALID_EVEX, TOO_MANY_PREFIXES,
+	NONE,
+	// encode
+	INVALID_MNEMONIC, NO_MATCHING_ENCODING, OPERAND_MISMATCH,
+	IMMEDIATE_OUT_OF_RANGE, BUFFER_OVERFLOW, LABEL_OUT_OF_RANGE,
+	INVALID_OPERAND_COUNT,
+	// decode
+	BUFFER_TOO_SHORT, INVALID_OPCODE, INVALID_MODRM, INVALID_SIB,
+	INVALID_PREFIX, INVALID_VEX, INVALID_EVEX, TOO_MANY_PREFIXES,
 }
 Error  :: struct #packed { inst_idx: u32, code: Error_Code, _pad: [3]u8 }   // 8 bytes
 Result :: struct { byte_count: u32, success: bool }
@@ -341,13 +353,13 @@ Helper: `op_type_to_size(Operand_Type) -> u8`.
 MAX_INST_SIZE :: 15
 
 encode :: proc(
-    instructions: []Instruction,
-    label_defs:   []Label_Definition,  // in: inst index; MODIFIED to byte offsets
-    code:         []u8,                 // output machine code
-    relocs:       ^[dynamic]Relocation, // unresolved relocations appended
-    errors:       ^[dynamic]Error,
-    resolve:      bool = true,          // patch resolvable relocs in place
-    base_address: u64  = 0,             // for ABS relocations
+	instructions: []Instruction,
+	label_defs:   []Label_Definition,  // in: inst index; MODIFIED to byte offsets
+	code:         []u8,                 // output machine code
+	relocs:       ^[dynamic]Relocation, // unresolved relocations appended
+	errors:       ^[dynamic]Error,
+	resolve:      bool = true,          // patch resolvable relocs in place
+	base_address: u64  = 0,             // for ABS relocations
 ) -> Result
 ```
 
@@ -371,19 +383,19 @@ Internal matcher (file-local, inlined): `encoding_matches_inline`,
 
 ```odin
 Instruction_Info :: struct {     // parallel metadata, one per decoded inst
-    offset: u32,
-    rex: u8, has_lock: bool, rep: Rep, segment: Register,
-    vex_type: VEX_Type, vex_l: VEX_L, vex_w: VEX_W,
-    evex_b: bool, evex_z: bool, opmask: u8,
+	offset: u32,
+	rex: u8, has_lock: bool, rep: Rep, segment: Register,
+	vex_type: VEX_Type, vex_l: VEX_L, vex_w: VEX_W,
+	evex_b: bool, evex_z: bool, opmask: u8,
 }
 
 decode :: proc(
-    data:         []u8,
-    relocs:       []Relocation,             // optional in: name labels
-    instructions: ^[dynamic]Instruction,    // out
-    inst_info:    ^[dynamic]Instruction_Info, // out (parallel)
-    label_defs:   ^[dynamic]Label_Definition, // out: inferred branch labels
-    errors:       ^[dynamic]Error,
+	data:         []u8,
+	relocs:       []Relocation,             // optional in: name labels
+	instructions: ^[dynamic]Instruction,    // out
+	inst_info:    ^[dynamic]Instruction_Info, // out (parallel)
+	label_defs:   ^[dynamic]Label_Definition, // out: inferred branch labels
+	errors:       ^[dynamic]Error,
 ) -> Result
 ```
 
@@ -406,15 +418,15 @@ Modified Intel syntax: size suffix on the mnemonic (`.b .w .d .q .x .y
 
 ```odin
 Token_Kind :: enum u8 { WHITESPACE, NEWLINE, LABEL_DEF, LABEL_REF, OFFSET,
-    MNEMONIC, REGISTER, IMMEDIATE, MEMORY_BRACKET, MEMORY_OPERATOR,
-    MEMORY_DISP, MEMORY_SCALE, PUNCTUATION, COMMENT }
+                        MNEMONIC, REGISTER, IMMEDIATE, MEMORY_BRACKET, MEMORY_OPERATOR,
+                        MEMORY_DISP, MEMORY_SCALE, PUNCTUATION, COMMENT }
 
 Token :: struct { offset: u32, length: u16, kind: Token_Kind, instruction_index: u16 }
 
 Print_Options :: struct {
-    uppercase: bool, hex_prefix: string, hex_lowercase: bool,
-    label_prefix: string, show_offsets: bool, indent: string,
-    separator: string, space_after_comma: bool,
+	uppercase: bool, hex_prefix: string, hex_lowercase: bool,
+	label_prefix: string, show_offsets: bool, indent: string,
+	separator: string, space_after_comma: bool,
 }
 DEFAULT_PRINT_OPTIONS :: Print_Options{ … }
 

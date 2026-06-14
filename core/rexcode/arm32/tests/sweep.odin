@@ -42,18 +42,17 @@ run_sweep_tests :: proc() {
 
 	for mn in a.Mnemonic {
 		forms := a.ENCODING_TABLE[mn]
-		for idx in 0..<len(forms) {
-			f := &forms[idx]
+		for &f, idx in forms {
 			ilen := a.inst_size_from_bits(f.bits, f.mode)
 
 			// Canonical word: form.bits | safe-fill operand bits.
 			word := f.bits
-			for k in 0..<4 { word |= sweep_safe_fill(f.enc[k]) }
+			for _, k in f.enc { word |= sweep_safe_fill(f.enc[k]) }
 			// Operand-type-driven extras: GPR_RSR needs a non-zero Rs in bits
 			// 11..8 to disambiguate from GPR_SHIFTED on decode/re-encode; the
 			// base bits already set bit 4 (the RSR flag), but Rs=0 would alias
 			// with R0 and the shape_matches predicate requires shift_amt != 0.
-			for k in 0..<4 {
+			for _, k in f.enc {
 				if f.ops[k] == .GPR_RSR && (f.enc[k] == .RM_A32 || f.enc[k] == .RM_T32) {
 					word |= u32(4) << 8
 				}

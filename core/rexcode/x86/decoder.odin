@@ -22,21 +22,21 @@ import "../isa"
 // part of the core Instruction struct. For batch decoding, this is stored
 // in a parallel array at the same index as the corresponding Instruction.
 Instruction_Info :: struct {
-	offset: u32,            // Byte offset from start of decoded region
+	offset:   u32,      // Byte offset from start of decoded region
 
 	// Prefix info
-	rex: u8,                // REX byte (0 if none)
+	rex:      u8,       // REX byte (0 if none)
 	has_lock: bool,
-	rep: Rep,               // Rep prefix (uses same enum as Instruction_Flags)
-	segment: Register,      // Segment override (NONE if none)
+	rep:      Rep,      // Rep prefix (uses same enum as Instruction_Flags)
+	segment:  Register, // Segment override (NONE if none)
 
 	// VEX/EVEX info
 	vex_type: VEX_Type,
-	vex_l: VEX_L,
-	vex_w: VEX_W,
-	evex_b: bool,           // EVEX broadcast
-	evex_z: bool,           // EVEX zeroing
-	opmask: u8,             // EVEX opmask register (k0-k7)
+	vex_l:    VEX_L,
+	vex_w:    VEX_W,
+	evex_b:   bool,     // EVEX broadcast
+	evex_z:   bool,     // EVEX zeroing
+	opmask:   u8,       // EVEX opmask register (k0-k7)
 }
 
 
@@ -46,39 +46,39 @@ Instruction_Info :: struct {
 // -----------------------------------------------------------------------------
 
 Decoder_State :: struct {
-	data: []u8,             // Input bytes
-	position: int,          // Current position
-	mode: Mode,             // CPU mode (._64 = long mode, ._32 = i386)
+	data:       []u8,       // Input bytes
+	position:   int,        // Current position
+	mode:       Mode,       // CPU mode (._64 = long mode, ._32 = i386)
 
 	// Decoded prefix state
-	rex: u8,
-	prefix_66: bool,
-	prefix_f2: bool,
-	prefix_f3: bool,
-	prefix_67: bool,        // Address size override
-	segment: Register,
-	has_lock: bool,
+	rex:        u8,
+	prefix_66:  bool,
+	prefix_f2:  bool,
+	prefix_f3:  bool,
+	prefix_67:  bool,       // Address size override
+	segment:    Register,
+	has_lock:   bool,
 
 	// +r opcode encoding
 	opcode_reg: u8,         // Register encoded in low 3 bits of opcode
 
 	// VEX/EVEX state
-	vex_type: VEX_Type,
-	vex_r: bool,            // VEX.R (inverted)
-	vex_x: bool,            // VEX.X (inverted)
-	vex_b: bool,            // VEX.B (inverted)
-	vex_w: bool,            // VEX.W
-	vex_l: u8,              // VEX.L (0, 1, or 2 for EVEX)
-	vex_vvvv: u8,           // VEX.vvvv register
-	vex_pp: u8,             // VEX.pp (implied prefix)
-	vex_mmmmm: u8,          // VEX.mmmmm (implied escape)
+	vex_type:   VEX_Type,
+	vex_r:      bool,       // VEX.R (inverted)
+	vex_x:      bool,       // VEX.X (inverted)
+	vex_b:      bool,       // VEX.B (inverted)
+	vex_w:      bool,       // VEX.W
+	vex_l:      u8,         // VEX.L (0, 1, or 2 for EVEX)
+	vex_vvvv:   u8,         // VEX.vvvv register
+	vex_pp:     u8,         // VEX.pp (implied prefix)
+	vex_mmmmm:  u8,         // VEX.mmmmm (implied escape)
 
 	// EVEX specific
-	evex_r2: bool,          // EVEX.R'
-	evex_v2: bool,          // EVEX.V'
-	evex_z: bool,           // EVEX.z (zeroing)
-	evex_b: bool,           // EVEX.b (broadcast/rc/sae)
-	evex_aaa: u8,           // EVEX.aaa (opmask)
+	evex_r2:    bool,       // EVEX.R'
+	evex_v2:    bool,       // EVEX.V'
+	evex_z:     bool,       // EVEX.z (zeroing)
+	evex_b:     bool,       // EVEX.b (broadcast/rc/sae)
+	evex_aaa:   u8,         // EVEX.aaa (opmask)
 }
 
 
@@ -114,6 +114,7 @@ PREFIX_TYPE_TABLE := [256]u8{
 }
 
 // Segment register lookup for prefix types 4-9
+@(rodata)
 PREFIX_SEGMENT_TABLE := [6]Register{ES, CS, SS, DS, FS, GS}
 
 decode_prefixes :: #force_inline proc(state: ^Decoder_State) -> Error_Code {
@@ -186,15 +187,15 @@ decode_vex2 :: #force_inline proc(state: ^Decoder_State) -> Error_Code {
 	b1 := state.data[state.position + 1]
 	state.position += 2
 
-	state.vex_type = .VEX
-	state.vex_r = (b1 & 0x80) == 0       // true = extend (bit was 0)
-	state.vex_x = false                  // Implied 1 in 2-byte VEX = no extend
-	state.vex_b = false                  // Implied 1 in 2-byte VEX = no extend
-	state.vex_vvvv = (b1 >> 3) & 0x0F
-	state.vex_l = (b1 >> 2) & 0x01
-	state.vex_pp = b1 & 0x03
-	state.vex_mmmmm = 1                  // Implied 0F escape
-	state.vex_w = false                  // Implied 0 in 2-byte VEX
+	state.vex_type  = .VEX
+	state.vex_r     = (b1 & 0x80) == 0  // true = extend (bit was 0)
+	state.vex_x     = false             // Implied 1 in 2-byte VEX = no extend
+	state.vex_b     = false             // Implied 1 in 2-byte VEX = no extend
+	state.vex_vvvv  = (b1 >> 3) & 0x0F
+	state.vex_l     = (b1 >> 2) & 0x01
+	state.vex_pp    =  b1 & 0x03
+	state.vex_mmmmm = 1                 // Implied 0F escape
+	state.vex_w     = false             // Implied 0 in 2-byte VEX
 
 	return .NONE
 }
@@ -205,20 +206,20 @@ decode_vex3 :: #force_inline proc(state: ^Decoder_State) -> Error_Code {
 	}
 
 	data := state.data
-	pos := state.position
-	b1 := data[pos + 1]
-	b2 := data[pos + 2]
+	pos  := state.position
+	b1   := data[pos + 1]
+	b2   := data[pos + 2]
 	state.position = pos + 3
 
-	state.vex_type = .VEX
-	state.vex_r = (b1 & 0x80) == 0      // Inverted
-	state.vex_x = (b1 & 0x40) == 0      // Inverted
-	state.vex_b = (b1 & 0x20) == 0      // Inverted
-	state.vex_mmmmm = b1 & 0x1F
-	state.vex_w = (b2 & 0x80) != 0
-	state.vex_vvvv = (b2 >> 3) & 0x0F
-	state.vex_l = (b2 >> 2) & 0x01
-	state.vex_pp = b2 & 0x03
+	state.vex_type  = .VEX
+	state.vex_r     = (b1 & 0x80) == 0      // Inverted
+	state.vex_x     = (b1 & 0x40) == 0      // Inverted
+	state.vex_b     = (b1 & 0x20) == 0      // Inverted
+	state.vex_mmmmm =  b1 & 0x1F
+	state.vex_w     = (b2 & 0x80) != 0
+	state.vex_vvvv  = (b2 >> 3) & 0x0F
+	state.vex_l     = (b2 >> 2) & 0x01
+	state.vex_pp    = b2 & 0x03
 
 	return .NONE
 }
@@ -237,20 +238,20 @@ decode_evex :: #force_inline proc(state: ^Decoder_State) -> Error_Code {
 
 	state.vex_type = .EVEX
 	// Byte 1: R, X, B, R', 0, 0, m, m
-	state.vex_r = (b1 & 0x80) == 0      // Inverted
-	state.vex_x = (b1 & 0x40) == 0      // Inverted
-	state.vex_b = (b1 & 0x20) == 0      // Inverted
-	state.evex_r2 = (b1 & 0x10) == 0    // Inverted (R')
-	state.vex_mmmmm = b1 & 0x03
+	state.vex_r     = (b1 & 0x80) == 0   // Inverted
+	state.vex_x     = (b1 & 0x40) == 0   // Inverted
+	state.vex_b     = (b1 & 0x20) == 0   // Inverted
+	state.evex_r2   = (b1 & 0x10) == 0   // Inverted (R')
+	state.vex_mmmmm =  b1 & 0x03
 	// Byte 2: W, v, v, v, v, 1, p, p
-	state.vex_w = (b2 & 0x80) != 0
+	state.vex_w    = (b2 & 0x80) != 0
 	state.vex_vvvv = (b2 >> 3) & 0x0F
-	state.vex_pp = b2 & 0x03
+	state.vex_pp   = b2 & 0x03
 	// Byte 3: z, L', L, b, V', a, a, a
-	state.evex_z = (b3 & 0x80) != 0
-	state.vex_l = ((b3 >> 5) & 0x03)    // L'L combined
-	state.evex_b = (b3 & 0x10) != 0
-	state.evex_v2 = (b3 & 0x08) == 0    // Inverted (V')
+	state.evex_z   = (b3 & 0x80) != 0
+	state.vex_l    = ((b3 >> 5) & 0x03)  // L'L combined
+	state.evex_b   = (b3 & 0x10) != 0
+	state.evex_v2  = (b3 & 0x08) == 0    // Inverted (V')
 	state.evex_aaa = b3 & 0x07
 
 	return .NONE
@@ -572,7 +573,7 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 
 	// Check if we need ModR/M
 	needs_modrm := false
-	for i in 0..<4 {
+	for _, i in entry.enc {
 		enc := entry.enc[i]
 		if enc == .MR || enc == .REG || enc == .VVVV {
 			needs_modrm = true
@@ -614,7 +615,7 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 	}
 
 	// Decode each operand
-	for i in 0..<4 {
+	for _, i in entry.ops {
 		op_type := entry.ops[i]
 		op_enc := entry.enc[i]
 
@@ -626,7 +627,7 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 		// really mean R32/RM32 in 32-bit mode (same encoded bytes).
 		effective := mode_rewrite_op_type(op_type, state.mode, entry.flags.default_64)
 		inst.ops[i], err = decode_single_operand(state, effective, op_enc, modrm_info, sib_info, has_sib)
-		if err != .NONE {
+		if err != nil {
 			return {}, err
 		}
 		inst.operand_count += 1
@@ -661,7 +662,7 @@ decode_operands_vex :: proc(state: ^Decoder_State, entry: ^VEX_Decode_Entry) -> 
 	}
 
 	// Decode each operand
-	for i in 0..<4 {
+	for _, i in entry.ops {
 		op_type := entry.ops[i]
 		op_enc := entry.enc[i]
 
@@ -670,7 +671,7 @@ decode_operands_vex :: proc(state: ^Decoder_State, entry: ^VEX_Decode_Entry) -> 
 		}
 
 		inst.ops[i], err = decode_single_operand_vex(state, op_type, op_enc, modrm_info, sib_info, has_sib)
-		if err != .NONE {
+		if err != nil {
 			return {}, err
 		}
 		inst.operand_count += 1
@@ -1058,7 +1059,7 @@ decode :: proc(
 
 		// Phase 1: Parse prefixes
 		err := decode_prefixes(&state)
-		if err != .NONE {
+		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
 			has_errors = true
 			break
@@ -1102,7 +1103,7 @@ decode :: proc(
 		entry: ^Decode_Entry
 		vex_entry: ^VEX_Decode_Entry
 		entry, vex_entry, err = decode_opcode(&state)
-		if err != .NONE {
+		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
 			has_errors = true
 			break
@@ -1118,7 +1119,7 @@ decode :: proc(
 			has_errors = true
 			break
 		}
-		if err != .NONE {
+		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
 			has_errors = true
 			break
