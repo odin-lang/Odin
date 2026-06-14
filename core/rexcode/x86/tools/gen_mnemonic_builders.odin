@@ -30,14 +30,14 @@ Operand_Signature :: struct {
 }
 
 Operand_Info :: struct {
-	op_type: x86.Operand_Type,
+	op_type:   x86.Operand_Type,
 	is_memory: bool, // For RM operands, distinguishes reg vs mem variant
 }
 
 // Collected procedure to generate
 Proc_Entry :: struct {
-	mnemonic: x86.Mnemonic,
-	sig: Operand_Signature,
+	mnemonic:  x86.Mnemonic,
+	sig:       Operand_Signature,
 	proc_name: string,
 }
 
@@ -70,7 +70,7 @@ main :: proc() {
 
 		for enc in encodings {
 			// Skip encodings we can't generate builders for (implicit-only operands, etc.)
-			if !can_generate_builder(enc) { continue }
+			can_generate_builder(enc) or_continue
 
 			// For RM operands, generate both register and memory variants
 			variants := get_operand_variants(enc)
@@ -289,8 +289,7 @@ can_generate_builder :: proc(enc: x86.Encoding) -> bool {
 	has_any_operand := false
 	has_explicit := false
 
-	for i in 0..<4 {
-		op := enc.ops[i]
+	for op in enc.ops {
 		if op == .NONE { continue }
 
 		has_any_operand = true
@@ -325,8 +324,8 @@ get_operand_variants :: proc(enc: x86.Encoding) -> []Operand_Signature {
 	rm_positions: [4]int
 	rm_count := 0
 
-	for i in 0..<4 {
-		if is_rm_operand(enc.ops[i]) {
+	for op, i in enc.ops {
+		if is_rm_operand(op) {
 			rm_positions[rm_count] = i
 			rm_count += 1
 		}
@@ -341,16 +340,16 @@ get_operand_variants :: proc(enc: x86.Encoding) -> []Operand_Signature {
 		sig.count = 0
 
 		valid := true
-		for i in 0..<4 {
-			op := enc.ops[i]
+		for op, i in enc.ops {
 			if op == .NONE { continue }
 
 			// Skip implicit operands
 			if is_implicit_operand(op) { continue }
 
-			info: Operand_Info
-			info.op_type = op
-			info.is_memory = false
+			info := Operand_Info{
+				op_type   = op,
+				is_memory = false,
+			}
 
 			// Check if this is an RM operand
 			if is_rm_operand(op) {
@@ -485,11 +484,11 @@ signature_key :: proc(mnemonic: x86.Mnemonic, sig: Operand_Signature) -> string 
 	sb := strings.builder_make()
 	defer strings.builder_destroy(&sb)
 
-	strings.write_string(&sb, fmt.tprintf("%v:", mnemonic))
+	fmt.sbprintf(&sb, "%v:", mnemonic)
 
 	for i in 0..<sig.count {
 		info := sig.types[i]
-		strings.write_string(&sb, fmt.tprintf("%v:%v,", info.op_type, info.is_memory))
+		fmt.sbprintf(&sb, "%v:%v,", info.op_type, info.is_memory)
 	}
 
 	return strings.clone(strings.to_string(sb))
@@ -525,72 +524,72 @@ operand_suffix :: proc(info: Operand_Info) -> string {
 	// For RM operands, use r or m prefix based on is_memory flag
 	if info.is_memory {
 		#partial switch op {
-		case .RM8: return "m8"
-		case .RM16: return "m16"
-		case .RM32: return "m32"
-		case .RM64: return "m64"
-		case .XMM_M32: return "m32"
-		case .XMM_M64: return "m64"
+		case .RM8:      return "m8"
+		case .RM16:     return "m16"
+		case .RM32:     return "m32"
+		case .RM64:     return "m64"
+		case .XMM_M32:  return "m32"
+		case .XMM_M64:  return "m64"
 		case .XMM_M128: return "m128"
 		case .YMM_M256: return "m256"
 		case .ZMM_M512: return "m512"
-		case .MM_M64: return "m64"
-		case .K_M8: return "m8"
-		case .K_M16: return "m16"
-		case .K_M32: return "m32"
-		case .K_M64: return "m64"
-		case .M: return "m"
-		case .M8: return "m8"
-		case .M16: return "m16"
-		case .M32: return "m32"
-		case .M64: return "m64"
-		case .M128: return "m128"
-		case .M256: return "m256"
-		case .M512: return "m512"
+		case .MM_M64:   return "m64"
+		case .K_M8:     return "m8"
+		case .K_M16:    return "m16"
+		case .K_M32:    return "m32"
+		case .K_M64:    return "m64"
+		case .M:        return "m"
+		case .M8:       return "m8"
+		case .M16:      return "m16"
+		case .M32:      return "m32"
+		case .M64:      return "m64"
+		case .M128:     return "m128"
+		case .M256:     return "m256"
+		case .M512:     return "m512"
 		}
 	} else {
 		#partial switch op {
-		case .RM8: return "r8"
-		case .RM16: return "r16"
-		case .RM32: return "r32"
-		case .RM64: return "r64"
+		case .RM8:                          return "r8"
+		case .RM16:                         return "r16"
+		case .RM32:                         return "r32"
+		case .RM64:                         return "r64"
 		case .XMM_M32, .XMM_M64, .XMM_M128: return "xmm"
-		case .YMM_M256: return "ymm"
-		case .ZMM_M512: return "zmm"
-		case .MM_M64: return "mm"
+		case .YMM_M256:                     return "ymm"
+		case .ZMM_M512:                     return "zmm"
+		case .MM_M64:                       return "mm"
 		case .K_M8, .K_M16, .K_M32, .K_M64: return "k"
 		}
 	}
 
 	// Non-RM operands
 	#partial switch op {
-	case .R8: return "r8"
-	case .R16: return "r16"
-	case .R32: return "r32"
-	case .R64: return "r64"
-	case .XMM: return "xmm"
-	case .YMM: return "ymm"
-	case .ZMM: return "zmm"
-	case .MM: return "mm"
-	case .IMM8: return "imm8"
+	case .R8:    return "r8"
+	case .R16:   return "r16"
+	case .R32:   return "r32"
+	case .R64:   return "r64"
+	case .XMM:   return "xmm"
+	case .YMM:   return "ymm"
+	case .ZMM:   return "zmm"
+	case .MM:    return "mm"
+	case .IMM8:  return "imm8"
 	case .IMM16: return "imm16"
 	case .IMM32: return "imm32"
 	case .IMM64: return "imm64"
-	case .REL8: return "rel8"
+	case .REL8:  return "rel8"
 	case .REL32: return "rel32"
-	case .SREG: return "sreg"
-	case .CR: return "cr"
-	case .DR: return "dr"
-	case .K: return "k"
-	case .STI: return "st"
-	case .M: return "m"
-	case .M8: return "m8"
-	case .M16: return "m16"
-	case .M32: return "m32"
-	case .M64: return "m64"
-	case .M128: return "m128"
-	case .M256: return "m256"
-	case .M512: return "m512"
+	case .SREG:  return "sreg"
+	case .CR:    return "cr"
+	case .DR:    return "dr"
+	case .K:     return "k"
+	case .STI:   return "st"
+	case .M:     return "m"
+	case .M8:    return "m8"
+	case .M16:   return "m16"
+	case .M32:   return "m32"
+	case .M64:   return "m64"
+	case .M128:  return "m128"
+	case .M256:  return "m256"
+	case .M512:  return "m512"
 	}
 
 	return "unk"
@@ -603,65 +602,65 @@ operand_odin_type :: proc(info: Operand_Info) -> string {
 	// For RM operands, use appropriate type based on is_memory flag
 	if info.is_memory {
 		#partial switch op {
-		case .RM8, .K_M8: return "Mem8"
-		case .RM16, .K_M16: return "Mem16"
-		case .RM32, .XMM_M32, .K_M32: return "Mem32"
+		case .RM8, .K_M8:                      return "Mem8"
+		case .RM16, .K_M16:                    return "Mem16"
+		case .RM32, .XMM_M32, .K_M32:          return "Mem32"
 		case .RM64, .XMM_M64, .MM_M64, .K_M64: return "Mem64"
-		case .XMM_M128: return "Mem128"
-		case .YMM_M256: return "Mem256"
-		case .ZMM_M512: return "Mem512"
-		case .M: return "Memory"
-		case .M8: return "Mem8"
-		case .M16: return "Mem16"
-		case .M32: return "Mem32"
-		case .M64: return "Mem64"
-		case .M128: return "Mem128"
-		case .M256: return "Mem256"
-		case .M512: return "Mem512"
+		case .XMM_M128:                        return "Mem128"
+		case .YMM_M256:                        return "Mem256"
+		case .ZMM_M512:                        return "Mem512"
+		case .M:                               return "Memory"
+		case .M8:                              return "Mem8"
+		case .M16:                             return "Mem16"
+		case .M32:                             return "Mem32"
+		case .M64:                             return "Mem64"
+		case .M128:                            return "Mem128"
+		case .M256:                            return "Mem256"
+		case .M512:                            return "Mem512"
 		}
 	} else {
 		#partial switch op {
-		case .RM8: return "GPR8"
-		case .RM16: return "GPR16"
-		case .RM32: return "GPR32"
-		case .RM64: return "GPR64"
+		case .RM8:                          return "GPR8"
+		case .RM16:                         return "GPR16"
+		case .RM32:                         return "GPR32"
+		case .RM64:                         return "GPR64"
 		case .XMM_M32, .XMM_M64, .XMM_M128: return "XMM"
-		case .YMM_M256: return "YMM"
-		case .ZMM_M512: return "ZMM"
-		case .MM_M64: return "MM"
+		case .YMM_M256:                     return "YMM"
+		case .ZMM_M512:                     return "ZMM"
+		case .MM_M64:                       return "MM"
 		case .K_M8, .K_M16, .K_M32, .K_M64: return "KREG"
 		}
 	}
 
 	// Non-RM operands
 	#partial switch op {
-	case .R8: return "GPR8"
-	case .R16: return "GPR16"
-	case .R32: return "GPR32"
-	case .R64: return "GPR64"
-	case .XMM: return "XMM"
-	case .YMM: return "YMM"
-	case .ZMM: return "ZMM"
-	case .MM: return "MM"
-	case .IMM8: return "i8"
+	case .R8:    return "GPR8"
+	case .R16:   return "GPR16"
+	case .R32:   return "GPR32"
+	case .R64:   return "GPR64"
+	case .XMM:   return "XMM"
+	case .YMM:   return "YMM"
+	case .ZMM:   return "ZMM"
+	case .MM:    return "MM"
+	case .IMM8:  return "i8"
 	case .IMM16: return "i16"
 	case .IMM32: return "i32"
 	case .IMM64: return "i64"
-	case .REL8: return "i8"
+	case .REL8:  return "i8"
 	case .REL32: return "i32"
-	case .SREG: return "SREG"
-	case .CR: return "CREG"
-	case .DR: return "DREG"
-	case .K: return "KREG"
-	case .STI: return "ST"
-	case .M: return "Memory"
-	case .M8: return "Mem8"
-	case .M16: return "Mem16"
-	case .M32: return "Mem32"
-	case .M64: return "Mem64"
-	case .M128: return "Mem128"
-	case .M256: return "Mem256"
-	case .M512: return "Mem512"
+	case .SREG:  return "SREG"
+	case .CR:    return "CREG"
+	case .DR:    return "DREG"
+	case .K:     return "KREG"
+	case .STI:   return "ST"
+	case .M:     return "Memory"
+	case .M8:    return "Mem8"
+	case .M16:   return "Mem16"
+	case .M32:   return "Mem32"
+	case .M64:   return "Mem64"
+	case .M128:  return "Mem128"
+	case .M256:  return "Mem256"
+	case .M512:  return "Mem512"
 	}
 
 	return "unknown"
@@ -711,53 +710,34 @@ generate_operand_expr :: proc(sb: ^strings.Builder, info: Operand_Info, param_na
 		size := operand_size(info)
 		if op == .M {
 			// Generic memory - size is 0
-			strings.write_string(sb, fmt.tprintf("op_mem(%s, 0)", param_name))
+			fmt.sbprintf(sb, "op_mem(%s, 0)", param_name)
 		} else {
-			strings.write_string(sb, fmt.tprintf("op_mem(%s.mem, %d)", param_name, size))
+			fmt.sbprintf(sb, "op_mem(%s.mem, %d)", param_name, size)
 		}
 		return
 	}
 
 	// Register operands
 	#partial switch op {
-	case .R8, .RM8:
-		strings.write_string(sb, fmt.tprintf("op_gpr8(%s)", param_name))
-	case .R16, .RM16:
-		strings.write_string(sb, fmt.tprintf("op_gpr16(%s)", param_name))
-	case .R32, .RM32:
-		strings.write_string(sb, fmt.tprintf("op_gpr32(%s)", param_name))
-	case .R64, .RM64:
-		strings.write_string(sb, fmt.tprintf("op_gpr64(%s)", param_name))
-	case .XMM, .XMM_M32, .XMM_M64, .XMM_M128:
-		strings.write_string(sb, fmt.tprintf("op_xmm(%s)", param_name))
-	case .YMM, .YMM_M256:
-		strings.write_string(sb, fmt.tprintf("op_ymm(%s)", param_name))
-	case .ZMM, .ZMM_M512:
-		strings.write_string(sb, fmt.tprintf("op_zmm(%s)", param_name))
-	case .MM, .MM_M64:
-		strings.write_string(sb, fmt.tprintf("op_mm(%s)", param_name))
-	case .K, .K_M8, .K_M16, .K_M32, .K_M64:
-		strings.write_string(sb, fmt.tprintf("op_kreg(%s)", param_name))
-	case .SREG:
-		strings.write_string(sb, fmt.tprintf("op_sreg(%s)", param_name))
-	case .CR:
-		strings.write_string(sb, fmt.tprintf("op_creg(%s)", param_name))
-	case .DR:
-		strings.write_string(sb, fmt.tprintf("op_dreg(%s)", param_name))
-	case .STI:
-		strings.write_string(sb, fmt.tprintf("op_st(%s)", param_name))
-	case .IMM8:
-		strings.write_string(sb, fmt.tprintf("op_imm8(%s)", param_name))
-	case .IMM16:
-		strings.write_string(sb, fmt.tprintf("op_imm16(%s)", param_name))
-	case .IMM32:
-		strings.write_string(sb, fmt.tprintf("op_imm32(%s)", param_name))
-	case .IMM64:
-		strings.write_string(sb, fmt.tprintf("op_imm64(%s)", param_name))
-	case .REL8:
-		strings.write_string(sb, fmt.tprintf("op_rel8(%s)", param_name))
-	case .REL32:
-		strings.write_string(sb, fmt.tprintf("op_rel32(%s)", param_name))
+	case .R8, .RM8:                           fmt.sbprintf(sb, "op_gpr8(%s)", param_name)
+	case .R16, .RM16:                         fmt.sbprintf(sb, "op_gpr16(%s)", param_name)
+	case .R32, .RM32:                         fmt.sbprintf(sb, "op_gpr32(%s)", param_name)
+	case .R64, .RM64:                         fmt.sbprintf(sb, "op_gpr64(%s)", param_name)
+	case .XMM, .XMM_M32, .XMM_M64, .XMM_M128: fmt.sbprintf(sb, "op_xmm(%s)", param_name)
+	case .YMM, .YMM_M256:                     fmt.sbprintf(sb, "op_ymm(%s)", param_name)
+	case .ZMM, .ZMM_M512:                     fmt.sbprintf(sb, "op_zmm(%s)", param_name)
+	case .MM, .MM_M64:                        fmt.sbprintf(sb, "op_mm(%s)", param_name)
+	case .K, .K_M8, .K_M16, .K_M32, .K_M64:   fmt.sbprintf(sb, "op_kreg(%s)", param_name)
+	case .SREG:                               fmt.sbprintf(sb, "op_sreg(%s)", param_name)
+	case .CR:                                 fmt.sbprintf(sb, "op_creg(%s)", param_name)
+	case .DR:                                 fmt.sbprintf(sb, "op_dreg(%s)", param_name)
+	case .STI:                                fmt.sbprintf(sb, "op_st(%s)", param_name)
+	case .IMM8:                               fmt.sbprintf(sb, "op_imm8(%s)", param_name)
+	case .IMM16:                              fmt.sbprintf(sb, "op_imm16(%s)", param_name)
+	case .IMM32:                              fmt.sbprintf(sb, "op_imm32(%s)", param_name)
+	case .IMM64:                              fmt.sbprintf(sb, "op_imm64(%s)", param_name)
+	case .REL8:                               fmt.sbprintf(sb, "op_rel8(%s)", param_name)
+	case .REL32:                              fmt.sbprintf(sb, "op_rel32(%s)", param_name)
 	case:
 		strings.write_string(sb, "{}")
 	}
@@ -876,7 +856,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ")")
 
 	case "r_r":
@@ -899,7 +879,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), ")
 		write_memory_arg(sb, sig.types[1], names[1])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ")")
 
 	case "m_r":
@@ -910,7 +890,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ", Register(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "))")
@@ -925,7 +905,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), i64(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "m_i":
@@ -937,11 +917,11 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", mem_size))
+		fmt.sbprintf(sb, "%d", mem_size)
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "i":
@@ -952,7 +932,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[0])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "r_m_i":
@@ -966,11 +946,11 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), ")
 		write_memory_arg(sb, sig.types[1], names[1])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", mem_size))
+		fmt.sbprintf(sb, "%d", mem_size)
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[2])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "m_r_i":
@@ -982,13 +962,13 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", mem_size))
+		fmt.sbprintf(sb, "%d", mem_size)
 		strings.write_string(sb, ", Register(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "), i64(")
 		strings.write_string(sb, names[2])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "rel":
@@ -999,7 +979,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[0])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", rel_size))
+		fmt.sbprintf(sb, "%d", rel_size)
 		strings.write_string(sb, ")")
 
 	case "r_r_r":
@@ -1026,7 +1006,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), ")
 		write_memory_arg(sb, sig.types[2], names[2])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ")")
 
 	case "r_r_i":
@@ -1041,7 +1021,7 @@ generate_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), i64(")
 		strings.write_string(sb, names[2])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "r_r_r_r":
@@ -1101,7 +1081,7 @@ generate_fallback_instruction :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 	strings.write_string(sb, "Instruction{ mnemonic = .")
 	strings.write_string(sb, mnemonic_str)
 	strings.write_string(sb, ", operand_count = ")
-	strings.write_string(sb, fmt.tprintf("%d", sig.count))
+	fmt.sbprintf(sb, "%d", sig.count)
 	strings.write_string(sb, ", ops = {")
 	strings.write_string(sb, ops)
 	strings.write_string(sb, "} }")
@@ -1138,7 +1118,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ")")
 
 	case "r_r":
@@ -1161,7 +1141,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), ")
 		write_memory_arg(sb, sig.types[1], names[1])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ")")
 
 	case "m_r":
@@ -1172,7 +1152,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ", Register(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "))")
@@ -1187,7 +1167,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), i64(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "m_i":
@@ -1199,11 +1179,11 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", mem_size))
+		fmt.sbprintf(sb, "%d", mem_size)
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "i":
@@ -1214,7 +1194,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[0])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "r_m_i":
@@ -1228,11 +1208,11 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), ")
 		write_memory_arg(sb, sig.types[1], names[1])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", mem_size))
+		fmt.sbprintf(sb, "%d", mem_size)
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[2])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "m_r_i":
@@ -1244,13 +1224,13 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", ")
 		write_memory_arg(sb, sig.types[0], names[0])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", mem_size))
+		fmt.sbprintf(sb, "%d", mem_size)
 		strings.write_string(sb, ", Register(")
 		strings.write_string(sb, names[1])
 		strings.write_string(sb, "), i64(")
 		strings.write_string(sb, names[2])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "rel":
@@ -1261,7 +1241,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, ", i64(")
 		strings.write_string(sb, names[0])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", rel_size))
+		fmt.sbprintf(sb, "%d", rel_size)
 		strings.write_string(sb, ")")
 
 	case "r_r_r":
@@ -1288,7 +1268,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), ")
 		write_memory_arg(sb, sig.types[2], names[2])
 		strings.write_string(sb, ", ")
-		strings.write_string(sb, fmt.tprintf("%d", size))
+		fmt.sbprintf(sb, "%d", size)
 		strings.write_string(sb, ")")
 
 	case "r_r_i":
@@ -1303,7 +1283,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 		strings.write_string(sb, "), i64(")
 		strings.write_string(sb, names[2])
 		strings.write_string(sb, "), ")
-		strings.write_string(sb, fmt.tprintf("%d", imm_size))
+		fmt.sbprintf(sb, "%d", imm_size)
 		strings.write_string(sb, ")")
 
 	case "r_r_r_r":
