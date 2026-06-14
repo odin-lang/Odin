@@ -1,5 +1,6 @@
 gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token);
 gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len);
+gb_internal LLVMRelocMode get_reloc_mode();
 
 gb_global Entity *lb_global_type_info_data_entity   = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
@@ -65,6 +66,12 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 			"RtLibUseGOT", 11, 
 			LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true)));
 	}
+	
+	LLVMAddModuleFlag(m->mod,
+		LLVMModuleFlagBehaviorWarning,
+		"PIC Level", 9, 
+		LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), get_reloc_mode(), true)));
+
 	if (build_context.ODIN_DEBUG) {
 		enum {DEBUG_METADATA_VERSION = 3};
 
@@ -3666,4 +3673,26 @@ gb_internal void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef valu
 	} else if (flags & EntityFlag_CustomLinkage_LinkOnce) {
 		LLVMSetLinkage(value, LLVMLinkOnceAnyLinkage);
 	}
+}
+
+LLVMRelocMode get_reloc_mode() {
+	// NOTE(dweiler): Dynamic libraries require position-independent code.
+	LLVMRelocMode reloc_mode = LLVMRelocDefault;
+	if (build_context.build_mode == BuildMode_DynamicLibrary) {
+		reloc_mode = LLVMRelocPIC;
+	}
+	switch (build_context.reloc_mode) {
+	case RelocMode_Default:
+		break;
+	case RelocMode_Static:
+		reloc_mode = LLVMRelocStatic;
+		break;
+	case RelocMode_PIC:
+		reloc_mode = LLVMRelocPIC;
+		break;
+	case RelocMode_DynamicNoPIC:
+		reloc_mode = LLVMRelocDynamicNoPic;
+		break;
+	}
+	return reloc_mode;
 }
