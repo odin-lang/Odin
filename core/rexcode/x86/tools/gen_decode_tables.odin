@@ -12,6 +12,7 @@ package main
 // Output: decoding_tables.odin (written to current directory)
 
 import "core:fmt"
+import "core:reflect"
 import "core:os"
 import "core:strings"
 import "core:slice"
@@ -85,8 +86,11 @@ generate_modrm_table :: proc(sb: ^strings.Builder) {
 			disp_size = 4
 		}
 
-		has_sib_str := has_sib ? "true" : "false"
-		strings.write_string(sb, fmt.tprintf("\t{{%d, %d, %d, %s, %d}},", mod, reg, rm, has_sib_str, disp_size))
+		if i % 4 == 0 {
+			strings.write_string(sb, "\t")
+		}
+		has_sib_str := has_sib ? " true" : "false"
+		fmt.sbprintf(sb, "{{%d, %d, %d, %s, %d}}, ", mod, reg, rm, has_sib_str, disp_size)
 		if (i + 1) % 4 == 0 {
 			strings.write_string(sb, "\n")
 		}
@@ -125,7 +129,7 @@ SIB_Info :: struct #packed {
 			index_out = 0xFF
 		}
 
-		strings.write_string(sb, fmt.tprintf("\t{{%d, %d, %d}},", scale, index_out, base))
+		fmt.sbprintf(sb, "\t{{%d, % 3d, %d}},", scale, index_out, base)
 		if (i + 1) % 4 == 0 {
 			strings.write_string(sb, "\n")
 		}
@@ -216,11 +220,15 @@ Decode_Entry :: struct {
 `)
 
 	// Generate legacy table
-	strings.write_string(sb, fmt.tprintf("// Legacy decode entries: %d\n", len(legacy_entries)))
+	fmt.sbprintfln(sb, "// Legacy decode entries: %d", len(legacy_entries))
 	strings.write_string(sb, "@(rodata)\n")
-	strings.write_string(sb, fmt.tprintf("LEGACY_DECODE_ENTRIES := [%d]Decode_Entry{{\n", len(legacy_entries)))
+	fmt.sbprintfln(sb, "LEGACY_DECODE_ENTRIES := [%d]Decode_Entry{{", len(legacy_entries))
+	max_legacy_decode_entries_name := 0
 	for entry in legacy_entries {
-		write_decode_entry(sb, entry)
+		max_legacy_decode_entries_name = max(max_legacy_decode_entries_name, len(reflect.enum_string(entry.mnemonic)))
+	}
+	for entry in legacy_entries {
+		write_decode_entry(sb, entry, max_legacy_decode_entries_name)
 	}
 	strings.write_string(sb, "}\n\n")
 
@@ -244,20 +252,28 @@ VEX_Decode_Entry :: struct {
 
 `)
 
-	strings.write_string(sb, fmt.tprintf("// VEX decode entries: %d\n", len(vex_entries)))
+	fmt.sbprintfln(sb, "// VEX decode entries: %d", len(vex_entries))
 	strings.write_string(sb, "@(rodata)\n")
-	strings.write_string(sb, fmt.tprintf("VEX_DECODE_ENTRIES := [%d]VEX_Decode_Entry{{\n", len(vex_entries)))
+	fmt.sbprintfln(sb, "VEX_DECODE_ENTRIES := [%d]VEX_Decode_Entry{{", len(vex_entries))
+	max_vex_decode_entries_name := 0
 	for entry in vex_entries {
-		write_vex_decode_entry(sb, entry)
+		max_vex_decode_entries_name = max(max_vex_decode_entries_name, len(reflect.enum_string(entry.mnemonic)))
+	}
+	for entry in vex_entries {
+		write_vex_decode_entry(sb, entry, max_vex_decode_entries_name)
 	}
 	strings.write_string(sb, "}\n\n")
 
 	// Generate EVEX table
-	strings.write_string(sb, fmt.tprintf("// EVEX decode entries: %d\n", len(evex_entries)))
+	fmt.sbprintfln(sb, "// EVEX decode entries: %d", len(evex_entries))
 	strings.write_string(sb, "@(rodata)\n")
-	strings.write_string(sb, fmt.tprintf("EVEX_DECODE_ENTRIES := [%d]VEX_Decode_Entry{{\n", len(evex_entries)))
+	fmt.sbprintfln(sb, "EVEX_DECODE_ENTRIES := [%d]VEX_Decode_Entry{{", len(evex_entries))
+	max_evex_decode_entries_name := 0
+	for entry in vex_entries {
+		max_evex_decode_entries_name = max(max_evex_decode_entries_name, len(reflect.enum_string(entry.mnemonic)))
+	}
 	for entry in evex_entries {
-		write_vex_decode_entry(sb, entry)
+		write_vex_decode_entry(sb, entry, max_evex_decode_entries_name)
 	}
 	strings.write_string(sb, "}\n\n")
 
@@ -269,27 +285,36 @@ VEX_Decode_Entry :: struct {
 	generate_vex_index_tables(sb, evex_entries[:], "EVEX")
 }
 
-write_decode_entry :: proc(sb: ^strings.Builder, entry: Collected_Entry) {
+print_enum_buffered :: proc(sb: ^strings.Builder, x: $T, max_name: int, comma: bool) {
+	fmt.sbprintf(sb, ".%v", x)
+	if comma {
+		strings.write_string(sb, ", ")
+	} else {
+		return
+	}
+	for n := max_name-len(reflect.enum_string(x)); n > 0; n -= 1 {
+		strings.write_byte(sb, ' ')
+	}
+}
+write_decode_entry :: proc(sb: ^strings.Builder, entry: Collected_Entry, max_entries_name: int) {
 	strings.write_string(sb, "\t{")
-	strings.write_string(sb, fmt.tprintf(".%v, ", entry.esc))
-	strings.write_string(sb, fmt.tprintf("%d, ", entry.prefix))
-	strings.write_string(sb, fmt.tprintf("0x%02X, ", entry.opcode))
-	strings.write_string(sb, fmt.tprintf("0x%02X, ", entry.ext))
-	strings.write_string(sb, fmt.tprintf(".%v, ", entry.mnemonic))
+	print_enum_buffered(sb, entry.esc, 5, true)
+	fmt.sbprintf(sb, "%d, ", entry.prefix)
+	fmt.sbprintf(sb, "0x%02X, ", entry.opcode)
+	fmt.sbprintf(sb, "0x%02X, ", entry.ext)
+	print_enum_buffered(sb, entry.mnemonic, max_entries_name, true)
 
 	// ops
 	strings.write_string(sb, "{")
-	for i in 0..<4 {
-		if i > 0 { strings.write_string(sb, ", ") }
-		strings.write_string(sb, fmt.tprintf(".%v", entry.ops[i]))
+	for op, i in entry.ops {
+		print_enum_buffered(sb, op, 9, i+1 < len(entry.ops))
 	}
 	strings.write_string(sb, "}, ")
 
 	// enc
 	strings.write_string(sb, "{")
-	for i in 0..<4 {
-		if i > 0 { strings.write_string(sb, ", ") }
-		strings.write_string(sb, fmt.tprintf(".%v", entry.enc[i]))
+	for enc, i in entry.enc {
+		print_enum_buffered(sb, enc, 4, i+1 < len(entry.enc))
 	}
 	strings.write_string(sb, "}, ")
 
@@ -299,29 +324,27 @@ write_decode_entry :: proc(sb: ^strings.Builder, entry: Collected_Entry) {
 	strings.write_string(sb, "},\n")
 }
 
-write_vex_decode_entry :: proc(sb: ^strings.Builder, entry: Collected_Entry) {
+write_vex_decode_entry :: proc(sb: ^strings.Builder, entry: Collected_Entry, max_entries_name: int) {
 	strings.write_string(sb, "\t{")
-	strings.write_string(sb, fmt.tprintf(".%v, ", entry.esc))
-	strings.write_string(sb, fmt.tprintf("%d, ", entry.prefix))
-	strings.write_string(sb, fmt.tprintf("0x%02X, ", entry.opcode))
-	strings.write_string(sb, fmt.tprintf("0x%02X, ", entry.ext))
-	strings.write_string(sb, fmt.tprintf(".%v, ", entry.vex_w))
-	strings.write_string(sb, fmt.tprintf(".%v, ", entry.vex_l))
-	strings.write_string(sb, fmt.tprintf(".%v, ", entry.mnemonic))
+	print_enum_buffered(sb, entry.esc, 5, true)
+	fmt.sbprintf(sb, "%d, ", entry.prefix)
+	fmt.sbprintf(sb, "0x%02X, ", entry.opcode)
+	fmt.sbprintf(sb, "0x%02X, ", entry.ext)
+	print_enum_buffered(sb, entry.vex_w, 4, true)
+	print_enum_buffered(sb, entry.vex_l, 4, true)
+	print_enum_buffered(sb, entry.mnemonic, max_entries_name, true)
 
 	// ops
 	strings.write_string(sb, "{")
-	for i in 0..<4 {
-		if i > 0 { strings.write_string(sb, ", ") }
-		strings.write_string(sb, fmt.tprintf(".%v", entry.ops[i]))
+	for op, i in entry.ops {
+		print_enum_buffered(sb, op, 8, i+1 < len(entry.enc))
 	}
 	strings.write_string(sb, "}, ")
 
 	// enc
 	strings.write_string(sb, "{")
-	for i in 0..<4 {
-		if i > 0 { strings.write_string(sb, ", ") }
-		strings.write_string(sb, fmt.tprintf(".%v", entry.enc[i]))
+	for enc, i in entry.enc {
+		print_enum_buffered(sb, enc, 4, i+1 < len(entry.enc))
 	}
 	strings.write_string(sb, "}, ")
 
@@ -403,7 +426,7 @@ generate_vex_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Ent
 		}
 
 		strings.write_string(sb, "@(rodata)\n")
-		strings.write_string(sb, fmt.tprintf("%s_INDEX_%s := [4][256]Decode_Index{{\n", name, esc_name))
+		fmt.sbprintfln(sb, "%s_INDEX_%s := [4][256]Decode_Index{{", name, esc_name)
 
 		for prefix in 0..<4 {
 			is_empty := true
@@ -462,7 +485,7 @@ generate_vex_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Ent
 					}
 
 					if count > 0 {
-						fmt.sbprintfln(sb, "\t\t0x%02X = {{%d, %d}},", opcode, start, count)
+						fmt.sbprintfln(sb, "\t\t0x%02X = {{% 3d, % 2d}},", opcode, start, count)
 					}
 				}
 
@@ -502,7 +525,7 @@ Decode_Index :: struct {
 		}
 
 		strings.write_string(sb, "@(rodata)\n")
-		strings.write_string(sb, fmt.tprintf("DECODE_INDEX_%s := [4][256]Decode_Index{{\n", esc_name))
+		fmt.sbprintfln(sb, "DECODE_INDEX_%s := [4][256]Decode_Index{{", esc_name)
 
 		for prefix in 0..<4 {
 			strings.write_string(sb, "\t{ // prefix = ")
@@ -533,7 +556,7 @@ Decode_Index :: struct {
 				}
 
 				if count > 0 {
-					fmt.sbprintfln(sb, "\t\t0x%02X = {{%d, %d}},", opcode, start, count)
+					fmt.sbprintfln(sb, "\t\t0x%02X = {{% 4d, % 2d}},", opcode, start, count)
 				}
 			}
 
