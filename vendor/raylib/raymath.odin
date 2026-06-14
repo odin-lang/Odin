@@ -99,6 +99,11 @@ Vector2LengthSqr :: proc "c" (v: Vector2) -> f32 {
 Vector2DotProduct :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.dot(v1, v2)
 }
+// Calculate two vectors dot product
+@(require_results)
+Vector2CrossProduct :: proc "c" (v1, v2: Vector2) -> f32 {
+	return linalg.cross(v1, v2)
+}
 // Calculate distance between two vectors
 @(require_results)
 Vector2Distance :: proc "c" (v1, v2: Vector2) -> f32 {
@@ -587,6 +592,12 @@ MatrixMultiply :: proc "c" (left, right: Matrix) -> Matrix {
 	return left * right
 }
 
+// Multiply matrix components by value
+@(require_results, deprecated="Prefer left * value")
+MatrixMultiplyValue :: proc "c" (left: Matrix, value: f32) -> Matrix {
+	return left * Matrix(value)
+}
+
 // Get translation matrix
 @(require_results)
 MatrixTranslate :: proc "c" (x, y, z: f32) -> Matrix {
@@ -819,6 +830,29 @@ QuaternionEquals :: proc "c" (p, q: Quaternion) -> bool {
 	       FloatEquals(p.y, q.y) &&
 	       FloatEquals(p.z, q.z) &&
 	       FloatEquals(p.w, q.w)
+}
+
+@(require_results)
+MatrixCompose :: proc "c" (translation: Vector3, rotation: Quaternion, scale: Vector3) -> Matrix {
+	// Initialize and scale vectors
+	right := Vector3 {1, 0, 0} * scale.x
+	up := Vector3 {0, 1, 0} * scale.y
+	forward := Vector3 {0, 0, 1} * scale.z
+
+	// Rotate vectors
+	right = Vector3RotateByQuaternion(right, rotation)
+	up = Vector3RotateByQuaternion(up, rotation)
+	forward = Vector3RotateByQuaternion(forward, rotation)
+	
+	// Set result matrix output
+	result := Matrix {
+		right.x, up.x, forward.x, translation.x,
+		right.y, up.y, forward.y, translation.y,
+		right.z, up.z, forward.z, translation.z,
+		0, 0, 0, 1,
+	}
+	
+	return result
 }
 
 @(private, require_results)
