@@ -26,7 +26,7 @@ package rexcode_arm64
 // immediate encoding (N:imms:immr); they're deferred to a follow-up
 // turn that adds the bitmask encoder helper.
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.INVALID = {},
 
 	// =========================================================================
