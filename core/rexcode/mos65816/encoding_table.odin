@@ -33,7 +33,7 @@ package rexcode_mos65816
 //       $A0 (LDA), $C0 (CMP), $E0 (SBC) to get the per-mnemonic base.
 
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
     .INVALID = {},
 
     // =========================================================================
