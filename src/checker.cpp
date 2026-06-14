@@ -2875,9 +2875,11 @@ gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *p
 	InternedString interned = string_interner_insert(str_lit("Test_Signature"), 0, &hash);
 	Entity *test_signature = scope_lookup_current(testing_scope, interned, hash);
 
-	Scope *s = pkg->scope;
-	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;
+	for_array(i, c->info.entities) {
+		Entity *e = c->info.entities[i];
+		if (e->pkg != pkg) {
+			continue;
+		}
 		if (e->kind != Entity_Procedure) {
 			continue;
 		}
