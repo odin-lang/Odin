@@ -24,7 +24,7 @@ package rexcode_mos6502
 //     4   HuC TST # abs
 //     7   HuC block transfer
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	.INVALID = {},
 
 	// =========================================================================
