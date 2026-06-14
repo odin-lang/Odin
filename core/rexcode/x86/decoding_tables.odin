@@ -3189,7 +3189,7 @@ DECODE_INDEX_ESC_0F3A := [4][256]Decode_Index{
 // Indexed by [esc_idx][prefix][opcode] where esc_idx: 0=0F, 1=0F38, 2=0F3A
 @(rodata)
 VEX_INDEX_0F := [4][256]Decode_Index{
-	{ // prefix = none
+	0 = { /* prefix = none */
 		0x10 = {0, 2},
 		0x11 = {2, 2},
 		0x12 = {4, 2},
@@ -3237,7 +3237,7 @@ VEX_INDEX_0F := [4][256]Decode_Index{
 		0xC2 = {82, 2},
 		0xC6 = {84, 2},
 	},
-	{ // prefix = 66
+	1 = { /* prefix = 66 */
 		0x10 = {86, 2},
 		0x11 = {88, 2},
 		0x12 = {90, 1},
@@ -3339,7 +3339,7 @@ VEX_INDEX_0F := [4][256]Decode_Index{
 		0xFD = {279, 2},
 		0xFE = {281, 2},
 	},
-	{ // prefix = F3
+	2 = { /* prefix = F3 */
 		0x10 = {283, 2},
 		0x11 = {285, 1},
 		0x2A = {286, 2},
@@ -3363,7 +3363,7 @@ VEX_INDEX_0F := [4][256]Decode_Index{
 		0xC2 = {311, 1},
 		0xE6 = {312, 2},
 	},
-	{ // prefix = F2
+	3 = { /* prefix = F2 */
 		0x10 = {314, 2},
 		0x11 = {316, 1},
 		0x2A = {317, 2},
@@ -3387,13 +3387,13 @@ VEX_INDEX_0F := [4][256]Decode_Index{
 
 @(rodata)
 VEX_INDEX_0F38 := [4][256]Decode_Index{
-	{ // prefix = none
+	0 = { /* prefix = none */
 		0xF2 = {340, 2},
 		0xF3 = {342, 6},
 		0xF5 = {348, 2},
 		0xF7 = {350, 2},
 	},
-	{ // prefix = 66
+	1 = { /* prefix = 66 */
 		0x00 = {352, 2},
 		0x01 = {354, 2},
 		0x02 = {356, 2},
@@ -3496,11 +3496,11 @@ VEX_INDEX_0F38 := [4][256]Decode_Index{
 		0xDF = {595, 1},
 		0xF7 = {596, 2},
 	},
-	{ // prefix = F3
+	2 = { /* prefix = F3 */
 		0xF5 = {598, 2},
 		0xF7 = {600, 2},
 	},
-	{ // prefix = F2
+	3 = { /* prefix = F2 */
 		0xF5 = {602, 2},
 		0xF6 = {604, 2},
 		0xF7 = {606, 2},
@@ -3509,9 +3509,8 @@ VEX_INDEX_0F38 := [4][256]Decode_Index{
 
 @(rodata)
 VEX_INDEX_0F3A := [4][256]Decode_Index{
-	{ // prefix = none
-	},
-	{ // prefix = 66
+	0 = { /* prefix = none */ },
+	1 = { /* prefix = 66 */
 		0x00 = {608, 1},
 		0x01 = {609, 1},
 		0x02 = {610, 2},
@@ -3550,9 +3549,8 @@ VEX_INDEX_0F3A := [4][256]Decode_Index{
 		0x4C = {662, 2},
 		0xDF = {664, 1},
 	},
-	{ // prefix = F3
-	},
-	{ // prefix = F2
+	2 = { /* prefix = F3 */ },
+	3 = { /* prefix = F2 */
 		0xF0 = {665, 2},
 	},
 }
@@ -3564,18 +3562,17 @@ VEX_INDEX_0F3A := [4][256]Decode_Index{
 // Indexed by [esc_idx][prefix][opcode] where esc_idx: 0=0F, 1=0F38, 2=0F3A
 @(rodata)
 EVEX_INDEX_0F := [4][256]Decode_Index{
-	{ // prefix = none
-	},
-	{ // prefix = 66
+	0 = { /* prefix = none */ },
+	1 = { /* prefix = 66 */
 		0x6F = {0, 6},
 		0x72 = {6, 12},
 		0x7F = {18, 6},
 	},
-	{ // prefix = F3
+	2 = { /* prefix = F3 */
 		0x6F = {24, 6},
 		0x7F = {30, 6},
 	},
-	{ // prefix = F2
+	3 = { /* prefix = F2 */
 		0x6F = {36, 6},
 		0x7F = {42, 6},
 	},
@@ -3583,9 +3580,8 @@ EVEX_INDEX_0F := [4][256]Decode_Index{
 
 @(rodata)
 EVEX_INDEX_0F38 := [4][256]Decode_Index{
-	{ // prefix = none
-	},
-	{ // prefix = 66
+	0 = { /* prefix = none */ },
+	1 = { /* prefix = 66 */
 		0x10 = {48, 3},
 		0x11 = {51, 3},
 		0x12 = {54, 3},
@@ -3625,7 +3621,7 @@ EVEX_INDEX_0F38 := [4][256]Decode_Index{
 		0xA3 = {228, 6},
 		0xC4 = {234, 6},
 	},
-	{ // prefix = F3
+	2 = { /* prefix = F3 */
 		0x10 = {240, 3},
 		0x11 = {243, 3},
 		0x12 = {246, 3},
@@ -3651,15 +3647,13 @@ EVEX_INDEX_0F38 := [4][256]Decode_Index{
 		0x38 = {318, 6},
 		0x39 = {324, 6},
 	},
-	{ // prefix = F2
-	},
+	3 = { /* prefix = F2 */ },
 }
 
 @(rodata)
 EVEX_INDEX_0F3A := [4][256]Decode_Index{
-	{ // prefix = none
-	},
-	{ // prefix = 66
+	0 = { /* prefix = none */ },
+	1 = { /* prefix = 66 */
 		0x03 = {330, 6},
 		0x08 = {336, 3},
 		0x09 = {339, 3},
@@ -3683,9 +3677,7 @@ EVEX_INDEX_0F3A := [4][256]Decode_Index{
 		0x66 = {410, 6},
 		0x67 = {416, 2},
 	},
-	{ // prefix = F3
-	},
-	{ // prefix = F2
-	},
+	2 = { /* prefix = F3 */ },
+	3 = { /* prefix = F2 */ },
 }
 

@@ -406,14 +406,7 @@ generate_vex_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Ent
 		strings.write_string(sb, fmt.tprintf("%s_INDEX_%s := [4][256]Decode_Index{{\n", name, esc_name))
 
 		for prefix in 0..<4 {
-			strings.write_string(sb, "\t{ // prefix = ")
-			switch prefix {
-			case 0: strings.write_string(sb, "none\n")
-			case 1: strings.write_string(sb, "66\n")
-			case 2: strings.write_string(sb, "F3\n")
-			case 3: strings.write_string(sb, "F2\n")
-			}
-
+			is_empty := true
 			for opcode in 0..<256 {
 				start: u16 = 0
 				count: u8 = 0
@@ -432,11 +425,49 @@ generate_vex_index_tables :: proc(sb: ^strings.Builder, entries: []Collected_Ent
 				}
 
 				if count > 0 {
-					fmt.sbprintfln(sb, "\t\t0x%02X = {{%d, %d}},", opcode, start, count)
+					is_empty = false
+					break
 				}
 			}
 
-			strings.write_string(sb, "\t},\n")
+
+			fmt.sbprintf(sb, "\t%d = {{ /* prefix = ", prefix)
+			switch prefix {
+			case 0: strings.write_string(sb, "none")
+			case 1: strings.write_string(sb, "66")
+			case 2: strings.write_string(sb, "F3")
+			case 3: strings.write_string(sb, "F2")
+			}
+
+			strings.write_string(sb, " */")
+			if is_empty {
+				strings.write_string(sb, " },\n")
+			} else {
+				strings.write_string(sb, "\n")
+				for opcode in 0..<256 {
+					start: u16 = 0
+					count: u8 = 0
+					found_start := false
+
+					for entry, idx in entries {
+						if entry.esc == esc && entry.prefix == u8(prefix) && entry.opcode == u8(opcode) {
+							if !found_start {
+								start = u16(idx)
+								found_start = true
+							}
+							count += 1
+						} else if found_start {
+							break
+						}
+					}
+
+					if count > 0 {
+						fmt.sbprintfln(sb, "\t\t0x%02X = {{%d, %d}},", opcode, start, count)
+					}
+				}
+
+				strings.write_string(sb, "\t},\n")
+			}
 		}
 
 		strings.write_string(sb, "}\n\n")
