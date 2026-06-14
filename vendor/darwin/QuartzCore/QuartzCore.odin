@@ -8,6 +8,8 @@ import "base:intrinsics"
 @(private)
 msgSend :: intrinsics.objc_send
 
+// CAMetalLayer
+
 @(objc_class="CAMetalLayer")
 MetalLayer :: struct{ using _: NS.Layer}
 
@@ -110,6 +112,7 @@ MetalLayer_nextDrawable :: proc "c" (self: ^MetalLayer) -> ^MetalDrawable {
 }
 
 
+// CAMetalDrawable
 
 @(objc_class="CAMetalDrawable")
 MetalDrawable :: struct { using _: MTL.Drawable }
@@ -130,6 +133,9 @@ MetalDrawable_addPresentedHandler :: proc "c" (self: ^MetalDrawable, block: Draw
 	msgSend(nil, self, "addPresentedHandler:", block)
 }
 
+
+// CATransaction
+
 @(objc_class="CATransaction")
 Transaction :: struct { using _: NS.Object }
 
@@ -148,3 +154,101 @@ transaction_flush :: proc() {
 	msgSend(nil, Transaction, "flush")
 }
 
+
+FrameRateRange :: struct {
+	minimum:   f32,
+	maximum:   f32,
+	preferred: f32,
+}
+
+
+// CAMetalDisplayLinkUpdate
+
+@(objc_class="CAMetalDisplayLinkUpdate")
+MetalDisplayLinkUpdate :: struct { using _: NS.Object }
+
+@(objc_type=MetalDisplayLinkUpdate, objc_name="drawable")
+MetalDisplayLinkUpdate_drawable :: proc "c" (self: ^MetalDisplayLinkUpdate) -> ^MetalDrawable {
+	return msgSend(^MetalDrawable, self, "drawable")
+}
+
+@(objc_type=MetalDisplayLinkUpdate, objc_name="targetTimestamp")
+MetalDisplayLinkUpdate_targetTimestamp :: proc "c" (self: ^MetalDisplayLinkUpdate) -> NS.TimeInterval {
+	return msgSend(NS.TimeInterval, self, "targetTimestamp")
+}
+
+@(objc_type=MetalDisplayLinkUpdate, objc_name="targetPresentationTimestamp")
+MetalDisplayLinkUpdate_targetPresentationTimestamp :: proc "c" (self: ^MetalDisplayLinkUpdate) -> NS.TimeInterval {
+	return msgSend(NS.TimeInterval, self, "targetPresentationTimestamp")
+}
+
+
+// CAMetalDisplayLink
+
+@(objc_class="CAMetalDisplayLink")
+MetalDisplayLink :: struct { using _: NS.Object }
+
+@(objc_type=MetalDisplayLink, objc_name="alloc", objc_is_class_method=true)
+MetalDisplayLink_alloc :: proc "c" () -> ^MetalDisplayLink {
+	return msgSend(^MetalDisplayLink, MetalDisplayLink, "alloc")
+}
+
+@(objc_type=MetalDisplayLink, objc_name="initWithMetalLayer")
+MetalDisplayLink_initWithMetalLayer :: proc "c" (self: ^MetalDisplayLink, layer: ^MetalLayer) -> ^MetalDisplayLink {
+	return msgSend(^MetalDisplayLink, self, "initWithMetalLayer:", layer)
+}
+
+@(objc_type=MetalDisplayLink, objc_name="addToRunLoop")
+MetalDisplayLink_addToRunLoop :: proc "c" (self: ^MetalDisplayLink, runloop: ^NS.RunLoop, mode: ^NS.String) {
+	msgSend(nil, self, "addToRunLoop:forMode:", runloop, mode)
+}
+
+@(objc_type=MetalDisplayLink, objc_name="removeFromRunLoop")
+MetalDisplayLink_removeFromRunLoop :: proc "c" (self: ^MetalDisplayLink, runloop: ^NS.RunLoop, mode: ^NS.String) {
+	msgSend(nil, self, "removeFromRunLoop:forMode:", runloop, mode)
+}
+
+@(objc_type=MetalDisplayLink, objc_name="invalidate")
+MetalDisplayLink_invalidate :: proc "c" (self: ^MetalDisplayLink) {
+	msgSend(nil, self, "invalidate")
+}
+
+@(objc_type=MetalDisplayLink, objc_name="delegate")
+MetalDisplayLink_delegate :: proc "c" (self: ^MetalDisplayLink) -> NS.id {
+	return msgSend(NS.id, self, "delegate")
+}
+
+@(objc_type=MetalDisplayLink, objc_name="setDelegate")
+MetalDisplayLink_setDelegate :: proc "c" (self: ^MetalDisplayLink, delegate: NS.id) {
+	msgSend(nil, self, "setDelegate:", delegate)
+}
+
+@(objc_type=MetalDisplayLink, objc_name="preferredFrameLatency")
+MetalDisplayLink_preferredFrameLatency :: proc "c" (self: ^MetalDisplayLink) -> f32 {
+	return msgSend(f32, self, "preferredFrameLatency")
+}
+
+@(objc_type=MetalDisplayLink, objc_name="setPreferredFrameLatency")
+MetalDisplayLink_setPreferredFrameLatency :: proc "c" (self: ^MetalDisplayLink, preferredFrameLatency: f32) {
+	msgSend(nil, self, "setPreferredFrameLatency:", preferredFrameLatency)
+}
+
+@(objc_type=MetalDisplayLink, objc_name="preferredFrameRateRange")
+MetalDisplayLink_preferredFrameRateRange :: proc "c" (self: ^MetalDisplayLink) -> FrameRateRange {
+	return msgSend(FrameRateRange, self, "preferredFrameRateRange")
+}
+
+@(objc_type=MetalDisplayLink, objc_name="setPreferredFrameRateRange")
+MetalDisplayLink_setPreferredFrameRateRange :: proc "c" (self: ^MetalDisplayLink, preferredFrameRateRange: FrameRateRange) {
+	msgSend(nil, self, "setPreferredFrameRateRange:", preferredFrameRateRange)
+}
+
+@(objc_type=MetalDisplayLink, objc_name="isPaused")
+MetalDisplayLink_isPaused :: proc "c" (self: ^MetalDisplayLink) -> NS.BOOL {
+	return msgSend(NS.BOOL, self, "isPaused")
+}
+
+@(objc_type=MetalDisplayLink, objc_name="setPaused")
+MetalDisplayLink_setPaused :: proc "c" (self: ^MetalDisplayLink, paused: NS.BOOL) {
+	msgSend(nil, self, "setPaused:", paused)
+}
