@@ -42,6 +42,7 @@ Token :: struct {
 	instruction_index: u16,         // which instruction (0xFFFF for labels/whitespace)
 }
 
+@(require_results)
 token_kind_to_string :: proc(k: Token_Kind) -> string {
 	if name, ok := reflect.enum_name_from_value(k); ok {
 		return name

@@ -23,6 +23,7 @@ LABEL_UNDEFINED :: Label_Definition(0xFFFFFFFF)
 
 // Define a label at the current instruction position. Parametric on $T so
 // any arch's Instruction type works.
+@(require_results)
 label :: #force_inline proc(labels: ^[dynamic]Label_Definition, instructions: ^[dynamic]$T) -> u32 {
 	id := u32(len(labels))
 	append(labels, Label_Definition(len(instructions)))
@@ -30,6 +31,7 @@ label :: #force_inline proc(labels: ^[dynamic]Label_Definition, instructions: ^[
 }
 
 // Reserve a label slot for forward references.
+@(require_results)
 label_forward :: #force_inline proc(labels: ^[dynamic]Label_Definition) -> u32 {
 	id := u32(len(labels))
 	append(labels, LABEL_UNDEFINED)
@@ -64,6 +66,7 @@ label_map_destroy :: #force_inline proc(lm: ^Label_Map) {
 }
 
 // Define a named label at the current instruction position.
+@(require_results)
 label_named :: #force_inline proc(lm: ^Label_Map, name: string, instructions: ^[dynamic]$T) -> u32 {
 	id := u32(len(lm.labels))
 	append(&lm.labels, Label_Definition(len(instructions)))
@@ -72,6 +75,7 @@ label_named :: #force_inline proc(lm: ^Label_Map, name: string, instructions: ^[
 }
 
 // Reserve a named label for forward reference.
+@(require_results)
 label_reserve :: #force_inline proc(lm: ^Label_Map, name: string) -> u32 {
 	id := u32(len(lm.labels))
 	append(&lm.labels, LABEL_UNDEFINED)
@@ -90,9 +94,7 @@ label_set :: #force_inline proc(lm: ^Label_Map, name: string, instructions: ^[dy
 // (relocation resolution). Pure bookkeeping, arch-independent.
 // -----------------------------------------------------------------------------
 
-rewrite_label_defs_to_offsets :: #force_inline proc(
-	label_defs: []Label_Definition, inst_offsets: []u32,
-) {
+rewrite_label_defs_to_offsets :: #force_inline proc(label_defs: []Label_Definition, inst_offsets: []u32) {
 	for &label in label_defs {
 		if label != LABEL_UNDEFINED {
 			inst_idx := u32(label)
