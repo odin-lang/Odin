@@ -61,6 +61,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	switch family {
 	case .IP4:  c_family = win.AF_INET
 	case .IP6:  c_family = win.AF_INET6
+	case .UNIX: c_family = win.AF_UNIX
 	case:
 		unreachable()
 	}
@@ -68,6 +69,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	switch protocol {
 	case .TCP:  c_type = win.SOCK_STREAM; c_protocol = win.IPPROTO_TCP
 	case .UDP:  c_type = win.SOCK_DGRAM;  c_protocol = win.IPPROTO_UDP
+	case .UNIX: c_type = win.SOCK_STREAM; assert(family == .UNIX)
 	case:
 		unreachable()
 	}
@@ -79,8 +81,9 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	}
 
 	switch protocol {
-	case .TCP:  return TCP_Socket(sock), nil
-	case .UDP:  return UDP_Socket(sock), nil
+	case .TCP:  return TCP_Socket(sock),  nil
+	case .UDP:  return UDP_Socket(sock),  nil
+	case .UNIX: return Unix_Socket(sock), nil
 	case:
 		unreachable()
 	}
@@ -117,6 +120,27 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 	return
 }
 
+_dial_unix :: proc(path: string, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(len(path) < win.UNIX_PATH_MAX, "net.dial_unix_from_path(): path too long", loc = loc)
+
+	sock := _create_socket(.UNIX, .UNIX) or_return
+	socket = sock.(Unix_Socket)
+
+	sockaddr := win.sockaddr_un {
+		sun_family = u16(win.AF_UNIX),
+	}
+	n := copy(sockaddr.sun_path[:], path)
+	sockaddr.sun_path[n] = 0
+
+	res := win.connect(win.SOCKET(socket), cast(^win.SOCKADDR_STORAGE_LH) &sockaddr, size_of(sockaddr))
+	if res < 0 {
+		err = _dial_error()
+		return
+	}
+
+	return
+}
+
 @(private)
 _bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
@@ -128,8 +152,10 @@ _bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	return
 }
 
+DEFAULT_LISTEN_BACKLOG :: 1000
+
 @(private)
-_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := DEFAULT_LISTEN_BACKLOG) -> (socket: TCP_Socket, err: Network_Error) {
 	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
 	socket = sock.(TCP_Socket)
@@ -144,6 +170,34 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	if res := win.listen(win.SOCKET(socket), i32(backlog)); res == win.SOCKET_ERROR {
 		err = _listen_error()
 	}
+	return
+}
+
+@(private)
+_listen_unix :: proc(path: string, backlog := DEFAULT_LISTEN_BACKLOG, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(len(path) < win.UNIX_PATH_MAX, "net.listen_unix(): path too long", loc = loc)
+
+	sock := _create_socket(.UNIX, .UNIX) or_return
+	socket = sock.(Unix_Socket)
+
+	sockaddr := win.sockaddr_un {
+		sun_family = u16(win.AF_UNIX),
+	}
+	n := copy(sockaddr.sun_path[:], path)
+	sockaddr.sun_path[n] = 0
+
+	res := win.bind(win.SOCKET(socket), cast(^win.SOCKADDR_STORAGE_LH) &sockaddr, size_of(sockaddr))
+	if res < 0 {
+		err = _bind_error()
+		return
+	}
+
+	res = win.listen(win.SOCKET(socket), c.int(backlog))
+	if res < 0 {
+		err = _listen_error()
+		return
+	}
+
 	return
 }
 
@@ -202,6 +256,16 @@ _accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client
 }
 
 @(private)
+_accept_unix :: proc(socket: Unix_Socket) -> (client: Unix_Socket, err: Accept_Error) {
+	socket := win.accept(win.SOCKET(socket), nil, nil)
+	if socket < 0 {
+		err = _accept_error()
+		return
+	}
+	return Unix_Socket(socket), nil
+}
+
+@(private)
 _close :: proc(socket: Any_Socket) {
 	if s := any_socket_to_socket(socket); s != {} {
 		win.closesocket(win.SOCKET(s))
@@ -241,6 +305,19 @@ _recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_e
 }
 
 @(private)
+_recv_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_read: int, err: Unix_Recv_Error) {
+	if len(buf) <= 0 {
+		return
+	}
+	res := win.recv(win.SOCKET(socket), raw_data(buf), c.int(len(buf)), 0)
+	if res < 0 {
+		err = _unix_recv_error()
+		return
+	}
+	return int(res), nil
+}
+
+@(private)
 _send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP_Send_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
@@ -267,6 +344,21 @@ _send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_writt
 			return
 		}
 
+		bytes_written += int(res)
+	}
+	return
+}
+
+@(private)
+_send_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_written: int, err: Unix_Send_Error) {
+	for bytes_written < len(buf) {
+		limit := min(int(max(i32)), len(buf) - bytes_written)
+		remaining := buf[bytes_written:]
+		res := win.send(win.SOCKET(socket), raw_data(remaining), c.int(limit), 0)
+		if res < 0 {
+			err = _unix_send_error()
+			return
+		}
 		bytes_written += int(res)
 	}
 	return
