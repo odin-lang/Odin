@@ -161,7 +161,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 			inst.flags.sets_flags = true
 		}
 
-		for k in 0..<4 {
+		for _, k in e.enc {
 			if e.enc[k] == .NONE { continue }
 			op := unpack_operand(word, e.enc[k], e.ops[k])
 			inst.ops[k] = op
@@ -173,7 +173,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		// re-encode shape match succeeds. The encoder won't pack anything for
 		// those slots since enc is .NONE; carrying a placeholder lets the
 		// user-facing API still show the slot.
-		for k in 0..<4 {
+		for _, k in e.enc {
 			if e.enc[k] != .NONE { continue }
 			if e.ops[k] == .NONE { continue }
 			inst.ops[k] = default_operand_for(e.ops[k])
