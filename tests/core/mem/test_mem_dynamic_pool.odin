@@ -4,10 +4,12 @@ import "core:testing"
 import "core:mem"
 
 
-expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, alignment: int) {
-	pool: mem.Dynamic_Pool
-	mem.dynamic_pool_init(&pool, alignment = alignment)
-	pool_allocator := mem.dynamic_pool_allocator(&pool)
+expect_pool_allocation :: proc(
+	t: ^testing.T,
+	pool: ^mem.Dynamic_Pool,
+	expected_used_bytes, num_bytes, alignment: int,
+) {
+	pool_allocator := mem.dynamic_pool_allocator(pool)
 
 	element, err := mem.alloc(num_bytes, alignment, pool_allocator)
 	testing.expect(t, err == .None)
@@ -31,7 +33,7 @@ expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, al
 		num_bytes, expected_bytes_left, pool.bytes_left, expected_bytes_left - pool.bytes_left,
 		pool.block_size,
 		pool.out_band_size,
-		pool.alignment,
+		alignment,
 		pool.unused_blocks,
 		pool.used_blocks,
 		pool.out_band_allocations,
@@ -39,6 +41,20 @@ expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, al
 		pool.current_pos,
 		pool.bytes_left,
 	)
+	testing.expectf(t, uintptr(element) % uintptr(alignment) == 0,
+		`
+		Expected allocation to be aligned to %d byte boundary, got %v.
+		`,
+		alignment,
+		element,
+	)
+}
+
+expect_pool_allocation_single :: proc(t: ^testing.T, expected_used_bytes, num_bytes, alignment: int) {
+	pool: mem.Dynamic_Pool
+	mem.dynamic_pool_init(&pool)
+
+	expect_pool_allocation(t, &pool, expected_used_bytes, num_bytes, alignment)
 
 	mem.dynamic_pool_destroy(&pool)
 	testing.expect(t, pool.used_blocks == nil)
@@ -64,13 +80,23 @@ expect_pool_allocation_out_of_band :: proc(t: ^testing.T, num_bytes, block_size,
 
 @(test)
 test_dynamic_pool_alloc_aligned :: proc(t: ^testing.T) {
-	expect_pool_allocation(t, expected_used_bytes = 16, num_bytes = 16, alignment=8)
+	expect_pool_allocation_single(t, expected_used_bytes = 16, num_bytes = 16, alignment = 8)
 }
 
 @(test)
 test_dynamic_pool_alloc_unaligned :: proc(t: ^testing.T) {
-	expect_pool_allocation(t, expected_used_bytes = 8,  num_bytes = 1, alignment = 8)
-	expect_pool_allocation(t, expected_used_bytes = 16, num_bytes = 9, alignment = 8)
+	expect_pool_allocation_single(t, expected_used_bytes = 1, num_bytes = 1, alignment = 8)
+	expect_pool_allocation_single(t, expected_used_bytes = 9, num_bytes = 9, alignment = 8)
+
+	pool: mem.Dynamic_Pool
+	mem.dynamic_pool_init(&pool)
+
+	expect_pool_allocation(t, &pool, expected_used_bytes = 1,  num_bytes = 1, alignment = 8)
+	expect_pool_allocation(t, &pool, expected_used_bytes = 16, num_bytes = 8, alignment = 8)
+	expect_pool_allocation(t, &pool, expected_used_bytes = 17, num_bytes = 1, alignment = 8)
+
+	mem.dynamic_pool_destroy(&pool)
+	testing.expect(t, pool.used_blocks == nil)
 }
 
 @(test)
