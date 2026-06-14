@@ -1959,7 +1959,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			metrics->os == TargetOs_openbsd ||
 			metrics->os == TargetOs_netbsd) {
 		if (bc->stack_protector == StackProtector_Default) {
-			bc->stack_protector = StackProtector_Ssp;
+			bc->stack_protector = StackProtector_SspStrong;
 		}
 	} else {
 		if (bc->stack_protector == StackProtector_Default) {
