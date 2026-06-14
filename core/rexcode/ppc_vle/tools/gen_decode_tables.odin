@@ -165,17 +165,17 @@ Decode_Index :: struct #packed {
 	}
 	strings.write_string(&sb, "}\n\n")
 
-	fmt.sbprintf(&sb, "DECODE_FORM_IDX := [%d]u16{{\n", len(all))
+	fmt.sbprintf(&sb, "DECODE_FORM_IDX := [%d]u16{{", len(all))
 	for e, i in all {
-		if i > 0 && i % 16 == 0 { strings.write_string(&sb, "\n") }
-		fmt.sbprintf(&sb, " %d,", e.form_idx)
+		if i % 16 == 0 { strings.write_string(&sb, "\n\t") }
+		fmt.sbprintf(&sb, "%d, ", e.form_idx)
 	}
 	strings.write_string(&sb, "\n}\n\n")
 
-	fmt.sbprintf(&sb, "DECODE_BUCKET_LIST := [%d]u16{{\n", len(bucket_list))
+	fmt.sbprintf(&sb, "DECODE_BUCKET_LIST := [%d]u16{{", len(bucket_list))
 	for v, i in bucket_list {
-		if i > 0 && i % 16 == 0 { strings.write_string(&sb, "\n") }
-		fmt.sbprintf(&sb, " %d,", v)
+		if i % 16 == 0 { strings.write_string(&sb, "\n\t") }
+		fmt.sbprintf(&sb, "% 3d, ", v)
 	}
 	strings.write_string(&sb, "\n}\n\n")
 
@@ -222,12 +222,9 @@ emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 	fmt.sbprintfln(sb, "@(rodata)")
 	fmt.sbprintfln(sb, "%s := [%d]Decode_Index{{", name, len(ranges))
 	for r, i in ranges {
-		if r.count == 0 {
-			if i % 16 == 0 { strings.write_string(sb, "\n") }
-			strings.write_string(sb, "{0,0,0},")
-		} else {
-			fmt.sbprintf(sb, "{{%d,%d,0}},", r.start, r.count)
+		if r.count != 0 {
+			fmt.sbprintfln(sb, "\t0x%02X = {{%d,%d,0}},", i, r.start, r.count)
 		}
 	}
-	strings.write_string(sb, "\n}\n\n")
+	strings.write_string(sb, "}\n\n")
 }

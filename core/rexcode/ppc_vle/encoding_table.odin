@@ -8,7 +8,7 @@ package rexcode_ppc_vle
 // encoding. Each entry's mask covers the FIXED bits of the form (primary
 // opcode, sub-opcode, baked operands), leaving variable operand bits free.
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = #partial {
+ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	.SE_ILLEGAL           = { {.SE_ILLEGAL          , {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x00000000, 0xFFFFFFFF, .BASE, .PPC32_VLE, {short=true}} },
 	.SE_ISYNC             = { {.SE_ISYNC            , {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x00000001, 0xFFFFFFFF, .BASE, .PPC32_VLE, {short=true}} },
 	.SE_SC                = { {.SE_SC               , {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x00000002, 0xFFFFFFFF, .BASE, .PPC32_VLE, {short=true}} },
