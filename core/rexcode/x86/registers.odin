@@ -294,58 +294,67 @@ RIP :: Register(0xFFFE)
 // -----------------------------------------------------------------------------
 
 // Register utility functions - all branchless single-cycle operations
+@(require_results)
 reg_hw :: #force_inline proc "contextless" (r: Register) -> u8 {
 	return u8(r) & 0x1F
 }
 
+@(require_results)
 reg_class :: #force_inline proc "contextless" (r: Register) -> u16 {
 	return u16(r) & 0xFF00
 }
 
+@(require_results)
 reg_needs_rex :: #force_inline proc "contextless" (r: Register) -> bool {
 	return (u16(r) & 0x08) != 0
 }
 
+@(require_results)
 reg_needs_rex_ext :: #force_inline proc "contextless" (r: Register) -> bool {
 	return (u16(r) & 0x08) != 0 && reg_class(r) < REG_K
 }
 
+@(require_results)
 reg_needs_evex :: #force_inline proc "contextless" (r: Register) -> bool {
 	return (u16(r) & 0x10) != 0
 }
 
+@(require_results)
 reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r)
 	return c >= REG_GPR64 && c <= REG_GPR8H
 }
 
+@(require_results)
 reg_is_vector :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r)
 	return c >= REG_XMM && c <= REG_ZMM
 }
 
+@(require_results)
 reg_is_high_byte :: #force_inline proc "contextless" (r: Register) -> bool {
 	return reg_class(r) == REG_GPR8H
 }
 
 // Size in bits for register
+@(require_results)
 reg_size :: proc "contextless" (r: Register) -> u16 {
 	switch reg_class(r) {
-	case REG_GPR64: return 64
-	case REG_GPR32: return 32
-	case REG_GPR16: return 16
+	case REG_GPR64:           return 64
+	case REG_GPR32:           return 32
+	case REG_GPR16:           return 16
 	case REG_GPR8, REG_GPR8H: return 8
-	case REG_XMM: return 128
-	case REG_YMM: return 256
-	case REG_ZMM: return 512
-	case REG_K: return 64
-	case REG_MM: return 64
-	case REG_ST: return 80
-	case REG_SEG: return 16
-	case REG_CR, REG_DR: return 64
-	case REG_BND: return 128
-	case: return 0
+	case REG_XMM:             return 128
+	case REG_YMM:             return 256
+	case REG_ZMM:             return 512
+	case REG_K:               return 64
+	case REG_MM:              return 64
+	case REG_ST:              return 80
+	case REG_SEG:             return 16
+	case REG_CR, REG_DR:      return 64
+	case REG_BND:             return 128
 	}
+	return 0
 }
 
 // -----------------------------------------------------------------------------
@@ -356,14 +365,17 @@ reg_size :: proc "contextless" (r: Register) -> u16 {
 // Since Register = class | hardware_number, and num IS the hardware number,
 // we just OR with the class constant. This is O(1) with no stack allocation.
 
+@(require_results)
 gpr64_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 16 ? Register(REG_GPR64 | u16(num)) : NONE
 }
 
+@(require_results)
 gpr32_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 16 ? Register(REG_GPR32 | u16(num)) : NONE
 }
 
+@(require_results)
 gpr16_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 16 ? Register(REG_GPR16 | u16(num)) : NONE
 }
@@ -383,18 +395,22 @@ gpr8_from_num :: proc(num: u8, has_rex: bool) -> Register {
 	}
 }
 
+@(require_results)
 xmm_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_XMM | u16(num)) : NONE
 }
 
+@(require_results)
 ymm_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_YMM | u16(num)) : NONE
 }
 
+@(require_results)
 zmm_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 32 ? Register(REG_ZMM | u16(num)) : NONE
 }
 
+@(require_results)
 mm_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 8 ? Register(REG_MM | u16(num)) : NONE
 }

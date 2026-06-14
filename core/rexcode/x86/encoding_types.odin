@@ -264,12 +264,12 @@ Encoding_Flags :: bit_field u32 {
 // -----------------------------------------------------------------------------
 
 Encoding :: struct #packed {
-	mnemonic: Mnemonic,       // 2 bytes
-	ops: [4]Operand_Type,     // 4 bytes - operand types
-	enc: [4]Operand_Encoding, // 4 bytes - operand encodings
-	opcode: u8,               // 1 byte - primary opcode byte
-	ext: u8,                  // 1 byte - ModR/M reg extension (/0-/7) or secondary opcode
-	flags: Encoding_Flags,    // 4 bytes
+	mnemonic: Mnemonic,            // 2 bytes
+	ops:      [4]Operand_Type,     // 4 bytes - operand types
+	enc:      [4]Operand_Encoding, // 4 bytes - operand encodings
+	opcode:   u8,                  // 1 byte - primary opcode byte
+	ext:      u8,                  // 1 byte - ModR/M reg extension (/0-/7) or secondary opcode
+	flags:    Encoding_Flags,      // 4 bytes
 }
 #assert(size_of(Encoding) == 16)
 
@@ -283,32 +283,32 @@ PREFIX_F2 :: 3
 // -----------------------------------------------------------------------------
 
 encoding_flags :: #force_inline proc "contextless" (
-	esc: Escape = .NONE,
-	prefix: u8 = 0,
-	vex_type: VEX_Type = .NONE,
-	vex_w: VEX_W = .WIG,
-	vex_l: VEX_L = .LIG,
-	default_64: bool = false,
-	force_rex_w: bool = false,
-	no_rex: bool = false,
-	lock_ok: bool = false,
-	rep_ok: bool = false,
-	modrm_reg_ext: bool = false,
-	mode_32_only: bool = false,
+	esc:           Escape   = .NONE,
+	prefix:        u8       = 0,
+	vex_type:      VEX_Type = .NONE,
+	vex_w:         VEX_W    = .WIG,
+	vex_l:         VEX_L    = .LIG,
+	default_64:    bool     = false,
+	force_rex_w:   bool     = false,
+	no_rex:        bool     = false,
+	lock_ok:       bool     = false,
+	rep_ok:        bool     = false,
+	modrm_reg_ext: bool     = false,
+	mode_32_only:  bool     = false,
 ) -> Encoding_Flags {
 	return Encoding_Flags{
-		esc = esc,
-		prefix = prefix,
-		vex_type = vex_type,
-		vex_w = vex_w,
-		vex_l = vex_l,
-		default_64 = default_64,
-		force_rex_w = force_rex_w,
-		no_rex = no_rex,
-		lock_ok = lock_ok,
-		rep_ok = rep_ok,
+		esc           = esc,
+		prefix        = prefix,
+		vex_type      = vex_type,
+		vex_w         = vex_w,
+		vex_l         = vex_l,
+		default_64    = default_64,
+		force_rex_w   = force_rex_w,
+		no_rex        = no_rex,
+		lock_ok       = lock_ok,
+		rep_ok        = rep_ok,
 		modrm_reg_ext = modrm_reg_ext,
-		mode_32_only = mode_32_only,
+		mode_32_only  = mode_32_only,
 	}
 }
 
@@ -318,21 +318,13 @@ encoding_flags :: #force_inline proc "contextless" (
 
 op_type_to_size :: proc(op_type: Operand_Type) -> u8 {
 	#partial switch op_type {
-	case .R8, .RM8, .M8, .IMM8:
-		return 1
-	case .R16, .RM16, .M16, .IMM16:
-		return 2
-	case .R32, .RM32, .M32, .IMM32, .XMM_M32:
-		return 4
-	case .R64, .RM64, .M64, .IMM64, .XMM_M64:
-		return 8
-	case .XMM, .XMM_M128, .M128:
-		return 16
-	case .YMM, .YMM_M256, .M256:
-		return 32
-	case .ZMM, .ZMM_M512, .M512:
-		return 64
-	case:
-		return 0
+	case .R8,  .RM8,      .M8,  .IMM8:            return 1
+	case .R16, .RM16,     .M16, .IMM16:           return 2
+	case .R32, .RM32,     .M32, .IMM32, .XMM_M32: return 4
+	case .R64, .RM64,     .M64, .IMM64, .XMM_M64: return 8
+	case .XMM, .XMM_M128, .M128:                  return 16
+	case .YMM, .YMM_M256, .M256:                  return 32
+	case .ZMM, .ZMM_M512, .M512:                  return 64
 	}
+	return 0
 }

@@ -683,7 +683,7 @@ decode_operands_vex :: proc(state: ^Decoder_State, entry: ^VEX_Decode_Entry) -> 
 decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_enc: Operand_Encoding,
 							   modrm_info: ModRM_Info, sib_info: SIB_Info, has_sib: bool) -> (op: Operand, err: Error_Code) {
 
-	#partial switch op_enc {
+	switch op_enc {
 	case .NONE:
 		return {}, .NONE
 
@@ -805,8 +805,7 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 }
 
 decode_single_operand_vex :: proc(state: ^Decoder_State, op_type: Operand_Type, op_enc: Operand_Encoding,
-								   modrm_info: ModRM_Info, sib_info: SIB_Info, has_sib: bool) -> (op: Operand, err: Error_Code) {
-
+                                  modrm_info: ModRM_Info, sib_info: SIB_Info, has_sib: bool) -> (op: Operand, err: Error_Code) {
 	#partial switch op_enc {
 	case .REG:
 		// Register in ModR/M.reg, extended by VEX.R

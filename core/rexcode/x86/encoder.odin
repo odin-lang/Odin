@@ -113,7 +113,8 @@ encode :: proc(
 			invalid := false
 			for i in 0..<inst.operand_count {
 				op := &inst.ops[i]
-				if op.kind == .REGISTER {
+				#partial switch op.kind {
+				case .REGISTER:
 					// R8-R15, XMM8-31, YMM8-31, ZMM8-31 require REX/VEX/EVEX extension.
 					if reg_needs_rex(op.reg) { invalid = true; break }
 					// SPL/BPL/SIL/DIL (REG_GPR8 hw 4-7) don't exist in i386;
@@ -123,7 +124,7 @@ encode :: proc(
 						hw := reg_hw(op.reg)
 						if hw >= 4 && hw <= 7 { invalid = true; break }
 					}
-				} else if op.kind == .MEMORY {
+				case .MEMORY:
 					m := op.mem
 					if (mem_has_base(m)  && m.base_ext)  ||
 					   (mem_has_index(m) && m.index_ext) {
@@ -198,7 +199,8 @@ encode :: proc(
 
 		// --- VEX/EVEX or Legacy Encoding ---
 
-		if enc.flags.vex_type == .VEX {
+		#partial switch enc.flags.vex_type{
+		case .VEX:
 			// VEX prefix encoding
 			r: u8 = 1; x: u8 = 1; b: u8 = 1
 			vvvv: u8 = 0xF; l: u8 = 0; pp: u8 = 0; mmmmm: u8 = 1; w: u8 = 0
@@ -224,19 +226,20 @@ encode :: proc(
 			}
 
 			// Check operands for REX bits
-			for i in 0..<4 {
+			for enc_type, i in enc.enc {
 				user_op := get_user_op_inline(&inst, enc, i)
 				if user_op == nil { continue }
 
-				#partial switch enc.enc[i] {
+				#partial switch enc_type {
 				case .REG:
 					if user_op.kind == .REGISTER && reg_needs_rex(user_op.reg) { r = 0 }
 				case .MR:
-					if user_op.kind == .REGISTER {
+					#partial switch user_op.kind {
+					case .REGISTER:
 						if reg_needs_rex(user_op.reg) { b = 0 }
-					} else if user_op.kind == .MEMORY {
+					case .MEMORY:
 						m := user_op.mem
-						if mem_has_base(m) && m.base_ext { b = 0 }
+						if mem_has_base(m)  && m.base_ext  { b = 0 }
 						if mem_has_index(m) && m.index_ext { x = 0 }
 					}
 				case .VVVV:
@@ -256,7 +259,7 @@ encode :: proc(
 				pos += 3
 			}
 
-		} else if enc.flags.vex_type == .EVEX {
+		case .EVEX:
 			// EVEX prefix encoding (4 bytes)
 			r: u8 = 1; x: u8 = 1; b: u8 = 1; rr: u8 = 1
 			mm: u8 = 1; w: u8 = 0; vvvv: u8 = 0xF; pp: u8 = 0
@@ -295,10 +298,11 @@ encode :: proc(
 						if hw >= 16 { rr = 0 }
 					}
 				case .MR:
-					if user_op.kind == .REGISTER {
+					#partial switch user_op.kind {
+					case .REGISTER:
 						hw := reg_hw(user_op.reg)
 						if hw >= 8 { b = 0 }
-					} else if user_op.kind == .MEMORY {
+					case .MEMORY:
 						m := user_op.mem
 						if mem_has_base(m) && m.base_ext { b = 0 }
 						if mem_has_index(m) && m.index_ext { x = 0 }
@@ -322,9 +326,7 @@ encode :: proc(
 			out[pos+3] = (z << 7) | (ll << 5) | (bb << 4) | (vvv << 3) | aaa
 			pos += 4
 
-		} else {
-			// Legacy encoding
-
+		case: // Legacy encoding
 			// Operand size override (66h)
 			needs_66 := false
 			for i in 0..<inst.operand_count {
@@ -353,18 +355,19 @@ encode :: proc(
 			rex: u8 = 0
 			if enc.flags.force_rex_w { rex |= 0x48 }
 
-			for i in 0..<4 {
-				if enc.enc[i] == .NONE { continue }
+			for enc_type, i in enc.enc {
+				if enc_type == .NONE { continue }
 				user_op := get_user_op_inline(&inst, enc, i)
 				if user_op == nil { continue }
 
-				#partial switch enc.enc[i] {
+				#partial switch enc_type {
 				case .REG:
 					if user_op.kind == .REGISTER && reg_needs_rex(user_op.reg) { rex |= 0x44 }
 				case .MR:
-					if user_op.kind == .REGISTER {
+					#partial switch user_op.kind {
+					case .REGISTER:
 						if reg_needs_rex(user_op.reg) { rex |= 0x41 }
-					} else if user_op.kind == .MEMORY {
+					case .MEMORY:
 						m := user_op.mem
 						if mem_has_base(m) && m.base_ext { rex |= 0x41 }
 						if mem_has_index(m) && m.index_ext { rex |= 0x42 }
@@ -425,8 +428,8 @@ encode :: proc(
 		x87_fixed_modrm := opcode >= 0xD8 && opcode <= 0xDF && enc.ext >= 0xC0
 		opr_index: u8 = 0
 		opr_seen := false
-		for i in 0..<4 {
-			if enc.enc[i] == .OP_R {
+		for enc_type, i in enc.enc {
+			if enc_type == .OP_R {
 				user_op := get_user_op_inline(&inst, enc, i)
 				if user_op != nil && user_op.kind == .REGISTER {
 					opr_index = reg_hw(user_op.reg) & 0x07
@@ -444,24 +447,24 @@ encode :: proc(
 
 		// --- ModR/M and SIB ---
 		has_modrm := false
-		mr_slot: int = -1
+		mr_slot:  int = -1
 		reg_slot: int = -1
 
-		for i in 0..<4 {
-			#partial switch enc.enc[i] {
-			case .MR:  mr_slot = i; has_modrm = true
+		for enc_type, i in enc.enc {
+			#partial switch enc_type {
+			case .MR:  mr_slot  = i; has_modrm = true
 			case .REG: reg_slot = i; has_modrm = true
 			}
 		}
 
 		if has_modrm {
-			mod: u8 = 0
-			reg_field: u8 = 0
-			rm: u8 = 0
 			has_sib := false
-			sib: u8 = 0
-			disp: i32 = 0
-			displacement_size: u8 = 0
+			mod:               u8  = 0
+			reg_field:         u8  = 0
+			rm:                u8  = 0
+			sib:               u8  = 0
+			disp:              i32 = 0
+			displacement_size: u8  = 0
 
 			// Reg field
 			if enc.flags.modrm_reg_ext {
@@ -477,10 +480,11 @@ encode :: proc(
 			if mr_slot >= 0 {
 				mr_op := get_user_op_inline(&inst, enc, mr_slot)
 				if mr_op != nil {
-					if mr_op.kind == .REGISTER {
+					#partial switch mr_op.kind {
+					case .REGISTER:
 						mod = 0b11
 						rm = reg_hw(mr_op.reg) & 0x07
-					} else if mr_op.kind == .MEMORY {
+					case .MEMORY:
 						m := mr_op.mem
 
 						if mem_is_rip_relative(m) {
@@ -580,15 +584,16 @@ encode :: proc(
 		}
 
 		// --- Immediates ---
-		for i in 0..<4 {
-			#partial switch enc.enc[i] {
+		for enc_type, i in enc.enc {
+			#partial switch enc_type {
 			case .IB:
 				user_op := get_user_op_inline(&inst, enc, i)
 				if user_op != nil {
-					if user_op.kind == .IMMEDIATE {
+					#partial switch user_op.kind {
+					case .IMMEDIATE:
 						out[pos] = u8(user_op.immediate)
 						pos += 1
-					} else if user_op.kind == .RELATIVE {
+					case .RELATIVE:
 						// Relative reference - record relocation
 						label_id := u32(user_op.relative)
 						append(&pending_relocations, Relocation{code_pos + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
@@ -608,12 +613,13 @@ encode :: proc(
 			case .ID:
 				user_op := get_user_op_inline(&inst, enc, i)
 				if user_op != nil {
-					if user_op.kind == .IMMEDIATE {
+					#partial switch user_op.kind {
+					case .IMMEDIATE:
 						immediate_val := u32(user_op.immediate)
 						out[pos] = u8(immediate_val); out[pos+1] = u8(immediate_val >> 8)
 						out[pos+2] = u8(immediate_val >> 16); out[pos+3] = u8(immediate_val >> 24)
 						pos += 4
-					} else if user_op.kind == .RELATIVE {
+					case .RELATIVE:
 						label_id := u32(user_op.relative)
 						append(&pending_relocations, Relocation{code_pos + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
 						out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
@@ -704,8 +710,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 	// Count non-implicit encoding operands
 	encoding_operand_count: u8 = 0
-	for i in 0..<4 {
-		op_type := enc.ops[i]
+	for op_type in enc.ops {
 		if op_type == .NONE { break }
 		if !is_implicit_op_inline(op_type) { encoding_operand_count += 1 }
 	}
@@ -716,8 +721,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 		// Check if the last user operand matches an implicit operand in the encoding
 		last_user_op := &inst.ops[inst.operand_count - 1]
 		found_matching_implicit := false
-		for i in 0..<4 {
-			op_type := enc.ops[i]
+		for op_type in enc.ops {
 			if op_type == .NONE { break }
 			if is_implicit_op_inline(op_type) && implicit_operand_matches(last_user_op, op_type) {
 				found_matching_implicit = true
@@ -728,8 +732,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 		// Match the first (operand_count - 1) user operands against non-implicit encoding operands
 		user_idx: u8 = 0
-		for i in 0..<4 {
-			op_type := enc.ops[i]
+		for op_type in enc.ops {
 			if op_type == .NONE { break }
 			if is_implicit_op_inline(op_type) { continue }
 
@@ -746,8 +749,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 	// Match each user operand against non-implicit encoding operands
 	user_idx: u8 = 0
-	for i in 0..<4 {
-		op_type := enc.ops[i]
+	for op_type in enc.ops {
 		if op_type == .NONE { break }
 		if is_implicit_op_inline(op_type) { continue }
 
@@ -777,7 +779,7 @@ implicit_operand_matches :: #force_inline proc "contextless" (op: ^Operand, op_t
 is_implicit_op_inline :: #force_inline proc "contextless" (op: Operand_Type) -> bool {
 	#partial switch op {
 	case .AL_IMPL, .AX_IMPL, .EAX_IMPL, .RAX_IMPL,
-		 .CL_IMPL, .DX_IMPL, .ONE_IMPL, .ST0_IMPL, .XMM0_IMPL:
+	     .CL_IMPL, .DX_IMPL, .ONE_IMPL, .ST0_IMPL, .XMM0_IMPL:
 		return true
 	}
 	return false
@@ -785,13 +787,13 @@ is_implicit_op_inline :: #force_inline proc "contextless" (op: Operand_Type) -> 
 
 operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: Operand_Type) -> bool {
 	switch op.kind {
-	case .NONE: return op_type == .NONE
+	case .NONE:      return op_type == .NONE
 	case .REGISTER:  return reg_matches_inline(op, op_type)
-	case .MEMORY:  return mem_matches_inline(op, op_type)
-	case .IMMEDIATE:  return imm_matches_inline(op, op_type)
+	case .MEMORY:    return mem_matches_inline(op, op_type)
+	case .IMMEDIATE: return imm_matches_inline(op, op_type)
 	case .RELATIVE:
 		// Respect user's size preference: size=1 -> REL8, size=4 -> REL32
-		if op.size == 1 { return op_type == .REL8 }
+		if op.size == 1 { return op_type == .REL8  }
 		if op.size == 4 { return op_type == .REL32 }
 		// Default: accept either
 		return op_type == .REL8 || op_type == .REL32
@@ -802,19 +804,19 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_typ
 reg_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: Operand_Type) -> bool {
 	class := reg_class(op.reg)
 	#partial switch op_type {
-	case .R8, .RM8:                    return class == REG_GPR8 || class == REG_GPR8H
-	case .R16, .RM16:                  return class == REG_GPR16
-	case .R32, .RM32:                  return class == REG_GPR32
-	case .R64, .RM64:                  return class == REG_GPR64
+	case .R8, .RM8:                           return class == REG_GPR8 || class == REG_GPR8H
+	case .R16, .RM16:                         return class == REG_GPR16
+	case .R32, .RM32:                         return class == REG_GPR32
+	case .R64, .RM64:                         return class == REG_GPR64
 	case .XMM, .XMM_M32, .XMM_M64, .XMM_M128: return class == REG_XMM
-	case .YMM, .YMM_M256:              return class == REG_YMM
-	case .ZMM, .ZMM_M512:              return class == REG_ZMM
-	case .MM, .MM_M64:                 return class == REG_MM
-	case .K, .K_M8, .K_M16, .K_M32, .K_M64: return class == REG_K
-	case .SREG:                        return class == REG_SEG
-	case .CR:                          return class == REG_CR
-	case .DR:                          return class == REG_DR
-	case .STI:                         return class == REG_ST
+	case .YMM, .YMM_M256:                     return class == REG_YMM
+	case .ZMM, .ZMM_M512:                     return class == REG_ZMM
+	case .MM, .MM_M64:                        return class == REG_MM
+	case .K, .K_M8, .K_M16, .K_M32, .K_M64:   return class == REG_K
+	case .SREG:                               return class == REG_SEG
+	case .CR:                                 return class == REG_CR
+	case .DR:                                 return class == REG_DR
+	case .STI:                                return class == REG_ST
 	}
 	return false
 }
@@ -875,9 +877,9 @@ imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 
 get_user_op_inline :: #force_inline proc "contextless" (inst: ^Instruction, enc: ^Encoding, slot: int) -> ^Operand {
 	user_idx := 0
-	for i in 0..<4 {
-		if enc.ops[i] == .NONE { break }
-		if is_implicit_op_inline(enc.ops[i]) { continue }
+	for op, i in enc.ops {
+		if op == .NONE { break }
+		if is_implicit_op_inline(op) { continue }
 		if i == slot {
 			if user_idx < int(inst.operand_count) {
 				return &inst.ops[user_idx]

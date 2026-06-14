@@ -49,7 +49,7 @@ Print_Result          :: isa.Print_Result
 
 mnemonic_to_string :: proc(m: Mnemonic, lowercase: bool) -> string {
 	#partial switch m {
-	case .INVALID: return "???"
+	case .INVALID:   return "???"
 	case .MOVSD_SSE: return lowercase ? "movsd" : "MOVSD"
 	}
 	if name, ok := reflect.enum_name_from_value(m); ok {
@@ -122,8 +122,8 @@ size_to_suffix :: proc(size: u8) -> u8 {
 	case 16: return 'x'
 	case 32: return 'y'
 	case 64: return 'z'
-	case:    return 0
 	}
+	return 0
 }
 
 // -----------------------------------------------------------------------------
@@ -279,7 +279,7 @@ sbprint :: proc(
 	inst_info:    []Instruction_Info,
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
-	options:      ^Print_Options = nil,
+	options:      ^Print_Options  = nil,
 	label_names:  ^map[u32]string = nil,  // Optional: for named label output (id → name)
 ) {
 	options := options != nil ? options^ : DEFAULT_PRINT_OPTIONS
@@ -424,10 +424,10 @@ sbprint :: proc(
 // write_memory_with_tokens: Print memory operand with token metadata
 @(private="file")
 write_memory_with_tokens :: proc(
-	sb: ^strings.Builder,
-	m: Memory,
-	options: ^Print_Options,
-	tokens: ^[dynamic]Token,
+	sb:                ^strings.Builder,
+	m:                 Memory,
+	options:           ^Print_Options,
+	tokens:            ^[dynamic]Token,
 	instruction_index: u16,
 ) {
 	emit_token :: proc(tokens: ^[dynamic]Token, sb: ^strings.Builder, kind: Token_Kind, instruction_index: u16, start: int) {
