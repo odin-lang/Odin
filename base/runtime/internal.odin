@@ -1374,53 +1374,6 @@ fixdfti :: proc "c" (a: u64) -> i128 {
 
 }
 
-__copy_bits :: proc "contextless" (
-	dst:       [^]byte,
-	src:       [^]byte,
-	buf_bytes: uintptr,
-	dst_bit:   uintptr,
-	src_bit:   uintptr,
-	size_bits: uintptr,
-) #no_bounds_check {
-	src_byte := src_bit >> 3
-	dst_byte := dst_bit >> 3
-	src_shift := src_bit & 7
-	dst_shift := dst_bit & 7
-	src_need_bytes := ((src_shift + size_bits + 7) >> 3)
-	a, b: u64
-	if src_need_bytes <= 4 {
-		a = u64(intrinsics.unaligned_load((^u32)(&src[src_byte])))
-	} else {
-		a = intrinsics.unaligned_load((^u64)(&src[src_byte]))
-		b = intrinsics.unaligned_load((^u64)(&src[src_byte + 8]))
-	}
-	bits := (a >> src_shift) | (b << (64 - src_shift))
-	mask := ~u64(0)
-	if size_bits < 64 {
-		mask = (u64(1) << size_bits) - 1
-	}
-	bits &= mask
-	dst_need_bytes := ((dst_shift + size_bits + 7) >> 3)
-	if dst_shift == 0 {
-		if dst_need_bytes <= 4 {
-			v := u64(intrinsics.unaligned_load((^u32)(&dst[dst_byte])))
-			v = (v & ~mask) | bits
-			intrinsics.unaligned_store((^u32)(&dst[dst_byte]), u32(v))
-		} else {
-			v := intrinsics.unaligned_load((^u64)(&dst[dst_byte]))
-			v = (v & ~mask) | bits
-			intrinsics.unaligned_store((^u64)(&dst[dst_byte]), v)
-		}
-	} else {
-		v0 := intrinsics.unaligned_load((^u64)(&dst[dst_byte]))
-		v1 := intrinsics.unaligned_load((^u64)(&dst[dst_byte + 8]))
-		v0 = (v0 & ~(mask << dst_shift)) | (bits << dst_shift)
-		v1 = (v1 & ~(mask >> (64 - dst_shift))) | (bits >> (64 - dst_shift))
-		intrinsics.unaligned_store((^u64)(&dst[dst_byte]), v0)
-		intrinsics.unaligned_store((^u64)(&dst[dst_byte + 8]), v1)
-	}
-}
-
 
 when .Address in ODIN_SANITIZER_FLAGS {
 	foreign {
