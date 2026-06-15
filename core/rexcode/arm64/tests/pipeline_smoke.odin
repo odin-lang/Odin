@@ -171,7 +171,7 @@ run_pipeline_tests :: proc() {
 	{
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
-		insts := []a.Instruction{ a.inst_csel(.CSEL, a.X0, a.X1, a.X2, .EQ) }
+		insts := []a.Instruction{ a.inst_csel(a.X0, a.X1, a.X2, .EQ) }
 		r := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("CSEL: encode", r.success)
 		eq_word("CSEL X0,X1,X2,EQ",     load_le(code[:], 0), 0x9A820020)
@@ -245,8 +245,8 @@ run_pipeline_tests :: proc() {
 		append(&ld, a.Label_Definition(2))   // target at inst 2 (byte 8)
 
 		insts := []a.Instruction{
-			a.inst_cbz(.CBZ, a.X0, 0),
-			a.inst_tbz(.TBZ, a.X0, 5, 0),
+			a.inst_cbz(a.X0, 0),
+			a.inst_tbz(a.X0, 5, 0),
 			a.inst_none(.NOP),                // target
 		}
 		r := a.encode(insts, ld[:], code[:], &relocs, &errors)
@@ -346,7 +346,7 @@ run_pipeline_tests :: proc() {
 
 		src := []a.Instruction{
 			a.inst_r_r_i(.ADD_IMM, a.X0, a.X0, 1),
-			a.inst_cbz(.CBNZ, a.X0, 0),
+			a.inst_cbnz(a.X0, 0),
 			a.inst_none(.RET),
 		}
 		r := a.encode(src, ld[:], code[:], &relocs, &errors)

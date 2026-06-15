@@ -75,25 +75,11 @@ inst_u :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, imm: i64)
 					   ops = {op_reg(rd), op_imm(imm, 4), {}, {}}}
 }
 
-// J-type: rd, label
-@(require_results)
-inst_jal :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, label_id: u32) -> Instruction {
-	return Instruction{mnemonic = m, operand_count = 2, length = 4,
-					   ops = {op_reg(rd), op_label(label_id, 4), {}, {}}}
-}
-
 // B-type branch: rs1, rs2, label
 @(require_results)
 inst_branch :: #force_inline proc "contextless" (m: Mnemonic, rs1, rs2: Register, label_id: u32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = 4,
 					   ops = {op_reg(rs1), op_reg(rs2), op_label(label_id, 2), {}}}
-}
-
-// JALR: rd, rs1, imm12  (indirect jump with offset)
-@(require_results)
-inst_jalr :: #force_inline proc "contextless" (rd, rs1: Register, imm: i64) -> Instruction {
-	return Instruction{mnemonic = .JALR, operand_count = 3, length = 4,
-					   ops = {op_reg(rd), op_reg(rs1), op_imm(imm, 2), {}}}
 }
 
 // CSR ops: rd, csr, rs1

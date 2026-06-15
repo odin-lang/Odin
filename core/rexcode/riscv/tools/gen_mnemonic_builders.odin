@@ -467,21 +467,12 @@ main :: proc() {
 
 		mlow := mnemonic_to_lower(m)
 
-		// inst_<mnem> overload group. If "inst_<mlow>" would collide with a
-		// hand-written helper of the same name in instructions.odin (inst_jal,
-		// inst_jalr), the standalone group alias is suppressed -- the existing
-		// helper keeps that name and the typed builder stays reachable under its
-		// explicit per-variant name (e.g. inst_jal_gpr_label).
+		// inst_<mnem> overload group.
 		inst_group := strings.concatenate({"inst_", mlow})
 		defer delete(inst_group)
-		if is_reserved_inst_group(inst_group) {
-			fmt.sbprintf(&sb, "// inst_%s: overload alias omitted (name taken by hand-written helper in instructions.odin); use %s\n",
-						 mlow, procs[0].proc_name)
-		} else {
-			strings.write_string(&sb, inst_group)
-			for n := pad - len(mlow); n > 0; n -= 1 { strings.write_byte(&sb, ' ') }
-			write_group(&sb, procs, "inst_")
-		}
+		strings.write_string(&sb, inst_group)
+		for n := pad - len(mlow); n > 0; n -= 1 { strings.write_byte(&sb, ' ') }
+		write_group(&sb, procs, "inst_")
 
 		// emit_<mnem> overload group. No hand-written emit_ helpers collide.
 		strings.write_string(&sb, "emit_")
@@ -509,18 +500,6 @@ main :: proc() {
 		fmt.eprintln("Failed to write mnemonic_builders.odin")
 		os.exit(1)
 	}
-}
-
-// inst_<mnemonic> group names that coincide with a hand-written helper of the
-// same name in instructions.odin. For these the standalone group alias is
-// suppressed (the existing helper keeps the name); the typed builder stays
-// reachable under its explicit per-variant name.
-is_reserved_inst_group :: proc(name: string) -> bool {
-	switch name {
-	case "inst_jal":  return true // inst_jal(m, rd, label_id)  in instructions.odin
-	case "inst_jalr": return true // inst_jalr(rd, rs1, imm)     in instructions.odin
-	}
-	return false
 }
 
 // Write the " :: proc{ ... }\n" overload group body (or single alias).

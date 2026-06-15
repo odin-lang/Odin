@@ -42,7 +42,7 @@ Shape :: enum {
 	REL,     // PC-relative branch target -> inst_rel(.M, label)
 	MEM,     // any addressing-mode mem   -> inst_m(.M, mem)
 	ZP_REL,  // BBR/BBS: zp + rel branch  -> inst_zp_rel(.M, zp, label)
-	TST,     // HuC TST: imm + mem        -> inst_tst(.M, imm, mem)
+	TST,     // HuC TST: imm + mem        -> Instruction{ op_imm8, op_mem }
 	BLOCK,   // HuC block xfer: 3x word16 -> inst_block(.M, src, dst, len)
 	SKIP,    // could not classify
 }
@@ -55,18 +55,6 @@ Proc_Entry :: struct {
 
 mnemonic_to_lower :: proc(m: m6502.Mnemonic) -> string {
 	return strings.to_lower(fmt.tprintf("%v", m))
-}
-
-// Base instruction helpers in instructions.odin are inst_<x> for these x.
-// If a mnemonic lowercases to one of them, an overload group named inst_<x>
-// would redeclare the helper -- so we suppress the group for that mnemonic.
-BASE_HELPER_SUFFIXES :: []string{"none", "a", "i", "m", "rel", "zp_rel", "tst", "block"}
-
-collides_with_base_helper :: proc(lower: string) -> bool {
-	for s in BASE_HELPER_SUFFIXES {
-		if lower == s { return true }
-	}
-	return false
 }
 
 // Classify a single encoding form into a builder Shape.
@@ -230,16 +218,6 @@ main :: proc() {
 	for mnemonic in mnemonic_list {
 		procs := procs_by_mnemonic[mnemonic]
 		if len(procs) == 0 { continue }
-		// A mnemonic named the same as an existing base helper (e.g. TST -> the
-		// HuC `inst_tst` bit-test helper) would have its overload group shadow /
-		// redeclare that helper. Skip the group in that case; the per-shape
-		// members (inst_<mnem>_<suffix>) remain the typed entry points.
-		lower := mnemonic_to_lower(mnemonic)
-		if collides_with_base_helper(lower) {
-			fmt.sbprintf(&sb, "// inst_%s / emit_%s overload group omitted: name collides with base helper inst_%s.\n",
-				lower, lower, lower)
-			continue
-		}
 		generate_overload_group(&sb, mnemonic, procs[:], pad)
 	}
 
@@ -309,7 +287,9 @@ shape_inst_body :: proc(sb: ^strings.Builder, e: Proc_Entry) {
 	case .REL:    fmt.sbprintf(sb, "inst_rel(.%s, label_id)", mn)
 	case .MEM:    fmt.sbprintf(sb, "inst_m(.%s, m)", mn)
 	case .ZP_REL: fmt.sbprintf(sb, "inst_zp_rel(.%s, zp, label_id)", mn)
-	case .TST:    fmt.sbprintf(sb, "inst_tst(.%s, imm, m)", mn)
+	// HuC6280 TST # imm, addr (imm + memory). Built inline so the inst_tst
+	// overload-group alias is free to name this mnemonic's typed entry point.
+	case .TST:    fmt.sbprintf(sb, "Instruction{{mnemonic = .%s, operand_count = 2, length = 0, ops = {{op_imm8(imm), op_mem(m), {{}}}}}}", mn)
 	case .BLOCK:  fmt.sbprintf(sb, "inst_block(.%s, src, dst, length_val)", mn)
 	case .SKIP:   strings.write_string(sb, "{}")
 	}

@@ -166,9 +166,9 @@ run_pipeline_tests :: proc() {
 		append(&ld, rv.Label_Definition(2))   // target at inst 2
 
 		insts := []rv.Instruction{
-			rv.inst_jal(.JAL, rv.RA, 0),
+			rv.inst_jal(rv.GPR.RA, 0),
 			rv.inst_r_r_i(.ADDI, rv.SP, rv.SP, 0),
-			rv.inst_jalr(rv.ZERO, rv.RA, 0),
+			rv.inst_jalr(rv.GPR.ZERO, rv.GPR.RA, 0),
 		}
 		r := rv.encode(insts, ld[:], code[:], &relocs, &errors)
 		ok("JAL: encode ok",   r.success)

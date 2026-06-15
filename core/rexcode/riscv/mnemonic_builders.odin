@@ -417,9 +417,9 @@ inst_lui                           :: inst_lui_gpr_imm20
 emit_lui                           :: emit_lui_gpr_imm20
 inst_auipc                         :: inst_auipc_gpr_imm20
 emit_auipc                         :: emit_auipc_gpr_imm20
-// inst_jal: overload alias omitted (name taken by hand-written helper in instructions.odin); use inst_jal_gpr_label
+inst_jal                           :: inst_jal_gpr_label
 emit_jal                           :: emit_jal_gpr_label
-// inst_jalr: overload alias omitted (name taken by hand-written helper in instructions.odin); use inst_jalr_gpr_gpr_imm12
+inst_jalr                          :: inst_jalr_gpr_gpr_imm12
 emit_jalr                          :: emit_jalr_gpr_gpr_imm12
 inst_beq                           :: inst_beq_gpr_gpr_label
 emit_beq                           :: emit_beq_gpr_gpr_label

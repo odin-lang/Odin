@@ -334,8 +334,8 @@ inst_tam_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction {
 emit_tam_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.TAM, imm)) }
 inst_tma_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.TMA, imm) }
 emit_tma_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.TMA, imm)) }
-inst_tst_tst     :: #force_inline proc "contextless" (imm: i64, m: Memory) -> Instruction { return inst_tst(.TST, imm, m) }
-emit_tst_tst     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, m: Memory) { append(instructions, inst_tst(.TST, imm, m)) }
+inst_tst_tst     :: #force_inline proc "contextless" (imm: i64, m: Memory) -> Instruction { return Instruction{mnemonic = .TST, operand_count = 2, length = 0, ops = {op_imm8(imm), op_mem(m), {}}} }
+emit_tst_tst     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, m: Memory) { append(instructions, Instruction{mnemonic = .TST, operand_count = 2, length = 0, ops = {op_imm8(imm), op_mem(m), {}}}) }
 inst_bsr_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BSR, label_id) }
 emit_bsr_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BSR, label_id)) }
 inst_tii_block   :: #force_inline proc "contextless" (src, dst, length_val: u16) -> Instruction { return inst_block(.TII, src, dst, length_val) }
@@ -627,7 +627,8 @@ inst_tam              :: inst_tam_imm8
 emit_tam              :: emit_tam_imm8
 inst_tma              :: inst_tma_imm8
 emit_tma              :: emit_tma_imm8
-// inst_tst / emit_tst overload group omitted: name collides with base helper inst_tst.
+inst_tst              :: inst_tst_tst
+emit_tst              :: emit_tst_tst
 inst_bsr              :: inst_bsr_rel
 emit_bsr              :: emit_bsr_rel
 inst_tii              :: inst_tii_block
