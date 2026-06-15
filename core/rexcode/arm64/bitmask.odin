@@ -157,7 +157,7 @@ decode_bitmask_imm :: proc "contextless" (n, immr, imms: u8, is_64: bool) -> (va
 	elem_size: u32 = 0
 	s_field: u8 = 0
 	if n == 1 {
-		if !is_64 { return 0, false }    // N=1 only valid for 64-bit ops
+		if !is_64 { return }    // N=1 only valid for 64-bit ops
 		elem_size = 64
 		s_field = s
 	} else {
@@ -179,15 +179,15 @@ decode_bitmask_imm :: proc "contextless" (n, immr, imms: u8, is_64: bool) -> (va
 			elem_size = 2
 			s_field = s & 0b000001
 		case:
-			return 0, false
+			return
 		}
 	}
 
 	width: u32 = is_64 ? 64 : 32
-	if elem_size > width { return 0, false }
+	if elem_size > width { return }
 
 	ones := u32(s_field) + 1
-	if ones == 0 || ones >= elem_size { return 0, false }
+	if ones == 0 || ones >= elem_size { return }
 
 	rotation := u32(immr) & (elem_size - 1)
 
@@ -199,10 +199,11 @@ decode_bitmask_imm :: proc "contextless" (n, immr, imms: u8, is_64: bool) -> (va
 	rotated := rotate_right_u64(pattern, inv_rot, elem_size) & elem_mask
 
 	// Replicate to fill width.
-	out: u64 = rotated
+	value = rotated
 	for size: u32 = elem_size; size < width; size *= 2 {
-		out |= out << size
+		value |= value << size
 	}
-	if width == 32 { out &= 0xFFFFFFFF }
-	return out, true
+	if width == 32 { value &= 0xFFFFFFFF }
+	ok = true
+	return
 }
