@@ -992,116 +992,84 @@ gb_internal void lb_copy_bits(lbProcedure *p,
 	u64 src_bit,
 	u64 size_bits
 ) {
+	if (size_bits == 0) {
+		return;
+	}
+	GB_ASSERT(size_bits <= 64); // this routine assembles the field in a single u64
+
 	auto ptr_offset = [](lbProcedure *p, LLVMValueRef ptr, u64 offset) -> LLVMValueRef {
 		LLVMValueRef indices[1] = {LLVMConstInt(lb_type(p->module, t_u64), offset, false)};
 		ptr = LLVMBuildPointerCast(p->builder, ptr, lb_type(p->module, t_u8_ptr), "");
 		return LLVMBuildGEP2(p->builder, lb_type(p->module, t_u8), ptr, indices, 1, "");
 	};
 
-	Type *t_u32_ptr = alloc_type_pointer(t_u32);
-	Type *t_u64_ptr = alloc_type_pointer(t_u64);
-	LLVMTypeRef llvm_u32 = lb_type(p->module, t_u32);
+	LLVMTypeRef llvm_u8  = lb_type(p->module, t_u8);
 	LLVMTypeRef llvm_u64 = lb_type(p->module, t_u64);
-	LLVMTypeRef llvm_u32_ptr = lb_type(p->module, t_u32_ptr);
-	LLVMTypeRef llvm_u64_ptr = lb_type(p->module, t_u64_ptr);
 
 	dst = LLVMBuildPointerCast(p->builder, dst, lb_type(p->module, t_u8_ptr), "");
 	src = LLVMBuildPointerCast(p->builder, src, lb_type(p->module, t_u8_ptr), "");
 
-	u64 src_byte = src_bit>>3;
-	u64 dst_byte = dst_bit>>3;
-	u64 src_shift = src_bit&7;
-	u64 dst_shift = dst_bit&7;
-	u64 src_need_bytes = (src_shift + size_bits + 7)>>3;
+	u64 src_byte  = src_bit >> 3;
+	u64 dst_byte  = dst_bit >> 3;
+	u64 src_shift = src_bit & 7;
+	u64 dst_shift = dst_bit & 7;
 
-	LLVMValueRef a = LLVMConstInt(llvm_u64, 0, false);
-	LLVMValueRef b = LLVMConstInt(llvm_u64, 0, false);
-	if (src_need_bytes <= 4) {
-		// a = u64(intrinsics.unaligned_load((^u32)(&src[src_byte])))
-		a = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte), t_u32_ptr);
-		a = LLVMBuildZExt(p->builder, a, llvm_u64, "");
-	} else {
-		// a = intrinsics.unaligned_load((^u64)(&src[src_byte]))
-		a = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte), t_u64_ptr);
-		if (src_need_bytes > 8) {
-			// b = intrinsics.unaligned_load((^u64)(&src[src_byte + 8]))
-			b = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte + 8), t_u64_ptr);
-		}
-	}
+	u64 src_need_bytes = (src_shift + size_bits + 7) >> 3; // 1..9, exact span of the field
+	u64 dst_need_bytes = (dst_shift + size_bits + 7) >> 3; // 1..9, exact span of the field
 
-	LLVMValueRef hi;
-	if (src_shift == 0) {
-		hi = LLVMConstInt(llvm_u64, 0, false);
-	} else {
-		hi = LLVMBuildShl(p->builder, b, LLVMConstInt(llvm_u64, 64 - src_shift, false), "");
-	}
-	LLVMValueRef bits = LLVMBuildOr(p->builder,
-	                                LLVMBuildLShr(p->builder, a, LLVMConstInt(llvm_u64, src_shift, false), ""),
-	                                hi, "");
+	// These spans are exactly the bytes the field occupies, so they are in bounds
+	// whenever the field is. (buf_bytes must bound the buffer each pointer refers to.)
+	GB_ASSERT(src_byte + src_need_bytes <= buf_bytes);
+	GB_ASSERT(dst_byte + dst_need_bytes <= buf_bytes);
 
-	// // bits := (a >> src_shift) | (b << (64 - src_shift))
-	// LLVMValueRef bits = LLVMBuildOr(p->builder,
-	// 	LLVMBuildLShr(p->builder, a, LLVMConstInt(llvm_u64, src_shift,      false), ""),
-	// 	LLVMBuildShl (p->builder, b, LLVMConstInt(llvm_u64, 64 - src_shift, false), ""),
-	// 	""
-	// );
 	u64 mask = ~cast(u64)0;
 	if (size_bits < 64) {
-		mask = ((cast(u64)1)<<size_bits)-1;
+		mask = ((cast(u64)1) << size_bits) - 1;
 	}
-	// bits &= mask
+
+	// Gather: read exactly src_need_bytes bytes, pack the field into the low size_bits of `bits` ---
+	LLVMValueRef bits = LLVMConstInt(llvm_u64, 0, false);
+	for (u64 i = 0; i < src_need_bytes; i++) {
+		LLVMValueRef byte = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte + i), t_u8_ptr);
+		byte = LLVMBuildZExt(p->builder, byte, llvm_u64, "");
+
+		// byte i sits at frame bit i*8; the field starts at frame bit src_shift
+		if (i*8 >= src_shift) {
+			u64 sh = i*8 - src_shift; // 0..63 (sh==64 only needs i==8, which requires src_shift>=1)
+			byte = LLVMBuildShl (p->builder, byte, LLVMConstInt(llvm_u64, sh, false), "");
+		} else {
+			u64 sh = src_shift - i*8; // 1..7
+			byte = LLVMBuildLShr(p->builder, byte, LLVMConstInt(llvm_u64, sh, false), "");
+		}
+		bits = LLVMBuildOr(p->builder, bits, byte, "");
+	}
 	bits = LLVMBuildAnd(p->builder, bits, LLVMConstInt(llvm_u64, mask, false), "");
 
-	u64 dst_need_bytes = (dst_shift + size_bits + 7) >> 3;
-	if (dst_shift == 0) {
-		if (dst_need_bytes <= 4) {
-			// v := u64(intrinsics.unaligned_load((^u32)(&dst[dst_byte])))
-			LLVMValueRef v = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, dst, dst_byte), t_u32_ptr);
-			v = LLVMBuildZExt(p->builder, v, llvm_u64, "");
+	// Scatter: write exactly dst_need_bytes bytes, each a masked read-modify-write ---
+	for (u64 i = 0; i < dst_need_bytes; i++) {
+		LLVMValueRef contrib = nullptr;
+		u64 byte_mask = 0; // which bits (0..7) of this byte belong to the field
 
-			// v = (v & ~mask) | bits
-			v = LLVMBuildAnd(p->builder, v, LLVMConstInt(llvm_u64, ~mask, false), "");
-			v = LLVMBuildOr(p->builder,  v, bits, "");
-
-			// intrinsics.unaligned_store((^u32)(&dst[dst_byte]), u32(v))
-			v = LLVMBuildTrunc(p->builder, v, llvm_u32, "");
-			LLVMValueRef store = LLVMBuildStore(p->builder, v, LLVMBuildPointerCast(p->builder, ptr_offset(p, dst, dst_byte), llvm_u32_ptr, ""));
-			LLVMSetAlignment(store, 1);
+		if (i*8 >= dst_shift) {
+			u64 sh = i*8 - dst_shift;
+			contrib   = LLVMBuildLShr(p->builder, bits, LLVMConstInt(llvm_u64, sh, false), "");
+			byte_mask = (mask >> sh) & 0xff;
 		} else {
-			// v := intrinsics.unaligned_load((^u64)(&dst[dst_byte]))
-			LLVMValueRef v = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, dst, dst_byte), t_u64_ptr);
-
-			// v = (v & ~mask) | bits
-			v = LLVMBuildAnd(p->builder, v, LLVMConstInt(llvm_u64, ~mask, false), "");
-			v = LLVMBuildOr(p->builder,  v, bits, "");
-
-			// intrinsics.unaligned_store((^u64)(&dst[dst_byte]), v)
-			LLVMValueRef store = LLVMBuildStore(p->builder, v, LLVMBuildPointerCast(p->builder, ptr_offset(p, dst, dst_byte), llvm_u64_ptr, ""));
-			LLVMSetAlignment(store, 1);
+			u64 sh = dst_shift - i*8; // 1..7
+			contrib   = LLVMBuildShl(p->builder, bits, LLVMConstInt(llvm_u64, sh, false), "");
+			byte_mask = (mask << sh) & 0xff;
 		}
-	} else {
-		// v0 := intrinsics.unaligned_load((^u64)(&dst[dst_byte]))
-		// v1 := intrinsics.unaligned_load((^u64)(&dst[dst_byte + 8]))
-		LLVMValueRef v0 = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, dst, dst_byte+0), t_u64_ptr);
-		LLVMValueRef v1 = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, dst, dst_byte+8), t_u64_ptr);
+		contrib = LLVMBuildTrunc(p->builder, contrib, llvm_u8, "");
+		contrib = LLVMBuildAnd(p->builder, contrib, LLVMConstInt(llvm_u8, byte_mask, false), "");
 
-		// v0 = (v0 & ~(mask << dst_shift)) | (bits << dst_shift)
-		v0 = LLVMBuildAnd(p->builder, v0, LLVMConstInt(llvm_u64, ~(mask << dst_shift), false), "");
-		v0 = LLVMBuildOr (p->builder, v0, LLVMBuildShl(p->builder, bits, LLVMConstInt(llvm_u64, dst_shift, false), ""), "");
+		LLVMValueRef old = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, dst, dst_byte + i), t_u8_ptr);
+		old = LLVMBuildAnd(p->builder, old, LLVMConstInt(llvm_u8, (~byte_mask) & 0xff, false), "");
 
-		// v1 = (v1 & ~(mask >> (64 - dst_shift))) | (bits >> (64 - dst_shift))
-		v1 = LLVMBuildAnd(p->builder, v1, LLVMConstInt(llvm_u64, ~(mask >> (64 - dst_shift)), false), "");
-		v1 = LLVMBuildOr (p->builder, v1, LLVMBuildLShr(p->builder, bits, LLVMConstInt(llvm_u64, (64 - dst_shift), false), ""), "");
-
-		// intrinsics.unaligned_store((^u64)(&dst[dst_byte]), v0)
-		// intrinsics.unaligned_store((^u64)(&dst[dst_byte + 8]), v1)
-		LLVMValueRef s0 = LLVMBuildStore(p->builder, v0, LLVMBuildPointerCast(p->builder, ptr_offset(p, dst, dst_byte+0), llvm_u64_ptr, ""));
-		LLVMValueRef s1 = LLVMBuildStore(p->builder, v1, LLVMBuildPointerCast(p->builder, ptr_offset(p, dst, dst_byte+8), llvm_u64_ptr, ""));
-		LLVMSetAlignment(s0, 1);
-		LLVMSetAlignment(s1, 1);
+		LLVMValueRef merged = LLVMBuildOr(p->builder, old, contrib, "");
+		LLVMValueRef store = LLVMBuildStore(p->builder, merged, ptr_offset(p, dst, dst_byte + i));
+		LLVMSetAlignment(store, 1);
 	}
 }
-
 
 gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
