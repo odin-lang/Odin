@@ -4676,7 +4676,8 @@ ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 // MLS prefix base = 0x06000000 (template=10, R=0, IMM18=0).
 // 8LS prefix base = 0x04000000 (template=00, R=0, IMM18=0).
 
-PREFIX_BITS_TABLE: [Mnemonic]u32 = #partial {
+@(rodata)
+PREFIX_BITS_TABLE := #partial [Mnemonic]u32{
 	// MLS-form (prefix template = 0b10)
 	.PLBZ  = 0x06000000,
 	.PLHZ  = 0x06000000,
