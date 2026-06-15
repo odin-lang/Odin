@@ -10,6 +10,7 @@ import "core:slice"
 import "core:strings"
 import "core:mem/virtual"
 import "core:math"
+import "core:os"
 
 // SIMD vector type aliases
 V4F32 :: #simd [4]f32
@@ -3136,6 +3137,11 @@ print_summary :: proc() {
 // =============================================================================
 
 main :: proc() {
+	if len(os.args) >= 2 && os.args[1] == "benchmark" {
+		log_header("PERFORMANCE BENCHMARKS")
+		run_benchmarks()
+		return
+	}
 	fmt.printf("\n%s======================================================================%s\n", BOLD, RESET)
 	fmt.printf("%s           x64 ENCODER/DECODER TEST SUITE                             %s\n", BOLD, RESET)
 	fmt.printf("%s======================================================================%s\n", BOLD, RESET)
