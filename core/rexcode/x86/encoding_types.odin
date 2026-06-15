@@ -258,8 +258,12 @@ Encoding_Flags :: bit_field u32 {
 	rep_ok:         bool     | 1, // REP prefix valid
 	modrm_reg_ext:  bool     | 1, // ModR/M reg field is opcode extension (use ext field)
 	mode_32_only:   bool     | 1, // only valid in Mode._32 (e.g. short-form INC/DEC at 0x40-0x4F)
-	explicit_count: u8       | 3, // 0..<4 non-implicit operands
+
+	explicit_count: u8       | 2, // 0..<4 non-implicit operands
 	has_implicit:   bool     | 1, // any implicit operand
+
+	op_count:       u8       | 2, // total operands including implicit (0..<4)
+	needs_modrm:    bool     | 1, // any enc is .MR/.REG/.VVVV
 }
 
 // -----------------------------------------------------------------------------

@@ -573,20 +573,13 @@ decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decod
 decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: Instruction, err: Error_Code) {
 	inst.mnemonic = entry.mnemonic
 
-	// Check if we need ModR/M
-	needs_modrm := false
-	for enc in entry.enc {
-		if enc == .MR || enc == .REG || enc == .VVVV {
-			needs_modrm = true
-			break
-		}
-	}
-
 	modrm: u8 = 0
 	modrm_info: ModRM_Info
 	sib: u8 = 0
 	sib_info: SIB_Info
 	has_sib := false
+
+	needs_modrm := entry.flags.needs_modrm
 
 	if needs_modrm {
 		if state.position >= len(state.data) {
@@ -616,18 +609,16 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 	}
 
 	// Decode each operand
-	for op_type, i in entry.ops {
-		if op_type == .NONE {
-			break
-		}
+	op_count := entry.flags.op_count
+	for i in 0..<op_count {
 		op_enc := entry.enc[i]
 
 		// i386: default_64 entries have R64/RM64 operand types but
 		// really mean R32/RM32 in 32-bit mode (same encoded bytes).
-		effective := mode_rewrite_op_type(op_type, state.mode, entry.flags.default_64)
+		effective := mode_rewrite_op_type(entry.ops[i], state.mode, entry.flags.default_64)
 		inst.ops[i] = decode_single_operand(state, effective, op_enc, modrm_info, sib_info, has_sib) or_return
-		inst.operand_count += 1
 	}
+	inst.operand_count += op_count
 
 	return
 }

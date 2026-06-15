@@ -228,7 +228,7 @@ gen_entries :: proc(sb: ^strings.Builder, name, typ: string, entries: []Collecte
 		strings.write_string(sb, "}, {")
 		for en, i in e.enc { print_enum_buffered(sb, en, 4, i+1 < len(e.enc)) }
 		strings.write_string(sb, "}, ")
-		write_flags(sb, nil, e.flags)
+		write_flags(sb, e, e.flags)
 		strings.write_string(sb, "},\n")
 	}
 	strings.write_string(sb, "}\n\n")
@@ -366,7 +366,7 @@ print_enum_buffered :: proc(sb: ^strings.Builder, x: $T, max_name: int, comma: b
 
 // Complete Encoding_Flags emitter -- every field, so ENCODE_FORMS round-trips
 // the SoT exactly (mode_32_only is read by the encoder).
-write_flags :: proc(sb: ^strings.Builder, enc: Maybe(Encoding), flags: lib.Encoding_Flags) {
+write_flags :: proc(sb: ^strings.Builder, enc: union{lib.Encoding, Collected_Entry}, flags: lib.Encoding_Flags) {
 	parts: [dynamic]string
 	defer delete(parts)
 	if flags.esc != .NONE          { append(&parts, fmt.tprintf("esc=.%v", flags.esc)) }
@@ -382,7 +382,8 @@ write_flags :: proc(sb: ^strings.Builder, enc: Maybe(Encoding), flags: lib.Encod
 	if flags.modrm_reg_ext         { append(&parts, "modrm_reg_ext=true") }
 	if flags.mode_32_only          { append(&parts, "mode_32_only=true") }
 
-	if e, ok := enc.?; ok {
+	switch e in enc {
+	case lib.Encoding:
 		encoding_operand_count: u8 = 0
 		has_implict := false
 		for op_type in e.ops {
@@ -398,6 +399,24 @@ write_flags :: proc(sb: ^strings.Builder, enc: Maybe(Encoding), flags: lib.Encod
 		}
 		if has_implict {
 			append(&parts, "has_implict=true")
+		}
+
+	case Collected_Entry:
+		op_count: u8 = 0
+		needs_modrm := false
+		for t, i in e.ops {
+			if t == .NONE { break }
+			op_count += 1
+			enc := e.enc[i]
+			if enc == .MR || enc == .REG || enc == .VVVV {
+				needs_modrm = true
+			}
+		}
+		if op_count > 0 {
+			append(&parts, fmt.tprintf("op_count=%d", op_count))
+		}
+		if needs_modrm {
+			append(&parts, "needs_modrm=true")
 		}
 	}
 
