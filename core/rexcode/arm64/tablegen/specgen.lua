@@ -49,6 +49,8 @@ local FAMILIES = {
 		{"MLA_V","mla"},    {"MLS_V","mls"},
 		{"CMGE","cmge"},    {"CMHS","cmhs"},    {"CMTST","cmtst"},
 		{"SQDMULH","sqdmulh"}, {"SQRDMULH","sqrdmulh"},
+		{"ADDP_V","addp"}, {"SMAXP","smaxp"}, {"SMINP","sminp"}, {"UMAXP","umaxp"}, {"UMINP","uminp"},
+		{"SSHL","sshl"}, {"USHL","ushl"}, {"SRSHL","srshl"}, {"URSHL","urshl"},
 	}},
 	{ shape="TWO_SAME", feature="NEON", title="Advanced SIMD two-register misc", items = {
 		{"NOT_V","not"},    {"RBIT_V","rbit"},
