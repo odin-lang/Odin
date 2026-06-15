@@ -26,6 +26,7 @@ Instruction :: struct #packed {
 	length:        u8,       // 2 or 4
 	form_id:       u16,
 }
+#assert(size_of(Instruction) == 80)
 
 @(require_results)
 inst_none :: #force_inline proc "contextless" (m: Mnemonic) -> Instruction {

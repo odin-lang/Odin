@@ -39,8 +39,8 @@ Operand :: struct #packed {
 	},
 	kind: Operand_Kind,
 	size: u8,
-	_:    [2]u8,
 }
+#assert(size_of(Operand) == 18)
 
 @(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
