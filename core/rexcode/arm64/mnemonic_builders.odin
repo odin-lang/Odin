@@ -119,6 +119,10 @@ inst_csinv_r_r_r_c              :: #force_inline proc "contextless" (dst: Regist
 emit_csinv_r_r_r_c              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, cond: Cond) { append(instructions, inst_csinv_r_r_r_c(dst, src, src2, cond)) }
 inst_csneg_r_r_r_c              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, cond: Cond) -> Instruction { return Instruction{mnemonic = .CSNEG, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_cond(cond)}} }
 emit_csneg_r_r_r_c              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, cond: Cond) { append(instructions, inst_csneg_r_r_r_c(dst, src, src2, cond)) }
+inst_ccmp_reg_r_r_i_c           :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMP_REG, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), op_cond(cond)}} }
+emit_ccmp_reg_r_r_i_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64, cond: Cond) { append(instructions, inst_ccmp_reg_r_r_i_c(dst, src, imm, cond)) }
+inst_ccmn_reg_r_r_i_c           :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMN_REG, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), op_cond(cond)}} }
+emit_ccmn_reg_r_r_i_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64, cond: Cond) { append(instructions, inst_ccmn_reg_r_r_i_c(dst, src, imm, cond)) }
 inst_extr_r_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .EXTR, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_imm(imm, 1)}} }
 emit_extr_r_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_extr_r_r_r_i(dst, src, src2, imm)) }
 inst_b_l                        :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B, label) }
@@ -1680,6 +1684,10 @@ inst_csinv                           :: inst_csinv_r_r_r_c
 emit_csinv                           :: emit_csinv_r_r_r_c
 inst_csneg                           :: inst_csneg_r_r_r_c
 emit_csneg                           :: emit_csneg_r_r_r_c
+inst_ccmp_reg                        :: inst_ccmp_reg_r_r_i_c
+emit_ccmp_reg                        :: emit_ccmp_reg_r_r_i_c
+inst_ccmn_reg                        :: inst_ccmn_reg_r_r_i_c
+emit_ccmn_reg                        :: emit_ccmn_reg_r_r_i_c
 inst_extr                            :: inst_extr_r_r_r_i
 emit_extr                            :: emit_extr_r_r_r_i
 inst_b                               :: inst_b_l

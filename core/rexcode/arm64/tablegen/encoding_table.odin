@@ -283,6 +283,25 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 
 	// =========================================================================
+	// §7b Conditional compare (register form)
+	// =========================================================================
+	//
+	//   sf op S 11010010 Rm cond 0 o2 Rn o3 nzcv   (o2 = bit11 = 0 for register)
+	//   Mask = bits[31:21] + bits[11:10] + bit[4] = 0xFFE00C10
+	//   CCMP op=1 (0x7A/0xFA), CCMN op=0 (0x3A/0xBA); nzcv@3:0, cond@15:12.
+	//   (imm5 forms, which place the immediate at bits 20:16, need a new
+	//    Operand_Encoding and are added separately.)
+
+	.CCMP_REG = {
+		{.CCMP_REG, {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM, .NZCV_FIELD, .COND_HI}, 0x7A400000, 0xFFE00C10, .BASE, {sets_flags=true}},
+		{.CCMP_REG, {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM, .NZCV_FIELD, .COND_HI}, 0xFA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}},
+	},
+	.CCMN_REG = {
+		{.CCMN_REG, {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM, .NZCV_FIELD, .COND_HI}, 0x3A400000, 0xFFE00C10, .BASE, {sets_flags=true}},
+		{.CCMN_REG, {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM, .NZCV_FIELD, .COND_HI}, 0xBA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}},
+	},
+
+	// =========================================================================
 	// §8 Branches
 	// =========================================================================
 
