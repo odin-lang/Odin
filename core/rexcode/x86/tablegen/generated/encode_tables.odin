@@ -7,6 +7,7 @@ package rexcode_x86_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [2355]lib.Encoding{
 	// .MOV
 	{.MOV,              {.RM8,       .R8,        .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x88, 0, {}},
@@ -3540,6 +3541,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.RDSEED,           {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, force_rex_w=true, modrm_reg_ext=true}},
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID          = {    0,   0},
 	.MOV              = {    0,  32},

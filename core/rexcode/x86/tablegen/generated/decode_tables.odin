@@ -7,6 +7,7 @@ package rexcode_x86_generated
 
 import lib "../.."
 
+@(rodata)
 MODRM_TABLE := [256]lib.ModRM_Info{
 	{0, 0, 0, false, 0}, {0, 0, 1, false, 0}, {0, 0, 2, false, 0}, {0, 0, 3, false, 0}, 
 	{0, 0, 4,  true, 0}, {0, 0, 5, false, 4}, {0, 0, 6, false, 0}, {0, 0, 7, false, 0}, 
@@ -74,6 +75,7 @@ MODRM_TABLE := [256]lib.ModRM_Info{
 	{3, 7, 4, false, 0}, {3, 7, 5, false, 0}, {3, 7, 6, false, 0}, {3, 7, 7, false, 0}, 
 }
 
+@(rodata)
 SIB_TABLE := [256]lib.SIB_Info{
 	{1,   0, 0},	{1,   0, 1},	{1,   0, 2},	{1,   0, 3},
 	{1,   0, 4},	{1,   0, 5},	{1,   0, 6},	{1,   0, 7},
@@ -141,6 +143,7 @@ SIB_TABLE := [256]lib.SIB_Info{
 	{8,   7, 4},	{8,   7, 5},	{8,   7, 6},	{8,   7, 7},
 }
 
+@(rodata)
 LEGACY_DECODE_ENTRIES := [1270]lib.Decode_Entry{
 	{.NONE,  0, 0x00, 0xFF, .ADD,             {.RM8,       .R8,        .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, {lock_ok=true}},
 	{.NONE,  0, 0x01, 0xFF, .ADD,             {.RM16,      .R16,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, {lock_ok=true}},
@@ -1414,6 +1417,7 @@ LEGACY_DECODE_ENTRIES := [1270]lib.Decode_Entry{
 	{._0F3A, 1, 0xDF, 0xFF, .AESKEYGENASSIST, {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, {esc=._0F3A, prefix=1}},
 }
 
+@(rodata)
 VEX_DECODE_ENTRIES := [667]lib.VEX_Decode_Entry{
 	{._0F,   0, 0x10, 0xFF, .WIG,  .L1,   .VMOVUPS,          {.YMM,       .YMM_M256,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, {esc=._0F, vex_type=.VEX, vex_l=.L1}},
 	{._0F,   0, 0x10, 0xFF, .WIG,  .L0,   .VMOVUPS,          {.XMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, {esc=._0F, vex_type=.VEX, vex_l=.L0}},
@@ -2084,6 +2088,7 @@ VEX_DECODE_ENTRIES := [667]lib.VEX_Decode_Entry{
 	{._0F3A, 3, 0xF0, 0xFF, .W1,   .L0,   .RORX,             {.R64,       .RM64,      .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, {esc=._0F3A, prefix=3, vex_type=.VEX, vex_w=.W1, vex_l=.L0}},
 }
 
+@(rodata)
 EVEX_DECODE_ENTRIES := [418]lib.VEX_Decode_Entry{
 	{._0F,   1, 0x6F, 0xFF, .W0,   .L1,   .VMOVDQA32,      {.YMM,       .YMM_M256,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, {esc=._0F, prefix=1, vex_type=.EVEX, vex_w=.W0, vex_l=.L1}},
 	{._0F,   1, 0x6F, 0xFF, .W0,   .L0,   .VMOVDQA32,      {.XMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, {esc=._0F, prefix=1, vex_type=.EVEX, vex_w=.W0, vex_l=.L0}},
@@ -2505,6 +2510,7 @@ EVEX_DECODE_ENTRIES := [418]lib.VEX_Decode_Entry{
 	{._0F3A, 1, 0x67, 0xFF, .W0,   .LIG,  .VFPCLASSSS,     {.K,         .XMM_M32,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, {esc=._0F3A, prefix=1, vex_type=.EVEX, vex_w=.W0}},
 }
 
+@(rodata)
 DECODE_INDEX_LEGACY := [4][256]lib.Decode_Index{
 	{ // prefix = none
 		0x00 = {   0,  1},
@@ -2677,6 +2683,7 @@ DECODE_INDEX_LEGACY := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 DECODE_INDEX_ESC_0F := [4][256]lib.Decode_Index{
 	{ // prefix = none
 		0x00 = { 614, 10},
@@ -2987,6 +2994,7 @@ DECODE_INDEX_ESC_0F := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 DECODE_INDEX_ESC_0F38 := [4][256]lib.Decode_Index{
 	{ // prefix = none
 		0xC8 = {1164,  1},
@@ -3066,6 +3074,7 @@ DECODE_INDEX_ESC_0F38 := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 DECODE_INDEX_ESC_0F3A := [4][256]lib.Decode_Index{
 	{ // prefix = none
 		0xCC = {1244,  1},
@@ -3101,6 +3110,7 @@ DECODE_INDEX_ESC_0F3A := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 VEX_INDEX_0F := [4][256]lib.Decode_Index{
 	0 = { /* prefix = none */
 		0x10 = {  0,  2},
@@ -3298,6 +3308,7 @@ VEX_INDEX_0F := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 VEX_INDEX_0F38 := [4][256]lib.Decode_Index{
 	0 = { /* prefix = none */
 		0xF2 = {340,  2},
@@ -3419,6 +3430,7 @@ VEX_INDEX_0F38 := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 VEX_INDEX_0F3A := [4][256]lib.Decode_Index{
 	0 = { /* prefix = none */ },
 	1 = { /* prefix = 66 */
@@ -3466,6 +3478,7 @@ VEX_INDEX_0F3A := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 EVEX_INDEX_0F := [4][256]lib.Decode_Index{
 	0 = { /* prefix = none */ },
 	1 = { /* prefix = 66 */
@@ -3483,6 +3496,7 @@ EVEX_INDEX_0F := [4][256]lib.Decode_Index{
 	},
 }
 
+@(rodata)
 EVEX_INDEX_0F38 := [4][256]lib.Decode_Index{
 	0 = { /* prefix = none */ },
 	1 = { /* prefix = 66 */
@@ -3554,6 +3568,7 @@ EVEX_INDEX_0F38 := [4][256]lib.Decode_Index{
 	3 = { /* prefix = F2 */ },
 }
 
+@(rodata)
 EVEX_INDEX_0F3A := [4][256]lib.Decode_Index{
 	0 = { /* prefix = none */ },
 	1 = { /* prefix = 66 */

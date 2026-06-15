@@ -41,6 +41,8 @@ PREFIX_F2 :: lib.PREFIX_F2
 // One row of the blob manifest. Drives BOTH the loader's #load lines and the
 // writer's dump calls, so the two can never disagree on names/files.
 Blob :: struct { global, file, typ: string }
+
+@(rodata)
 BLOBS := [?]Blob{
 	{"ENCODE_FORMS",          "x86.encode_forms.bin", "Encoding"},
 	{"ENCODE_RUNS",           "x86.encode_runs.bin",  "Encode_Run"},
@@ -61,7 +63,7 @@ BLOBS := [?]Blob{
 	{"EVEX_INDEX_0F3A",       "x86.evex_idx_0f3a.bin","Decode_Index"},
 }
 
-DIR_GEN    :: #directory + "/generated/"
+DIR_GEN     :: #directory + "/generated/"
 PATH_LOADER :: #directory + "/../tables.odin"
 
 main :: proc() {
@@ -96,6 +98,7 @@ emit_encode_tables :: proc() {
 		}
 	}
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total_forms())
 	for m in Mnemonic {
 		forms := ENCODING_TABLE[m]
@@ -108,6 +111,7 @@ emit_encode_tables :: proc() {
 	// Run index, one entry per mnemonic (dense, enum-ordinal order).
 	run_name := 0
 	for m in Mnemonic { run_name = max(run_name, len(reflect.enum_string(m))) }
+	strings.write_string(&sb, "@(rodata)\n")
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
@@ -208,6 +212,7 @@ entry_less :: proc(a, b: Collected_Entry) -> bool {
 gen_entries :: proc(sb: ^strings.Builder, name, typ: string, entries: []Collected_Entry, is_vex: bool) {
 	max_name := 0
 	for e in entries { max_name = max(max_name, len(reflect.enum_string(e.mnemonic))) }
+	strings.write_string(sb, "@(rodata)\n")
 	fmt.sbprintfln(sb, "%s := [%d]%s{{", name, len(entries), typ)
 	for e in entries {
 		strings.write_string(sb, "\t{")
@@ -261,6 +266,7 @@ gen_legacy_index :: proc(sb: ^strings.Builder, entries: []Collected_Entry) {
 		case ._0F38: name = "DECODE_INDEX_ESC_0F38"
 		case ._0F3A: name = "DECODE_INDEX_ESC_0F3A"
 		}
+		strings.write_string(sb, "@(rodata)\n")
 		fmt.sbprintfln(sb, "%s := [4][256]lib.Decode_Index{{", name)
 		for prefix in 0..<4 {
 			fmt.sbprintfln(sb, "\t{{ // prefix = %s", prefix_name(prefix))
@@ -285,6 +291,7 @@ gen_vex_index :: proc(sb: ^strings.Builder, entries: []Collected_Entry, kind: st
 		case 1: esc = ._0F38; esc_name = "0F38"
 		case 2: esc = ._0F3A; esc_name = "0F3A"
 		}
+		strings.write_string(sb, "@(rodata)\n")
 		fmt.sbprintfln(sb, "%s_INDEX_%s := [4][256]lib.Decode_Index{{", kind, esc_name)
 		for prefix in 0..<4 {
 			any := false
@@ -311,6 +318,7 @@ gen_vex_index :: proc(sb: ^strings.Builder, entries: []Collected_Entry, kind: st
 }
 
 gen_modrm :: proc(sb: ^strings.Builder) {
+	strings.write_string(sb, "@(rodata)\n")
 	strings.write_string(sb, "MODRM_TABLE := [256]lib.ModRM_Info{\n")
 	for i in 0..<256 {
 		modrm := u8(i)
@@ -330,6 +338,7 @@ gen_modrm :: proc(sb: ^strings.Builder) {
 }
 
 gen_sib :: proc(sb: ^strings.Builder) {
+	strings.write_string(sb, "@(rodata)\n")
 	strings.write_string(sb, "SIB_TABLE := [256]lib.SIB_Info{\n")
 	for i in 0..<256 {
 		sib := u8(i)
