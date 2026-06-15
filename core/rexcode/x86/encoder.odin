@@ -706,16 +706,20 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// when not in Mode._32.
 	if enc.flags.mode_32_only && mode != ._32 { return false }
 
-	// Count non-implicit encoding operands
-	encoding_operand_count: u8 = 0
-	for op_type in enc.ops {
-		if op_type == .NONE { break }
-		if !is_implicit_op_inline(op_type) { encoding_operand_count += 1 }
+	explicit_count := enc.flags.explicit_count
+
+	if !enc.flags.has_implicit {
+		if inst.operand_count != explicit_count { return false }
+		for i in 0 ..< explicit_count {
+			eff := mode_rewrite_op_type(enc.ops[i], mode, enc.flags.default_64)
+			operand_matches_inline(&inst.ops[i], eff) or_return
+		}
+		return true
 	}
 
 	// Special case: if user provides exactly one more operand than non-implicit count,
 	// check if the extra operand matches an implicit operand (e.g., CL for shifts)
-	if inst.operand_count == encoding_operand_count + 1 {
+	if inst.operand_count == explicit_count + 1 {
 		// Check if the last user operand matches an implicit operand in the encoding
 		last_user_op := &inst.ops[inst.operand_count - 1]
 		found_matching_implicit := false
@@ -743,7 +747,7 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	}
 
 	// STandard case: operand count must match non-implicit count
-	if inst.operand_count != encoding_operand_count { return false }
+	if inst.operand_count != explicit_count { return false }
 
 	// Match each user operand against non-implicit encoding operands
 	user_idx: u8 = 0
