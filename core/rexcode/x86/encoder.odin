@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_x86
 
 // =============================================================================
@@ -140,7 +142,7 @@ encode :: proc(
 		}
 
 		// Find matching encoding from table (O(1) mnemonic lookup)
-		encodings := ENCODING_TABLE[inst.mnemonic]
+		encodings := encoding_forms(inst.mnemonic)
 		if len(encodings) == 0 {
 			append(errors, Error{u32(instruction_index), .INVALID_MNEMONIC, {}})
 			has_errors = true

@@ -1,3 +1,5 @@
+<!-- rexcode  ·  Brendan Punsky (dotbmp@github), original author -->
+
 # MIPS targets and extensions — platform catalog
 
 > What's worth supporting in `rexcode/mips/` (or a sibling subpackage) and

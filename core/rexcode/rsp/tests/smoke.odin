@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_rsp_tests
 
 // Spot-check N64 RSP encodings across scalar core, vector ALU, and
@@ -13,7 +15,8 @@ import rsp "../"
 @(private="file") failures := 0
 
 check :: proc(name: string, m: rsp.Mnemonic, want_bits, want_mask: u32) {
-	encs := rsp.ENCODING_TABLE[m]
+	_run := rsp.ENCODE_RUNS[u16(m)]
+	encs := rsp.ENCODE_FORMS[_run.start:][:_run.count]
 	if len(encs) == 0 {
 		fmt.printfln("  [FAIL] %s: no encoding", name)
 		failures += 1

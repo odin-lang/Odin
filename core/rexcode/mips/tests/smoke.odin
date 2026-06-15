@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mips_tests
 
 // Spot-check that ENCODING_TABLE entries are present and have the
@@ -14,7 +16,8 @@ import mips "../"
 @(private="file") failures := 0
 
 check :: proc(name: string, m: mips.Mnemonic, want_bits, want_mask: u32) {
-	encs := mips.ENCODING_TABLE[m]
+	r := mips.ENCODE_RUNS[u16(m)]
+	encs := mips.ENCODE_FORMS[r.start:][:r.count]
 	if len(encs) == 0 {
 		fmt.printfln("  [FAIL] %s: no encoding in table", name)
 		failures += 1

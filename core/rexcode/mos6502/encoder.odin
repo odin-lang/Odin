@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mos6502
 
 import "../isa"
@@ -121,7 +123,7 @@ find_form_inline :: #force_inline proc(
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
 		return nil, false
 	}
-	forms := ENCODING_TABLE[inst.mnemonic]
+	forms := encoding_forms(inst.mnemonic)
 	if len(forms) == 0 {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
 		return nil, false

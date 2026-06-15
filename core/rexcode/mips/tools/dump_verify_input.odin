@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -31,14 +33,15 @@ main :: proc() {
 
 	count := 0
 	for mn in m.Mnemonic {
-		for f in m.ENCODING_TABLE[mn] {
+		_run := m.ENCODE_RUNS[u16(mn)]
+		for f in m.ENCODE_FORMS[_run.start:][:_run.count] {
 			b3 := u8((f.bits >> 24) & 0xFF)
 			b2 := u8((f.bits >> 16) & 0xFF)
 			b1 := u8((f.bits >>  8) & 0xFF)
 			b0 := u8( f.bits        & 0xFF)
 			// MIPS big-endian byte order: most-significant byte first
 			fmt.sbprintf(&hex_buf, "0x%02x,0x%02x,0x%02x,0x%02x\n", b3, b2, b1, b0)
-			fmt.sbprintf(&meta_buf, "%v\t%08x\t%08x\t%v\n", mn, f.bits, f.mask, f.isa)
+			fmt.sbprintf(&meta_buf, "%v\t%08x\t%08x\t%v\n", mn, f.bits, f.mask, f.feature)
 			count += 1
 		}
 	}

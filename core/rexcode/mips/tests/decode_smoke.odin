@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mips_tests
 
 // Decoder smoke tests. Drives encode -> decode round-trips and checks

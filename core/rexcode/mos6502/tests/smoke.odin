@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mos6502_tests
 
 // Spot-check that ENCODING_TABLE entries are present with the canonical
@@ -22,7 +24,8 @@ check :: proc(
 	want_length:   u8,
 	want_cpu:      m.CPU,
 ) {
-	encs := m.ENCODING_TABLE[mn]
+	_run := m.ENCODE_RUNS[u16(mn)]
+	encs := m.ENCODE_FORMS[_run.start:][:_run.count]
 	if len(encs) <= want_mode_idx {
 		fmt.printfln("  [FAIL] %-12s no encoding at idx %d", name, want_mode_idx)
 		failures += 1
@@ -44,7 +47,8 @@ check :: proc(
 @(private="file")
 check_mode :: proc(name: string, mn: m.Mnemonic, want_mode: m.Operand_Type, want_opcode: u8) {
 	// Find the form whose first Operand_Type matches `want_mode`.
-	for e in m.ENCODING_TABLE[mn] {
+	_run := m.ENCODE_RUNS[u16(mn)]
+	for e in m.ENCODE_FORMS[_run.start:][:_run.count] {
 		if e.ops[0] == want_mode {
 			if e.opcode == want_opcode {
 				fmt.printfln("  [ok]   %-22s op=%02x", name, want_opcode)

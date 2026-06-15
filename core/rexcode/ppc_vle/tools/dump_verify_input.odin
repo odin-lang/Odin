@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -42,7 +44,8 @@ main :: proc() {
 
 	n: int
 	for mn in v.Mnemonic {
-		for &f in v.ENCODING_TABLE[mn] {
+		_run := v.ENCODE_RUNS[u16(mn)]
+		for &f in v.ENCODE_FORMS[_run.start:][:_run.count] {
 			word := f.bits
 			if f.flags.short {
 				fmt.sbprintf(&hex_buf, "0x%02x,0x%02x\n",

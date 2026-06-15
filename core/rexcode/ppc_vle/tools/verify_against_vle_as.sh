@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 # =============================================================================
 # PowerPC VLE verification harness — assemble + objdump (binutils VLE)
 # =============================================================================

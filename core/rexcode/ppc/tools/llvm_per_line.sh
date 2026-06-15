@@ -1,4 +1,6 @@
 #!/bin/bash
+# rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 # Per-line llvm-mc disassembly wrapper. Reads a .hex manifest, runs each line
 # through llvm-mc independently so output lines align 1:1 with input lines.
 # (llvm-mc's stream mode is greedy: it consumes prefix bytes when a line looks

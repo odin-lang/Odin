@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc_tests
 
 // Full encode→decode→re-encode sweep across the entire ENCODING_TABLE.
@@ -30,7 +32,8 @@ run_full_sweep :: proc() {
 	defer delete(fail_samples)
 
 	for mn in p.Mnemonic {
-		forms := p.ENCODING_TABLE[mn]
+		_run := p.ENCODE_RUNS[u16(mn)]
+		forms := p.ENCODE_FORMS[_run.start:][:_run.count]
 		for &f, fi in forms {
 			test_form(mn, fi, &f, &fail_samples)
 		}

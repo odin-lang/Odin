@@ -1,4 +1,6 @@
 #!/bin/bash
+# rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 # Per-line llvm-mc disassembly wrapper.
 #
 # llvm-mc reads the entire stdin as a stream and decodes greedily, so a

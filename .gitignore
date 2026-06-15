@@ -279,6 +279,13 @@ demo.bin
 libLLVM*.so*
 *.a
 
+# core:rexcode commits its generated encode/decode tables: each arch's tablegen
+# emits human-readable Odin, serialized to tables/*.bin, which the library
+# #loads at compile time. The blobs (and the rexcode x86 package, caught by the
+# broad x86/ rule above) must be tracked.
+!/core/rexcode/x86/
+!core/rexcode/*/tables/*.bin
+
 # WASM
 *.wasm
 

@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mips_tests
 
 // Printer smoke tests. Encode a stream, decode it, print it, and check the

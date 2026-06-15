@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc_tests
 
 import "core:fmt"
@@ -15,7 +17,8 @@ run_decode_sweep :: proc() {
 	ok_total, missing_mn_total, wrong_mn_total: int
 
 	for mn in p.Mnemonic {
-		forms := p.ENCODING_TABLE[mn]
+		_run := p.ENCODE_RUNS[u16(mn)]
+		forms := p.ENCODE_FORMS[_run.start:][:_run.count]
 		for &f in forms {
 			// Build a canonical word — base bits | safe-fill operands.
 			// Safe-fill values mirror dump_verify_input.odin.
@@ -32,7 +35,7 @@ run_decode_sweep :: proc() {
 			buf[3] = u8(word)
 			ilen := 4
 			if f.flags.prefixed {
-				pfx := p.PREFIX_BITS_TABLE[mn]
+				pfx := p.PREFIX_BITS_TABLE[u16(mn)]
 				buf[0] = u8(pfx >> 24); buf[1] = u8(pfx >> 16); buf[2] = u8(pfx >> 8); buf[3] = u8(pfx)
 				buf[4] = u8(word >> 24); buf[5] = u8(word >> 16); buf[6] = u8(word >> 8); buf[7] = u8(word)
 				ilen = 8

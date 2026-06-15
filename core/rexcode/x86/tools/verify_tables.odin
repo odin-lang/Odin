@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -79,7 +81,8 @@ main :: proc() {
 	// Check that each entry in LEGACY_DECODE_ENTRIES corresponds to something in ENC_TABLE
 	for entry in x86.LEGACY_DECODE_ENTRIES {
 		// Find matching encoding in ENC_TABLE
-		encodings := x86.ENCODING_TABLE[entry.mnemonic]
+		_run := x86.ENCODE_RUNS[u16(entry.mnemonic)]
+		encodings := x86.ENCODE_FORMS[_run.start:][:_run.count]
 		found := false
 		for enc in encodings {
 			if enc.opcode == entry.opcode &&
@@ -130,10 +133,10 @@ main :: proc() {
 	for tc in test_cases {
 		idx: x86.Decode_Index
 		switch tc.esc {
-		case .NONE:  idx = x86.DECODE_INDEX_LEGACY[tc.prefix][tc.opcode]
-		case ._0F:   idx = x86.DECODE_INDEX_ESC_0F[tc.prefix][tc.opcode]
-		case ._0F38: idx = x86.DECODE_INDEX_ESC_0F38[tc.prefix][tc.opcode]
-		case ._0F3A: idx = x86.DECODE_INDEX_ESC_0F3A[tc.prefix][tc.opcode]
+		case .NONE:  idx = x86.DECODE_INDEX_LEGACY[(int(tc.prefix) << 8) | int(tc.opcode)]
+		case ._0F:   idx = x86.DECODE_INDEX_ESC_0F[(int(tc.prefix) << 8) | int(tc.opcode)]
+		case ._0F38: idx = x86.DECODE_INDEX_ESC_0F38[(int(tc.prefix) << 8) | int(tc.opcode)]
+		case ._0F3A: idx = x86.DECODE_INDEX_ESC_0F3A[(int(tc.prefix) << 8) | int(tc.opcode)]
 		}
 
 		if idx.count == 0 {

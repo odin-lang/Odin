@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -38,7 +40,8 @@ main :: proc() {
 	n_main, n_spe: int
 
 	for mn in p.Mnemonic {
-		for &f in p.ENCODING_TABLE[mn] {
+		_run := p.ENCODE_RUNS[u16(mn)]
+		for &f in p.ENCODE_FORMS[_run.start:][:_run.count] {
 			bits := fill_safe_operands(&f)
 			hex_buf  := &main_hex
 			meta_buf := &main_meta
@@ -53,7 +56,7 @@ main :: proc() {
 			// For prefixed (POWER10 8-byte) instructions, emit the PREFIX
 			// word first, then the SUFFIX word, both BE.
 			if f.flags.prefixed {
-				pfx := p.PREFIX_BITS_TABLE[mn] | prefix_safe_fill(&f)
+				pfx := p.PREFIX_BITS_TABLE[u16(mn)] | prefix_safe_fill(&f)
 				fmt.sbprintf(hex_buf, "0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x\n",
 					(pfx  >> 24) & 0xFF, (pfx  >> 16) & 0xFF, (pfx  >> 8) & 0xFF, pfx  & 0xFF,
 					(bits >> 24) & 0xFF, (bits >> 16) & 0xFF, (bits >> 8) & 0xFF, bits & 0xFF)

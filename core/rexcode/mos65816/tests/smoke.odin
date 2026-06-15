@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mos65816_tests
 
 // End-to-end W65C816S smoke tests: opcode-matrix spot checks, encode->

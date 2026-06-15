@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_arm64_tests
 
 // End-to-end AArch64 pipeline tests: encode -> decode -> print round-trips

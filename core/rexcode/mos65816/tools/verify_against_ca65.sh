@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 # =============================================================================
 # W65C816 verification harness — assembles via ca65, compares bytes
 # =============================================================================

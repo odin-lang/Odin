@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -90,7 +92,8 @@ main :: proc() {
 
 	n: int
 	for mn in r.Mnemonic {
-		for &f in r.ENCODING_TABLE[mn] {
+		_run := r.ENCODE_RUNS[u16(mn)]
+		for &f in r.ENCODE_FORMS[_run.start:][:_run.count] {
 			word := f.bits
 			// Compute "armips-effective" expected bytes:
 			// For single-source ops, armips's [0] yields element=8 in two fields.

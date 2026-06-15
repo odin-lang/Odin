@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_arm32_tests
 
 import "core:fmt"
@@ -8,7 +10,8 @@ ok_count, fail_count: int
 
 @(private="file")
 check :: proc(name: string, mn: a.Mnemonic, idx: int, want_bits, want_mask: u32) {
-	enc := a.ENCODING_TABLE[mn]
+	_run := a.ENCODE_RUNS[u16(mn)]
+	enc := a.ENCODE_FORMS[_run.start:][:_run.count]
 	if idx >= len(enc) {
 		fmt.printf("  [FAIL] %s: entry %d not present (have %d entries)\n", name, idx, len(enc))
 		fail_count += 1

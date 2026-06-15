@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc_vle
 
 // =============================================================================
@@ -82,7 +84,7 @@ encode_one_inline :: #force_inline proc(
 	relocs:   ^[dynamic]Relocation,
 	errors:   ^[dynamic]Error,
 ) -> bool {
-	forms := ENCODING_TABLE[inst.mnemonic]
+	forms := encoding_forms(inst.mnemonic)
 	if len(forms) == 0 {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
 		return false

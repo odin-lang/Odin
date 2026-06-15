@@ -1,3 +1,5 @@
+<!-- rexcode  ·  Brendan Punsky (dotbmp@github), original author -->
+
 # rexcode `x86` — Complete API Extraction
 
 > Snapshot of the entire public surface of the `x86` subpackage
@@ -6,19 +8,19 @@
 > is built against.
 
 The package is **table-driven**: a hand-written master encoding table
-(`ENCODING_TABLE`) is the single source of truth, from which the decode
-tables and the typed builder procedures are *generated*. The runtime is
-zero-allocation (caller owns every buffer) and the hot paths are fully
-inlined.
+(`ENCODING_TABLE`, in `tablegen/`) is the single source of truth, from which the
+encode/decode tables (committed binary blobs, `#load`ed into `@(rodata)`) and the
+typed builder procedures are *generated*. The runtime is zero-allocation (caller
+owns every buffer) and the hot paths are fully inlined.
 
 ```
                        ENCODING_TABLE  (hand-written, source of truth)
                               │
               ┌───────────────┼────────────────┐
-        gen_decode_tables           gen_mnemonic_builders
+        tablegen (2-stage)          gen_mnemonic_builders
               │                              │
-       decoding_tables.odin          mnemonic_builders.odin
-       (decode() reads these)        (typed inst_*/emit_* helpers)
+       tables/*.bin → tables.odin   mnemonic_builders.odin
+       (#loaded into @(rodata))      (typed inst_*/emit_* helpers)
 ```
 
 Pipeline at a glance:
@@ -131,10 +133,8 @@ MEM_BASE_RIP :: 30   MEM_BASE_NONE :: 31   MEM_INDEX_NONE :: 31
 `mem_base_index(base, index, scale)`,
 `mem_base_index_disp(base, index, scale, disp)`, `mem_rip_disp(disp)`.
 
-> ⚠️ The README and `tests/test.odin` still use the *old* names
-> (`mem_base`, `mem_base_displacement`, `mem_base_index_displacement`,
-> `mem_rip_relative`). `mem_base` is now an **accessor**, not a
-> constructor. See the "Known drift" note at the end.
+> ⚠️ `mem_base` is an **accessor** (returns the base `Register`), not a
+> constructor — use `mem_base_only` for the no-displacement case.
 
 **Accessors:** `mem_scale`, `mem_is_rip_relative`, `mem_has_base`,
 `mem_has_index` `(Memory) -> …`; `mem_base`, `mem_index` `(Memory) -> Register`.
@@ -295,7 +295,7 @@ VEX_Type :: enum u8 { NONE, VEX, EVEX, XOP }
 VEX_W    :: enum u8 { WIG, W0, W1 }
 VEX_L    :: enum u8 { LIG, L0, L1, L2 }
 
-Encoding_Flags :: bit_field u16 {
+Encoding_Flags :: bit_field u32 {
 	esc:           Escape   | 2,
 	prefix:        u8       | 2,
 	vex_type:      VEX_Type | 2,
@@ -307,9 +307,10 @@ Encoding_Flags :: bit_field u16 {
 	lock_ok:       bool     | 1,
 	rep_ok:        bool     | 1,
 	modrm_reg_ext: bool     | 1,
+	mode_32_only:  bool     | 1,
 }
 
-Encoding :: struct #packed {         // 14 bytes — one encoding form
+Encoding :: struct #packed {         // 16 bytes — one encoding form
 	mnemonic: Mnemonic,
 	ops:      [4]Operand_Type,
 	enc:      [4]Operand_Encoding,
@@ -455,33 +456,41 @@ label_defs: []Label_Definition, …)`.
 
 ---
 
-## 10. Generated tables & builders
+## 10. Tables & builders
 
-### `encoding_table.odin` (hand-written master)
+### `tablegen/encoding_table.odin` (hand-written master — the source of truth)
 
 ```odin
 ENCODING_TABLE: [Mnemonic][]Encoding = { .MOV = { …forms… }, … }
 ```
-The single source of truth. `encode()` does `ENCODING_TABLE[mnemonic]`
-(O(1)) then linear-scans the forms via `encoding_matches_inline`.
+Lives in `x86/tablegen/` (a metaprogram package), **not** in the library. A
+two-stage pipeline flattens it and serializes committed binary blobs
+(`odin run x86/tablegen` → generated Odin + `tables.odin`; then
+`odin run x86/tablegen/generated` → `tables/x86.*.bin`). See
+[table_migration.md](table_migration.md).
 
-### `decoding_tables.odin` (generated from `ENCODING_TABLE`)
+### `tables.odin` (generated — `#load`s the blobs into `@(rodata)`)
+
+The library compiles no table body; `tables.odin` `#load`s `tables/x86.*.bin`
+and defines the subsidiary types + accessors:
 
 ```odin
-ModRM_Info :: struct #packed { mod, reg, rm: u8, has_sib: bool, disp_size: u8 }
-SIB_Info   :: struct #packed { /* scale, index, base */ }
+Encode_Run       :: struct { start: u32, count: u32 }   // run into ENCODE_FORMS
+ModRM_Info       :: struct #packed { mod, reg, rm: u8, has_sib: bool, disp_size: u8 }
+SIB_Info         :: struct #packed { scale, index, base: u8 }
 Decode_Entry     :: struct { esc: Escape, prefix, opcode, ext: u8,
                              mnemonic: Mnemonic, ops: [4]Operand_Type,
                              enc: [4]Operand_Encoding, flags: Encoding_Flags }
 VEX_Decode_Entry :: struct { …Decode_Entry fields + vex_w: VEX_W, vex_l: VEX_L }
-Decode_Index     :: struct { start: u16, count: u8 }   // range into entries
+Decode_Index     :: struct { start: u16, count: u8 }    // range into entries
 
-MODRM_TABLE[256], SIB_TABLE[256]
-LEGACY_DECODE_ENTRIES[1266], VEX_DECODE_ENTRIES[667], EVEX_DECODE_ENTRIES[418]
-DECODE_INDEX_LEGACY[4][256], DECODE_INDEX_ESC_0F/_0F38/_0F3A[4][256]
-VEX_INDEX_0F/_0F38/_0F3A[4][256], EVEX_INDEX_0F/_0F38/_0F3A[4][256]
+ENCODE_FORMS: []Encoding,  ENCODE_RUNS: []Encode_Run     // encode via encoding_forms(m)
+MODRM_TABLE, SIB_TABLE,  LEGACY/VEX/EVEX_DECODE_ENTRIES (1270/667/418)
+DECODE_INDEX_* / VEX_INDEX_* / EVEX_INDEX_*  ([]Decode_Index, flat 4×256)
 ```
-`[prefix][opcode] -> Decode_Index` gives O(1) opcode resolution; the
+`encode()` does `encoding_forms(mnemonic)` (a run into `ENCODE_FORMS`) then
+linear-scans the forms via `encoding_matches_inline`. `decode()` does
+`didx(table, prefix, opcode) -> Decode_Index` for O(1) opcode resolution; the
 small `count` range is scanned for ModR/M-ext, operand-size, or VEX.W/L
 disambiguation.
 
@@ -505,26 +514,10 @@ with full type checking, no runtime dispatch.
 
 | File | Package | Role |
 |---|---|---|
-| `gen_decode_tables.odin` | `main` (`-file`) | walk `ENCODING_TABLE` → emit `decoding_tables.odin` |
-| `gen_mnemonic_builders.odin` | `main` (`-file`) | walk `ENCODING_TABLE` → emit `mnemonic_builders.odin` |
-| `verify_tables.odin` | `main`, imports `x86 "../"` | check decode tables consistent with `ENCODING_TABLE` |
+| `tablegen/gen.odin` | `main` | flatten `ENCODING_TABLE` → generated Odin → `tables/*.bin` (2-stage) |
+| `tools/gen_mnemonic_builders.odin` | `main` (`-file`) | walk the encode forms → emit `mnemonic_builders.odin` |
+| `tools/verify_tables.odin` | `main`, imports `x86 "../"` | check decode tables consistent with the encode forms |
+| `tools/dump_verify_input.odin`, `verify_against_llvm.odin` | `main` | LLVM-mc verification harness |
 
 Tests live in `x86/tests/test.odin` (`package x86_tests`, `import x86 "../"`),
 run with `odin run x86/tests`.
-
----
-
-## Known drift (pre-existing, not from the move)
-
-The working tree had uncommitted edits to `operands.odin`/`printer.odin`
-that **renamed the memory constructors** but did not update callers:
-
-- `mem_base_displacement` → `mem_base_disp`
-- `mem_base_index_displacement` → `mem_base_index_disp`
-- `mem_rip_relative` → `mem_rip_disp`
-- `mem_base` repurposed from *constructor* to *accessor*
-
-Result: the library compiles, but `tests/test.odin` (and the README
-examples) reference the old names and currently fail to type-check.
-Fixing requires either restoring the old constructor names or sweeping
-the tests/README to the new ones — a deliberate decision left to you.

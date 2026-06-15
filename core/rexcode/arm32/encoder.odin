@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_arm32
 
 // =============================================================================
@@ -115,7 +117,7 @@ encode_one_inline :: #force_inline proc(
 		return 0, 0, false
 	}
 
-	forms := ENCODING_TABLE[inst.mnemonic]
+	forms := encoding_forms(inst.mnemonic)
 	if len(forms) == 0 {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
 		return 0, 0, false

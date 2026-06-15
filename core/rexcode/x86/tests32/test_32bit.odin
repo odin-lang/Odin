@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_x86_tests32
 
 // Focused smoke tests for the i386 (Mode._32) encode/decode paths.

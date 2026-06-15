@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mos6502_tests
 
 // End-to-end MOS 6502 pipeline tests: encode -> decode -> print round-trips

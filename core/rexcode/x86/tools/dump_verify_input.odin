@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -113,7 +115,8 @@ main :: proc() {
 
 	total, dumped, skipped := 0, 0, 0
 	for mn in x.Mnemonic {
-		for entry, ei in x.ENCODING_TABLE[mn] {
+		_run := x.ENCODE_RUNS[u16(mn)]
+		for entry, ei in x.ENCODE_FORMS[_run.start:][:_run.count] {
 			total += 1
 
 			// Skip entries that need REL/MOFFS or other forms we can't easily

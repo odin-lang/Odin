@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_x86
 
 import "core:fmt"
@@ -317,29 +319,29 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 	switch esc {
 	case .NONE:
 		// For legacy instructions, 0x66 is operand size override, use prefix=0
-		idx = DECODE_INDEX_LEGACY[0][opcode]
+		idx = didx(DECODE_INDEX_LEGACY, 0, opcode)
 	case ._0F:
-		idx = DECODE_INDEX_ESC_0F[prefix][opcode]
+		idx = didx(DECODE_INDEX_ESC_0F, prefix, opcode)
 		// If not found with 66 prefix, try without (66 is operand size override)
 		if idx.count == 0 && prefix == 1 {
-			idx = DECODE_INDEX_ESC_0F[0][opcode]
+			idx = didx(DECODE_INDEX_ESC_0F, 0, opcode)
 		}
 	case ._0F38:
-		idx = DECODE_INDEX_ESC_0F38[prefix][opcode]
+		idx = didx(DECODE_INDEX_ESC_0F38, prefix, opcode)
 		if idx.count == 0 && prefix == 1 {
-			idx = DECODE_INDEX_ESC_0F38[0][opcode]
+			idx = didx(DECODE_INDEX_ESC_0F38, 0, opcode)
 		}
 	case ._0F3A:
-		idx = DECODE_INDEX_ESC_0F3A[prefix][opcode]
+		idx = didx(DECODE_INDEX_ESC_0F3A, prefix, opcode)
 		if idx.count == 0 && prefix == 1 {
-			idx = DECODE_INDEX_ESC_0F3A[0][opcode]
+			idx = didx(DECODE_INDEX_ESC_0F3A, 0, opcode)
 		}
 	}
 
 	// If not found, try +r encoding (opcode with register in low 3 bits)
 	if idx.count == 0 && esc == .NONE {
 		base_opcode := opcode & 0xF8  // Mask off low 3 bits
-		idx = DECODE_INDEX_LEGACY[prefix][base_opcode]
+		idx = didx(DECODE_INDEX_LEGACY, prefix, base_opcode)
 
 		// Check if this is actually an Op_R encoding
 		if idx.count > 0 {
@@ -523,16 +525,16 @@ decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decod
 
 	if state.vex_type == .EVEX {
 		switch esc_idx {
-		case 0: idx = EVEX_INDEX_0F[prefix][opcode]
-		case 1: idx = EVEX_INDEX_0F38[prefix][opcode]
-		case 2: idx = EVEX_INDEX_0F3A[prefix][opcode]
+		case 0: idx = didx(EVEX_INDEX_0F, prefix, opcode)
+		case 1: idx = didx(EVEX_INDEX_0F38, prefix, opcode)
+		case 2: idx = didx(EVEX_INDEX_0F3A, prefix, opcode)
 		}
 		entries = EVEX_DECODE_ENTRIES[:]
 	} else {
 		switch esc_idx {
-		case 0: idx = VEX_INDEX_0F[prefix][opcode]
-		case 1: idx = VEX_INDEX_0F38[prefix][opcode]
-		case 2: idx = VEX_INDEX_0F3A[prefix][opcode]
+		case 0: idx = didx(VEX_INDEX_0F, prefix, opcode)
+		case 1: idx = didx(VEX_INDEX_0F38, prefix, opcode)
+		case 2: idx = didx(VEX_INDEX_0F3A, prefix, opcode)
 		}
 		entries = VEX_DECODE_ENTRIES[:]
 	}

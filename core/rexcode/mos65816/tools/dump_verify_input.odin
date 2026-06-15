@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -94,7 +96,8 @@ main :: proc() {
 
 	n: int
 	for mn in m.Mnemonic {
-		for &f in m.ENCODING_TABLE[mn] {
+		_run := m.ENCODE_RUNS[u16(mn)]
+		for &f in m.ENCODE_FORMS[_run.start:][:_run.count] {
 			// --- bytes ---
 			bytes: [4]u8
 			bytes[0] = f.opcode

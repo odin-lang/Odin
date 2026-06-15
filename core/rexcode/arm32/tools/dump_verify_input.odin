@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -39,7 +41,8 @@ main :: proc() {
 	n_a32, n_t32, n_t16 := 0, 0, 0
 
 	for mn in a.Mnemonic {
-		for &f in a.ENCODING_TABLE[mn] {
+		_run := a.ENCODE_RUNS[u16(mn)]
+		for &f in a.ENCODE_FORMS[_run.start:][:_run.count] {
 			bits := fill_safe_operands(&f)
 			ilen := a.inst_size_from_bits(f.bits, f.mode)
 			if f.mode == .A32 {
