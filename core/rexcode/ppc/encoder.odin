@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc
 
 // =============================================================================
@@ -101,7 +103,7 @@ encode_one_inline :: #force_inline proc(
 	relocs:   ^[dynamic]Relocation,
 	errors:   ^[dynamic]Error,
 ) -> bool {
-	forms := ENCODING_TABLE[inst.mnemonic]
+	forms := encoding_forms(inst.mnemonic)
 	if len(forms) == 0 {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
 		return false
@@ -142,7 +144,7 @@ encode_one_inline :: #force_inline proc(
 
 	// Emit bytes. PowerPC is big-endian on the wire.
 	if form.flags.prefixed {
-		prefix := PREFIX_BITS_TABLE[inst.mnemonic]
+		prefix := PREFIX_BITS_TABLE[u16(inst.mnemonic)]
 		write_u32_be(code, pc,     prefix)
 		write_u32_be(code, pc + 4, word)
 		inst.length = 8

@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc
 
 import "../isa"
@@ -127,7 +129,7 @@ try_bucket :: proc(word, prefix: u32, prefixed: bool, mode: Mode, r: Decode_Inde
 		// the 8-bit template at bits 24..21 LSB). Only the IMM18+R fields
 		// (bits 0..18 LSB) are variable in the prefix.
 		if prefixed {
-			expected_prefix := PREFIX_BITS_TABLE[e.mnemonic]
+			expected_prefix := PREFIX_BITS_TABLE[u16(e.mnemonic)]
 			// Mask covers primary (bits 26..31) and template/R (bits 19..25).
 			// IMM18 occupies bits 0..17 — leave those free.
 			prefix_mask: u32 = 0xFFFC0000

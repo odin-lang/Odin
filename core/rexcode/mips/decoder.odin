@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mips
 
 import "../isa"
@@ -10,7 +12,7 @@ import "../isa"
 //
 //   PASS 1 - read each instruction word in the given endianness, dispatch
 //            via the generated tables (DECODE_INDEX_PRIMARY plus the five
-//            sub-tables in decoding_tables.odin), and emit one Instruction
+//            sub-tables in tables.odin), and emit one Instruction
 //            + one Instruction_Info. Branch/jump operands are emitted as
 //            RELATIVE-kind operands carrying the *absolute* target byte
 //            offset within the decoded region.

@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_x86_tests
 
 import x86 "../"
@@ -59,6 +61,8 @@ log_header :: proc(title: string) {
 
 alloc_exec :: proc(size: uint) -> []u8 {
 	data, _ := virtual.reserve_and_commit(size)
+	// reserve_and_commit maps R/W only; JIT execution needs the page executable.
+	_ = virtual.protect(raw_data(data), uint(len(data)), {.Read, .Write, .Execute})
 	return data
 }
 

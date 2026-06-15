@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_arm64_tests
 
 // Spot-check ENCODING_TABLE entries against canonical bit patterns from
@@ -15,7 +17,8 @@ import a "../"
 
 @(private="file")
 check :: proc(name: string, m: a.Mnemonic, idx: int, want_bits, want_mask: u32) {
-	encs := a.ENCODING_TABLE[m]
+	_run := a.ENCODE_RUNS[u16(m)]
+	encs := a.ENCODE_FORMS[_run.start:][:_run.count]
 	if idx >= len(encs) {
 		fmt.printfln("  [FAIL] %s: no encoding at idx %d", name, idx)
 		failures += 1

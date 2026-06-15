@@ -1,8 +1,10 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 /*
 # rexcode
 
 High-performance multi-architecture instruction encoder/decoder/printer
-library written in Odin. Developed by dotbmp/Br.
+library written in Odin. Original author: Brendan Punsky (dotbmp@github).
 
 ## Architectures
 
@@ -28,8 +30,8 @@ Every package follows the same API contract (see `docs/cross_arch_design.md`).
 - **Decoder**: disassembles machine code back to structured instructions.
 - **Printer**: emits assembly text output with optional syntax-highlighting
   tokens.
-- **Table-driven**: O(1) opcode lookup via precomputed encoding/decoding
-  tables.
+- **Table-driven**: O(1) opcode lookup via precomputed encode/decode tables,
+  serialized to committed binary blobs and `#load`ed into `@(rodata)`.
 - **Zero allocations** on the hot path: caller provides all buffers.
 
 The `isa/` package owns the parts that are the same on every ISA — labels,
@@ -37,6 +39,20 @@ result/error types, the print framework, token types, and shared
 formatting helpers. Each architecture package owns its registers, memory
 model, operand types, mnemonics, encoding tables, and the actual
 `encode_one`/`decode_one` bytes.
+
+## Encoding tables
+
+Each arch's `ENCODING_TABLE` (the hand-written single source of truth) lives in
+`<arch>/tablegen/`, not in the library. A two-stage metaprogram flattens it and
+emits committed binary blobs that the library `#load`s into `@(rodata)` at
+compile time — no table is built during a normal library build:
+
+```sh
+odin run <arch>/tablegen            # ENCODING_TABLE -> generated Odin + <arch>/tables.odin
+odin run <arch>/tablegen/generated  # -> <arch>/tables/<arch>.*.bin
+```
+
+Regenerate after editing `ENCODING_TABLE`. See `docs/table_migration.md`.
 
 ## Performance (x86)
 
@@ -133,6 +149,31 @@ for name, id in lm.names { id_to_name[id] = name }
 x86.print(decoded_insts[:], decoded_info[:], lm.labels[:], label_names = &id_to_name)
 ```
 
+## Driver script (`build.lua`)
+
+`build.lua` (LuaJIT) drives the pre-build metaprograms, validations, and tests
+across every ISA, with cross-platform gating (Linux / macOS / Windows) and a
+clear report. With no flags it prints help, including what's available on the
+current platform.
+
+```sh
+luajit build.lua                 # help + platform availability
+luajit build.lua all             # everything: generate -> validate -> test, all ISAs
+luajit build.lua --gen --isa x86 # only regenerate one ISA's tables
+luajit build.lua --check --test  # validate + test the committed tables
+luajit build.lua --verify        # external-tool round-trip where the tool is installed
+luajit build.lua --list          # ISA x task availability matrix for this platform
+```
+
+Tasks: `--gen` (table metaprograms), `--check` (compile + structural invariants),
+`--test` (run the suites), `--verify` (round-trip vs `llvm-mc`/`da65`/`ca65`/
+`armips`/…), `--idempotent` (re-gen and confirm byte-stable). Scope with
+`--isa <list>`. It uses the in-repo `./odin` — build that first.
+
+> Gating: x86's `--test` JIT-executes x86-64 code, so it runs only on an x86-64
+> host; `--verify` needs the matching tool in PATH (retro ISAs use shell scripts,
+> skipped on Windows). Anything unavailable is skipped with a note, never fatal.
+
 ## Running Tests
 
 Each package has its own test suite:
@@ -187,12 +228,13 @@ Per-package layout (canonical, enforced by the cross-arch contract):
 	operands.odin        # Operand, Memory, Operand_Kind, op_* constructors
 	instructions.odin    # Instruction, inst_* builders
 	encoding_types.odin  # Encoding, Encoding_Flags, isa re-exports
-	encoding_table.odin  # ENCODING_TABLE: [Mnemonic][]Encoding
-	decoding_tables.odin # generated dispatch tables
+	tables.odin          # generated: #load()s the binary tables into @(rodata) + accessors
+	tables/              # committed binary blobs (<arch>.*.bin) the library #loads
 	mnemonics.odin       # Mnemonic enum (u16, INVALID=0)
 	reloc.odin           # Relocation_Type + Relocation
+	tablegen/            # ENCODING_TABLE (source of truth) + gen.odin metaprogram
 	tests/               # smoke, pipeline_smoke, sweep
-	tools/               # gen_decode_tables, dump_verify_input, verify_against_*
+	tools/               # dump_verify_input, verify_against_*
 ```
 
 ## Cross-architecture API design

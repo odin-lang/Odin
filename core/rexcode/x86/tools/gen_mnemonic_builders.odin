@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -41,6 +43,8 @@ Proc_Entry :: struct {
 	proc_name: string,
 }
 
+GEN_ATTRIB :: "// rexcode  ·  Brendan Punsky (dotbmp@github), original author\n\n"
+
 main :: proc() {
 	fmt.println("Generating mnemonic builders from ENCODING_TABLE...")
 
@@ -65,7 +69,8 @@ main :: proc() {
 	for mnemonic in x86.Mnemonic {
 		if mnemonic == .INVALID { continue }
 
-		encodings := x86.ENCODING_TABLE[mnemonic]
+		_run := x86.ENCODE_RUNS[u16(mnemonic)]
+		encodings := x86.ENCODE_FORMS[_run.start:][:_run.count]
 		if len(encodings) == 0 { continue }
 
 		for enc in encodings {
@@ -197,7 +202,7 @@ main :: proc() {
 
 	output := strings.to_string(sb)
 
-	err := os.write_entire_file("mnemonic_builders.odin", transmute([]u8)output)
+	err := os.write_entire_file("mnemonic_builders.odin", transmute([]u8)strings.concatenate({GEN_ATTRIB, output}))
 	if err == nil {
 		fmt.println("Generated mnemonic_builders.odin successfully!")
 		fmt.printf("Total mnemonics with builders: %d\n", len(mnemonic_list))

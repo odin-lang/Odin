@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -29,7 +31,8 @@ main :: proc() {
 
 	count := 0
 	for mn in r.Mnemonic {
-		for f in r.ENCODING_TABLE[mn] {
+		_run := r.ENCODE_RUNS[u16(mn)]
+		for f in r.ENCODE_FORMS[_run.start:][:_run.count] {
 			size := r.inst_size_from_bits(f.bits)
 			b0 := u8( f.bits        & 0xFF)
 			b1 := u8((f.bits >>  8) & 0xFF)
@@ -41,7 +44,7 @@ main :: proc() {
 				fmt.sbprintf(&hex_buf, "0x%02x,0x%02x,0x%02x,0x%02x\n", b0, b1, b2, b3)
 			}
 			fmt.sbprintf(&meta_buf, "%v\t%08x\t%08x\t%v\t%d\n",
-						 mn, f.bits, f.mask, f.ext, size)
+						 mn, f.bits, f.mask, f.feature, size)
 			count += 1
 		}
 	}

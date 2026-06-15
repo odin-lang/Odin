@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_arm32_tests
 
 import "core:fmt"
@@ -41,7 +43,8 @@ run_sweep_tests :: proc() {
 	only_print_kind: string = ""
 
 	for mn in a.Mnemonic {
-		forms := a.ENCODING_TABLE[mn]
+		_run := a.ENCODE_RUNS[u16(mn)]
+		forms := a.ENCODE_FORMS[_run.start:][:_run.count]
 		for &f, idx in forms {
 			ilen := a.inst_size_from_bits(f.bits, f.mode)
 

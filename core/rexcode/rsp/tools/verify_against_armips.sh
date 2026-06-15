@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 # =============================================================================
 # N64 RSP verification harness — assembles via `armips`, compares bytes
 # =============================================================================

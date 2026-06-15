@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_riscv_tests
 
 // Spot-check ENCODING_TABLE entries against the canonical bit/mask
@@ -15,7 +17,8 @@ import rv "../"
 
 @(private="file")
 check :: proc(name: string, m: rv.Mnemonic, want_bits, want_mask: u32) {
-	encs := rv.ENCODING_TABLE[m]
+	_run := rv.ENCODE_RUNS[u16(m)]
+	encs := rv.ENCODE_FORMS[_run.start:][:_run.count]
 	if len(encs) == 0 {
 		fmt.printfln("  [FAIL] %s: no encoding", name)
 		failures += 1

@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package main
 
 // =============================================================================
@@ -30,7 +32,8 @@ main :: proc() {
 
 	n: int
 	for mn in m.Mnemonic {
-		for &f in m.ENCODING_TABLE[mn] {
+		_run := m.ENCODE_RUNS[u16(mn)]
+		for &f in m.ENCODE_FORMS[_run.start:][:_run.count] {
 			bytes: [7]u8
 			bytes[0] = f.opcode
 			// Safe-fill the operand bytes: byte1 = 0x42, byte2 = 0x12 (page 0x12, offset 0x42)

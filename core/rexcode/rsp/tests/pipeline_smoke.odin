@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_rsp_tests
 
 // End-to-end RSP pipeline tests: encode -> decode -> print round-trips

@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_riscv_tests
 
 // End-to-end RISC-V pipeline tests: encode -> decode -> print across

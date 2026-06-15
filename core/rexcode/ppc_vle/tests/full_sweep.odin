@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc_vle_tests
 
 import "core:fmt"
@@ -11,7 +13,9 @@ run_full_sweep :: proc() {
     fmt.println("==== ppc_vle full sweep ====")
 
     for mn in v.Mnemonic {
-        for &f, fi in v.ENCODING_TABLE[mn] {
+        _run := v.ENCODE_RUNS[u16(mn)]
+        forms := v.ENCODE_FORMS[_run.start:][:_run.count]
+        for &f, fi in forms {
             test_one(mn, fi, &f)
         }
     }

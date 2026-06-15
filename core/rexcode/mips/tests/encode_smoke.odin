@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_mips_tests
 
 // Encoder smoke tests. Exercises encode() end-to-end across all the

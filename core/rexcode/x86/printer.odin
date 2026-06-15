@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_x86
 
 // =============================================================================
@@ -306,7 +308,9 @@ sbprint :: proc(
 			if label_def != LABEL_UNDEFINED && u32(label_def) == info.offset {
 				// Print label definition
 				start := strings.builder_len(sb^)
-				if name, ok := label_names^[u32(label_id)]; ok {
+				name: string; ok: bool
+			if label_names != nil { name, ok = label_names^[u32(label_id)] }
+			if ok {
 					strings.write_string(sb, name)
 				} else {
 					strings.write_string(sb, options.label_prefix)
@@ -397,7 +401,9 @@ sbprint :: proc(
 
 				if found_label_valid {
 					start := strings.builder_len(sb^)
-					if name, ok := label_names^[found_label]; ok {
+					name: string; ok: bool
+					if label_names != nil { name, ok = label_names^[found_label] }
+					if ok {
 						strings.write_string(sb, name)
 					} else {
 						strings.write_string(sb, options.label_prefix)

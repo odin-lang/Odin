@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc_vle_tests
 
 import "core:fmt"
@@ -8,7 +10,8 @@ ok_count, fail_count: int
 
 @(private="file")
 check :: proc(name: string, mn: v.Mnemonic, idx: int, want_bits, want_mask: u32) {
-	enc := v.ENCODING_TABLE[mn]
+	_run := v.ENCODE_RUNS[u16(mn)]
+	enc := v.ENCODE_FORMS[_run.start:][:_run.count]
 	if idx >= len(enc) {
 		fmt.printf("  [FAIL] %s: no entry (have %d)\n", name, len(enc))
 		fail_count += 1
@@ -40,7 +43,10 @@ run_smoke :: proc() {
 
 	// Total count
 	total := 0
-	for mn in v.Mnemonic { total += len(v.ENCODING_TABLE[mn]) }
+	for mn in v.Mnemonic {
+		_run := v.ENCODE_RUNS[u16(mn)]
+		total += int(_run.count)
+	}
 	fmt.printf("\n[TOTAL entries] %d\n", total)
 	fmt.printf("==> ppc_vle: %d passed, %d failed\n", ok_count, fail_count)
 	if fail_count > 0 { os.exit(1) }

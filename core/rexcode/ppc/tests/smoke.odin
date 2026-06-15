@@ -1,3 +1,5 @@
+// rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 package rexcode_ppc_tests
 
 import "core:fmt"
@@ -8,7 +10,8 @@ ok_count, fail_count: int
 
 @(private="file")
 check :: proc(name: string, mn: p.Mnemonic, idx: int, want_bits, want_mask: u32) {
-	enc := p.ENCODING_TABLE[mn]
+	_run := p.ENCODE_RUNS[u16(mn)]
+	enc := p.ENCODE_FORMS[_run.start:][:_run.count]
 	if idx >= len(enc) {
 		fmt.printf("  [FAIL] %s: entry %d not present (have %d)\n", name, idx, len(enc))
 		fail_count += 1

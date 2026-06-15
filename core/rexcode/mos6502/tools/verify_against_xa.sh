@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# rexcode  ·  Brendan Punsky (dotbmp@github), original author
+
 # =============================================================================
 # MOS 6502 verification harness — disassembles via `da65` (cc65)
 # =============================================================================
