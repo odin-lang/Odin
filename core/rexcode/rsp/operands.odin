@@ -46,7 +46,6 @@ vmem :: #force_inline proc "contextless" (base: Register, element: u8, offset: i
 	return Vector_Mem{base = base, element = element, offset = offset}
 }
 
-// Operand: 16-byte tagged union.
 Operand :: struct #packed {
 	using _: struct #raw_union {
 		reg:        Register,    // for REGISTER and VECTOR_REG
@@ -58,9 +57,9 @@ Operand :: struct #packed {
 	kind:    Operand_Kind,        // 1 byte
 	size:    u8,                  // 1 byte
 	element: u8,                  // 1 byte — for VECTOR_REG
-	_:       [5]u8,
+	_:       [1]u8,
 }
-#assert(size_of(Operand) == 16)
+#assert(size_of(Operand) == 12)
 
 @(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
