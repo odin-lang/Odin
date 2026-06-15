@@ -1023,16 +1023,28 @@ gb_internal void lb_copy_bits(lbProcedure *p,
 	} else {
 		// a = intrinsics.unaligned_load((^u64)(&src[src_byte]))
 		a = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte), t_u64_ptr);
-		// b = intrinsics.unaligned_load((^u64)(&src[src_byte + 8]))
-		b = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte + 8), t_u64_ptr);
+		if (src_need_bytes > 8) {
+			// b = intrinsics.unaligned_load((^u64)(&src[src_byte + 8]))
+			b = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte + 8), t_u64_ptr);
+		}
 	}
 
-	// bits := (a >> src_shift) | (b << (64 - src_shift))
+	LLVMValueRef hi;
+	if (src_shift == 0) {
+		hi = LLVMConstInt(llvm_u64, 0, false);
+	} else {
+		hi = LLVMBuildShl(p->builder, b, LLVMConstInt(llvm_u64, 64 - src_shift, false), "");
+	}
 	LLVMValueRef bits = LLVMBuildOr(p->builder,
-		LLVMBuildLShr(p->builder, a, LLVMConstInt(llvm_u64, src_shift,      false), ""),
-		LLVMBuildShl (p->builder, b, LLVMConstInt(llvm_u64, 64 - src_shift, false), ""),
-		""
-	);
+	                                LLVMBuildLShr(p->builder, a, LLVMConstInt(llvm_u64, src_shift, false), ""),
+	                                hi, "");
+
+	// // bits := (a >> src_shift) | (b << (64 - src_shift))
+	// LLVMValueRef bits = LLVMBuildOr(p->builder,
+	// 	LLVMBuildLShr(p->builder, a, LLVMConstInt(llvm_u64, src_shift,      false), ""),
+	// 	LLVMBuildShl (p->builder, b, LLVMConstInt(llvm_u64, 64 - src_shift, false), ""),
+	// 	""
+	// );
 	u64 mask = ~cast(u64)0;
 	if (size_bits < 64) {
 		mask = ((cast(u64)1)<<size_bits)-1;
