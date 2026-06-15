@@ -5030,9 +5030,15 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
-		if (nested_level > 0) {
-			return nested_level;
+		// Only follow the chain transitively when the field also has `using`, which is
+		// what the backend's lookup_subtype_polymorphic_selection requires (it gates
+		// recursion on EntityFlag_Using). A plain `#subtype`-only field enables a
+		// single-hop conversion but not a two-or-more hop transitive one.
+		if (f->flags & EntityFlag_Using) {
+			isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
+			if (nested_level > 0) {
+				return nested_level;
+			}
 		}
 	}
 
