@@ -529,7 +529,7 @@ run_test :: proc(t: Test) -> bool {
 	// =========================================================================
 
 	if len(code_to_decode) > 0 {
-		byte_count, ok := x86.decode(
+		_, ok := x86.decode(
 			code_to_decode,
 			nil,
 			&decoded_insts,
