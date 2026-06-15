@@ -90,9 +90,8 @@ Operand :: struct #packed {
 	},
 	kind: Operand_Kind,
 	size: u8,
-	_:    [6]u8,
 }
-#assert(size_of(Operand) == 16)
+#assert(size_of(Operand) == 10)
 
 @(require_results) op_reg    :: #force_inline proc "contextless" (r: Register) -> Operand { return Operand{reg = r, kind = .REGISTER, size = 1} }
 @(require_results) op_imm8   :: #force_inline proc "contextless" (v: i64)      -> Operand { return Operand{immediate = v, kind = .IMMEDIATE, size = 1} }

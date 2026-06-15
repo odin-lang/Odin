@@ -11,14 +11,14 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [2]Operand `fmt:"v,operand_count"`, // 32 bytes (only MVN/MVP use 2; rest use 0 or 1)
+	ops:           [2]Operand `fmt:"v,operand_count"`, // 20 bytes (only MVN/MVP use 2; rest use 0 or 1)
 	mnemonic:      Mnemonic,                           // 2
 	operand_count: u8,                                 // 1
 	flags:         Instruction_Flags,                  // 1
 	length:        u8,                                 // 1
-	_:             [3]u8,                              // 3
+	_:             [7]u8,                              // 3
 }
-#assert(size_of(Instruction) == 40)
+#assert(size_of(Instruction) == 32)
 
 @(require_results)
 inst_none :: #force_inline proc "contextless" (m: Mnemonic) -> Instruction {
