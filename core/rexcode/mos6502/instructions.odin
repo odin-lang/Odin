@@ -14,14 +14,14 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [3]Operand `fmt:"v,operand_count"`, // 48 bytes
+	ops:           [3]Operand `fmt:"v,operand_count"`, // 30 bytes
 	mnemonic:      Mnemonic,                           // 2
 	operand_count: u8,                                 // 1
 	flags:         Instruction_Flags,                  // 1
 	length:        u8,                                 // 1 (filled by decoder; 1..7)
-	_:             [3]u8,                              // 3
+	_:             [1]u8,                              // 1
 }
-#assert(size_of(Instruction) == 56)
+#assert(size_of(Instruction) == 36)
 
 // =============================================================================
 // Builders (mirror the contract: shape spelled out, comma-separated)

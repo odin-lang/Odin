@@ -83,9 +83,8 @@ Operand :: struct #packed {
 	},
 	kind: Operand_Kind,         // 1
 	size: u8,                   // 1
-	_:    [6]u8,                // 6
 }
-#assert(size_of(Operand) == 16)
+#assert(size_of(Operand) == 10)
 
 // Generic constructors -------------------------------------------------------
 
