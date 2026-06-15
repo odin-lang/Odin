@@ -12,17 +12,19 @@
    luajit build.lua                       # no flags -> this help screen
    luajit build.lua all                   # do everything (gen + check + test), all ISAs
    luajit build.lua --gen --isa x86       # only (re)generate x86's tables
+   luajit build.lua --builders --isa arm64  # only regenerate arm64's mnemonic builders
    luajit build.lua --check --test        # validate + test all ISAs (using committed blobs)
    luajit build.lua --verify --isa mips   # external-tool verification where available
    luajit build.lua --list                # ISA x task availability for THIS platform
 
  TASKS
    --gen         run the two metaprograms: ENCODING_TABLE -> generated Odin -> tables/*.bin
+   --builders    regenerate each ISA's typed mnemonic builders (mnemonic_builders.odin)
    --check       `odin check` (compiles against the #loaded blobs) + structural invariants
    --test        run each ISA's test suite
    --verify      round-trip against an external assembler/disassembler (llvm-mc, da65, ...)
-   --idempotent  re-run --gen and confirm the generated files + blobs are byte-stable
-   all           shorthand for `--gen --check --test`
+   --idempotent  re-run --gen + --builders and confirm all generated files are byte-stable
+   all           shorthand for `--gen --builders --check --test`
 
  OPTIONS
    --isa <list>  comma/space-separated ISAs (default: all). e.g. --isa x86,arm64
@@ -148,8 +150,9 @@ local function parse_args(argv)
     local a = argv[i]
     if     a == "-h" or a == "--help" then o.help = true
     elseif a == "--list"        then o.list = true
-    elseif a == "all" or a == "--all" then o.tasks.gen=true; o.tasks.check=true; o.tasks.test=true
+    elseif a == "all" or a == "--all" then o.tasks.gen=true; o.tasks.builders=true; o.tasks.check=true; o.tasks.test=true
     elseif a == "--gen" or a == "--generate" then o.tasks.gen = true
+    elseif a == "--builders" or a == "--mnemonics" then o.tasks.builders = true
     elseif a == "--check" or a == "--validate" then o.tasks.check = true
     elseif a == "--test"        then o.tasks.test = true
     elseif a == "--verify"      then o.tasks.verify = true
@@ -212,6 +215,7 @@ local function structural(isa)
   must("tables.odin"); must("tablegen/encoding_table.odin"); must("tablegen/gen.odin")
   must("tablegen/generated/encode_tables.odin"); must("tablegen/generated/decode_tables.odin")
   must("tablegen/generated/writer.odin")
+  must("mnemonic_builders.odin"); must("tools/gen_mnemonic_builders.odin")
   absent("encoding_table.odin"); absent("decoding_tables.odin"); absent("tools/gen_decode_tables.odin")
   if #bad == 0 then return true end
   return false, table.concat(bad, "; ")
@@ -227,6 +231,7 @@ end
 
 local function gen_files(isa)
   local t = { pkg(isa).."/tables.odin",
+              pkg(isa).."/mnemonic_builders.odin",
               pkg(isa).."/tablegen/generated/encode_tables.odin",
               pkg(isa).."/tablegen/generated/decode_tables.odin" }
   for _, b in ipairs(blob_paths(isa)) do t[#t+1] = b end
@@ -240,6 +245,25 @@ local function do_gen(isa)
   if not okB then return false, "Stage B failed:\n"..outB end
   -- counts line from Stage A (e.g. "x86 tablegen: 2355 encode forms, ...")
   return true, (outA:match("tablegen:%s*(.-)\n") or ""):gsub("%s+$","")
+end
+
+-- regenerate the typed mnemonic builders (mnemonic_builders.odin). The generator
+-- anchors its output via #directory, so it runs correctly from any CWD.
+local function do_builders(isa)
+  local gen = pkg(isa, "tools/gen_mnemonic_builders.odin")
+  if not file_exists(gen) then return false, "missing tools/gen_mnemonic_builders.odin" end
+  local ok, out = run(q(ODIN).." run "..q(gen).." -file -out:"..q(OUT))
+  if not ok then return false, "generator failed:\n"..out:sub(-400) end
+  if not file_exists(pkg(isa).."/mnemonic_builders.odin") then
+    return false, "generator ran but produced no mnemonic_builders.odin"
+  end
+  local n = out:match("procedures generated:%s*(%d+)")
+        or out:match("[Bb]uilder procedures:%s*(%d+)")
+        or out:match("inst_/emit_ pairs:%s*(%d+)")
+        or out:match("[Pp]rocedures generated:%s*(%d+)")
+        or out:match("inst_ procedures:%s*(%d+)")
+        or out:match("total builder procs:%s*(%d+)")
+  return true, (n and (n.." builders") or "regenerated")
 end
 
 local function do_check(isa)
@@ -281,6 +305,8 @@ local function do_idempotent(isa)
   for _, f in ipairs(files) do before[f] = read_file(f) end
   local ok, why = do_gen(isa)
   if not ok then return false, "re-gen failed: "..why end
+  local okb, whyb = do_builders(isa)
+  if not okb then return false, "re-gen builders failed: "..whyb end
   local changed = {}
   for _, f in ipairs(files) do
     if read_file(f) ~= before[f] then changed[#changed+1] = f:match("[^/]+$") end
@@ -289,9 +315,9 @@ local function do_idempotent(isa)
   return false, "changed on re-gen: "..table.concat(changed, ", ")
 end
 
-local TASK_FN = { gen=do_gen, check=do_check, test=do_test, verify=do_verify, idempotent=do_idempotent }
-local TASK_ORDER = { "gen", "check", "test", "verify", "idempotent" }
-local TASK_LABEL = { gen="generate", check="validate", test="test", verify="verify", idempotent="idempotent" }
+local TASK_FN = { gen=do_gen, builders=do_builders, check=do_check, test=do_test, verify=do_verify, idempotent=do_idempotent }
+local TASK_ORDER = { "gen", "builders", "check", "test", "verify", "idempotent" }
+local TASK_LABEL = { gen="generate", builders="builders", check="validate", test="test", verify="verify", idempotent="idempotent" }
 
 -- ----------------------------------------------------------------------------
 -- help / list
@@ -309,19 +335,20 @@ local function print_help(ctx)
   print()
   print(bold("USAGE"))
   print("  luajit build.lua                 " .. dim("# no flags -> this help"))
-  print("  luajit build.lua all             " .. dim("# everything (gen + check + test), all ISAs"))
+  print("  luajit build.lua all             " .. dim("# everything (gen + builders + check + test)"))
   print("  luajit build.lua --gen --isa x86 " .. dim("# only regenerate x86's tables"))
   print("  luajit build.lua --check --test  " .. dim("# validate + test (using committed blobs)"))
   print("  luajit build.lua --list          " .. dim("# availability matrix for this platform"))
   print()
   print(bold("TASKS") .. dim("  (availability on " .. OS .. "/" .. ARCH .. ")"))
   print("  --gen          metaprograms: ENCODING_TABLE -> generated Odin -> tables/*.bin   " .. green("all ISAs"))
+  print("  --builders     regenerate typed mnemonic builders (mnemonic_builders.odin)      " .. green("all ISAs"))
   print("  --check        odin check (compiles vs #loaded blobs) + structural invariants   " .. green("all ISAs"))
   local tnote = HOST_X64 and green("all ISAs") or yellow("x86 skipped (needs x86-64 host)")
   print("  --test         run each ISA's test suite                                        " .. tnote)
   print("  --verify       round-trip vs external assembler/disassembler                    " .. yellow("per-tool (see --list)"))
   print("  --idempotent   re-run --gen and confirm byte-stable output                      " .. green("all ISAs"))
-  print("  all            = --gen --check --test")
+  print("  all            = --gen --builders --check --test")
   print()
   print(bold("OPTIONS"))
   print("  --isa <list>   comma/space ISAs (default: all): " .. dim("x86 arm32 arm64 mips riscv ppc ppc_vle rsp mos6502 mos65816"))
