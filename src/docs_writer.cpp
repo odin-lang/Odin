@@ -943,7 +943,10 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 			} else if (e->Constant.param_value.original_ast_expr) {
 				init_string = odin_doc_expr_string(w, e->Constant.param_value.original_ast_expr);
 			} else {
-				init_string = odin_doc_write_string(w, make_string_c(exact_value_to_string(e->Constant.value)));
+				gbString s = exact_value_to_string(e->Constant.value);
+				String str = string_intern_string(make_string(cast(u8 *)s, gb_string_length(s)));
+				gb_string_free(s);
+				init_string = odin_doc_write_string(w, str);
 			}
 		} else if (e->kind == Entity_Variable) {
 			if (e->Variable.param_value.original_ast_expr) {
