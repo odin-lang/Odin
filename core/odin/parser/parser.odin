@@ -2812,11 +2812,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		}
 		p.expr_level = prev_level
 
-		if is_raw_union && is_packed {
-			is_packed = false
-			error(p, tok.pos, "'#raw_union' cannot also be '#packed")
-		}
-
 		if is_raw_union && is_all_or_none {
 			is_all_or_none = false
 			error(p, tok.pos, "'#raw_union' cannot also be '#all_or_none")
