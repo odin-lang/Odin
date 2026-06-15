@@ -25,37 +25,36 @@ decode :: proc(
 	inst_info:    ^[dynamic]Instruction_Info,
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data)) & ~u32(1)
 	errors_start := u32(len(errors))
 
 	pending_branches: [dynamic]isa.Branch_Target
 	defer delete(pending_branches)
 
-	pc: u32 = 0
-	for pc < n_bytes {
-		if pc + 2 > n_bytes { break }
-		hw := u32(read_u16_be(data, pc))
+	for byte_count < n_bytes {
+		if byte_count + 2 > n_bytes { break }
+		hw := u32(read_u16_be(data, byte_count))
 
 		inst: Instruction
 		info: Instruction_Info
-		info.offset = pc
+		info.offset = byte_count
 
 		matched := try_decode(hw, true, &inst, &info)
 		ilen: u32 = 2
 
 		if !matched {
-			if pc + 4 > n_bytes {
-				append(errors, Error{inst_idx = pc, code = .BUFFER_TOO_SHORT})
+			if byte_count + 4 > n_bytes {
+				append(errors, Error{inst_idx = byte_count, code = .BUFFER_TOO_SHORT})
 				break
 			}
-			word := (hw << 16) | u32(read_u16_be(data, pc + 2))
+			word := (hw << 16) | u32(read_u16_be(data, byte_count + 2))
 			matched = try_decode(word, false, &inst, &info)
 			ilen = 4
 		}
 
 		if !matched {
-			append(errors, Error{inst_idx = pc, code = .INVALID_OPCODE})
+			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = 2, mode = .PPC32_VLE}
 			ilen = 2
 		} else {
@@ -70,7 +69,7 @@ decode :: proc(
 					append(&pending_branches, isa.Branch_Target{
 						inst_idx = inst_idx,
 						op_idx   = slot,
-						target   = u32(i32(pc) + i32(op.relative)),
+						target   = u32(i32(byte_count) + i32(op.relative)),
 					})
 				}
 			}
@@ -78,11 +77,12 @@ decode :: proc(
 
 		append(instructions, inst)
 		append(inst_info,    info)
-		pc += ilen
+		byte_count += ilen
 	}
 
-	isa.infer_labels_from_branches(pending_branches[:], pc, label_defs, relocs)
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 @(private="file")

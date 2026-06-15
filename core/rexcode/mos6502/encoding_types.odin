@@ -27,7 +27,6 @@ import "../isa"
 // 65C816 (SNES, Apple IIgs) is a separate 16/24-bit ISA and lives in a
 // sibling subpackage if/when added.
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

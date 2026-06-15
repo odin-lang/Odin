@@ -44,23 +44,22 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	cpu:          CPU = .NMOS,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data))
 	errors_start := u32(len(errors))
 
 	pending_branches: [dynamic]isa.Branch_Target
 	defer delete(pending_branches)
 
-	pc: u32 = 0
-	for pc < n_bytes {
+	for byte_count < n_bytes {
 		inst: Instruction
 		info: Instruction_Info
-		entry_idx, consumed := decode_one_inline(data, pc, n_bytes, cpu, &inst, &info)
+		entry_idx, consumed := decode_one_inline(data, byte_count, n_bytes, cpu, &inst, &info)
 
 		if entry_idx < 0 {
-			append(errors, Error{inst_idx = pc, code = .INVALID_OPCODE})
+			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = 1}
-			info = Instruction_Info{offset = pc}
+			info = Instruction_Info{offset = byte_count}
 			consumed = 1
 		} else {
 			inst_idx_for_branches := u32(len(instructions))
@@ -78,11 +77,12 @@ decode :: proc(
 
 		append(instructions, inst)
 		append(inst_info,    info)
-		pc += consumed
+		byte_count += consumed
 	}
 
-	isa.infer_labels_from_branches(pending_branches[:], pc, label_defs, relocs)
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

@@ -1016,21 +1016,20 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	mode:         Mode = ._64,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	if mode == ._16 {
 		// Real-mode decoding is not implemented; the ModRM addressing
 		// model differs from protected/long mode and needs a separate
 		// decode path. See Mode enum comment in encoding_types.odin.
 		fmt.panicf("x64.decode: Mode._16 (real mode) is not yet supported")
 	}
+	ok = true
 
 	if len(data) == 0 {
-		return Result{success = true}
+		return
 	}
 
-	data_length := len(data)
-	pos  := 0
-	has_errors := false
+	data_length := u32(len(data))
 
 	// Track branch targets for label inference (resolved in pass 2 by isa).
 	pending_branches: [dynamic]isa.Branch_Target
@@ -1040,26 +1039,26 @@ decode :: proc(
 	// PASS 1: Decode all instructions, collect branch targets
 	// =========================================================================
 
-	for pos < data_length {
+	for byte_count < data_length {
 		inst: Instruction
 		info: Instruction_Info
 
 		// Record offset
-		info.offset = u32(pos)
+		info.offset = byte_count
 
 		// Initialize decoder state
 		state := Decoder_State{
-			data = data[pos:],
+			data     = data[byte_count:],
 			position = 0,
-			mode = mode,
-			segment = NONE,
+			mode     = mode,
+			segment  = NONE,
 		}
 
 		// Phase 1: Parse prefixes
 		err := decode_prefixes(&state)
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
-			has_errors = true
+			ok = false
 			break
 		}
 
@@ -1092,7 +1091,7 @@ decode :: proc(
 
 				append(instructions, inst)
 				append(inst_info, info)
-				pos += state.position
+				byte_count += u32(state.position)
 				continue
 			}
 		}
@@ -1103,7 +1102,7 @@ decode :: proc(
 		entry, vex_entry, err = decode_opcode(&state)
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
-			has_errors = true
+			ok = false
 			break
 		}
 
@@ -1114,12 +1113,12 @@ decode :: proc(
 			inst, err = decode_operands(&state, entry)
 		} else {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = .INVALID_OPCODE})
-			has_errors = true
+			ok = false
 			break
 		}
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
-			has_errors = true
+			ok = false
 			break
 		}
 
@@ -1164,7 +1163,7 @@ decode :: proc(
 		}
 
 		// Check for relative operands and record pending branch targets
-		inst_end := pos + state.position
+		inst_end := byte_count + u32(state.position)
 		for op_idx in 0..<inst.operand_count {
 			op := &inst.ops[op_idx]
 			if op.kind == .RELATIVE {
@@ -1183,17 +1182,14 @@ decode :: proc(
 		append(instructions, inst)
 		append(inst_info, info)
 
-		pos += state.position
+		byte_count += u32(state.position)
 	}
 
 	// =========================================================================
 	// PASS 2: Infer labels from branch targets within the decoded region
 	// =========================================================================
 
-	isa.infer_labels_from_branches(pending_branches[:], u32(pos), label_defs, relocs)
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
 
-	return Result{
-		byte_count = u32(pos),
-		success    = !has_errors,
-	}
+	return
 }

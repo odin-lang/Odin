@@ -21,14 +21,14 @@ check_bytes :: proc(name: string, inst: a.Instruction, want: []u8) {
 	errors: [dynamic]a.Error
 	defer { delete(label_defs); delete(code); delete(relocs); delete(errors) }
 
-	res := a.encode(insts, label_defs[:], code, &relocs, &errors)
-	if !res.success {
+	byte_count, success := a.encode(insts, label_defs[:], code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] %s: encode failed (errors=%d)\n", name, len(errors))
 		fail += 1
 		return
 	}
-	if int(res.byte_count) != len(want) {
-		fmt.printf("  [FAIL] %s: got %d bytes, want %d\n", name, res.byte_count, len(want))
+	if int(byte_count) != len(want) {
+		fmt.printf("  [FAIL] %s: got %d bytes, want %d\n", name, byte_count, len(want))
 		fail += 1
 		return
 	}
@@ -55,9 +55,9 @@ check_decode :: proc(name: string, bytes: []u8, want_mn: a.Mnemonic, mode: a.Mod
 	labels: [dynamic]a.Label_Definition
 	errors: [dynamic]a.Error
 	defer { delete(insts); delete(info); delete(labels); delete(errors) }
-	res := a.decode(bytes, relocs, &insts, &info, &labels, &errors, mode)
-	if !res.success || len(insts) == 0 {
-		fmt.printf("  [FAIL] decode %s: success=%v len=%d\n", name, res.success, len(insts))
+	byte_count, success := a.decode(bytes, relocs, &insts, &info, &labels, &errors, mode)
+	if !success || len(insts) == 0 {
+		fmt.printf("  [FAIL] decode %s: success=%v len=%d\n", name, success, len(insts))
 		fail += 1
 		return
 	}
@@ -160,8 +160,8 @@ check_roundtrip :: proc(name: string, inst: a.Instruction) {
 	errors: [dynamic]a.Error
 	defer { delete(label_defs); delete(code); delete(relocs); delete(errors) }
 
-	res := a.encode(insts, label_defs[:], code, &relocs, &errors)
-	if !res.success {
+	byte_count, success := a.encode(insts, label_defs[:], code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] roundtrip %s: encode failed\n", name)
 		fail += 1
 		return
@@ -174,8 +174,8 @@ check_roundtrip :: proc(name: string, inst: a.Instruction) {
 	dec_err: [dynamic]a.Error
 	defer { delete(decoded); delete(info); delete(labels); delete(dec_err) }
 
-	dec_res := a.decode(code[:res.byte_count], dec_relocs, &decoded, &info, &labels, &dec_err, inst.mode)
-	if !dec_res.success || len(decoded) == 0 {
+	dec_byte_count, dec_success := a.decode(code[:byte_count], dec_relocs, &decoded, &info, &labels, &dec_err, inst.mode)
+	if !dec_success || len(decoded) == 0 {
 		fmt.printf("  [FAIL] roundtrip %s: decode failed\n", name)
 		fail += 1
 		return

@@ -17,14 +17,14 @@ check :: proc(name: string, instructions: []v.Instruction, label_defs: []isa.Lab
 	errors: [dynamic]v.Error
 	defer delete(relocs); defer delete(errors)
 
-	r := v.encode(instructions, label_defs, code, &relocs, &errors)
-	if !r.success {
+	byte_count, success := v.encode(instructions, label_defs, code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] %s: encode failed\n", name)
 		fail_count += 1
 		return
 	}
-	if int(r.byte_count) != len(want_bytes) {
-		fmt.printf("  [FAIL] %s: byte_count=%d want=%d\n", name, r.byte_count, len(want_bytes))
+	if int(byte_count) != len(want_bytes) {
+		fmt.printf("  [FAIL] %s: byte_count=%d want=%d\n", name, byte_count, len(want_bytes))
 		fail_count += 1
 		return
 	}
@@ -45,8 +45,8 @@ check :: proc(name: string, instructions: []v.Instruction, label_defs: []isa.Lab
 	dec_labs: [dynamic]v.Label_Definition
 	dec_errs: [dynamic]v.Error
 	defer delete(decoded); defer delete(info); defer delete(dec_labs); defer delete(dec_errs)
-	dr := v.decode(code[:r.byte_count], relocs[:], &decoded, &info, &dec_labs, &dec_errs)
-	if !dr.success {
+	dbyte_count, dsuccess := v.decode(code[:byte_count], relocs[:], &decoded, &info, &dec_labs, &dec_errs)
+	if !dsuccess {
 		fmt.printf("  [FAIL] %s: decode failed\n", name)
 		fail_count += 1
 		return
@@ -65,7 +65,7 @@ check :: proc(name: string, instructions: []v.Instruction, label_defs: []isa.Lab
 			return
 		}
 	}
-	fmt.printf("  [ok]   %-35s %d bytes, %d insts\n", name, r.byte_count, len(decoded))
+	fmt.printf("  [ok]   %-35s %d bytes, %d insts\n", name, byte_count, len(decoded))
 	ok_count += 1
 }
 

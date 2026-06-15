@@ -43,35 +43,34 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	xlen:         XLEN = .RV64,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data)) & ~u32(1)   // align to halfword (RVC is 2-byte)
 	errors_start := u32(len(errors))
 
 	pending_branches: [dynamic]isa.Branch_Target
 	defer delete(pending_branches)
 
-	pc: u32 = 0
-	for pc < n_bytes {
+	for byte_count < n_bytes {
 		// Read the first halfword; bits[1:0] != 11 means compressed (2 bytes).
-		hword_lo := read_u16_le(data, pc)
+		hword_lo := read_u16_le(data, byte_count)
 		ilen: u32 = 4
 		word: u32
 		if (hword_lo & 0x3) != 0x3 {
 			ilen = 2
 			word = u32(hword_lo)
 		} else {
-			if pc + 4 > n_bytes { break }
-			word = read_u32_le(data, pc)
+			if byte_count + 4 > n_bytes { break }
+			word = read_u32_le(data, byte_count)
 		}
 
 		inst: Instruction
 		info: Instruction_Info
-		entry_idx := decode_one_inline(word, pc, xlen, ilen == 2, &inst, &info)
+		entry_idx := decode_one_inline(word, byte_count, xlen, ilen == 2, &inst, &info)
 
 		if entry_idx < 0 {
-			append(errors, Error{inst_idx = pc, code = .INVALID_OPCODE})
+			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = u8(ilen)}
-			info = Instruction_Info{offset = pc}
+			info = Instruction_Info{offset = byte_count}
 		} else {
 			inst.length = u8(ilen)
 			inst_idx_for_branches := u32(len(instructions))
@@ -89,11 +88,12 @@ decode :: proc(
 
 		append(instructions, inst)
 		append(inst_info,    info)
-		pc += ilen
+		byte_count += ilen
 	}
 
-	isa.infer_labels_from_branches(pending_branches[:], pc, label_defs, relocs)
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

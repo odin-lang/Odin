@@ -76,8 +76,8 @@ run_rsp_pipeline_tests :: proc() {
 			rsp.inst_r_m  (.LW,   rsp.T0, rsp.mem(rsp.SP, 16)),
 			rsp.inst_none (.NOP),
 		}
-		e := rsp.encode(insts, nil, code[:], &relocs, &errors)
-		ok      ("scalar: encode success",  e.success)
+		byte_count, success := rsp.encode(insts, nil, code[:], &relocs, &errors)
+		ok      ("scalar: encode success",  success)
 		eq_word ("scalar: ADD word",        load_be(code[:], 0),  0x012A4020)
 		eq_word ("scalar: ADDIU word",      load_be(code[:], 4),  0x25280064)
 		eq_word ("scalar: LW word",         load_be(code[:], 8),  0x8FA80010)
@@ -90,8 +90,8 @@ run_rsp_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		d := rsp.decode(code[:e.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("scalar: decode success", d.success)
+		dbyte_count, dsuccess := rsp.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("scalar: decode success", dsuccess)
 		ok("scalar: 4 insts",        len(d_insts) == 4)
 		ok("scalar[0] ADD",          d_insts[0].mnemonic == .ADD)
 		ok("scalar[3] NOP",          d_insts[3].mnemonic == .NOP)
@@ -115,8 +115,8 @@ run_rsp_pipeline_tests :: proc() {
 		insts := []rsp.Instruction{
 			rsp.inst_v_v_v(.VMULF, rsp.VR0, rsp.VR1, rsp.VR2, 3),
 		}
-		e := rsp.encode(insts, nil, code[:], &relocs, &errors)
-		ok     ("vu: encode",   e.success)
+		byte_count, success := rsp.encode(insts, nil, code[:], &relocs, &errors)
+		ok     ("vu: encode",   success)
 		eq_word("vu: VMULF",    load_be(code[:], 0), 0x4A620800)
 
 		d_insts:  [dynamic]rsp.Instruction
@@ -126,8 +126,8 @@ run_rsp_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		d := rsp.decode(code[:e.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("vu: decode",       d.success)
+		dbyte_count, dsuccess := rsp.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("vu: decode",       dsuccess)
 		ok("vu: VMULF mnem",   d_insts[0].mnemonic == .VMULF)
 		i0 := d_insts[0]
 		ok("vu: vd=$v0",       i0.ops[0].reg == rsp.VR0)
@@ -153,8 +153,8 @@ run_rsp_pipeline_tests :: proc() {
 		insts := []rsp.Instruction{
 			rsp.inst_v_vmem(.LQV, rsp.VR4, rsp.vmem(rsp.T0, 0, 16)),
 		}
-		e := rsp.encode(insts, nil, code[:], &relocs, &errors)
-		ok     ("vls: encode",   e.success)
+		byte_count, success := rsp.encode(insts, nil, code[:], &relocs, &errors)
+		ok     ("vls: encode",   success)
 		eq_word("vls: LQV",      load_be(code[:], 0), 0xC9042010)
 
 		d_insts:  [dynamic]rsp.Instruction
@@ -164,8 +164,8 @@ run_rsp_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		d := rsp.decode(code[:e.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("vls: decode",       d.success)
+		dbyte_count, dsuccess := rsp.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("vls: decode",       dsuccess)
 		ok("vls: LQV mnem",     d_insts[0].mnemonic == .LQV)
 		i0 := d_insts[0]
 		ok("vls: vt=$v4",       i0.ops[0].reg == rsp.VR4)
@@ -195,8 +195,8 @@ run_rsp_pipeline_tests :: proc() {
 			rsp.inst_branch2(.BNE, rsp.T0, rsp.ZERO, 0),
 			rsp.inst_none(.NOP),
 		}
-		e := rsp.encode(insts, ld_in[:], code[:], &relocs, &errors)
-		ok("br: encode", e.success)
+		byte_count, success := rsp.encode(insts, ld_in[:], code[:], &relocs, &errors)
+		ok("br: encode", success)
 		eq_word("br: BNE word", load_be(code[:], 8), 0x1500FFFD)
 
 		d_insts:  [dynamic]rsp.Instruction
@@ -206,8 +206,8 @@ run_rsp_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		d := rsp.decode(code[:e.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("br: decode", d.success)
+		dbyte_count, dsuccess := rsp.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("br: decode", dsuccess)
 		ok("br: 1 label inferred", len(d_labels) == 1)
 		ok("br: label at byte 0",  int(d_labels[0]) == 0)
 
@@ -233,8 +233,8 @@ run_rsp_pipeline_tests :: proc() {
 				ops = {rsp.op_reg(rsp.T0), rsp.op_reg(rsp.VCO), {}, {}},
 			},
 		}
-		e := rsp.encode(insts, nil, code[:], &relocs, &errors)
-		ok("cop2c: encode",   e.success)
+		byte_count, success := rsp.encode(insts, nil, code[:], &relocs, &errors)
+		ok("cop2c: encode",   success)
 		eq_word("cop2c: CFC2",load_be(code[:], 0), 0x48480000)
 
 		d_insts:  [dynamic]rsp.Instruction
@@ -244,8 +244,8 @@ run_rsp_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		d := rsp.decode(code[:e.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("cop2c: decode",   d.success)
+		dbyte_count, dsuccess := rsp.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("cop2c: decode",   dsuccess)
 		ok("cop2c: CFC2 mnem",d_insts[0].mnemonic == .CFC2)
 
 		text := rsp.aprint(d_insts[:], d_info[:], d_labels[:],
@@ -268,8 +268,8 @@ run_rsp_pipeline_tests :: proc() {
 				ops = {rsp.op_reg(rsp.T0), rsp.op_reg(rsp.Register(rsp.REG_CP0 | 4)), {}, {}},
 			},
 		}
-		e := rsp.encode(insts, nil, code[:], &relocs, &errors)
-		ok("cp0: encode",     e.success)
+		byte_count, success := rsp.encode(insts, nil, code[:], &relocs, &errors)
+		ok("cp0: encode",     success)
 		eq_word("cp0: MTC0",  load_be(code[:], 0), 0x40882000)
 
 		d_insts:  [dynamic]rsp.Instruction
@@ -279,7 +279,7 @@ run_rsp_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		rsp.decode(code[:e.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rsp.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 
 		text := rsp.aprint(d_insts[:], d_info[:], d_labels[:],
 						   nil, nil, nil, context.temp_allocator)

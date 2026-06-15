@@ -65,7 +65,7 @@ encode :: proc(
 	resolve:      bool       = true,
 	base_address: u64        = 0,
 	mode:         Mode       = ._64,           // i386 vs x86-64 mode
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	if mode == ._16 {
 		// Real-mode encoding is not implemented; the ModRM addressing
 		// model differs from protected/long mode and needs a separate
@@ -73,8 +73,7 @@ encode :: proc(
 		fmt.panicf("x64.encode: Mode._16 (real mode) is not yet supported")
 	}
 
-	code_pos: u32 = 0
-	has_errors := false
+	ok = true
 
 	// Temp storage for pending relocations (before resolution)
 	pending_relocations: [dynamic]Relocation
@@ -91,19 +90,19 @@ encode :: proc(
 
 	for &inst, instruction_index in instructions {
 		// Record this instruction's byte offset
-		inst_offsets[instruction_index] = code_pos
+		inst_offsets[instruction_index] = byte_count
 
 		// Validate operand_count bounds
 		if inst.operand_count > 4 {
 			append(errors, Error{u32(instruction_index), .INVALID_OPERAND_COUNT, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
 		// Check buffer space
-		if code_pos + MAX_INST_SIZE > u32(len(code)) {
+		if byte_count + MAX_INST_SIZE > u32(len(code)) {
 			append(errors, Error{u32(instruction_index), .BUFFER_OVERFLOW, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
@@ -136,7 +135,7 @@ encode :: proc(
 			}
 			if invalid {
 				append(errors, Error{u32(instruction_index), .OPERAND_MISMATCH, {}})
-				has_errors = true
+				ok = false
 				continue
 			}
 		}
@@ -145,7 +144,7 @@ encode :: proc(
 		encodings := encoding_forms(inst.mnemonic)
 		if len(encodings) == 0 {
 			append(errors, Error{u32(instruction_index), .INVALID_MNEMONIC, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
@@ -160,7 +159,7 @@ encode :: proc(
 
 		if matched_enc == nil {
 			append(errors, Error{u32(instruction_index), .NO_MATCHING_ENCODING, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
@@ -169,7 +168,7 @@ encode :: proc(
 		// =====================================================================
 
 		enc := matched_enc
-		out := code[code_pos:]
+		out := code[byte_count:]
 		pos: u32 = 0
 
 		// --- Legacy Prefixes ---
@@ -398,7 +397,7 @@ encode :: proc(
 			// the instruction is not legal i386.
 			if mode == ._32 && rex != 0 {
 				append(errors, Error{u32(instruction_index), .OPERAND_MISMATCH, {}})
-				has_errors = true
+				ok = false
 				continue
 			}
 
@@ -598,7 +597,7 @@ encode :: proc(
 					case .RELATIVE:
 						// Relative reference - record relocation
 						label_id := u32(user_op.relative)
-						append(&pending_relocations, Relocation{code_pos + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
+						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
 						out[pos] = 0
 						pos += 1
 					}
@@ -623,7 +622,7 @@ encode :: proc(
 						pos += 4
 					case .RELATIVE:
 						label_id := u32(user_op.relative)
-						append(&pending_relocations, Relocation{code_pos + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
+						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
 						out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
 						pos += 4
 					}
@@ -639,7 +638,7 @@ encode :: proc(
 			}
 		}
 
-		code_pos += pos
+		byte_count += pos
 	}
 
 	// =========================================================================
@@ -677,7 +676,7 @@ encode :: proc(
 			next_pc := patch_offset + 1
 			if !patch_pcrel_i8(code, patch_offset, target_offset, next_pc, relocation.addend) {
 				append(errors, Error{u32(relocation.inst_idx), .LABEL_OUT_OF_RANGE, {}})
-				has_errors = true
+				ok = false
 			}
 
 		case .REL32:
@@ -692,10 +691,7 @@ encode :: proc(
 		}
 	}
 
-	return Result{
-		byte_count = code_pos,
-		success    = !has_errors,
-	}
+	return
 }
 
 // -----------------------------------------------------------------------------

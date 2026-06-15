@@ -14,15 +14,15 @@ check :: proc(name: string, instructions: []v.Instruction, label_defs: []isa.Lab
     errors: [dynamic]v.Error
     defer delete(relocs); defer delete(errors)
 
-    r := v.encode(instructions, label_defs, code, &relocs, &errors)
-    if !r.success {
+    byte_count, success := v.encode(instructions, label_defs, code, &relocs, &errors)
+    if !success {
         fmt.printf("  [FAIL] %s: encode failed\n", name)
         for e in errors { fmt.printf("           code=%v inst_idx=%d\n", e.code, e.inst_idx) }
         fail_count += 1
         return
     }
-    if int(r.byte_count) != len(want) {
-        fmt.printf("  [FAIL] %s: byte_count %d (want %d)\n", name, r.byte_count, len(want))
+    if int(byte_count) != len(want) {
+        fmt.printf("  [FAIL] %s: byte_count %d (want %d)\n", name, byte_count, len(want))
         fail_count += 1
         return
     }
@@ -65,14 +65,14 @@ run_branch_test :: proc() {
         relocs: [dynamic]v.Relocation
         errors: [dynamic]v.Error
         defer delete(relocs); defer delete(errors)
-        r := v.encode(instructions[:], label_defs[:], code, &relocs, &errors)
-        if !r.success {
+        byte_count, success := v.encode(instructions[:], label_defs[:], code, &relocs, &errors)
+        if !success {
             fmt.printf("  [FAIL] se_b+label: encode failed\n")
             for e in errors { fmt.printf("           code=%v\n", e.code) }
             fail_count += 1
         } else {
-            fmt.printf("  [ok]   se_b+label: %d bytes, bytes=", r.byte_count)
-            for i in 0..<r.byte_count { fmt.printf("%02x", code[i]) }
+            fmt.printf("  [ok]   se_b+label: %d bytes, bytes=", byte_count)
+            for i in 0..<byte_count { fmt.printf("%02x", code[i]) }
             fmt.println()
             ok_count += 1
         }
@@ -90,13 +90,13 @@ run_branch_test :: proc() {
         relocs: [dynamic]v.Relocation
         errors: [dynamic]v.Error
         defer delete(relocs); defer delete(errors)
-        r := v.encode(instructions[:], label_defs[:], code, &relocs, &errors)
-        if !r.success {
+        byte_count, success := v.encode(instructions[:], label_defs[:], code, &relocs, &errors)
+        if !success {
             fmt.printf("  [FAIL] e_b+label: encode failed\n")
             fail_count += 1
         } else {
-            fmt.printf("  [ok]   e_b+label: %d bytes, bytes=", r.byte_count)
-            for i in 0..<r.byte_count { fmt.printf("%02x", code[i]) }
+            fmt.printf("  [ok]   e_b+label: %d bytes, bytes=", byte_count)
+            for i in 0..<byte_count { fmt.printf("%02x", code[i]) }
             fmt.println()
             ok_count += 1
         }

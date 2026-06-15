@@ -34,28 +34,24 @@ encode :: proc(
 	errors:       ^[dynamic]Error,
 	resolve:      bool = true,
 	base_address: u64  = 0,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_inst := u32(len(instructions))
 	if u32(len(code)) < n_inst * MAX_INST_SIZE {
 		append(errors, Error{inst_idx = 0, code = .BUFFER_OVERFLOW})
-		return Result{byte_count = 0, success = false}
+		return
 	}
 
 	errors_start  := u32(len(errors))
 	pending_start := u32(len(relocs))
-	pc: u32 = 0
 
 	inst_pc := make([]u32, n_inst, context.temp_allocator)
 
 	// ---- PASS 1 ------------------------------------------------------------
 	for i in 0..<n_inst {
-		inst_pc[i] = pc
+		inst_pc[i] = byte_count
 		inst := &instructions[i]
-		ok := encode_one_inline(inst, pc, code, u16(i), relocs, errors)
-		if !ok {
-			return Result{byte_count = pc, success = false}
-		}
-		pc += u32(inst.length)
+		encode_one_inline(inst, byte_count, code, u16(i), relocs, errors) or_return
+		byte_count += u32(inst.length)
 	}
 
 	// ---- PASS 1.5: label instruction-idx -> byte offset --------------------
@@ -71,7 +67,8 @@ encode :: proc(
 	}
 
 	if !resolve {
-		return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+		ok = u32(len(errors)) == errors_start
+		return
 	}
 
 	// ---- PASS 2: resolve relocations ---------------------------------------
@@ -87,7 +84,8 @@ encode :: proc(
 	}
 	if write_idx != n_relocs { resize(relocs, int(write_idx)) }
 
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

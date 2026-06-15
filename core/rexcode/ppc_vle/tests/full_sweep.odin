@@ -43,8 +43,8 @@ test_one :: proc(mn: v.Mnemonic, fi: int, f: ^v.Encoding) {
     defer delete(relocs); defer delete(errors)
 
     instructions := []v.Instruction{inst}
-    r := v.encode(instructions, label_defs, code, &relocs, &errors)
-    if !r.success {
+    byte_count, success := v.encode(instructions, label_defs, code, &relocs, &errors)
+    if !success {
         stats.encode_fail += 1
         return
     }
@@ -55,8 +55,8 @@ test_one :: proc(mn: v.Mnemonic, fi: int, f: ^v.Encoding) {
     dec_errors: [dynamic]v.Error
     defer delete(decoded); defer delete(info); defer delete(dec_labels); defer delete(dec_errors)
 
-    dr := v.decode(code[:r.byte_count], nil, &decoded, &info, &dec_labels, &dec_errors)
-    if !dr.success || len(decoded) == 0 || decoded[0].mnemonic == .INVALID {
+    dbyte_count, dsuccess := v.decode(code[:byte_count], nil, &decoded, &info, &dec_labels, &dec_errors)
+    if !dsuccess || len(decoded) == 0 || decoded[0].mnemonic == .INVALID {
         stats.decode_fail += 1
         return
     }
@@ -67,19 +67,19 @@ test_one :: proc(mn: v.Mnemonic, fi: int, f: ^v.Encoding) {
     re_errors: [dynamic]v.Error
     defer delete(re_relocs); defer delete(re_errors)
 
-    rr := v.encode(decoded[:], dec_labels[:], code2, &re_relocs, &re_errors)
-    if !rr.success || rr.byte_count != r.byte_count {
+    rrbyte_count, rrsuccess := v.encode(decoded[:], dec_labels[:], code2, &re_relocs, &re_errors)
+    if !rrsuccess || rrbyte_count != byte_count {
         stats.byte_mismatch += 1
         return
     }
-    for i in 0..<r.byte_count {
+    for i in 0..<byte_count {
         if code[i] != code2[i] {
             stats.byte_mismatch += 1
             if stats.byte_mismatch <= 10 {
                 fmt.printf("  [BYTE_MISMATCH] %v: orig=", mn)
-                for j in 0..<r.byte_count { fmt.printf("%02x", code[j]) }
+                for j in 0..<byte_count { fmt.printf("%02x", code[j]) }
                 fmt.printf(" re=")
-                for j in 0..<r.byte_count { fmt.printf("%02x", code2[j]) }
+                for j in 0..<byte_count { fmt.printf("%02x", code2[j]) }
                 fmt.printf(" decoded=%v\n", decoded[0].mnemonic)
             }
             return

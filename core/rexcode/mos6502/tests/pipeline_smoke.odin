@@ -69,8 +69,8 @@ encode_one :: proc(insts: []m.Instruction) -> ([]u8, bool) {
 	@(static) errors: [dynamic]m.Error
 	clear(&relocs); clear(&errors)
 	for i in 0..<len(code) { code[i] = 0 }
-	r := m.encode(insts, nil, code[:], &relocs, &errors)
-	return code[:r.byte_count], r.success
+	byte_count, success := m.encode(insts, nil, code[:], &relocs, &errors)
+	return code[:byte_count], success
 }
 
 run_pipeline_tests :: proc() {
@@ -139,10 +139,10 @@ run_pipeline_tests :: proc() {
 			m.inst_rel(.BNE, 0),
 			m.inst_none(.RTS),
 		}
-		r := m.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("br: encode ok", r.success)
+		byte_count, success := m.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("br: encode ok", success)
 		// BNE rel byte at code[4]; target = 0, next_pc = 5, rel = -5.
-		eq_bytes("br: bytes", code[:r.byte_count],
+		eq_bytes("br: bytes", code[:byte_count],
 				 {0xA5, 0x42, 0xCA, 0xD0, 0xFB, 0x60})
 		// label_defs[0] should be byte offset 0.
 		ok("br: label_def[0] = 0", int(ld[0]) == 0)
@@ -173,10 +173,10 @@ run_pipeline_tests :: proc() {
 			mnemonic = .JMP, operand_count = 1, length = 0,
 			ops = {m.op_label(0, 2), {}, {}},
 		}
-		r := m.encode(insts, ld[:], code[:], &relocs, &errors,
+		byte_count, success := m.encode(insts, ld[:], code[:], &relocs, &errors,
 					  base_address = 0x8000)
-		ok("jmp lbl: encode ok", r.success)
-		eq_bytes("jmp lbl: bytes", code[:r.byte_count],
+		ok("jmp lbl: encode ok", success)
+		eq_bytes("jmp lbl: bytes", code[:byte_count],
 				 {0xEA, 0x4C, 0x04, 0x80, 0x60})
 	}
 
@@ -195,8 +195,8 @@ run_pipeline_tests :: proc() {
 			m.inst_rel(.BNE, 0),
 			m.inst_none(.RTS),
 		}
-		r := m.encode(src, ld[:], code[:], &relocs, &errors)
-		ok("rt: encode ok", r.success)
+		byte_count, success := m.encode(src, ld[:], code[:], &relocs, &errors)
+		ok("rt: encode ok", success)
 
 		d_insts:  [dynamic]m.Instruction
 		d_info:   [dynamic]m.Instruction_Info
@@ -205,9 +205,9 @@ run_pipeline_tests :: proc() {
 		defer delete(d_info)
 		defer delete(d_labels)
 		clear(&errors)
-		d := m.decode(code[:r.byte_count], nil,
+		_, dsuccess := m.decode(code[:byte_count], nil,
 					  &d_insts, &d_info, &d_labels, &errors)
-		ok("rt: decode ok",   d.success)
+		ok("rt: decode ok",   dsuccess)
 		ok("rt: 4 insts",     len(d_insts) == 4)
 		ok("rt: LDA",         d_insts[0].mnemonic == .LDA)
 		ok("rt: BNE",         d_insts[2].mnemonic == .BNE)
@@ -235,7 +235,7 @@ run_pipeline_tests :: proc() {
 			m.inst_m(.STZ, m.mem_abs(0x1234)),      // 65C02 STZ
 			m.inst_rel(.BRA, 0),                     // 65C02 BRA
 		}
-		r := m.encode(src, ld[:], code[:], &relocs, &errors)
+		byte_count, success := m.encode(src, ld[:], code[:], &relocs, &errors)
 
 		d_insts:  [dynamic]m.Instruction
 		d_info:   [dynamic]m.Instruction_Info
@@ -245,7 +245,7 @@ run_pipeline_tests :: proc() {
 		defer delete(d_labels)
 		clear(&errors)
 		// Decode in 65C02 mode -- $B2 is LDA(zp), $9C is STZ, $80 is BRA.
-		m.decode(code[:r.byte_count], nil,
+		m.decode(code[:byte_count], nil,
 				 &d_insts, &d_info, &d_labels, &errors, cpu = .CMOS_65C02)
 
 		names: map[u32]string
@@ -291,16 +291,16 @@ run_pipeline_tests :: proc() {
 		src := []m.Instruction{
 			m.inst_block(.TII, 0x4000, 0x2000, 0x100),
 		}
-		r := m.encode(src, nil, code[:], &relocs, &errors)
-		ok("huc tii: encode ok", r.success)
-		ok("huc tii: 7 bytes",   int(r.byte_count) == 7)
+		byte_count, success := m.encode(src, nil, code[:], &relocs, &errors)
+		ok("huc tii: encode ok", success)
+		ok("huc tii: 7 bytes",   int(byte_count) == 7)
 
 		d_insts:  [dynamic]m.Instruction
 		d_info:   [dynamic]m.Instruction_Info
 		d_labels: [dynamic]m.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		m.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors,
+		m.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors,
 				 cpu = .HUC6280)
 		ok("huc tii: decode TII",   len(d_insts) >= 1 && d_insts[0].mnemonic == .TII)
 		ok("huc tii: 3 operands",   d_insts[0].operand_count == 3)
@@ -321,7 +321,7 @@ encode_or_fail :: proc(insts: []m.Instruction) -> []u8 {
 	@(static) errors: [dynamic]m.Error
 	clear(&relocs); clear(&errors)
 	for i in 0..<len(code) { code[i] = 0 }
-	r := m.encode(insts, nil, code[:], &relocs, &errors)
-	if !r.success { return nil }
-	return code[:r.byte_count]
+	byte_count, success := m.encode(insts, nil, code[:], &relocs, &errors)
+	if !success { return nil }
+	return code[:byte_count]
 }

@@ -37,7 +37,6 @@ import "../isa"
 //   option    13-15   extend type (data-proc extended register, LDR/STR EXT)
 //   imm3      10-12   extend amount
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

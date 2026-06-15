@@ -35,7 +35,6 @@ import "../isa"
 // (op=0x18, 0x19, 0x35, 0x37, 0x3F, ...) with their own layouts.
 
 // Re-exports from isa.
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

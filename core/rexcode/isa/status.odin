@@ -43,7 +43,3 @@ Error :: struct #packed {
 }
 #assert(size_of(Error) == 8)
 
-Result :: struct {
-	byte_count: u32,   // Bytes written/read
-	success:    bool,  // True if no errors
-}

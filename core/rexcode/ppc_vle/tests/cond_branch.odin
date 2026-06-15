@@ -14,14 +14,14 @@ check :: proc(name: string, instructions: []v.Instruction, label_defs: []isa.Lab
 	errors: [dynamic]v.Error
 	defer delete(relocs); defer delete(errors)
 
-	r := v.encode(instructions, label_defs, code, &relocs, &errors)
-	if !r.success {
+	byte_count, success := v.encode(instructions, label_defs, code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] %s: encode failed\n", name)
 		fail_count += 1
 		return
 	}
-	if int(r.byte_count) != len(want) {
-		fmt.printf("  [FAIL] %s: bc=%d want=%d\n", name, r.byte_count, len(want))
+	if int(byte_count) != len(want) {
+		fmt.printf("  [FAIL] %s: bc=%d want=%d\n", name, byte_count, len(want))
 		fail_count += 1
 		return
 	}
@@ -61,14 +61,14 @@ run_cond_branch :: proc() {
 		relocs: [dynamic]v.Relocation
 		errors: [dynamic]v.Error
 		defer delete(relocs); defer delete(errors)
-		r := v.encode(instructions[:], label_defs[:], code, &relocs, &errors)
-		if !r.success {
+		byte_count, success := v.encode(instructions[:], label_defs[:], code, &relocs, &errors)
+		if !success {
 			fmt.printf("  [FAIL] e_bc encode failed (%d errors)\n", len(errors))
 			for e in errors { fmt.printf("           code=%v\n", e.code) }
 			fail_count += 1
 		} else {
 			fmt.printf("  [ok]   e_bc 12, cr0[lt], L                 ")
-			for i in 0..<r.byte_count { fmt.printf("%02x", code[i]) }
+			for i in 0..<byte_count { fmt.printf("%02x", code[i]) }
 			fmt.println()
 			ok_count += 1
 		}

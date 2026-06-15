@@ -34,36 +34,35 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	mode:         Mode = .PPC32,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data)) & ~u32(3)
 	errors_start := u32(len(errors))
 
 	pending_branches: [dynamic]isa.Branch_Target
 	defer delete(pending_branches)
 
-	pc: u32 = 0
-	for pc < n_bytes {
-		if pc + 4 > n_bytes { break }
-		word := read_u32_be(data, pc)
+	for byte_count < n_bytes {
+		if byte_count + 4 > n_bytes { break }
+		word := read_u32_be(data, byte_count)
 
 		// Detect prefixed instruction: primary opcode = 1.
 		is_prefixed := (word >> 26) == 0x01
 		ilen: u32 = 4
 		suffix: u32 = 0
 		if is_prefixed {
-			if pc + 8 > n_bytes { break }
-			suffix = read_u32_be(data, pc + 4)
+			if byte_count + 8 > n_bytes { break }
+			suffix = read_u32_be(data, byte_count + 4)
 			ilen   = 8
 		}
 
 		inst: Instruction
 		info: Instruction_Info
-		info.offset = pc
+		info.offset = byte_count
 
 		match_word := is_prefixed ? suffix : word
 		prefix_word := is_prefixed ? word : 0
 		if !find_and_decode(match_word, prefix_word, is_prefixed, mode, &inst, &info) {
-			append(errors, Error{inst_idx = pc, code = .INVALID_OPCODE})
+			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = u8(ilen), mode = mode}
 		} else {
 			inst.length = u8(ilen)
@@ -74,7 +73,7 @@ decode :: proc(
 				if op.kind == .RELATIVE && op.relative >= 0 {
 					// The unpacker stores PC-relative byte offsets; convert
 					// to absolute target = pc + relative.
-					target := u32(i32(pc) + i32(op.relative))
+					target := u32(i32(byte_count) + i32(op.relative))
 					append(&pending_branches, isa.Branch_Target{
 						inst_idx = inst_idx,
 						op_idx   = slot,
@@ -86,11 +85,12 @@ decode :: proc(
 
 		append(instructions, inst)
 		append(inst_info,    info)
-		pc += ilen
+		byte_count += ilen
 	}
 
-	isa.infer_labels_from_branches(pending_branches[:], pc, label_defs, relocs)
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

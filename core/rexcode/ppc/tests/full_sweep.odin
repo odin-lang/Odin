@@ -182,8 +182,8 @@ test_form :: proc(mn: p.Mnemonic, fi: int, f: ^p.Encoding, fails: ^[dynamic]stri
 
 	instructions := []p.Instruction{inst}
 	label_defs:   []isa.Label_Definition
-	r := p.encode(instructions, label_defs, code, &relocs, &errors)
-	if !r.success {
+	byte_count, success := p.encode(instructions, label_defs, code, &relocs, &errors)
+	if !success {
 		stats.encode_fail += 1
 		if len(fails) < 100 { append(fails, fmt.aprintf("ENCODE_FAIL %v[%d] errors=%d", mn, fi, len(errors))) }
 		return
@@ -196,8 +196,8 @@ test_form :: proc(mn: p.Mnemonic, fi: int, f: ^p.Encoding, fails: ^[dynamic]stri
 	dec_errors:     [dynamic]p.Error
 	defer delete(decoded); defer delete(dec_info); defer delete(dec_labels); defer delete(dec_errors)
 
-	dr := p.decode(code[:r.byte_count], nil, &decoded, &dec_info, &dec_labels, &dec_errors, f.mode)
-	if !dr.success || len(decoded) == 0 || decoded[0].mnemonic == .INVALID {
+	dbyte_count, dsuccess := p.decode(code[:byte_count], nil, &decoded, &dec_info, &dec_labels, &dec_errors, f.mode)
+	if !dsuccess || len(decoded) == 0 || decoded[0].mnemonic == .INVALID {
 		stats.decode_fail += 1
 		if len(fails) < 100 {
 			append(fails, fmt.aprintf("DECODE_FAIL %v[%d] bytes=%02x%02x%02x%02x",
@@ -213,8 +213,8 @@ test_form :: proc(mn: p.Mnemonic, fi: int, f: ^p.Encoding, fails: ^[dynamic]stri
 	re_errors: [dynamic]p.Error
 	defer delete(re_relocs); defer delete(re_errors)
 
-	rr := p.encode(decoded[:], dec_labels[:], code2, &re_relocs, &re_errors)
-	if !rr.success {
+	rrbyte_count, rrsuccess := p.encode(decoded[:], dec_labels[:], code2, &re_relocs, &re_errors)
+	if !rrsuccess {
 		stats.reencode_fail += 1
 		if len(fails) < 100 {
 			append(fails, fmt.aprintf("REENCODE_FAIL %v[%d] decoded_mn=%v",
@@ -223,14 +223,14 @@ test_form :: proc(mn: p.Mnemonic, fi: int, f: ^p.Encoding, fails: ^[dynamic]stri
 		return
 	}
 
-	if rr.byte_count != r.byte_count {
+	if rrbyte_count != byte_count {
 		stats.byte_mismatch += 1
 		if len(fails) < 100 {
-			append(fails, fmt.aprintf("LEN_MISMATCH %v[%d] orig=%d re=%d", mn, fi, r.byte_count, rr.byte_count))
+			append(fails, fmt.aprintf("LEN_MISMATCH %v[%d] orig=%d re=%d", mn, fi, byte_count, rrbyte_count))
 		}
 		return
 	}
-	for i in 0..<r.byte_count {
+	for i in 0..<byte_count {
 		if code[i] != code2[i] {
 			stats.byte_mismatch += 1
 			if len(fails) < 100 {

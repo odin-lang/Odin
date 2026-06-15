@@ -51,7 +51,6 @@ import "../isa"
 // All operand-driven fields live in the zeros of `mask`; the encoder ORs
 // them in. The matcher tests `(word & mask) == bits`.
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

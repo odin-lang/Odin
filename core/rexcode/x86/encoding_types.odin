@@ -12,7 +12,6 @@ import "../isa"
 // SECTION: 6.0 Re-exports from isa (status, relocation)
 // -----------------------------------------------------------------------------
 
-Result          :: isa.Result
 Error           :: isa.Error
 Error_Code      :: isa.Error_Code
 // Relocation and Relocation_Type live in reloc.odin (per-arch by design).

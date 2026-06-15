@@ -38,8 +38,8 @@ encode_and_print :: proc(
     defer delete(relocs)
     defer delete(errors)
 
-    eres := mips.encode(insts, label_defs, code[:], &relocs, &errors)
-    if !eres.success { return "<encode failed>" }
+    byte_count, esuccess := mips.encode(insts, label_defs, code[:], &relocs, &errors)
+    if !esuccess { return "<encode failed>" }
 
     dec_insts:  [dynamic]mips.Instruction
     dec_info:   [dynamic]mips.Instruction_Info
@@ -49,9 +49,9 @@ encode_and_print :: proc(
     defer delete(dec_labels)
     clear(&errors)
 
-    dres := mips.decode(code[:eres.byte_count], nil,
+    _, dsuccess := mips.decode(code[:byte_count], nil,
                         &dec_insts, &dec_info, &dec_labels, &errors)
-    if !dres.success { return "<decode failed>" }
+    if !dsuccess { return "<decode failed>" }
 
     sb := strings.builder_make(context.temp_allocator)
     mips.sbprint(&sb, dec_insts[:], dec_info[:], dec_labels[:])
@@ -162,7 +162,7 @@ run_printer_tests :: proc() {
             mips.inst_none(.NOP),
             mips.inst_branch2(.BEQ, mips.T0, mips.T1, 0),
         }
-        eres := mips.encode(insts, ld[:], code[:], &relocs, &errors)
+        byte_count, _ := mips.encode(insts, ld[:], code[:], &relocs, &errors)
 
         dec_insts:  [dynamic]mips.Instruction
         dec_info:   [dynamic]mips.Instruction_Info
@@ -171,7 +171,7 @@ run_printer_tests :: proc() {
         defer delete(dec_info)
         defer delete(dec_labels)
         clear(&errors)
-        mips.decode(code[:eres.byte_count], nil, &dec_insts, &dec_info, &dec_labels, &errors)
+        mips.decode(code[:byte_count], nil, &dec_insts, &dec_info, &dec_labels, &errors)
 
         names: map[u32]string
         defer delete(names)
@@ -197,7 +197,7 @@ run_printer_tests :: proc() {
         errors: [dynamic]mips.Error
         defer delete(relocs)
         defer delete(errors)
-        eres := mips.encode(insts, nil, code[:], &relocs, &errors)
+        byte_count, _ := mips.encode(insts, nil, code[:], &relocs, &errors)
 
         dec_insts:  [dynamic]mips.Instruction
         dec_info:   [dynamic]mips.Instruction_Info
@@ -206,7 +206,7 @@ run_printer_tests :: proc() {
         defer delete(dec_info)
         defer delete(dec_labels)
         clear(&errors)
-        mips.decode(code[:eres.byte_count], nil, &dec_insts, &dec_info, &dec_labels, &errors)
+        mips.decode(code[:byte_count], nil, &dec_insts, &dec_info, &dec_labels, &errors)
 
         out := mips.aprint(dec_insts[:], dec_info[:], dec_labels[:],
                            nil, &opts, nil, context.temp_allocator)

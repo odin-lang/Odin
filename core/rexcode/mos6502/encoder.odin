@@ -48,47 +48,43 @@ encode :: proc(
 	errors:       ^[dynamic]Error,
 	resolve:      bool = true,
 	base_address: u64  = 0,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_inst := u32(len(instructions))
 	errors_start  := u32(len(errors))
 	pending_start := u32(len(relocs))
 
 	inst_offsets := make([]u32, n_inst, context.temp_allocator)
 
-	pc: u32 = 0
-
 	// ---- PASS 1 -----------------------------------------------------------
 	for i in 0..<n_inst {
-		inst_offsets[i] = pc
+		inst_offsets[i] = byte_count
 
 		inst := &instructions[i]
-		form, ok := find_form_inline(inst, u16(i), errors)
-		if !ok {
-			return Result{byte_count = pc, success = false}
-		}
+		form := find_form_inline(inst, u16(i), errors) or_return
 
-		if pc + u32(form.length) > u32(len(code)) {
+		if byte_count + u32(form.length) > u32(len(code)) {
 			append(errors, Error{inst_idx = i, code = .BUFFER_OVERFLOW})
-			return Result{byte_count = pc, success = false}
+			return
 		}
 
 		// Opcode byte
-		code[pc] = form.opcode
+		code[byte_count] = form.opcode
 
 		// Operand bytes
-		if form.enc[0] != .NONE { pack_operand_inline(&inst.ops[0], form.enc[0], pc, u16(i), code, relocs) }
-		if form.enc[1] != .NONE { pack_operand_inline(&inst.ops[1], form.enc[1], pc, u16(i), code, relocs) }
-		if form.enc[2] != .NONE { pack_operand_inline(&inst.ops[2], form.enc[2], pc, u16(i), code, relocs) }
+		if form.enc[0] != .NONE { pack_operand_inline(&inst.ops[0], form.enc[0], byte_count, u16(i), code, relocs) }
+		if form.enc[1] != .NONE { pack_operand_inline(&inst.ops[1], form.enc[1], byte_count, u16(i), code, relocs) }
+		if form.enc[2] != .NONE { pack_operand_inline(&inst.ops[2], form.enc[2], byte_count, u16(i), code, relocs) }
 
 		inst.length = form.length
-		pc += u32(form.length)
+		byte_count += u32(form.length)
 	}
 
 	// ---- PASS 1.5: inst-index -> byte-offset -----------------------------
 	isa.rewrite_label_defs_to_offsets(label_defs, inst_offsets)
 
 	if !resolve {
-		return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+		ok = u32(len(errors)) == errors_start
+		return
 	}
 
 	// ---- PASS 2: resolve relocations --------------------------------------
@@ -108,7 +104,8 @@ encode :: proc(
 		resize(relocs, int(write_idx))
 	}
 
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

@@ -41,16 +41,15 @@ encode :: proc(
 	errors:       ^[dynamic]Error,
 	resolve:      bool = true,
 	base_address: u64  = 0,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_inst := u32(len(instructions))
 	if u32(len(code)) < n_inst * 4 {
 		append(errors, Error{inst_idx = 0, code = .BUFFER_OVERFLOW})
-		return Result{byte_count = 0, success = false}
+		return
 	}
 
 	errors_start  := u32(len(errors))
 	pending_start := u32(len(relocs))
-	pc: u32 = 0
 
 	// Per-instruction byte offsets so label_defs (instruction-indexed)
 	// can be rewritten to byte-offset after pass 1 in the presence of
@@ -59,16 +58,15 @@ encode :: proc(
 
 	// ---- PASS 1 -----------------------------------------------------------
 	for i in 0..<n_inst {
-		inst_pc[i] = pc
+		inst_pc[i] = byte_count
 		inst := &instructions[i]
-		word, ilen, ok := encode_one_inline(inst, pc, u16(i), relocs, errors)
-		if !ok { return Result{byte_count = pc, success = false} }
+		word, ilen := encode_one_inline(inst, byte_count, u16(i), relocs, errors) or_return
 		if ilen == 2 {
-			write_u16_le(code, pc, u16(word))
+			write_u16_le(code, byte_count, u16(word))
 		} else {
-			write_u32_le(code, pc, word)
+			write_u32_le(code, byte_count, word)
 		}
-		pc += u32(ilen)
+		byte_count += u32(ilen)
 	}
 
 	// ---- PASS 1.5: rewrite label_defs (instruction-index -> byte-offset) --
@@ -84,7 +82,8 @@ encode :: proc(
 	}
 
 	if !resolve {
-		return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+		ok = u32(len(errors)) == errors_start
+		return
 	}
 
 	// ---- PASS 2: resolve relocations --------------------------------------
@@ -100,7 +99,8 @@ encode :: proc(
 	}
 	if write_idx != n_relocs { resize(relocs, int(write_idx)) }
 
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

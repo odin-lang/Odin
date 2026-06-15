@@ -322,7 +322,7 @@ run_test :: proc(t: Test) -> bool {
 		relocs: [dynamic]x86.Relocation
 		defer delete(relocs)
 
-		encode_result := x86.encode(
+		byte_count, ok := x86.encode(
 			t.instructions,
 			labels_copy[:len(t.labels)],
 			code_buf[:],
@@ -333,11 +333,11 @@ run_test :: proc(t: Test) -> bool {
 		)
 
 		// Copy encoded bytes
-		for i in 0..<encode_result.byte_count {
+		for i in 0..<byte_count {
 			append(&encoded_code, code_buf[i])
 		}
 
-		if !encode_result.success {
+		if !ok {
 			fmt.printf("%s[FAIL]%s %s - encoding failed\n", RED, RESET, t.name)
 			for err in encode_errors {
 				fmt.printf("       Error at inst %d: %v\n", err.inst_idx, err.code)
@@ -348,13 +348,13 @@ run_test :: proc(t: Test) -> bool {
 
 		// Verify expected bytes if provided
 		if len(t.expected_code) > 0 {
-			if int(encode_result.byte_count) != len(t.expected_code) {
+			if int(byte_count) != len(t.expected_code) {
 				fmt.printf("%s[FAIL]%s %s - code size %d != expected %d\n",
-						   RED, RESET, t.name, encode_result.byte_count, len(t.expected_code))
+						   RED, RESET, t.name, byte_count, len(t.expected_code))
 				g_stats.failed += 1
 				return false
 			}
-			for i in 0..<encode_result.byte_count {
+			for i in 0..<byte_count {
 				if encoded_code[i] != t.expected_code[i] {
 					fmt.printf("%s[FAIL]%s %s - byte %d: 0x%02X != expected 0x%02X\n",
 							   RED, RESET, t.name, i, encoded_code[i], t.expected_code[i])
@@ -529,7 +529,7 @@ run_test :: proc(t: Test) -> bool {
 	// =========================================================================
 
 	if len(code_to_decode) > 0 {
-		decode_result := x86.decode(
+		byte_count, ok := x86.decode(
 			code_to_decode,
 			nil,
 			&decoded_insts,
@@ -538,7 +538,7 @@ run_test :: proc(t: Test) -> bool {
 			&decode_errors,
 		)
 
-		if !decode_result.success {
+		if !ok {
 			fmt.printf("%s[FAIL]%s %s - decoding failed\n", RED, RESET, t.name)
 			if len(decode_errors) > 0 {
 				for err in decode_errors {
@@ -2991,9 +2991,8 @@ run_label_map_tests :: proc() {
 	defer delete(relocs)
 	defer delete(errs)
 
-	result := x86.encode(instructions[:], lm.labels[:], code_buf[:], &relocs, &errs, true, 0)
-
-	if !result.success {
+	byte_count, ok := x86.encode(instructions[:], lm.labels[:], code_buf[:], &relocs, &errs, true, 0)
+	if !ok {
 		fmt.printf("%s[FAIL]%s Label_Map test - encoding failed\n", RED, RESET)
 		g_stats.failed += 1
 		return
@@ -3009,7 +3008,7 @@ run_label_map_tests :: proc() {
 	defer delete(decoded_labels)
 	defer delete(decode_errors)
 
-	x86.decode(code_buf[:result.byte_count], nil, &decoded_insts, &decoded_info, &decoded_labels, &decode_errors)
+	x86.decode(code_buf[:byte_count], nil, &decoded_insts, &decoded_info, &decoded_labels, &decode_errors)
 
 	// Print with named labels (printer wants id→name; Label_Map stores name→id).
 	id_to_name := make(map[u32]string, len(lm.names), context.temp_allocator)
@@ -3088,8 +3087,8 @@ run_benchmarks :: proc() {
 	for _ in 0..<ITERATIONS {
 		clear(&relocs)
 		clear(&errs)
-		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
-		enc_bytes += int(result.byte_count)
+		byte_count, _ := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
+		enc_bytes += int(byte_count)
 	}
 	enc_dur := time.duration_seconds(time.since(enc_start))
 
@@ -3098,8 +3097,8 @@ run_benchmarks :: proc() {
 	{
 		clear(&relocs)
 		clear(&errs)
-		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
-		encoded_len = result.byte_count
+		byte_count, _ := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
+		encoded_len = byte_count
 	}
 
 	// Decode
