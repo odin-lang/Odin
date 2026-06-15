@@ -60,16 +60,16 @@ Address_Mode :: enum u8 {
 // 16-byte memory operand: base + optional index + signed disp + addressing
 // metadata. Index is `NONE` for non-register-offset modes.
 Memory :: struct #packed {
-	base:    Register,    // 2
-	index:   Register,    // 2  (NONE for OFFSET/PRE/POST/LITERAL)
-	disp:    i32,         // 4  (signed; pre/post can be -256..255 unscaled,
-						  //     OFFSET supports 0..32760 scaled via imm12*size)
-	extend:  Extend,      // 1  (for EXT_REG_OFFSET; UXTX otherwise)
-	shift:   u8,          // 1  (0..4 for register-offset / extended; or
-						  //     shift amount for shifted-register operands
-						  //     when reused there)
+	base:    Register,     // 2
+	index:   Register,     // 2  (NONE for OFFSET/PRE/POST/LITERAL)
+	disp:    i32,          // 4  (signed; pre/post can be -256..255 unscaled,
+	                       //     OFFSET supports 0..32760 scaled via imm12*size)
+	extend:  Extend,       // 1  (for EXT_REG_OFFSET; UXTX otherwise)
+	shift:   u8,           // 1  (0..4 for register-offset / extended; or
+	                       //     shift amount for shifted-register operands
+	                       //     when reused there)
 	mode:    Address_Mode, // 1
-	_:       u8,          // 1
+	_:       u8,           // 1
 }
 #assert(size_of(Memory) == 12)
 
@@ -77,17 +77,15 @@ Shifted_Reg :: struct #packed {
 	reg:    Register,    // 2
 	type:   Shift_Type,  // 1
 	amount: u8,          // 1  (0..63 for 64-bit; 0..31 for 32-bit)
-	_:      [4]u8,       // 4
 }
-#assert(size_of(Shifted_Reg) == 8)
+#assert(size_of(Shifted_Reg) == 4)
 
 Extended_Reg :: struct #packed {
 	reg:    Register,    // 2
 	extend: Extend,      // 1
 	amount: u8,          // 1  (0..4)
-	_:      [4]u8,       // 4
 }
-#assert(size_of(Extended_Reg) == 8)
+#assert(size_of(Extended_Reg) == 4)
 
 // 16-byte tagged operand. The union holds whichever payload matches `kind`.
 Operand :: struct #packed {
@@ -99,14 +97,11 @@ Operand :: struct #packed {
 		shifted:   Shifted_Reg,     // 8
 		extended:  Extended_Reg,    // 8
 		cond:      u8,              // 1
-	},
-	kind: Operand_Kind,             // 1
-	size: u8,                       // 1 -- carried width info; meaning varies
-	_:    [2]u8,                    // 2
+	}, // 16 total because of alignment
+	kind: Operand_Kind,                 // 1
+	size: u8,                           // 1 -- carried width info; meaning varies
 }
-// NB: Memory is 12 bytes, larger than the i64 payload other arches use,
-// so Operand here is 16+: the table-driven matcher is size-agnostic.
-#assert(size_of(Operand) >= 16 && size_of(Operand) <= 24)
+#assert(size_of(Operand) == 18)
 
 // -----------------------------------------------------------------------------
 // Constructors -- generic
