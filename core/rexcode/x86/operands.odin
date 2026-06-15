@@ -165,9 +165,8 @@ Operand :: struct #packed {
 	kind:  Operand_Kind,
 	size:  u8,           // operand size in bytes (1, 2, 4, 8, 16, 32, 64)
 	flags: Operand_Flags,
-	_:     [4]u8,
 }
-#assert(size_of(Operand) == 16)
+#assert(size_of(Operand) == 12)
 
 // EVEX broadcast mode values for Operand_Flags.broadcast
 // Used for EVEX instructions to broadcast a scalar element to all lanes
