@@ -3182,5 +3182,61 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SQRDMULH, {.V_2S, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA0B400, 0xFFE0FC00, .NEON, {}},
 		{.SQRDMULH, {.V_4S, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA0B400, 0xFFE0FC00, .NEON, {}},
 	},
+
+	// Advanced SIMD two-register misc.
+	.NOT_V = {
+		{.NOT_V, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E205800, 0xFFFFFC00, .NEON, {}},
+		{.NOT_V, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E205800, 0xFFFFFC00, .NEON, {}},
+	},
+	.RBIT_V = {
+		{.RBIT_V, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E605800, 0xFFFFFC00, .NEON, {}},
+		{.RBIT_V, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E605800, 0xFFFFFC00, .NEON, {}},
+	},
+	.REV16_V = {
+		{.REV16_V, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E201800, 0xFFFFFC00, .NEON, {}},
+		{.REV16_V, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E201800, 0xFFFFFC00, .NEON, {}},
+	},
+	.REV32_V = {
+		{.REV32_V, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E200800, 0xFFFFFC00, .NEON, {}},
+		{.REV32_V, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E200800, 0xFFFFFC00, .NEON, {}},
+		{.REV32_V, {.V_4H, .V_4H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E600800, 0xFFFFFC00, .NEON, {}},
+		{.REV32_V, {.V_8H, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E600800, 0xFFFFFC00, .NEON, {}},
+	},
+	.REV64 = {
+		{.REV64, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E200800, 0xFFFFFC00, .NEON, {}},
+		{.REV64, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E200800, 0xFFFFFC00, .NEON, {}},
+		{.REV64, {.V_4H, .V_4H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E600800, 0xFFFFFC00, .NEON, {}},
+		{.REV64, {.V_8H, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E600800, 0xFFFFFC00, .NEON, {}},
+		{.REV64, {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA00800, 0xFFFFFC00, .NEON, {}},
+		{.REV64, {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA00800, 0xFFFFFC00, .NEON, {}},
+	},
+	.CLS_V = {
+		{.CLS_V, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E204800, 0xFFFFFC00, .NEON, {}},
+		{.CLS_V, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E204800, 0xFFFFFC00, .NEON, {}},
+		{.CLS_V, {.V_4H, .V_4H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E604800, 0xFFFFFC00, .NEON, {}},
+		{.CLS_V, {.V_8H, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E604800, 0xFFFFFC00, .NEON, {}},
+		{.CLS_V, {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA04800, 0xFFFFFC00, .NEON, {}},
+		{.CLS_V, {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA04800, 0xFFFFFC00, .NEON, {}},
+	},
+	.CLZ_V = {
+		{.CLZ_V, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E204800, 0xFFFFFC00, .NEON, {}},
+		{.CLZ_V, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E204800, 0xFFFFFC00, .NEON, {}},
+		{.CLZ_V, {.V_4H, .V_4H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E604800, 0xFFFFFC00, .NEON, {}},
+		{.CLZ_V, {.V_8H, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E604800, 0xFFFFFC00, .NEON, {}},
+		{.CLZ_V, {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA04800, 0xFFFFFC00, .NEON, {}},
+		{.CLZ_V, {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA04800, 0xFFFFFC00, .NEON, {}},
+	},
+	.CNT = {
+		{.CNT, {.V_8B, .V_8B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E205800, 0xFFFFFC00, .NEON, {}},
+		{.CNT, {.V_16B, .V_16B, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E205800, 0xFFFFFC00, .NEON, {}},
+	},
+	.URECPE_V = {
+		{.URECPE_V, {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA1C800, 0xFFFFFC00, .NEON, {}},
+		{.URECPE_V, {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA1C800, 0xFFFFFC00, .NEON, {}},
+	},
+	.URSQRTE_V = {
+		{.URSQRTE_V, {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA1C800, 0xFFFFFC00, .NEON, {}},
+		{.URSQRTE_V, {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA1C800, 0xFFFFFC00, .NEON, {}},
+	},
 	// SPECGEN:END
 }
