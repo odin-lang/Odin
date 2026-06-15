@@ -54,9 +54,8 @@ Operand :: struct #packed {
 	},
 	kind: Operand_Kind,
 	size: u8,                  // operand size in bytes (4 = word, 8 = dword)
-	_:    [2]u8,
 }
-// raw_union size = max(2, 12, 8, 8) = 12; + 1 kind + 1 size + 2 pad = 16 bytes
+#assert(size_of(Operand) == 18)
 
 @(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {

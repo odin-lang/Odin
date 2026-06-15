@@ -20,7 +20,7 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 16 = 64
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 18 = 68
 	mnemonic:      Mnemonic,                           // 2
 	operand_count: u8,                                 // 0..4
 	flags:         Instruction_Flags,                  // 1
@@ -28,7 +28,7 @@ Instruction :: struct #packed {
 	length:        u8,                                 // 4 or 8 (prefixed)
 	form_id:       u16,                                // 0 = no hint; otherwise 1 + form index
 }
-// 64 + 7 = 71 bytes (packed)
+#assert(size_of(Instruction) == 80)
 
 // =============================================================================
 // Builders
