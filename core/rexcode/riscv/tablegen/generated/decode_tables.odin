@@ -7,6 +7,7 @@ package rexcode_riscv_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [194]lib.Decode_Entry{
 	{ .LB, {.GPR,.MEM,.NONE,.NONE}, {.RD,.OFFSET_BASE_I,.NONE,.NONE}, 0x00000003, 0x0000707F, .I, {} },
 	{ .LH, {.GPR,.MEM,.NONE,.NONE}, {.RD,.OFFSET_BASE_I,.NONE,.NONE}, 0x00001003, 0x0000707F, .I, {} },
@@ -204,6 +205,7 @@ DECODE_ENTRIES := [194]lib.Decode_Entry{
 	{ .C_SDSP, {.GPR,.MEM_C_SP_D,.NONE,.NONE}, {.C_RS2,.C_IMM_CSS_D,.NONE,.NONE}, 0x0000E002, 0x0000E003, .C, {rv64_only=true} },
 }
 
+@(rodata)
 DECODE_INDEX_OPCODE := [128]lib.Decode_Index{
 	0x03 = {   0,   7},
 	0x07 = {   7,   2},
@@ -228,6 +230,7 @@ DECODE_INDEX_OPCODE := [128]lib.Decode_Index{
 	0x73 = { 148,   8},
 }
 
+@(rodata)
 DECODE_INDEX_OP_FP := [128]lib.Decode_Index{
 	0x00 = {  90,   1},
 	0x01 = {  91,   1},
@@ -257,6 +260,7 @@ DECODE_INDEX_OP_FP := [128]lib.Decode_Index{
 	0x79 = { 139,   1},
 }
 
+@(rodata)
 DECODE_INDEX_RVC := [32]lib.Decode_Index{
 	0x00 = { 156,   1},
 	0x01 = { 157,   2},

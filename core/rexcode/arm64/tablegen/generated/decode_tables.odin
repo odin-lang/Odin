@@ -7,6 +7,7 @@ package rexcode_arm64_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [1198]lib.Decode_Entry{
 	{ .AMX_SET, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x00201220, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_CLR, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x00201240, 0xFFFFFFFF, .AMX, {} },
@@ -1208,6 +1209,7 @@ DECODE_ENTRIES := [1198]lib.Decode_Entry{
 	{ .FNMSUB_H, {.H_REG,.H_REG,.H_REG,.H_REG}, {.RD,.RN,.RM,.RA}, 0x1FE08000, 0xFFE08000, .FP16, {} },
 }
 
+@(rodata)
 DECODE_INDEX_OP0 := [16]lib.Decode_Index{
 	0x00 = {   0,  75},
 	0x02 = {  75, 379},

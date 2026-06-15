@@ -7,6 +7,7 @@ package rexcode_riscv_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [194]lib.Encoding{
 	// .LUI
 	{ .LUI, {.GPR,.IMM20,.NONE,.NONE}, {.RD,.IMM_U,.NONE,.NONE}, 0x00000037, 0x0000007F, .I, {} },
@@ -398,6 +399,7 @@ ENCODE_FORMS := [194]lib.Encoding{
 	{ .C_ADD, {.GPR_NONZERO,.GPR_NONZERO,.NONE,.NONE}, {.C_RD_RS1,.C_RS2,.NONE,.NONE}, 0x00009002, 0x0000F003, .C, {} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID    = {    0,   0},
 	.LUI        = {    0,   1},

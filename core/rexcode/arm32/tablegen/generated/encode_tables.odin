@@ -7,6 +7,7 @@ package rexcode_arm32_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [1553]lib.Encoding{
 	// .AND
 	{ .AND, {.GPR,.GPR,.IMM_MOD,.NONE}, {.RD,.RN_A32,.A32_IMM_MOD,.NONE}, 0x02000000, 0x0FE00000, .BASE, .A32, {} },

@@ -7,6 +7,7 @@ package rexcode_rsp_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [116]lib.Encoding{
 	// .ADD
 	{ .ADD, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000020, 0xFC0007FF, .RSP_SCALAR, {} },
@@ -242,6 +243,7 @@ ENCODE_FORMS := [116]lib.Encoding{
 	{ .STV, {.VR,.VMEM,.NONE,.NONE}, {.VT_LS,.VBASE,.NONE,.NONE}, 0xE8005800, 0xFC00F800, .RSP_VLS, {} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID = {    0,   0},
 	.ADD     = {    0,   1},

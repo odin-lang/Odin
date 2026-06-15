@@ -92,6 +92,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
 		forms := ENCODING_TABLE[m]
@@ -105,6 +106,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	run_w := 0
 	for m in Mnemonic { run_w = max(run_w, len(reflect.enum_string(m))) }
+	strings.write_string(&sb, "@(rodata)\n")
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
@@ -120,6 +122,7 @@ emit_encode_tables :: proc() -> (total: int) {
 	// PREFIX_BITS_TABLE: dense [len(Mnemonic)]u32, indexed by mnemonic ordinal.
 	// (Non-prefixed mnemonics are 0; the library reads it as PREFIX_BITS_TABLE[u16(mn)].)
 	nmn := len(Mnemonic)
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "PREFIX_BITS_TABLE := [%d]u32{{", nmn)
 	for m in Mnemonic {
 		v := PREFIX_BITS_TABLE[m]
@@ -242,6 +245,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Reverse decode tables (source: ENCODING_TABLE), two-level primary+sub dispatch.\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "DECODE_ENTRIES := [%d]lib.Decode_Entry{{", len(all))
 	for e in all {
 		write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags)
@@ -276,8 +280,10 @@ emit_form_idx :: proc(sb: ^strings.Builder, entries: []Entry) {
 		if e.form_idx != 0 { all_zero = false; break }
 	}
 	if all_zero {
+		strings.write_string(sb, "@(rodata)\n")
 		fmt.sbprintf(sb, "DECODE_FORM_IDX: [%d]u16\n\n", len(entries))
 	} else {
+		strings.write_string(sb, "@(rodata)\n")
 		fmt.sbprintf(sb, "DECODE_FORM_IDX := [%d]u16{{", len(entries))
 		for e, i in entries {
 			if i % 64 == 0 { strings.write_string(sb, "\n\t") }
@@ -288,6 +294,7 @@ emit_form_idx :: proc(sb: ^strings.Builder, entries: []Entry) {
 }
 
 emit_bucket_list :: proc(sb: ^strings.Builder, items: []u16) {
+	strings.write_string(sb, "@(rodata)\n")
 	fmt.sbprintf(sb, "DECODE_BUCKET_LIST := [%d]u16{{", len(items))
 	for v, i in items {
 		if i % 64 == 0 { strings.write_string(sb, "\n\t") }
@@ -297,6 +304,7 @@ emit_bucket_list :: proc(sb: ^strings.Builder, items: []u16) {
 }
 
 emit_range_table :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
+	strings.write_string(sb, "@(rodata)\n")
 	fmt.sbprintf(sb, "%s := [%d]lib.Decode_Index{{", name, len(ranges))
 	amount_set := 0
 	for r, i in ranges {

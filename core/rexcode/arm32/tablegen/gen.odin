@@ -94,6 +94,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
 		forms := ENCODING_TABLE[m]
@@ -297,6 +298,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Reverse decode tables (source: ENCODING_TABLE), keyed by mode + primary key.\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "DECODE_ENTRIES := [%d]lib.Decode_Entry{{", len(all))
 	for e in all {
 		write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags)
@@ -321,6 +323,7 @@ form_idx_slice :: proc(entries: []Entry) -> []u16 {
 }
 
 emit_u16_array :: proc(sb: ^strings.Builder, name: string, items: []u16) {
+	strings.write_string(sb, "@(rodata)\n")
 	fmt.sbprintfln(sb, "%s := [%d]u16{{", name, len(items))
 	for v, i in items {
 		if i % 16 == 0 {

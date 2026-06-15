@@ -7,6 +7,7 @@ package rexcode_arm64_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [1196]lib.Encoding{
 	// .ADD_IMM
 	{ .ADD_IMM, {.WSP_REG,.WSP_REG,.IMM_12,.NONE}, {.RD,.RN,.IMM12,.NONE}, 0x11000000, 0xFF800000, .BASE, {} },
@@ -1983,6 +1984,7 @@ ENCODE_FORMS := [1196]lib.Encoding{
 	{ .TST_SR, {.X_REG,.X_SHIFTED,.NONE,.NONE}, {.RN,.RM,.NONE,.NONE}, 0xEA00001F, 0xFF20001F, .BASE, {sets_flags=true, is_64=true} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID              = {    0,   0},
 	.ADD_IMM              = {    0,   2},

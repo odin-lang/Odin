@@ -7,6 +7,7 @@ package rexcode_ppc_vle_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [222]lib.Encoding{
 	// .SE_ILLEGAL
 	{ .SE_ILLEGAL, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x00000000, 0xFFFFFFFF, .BASE, .PPC32_VLE, {short=true} },
@@ -454,6 +455,7 @@ ENCODE_FORMS := [222]lib.Encoding{
 	{ .E_BTL, {.REL, .NONE, .NONE, .NONE}, {.B15, .NONE, .NONE, .NONE}, 0x7A100001, 0xFFF00001, .BASE, .PPC32_VLE, {cond_branch=true, writes_lr=true} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID      = {    0,   0},
 	.SE_ILLEGAL   = {    0,   1},

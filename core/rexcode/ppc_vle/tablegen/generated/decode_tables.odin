@@ -8,6 +8,7 @@ package rexcode_ppc_vle_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [222]lib.Decode_Entry{
 	{ .SE_ILLEGAL, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x00000000, 0xFFFFFFFF, .BASE, .PPC32_VLE, {short=true} },
 	{ .SE_ISYNC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x00000001, 0xFFFFFFFF, .BASE, .PPC32_VLE, {short=true} },
@@ -233,6 +234,7 @@ DECODE_ENTRIES := [222]lib.Decode_Entry{
 	{ .SE_BL, {.REL, .NONE, .NONE, .NONE}, {.B8, .NONE, .NONE, .NONE}, 0x0000E900, 0xFFFFFF00, .BASE, .PPC32_VLE, {short=true} },
 }
 
+@(rodata)
 DECODE_FORM_IDX := [222]u16{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
@@ -250,6 +252,7 @@ DECODE_FORM_IDX := [222]u16{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 }
 
+@(rodata)
 DECODE_BUCKET_LIST := [222]u16{
 	  0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15, 
 	 16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31, 
@@ -267,6 +270,7 @@ DECODE_BUCKET_LIST := [222]u16{
 	185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 
 }
 
+@(rodata)
 DECODE_INDEX_SHORT := [64]lib.Decode_Index{
 	0x00 = {0, 25, 0},
 	0x01 = {25, 4, 0},
@@ -293,6 +297,7 @@ DECODE_INDEX_SHORT := [64]lib.Decode_Index{
 	0x3A = {77, 2, 0},
 }
 
+@(rodata)
 DECODE_INDEX_LONG := [64]lib.Decode_Index{
 	0x06 = {79, 47, 0},
 	0x07 = {126, 3, 0},

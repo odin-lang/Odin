@@ -7,6 +7,7 @@ package rexcode_mips_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [783]lib.Encoding{
 	// .ADD
 	{ .ADD, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000020, 0xFC0007FF, .MIPS_I, {} },
@@ -1576,6 +1577,7 @@ ENCODE_FORMS := [783]lib.Encoding{
 	{ .BVTL, {.IMM5,.REL16,.NONE,.NONE}, {.VFPU_CC3,.BRANCH_16,.NONE,.NONE}, 0x49030000, 0xFFE30000, .VFPU_PSP, {delay_slot=true, likely=true} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID         = {    0,   0},
 	.ADD             = {    0,   1},

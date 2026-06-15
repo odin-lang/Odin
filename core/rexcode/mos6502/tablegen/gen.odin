@@ -81,6 +81,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
 		forms := ENCODING_TABLE[m]
@@ -94,6 +95,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	run_w := 0
 	for m in Mnemonic { run_w = max(run_w, len(reflect.enum_string(m))) }
+	strings.write_string(&sb, "@(rodata)\n")
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
@@ -144,6 +146,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Reverse decode tables (source: ENCODING_TABLE), keyed by the first opcode byte.\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "DECODE_ENTRIES := [%d]lib.Decode_Entry{{", len(all))
 	for e in all {
 		write_entry(&sb, e.mnemonic, e.ops, e.enc, e.opcode, e.length, e.cpu, e.flags)
@@ -158,6 +161,7 @@ emit_decode_tables :: proc() -> (total: int) {
 push :: proc(r: ^Range, i: u16) { if r.count == 0 { r.start = i }; r.count += 1 }
 
 emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
+	strings.write_string(sb, "@(rodata)\n")
 	fmt.sbprintfln(sb, "%s := [%d]lib.Decode_Index{{", name, len(ranges))
 	for r, i in ranges {
 		if r.count != 0 {

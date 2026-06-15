@@ -7,6 +7,7 @@ package rexcode_mos6502_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [321]lib.Encoding{
 	// .ADC
 	{ .ADC, {.IMM_8,.NONE,.NONE,.NONE}, {.BYTE_1_IMM,.NONE,.NONE,.NONE}, 0x69, 2, .NMOS, {decimal=true} },
@@ -475,6 +476,7 @@ ENCODE_FORMS := [321]lib.Encoding{
 	{ .TAI, {.IMM_16,.IMM_16,.IMM_16,.NONE}, {.WORD_1,.WORD_3,.WORD_5,.NONE}, 0xF3, 7, .HUC6280, {} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID  = {    0,   0},
 	.ADC      = {    0,   9},

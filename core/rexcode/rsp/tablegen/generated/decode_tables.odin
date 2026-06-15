@@ -7,6 +7,7 @@ package rexcode_rsp_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [116]lib.Decode_Entry{
 	{ .NOP, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x00000000, 0xFFFFFFFF, .RSP_SCALAR, {} },
 	{ .SLL, {.GPR,.GPR,.IMM5,.NONE}, {.RD,.RT,.IMM_5,.NONE}, 0x00000000, 0xFFE0003F, .RSP_SCALAR, {} },
@@ -126,6 +127,7 @@ DECODE_ENTRIES := [116]lib.Decode_Entry{
 	{ .STV, {.VR,.VMEM,.NONE,.NONE}, {.VT_LS,.VBASE,.NONE,.NONE}, 0xE8005800, 0xFC00F800, .RSP_VLS, {} },
 }
 
+@(rodata)
 DECODE_INDEX_PRIMARY := [64]lib.Decode_Index{
 	0x00 = {   0,  20},
 	0x01 = {  20,   4},
@@ -157,6 +159,7 @@ DECODE_INDEX_PRIMARY := [64]lib.Decode_Index{
 	0x3A = { 104,  12},
 }
 
+@(rodata)
 DECODE_INDEX_SPECIAL := [64]lib.Decode_Index{
 	0x00 = {   0,   2},
 	0x02 = {   2,   1},
@@ -179,6 +182,7 @@ DECODE_INDEX_SPECIAL := [64]lib.Decode_Index{
 	0x2B = {  19,   1},
 }
 
+@(rodata)
 DECODE_INDEX_REGIMM := [32]lib.Decode_Index{
 	0x00 = {  20,   1},
 	0x01 = {  21,   1},
@@ -186,6 +190,7 @@ DECODE_INDEX_REGIMM := [32]lib.Decode_Index{
 	0x11 = {  23,   1},
 }
 
+@(rodata)
 DECODE_INDEX_COP2 := [64]lib.Decode_Index{
 	0x00 = {  40,   5},
 	0x01 = {  45,   1},
@@ -229,6 +234,7 @@ DECODE_INDEX_COP2 := [64]lib.Decode_Index{
 	0x37 = {  83,   1},
 }
 
+@(rodata)
 DECODE_INDEX_LWC2 := [32]lib.Decode_Index{
 	0x00 = {  92,   1},
 	0x01 = {  93,   1},
@@ -244,6 +250,7 @@ DECODE_INDEX_LWC2 := [32]lib.Decode_Index{
 	0x0B = { 103,   1},
 }
 
+@(rodata)
 DECODE_INDEX_SWC2 := [32]lib.Decode_Index{
 	0x00 = { 104,   1},
 	0x01 = { 105,   1},

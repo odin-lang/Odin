@@ -7,6 +7,7 @@ package rexcode_mips_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [783]lib.Decode_Entry{
 	{ .NOP, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x00000000, 0xFFFFFFFF, .MIPS_I, {} },
 	{ .SSNOP, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x00000040, 0xFFFFFFFF, .MIPS32_R1, {} },
@@ -793,6 +794,7 @@ DECODE_ENTRIES := [783]lib.Decode_Entry{
 	{ .SD, {.GPR,.MEM,.NONE,.NONE}, {.RT,.OFFSET_BASE,.NONE,.NONE}, 0xFC000000, 0xFC000000, .MIPS_III, {only_64=true} },
 }
 
+@(rodata)
 DECODE_INDEX_PRIMARY := [64]lib.Decode_Index{
 	0x00 = {   0,  84},
 	0x01 = {  84,  20},
@@ -860,6 +862,7 @@ DECODE_INDEX_PRIMARY := [64]lib.Decode_Index{
 	0x3F = { 779,   4},
 }
 
+@(rodata)
 DECODE_INDEX_SPECIAL := [64]lib.Decode_Index{
 	0x00 = {   0,   5},
 	0x01 = {   5,   2},
@@ -924,6 +927,7 @@ DECODE_INDEX_SPECIAL := [64]lib.Decode_Index{
 	0x3F = {  83,   1},
 }
 
+@(rodata)
 DECODE_INDEX_REGIMM := [32]lib.Decode_Index{
 	0x00 = {  84,   1},
 	0x01 = {  85,   1},
@@ -947,6 +951,7 @@ DECODE_INDEX_REGIMM := [32]lib.Decode_Index{
 	0x1E = { 103,   1},
 }
 
+@(rodata)
 DECODE_INDEX_COP1 := [32]lib.Decode_Index{
 	0x00 = { 132,   1},
 	0x01 = { 133,   1},
@@ -966,6 +971,7 @@ DECODE_INDEX_COP1 := [32]lib.Decode_Index{
 	0x16 = { 224,  22},
 }
 
+@(rodata)
 DECODE_INDEX_SPECIAL2 := [64]lib.Decode_Index{
 	0x00 = { 333,   1},
 	0x01 = { 334,   1},
@@ -998,6 +1004,7 @@ DECODE_INDEX_SPECIAL2 := [64]lib.Decode_Index{
 	0x3F = { 440,   2},
 }
 
+@(rodata)
 DECODE_INDEX_SPECIAL3 := [64]lib.Decode_Index{
 	0x00 = { 560,   2},
 	0x01 = { 562,   1},

@@ -7,6 +7,7 @@ package rexcode_ppc_generated
 
 import lib "../.."
 
+@(rodata)
 ENCODE_FORMS := [3327]lib.Encoding{
 	// .B
 	{ .B, {.REL,.NONE,.NONE,.NONE}, {.BRANCH_LI,.NONE,.NONE,.NONE}, 0x48000000, 0xFC000003, .BASE, .PPC32, {branch=true} },
@@ -6664,6 +6665,7 @@ ENCODE_FORMS := [3327]lib.Encoding{
 	{ .EVSETLTWS_DOT, {.GPR,.GPR,.GPR,.NONE}, {.RT,.RA,.RB,.NONE}, 0x1000061F, 0xFC0007FF, .BASE, .PPC32, {} },
 }
 
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID            = {    0,   0},
 	.B                  = {    0,   1},
@@ -9995,6 +9997,7 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.EVSETLTWS_DOT      = { 3326,   1},
 }
 
+@(rodata)
 PREFIX_BITS_TABLE := [3328]u32{
 	933 = 0x05000000, // .XXSPLTIW
 	934 = 0x05000000, // .XXSPLTIDP

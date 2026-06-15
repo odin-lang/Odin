@@ -7,6 +7,7 @@ package rexcode_mos65816_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [268]lib.Decode_Entry{
 	{ .BRK, {.IMM_8, .NONE}, {.BYTE_1_IMM, .NONE}, 0x00, 2, {branch=true} },
 	{ .ORA, {.MEM_DP_IND_X, .NONE}, {.BYTE_1_ADDR, .NONE}, 0x01, 2, {} },
@@ -278,6 +279,7 @@ DECODE_ENTRIES := [268]lib.Decode_Entry{
 	{ .SBC, {.MEM_LONG_X, .NONE}, {.LONG_1_ADDR, .NONE}, 0xFF, 4, {} },
 }
 
+@(rodata)
 DECODE_INDEX_OPCODE := [256]lib.Decode_Index{
 	0x00 = {   0,   1},
 	0x01 = {   1,   1},

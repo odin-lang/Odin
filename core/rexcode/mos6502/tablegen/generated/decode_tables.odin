@@ -7,6 +7,7 @@ package rexcode_mos6502_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [321]lib.Decode_Entry{
 	{ .BRK, {.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE}, 0x00, 1, .NMOS, {branch=true} },
 	{ .ORA, {.MEM_IND_X,.NONE,.NONE}, {.BYTE_1_ADDR,.NONE,.NONE}, 0x01, 2, .NMOS, {} },
@@ -331,6 +332,7 @@ DECODE_ENTRIES := [321]lib.Decode_Entry{
 	{ .BBS7, {.MEM_ZP,.REL,.NONE}, {.BYTE_1_ADDR,.BYTE_2_REL,.NONE}, 0xFF, 3, .CMOS_65C02, {cond_branch=true} },
 }
 
+@(rodata)
 DECODE_INDEX_OPCODE := [256]lib.Decode_Index{
 	0x00 = {   0,   1},
 	0x01 = {   1,   1},

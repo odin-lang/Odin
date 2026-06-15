@@ -7,6 +7,7 @@ package rexcode_arm32_generated
 
 import lib "../.."
 
+@(rodata)
 DECODE_ENTRIES := [1553]lib.Decode_Entry{
 	{ .MUL, {.GPR,.GPR,.GPR,.NONE}, {.RN_A32,.RM_A32,.RS_A32,.NONE}, 0x00000090, 0x0FE000F0, .BASE, .A32, {} },
 	{ .AND, {.GPR,.GPR,.GPR_RSR,.NONE}, {.RD,.RN_A32,.RM_A32,.NONE}, 0x00000010, 0x0FE00090, .BASE, .A32, {} },
@@ -1563,6 +1564,7 @@ DECODE_ENTRIES := [1553]lib.Decode_Entry{
 	{ .B, {.REL11,.NONE,.NONE,.NONE}, {.BRANCH_11_T16,.NONE,.NONE,.NONE}, 0x0000E000, 0x0000F800, .THUMB, .T32, {branch=true, writes_pc=true} },
 }
 
+@(rodata)
 DECODE_FORM_IDX := [1553]u16{
 	 0, 2, 1, 1, 5, 4, 0, 2, 1, 1, 5, 4, 0, 2, 1, 5,
 	 4, 0, 2, 1, 5, 4, 0, 2, 1, 1, 5, 4, 0, 2, 1, 1,
@@ -1664,6 +1666,7 @@ DECODE_FORM_IDX := [1553]u16{
 	 2,
 }
 
+@(rodata)
 DECODE_BUCKET_LIST := [5141]u16{
 	 0, 1, 2, 3, 0, 4, 1, 5, 2, 6, 7, 8, 9, 6, 10, 7,
 	 11, 8, 12, 35, 36, 37, 13, 14, 41, 42, 43, 15, 13, 16, 14, 17,

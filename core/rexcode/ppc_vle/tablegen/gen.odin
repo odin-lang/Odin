@@ -89,6 +89,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
 		forms := ENCODING_TABLE[m]
@@ -102,6 +103,7 @@ emit_encode_tables :: proc() -> (total: int) {
 
 	run_w := 0
 	for m in Mnemonic { run_w = max(run_w, len(reflect.enum_string(m))) }
+	strings.write_string(&sb, "@(rodata)\n")
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
@@ -205,12 +207,14 @@ emit_decode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Two dispatch namespaces: 16-bit (SHORT) and 32-bit (LONG).\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "DECODE_ENTRIES := [%d]lib.Decode_Entry{{", len(all))
 	for e in all {
 		write_row(&sb, e.mn, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags)
 	}
 	strings.write_string(&sb, "}\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintf(&sb, "DECODE_FORM_IDX := [%d]u16{{", len(all))
 	for e, i in all {
 		if i % 16 == 0 { strings.write_string(&sb, "\n\t") }
@@ -218,6 +222,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	}
 	strings.write_string(&sb, "\n}\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintf(&sb, "DECODE_BUCKET_LIST := [%d]u16{{", len(bucket_list))
 	for v, i in bucket_list {
 		if i % 16 == 0 { strings.write_string(&sb, "\n\t") }
@@ -239,6 +244,7 @@ primary_key :: proc(e: Entry) -> u16 {
 }
 
 emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
+	strings.write_string(sb, "@(rodata)\n")
 	fmt.sbprintfln(sb, "%s := [%d]lib.Decode_Index{{", name, len(ranges))
 	for r, i in ranges {
 		if r.count != 0 {
