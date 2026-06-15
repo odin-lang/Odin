@@ -705,7 +705,7 @@ encode :: proc(
 // Check if instruction matches encoding (inlined for hot path).
 // `mode` lets default_64 entries match 32-bit operands in i386 and
 // filters out mode-restricted (mode_32_only) encodings when not in i386.
-encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction, enc: ^Encoding, mode: Mode) -> bool {
+encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encoding, mode: Mode) -> bool {
 	// Mode gate: skip i386-only encodings (short-form INC/DEC at 0x40-0x4F)
 	// when not in Mode._32.
 	if enc.flags.mode_32_only && mode != ._32 { return false }
@@ -740,7 +740,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 			if user_idx >= inst.operand_count - 1 { return false }
 			effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
-			if !operand_matches_inline(&inst.ops[user_idx], effective_op_type) { return false }
+			operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
 			user_idx += 1
 		}
 		return user_idx == inst.operand_count - 1
@@ -757,7 +757,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 		if user_idx >= inst.operand_count { return false }
 		effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
-		if !operand_matches_inline(&inst.ops[user_idx], effective_op_type) { return false }
+		operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
 		user_idx += 1
 	}
 
@@ -861,16 +861,16 @@ imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 	#partial switch op_type {
 	case .IMM8:
 		// Full 8-bit range: signed [-128, 127] OR unsigned [0, 255]
-		return op.immediate >= -128 && op.immediate <= 255
+		return        -128 <= op.immediate && op.immediate <= 255
 	case .IMM8SX:
 		// Sign-extended 8-bit: must be in signed 8-bit range
-		return op.immediate >= -128 && op.immediate <= 127
+		return        -128 <= op.immediate && op.immediate <= 127
 	case .IMM16:
 		// Full 16-bit range: signed [-32768, 32767] OR unsigned [0, 65535]
-		return op.immediate >= -32768 && op.immediate <= 65535
+		return      -32768 <= op.immediate && op.immediate <= 65535
 	case .IMM32:
 		// Full 32-bit range: signed [-2147483648, 2147483647] OR unsigned [0, 4294967295]
-		return op.immediate >= -2147483648 && op.immediate <= 4294967295
+		return -2147483648 <= op.immediate && op.immediate <= 4294967295
 	case .IMM64:
 		return true  // Any i64 value fits
 	}

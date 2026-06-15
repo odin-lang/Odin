@@ -6,7 +6,6 @@ import x86 "../"
 import "../../isa"
 import "core:fmt"
 import "core:time"
-import "core:slice"
 import "core:strings"
 import "core:mem/virtual"
 import "core:math"
@@ -3051,7 +3050,7 @@ run_benchmarks :: proc() {
 	bench_insts := make([dynamic]x86.Instruction)
 	defer delete(bench_insts)
 
-	for _ in 0..<1000 {
+	for _ in 0..<100 {
 		insts := []x86.Instruction{
 			x86.inst_r(.PUSH, x86.RBP),
 			x86.inst_r_r(.MOV, x86.RBP, x86.RSP),
@@ -3071,25 +3070,34 @@ run_benchmarks :: proc() {
 		append(&bench_insts, ..insts)
 	}
 
-	code_buf: [16 * 1024]u8
+	code_buf := make([]byte, 1<<16)
+	defer delete(code_buf)
+
 	labels: [4]x86.Label_Definition
+
+	relocs: [dynamic]x86.Relocation; defer delete(relocs)
+	errs:   [dynamic]x86.Error;      defer delete(relocs)
+
+	insts: [dynamic]x86.Instruction;      defer delete(insts)
+	info:  [dynamic]x86.Instruction_Info; defer delete(info)
+	lbls:  [dynamic]x86.Label_Definition; defer delete(lbls)
 
 	// Encode
 	enc_start := time.now()
 	enc_bytes := 0
 	for _ in 0..<ITERATIONS {
-		relocs: [dynamic]x86.Relocation; defer delete(relocs)
-		errs:   [dynamic]x86.Error;      defer delete(errs)
+		clear(&relocs)
+		clear(&errs)
 		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
 		enc_bytes += int(result.byte_count)
 	}
-	enc_dur := time.duration_microseconds(time.since(enc_start))
+	enc_dur := time.duration_seconds(time.since(enc_start))
 
 	// Get encoded length for decode
 	encoded_len: u32
 	{
-		relocs: [dynamic]x86.Relocation; defer delete(relocs)
-		errs:   [dynamic]x86.Error;      defer delete(errs)
+		clear(&relocs)
+		clear(&errs)
 		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
 		encoded_len = result.byte_count
 	}
@@ -3098,22 +3106,22 @@ run_benchmarks :: proc() {
 	dec_start := time.now()
 	dec_insts := 0
 	for _ in 0..<ITERATIONS {
-		insts: [dynamic]x86.Instruction;      defer delete(insts)
-		info:  [dynamic]x86.Instruction_Info; defer delete(info)
-		lbls:  [dynamic]x86.Label_Definition; defer delete(lbls)
-		errs:  [dynamic]x86.Error;            defer delete(errs)
+		clear(&insts)
+		clear(&info)
+		clear(&lbls)
+		clear(&errs)
 		x86.decode(code_buf[:encoded_len], nil, &insts, &info, &lbls, &errs)
 		dec_insts += len(insts)
 	}
-	dec_dur := time.duration_microseconds(time.since(dec_start))
+	dec_dur := time.duration_seconds(time.since(dec_start))
 
-	enc_ips := f64(ITERATIONS * len(bench_insts)) / (enc_dur / 1_000_000)
-	dec_ips := f64(dec_insts) / (dec_dur / 1_000_000)
-	enc_mbps := f64(enc_bytes) / (enc_dur / 1_000_000) / 1_000_000
-	dec_mbps := f64(ITERATIONS * int(encoded_len)) / (dec_dur / 1_000_000) / 1_000_000
+	enc_ips := f64(ITERATIONS * len(bench_insts)) / enc_dur
+	dec_ips := f64(dec_insts) / dec_dur
+	enc_bps := u64(f64(enc_bytes) / enc_dur)
+	dec_bps := u64(f64(ITERATIONS * int(encoded_len)) / dec_dur)
 
-	fmt.printf("  Encoder: %.1f M insts/sec (%.1f MB/s)\n", enc_ips / 1_000_000, enc_mbps)
-	fmt.printf("  Decoder: %.1f M insts/sec (%.1f MB/s)\n", dec_ips / 1_000_000, dec_mbps)
+	fmt.printf("  Encoder: %.1f M insts/sec (%.1M/s)\n", enc_ips / 1_000_000, enc_bps)
+	fmt.printf("  Decoder: %.1f M insts/sec (%.1M/s)\n", dec_ips / 1_000_000, dec_bps)
 }
 
 // =============================================================================
