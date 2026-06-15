@@ -6131,11 +6131,6 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	operand->type = entity->type;
 	operand->expr = node;
 
-	if (entity->flags & EntityFlag_BitFieldField) {
-		add_package_dependency(c, "runtime", "__write_bits");
-		add_package_dependency(c, "runtime", "__read_bits");
-	}
-
 	switch (entity->kind) {
 	case Entity_Constant:
 		operand->value = entity->Constant.value;

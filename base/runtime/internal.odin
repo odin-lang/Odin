@@ -1374,7 +1374,7 @@ fixdfti :: proc "c" (a: u64) -> i128 {
 
 }
 
-__copy_bits :: #force_inline proc "contextless" (
+__copy_bits :: proc "contextless" (
 	dst:       [^]byte,
 	src:       [^]byte,
 	buf_bytes: uintptr,
@@ -1421,25 +1421,6 @@ __copy_bits :: #force_inline proc "contextless" (
 	}
 }
 
-__write_bits :: proc "contextless" (dst, src: [^]byte, dst_size_bytes: uintptr, offset_bits: uintptr, size_bits: uintptr) {
-	__copy_bits(dst, src, dst_size_bytes, offset_bits, 0, size_bits)
-	// for i in 0..<size_bits {
-	// 	j := offset_bits+i
-	// 	the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
-	// 	dst[j>>3] &~=       1<<(j&7)
-	// 	dst[j>>3]  |= the_bit<<(j&7)
-	// }
-}
-
-__read_bits :: proc "contextless" (dst, src: [^]byte, src_size_bytes: uintptr, offset_bits: uintptr, size_bits: uintptr) {
-	__copy_bits(dst, src, src_size_bytes, 0, offset_bits, size_bits)
-	// for j in 0..<size_bits {
-	// 	i := offset_bits+j
-	// 	the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
-	// 	dst[j>>3] &~=       1<<(j&7)
-	// 	dst[j>>3]  |= the_bit<<(j&7)
-	// }
-}
 
 when .Address in ODIN_SANITIZER_FLAGS {
 	foreign {
