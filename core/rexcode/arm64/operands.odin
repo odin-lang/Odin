@@ -89,7 +89,7 @@ Extended_Reg :: struct #packed {
 
 // 16-byte tagged operand. The union holds whichever payload matches `kind`.
 Operand :: struct #packed {
-	using _: struct #raw_union {
+	using _: struct #raw_union #packed {
 		reg:       Register,        // 2
 		mem:       Memory,          // 12
 		immediate: i64,             // 8
@@ -97,11 +97,11 @@ Operand :: struct #packed {
 		shifted:   Shifted_Reg,     // 8
 		extended:  Extended_Reg,    // 8
 		cond:      u8,              // 1
-	}, // 16 total because of alignment
+	}, // 12 total because of alignment
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
 }
-#assert(size_of(Operand) == 18)
+#assert(size_of(Operand) == 14)
 
 // -----------------------------------------------------------------------------
 // Constructors -- generic
