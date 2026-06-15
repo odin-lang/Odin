@@ -22,7 +22,7 @@ Instruction :: struct #packed {
 	length:        u8,                                 //  1 byte — always 4 for now; will be 2 for future μMIPS / MIPS16e
 	_:             [3]u8,                              //  3 bytes
 }
-#assert(size_of(Instruction) == 72)
+#assert(size_of(Instruction) == 48)
 
 // =============================================================================
 // Builders (mirror x86's `inst_*` shapes; per the cross-arch contract)

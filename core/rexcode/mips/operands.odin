@@ -64,9 +64,8 @@ Operand :: struct #packed {
 	},
 	kind: Operand_Kind,         // 1 byte
 	size: u8,                   // 1 byte — width hint in bytes (4 = word, 8 = dword, etc.)
-	_:    [6]u8,                // 6 bytes
 }
-#assert(size_of(Operand) == 16)
+#assert(size_of(Operand) == 10)
 
 // -----------------------------------------------------------------------------
 // Generic operand constructors
