@@ -385,11 +385,11 @@ write_flags :: proc(sb: ^strings.Builder, enc: union{lib.Encoding, Collected_Ent
 	switch e in enc {
 	case lib.Encoding:
 		encoding_operand_count: u8 = 0
-		has_implict := false
+		has_implicit := false
 		for op_type in e.ops {
 			if op_type == .NONE { break }
 			if lib.is_implicit_op_inline(op_type) {
-				has_implict = true
+				has_implicit = true
 			} else {
 				encoding_operand_count += 1
 			}
@@ -397,8 +397,8 @@ write_flags :: proc(sb: ^strings.Builder, enc: union{lib.Encoding, Collected_Ent
 		if encoding_operand_count > 0 {
 			append(&parts, fmt.tprintf("explicit_count=%d", encoding_operand_count))
 		}
-		if has_implict {
-			append(&parts, "has_implict=true")
+		if has_implicit {
+			append(&parts, "has_implicit=true")
 		}
 
 	case Collected_Entry:
