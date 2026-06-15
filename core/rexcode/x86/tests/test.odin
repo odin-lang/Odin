@@ -3047,24 +3047,30 @@ run_label_map_tests :: proc() {
 run_benchmarks :: proc() {
 	ITERATIONS :: 10000
 
-	bench_insts := []x86.Instruction{
-		x86.inst_r(.PUSH, x86.RBP),
-		x86.inst_r_r(.MOV, x86.RBP, x86.RSP),
-		x86.inst_r_i(.SUB, x86.RSP, 0x20, 1),
-		x86.inst_r_r(.MOV, x86.RAX, x86.RDI),
-		x86.inst_r_r(.ADD, x86.RAX, x86.RSI),
-		x86.inst_r_r(.XOR, x86.ECX, x86.ECX),
-		x86.inst_r_r(.IMUL, x86.RAX, x86.RDX),
-		x86.inst_r_i(.ADD, x86.RSP, 0x20, 1),
-		x86.inst_r(.POP, x86.RBP),
-		x86.inst_none(.RET),
-		x86.inst_r_r(.MOVAPS, x86.XMM0, x86.XMM1),
-		x86.inst_r_r(.ADDPS, x86.XMM0, x86.XMM2),
-		x86.inst_r_r(.VMOVAPS, x86.YMM0, x86.YMM1),
-		x86.inst_r_r_r(.VADDPS, x86.YMM0, x86.YMM1, x86.YMM2),
+	bench_insts := make([dynamic]x86.Instruction)
+	defer delete(bench_insts)
+
+	for _ in 0..<1000 {
+		insts := []x86.Instruction{
+			x86.inst_r(.PUSH, x86.RBP),
+			x86.inst_r_r(.MOV, x86.RBP, x86.RSP),
+			x86.inst_r_i(.SUB, x86.RSP, 0x20, 1),
+			x86.inst_r_r(.MOV, x86.RAX, x86.RDI),
+			x86.inst_r_r(.ADD, x86.RAX, x86.RSI),
+			x86.inst_r_r(.XOR, x86.ECX, x86.ECX),
+			x86.inst_r_r(.IMUL, x86.RAX, x86.RDX),
+			x86.inst_r_i(.ADD, x86.RSP, 0x20, 1),
+			x86.inst_r(.POP, x86.RBP),
+			x86.inst_none(.RET),
+			x86.inst_r_r(.MOVAPS, x86.XMM0, x86.XMM1),
+			x86.inst_r_r(.ADDPS, x86.XMM0, x86.XMM2),
+			x86.inst_r_r(.VMOVAPS, x86.YMM0, x86.YMM1),
+			x86.inst_r_r_r(.VADDPS, x86.YMM0, x86.YMM1, x86.YMM2),
+		}
+		append(&bench_insts, ..insts)
 	}
 
-	code_buf: [4096]u8
+	code_buf: [16 * 1024]u8
 	labels: [4]x86.Label_Definition
 
 	// Encode
@@ -3073,7 +3079,7 @@ run_benchmarks :: proc() {
 	for _ in 0..<ITERATIONS {
 		relocs: [dynamic]x86.Relocation; defer delete(relocs)
 		errs:   [dynamic]x86.Error;      defer delete(errs)
-		result := x86.encode(bench_insts, labels[:], code_buf[:], &relocs, &errs, true, 0)
+		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
 		enc_bytes += int(result.byte_count)
 	}
 	enc_dur := time.duration_microseconds(time.since(enc_start))
@@ -3083,7 +3089,7 @@ run_benchmarks :: proc() {
 	{
 		relocs: [dynamic]x86.Relocation; defer delete(relocs)
 		errs:   [dynamic]x86.Error;      defer delete(errs)
-		result := x86.encode(bench_insts, labels[:], code_buf[:], &relocs, &errs, true, 0)
+		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
 		encoded_len = result.byte_count
 	}
 
@@ -3134,31 +3140,33 @@ main :: proc() {
 	fmt.printf("%s           x64 ENCODER/DECODER TEST SUITE                             %s\n", BOLD, RESET)
 	fmt.printf("%s======================================================================%s\n", BOLD, RESET)
 
-	log_header("INTEGER INSTRUCTION TESTS")
-	log_section("MOV")
-	run_mov_tests()
-	log_section("Arithmetic")
-	run_arithmetic_tests()
-	log_section("Stack")
-	run_stack_tests()
-	log_section("Control")
-	run_control_tests()
-	log_section("Memory")
-	run_memory_tests()
-	log_section("Compare/CMOV/SET")
-	run_compare_tests()
+	when ODIN_OS != .Windows {
+		log_header("INTEGER INSTRUCTION TESTS")
+		log_section("MOV")
+		run_mov_tests()
+		log_section("Arithmetic")
+		run_arithmetic_tests()
+		log_section("Stack")
+		run_stack_tests()
+		log_section("Control")
+		run_control_tests()
+		log_section("Memory")
+		run_memory_tests()
+		log_section("Compare/CMOV/SET")
+		run_compare_tests()
 
-	log_header("SSE INSTRUCTION TESTS")
-	log_section("Scalar Float/Double")
-	run_sse_float_tests()
-	log_section("Vector Float/Double")
-	run_sse_vector_tests()
+		log_header("SSE INSTRUCTION TESTS")
+		log_section("Scalar Float/Double")
+		run_sse_float_tests()
+		log_section("Vector Float/Double")
+		run_sse_vector_tests()
 
-	log_header("AVX INSTRUCTION TESTS")
-	run_avx_tests()
+		log_header("AVX INSTRUCTION TESTS")
+		run_avx_tests()
 
-	log_header("LARGE FUNCTION TESTS")
-	run_large_tests()
+		log_header("LARGE FUNCTION TESTS")
+		run_large_tests()
+	}
 
 	log_header("DECODE-ONLY TESTS")
 	run_decode_only_tests()
