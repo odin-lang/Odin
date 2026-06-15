@@ -2894,10 +2894,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		f->expr_level = prev_level;
 
-		if (is_raw_union && is_packed) {
-			is_packed = false;
-			syntax_error(token, "'#raw_union' cannot also be '#packed'");
-		}
 		if (is_raw_union && is_all_or_none) {
 			is_all_or_none = false;
 			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
