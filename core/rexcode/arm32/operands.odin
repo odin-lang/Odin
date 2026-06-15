@@ -106,9 +106,9 @@ Operand :: struct #packed {
 	shift_amt:  u8,           // immediate shift amount 0..31 (or Rs index for RSR)
 	lane:       u8,           // SIMD lane index for DPR_ELEM / QPR_ELEM
 	cond:       u8,           // condition code 0..15 (default = AL = 14)
-	_:          u8,
 }
-// 10-byte raw_union (Memory is largest) + 7 bytes of trailing fields = 17 bytes
+#assert(size_of(Operand) == 22)
+// 16-byte raw_union (Memory is largest) + 6 bytes of trailing fields = 22 bytes
 // (packed; no alignment padding).
 
 // ---- Operand builders ------------------------------------------------------

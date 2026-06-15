@@ -21,7 +21,7 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 17 = 68
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 22 = 88
 	mnemonic:      Mnemonic,                           // 2
 	cond:          u8,                                 // 0..15 (AL=14)
 	operand_count: u8,                                 // 0..4
@@ -36,7 +36,8 @@ Instruction :: struct #packed {
 	// falls back to first-shape-match. Stored as u16 over the two padding bytes.
 	form_id:       u16,
 }
-// 68 + 9 = 77 bytes (packed)
+#assert(size_of(Instruction) == 97)
+// 88 + 9 = 97 bytes (packed)
 
 // =============================================================================
 // Builders
