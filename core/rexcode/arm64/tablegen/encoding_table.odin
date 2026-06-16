@@ -3985,5 +3985,29 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.FMINNMV, {.H_REG, .V_4H_FP16, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EB0C800, 0xFFFFFC00, .FP16, {}},
 		{.FMINNMV, {.H_REG, .V_8H_FP16, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EB0C800, 0xFFFFFC00, .FP16, {}},
 	},
+
+	// Advanced SIMD floating-point widen / narrow.
+	.FCVTL = {
+		{.FCVTL, {.V_4S, .V_4H_FP16, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E217800, 0xFFFFFC00, .FP16, {}},
+		{.FCVTL, {.V_2D, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E617800, 0xFFFFFC00, .NEON, {}},
+	},
+	.FCVTL2 = {
+		{.FCVTL2, {.V_4S, .V_8H_FP16, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E217800, 0xFFFFFC00, .FP16, {}},
+		{.FCVTL2, {.V_2D, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E617800, 0xFFFFFC00, .NEON, {}},
+	},
+	.FCVTN = {
+		{.FCVTN, {.V_4H_FP16, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E216800, 0xFFFFFC00, .FP16, {}},
+		{.FCVTN, {.V_2S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E616800, 0xFFFFFC00, .NEON, {}},
+	},
+	.FCVTN2 = {
+		{.FCVTN2, {.V_8H_FP16, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E216800, 0xFFFFFC00, .FP16, {}},
+		{.FCVTN2, {.V_4S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E616800, 0xFFFFFC00, .NEON, {}},
+	},
+	.FCVTXN = {
+		{.FCVTXN, {.V_2S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E616800, 0xFFFFFC00, .NEON, {}},
+	},
+	.FCVTXN2 = {
+		{.FCVTXN2, {.V_4S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E616800, 0xFFFFFC00, .NEON, {}},
+	},
 	// SPECGEN:END
 }

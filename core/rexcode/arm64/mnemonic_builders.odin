@@ -1015,6 +1015,18 @@ inst_fcvtzs_v_r_r               :: #force_inline proc "contextless" (dst: Regist
 emit_fcvtzs_v_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtzs_v_r_r(dst, src)) }
 inst_fcvtzu_v_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTZU_V, operand_count = 2, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), {}, {}}} }
 emit_fcvtzu_v_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtzu_v_r_r(dst, src)) }
+inst_fcvtl_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTL, operand_count = 2, length = 4, ops = {op_v_4s(u8(reg_hw(dst))), op_v_4h(u8(reg_hw(src))), {}, {}}} }
+emit_fcvtl_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtl_r_r(dst, src)) }
+inst_fcvtl2_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTL2, operand_count = 2, length = 4, ops = {op_v_4s(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), {}, {}}} }
+emit_fcvtl2_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtl2_r_r(dst, src)) }
+inst_fcvtn_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTN, operand_count = 2, length = 4, ops = {op_v_4h(u8(reg_hw(dst))), op_v_4s(u8(reg_hw(src))), {}, {}}} }
+emit_fcvtn_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtn_r_r(dst, src)) }
+inst_fcvtn2_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTN2, operand_count = 2, length = 4, ops = {op_v_8h(u8(reg_hw(dst))), op_v_4s(u8(reg_hw(src))), {}, {}}} }
+emit_fcvtn2_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtn2_r_r(dst, src)) }
+inst_fcvtxn_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTXN, operand_count = 2, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2d(u8(reg_hw(src))), {}, {}}} }
+emit_fcvtxn_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtxn_r_r(dst, src)) }
+inst_fcvtxn2_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCVTXN2, operand_count = 2, length = 4, ops = {op_v_4s(u8(reg_hw(dst))), op_v_2d(u8(reg_hw(src))), {}, {}}} }
+emit_fcvtxn2_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtxn2_r_r(dst, src)) }
 inst_fcmeq_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
 emit_fcmeq_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_r_r_r(dst, src, src2)) }
 inst_fcmge_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
@@ -2882,6 +2894,18 @@ inst_fcvtzs_v                        :: inst_fcvtzs_v_r_r
 emit_fcvtzs_v                        :: emit_fcvtzs_v_r_r
 inst_fcvtzu_v                        :: inst_fcvtzu_v_r_r
 emit_fcvtzu_v                        :: emit_fcvtzu_v_r_r
+inst_fcvtl                           :: inst_fcvtl_r_r
+emit_fcvtl                           :: emit_fcvtl_r_r
+inst_fcvtl2                          :: inst_fcvtl2_r_r
+emit_fcvtl2                          :: emit_fcvtl2_r_r
+inst_fcvtn                           :: inst_fcvtn_r_r
+emit_fcvtn                           :: emit_fcvtn_r_r
+inst_fcvtn2                          :: inst_fcvtn2_r_r
+emit_fcvtn2                          :: emit_fcvtn2_r_r
+inst_fcvtxn                          :: inst_fcvtxn_r_r
+emit_fcvtxn                          :: emit_fcvtxn_r_r
+inst_fcvtxn2                         :: inst_fcvtxn2_r_r
+emit_fcvtxn2                         :: emit_fcvtxn2_r_r
 inst_fcmeq                           :: inst_fcmeq_r_r_r
 emit_fcmeq                           :: emit_fcmeq_r_r_r
 inst_fcmge                           :: inst_fcmge_r_r_r

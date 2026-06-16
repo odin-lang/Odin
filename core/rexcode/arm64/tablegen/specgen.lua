@@ -161,6 +161,13 @@ local ACROSS  = {{"B","8B"},{"B","16B"},{"H","4H"},{"H","8H"},{"S","4S"}}
 local ACROSSL = {{"H","8B"},{"H","16B"},{"S","4H"},{"S","8H"},{"D","4S"}}
 -- FP across-lanes: scalar dst (S for .4S, H for the FP16 forms), Vn.<T>
 local ACROSSF = {{"S","4S"},{"H","4HF"},{"H","8HF"}}
+-- FP widen (FCVTL): Vd.<wide>, Vn.<narrow>;  narrow (FCVTN/FCVTXN): Vd.<narrow>, Vn.<wide>
+local FCVTL_LO  = {{"4S","4HF"},{"2D","2S"}}
+local FCVTL_HI  = {{"4S","8HF"},{"2D","4S"}}
+local FCVTN_LO  = {{"4HF","4S"},{"2S","2D"}}
+local FCVTN_HI  = {{"8HF","4S"},{"4S","2D"}}
+local FCVTXN_LO = {{"2S","2D"}}
+local FCVTXN_HI = {{"4S","2D"}}
 
 local DIFF = {
 	{ title="three-different (long)", enc=VD_VN_VM, items={
@@ -208,6 +215,11 @@ local DIFF = {
 	{ title="floating-point across lanes", enc=VD_VN, items={
 		{"FMAXV_V","fmaxv",ACROSSF},{"FMINV_V","fminv",ACROSSF},
 		{"FMAXNMV","fmaxnmv",ACROSSF},{"FMINNMV","fminnmv",ACROSSF},
+	}},
+	{ title="floating-point widen / narrow", enc=VD_VN, items={
+		{"FCVTL","fcvtl",FCVTL_LO},{"FCVTL2","fcvtl2",FCVTL_HI},
+		{"FCVTN","fcvtn",FCVTN_LO},{"FCVTN2","fcvtn2",FCVTN_HI},
+		{"FCVTXN","fcvtxn",FCVTXN_LO},{"FCVTXN2","fcvtxn2",FCVTXN_HI},
 	}},
 }
 for _, fam in ipairs(DIFF) do
