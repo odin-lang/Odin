@@ -3441,5 +3441,131 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SQDMLSL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E60B000, 0xFFE0FC00, .NEON, {}},
 		{.SQDMLSL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA0B000, 0xFFE0FC00, .NEON, {}},
 	},
+
+	// Advanced SIMD three-different (wide).
+	.SADDW = {
+		{.SADDW, {.V_8H, .V_8H, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E201000, 0xFFE0FC00, .NEON, {}},
+		{.SADDW, {.V_4S, .V_4S, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E601000, 0xFFE0FC00, .NEON, {}},
+		{.SADDW, {.V_2D, .V_2D, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA01000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SADDW2 = {
+		{.SADDW2, {.V_8H, .V_8H, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E201000, 0xFFE0FC00, .NEON, {}},
+		{.SADDW2, {.V_4S, .V_4S, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E601000, 0xFFE0FC00, .NEON, {}},
+		{.SADDW2, {.V_2D, .V_2D, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA01000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UADDW = {
+		{.UADDW, {.V_8H, .V_8H, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E201000, 0xFFE0FC00, .NEON, {}},
+		{.UADDW, {.V_4S, .V_4S, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E601000, 0xFFE0FC00, .NEON, {}},
+		{.UADDW, {.V_2D, .V_2D, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA01000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UADDW2 = {
+		{.UADDW2, {.V_8H, .V_8H, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E201000, 0xFFE0FC00, .NEON, {}},
+		{.UADDW2, {.V_4S, .V_4S, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E601000, 0xFFE0FC00, .NEON, {}},
+		{.UADDW2, {.V_2D, .V_2D, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA01000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SSUBW = {
+		{.SSUBW, {.V_8H, .V_8H, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E203000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBW, {.V_4S, .V_4S, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E603000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBW, {.V_2D, .V_2D, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA03000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SSUBW2 = {
+		{.SSUBW2, {.V_8H, .V_8H, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E203000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBW2, {.V_4S, .V_4S, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E603000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBW2, {.V_2D, .V_2D, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA03000, 0xFFE0FC00, .NEON, {}},
+	},
+	.USUBW = {
+		{.USUBW, {.V_8H, .V_8H, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E203000, 0xFFE0FC00, .NEON, {}},
+		{.USUBW, {.V_4S, .V_4S, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E603000, 0xFFE0FC00, .NEON, {}},
+		{.USUBW, {.V_2D, .V_2D, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA03000, 0xFFE0FC00, .NEON, {}},
+	},
+	.USUBW2 = {
+		{.USUBW2, {.V_8H, .V_8H, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E203000, 0xFFE0FC00, .NEON, {}},
+		{.USUBW2, {.V_4S, .V_4S, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E603000, 0xFFE0FC00, .NEON, {}},
+		{.USUBW2, {.V_2D, .V_2D, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA03000, 0xFFE0FC00, .NEON, {}},
+	},
+
+	// Advanced SIMD three-different (narrow, halving).
+	.ADDHN = {
+		{.ADDHN, {.V_8B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E204000, 0xFFE0FC00, .NEON, {}},
+		{.ADDHN, {.V_4H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E604000, 0xFFE0FC00, .NEON, {}},
+		{.ADDHN, {.V_2S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA04000, 0xFFE0FC00, .NEON, {}},
+	},
+	.ADDHN2 = {
+		{.ADDHN2, {.V_16B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E204000, 0xFFE0FC00, .NEON, {}},
+		{.ADDHN2, {.V_8H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E604000, 0xFFE0FC00, .NEON, {}},
+		{.ADDHN2, {.V_4S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA04000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SUBHN = {
+		{.SUBHN, {.V_8B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E206000, 0xFFE0FC00, .NEON, {}},
+		{.SUBHN, {.V_4H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E606000, 0xFFE0FC00, .NEON, {}},
+		{.SUBHN, {.V_2S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA06000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SUBHN2 = {
+		{.SUBHN2, {.V_16B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E206000, 0xFFE0FC00, .NEON, {}},
+		{.SUBHN2, {.V_8H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E606000, 0xFFE0FC00, .NEON, {}},
+		{.SUBHN2, {.V_4S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA06000, 0xFFE0FC00, .NEON, {}},
+	},
+	.RADDHN = {
+		{.RADDHN, {.V_8B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E204000, 0xFFE0FC00, .NEON, {}},
+		{.RADDHN, {.V_4H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E604000, 0xFFE0FC00, .NEON, {}},
+		{.RADDHN, {.V_2S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA04000, 0xFFE0FC00, .NEON, {}},
+	},
+	.RADDHN2 = {
+		{.RADDHN2, {.V_16B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E204000, 0xFFE0FC00, .NEON, {}},
+		{.RADDHN2, {.V_8H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E604000, 0xFFE0FC00, .NEON, {}},
+		{.RADDHN2, {.V_4S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA04000, 0xFFE0FC00, .NEON, {}},
+	},
+	.RSUBHN = {
+		{.RSUBHN, {.V_8B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E206000, 0xFFE0FC00, .NEON, {}},
+		{.RSUBHN, {.V_4H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E606000, 0xFFE0FC00, .NEON, {}},
+		{.RSUBHN, {.V_2S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA06000, 0xFFE0FC00, .NEON, {}},
+	},
+	.RSUBHN2 = {
+		{.RSUBHN2, {.V_16B, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E206000, 0xFFE0FC00, .NEON, {}},
+		{.RSUBHN2, {.V_8H, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E606000, 0xFFE0FC00, .NEON, {}},
+		{.RSUBHN2, {.V_4S, .V_2D, .V_2D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA06000, 0xFFE0FC00, .NEON, {}},
+	},
+
+	// Advanced SIMD two-register narrowing (XTN).
+	.XTN = {
+		{.XTN, {.V_8B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E212800, 0xFFFFFC00, .NEON, {}},
+		{.XTN, {.V_4H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E612800, 0xFFFFFC00, .NEON, {}},
+		{.XTN, {.V_2S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA12800, 0xFFFFFC00, .NEON, {}},
+	},
+	.XTN2 = {
+		{.XTN2, {.V_16B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E212800, 0xFFFFFC00, .NEON, {}},
+		{.XTN2, {.V_8H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E612800, 0xFFFFFC00, .NEON, {}},
+		{.XTN2, {.V_4S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA12800, 0xFFFFFC00, .NEON, {}},
+	},
+	.SQXTN = {
+		{.SQXTN, {.V_8B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E214800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTN, {.V_4H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E614800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTN, {.V_2S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA14800, 0xFFFFFC00, .NEON, {}},
+	},
+	.SQXTN2 = {
+		{.SQXTN2, {.V_16B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E214800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTN2, {.V_8H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E614800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTN2, {.V_4S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA14800, 0xFFFFFC00, .NEON, {}},
+	},
+	.UQXTN = {
+		{.UQXTN, {.V_8B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E214800, 0xFFFFFC00, .NEON, {}},
+		{.UQXTN, {.V_4H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E614800, 0xFFFFFC00, .NEON, {}},
+		{.UQXTN, {.V_2S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA14800, 0xFFFFFC00, .NEON, {}},
+	},
+	.UQXTN2 = {
+		{.UQXTN2, {.V_16B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E214800, 0xFFFFFC00, .NEON, {}},
+		{.UQXTN2, {.V_8H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E614800, 0xFFFFFC00, .NEON, {}},
+		{.UQXTN2, {.V_4S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA14800, 0xFFFFFC00, .NEON, {}},
+	},
+	.SQXTUN = {
+		{.SQXTUN, {.V_8B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E212800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTUN, {.V_4H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2E612800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTUN, {.V_2S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA12800, 0xFFFFFC00, .NEON, {}},
+	},
+	.SQXTUN2 = {
+		{.SQXTUN2, {.V_16B, .V_8H, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E212800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTUN2, {.V_8H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E612800, 0xFFFFFC00, .NEON, {}},
+		{.SQXTUN2, {.V_4S, .V_2D, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA12800, 0xFFFFFC00, .NEON, {}},
+	},
 	// SPECGEN:END
 }
