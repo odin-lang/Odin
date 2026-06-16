@@ -157,10 +157,10 @@ decode_one :: proc(
 			field := off
 			raw := read_uleb(data, &off) or_return
 			op := Operand{index = u32(raw), kind = .INDEX, idx_kind = idx_kind_for(m, ki)}
-			if lid, sym := reloc_label_at(relocs, field); sym {
-				op.index        = lid
+			if lid, found := reloc_label_at(relocs, field); found {
+				op.index          = lid
 				op.flags.symbolic = true
-				op.size         = 5
+				op.size           = 5
 			}
 			inst.ops[slot] = op
 			slot += 1
@@ -168,9 +168,7 @@ decode_one :: proc(
 		case .MEMARG:
 			align  := read_uleb(data, &off) or_return
 			offset := read_uleb(data, &off) or_return
-			inst.ops[slot] = Operand{
-				memarg = Memarg{align = u32(align), offset = u32(offset)}, kind = .MEMARG,
-			}
+			inst.ops[slot] = Operand{memarg = Memarg{align = u32(align), offset = u32(offset)}, kind = .MEMARG}
 			slot += 1
 
 		case .REFTYPE:
@@ -178,7 +176,8 @@ decode_one :: proc(
 				next = pc
 				return
 			}
-			t := data[off]; off += 1
+			t := data[off]
+			off += 1
 			inst.ops[slot] = Operand{immediate = i64(t), kind = .IMMEDIATE, size = 1}
 			slot += 1
 
@@ -206,7 +205,8 @@ decode_one :: proc(
 				next = pc
 				return
 			}
-			l := data[off]; off += 1
+			l := data[off]
+			off += 1
 			inst.ops[slot] = Operand{immediate = i64(l), kind = .IMMEDIATE, size = 1}
 			slot += 1
 
@@ -254,5 +254,5 @@ reloc_label_at :: #force_inline proc "contextless" (relocs: []Relocation, offset
 			return r.label_id, true
 		}
 	}
-	return 0, false
+	return
 }

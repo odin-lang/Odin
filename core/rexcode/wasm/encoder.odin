@@ -71,14 +71,14 @@ encode_one :: #force_inline proc(
 ) -> (size: u32, ok: bool) {
 	if inst.mnemonic == .INVALID {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
-		return 0, false
+		return
 	}
 	form := encoding_form(inst.mnemonic)
 
 	need := encoded_size(inst, form)
 	if pc + need > u32(len(code)) {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .BUFFER_OVERFLOW})
-		return 0, false
+		return
 	}
 
 	off := pc
@@ -156,34 +156,46 @@ encode_one :: #force_inline proc(
 
 @(private="file")
 encoded_size :: proc(inst: ^Instruction, form: ^Encoding) -> u32 {
-	size: u32 = form.prefix == PREFIX_NONE ? 1 : 1 + uleb_size(u64(form.opcode))
+	size: u32 = 1
+	if form.prefix != PREFIX_NONE {
+		size += uleb_size(u64(form.opcode))
+	}
 	opi := 0
 	for k in form.imm {
 		switch k {
 		case .NONE:
 		case .BLOCKTYPE, .I32, .I64:
-			size += sleb_size(inst.ops[opi].immediate); opi += 1
+			size += sleb_size(inst.ops[opi].immediate)
+			opi  += 1
 		case .F32:
-			size += 4; opi += 1
+			size += 4
+			opi  += 1
 		case .F64:
-			size += 8; opi += 1
+			size += 8
+			opi  += 1
 		case .IDX:
 			op := &inst.ops[opi]
 			size += op.flags.symbolic ? 5 : uleb_size(u64(op.index))
-			opi += 1
+			opi  += 1
 		case .MEMARG:
 			ma := inst.ops[opi].memarg
-			size += uleb_size(u64(ma.align)) + uleb_size(u64(ma.offset)); opi += 1
+			size += uleb_size(u64(ma.align)) + uleb_size(u64(ma.offset))
+			opi  += 1
 		case .REFTYPE:
-			size += 1; opi += 1
+			size += 1
+			opi  += 1
 		case .BR_TABLE:
 			size += uleb_size(u64(len(inst.targets)))
-			for t in inst.targets { size += uleb_size(u64(t)) }
-			size += uleb_size(u64(inst.ops[opi].index)); opi += 1
+			for t in inst.targets {
+				size += uleb_size(u64(t))
+			}
+			size += uleb_size(u64(inst.ops[opi].index))
+			opi  += 1
 		case .ZERO_BYTE:
 			size += 1
 		case .LANE:
-			size += 1; opi += 1
+			size += 1
+			opi  += 1
 		case .LANES16:
 			size += 16
 		}

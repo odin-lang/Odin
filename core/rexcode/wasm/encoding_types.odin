@@ -118,7 +118,9 @@ write_uleb_padded5 :: #force_inline proc "contextless" (code: []u8, offset: ^u32
 uleb_size :: #force_inline proc "contextless" (value: u64) -> u32 {
 	v := value
 	n: u32 = 1
-	for v >= 0x80 { v >>= 7; n += 1 }
+	for /**/; v >= 0x80; n += 1 {
+		v >>= 7
+	}
 	return n
 }
 
@@ -168,7 +170,8 @@ read_sleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (val
 	if shift < 64 && (b & 0x40) != 0 {
 		value |= -(i64(1) << shift)
 	}
-	return value, true
+	ok = true
+	return
 }
 
 write_u32le :: #force_inline proc(code: []u8, offset: ^u32, v: u32) {

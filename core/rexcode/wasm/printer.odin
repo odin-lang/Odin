@@ -356,7 +356,7 @@ write_label :: proc(
 	opts:        ^Print_Options,
 ) {
 	if label_names != nil {
-		if name, has := label_names^[label_id]; has {
+		if name, ok := label_names^[label_id]; ok {
 			strings.write_string(sb, name)
 			return
 		}
@@ -367,12 +367,20 @@ write_label :: proc(
 
 @(private="file")
 write_decimal_u32 :: proc(sb: ^strings.Builder, v: u32) {
-	if v == 0 { strings.write_byte(sb, '0'); return }
+	if v == 0 {
+		strings.write_byte(sb, '0')
+		return
+	}
+
 	buf: [10]u8
 	i := 0
-	n := v
-	for n > 0 { buf[i] = '0' + u8(n % 10); n /= 10; i += 1 }
-	for j := i - 1; j >= 0; j -= 1 { strings.write_byte(sb, buf[j]) }
+	for n := v; n > 0; i += 1 {
+		buf[i] = '0' + u8(n % 10)
+		n /= 10
+	}
+	for j := i - 1; j >= 0; j -= 1 {
+		strings.write_byte(sb, buf[j])
+	}
 }
 
 @(private="file")
@@ -387,10 +395,17 @@ write_signed_decimal :: proc(sb: ^strings.Builder, v: i64) {
 
 @(private="file")
 write_decimal_u64 :: proc(sb: ^strings.Builder, v: u64) {
-	if v == 0 { strings.write_byte(sb, '0'); return }
+	if v == 0 {
+		strings.write_byte(sb, '0')
+		return
+	}
 	buf: [20]u8
 	i := 0
-	n := v
-	for n > 0 { buf[i] = '0' + u8(n % 10); n /= 10; i += 1 }
-	for j := i - 1; j >= 0; j -= 1 { strings.write_byte(sb, buf[j]) }
+	for n := v; n > 0; i += 1 {
+		buf[i] = '0' + u8(n % 10)
+		n /= 10
+	}
+	for j := i - 1; j >= 0; j -= 1 {
+		strings.write_byte(sb, buf[j])
+	}
 }
