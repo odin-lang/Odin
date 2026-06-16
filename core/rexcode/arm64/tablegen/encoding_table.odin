@@ -3315,5 +3315,131 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.URSQRTE_V, {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA1C800, 0xFFFFFC00, .NEON, {}},
 		{.URSQRTE_V, {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA1C800, 0xFFFFFC00, .NEON, {}},
 	},
+
+	// Advanced SIMD three-different (long).
+	.SADDL = {
+		{.SADDL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E200000, 0xFFE0FC00, .NEON, {}},
+		{.SADDL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E600000, 0xFFE0FC00, .NEON, {}},
+		{.SADDL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA00000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SADDL2 = {
+		{.SADDL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E200000, 0xFFE0FC00, .NEON, {}},
+		{.SADDL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E600000, 0xFFE0FC00, .NEON, {}},
+		{.SADDL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA00000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UADDL = {
+		{.UADDL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E200000, 0xFFE0FC00, .NEON, {}},
+		{.UADDL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E600000, 0xFFE0FC00, .NEON, {}},
+		{.UADDL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA00000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UADDL2 = {
+		{.UADDL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E200000, 0xFFE0FC00, .NEON, {}},
+		{.UADDL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E600000, 0xFFE0FC00, .NEON, {}},
+		{.UADDL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA00000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SSUBL = {
+		{.SSUBL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E202000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E602000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA02000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SSUBL2 = {
+		{.SSUBL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E202000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E602000, 0xFFE0FC00, .NEON, {}},
+		{.SSUBL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA02000, 0xFFE0FC00, .NEON, {}},
+	},
+	.USUBL = {
+		{.USUBL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E202000, 0xFFE0FC00, .NEON, {}},
+		{.USUBL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E602000, 0xFFE0FC00, .NEON, {}},
+		{.USUBL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA02000, 0xFFE0FC00, .NEON, {}},
+	},
+	.USUBL2 = {
+		{.USUBL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E202000, 0xFFE0FC00, .NEON, {}},
+		{.USUBL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E602000, 0xFFE0FC00, .NEON, {}},
+		{.USUBL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA02000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SMULL_V = {
+		{.SMULL_V, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E20C000, 0xFFE0FC00, .NEON, {}},
+		{.SMULL_V, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E60C000, 0xFFE0FC00, .NEON, {}},
+		{.SMULL_V, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA0C000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SMULL2_V = {
+		{.SMULL2_V, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E20C000, 0xFFE0FC00, .NEON, {}},
+		{.SMULL2_V, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E60C000, 0xFFE0FC00, .NEON, {}},
+		{.SMULL2_V, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA0C000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UMULL_V = {
+		{.UMULL_V, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E20C000, 0xFFE0FC00, .NEON, {}},
+		{.UMULL_V, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E60C000, 0xFFE0FC00, .NEON, {}},
+		{.UMULL_V, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA0C000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UMULL2_V = {
+		{.UMULL2_V, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E20C000, 0xFFE0FC00, .NEON, {}},
+		{.UMULL2_V, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E60C000, 0xFFE0FC00, .NEON, {}},
+		{.UMULL2_V, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA0C000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SMLAL = {
+		{.SMLAL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E208000, 0xFFE0FC00, .NEON, {}},
+		{.SMLAL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E608000, 0xFFE0FC00, .NEON, {}},
+		{.SMLAL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA08000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SMLAL2 = {
+		{.SMLAL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E208000, 0xFFE0FC00, .NEON, {}},
+		{.SMLAL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E608000, 0xFFE0FC00, .NEON, {}},
+		{.SMLAL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA08000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UMLAL = {
+		{.UMLAL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E208000, 0xFFE0FC00, .NEON, {}},
+		{.UMLAL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E608000, 0xFFE0FC00, .NEON, {}},
+		{.UMLAL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA08000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UMLAL2 = {
+		{.UMLAL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E208000, 0xFFE0FC00, .NEON, {}},
+		{.UMLAL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E608000, 0xFFE0FC00, .NEON, {}},
+		{.UMLAL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA08000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SMLSL = {
+		{.SMLSL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E20A000, 0xFFE0FC00, .NEON, {}},
+		{.SMLSL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E60A000, 0xFFE0FC00, .NEON, {}},
+		{.SMLSL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA0A000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SMLSL2 = {
+		{.SMLSL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E20A000, 0xFFE0FC00, .NEON, {}},
+		{.SMLSL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E60A000, 0xFFE0FC00, .NEON, {}},
+		{.SMLSL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA0A000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UMLSL = {
+		{.UMLSL, {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E20A000, 0xFFE0FC00, .NEON, {}},
+		{.UMLSL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2E60A000, 0xFFE0FC00, .NEON, {}},
+		{.UMLSL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x2EA0A000, 0xFFE0FC00, .NEON, {}},
+	},
+	.UMLSL2 = {
+		{.UMLSL2, {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E20A000, 0xFFE0FC00, .NEON, {}},
+		{.UMLSL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6E60A000, 0xFFE0FC00, .NEON, {}},
+		{.UMLSL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EA0A000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SQDMULL = {
+		{.SQDMULL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E60D000, 0xFFE0FC00, .NEON, {}},
+		{.SQDMULL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA0D000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SQDMULL2 = {
+		{.SQDMULL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E60D000, 0xFFE0FC00, .NEON, {}},
+		{.SQDMULL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA0D000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SQDMLAL = {
+		{.SQDMLAL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E609000, 0xFFE0FC00, .NEON, {}},
+		{.SQDMLAL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA09000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SQDMLAL2 = {
+		{.SQDMLAL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E609000, 0xFFE0FC00, .NEON, {}},
+		{.SQDMLAL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA09000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SQDMLSL = {
+		{.SQDMLSL, {.V_4S, .V_4H, .V_4H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E60B000, 0xFFE0FC00, .NEON, {}},
+		{.SQDMLSL, {.V_2D, .V_2S, .V_2S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EA0B000, 0xFFE0FC00, .NEON, {}},
+	},
+	.SQDMLSL2 = {
+		{.SQDMLSL2, {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E60B000, 0xFFE0FC00, .NEON, {}},
+		{.SQDMLSL2, {.V_2D, .V_4S, .V_4S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EA0B000, 0xFFE0FC00, .NEON, {}},
+	},
 	// SPECGEN:END
 }

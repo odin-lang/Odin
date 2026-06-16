@@ -109,6 +109,55 @@ for _, fam in ipairs(FAMILIES) do
 	sections[#sections+1] = string.format("\t// %s.\n%s", fam.title, table.concat(blocks, "\n"))
 end
 
+-- Advanced SIMD three-different (long): Vd.<wide>, Vn.<narrow>, Vm.<narrow>.
+-- Base mnemonics use the low-half source arrangement; the "2" variants use the
+-- high half. enc stays VD/VN/VM; only the operand arrangements differ.
+local LONG_LOW  = {{"8H","8B"},{"4S","4H"},{"2D","2S"}}
+local LONG_HIGH = {{"8H","16B"},{"4S","8H"},{"2D","4S"}}
+local THREE_DIFF = {
+	{"SADDL","saddl",LONG_LOW},   {"SADDL2","saddl2",LONG_HIGH},
+	{"UADDL","uaddl",LONG_LOW},   {"UADDL2","uaddl2",LONG_HIGH},
+	{"SSUBL","ssubl",LONG_LOW},   {"SSUBL2","ssubl2",LONG_HIGH},
+	{"USUBL","usubl",LONG_LOW},   {"USUBL2","usubl2",LONG_HIGH},
+	{"SMULL_V","smull",LONG_LOW}, {"SMULL2_V","smull2",LONG_HIGH},
+	{"UMULL_V","umull",LONG_LOW}, {"UMULL2_V","umull2",LONG_HIGH},
+	{"SMLAL","smlal",LONG_LOW},   {"SMLAL2","smlal2",LONG_HIGH},
+	{"UMLAL","umlal",LONG_LOW},   {"UMLAL2","umlal2",LONG_HIGH},
+	{"SMLSL","smlsl",LONG_LOW},   {"SMLSL2","smlsl2",LONG_HIGH},
+	{"UMLSL","umlsl",LONG_LOW},   {"UMLSL2","umlsl2",LONG_HIGH},
+	{"SQDMULL","sqdmull",LONG_LOW},   {"SQDMULL2","sqdmull2",LONG_HIGH},
+	{"SQDMLAL","sqdmlal",LONG_LOW},   {"SQDMLAL2","sqdmlal2",LONG_HIGH},
+	{"SQDMLSL","sqdmlsl",LONG_LOW},   {"SQDMLSL2","sqdmlsl2",LONG_HIGH},
+}
+do
+	local dblocks = {}
+	for _, it in ipairs(THREE_DIFF) do
+		local mnem, llvm, pairs = it[1], it[2], it[3]
+		local rows = {}
+		for _, pr in ipairs(pairs) do
+			local d, s = pr[1], pr[2]
+			local da, sa = ARR[d].asm, ARR[s].asm
+			local function mk(r) return string.format("%s v%d.%s, v%d.%s, v%d.%s", llvm, r,da, r,sa, r,sa) end
+			local w0, w31 = word(mk(0)), word(mk(31))
+			if w0 and w31 then
+				local mask = bit.band(bit.bnot(bit.bxor(w0, w31)), 0xFFFFFFFF)
+				rows[#rows+1] = string.format(
+					"\t\t{.%s, {.%s, .%s, .%s, .NONE}, {.VD, .VN, .VM, .NONE}, 0x%s, 0x%s, .NEON, {}},",
+					mnem, ARR[d].vt, ARR[s].vt, ARR[s].vt,
+					bit.tohex(w0):upper(), bit.tohex(mask):upper())
+				n_forms = n_forms + 1
+			else
+				skips[#skips+1] = mnem.." "..d.."<-"..s
+			end
+		end
+		if #rows > 0 then
+			dblocks[#dblocks+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
+			n_mnem = n_mnem + 1
+		end
+	end
+	sections[#sections+1] = "\t// Advanced SIMD three-different (long).\n" .. table.concat(dblocks, "\n")
+end
+
 local region = "\t// SPECGEN:BEGIN\n" .. table.concat(sections, "\n\n") .. "\n\t// SPECGEN:END"
 
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()
