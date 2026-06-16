@@ -102,6 +102,7 @@ local UNIFORM = {
 		{"SSHL","sshl"},{"USHL","ushl"},{"SRSHL","srshl"},{"URSHL","urshl"},
 	}},
 	{ title="two-register misc", enc=VD_VN, nreg=2, items={
+		{"ABS_V","abs"},{"NEG_V","neg"},
 		{"NOT_V","not"},{"RBIT_V","rbit"},
 		{"REV16_V","rev16"},{"REV32_V","rev32"},{"REV64","rev64"},
 		{"CLS_V","cls"},{"CLZ_V","clz"},{"CNT","cnt"},
@@ -120,6 +121,11 @@ local UNIFORM = {
 		{"FRINTA_V","frinta"},{"FRINTI_V","frinti"},{"FRINTM_V","frintm"},{"FRINTN_V","frintn"},
 		{"FRINTP_V","frintp"},{"FRINTX_V","frintx"},{"FRINTZ_V","frintz"},
 		{"FRECPE","frecpe"},{"FRSQRTE","frsqrte"},
+	}},
+	{ title="floating-point convert (vector, register form)", enc=VD_VN, nreg=2, arr={"2S","4S","2D","4HF","8HF"}, items={
+		{"FCVTAS_V","fcvtas"},{"FCVTAU_V","fcvtau"},{"FCVTMS_V","fcvtms"},{"FCVTMU_V","fcvtmu"},
+		{"FCVTNS_V","fcvtns"},{"FCVTNU_V","fcvtnu"},{"FCVTPS_V","fcvtps"},{"FCVTPU_V","fcvtpu"},
+		{"FCVTZS_V","fcvtzs"},{"FCVTZU_V","fcvtzu"},{"SCVTF_V","scvtf"},{"UCVTF_V","ucvtf"},
 	}},
 }
 for _, fam in ipairs(UNIFORM) do
