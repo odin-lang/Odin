@@ -931,6 +931,40 @@ inst_fmla_v_r_r_r               :: #force_inline proc "contextless" (dst: Regist
 emit_fmla_v_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmla_v_r_r_r(dst, src, src2)) }
 inst_fmls_v_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMLS_V, operand_count = 3, length = 4, ops = {op_v_4s(u8(reg_hw(dst))), op_v_4s(u8(reg_hw(src))), op_v_4s(u8(reg_hw(src2))), {}}} }
 emit_fmls_v_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmls_v_r_r_r(dst, src, src2)) }
+inst_fmulx_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMULX, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fmulx_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmulx_r_r_r(dst, src, src2)) }
+inst_fmax_v_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAX_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fmax_v_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_v_r_r_r(dst, src, src2)) }
+inst_fmin_v_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMIN_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fmin_v_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_v_r_r_r(dst, src, src2)) }
+inst_fmaxnm_v_r_r_r             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNM_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fmaxnm_v_r_r_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_v_r_r_r(dst, src, src2)) }
+inst_fminnm_v_r_r_r             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNM_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fminnm_v_r_r_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_v_r_r_r(dst, src, src2)) }
+inst_fmaxp_v_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXP_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fmaxp_v_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxp_v_r_r_r(dst, src, src2)) }
+inst_fminp_v_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINP_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fminp_v_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminp_v_r_r_r(dst, src, src2)) }
+inst_fmaxnmp_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNMP, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fmaxnmp_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnmp_r_r_r(dst, src, src2)) }
+inst_fminnmp_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNMP, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fminnmp_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnmp_r_r_r(dst, src, src2)) }
+inst_frecps_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_frecps_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_r_r_r(dst, src, src2)) }
+inst_frsqrts_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_frsqrts_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_r_r_r(dst, src, src2)) }
+inst_faddp_v_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADDP_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_faddp_v_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_faddp_v_r_r_r(dst, src, src2)) }
+inst_fcmeq_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fcmeq_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_r_r_r(dst, src, src2)) }
+inst_fcmge_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fcmge_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmge_r_r_r(dst, src, src2)) }
+inst_fcmgt_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_fcmgt_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmgt_r_r_r(dst, src, src2)) }
+inst_facge_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FACGE, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_facge_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_facge_r_r_r(dst, src, src2)) }
+inst_facgt_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FACGT, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
+emit_facgt_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_facgt_r_r_r(dst, src, src2)) }
 inst_cmeq_r_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .CMEQ, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_16b(u8(reg_hw(src))), op_v_16b(u8(reg_hw(src2))), {}}} }
 emit_cmeq_r_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_cmeq_r_r_r(dst, src, src2)) }
 inst_cmge_r_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .CMGE, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_v_8b(u8(reg_hw(src2))), {}}} }
@@ -2704,6 +2738,40 @@ inst_fmla_v                          :: inst_fmla_v_r_r_r
 emit_fmla_v                          :: emit_fmla_v_r_r_r
 inst_fmls_v                          :: inst_fmls_v_r_r_r
 emit_fmls_v                          :: emit_fmls_v_r_r_r
+inst_fmulx                           :: inst_fmulx_r_r_r
+emit_fmulx                           :: emit_fmulx_r_r_r
+inst_fmax_v                          :: inst_fmax_v_r_r_r
+emit_fmax_v                          :: emit_fmax_v_r_r_r
+inst_fmin_v                          :: inst_fmin_v_r_r_r
+emit_fmin_v                          :: emit_fmin_v_r_r_r
+inst_fmaxnm_v                        :: inst_fmaxnm_v_r_r_r
+emit_fmaxnm_v                        :: emit_fmaxnm_v_r_r_r
+inst_fminnm_v                        :: inst_fminnm_v_r_r_r
+emit_fminnm_v                        :: emit_fminnm_v_r_r_r
+inst_fmaxp_v                         :: inst_fmaxp_v_r_r_r
+emit_fmaxp_v                         :: emit_fmaxp_v_r_r_r
+inst_fminp_v                         :: inst_fminp_v_r_r_r
+emit_fminp_v                         :: emit_fminp_v_r_r_r
+inst_fmaxnmp                         :: inst_fmaxnmp_r_r_r
+emit_fmaxnmp                         :: emit_fmaxnmp_r_r_r
+inst_fminnmp                         :: inst_fminnmp_r_r_r
+emit_fminnmp                         :: emit_fminnmp_r_r_r
+inst_frecps                          :: inst_frecps_r_r_r
+emit_frecps                          :: emit_frecps_r_r_r
+inst_frsqrts                         :: inst_frsqrts_r_r_r
+emit_frsqrts                         :: emit_frsqrts_r_r_r
+inst_faddp_v                         :: inst_faddp_v_r_r_r
+emit_faddp_v                         :: emit_faddp_v_r_r_r
+inst_fcmeq                           :: inst_fcmeq_r_r_r
+emit_fcmeq                           :: emit_fcmeq_r_r_r
+inst_fcmge                           :: inst_fcmge_r_r_r
+emit_fcmge                           :: emit_fcmge_r_r_r
+inst_fcmgt                           :: inst_fcmgt_r_r_r
+emit_fcmgt                           :: emit_fcmgt_r_r_r
+inst_facge                           :: inst_facge_r_r_r
+emit_facge                           :: emit_facge_r_r_r
+inst_facgt                           :: inst_facgt_r_r_r
+emit_facgt                           :: emit_facgt_r_r_r
 inst_cmeq                            :: inst_cmeq_r_r_r
 emit_cmeq                            :: emit_cmeq_r_r_r
 inst_cmge                            :: inst_cmge_r_r_r

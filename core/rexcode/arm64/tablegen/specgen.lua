@@ -19,7 +19,7 @@
 --   Run: luajit tablegen/specgen.lua   (from arm64/, or with a full path)
 
 local bit  = require("bit")
-local LLVM = "llvm-mc --assemble --arch=aarch64 --show-encoding"
+local LLVM = "llvm-mc --assemble --arch=aarch64 --mattr=+fullfp16 --show-encoding"
 local DIR   = (arg[0]:match("^(.*)/[^/]*$")) or "."
 local TABLE = DIR .. "/encoding_table.odin"
 
@@ -28,6 +28,8 @@ local ARR = {
 	["4H"]={vt="V_4H",asm="4h"}, ["8H"] ={vt="V_8H", asm="8h"},
 	["2S"]={vt="V_2S",asm="2s"}, ["4S"] ={vt="V_4S", asm="4s"},
 	["1D"]={vt="V_1D",asm="1d"}, ["2D"] ={vt="V_2D", asm="2d"},
+	-- half-precision FP arrangements (distinct operand type + FP16 feature)
+	["4HF"]={vt="V_4H_FP16",asm="4h",feat="FP16"}, ["8HF"]={vt="V_8H_FP16",asm="8h",feat="FP16"},
 }
 local ALL_ARR = {"8B","16B","4H","8H","2S","4S","2D"}
 
@@ -68,8 +70,9 @@ local function emit(mnem, llvm, enc_str, feature, variants)
 			local mask = bit.band(bit.bnot(bit.bxor(w0, w31)), 0xFFFFFFFF)
 			local ops = {}
 			for i, t in ipairs(tup) do ops[i] = "."..tok_vt(t) end
+			local f = (ARR[tup[1]] and ARR[tup[1]].feat) or feature
 			rows[#rows+1] = string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .%s, {}},",
-				mnem, padded(ops, #tup), enc_str, bit.tohex(w0):upper(), bit.tohex(mask):upper(), feature)
+				mnem, padded(ops, #tup), enc_str, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f)
 			n_forms = n_forms + 1
 		else
 			skips[#skips+1] = mnem.." "..table.concat(tup, "/")
@@ -103,12 +106,20 @@ local UNIFORM = {
 		{"CLS_V","cls"},{"CLZ_V","clz"},{"CNT","cnt"},
 		{"URECPE_V","urecpe"},{"URSQRTE_V","ursqrte"},
 	}},
+	{ title="floating-point three-same", enc=VD_VN_VM, nreg=3, arr={"2S","4S","2D","4HF","8HF"}, items={
+		{"FMAX_V","fmax"},{"FMIN_V","fmin"},{"FMAXNM_V","fmaxnm"},{"FMINNM_V","fminnm"},
+		{"FMULX","fmulx"},{"FRECPS","frecps"},{"FRSQRTS","frsqrts"},
+		{"FACGE","facge"},{"FACGT","facgt"},
+		{"FCMEQ","fcmeq"},{"FCMGE","fcmge"},{"FCMGT","fcmgt"},
+		{"FADDP_V","faddp"},{"FMAXP_V","fmaxp"},{"FMINP_V","fminp"},
+		{"FMAXNMP","fmaxnmp"},{"FMINNMP","fminnmp"},
+	}},
 }
 for _, fam in ipairs(UNIFORM) do
 	local blk = {}
 	for _, it in ipairs(fam.items) do
 		local variants = {}
-		for _, a in ipairs(ALL_ARR) do
+		for _, a in ipairs(fam.arr or ALL_ARR) do
 			local tup = {}; for i = 1, fam.nreg do tup[i] = a end
 			variants[#variants+1] = tup
 		end
