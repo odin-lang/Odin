@@ -31,6 +31,12 @@ local ARR = {
 }
 local ALL_ARR = {"8B","16B","4H","8H","2S","4S","2D"}
 
+-- scalar SIMD register destinations (across-lanes reductions): token -> reg
+local SCAL = { B={vt="B_REG",asm="b"}, H={vt="H_REG",asm="h"}, S={vt="S_REG",asm="s"}, D={vt="D_REG",asm="d"} }
+-- a tuple token is either a vector arrangement (in ARR) or a scalar size (in SCAL)
+local function tok_asm(t, r) if ARR[t] then return "v"..r.."."..ARR[t].asm else return SCAL[t].asm..r end end
+local function tok_vt(t)     if ARR[t] then return ARR[t].vt      else return SCAL[t].vt end end
+
 local function word(line)
 	local p = io.popen(string.format("printf '%%s\\n' '%s' | %s 2>/dev/null", line, LLVM))
 	local out = p:read("*a"); p:close()
@@ -54,14 +60,14 @@ local function emit(mnem, llvm, enc_str, feature, variants)
 	for _, tup in ipairs(variants) do
 		local function mk(r)
 			local parts = {}
-			for i, arr in ipairs(tup) do parts[i] = "v"..r.."."..ARR[arr].asm end
+			for i, t in ipairs(tup) do parts[i] = tok_asm(t, r) end
 			return llvm.." "..table.concat(parts, ", ")
 		end
 		local w0, w31 = word(mk(0)), word(mk(31))
 		if w0 and w31 then
 			local mask = bit.band(bit.bnot(bit.bxor(w0, w31)), 0xFFFFFFFF)
 			local ops = {}
-			for i, arr in ipairs(tup) do ops[i] = "."..ARR[arr].vt end
+			for i, t in ipairs(tup) do ops[i] = "."..tok_vt(t) end
 			rows[#rows+1] = string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .%s, {}},",
 				mnem, padded(ops, #tup), enc_str, bit.tohex(w0):upper(), bit.tohex(mask):upper(), feature)
 			n_forms = n_forms + 1
@@ -123,6 +129,12 @@ local NARR_LO = {{"8B","8H","8H"},{"4H","4S","4S"},{"2S","2D","2D"}}
 local NARR_HI = {{"16B","8H","8H"},{"8H","4S","4S"},{"4S","2D","2D"}}
 local XTN_LO  = {{"8B","8H"},{"4H","4S"},{"2S","2D"}}
 local XTN_HI  = {{"16B","8H"},{"8H","4S"},{"4S","2D"}}
+-- pairwise-long: Vd.<wide>, Vn.<narrow> (half the lanes, double the element size)
+local PLONG   = {{"4H","8B"},{"8H","16B"},{"2S","4H"},{"4S","8H"},{"1D","2S"},{"2D","4S"}}
+-- across-lanes: scalar dst of the element size, Vn.<T>
+local ACROSS  = {{"B","8B"},{"B","16B"},{"H","4H"},{"H","8H"},{"S","4S"}}
+-- across-lanes long: scalar dst of 2x the element size, Vn.<T>
+local ACROSSL = {{"H","8B"},{"H","16B"},{"S","4H"},{"S","8H"},{"D","4S"}}
 
 local DIFF = {
 	{ title="three-different (long)", enc=VD_VN_VM, items={
@@ -157,6 +169,15 @@ local DIFF = {
 		{"SQXTN","sqxtn",XTN_LO},{"SQXTN2","sqxtn2",XTN_HI},
 		{"UQXTN","uqxtn",XTN_LO},{"UQXTN2","uqxtn2",XTN_HI},
 		{"SQXTUN","sqxtun",XTN_LO},{"SQXTUN2","sqxtun2",XTN_HI},
+	}},
+	{ title="two-register pairwise long", enc=VD_VN, items={
+		{"SADDLP","saddlp",PLONG},{"UADDLP","uaddlp",PLONG},
+		{"SADALP","sadalp",PLONG},{"UADALP","uadalp",PLONG},
+	}},
+	{ title="across lanes", enc=VD_VN, items={
+		{"ADDV","addv",ACROSS},{"SMAXV","smaxv",ACROSS},{"SMINV","sminv",ACROSS},
+		{"UMAXV","umaxv",ACROSS},{"UMINV","uminv",ACROSS},
+		{"SADDLV","saddlv",ACROSSL},{"UADDLV","uaddlv",ACROSSL},
 	}},
 }
 for _, fam in ipairs(DIFF) do
