@@ -70,7 +70,8 @@ local function emit(mnem, llvm, enc_str, feature, variants)
 			local mask = bit.band(bit.bnot(bit.bxor(w0, w31)), 0xFFFFFFFF)
 			local ops = {}
 			for i, t in ipairs(tup) do ops[i] = "."..tok_vt(t) end
-			local f = (ARR[tup[1]] and ARR[tup[1]].feat) or feature
+			local f = feature
+			for _, tk in ipairs(tup) do if ARR[tk] and ARR[tk].feat then f = ARR[tk].feat end end
 			rows[#rows+1] = string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .%s, {}},",
 				mnem, padded(ops, #tup), enc_str, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f)
 			n_forms = n_forms + 1
@@ -114,6 +115,12 @@ local UNIFORM = {
 		{"FADDP_V","faddp"},{"FMAXP_V","fmaxp"},{"FMINP_V","fminp"},
 		{"FMAXNMP","fmaxnmp"},{"FMINNMP","fminnmp"},
 	}},
+	{ title="floating-point two-register", enc=VD_VN, nreg=2, arr={"2S","4S","2D","4HF","8HF"}, items={
+		{"FABS_V","fabs"},{"FNEG_V","fneg"},{"FSQRT_V","fsqrt"},
+		{"FRINTA_V","frinta"},{"FRINTI_V","frinti"},{"FRINTM_V","frintm"},{"FRINTN_V","frintn"},
+		{"FRINTP_V","frintp"},{"FRINTX_V","frintx"},{"FRINTZ_V","frintz"},
+		{"FRECPE","frecpe"},{"FRSQRTE","frsqrte"},
+	}},
 }
 for _, fam in ipairs(UNIFORM) do
 	local blk = {}
@@ -146,6 +153,8 @@ local PLONG   = {{"4H","8B"},{"8H","16B"},{"2S","4H"},{"4S","8H"},{"1D","2S"},{"
 local ACROSS  = {{"B","8B"},{"B","16B"},{"H","4H"},{"H","8H"},{"S","4S"}}
 -- across-lanes long: scalar dst of 2x the element size, Vn.<T>
 local ACROSSL = {{"H","8B"},{"H","16B"},{"S","4H"},{"S","8H"},{"D","4S"}}
+-- FP across-lanes: scalar dst (S for .4S, H for the FP16 forms), Vn.<T>
+local ACROSSF = {{"S","4S"},{"H","4HF"},{"H","8HF"}}
 
 local DIFF = {
 	{ title="three-different (long)", enc=VD_VN_VM, items={
@@ -189,6 +198,10 @@ local DIFF = {
 		{"ADDV","addv",ACROSS},{"SMAXV","smaxv",ACROSS},{"SMINV","sminv",ACROSS},
 		{"UMAXV","umaxv",ACROSS},{"UMINV","uminv",ACROSS},
 		{"SADDLV","saddlv",ACROSSL},{"UADDLV","uaddlv",ACROSSL},
+	}},
+	{ title="floating-point across lanes", enc=VD_VN, items={
+		{"FMAXV_V","fmaxv",ACROSSF},{"FMINV_V","fminv",ACROSSF},
+		{"FMAXNMV","fmaxnmv",ACROSSF},{"FMINNMV","fminnmv",ACROSSF},
 	}},
 }
 for _, fam in ipairs(DIFF) do
