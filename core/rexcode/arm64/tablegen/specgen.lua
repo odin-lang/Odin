@@ -236,41 +236,49 @@ end
 -- derived empirically by also varying the shift (canon = operand bits 0, other =
 -- all shift bits set). The encoder/decoder compute the amount (NEON_SHL/SHR_IMM).
 local ESIZE = {["8B"]=8,["16B"]=8,["4H"]=16,["8H"]=16,["2S"]=32,["4S"]=32,["1D"]=64,["2D"]=64}
-local SHIFT_ARR = {"8B","16B","4H","8H","2S","4S","2D"}
-local function emit_shift(mnem, llvm, dir)
+-- variants are arrangement pairs {dst, src}; the shift element size is the SOURCE
+-- (same for same-arrangement shifts, the narrow input for widening shifts).
+local function emit_shift(mnem, llvm, dir, variants)
 	local enc_tok = (dir == "L") and ".NEON_SHL_IMM" or ".NEON_SHR_IMM"
 	local rows = {}
-	for _, a in ipairs(SHIFT_ARR) do
-		local es = ESIZE[a]
+	for _, v in ipairs(variants) do
+		local dst, src = v[1], v[2]
+		local es = ESIZE[src]
 		local canon = (dir == "L") and 0 or es
 		local other = (dir == "L") and (es - 1) or 1
-		local sa = ARR[a].asm
-		local function mk(r, sh) return string.format("%s v%d.%s, v%d.%s, #%d", llvm, r, sa, r, sa, sh) end
+		local da, sa = ARR[dst].asm, ARR[src].asm
+		local function mk(r, sh) return string.format("%s v%d.%s, v%d.%s, #%d", llvm, r, da, r, sa, sh) end
 		local bits, regV, shV = word(mk(0, canon)), word(mk(31, canon)), word(mk(0, other))
 		if bits and regV and shV then
 			local mask = bit.band(bit.bnot(bit.bor(bit.bxor(bits, regV), bit.bxor(bits, shV))), 0xFFFFFFFF)
 			rows[#rows+1] = string.format(
 				"\t\t{.%s, {.%s, .%s, .VEC_SHIFT, .NONE}, {.VD, .VN, %s, .NONE}, 0x%s, 0x%s, .NEON, {}},",
-				mnem, ARR[a].vt, ARR[a].vt, enc_tok, bit.tohex(bits):upper(), bit.tohex(mask):upper())
+				mnem, ARR[dst].vt, ARR[src].vt, enc_tok, bit.tohex(bits):upper(), bit.tohex(mask):upper())
 			n_forms = n_forms + 1
 		else
-			skips[#skips+1] = mnem.." ."..a
+			skips[#skips+1] = mnem.." "..dst.."/"..src
 		end
 	end
 	if #rows == 0 then return nil end
 	n_mnem = n_mnem + 1
 	return string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
 end
+local SAME_SH = {}
+for _, a in ipairs({"8B","16B","4H","8H","2S","4S","2D"}) do SAME_SH[#SAME_SH+1] = {a, a} end
+local WSHL_LO = {{"8H","8B"},{"4S","4H"},{"2D","2S"}}
+local WSHL_HI = {{"8H","16B"},{"4S","8H"},{"2D","4S"}}
 local SHIFTS = {
-	{"SHL_V","shl","L"},{"SLI","sli","L"},{"SQSHLU","sqshlu","L"},{"SQSHL_V","sqshl","L"},
-	{"SSHR","sshr","R"},{"USHR","ushr","R"},{"SRSHR","srshr","R"},{"URSHR","urshr","R"},
-	{"SSRA","ssra","R"},{"USRA","usra","R"},{"SRSRA","srsra","R"},{"URSRA","ursra","R"},
-	{"SRI","sri","R"},
+	{"SHL_V","shl","L",SAME_SH},{"SLI","sli","L",SAME_SH},{"SQSHLU","sqshlu","L",SAME_SH},{"SQSHL_V","sqshl","L",SAME_SH},
+	{"SSHR","sshr","R",SAME_SH},{"USHR","ushr","R",SAME_SH},{"SRSHR","srshr","R",SAME_SH},{"URSHR","urshr","R",SAME_SH},
+	{"SSRA","ssra","R",SAME_SH},{"USRA","usra","R",SAME_SH},{"SRSRA","srsra","R",SAME_SH},{"URSRA","ursra","R",SAME_SH},
+	{"SRI","sri","R",SAME_SH},
+	{"SSHLL","sshll","L",WSHL_LO},{"SSHLL2","sshll2","L",WSHL_HI},
+	{"USHLL","ushll","L",WSHL_LO},{"USHLL2","ushll2","L",WSHL_HI},
 }
 do
 	local blk = {}
 	for _, it in ipairs(SHIFTS) do
-		local b = emit_shift(it[1], it[2], it[3])
+		local b = emit_shift(it[1], it[2], it[3], it[4])
 		if b then blk[#blk+1] = b end
 	end
 	sections[#sections+1] = "\t// Advanced SIMD shift by immediate.\n" .. table.concat(blk, "\n")

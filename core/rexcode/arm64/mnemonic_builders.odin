@@ -1099,6 +1099,14 @@ inst_sli_r_r_i                  :: #force_inline proc "contextless" (dst: Regist
 emit_sli_r_r_i                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sli_r_r_i(dst, src, imm)) }
 inst_sri_r_r_i                  :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SRI, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
 emit_sri_r_r_i                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sri_r_r_i(dst, src, imm)) }
+inst_sshll_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SSHLL, operand_count = 3, length = 4, ops = {op_v_8h(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sshll_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sshll_r_r_i(dst, src, imm)) }
+inst_sshll2_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SSHLL2, operand_count = 3, length = 4, ops = {op_v_8h(u8(reg_hw(dst))), op_v_16b(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sshll2_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sshll2_r_r_i(dst, src, imm)) }
+inst_ushll_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .USHLL, operand_count = 3, length = 4, ops = {op_v_8h(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_ushll_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_ushll_r_r_i(dst, src, imm)) }
+inst_ushll2_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .USHLL2, operand_count = 3, length = 4, ops = {op_v_8h(u8(reg_hw(dst))), op_v_16b(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_ushll2_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_ushll2_r_r_i(dst, src, imm)) }
 inst_not_v_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NOT_V, operand_count = 2, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), {}, {}}} }
 emit_not_v_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_not_v_r_r(dst, src)) }
 inst_rbit_v_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .RBIT_V, operand_count = 2, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), {}, {}}} }
@@ -3004,6 +3012,14 @@ inst_sli                             :: inst_sli_r_r_i
 emit_sli                             :: emit_sli_r_r_i
 inst_sri                             :: inst_sri_r_r_i
 emit_sri                             :: emit_sri_r_r_i
+inst_sshll                           :: inst_sshll_r_r_i
+emit_sshll                           :: emit_sshll_r_r_i
+inst_sshll2                          :: inst_sshll2_r_r_i
+emit_sshll2                          :: emit_sshll2_r_r_i
+inst_ushll                           :: inst_ushll_r_r_i
+emit_ushll                           :: emit_ushll_r_r_i
+inst_ushll2                          :: inst_ushll2_r_r_i
+emit_ushll2                          :: emit_ushll2_r_r_i
 inst_not_v                           :: inst_not_v_r_r
 emit_not_v                           :: emit_not_v_r_r
 inst_rbit_v                          :: inst_rbit_v_r_r
