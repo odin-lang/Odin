@@ -7811,6 +7811,30 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 
 		data.result_type = t_invalid;
+		if (procs.count > 0) {
+			Type *first_type = base_type(procs[0]->type);
+			GB_ASSERT(first_type->kind == Type_Proc);
+			Type *first_results = first_type->Proc.results;
+			bool all_the_same = true;
+			for (isize i = 1; i < procs.count; i++) {
+				Type *type = base_type(procs[i]->type);
+				if (type->kind != Type_Proc) {
+					all_the_same = false;
+					break;
+				}
+				Type *results = type->Proc.results;
+				if (!are_types_identical(first_results, results)) {
+					all_the_same = false;
+					break;
+				}
+			}
+			if (all_the_same) {
+				GB_ASSERT_MSG(is_type_tuple(first_results), "%s", type_to_string(first_results));
+				data.result_type = first_results;
+			}
+		}
+
+
 	} else if (valids.count > 1) {
 		ERROR_BLOCK();
 
