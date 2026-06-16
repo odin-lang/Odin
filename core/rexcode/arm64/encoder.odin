@@ -247,7 +247,7 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .IMMEDIATE
 
 	case .IMM_12, .IMM_16, .IMM_8, .IMM_6, .IMM_5, .IMM_4, .IMM_3, .IMM_2,
-		 .NZCV_IMM, .SYS_REG, .HW_SHIFT, .LSE_SIZE:
+		 .NZCV_IMM, .SYS_REG, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT:
 		return op.kind == .IMMEDIATE
 	case .BITMASK_IMM:
 		// The user passes the raw logical mask value; we validate that it
@@ -268,6 +268,17 @@ operand_matches_inline :: #force_inline proc "contextless" (
 // =============================================================================
 
 @(private="file")
+// Element size in bits for a NEON vector arrangement operand type.
+vec_esize :: #force_inline proc "contextless" (ot: Operand_Type) -> u32 {
+	#partial switch ot {
+	case .V_8B, .V_16B:                         return 8
+	case .V_4H, .V_8H, .V_4H_FP16, .V_8H_FP16:  return 16
+	case .V_2S, .V_4S:                          return 32
+	case .V_1D, .V_2D:                          return 64
+	}
+	return 8
+}
+
 pack_operand_inline :: #force_inline proc(
 	op:       ^Operand,
 	enc:      Operand_Encoding,
@@ -421,6 +432,14 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0x1F) << 16
 	case .VA:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 10
+
+	// NEON shift-by-immediate: the element-size marker is already in `bits`;
+	// the operand drives only the low immh:immb bits at 22:16.
+	case .NEON_SHL_IMM:
+		return (u32(op.immediate) & 0x3F) << 16
+	case .NEON_SHR_IMM:
+		esize := vec_esize(form.ops[0])
+		return ((esize - u32(op.immediate)) & 0x3F) << 16
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:

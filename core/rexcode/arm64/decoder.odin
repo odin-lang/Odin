@@ -199,6 +199,18 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .BARRIER_FIELD:
 		return Operand{immediate = i64((word >> 8) & 0xF), kind = .IMMEDIATE, size = 1}
 
+	// ---- NEON shift-by-immediate: recover the amount from immh:immb ---------
+	case .NEON_SHL_IMM, .NEON_SHR_IMM:
+		immh := (word >> 19) & 0xF
+		esize: i64 = 8
+		if      immh >= 8 { esize = 64 }
+		else if immh >= 4 { esize = 32 }
+		else if immh >= 2 { esize = 16 }
+		val := i64((word >> 16) & 0x7F)
+		amt := val - esize
+		if en == .NEON_SHR_IMM { amt = 2 * esize - val }
+		return Operand{immediate = amt, kind = .IMMEDIATE, size = 1}
+
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:
 		size := u32(1) << ((word >> 30) & 0x3)

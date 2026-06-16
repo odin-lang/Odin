@@ -165,6 +165,10 @@ Operand_Type :: enum u8 {
 
 	// ---- Condition code ----
 	COND,
+
+	// ---- NEON shift-by-immediate amount (encoded into immh:immb together
+	//      with the element size: left = esize+shift, right = 2*esize-shift) ----
+	VEC_SHIFT,
 }
 
 // Where each operand's bits land in the 32-bit word.
@@ -222,6 +226,12 @@ Operand_Encoding :: enum u8 {
 	NEON_INDEX_H,         // 2-bit H lane index
 	NEON_INDEX_S,         // S lane index
 	NEON_INDEX_D,         // D lane index
+
+	// ---- NEON shift-by-immediate (immh:immb at bits 22:16) ----
+	// The element-size marker bit is fixed in the entry's `bits`; the operand
+	// drives only the low bits. Left: low = shift. Right: low = esize - shift.
+	NEON_SHL_IMM,
+	NEON_SHR_IMM,
 
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20
