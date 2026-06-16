@@ -185,9 +185,9 @@ decode_one :: proc(
 		case .BR_TABLE:
 			count := read_uleb(data, &off) or_return
 			targets := make([]u32, int(count), targets_allocator)
-			for i in 0..<int(count) {
+			for &target in targets {
 				t := read_uleb(data, &off) or_return
-				targets[i] = u32(t)
+				target = u32(t)
 			}
 			def := read_uleb(data, &off) or_return
 			inst.targets   = targets

@@ -81,7 +81,9 @@ write_uleb :: #force_inline proc "contextless" (code: []u8, offset: ^u32, value:
 		if v != 0 { b |= 0x80 }
 		code[offset^] = b
 		offset^ += 1
-		if v == 0 { break }
+		if v == 0 {
+			break
+		}
 	}
 }
 
@@ -95,7 +97,9 @@ write_sleb :: #force_inline proc "contextless" (code: []u8, offset: ^u32, value:
 		if !done { b |= 0x80 }
 		code[offset^] = b
 		offset^ += 1
-		if done { break }
+		if done {
+			break
+		}
 	}
 }
 
@@ -125,7 +129,9 @@ sleb_size :: #force_inline proc "contextless" (value: i64) -> u32 {
 		b := u8(v & 0x7F)
 		v >>= 7
 		n += 1
-		if (v == 0 && (b & 0x40) == 0) || (v == -1 && (b & 0x40) != 0) { break }
+		if (v == 0 && (b & 0x40) == 0) || (v == -1 && (b & 0x40) != 0) {
+			break
+		}
 	}
 	return n
 }
@@ -138,7 +144,9 @@ read_uleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (val
 		b := data[offset^]
 		offset^ += 1
 		value |= u64(b & 0x7F) << shift
-		if b & 0x80 == 0 { return value, true }
+		if b & 0x80 == 0 {
+			return value, true
+		}
 		shift += 7
 	}
 	return 0, false
@@ -153,7 +161,9 @@ read_sleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (val
 		offset^ += 1
 		value |= i64(b & 0x7F) << shift
 		shift += 7
-		if b & 0x80 == 0 { break }
+		if b & 0x80 == 0 {
+			break
+		}
 	}
 	if shift < 64 && (b & 0x40) != 0 {
 		value |= -(i64(1) << shift)

@@ -32,9 +32,8 @@ package rexcode_wasm
 
 Operand_Kind :: enum u8 {
 	NONE,
-	REGISTER,    // vestigial -- WASM is register-less (never produced)
 	IMMEDIATE,   // i32/i64/f32/f64 constant (floats stored as raw bits)
-	INDEX,        // LEB128 unsigned index into one of the index spaces
+	INDEX,       // LEB128 unsigned index into one of the index spaces
 	MEMARG,      // load/store alignment + offset pair
 	BLOCK_TYPE,  // block / loop / if signature
 }
@@ -97,11 +96,6 @@ Operand :: struct #packed {
 // -----------------------------------------------------------------------------
 // Generic constructors (contract surface)
 // -----------------------------------------------------------------------------
-
-@(require_results)
-op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
-	return Operand{reg = r, kind = .REGISTER}
-}
 
 @(require_results)
 op_imm :: #force_inline proc "contextless" (v: i64, size: u8) -> Operand {
@@ -171,14 +165,14 @@ op_index :: #force_inline proc "contextless" (kind: Index_Kind, value: u32) -> O
 	return Operand{index = value, kind = .INDEX, idx_kind = kind}
 }
 
-@(require_results) op_local    :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.LOCAL,  n) }
-@(require_results) op_global   :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.GLOBAL, n) }
-@(require_results) op_func     :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.FUNC,   n) }
-@(require_results) op_type     :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.TYPE,   n) }
-@(require_results) op_table    :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.TABLE,  n) }
-@(require_results) op_memory   :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.MEMORY, n) }
-@(require_results) op_data     :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.DATA,   n) }
-@(require_results) op_elem     :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.ELEM,   n) }
+@(require_results) op_local  :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.LOCAL,  n) }
+@(require_results) op_global :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.GLOBAL, n) }
+@(require_results) op_func   :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.FUNC,   n) }
+@(require_results) op_type   :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.TYPE,   n) }
+@(require_results) op_table  :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.TABLE,  n) }
+@(require_results) op_memory :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.MEMORY, n) }
+@(require_results) op_data   :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.DATA,   n) }
+@(require_results) op_elem   :: #force_inline proc "contextless" (n: u32) -> Operand { return op_index(.ELEM,   n) }
 
 // Branch label depth (number of enclosing blocks to break out of).
 @(require_results) op_labelidx :: #force_inline proc "contextless" (depth: u32) -> Operand { return op_index(.LABEL, depth) }

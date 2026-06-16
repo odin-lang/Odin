@@ -33,13 +33,7 @@ ok :: proc(name: string, cond: bool) {
 
 @(private="file")
 eq_bytes :: proc(name: string, got, want: []u8) {
-	same := len(got) == len(want)
-	if same {
-		for i in 0..<len(got) {
-			if got[i] != want[i] { same = false; break }
-		}
-	}
-	if same {
+	if string(got) == string(want) {
 		fmt.printfln("  [ok]   %s (% x)", name, got)
 		rpasses += 1
 	} else {

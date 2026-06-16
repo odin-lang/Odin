@@ -49,8 +49,7 @@ main :: proc() {
 		defer delete(relocs)
 		defer delete(errors)
 
-		n, ok := w.encode(one, nil, code[:], &relocs, &errors)
-		if !ok { continue }
+		n := w.encode(one, nil, code[:], &relocs, &errors) or_continue
 
 		for i in 0..<n {
 			if i > 0 { strings.write_byte(&hex_buf, ',') }
@@ -82,28 +81,17 @@ synth :: proc(mn: w.Mnemonic, form: w.Encoding) -> w.Instruction {
 		switch k {
 		case .NONE, .ZERO_BYTE:
 			// no operand
-		case .BLOCKTYPE:
-			inst.ops[slot] = w.op_blocktype(.EMPTY); slot += 1
-		case .I32:
-			inst.ops[slot] = w.op_i32(1); slot += 1
-		case .I64:
-			inst.ops[slot] = w.op_i64(1); slot += 1
-		case .F32:
-			inst.ops[slot] = w.op_f32(1); slot += 1
-		case .F64:
-			inst.ops[slot] = w.op_f64(1); slot += 1
-		case .IDX:
-			inst.ops[slot] = w.op_func(0); slot += 1
-		case .MEMARG:
-			inst.ops[slot] = w.op_memarg(0, 0); slot += 1
-		case .REFTYPE:
-			inst.ops[slot] = w.op_reftype(.FUNCREF); slot += 1
-		case .LANE:
-			inst.ops[slot] = w.op_lane(0); slot += 1
-		case .LANES16:
-			// 16-byte value lives in inst.bytes (left zero), no operand
-		case .BR_TABLE:
-			// handled above
+		case .BLOCKTYPE: inst.ops[slot] = w.op_blocktype(.EMPTY); slot += 1
+		case .I32:       inst.ops[slot] = w.op_i32(1);            slot += 1
+		case .I64:       inst.ops[slot] = w.op_i64(1);            slot += 1
+		case .F32:       inst.ops[slot] = w.op_f32(1);            slot += 1
+		case .F64:       inst.ops[slot] = w.op_f64(1);            slot += 1
+		case .IDX:       inst.ops[slot] = w.op_func(0);           slot += 1
+		case .MEMARG:    inst.ops[slot] = w.op_memarg(0, 0);      slot += 1
+		case .REFTYPE:   inst.ops[slot] = w.op_reftype(.FUNCREF); slot += 1
+		case .LANE:      inst.ops[slot] = w.op_lane(0);           slot += 1
+		case .LANES16:   // 16-byte value lives in inst.bytes (left zero), no operand
+		case .BR_TABLE:  // handled above
 		}
 	}
 	inst.operand_count = u8(slot)

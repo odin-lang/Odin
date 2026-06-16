@@ -47,13 +47,6 @@ mnemonic_to_string :: proc(m: Mnemonic, lowercase: bool = true, allocator := con
 	return strings.to_string(sb)
 }
 
-// Vestigial -- WASM is register-less; provided for contract parity only.
-register_name :: proc(r: Register, lowercase: bool = true, allocator := context.temp_allocator) -> string {
-	_ = r
-	_ = lowercase
-	return "<none>"
-}
-
 // =============================================================================
 // Core sbprint
 // =============================================================================
@@ -73,13 +66,8 @@ sbprint :: proc(
 		opts = &defaults
 	}
 
-	running: u32 = 0
-	for i in 0..<len(instructions) {
-		inst := &instructions[i]
-		offset := running
-		if i < len(inst_info) {
-			offset = inst_info[i].offset
-		}
+	for &inst, i in instructions {
+		offset := inst_info[i].offset if i < len(inst_info) else u32(0)
 
 		strings.write_string(sb, opts.indent)
 		if opts.show_offsets {
@@ -90,25 +78,26 @@ sbprint :: proc(
 		write_mnemonic(sb, inst.mnemonic, opts.uppercase)
 
 		// br_table prints its case vector followed by the default depth.
-		if inst.mnemonic == .BR_TABLE {
+		#partial switch inst.mnemonic {
+		case .BR_TABLE:
 			for t in inst.targets {
 				strings.write_byte(sb, ' ')
 				write_decimal_u32(sb, t)
 			}
 			strings.write_byte(sb, ' ')
 			write_decimal_u32(sb, inst.ops[0].index)
-		} else if inst.mnemonic == .V128_CONST {
+		case .V128_CONST:
 			strings.write_string(sb, " i8x16")
 			for bb in inst.bytes {
 				strings.write_byte(sb, ' ')
 				isa.print_hex(sb, u64(bb), opts)
 			}
-		} else if inst.mnemonic == .I8X16_SHUFFLE {
+		case .I8X16_SHUFFLE:
 			for bb in inst.bytes {
 				strings.write_byte(sb, ' ')
 				write_decimal_u32(sb, u32(bb))
 			}
-		} else if inst.operand_count > 0 {
+		case:
 			for slot in 0..<int(inst.operand_count) {
 				strings.write_byte(sb, ' ')
 				write_operand(sb, &inst.ops[slot], inst.mnemonic, label_names, opts)
@@ -264,8 +253,12 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	if name == "" { strings.write_string(sb, "<?>"); return }
 	if uppercase {
 		for i in 0..<len(name) {
-			c := name[i]
-			if c >= 'a' && c <= 'z' { strings.write_byte(sb, c - 32) } else { strings.write_byte(sb, c) }
+			c := name[i] // to force ASCII
+			if 'a' <= c && c <= 'z' {
+				strings.write_byte(sb, c - 32)
+			} else {
+				strings.write_byte(sb, c)
+			}
 		}
 	} else {
 		strings.write_string(sb, name)
@@ -282,9 +275,6 @@ write_operand :: proc(
 ) {
 	switch op.kind {
 	case .NONE:
-
-	case .REGISTER:
-		strings.write_string(sb, "<none>")   // vestigial
 
 	case .IMMEDIATE:
 		if mnemonic == .REF_NULL {
