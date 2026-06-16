@@ -3656,7 +3656,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 	String command = args[1];
 	String init_filename = {};
-	String run_args_string = {};
 	isize  last_non_run_arg = args.count;
 
 	for_array(i, args) {
@@ -3701,7 +3700,6 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 		}
 		args = array_slice(args, 0, last_non_run_arg);
-		run_args_string = string_join_and_quote(heap_allocator(), run_args);
 
 		init_filename = args[2];
 		run_output = true;
