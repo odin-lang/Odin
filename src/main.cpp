@@ -187,7 +187,7 @@ extern char **environ;
 
 int run_subprocess(const char *name, const char **args) {
 #if defined(GB_SYSTEM_WINDOWS)
-	return (int)_spawnvp(_P_WAIT, name, args);
+	return (int)_spawnv(_P_WAIT, name, args);
 #else
 	pid_t pid;
 	int status;
