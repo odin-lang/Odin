@@ -78,7 +78,6 @@ decode_one :: proc(
 		return
 	}
 
-	// --- opcode (and optional misc sub-opcode) ------------------------------
 	b0 := data[off]
 	off += 1
 
@@ -111,7 +110,6 @@ decode_one :: proc(
 	inst.mnemonic = m
 	inst.flags    = {}
 
-	// --- immediates ---------------------------------------------------------
 	slot := 0
 	for k, ki in form.imm {
 		switch k {
@@ -120,37 +118,39 @@ decode_one :: proc(
 
 		case .BLOCKTYPE:
 			v := read_sleb(data, &off) or_return
-			inst.ops[slot] = Operand{immediate = v, kind = .BLOCK_TYPE}
+			inst.ops[slot] = Operand{kind = .BLOCK_TYPE, immediate = v}
 			slot += 1
 
 		case .I32:
 			v := read_sleb(data, &off) or_return
-			inst.ops[slot] = Operand{immediate = v, kind = .IMMEDIATE, size = 4}
+			inst.ops[slot] = Operand{kind = .IMMEDIATE, immediate = v, size = 4}
 			slot += 1
 
 		case .I64:
 			v := read_sleb(data, &off) or_return
-			inst.ops[slot] = Operand{immediate = v, kind = .IMMEDIATE, size = 8}
+			inst.ops[slot] = Operand{kind = .IMMEDIATE, immediate = v, size = 8}
 			slot += 1
 
 		case .F32:
-			bits := read_u32le(data, &off) or_return
+			bits := read_u32_block(data, &off) or_return
 			inst.ops[slot] = Operand{
-				immediate = i64(bits), kind = .IMMEDIATE, size = 4, flags = {is_float = true},
+				kind = .IMMEDIATE,
+				immediate = i64(bits), size = 4, flags = {is_float = true},
 			}
 			slot += 1
 
 		case .F64:
-			bits := read_u64le(data, &off) or_return
+			bits := read_u64_block(data, &off) or_return
 			inst.ops[slot] = Operand{
-				immediate = i64(bits), kind = .IMMEDIATE, size = 8, flags = {is_float = true},
+				kind = .IMMEDIATE,
+				immediate = i64(bits), size = 8, flags = {is_float = true},
 			}
 			slot += 1
 
 		case .IDX:
 			field := off
 			raw := read_uleb(data, &off) or_return
-			op := Operand{index = u32(raw), kind = .INDEX, idx_kind = idx_kind_for(m, ki)}
+			op := Operand{kind = .INDEX, index = u32(raw), idx_kind = idx_kind_for(m, ki)}
 			if lid, found := reloc_label_at(relocs, field); found {
 				op.index          = lid
 				op.flags.symbolic = true
@@ -162,9 +162,11 @@ decode_one :: proc(
 			slot += 1
 
 		case .MEMARG:
+			// TODO(bill): Is this fully correct?
+			// See: https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions
 			align  := read_uleb(data, &off) or_return
 			offset := read_uleb(data, &off) or_return
-			inst.ops[slot] = Operand{memarg = Memarg{align = u32(align), offset = u32(offset)}, kind = .MEMARG}
+			inst.ops[slot] = Operand{kind = .MEMARG, memarg = Memarg{align = u32(align), offset = u32(offset)}}
 			slot += 1
 
 		case .REFTYPE:
@@ -174,7 +176,7 @@ decode_one :: proc(
 			}
 			t := data[off]
 			off += 1
-			inst.ops[slot] = Operand{immediate = i64(t), kind = .IMMEDIATE, size = 1}
+			inst.ops[slot] = Operand{kind = .IMMEDIATE, immediate = i64(t), size = 1}
 			slot += 1
 
 		case .BR_TABLE:
@@ -186,7 +188,7 @@ decode_one :: proc(
 			}
 			def := read_uleb(data, &off) or_return
 			inst.targets   = targets
-			inst.ops[slot] = Operand{index = u32(def), kind = .INDEX, idx_kind = .LABEL}
+			inst.ops[slot] = Operand{kind = .INDEX, index = u32(def), idx_kind = .LABEL}
 			slot += 1
 
 		case .ZERO_BYTE:
@@ -194,7 +196,7 @@ decode_one :: proc(
 				next = pc
 				return
 			}
-			off += 1   // reserved 0x00, consumes no operand
+			off += 1 // reserved 0x00, consumes no operand
 
 		case .LANE:
 			if off >= u32(len(data)) {
@@ -203,7 +205,7 @@ decode_one :: proc(
 			}
 			l := data[off]
 			off += 1
-			inst.ops[slot] = Operand{immediate = i64(l), kind = .IMMEDIATE, size = 1}
+			inst.ops[slot] = Operand{kind = .IMMEDIATE, immediate = i64(l), size = 1}
 			slot += 1
 
 		case .LANES16:
@@ -211,8 +213,8 @@ decode_one :: proc(
 				next = pc
 				return
 			}
-			copy(inst.bytes[:], data[off:off + 16])
-			off += 16   // value lives in inst.bytes, no operand
+			copy(inst.bytes[:], data[off:][:16])
+			off += 16 // value lives in inst.bytes, no operand
 		}
 	}
 
@@ -231,11 +233,11 @@ idx_kind_for :: #force_inline proc "contextless" (m: Mnemonic, which: int) -> In
 	#partial switch m {
 	case .BR, .BR_IF:                           return .LABEL
 	case .CALL, .REF_FUNC:                      return .FUNC
-	case .CALL_INDIRECT:                        return which == 0 ? .TYPE : .TABLE
+	case .CALL_INDIRECT:                        return .TYPE if which == 0 else .TABLE
 	case .LOCAL_GET, .LOCAL_SET, .LOCAL_TEE:    return .LOCAL
 	case .GLOBAL_GET, .GLOBAL_SET:              return .GLOBAL
 	case .MEMORY_INIT, .DATA_DROP:              return .DATA
-	case .TABLE_INIT:                           return which == 0 ? .ELEM : .TABLE
+	case .TABLE_INIT:                           return .ELEM if which == 0 else .TABLE
 	case .ELEM_DROP:                            return .ELEM
 	case .TABLE_COPY:                           return .TABLE
 	case .TABLE_GROW, .TABLE_SIZE, .TABLE_FILL: return .TABLE

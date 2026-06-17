@@ -54,7 +54,7 @@ encode :: proc(
 }
 
 
-encode_one :: #force_inline proc(
+encode_one :: proc(
 	inst:     ^Instruction,
 	pc:       u32,
 	inst_idx: u16,
@@ -96,10 +96,10 @@ encode_one :: #force_inline proc(
 			write_sleb(code, &off, inst.ops[opi].immediate)
 			opi += 1
 		case .F32:
-			write_u32le(code, &off, u32(inst.ops[opi].immediate))
+			write_u32_block(code, &off, u32(inst.ops[opi].immediate))
 			opi += 1
 		case .F64:
-			write_u64le(code, &off, u64(inst.ops[opi].immediate))
+			write_u64_block(code, &off, u64(inst.ops[opi].immediate))
 			opi += 1
 		case .IDX:
 			op := &inst.ops[opi]

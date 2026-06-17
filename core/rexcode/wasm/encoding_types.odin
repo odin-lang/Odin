@@ -146,6 +146,7 @@ sleb_size :: #force_inline proc "contextless" (value: i64) -> u32 {
 
 // Read unsigned LEB128 starting at `*offset`; advances it. `ok` is false on
 // truncation. Reads at most `max` bytes (10 covers u64).
+@(require_results)
 read_uleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (value: u64, ok: bool) {
 	shift: uint = 0
 	for i := 0; i < 10 && offset^ < u32(len(data)); i += 1 {
@@ -161,6 +162,7 @@ read_uleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (val
 }
 
 // Read signed LEB128 starting at `*offset`; advances it.
+@(require_results)
 read_sleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (value: i64, ok: bool) {
 	shift: uint = 0
 	b: u8 = 0
@@ -180,7 +182,7 @@ read_sleb :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (val
 	return
 }
 
-write_u32le :: #force_inline proc(code: []u8, offset: ^u32, v: u32) {
+write_u32_block :: #force_inline proc(code: []u8, offset: ^u32, v: u32) {
 	assert(offset^+ 4 <= u32(len(code)))
 	code[offset^+0] = u8(v)
 	code[offset^+1] = u8(v >> 8)
@@ -189,7 +191,7 @@ write_u32le :: #force_inline proc(code: []u8, offset: ^u32, v: u32) {
 	offset^ += 4
 }
 
-write_u64le :: #force_inline proc(code: []u8, offset: ^u32, v: u64) {
+write_u64_block :: #force_inline proc(code: []u8, offset: ^u32, v: u64) {
 	assert(offset^+ 8 <= u32(len(code)))
 	for i in u32(0)..<8 {
 		code[offset^+i] = u8(v >> (8 * i))
@@ -197,7 +199,8 @@ write_u64le :: #force_inline proc(code: []u8, offset: ^u32, v: u64) {
 	offset^ += 8
 }
 
-read_u32le :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (u32, bool) {
+@(require_results)
+read_u32_block :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (u32, bool) {
 	if offset^ + 4 > u32(len(data)) {
 		return 0, false
 	}
@@ -209,7 +212,8 @@ read_u32le :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (u3
 	return v, true
 }
 
-read_u64le :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (u64, bool) {
+@(require_results)
+read_u64_block :: #force_inline proc "contextless" (data: []u8, offset: ^u32) -> (u64, bool) {
 	if offset^ + 8 > u32(len(data)) {
 		return 0, false
 	}
