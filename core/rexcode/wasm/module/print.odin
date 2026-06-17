@@ -14,8 +14,24 @@ print_module :: proc(m: Module) {
 }
 
 sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
+	write_func_type :: proc(sb: ^strings.Builder, t: Func_Type) {
+		strings.write_byte(sb, '(')
+		for p, i in t.params {
+			if i > 0 { strings.write_string(sb, ", ") }
+			strings.write_string(sb, valtype_name(p))
+		}
+		strings.write_string(sb, ") -> ")
+		strings.write_byte(sb, '(')
+		for rt, i in t.results {
+			if i > 0 { strings.write_string(sb, ", ") }
+			strings.write_string(sb, valtype_name(rt))
+		}
+		strings.write_byte(sb, ')')
+	}
+
+
 	strings.write_string(sb, "WebAssembly Module, Version: ")
-	write_u64(sb, u64(m.version))
+	strings.write_u64(sb, u64(m.version))
 	strings.write_byte(sb, '\n')
 
 	label_names: map[u32]string
@@ -31,6 +47,13 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 
 	// sections
 	for sec in m.sections {
+		write_padded :: proc(sb: ^strings.Builder, s: string, width: int) {
+			strings.write_string(sb, s)
+			for _ in len(s)..<width {
+				strings.write_byte(sb, ' ')
+			}
+		}
+
 		strings.write_string(sb, ".")
 		write_padded(sb, section_name(sec.id), 12)
 		#partial switch sec.id {
@@ -42,7 +65,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 			// do nothing
 		case:
 			strings.write_string(sb, "  (")
-			write_u64(sb, u64(sec.count))
+			strings.write_u64(sb, u64(sec.count))
 			strings.write_string(sb, " entries)")
 		}
 		strings.write_byte(sb, '\n')
@@ -121,7 +144,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		strings.write_string(sb, "\n")
 		for t, i in m.types {
 			strings.write_string(sb, "  [")
-			write_u64(sb, u64(i))
+			strings.write_u64(sb, u64(i))
 			strings.write_string(sb, "] ")
 			write_func_type(sb, t)
 			strings.write_byte(sb, '\n')
@@ -137,11 +160,10 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 	}
 
-
 	strings.write_string(sb, "\nfunctions:\n")
 	for f in m.functions {
 		strings.write_string(sb, "  [")
-		write_u64(sb, u64(f.func_index))
+		strings.write_u64(sb, u64(f.func_index))
 		strings.write_string(sb, "] ")
 		if f.name != "" {
 			strings.write_byte(sb, '$')
@@ -160,14 +182,39 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 
 		strings.write_byte(sb, '\n')
-		write_locals(sb, f.locals)
-		write_body(sb, m, f, func_relocs, &label_names)
+
+		if len(f.locals) != 0 {
+			strings.write_string(sb, "    locals:")
+			for g in f.locals {
+				strings.write_byte(sb, ' ')
+				if g.count > 1 {
+					strings.write_u64(sb, u64(g.count))
+					strings.write_string(sb, "x")
+				}
+				strings.write_string(sb, valtype_name(g.type))
+			}
+			strings.write_byte(sb, '\n')
+		}
+
+		if f.body_size != 0 {
+			tmp_sb: strings.Builder
+			defer strings.builder_destroy(&tmp_sb)
+			text := sbprint_function(&tmp_sb, m, f, func_relocs, &label_names)
+			for line in strings.split_lines_iterator(&text) {
+				if line == "" {
+					continue
+				}
+				strings.write_string(sb, "  ")
+				strings.write_string(sb, line)
+				strings.write_byte(sb, '\n')
+			}
+		}
 	}
 }
 
 // Disassemble and print one function body. Returns the empty string for
 // imported functions (which have no body).
-aprint_function :: proc(m: Module, f: Function, relocs: []wasm.Relocation, label_names: ^map[u32]string, allocator := context.allocator) -> string {
+sbprint_function :: proc(sb: ^strings.Builder, m: Module, f: Function, relocs: []wasm.Relocation, label_names: ^map[u32]string) -> string {
 	if f.imported || f.body_size == 0 {
 		return ""
 	}
@@ -181,61 +228,6 @@ aprint_function :: proc(m: Module, f: Function, relocs: []wasm.Relocation, label
 	defer delete(errs)
 
 	wasm.decode(body, relocs, &insts, &info, &errs)
-	return wasm.aprint(insts[:], info[:], allocator=allocator, label_names=label_names)
-}
-
-write_body :: proc(sb: ^strings.Builder, m: Module, f: Function, relocs: []wasm.Relocation, label_names: ^map[u32]string) {
-	if f.body_size == 0 { return }
-	text := aprint_function(m, f, relocs, label_names, context.temp_allocator)
-	for line in strings.split_lines_iterator(&text) {
-		if line == "" {
-			continue
-		}
-		strings.write_string(sb, "  ")
-		strings.write_string(sb, line)
-		strings.write_byte(sb, '\n')
-	}
-}
-
-write_locals :: proc(sb: ^strings.Builder, locals: []Local_Group) {
-	if len(locals) == 0 { return }
-	strings.write_string(sb, "    locals:")
-	for g in locals {
-		strings.write_byte(sb, ' ')
-		if g.count > 1 {
-			write_u64(sb, u64(g.count))
-			strings.write_string(sb, "x")
-		}
-		strings.write_string(sb, valtype_name(g.type))
-	}
-	strings.write_byte(sb, '\n')
-}
-
-write_func_type :: proc(sb: ^strings.Builder, t: Func_Type) {
-	strings.write_byte(sb, '(')
-	for p, i in t.params {
-		if i > 0 { strings.write_string(sb, ", ") }
-		strings.write_string(sb, valtype_name(p))
-	}
-	strings.write_string(sb, ") -> ")
-	strings.write_byte(sb, '(')
-	for rt, i in t.results {
-		if i > 0 { strings.write_string(sb, ", ") }
-		strings.write_string(sb, valtype_name(rt))
-	}
-	strings.write_byte(sb, ')')
-}
-
-write_u64 :: proc(sb: ^strings.Builder, v: u64) {
-	if v == 0 { strings.write_byte(sb, '0'); return }
-	buf: [20]u8
-	i := 0
-	n := v
-	for n > 0 { buf[i] = '0' + u8(n % 10); n /= 10; i += 1 }
-	for j := i - 1; j >= 0; j -= 1 { strings.write_byte(sb, buf[j]) }
-}
-
-write_padded :: proc(sb: ^strings.Builder, s: string, width: int) {
-	strings.write_string(sb, s)
-	for _ in len(s)..<width { strings.write_byte(sb, ' ') }
+	wasm.sbprint(sb, insts[:], info[:], label_names=label_names)
+	return strings.to_string(sb^)
 }
