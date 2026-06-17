@@ -1,6 +1,7 @@
 package rexcode_wasm_module
 
 import "base:runtime"
+import "core:strings"
 import "core:rexcode/wasm"
 
 Parse_Error :: enum {
@@ -193,7 +194,6 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (m: Module, err: Re
 
 	parse_custom_sections(&m, allocator) or_return
 
-
 	build_functions(&m, func_typeidx, codes, allocator) or_return
 	apply_name_section(&m)
 	return
@@ -312,12 +312,29 @@ parse_custom_sections :: proc(m: ^Module, allocator: runtime.Allocator) -> Reade
 
 		custom.section = sec
 
-		section_data := m.data[sec.offset:][:sec.size]
-		r := reader(section_data, 0)
+		custom.payload = m.data[sec.offset:][:sec.size]
+
+		r := reader(custom.payload, 0)
 		sec_name := rd_name(&r) or_continue
 		assert(sec_name == sec.name)
 
+		if strings.has_prefix(sec.name, ".debug_") {
+			// DWARF debug stuff
+		} else if strings.has_prefix(sec.name, "reloc.") {
+			// other relocation stuff
+		}
+
 		custom_block: switch sec.name {
+		case "linking":
+			// not yet handled
+		case "producers":
+			// not yet handled
+		case "dynlink.0":
+			// not yet handled
+		case "external_debug_info", "sourceMappingURL":
+			// not yet handled, but debugging related
+		case "metadata.code.branch_hint":
+			// not yet handled
 		case "name":
 			cname: Custom_Section_Name
 			defer custom.variant = cname

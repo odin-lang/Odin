@@ -110,6 +110,7 @@ Module :: struct {
 
 Custom_Section :: struct {
 	section: Section,
+	payload: []byte, // borrowed, m.data[section.offset:][:section.size]
 	variant: union {
 		Custom_Section_Name,
 		Custom_Section_Target_Features,
