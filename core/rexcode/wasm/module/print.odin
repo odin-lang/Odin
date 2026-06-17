@@ -42,8 +42,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 	}
 
-	relocs_group, _ := parse_relocations(m, m.allocator)
-	defer delete(relocs_group, m.allocator)
+	relocs_group, _ := parse_relocations(m, context.temp_allocator)
 
 	// sections
 	for sec in m.sections {
@@ -173,7 +172,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		write_func_type(sb, f.type)
 
 		if f.imported {
-			strings.write_string(sb, " @ import ")
+			strings.write_string(sb, "\n    import ")
 			strings.write_quoted_string(sb, f.import_module)
 			strings.write_string(sb, " ")
 			strings.write_quoted_string(sb, f.import_field)

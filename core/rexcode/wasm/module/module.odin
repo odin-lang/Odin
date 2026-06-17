@@ -76,6 +76,7 @@ Function :: struct {
 	type_index:    u32,
 	type:          Func_Type,     // resolved signature ({} if the type id was out of range)
 	imported:      bool,
+	exported:      bool,
 	name:          string,        // export / name-section / import field (borrowed)
 	import_module: string,        // borrowed, "" for defined functions
 	import_field:  string,        // borrowed, "" for defined functions
