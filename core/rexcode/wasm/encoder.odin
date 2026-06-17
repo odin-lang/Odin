@@ -40,8 +40,6 @@ encode :: proc(
 	code:         []u8,
 	relocs:       ^[dynamic]Relocation,
 	errors:       ^[dynamic]Error,
-	resolve:      bool = true,
-	base_address: u64  = 0,
 ) -> (byte_count: u32, ok: bool) {
 	errors_start := u32(len(errors))
 
