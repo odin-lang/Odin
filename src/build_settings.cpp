@@ -518,7 +518,6 @@ struct BuildContext {
 	String export_dependencies_file;
 	bool   show_unused;
 	bool   show_unused_with_location;
-	bool   show_unused_struct_fields;
 	bool   struct_access_counts;
 	bool   show_more_timings;
 	bool   show_defineables;

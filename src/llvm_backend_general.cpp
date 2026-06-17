@@ -125,7 +125,6 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
-	map_init(&m->struct_field_usage_masks, 0);
 	map_init(&m->struct_field_access_read_ptrs, 0);
 	map_init(&m->struct_field_access_write_ptrs, 0);
 
@@ -307,7 +306,7 @@ gb_internal String lb_struct_field_usage_global_name(i32 index) {
 }
 
 gb_internal void lb_init_struct_field_usage_tracking(lbGenerator *gen) {
-	if (!build_context.show_unused_struct_fields && !build_context.struct_access_counts) {
+	if (!build_context.struct_access_counts) {
 		return;
 	}
 
@@ -344,7 +343,7 @@ gb_internal void lb_init_struct_field_usage_tracking(lbGenerator *gen) {
 		}
 
 		if (actual_type->Struct.fields.count != report_type->Struct.fields.count) {
-			gb_printf_err("[show-unused-struct-fields] skipping field tracking for %.*s.%.*s: field count mismatch with %.*s.%.*s (%td vs %td)\n",
+			gb_printf_err("[struct-access-counts] skipping field tracking for %.*s.%.*s: field count mismatch with %.*s.%.*s (%td vs %td)\n",
 			              LIT(e->pkg->name), LIT(e->token.string),
 			              LIT(owner_type->pkg->name), LIT(owner_type->token.string),
 			              actual_type->Struct.fields.count, report_type->Struct.fields.count);
@@ -371,31 +370,25 @@ gb_internal void lb_init_struct_field_usage_tracking(lbGenerator *gen) {
 				entry.field = report_field;
 				entry.report_name = lb_struct_field_usage_report_name(owner_type, report_field);
 				entry.global_name = lb_struct_field_usage_global_name(next_index);
-				if (build_context.show_unused_struct_fields) {
-					entry.global_value = LLVMAddGlobal(m->mod, lb_type(m, t_u8), alloc_cstring(permanent_allocator(), entry.global_name));
-					LLVMSetInitializer(entry.global_value, LLVMConstInt(lb_type(m, t_u8), 0, false));
-					LLVMSetLinkage(entry.global_value, LLVMExternalLinkage);
-				}
-				if (build_context.struct_access_counts) {
-					gbAllocator a = permanent_allocator();
-					gbString read_name = gb_string_make(a, "");
-					read_name = gb_string_append_length(read_name, cast(char const *)entry.global_name.text, entry.global_name.len);
-					read_name = gb_string_appendc(read_name, "$read");
-					String r_name = make_string(cast(u8 const *)read_name, gb_string_length(read_name));
 
-					gbString write_name = gb_string_make(a, "");
-					write_name = gb_string_append_length(write_name, cast(char const *)entry.global_name.text, entry.global_name.len);
-					write_name = gb_string_appendc(write_name, "$write");
-					String w_name = make_string(cast(u8 const *)write_name, gb_string_length(write_name));
+				gbAllocator a = permanent_allocator();
+				gbString read_name = gb_string_make(a, "");
+				read_name = gb_string_append_length(read_name, cast(char const *)entry.global_name.text, entry.global_name.len);
+				read_name = gb_string_appendc(read_name, "$read");
+				String r_name = make_string(cast(u8 const *)read_name, gb_string_length(read_name));
 
-					entry.global_read_value = LLVMAddGlobal(m->mod, lb_type(m, t_u64), alloc_cstring(permanent_allocator(), r_name));
-					LLVMSetInitializer(entry.global_read_value, LLVMConstInt(lb_type(m, t_u64), 0, false));
-					LLVMSetLinkage(entry.global_read_value, LLVMExternalLinkage);
+				gbString write_name = gb_string_make(a, "");
+				write_name = gb_string_append_length(write_name, cast(char const *)entry.global_name.text, entry.global_name.len);
+				write_name = gb_string_appendc(write_name, "$write");
+				String w_name = make_string(cast(u8 const *)write_name, gb_string_length(write_name));
 
-					entry.global_write_value = LLVMAddGlobal(m->mod, lb_type(m, t_u64), alloc_cstring(permanent_allocator(), w_name));
-					LLVMSetInitializer(entry.global_write_value, LLVMConstInt(lb_type(m, t_u64), 0, false));
-					LLVMSetLinkage(entry.global_write_value, LLVMExternalLinkage);
-				}
+				entry.global_read_value = LLVMAddGlobal(m->mod, lb_type(m, t_u64), alloc_cstring(permanent_allocator(), r_name));
+				LLVMSetInitializer(entry.global_read_value, LLVMConstInt(lb_type(m, t_u64), 0, false));
+				LLVMSetLinkage(entry.global_read_value, LLVMExternalLinkage);
+
+				entry.global_write_value = LLVMAddGlobal(m->mod, lb_type(m, t_u64), alloc_cstring(permanent_allocator(), w_name));
+				LLVMSetInitializer(entry.global_write_value, LLVMConstInt(lb_type(m, t_u64), 0, false));
+				LLVMSetLinkage(entry.global_write_value, LLVMExternalLinkage);
 
 				array_add(&gen->struct_field_usage_entries, entry);
 
@@ -413,7 +406,7 @@ gb_internal void lb_init_struct_field_usage_tracking(lbGenerator *gen) {
 }
 
 gb_internal Entity *lb_resolve_struct_field_usage_entity(lbModule *m, Entity *field) {
-	if ((!build_context.show_unused_struct_fields && !build_context.struct_access_counts) || field == nullptr) {
+	if (!build_context.struct_access_counts || field == nullptr) {
 		return nullptr;
 	}
 	i32 *entry_index = map_get(&m->gen->struct_field_usage_indices, field);
@@ -421,58 +414,6 @@ gb_internal Entity *lb_resolve_struct_field_usage_entity(lbModule *m, Entity *fi
 		return nullptr;
 	}
 	return m->gen->struct_field_usage_entries[*entry_index].field;
-}
-
-gb_internal lbValue lb_struct_field_usage_mask_ptr(lbModule *m, Entity *field) {
-	if (!build_context.show_unused_struct_fields) {
-		return {};
-	}
-	field = lb_resolve_struct_field_usage_entity(m, field);
-	if (field == nullptr) {
-		return {};
-	}
-
-	lbValue *found = map_get(&m->struct_field_usage_masks, field);
-	if (found != nullptr) {
-		return *found;
-	}
-
-	i32 entry_index = map_must_get(&m->gen->struct_field_usage_indices, field);
-	lbStructFieldUsageEntry const &entry = m->gen->struct_field_usage_entries[entry_index];
-
-	lbValue g = {};
-	g.type = alloc_type_pointer(t_u8);
-	if (m == &m->gen->default_module) {
-		g.value = entry.global_value;
-	} else {
-		g.value = LLVMAddGlobal(m->mod, lb_type(m, t_u8), alloc_cstring(permanent_allocator(), entry.global_name));
-		LLVMSetLinkage(g.value, LLVMExternalLinkage);
-	}
-
-	map_set(&m->struct_field_usage_masks, field, g);
-	return g;
-}
-
-gb_internal void lb_mark_struct_field_usage(lbProcedure *p, Entity *field, u8 usage_bits) {
-	if (!build_context.show_unused_struct_fields || usage_bits == 0) {
-		return;
-	}
-
-	lbValue mask_ptr = lb_struct_field_usage_mask_ptr(p->module, field);
-	if (mask_ptr.value == nullptr) {
-		return;
-	}
-
-	LLVMValueRef usage = LLVMConstInt(lb_type(p->module, t_u8), usage_bits, false);
-	LLVMValueRef instr = LLVMBuildAtomicRMW(
-		p->builder,
-		LLVMAtomicRMWBinOpOr,
-		mask_ptr.value,
-		usage,
-		LLVMAtomicOrderingMonotonic,
-		false
-	);
-	LLVMSetVolatile(instr, true);
 }
 
 gb_internal void lb_struct_field_access_count_ptrs(lbModule *m, Entity *field, lbValue *out_read_ptr, lbValue *out_write_ptr) {
@@ -1247,7 +1188,6 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		value.value = LLVMConstNull(lb_type(p->module, t));
 	}
 
-	lb_mark_struct_field_usage(p, addr.tracked_field, 1<<1);
 	lb_increment_struct_field_access_count(p, addr.tracked_field, true);
 
 	if (addr.kind == lbAddr_BitField) {
@@ -1556,7 +1496,6 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 
 gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
-	lb_mark_struct_field_usage(p, addr.tracked_field, 1<<0);
 	lb_increment_struct_field_access_count(p, addr.tracked_field, false);
 
 	if (addr.kind == lbAddr_BitField) {

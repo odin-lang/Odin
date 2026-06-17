@@ -122,7 +122,6 @@ struct lbStructFieldUsageEntry {
 	Entity *field;
 	String report_name;
 	String global_name;
-	LLVMValueRef global_value;
 	LLVMValueRef global_read_value;
 	LLVMValueRef global_write_value;
 };
@@ -209,7 +208,6 @@ struct lbModule {
 	PtrMap<u64/*type hash*/, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 
 	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
-	PtrMap<Entity *, lbValue> struct_field_usage_masks;
 	PtrMap<Entity *, lbValue> struct_field_access_read_ptrs;
 	PtrMap<Entity *, lbValue> struct_field_access_write_ptrs;
 
@@ -538,7 +536,6 @@ gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_
 gb_internal lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
 gb_internal void    lb_init_struct_field_usage_tracking(lbGenerator *gen);
 gb_internal Entity *lb_resolve_struct_field_usage_entity(lbModule *m, Entity *field);
-gb_internal void    lb_mark_struct_field_usage(lbProcedure *p, Entity *field, u8 usage_bits);
 gb_internal void    lb_struct_field_access_count_ptrs(lbModule *m, Entity *field, lbValue *out_read_ptr, lbValue *out_write_ptr);
 gb_internal void    lb_increment_struct_field_access_count(lbProcedure *p, Entity *field, bool is_write);
 

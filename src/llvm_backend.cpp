@@ -2173,96 +2173,6 @@ gb_internal void lb_emit_runtime_print_u64(lbProcedure *p, lbValue val) {
 	lb_emit_runtime_call(p, "print_u64", args);
 }
 
-gb_internal String lb_struct_field_usage_report_line(String const &report_name, char const *suffix) {
-	gbAllocator a = permanent_allocator();
-	gbString s = gb_string_make(a, "  ");
-	s = gb_string_append_length(s, cast(char const *)report_name.text, report_name.len);
-	s = gb_string_appendc(s, ": ");
-	s = gb_string_appendc(s, suffix);
-	return make_string(cast(u8 const *)s, gb_string_length(s));
-}
-
-gb_internal void lb_emit_cleanup_runtime_struct_field_report(lbProcedure *p) {
-	if (!build_context.show_unused_struct_fields) {
-		return;
-	}
-
-	auto const &entries = p->module->gen->struct_field_usage_entries;
-	if (entries.count == 0) {
-		return;
-	}
-
-	lbAddr did_print_header = lb_add_local_generated(p, t_bool, true);
-
-	for (auto const &entry : entries) {
-		lbValue mask_ptr = {};
-		mask_ptr.value = entry.global_value;
-		mask_ptr.type = alloc_type_pointer(t_u8);
-
-		lbValue mask = lb_emit_load(p, mask_ptr);
-		lbValue is_used = lb_emit_comp(p, Token_CmpEq, mask, lb_const_int(p->module, t_u8, 0x3));
-
-		lbBlock *skip_block = lb_create_block(p, "sfu.skip");
-		lbBlock *report_block = lb_create_block(p, "sfu.report");
-		lb_emit_if(p, is_used, skip_block, report_block);
-
-		lb_start_block(p, report_block);
-		{
-			lbValue header_was_printed = lb_addr_load(p, did_print_header);
-			lbBlock *header_done = lb_create_block(p, "sfu.header.done");
-			lbBlock *print_header = lb_create_block(p, "sfu.header.print");
-			lb_emit_if(p, header_was_printed, header_done, print_header);
-
-			lb_start_block(p, print_header);
-			{
-				lb_emit_runtime_print_string(p, str_lit("\nUnused Struct Fields\n"));
-				lb_addr_store(p, did_print_header, lb_const_bool(p->module, t_bool, true));
-				lb_emit_jump(p, header_done);
-			}
-
-			lb_start_block(p, header_done);
-			{
-				lbValue is_never_read_and_written = lb_emit_comp(p, Token_CmpEq, mask, lb_const_int(p->module, t_u8, 0x0));
-				lbBlock *both_block = lb_create_block(p, "sfu.both");
-				lbBlock *single_block = lb_create_block(p, "sfu.single");
-				lbBlock *done_block = lb_create_block(p, "sfu.done");
-				lb_emit_if(p, is_never_read_and_written, both_block, single_block);
-
-				lb_start_block(p, both_block);
-				{
-					lb_emit_runtime_print_string(p, lb_struct_field_usage_report_line(entry.report_name, "never read or written\n"));
-					lb_emit_jump(p, done_block);
-				}
-
-				lb_start_block(p, single_block);
-				{
-					lbValue is_never_written = lb_emit_comp(p, Token_CmpEq, mask, lb_const_int(p->module, t_u8, 0x1));
-					lbBlock *write_block = lb_create_block(p, "sfu.write");
-					lbBlock *read_block = lb_create_block(p, "sfu.read");
-					lb_emit_if(p, is_never_written, write_block, read_block);
-
-					lb_start_block(p, write_block);
-					{
-						lb_emit_runtime_print_string(p, lb_struct_field_usage_report_line(entry.report_name, "never written\n"));
-						lb_emit_jump(p, done_block);
-					}
-
-					lb_start_block(p, read_block);
-					{
-						lb_emit_runtime_print_string(p, lb_struct_field_usage_report_line(entry.report_name, "never read\n"));
-						lb_emit_jump(p, done_block);
-					}
-				}
-
-				lb_start_block(p, done_block);
-				lb_emit_jump(p, skip_block);
-			}
-		}
-
-		lb_start_block(p, skip_block);
-	}
-}
-
 gb_internal void lb_emit_cleanup_runtime_struct_field_access_counts_report(lbProcedure *p) {
 	if (!build_context.struct_access_counts) {
 		return;
@@ -2362,7 +2272,6 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
 	}
 
-	lb_emit_cleanup_runtime_struct_field_report(p);
 	lb_emit_cleanup_runtime_struct_field_access_counts_report(p);
 
 	lb_end_procedure_body(p);
