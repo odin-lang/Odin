@@ -90,6 +90,7 @@ Function :: struct {
 Module :: struct {
 	version:   u32,
 	sections:  []Section,
+	customs:   []Custom_Section,
 	types:     []Func_Type,
 	imports:   []Import,
 	functions: []Function, // whole function index space (imports + defined)
@@ -100,6 +101,58 @@ Module :: struct {
 
 	allocator: runtime.Allocator,
 }
+
+
+
+// -----------------------------------------------------------------------------
+// Custom Section Layout
+// -----------------------------------------------------------------------------
+
+Custom_Section :: struct {
+	section: Section,
+	variant: union {
+		Custom_Section_Name,
+		Custom_Section_Target_Features,
+	},
+}
+
+Custom_Section_Name_Function :: struct {
+	id:   u32,
+	name: string, // borrowed
+}
+
+Custom_Section_Name_Local :: struct {
+	idx:  u32,
+	name: string, // borrowed
+}
+
+Custom_Section_Name_Function_Locals :: struct {
+	func_idx: u32,
+	locals: []Custom_Section_Name_Local,
+}
+
+Custom_Section_Name :: struct {
+	module_name: string,
+	functions:   []Custom_Section_Name_Function,
+	locals:      []Custom_Section_Name_Function_Locals,
+}
+
+Custom_Section_Target_Feature_Prefix :: enum u8 {
+	Used       = '+',
+	Disallowed = '-',
+	Required   = '=',
+}
+
+Custom_Section_Target_Feature :: struct {
+	prefix:  Custom_Section_Target_Feature_Prefix,
+	feature: string, // borrowed
+}
+
+
+Custom_Section_Target_Features :: struct {
+	features: []Custom_Section_Target_Feature,
+}
+
 
 // -----------------------------------------------------------------------------
 // Small display helpers

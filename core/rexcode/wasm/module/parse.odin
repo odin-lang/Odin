@@ -191,6 +191,9 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (m: Module, err: Re
 		}
 	}
 
+	parse_custom_sections(&m, allocator) or_return
+
+
 	build_functions(&m, func_typeidx, codes, allocator) or_return
 	apply_name_section(&m)
 	return
@@ -287,6 +290,86 @@ parse_code :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Code_Bod
 		r.off = body_end // jump past the expression to the next entry
 	}
 	return
+}
+
+@(require_results)
+parse_custom_sections :: proc(m: ^Module, allocator: runtime.Allocator) -> Reader_Error {
+	custom_count := 0
+	for &sec in m.sections {
+		if sec.id == .CUSTOM {
+			custom_count += 1
+		}
+	}
+	m.customs = make([]Custom_Section, custom_count, allocator) or_return
+	custom_index := 0
+	for &sec in m.sections {
+		if sec.id != .CUSTOM {
+			continue
+		}
+
+		custom := &m.customs[custom_index]
+		custom_index += 1
+
+		custom.section = sec
+
+		section_data := m.data[sec.offset:][:sec.size]
+		r := reader(section_data, 0)
+		sec_name := rd_name(&r) or_continue
+		assert(sec_name == sec.name)
+
+		custom_block: switch sec.name {
+		case "name":
+			cname: Custom_Section_Name
+			defer custom.variant = cname
+
+			for r.off < u32(len(r.data)) {
+				id   := rd_byte(&r) or_return
+				size := rd_u32(&r)  or_return
+				end_off := r.off+size
+				defer r.off = end_off
+
+				switch id {
+				case 0: // module
+					cname.module_name = rd_name(&r) or_return
+				case 1: // functions
+					count := rd_u32(&r) or_return
+					cname.functions = make([]Custom_Section_Name_Function, count, allocator) or_return
+					for &func in cname.functions {
+						func.id   = rd_u32(&r)  or_return
+						func.name = rd_name(&r) or_return
+					}
+				case 2: // locals
+					count := rd_u32(&r) or_return
+
+					cname.locals = make([]Custom_Section_Name_Function_Locals, count, allocator) or_return
+
+					for &local_func in cname.locals {
+						local_func.func_idx = rd_u32(&r) or_return
+						local_count := rd_u32(&r) or_return
+						local_func.locals = make([]Custom_Section_Name_Local, local_count, allocator) or_return
+						for &local in local_func.locals {
+							local.idx  = rd_u32(&r)  or_return
+							local.name = rd_name(&r) or_return
+						}
+					}
+				}
+			}
+
+		case "target_features":
+			target_features: Custom_Section_Target_Features
+			defer custom.variant = target_features
+
+			count := rd_u32(&r) or_return
+			target_features.features = make([]Custom_Section_Target_Feature, count, allocator) or_return
+
+			for &feature in target_features.features {
+				feature.prefix  = Custom_Section_Target_Feature_Prefix(rd_byte(&r) or_return)
+				feature.feature = rd_name(&r) or_return
+			}
+		}
+	}
+
+	return nil
 }
 
 @(require_results)
@@ -393,6 +476,19 @@ module_destroy :: proc(m: ^Module) {
 			delete(f.locals, m.allocator)
 		}
 	}
+	for c in m.customs {
+		switch v in c.variant {
+		case Custom_Section_Name:
+			for function_locals in v.locals {
+				delete(function_locals.locals, m.allocator)
+			}
+			delete(v.functions, m.allocator)
+			delete(v.locals, m.allocator)
+		case Custom_Section_Target_Features:
+			delete(v.features)
+		}
+	}
+	delete(m.customs,   m.allocator)
 	delete(m.sections,  m.allocator)
 	delete(m.types,     m.allocator)
 	delete(m.imports,   m.allocator)

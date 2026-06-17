@@ -5,12 +5,12 @@ import "core:os"
 import "core:fmt"
 import wasm "../"
 
-print_module :: proc(m: Module) {
+print_module :: proc(m: Module, file: ^os.File) {
 	sb := strings.builder_make(context.allocator)
 	defer strings.builder_destroy(&sb)
 	sbprint_module(&sb, m)
 	s := strings.to_string(sb)
-	os.write_string(os.stdout, s)
+	os.write_string(file, s)
 }
 
 sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
@@ -69,11 +69,45 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 		strings.write_byte(sb, '\n')
 
-		data := m.data[sec.offset:][:sec.size]
+		section_data := m.data[sec.offset:][:sec.size]
 
 		section_printing: #partial switch sec.id {
+		case .CUSTOM:
+			for c in m.customs {
+				if c.section != sec {
+					continue
+				}
+				switch v in c.variant {
+				case Custom_Section_Name:
+					if v.module_name != "" {
+						fmt.sbprintf(sb, "  module: %q\n", v.module_name)
+					}
+					if len(v.functions) > 0 {
+						fmt.sbprintf(sb, "  functions:\n")
+						for f in v.functions {
+							fmt.sbprintf(sb, "    [%d] %q\n", f.id, f.name)
+						}
+					}
+					if len(v.locals) > 0 {
+						fmt.sbprintf(sb, "  locals:\n")
+						for fl in v.locals {
+							fmt.sbprintf(sb, "    [%d] function\n", fl.func_idx)
+							for local in fl.locals {
+								fmt.sbprintf(sb, "      [%d] %q\n", local.idx, local.name)
+							}
+						}
+					}
+				case Custom_Section_Target_Features:
+					for f in v.features {
+						fmt.sbprintf(sb, "  \"%c%s\"\n", u8(f.prefix), f.feature)
+					}
+				}
+				break
+			}
+			strings.write_byte(sb, '\n')
+
 		case .DATA:
-			r := reader(data, 0)
+			r := reader(section_data, 0)
 			count := rd_u32(&r) or_break section_printing
 			assert(count == sec.count)
 			for i in 0..<sec.count {
@@ -108,7 +142,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 				}
 			}
 		case .MEMORY:
-			r := reader(data, 0)
+			r := reader(section_data, 0)
 			count := rd_u32(&r) or_break section_printing
 			assert(count == sec.count)
 			for i in 0..<sec.count {
