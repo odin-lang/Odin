@@ -1485,6 +1485,11 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
+
+	if (ac.link_section.len > 0) {
+		e->Procedure.link_section = ac.link_section;
+	}
+
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {
 			e->flags |= EntityFlag_Disabled;

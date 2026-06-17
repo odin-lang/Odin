@@ -562,6 +562,19 @@ try_cross_linking:;
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
 							);
+						} else if (build_context.metrics.arch == TargetArch_arm64) {
+							result = system_exec_command_line_app("clang",
+								"%s \"%.*s\" "
+								"-c -o \"%.*s\" "
+								"-target %.*s "
+								"%.*s "
+								"",
+								clang_path,
+								LIT(asm_file),
+								LIT(obj_file),
+								LIT(build_context.metrics.target_triplet),
+								LIT(build_context.extra_assembler_flags)
+							);
 						} else {
 							// Note(bumbread): I'm assuming nasm is installed on the host machine.
 							// Shipping binaries on unix-likes gets into the weird territorry of
@@ -788,7 +801,12 @@ try_cross_linking:;
 			}
 
 			if (build_context.build_mode == BuildMode_Executable && build_context.reloc_mode == RelocMode_PIC) {
-				// Do not disable PIE, let the linker choose. (most likely you want it enabled)
+				if (build_context.metrics.os == TargetOs_linux) {
+					// Linux does not enable PIE by default but required for ASLR
+					link_settings = gb_string_appendc(link_settings, "-pie ");
+				} else {
+					// Do not disable PIE, let the linker choose. (most likely you want it enabled)
+				}
 			} else if (build_context.build_mode != BuildMode_DynamicLibrary) {
 				if (build_context.metrics.os != TargetOs_openbsd
 					&& build_context.metrics.arch != TargetArch_riscv64
@@ -906,6 +924,9 @@ try_cross_linking:;
 				// need to pass -z nobtcfi in order to allow the resulting program to run under
 				// OpenBSD 7.4 and newer. Once support is added at compile time, this can be dropped.
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-z,nobtcfi ");
+			} else if (build_context.metrics.os == TargetOs_linux) {
+				// required for RELRO
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,-z,now -Wl,-z,relro ");
 			}
 
 			if (is_android) {

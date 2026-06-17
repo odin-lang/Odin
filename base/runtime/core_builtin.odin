@@ -1471,9 +1471,10 @@ _shrink_dynamic_array :: proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem
 }
 
 @builtin
-map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
+map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (value_ptr: ^V, err: Allocator_Error) #optional_allocator_error {
 	key, value := key, value
-	return (^V)(__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc))
+	value_ptr_raw, err_set :=__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
+	return (^V)(value_ptr_raw), err_set
 }
 
 // Explicitly inserts a key and value into a map `m`, the same as `map_insert`, but the return values differ.
@@ -1624,14 +1625,14 @@ ensure_contextless :: proc "contextless" (condition: bool, message := #caller_ex
 	}
 }
 
-// Panics the program with a message to indicate something has yet to be implemented.
+// Panics the program with a message.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 @builtin
 panic_contextless :: proc "contextless" (message: string, loc := #caller_location) -> ! {
 	default_assertion_contextless_failure_proc("panic", message, loc)
 }
 
-// Panics the program with a message.
+// Panics the program with a message to indicate something has yet to be implemented.
 // This uses the `default_assertion_contextless_failure_proc` to assert.
 @builtin
 unimplemented_contextless :: proc "contextless" (message := "", loc := #caller_location) -> ! {

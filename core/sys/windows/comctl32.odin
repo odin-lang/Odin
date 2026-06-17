@@ -410,7 +410,7 @@ Header_SetFilterChangeTimeout :: #force_inline proc "system" (hwnd: HWND, i: c_i
 	return cast(c_int)SendMessageW(hwnd,HDM_SETFILTERCHANGETIMEOUT,0,cast(LPARAM)i)
 }
 Header_EditFilter :: #force_inline proc "system" (hwnd: HWND, i: c_int, fDiscardChanges: BOOL) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd,HDM_EDITFILTER,cast(WPARAM)i,MAKELPARAM(fDiscardChanges,0))
+	return cast(BOOL)SendMessageW(hwnd,HDM_EDITFILTER,cast(WPARAM)i,MAKELPARAM(int(fDiscardChanges),0))
 }
 Header_ClearFilter :: #force_inline proc "system" (hwnd: HWND, i: c_int) -> BOOL {
 	return cast(BOOL)SendMessageW(hwnd,HDM_CLEARFILTER,cast(WPARAM)i,0)
@@ -1204,7 +1204,7 @@ ListView_HitTest :: #force_inline proc "system" (hwndLV: HWND, pinfo: ^LV_HITTES
 	return cast(c_int)SendMessageW(hwndLV, LVM_HITTEST, 0, cast(LPARAM)uintptr(pinfo))
 }
 ListView_EnsureVisible :: #force_inline proc "system" (hwndLV: HWND, i: c_int, fPartialOK: BOOL) -> BOOL {
-	return cast(BOOL)SendMessageW(hwndLV, LVM_ENSUREVISIBLE, cast(WPARAM)i, MAKELPARAM(fPartialOK,0))
+	return cast(BOOL)SendMessageW(hwndLV, LVM_ENSUREVISIBLE, cast(WPARAM)i, MAKELPARAM(int(fPartialOK),0))
 }
 ListView_Scroll :: #force_inline proc "system" (hwndLV: HWND, dx,dy: c_int) -> BOOL {
 	return cast(BOOL)SendMessageW(hwndLV, LVM_SCROLL, cast(WPARAM)dx, cast(LPARAM)dy)
@@ -2082,7 +2082,7 @@ TabCtrl_DeselectAll :: #force_inline proc "system" (hwnd: HWND, fExcludeFocus: B
 	SendMessageW(hwnd, TCM_DESELECTALL, cast(WPARAM)fExcludeFocus, 0)
 }
 TabCtrl_HighlightItem :: #force_inline proc "system" (hwnd: HWND, i: c_int, fHighlight: BOOL) -> BOOL {
-	return cast(BOOL)SendMessageW(hwnd, TCM_HIGHLIGHTITEM, cast(WPARAM)i, cast(LPARAM)MAKELONG(fHighlight,0))
+	return cast(BOOL)SendMessageW(hwnd, TCM_HIGHLIGHTITEM, cast(WPARAM)i, cast(LPARAM)MAKELONG(int(fHighlight),0))
 }
 TabCtrl_SetExtendedStyle :: #force_inline proc "system" (hwnd: HWND, dw: DWORD) -> DWORD {
 	return cast(DWORD)SendMessageW(hwnd, TCM_SETEXTENDEDSTYLE, 0, cast(LPARAM)dw)

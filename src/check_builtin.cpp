@@ -1173,7 +1173,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			// masked_load (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
 			// masked_store(ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
-			// masked_expand_load (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
+			// masked_expand_load   (ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool) -> #simd[N]T
 			// masked_compress_store(ptr: rawptr, values: #simd[N]T, mask: #simd[N]int_or_bool)
 
 			Operand ptr    = {};

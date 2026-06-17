@@ -44,18 +44,24 @@ jobs:
           name: windows_artifacts
           path: dist
   build_linux:
-    name: Linux Build
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      DOCKER_IMAGE: ${{ matrix.arch == 'amd64' && 'alpine:3.24' || 'arm64v8/alpine:3.24' }}
+    name: Linux Build ${{ matrix.arch }}
     if: github.repository == 'odin-lang/Odin'
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-latest' || 'ubuntu-24.04-arm' }}
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
       - name: (Linux) Download LLVM and Build Odin
         run: |
-          docker run --rm -v "$PWD:/src" -w /src alpine sh -c '
+          docker run --rm -v "$PWD:/src" -w /src $DOCKER_IMAGE sh -c '
             apk add --no-cache \
-              musl-dev llvm20-dev clang20 git mold lz4 \
+              musl-dev llvm20-dev clang20 build-base git mold lz4 \
               libxml2-static llvm20-static zlib-static zstd-static \
               make &&
             git config --global --add safe.directory /src &&
@@ -65,7 +71,7 @@ jobs:
         run: ./odin run examples/demo
       - name: Copy artifacts
         run: |
-          FILE="odin-linux-amd64-nightly+$(date -I)"
+          FILE="odin-linux-$ARCH-nightly+$(date -I)"
           mkdir $FILE
           cp odin $FILE
           cp LICENSE $FILE
@@ -79,60 +85,22 @@ jobs:
           tar -czvf dist.tar.gz $FILE
       - name: Odin run
         run: |
-          FILE="odin-linux-amd64-nightly+$(date -I)"
+          FILE="odin-linux-$ARCH-nightly+$(date -I)"
           $FILE/odin run examples/demo
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux_artifacts
-          path: dist.tar.gz
-  build_linux_arm:
-    name: Linux ARM Build
-    if: github.repository == 'odin-lang/Odin'
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-      - name: (Linux ARM) Download LLVM and Build Odin
-        run: |
-          docker run --rm -v "$PWD:/src" -w /src arm64v8/alpine sh -c '
-            apk add --no-cache \
-              musl-dev llvm20-dev clang20 git mold lz4 \
-              libxml2-static llvm20-static zlib-static zstd-static \
-              make &&
-            git config --global --add safe.directory /src &&
-            ./ci/build_linux_static.sh
-          '
-      - name: Odin run
-        run: ./odin run examples/demo
-      - name: Copy artifacts
-        run: |
-          FILE="odin-linux-arm64-nightly+$(date -I)"
-          mkdir $FILE
-          cp odin $FILE
-          cp LICENSE $FILE
-          cp -r shared $FILE
-          cp -r base $FILE
-          cp -r core $FILE
-          cp -r vendor $FILE
-          cp -r examples $FILE
-          ./ci/remove_windows_binaries.sh $FILE
-          # Creating a tarball so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
-          tar -czvf dist.tar.gz $FILE
-      - name: Odin run
-        run: |
-          FILE="odin-linux-arm64-nightly+$(date -I)"
-          $FILE/odin run examples/demo
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux_arm_artifacts
+          name: ${{ matrix.arch == 'amd64' && 'linux_artifacts' || 'linux_arm_artifacts' }}
           path: dist.tar.gz
   build_macos:
-    name: MacOS Build
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+    name: Macos Build ${{ matrix.arch }}
     if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-15-intel
+    runs-on: ${{ matrix.arch == 'amd64' && 'macos-15-intel' || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -141,6 +109,7 @@ jobs:
         run: |
           brew update
           brew install llvm@20 dylibbundler lld@20
+          brew link llvm@20
 
       - name: build odin
         # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
@@ -148,7 +117,7 @@ jobs:
         run: CXXFLAGS="-L/usr/lib/system -L/usr/lib" make nightly
       - name: Bundle
         run: |
-          FILE="odin-macos-amd64-nightly+$(date -I)"
+          FILE="odin-macos-$ARCH-nightly+$(date -I)"
           mkdir $FILE
           cp odin $FILE
           cp LICENSE $FILE
@@ -163,57 +132,16 @@ jobs:
           tar -czvf dist.tar.gz $FILE
       - name: Odin run
         run: |
-          FILE="odin-macos-amd64-nightly+$(date -I)"
+          FILE="odin-macos-$ARCH-nightly+$(date -I)"
           $FILE/odin run examples/demo
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos_artifacts
-          path: dist.tar.gz
-  build_macos_arm:
-    name: MacOS ARM Build
-    if: github.repository == 'odin-lang/Odin'
-    runs-on: macos-latest # ARM machine
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          lfs: true
-      - name: Download LLVM and setup PATH
-        run: |
-          brew update
-          brew install llvm@20 dylibbundler lld@20
-
-      - name: build odin
-        # These -L makes the linker prioritize system libraries over LLVM libraries, this is mainly to
-        # not link with libunwind bundled with LLVM but link with libunwind on the system.
-        run: CXXFLAGS="-L/usr/lib/system -L/usr/lib" make nightly
-      - name: Bundle
-        run: |
-          FILE="odin-macos-arm64-nightly+$(date -I)"
-          mkdir $FILE
-          cp odin $FILE
-          cp LICENSE $FILE
-          cp -r shared $FILE
-          cp -r base $FILE
-          cp -r core $FILE
-          cp -r vendor $FILE
-          cp -r examples $FILE
-          ./ci/remove_windows_binaries.sh $FILE
-          dylibbundler -b -x $FILE/odin -d $FILE/libs -od -p @executable_path/libs
-          # Creating a tarball so executable permissions are retained, see https://github.com/actions/upload-artifact/issues/38
-          tar -czvf dist.tar.gz $FILE
-      - name: Odin run
-        run: |
-          FILE="odin-macos-arm64-nightly+$(date -I)"
-          $FILE/odin run examples/demo
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos_arm_artifacts
+          name: ${{ matrix.arch == 'amd64' && 'macos_artifacts' || 'macos_arm_artifacts' }}
           path: dist.tar.gz
   upload_b2:
     runs-on: [ubuntu-latest]
-    needs: [build_windows, build_macos, build_macos_arm, build_linux, build_linux_arm]
+    needs: [build_windows, build_macos, build_linux]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

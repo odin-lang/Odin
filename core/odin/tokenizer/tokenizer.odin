@@ -679,6 +679,9 @@ scan :: proc(t: ^Tokenizer) -> Token {
 			if t.ch == '=' {
 				advance_rune(t)
 				kind = .Mul_Eq
+			} else if t.ch == '*' {
+				advance_rune(t)
+				kind = .Mul_Mul
 			}
 		case '=':
 			kind = .Eq

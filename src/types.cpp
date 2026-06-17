@@ -2656,6 +2656,40 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type);
+
+gb_internal bool is_type_constant_type_for_unions(Type *t) {
+	t = core_type(t);
+	if (t == nullptr) { return false; }
+	switch (t->kind) {
+	case Type_Basic:
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
+	case Type_BitSet:
+		return true;
+	case Type_Proc:
+		return true;
+	case Type_Array:
+		return is_type_constant_type(t->Array.elem);
+	case Type_EnumeratedArray:
+		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_Struct:
+		{
+			for (Entity *field : t->Struct.fields) {
+				if (!is_type_constant_type_for_unions(field->type)) {
+					return false;
+				}
+			}
+			return true;
+		}
+	case Type_Union:
+		return is_type_union_constantable(t);
+	}
+	return false;
+}
+
 gb_internal bool is_type_union_constantable(Type *type) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
@@ -2667,7 +2701,7 @@ gb_internal bool is_type_union_constantable(Type *type) {
 	}
 
 	for (Type *v : bt->Union.variants) {
-		if (!is_type_constant_type(v)) {
+		if (!is_type_constant_type_for_unions(v)) {
 			return false;
 		}
 	}
@@ -2680,7 +2714,7 @@ gb_internal bool is_type_raw_union_constantable(Type *type) {
 	GB_ASSERT(bt->Struct.is_raw_union);
 
 	for (Entity *f : bt->Struct.fields) {
-		if (!is_type_constant_type(f->type)) {
+		if (!is_type_constant_type_for_unions(f->type)) {
 			return false;
 		}
 	}
@@ -4996,9 +5030,15 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
-		if (nested_level > 0) {
-			return nested_level;
+		// Only follow the chain transitively when the field also has `using`, which is
+		// what the backend's lookup_subtype_polymorphic_selection requires (it gates
+		// recursion on EntityFlag_Using). A plain `#subtype`-only field enables a
+		// single-hop conversion but not a two-or-more hop transitive one.
+		if (f->flags & EntityFlag_Using) {
+			isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
+			if (nested_level > 0) {
+				return nested_level;
+			}
 		}
 	}
 

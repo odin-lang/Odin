@@ -2043,7 +2043,8 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 		GB_ASSERT(!var.is_initialized);
 		Type *t = type_deref(var.var.type);
 
-		if (is_type_any(t)) {
+		// NOTE: 'any' literals or 'any's that point to other variables can be handled by the generic path
+		if (is_type_any(t) && !is_type_any(var.init.type) && init_expr->tav.mode != Addressing_Variable) {
 			// NOTE(bill): Edge case for 'any' type
 			Type *var_type = default_type(var.init.type);
 			gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");
@@ -2142,6 +2143,9 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	if (build_context.no_plt) {
+		lb_add_attribute_to_proc(p->module, p->value, "nonlazybind");
+	}
 	lb_add_attribute_to_proc(p->module, p->value, "optnone");
 	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
@@ -2339,6 +2343,9 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
 	p->is_startup = true;
+	if (build_context.no_plt) {
+		lb_add_attribute_to_proc(p->module, p->value, "nonlazybind");
+	}
 	lb_add_attribute_to_proc(p->module, p->value, "optnone");
 	lb_add_attribute_to_proc(p->module, p->value, "noinline");
 
@@ -3336,16 +3343,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	switch (build_context.reloc_mode) {
 	case RelocMode_Default:
-		if (build_context.metrics.os == TargetOs_openbsd) {
-			// Always use PIC for OpenBSD: it defaults to PIE
-			reloc_mode = LLVMRelocPIC;
-		}
-
-		if (build_context.metrics.arch == TargetArch_riscv64) {
-			// NOTE(laytan): didn't seem to work without this.
-			reloc_mode = LLVMRelocPIC;
-		}
-
 		break;
 	case RelocMode_Static:
 		reloc_mode = LLVMRelocStatic;
@@ -3601,7 +3598,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 						cc.link_section = e->Variable.link_section;
 
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, e->type, v, cc);
+						lbValue init = lb_const_value(m, e->type, v, tav.type, cc);
+
 
 						LLVMDeleteGlobal(g.value);
 						g.value = nullptr;

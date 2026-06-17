@@ -2039,9 +2039,6 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 }
 
 gb_internal Ast *parse_value(AstFile *f) {
-	if (f->curr_token.kind == Token_OpenBrace) {
-		return parse_literal_value(f, nullptr);
-	}
 	Ast *value;
 	bool prev_allow_range = f->allow_range;
 	f->allow_range = true;
@@ -2058,54 +2055,6 @@ gb_internal void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTa
 		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
-}
-
-gb_internal bool is_foreign_name_valid(String const &name) {
-	if (name.len == 0) {
-		return false;
-	}
-	isize offset = 0;
-	while (offset < name.len) {
-		Rune rune;
-		isize remaining = name.len - offset;
-		isize width = utf8_decode(name.text+offset, remaining, &rune);
-		if (rune == GB_RUNE_INVALID && width == 1) {
-			return false;
-		} else if (rune == GB_RUNE_BOM && remaining > 0) {
-			return false;
-		}
-
-		if (offset == 0) {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alpha(cast(char)rune))
-					return false;
-				break;
-			}
-		} else {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alphanumeric(cast(char)rune)) {
-					return false;
-				}
-				break;
-			}
-		}
-
-		offset += width;
-	}
-
-	return true;
 }
 
 gb_internal void parse_proc_tags(AstFile *f, u64 *tags) {
@@ -3525,6 +3474,7 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Xor:
 	case Token_And:
 	case Token_Not:
+	case Token_MulMul: // 'expand_values' operator
 	case Token_Mul: // Used for error handling when people do C-like things
 	{
 		Token token = advance_token(f);

@@ -905,22 +905,22 @@ __dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: 
 	return nil, false
 }
 
-__dynamic_map_set_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
+__dynamic_map_set_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> (value_ptr: rawptr, err: Allocator_Error) #optional_allocator_error {
 	return __dynamic_map_set(m, info, info.key_hasher(key, map_seed(m^)), key, value, loc)
 }
 
 
 // IMPORTANT: USED WITHIN THE COMPILER
-__dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, hash: Map_Hash, key, value: rawptr, loc := #caller_location) -> rawptr {
+__dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, hash: Map_Hash, key, value: rawptr, loc := #caller_location) -> (value_ptr: rawptr, err: Allocator_Error) #optional_allocator_error {
 	if found := __dynamic_map_get(m, info, hash, key); found != nil {
 		intrinsics.mem_copy_non_overlapping(found, value, info.vs.size_of_type)
-		return found
+		return found, nil
 	}
 
 	hash := hash
-	err, has_grown := __dynamic_map_check_grow(m, info, loc)
-	if err != nil {
-		return nil
+	err_grow, has_grown := __dynamic_map_check_grow(m, info, loc)
+	if err_grow != nil {
+		return nil, err_grow
 	}
 	if has_grown {
 		hash = info.key_hasher(key, map_seed(m^))
@@ -930,7 +930,7 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	if result != 0 {
 		m.len += 1
 	}
-	return rawptr(result)
+	return rawptr(result), nil
 }
 __dynamic_map_set_extra_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> (prev_key_ptr, value_ptr: rawptr) {
 	return __dynamic_map_set_extra(m, info, info.key_hasher(key, map_seed(m^)), key, value, loc)

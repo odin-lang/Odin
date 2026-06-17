@@ -59,6 +59,12 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	m->ctx = LLVMContextCreate();
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
+	if (build_context.no_plt) {
+		LLVMAddModuleFlag(m->mod,
+			LLVMModuleFlagBehaviorWarning,
+			"RtLibUseGOT", 11, 
+			LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true)));
+	}
 	if (build_context.ODIN_DEBUG) {
 		enum {DEBUG_METADATA_VERSION = 3};
 
