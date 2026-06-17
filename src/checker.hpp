@@ -142,8 +142,11 @@ struct AttributeContext {
 	bool    no_sanitize_address   : 1;
 	bool    no_sanitize_memory    : 1;
 	bool    no_sanitize_thread    : 1;
+	bool    xray_always_instrument: 1;
+	bool    xray_never_instrument : 1;
 	bool    rodata                : 1;
 	bool    ignore_duplicates     : 1;
+	i64     xray_log_args_count;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
 	String extra_linker_flags;

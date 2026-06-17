@@ -271,8 +271,11 @@ struct Entity {
 			bool    no_sanitize_address        : 1;
 			bool    no_sanitize_memory         : 1;
 			bool    no_sanitize_thread         : 1;
+			bool    xray_always_instrument     : 1;
+			bool    xray_never_instrument      : 1;
 			bool    is_objc_impl_or_import     : 1;
 			bool    is_objc_class_method       : 1;
+			i64     xray_log_args_count;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

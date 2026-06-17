@@ -4226,6 +4226,31 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		}
 		ac->no_sanitize_thread = true;
 		return true;
+	} else if (name == "xray_always_instrument") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->xray_always_instrument = true;
+		return true;
+	} else if (name == "xray_never_instrument") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter", LIT(name));
+		}
+		ac->xray_never_instrument = true;
+		return true;
+	} else if (name == "xray_log_args") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_Integer) {
+			error(elem, "Expected a constant integer value for '%.*s'", LIT(name));
+		} else {
+			i64 count = big_int_to_i64(&ev.value_integer);
+			if (count < 1) {
+				error(elem, "Expected '%.*s' to be at least 1, got %lld", LIT(name), count);
+			} else {
+				ac->xray_log_args_count = count;
+			}
+		}
+		return true;
 	} else if (name == "fast_math") {
 		if (value == nullptr) {
 			error(elem, "Expected a constant bit_set of type 'intrinsics.Fast_Math_Flags' for '%.*s'", LIT(name));

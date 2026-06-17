@@ -1479,6 +1479,12 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.no_sanitize_address = ac.no_sanitize_address;
 	e->Procedure.no_sanitize_memory  = ac.no_sanitize_memory;
 	e->Procedure.no_sanitize_thread  = ac.no_sanitize_thread;
+	if (ac.xray_always_instrument && ac.xray_never_instrument) {
+		error(e->token, "A procedure cannot be marked with both @(xray_always_instrument) and @(xray_never_instrument)");
+	}
+	e->Procedure.xray_always_instrument = ac.xray_always_instrument;
+	e->Procedure.xray_never_instrument  = ac.xray_never_instrument;
+	e->Procedure.xray_log_args_count    = ac.xray_log_args_count;
 
 	e->Procedure.fast_math_flags = ac.fast_math_flags;
 

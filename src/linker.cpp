@@ -988,6 +988,9 @@ try_cross_linking:;
 				link_command_line = gb_string_appendc(link_command_line, clang_path);
 			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
+			if (build_context.xray_instrument) {
+				link_command_line = gb_string_appendc(link_command_line, " -fxray-instrument ");
+			}
 
 			if (build_context.lto_kind != LTO_None) {
 				link_command_line = gb_string_appendc(link_command_line, " -flto=thin");

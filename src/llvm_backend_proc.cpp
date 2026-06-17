@@ -394,6 +394,21 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
+	if (p->body && build_context.xray_instrument) {
+		if (entity->Procedure.xray_always_instrument) {
+			lb_add_attribute_to_proc_with_string(m, p->value, str_lit("function-instrument"), str_lit("xray-always"));
+		} else if (entity->Procedure.xray_never_instrument) {
+			lb_add_attribute_to_proc_with_string(m, p->value, str_lit("function-instrument"), str_lit("xray-never"));
+		} else {
+			lb_add_attribute_to_proc_with_string(m, p->value, str_lit("xray-instruction-threshold"), str_lit("200"));
+		}
+
+		if (entity->Procedure.xray_log_args_count > 0) {
+			String count = make_string_c(gb_bprintf("%lld", cast(long long)entity->Procedure.xray_log_args_count));
+			lb_add_attribute_to_proc_with_string(m, p->value, str_lit("xray-log-args"), count);
+		}
+	}
+
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
 	lb_add_member(m, p->name, proc_value);
@@ -5089,4 +5104,3 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	return lb_emit_call(p, value, call_args, inlining, tailing, sret_dst);
 }
-
