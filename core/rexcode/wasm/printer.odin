@@ -55,8 +55,6 @@ sbprint :: proc(
 	sb:           ^strings.Builder,
 	instructions: []Instruction,
 	inst_info:    []Instruction_Info,
-	label_defs:   []Label_Definition,
-	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
 	label_names:  ^map[u32]string = nil,
 ) {
@@ -98,7 +96,7 @@ sbprint :: proc(
 				write_decimal_u32(sb, u32(bb))
 			}
 		case:
-			for slot in 0..<int(inst.operand_count) {
+			for slot in 0..<inst.operand_count {
 				strings.write_byte(sb, ' ')
 				write_operand(sb, &inst.ops[slot], inst.mnemonic, label_names, opts)
 			}
@@ -106,20 +104,16 @@ sbprint :: proc(
 
 		strings.write_string(sb, opts.separator)
 	}
-	_ = tokens
-	_ = label_defs
 }
 
 sbprintln :: proc(
 	sb:           ^strings.Builder,
 	instructions: []Instruction,
 	inst_info:    []Instruction_Info,
-	label_defs:   []Label_Definition,
-	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
 	label_names:  ^map[u32]string = nil,
 ) {
-	sbprint(sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(sb, instructions, inst_info, options, label_names)
 	strings.write_byte(sb, '\n')
 }
 
@@ -128,118 +122,106 @@ sbprintln :: proc(
 // =============================================================================
 
 print :: proc(
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(&sb, instructions, inst_info, options, label_names)
 	os.write_string(os.stdout, strings.to_string(sb))
 }
 
 println :: proc(
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprintln(&sb, instructions, inst_info, options, label_names)
 	os.write_string(os.stdout, strings.to_string(sb))
 }
 
 aprint :: proc(
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 	allocator := context.allocator,
 ) -> string {
 	sb := strings.builder_make(allocator)
-	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(&sb, instructions, inst_info, options, label_names)
 	return strings.to_string(sb)
 }
 
 aprintln :: proc(
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 	allocator := context.allocator,
 ) -> string {
 	sb := strings.builder_make(allocator)
-	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprintln(&sb, instructions, inst_info, options, label_names)
 	return strings.to_string(sb)
 }
 
 tprint :: proc(
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) -> string {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(&sb, instructions, inst_info, options, label_names)
 	return strings.to_string(sb)
 }
 
 tprintln :: proc(
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) -> string {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprintln(&sb, instructions, inst_info, options, label_names)
 	return strings.to_string(sb)
 }
 
 bprint :: proc(
 	buf: []u8,
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) -> string {
 	sb := strings.builder_from_bytes(buf)
-	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(&sb, instructions, inst_info, options, label_names)
 	return strings.to_string(sb)
 }
 
 bprintln :: proc(
 	buf: []u8,
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) -> string {
 	sb := strings.builder_from_bytes(buf)
-	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprintln(&sb, instructions, inst_info, options, label_names)
 	return strings.to_string(sb)
 }
 
 fprint :: proc(
 	fd: ^os.File,
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(&sb, instructions, inst_info, options, label_names)
 	os.write_string(fd, strings.to_string(sb))
 }
 
 fprintln :: proc(
 	fd: ^os.File,
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprintln(&sb, instructions, inst_info, options, label_names)
 	os.write_string(fd, strings.to_string(sb))
 }
 
 wprint :: proc(
 	w: io.Writer,
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprint(&sb, instructions, inst_info, options, label_names)
 	io.write_string(w, strings.to_string(sb))
 }
 
 wprintln :: proc(
 	w: io.Writer,
-	instructions: []Instruction, inst_info: []Instruction_Info, label_defs: []Label_Definition,
-	tokens: ^[dynamic]Token = nil, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
+	instructions: []Instruction, inst_info: []Instruction_Info, options: ^Print_Options = nil, label_names: ^map[u32]string = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
-	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
+	sbprintln(&sb, instructions, inst_info, options, label_names)
 	io.write_string(w, strings.to_string(sb))
 }
 
@@ -247,7 +229,6 @@ wprintln :: proc(
 // Internal writers
 // =============================================================================
 
-@(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	name := MNEMONIC_NAMES[m]
 	if name == "" { strings.write_string(sb, "<?>"); return }
@@ -265,7 +246,6 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	}
 }
 
-@(private="file")
 write_operand :: proc(
 	sb:          ^strings.Builder,
 	op:          ^Operand,
@@ -293,19 +273,18 @@ write_operand :: proc(
 		}
 
 	case .MEMARG:
-		// WAT prints non-trivial memargs as `offset=N align=N` (omitting either
-		// when it is the natural default is a refinement; we print both).
-		strings.write_string(sb, "offset=")
-		write_decimal_u32(sb, op.memarg.offset)
-		strings.write_string(sb, " align=")
+		// WAT prints non-trivial memargs as `align=N offset=N`
+		// omitting either when it is the natural default is a refinement.
+		strings.write_string(sb, "align=")
 		write_decimal_u32(sb, op.memarg.align)
+		strings.write_string(sb, " offset=")
+		write_decimal_u32(sb, op.memarg.offset)
 
 	case .BLOCK_TYPE:
 		write_block_type(sb, op.immediate)
 	}
 }
 
-@(private="file")
 write_block_type :: proc(sb: ^strings.Builder, v: i64) {
 	switch Block_Type(v) {
 	case .EMPTY:     // no result annotation
@@ -324,7 +303,6 @@ write_block_type :: proc(sb: ^strings.Builder, v: i64) {
 	}
 }
 
-@(private="file")
 write_heap_type :: proc(sb: ^strings.Builder, b: u8) {
 	#partial switch Value_Type(b) {
 	case .FUNCREF:   strings.write_string(sb, "func")
@@ -334,7 +312,6 @@ write_heap_type :: proc(sb: ^strings.Builder, b: u8) {
 	}
 }
 
-@(private="file")
 write_float :: proc(sb: ^strings.Builder, op: ^Operand) {
 	buf: [40]u8
 	if op.size == 4 {
@@ -348,7 +325,6 @@ write_float :: proc(sb: ^strings.Builder, op: ^Operand) {
 	}
 }
 
-@(private="file")
 write_label :: proc(
 	sb:          ^strings.Builder,
 	label_id:    u32,
@@ -357,15 +333,15 @@ write_label :: proc(
 ) {
 	if label_names != nil {
 		if name, ok := label_names^[label_id]; ok {
-			strings.write_string(sb, name)
+			strings.write_string(sb, "$")
+			strings.write_quoted_string(sb, name)
 			return
 		}
 	}
-	strings.write_string(sb, opts.label_prefix)
+	strings.write_string(sb, "$")
 	write_decimal_u32(sb, label_id)
 }
 
-@(private="file")
 write_decimal_u32 :: proc(sb: ^strings.Builder, v: u32) {
 	if v == 0 {
 		strings.write_byte(sb, '0')
@@ -383,7 +359,6 @@ write_decimal_u32 :: proc(sb: ^strings.Builder, v: u32) {
 	}
 }
 
-@(private="file")
 write_signed_decimal :: proc(sb: ^strings.Builder, v: i64) {
 	if v < 0 {
 		strings.write_byte(sb, '-')
@@ -393,7 +368,6 @@ write_signed_decimal :: proc(sb: ^strings.Builder, v: i64) {
 	}
 }
 
-@(private="file")
 write_decimal_u64 :: proc(sb: ^strings.Builder, v: u64) {
 	if v == 0 {
 		strings.write_byte(sb, '0')

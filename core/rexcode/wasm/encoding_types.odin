@@ -78,7 +78,9 @@ write_uleb :: #force_inline proc "contextless" (code: []u8, offset: ^u32, value:
 	for {
 		b := u8(v & 0x7F)
 		v >>= 7
-		if v != 0 { b |= 0x80 }
+		if v != 0 {
+			b |= 0x80
+		}
 		code[offset^] = b
 		offset^ += 1
 		if v == 0 {
@@ -94,7 +96,9 @@ write_sleb :: #force_inline proc "contextless" (code: []u8, offset: ^u32, value:
 		b := u8(v & 0x7F)
 		v >>= 7 // arithmetic shift on signed value sign-extends
 		done := (v == 0 && (b & 0x40) == 0) || (v == -1 && (b & 0x40) != 0)
-		if !done { b |= 0x80 }
+		if !done {
+			b |= 0x80
+		}
 		code[offset^] = b
 		offset^ += 1
 		if done {
@@ -109,7 +113,9 @@ write_uleb_padded5 :: #force_inline proc "contextless" (code: []u8, offset: ^u32
 	for i := 0; i < 5 && offset^ < u32(len(code)); i += 1 {
 		b := u8(v & 0x7F)
 		v >>= 7
-		if i != 4 { b |= 0x80 }
+		if i != 4 {
+			b |= 0x80
+		}
 		code[offset^] = b
 		offset^ += 1
 	}

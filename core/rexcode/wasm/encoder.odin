@@ -45,9 +45,8 @@ encode :: proc(
 ) -> (byte_count: u32, ok: bool) {
 	errors_start := u32(len(errors))
 
-	for i in 0..<u32(len(instructions)) {
-		inst := &instructions[i]
-		n := encode_one(inst, byte_count, u16(i), code, relocs, errors) or_return
+	for &inst, i in instructions {
+		n := encode_one(&inst, byte_count, u16(i), code, relocs, errors) or_return
 		inst.length = u8(min(n, 255))
 		byte_count += n
 	}
@@ -56,11 +55,7 @@ encode :: proc(
 	return
 }
 
-// =============================================================================
-// Internal
-// =============================================================================
 
-@(private="file")
 encode_one :: #force_inline proc(
 	inst:     ^Instruction,
 	pc:       u32,

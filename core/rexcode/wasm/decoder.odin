@@ -19,8 +19,7 @@ import "base:runtime"
 //      its immediates in declaration order, reconstructing Operands.
 //
 // WASM control flow is structured (branches carry relative label depths, not
-// byte offsets), so there is no PC-relative label inference -- `label_defs`
-// is part of the universal signature but left untouched. Object-file index
+// byte offsets), so there is no PC-relative label inference. Object-file index
 // relocations *are* re-attached: when an input relocation lands on a decoded
 // index field, that operand is marked `symbolic` and carries the label id.
 //
@@ -39,7 +38,6 @@ decode :: proc(
 	relocs:       []Relocation,
 	instructions: ^[dynamic]Instruction,
 	inst_info:    ^[dynamic]Instruction_Info,
-	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	targets_allocator := context.allocator,
 ) -> (byte_count: u32, ok: bool) {
@@ -157,6 +155,8 @@ decode_one :: proc(
 				op.index          = lid
 				op.flags.symbolic = true
 				op.size           = 5
+			} else if m == .CALL {
+				op.flags.symbolic = true
 			}
 			inst.ops[slot] = op
 			slot += 1
@@ -229,15 +229,15 @@ decode_one :: proc(
 @(private="file")
 idx_kind_for :: #force_inline proc "contextless" (m: Mnemonic, which: int) -> Index_Kind {
 	#partial switch m {
-	case .BR, .BR_IF:                 return .LABEL
-	case .CALL, .REF_FUNC:            return .FUNC
-	case .CALL_INDIRECT:              return which == 0 ? .TYPE : .TABLE
-	case .LOCAL_GET, .LOCAL_SET, .LOCAL_TEE:   return .LOCAL
-	case .GLOBAL_GET, .GLOBAL_SET:    return .GLOBAL
-	case .MEMORY_INIT, .DATA_DROP:    return .DATA
-	case .TABLE_INIT:                 return which == 0 ? .ELEM : .TABLE
-	case .ELEM_DROP:                  return .ELEM
-	case .TABLE_COPY:                 return .TABLE
+	case .BR, .BR_IF:                           return .LABEL
+	case .CALL, .REF_FUNC:                      return .FUNC
+	case .CALL_INDIRECT:                        return which == 0 ? .TYPE : .TABLE
+	case .LOCAL_GET, .LOCAL_SET, .LOCAL_TEE:    return .LOCAL
+	case .GLOBAL_GET, .GLOBAL_SET:              return .GLOBAL
+	case .MEMORY_INIT, .DATA_DROP:              return .DATA
+	case .TABLE_INIT:                           return which == 0 ? .ELEM : .TABLE
+	case .ELEM_DROP:                            return .ELEM
+	case .TABLE_COPY:                           return .TABLE
 	case .TABLE_GROW, .TABLE_SIZE, .TABLE_FILL: return .TABLE
 	}
 	return .NONE
