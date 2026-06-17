@@ -80,10 +80,10 @@ sbprint :: proc(
 		case .BR_TABLE:
 			for t in inst.targets {
 				strings.write_byte(sb, ' ')
-				write_decimal_u32(sb, t)
+				strings.write_u64(sb, u64(t))
 			}
 			strings.write_byte(sb, ' ')
-			write_decimal_u32(sb, inst.ops[0].index)
+			strings.write_u64(sb, u64(inst.ops[0].index))
 		case .V128_CONST:
 			strings.write_string(sb, " i8x16")
 			for bb in inst.bytes {
@@ -93,7 +93,7 @@ sbprint :: proc(
 		case .I8X16_SHUFFLE:
 			for bb in inst.bytes {
 				strings.write_byte(sb, ' ')
-				write_decimal_u32(sb, u32(bb))
+				strings.write_u64(sb, u64(u32(bb)))
 			}
 		case:
 			for slot in 0..<inst.operand_count {
@@ -262,23 +262,23 @@ write_operand :: proc(
 		} else if op.flags.is_float {
 			write_float(sb, op)
 		} else {
-			write_signed_decimal(sb, op.immediate)
+			strings.write_i64(sb, op.immediate)
 		}
 
 	case .INDEX:
 		if op.flags.symbolic {
 			write_label(sb, op.index, label_names, opts)
 		} else {
-			write_decimal_u32(sb, op.index)
+			strings.write_u64(sb, u64(op.index))
 		}
 
 	case .MEMARG:
 		// WAT prints non-trivial memargs as `align=N offset=N`
 		// omitting either when it is the natural default is a refinement.
 		strings.write_string(sb, "align=")
-		write_decimal_u32(sb, op.memarg.align)
+		strings.write_u64(sb, u64(op.memarg.align))
 		strings.write_string(sb, " offset=")
-		write_decimal_u32(sb, op.memarg.offset)
+		strings.write_u64(sb, u64(op.memarg.offset))
 
 	case .BLOCK_TYPE:
 		write_block_type(sb, op.immediate)
@@ -298,7 +298,7 @@ write_block_type :: proc(sb: ^strings.Builder, v: i64) {
 	case:
 		// non-negative: a type index
 		strings.write_string(sb, "(type ")
-		write_decimal_u32(sb, u32(v))
+		strings.write_u64(sb, u64(u32(v)))
 		strings.write_byte(sb, ')')
 	}
 }
@@ -308,7 +308,7 @@ write_heap_type :: proc(sb: ^strings.Builder, b: u8) {
 	case .FUNCREF:   strings.write_string(sb, "func")
 	case .EXTERNREF: strings.write_string(sb, "extern")
 	case:
-		write_decimal_u32(sb, u32(b))
+		strings.write_u64(sb, u64(u32(b)))
 	}
 }
 
@@ -339,47 +339,5 @@ write_label :: proc(
 		}
 	}
 	strings.write_string(sb, "$")
-	write_decimal_u32(sb, label_id)
-}
-
-write_decimal_u32 :: proc(sb: ^strings.Builder, v: u32) {
-	if v == 0 {
-		strings.write_byte(sb, '0')
-		return
-	}
-
-	buf: [10]u8
-	i := 0
-	for n := v; n > 0; i += 1 {
-		buf[i] = '0' + u8(n % 10)
-		n /= 10
-	}
-	for j := i - 1; j >= 0; j -= 1 {
-		strings.write_byte(sb, buf[j])
-	}
-}
-
-write_signed_decimal :: proc(sb: ^strings.Builder, v: i64) {
-	if v < 0 {
-		strings.write_byte(sb, '-')
-		write_decimal_u64(sb, u64(-(v + 1)) + 1)
-	} else {
-		write_decimal_u64(sb, u64(v))
-	}
-}
-
-write_decimal_u64 :: proc(sb: ^strings.Builder, v: u64) {
-	if v == 0 {
-		strings.write_byte(sb, '0')
-		return
-	}
-	buf: [20]u8
-	i := 0
-	for n := v; n > 0; i += 1 {
-		buf[i] = '0' + u8(n % 10)
-		n /= 10
-	}
-	for j := i - 1; j >= 0; j -= 1 {
-		strings.write_byte(sb, buf[j])
-	}
+	strings.write_u64(sb, u64(label_id))
 }

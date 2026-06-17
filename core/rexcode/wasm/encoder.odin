@@ -3,6 +3,8 @@
 
 package rexcode_wasm
 
+import "core:math/bits"
+
 // =============================================================================
 // WebAssembly ENCODER
 // =============================================================================
@@ -115,7 +117,10 @@ encode_one :: proc(
 			opi += 1
 		case .MEMARG:
 			ma := inst.ops[opi].memarg
-			write_uleb(code, &off, u64(ma.align))
+			// TODO(bill): is this correct because the spec says otherwise but the binary formats look like it's log2
+			align := bits.log2(u64(ma.align))
+
+			write_uleb(code, &off, align)
 			write_uleb(code, &off, u64(ma.offset))
 			opi += 1
 		case .REFTYPE:

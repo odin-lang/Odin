@@ -166,6 +166,8 @@ decode_one :: proc(
 			// See: https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions
 			align  := read_uleb(data, &off) or_return
 			offset := read_uleb(data, &off) or_return
+			// NOTE(bill) this appears to be stored as log2 even though the docs say otherwise
+			align = 1<<align
 			inst.ops[slot] = Operand{kind = .MEMARG, memarg = Memarg{align = u32(align), offset = u32(offset)}}
 			slot += 1
 
