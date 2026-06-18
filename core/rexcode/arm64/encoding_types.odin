@@ -265,6 +265,15 @@ Operand_Encoding :: enum u8 {
 	SVE_EXT_IMM,      // SVE EXT byte index: imm8h at 20:16, imm8l at 12:10
 	ZA_TILE_LOW,      // SME ZA accumulator tile number at bits 2:0 (ADDHA/ADDVA)
 
+	// ---- NEON single-structure lane index (LD1..4_LANE / ST1..4_LANE) ----
+	// The lane index is split across Q (bit 30), S (bit 12) and size (bits
+	// 11:10) in an element-size-dependent way; the structure-size/count opcode
+	// bits stay fixed in the entry `bits`.
+	NEON_LANE_B,      // .B[i]: Q<<3 | S<<2 | size  (i in 0..15)
+	NEON_LANE_H,      // .H[i]: Q<<2 | S<<1 | bit11 (i in 0..7)
+	NEON_LANE_S,      // .S[i]: Q<<1 | S            (i in 0..3)
+	NEON_LANE_D,      // .D[i]: Q                   (i in 0..1)
+
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20
 	ATOMIC_RT,            // Rt (target) at bits 0-4

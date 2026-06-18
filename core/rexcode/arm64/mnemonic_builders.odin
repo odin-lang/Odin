@@ -1309,6 +1309,22 @@ inst_ld3r_r_m                   :: #force_inline proc "contextless" (dst: Regist
 emit_ld3r_r_m                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ld3r_r_m(dst, mem)) }
 inst_ld4r_r_m                   :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD4R, operand_count = 2, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_mem(mem), {}, {}}} }
 emit_ld4r_r_m                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ld4r_r_m(dst, mem)) }
+inst_ld1_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_ld1_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_ld1_lane_r_i_m(dst, imm, mem)) }
+inst_ld2_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD2_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_ld2_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_ld2_lane_r_i_m(dst, imm, mem)) }
+inst_ld3_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD3_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_ld3_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_ld3_lane_r_i_m(dst, imm, mem)) }
+inst_ld4_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD4_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_ld4_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_ld4_lane_r_i_m(dst, imm, mem)) }
+inst_st1_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_st1_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_st1_lane_r_i_m(dst, imm, mem)) }
+inst_st2_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST2_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_st2_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_st2_lane_r_i_m(dst, imm, mem)) }
+inst_st3_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST3_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_st3_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_st3_lane_r_i_m(dst, imm, mem)) }
+inst_st4_lane_r_i_m             :: #force_inline proc "contextless" (dst: Register, imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST4_LANE, operand_count = 3, length = 4, ops = {op_v_elem_b(u8(reg_hw(dst))), op_imm(imm, 4), op_mem(mem), {}}} }
+emit_st4_lane_r_i_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, mem: Memory) { append(instructions, inst_st4_lane_r_i_m(dst, imm, mem)) }
 inst_ldr_v_r_m                  :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDR_V, dst, mem) }
 emit_ldr_v_r_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldr_v_r_m(dst, mem)) }
 inst_str_v_r_m                  :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STR_V, dst, mem) }
@@ -3504,6 +3520,22 @@ inst_ld3r                            :: inst_ld3r_r_m
 emit_ld3r                            :: emit_ld3r_r_m
 inst_ld4r                            :: inst_ld4r_r_m
 emit_ld4r                            :: emit_ld4r_r_m
+inst_ld1_lane                        :: inst_ld1_lane_r_i_m
+emit_ld1_lane                        :: emit_ld1_lane_r_i_m
+inst_ld2_lane                        :: inst_ld2_lane_r_i_m
+emit_ld2_lane                        :: emit_ld2_lane_r_i_m
+inst_ld3_lane                        :: inst_ld3_lane_r_i_m
+emit_ld3_lane                        :: emit_ld3_lane_r_i_m
+inst_ld4_lane                        :: inst_ld4_lane_r_i_m
+emit_ld4_lane                        :: emit_ld4_lane_r_i_m
+inst_st1_lane                        :: inst_st1_lane_r_i_m
+emit_st1_lane                        :: emit_st1_lane_r_i_m
+inst_st2_lane                        :: inst_st2_lane_r_i_m
+emit_st2_lane                        :: emit_st2_lane_r_i_m
+inst_st3_lane                        :: inst_st3_lane_r_i_m
+emit_st3_lane                        :: emit_st3_lane_r_i_m
+inst_st4_lane                        :: inst_st4_lane_r_i_m
+emit_st4_lane                        :: emit_st4_lane_r_i_m
 inst_ldr_v                           :: inst_ldr_v_r_m
 emit_ldr_v                           :: emit_ldr_v_r_m
 inst_str_v                           :: inst_str_v_r_m

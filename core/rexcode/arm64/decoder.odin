@@ -252,6 +252,17 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 	case .ZA_TILE_LOW:
 		return Operand{immediate = i64(word & 0x7), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_B:
+		i := ((word >> 30) & 0x1) << 3 | ((word >> 12) & 0x1) << 2 | ((word >> 10) & 0x3)
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_H:
+		i := ((word >> 30) & 0x1) << 2 | ((word >> 12) & 0x1) << 1 | ((word >> 11) & 0x1)
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_S:
+		i := ((word >> 30) & 0x1) << 1 | ((word >> 12) & 0x1)
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_D:
+		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:

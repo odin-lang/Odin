@@ -506,6 +506,19 @@ pack_operand_inline :: #force_inline proc(
 	case .ZA_TILE_LOW:
 		return (u32(op.immediate) & 0x7) << 0
 
+	// NEON single-structure lane index (Q at 30, S at 12, size at 11:10).
+	case .NEON_LANE_B:
+		i := u32(op.immediate)
+		return ((i >> 3) & 0x1) << 30 | ((i >> 2) & 0x1) << 12 | (i & 0x3) << 10
+	case .NEON_LANE_H:
+		i := u32(op.immediate)
+		return ((i >> 2) & 0x1) << 30 | ((i >> 1) & 0x1) << 12 | (i & 0x1) << 11
+	case .NEON_LANE_S:
+		i := u32(op.immediate)
+		return ((i >> 1) & 0x1) << 30 | (i & 0x1) << 12
+	case .NEON_LANE_D:
+		return (u32(op.immediate) & 0x1) << 30
+
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:
 		v := u32(op.immediate) & 0xFF
