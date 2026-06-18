@@ -473,9 +473,6 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		imm10 := (word >> 1)  & 0x3FF       // hw1[10:1]
 		val   := (imm10 << 1) | j
 		return op_rel_offset(i64(val) << 1)
-	case .BF_BELSE:
-		imm   := (word >> 23) & 0xF
-		return op_rel_offset(i64(imm) << 1)
 	case .BF_RM:
 		return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
 	case .BFCSEL_COND:

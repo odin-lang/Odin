@@ -574,12 +574,6 @@ pack_operand_inline :: #force_inline proc(
 			type = .BF_BLOC_T32, size = 4, inst_idx = inst_idx,
 		})
 		return 0
-	case .BF_BELSE:
-		append(relocs, Relocation{
-			offset = pc, label_id = u32(op.relative),
-			type = .BFCSEL_ELSE_T32, size = 4, inst_idx = inst_idx,
-		})
-		return 0
 	case .BF_RM:
 		return (u32(reg_hw(op.reg)) & 0xF) << 16   // Rm at hw0[3:0] (word bits 19:16)
 	case .BFCSEL_COND:

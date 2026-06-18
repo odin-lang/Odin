@@ -356,7 +356,6 @@ Operand_Encoding :: enum u8 {
 	// ARMv8.1-M Branch Future fields (T32):
 	BF_BOFF,               // bf-point offset: imm4 at hw0[10:7], (label-PC-4)/2
 	BF_BLOC,               // branch target: J at hw1[11] + imm10 at hw1[10:1]
-	BF_BELSE,              // BFCSEL else-target: imm4 at hw0[? ] (relative to bf-point)
 	BF_RM,                 // BFLX/BFX register target at hw0[3:0]
 	BFCSEL_COND,           // BFCSEL condition at hw0[5:2]
 

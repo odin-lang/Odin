@@ -243,10 +243,12 @@ for _, b in ipairs({{"MADD","madd"},{"MSUB","msub"},{"NMADD","nmadd"},{"NMSUB","
 end
 
 -- ---- MSA COPY (vector lane -> GPR) and INSERT (GPR -> vector lane) ----------
-for _, b in ipairs({{"COPY_S","copy_s"},{"COPY_U","copy_u"}}) do
-	for _, d in ipairs({{"B","b",15},{"H","h",7},{"W","w",3}}) do
-		local r = entry(b[1].."_"..d[1], "{.GPR,.MSA_VEC,.IMM5,.NONE}", "{.GPR_AT_6,.WS,.MSA_ELM_IDX,.NONE}", "MSA",
-			function(v) return string.format("%s.%s $%d,$w%d[%d]", b[2], d[2], v[1], v[2], v[3]) end, {31,31,d[3]})
+-- COPY_S has .B/.H/.W; COPY_U only .B/.H on mips32 (COPY_U.W is a mips64-only
+-- form, emitted in the mips64 section below).
+for _, c in ipairs({{"COPY_S","copy_s",{{"B","b",15},{"H","h",7},{"W","w",3}}}, {"COPY_U","copy_u",{{"B","b",15},{"H","h",7}}}}) do
+	for _, d in ipairs(c[3]) do
+		local r = entry(c[1].."_"..d[1], "{.GPR,.MSA_VEC,.IMM5,.NONE}", "{.GPR_AT_6,.WS,.MSA_ELM_IDX,.NONE}", "MSA",
+			function(v) return string.format("%s.%s $%d,$w%d[%d]", c[2], d[2], v[1], v[2], v[3]) end, {31,31,d[3]})
 		if r then sections[#sections+1]=r end
 	end
 end
