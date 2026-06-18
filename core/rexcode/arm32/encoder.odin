@@ -418,6 +418,12 @@ pack_operand_inline :: #force_inline proc(
 		n := u32(reg_hw(op.reg)) & 0x1F
 		if reg_class(op.reg) == REG_QPR { n = (n & 0xF) * 2 }
 		return (n & 0xF) | ((n >> 4) & 1) << 5
+	case .NEON_VM_SCALAR16:
+		// Dm in D0..D7 at bits 2:0; lane = bit5(lane[1]) : bit3(lane[0]).
+		return (u32(reg_hw(op.reg)) & 0x7) | ((u32(op.lane) >> 1) & 1) << 5 | (u32(op.lane) & 1) << 3
+	case .NEON_VM_SCALAR32:
+		// Dm in D0..D15 at bits 3:0; lane = bit5.
+		return (u32(reg_hw(op.reg)) & 0xF) | (u32(op.lane) & 1) << 5
 	case .VFP_IMM8:
 		// Run the VFP 8-bit float encoder; the user supplies the wire-format
 		// 32-bit float bit pattern (for F32). The encoder finds the abcdefgh.

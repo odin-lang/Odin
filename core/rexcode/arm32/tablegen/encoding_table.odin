@@ -3666,6 +3666,21 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.DCPS2 = { {.DCPS2, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF78F8002, 0xFFFFFFFF, .V8, .T32, {thumb32=true, cond_in_28=false}} },
 	.DCPS3 = { {.DCPS3, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF78F8003, 0xFFFFFFFF, .V8, .T32, {thumb32=true, cond_in_28=false}} },
 
+	// NEON (saturating) doubling multiply-high by scalar Dm[lane]:
+	//   .16 -> Dm in D0..D7 (bits 2:0), lane at bit5:bit3;  .32 -> D0..D15, lane bit5.
+	.VQDMULH_LANE = {
+		{.VQDMULH_LANE, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR16, .NONE}, 0xF2900C40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}},
+		{.VQDMULH_LANE, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR16, .NONE}, 0xF3900C40, 0xFFB11F50, .NEON, .A32, {cond_in_28=false}},
+		{.VQDMULH_LANE, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR32, .NONE}, 0xF2A00C40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}},
+		{.VQDMULH_LANE, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR32, .NONE}, 0xF3A00C40, 0xFFB11F50, .NEON, .A32, {cond_in_28=false}},
+	},
+	.VQRDMULH_LANE = {
+		{.VQRDMULH_LANE, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR16, .NONE}, 0xF2900D40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}},
+		{.VQRDMULH_LANE, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR16, .NONE}, 0xF3900D40, 0xFFB11F50, .NEON, .A32, {cond_in_28=false}},
+		{.VQRDMULH_LANE, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR32, .NONE}, 0xF2A00D40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}},
+		{.VQRDMULH_LANE, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR32, .NONE}, 0xF3A00D40, 0xFFB11F50, .NEON, .A32, {cond_in_28=false}},
+	},
+
 	// SPECGEN:BEGIN
 	.VADDL = {
 		{.VADDL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2800000, 0xFFB01F50, .NEON, .A32, {cond_in_28=false}},

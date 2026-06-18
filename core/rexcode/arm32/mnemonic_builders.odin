@@ -794,6 +794,10 @@ inst_vqdmulh_d_d_d               :: #force_inline proc "contextless" (dst: Regis
 emit_vqdmulh_d_d_d               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqdmulh_d_d_d(dst, src, src2)) }
 inst_vqrdmulh_d_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQRDMULH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vqrdmulh_d_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqrdmulh_d_d_d(dst, src, src2)) }
+inst_vqdmulh_lane_d_d_dlane      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMULH_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
+emit_vqdmulh_lane_d_d_dlane      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmulh_lane_d_d_dlane(dst, src, src2, lane)) }
+inst_vqrdmulh_lane_d_d_dlane     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMULH_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
+emit_vqrdmulh_lane_d_d_dlane     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmulh_lane_d_d_dlane(dst, src, src2, lane)) }
 inst_vqrdmlah_d_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQRDMLAH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vqrdmlah_d_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqrdmlah_d_d_d(dst, src, src2)) }
 inst_vqrdmlsh_d_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQRDMLSH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -2053,6 +2057,10 @@ inst_vqdmulh                          :: inst_vqdmulh_d_d_d
 emit_vqdmulh                          :: emit_vqdmulh_d_d_d
 inst_vqrdmulh                         :: inst_vqrdmulh_d_d_d
 emit_vqrdmulh                         :: emit_vqrdmulh_d_d_d
+inst_vqdmulh_lane                     :: inst_vqdmulh_lane_d_d_dlane
+emit_vqdmulh_lane                     :: emit_vqdmulh_lane_d_d_dlane
+inst_vqrdmulh_lane                    :: inst_vqrdmulh_lane_d_d_dlane
+emit_vqrdmulh_lane                    :: emit_vqrdmulh_lane_d_d_dlane
 inst_vqrdmlah                         :: inst_vqrdmlah_d_d_d
 emit_vqrdmlah                         :: emit_vqrdmlah_d_d_d
 inst_vqrdmlsh                         :: inst_vqrdmlsh_d_d_d

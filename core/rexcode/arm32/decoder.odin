@@ -336,6 +336,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .VM_D:
 		n := ((word >> 5) & 1) << 4 | (word & 0xF)
 		return op_reg(Register(REG_DPR | u16(n)))
+	case .NEON_VM_SCALAR16:
+		lane := ((word >> 5) & 1) << 1 | ((word >> 3) & 1)
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)), u8(lane))
+	case .NEON_VM_SCALAR32:
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
 	case .VD_Q:
 		n := (((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)) >> 1
 		return op_reg(Register(REG_QPR | u16(n)))

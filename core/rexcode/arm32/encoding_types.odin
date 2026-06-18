@@ -300,6 +300,11 @@ Operand_Encoding :: enum u8 {
 	VD_Q,                  // Q<reg>: D=bit 22, Vd<3:0>=bits 15-12 (must be even)
 	VN_Q,                  // Q<reg>: N=bit 7,  Vn<3:0>=bits 19-16 (must be even)
 	VM_Q,                  // Q<reg>: M=bit 5,  Vm<3:0>=bits 3-0 (must be even)
+	// NEON by-element scalar Dm[lane] (VQDMULH/VQRDMULH-by-scalar):
+	//   .16: Dm in D0..D7 at bits 2:0, lane = bit5:bit3
+	//   .32: Dm in D0..D15 at bits 3:0, lane = bit5
+	NEON_VM_SCALAR16,
+	NEON_VM_SCALAR32,
 	VFP_IMM8,              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)
