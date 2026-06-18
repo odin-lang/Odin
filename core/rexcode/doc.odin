@@ -48,15 +48,15 @@ emits committed binary blobs that the library `#load`s into `@(rodata)` at
 compile time — no table is built during a normal library build:
 
 ```sh
-odin run <arch>/tablegen            # ENCODING_TABLE -> generated Odin + <arch>/tables.odin
-odin run <arch>/tablegen/generated  # -> <arch>/tables/<arch>.*.bin
+odin run isa/<arch>/tablegen            # ENCODING_TABLE -> generated Odin + tables.odin
+odin run isa/<arch>/tablegen/generated  # -> isa/<arch>/tables/<arch>.*.bin
 ```
 Regenerate after editing `ENCODING_TABLE`. See `docs/table_migration.md`.
 
 ## Usage
 
 ```odin
-import "x86"
+import x86 "core:rexcode/isa/x86"
 
 instructions := []x86.Instruction{
 	x86.inst_r_r(.MOV, x86.RAX, x86.RDI),
@@ -179,21 +179,21 @@ Tasks: `--gen` (table metaprograms), `--builders` (regenerate each ISA's
 Each package has its own test suite:
 
 ```sh
-odin run x86/tests
-odin run arm32/tests
-odin run arm64/tests
-odin run mips/tests
-odin run mos6502/tests
-odin run mos65816/tests
-odin run ppc/tests
-odin run ppc_vle/tests
-odin run riscv/tests
-odin run rsp/tests
+odin run isa/x86/tests
+odin run isa/arm32/tests
+odin run isa/arm64/tests
+odin run isa/mips/tests
+odin run isa/mos6502/tests
+odin run isa/mos65816/tests
+odin run isa/ppc/tests
+odin run isa/ppc_vle/tests
+odin run isa/riscv/tests
+odin run isa/rsp/tests
 ```
 
 ## Verification harnesses
 
-Each arch has a verification harness under `<arch>/tools/`:
+Each arch has a verification harness under `isa/<arch>/tools/`:
 - `dump_verify_input.odin` — emits the per-entry hex/asm manifest.
 - `verify_against_<tool>.*` — runs the canonical external assembler/
   disassembler and compares. LLVM-mc for the seven modern archs, plus
@@ -203,24 +203,27 @@ Each arch has a verification harness under `<arch>/tools/`:
 
 ```
 rexcode/
-	isa/                # shared core: labels, status, print framework, label-inference
+	isa/                # shared ISA core: labels, status, print framework, label-inference
+		x86/            # x86-64 / i386
+		arm32/          # AArch32
+		arm64/          # AArch64
+		mips/           # MIPS (R1..R6 + ASEs + coprocessors)
+		mos6502/        # NMOS 6502 family
+		mos65816/       # W65C816S
+		ppc/            # PowerPC (Power ISA 3.1)
+		ppc_vle/        # Freescale VLE (sibling of ppc)
+		riscv/          # RISC-V
+		rsp/            # N64 RSP
+	wasm/               # WebAssembly (an IR; destined for ir/wasm once the IR layer settles)
 	docs/               # cross-arch design + per-arch design docs
-	x86/                # x86-64 / i386
-	arm32/              # AArch32
-	arm64/              # AArch64
-	mips/               # MIPS (R1..R6 + ASEs + coprocessors)
-	mos6502/            # NMOS 6502 family
-	mos65816/           # W65C816S
-	ppc/                # PowerPC (Power ISA 3.1)
-	ppc_vle/            # Freescale VLE (sibling of ppc)
-	riscv/              # RISC-V
-	rsp/                # N64 RSP
 ```
 
-Per-package layout (canonical, enforced by the cross-arch contract):
+Each ISA is imported as `core:rexcode/isa/<arch>` (e.g. `core:rexcode/isa/x86`); the
+shared core is `core:rexcode/isa`. Per-package layout (canonical, enforced by the
+cross-arch contract):
 
 ```
-<arch>/
+isa/<arch>/
 	encoder.odin         # encode() — two-pass, label/reloc-aware
 	decoder.odin         # decode()
 	printer.odin         # sb/sbln/print/println/aprint/aprintln/tprint/tprintln/bprint/bprintln/fprint/fprintln/wprint/wprintln

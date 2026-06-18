@@ -202,7 +202,8 @@ end
 -- ----------------------------------------------------------------------------
 local ODIN, ROOT, OUT  -- set in main
 
-local function pkg(isa, sub) return ROOT .. "/" .. isa.name .. (sub and ("/"..sub) or "") end
+-- ISA packages live under <root>/isa/<name> (the shared isa package is <root>/isa).
+local function pkg(isa, sub) return ROOT .. "/isa/" .. isa.name .. (sub and ("/"..sub) or "") end
 
 local function odin_run(target)  return q(ODIN).." run "..q(target).." -out:"..q(OUT) end
 local function odin_check(target)return q(ODIN).." check "..q(target).." -no-entry-point" end
