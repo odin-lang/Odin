@@ -269,7 +269,7 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 	}
 
 	// Handle VEX/EVEX encoded instructions
-	if state.vex_type != .NONE {
+	if state.vex_type != nil {
 		return decode_opcode_vex(state)
 	}
 
@@ -573,21 +573,13 @@ decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decod
 decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: Instruction, err: Error_Code) {
 	inst.mnemonic = entry.mnemonic
 
-	// Check if we need ModR/M
-	needs_modrm := false
-	for _, i in entry.enc {
-		enc := entry.enc[i]
-		if enc == .MR || enc == .REG || enc == .VVVV {
-			needs_modrm = true
-			break
-		}
-	}
-
 	modrm: u8 = 0
 	modrm_info: ModRM_Info
 	sib: u8 = 0
 	sib_info: SIB_Info
 	has_sib := false
+
+	needs_modrm := entry.flags.needs_modrm
 
 	if needs_modrm {
 		if state.position >= len(state.data) {
@@ -617,25 +609,18 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 	}
 
 	// Decode each operand
-	for _, i in entry.ops {
-		op_type := entry.ops[i]
+	op_count := entry.flags.op_count
+	for i in 0..<op_count {
 		op_enc := entry.enc[i]
-
-		if op_type == .NONE {
-			break
-		}
 
 		// i386: default_64 entries have R64/RM64 operand types but
 		// really mean R32/RM32 in 32-bit mode (same encoded bytes).
-		effective := mode_rewrite_op_type(op_type, state.mode, entry.flags.default_64)
-		inst.ops[i], err = decode_single_operand(state, effective, op_enc, modrm_info, sib_info, has_sib)
-		if err != nil {
-			return {}, err
-		}
-		inst.operand_count += 1
+		effective := mode_rewrite_op_type(entry.ops[i], state.mode, entry.flags.default_64)
+		inst.ops[i] = decode_single_operand(state, effective, op_enc, modrm_info, sib_info, has_sib) or_return
 	}
+	inst.operand_count += op_count
 
-	return inst, .NONE
+	return
 }
 
 decode_operands_vex :: proc(state: ^Decoder_State, entry: ^VEX_Decode_Entry) -> (inst: Instruction, err: Error_Code) {
@@ -664,30 +649,25 @@ decode_operands_vex :: proc(state: ^Decoder_State, entry: ^VEX_Decode_Entry) -> 
 	}
 
 	// Decode each operand
-	for _, i in entry.ops {
-		op_type := entry.ops[i]
-		op_enc := entry.enc[i]
-
+	for op_type, i in entry.ops {
 		if op_type == .NONE {
 			break
 		}
+		op_enc := entry.enc[i]
 
-		inst.ops[i], err = decode_single_operand_vex(state, op_type, op_enc, modrm_info, sib_info, has_sib)
-		if err != nil {
-			return {}, err
-		}
+		inst.ops[i] = decode_single_operand_vex(state, op_type, op_enc, modrm_info, sib_info, has_sib) or_return
 		inst.operand_count += 1
 	}
 
-	return inst, .NONE
+	return
 }
 
 decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_enc: Operand_Encoding,
-							   modrm_info: ModRM_Info, sib_info: SIB_Info, has_sib: bool) -> (op: Operand, err: Error_Code) {
+                              modrm_info: ModRM_Info, sib_info: SIB_Info, has_sib: bool) -> (op: Operand, err: Error_Code) {
 
 	switch op_enc {
 	case .NONE:
-		return {}, .NONE
+		return
 
 	case .REG:
 		// Register encoded in ModR/M.reg
@@ -696,7 +676,8 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 			register_number += 8
 		}
 		reg := decode_register(register_number, op_type, state.rex)
-		return op_reg(reg), .NONE
+		op = op_reg(reg)
+		return
 
 	case .MR:
 		// Register or memory in ModR/M.rm
@@ -707,7 +688,8 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 				register_number += 8
 			}
 			reg := decode_register(register_number, op_type, state.rex)
-			return op_reg(reg), .NONE
+			op = op_reg(reg)
+			return
 		} else {
 			// Memory
 			return decode_memory_operand(state, modrm_info, sib_info, has_sib, op_type)
@@ -716,43 +698,44 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 	case .IB:
 		// 8-bit immediate or rel8
 		if state.position >= len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		immediate_value := i64(i8(state.data[state.position]))
 		state.position += 1
-		if op_type == .REL8 {
-			return Operand{kind = .RELATIVE, relative = immediate_value, size = 1}, .NONE
-		}
-		return Operand{kind = .IMMEDIATE, immediate = immediate_value, size = 1}, .NONE
+		op = Operand{kind = (op_type == .REL8 ? .RELATIVE : .IMMEDIATE), relative = immediate_value, size = 1}
+		return
 
 	case .IW:
 		// 16-bit immediate
 		if state.position + 2 > len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		immediate_value := i64(i16(u16(state.data[state.position]) | u16(state.data[state.position+1]) << 8))
 		state.position += 2
-		return Operand{kind = .IMMEDIATE, immediate = immediate_value, size = 2}, .NONE
+		op = Operand{kind = .IMMEDIATE, immediate = immediate_value, size = 2}
+		return
 
 	case .ID:
 		// 32-bit immediate or rel32
 		if state.position + 4 > len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		immediate_value := i64(i32(u32(state.data[state.position]) |
 					   u32(state.data[state.position+1]) << 8 |
 					   u32(state.data[state.position+2]) << 16 |
 					   u32(state.data[state.position+3]) << 24))
 		state.position += 4
-		if op_type == .REL32 {
-			return Operand{kind = .RELATIVE, relative = immediate_value, size = 4}, .NONE
-		}
-		return Operand{kind = .IMMEDIATE, immediate = immediate_value, size = 4}, .NONE
+		op = Operand{kind = (op_type == .REL32 ? .RELATIVE : .IMMEDIATE), relative = immediate_value, size = 4}
+		return
 
 	case .IQ:
 		// 64-bit immediate
 		if state.position + 8 > len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		immediate_value := i64(u64(state.data[state.position]) |
 				   u64(state.data[state.position+1]) << 8 |
@@ -763,7 +746,8 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 				   u64(state.data[state.position+6]) << 48 |
 				   u64(state.data[state.position+7]) << 56)
 		state.position += 8
-		return Operand{kind = .IMMEDIATE, immediate = immediate_value, size = 8}, .NONE
+		op = Operand{kind = .IMMEDIATE, immediate = immediate_value, size = 8}
+		return
 
 	case .IMPL:
 		// Implicit register - decode from operand type
@@ -776,7 +760,8 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 			register_number += 8
 		}
 		reg := decode_register(register_number, op_type, state.rex)
-		return op_reg(reg), .NONE
+		op = op_reg(reg)
+		return
 
 	case .VVVV:
 		// VEX.vvvv register
@@ -785,25 +770,28 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 			register_number += 16
 		}
 		reg := decode_register(register_number, op_type, state.rex)
-		return op_reg(reg), .NONE
+		op = op_reg(reg)
+		return
 
 	case .IS4:
 		// Immediate byte with register in high 4 bits
 		if state.position >= len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		immediate_byte := state.data[state.position]
 		state.position += 1
 		register_number := (immediate_byte >> 4) & 0x0F
 		reg := decode_register(register_number, op_type, state.rex)
-		return op_reg(reg), .NONE
+		op = op_reg(reg)
+		return
 
 	case .AAA:
 		// EVEX opmask - already decoded in state
-		return {}, .NONE
+		return
 	}
 
-	return {}, .NONE
+	return
 }
 
 decode_single_operand_vex :: proc(state: ^Decoder_State, op_type: Operand_Type, op_enc: Operand_Encoding,
@@ -940,7 +928,7 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 // 8.8 Register Decoding Helpers
 // -----------------------------------------------------------------------------
 
-decode_register :: proc(num: u8, op_type: Operand_Type, rex: u8) -> Register {
+decode_register :: #force_inline proc "contextless" (num: u8, op_type: Operand_Type, rex: u8) -> Register {
 	#partial switch op_type {
 	case .R64, .RM64:
 		return gpr64_from_num(num)
@@ -1019,21 +1007,20 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	mode:         Mode = ._64,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	if mode == ._16 {
 		// Real-mode decoding is not implemented; the ModRM addressing
 		// model differs from protected/long mode and needs a separate
 		// decode path. See Mode enum comment in encoding_types.odin.
 		fmt.panicf("x64.decode: Mode._16 (real mode) is not yet supported")
 	}
+	ok = true
 
 	if len(data) == 0 {
-		return Result{success = true}
+		return
 	}
 
-	data_length := len(data)
-	pos: u32 = 0
-	has_errors := false
+	data_length := u32(len(data))
 
 	// Track branch targets for label inference (resolved in pass 2 by isa).
 	pending_branches: [dynamic]isa.Branch_Target
@@ -1043,26 +1030,26 @@ decode :: proc(
 	// PASS 1: Decode all instructions, collect branch targets
 	// =========================================================================
 
-	for pos < u32(data_length) {
+	for byte_count < data_length {
 		inst: Instruction
 		info: Instruction_Info
 
 		// Record offset
-		info.offset = pos
+		info.offset = byte_count
 
 		// Initialize decoder state
 		state := Decoder_State{
-			data = data[pos:],
+			data     = data[byte_count:],
 			position = 0,
-			mode = mode,
-			segment = NONE,
+			mode     = mode,
+			segment  = NONE,
 		}
 
 		// Phase 1: Parse prefixes
 		err := decode_prefixes(&state)
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
-			has_errors = true
+			ok = false
 			break
 		}
 
@@ -1080,7 +1067,7 @@ decode :: proc(
 				is_dec  := (b & 0x08) != 0
 				reg: Register = state.prefix_66 ? gpr16_from_num(reg_num) : gpr32_from_num(reg_num)
 
-				inst.mnemonic      = is_dec ? Mnemonic.DEC : Mnemonic.INC
+				inst.mnemonic      = is_dec ? .DEC : .INC
 				inst.operand_count = 1
 				inst.ops[0]        = op_reg(reg)
 				inst.length        = u8(state.position)
@@ -1095,7 +1082,7 @@ decode :: proc(
 
 				append(instructions, inst)
 				append(inst_info, info)
-				pos += u32(state.position)
+				byte_count += u32(state.position)
 				continue
 			}
 		}
@@ -1106,7 +1093,7 @@ decode :: proc(
 		entry, vex_entry, err = decode_opcode(&state)
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
-			has_errors = true
+			ok = false
 			break
 		}
 
@@ -1117,12 +1104,12 @@ decode :: proc(
 			inst, err = decode_operands(&state, entry)
 		} else {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = .INVALID_OPCODE})
-			has_errors = true
+			ok = false
 			break
 		}
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
-			has_errors = true
+			ok = false
 			break
 		}
 
@@ -1140,7 +1127,7 @@ decode :: proc(
 		info.rep = inst.flags.rep
 		info.segment = state.segment
 		info.vex_type = state.vex_type
-		if state.vex_type != .NONE && vex_entry != nil {
+		if state.vex_type != nil && vex_entry != nil {
 			// Use encoding requirements to distinguish LIG/WIG from L0/W0
 			// If encoding says LIG, the actual L value doesn't matter for re-encoding
 			// If encoding says L0/L1/L2, we should preserve the actual value
@@ -1157,7 +1144,7 @@ decode :: proc(
 			info.evex_b = state.evex_b
 			info.evex_z = state.evex_z
 			info.opmask = state.evex_aaa
-		} else if state.vex_type != .NONE {
+		} else if state.vex_type != nil {
 			// Fallback when vex_entry is nil (shouldn't happen normally)
 			info.vex_l = state.vex_l == 0 ? .L0 : (state.vex_l == 1 ? .L1 : .L2)
 			info.vex_w = state.vex_w ? .W1 : .W0
@@ -1167,7 +1154,7 @@ decode :: proc(
 		}
 
 		// Check for relative operands and record pending branch targets
-		inst_end := pos + u32(state.position)
+		inst_end := byte_count + u32(state.position)
 		for op_idx in 0..<inst.operand_count {
 			op := &inst.ops[op_idx]
 			if op.kind == .RELATIVE {
@@ -1186,17 +1173,14 @@ decode :: proc(
 		append(instructions, inst)
 		append(inst_info, info)
 
-		pos += u32(state.position)
+		byte_count += u32(state.position)
 	}
 
 	// =========================================================================
 	// PASS 2: Infer labels from branch targets within the decoded region
 	// =========================================================================
 
-	isa.infer_labels_from_branches(pending_branches[:], pos, label_defs, relocs)
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
 
-	return Result{
-		byte_count = pos,
-		success    = !has_errors,
-	}
+	return
 }

@@ -67,7 +67,6 @@ import "../isa"
 //   XX4-form  vsx 4-op  (xxsel)                     -- + XT + XA + XB + XC + XO + CX + AX + BX + TX
 //   MLS / MMIRR / 8RR / 8LS  prefixed (ISA 3.1)     -- 8-byte (4 prefix + 4 suffix)
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

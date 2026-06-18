@@ -78,8 +78,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r_r_i(.ADD_IMM, a.X0, a.X1, 100),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADD_IMM: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("ADD_IMM: encode", success)
 		eq_word("ADD X0,X1,#100",         load_le(code[:], 0), 0x91019020)
 	}
 
@@ -92,8 +92,8 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{ a.inst_mov_imm(.MOVZ, a.X0, 0x1234, 1) }
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("MOVZ: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("MOVZ: encode", success)
 		eq_word("MOVZ X0,#0x1234,LSL#16", load_le(code[:], 0), 0xD2A24680)
 	}
 
@@ -111,8 +111,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_shifted(a.X2, .LSL, 3), {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADD_SR: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("ADD_SR: encode", success)
 		eq_word("ADD X0,X1,X2,LSL#3",     load_le(code[:], 0), 0x8B020C20)
 	}
 
@@ -129,8 +129,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X0), a.op_reg(a.SP), a.op_extended(a.W1, .UXTW, 2), {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADD_ER: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("ADD_ER: encode", success)
 		eq_word("ADD X0,SP,W1,UXTW#2",   load_le(code[:], 0), 0x8B214BE0)
 	}
 
@@ -144,8 +144,8 @@ run_pipeline_tests :: proc() {
 			a.inst_r_r_r  (.UDIV, a.X0, a.X1, a.X2),
 			a.inst_r_r_r_r(.MADD, a.X0, a.X1, a.X2, a.X3),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("UDIV/MADD: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("UDIV/MADD: encode", success)
 		eq_word("UDIV X0,X1,X2",         load_le(code[:], 0), 0x9AC20820)
 		eq_word("MADD X0,X1,X2,X3",      load_le(code[:], 4), 0x9B020C20)
 	}
@@ -160,8 +160,8 @@ run_pipeline_tests :: proc() {
 			a.inst_r_r(.CLZ, a.X0, a.X1),
 			a.inst_r_r(.REV, a.X0, a.X1),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("CLZ/REV: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("CLZ/REV: encode", success)
 		eq_word("CLZ X0,X1",             load_le(code[:], 0), 0xDAC01020)
 		eq_word("REV X0,X1",             load_le(code[:], 4), 0xDAC00C20)
 	}
@@ -172,8 +172,8 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{ a.inst_csel(a.X0, a.X1, a.X2, .EQ) }
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("CSEL: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("CSEL: encode", success)
 		eq_word("CSEL X0,X1,X2,EQ",     load_le(code[:], 0), 0x9A820020)
 	}
 
@@ -189,8 +189,8 @@ run_pipeline_tests :: proc() {
 			a.inst_ldst(.LDR, a.X0, a.mem_offset(a.X1, 16)),
 			a.inst_ldst(.STR, a.W0, a.mem_offset(a.SP, 20)),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("LDR/STR: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("LDR/STR: encode", success)
 		eq_word("LDR X0,[X1,#16]",       load_le(code[:], 0), 0xF9400820)
 		eq_word("STR W0,[SP,#20]",       load_le(code[:], 4), 0xB90017E0)
 	}
@@ -219,8 +219,8 @@ run_pipeline_tests :: proc() {
 			a.inst_none(.RET),
 			a.inst_branch(.BL, 0),
 		}
-		r := a.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("br: encode", r.success)
+		byte_count, success := a.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("br: encode", success)
 		eq_word("B  forward (+3 words)", load_le(code[:], 0),  0x14000003)
 		eq_word("BL backward (-1 word)", load_le(code[:], 16), 0x97FFFFFF)
 	}
@@ -249,8 +249,8 @@ run_pipeline_tests :: proc() {
 			a.inst_tbz(a.X0, 5, 0),
 			a.inst_none(.NOP),                // target
 		}
-		r := a.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("CBZ/TBZ: encode", r.success)
+		byte_count, success := a.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("CBZ/TBZ: encode", success)
 		eq_word("CBZ X0,+2 words",       load_le(code[:], 0), 0xB4000040)
 		eq_word("TBZ X0,#5,+1 word",     load_le(code[:], 4), 0x36280020)
 	}
@@ -286,8 +286,8 @@ run_pipeline_tests :: proc() {
 			a.inst_none(.NOP),
 			a.inst_none(.NOP),
 		}
-		r := a.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("ADR: encode", r.success)
+		byte_count, success := a.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("ADR: encode", success)
 		eq_word("ADR X0,+8",             load_le(code[:], 0), 0x10000040)
 	}
 
@@ -315,8 +315,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X0), a.op_imm(0xDA10, 2), {}, {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("system: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("system: encode", success)
 		eq_word("NOP",                   load_le(code[:], 0), 0xD503201F)
 		eq_word("SVC #1",                load_le(code[:], 4), 0xD4000021)
 		eq_word("MRS X0,NZCV",           load_le(code[:], 8), 0xD53B4200)
@@ -330,8 +330,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r_r_r(.FADD, a.d_reg(0), a.d_reg(1), a.d_reg(2)),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("FADD: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("FADD: encode", success)
 		eq_word("FADD D0,D1,D2",         load_le(code[:], 0), 0x1E622820)
 	}
 
@@ -349,16 +349,16 @@ run_pipeline_tests :: proc() {
 			a.inst_cbnz(a.X0, 0),
 			a.inst_none(.RET),
 		}
-		r := a.encode(src, ld[:], code[:], &relocs, &errors)
-		ok("rt: encode", r.success)
+		byte_count, success := a.encode(src, ld[:], code[:], &relocs, &errors)
+		ok("rt: encode", success)
 
 		d_insts:  [dynamic]a.Instruction
 		d_info:   [dynamic]a.Instruction_Info
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		d := a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("rt: decode", d.success)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("rt: decode", d_success)
 		ok("rt: 3 insts",  len(d_insts) == 3)
 		ok("rt: ADD",      d_insts[0].mnemonic == .ADD_IMM)
 		ok("rt: CBNZ",     d_insts[1].mnemonic == .CBNZ)
@@ -385,15 +385,15 @@ run_pipeline_tests :: proc() {
 			a.inst_b_cond(.EQ, 0),
 			a.inst_none(.RET),
 		}
-		r := a.encode(src, ld[:], code[:], &relocs, &errors)
-		ok("b.cond: encode", r.success)
+		byte_count, success := a.encode(src, ld[:], code[:], &relocs, &errors)
+		ok("b.cond: encode", success)
 
 		d_insts:  [dynamic]a.Instruction
 		d_info:   [dynamic]a.Instruction_Info
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 
 		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
 						 nil, nil, nil, context.temp_allocator)
@@ -423,8 +423,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r_r_i(.ORR_IMM, a.X0, a.X1, transmute(i64)mask),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("bitmask ORR: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("bitmask ORR: encode", success)
 		eq_word("ORR X0,X1,#0xFF00.. repeat", load_le(code[:], 0), 0xB2089C20)
 
 		// Round-trip: decode and verify operand round-trips back to the raw mask.
@@ -433,7 +433,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("bitmask ORR: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .ORR_IMM)
 		if len(d_insts) == 1 {
 			got := u64(d_insts[0].ops[2].immediate)
@@ -457,8 +457,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r_r_i(.AND_IMM, a.W0, a.W1, 0xF0),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("bitmask AND 32: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("bitmask AND 32: encode", success)
 		eq_word("AND W0,W1,#0xF0", load_le(code[:], 0), 0x12040C20)
 
 		// Round-trip.
@@ -467,7 +467,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("bitmask AND 32: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .AND_IMM)
 		if len(d_insts) == 1 {
 			got := u64(d_insts[0].ops[2].immediate)
@@ -487,8 +487,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_z_s(0), a.op_z_s(1), a.op_z_s(2), {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SVE ADD Z: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SVE ADD Z: encode", success)
 		eq_word("SVE ADD Z0.S,Z1.S,Z2.S", load_le(code[:], 0), 0x04A20020)
 
 		// Round-trip.
@@ -497,7 +497,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("SVE ADD Z: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .SVE_ADD_Z)
 	}
 
@@ -514,8 +514,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_z_s(0), a.op_reg(p0), a.op_z_s(0), a.op_z_s(1)},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SVE ADD_PRED: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SVE ADD_PRED: encode", success)
 		eq_word("SVE ADD Z0.S,P0/M,Z0.S,Z1.S", load_le(code[:], 0), 0x04810000)
 	}
 
@@ -532,8 +532,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(p0), a.op_imm(0x1F, 1), {}, {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SVE PTRUE: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SVE PTRUE: encode", success)
 		eq_word("SVE PTRUE P0.B,ALL", load_le(code[:], 0), 0x2518E3E0)
 	}
 
@@ -547,8 +547,8 @@ run_pipeline_tests :: proc() {
 			a.inst_none(.SME_SMSTART),
 			a.inst_none(.SME_SMSTOP),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SME SMSTART/SMSTOP: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SME SMSTART/SMSTOP: encode", success)
 		eq_word("SME SMSTART", load_le(code[:], 0), 0xD503477F)
 		eq_word("SME SMSTOP",  load_le(code[:], 4), 0xD503467F)
 	}
@@ -572,8 +572,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_imm(0, 1), a.op_reg(p0), a.op_reg(p1), a.op_z_s(0)},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SME FMOPA: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SME FMOPA: encode", success)
 		eq_word("SME FMOPA ZA0.S,P0/M,P1/M,Z0.S,Z0.S", load_le(code[:], 0), 0x80802000)
 	}
 
@@ -595,8 +595,8 @@ run_pipeline_tests :: proc() {
 			a.inst_r(.AMX_STZ,   a.X3),
 			a.inst_none(.AMX_CLR),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("AMX: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("AMX: encode", success)
 		eq_word("AMX SET",         load_le(code[:],  0), 0x00201220)
 		eq_word("AMX LDX X0",      load_le(code[:],  4), 0x00201000)
 		eq_word("AMX LDY X1",      load_le(code[:],  8), 0x00201021)
@@ -610,8 +610,8 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		d := a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("AMX: decode",       d.success)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("AMX: decode",       d_success)
 		ok("AMX: 6 insts",      len(d_insts) == 6)
 		ok("AMX: SET",          len(d_insts) >= 1 && d_insts[0].mnemonic == .AMX_SET)
 		ok("AMX: LDX",          len(d_insts) >= 2 && d_insts[1].mnemonic == .AMX_LDX)
@@ -651,9 +651,9 @@ run_pipeline_tests :: proc() {
 		isa.label_set_at(&labels, fwd, &insts)                     //    .L1: at instruction 4
 		append(&insts, a.inst_none(.RET))                          // [4] byte 16: RET
 
-		r := a.encode(insts[:], labels[:], code[:], &relocs, &errors)
-		ok("anon labels: encode",          r.success)
-		ok("anon labels: byte_count = 20", r.byte_count == 20)
+		byte_count, success := a.encode(insts[:], labels[:], code[:], &relocs, &errors)
+		ok("anon labels: encode",          success)
+		ok("anon labels: byte_count = 20", byte_count == 20)
 
 		// B.LT at byte 8 -> .L1 at byte 16: offset = +8 = +2 words.
 		//   bits = 0x54000000 | (2<<5) | LT(0xB) = 0x5400004B
@@ -670,7 +670,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("anon labels: decode 5 insts", len(d_insts) == 5)
 		have_back, have_fwd: bool
 		for ld in d_labels {
@@ -713,8 +713,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X3), a.op_imm(a.DCZID_EL0, 2), {}, {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("sysreg: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("sysreg: encode", success)
 		eq_word("MRS X0,NZCV",       load_le(code[:],  0), 0xD53B4200)
 		eq_word("MRS X1,TPIDR_EL0",  load_le(code[:],  4), 0xD53BD041)
 		eq_word("MRS X2,CNTVCT_EL0", load_le(code[:],  8), 0xD53BE042)
@@ -729,8 +729,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r(.DC_ZVA, a.X0),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("DC ZVA: encode",     r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("DC ZVA: encode",     success)
 		eq_word("DC ZVA X0",     load_le(code[:], 0), 0xD50B7420)
 
 		d_insts:  [dynamic]a.Instruction
@@ -738,7 +738,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("DC ZVA: decode",         len(d_insts) == 1 && d_insts[0].mnemonic == .DC_ZVA)
 		ok("DC ZVA: Rt = X0",        len(d_insts) == 1 && d_insts[0].ops[0].reg == a.X0)
 	}
@@ -756,8 +756,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X0), a.op_shifted(a.X1, .LSL, 0), {}, {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("CMP_SR: encode",    r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("CMP_SR: encode",    success)
 		eq_word("CMP X0,X1",    load_le(code[:], 0), 0xEB01001F)
 	}
 
@@ -786,8 +786,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("MOPS CPY: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("MOPS CPY: encode", success)
 		eq_word("CPYP X0,X1,X2", load_le(code[:], 0), 0x1D020420)
 		eq_word("CPYM X0,X1,X2", load_le(code[:], 4), 0x1D420420)
 		eq_word("CPYE X0,X1,X2", load_le(code[:], 8), 0x1D820420)
@@ -808,8 +808,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_z_s(0), a.op_z_s(1), a.op_z_s(2), a.op_imm(2, 1)},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SVE FMLA indexed: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SVE FMLA indexed: encode", success)
 		eq_word("SVE FMLA Z0.S, Z1.S, Z2.S[2]", load_le(code[:], 0), 0x64B20020)
 	}
 
@@ -835,8 +835,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_z_s(0), a.op_reg(p0), a.op_mem(mem), {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SVE LD1W gather: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SVE LD1W gather: encode", success)
 		eq_word("SVE LD1W Z0.S,P0/Z,[X1,Z2.S,UXTW]", load_le(code[:], 0), 0x85024020)
 	}
 
@@ -864,8 +864,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_imm(slice_packed, 2), a.op_reg(p5), a.op_mem(mem), {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("SME LD1B tile vs LLVM: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("SME LD1B tile vs LLVM: encode", success)
 		eq_word("SME LD1B ZA0V.B[W14,5],P5/Z,[X10,X21]", load_le(code[:], 0), 0xE015D545)
 
 		d_insts:  [dynamic]a.Instruction
@@ -873,7 +873,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]a.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		a.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("SME LD1B tile: decode 1 inst", len(d_insts) == 1)
 		ok("SME LD1B tile: mnemonic",      len(d_insts) == 1 && d_insts[0].mnemonic == .SME_LD1B_TILE)
 		ok("SME LD1B tile: slice roundtrip",
@@ -891,8 +891,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_v_4s(0), a.op_v_4s(1), a.op_v_4s(2), a.op_imm(0, 1)},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("FCMLA: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("FCMLA: encode", success)
 		eq_word("FCMLA V0.4S,V1.4S,V2.4S,#0", load_le(code[:], 0), 0x6E82C420)
 	}
 
@@ -908,8 +908,8 @@ run_pipeline_tests :: proc() {
 			a.inst_none(.TCOMMIT),
 			a.inst_r(.TTEST,   a.X1),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("TME: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("TME: encode", success)
 		eq_word("TSTART X0",  load_le(code[:], 0), 0xD5233060)
 		eq_word("TCOMMIT",    load_le(code[:], 4), 0xD503307F)
 		eq_word("TTEST X1",   load_le(code[:], 8), 0xD5233161)
@@ -925,8 +925,8 @@ run_pipeline_tests :: proc() {
 			a.inst_r_r(.UXTB, a.W0, a.W1),
 			a.inst_r_r(.SXTW, a.X0, a.W1),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("extend aliases: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("extend aliases: encode", success)
 		eq_word("UXTB W0,W1", load_le(code[:], 0), 0x53001C20)
 		eq_word("SXTW X0,W1", load_le(code[:], 4), 0x93407C20)
 	}
@@ -942,8 +942,8 @@ run_pipeline_tests :: proc() {
 			a.inst_r_r_r(.ADC,  a.X0, a.X1, a.X2),
 			a.inst_r_r_r(.SBCS, a.X3, a.X4, a.X5),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADC/SBCS: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("ADC/SBCS: encode", success)
 		eq_word("ADC X0,X1,X2",  load_le(code[:], 0), 0x9A020020)
 		eq_word("SBCS X3,X4,X5", load_le(code[:], 4), 0xFA050083)
 	}
@@ -961,8 +961,8 @@ run_pipeline_tests :: proc() {
 				ops = {a.op_reg(a.X7), a.op_imm(a.RNDR, 2), {}, {}},
 			},
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("MRS X7,RNDR: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("MRS X7,RNDR: encode", success)
 		eq_word("MRS X7,RNDR",   load_le(code[:], 0), 0xD53B2407)
 	}
 
@@ -979,8 +979,8 @@ run_pipeline_tests :: proc() {
 			a.inst_ldst(.LDAPUR, a.X0, a.mem_offset(a.X1, 8)),
 			a.inst_ldst(.STLUR,  a.X2, a.mem_offset(a.SP, -8)),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("RCpc unscaled: encode",   r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("RCpc unscaled: encode",   success)
 		eq_word("LDAPUR X0,[X1,#8]",  load_le(code[:], 0), 0xD9408020)
 		eq_word("STLUR X2,[SP,#-8]",  load_le(code[:], 4), 0xD91F83E2)
 	}
@@ -994,8 +994,8 @@ run_pipeline_tests :: proc() {
 			a.inst_none(.BTI_J),
 			a.inst_none(.PSB_CSYNC),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("barriers/BTI: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("barriers/BTI: encode", success)
 		eq_word("SB",        load_le(code[:], 0), 0xD50330FF)
 		eq_word("BTI j",     load_le(code[:], 4), 0xD503245F)
 		eq_word("PSB CSYNC", load_le(code[:], 8), 0xD503223F)
@@ -1011,8 +1011,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r_r_i(.LSL_IMM, a.W0, a.W1, 4),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("LSL_IMM 32: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("LSL_IMM 32: encode", success)
 		eq_word("LSL W0,W1,#4", load_le(code[:], 0), 0x531C6C20)
 	}
 
@@ -1026,8 +1026,8 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.inst_r_r_i(.ROR_IMM, a.W0, a.W1, 4),
 		}
-		r := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ROR_IMM 32: encode", r.success)
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("ROR_IMM 32: encode", success)
 		eq_word("ROR W0,W1,#4", load_le(code[:], 0), 0x13811020)
 	}
 

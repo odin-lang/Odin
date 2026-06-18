@@ -32,7 +32,6 @@ import "../isa"
 // is sign-extended and pre-scaled by element size, so the effective
 // range is `±64 × element_size` bytes.
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

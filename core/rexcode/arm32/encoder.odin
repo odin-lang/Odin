@@ -34,38 +34,37 @@ encode :: proc(
 	errors:       ^[dynamic]Error,
 	resolve:      bool = true,
 	base_address: u64  = 0,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_inst := len(instructions)
 	if len(code) < n_inst * 4 {
 		append(errors, Error{inst_idx = 0, code = .BUFFER_OVERFLOW})
-		return Result{byte_count = 0, success = false}
+		return
 	}
 
 	errors_start  := u32(len(errors))
 	pending_start := u32(len(relocs))
-	pc: u32 = 0
 
 	inst_pc := make([]u32, n_inst, context.temp_allocator)
 
 	// ---- PASS 1 ------------------------------------------------------------
 	for i in 0..<n_inst {
-		inst_pc[i] = pc
+		inst_pc[i] = byte_count
 		inst := &instructions[i]
-		word, ilen, ok := encode_one_inline(inst, pc, u16(i), relocs, errors)
-		if !ok { return Result{byte_count = pc, success = false} }
+		word, ilen := encode_one_inline(inst, byte_count, u16(i), relocs, errors) or_return
+
 		if ilen == 2 {
-			write_u16_le(code, pc, u16(word))
+			write_u16_le(code, byte_count, u16(word))
 		} else {
 			// T32 32-bit: bits = low_hword | (high_hword << 16); each
 			// halfword is written little-endian in its own slot.
 			if inst.mode == .T32 {
-				write_u16_le(code, pc,     u16(word >> 16))
-				write_u16_le(code, pc + 2, u16(word))
+				write_u16_le(code, byte_count,     u16(word >> 16))
+				write_u16_le(code, byte_count + 2, u16(word))
 			} else {
-				write_u32_le(code, pc, word)
+				write_u32_le(code, byte_count, word)
 			}
 		}
-		pc += u32(ilen)
+		byte_count += u32(ilen)
 	}
 
 	// ---- PASS 1.5: label_def instruction-idx -> byte-offset -----------------
@@ -81,7 +80,8 @@ encode :: proc(
 	}
 
 	if !resolve {
-		return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+		ok = u32(len(errors)) == errors_start
+		return
 	}
 
 	// ---- PASS 2: resolve relocations ----------------------------------------
@@ -97,7 +97,8 @@ encode :: proc(
 	}
 	if write_idx != n_relocs { resize(relocs, int(write_idx)) }
 
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

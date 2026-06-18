@@ -51,16 +51,7 @@ compile time — no table is built during a normal library build:
 odin run <arch>/tablegen            # ENCODING_TABLE -> generated Odin + <arch>/tables.odin
 odin run <arch>/tablegen/generated  # -> <arch>/tables/<arch>.*.bin
 ```
-
 Regenerate after editing `ENCODING_TABLE`. See `docs/table_migration.md`.
-
-## Performance (x86)
-
-With `-o:speed -microarch:native -no-bounds-check`:
-- Encoder: ~17 M instructions/sec (~56 MB/s)
-- Decoder: ~16 M instructions/sec (~54 MB/s)
-
-Measured on AMD Ryzen 3950X.
 
 ## Usage
 

@@ -16,14 +16,14 @@ check :: proc(name: string, inst: v.Instruction, want_bytes: []u8) {
 	defer delete(relocs); defer delete(errors)
 
 	instructions := []v.Instruction{inst}
-	r := v.encode(instructions, label_defs, code, &relocs, &errors)
-	if !r.success {
+	byte_count, success := v.encode(instructions, label_defs, code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] %s: encode failed\n", name)
 		fail_count += 1
 		return
 	}
-	if int(r.byte_count) != len(want_bytes) {
-		fmt.printf("  [FAIL] %s: byte_count=%d (want %d)\n", name, r.byte_count, len(want_bytes))
+	if int(byte_count) != len(want_bytes) {
+		fmt.printf("  [FAIL] %s: byte_count=%d (want %d)\n", name, byte_count, len(want_bytes))
 		fail_count += 1
 		return
 	}

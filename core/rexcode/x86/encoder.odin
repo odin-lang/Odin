@@ -65,7 +65,7 @@ encode :: proc(
 	resolve:      bool       = true,
 	base_address: u64        = 0,
 	mode:         Mode       = ._64,           // i386 vs x86-64 mode
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	if mode == ._16 {
 		// Real-mode encoding is not implemented; the ModRM addressing
 		// model differs from protected/long mode and needs a separate
@@ -73,8 +73,7 @@ encode :: proc(
 		fmt.panicf("x64.encode: Mode._16 (real mode) is not yet supported")
 	}
 
-	code_pos: u32 = 0
-	has_errors := false
+	ok = true
 
 	// Temp storage for pending relocations (before resolution)
 	pending_relocations: [dynamic]Relocation
@@ -91,19 +90,19 @@ encode :: proc(
 
 	for &inst, instruction_index in instructions {
 		// Record this instruction's byte offset
-		inst_offsets[instruction_index] = code_pos
+		inst_offsets[instruction_index] = byte_count
 
 		// Validate operand_count bounds
 		if inst.operand_count > 4 {
 			append(errors, Error{u32(instruction_index), .INVALID_OPERAND_COUNT, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
 		// Check buffer space
-		if code_pos + MAX_INST_SIZE > u32(len(code)) {
+		if byte_count + MAX_INST_SIZE > u32(len(code)) {
 			append(errors, Error{u32(instruction_index), .BUFFER_OVERFLOW, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
@@ -136,7 +135,7 @@ encode :: proc(
 			}
 			if invalid {
 				append(errors, Error{u32(instruction_index), .OPERAND_MISMATCH, {}})
-				has_errors = true
+				ok = false
 				continue
 			}
 		}
@@ -145,7 +144,7 @@ encode :: proc(
 		encodings := encoding_forms(inst.mnemonic)
 		if len(encodings) == 0 {
 			append(errors, Error{u32(instruction_index), .INVALID_MNEMONIC, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
@@ -160,7 +159,7 @@ encode :: proc(
 
 		if matched_enc == nil {
 			append(errors, Error{u32(instruction_index), .NO_MATCHING_ENCODING, {}})
-			has_errors = true
+			ok = false
 			continue
 		}
 
@@ -169,7 +168,7 @@ encode :: proc(
 		// =====================================================================
 
 		enc := matched_enc
-		out := code[code_pos:]
+		out := code[byte_count:]
 		pos: u32 = 0
 
 		// --- Legacy Prefixes ---
@@ -398,7 +397,7 @@ encode :: proc(
 			// the instruction is not legal i386.
 			if mode == ._32 && rex != 0 {
 				append(errors, Error{u32(instruction_index), .OPERAND_MISMATCH, {}})
-				has_errors = true
+				ok = false
 				continue
 			}
 
@@ -598,7 +597,7 @@ encode :: proc(
 					case .RELATIVE:
 						// Relative reference - record relocation
 						label_id := u32(user_op.relative)
-						append(&pending_relocations, Relocation{code_pos + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
+						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
 						out[pos] = 0
 						pos += 1
 					}
@@ -623,7 +622,7 @@ encode :: proc(
 						pos += 4
 					case .RELATIVE:
 						label_id := u32(user_op.relative)
-						append(&pending_relocations, Relocation{code_pos + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
+						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
 						out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
 						pos += 4
 					}
@@ -639,7 +638,7 @@ encode :: proc(
 			}
 		}
 
-		code_pos += pos
+		byte_count += pos
 	}
 
 	// =========================================================================
@@ -677,7 +676,7 @@ encode :: proc(
 			next_pc := patch_offset + 1
 			if !patch_pcrel_i8(code, patch_offset, target_offset, next_pc, relocation.addend) {
 				append(errors, Error{u32(relocation.inst_idx), .LABEL_OUT_OF_RANGE, {}})
-				has_errors = true
+				ok = false
 			}
 
 		case .REL32:
@@ -692,10 +691,7 @@ encode :: proc(
 		}
 	}
 
-	return Result{
-		byte_count = code_pos,
-		success    = !has_errors,
-	}
+	return
 }
 
 // -----------------------------------------------------------------------------
@@ -705,21 +701,25 @@ encode :: proc(
 // Check if instruction matches encoding (inlined for hot path).
 // `mode` lets default_64 entries match 32-bit operands in i386 and
 // filters out mode-restricted (mode_32_only) encodings when not in i386.
-encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction, enc: ^Encoding, mode: Mode) -> bool {
+encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encoding, mode: Mode) -> bool {
 	// Mode gate: skip i386-only encodings (short-form INC/DEC at 0x40-0x4F)
 	// when not in Mode._32.
 	if enc.flags.mode_32_only && mode != ._32 { return false }
 
-	// Count non-implicit encoding operands
-	encoding_operand_count: u8 = 0
-	for op_type in enc.ops {
-		if op_type == .NONE { break }
-		if !is_implicit_op_inline(op_type) { encoding_operand_count += 1 }
+	explicit_count := enc.flags.explicit_count
+
+	if !enc.flags.has_implicit {
+		if inst.operand_count != explicit_count { return false }
+		for i in 0 ..< explicit_count {
+			eff := mode_rewrite_op_type(enc.ops[i], mode, enc.flags.default_64)
+			operand_matches_inline(&inst.ops[i], eff) or_return
+		}
+		return true
 	}
 
 	// Special case: if user provides exactly one more operand than non-implicit count,
 	// check if the extra operand matches an implicit operand (e.g., CL for shifts)
-	if inst.operand_count == encoding_operand_count + 1 {
+	if inst.operand_count == explicit_count + 1 {
 		// Check if the last user operand matches an implicit operand in the encoding
 		last_user_op := &inst.ops[inst.operand_count - 1]
 		found_matching_implicit := false
@@ -740,14 +740,14 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 			if user_idx >= inst.operand_count - 1 { return false }
 			effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
-			if !operand_matches_inline(&inst.ops[user_idx], effective_op_type) { return false }
+			operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
 			user_idx += 1
 		}
 		return user_idx == inst.operand_count - 1
 	}
 
 	// STandard case: operand count must match non-implicit count
-	if inst.operand_count != encoding_operand_count { return false }
+	if inst.operand_count != explicit_count { return false }
 
 	// Match each user operand against non-implicit encoding operands
 	user_idx: u8 = 0
@@ -757,7 +757,7 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 
 		if user_idx >= inst.operand_count { return false }
 		effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
-		if !operand_matches_inline(&inst.ops[user_idx], effective_op_type) { return false }
+		operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
 		user_idx += 1
 	}
 
@@ -861,16 +861,16 @@ imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 	#partial switch op_type {
 	case .IMM8:
 		// Full 8-bit range: signed [-128, 127] OR unsigned [0, 255]
-		return op.immediate >= -128 && op.immediate <= 255
+		return        -128 <= op.immediate && op.immediate <= 255
 	case .IMM8SX:
 		// Sign-extended 8-bit: must be in signed 8-bit range
-		return op.immediate >= -128 && op.immediate <= 127
+		return        -128 <= op.immediate && op.immediate <= 127
 	case .IMM16:
 		// Full 16-bit range: signed [-32768, 32767] OR unsigned [0, 65535]
-		return op.immediate >= -32768 && op.immediate <= 65535
+		return      -32768 <= op.immediate && op.immediate <= 65535
 	case .IMM32:
 		// Full 32-bit range: signed [-2147483648, 2147483647] OR unsigned [0, 4294967295]
-		return op.immediate >= -2147483648 && op.immediate <= 4294967295
+		return -2147483648 <= op.immediate && op.immediate <= 4294967295
 	case .IMM64:
 		return true  // Any i64 value fits
 	}

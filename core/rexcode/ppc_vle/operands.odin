@@ -31,7 +31,7 @@ mem_x :: #force_inline proc "contextless" (base, index: Register) -> Memory {
 }
 
 Operand :: struct #packed {
-	using _: struct #raw_union {
+	using _: struct #raw_union #packed {
 		reg:       Register,
 		mem:       Memory,
 		immediate: i64,
@@ -40,7 +40,7 @@ Operand :: struct #packed {
 	kind: Operand_Kind,
 	size: u8,
 }
-#assert(size_of(Operand) == 18)
+#assert(size_of(Operand) == 14)
 
 @(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {

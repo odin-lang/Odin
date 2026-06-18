@@ -15,15 +15,15 @@ check_encode :: proc(name: string, inst: v.Instruction, want_bytes: []u8) {
 	defer delete(relocs); defer delete(errors)
 
 	instructions := []v.Instruction{inst}
-	r := v.encode(instructions, label_defs, code, &relocs, &errors)
-	if !r.success {
+	byte_count, success := v.encode(instructions, label_defs, code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] %s: encode failed (%d errors)\n", name, len(errors))
 		for e in errors { fmt.printf("           code=%v\n", e.code) }
 		fail_count += 1
 		return
 	}
-	if int(r.byte_count) != len(want_bytes) {
-		fmt.printf("  [FAIL] %s: byte count %d != %d\n", name, r.byte_count, len(want_bytes))
+	if int(byte_count) != len(want_bytes) {
+		fmt.printf("  [FAIL] %s: byte count %d != %d\n", name, byte_count, len(want_bytes))
 		fail_count += 1
 		return
 	}
@@ -46,8 +46,8 @@ check_encode :: proc(name: string, inst: v.Instruction, want_bytes: []u8) {
 	dec_errors:   [dynamic]v.Error
 	defer delete(decoded); defer delete(info); defer delete(dec_labels); defer delete(dec_errors)
 
-	dr := v.decode(code[:r.byte_count], nil, &decoded, &info, &dec_labels, &dec_errors)
-	if !dr.success {
+	dbyte_count, dsuccess := v.decode(code[:byte_count], nil, &decoded, &info, &dec_labels, &dec_errors)
+	if !dsuccess {
 		fmt.printf("  [FAIL] %s: decode failed\n", name)
 		fail_count += 1
 		return

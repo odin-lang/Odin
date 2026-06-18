@@ -30,7 +30,6 @@ import "../isa"
 // passes `e=true` in Assumed_State so the decoder picks the 8-bit immediate
 // forms.
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

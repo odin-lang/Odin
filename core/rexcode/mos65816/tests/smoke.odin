@@ -68,9 +68,9 @@ enc :: proc(insts: []m.Instruction) -> []u8 {
 	@(static) errors: [dynamic]m.Error
 	clear(&relocs); clear(&errors)
 	for i in 0..<len(code) { code[i] = 0 }
-	r := m.encode(insts, nil, code[:], &relocs, &errors)
-	if !r.success { return nil }
-	return code[:r.byte_count]
+	byte_count, success := m.encode(insts, nil, code[:], &relocs, &errors)
+	if !success { return nil }
+	return code[:byte_count]
 }
 
 main :: proc() {
@@ -140,10 +140,10 @@ main :: proc() {
 			m.inst_none(.NOP),             // 1 byte
 			m.inst_none(.RTS),             // 1 byte (target)
 		}
-		r := m.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("BRL encode ok", r.success)
+		byte_count, success := m.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("BRL encode ok", success)
 		// BRL at pc=0, target at byte 4. next_pc = 3. rel = 4-3 = 1.
-		eq_bytes("BRL forward", code[:r.byte_count], {0x82, 0x01, 0x00, 0xEA, 0x60})
+		eq_bytes("BRL forward", code[:byte_count], {0x82, 0x01, 0x00, 0xEA, 0x60})
 	}
 
 	// ---- 7. PER (push effective PC-rel, 16-bit signed) -------------------
@@ -165,9 +165,9 @@ main :: proc() {
 			m.inst_none(.NOP),
 			m.inst_none(.RTS),
 		}
-		r := m.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("PER encode ok", r.success)
-		eq_bytes("PER forward",  code[:r.byte_count], {0x62, 0x01, 0x00, 0xEA, 0x60})
+		byte_count, success := m.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("PER encode ok", success)
+		eq_bytes("PER forward",  code[:byte_count], {0x62, 0x01, 0x00, 0xEA, 0x60})
 	}
 
 	// ---- 8. Round-trip: encode -> decode in 16-bit native, print ---------
@@ -186,18 +186,18 @@ main :: proc() {
 			m.inst_m(.STA, m.mem_long(0x7E1000)),    // 4 bytes
 			m.inst_rel(.BRA, 0),                      // 2 bytes back to loop
 		}
-		r := m.encode(src, ld[:], code[:], &relocs, &errors)
-		ok("rt: encode ok", r.success)
+		byte_count, success := m.encode(src, ld[:], code[:], &relocs, &errors)
+		ok("rt: encode ok", success)
 
 		d_insts:  [dynamic]m.Instruction
 		d_info:   [dynamic]m.Instruction_Info
 		d_labels: [dynamic]m.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		d := m.decode(code[:r.byte_count], nil,
+		_, dsuccess := m.decode(code[:byte_count], nil,
 					  &d_insts, &d_info, &d_labels, &errors,
 					  state = m.NATIVE_16)
-		ok("rt: decode ok", d.success)
+		ok("rt: decode ok", dsuccess)
 		ok("rt: 3 insts",   len(d_insts) == 3)
 		ok("rt: LDA",       d_insts[0].mnemonic == .LDA)
 		ok("rt: STA",       d_insts[1].mnemonic == .STA)
@@ -261,14 +261,14 @@ main :: proc() {
 			m.inst_m(.JML, m.mem_abs_ind_long(0xFFFC)),
 			m.inst_m(.LDA, m.mem_sr_ind_y(0x10)),
 		}
-		r := m.encode(src, nil, code[:], &relocs, &errors)
+		byte_count, success := m.encode(src, nil, code[:], &relocs, &errors)
 
 		d_insts:  [dynamic]m.Instruction
 		d_info:   [dynamic]m.Instruction_Info
 		d_labels: [dynamic]m.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		m.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors,
+		m.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors,
 				 state = m.NATIVE_16)
 
 		text := m.aprint(d_insts[:], d_info[:], d_labels[:],

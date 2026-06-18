@@ -6,7 +6,6 @@ import x86 "../"
 import "../../isa"
 import "core:fmt"
 import "core:time"
-import "core:slice"
 import "core:strings"
 import "core:mem/virtual"
 import "core:math"
@@ -323,7 +322,7 @@ run_test :: proc(t: Test) -> bool {
 		relocs: [dynamic]x86.Relocation
 		defer delete(relocs)
 
-		encode_result := x86.encode(
+		byte_count, ok := x86.encode(
 			t.instructions,
 			labels_copy[:len(t.labels)],
 			code_buf[:],
@@ -334,11 +333,11 @@ run_test :: proc(t: Test) -> bool {
 		)
 
 		// Copy encoded bytes
-		for i in 0..<encode_result.byte_count {
+		for i in 0..<byte_count {
 			append(&encoded_code, code_buf[i])
 		}
 
-		if !encode_result.success {
+		if !ok {
 			fmt.printf("%s[FAIL]%s %s - encoding failed\n", RED, RESET, t.name)
 			for err in encode_errors {
 				fmt.printf("       Error at inst %d: %v\n", err.inst_idx, err.code)
@@ -349,13 +348,13 @@ run_test :: proc(t: Test) -> bool {
 
 		// Verify expected bytes if provided
 		if len(t.expected_code) > 0 {
-			if int(encode_result.byte_count) != len(t.expected_code) {
+			if int(byte_count) != len(t.expected_code) {
 				fmt.printf("%s[FAIL]%s %s - code size %d != expected %d\n",
-						   RED, RESET, t.name, encode_result.byte_count, len(t.expected_code))
+						   RED, RESET, t.name, byte_count, len(t.expected_code))
 				g_stats.failed += 1
 				return false
 			}
-			for i in 0..<encode_result.byte_count {
+			for i in 0..<byte_count {
 				if encoded_code[i] != t.expected_code[i] {
 					fmt.printf("%s[FAIL]%s %s - byte %d: 0x%02X != expected 0x%02X\n",
 							   RED, RESET, t.name, i, encoded_code[i], t.expected_code[i])
@@ -530,7 +529,7 @@ run_test :: proc(t: Test) -> bool {
 	// =========================================================================
 
 	if len(code_to_decode) > 0 {
-		decode_result := x86.decode(
+		_, ok := x86.decode(
 			code_to_decode,
 			nil,
 			&decoded_insts,
@@ -539,7 +538,7 @@ run_test :: proc(t: Test) -> bool {
 			&decode_errors,
 		)
 
-		if !decode_result.success {
+		if !ok {
 			fmt.printf("%s[FAIL]%s %s - decoding failed\n", RED, RESET, t.name)
 			if len(decode_errors) > 0 {
 				for err in decode_errors {
@@ -2992,9 +2991,8 @@ run_label_map_tests :: proc() {
 	defer delete(relocs)
 	defer delete(errs)
 
-	result := x86.encode(instructions[:], lm.labels[:], code_buf[:], &relocs, &errs, true, 0)
-
-	if !result.success {
+	byte_count, ok := x86.encode(instructions[:], lm.labels[:], code_buf[:], &relocs, &errs, true, 0)
+	if !ok {
 		fmt.printf("%s[FAIL]%s Label_Map test - encoding failed\n", RED, RESET)
 		g_stats.failed += 1
 		return
@@ -3010,7 +3008,7 @@ run_label_map_tests :: proc() {
 	defer delete(decoded_labels)
 	defer delete(decode_errors)
 
-	x86.decode(code_buf[:result.byte_count], nil, &decoded_insts, &decoded_info, &decoded_labels, &decode_errors)
+	x86.decode(code_buf[:byte_count], nil, &decoded_insts, &decoded_info, &decoded_labels, &decode_errors)
 
 	// Print with named labels (printer wants id→name; Label_Map stores name→id).
 	id_to_name := make(map[u32]string, len(lm.names), context.temp_allocator)
@@ -3051,7 +3049,7 @@ run_benchmarks :: proc() {
 	bench_insts := make([dynamic]x86.Instruction)
 	defer delete(bench_insts)
 
-	for _ in 0..<1000 {
+	for _ in 0..<100 {
 		insts := []x86.Instruction{
 			x86.inst_r(.PUSH, x86.RBP),
 			x86.inst_r_r(.MOV, x86.RBP, x86.RSP),
@@ -3071,49 +3069,58 @@ run_benchmarks :: proc() {
 		append(&bench_insts, ..insts)
 	}
 
-	code_buf: [16 * 1024]u8
+	code_buf := make([]byte, 1<<16)
+	defer delete(code_buf)
+
 	labels: [4]x86.Label_Definition
+
+	relocs: [dynamic]x86.Relocation; defer delete(relocs)
+	errs:   [dynamic]x86.Error;      defer delete(relocs)
+
+	insts: [dynamic]x86.Instruction;      defer delete(insts)
+	info:  [dynamic]x86.Instruction_Info; defer delete(info)
+	lbls:  [dynamic]x86.Label_Definition; defer delete(lbls)
 
 	// Encode
 	enc_start := time.now()
 	enc_bytes := 0
 	for _ in 0..<ITERATIONS {
-		relocs: [dynamic]x86.Relocation; defer delete(relocs)
-		errs:   [dynamic]x86.Error;      defer delete(errs)
-		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
-		enc_bytes += int(result.byte_count)
+		clear(&relocs)
+		clear(&errs)
+		byte_count, _ := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
+		enc_bytes += int(byte_count)
 	}
-	enc_dur := time.duration_microseconds(time.since(enc_start))
+	enc_dur := time.duration_seconds(time.since(enc_start))
 
 	// Get encoded length for decode
 	encoded_len: u32
 	{
-		relocs: [dynamic]x86.Relocation; defer delete(relocs)
-		errs:   [dynamic]x86.Error;      defer delete(errs)
-		result := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
-		encoded_len = result.byte_count
+		clear(&relocs)
+		clear(&errs)
+		byte_count, _ := x86.encode(bench_insts[:], labels[:], code_buf[:], &relocs, &errs, true, 0)
+		encoded_len = byte_count
 	}
 
 	// Decode
 	dec_start := time.now()
 	dec_insts := 0
 	for _ in 0..<ITERATIONS {
-		insts: [dynamic]x86.Instruction;      defer delete(insts)
-		info:  [dynamic]x86.Instruction_Info; defer delete(info)
-		lbls:  [dynamic]x86.Label_Definition; defer delete(lbls)
-		errs:  [dynamic]x86.Error;            defer delete(errs)
+		clear(&insts)
+		clear(&info)
+		clear(&lbls)
+		clear(&errs)
 		x86.decode(code_buf[:encoded_len], nil, &insts, &info, &lbls, &errs)
 		dec_insts += len(insts)
 	}
-	dec_dur := time.duration_microseconds(time.since(dec_start))
+	dec_dur := time.duration_seconds(time.since(dec_start))
 
-	enc_ips := f64(ITERATIONS * len(bench_insts)) / (enc_dur / 1_000_000)
-	dec_ips := f64(dec_insts) / (dec_dur / 1_000_000)
-	enc_mbps := f64(enc_bytes) / (enc_dur / 1_000_000) / 1_000_000
-	dec_mbps := f64(ITERATIONS * int(encoded_len)) / (dec_dur / 1_000_000) / 1_000_000
+	enc_ips := f64(ITERATIONS * len(bench_insts)) / enc_dur
+	dec_ips := f64(dec_insts) / dec_dur
+	enc_bps := u64(f64(enc_bytes) / enc_dur)
+	dec_bps := u64(f64(ITERATIONS * int(encoded_len)) / dec_dur)
 
-	fmt.printf("  Encoder: %.1f M insts/sec (%.1f MB/s)\n", enc_ips / 1_000_000, enc_mbps)
-	fmt.printf("  Decoder: %.1f M insts/sec (%.1f MB/s)\n", dec_ips / 1_000_000, dec_mbps)
+	fmt.printf("  Encoder: %.1f M insts/sec (%.1M/s)\n", enc_ips / 1_000_000, enc_bps)
+	fmt.printf("  Decoder: %.1f M insts/sec (%.1M/s)\n", dec_ips / 1_000_000, dec_bps)
 }
 
 // =============================================================================

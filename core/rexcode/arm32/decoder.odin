@@ -40,7 +40,7 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	mode:         Mode = .A32,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data))
 	if mode == .T32 { n_bytes = n_bytes & ~u32(1) }
 	else            { n_bytes = n_bytes & ~u32(3) }
@@ -50,21 +50,20 @@ decode :: proc(
 	pending_branches: [dynamic]isa.Branch_Target
 	defer delete(pending_branches)
 
-	pc: u32 = 0
-	for pc < n_bytes {
+	for byte_count < n_bytes {
 		word: u32
 		ilen: u32 = 4
 
 		if mode == .A32 {
-			if pc + 4 > n_bytes { break }
-			word = read_u32_le(data, pc)
+			if byte_count + 4 > n_bytes { break }
+			word = read_u32_le(data, byte_count)
 		} else {
 			// T32: 16 or 32 bit
-			hword_hi := read_u16_le(data, pc)
+			hword_hi := read_u16_le(data, byte_count)
 			top5 := (hword_hi >> 11) & 0x1F
 			if top5 == 0x1D || top5 == 0x1E || top5 == 0x1F {
-				if pc + 4 > n_bytes { break }
-				hword_lo := read_u16_le(data, pc + 2)
+				if byte_count + 4 > n_bytes { break }
+				hword_lo := read_u16_le(data, byte_count + 2)
 				// Pack: bits = low_halfword | (high_halfword << 16)
 				word = u32(hword_lo) | (u32(hword_hi) << 16)
 				ilen = 4
@@ -76,10 +75,10 @@ decode :: proc(
 
 		inst: Instruction
 		info: Instruction_Info
-		info.offset = pc
+		info.offset = byte_count
 
 		if !find_and_decode(word, mode, ilen, &inst, &info) {
-			append(errors, Error{inst_idx = pc, code = .INVALID_OPCODE})
+			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = u8(ilen), mode = mode}
 		} else {
 			inst.length = u8(ilen)
@@ -103,11 +102,12 @@ decode :: proc(
 
 		append(instructions, inst)
 		append(inst_info,    info)
-		pc += ilen
+		byte_count += ilen
 	}
 
-	isa.infer_labels_from_branches(pending_branches[:], pc, label_defs, relocs)
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	isa.infer_labels_from_branches(pending_branches[:], byte_count, label_defs, relocs)
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

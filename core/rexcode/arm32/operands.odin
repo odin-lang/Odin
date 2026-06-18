@@ -94,7 +94,7 @@ mem_reg_shift :: #force_inline proc "contextless" (
 // ---- Operand structure -----------------------------------------------------
 
 Operand :: struct #packed {
-	using _: struct #raw_union {
+	using _: struct #raw_union #packed {
 		reg:       Register,
 		mem:       Memory,
 		immediate: i64,
@@ -107,9 +107,7 @@ Operand :: struct #packed {
 	lane:       u8,           // SIMD lane index for DPR_ELEM / QPR_ELEM
 	cond:       u8,           // condition code 0..15 (default = AL = 14)
 }
-#assert(size_of(Operand) == 22)
-// 16-byte raw_union (Memory is largest) + 6 bytes of trailing fields = 22 bytes
-// (packed; no alignment padding).
+#assert(size_of(Operand) == 18)
 
 // ---- Operand builders ------------------------------------------------------
 

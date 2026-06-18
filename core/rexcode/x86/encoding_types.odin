@@ -12,7 +12,6 @@ import "../isa"
 // SECTION: 6.0 Re-exports from isa (status, relocation)
 // -----------------------------------------------------------------------------
 
-Result          :: isa.Result
 Error           :: isa.Error
 Error_Code      :: isa.Error_Code
 // Relocation and Relocation_Type live in reloc.odin (per-arch by design).
@@ -247,18 +246,24 @@ VEX_L :: enum u8 {
 // -----------------------------------------------------------------------------
 
 Encoding_Flags :: bit_field u32 {
-	esc:           Escape   | 2, // escape sequence
-	prefix:        u8       | 2, // mandatory prefix: 0=none, 1=66, 2=F3, 3=F2
-	vex_type:      VEX_Type | 2, // VEX/EVEX/XOP
-	vex_w:         VEX_W    | 2, // VEX.W requirement
-	vex_l:         VEX_L    | 2, // VEX.L requirement
-	default_64:    bool     | 1, // default to 64-bit operand size (PUSH, POP, etc.)
-	force_rex_w:   bool     | 1, // always emit REX.W
-	no_rex:        bool     | 1, // REX prefix not allowed (high byte regs)
-	lock_ok:       bool     | 1, // LOCK prefix valid
-	rep_ok:        bool     | 1, // REP prefix valid
-	modrm_reg_ext: bool     | 1, // ModR/M reg field is opcode extension (use ext field)
-	mode_32_only:  bool     | 1, // only valid in Mode._32 (e.g. short-form INC/DEC at 0x40-0x4F)
+	esc:            Escape   | 2, // escape sequence
+	prefix:         u8       | 2, // mandatory prefix: 0=none, 1=66, 2=F3, 3=F2
+	vex_type:       VEX_Type | 2, // VEX/EVEX/XOP
+	vex_w:          VEX_W    | 2, // VEX.W requirement
+	vex_l:          VEX_L    | 2, // VEX.L requirement
+	default_64:     bool     | 1, // default to 64-bit operand size (PUSH, POP, etc.)
+	force_rex_w:    bool     | 1, // always emit REX.W
+	no_rex:         bool     | 1, // REX prefix not allowed (high byte regs)
+	lock_ok:        bool     | 1, // LOCK prefix valid
+	rep_ok:         bool     | 1, // REP prefix valid
+	modrm_reg_ext:  bool     | 1, // ModR/M reg field is opcode extension (use ext field)
+	mode_32_only:   bool     | 1, // only valid in Mode._32 (e.g. short-form INC/DEC at 0x40-0x4F)
+
+	explicit_count: u8       | 3, // 0..<4 non-implicit operands
+	has_implicit:   bool     | 1, // any implicit operand
+
+	op_count:       u8       | 3, // total operands including implicit (0..<4)
+	needs_modrm:    bool     | 1, // any enc is .MR/.REG/.VVVV
 }
 
 // -----------------------------------------------------------------------------

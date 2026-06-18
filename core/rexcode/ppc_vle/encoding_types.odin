@@ -17,7 +17,6 @@ import "../isa"
 // VLE shares the same GPR/SPR register model as standard PowerPC; types are
 // duplicated here to keep ppc_vle as a standalone sibling package.
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

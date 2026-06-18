@@ -31,7 +31,6 @@ import "../isa"
 // pattern, `mask` flags which positions are static. Operand-driven bits
 // land in the zero positions of `bits`.
 
-Result           :: isa.Result
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition

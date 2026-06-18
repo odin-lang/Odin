@@ -88,10 +88,10 @@ run_encoder_tests :: proc() {
 			mips.inst_r_i  (.LUI,  mips.T0, 0x1234),                  // 0x3C081234
 			mips.inst_shift(.SLL,  mips.T0, mips.T1, 5),              // 0x00094140
 		}
-		res := mips.encode(insts, nil, code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, nil, code[:], &relocs, &errors)
 
-		check_bool("core: success",       res.success,     true)
-		check_int ("core: byte_count",    int(res.byte_count), 24)
+		check_bool("core: success",       success,     true)
+		check_int ("core: byte_count",    int(byte_count), 24)
 		check_int ("core: errors len",    len(errors),     0)
 		check_int ("core: relocs len",    len(relocs),     0)
 		check_word("core: ADD t0,t1,t2",  load_word_be(code[:], 0),  0x012A4020)
@@ -111,10 +111,10 @@ run_encoder_tests :: proc() {
 		insts := []mips.Instruction{
 			mips.inst_r_r_r(.ADD, mips.T0, mips.T1, mips.T2),
 		}
-		res := mips.encode(insts, nil, code[:], &relocs, &errors,
+		byte_count, success := mips.encode(insts, nil, code[:], &relocs, &errors,
 						   endianness = .LITTLE)
 
-		check_bool("LE: success", res.success, true)
+		check_bool("LE: success", success, true)
 		check_word("LE: ADD (le bytes)",
 				   load_word_le(code[:], 0),   // reads as native u32 little-endian
 				   0x012A4020)
@@ -144,12 +144,12 @@ run_encoder_tests :: proc() {
 			mips.inst_branch2(.BNE, mips.T0, mips.ZERO, 0),
 			mips.inst_none(.NOP),
 		}
-		res := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
 
 		// BNE t0, zero, -3 = (op=5 << 26) | (rs=8 << 21) | (rt=0 << 16) | 0xFFFD
 		//                   = 0x14000000 | 0x01000000 | 0xFFFD
 		//                   = 0x1500FFFD
-		check_bool("brB: success",   res.success,    true)
+		check_bool("brB: success",   success,    true)
 		check_int ("brB: relocs len",len(relocs),    0)         // resolved
 		check_int ("brB: errors len",len(errors),    0)
 		check_word("brB: BNE -3w",   load_word_be(code[:], 8), 0x1500FFFD)
@@ -177,10 +177,10 @@ run_encoder_tests :: proc() {
 			mips.inst_none(.NOP),
 			mips.inst_r_r_r(.ADD, mips.T2, mips.T2, mips.T2),
 		}
-		res := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
 
 		// BEQ t0,t1,+2 = 0x10000000 | (8<<21) | (9<<16) | 0x0002 = 0x11090002
-		check_bool("brF: success",   res.success,    true)
+		check_bool("brF: success",   success,    true)
 		check_int ("brF: relocs len",len(relocs),    0)
 		check_word("brF: BEQ +2w",   load_word_be(code[:], 0), 0x11090002)
 		check_int ("brF: label_def[0]", int(label_defs[0]), 12)
@@ -209,10 +209,10 @@ run_encoder_tests :: proc() {
 			mips.inst_none(.NOP),
 			mips.inst_none(.NOP),   // target
 		}
-		res := mips.encode(insts, label_defs[:], code[:], &relocs, &errors,
+		byte_count, success := mips.encode(insts, label_defs[:], code[:], &relocs, &errors,
 						   base_address = 0x80000000)
 
-		check_bool("J: success",      res.success,    true)
+		check_bool("J: success",      success,    true)
 		check_int ("J: relocs len",   len(relocs),    0)
 		check_word("J: encoded",      load_word_be(code[:], 0), 0x08000004)
 	}
@@ -230,9 +230,9 @@ run_encoder_tests :: proc() {
 		insts := []mips.Instruction{
 			mips.inst_branch2(.BEQ, mips.T0, mips.T1, 0),
 		}
-		res := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
 
-		check_bool("unres: success",      res.success,    true)
+		check_bool("unres: success",      success,    true)
 		check_int ("unres: relocs left",  len(relocs),    1)   // kept for linker
 		check_int ("unres: errors len",   len(errors),    0)
 	}
@@ -256,9 +256,9 @@ run_encoder_tests :: proc() {
 		insts := []mips.Instruction{
 			mips.inst_branch2(.BEQ, mips.T0, mips.T1, 0),
 		}
-		res := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, label_defs[:], code[:], &relocs, &errors)
 
-		check_bool("OOR: success",     res.success,    false)   // had errors
+		check_bool("OOR: success",     success,    false)   // had errors
 		check_int ("OOR: relocs len",  len(relocs),    0)        // patched (truncated)
 		check_int ("OOR: errors len",  len(errors),    1)
 		// Error code should be LABEL_OUT_OF_RANGE.
@@ -277,9 +277,9 @@ run_encoder_tests :: proc() {
 			mips.inst_none(.NOP),
 		}
 		small_code: [4]u8
-		res := mips.encode(insts, nil, small_code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, nil, small_code[:], &relocs, &errors)
 
-		check_bool("OVF: success",    res.success,    false)
+		check_bool("OVF: success",    success,    false)
 		check_int ("OVF: errors len", len(errors),    1)
 		check_bool("OVF: error code",
 				   len(errors) > 0 && errors[0].code == .BUFFER_OVERFLOW,
@@ -300,9 +300,9 @@ run_encoder_tests :: proc() {
 		insts := []mips.Instruction{
 			mips.inst_r_r_r(.ADD_S, mips.F4, mips.F5, mips.F6),
 		}
-		res := mips.encode(insts, nil, code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, nil, code[:], &relocs, &errors)
 
-		check_bool("FPU: success",  res.success, true)
+		check_bool("FPU: success",  success, true)
 		check_word("FPU: ADD.S",    load_word_be(code[:], 0), 0x46062900)
 	}
 
@@ -316,9 +316,9 @@ run_encoder_tests :: proc() {
 		insts := []mips.Instruction{
 			mips.inst_none(.RTPS),
 		}
-		res := mips.encode(insts, nil, code[:], &relocs, &errors)
+		byte_count, success := mips.encode(insts, nil, code[:], &relocs, &errors)
 
-		check_bool("GTE: success",  res.success, true)
+		check_bool("GTE: success",  success, true)
 		check_word("GTE: RTPS",     load_word_be(code[:], 0), 0x4A000001)
 	}
 

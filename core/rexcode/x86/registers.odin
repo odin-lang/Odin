@@ -324,13 +324,13 @@ reg_needs_evex :: #force_inline proc "contextless" (r: Register) -> bool {
 @(require_results)
 reg_is_gpr :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r)
-	return c >= REG_GPR64 && c <= REG_GPR8H
+	return REG_GPR64 <= c && c <= REG_GPR8H
 }
 
 @(require_results)
 reg_is_vector :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r)
-	return c >= REG_XMM && c <= REG_ZMM
+	return REG_XMM <= c && c <= REG_ZMM
 }
 
 @(require_results)
@@ -340,7 +340,7 @@ reg_is_high_byte :: #force_inline proc "contextless" (r: Register) -> bool {
 
 // Size in bits for register
 @(require_results)
-reg_size :: proc "contextless" (r: Register) -> u16 {
+reg_size :: #force_inline proc "contextless" (r: Register) -> u16 {
 	switch reg_class(r) {
 	case REG_GPR64:           return 64
 	case REG_GPR32:           return 32
@@ -382,19 +382,18 @@ gpr16_from_num :: #force_inline proc "contextless" (num: u8) -> Register {
 	return num < 16 ? Register(REG_GPR16 | u16(num)) : NONE
 }
 
-gpr8_from_num :: proc(num: u8, has_rex: bool) -> Register {
+@(require_results)
+gpr8_from_num :: #force_inline proc "contextless" (num: u8, has_rex: bool) -> Register {
 	// Without REX prefix, nums 4-7 encode AH/CH/DH/BH (high byte legacy regs)
 	// With REX prefix, nums 4-7 encode SPL/BPL/SIL/DIL (low byte regs)
 	if has_rex {
 		return num < 16 ? Register(REG_GPR8 | u16(num)) : NONE
-	} else {
-		if num < 4 {
-			return Register(REG_GPR8 | u16(num))  // AL, CL, DL, BL
-		} else if num < 8 {
-			return Register(REG_GPR8H | u16(num))  // AH, CH, DH, BH (hw num 4-7)
-		}
-		return NONE
+	} else if num < 4 {
+		return Register(REG_GPR8 | u16(num))  // AL, CL, DL, BL
+	} else if num < 8 {
+		return Register(REG_GPR8H | u16(num))  // AH, CH, DH, BH (hw num 4-7)
 	}
+	return NONE
 }
 
 @(require_results)

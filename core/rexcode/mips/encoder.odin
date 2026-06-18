@@ -71,26 +71,22 @@ encode :: proc(
 	endianness:   Endianness = .BIG,
 	resolve:      bool       = true,
 	base_address: u64        = 0,
-) -> Result {
+) -> (byte_count: u32, ok: bool) {
 	n_inst := u32(len(instructions))
 	if u32(len(code)) < n_inst * 4 {
 		append(errors, Error{inst_idx = 0, code = .BUFFER_OVERFLOW})
-		return Result{byte_count = 0, success = false}
+		return
 	}
 
 	errors_start  := u32(len(errors))
 	pending_start := u32(len(relocs))
-	pc: u32       = 0
 
 	// ---- PASS 1 ------------------------------------------------------------
 	for i in 0..<n_inst {
 		inst := &instructions[i]
-		word, ok := encode_one_inline(inst, pc, u16(i), relocs, errors)
-		if !ok {
-			return Result{byte_count = pc, success = false}
-		}
-		write_u32(code, pc, word, endianness)
-		pc += 4
+		word := encode_one_inline(inst, byte_count, u16(i), relocs, errors) or_return
+		write_u32(code, byte_count, word, endianness)
+		byte_count += 4
 	}
 
 	// ---- PASS 1.5: rewrite label_defs from inst-idx to byte-offset --------
@@ -102,7 +98,8 @@ encode :: proc(
 	}
 
 	if !resolve {
-		return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+		ok = u32(len(errors)) == errors_start
+		return
 	}
 
 	// ---- PASS 2: resolve relocations ---------------------------------------
@@ -124,7 +121,8 @@ encode :: proc(
 		resize(relocs, int(write_idx))
 	}
 
-	return Result{byte_count = pc, success = u32(len(errors)) == errors_start}
+	ok = u32(len(errors)) == errors_start
+	return
 }
 
 // =============================================================================

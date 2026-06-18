@@ -91,8 +91,8 @@ run_pipeline_tests :: proc() {
 			rv.inst_u    (.LUI,  rv.T0, 0x12345),
 			rv.inst_u    (.AUIPC,rv.RA, 0x10),
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("R/I/U: encode ok", r.success)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("R/I/U: encode ok", success)
 		eq_word("R: ADD t0,a0,a1",     load_le(code[:], 0),  0x00B502B3)
 		eq_word("I: ADDI sp,sp,-16",   load_le(code[:], 4),  0xFF010113)
 		eq_word("U: LUI t0,0x12345",   load_le(code[:], 8),  0x123452B7)
@@ -114,8 +114,8 @@ run_pipeline_tests :: proc() {
 			rv.inst_load (.LW, rv.T0, rv.mem(rv.SP, 100)),
 			rv.inst_store(.SW, rv.A0, rv.mem(rv.SP, -8)),
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("LW/SW: encode ok", r.success)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("LW/SW: encode ok", success)
 		eq_word("LW t0,100(sp)",  load_le(code[:], 0), 0x06412283)
 		eq_word("SW a0,-8(sp)",   load_le(code[:], 4), 0xFEA12C23)
 	}
@@ -144,8 +144,8 @@ run_pipeline_tests :: proc() {
 			rv.inst_branch(.BNE, rv.T0, rv.ZERO, 0),
 			rv.inst_r_r_i(.ADDI, rv.ZERO, rv.ZERO, 0),
 		}
-		r := rv.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("br: encode ok",     r.success)
+		byte_count, success := rv.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("br: encode ok", success)
 		ok("br: no leftover relocs", len(relocs) == 0)
 		eq_word("BNE rel=-8",  load_le(code[:], 8), 0xFE029CE3)
 	}
@@ -170,9 +170,9 @@ run_pipeline_tests :: proc() {
 			rv.inst_r_r_i(.ADDI, rv.SP, rv.SP, 0),
 			rv.inst_jalr(rv.GPR.ZERO, rv.GPR.RA, 0),
 		}
-		r := rv.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("JAL: encode ok",   r.success)
-		eq_word("JAL ra,+8",   load_le(code[:], 0), 0x008000EF)
+		byte_count, success := rv.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("JAL: encode ok", success)
+		eq_word("JAL ra,+8", load_le(code[:], 0), 0x008000EF)
 	}
 
 	// ---- 5. Round-trip: encode -> decode -> print -----------------------
@@ -189,16 +189,16 @@ run_pipeline_tests :: proc() {
 			rv.inst_load (.LW,   rv.A0, rv.mem(rv.SP, 0)),
 			rv.inst_branch(.BNE, rv.T0, rv.ZERO, 0),
 		}
-		r := rv.encode(src, ld[:], code[:], &relocs, &errors)
-		ok("rt: encode ok", r.success)
+		byte_count, success := rv.encode(src, ld[:], code[:], &relocs, &errors)
+		ok("rt: encode ok", success)
 
 		d_insts:  [dynamic]rv.Instruction
 		d_info:   [dynamic]rv.Instruction_Info
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		d := rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("rt: decode ok",   d.success)
+		dbyte_count, dsuccess := rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("rt: decode ok",   dsuccess)
 		ok("rt: 3 insts",     len(d_insts) == 3)
 		ok("rt: ADDI",        d_insts[0].mnemonic == .ADDI)
 		ok("rt: LW",          d_insts[1].mnemonic == .LW)
@@ -223,15 +223,15 @@ run_pipeline_tests :: proc() {
 			rv.inst_r_r_r(.DIV,  rv.T1, rv.A0, rv.A1),
 			rv.inst_r_r_r(.REMU, rv.T2, rv.A0, rv.A1),
 		}
-		r := rv.encode(src, nil, code[:], &relocs, &errors)
-		ok("M: encode ok", r.success)
+		byte_count, success := rv.encode(src, nil, code[:], &relocs, &errors)
+		ok("M: encode ok", success)
 
 		d_insts:  [dynamic]rv.Instruction
 		d_info:   [dynamic]rv.Instruction_Info
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("M: MUL",  d_insts[0].mnemonic == .MUL)
 		ok("M: DIV",  d_insts[1].mnemonic == .DIV)
 		ok("M: REMU", d_insts[2].mnemonic == .REMU)
@@ -258,8 +258,8 @@ run_pipeline_tests :: proc() {
 				},
 			},
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("A: encode ok",       r.success)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("A: encode ok",       success)
 		eq_word("A: AMOADD.W",   load_le(code[:], 0), 0x00B522AF)
 	}
 
@@ -283,8 +283,8 @@ run_pipeline_tests :: proc() {
 				},
 			},
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("F: encode ok",    r.success)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("F: encode ok",    success)
 		eq_word("F: FADD.S",  load_le(code[:], 0), 0x00C58553)
 
 		d_insts:  [dynamic]rv.Instruction
@@ -292,7 +292,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 
 		text := rv.aprint(d_insts[:], d_info[:], d_labels[:],
 						  nil, nil, nil, context.temp_allocator)
@@ -317,8 +317,8 @@ run_pipeline_tests :: proc() {
 				rv.Register(rv.REG_FPR | 12),    // fa2
 				rv.Register(rv.REG_FPR | 13)),   // fa3
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("D: encode ok",     r.success)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("D: encode ok",     success)
 		eq_word("D: FMADD.D",  load_le(code[:], 0), 0x6AC58543)
 	}
 
@@ -333,8 +333,8 @@ run_pipeline_tests :: proc() {
 		insts := []rv.Instruction{
 			rv.inst_csr(.CSRRW, rv.A0, 0xF14, rv.ZERO),
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("CSR: encode ok",  r.success)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("CSR: encode ok",  success)
 		eq_word("CSR: csrrw",  load_le(code[:], 0), 0xF1401573)
 	}
 
@@ -382,9 +382,9 @@ run_pipeline_tests :: proc() {
 				ops = {rv.op_reg(rv.A2), rv.op_reg(rv.A3), {}, {}},
 			},
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("C: encode ok",  r.success)
-		ok("C: byte count", r.byte_count == 8)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("C: encode ok",  success)
+		ok("C: byte count", byte_count == 8)
 		get_hw := proc(buf: []u8, off: u32) -> u16 {
 			return u16(buf[off]) | (u16(buf[off+1]) << 8)
 		}
@@ -402,7 +402,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("C: decode 4 insts", len(d_insts) == 4)
 		ok("C: NOP",   len(d_insts) >= 1 && d_insts[0].mnemonic == .C_NOP)
 		ok("C: LI",    len(d_insts) >= 2 && d_insts[1].mnemonic == .C_LI)
@@ -429,16 +429,16 @@ run_pipeline_tests :: proc() {
 				ops = {rv.op_reg(rv.A2), rv.op_reg(rv.A0), {}, {}},
 			},
 		}
-		r := rv.encode(insts, nil, code[:], &relocs, &errors)
-		ok("C: mixed encode",     r.success)
-		ok("C: mixed bytes = 8",  r.byte_count == 8)
+		byte_count, success := rv.encode(insts, nil, code[:], &relocs, &errors)
+		ok("C: mixed encode",     success)
+		ok("C: mixed bytes = 8",  byte_count == 8)
 
 		d_insts:  [dynamic]rv.Instruction
 		d_info:   [dynamic]rv.Instruction_Info
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("C: mixed decode 3",  len(d_insts) == 3)
 		ok("C: [0]=C.LI len=2", len(d_insts) >= 1 && d_insts[0].mnemonic == .C_LI    && d_insts[0].length == 2)
 		ok("C: [1]=ADDI len=4", len(d_insts) >= 2 && d_insts[1].mnemonic == .ADDI    && d_insts[1].length == 4)
@@ -483,9 +483,9 @@ run_pipeline_tests :: proc() {
 			},
 			rv.inst_none(.C_NOP),
 		}
-		r := rv.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("C.BEQZ: encode",      r.success)
-		ok("C.BEQZ: byte_count=8", r.byte_count == 8)
+		byte_count, success := rv.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("C.BEQZ: encode",       success)
+		ok("C.BEQZ: byte_count=8", byte_count == 8)
 
 		get_hw := proc(buf: []u8, off: u32) -> u16 {
 			return u16(buf[off]) | (u16(buf[off+1]) << 8)
@@ -502,7 +502,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("C.BEQZ: decode count",   len(d_insts) == 4)
 		ok("C.BEQZ: [0] mnemonic",   len(d_insts) >= 1 && d_insts[0].mnemonic == .C_BEQZ)
 		ok("C.BEQZ: target = 6",     len(d_insts) >= 1 && d_insts[0].ops[1].kind == .RELATIVE && u32(d_insts[0].ops[0].relative + d_insts[0].ops[1].relative)*0+ u32(d_insts[0].ops[1].relative) == 6)
@@ -552,9 +552,9 @@ run_pipeline_tests :: proc() {
 				ops = {rv.op_label(0), {}, {}, {}},
 			},
 		}
-		r := rv.encode(insts, ld[:], code[:], &relocs, &errors)
-		ok("C.J: encode",       r.success)
-		ok("C.J: byte_count=10", r.byte_count == 10)
+		byte_count, success := rv.encode(insts, ld[:], code[:], &relocs, &errors)
+		ok("C.J: encode",       success)
+		ok("C.J: byte_count=10", byte_count == 10)
 
 		get_hw := proc(buf: []u8, off: u32) -> u16 {
 			return u16(buf[off]) | (u16(buf[off+1]) << 8)
@@ -571,7 +571,7 @@ run_pipeline_tests :: proc() {
 		d_labels: [dynamic]rv.Label_Definition
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
-		rv.decode(code[:r.byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		rv.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("C.J: decode count",  len(d_insts) == 4)
 		ok("C.J: [3] mnemonic",  len(d_insts) >= 4 && d_insts[3].mnemonic == .C_J)
 		ok("C.J: target = 0",    len(d_insts) >= 4 && d_insts[3].ops[0].kind == .RELATIVE && u32(d_insts[3].ops[0].relative) == 0)
@@ -601,8 +601,8 @@ run_pipeline_tests :: proc() {
 		// Target at byte 2 + 64*4 = 258 -- out of range for 9-bit signed (max 254)
 		append(&long_insts, rv.inst_none(.C_NOP))
 
-		r := rv.encode(long_insts[:], ld[:], big_code[:], &relocs, &errors)
-		ok("C.BEQZ out-of-range: error", !r.success && len(errors) > 0)
+		byte_count, success := rv.encode(long_insts[:], ld[:], big_code[:], &relocs, &errors)
+		ok("C.BEQZ out-of-range: error", !success && len(errors) > 0)
 		if len(errors) > 0 {
 			ok("C.BEQZ out-of-range: code", errors[0].code == .LABEL_OUT_OF_RANGE)
 		}

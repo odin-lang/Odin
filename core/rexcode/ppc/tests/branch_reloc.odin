@@ -16,15 +16,15 @@ check :: proc(name: string, instructions: []p.Instruction, label_defs: []isa.Lab
 	errors: [dynamic]p.Error
 	defer delete(relocs); defer delete(errors)
 
-	r := p.encode(instructions, label_defs, code, &relocs, &errors)
-	if !r.success {
+	byte_count, success := p.encode(instructions, label_defs, code, &relocs, &errors)
+	if !success {
 		fmt.printf("  [FAIL] %s: encode failed, %d errors\n", name, len(errors))
 		for e in errors { fmt.printf("           code=%v inst_idx=%d\n", e.code, e.inst_idx) }
 		fail += 1
 		return
 	}
-	if int(r.byte_count) != len(want_bytes) {
-		fmt.printf("  [FAIL] %s: wrong byte count (got %d, want %d)\n", name, r.byte_count, len(want_bytes))
+	if int(byte_count) != len(want_bytes) {
+		fmt.printf("  [FAIL] %s: wrong byte count (got %d, want %d)\n", name, byte_count, len(want_bytes))
 		fail += 1
 		return
 	}

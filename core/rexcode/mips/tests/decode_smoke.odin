@@ -80,8 +80,8 @@ run_decoder_tests :: proc() {
 			mips.inst_r_i  (.LUI,   mips.T0, 0x1234),
 			mips.inst_shift(.SLL,   mips.T0, mips.T1, 5),
 		}
-		eres := mips.encode(src, nil, code[:], &relocs, &errors)
-		dcheck_bool("rt: encode ok", eres.success, true)
+		ebyte_count, esuccess := mips.encode(src, nil, code[:], &relocs, &errors)
+		dcheck_bool("rt: encode ok", esuccess, true)
 
 		dec_insts:  [dynamic]mips.Instruction
 		dec_info:   [dynamic]mips.Instruction_Info
@@ -91,11 +91,11 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:eres.byte_count], nil,
+		dbyte_count, dsuccess := mips.decode(code[:ebyte_count], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors)
 
-		dcheck_bool("rt: decode ok",      dres.success,   true)
-		dcheck_int ("rt: byte_count",     int(dres.byte_count), 24)
+		dcheck_bool("rt: decode ok",      dsuccess,   true)
+		dcheck_int ("rt: byte_count",     int(dbyte_count), 24)
 		dcheck_int ("rt: instruction n",  len(dec_insts), 6)
 		dcheck_int ("rt: info n",         len(dec_info),  6)
 		dcheck_int ("rt: errors n",       len(errors),    0)
@@ -161,8 +161,8 @@ run_decoder_tests :: proc() {
 			mips.inst_branch2(.BNE, mips.T0, mips.ZERO, 0),
 			mips.inst_none(.NOP),
 		}
-		eres := mips.encode(src, ld_in[:], code[:], &relocs, &errors)
-		dcheck_bool("br: encode ok", eres.success, true)
+		ebyte_count, esuccess := mips.encode(src, ld_in[:], code[:], &relocs, &errors)
+		dcheck_bool("br: encode ok", esuccess, true)
 
 		dec_insts:  [dynamic]mips.Instruction
 		dec_info:   [dynamic]mips.Instruction_Info
@@ -172,9 +172,9 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:eres.byte_count], nil,
+		dbyte_count, dsuccess := mips.decode(code[:ebyte_count], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors)
-		dcheck_bool("br: decode ok",  dres.success,   true)
+		dcheck_bool("br: decode ok",  dsuccess,   true)
 		dcheck_int ("br: insts",      len(dec_insts), 4)
 		dcheck_mnem("br: BNE",        dec_insts[2].mnemonic, .BNE)
 
@@ -206,9 +206,9 @@ run_decoder_tests :: proc() {
 			mips.inst_none(.NOP),
 			mips.inst_none(.NOP),
 		}
-		eres := mips.encode(src, ld_in[:], code[:], &relocs, &errors,
+		ebyte_count, esuccess := mips.encode(src, ld_in[:], code[:], &relocs, &errors,
 							base_address = 0)
-		dcheck_bool("J: encode ok", eres.success, true)
+		dcheck_bool("J: encode ok", esuccess, true)
 
 		dec_insts:  [dynamic]mips.Instruction
 		dec_info:   [dynamic]mips.Instruction_Info
@@ -218,9 +218,9 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:eres.byte_count], nil,
+		dbyte_count, dsuccess := mips.decode(code[:ebyte_count], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors)
-		dcheck_bool("J: decode ok",  dres.success,   true)
+		dcheck_bool("J: decode ok",  dsuccess,   true)
 		dcheck_mnem("J: mnemonic",   dec_insts[0].mnemonic, .J)
 		dcheck_int ("J: op kind",    int(dec_insts[0].ops[0].kind),
 									 int(mips.Operand_Kind.RELATIVE))
@@ -235,8 +235,8 @@ run_decoder_tests :: proc() {
 		src := []mips.Instruction{
 			mips.inst_r_r_r(.ADD_S, mips.F4, mips.F5, mips.F6),
 		}
-		eres := mips.encode(src, nil, code[:], &relocs, &errors)
-		dcheck_bool("FPU: encode ok", eres.success, true)
+		ebyte_count, esuccess := mips.encode(src, nil, code[:], &relocs, &errors)
+		dcheck_bool("FPU: encode ok", esuccess, true)
 
 		dec_insts:  [dynamic]mips.Instruction
 		dec_info:   [dynamic]mips.Instruction_Info
@@ -246,9 +246,9 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:eres.byte_count], nil,
+		dbyte_count, dsuccess := mips.decode(code[:ebyte_count], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors)
-		dcheck_bool("FPU: decode ok", dres.success, true)
+		dcheck_bool("FPU: decode ok", dsuccess, true)
 		dcheck_mnem("FPU: ADD.S",     dec_insts[0].mnemonic, .ADD_S)
 		i0 := dec_insts[0]
 		dcheck_reg ("FPU: op0=F4",    i0.ops[0].reg, mips.F4)
@@ -262,8 +262,8 @@ run_decoder_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 
 		src := []mips.Instruction{mips.inst_none(.RTPS)}
-		eres := mips.encode(src, nil, code[:], &relocs, &errors)
-		dcheck_bool("GTE: encode ok", eres.success, true)
+		ebyte_count, esuccess := mips.encode(src, nil, code[:], &relocs, &errors)
+		dcheck_bool("GTE: encode ok", esuccess, true)
 
 		dec_insts:  [dynamic]mips.Instruction
 		dec_info:   [dynamic]mips.Instruction_Info
@@ -273,9 +273,9 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:eres.byte_count], nil,
+		dbyte_count, dsuccess := mips.decode(code[:ebyte_count], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors)
-		dcheck_bool("GTE: decode ok", dres.success, true)
+		dcheck_bool("GTE: decode ok", dsuccess, true)
 		dcheck_mnem("GTE: RTPS",      dec_insts[0].mnemonic, .RTPS)
 		dcheck_int ("GTE: opcnt 0",   int(dec_insts[0].operand_count), 0)
 	}
@@ -288,9 +288,9 @@ run_decoder_tests :: proc() {
 		src := []mips.Instruction{
 			mips.inst_r_r_r(.ADD, mips.T0, mips.T1, mips.T2),
 		}
-		eres := mips.encode(src, nil, code[:], &relocs, &errors,
+		ebyte_count, esuccess := mips.encode(src, nil, code[:], &relocs, &errors,
 							endianness = .LITTLE)
-		dcheck_bool("LE: encode ok", eres.success, true)
+		dcheck_bool("LE: encode ok", esuccess, true)
 
 		dec_insts:  [dynamic]mips.Instruction
 		dec_info:   [dynamic]mips.Instruction_Info
@@ -300,10 +300,10 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:eres.byte_count], nil,
+		dbyte_count, dsuccess := mips.decode(code[:ebyte_count], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors,
 							endianness = .LITTLE)
-		dcheck_bool("LE: decode ok", dres.success, true)
+		dcheck_bool("LE: decode ok", dsuccess, true)
 		dcheck_mnem("LE: ADD",       dec_insts[0].mnemonic, .ADD)
 	}
 
@@ -326,9 +326,9 @@ run_decoder_tests :: proc() {
 		defer delete(dec_labels)
 		clear(&errors)
 
-		dres := mips.decode(code[:4], nil,
+		dbyte_count, dsuccess := mips.decode(code[:4], nil,
 							&dec_insts, &dec_info, &dec_labels, &errors)
-		dcheck_bool("garbage: success",   dres.success, false)
+		dcheck_bool("garbage: success",   dsuccess, false)
 		dcheck_int ("garbage: insts",     len(dec_insts), 1)
 		dcheck_mnem("garbage: INVALID",   dec_insts[0].mnemonic, .INVALID)
 		dcheck_int ("garbage: errors n",  len(errors), 1)

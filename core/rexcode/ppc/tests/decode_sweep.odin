@@ -47,8 +47,8 @@ run_decode_sweep :: proc() {
 			errors:  [dynamic]p.Error
 			defer delete(decoded); defer delete(info); defer delete(labels); defer delete(errors)
 
-			r := p.decode(buf[:ilen], nil, &decoded, &info, &labels, &errors, .PPC64)
-			if !r.success || len(decoded) == 0 || (len(decoded) > 0 && decoded[0].mnemonic == .INVALID) {
+			byte_count, success := p.decode(buf[:ilen], nil, &decoded, &info, &labels, &errors, .PPC64)
+			if !success || len(decoded) == 0 || (len(decoded) > 0 && decoded[0].mnemonic == .INVALID) {
 				if missing_mn_total < 20 {
 					fmt.printf("  [UNDECODABLE] %v  word=%08x prefixed=%v\n", mn, word, f.flags.prefixed)
 				}

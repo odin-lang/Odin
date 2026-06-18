@@ -8,10 +8,10 @@ IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
 RUNTIME_LINKAGE :: "strong"   when ODIN_USE_SEPARATE_MODULES else
-                   "internal" when ODIN_NO_ENTRY_POINT && (ODIN_BUILD_MODE == .Static || ODIN_BUILD_MODE == .Dynamic || ODIN_BUILD_MODE == .Object) else
-                   "strong"   when ODIN_BUILD_MODE == .Dynamic else
-                   "strong"   when !ODIN_NO_CRT else
-                   "internal"
+				   "internal" when ODIN_NO_ENTRY_POINT && (ODIN_BUILD_MODE == .Static || ODIN_BUILD_MODE == .Dynamic || ODIN_BUILD_MODE == .Object) else
+				   "strong"   when ODIN_BUILD_MODE == .Dynamic else
+				   "strong"   when !ODIN_NO_CRT else
+				   "internal"
 RUNTIME_REQUIRE :: false // !ODIN_TILDE
 
 @(private)
@@ -24,7 +24,7 @@ HAS_HARDWARE_SIMD :: false when (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) && !
 	true
 
 // Size of a native SIMD register for the current compilation target
-NATIVE_SIMD_BIT_WIDTH :: 
+NATIVE_SIMD_BIT_WIDTH ::
 	512 when (ODIN_ARCH == .amd64) && intrinsics.has_target_feature("avx512f") else
 	256 when (ODIN_ARCH == .amd64) && (intrinsics.has_target_feature("avx2") || intrinsics.has_target_feature("avx")) else
 	// Fallback for no hardware SIMD, but also SSE, NEON, SVE, RVV and WASM SIMD128.
@@ -1186,7 +1186,7 @@ floattidf :: proc "c" (a: i128) -> f64 {
 			// okay
 		case:
 			a = i128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
-			    i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
+				i128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
 		}
 
 		a |= i128((a & 4) != 0)
@@ -1202,8 +1202,8 @@ floattidf :: proc "c" (a: i128) -> f64 {
 	}
 	fb: [2]u32
 	fb[1] = (u32(s) & 0x80000000) |          // sign
-	        (u32(e + 1023) << 20) |          // exponent
-	        u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
+			(u32(e + 1023) << 20) |          // exponent
+			u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
@@ -1243,8 +1243,8 @@ floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 	}
 	fb: [2]u32
 	fb[1] = (0) |                            // sign
-	        u32((e + 1023) << 20) |          // exponent
-	        u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
+			u32((e + 1023) << 20) |          // exponent
+			u32((u64(a) >> 32) & 0x000FFFFF) // mantissa-high
 	fb[0] = u32(a)                           // mantissa-low
 	return transmute(f64)fb
 }
@@ -1374,25 +1374,6 @@ fixdfti :: proc "c" (a: u64) -> i128 {
 
 }
 
-
-
-__write_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
-	for i in 0..<size {
-		j := offset+i
-		the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
-		dst[j>>3] &~=       1<<(j&7)
-		dst[j>>3]  |= the_bit<<(j&7)
-	}
-}
-
-__read_bits :: proc "contextless" (dst, src: [^]byte, offset: uintptr, size: uintptr) {
-	for j in 0..<size {
-		i := offset+j
-		the_bit := byte((src[i>>3]) & (1<<(i&7)) != 0)
-		dst[j>>3] &~=       1<<(j&7)
-		dst[j>>3]  |= the_bit<<(j&7)
-	}
-}
 
 when .Address in ODIN_SANITIZER_FLAGS {
 	foreign {

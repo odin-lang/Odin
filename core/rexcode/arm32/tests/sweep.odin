@@ -113,8 +113,8 @@ run_sweep_tests :: proc() {
 			ren_errors: [dynamic]a.Error
 			out: [4]u8
 			defer { delete(ren_relocs); delete(ren_errors) }
-			res := a.encode(insts[:], label_defs[:], out[:], &ren_relocs, &ren_errors, resolve=false)
-			if !res.success {
+			byte_count, success := a.encode(insts[:], label_defs[:], out[:], &ren_relocs, &ren_errors, resolve=false)
+			if !success {
 				stats.fail_encode += 1
 				if failed_examples < max_fail_print && (only_print_kind == "" || only_print_kind == "re-enc") {
 					fmt.printf("  [re-enc  ] %v[%d] %08X re-encode failed\n", mn, idx, word)
