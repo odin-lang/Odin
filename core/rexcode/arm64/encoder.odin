@@ -209,8 +209,17 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 64)
 	case .V_4H_FP16:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 24)
-	case .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V
+	// Element-indexed V views: element size carried in op.size (B=1,H=2,S=4,
+	// D=8) so DUP/INS forms disambiguate. .S also accepts size 0 so a plain
+	// op_reg (as the hand-written SM3TT forms pass) still matches the .S slot.
+	case .V_ELEM_B:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 1
+	case .V_ELEM_H:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 2
+	case .V_ELEM_S:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 4 || op.size == 0)
+	case .V_ELEM_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 8
 
 	// SVE Z registers. Element size carried in op.size: B=1, H=2, S=4, D=8.
 	// op.size==0 (legacy / default-constructed) accepts any width.
@@ -247,7 +256,7 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .IMMEDIATE
 
 	case .IMM_12, .IMM_16, .IMM_8, .IMM_6, .IMM_5, .IMM_4, .IMM_3, .IMM_2,
-		 .NZCV_IMM, .SYS_REG, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT:
+		 .NZCV_IMM, .SYS_REG, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT, .VEC_INDEX:
 		return op.kind == .IMMEDIATE
 	case .BITMASK_IMM:
 		// The user passes the raw logical mask value; we validate that it
@@ -277,6 +286,21 @@ vec_esize :: #force_inline proc "contextless" (ot: Operand_Type) -> u32 {
 	case .V_1D, .V_2D:                          return 64
 	}
 	return 8
+}
+
+@(private="file")
+// Lane-index marker bit (log2 of element-size in bytes) for a DUP/INS form:
+// derived from the V_ELEM_* operand the form carries. B=0, H=1, S=2, D=3.
+vidx_markerbit :: #force_inline proc "contextless" (form: ^Encoding) -> u32 {
+	for ot in form.ops {
+		#partial switch ot {
+		case .V_ELEM_B: return 0
+		case .V_ELEM_H: return 1
+		case .V_ELEM_S: return 2
+		case .V_ELEM_D: return 3
+		}
+	}
+	return 0
 }
 
 pack_operand_inline :: #force_inline proc(
@@ -440,6 +464,19 @@ pack_operand_inline :: #force_inline proc(
 	case .NEON_SHR_IMM:
 		esize := vec_esize(form.ops[0])
 		return ((esize - u32(op.immediate)) & 0x3F) << 16
+
+	// NEON copy/permute index fields (element-size marker fixed in `bits`).
+	case .VN_VM_DUP:
+		hw := u32(reg_hw(op.reg)) & 0x1F
+		return (hw << 5) | (hw << 16)
+	case .NEON_IDX5:
+		mb := vidx_markerbit(form)
+		return (u32(op.immediate) << (mb + 1)) << 16
+	case .NEON_IDX4:
+		mb := vidx_markerbit(form)
+		return (u32(op.immediate) << mb) << 11
+	case .NEON_EXT_IDX:
+		return (u32(op.immediate) & 0xF) << 11
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:

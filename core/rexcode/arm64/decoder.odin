@@ -211,6 +211,30 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		if en == .NEON_SHR_IMM { amt = 2 * esize - val }
 		return Operand{immediate = amt, kind = .IMMEDIATE, size = 1}
 
+	// ---- NEON copy/permute index fields ------------------------------------
+	case .VN_VM_DUP:
+		return Operand{reg = Register(REG_V | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
+	case .NEON_IDX5:
+		// imm5 = index << (markerbit+1) | (1 << markerbit); marker = lowest set bit.
+		imm5 := (word >> 16) & 0x1F
+		mb: u32 = 0
+		if      imm5 & 0x1 != 0 { mb = 0 }
+		else if imm5 & 0x2 != 0 { mb = 1 }
+		else if imm5 & 0x4 != 0 { mb = 2 }
+		else                    { mb = 3 }
+		return Operand{immediate = i64(imm5 >> (mb + 1)), kind = .IMMEDIATE, size = 1}
+	case .NEON_IDX4:
+		// imm4 = index << markerbit; recover markerbit from imm5 in the word.
+		imm5 := (word >> 16) & 0x1F
+		mb: u32 = 0
+		if      imm5 & 0x1 != 0 { mb = 0 }
+		else if imm5 & 0x2 != 0 { mb = 1 }
+		else if imm5 & 0x4 != 0 { mb = 2 }
+		else                    { mb = 3 }
+		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = 1}
+	case .NEON_EXT_IDX:
+		return Operand{immediate = i64((word >> 11) & 0xF), kind = .IMMEDIATE, size = 1}
+
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:
 		size := u32(1) << ((word >> 30) & 0x3)

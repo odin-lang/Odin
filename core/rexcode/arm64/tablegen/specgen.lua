@@ -347,6 +347,120 @@ do
 	sections[#sections+1] = "\t// Advanced SIMD shift by immediate.\n" .. table.concat(blk, "\n")
 end
 
+-- ---- NEON copy / permute (MOV/MVN/DUP/INS/EXT) -----------------------------
+-- These carry a lane index in imm5/imm4 whose element-size marker is fixed in
+-- `bits`; the operand drives the bits above it. mask is derived by varying the
+-- registers AND each index field to its maximum (mask = ~union of the deltas).
+local function mask_of(base, variants)
+	local x = 0
+	for _, w in ipairs(variants) do x = bit.bor(x, bit.bxor(base, w)) end
+	return bit.band(bit.bnot(x), 0xFFFFFFFF)
+end
+-- element metadata: asm token, valid dst arrangements, max lane index, V_ELEM type.
+local ELEM = {
+	B = {tok="b", dst={"8B","16B"}, idxmax=15, vt="V_ELEM_B"},
+	H = {tok="h", dst={"4H","8H"},  idxmax=7,  vt="V_ELEM_H"},
+	S = {tok="s", dst={"2S","4S"},  idxmax=3,  vt="V_ELEM_S"},
+	D = {tok="d", dst={"2D"},       idxmax=1,  vt="V_ELEM_D"},
+}
+do
+	local blk = {}
+	local function emit_rows(mnem, rows)
+		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
+	end
+	local function mkrow(mnem, ops, enc, b0, variants)
+		n_forms = n_forms + 1
+		return string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .NEON, {}},",
+			mnem, ops, enc, bit.tohex(b0):upper(), bit.tohex(mask_of(b0, variants)):upper())
+	end
+
+	-- MOV Vd.T, Vn.T  (= ORR Vd,Vn,Vn): the single source feeds both Vn and Vm.
+	local mov = {}
+	for _, a in ipairs({"8B","16B"}) do
+		local function mk(x) return string.format("mov v%d.%s, v%d.%s", x, ARR[a].asm, x, ARR[a].asm) end
+		local b0, b31 = word(mk(0)), word(mk(31))
+		if b0 and b31 then mov[#mov+1] = mkrow("MOV_V",
+			string.format("{.%s, .%s, .NONE, .NONE}", ARR[a].vt, ARR[a].vt),
+			"{.VD, .VN_VM_DUP, .NONE, .NONE}", b0, {b31}) end
+	end
+	emit_rows("MOV_V", mov)
+
+	-- MVN Vd.T, Vn.T (= NOT alias): plain two-register.
+	local mvn = {}
+	for _, a in ipairs({"8B","16B"}) do
+		local function mk(x) return string.format("mvn v%d.%s, v%d.%s", x, ARR[a].asm, x, ARR[a].asm) end
+		local b0, b31 = word(mk(0)), word(mk(31))
+		if b0 and b31 then mvn[#mvn+1] = mkrow("MVN_V",
+			string.format("{.%s, .%s, .NONE, .NONE}", ARR[a].vt, ARR[a].vt),
+			"{.VD, .VN, .NONE, .NONE}", b0, {b31}) end
+	end
+	emit_rows("MVN_V", mvn)
+
+	-- DUP: element form (Vd.T, Vn.Ts[i]) + general form (Vd.T, Wn/Xn).
+	local dup = {}
+	for _, ek in ipairs({"B","H","S","D"}) do
+		local e = ELEM[ek]
+		for _, a in ipairs(e.dst) do
+			local function mk(r,i) return string.format("dup v%d.%s, v%d.%s[%d]", r, ARR[a].asm, r, e.tok, i) end
+			local b0, br, bi = word(mk(0,0)), word(mk(31,0)), word(mk(0,e.idxmax))
+			if b0 and br and bi then dup[#dup+1] = mkrow("DUP_V",
+				string.format("{.%s, .%s, .VEC_INDEX, .NONE}", ARR[a].vt, e.vt),
+				"{.VD, .VN, .NEON_IDX5, .NONE}", b0, {br, bi}) end
+		end
+	end
+	for _, g in ipairs({{"8B","w","W_REG"},{"16B","w","W_REG"},{"4H","w","W_REG"},{"8H","w","W_REG"},{"2S","w","W_REG"},{"4S","w","W_REG"},{"2D","x","X_REG"}}) do
+		-- Vary Vd and Rn independently to 31 (Rn 31 is the zero register, asm
+		-- "wzr"/"xzr") so the low bit of each register field toggles.
+		local zr = (g[2] == "x") and "xzr" or "wzr"
+		local function mk(vr, gs) return string.format("dup v%d.%s, %s", vr, ARR[g[1]].asm, gs) end
+		local b0, bV, bR = word(mk(0, g[2].."0")), word(mk(31, g[2].."0")), word(mk(0, zr))
+		if b0 and bV and bR then dup[#dup+1] = mkrow("DUP_V",
+			string.format("{.%s, .%s, .NONE, .NONE}", ARR[g[1]].vt, g[3]),
+			"{.VD, .RN, .NONE, .NONE}", b0, {bV, bR}) end
+	end
+	emit_rows("DUP_V", dup)
+
+	-- INS: element form (Vd.Ts[i], Vn.Ts[j]) + general form (Vd.Ts[i], Wn/Xn).
+	local ins = {}
+	for _, ek in ipairs({"B","H","S","D"}) do
+		local e = ELEM[ek]
+		local function mk(r,i,j) return string.format("ins v%d.%s[%d], v%d.%s[%d]", r, e.tok, i, r, e.tok, j) end
+		local b0, br, bi, bj = word(mk(0,0,0)), word(mk(31,0,0)), word(mk(0,e.idxmax,0)), word(mk(0,0,e.idxmax))
+		if b0 and br and bi and bj then ins[#ins+1] = mkrow("INS",
+			string.format("{.%s, .VEC_INDEX, .%s, .VEC_INDEX}", e.vt, e.vt),
+			"{.VD, .NEON_IDX5, .VN, .NEON_IDX4}", b0, {br, bi, bj}) end
+	end
+	for _, ek in ipairs({"B","H","S","D"}) do
+		local e = ELEM[ek]
+		local gpr = (ek == "D") and "x" or "w"
+		local gvt = (ek == "D") and "X_REG" or "W_REG"
+		local zr  = (ek == "D") and "xzr" or "wzr"
+		local function mk(vr, gs, i) return string.format("ins v%d.%s[%d], %s", vr, e.tok, i, gs) end
+		local b0 = word(mk(0, gpr.."0", 0))
+		local bV = word(mk(31, gpr.."0", 0))   -- Vd field
+		local bR = word(mk(0, zr, 0))          -- Rn field (zero register)
+		local bi = word(mk(0, gpr.."0", e.idxmax))
+		if b0 and bV and bR and bi then ins[#ins+1] = mkrow("INS",
+			string.format("{.%s, .VEC_INDEX, .%s, .NONE}", e.vt, gvt),
+			"{.VD, .NEON_IDX5, .RN, .NONE}", b0, {bV, bR, bi}) end
+	end
+	emit_rows("INS", ins)
+
+	-- EXT Vd.T, Vn.T, Vm.T, #index  (imm4 byte index; .8b idx 0..7, .16b 0..15).
+	local ext = {}
+	for _, ai in ipairs({{"8B",7},{"16B",15}}) do
+		local a, imax = ai[1], ai[2]
+		local function mk(r,i) return string.format("ext v%d.%s, v%d.%s, v%d.%s, #%d", r, ARR[a].asm, r, ARR[a].asm, r, ARR[a].asm, i) end
+		local b0, br, bi = word(mk(0,0)), word(mk(31,0)), word(mk(0,imax))
+		if b0 and br and bi then ext[#ext+1] = mkrow("EXT_V",
+			string.format("{.%s, .%s, .%s, .VEC_INDEX}", ARR[a].vt, ARR[a].vt, ARR[a].vt),
+			"{.VD, .VN, .VM, .NEON_EXT_IDX}", b0, {br, bi}) end
+	end
+	emit_rows("EXT_V", ext)
+
+	sections[#sections+1] = "\t// Advanced SIMD copy / permute (MOV/MVN/DUP/INS/EXT).\n" .. table.concat(blk, "\n")
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "\t// SPECGEN:BEGIN\n" .. table.concat(sections, "\n\n") .. "\n\t// SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()

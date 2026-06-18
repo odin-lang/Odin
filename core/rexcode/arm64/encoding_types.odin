@@ -169,6 +169,10 @@ Operand_Type :: enum u8 {
 	// ---- NEON shift-by-immediate amount (encoded into immh:immb together
 	//      with the element size: left = esize+shift, right = 2*esize-shift) ----
 	VEC_SHIFT,
+
+	// ---- NEON element lane index (DUP/INS/EXT). The element-size marker
+	//      lives in the entry `bits`; the operand drives only the index bits. ----
+	VEC_INDEX,
 }
 
 // Where each operand's bits land in the 32-bit word.
@@ -232,6 +236,15 @@ Operand_Encoding :: enum u8 {
 	// drives only the low bits. Left: low = shift. Right: low = esize - shift.
 	NEON_SHL_IMM,
 	NEON_SHR_IMM,
+
+	// ---- NEON copy/permute index fields ----
+	// The element-size marker bit lives in the entry `bits`; the lane index
+	// operand drives the bits above it (DUP/INS imm5, INS imm4) or the plain
+	// imm4 (EXT). The decoder recovers the element size from imm5's marker.
+	VN_VM_DUP,        // one V reg packed into BOTH Vn (9:5) and Vm (20:16) (MOV = ORR alias)
+	NEON_IDX5,        // element lane index in imm5 (20:16); index << (markerbit+1)
+	NEON_IDX4,        // INS source lane index in imm4 (14:11); index << markerbit
+	NEON_EXT_IDX,     // EXT byte index in imm4 (14:11)
 
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20

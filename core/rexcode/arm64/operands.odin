@@ -210,6 +210,26 @@ op_v_2d  :: #force_inline proc "contextless" (n: u8) -> Operand {
 	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 64}
 }
 
+// Element-indexed V views (V0.B[i]/.H[i]/.S[i]/.D[i]). The element size rides
+// in op.size (1/2/4/8) so the matcher can disambiguate DUP/INS forms; the lane
+// index is a separate immediate operand.
+@(require_results)
+op_v_elem_b :: #force_inline proc "contextless" (n: u8) -> Operand {
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 1}
+}
+@(require_results)
+op_v_elem_h :: #force_inline proc "contextless" (n: u8) -> Operand {
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 2}
+}
+@(require_results)
+op_v_elem_s :: #force_inline proc "contextless" (n: u8) -> Operand {
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 4}
+}
+@(require_results)
+op_v_elem_d :: #force_inline proc "contextless" (n: u8) -> Operand {
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 8}
+}
+
 // -----------------------------------------------------------------------------
 // Memory constructors (one per addressing mode)
 // -----------------------------------------------------------------------------

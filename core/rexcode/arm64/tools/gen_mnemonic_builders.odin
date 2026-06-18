@@ -315,6 +315,10 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]st
 		case .V_4S:  fmt.sbprintf(sb, "op_v_4s(u8(reg_hw(%s)))",  names[0])
 		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(u8(reg_hw(%s)))",  names[0])
 		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(u8(reg_hw(%s)))",  names[0])
+		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(u8(reg_hw(%s)))", names[0])
+		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(u8(reg_hw(%s)))", names[0])
+		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(u8(reg_hw(%s)))", names[0])
+		case .V_ELEM_D: fmt.sbprintf(sb, "op_v_elem_d(u8(reg_hw(%s)))", names[0])
 		case:        fmt.sbprintf(sb, "op_reg(%s)", names[0])
 		}
 	case .ZREG:
