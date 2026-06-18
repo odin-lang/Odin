@@ -1382,6 +1382,30 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.ST1, {.V_2D,  .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C007C00, 0xFFFFFC00, .NEON, {}},
 	},
 
+	// Table lookup (TBL/TBX): the table operand is a register list whose first
+	// register is encoded at Vn; the list length (here 1) is fixed in the bits.
+	.TBL = {
+		{.TBL, {.V_8B,  .V_16B, .V_8B,  .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E000000, 0xFFE0FC00, .NEON, {}},
+		{.TBL, {.V_16B, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E000000, 0xFFE0FC00, .NEON, {}},
+	},
+	.TBX = {
+		{.TBX, {.V_8B,  .V_16B, .V_8B,  .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E001000, 0xFFE0FC00, .NEON, {}},
+		{.TBX, {.V_16B, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E001000, 0xFFE0FC00, .NEON, {}},
+	},
+	// Structured load/store of 2/3/4 registers, and load-and-replicate (LD#R).
+	// The register list is encoded by its first register (Vd); the count and
+	// arrangement (here .16b) are fixed in the bits (mirrors the LD1/ST1 forms).
+	.LD2 = { {.LD2, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C408000, 0xFFFFFC00, .NEON, {}} },
+	.LD3 = { {.LD3, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C404000, 0xFFFFFC00, .NEON, {}} },
+	.LD4 = { {.LD4, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C400000, 0xFFFFFC00, .NEON, {}} },
+	.ST2 = { {.ST2, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C008000, 0xFFFFFC00, .NEON, {}} },
+	.ST3 = { {.ST3, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C004000, 0xFFFFFC00, .NEON, {}} },
+	.ST4 = { {.ST4, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4C000000, 0xFFFFFC00, .NEON, {}} },
+	.LD1R = { {.LD1R, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4D40C000, 0xFFFFFC00, .NEON, {}} },
+	.LD2R = { {.LD2R, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4D60C000, 0xFFFFFC00, .NEON, {}} },
+	.LD3R = { {.LD3R, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4D40E000, 0xFFFFFC00, .NEON, {}} },
+	.LD4R = { {.LD4R, {.V_16B, .MEM, .NONE, .NONE}, {.VD, .OFFSET_BASE_A, .NONE, .NONE}, 0x4D60E000, 0xFFFFFC00, .NEON, {}} },
+
 	// FP/SIMD scalar load/store via V regs (offset-form)
 	.LDR_V = {
 		{.LDR_V, {.B_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_U12, .NONE, .NONE}, 0x3D400000, 0xFFC00000, .FP, {}},
