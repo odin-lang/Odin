@@ -562,6 +562,20 @@ inst_cvt_l_s_f_f           :: #force_inline proc "contextless" (dst: FPR, src: F
 emit_cvt_l_s_f_f           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR) { append(instructions, inst_cvt_l_s_f_f(dst, src)) }
 inst_cvt_l_d_f_f           :: #force_inline proc "contextless" (dst: FPR, src: FPR) -> Instruction { return Instruction{mnemonic = .CVT_L_D, operand_count = 2, length = 4, ops = {op_fpr(dst), op_fpr(src), {}, {}}} }
 emit_cvt_l_d_f_f           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR) { append(instructions, inst_cvt_l_d_f_f(dst, src)) }
+inst_cvt_ps_s_f_f_f        :: #force_inline proc "contextless" (dst: FPR, src: FPR, src2: FPR) -> Instruction { return Instruction{mnemonic = .CVT_PS_S, operand_count = 3, length = 4, ops = {op_fpr(dst), op_fpr(src), op_fpr(src2), {}}} }
+emit_cvt_ps_s_f_f_f        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR, src2: FPR) { append(instructions, inst_cvt_ps_s_f_f_f(dst, src, src2)) }
+inst_cvt_s_pu_f_f          :: #force_inline proc "contextless" (dst: FPR, src: FPR) -> Instruction { return Instruction{mnemonic = .CVT_S_PU, operand_count = 2, length = 4, ops = {op_fpr(dst), op_fpr(src), {}, {}}} }
+emit_cvt_s_pu_f_f          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR) { append(instructions, inst_cvt_s_pu_f_f(dst, src)) }
+inst_cvt_s_pl_f_f          :: #force_inline proc "contextless" (dst: FPR, src: FPR) -> Instruction { return Instruction{mnemonic = .CVT_S_PL, operand_count = 2, length = 4, ops = {op_fpr(dst), op_fpr(src), {}, {}}} }
+emit_cvt_s_pl_f_f          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR) { append(instructions, inst_cvt_s_pl_f_f(dst, src)) }
+inst_pll_ps_f_f_f          :: #force_inline proc "contextless" (dst: FPR, src: FPR, src2: FPR) -> Instruction { return Instruction{mnemonic = .PLL_PS, operand_count = 3, length = 4, ops = {op_fpr(dst), op_fpr(src), op_fpr(src2), {}}} }
+emit_pll_ps_f_f_f          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR, src2: FPR) { append(instructions, inst_pll_ps_f_f_f(dst, src, src2)) }
+inst_plu_ps_f_f_f          :: #force_inline proc "contextless" (dst: FPR, src: FPR, src2: FPR) -> Instruction { return Instruction{mnemonic = .PLU_PS, operand_count = 3, length = 4, ops = {op_fpr(dst), op_fpr(src), op_fpr(src2), {}}} }
+emit_plu_ps_f_f_f          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR, src2: FPR) { append(instructions, inst_plu_ps_f_f_f(dst, src, src2)) }
+inst_pul_ps_f_f_f          :: #force_inline proc "contextless" (dst: FPR, src: FPR, src2: FPR) -> Instruction { return Instruction{mnemonic = .PUL_PS, operand_count = 3, length = 4, ops = {op_fpr(dst), op_fpr(src), op_fpr(src2), {}}} }
+emit_pul_ps_f_f_f          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR, src2: FPR) { append(instructions, inst_pul_ps_f_f_f(dst, src, src2)) }
+inst_puu_ps_f_f_f          :: #force_inline proc "contextless" (dst: FPR, src: FPR, src2: FPR) -> Instruction { return Instruction{mnemonic = .PUU_PS, operand_count = 3, length = 4, ops = {op_fpr(dst), op_fpr(src), op_fpr(src2), {}}} }
+emit_puu_ps_f_f_f          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR, src2: FPR) { append(instructions, inst_puu_ps_f_f_f(dst, src, src2)) }
 inst_round_w_s_f_f         :: #force_inline proc "contextless" (dst: FPR, src: FPR) -> Instruction { return Instruction{mnemonic = .ROUND_W_S, operand_count = 2, length = 4, ops = {op_fpr(dst), op_fpr(src), {}, {}}} }
 emit_round_w_s_f_f         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: FPR, src: FPR) { append(instructions, inst_round_w_s_f_f(dst, src)) }
 inst_round_w_d_f_f         :: #force_inline proc "contextless" (dst: FPR, src: FPR) -> Instruction { return Instruction{mnemonic = .ROUND_W_D, operand_count = 2, length = 4, ops = {op_fpr(dst), op_fpr(src), {}, {}}} }
@@ -1600,12 +1614,16 @@ inst_copy_u_b_r_w_i5       :: #force_inline proc "contextless" (dst: GPR, src: R
 emit_copy_u_b_r_w_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: Register, imm: i64) { append(instructions, inst_copy_u_b_r_w_i5(dst, src, imm)) }
 inst_copy_u_h_r_w_i5       :: #force_inline proc "contextless" (dst: GPR, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .COPY_U_H, operand_count = 3, length = 4, ops = {op_gpr(dst), op_reg(src), op_imm(imm, 1), {}}} }
 emit_copy_u_h_r_w_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: Register, imm: i64) { append(instructions, inst_copy_u_h_r_w_i5(dst, src, imm)) }
+inst_copy_u_w_r_w_i5       :: #force_inline proc "contextless" (dst: GPR, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .COPY_U_W, operand_count = 3, length = 4, ops = {op_gpr(dst), op_reg(src), op_imm(imm, 1), {}}} }
+emit_copy_u_w_r_w_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: Register, imm: i64) { append(instructions, inst_copy_u_w_r_w_i5(dst, src, imm)) }
 inst_insert_b_w_r_i5       :: #force_inline proc "contextless" (dst: Register, src: GPR, imm: i64) -> Instruction { return Instruction{mnemonic = .INSERT_B, operand_count = 3, length = 4, ops = {op_reg(dst), op_gpr(src), op_imm(imm, 1), {}}} }
 emit_insert_b_w_r_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: GPR, imm: i64) { append(instructions, inst_insert_b_w_r_i5(dst, src, imm)) }
 inst_insert_h_w_r_i5       :: #force_inline proc "contextless" (dst: Register, src: GPR, imm: i64) -> Instruction { return Instruction{mnemonic = .INSERT_H, operand_count = 3, length = 4, ops = {op_reg(dst), op_gpr(src), op_imm(imm, 1), {}}} }
 emit_insert_h_w_r_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: GPR, imm: i64) { append(instructions, inst_insert_h_w_r_i5(dst, src, imm)) }
 inst_insert_w_w_r_i5       :: #force_inline proc "contextless" (dst: Register, src: GPR, imm: i64) -> Instruction { return Instruction{mnemonic = .INSERT_W, operand_count = 3, length = 4, ops = {op_reg(dst), op_gpr(src), op_imm(imm, 1), {}}} }
 emit_insert_w_w_r_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: GPR, imm: i64) { append(instructions, inst_insert_w_w_r_i5(dst, src, imm)) }
+inst_insert_d_w_r_i5       :: #force_inline proc "contextless" (dst: Register, src: GPR, imm: i64) -> Instruction { return Instruction{mnemonic = .INSERT_D, operand_count = 3, length = 4, ops = {op_reg(dst), op_gpr(src), op_imm(imm, 1), {}}} }
+emit_insert_d_w_r_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: GPR, imm: i64) { append(instructions, inst_insert_d_w_r_i5(dst, src, imm)) }
 inst_insve_b_w_w_i5        :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .INSVE_B, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), {}}} }
 emit_insve_b_w_w_i5        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_insve_b_w_w_i5(dst, src, imm)) }
 inst_insve_h_w_w_i5        :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .INSVE_H, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), {}}} }
@@ -2543,6 +2561,20 @@ inst_cvt_l_s               :: inst_cvt_l_s_f_f
 emit_cvt_l_s               :: emit_cvt_l_s_f_f
 inst_cvt_l_d               :: inst_cvt_l_d_f_f
 emit_cvt_l_d               :: emit_cvt_l_d_f_f
+inst_cvt_ps_s              :: inst_cvt_ps_s_f_f_f
+emit_cvt_ps_s              :: emit_cvt_ps_s_f_f_f
+inst_cvt_s_pu              :: inst_cvt_s_pu_f_f
+emit_cvt_s_pu              :: emit_cvt_s_pu_f_f
+inst_cvt_s_pl              :: inst_cvt_s_pl_f_f
+emit_cvt_s_pl              :: emit_cvt_s_pl_f_f
+inst_pll_ps                :: inst_pll_ps_f_f_f
+emit_pll_ps                :: emit_pll_ps_f_f_f
+inst_plu_ps                :: inst_plu_ps_f_f_f
+emit_plu_ps                :: emit_plu_ps_f_f_f
+inst_pul_ps                :: inst_pul_ps_f_f_f
+emit_pul_ps                :: emit_pul_ps_f_f_f
+inst_puu_ps                :: inst_puu_ps_f_f_f
+emit_puu_ps                :: emit_puu_ps_f_f_f
 inst_round_w_s             :: inst_round_w_s_f_f
 emit_round_w_s             :: emit_round_w_s_f_f
 inst_round_w_d             :: inst_round_w_d_f_f
@@ -3581,12 +3613,16 @@ inst_copy_u_b              :: inst_copy_u_b_r_w_i5
 emit_copy_u_b              :: emit_copy_u_b_r_w_i5
 inst_copy_u_h              :: inst_copy_u_h_r_w_i5
 emit_copy_u_h              :: emit_copy_u_h_r_w_i5
+inst_copy_u_w              :: inst_copy_u_w_r_w_i5
+emit_copy_u_w              :: emit_copy_u_w_r_w_i5
 inst_insert_b              :: inst_insert_b_w_r_i5
 emit_insert_b              :: emit_insert_b_w_r_i5
 inst_insert_h              :: inst_insert_h_w_r_i5
 emit_insert_h              :: emit_insert_h_w_r_i5
 inst_insert_w              :: inst_insert_w_w_r_i5
 emit_insert_w              :: emit_insert_w_w_r_i5
+inst_insert_d              :: inst_insert_d_w_r_i5
+emit_insert_d              :: emit_insert_d_w_r_i5
 inst_insve_b               :: inst_insve_b_w_w_i5
 emit_insve_b               :: emit_insve_b_w_w_i5
 inst_insve_h               :: inst_insve_h_w_w_i5

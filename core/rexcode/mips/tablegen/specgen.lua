@@ -17,13 +17,16 @@ local LLVM = "llvm-mc --assemble --triple=mips --mattr=+msa,+dsp,+dspr2,+mips32r
 local DIR   = (arg[0]:match("^(.*)/[^/]*$")) or "."
 local TABLE = DIR .. "/encoding_table.odin"
 
-local function word(line)
-	local p = io.popen(string.format("printf '%%s\\n' '%s' | %s 2>/dev/null", line, LLVM))
+local function word(line, cmd)
+	local p = io.popen(string.format("printf '%%s\\n' '%s' | %s 2>/dev/null", line, cmd or LLVM))
 	local out = p:read("*a"); p:close()
 	local b1,b2,b3,b4 = out:match("0x(%x%x),0x(%x%x),0x(%x%x),0x(%x%x)")
 	if not b1 then return nil end
 	return tonumber(b1..b2..b3..b4, 16)   -- big-endian: first byte is MSB
 end
+-- Paired-single / mips64 forms need a 64-bit-capable assembler invocation.
+local LLVM_PS  = "llvm-mc --assemble --triple=mips64 -mcpu=mips64r2 --show-encoding"
+local LLVM_64  = "llvm-mc --assemble --triple=mips64 --mattr=+msa,+mips64r6 --show-encoding"
 local function mask_of(base, variants)
 	local x = 0
 	for _, w in ipairs(variants) do x = bit.bor(x, bit.bxor(base, w)) end
@@ -35,14 +38,14 @@ local sections, skips, n_forms = {}, {}, 0
 -- Emit one mnemonic's single-form entry from an asm builder + per-field maxes.
 -- ops/enc are the prebuilt "{.A,.B,.C,.NONE}" text. asm(vals) returns the asm
 -- (vals[i] = register number for field i); maxes[i] = max register for field i.
-local function entry(mnem, ops, enc, feat, asm, maxes)
+local function entry(mnem, ops, enc, feat, asm, maxes, cmd)
 	local zero = {}; for i=1,#maxes do zero[i]=0 end
-	local b0 = word(asm(zero))
+	local b0 = word(asm(zero), cmd)
 	if not b0 then skips[#skips+1]=mnem; return nil end
 	local vs = {}
 	for i=1,#maxes do
 		local v={}; for j=1,#maxes do v[j]=0 end; v[i]=maxes[i]
-		local w=word(asm(v)); if not w then skips[#skips+1]=mnem; return nil end; vs[#vs+1]=w
+		local w=word(asm(v), cmd); if not w then skips[#skips+1]=mnem; return nil end; vs[#vs+1]=w
 	end
 	n_forms = n_forms + 1
 	return string.format("    .%s = { {.%s, %s, %s, 0x%s, 0x%s, .%s, {}} },",
@@ -291,6 +294,33 @@ do
 	-- SHILO immediate is signed 6-bit; vary to -1 so all six field bits toggle.
 	r = entry("SHILO", "{.IMM5,.IMM5,.NONE,.NONE}", "{.AC_NUM,.SHILO_IMM,.NONE,.NONE}", "DSP_R2",
 		function(v) return string.format("shilo $ac%d,%d", v[1], v[2]) end, {3,-1})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- Paired-single FP (needs a 64-bit FPU; assembled via mips64r2) ---------
+do
+	local r = entry("CVT_PS_S", "{.FPR_PS,.FPR_S,.FPR_S,.NONE}", "{.FD,.FS,.FT,.NONE}", "FPU",
+		function(v) return string.format("cvt.ps.s $f%d,$f%d,$f%d", v[1], v[2], v[3]) end, {31,31,31}, LLVM_PS)
+	if r then sections[#sections+1]=r end
+	for _, b in ipairs({{"CVT_S_PL","cvt.s.pl"},{"CVT_S_PU","cvt.s.pu"}}) do
+		r = entry(b[1], "{.FPR_S,.FPR_PS,.NONE,.NONE}", "{.FD,.FS,.NONE,.NONE}", "FPU",
+			function(v) return string.format("%s $f%d,$f%d", b[2], v[1], v[2]) end, {31,31}, LLVM_PS)
+		if r then sections[#sections+1]=r end
+	end
+	for _, b in ipairs({{"PLL_PS","pll.ps"},{"PLU_PS","plu.ps"},{"PUL_PS","pul.ps"},{"PUU_PS","puu.ps"}}) do
+		r = entry(b[1], "{.FPR_PS,.FPR_PS,.FPR_PS,.NONE}", "{.FD,.FS,.FT,.NONE}", "FPU",
+			function(v) return string.format("%s $f%d,$f%d,$f%d", b[2], v[1], v[2], v[3]) end, {31,31,31}, LLVM_PS)
+		if r then sections[#sections+1]=r end
+	end
+end
+
+-- ---- mips64-only MSA element ops (assembled via the mips64 triple) ----------
+do
+	local r = entry("INSERT_D", "{.MSA_VEC,.GPR,.IMM5,.NONE}", "{.WD,.GPR_AT_11,.MSA_ELM_IDX,.NONE}", "MSA",
+		function(v) return string.format("insert.d $w%d[%d],$%d", v[1], v[3], v[2]) end, {31,31,1}, LLVM_64)
+	if r then sections[#sections+1]=r end
+	r = entry("COPY_U_W", "{.GPR,.MSA_VEC,.IMM5,.NONE}", "{.GPR_AT_6,.WS,.MSA_ELM_IDX,.NONE}", "MSA",
+		function(v) return string.format("copy_u.w $%d,$w%d[%d]", v[1], v[2], v[3]) end, {31,31,3}, LLVM_64)
 	if r then sections[#sections+1]=r end
 end
 
