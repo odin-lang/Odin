@@ -590,6 +590,16 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .DIVU1  = { {.DIVU1,  {.GPR,.GPR,.NONE,.NONE},  {.RS,.RT,.NONE,.NONE}, 0x7000001B, 0xFC00FFFF, .MMI_PS2, {writes_hilo=true}} },
     .MADD1  = { {.MADD1,  {.GPR,.GPR,.NONE,.NONE},  {.RS,.RT,.NONE,.NONE}, 0x70000020, 0xFC00FFFF, .MMI_PS2, {writes_hilo=true}} },
     .MADDU1 = { {.MADDU1, {.GPR,.GPR,.NONE,.NONE},  {.RS,.RT,.NONE,.NONE}, 0x70000021, 0xFC00FFFF, .MMI_PS2, {writes_hilo=true}} },
+    // Second-MAC subtract forms: same SPECIAL2 func + 0x20 as MADD1/MADDU1.
+    .MSUB1  = { {.MSUB1,  {.GPR,.GPR,.NONE,.NONE},  {.RS,.RT,.NONE,.NONE}, 0x70000024, 0xFC00FFFF, .MMI_PS2, {writes_hilo=true}} },
+    .MSUBU1 = { {.MSUBU1, {.GPR,.GPR,.NONE,.NONE},  {.RS,.RT,.NONE,.NONE}, 0x70000025, 0xFC00FFFF, .MMI_PS2, {writes_hilo=true}} },
+    // R5900 three-operand multiply-accumulate (writes Rd as well as HI/LO).
+    // Same SPECIAL2 funcs as the MIPS32 two-operand MADD/MADDU/MSUB/MSUBU; the
+    // Rd != 0 form is selected by the less-specific mask after those match.
+    .MADD_EE  = { {.MADD_EE,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000000, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
+    .MADDU_EE = { {.MADDU_EE, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000001, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
+    .MSUB_EE  = { {.MSUB_EE,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000004, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
+    .MSUBU_EE = { {.MSUBU_EE, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000005, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
 
     // Pack/unpack HI:LO (PMFHL with 5-bit sub-op in sa slot).
     .PMFHL_LW  = { {.PMFHL_LW,  {.GPR,.NONE,.NONE,.NONE}, {.RD,.NONE,.NONE,.NONE}, 0x70000030, 0xFFFF07FF, .MMI_PS2, {}} },
@@ -1483,6 +1493,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .MOVZ_PS  = { {.MOVZ_PS,  {.FPR_PS,.FPR_PS,.GPR,.NONE}, {.FD,.FS,.RT,.NONE}, 0x46C00012, 0xFFE0003F, .FPU, {}} },
     .MOVF_PS  = { {.MOVF_PS,  {.FPR_PS,.FPR_PS,.FCC,.NONE}, {.FD,.FS,.FCC_BC,.NONE}, 0x46C00011, 0xFFE3003F, .FPU, {}} },
     .MOVT_PS  = { {.MOVT_PS,  {.FPR_PS,.FPR_PS,.FCC,.NONE}, {.FD,.FS,.FCC_BC,.NONE}, 0x46C10011, 0xFFE3003F, .FPU, {}} },
+
+    // COP0 shadow-GPR move (MIPS32r2). llvm-mc gates these behind a feature it
+    // does not expose, so they are hand-encoded from the manual: COP0 (0x10),
+    // sub-opcode 0x0A (RDPGPR) / 0x0E (WRPGPR) at 25:21, rt at 20:16, rd at
+    // 15:11. Decode-clean.
+    .RDPGPR = { {.RDPGPR, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RT,.NONE,.NONE}, 0x41400000, 0xFFE007FF, .MIPS32_R2, {}} },
+    .WRPGPR = { {.WRPGPR, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RT,.NONE,.NONE}, 0x41C00000, 0xFFE007FF, .MIPS32_R2, {}} },
 
     // SPECGEN:BEGIN
     .FADD_W = { {.FADD_W, {.MSA_VEC,.MSA_VEC,.MSA_VEC,.NONE}, {.WD,.WS,.WT,.NONE}, 0x7800001B, 0xFFE0003F, .MSA, {}} },

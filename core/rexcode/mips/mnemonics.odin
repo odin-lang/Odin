@@ -401,7 +401,6 @@ Mnemonic :: enum u16 {
 
 	// DSP control / branch
 	BPOSGE32,                  // branch if DSPControl.pos >= 32
-	BPOSGE64,                  // 64-bit variant (only MIPS64 DSP)
 	INSV,                      // insert variable position
 	BITREV,                    // R2 bit reversal
 	ABSQ_S_PH, ABSQ_S_W,
