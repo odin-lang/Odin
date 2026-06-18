@@ -3688,6 +3688,14 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMOV_LANE, {.DPR_ELEM, .GPR, .NONE, .NONE}, {.VMOV_LANE_32, .RT_A32, .NONE, .NONE}, 0x0E000B10, 0x0FD00F7F, .VFPV2, .A32, {}},
 	},
 
+	// MVE (M-profile vector) multiply-subtract-across-vector reduce, halving
+	// complex add (saturating), and complex multiply-accumulate. T32; the
+	// complex ops carry a rotation immediate (degrees).
+	// One form per mnemonic with the element-size bits left variable in the
+	// mask (the MVE convention); the complex ops encode the rotation immediate.
+	.VHCADD_SAT = { {.VHCADD_SAT, {.QPR, .QPR, .QPR, .IMM},  {.VD_Q, .VN_Q, .VM_Q, .MVE_ROT_HCADD},   0xEE000F00, 0xFFE10FF1, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}} },
+	.VCMLA_MVE  = { {.VCMLA_MVE,  {.QPR, .QPR, .QPR, .IMM},  {.VD_Q, .VN_Q, .VM_Q, .MVE_ROT_CMLA},    0xFC200840, 0xFE611FF1, .MVE_FP,  .T32, {thumb32=true, cond_in_28=false}} },
+
 	// SPECGEN:BEGIN
 	.VADDL = {
 		{.VADDL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2800000, 0xFFB01F50, .NEON, .A32, {cond_in_28=false}},

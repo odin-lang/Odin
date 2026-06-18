@@ -312,6 +312,10 @@ Operand_Encoding :: enum u8 {
 	VMOV_LANE_8,
 	VMOV_LANE_16,
 	VMOV_LANE_32,
+	// MVE complex-op rotation immediate (user passes degrees):
+	//   MVE_ROT_HCADD: #90/#270 -> bit 12;  MVE_ROT_CMLA: #0/90/180/270 -> bits 24:23
+	MVE_ROT_HCADD,
+	MVE_ROT_CMLA,
 	VFP_IMM8,              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)

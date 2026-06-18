@@ -352,6 +352,10 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 			lane = (word >> 21) & 1
 		}
 		return op_dpr_lane(Register(REG_DPR | u16(n)), u8(lane))
+	case .MVE_ROT_HCADD:
+		return op_imm(((word >> 12) & 1) == 1 ? 270 : 90)
+	case .MVE_ROT_CMLA:
+		return op_imm(i64((word >> 23) & 0x3) * 90)
 	case .VD_Q:
 		n := (((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)) >> 1
 		return op_reg(Register(REG_QPR | u16(n)))

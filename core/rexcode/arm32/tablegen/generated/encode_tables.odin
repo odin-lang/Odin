@@ -8,7 +8,7 @@ package rexcode_arm32_generated
 import lib "../.."
 
 @(rodata)
-ENCODE_FORMS := [1671]lib.Encoding{
+ENCODE_FORMS := [1673]lib.Encoding{
 	// .AND
 	{ .AND, {.GPR,.GPR,.IMM_MOD,.NONE}, {.RD,.RN_A32,.A32_IMM_MOD,.NONE}, 0x02000000, 0x0FE00000, .BASE, .A32, {} },
 	{ .AND, {.GPR,.GPR,.GPR_SHIFTED,.NONE}, {.RD,.RN_A32,.RM_A32,.NONE}, 0x00000000, 0x0FE00010, .BASE, .A32, {} },
@@ -2262,6 +2262,10 @@ ENCODE_FORMS := [1671]lib.Encoding{
 	{ .VQRDMLSDH, {.QPR,.QPR,.QPR,.NONE}, {.VD_Q,.VN_Q,.VM_Q,.NONE}, 0xFE000E01, 0xFF811F51, .MVE_INT, .T32, {thumb32=true} },
 	// .VQRDMLSDHX
 	{ .VQRDMLSDHX, {.QPR,.QPR,.QPR,.NONE}, {.VD_Q,.VN_Q,.VM_Q,.NONE}, 0xFE001E01, 0xFF811F51, .MVE_INT, .T32, {thumb32=true} },
+	// .VHCADD_SAT
+	{ .VHCADD_SAT, {.QPR,.QPR,.QPR,.IMM}, {.VD_Q,.VN_Q,.VM_Q,.MVE_ROT_HCADD}, 0xEE000F00, 0xFFE10FF1, .MVE_INT, .T32, {thumb32=true} },
+	// .VCMLA_MVE
+	{ .VCMLA_MVE, {.QPR,.QPR,.QPR,.IMM}, {.VD_Q,.VN_Q,.VM_Q,.MVE_ROT_CMLA}, 0xFC200840, 0xFE611FF1, .MVE_FP, .T32, {thumb32=true} },
 	// .VLDRB
 	{ .VLDRB, {.QPR,.MEM,.NONE,.NONE}, {.VD_Q,.MEM_IMM12_OFFSET,.NONE,.NONE}, 0xED901E00, 0xFFB01F00, .MVE_INT, .T32, {thumb32=true} },
 	// .VLDRH
@@ -2918,27 +2922,27 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.VQRDMLSDH     = { 1649,   1},
 	.VQRDMLSDHX    = { 1650,   1},
 	.VPRINT        = { 1651,   0},
-	.VHCADD_SAT    = { 1651,   0},
-	.VCMLA_MVE     = { 1651,   0},
-	.VLDRB         = { 1651,   1},
-	.VLDRH         = { 1652,   1},
-	.VLDRW         = { 1653,   1},
-	.VLDRD         = { 1654,   1},
-	.VSTRB         = { 1655,   1},
-	.VSTRH         = { 1656,   1},
-	.VSTRW         = { 1657,   1},
-	.VSTRD         = { 1658,   1},
-	.VLD20         = { 1659,   1},
-	.VLD21         = { 1660,   1},
-	.VLD40         = { 1661,   1},
-	.VLD41         = { 1662,   1},
-	.VLD42         = { 1663,   1},
-	.VLD43         = { 1664,   1},
-	.VST20         = { 1665,   1},
-	.VST21         = { 1666,   1},
-	.VST40         = { 1667,   1},
-	.VST41         = { 1668,   1},
-	.VST42         = { 1669,   1},
-	.VST43         = { 1670,   1},
-	._COUNT        = { 1671,   0},
+	.VHCADD_SAT    = { 1651,   1},
+	.VCMLA_MVE     = { 1652,   1},
+	.VLDRB         = { 1653,   1},
+	.VLDRH         = { 1654,   1},
+	.VLDRW         = { 1655,   1},
+	.VLDRD         = { 1656,   1},
+	.VSTRB         = { 1657,   1},
+	.VSTRH         = { 1658,   1},
+	.VSTRW         = { 1659,   1},
+	.VSTRD         = { 1660,   1},
+	.VLD20         = { 1661,   1},
+	.VLD21         = { 1662,   1},
+	.VLD40         = { 1663,   1},
+	.VLD41         = { 1664,   1},
+	.VLD42         = { 1665,   1},
+	.VLD43         = { 1666,   1},
+	.VST20         = { 1667,   1},
+	.VST21         = { 1668,   1},
+	.VST40         = { 1669,   1},
+	.VST41         = { 1670,   1},
+	.VST42         = { 1671,   1},
+	.VST43         = { 1672,   1},
+	._COUNT        = { 1673,   0},
 }
