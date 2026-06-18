@@ -173,6 +173,25 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .BNEL    = { {.BNEL,    {.GPR,.GPR,.REL16,.NONE},  {.RS,.RT,.BRANCH_16,.NONE},   0x54000000, 0xFC000000, .MIPS_II, {delay_slot=true, likely=true}} },
     .BLEZL   = { {.BLEZL,   {.GPR,.REL16,.NONE,.NONE}, {.RS,.BRANCH_16,.NONE,.NONE}, 0x58000000, 0xFC1F0000, .MIPS_II, {delay_slot=true, likely=true}} },
     .BGTZL   = { {.BGTZL,   {.GPR,.REL16,.NONE,.NONE}, {.RS,.BRANCH_16,.NONE,.NONE}, 0x5C000000, 0xFC1F0000, .MIPS_II, {delay_slot=true, likely=true}} },
+
+    // R6 two-register compact branches (no delay slot). Unique major opcodes
+    // for the EQ/NE/ordered-unsigned forms; the signed BGEC/BLTC share POP26/
+    // POP27 (opcodes 22/23) with the one-register compacts below and with the
+    // pre-R6 BLEZL/BGTZL -- the mask sort tries the more-specific rt=0 (BLEZL)
+    // and rs=0 (BLEZC) forms first, and decode_one_inline re-disambiguates the
+    // POP26/POP27 group by the rs/rt relationship.
+    .BEQC    = { {.BEQC,    {.GPR,.GPR,.REL16,.NONE}, {.RS,.RT,.BRANCH_16,.NONE}, 0x20000000, 0xFC000000, .MIPS32_R6, {}} },
+    .BNEC    = { {.BNEC,    {.GPR,.GPR,.REL16,.NONE}, {.RS,.RT,.BRANCH_16,.NONE}, 0x60000000, 0xFC000000, .MIPS32_R6, {}} },
+    .BGEUC   = { {.BGEUC,   {.GPR,.GPR,.REL16,.NONE}, {.RS,.RT,.BRANCH_16,.NONE}, 0x18000000, 0xFC000000, .MIPS32_R6, {}} },
+    .BLTUC   = { {.BLTUC,   {.GPR,.GPR,.REL16,.NONE}, {.RS,.RT,.BRANCH_16,.NONE}, 0x1C000000, 0xFC000000, .MIPS32_R6, {}} },
+    .BGEC    = { {.BGEC,    {.GPR,.GPR,.REL16,.NONE}, {.RS,.RT,.BRANCH_16,.NONE}, 0x58000000, 0xFC000000, .MIPS32_R6, {}} },
+    .BLTC    = { {.BLTC,    {.GPR,.GPR,.REL16,.NONE}, {.RS,.RT,.BRANCH_16,.NONE}, 0x5C000000, 0xFC000000, .MIPS32_R6, {}} },
+    // One-register compacts: BLEZC/BGTZC set rs=0 (specific mask); BGEZC/BLTZC
+    // set rs=rt (encoded via RS_RT, general mask -- decode hook recovers them).
+    .BLEZC   = { {.BLEZC,   {.GPR,.REL16,.NONE,.NONE}, {.RT,.BRANCH_16,.NONE,.NONE}, 0x58000000, 0xFFE00000, .MIPS32_R6, {}} },
+    .BGTZC   = { {.BGTZC,   {.GPR,.REL16,.NONE,.NONE}, {.RT,.BRANCH_16,.NONE,.NONE}, 0x5C000000, 0xFFE00000, .MIPS32_R6, {}} },
+    .BGEZC   = { {.BGEZC,   {.GPR,.REL16,.NONE,.NONE}, {.RS_RT,.BRANCH_16,.NONE,.NONE}, 0x58000000, 0xFC000000, .MIPS32_R6, {}} },
+    .BLTZC   = { {.BLTZC,   {.GPR,.REL16,.NONE,.NONE}, {.RS_RT,.BRANCH_16,.NONE,.NONE}, 0x5C000000, 0xFC000000, .MIPS32_R6, {}} },
     .BLTZL   = { {.BLTZL,   {.GPR,.REL16,.NONE,.NONE}, {.RS,.BRANCH_16,.NONE,.NONE}, 0x04020000, 0xFC1F0000, .MIPS_II, {delay_slot=true, likely=true}} },
     .BGEZL   = { {.BGEZL,   {.GPR,.REL16,.NONE,.NONE}, {.RS,.BRANCH_16,.NONE,.NONE}, 0x04030000, 0xFC1F0000, .MIPS_II, {delay_slot=true, likely=true}} },
     .BLTZALL = { {.BLTZALL, {.GPR,.REL16,.NONE,.NONE}, {.RS,.BRANCH_16,.NONE,.NONE}, 0x04120000, 0xFC1F0000, .MIPS_II, {delay_slot=true, likely=true}} },

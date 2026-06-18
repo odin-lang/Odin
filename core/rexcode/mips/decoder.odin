@@ -147,6 +147,19 @@ decode_one_inline :: #force_inline proc "contextless" (
 	inst.length   = 4
 	inst.flags    = {}
 
+	// R6 POP26/POP27 compact branches share opcodes 22/23 and are distinguished
+	// only by the rs/rt relationship. The more-specific pre-R6 (rt=0) and the
+	// rs=0 forms already matched earlier; here we refine the remaining group so
+	// rs==rt decodes as BGEZC/BLTZC rather than the general BGEC/BLTC.
+	#partial switch inst.mnemonic {
+	case .BGEC, .BLEZC, .BGEZC:
+		rs := (word >> 21) & 0x1F; rt := (word >> 16) & 0x1F
+		inst.mnemonic = rs == 0 ? .BLEZC : (rs == rt ? .BGEZC : .BGEC)
+	case .BLTC, .BGTZC, .BLTZC:
+		rs := (word >> 21) & 0x1F; rt := (word >> 16) & 0x1F
+		inst.mnemonic = rs == 0 ? .BGTZC : (rs == rt ? .BLTZC : .BLTC)
+	}
+
 	cnt_used: u8 = 0
 	if entry.ops[0] != .NONE {
 		inst.ops[0] = extract_operand_inline(word, pc, entry.ops[0], entry.enc[0])

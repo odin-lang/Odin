@@ -346,6 +346,26 @@ inst_bc_rel26              :: #force_inline proc "contextless" (target: u32) -> 
 emit_bc_rel26              :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_bc_rel26(target)) }
 inst_balc_rel26            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .BALC, operand_count = 1, length = 4, ops = {op_label(target), {}, {}, {}}} }
 emit_balc_rel26            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_balc_rel26(target)) }
+inst_beqc_r_r_rel          :: #force_inline proc "contextless" (dst: GPR, src: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BEQC, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_label(target), {}}} }
+emit_beqc_r_r_rel          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, target: u32) { append(instructions, inst_beqc_r_r_rel(dst, src, target)) }
+inst_bnec_r_r_rel          :: #force_inline proc "contextless" (dst: GPR, src: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BNEC, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_label(target), {}}} }
+emit_bnec_r_r_rel          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, target: u32) { append(instructions, inst_bnec_r_r_rel(dst, src, target)) }
+inst_bltc_r_r_rel          :: #force_inline proc "contextless" (dst: GPR, src: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BLTC, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_label(target), {}}} }
+emit_bltc_r_r_rel          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, target: u32) { append(instructions, inst_bltc_r_r_rel(dst, src, target)) }
+inst_bgec_r_r_rel          :: #force_inline proc "contextless" (dst: GPR, src: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BGEC, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_label(target), {}}} }
+emit_bgec_r_r_rel          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, target: u32) { append(instructions, inst_bgec_r_r_rel(dst, src, target)) }
+inst_bltuc_r_r_rel         :: #force_inline proc "contextless" (dst: GPR, src: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BLTUC, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_label(target), {}}} }
+emit_bltuc_r_r_rel         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, target: u32) { append(instructions, inst_bltuc_r_r_rel(dst, src, target)) }
+inst_bgeuc_r_r_rel         :: #force_inline proc "contextless" (dst: GPR, src: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BGEUC, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_label(target), {}}} }
+emit_bgeuc_r_r_rel         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, target: u32) { append(instructions, inst_bgeuc_r_r_rel(dst, src, target)) }
+inst_blezc_r_rel           :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BLEZC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_blezc_r_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_blezc_r_rel(dst, target)) }
+inst_bgezc_r_rel           :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BGEZC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_bgezc_r_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_bgezc_r_rel(dst, target)) }
+inst_bgtzc_r_rel           :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BGTZC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_bgtzc_r_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_bgtzc_r_rel(dst, target)) }
+inst_bltzc_r_rel           :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BLTZC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_bltzc_r_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_bltzc_r_rel(dst, target)) }
 inst_beqzc_r_rel21         :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BEQZC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
 emit_beqzc_r_rel21         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_beqzc_r_rel21(dst, target)) }
 inst_bnezc_r_rel21         :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .BNEZC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
@@ -2367,6 +2387,26 @@ inst_bc                    :: inst_bc_rel26
 emit_bc                    :: emit_bc_rel26
 inst_balc                  :: inst_balc_rel26
 emit_balc                  :: emit_balc_rel26
+inst_beqc                  :: inst_beqc_r_r_rel
+emit_beqc                  :: emit_beqc_r_r_rel
+inst_bnec                  :: inst_bnec_r_r_rel
+emit_bnec                  :: emit_bnec_r_r_rel
+inst_bltc                  :: inst_bltc_r_r_rel
+emit_bltc                  :: emit_bltc_r_r_rel
+inst_bgec                  :: inst_bgec_r_r_rel
+emit_bgec                  :: emit_bgec_r_r_rel
+inst_bltuc                 :: inst_bltuc_r_r_rel
+emit_bltuc                 :: emit_bltuc_r_r_rel
+inst_bgeuc                 :: inst_bgeuc_r_r_rel
+emit_bgeuc                 :: emit_bgeuc_r_r_rel
+inst_blezc                 :: inst_blezc_r_rel
+emit_blezc                 :: emit_blezc_r_rel
+inst_bgezc                 :: inst_bgezc_r_rel
+emit_bgezc                 :: emit_bgezc_r_rel
+inst_bgtzc                 :: inst_bgtzc_r_rel
+emit_bgtzc                 :: emit_bgtzc_r_rel
+inst_bltzc                 :: inst_bltzc_r_rel
+emit_bltzc                 :: emit_bltzc_r_rel
 inst_beqzc                 :: inst_beqzc_r_rel21
 emit_beqzc                 :: emit_beqzc_r_rel21
 inst_bnezc                 :: inst_bnezc_r_rel21
