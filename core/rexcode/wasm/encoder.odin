@@ -38,7 +38,6 @@ encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int 
 
 encode :: proc(
 	instructions: []Instruction,
-	label_defs:   []Label_Definition,
 	code:         []u8,
 	relocs:       ^[dynamic]Relocation,
 	errors:       ^[dynamic]Error,
