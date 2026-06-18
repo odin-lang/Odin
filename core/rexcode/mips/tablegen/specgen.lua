@@ -219,6 +219,52 @@ for _, b in ipairs({{"FCVT_D_W","cvt.d.w","FPR_D","FPR_W"},{"FCVT_S_D","cvt.s.d"
 	if r then sections[#sections+1]=r end
 end
 
+-- ---- DSP ASE two-register (Rd, Rt) ----------------------------------------
+for _, b in ipairs({
+	{"PRECEQU_PH_QBLA","precequ.ph.qbla"},{"PRECEQU_PH_QBRA","precequ.ph.qbra"},
+	{"PRECEU_PH_QBLA","preceu.ph.qbla"},{"PRECEU_PH_QBRA","preceu.ph.qbra"},
+	{"REPLV_PH","replv.ph"},{"REPLV_QB","replv.qb"},
+}) do
+	local r = entry(b[1], "{.GPR,.GPR,.NONE,.NONE}", "{.RD,.RT,.NONE,.NONE}", "DSP_R2",
+		function(v) return string.format("%s $%d,$%d", b[2], v[1], v[2]) end, {31,31})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- FPU fused multiply-add (COP1X 4-register: fd, fr, fs, ft) -------------
+for _, b in ipairs({{"MADD","madd"},{"MSUB","msub"},{"NMADD","nmadd"},{"NMSUB","nmsub"}}) do
+	for _, f in ipairs({{"S","s","FPR_S"},{"D","d","FPR_D"}}) do
+		local r = entry(b[1].."_"..f[1], "{."..f[3]..",."..f[3]..",."..f[3]..",."..f[3].."}", "{.FD,.FR,.FS,.FT}", "FPU",
+			function(v) return string.format("%s.%s $f%d,$f%d,$f%d,$f%d", b[2], f[2], v[1], v[2], v[3], v[4]) end, {31,31,31,31})
+		if r then sections[#sections+1]=r end
+	end
+end
+
+-- ---- MSA COPY (vector lane -> GPR) and INSERT (GPR -> vector lane) ----------
+for _, b in ipairs({{"COPY_S","copy_s"},{"COPY_U","copy_u"}}) do
+	for _, d in ipairs({{"B","b",15},{"H","h",7},{"W","w",3}}) do
+		local r = entry(b[1].."_"..d[1], "{.GPR,.MSA_VEC,.IMM5,.NONE}", "{.GPR_AT_6,.WS,.MSA_ELM_IDX,.NONE}", "MSA",
+			function(v) return string.format("%s.%s $%d,$w%d[%d]", b[2], d[2], v[1], v[2], v[3]) end, {31,31,d[3]})
+		if r then sections[#sections+1]=r end
+	end
+end
+for _, d in ipairs({{"B","b",15},{"H","h",7},{"W","w",3}}) do
+	local r = entry("INSERT_"..d[1], "{.MSA_VEC,.GPR,.IMM5,.NONE}", "{.WD,.GPR_AT_11,.MSA_ELM_IDX,.NONE}", "MSA",
+		function(v) return string.format("insert.%s $w%d[%d],$%d", d[2], v[1], v[3], v[2]) end, {31,31,d[3]})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- Misc control: DI/EI (rt), RDHWR (rt, rd) ------------------------------
+for _, b in ipairs({{"DI","di"},{"EI","ei"}}) do
+	local r = entry(b[1], "{.GPR,.NONE,.NONE,.NONE}", "{.RT,.NONE,.NONE,.NONE}", "MIPS32_R2",
+		function(v) return string.format("%s $%d", b[2], v[1]) end, {31})
+	if r then sections[#sections+1]=r end
+end
+do
+	local r = entry("RDHWR", "{.GPR,.GPR,.NONE,.NONE}", "{.RT,.RD,.NONE,.NONE}", "MIPS32_R2",
+		function(v) return string.format("rdhwr $%d,$%d", v[1], v[2]) end, {31,31})
+	if r then sections[#sections+1]=r end
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "    // SPECGEN:BEGIN\n" .. table.concat(sections, "\n") .. "\n    // SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()

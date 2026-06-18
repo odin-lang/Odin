@@ -237,6 +237,9 @@ Operand_Encoding :: enum u8 {
 	MSA_BIT_SHIFT, // BIT-format shift amount (.B m=0x70|sh, .H 0x60|sh, .W 0x40|sh, .D sh)
 	MSA_ELM_IDX,   // ELM-format element index (.B n, .H 0x20|n, .W 0x30|n, .D 0x38|n)
 	MSA_I8,        // 8-bit immediate at bits 23:16 (I8 forms: ANDI.B/SHF/...)
+	FR,            // FP register at bits 25:21 (COP1X 4-register FMA: fr)
+	GPR_AT_6,      // GPR at bits 10:6 (MSA COPY destination)
+	GPR_AT_11,     // GPR at bits 15:11 (MSA INSERT source)
 
 	// MSA memory operand: base GPR at bits 15:11 + signed 10-bit disp at 25:16,
 	// scaled by element size (1/2/4/8 for B/H/W/D).

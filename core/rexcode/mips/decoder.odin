@@ -200,6 +200,12 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return reg_operand(decode_reg(word, 11, ot), ot)
 	case .FD:
 		return reg_operand(decode_reg(word, 6, ot), ot)
+	case .FR:
+		return reg_operand(decode_reg(word, 21, ot), ot)
+	case .GPR_AT_6:
+		return reg_operand(decode_reg(word, 6, ot), ot)
+	case .GPR_AT_11:
+		return reg_operand(decode_reg(word, 11, ot), ot)
 
 	// Immediates ------------------------------------------------------------
 	case .IMM_16:
