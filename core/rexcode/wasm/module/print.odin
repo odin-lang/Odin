@@ -30,9 +30,21 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 	}
 
 
-	strings.write_string(sb, "WebAssembly Module, Version: ")
+	strings.write_string(sb, "module\n")
+	strings.write_string(sb, "  version: ")
 	strings.write_u64(sb, u64(m.version))
 	strings.write_byte(sb, '\n')
+	for c in m.customs {
+		#partial switch v in c.variant {
+		case Custom_Section_Name:
+			if v.module_name != "" {
+				strings.write_string(sb, "  file: ")
+				strings.write_quoted_string(sb, v.module_name)
+				strings.write_byte(sb, '\n')
+			}
+		}
+	}
+
 
 	label_names: map[u32]string
 	defer delete(label_names)
@@ -138,6 +150,10 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 					fmt.sbprintf(sb, "    %q\n", r.data[r.off:][:size])
 				case 1:  // []byte
 					fmt.sbprintf(sb, "    %q\n", r.data[r.off:])
+				case 48:
+					// fmt.sbprintf(sb, "    %q\n", r.data[r.off:])
+				case 49:
+					// fmt.sbprintf(sb, "    %q\n", r.data[r.off:])
 				}
 			}
 		case .MEMORY:
@@ -145,43 +161,53 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 			count := rd_u32(&r) or_break section_printing
 			assert(count == sec.count)
 			for i in 0..<sec.count {
-				fmt.sbprintf(sb, "  [%d]\n", i)
+				fmt.sbprintf(sb, "  [%d] ", i)
 				min, max := rd_limits(&r) or_break section_printing
 				if max == nil {
-					fmt.sbprintf(sb, "    limits: %v..inf\n", min)
+					fmt.sbprintf(sb, "limits: %v..inf\n", min)
 				} else {
-					fmt.sbprintf(sb, "    limits: %v..%v\n", min, max)
+					fmt.sbprintf(sb, "limits: %v..%v\n", min, max)
 				}
 			}
 		}
 	}
 
+	strings.write_string(sb, "\n")
+
 	if len(m.imports) > 0 {
-		strings.write_string(sb, "\n.import\n")
-		for imp, i in m.imports {
-			fmt.sbprintf(sb, "  [%d] %s %q %q idx:%d\n", i, external_kind_string[imp.kind], imp.module_name, imp.field_name, imp.index)
+		strings.write_string(sb, ".import\n")
+		for imp in m.imports {
+			f := &m.functions[imp.index]
+			fmt.sbprintf(sb, "  %s %q %q", external_kind_string[imp.kind], imp.module_name, imp.field_name)
+			write_func_type(sb, f.type)
+			strings.write_string(sb, "\n")
 		}
+		strings.write_string(sb, "\n")
 	}
 
 	if len(m.exports) > 0 {
-		strings.write_string(sb, "\n.export\n")
-		for e, i in m.exports {
-			fmt.sbprintf(sb, "  [%d] %s %q idx:%d\n", i, external_kind_string[e.kind], e.name, e.index)
+		strings.write_string(sb, ".export\n")
+		for e in m.exports {
+			f := &m.functions[e.index]
+			fmt.sbprintf(sb, "  %s %q", external_kind_string[e.kind], e.name)
+			write_func_type(sb, f.type)
+			strings.write_string(sb, "\n")
 		}
+		strings.write_string(sb, "\n")
 	}
 
-	if len(m.types) > 0 {
-		strings.write_string(sb, "\n.")
-		strings.write_string(sb, section_name(.TYPE))
-		strings.write_string(sb, "\n")
-		for t, i in m.types {
-			strings.write_string(sb, "  [")
-			strings.write_u64(sb, u64(i))
-			strings.write_string(sb, "] ")
-			write_func_type(sb, t)
-			strings.write_byte(sb, '\n')
-		}
-	}
+	// if len(m.types) > 0 {
+	// 	strings.write_string(sb, "\n.")
+	// 	strings.write_string(sb, section_name(.TYPE))
+	// 	strings.write_string(sb, "\n")
+	// 	for t, i in m.types {
+	// 		strings.write_string(sb, "  [")
+	// 		strings.write_u64(sb, u64(i))
+	// 		strings.write_string(sb, "] ")
+	// 		write_func_type(sb, t)
+	// 		strings.write_byte(sb, '\n')
+	// 	}
+	// }
 
 
 	func_relocs: []wasm.Relocation
@@ -192,20 +218,20 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 	}
 
-	strings.write_string(sb, "\nfunctions:\n")
 	for f in m.functions {
-		strings.write_string(sb, "  [")
-		strings.write_u64(sb, u64(f.func_index))
-		strings.write_string(sb, "] ")
+		if f.exported {
+			strings.write_string(sb, "export ")
+		}
 		if f.name != "" {
-			strings.write_byte(sb, '$')
-			strings.write_quoted_string(sb, f.name)
+			strings.write_string(sb, external_kind_string[.FUNC])
 			strings.write_byte(sb, ' ')
+			strings.write_quoted_string(sb, f.name)
 		}
 		write_func_type(sb, f.type)
 
+
 		if f.imported {
-			strings.write_string(sb, "\n    import ")
+			strings.write_string(sb, "\n  import ")
 			strings.write_quoted_string(sb, f.import_module)
 			strings.write_string(sb, " ")
 			strings.write_quoted_string(sb, f.import_field)
@@ -216,7 +242,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		strings.write_byte(sb, '\n')
 
 		if len(f.locals) != 0 {
-			strings.write_string(sb, "    locals:")
+			strings.write_string(sb, "  locals:")
 			for g in f.locals {
 				strings.write_byte(sb, ' ')
 				if g.count > 1 {
@@ -229,17 +255,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 
 		if f.body_size != 0 {
-			tmp_sb: strings.Builder
-			defer strings.builder_destroy(&tmp_sb)
-			text := sbprint_function(&tmp_sb, m, f, func_relocs, &label_names)
-			for line in strings.split_lines_iterator(&text) {
-				if line == "" {
-					continue
-				}
-				strings.write_string(sb, "  ")
-				strings.write_string(sb, line)
-				strings.write_byte(sb, '\n')
-			}
+			sbprint_function(sb, m, f, func_relocs, &label_names)
 		}
 	}
 }

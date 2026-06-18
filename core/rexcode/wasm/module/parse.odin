@@ -443,7 +443,9 @@ build_functions :: proc(m: ^Module, func_typeidx: []u32, codes: []Code_Body, all
 
 	for e in m.exports {
 		if e.kind == .FUNC && int(e.index) < total && funcs[e.index].name == "" {
-			funcs[e.index].name = e.name
+			f := &funcs[e.index]
+			f.name = e.name
+			f.exported = true
 		}
 	}
 
