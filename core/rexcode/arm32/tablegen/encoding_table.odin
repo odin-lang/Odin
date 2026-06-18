@@ -3695,6 +3695,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	// mask (the MVE convention); the complex ops encode the rotation immediate.
 	.VHCADD_SAT = { {.VHCADD_SAT, {.QPR, .QPR, .QPR, .IMM},  {.VD_Q, .VN_Q, .VM_Q, .MVE_ROT_HCADD},   0xEE000F00, 0xFFE10FF1, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}} },
 	.VCMLA_MVE  = { {.VCMLA_MVE,  {.QPR, .QPR, .QPR, .IMM},  {.VD_Q, .VN_Q, .VM_Q, .MVE_ROT_CMLA},    0xFC200840, 0xFE611FF1, .MVE_FP,  .T32, {thumb32=true, cond_in_28=false}} },
+	// MVE multiply-subtract reduce (Rd at 15:12, Qn at 19:17, Qm at 3:1 -- the
+	// proper 3-bit MVE Q fields, .s16 form). VMLSVA accumulates (bit 5).
+	.VMLSV      = { {.VMLSV,      {.GPR, .QPR, .QPR, .NONE}, {.RDLO_A32, .VN_Q_MVE, .VM_Q_MVE, .NONE}, 0xEEF00E01, 0xFFF10FF1, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}} },
+	.VMLSVA     = { {.VMLSVA,     {.GPR, .QPR, .QPR, .NONE}, {.RDLO_A32, .VN_Q_MVE, .VM_Q_MVE, .NONE}, 0xEEF00E21, 0xFFF10FF1, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}} },
 
 	// SPECGEN:BEGIN
 	.VADDL = {

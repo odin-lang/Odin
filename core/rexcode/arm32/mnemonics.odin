@@ -306,7 +306,7 @@ Mnemonic :: enum u16 {
 	SHA256H, SHA256H2, SHA256SU0, SHA256SU1,
 
 	// -- VFP rounding (ARMv8 FEAT_FP) ----------------------------------------
-	VRINT,   VJCVT,                        // VJCVT: F64-to-S32 with FPSCR.RM rounding
+	VJCVT,                                 // VJCVT: F64-to-S32 with FPSCR.RM rounding
 
 	// -- Dot Product (FEAT_DotProd) ------------------------------------------
 	VSDOT,   VUDOT,
@@ -465,7 +465,6 @@ Mnemonic :: enum u16 {
 	// Bit reverse + shifts unique to MVE
 	VBRSR,                                 // bit reverse with shift right
 	VSHLC,                                 // shift left with carry
-	VRSHL_MVE,                             // (placeholder if needed; usually VRSHL)
 	VDDUP,                                 // decrement and duplicate
 	VIDUP,                                 // increment and duplicate
 	VDWDUP,                                // decrement-wrap and duplicate
@@ -501,7 +500,6 @@ Mnemonic :: enum u16 {
 	VQRDMLSDH,  VQRDMLSDHX,
 
 	// Misc
-	VPRINT,                                // printf-like debug op (rare)
 	VHCADD_SAT,                            // (rarely used)
 	VCMLA_MVE,                             // (MVE form; VCMLA already exists)
 

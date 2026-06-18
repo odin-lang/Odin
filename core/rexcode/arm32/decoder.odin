@@ -356,6 +356,10 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_imm(((word >> 12) & 1) == 1 ? 270 : 90)
 	case .MVE_ROT_CMLA:
 		return op_imm(i64((word >> 23) & 0x3) * 90)
+	case .VN_Q_MVE:
+		return op_reg(Register(REG_QPR | u16((word >> 17) & 0x7)))
+	case .VM_Q_MVE:
+		return op_reg(Register(REG_QPR | u16((word >> 1) & 0x7)))
 	case .VD_Q:
 		n := (((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)) >> 1
 		return op_reg(Register(REG_QPR | u16(n)))

@@ -440,6 +440,10 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) == 270 ? 1 : 0) << 12
 	case .MVE_ROT_CMLA:
 		return ((u32(op.immediate) / 90) & 0x3) << 23
+	case .VN_Q_MVE:
+		return (u32(reg_hw(op.reg)) & 0x7) << 17
+	case .VM_Q_MVE:
+		return (u32(reg_hw(op.reg)) & 0x7) << 1
 	case .VFP_IMM8:
 		// Run the VFP 8-bit float encoder; the user supplies the wire-format
 		// 32-bit float bit pattern (for F32). The encoder finds the abcdefgh.

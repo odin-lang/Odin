@@ -1298,6 +1298,10 @@ inst_vmlav_r_q_q                 :: #force_inline proc "contextless" (dst: Regis
 emit_vmlav_r_q_q                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmlav_r_q_q(dst, src, src2)) }
 inst_vmlava_r_q_q                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLAVA, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vmlava_r_q_q                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmlava_r_q_q(dst, src, src2)) }
+inst_vmlsv_r_q_q                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLSV, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+emit_vmlsv_r_q_q                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmlsv_r_q_q(dst, src, src2)) }
+inst_vmlsva_r_q_q                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLSVA, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+emit_vmlsva_r_q_q                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmlsva_r_q_q(dst, src, src2)) }
 inst_vcmul_q_q_q                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VCMUL, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vcmul_q_q_q                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vcmul_q_q_q(dst, src, src2)) }
 inst_vhcadd_q_q_q                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VHCADD, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -2551,6 +2555,10 @@ inst_vmlav                            :: inst_vmlav_r_q_q
 emit_vmlav                            :: emit_vmlav_r_q_q
 inst_vmlava                           :: inst_vmlava_r_q_q
 emit_vmlava                           :: emit_vmlava_r_q_q
+inst_vmlsv                            :: inst_vmlsv_r_q_q
+emit_vmlsv                            :: emit_vmlsv_r_q_q
+inst_vmlsva                           :: inst_vmlsva_r_q_q
+emit_vmlsva                           :: emit_vmlsva_r_q_q
 inst_vcmul                            :: inst_vcmul_q_q_q
 emit_vcmul                            :: emit_vcmul_q_q_q
 inst_vhcadd                           :: inst_vhcadd_q_q_q
