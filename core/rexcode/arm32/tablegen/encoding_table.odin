@@ -3661,6 +3661,11 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VCVTR, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0x0EBC0B40, 0x0FBF0FD0, .VFPV2, .A32, {}},
 	},
 
+	// Debug change PE state (T32, fixed encoding, no operands).
+	.DCPS1 = { {.DCPS1, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF78F8001, 0xFFFFFFFF, .V8, .T32, {thumb32=true, cond_in_28=false}} },
+	.DCPS2 = { {.DCPS2, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF78F8002, 0xFFFFFFFF, .V8, .T32, {thumb32=true, cond_in_28=false}} },
+	.DCPS3 = { {.DCPS3, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF78F8003, 0xFFFFFFFF, .V8, .T32, {thumb32=true, cond_in_28=false}} },
+
 	// SPECGEN:BEGIN
 	.VADDL = {
 		{.VADDL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2800000, 0xFFB01F50, .NEON, .A32, {cond_in_28=false}},

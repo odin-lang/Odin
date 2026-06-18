@@ -482,6 +482,12 @@ inst_pli_mem                     :: #force_inline proc "contextless" (dst: Memor
 emit_pli_mem                     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Memory) { append(instructions, inst_pli_mem(dst)) }
 inst_hlt_imm                     :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .HLT, operand_count = 1, mode = .A32, cond = 14, length = 4, ops = {op_imm(imm), {}, {}, {}}} }
 emit_hlt_imm                     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_hlt_imm(imm)) }
+inst_dcps1_none                  :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .DCPS1, operand_count = 0, mode = .T32, cond = 14, length = 4, ops = {{}, {}, {}, {}}} }
+emit_dcps1_none                  :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_dcps1_none()) }
+inst_dcps2_none                  :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .DCPS2, operand_count = 0, mode = .T32, cond = 14, length = 4, ops = {{}, {}, {}, {}}} }
+emit_dcps2_none                  :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_dcps2_none()) }
+inst_dcps3_none                  :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .DCPS3, operand_count = 0, mode = .T32, cond = 14, length = 4, ops = {{}, {}, {}, {}}} }
+emit_dcps3_none                  :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_dcps3_none()) }
 inst_eret_none                   :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .ERET, operand_count = 0, mode = .A32, cond = 14, length = 4, ops = {{}, {}, {}, {}}} }
 emit_eret_none                   :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_eret_none()) }
 inst_esb_none                    :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .ESB, operand_count = 0, mode = .A32, cond = 14, length = 4, ops = {{}, {}, {}, {}}} }
@@ -1757,6 +1763,12 @@ inst_pli                              :: inst_pli_mem
 emit_pli                              :: emit_pli_mem
 inst_hlt                              :: inst_hlt_imm
 emit_hlt                              :: emit_hlt_imm
+inst_dcps1                            :: inst_dcps1_none
+emit_dcps1                            :: emit_dcps1_none
+inst_dcps2                            :: inst_dcps2_none
+emit_dcps2                            :: emit_dcps2_none
+inst_dcps3                            :: inst_dcps3_none
+emit_dcps3                            :: emit_dcps3_none
 inst_eret                             :: inst_eret_none
 emit_eret                             :: emit_eret_none
 inst_esb                              :: inst_esb_none
