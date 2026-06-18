@@ -13,7 +13,7 @@
 --   Run: luajit tablegen/specgen.lua   (from mips/, or with a full path)
 
 local bit  = require("bit")
-local LLVM = "llvm-mc --assemble --triple=mips --mattr=+msa,+dsp,+dspr2 --show-encoding"
+local LLVM = "llvm-mc --assemble --triple=mips --mattr=+msa,+dsp,+dspr2,+mips32r2,+fp64 --show-encoding"
 local DIR   = (arg[0]:match("^(.*)/[^/]*$")) or "."
 local TABLE = DIR .. "/encoding_table.odin"
 
@@ -193,6 +193,29 @@ for _, b in ipairs({
 }) do
 	local r = entry(b[1], "{.GPR,.GPR,.NONE,.NONE}", "{.RS,.RT,.NONE,.NONE}", "DSP_R2",
 		function(v) return string.format("%s $%d,$%d", b[2], v[1], v[2]) end, {31,31})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- FPU conditional move (S/D) -------------------------------------------
+for _, b in ipairs({{"MOVN","movn"},{"MOVZ","movz"}}) do
+	for _, f in ipairs({{"S","s","FPR_S"},{"D","d","FPR_D"}}) do
+		local r = entry(b[1].."_"..f[1], "{."..f[3]..",."..f[3]..",.GPR,.NONE}", "{.FD,.FS,.RT,.NONE}", "FPU",
+			function(v) return string.format("%s.%s $f%d,$f%d,$%d", b[2], f[2], v[1], v[2], v[3]) end, {31,31,31})
+		if r then sections[#sections+1]=r end
+	end
+end
+for _, b in ipairs({{"MOVF","movf"},{"MOVT","movt"}}) do
+	for _, f in ipairs({{"S","s","FPR_S"},{"D","d","FPR_D"}}) do
+		local r = entry(b[1].."_"..f[1], "{."..f[3]..",."..f[3]..",.FCC,.NONE}", "{.FD,.FS,.FCC_BC,.NONE}", "FPU",
+			function(v) return string.format("%s.%s $f%d,$f%d,$fcc%d", b[2], f[2], v[1], v[2], v[3]) end, {31,31,7})
+		if r then sections[#sections+1]=r end
+	end
+end
+
+-- ---- FPU convert to FP (FCVT_x_y = cvt.x.y) --------------------------------
+for _, b in ipairs({{"FCVT_D_W","cvt.d.w","FPR_D","FPR_W"},{"FCVT_S_D","cvt.s.d","FPR_S","FPR_D"},{"FCVT_S_W","cvt.s.w","FPR_S","FPR_W"}}) do
+	local r = entry(b[1], "{."..b[3]..",."..b[4]..",.NONE,.NONE}", "{.FD,.FS,.NONE,.NONE}", "FPU",
+		function(v) return string.format("%s $f%d,$f%d", b[2], v[1], v[2]) end, {31,31})
 	if r then sections[#sections+1]=r end
 end
 
