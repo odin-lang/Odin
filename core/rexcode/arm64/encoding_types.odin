@@ -274,6 +274,11 @@ Operand_Encoding :: enum u8 {
 	NEON_LANE_S,      // .S[i]: Q<<1 | S            (i in 0..3)
 	NEON_LANE_D,      // .D[i]: Q                   (i in 0..1)
 
+	// ---- SVE2 XAR rotate amount (tszh:tszl:imm3 split) ----
+	// V = 2*esize - amount placed as tszh(23:22):tszl(20:19):imm3(18:16);
+	// esize comes from the form's Z register (highest set bit of tszh:tszl).
+	SVE_XAR_SHIFT,
+
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20
 	ATOMIC_RT,            // Rt (target) at bits 0-4

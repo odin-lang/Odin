@@ -1881,6 +1881,14 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SVE_MOV_P, {.P_REG, .P_REG_ZERO, .P_REG, .NONE}, {.PD, .PG4, .PN_PM_DUP, .NONE}, 0x25004000, 0xFFE0C210, .SVE, {}},
 		{.SVE_MOV_P, {.P_REG, .P_REG, .NONE, .NONE}, {.PD, .PN_PG_PM_DUP, .NONE, .NONE}, 0x25804000, 0xFFE0C210, .SVE, {}},
 	},
+	// SVE2 XAR (destructive): Zdn.T, Zdn.T, Zm.T, #rotate. The rotate amount is
+	// V = 2*esize - amount, split tszh:tszl:imm3; esize selected by the Z type.
+	.SVE_XAR_Z = {
+		{.SVE_XAR_Z, {.Z_REG_B, .Z_REG_B, .Z_REG_B, .VEC_SHIFT}, {.VD, .VD, .VN, .SVE_XAR_SHIFT}, 0x04203400, 0xFF20FC00, .SVE2, {}},
+		{.SVE_XAR_Z, {.Z_REG_H, .Z_REG_H, .Z_REG_H, .VEC_SHIFT}, {.VD, .VD, .VN, .SVE_XAR_SHIFT}, 0x04203400, 0xFF20FC00, .SVE2, {}},
+		{.SVE_XAR_Z, {.Z_REG_S, .Z_REG_S, .Z_REG_S, .VEC_SHIFT}, {.VD, .VD, .VN, .SVE_XAR_SHIFT}, 0x04203400, 0xFF20FC00, .SVE2, {}},
+		{.SVE_XAR_Z, {.Z_REG_D, .Z_REG_D, .Z_REG_D, .VEC_SHIFT}, {.VD, .VD, .VN, .SVE_XAR_SHIFT}, 0x04203400, 0xFF20FC00, .SVE2, {is_64=true}},
+	},
 
 	// -------------------------------------------------------------------------
 	// §23.11 Integer compare (Zn vs Zm) -> Pd.T

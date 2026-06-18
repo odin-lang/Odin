@@ -263,6 +263,16 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
 	case .NEON_LANE_D:
 		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = 1}
+	case .SVE_XAR_SHIFT:
+		tszh := (word >> 22) & 0x3
+		tszl := (word >> 19) & 0x3
+		v    := i64((tszh << 5) | (tszl << 3) | ((word >> 16) & 0x7))
+		tsize := (tszh << 2) | tszl
+		esize: i64 = 8
+		if      tsize >= 8 { esize = 64 }
+		else if tsize >= 4 { esize = 32 }
+		else if tsize >= 2 { esize = 16 }
+		return Operand{immediate = 2 * esize - v, kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:

@@ -284,6 +284,10 @@ vec_esize :: #force_inline proc "contextless" (ot: Operand_Type) -> u32 {
 	case .V_4H, .V_8H, .V_4H_FP16, .V_8H_FP16:  return 16
 	case .V_2S, .V_4S:                          return 32
 	case .V_1D, .V_2D:                          return 64
+	case .Z_REG_B:                              return 8
+	case .Z_REG_H:                              return 16
+	case .Z_REG_S:                              return 32
+	case .Z_REG_D:                              return 64
 	}
 	return 8
 }
@@ -518,6 +522,12 @@ pack_operand_inline :: #force_inline proc(
 		return ((i >> 1) & 0x1) << 30 | (i & 0x1) << 12
 	case .NEON_LANE_D:
 		return (u32(op.immediate) & 0x1) << 30
+
+	// SVE2 XAR rotate amount: V = 2*esize - amount, split tszh:tszl:imm3.
+	case .SVE_XAR_SHIFT:
+		esize := vec_esize(form.ops[0])
+		v := (2 * esize - u32(op.immediate)) & 0x7F
+		return ((v >> 5) & 0x3) << 22 | ((v >> 3) & 0x3) << 19 | (v & 0x7) << 16
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:

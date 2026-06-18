@@ -1693,6 +1693,8 @@ inst_sve_aesimc_z               :: #force_inline proc "contextless" (rz: u8) -> 
 emit_sve_aesimc_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_sve_aesimc_z(rz)) }
 inst_sve_bcax_z_z_z_z_z         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_BCAX_Z, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
 emit_sve_bcax_z_z_z_z_z         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_bcax_z_z_z_z_z(rz, rz2, rz3, rz4)) }
+inst_sve_xar_z_z_z_z_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .SVE_XAR_Z, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 4)}} }
+emit_sve_xar_z_z_z_z_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_sve_xar_z_z_z_z_i(rz, rz2, rz3, imm)) }
 inst_sve_eor3_z_z_z_z_z         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_EOR3_Z, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
 emit_sve_eor3_z_z_z_z_z         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_eor3_z_z_z_z_z(rz, rz2, rz3, rz4)) }
 inst_sve_match_p_p_z_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_MATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
@@ -3902,6 +3904,8 @@ inst_sve_aesimc                      :: inst_sve_aesimc_z
 emit_sve_aesimc                      :: emit_sve_aesimc_z
 inst_sve_bcax_z                      :: inst_sve_bcax_z_z_z_z_z
 emit_sve_bcax_z                      :: emit_sve_bcax_z_z_z_z_z
+inst_sve_xar_z                       :: inst_sve_xar_z_z_z_z_i
+emit_sve_xar_z                       :: emit_sve_xar_z_z_z_z_i
 inst_sve_eor3_z                      :: inst_sve_eor3_z_z_z_z_z
 emit_sve_eor3_z                      :: emit_sve_eor3_z_z_z_z_z
 inst_sve_match                       :: inst_sve_match_p_p_z_z
