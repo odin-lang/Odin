@@ -206,6 +206,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return reg_operand(decode_reg(word, 6, ot), ot)
 	case .GPR_AT_11:
 		return reg_operand(decode_reg(word, 11, ot), ot)
+	case .DSP_SA:
+		return Operand{immediate = i64((word >> 21) & 0xF), kind = .IMMEDIATE, size = 1}
 
 	// Immediates ------------------------------------------------------------
 	case .IMM_16:

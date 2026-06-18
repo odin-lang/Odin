@@ -265,6 +265,13 @@ do
 	if r then sections[#sections+1]=r end
 end
 
+-- ---- DSP ASE shift by immediate (Rd, Rt, sa) ------------------------------
+for _, b in ipairs({{"SHRA_QB","shra.qb",7},{"SHRA_R_QB","shra_r.qb",7},{"SHRA_R_PH","shra_r.ph",15},{"SHRL_PH","shrl.ph",15}}) do
+	local r = entry(b[1], "{.GPR,.GPR,.IMM5,.NONE}", "{.RD,.RT,.DSP_SA,.NONE}", "DSP_R2",
+		function(v) return string.format("%s $%d,$%d,%d", b[2], v[1], v[2], v[3]) end, {31,31,b[3]})
+	if r then sections[#sections+1]=r end
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "    // SPECGEN:BEGIN\n" .. table.concat(sections, "\n") .. "\n    // SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()

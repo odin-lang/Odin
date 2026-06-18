@@ -240,6 +240,7 @@ Operand_Encoding :: enum u8 {
 	FR,            // FP register at bits 25:21 (COP1X 4-register FMA: fr)
 	GPR_AT_6,      // GPR at bits 10:6 (MSA COPY destination)
 	GPR_AT_11,     // GPR at bits 15:11 (MSA INSERT source)
+	DSP_SA,        // DSP shift amount at bits 24:21 (.PH 4-bit, .QB 3-bit)
 
 	// MSA memory operand: base GPR at bits 15:11 + signed 10-bit disp at 25:16,
 	// scaled by element size (1/2/4/8 for B/H/W/D).
