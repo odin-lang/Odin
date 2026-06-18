@@ -95,6 +95,9 @@ sbprint :: proc(
 				strings.write_byte(sb, ' ')
 				strings.write_u64(sb, u64(u32(bb)))
 			}
+
+		case .CALL_INDIRECT:
+
 		case:
 			for slot in 0..<inst.operand_count {
 				strings.write_byte(sb, ' ')
@@ -273,12 +276,16 @@ write_operand :: proc(
 		}
 
 	case .MEMARG:
-		// WAT prints non-trivial memargs as `align=N offset=N`
+		// WAT prints non-trivial memargs as `offset=N align=N`
 		// omitting either when it is the natural default is a refinement.
-		strings.write_string(sb, "align=")
-		strings.write_u64(sb, u64(op.memarg.align))
-		strings.write_string(sb, " offset=")
-		strings.write_u64(sb, u64(op.memarg.offset))
+		if op.memarg.offset != 0 {
+			strings.write_string(sb, "offset=")
+			strings.write_u64(sb, u64(op.memarg.offset))
+		}
+		if op.memarg.align != 0 {
+			strings.write_string(sb, " align=")
+			strings.write_u64(sb, u64(op.memarg.align))
+		}
 
 	case .BLOCK_TYPE:
 		write_block_type(sb, op.immediate)

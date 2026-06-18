@@ -28,6 +28,7 @@ Mnemonic :: enum u16 {
 	BLOCK, LOOP, IF, ELSE, END,
 	BR, BR_IF, BR_TABLE,
 	RETURN, CALL, CALL_INDIRECT,
+	RETURN_CALL, RETURN_CALL_INDIRECT,
 
 	// -------------------------------------------------------------- parametric
 	DROP, SELECT,
@@ -226,6 +227,7 @@ MNEMONIC_NAMES := [Mnemonic]string{
 	.BLOCK = "block", .LOOP = "loop", .IF = "if", .ELSE = "else", .END = "end",
 	.BR = "br", .BR_IF = "br_if", .BR_TABLE = "br_table",
 	.RETURN = "return", .CALL = "call", .CALL_INDIRECT = "call_indirect",
+	.RETURN_CALL = "return_call", .RETURN_CALL_INDIRECT = "return_call_indirect",
 
 	.DROP = "drop", .SELECT = "select",
 

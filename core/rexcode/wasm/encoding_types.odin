@@ -65,8 +65,19 @@ Encoding :: struct #packed {
 	opcode:   u16,            // 2 -- primary opcode, or sub-opcode within a prefix group (SIMD reaches 0x113)
 	imm:      [2]Imm_Kind,    // 2 -- immediate layout, walked in order
 	flags:    Encoding_Flags, // 1
+	inputs:   i8,             // 1 -- stack operands consumed (the arity in);  -1 when it varies
+	outputs:  i8,             // 1 -- stack results produced  (the arity out); -1 when it varies
 }
-#assert(size_of(Encoding) == 8)
+#assert(size_of(Encoding) == 10)
+
+// `inputs`/`outputs` give the fixed stack arity of an instruction: how many
+// values it pops and how many it pushes. They are -1 when the count is not a
+// constant of the opcode -- i.e. it depends on a type/blocktype immediate or on
+// the surrounding control frame. That covers `call`/`call_indirect` (the callee
+// or referenced signature), the structured control ops `block`/`loop`/`if`
+// (their blocktype) plus `else`/`end`, the branches `br`/`br_if`/`br_table` and
+// `return` (the target/result types, and stack-polymorphism), and the
+// stack-polymorphic `unreachable`. Everything else is a fixed (inputs, outputs).
 
 // =============================================================================
 // LEB128 + little-endian primitives (shared by encoder and decoder)
