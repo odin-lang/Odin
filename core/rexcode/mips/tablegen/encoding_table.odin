@@ -1451,6 +1451,20 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .VIIM_S = { {.VIIM_S, {.VFPU_S, .IMM16S, .NONE, .NONE}, {.RT, .IMM_16, .NONE, .NONE}, 0xDF000000, 0xFF800000, .VFPU_PSP, {}} },
     .VFIM_S = { {.VFIM_S, {.VFPU_S, .IMM16S, .NONE, .NONE}, {.RT, .IMM_16, .NONE, .NONE}, 0xDF800000, 0xFF800000, .VFPU_PSP, {}} },
 
+    // Paired-single FP that this llvm-mc cannot assemble (it knows only .S/.D
+    // of these). Derived from the llvm-verified single forms by setting the
+    // data format to PS: COP1X fused-multiply-add fmt is bits 2:0 (S=0 -> PS=6),
+    // and the COP1 conditional-move fmt is bits 25:21 (S=16 -> PS=22, i.e.
+    // +0x00C00000). Same operand slots and masks as the .S forms. Decode-clean.
+    .MADD_PS  = { {.MADD_PS,  {.FPR_PS,.FPR_PS,.FPR_PS,.FPR_PS}, {.FD,.FR,.FS,.FT}, 0x4C000026, 0xFC00003F, .FPU, {}} },
+    .MSUB_PS  = { {.MSUB_PS,  {.FPR_PS,.FPR_PS,.FPR_PS,.FPR_PS}, {.FD,.FR,.FS,.FT}, 0x4C00002E, 0xFC00003F, .FPU, {}} },
+    .NMADD_PS = { {.NMADD_PS, {.FPR_PS,.FPR_PS,.FPR_PS,.FPR_PS}, {.FD,.FR,.FS,.FT}, 0x4C000036, 0xFC00003F, .FPU, {}} },
+    .NMSUB_PS = { {.NMSUB_PS, {.FPR_PS,.FPR_PS,.FPR_PS,.FPR_PS}, {.FD,.FR,.FS,.FT}, 0x4C00003E, 0xFC00003F, .FPU, {}} },
+    .MOVN_PS  = { {.MOVN_PS,  {.FPR_PS,.FPR_PS,.GPR,.NONE}, {.FD,.FS,.RT,.NONE}, 0x46C00013, 0xFFE0003F, .FPU, {}} },
+    .MOVZ_PS  = { {.MOVZ_PS,  {.FPR_PS,.FPR_PS,.GPR,.NONE}, {.FD,.FS,.RT,.NONE}, 0x46C00012, 0xFFE0003F, .FPU, {}} },
+    .MOVF_PS  = { {.MOVF_PS,  {.FPR_PS,.FPR_PS,.FCC,.NONE}, {.FD,.FS,.FCC_BC,.NONE}, 0x46C00011, 0xFFE3003F, .FPU, {}} },
+    .MOVT_PS  = { {.MOVT_PS,  {.FPR_PS,.FPR_PS,.FCC,.NONE}, {.FD,.FS,.FCC_BC,.NONE}, 0x46C10011, 0xFFE3003F, .FPU, {}} },
+
     // SPECGEN:BEGIN
     .FADD_W = { {.FADD_W, {.MSA_VEC,.MSA_VEC,.MSA_VEC,.NONE}, {.WD,.WS,.WT,.NONE}, 0x7800001B, 0xFFE0003F, .MSA, {}} },
     .FADD_D = { {.FADD_D, {.MSA_VEC,.MSA_VEC,.MSA_VEC,.NONE}, {.WD,.WS,.WT,.NONE}, 0x7820001B, 0xFFE0003F, .MSA, {}} },
