@@ -3636,6 +3636,31 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.LDRSBT = { {.LDRSBT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000D0, 0x0F7000F0, .BASE, .A32, {}} },
 	.LDRSHT = { {.LDRSHT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000F0, 0x0F7000F0, .BASE, .A32, {}} },
 
+	// NEON rounding shift-right-accumulate (imm); FP reciprocal/rsqrt estimate;
+	// FP pairwise add; VFP convert-to-integer using the FPSCR rounding mode.
+	.VRSRA = {
+		{.VRSRA, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800310, 0xFE800F10, .NEON, .A32, {cond_in_28=false}},
+		{.VRSRA, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800350, 0xFE800F50, .NEON, .A32, {cond_in_28=false}},
+	},
+	.VRECPE_F = {
+		{.VRECPE_F, {.DPR, .DPR, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xF3BB0500, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}},
+		{.VRECPE_F, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3BB0540, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}},
+	},
+	.VRSQRTE_F = {
+		{.VRSQRTE_F, {.DPR, .DPR, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xF3BB0580, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}},
+		{.VRSQRTE_F, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3BB05C0, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}},
+	},
+	.VPADD_F = {
+		{.VPADD_F, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF3000D00, 0xFFB00F10, .NEON, .A32, {cond_in_28=false}},
+		{.VPADD_F, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF3100D00, 0xFFB00F10, .NEON_HALF_FP, .A32, {cond_in_28=false}},
+	},
+	.VCVTR = {
+		{.VCVTR, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBD0A40, 0x0FBF0FD0, .VFPV2, .A32, {}},
+		{.VCVTR, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBC0A40, 0x0FBF0FD0, .VFPV2, .A32, {}},
+		{.VCVTR, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0x0EBD0B40, 0x0FBF0FD0, .VFPV2, .A32, {}},
+		{.VCVTR, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0x0EBC0B40, 0x0FBF0FD0, .VFPV2, .A32, {}},
+	},
+
 	// SPECGEN:BEGIN
 	.VADDL = {
 		{.VADDL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2800000, 0xFFB01F50, .NEON, .A32, {cond_in_28=false}},
