@@ -202,6 +202,18 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 }
 
 @test
+map_reserve_correct_capacity :: proc(t: ^testing.T) {
+	m: map[int]struct{}
+	defer delete(m)
+
+	reserve(&m, 12)
+	testing.expect_value(t, cap(m), 16)
+
+	reserve(&m, 13)
+	testing.expect_value(t, cap(m), 32)
+}
+
+@test
 set_insert_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {

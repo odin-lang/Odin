@@ -608,15 +608,17 @@ map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_
 		m.allocator = context.allocator
 	}
 
-	new_capacity := new_capacity
+	// Take into account the fact that the map will resize itself at
+	// MAP_LOAD_FACTOR capacity.
+	new_capacity_with_resize := new_capacity * 100 / MAP_LOAD_FACTOR
 	old_capacity := uintptr(map_cap(m^))
 
-	if old_capacity >= new_capacity {
+	if old_capacity >= new_capacity_with_resize {
 		return nil
 	}
 
 	// ceiling nearest power of two
-	log2_new_capacity := ceil_log2(new_capacity)
+	log2_new_capacity := ceil_log2(new_capacity_with_resize)
 
 	log2_min_cap := max(MAP_MIN_LOG2_CAPACITY, log2_new_capacity)
 
