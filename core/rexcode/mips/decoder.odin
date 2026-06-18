@@ -216,6 +216,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		v := i32((word >> 20) & 0x3F)
 		if v & 0x20 != 0 { v |= ~i32(0x3F) }
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .EXT_SIZE:
+		return Operand{immediate = i64((word >> 21) & 0x1F), kind = .IMMEDIATE, size = 1}
 
 	// Immediates ------------------------------------------------------------
 	case .IMM_16:

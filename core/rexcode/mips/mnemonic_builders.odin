@@ -1082,10 +1082,20 @@ inst_extr_s_h_r_i5_i5      :: #force_inline proc "contextless" (dst: GPR, imm: i
 emit_extr_s_h_r_i5_i5      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, imm2: i64) { append(instructions, inst_extr_s_h_r_i5_i5(dst, imm, imm2)) }
 inst_extrv_w_r_i5_r        :: #force_inline proc "contextless" (dst: GPR, imm: i64, src: GPR) -> Instruction { return Instruction{mnemonic = .EXTRV_W, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_gpr(src), {}}} }
 emit_extrv_w_r_i5_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, src: GPR) { append(instructions, inst_extrv_w_r_i5_r(dst, imm, src)) }
+inst_extrv_r_w_r_i5_r      :: #force_inline proc "contextless" (dst: GPR, imm: i64, src: GPR) -> Instruction { return Instruction{mnemonic = .EXTRV_R_W, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_gpr(src), {}}} }
+emit_extrv_r_w_r_i5_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, src: GPR) { append(instructions, inst_extrv_r_w_r_i5_r(dst, imm, src)) }
+inst_extrv_rs_w_r_i5_r     :: #force_inline proc "contextless" (dst: GPR, imm: i64, src: GPR) -> Instruction { return Instruction{mnemonic = .EXTRV_RS_W, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_gpr(src), {}}} }
+emit_extrv_rs_w_r_i5_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, src: GPR) { append(instructions, inst_extrv_rs_w_r_i5_r(dst, imm, src)) }
+inst_extrv_s_h_r_i5_r      :: #force_inline proc "contextless" (dst: GPR, imm: i64, src: GPR) -> Instruction { return Instruction{mnemonic = .EXTRV_S_H, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_gpr(src), {}}} }
+emit_extrv_s_h_r_i5_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, src: GPR) { append(instructions, inst_extrv_s_h_r_i5_r(dst, imm, src)) }
 inst_extp_r_i5_i5          :: #force_inline proc "contextless" (dst: GPR, imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .EXTP, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_imm(imm2, 1), {}}} }
 emit_extp_r_i5_i5          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, imm2: i64) { append(instructions, inst_extp_r_i5_i5(dst, imm, imm2)) }
 inst_extpv_r_i5_r          :: #force_inline proc "contextless" (dst: GPR, imm: i64, src: GPR) -> Instruction { return Instruction{mnemonic = .EXTPV, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_gpr(src), {}}} }
 emit_extpv_r_i5_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, src: GPR) { append(instructions, inst_extpv_r_i5_r(dst, imm, src)) }
+inst_extpdp_r_i5_i5        :: #force_inline proc "contextless" (dst: GPR, imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .EXTPDP, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_imm(imm2, 1), {}}} }
+emit_extpdp_r_i5_i5        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, imm2: i64) { append(instructions, inst_extpdp_r_i5_i5(dst, imm, imm2)) }
+inst_extpdpv_r_i5_r        :: #force_inline proc "contextless" (dst: GPR, imm: i64, src: GPR) -> Instruction { return Instruction{mnemonic = .EXTPDPV, operand_count = 3, length = 4, ops = {op_gpr(dst), op_imm(imm, 1), op_gpr(src), {}}} }
+emit_extpdpv_r_i5_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, imm: i64, src: GPR) { append(instructions, inst_extpdpv_r_i5_r(dst, imm, src)) }
 inst_shilo_i5_i5           :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .SHILO, operand_count = 2, length = 4, ops = {op_imm(imm, 1), op_imm(imm2, 1), {}, {}}} }
 emit_shilo_i5_i5           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_shilo_i5_i5(imm, imm2)) }
 inst_shilov_i5_r           :: #force_inline proc "contextless" (imm: i64, dst: GPR) -> Instruction { return Instruction{mnemonic = .SHILOV, operand_count = 2, length = 4, ops = {op_imm(imm, 1), op_gpr(dst), {}, {}}} }
@@ -3049,10 +3059,20 @@ inst_extr_s_h              :: inst_extr_s_h_r_i5_i5
 emit_extr_s_h              :: emit_extr_s_h_r_i5_i5
 inst_extrv_w               :: inst_extrv_w_r_i5_r
 emit_extrv_w               :: emit_extrv_w_r_i5_r
+inst_extrv_r_w             :: inst_extrv_r_w_r_i5_r
+emit_extrv_r_w             :: emit_extrv_r_w_r_i5_r
+inst_extrv_rs_w            :: inst_extrv_rs_w_r_i5_r
+emit_extrv_rs_w            :: emit_extrv_rs_w_r_i5_r
+inst_extrv_s_h             :: inst_extrv_s_h_r_i5_r
+emit_extrv_s_h             :: emit_extrv_s_h_r_i5_r
 inst_extp                  :: inst_extp_r_i5_i5
 emit_extp                  :: emit_extp_r_i5_i5
 inst_extpv                 :: inst_extpv_r_i5_r
 emit_extpv                 :: emit_extpv_r_i5_r
+inst_extpdp                :: inst_extpdp_r_i5_i5
+emit_extpdp                :: emit_extpdp_r_i5_i5
+inst_extpdpv               :: inst_extpdpv_r_i5_r
+emit_extpdpv               :: emit_extpdpv_r_i5_r
 inst_shilo                 :: inst_shilo_i5_i5
 emit_shilo                 :: emit_shilo_i5_i5
 inst_shilov                :: inst_shilov_i5_r

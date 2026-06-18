@@ -244,6 +244,7 @@ Operand_Encoding :: enum u8 {
 	RS_RT,         // same GPR in both rs (25:21) and rt (20:16) (R6 BGEZC/BLTZC)
 	AC_NUM,        // DSP accumulator number ac0..ac3 at bits 12:11 (immediate)
 	SHILO_IMM,     // DSP SHILO signed 6-bit shift at bits 25:20
+	EXT_SIZE,      // DSP EXTPDP extract size, 5-bit immediate at bits 25:21
 
 	// MSA memory operand: base GPR at bits 15:11 + signed 10-bit disp at 25:16,
 	// scaled by element size (1/2/4/8 for B/H/W/D).

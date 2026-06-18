@@ -294,6 +294,18 @@ do
 	if r then sections[#sections+1]=r end
 end
 
+-- ---- DSP ASE extract-from-accumulator ops ---------------------------------
+do
+	local r = entry("EXTPDP", "{.GPR,.IMM5,.IMM5,.NONE}", "{.RT,.AC_NUM,.EXT_SIZE,.NONE}", "DSP_R2",
+		function(v) return string.format("extpdp $%d,$ac%d,%d", v[1], v[2], v[3]) end, {31,3,31})
+	if r then sections[#sections+1]=r end
+end
+for _, b in ipairs({{"EXTPDPV","extpdpv"},{"EXTRV_R_W","extrv_r.w"},{"EXTRV_RS_W","extrv_rs.w"},{"EXTRV_S_H","extrv_s.h"}}) do
+	local r = entry(b[1], "{.GPR,.IMM5,.GPR,.NONE}", "{.RT,.AC_NUM,.RS,.NONE}", "DSP_R2",
+		function(v) return string.format("%s $%d,$ac%d,$%d", b[2], v[1], v[2], v[3]) end, {31,3,31})
+	if r then sections[#sections+1]=r end
+end
+
 -- ---- Branches: derive bits/regs, then mark the PC-relative offset variable.
 -- Compact (R6) branches need the r6 ISA, so each family passes its own mattr.
 local function bword(line, mattr)
