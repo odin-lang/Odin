@@ -279,6 +279,36 @@ inst_fcvtzs_r_r                 :: #force_inline proc "contextless" (dst: Regist
 emit_fcvtzs_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtzs_r_r(dst, src)) }
 inst_fcvtzu_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTZU, dst, src) }
 emit_fcvtzu_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtzu_r_r(dst, src)) }
+inst_fcvtas_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTAS, dst, src) }
+emit_fcvtas_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtas_r_r(dst, src)) }
+inst_fcvtau_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTAU, dst, src) }
+emit_fcvtau_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtau_r_r(dst, src)) }
+inst_fcvtns_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTNS, dst, src) }
+emit_fcvtns_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtns_r_r(dst, src)) }
+inst_fcvtnu_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTNU, dst, src) }
+emit_fcvtnu_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtnu_r_r(dst, src)) }
+inst_fcvtps_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTPS, dst, src) }
+emit_fcvtps_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtps_r_r(dst, src)) }
+inst_fcvtpu_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTPU, dst, src) }
+emit_fcvtpu_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtpu_r_r(dst, src)) }
+inst_fcvtms_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTMS, dst, src) }
+emit_fcvtms_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtms_r_r(dst, src)) }
+inst_fcvtmu_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVTMU, dst, src) }
+emit_fcvtmu_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvtmu_r_r(dst, src)) }
+inst_frinta_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTA, dst, src) }
+emit_frinta_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_r_r(dst, src)) }
+inst_frinti_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTI, dst, src) }
+emit_frinti_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_r_r(dst, src)) }
+inst_frintm_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTM, dst, src) }
+emit_frintm_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_r_r(dst, src)) }
+inst_frintn_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTN, dst, src) }
+emit_frintn_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_r_r(dst, src)) }
+inst_frintp_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTP, dst, src) }
+emit_frintp_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_r_r(dst, src)) }
+inst_frintx_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTX, dst, src) }
+emit_frintx_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_r_r(dst, src)) }
+inst_frintz_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTZ, dst, src) }
+emit_frintz_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_r_r(dst, src)) }
 inst_and_imm_r_r_i              :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.AND_IMM, dst, src, imm) }
 emit_and_imm_r_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_and_imm_r_r_i(dst, src, imm)) }
 inst_ands_imm_r_r_i             :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.ANDS_IMM, dst, src, imm) }
@@ -975,6 +1005,8 @@ inst_frecps_r_r_r               :: #force_inline proc "contextless" (dst: Regist
 emit_frecps_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_r_r_r(dst, src, src2)) }
 inst_frsqrts_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
 emit_frsqrts_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_r_r_r(dst, src, src2)) }
+inst_frecpx_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRECPX, dst, src) }
+emit_frecpx_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frecpx_r_r(dst, src)) }
 inst_faddp_v_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADDP_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
 emit_faddp_v_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_faddp_v_r_r_r(dst, src, src2)) }
 inst_frinta_v_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTA_V, operand_count = 2, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), {}, {}}} }
@@ -2266,6 +2298,36 @@ inst_fcvtzs                          :: inst_fcvtzs_r_r
 emit_fcvtzs                          :: emit_fcvtzs_r_r
 inst_fcvtzu                          :: inst_fcvtzu_r_r
 emit_fcvtzu                          :: emit_fcvtzu_r_r
+inst_fcvtas                          :: inst_fcvtas_r_r
+emit_fcvtas                          :: emit_fcvtas_r_r
+inst_fcvtau                          :: inst_fcvtau_r_r
+emit_fcvtau                          :: emit_fcvtau_r_r
+inst_fcvtns                          :: inst_fcvtns_r_r
+emit_fcvtns                          :: emit_fcvtns_r_r
+inst_fcvtnu                          :: inst_fcvtnu_r_r
+emit_fcvtnu                          :: emit_fcvtnu_r_r
+inst_fcvtps                          :: inst_fcvtps_r_r
+emit_fcvtps                          :: emit_fcvtps_r_r
+inst_fcvtpu                          :: inst_fcvtpu_r_r
+emit_fcvtpu                          :: emit_fcvtpu_r_r
+inst_fcvtms                          :: inst_fcvtms_r_r
+emit_fcvtms                          :: emit_fcvtms_r_r
+inst_fcvtmu                          :: inst_fcvtmu_r_r
+emit_fcvtmu                          :: emit_fcvtmu_r_r
+inst_frinta                          :: inst_frinta_r_r
+emit_frinta                          :: emit_frinta_r_r
+inst_frinti                          :: inst_frinti_r_r
+emit_frinti                          :: emit_frinti_r_r
+inst_frintm                          :: inst_frintm_r_r
+emit_frintm                          :: emit_frintm_r_r
+inst_frintn                          :: inst_frintn_r_r
+emit_frintn                          :: emit_frintn_r_r
+inst_frintp                          :: inst_frintp_r_r
+emit_frintp                          :: emit_frintp_r_r
+inst_frintx                          :: inst_frintx_r_r
+emit_frintx                          :: emit_frintx_r_r
+inst_frintz                          :: inst_frintz_r_r
+emit_frintz                          :: emit_frintz_r_r
 inst_and_imm                         :: inst_and_imm_r_r_i
 emit_and_imm                         :: emit_and_imm_r_r_i
 inst_ands_imm                        :: inst_ands_imm_r_r_i
@@ -2962,6 +3024,8 @@ inst_frecps                          :: inst_frecps_r_r_r
 emit_frecps                          :: emit_frecps_r_r_r
 inst_frsqrts                         :: inst_frsqrts_r_r_r
 emit_frsqrts                         :: emit_frsqrts_r_r_r
+inst_frecpx                          :: inst_frecpx_r_r
+emit_frecpx                          :: emit_frecpx_r_r
 inst_faddp_v                         :: inst_faddp_v_r_r_r
 emit_faddp_v                         :: emit_faddp_v_r_r_r
 inst_frinta_v                        :: inst_frinta_v_r_r

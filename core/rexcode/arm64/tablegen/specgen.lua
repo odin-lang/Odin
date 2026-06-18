@@ -461,6 +461,55 @@ do
 	sections[#sections+1] = "\t// Advanced SIMD copy / permute (MOV/MVN/DUP/INS/EXT).\n" .. table.concat(blk, "\n")
 end
 
+-- ---- Scalar FP round/reciprocal + FP-to-GPR convert ------------------------
+-- All use Rd at 0:4, Rn at 5:9; element type (H/S/D) selected by static ftype
+-- bits, so each is a register-only form. H variants require FP16.
+do
+	local blk = {}
+	local function block(mnem, rows)
+		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
+	end
+	-- scalar FP two-register (FRINTx, FRECPX): <op> Sd, Sn.
+	for _, it in ipairs({
+		{"FRINTN","frintn"},{"FRINTP","frintp"},{"FRINTM","frintm"},{"FRINTZ","frintz"},
+		{"FRINTA","frinta"},{"FRINTX","frintx"},{"FRINTI","frinti"},{"FRECPX","frecpx"},
+	}) do
+		local rows = {}
+		for _, sc in ipairs({{"s","S_REG","FP"},{"d","D_REG","FP"},{"h","H_REG","FP16"}}) do
+			local function mk(r) return string.format("%s %s%d, %s%d", it[2], sc[1], r, sc[1], r) end
+			local b0, b31 = word(mk(0)), word(mk(31))
+			if b0 and b31 then
+				rows[#rows+1] = string.format("\t\t{.%s, {.%s, .%s, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}},",
+					it[1], sc[2], sc[2], bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{b31})):upper(), sc[3])
+				n_forms = n_forms + 1
+			end
+		end
+		block(it[1], rows)
+	end
+	-- FP -> GPR convert (FCVTxS/xU): <op> Wd/Xd, Hn/Sn/Dn.
+	for _, it in ipairs({
+		{"FCVTAS","fcvtas"},{"FCVTAU","fcvtau"},{"FCVTMS","fcvtms"},{"FCVTMU","fcvtmu"},
+		{"FCVTNS","fcvtns"},{"FCVTNU","fcvtnu"},{"FCVTPS","fcvtps"},{"FCVTPU","fcvtpu"},
+	}) do
+		local rows = {}
+		for _, gp in ipairs({{"w","W_REG","wzr"},{"x","X_REG","xzr"}}) do
+			for _, fp in ipairs({{"s","S_REG","FP"},{"d","D_REG","FP"},{"h","H_REG","FP16"}}) do
+				local function mk(g, f) return string.format("%s %s, %s", it[2], g, f) end
+				local b0 = word(mk(gp[1].."0", fp[1].."0"))
+				local bD = word(mk(gp[3], fp[1].."0"))        -- Rd field (zero reg)
+				local bN = word(mk(gp[1].."0", fp[1].."31"))  -- Rn field
+				if b0 and bD and bN then
+					rows[#rows+1] = string.format("\t\t{.%s, {.%s, .%s, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}},",
+						it[1], gp[2], fp[2], bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{bD,bN})):upper(), fp[3])
+					n_forms = n_forms + 1
+				end
+			end
+		end
+		block(it[1], rows)
+	end
+	sections[#sections+1] = "\t// Scalar FP round/reciprocal + FP-to-GPR convert.\n" .. table.concat(blk, "\n")
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "\t// SPECGEN:BEGIN\n" .. table.concat(sections, "\n\n") .. "\n\t// SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()
