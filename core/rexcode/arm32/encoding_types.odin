@@ -305,6 +305,13 @@ Operand_Encoding :: enum u8 {
 	//   .32: Dm in D0..D15 at bits 3:0, lane = bit5
 	NEON_VM_SCALAR16,
 	NEON_VM_SCALAR32,
+	// VMOV (core register to scalar) destination Dd[lane]: Dd at bits 19:16 +
+	// bit 7; the lane bits depend on element size:
+	//   .8  lane[2:0] = bit22 : bit21 : bit5     .16 lane[1:0] = bit21 : bit6
+	//   .32 lane[0]   = bit21
+	VMOV_LANE_8,
+	VMOV_LANE_16,
+	VMOV_LANE_32,
 	VFP_IMM8,              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)

@@ -3680,6 +3680,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VQRDMULH_LANE, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR32, .NONE}, 0xF2A00D40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}},
 		{.VQRDMULH_LANE, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR32, .NONE}, 0xF3A00D40, 0xFFB11F50, .NEON, .A32, {cond_in_28=false}},
 	},
+	// VMOV (ARM core register to scalar): Dd[lane], Rt. The lane bits depend on
+	// the element size (see VMOV_LANE_8/16/32); bit22/bit5 carry the size.
+	.VMOV_LANE = {
+		{.VMOV_LANE, {.DPR_ELEM, .GPR, .NONE, .NONE}, {.VMOV_LANE_8,  .RT_A32, .NONE, .NONE}, 0x0E400B10, 0x0FD00F1F, .VFPV2, .A32, {}},
+		{.VMOV_LANE, {.DPR_ELEM, .GPR, .NONE, .NONE}, {.VMOV_LANE_16, .RT_A32, .NONE, .NONE}, 0x0E000B30, 0x0FD00F3F, .VFPV2, .A32, {}},
+		{.VMOV_LANE, {.DPR_ELEM, .GPR, .NONE, .NONE}, {.VMOV_LANE_32, .RT_A32, .NONE, .NONE}, 0x0E000B10, 0x0FD00F7F, .VFPV2, .A32, {}},
+	},
 
 	// SPECGEN:BEGIN
 	.VADDL = {

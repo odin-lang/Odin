@@ -958,6 +958,8 @@ emit_vdup_d_r                    :: #force_inline proc(instructions: ^[dynamic]I
 emit_vdup_d_dlane                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, lane: u8) { append(instructions, inst_vdup_d_dlane(dst, src, lane)) }
 inst_vswp_d_d                    :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VSWP, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vswp_d_d                    :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vswp_d_d(dst, src)) }
+inst_vmov_lane_dlane_r           :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Register) -> Instruction { return Instruction{mnemonic = .VMOV_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_reg(src), {}, {}}} }
+emit_vmov_lane_dlane_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Register) { append(instructions, inst_vmov_lane_dlane_r(dst, lane, src)) }
 inst_vld1_dlist_mem              :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD1, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
 inst_vld1_dlane_mem              :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD1, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_mem(src), {}, {}}} }
 emit_vld1_dlist_mem              :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld1_dlist_mem(regs, src)) }
@@ -2209,6 +2211,8 @@ inst_vdup                             :: proc{ inst_vdup_d_r, inst_vdup_d_dlane 
 emit_vdup                             :: proc{ emit_vdup_d_r, emit_vdup_d_dlane }
 inst_vswp                             :: inst_vswp_d_d
 emit_vswp                             :: emit_vswp_d_d
+inst_vmov_lane                        :: inst_vmov_lane_dlane_r
+emit_vmov_lane                        :: emit_vmov_lane_dlane_r
 inst_vld1                             :: proc{ inst_vld1_dlist_mem, inst_vld1_dlane_mem }
 emit_vld1                             :: proc{ emit_vld1_dlist_mem, emit_vld1_dlane_mem }
 inst_vld2                             :: inst_vld2_dlist_mem

@@ -341,6 +341,17 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)), u8(lane))
 	case .NEON_VM_SCALAR32:
 		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
+	case .VMOV_LANE_8, .VMOV_LANE_16, .VMOV_LANE_32:
+		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
+		lane: u32 = 0
+		if enc == .VMOV_LANE_8 {
+			lane = ((word >> 21) & 1) << 2 | ((word >> 6) & 1) << 1 | ((word >> 5) & 1)
+		} else if enc == .VMOV_LANE_16 {
+			lane = ((word >> 21) & 1) << 1 | ((word >> 6) & 1)
+		} else {
+			lane = (word >> 21) & 1
+		}
+		return op_dpr_lane(Register(REG_DPR | u16(n)), u8(lane))
 	case .VD_Q:
 		n := (((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)) >> 1
 		return op_reg(Register(REG_QPR | u16(n)))

@@ -424,6 +424,18 @@ pack_operand_inline :: #force_inline proc(
 	case .NEON_VM_SCALAR32:
 		// Dm in D0..D15 at bits 3:0; lane = bit5.
 		return (u32(reg_hw(op.reg)) & 0xF) | (u32(op.lane) & 1) << 5
+	case .VMOV_LANE_8, .VMOV_LANE_16, .VMOV_LANE_32:
+		n := u32(reg_hw(op.reg)) & 0x1F                       // Dd
+		v := (n & 0xF) << 16 | ((n >> 4) & 1) << 7
+		l := u32(op.lane)
+		if enc == .VMOV_LANE_8 {
+			v |= ((l >> 2) & 1) << 21 | ((l >> 1) & 1) << 6 | (l & 1) << 5
+		} else if enc == .VMOV_LANE_16 {
+			v |= ((l >> 1) & 1) << 21 | (l & 1) << 6
+		} else {
+			v |= (l & 1) << 21
+		}
+		return v
 	case .VFP_IMM8:
 		// Run the VFP 8-bit float encoder; the user supplies the wire-format
 		// 32-bit float bit pattern (for F32). The encoder finds the abcdefgh.
