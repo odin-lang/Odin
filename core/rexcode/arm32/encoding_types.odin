@@ -213,6 +213,7 @@ Operand_Type :: enum u8 {
 	REL11,                // T16 B<cond>
 	REL8,                 // T16 conditional branch (signed 8-bit)
 	REL_LDR_LITERAL,      // PC-relative literal load offset
+	REL_BF,               // ARMv8.1-M Branch Future label (bf-point / branch target)
 
 	// ---- Condition code ----
 	COND,                 // 4-bit cond field (for IT block / B<cond> / etc.)
@@ -299,6 +300,25 @@ Operand_Encoding :: enum u8 {
 	VD_Q,                  // Q<reg>: D=bit 22, Vd<3:0>=bits 15-12 (must be even)
 	VN_Q,                  // Q<reg>: N=bit 7,  Vn<3:0>=bits 19-16 (must be even)
 	VM_Q,                  // Q<reg>: M=bit 5,  Vm<3:0>=bits 3-0 (must be even)
+	// NEON by-element scalar Dm[lane] (VQDMULH/VQRDMULH-by-scalar):
+	//   .16: Dm in D0..D7 at bits 2:0, lane = bit5:bit3
+	//   .32: Dm in D0..D15 at bits 3:0, lane = bit5
+	NEON_VM_SCALAR16,
+	NEON_VM_SCALAR32,
+	// VMOV (core register to scalar) destination Dd[lane]: Dd at bits 19:16 +
+	// bit 7; the lane bits depend on element size:
+	//   .8  lane[2:0] = bit22 : bit21 : bit5     .16 lane[1:0] = bit21 : bit6
+	//   .32 lane[0]   = bit21
+	VMOV_LANE_8,
+	VMOV_LANE_16,
+	VMOV_LANE_32,
+	// MVE complex-op rotation immediate (user passes degrees):
+	//   MVE_ROT_HCADD: #90/#270 -> bit 12;  MVE_ROT_CMLA: #0/90/180/270 -> bits 24:23
+	MVE_ROT_HCADD,
+	MVE_ROT_CMLA,
+	// MVE 3-bit Q registers (Q0..Q7): Qn at bits 19:17, Qm at bits 3:1.
+	VN_Q_MVE,
+	VM_Q_MVE,
 	VFP_IMM8,              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)
@@ -332,6 +352,11 @@ Operand_Encoding :: enum u8 {
 	BRANCH_11_T16,         // T16 unconditional (imm11, scaled ×2, ±2KB)
 	BRANCH_8_T16,          // T16 conditional (cond + imm8, scaled ×2, ±256B)
 	BRANCH_CBZ,            // T16 CBZ/CBNZ (i + imm5 + Rn, scaled ×2)
+	// ARMv8.1-M Branch Future fields (T32):
+	BF_BOFF,               // bf-point offset: imm4 at hw0[10:7], (label-PC-4)/2
+	BF_BLOC,               // branch target: J at hw1[11] + imm10 at hw1[10:1]
+	BF_RM,                 // BFLX/BFX register target at hw0[3:0]
+	BFCSEL_COND,           // BFCSEL condition at hw0[5:2]
 
 	// ---- Misc ----
 	PSR_FIELD_MASK,        // APSR fields_mask at bits 19-16 (MSR)

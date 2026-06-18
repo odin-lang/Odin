@@ -160,7 +160,6 @@ Mnemonic :: enum u16 {
 	LDXP, STXP, LDAXP, STLXP,                  // exclusive pair
 	LDXRB, STXRB, LDAXRB, STLXRB,              // exclusive byte
 	LDXRH, STXRH, LDAXRH, STLXRH,              // exclusive halfword
-	LDARB_X, STLRB_X, LDARH_X, STLRH_X,        // acquire/release byte/half (the existing LDARB/STLRB/LDARH/STLRH are unsigned)
 	LDAPR, LDAPRB, LDAPRH,                     // load-acquire RCpc
 
 	// -------------------------------------------------------------------------
@@ -433,9 +432,6 @@ Mnemonic :: enum u16 {
 	SME_BFMOPA, SME_BFMOPS,
 	SME_SMOPA, SME_SMOPS, SME_UMOPA, SME_UMOPS,
 	SME_USMOPA, SME_SUMOPA,
-	SME_MOVA_TO_Z, SME_MOVA_TO_ZA,
-	SME_LD1B_ZA, SME_LD1H_ZA, SME_LD1W_ZA, SME_LD1D_ZA, SME_LD1Q_ZA,
-	SME_ST1B_ZA, SME_ST1H_ZA, SME_ST1W_ZA, SME_ST1D_ZA, SME_ST1Q_ZA,
 	SME_LDR_ZA, SME_STR_ZA,
 
 	// -------------------------------------------------------------------------

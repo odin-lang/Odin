@@ -147,6 +147,19 @@ decode_one_inline :: #force_inline proc "contextless" (
 	inst.length   = 4
 	inst.flags    = {}
 
+	// R6 POP26/POP27 compact branches share opcodes 22/23 and are distinguished
+	// only by the rs/rt relationship. The more-specific pre-R6 (rt=0) and the
+	// rs=0 forms already matched earlier; here we refine the remaining group so
+	// rs==rt decodes as BGEZC/BLTZC rather than the general BGEC/BLTC.
+	#partial switch inst.mnemonic {
+	case .BGEC, .BLEZC, .BGEZC:
+		rs := (word >> 21) & 0x1F; rt := (word >> 16) & 0x1F
+		inst.mnemonic = rs == 0 ? .BLEZC : (rs == rt ? .BGEZC : .BGEC)
+	case .BLTC, .BGTZC, .BLTZC:
+		rs := (word >> 21) & 0x1F; rt := (word >> 16) & 0x1F
+		inst.mnemonic = rs == 0 ? .BGTZC : (rs == rt ? .BLTZC : .BLTC)
+	}
+
 	cnt_used: u8 = 0
 	if entry.ops[0] != .NONE {
 		inst.ops[0] = extract_operand_inline(word, pc, entry.ops[0], entry.enc[0])
@@ -200,6 +213,24 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return reg_operand(decode_reg(word, 11, ot), ot)
 	case .FD:
 		return reg_operand(decode_reg(word, 6, ot), ot)
+	case .FR:
+		return reg_operand(decode_reg(word, 21, ot), ot)
+	case .GPR_AT_6:
+		return reg_operand(decode_reg(word, 6, ot), ot)
+	case .GPR_AT_11:
+		return reg_operand(decode_reg(word, 11, ot), ot)
+	case .DSP_SA:
+		return Operand{immediate = i64((word >> 21) & 0xF), kind = .IMMEDIATE, size = 1}
+	case .RS_RT:
+		return reg_operand(decode_reg(word, 16, ot), ot)
+	case .AC_NUM:
+		return Operand{immediate = i64((word >> 11) & 0x3), kind = .IMMEDIATE, size = 1}
+	case .SHILO_IMM:
+		v := i32((word >> 20) & 0x3F)
+		if v & 0x20 != 0 { v |= ~i32(0x3F) }
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .EXT_SIZE:
+		return Operand{immediate = i64((word >> 21) & 0x1F), kind = .IMMEDIATE, size = 1}
 
 	// Immediates ------------------------------------------------------------
 	case .IMM_16:
@@ -248,6 +279,18 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		rel26 := i32(word & 0x3FFFFFF)
 		if rel26 & (1 << 25) != 0 { rel26 |= ~i32(0x3FFFFFF) }
 		target := u32(i32(pc) + 4 + (rel26 << 2))
+		return Operand{relative = i64(target), kind = .RELATIVE, size = 4}
+	case .BRANCH_19:
+		// R6 PC-relative load: relative to this instruction (no +4), << 2.
+		rel19 := i32(word & 0x7FFFF)
+		if rel19 & (1 << 18) != 0 { rel19 |= ~i32(0x7FFFF) }
+		target := u32(i32(pc) + (rel19 << 2))
+		return Operand{relative = i64(target), kind = .RELATIVE, size = 4}
+	case .BRANCH_18:
+		// LDPC: relative to this instruction aligned down to 8, << 3.
+		rel18 := i32(word & 0x3FFFF)
+		if rel18 & (1 << 17) != 0 { rel18 |= ~i32(0x3FFFF) }
+		target := u32((i32(pc) &~ i32(7)) + (rel18 << 3))
 		return Operand{relative = i64(target), kind = .RELATIVE, size = 4}
 
 	// Misc small immediates -------------------------------------------------
@@ -313,6 +356,26 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
 	case .MSA_BIT5:
 		return Operand{immediate = i64((word >> 11) & 0x1F), kind = .IMMEDIATE, size = 1}
+	case .MSA_BIT_SHIFT:
+		// m at 22:16; df from the marker, shift = m - marker.
+		m := (word >> 16) & 0x7F
+		sh: u32
+		if      m >= 0x70 { sh = m & 0x07 }
+		else if m >= 0x60 { sh = m & 0x0F }
+		else if m >= 0x40 { sh = m & 0x1F }
+		else              { sh = m & 0x3F }
+		return Operand{immediate = i64(sh), kind = .IMMEDIATE, size = 1}
+	case .MSA_ELM_IDX:
+		// n at 21:16; df from the marker, index = n - marker.
+		n := (word >> 16) & 0x3F
+		idx: u32
+		if      n >= 0x38 { idx = n & 0x01 }
+		else if n >= 0x30 { idx = n & 0x03 }
+		else if n >= 0x20 { idx = n & 0x07 }
+		else              { idx = n & 0x0F }
+		return Operand{immediate = i64(idx), kind = .IMMEDIATE, size = 1}
+	case .MSA_I8:
+		return Operand{immediate = i64((word >> 16) & 0xFF), kind = .IMMEDIATE, size = 1}
 
 	case .MSA_OFFSET_BASE_B, .MSA_OFFSET_BASE_H, .MSA_OFFSET_BASE_W, .MSA_OFFSET_BASE_D:
 		shift: u32 = 0

@@ -199,6 +199,81 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .BARRIER_FIELD:
 		return Operand{immediate = i64((word >> 8) & 0xF), kind = .IMMEDIATE, size = 1}
 
+	// ---- NEON shift-by-immediate: recover the amount from immh:immb ---------
+	case .NEON_SHL_IMM, .NEON_SHR_IMM:
+		immh := (word >> 19) & 0xF
+		esize: i64 = 8
+		if      immh >= 8 { esize = 64 }
+		else if immh >= 4 { esize = 32 }
+		else if immh >= 2 { esize = 16 }
+		val := i64((word >> 16) & 0x7F)
+		amt := val - esize
+		if en == .NEON_SHR_IMM { amt = 2 * esize - val }
+		return Operand{immediate = amt, kind = .IMMEDIATE, size = 1}
+
+	// ---- NEON copy/permute index fields ------------------------------------
+	case .VN_VM_DUP:
+		return Operand{reg = Register(REG_V | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
+	case .NEON_IDX5:
+		// imm5 = index << (markerbit+1) | (1 << markerbit); marker = lowest set bit.
+		imm5 := (word >> 16) & 0x1F
+		mb: u32 = 0
+		if      imm5 & 0x1 != 0 { mb = 0 }
+		else if imm5 & 0x2 != 0 { mb = 1 }
+		else if imm5 & 0x4 != 0 { mb = 2 }
+		else                    { mb = 3 }
+		return Operand{immediate = i64(imm5 >> (mb + 1)), kind = .IMMEDIATE, size = 1}
+	case .NEON_IDX4:
+		// imm4 = index << markerbit; recover markerbit from imm5 in the word.
+		imm5 := (word >> 16) & 0x1F
+		mb: u32 = 0
+		if      imm5 & 0x1 != 0 { mb = 0 }
+		else if imm5 & 0x2 != 0 { mb = 1 }
+		else if imm5 & 0x4 != 0 { mb = 2 }
+		else                    { mb = 3 }
+		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = 1}
+	case .NEON_EXT_IDX:
+		return Operand{immediate = i64((word >> 11) & 0xF), kind = .IMMEDIATE, size = 1}
+	case .IMM5_HI:
+		return Operand{immediate = i64((word >> 16) & 0x1F), kind = .IMMEDIATE, size = 1}
+	case .MSR_PSTATE:
+		v := ((word >> 16) & 0x7) << 3 | ((word >> 5) & 0x7)
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .FMOV_SCALAR_IMM:
+		return Operand{immediate = i64((word >> 13) & 0xFF), kind = .IMMEDIATE, size = 1}
+	case .PG4_PM_DUP:
+		return Operand{reg = Register(REG_P | u16((word >> 10) & 0xF)), kind = .REGISTER, size = 4}
+	case .PN_PM_DUP, .PN_PG_PM_DUP:
+		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
+	case .ZD_ZM_DUP:
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = 4}
+	case .SVE_EXT_IMM:
+		v := ((word >> 16) & 0x1F) << 3 | ((word >> 10) & 0x7)
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .ZA_TILE_LOW:
+		return Operand{immediate = i64(word & 0x7), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_B:
+		i := ((word >> 30) & 0x1) << 3 | ((word >> 12) & 0x1) << 2 | ((word >> 10) & 0x3)
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_H:
+		i := ((word >> 30) & 0x1) << 2 | ((word >> 12) & 0x1) << 1 | ((word >> 11) & 0x1)
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_S:
+		i := ((word >> 30) & 0x1) << 1 | ((word >> 12) & 0x1)
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+	case .NEON_LANE_D:
+		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = 1}
+	case .SVE_XAR_SHIFT:
+		tszh := (word >> 22) & 0x3
+		tszl := (word >> 19) & 0x3
+		v    := i64((tszh << 5) | (tszl << 3) | ((word >> 16) & 0x7))
+		tsize := (tszh << 2) | tszl
+		esize: i64 = 8
+		if      tsize >= 8 { esize = 64 }
+		else if tsize >= 4 { esize = 32 }
+		else if tsize >= 2 { esize = 16 }
+		return Operand{immediate = 2 * esize - v, kind = .IMMEDIATE, size = 1}
+
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:
 		size := u32(1) << ((word >> 30) & 0x3)

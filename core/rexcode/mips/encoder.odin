@@ -223,7 +223,7 @@ operand_matches_inline :: #force_inline proc "contextless" (
 	case .IMM5, .IMM16S, .IMM16U, .IMM20, .IMM26, .SEL, .FCC,
 		 .GTE_SF, .GTE_MX, .GTE_V, .GTE_CV, .GTE_LM:
 		return op.kind == .IMMEDIATE
-	case .REL16, .REL21, .REL26, .REL_J26:
+	case .REL16, .REL21, .REL26, .REL_J26, .REL19, .REL18:
 		return op.kind == .RELATIVE
 	case .MEM:
 		return op.kind == .MEMORY
@@ -308,6 +308,18 @@ pack_operand_inline :: #force_inline proc(
 			type = .REL26, size = 4, inst_idx = inst_idx,
 		})
 		return 0
+	case .BRANCH_19:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .REL_PC19, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .BRANCH_18:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .REL_PC18, size = 4, inst_idx = inst_idx,
+		})
+		return 0
 
 	// FP condition-code field (BC1*, MOVF/MOVT, C.cond.fmt).
 	case .FCC_BC:
@@ -386,6 +398,29 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x3FF) << 16
 	case .MSA_BIT5:
 		return (u32(op.immediate) & 0x1F) << 11
+	case .MSA_BIT_SHIFT, .MSA_ELM_IDX:
+		// The marker (data format) is fixed in `bits`; the operand drives the
+		// low bits of the shift/index field at bit 16.
+		return (u32(op.immediate) & 0x3F) << 16
+	case .MSA_I8:
+		return (u32(op.immediate) & 0xFF) << 16
+	case .FR:
+		return (u32(reg_hw(op.reg)) & 0x1F) << 21
+	case .GPR_AT_6:
+		return (u32(reg_hw(op.reg)) & 0x1F) << 6
+	case .GPR_AT_11:
+		return (u32(reg_hw(op.reg)) & 0x1F) << 11
+	case .DSP_SA:
+		return (u32(op.immediate) & 0xF) << 21
+	case .RS_RT:
+		r := u32(reg_hw(op.reg)) & 0x1F
+		return r << 21 | r << 16
+	case .AC_NUM:
+		return (u32(op.immediate) & 0x3) << 11
+	case .SHILO_IMM:
+		return (u32(op.immediate) & 0x3F) << 20
+	case .EXT_SIZE:
+		return (u32(op.immediate) & 0x1F) << 21
 
 	// MSA memory operand: base GPR at 15:11, signed-10 disp at 25:16
 	// (caller has already scaled the displacement by element size).
@@ -466,6 +501,36 @@ resolve_relocation_inline :: #force_inline proc(
 			return true
 		}
 		word = (word &~ 0x3FFFFFF) | (u32(rel) & 0x3FFFFFF)
+
+	case .REL_PC19:
+		// R6 PC-relative load: offset is relative to the instruction's own
+		// address (no delay-slot adjustment), scaled by 4, 19-bit signed.
+		rel := i32(target) - i32(relocation.offset)
+		if rel & 3 != 0 {
+			append(errors, Error{inst_idx = u32(relocation.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		rel >>= 2
+		if rel < -(1<<18) || rel > (1<<18)-1 {
+			append(errors, Error{inst_idx = u32(relocation.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		word = (word &~ 0x7FFFF) | (u32(rel) & 0x7FFFF)
+
+	case .REL_PC18:
+		// LDPC: relative to the instruction's address aligned down to 8, scaled
+		// by 8, 18-bit signed.
+		rel := i32(target) - (i32(relocation.offset) &~ i32(7))
+		if rel & 7 != 0 {
+			append(errors, Error{inst_idx = u32(relocation.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		rel >>= 3
+		if rel < -(1<<17) || rel > (1<<17)-1 {
+			append(errors, Error{inst_idx = u32(relocation.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		word = (word &~ 0x3FFFF) | (u32(rel) & 0x3FFFF)
 
 	case .J26:
 		// J/JAL: target = ((PC+4)[31:28] << 28) | (encoded_field << 2)

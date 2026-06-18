@@ -115,7 +115,7 @@ run_pipeline_tests :: proc() {
 	eq_bytes("SAX (HuC)",        encode_or_fail({m.inst_none(.SAX)}),                     {0x22})
 	eq_bytes("CLA",              encode_or_fail({m.inst_none(.CLA)}),                     {0x62})
 	eq_bytes("ST0 #$05",         encode_or_fail({m.inst_i(.ST0, 0x05)}),                  {0x03, 0x05})
-	eq_bytes("TST #$10, $80",    encode_or_fail({m.inst_tst(.TST, 0x10, m.mem_zp(0x80))}), {0x83, 0x10, 0x80})
+	eq_bytes("TST #$10, $80",    encode_or_fail({m.inst_tst(0x10, m.mem_zp(0x80))}), {0x83, 0x10, 0x80})
 	eq_bytes("TII",              encode_or_fail({m.inst_block(.TII, 0x4000, 0x2000, 0x100)}),
 			 {0x73, 0x00, 0x40, 0x00, 0x20, 0x00, 0x01})
 

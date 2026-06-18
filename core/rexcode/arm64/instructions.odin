@@ -100,30 +100,8 @@ inst_branch :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32) -> 
 					   ops = {op_label(label_id, 4), {}, {}, {}}}
 }
 
-// Conditional branch (B.cond label).
-@(require_results)
-inst_b_cond :: #force_inline proc "contextless" (c: Cond, label_id: u32) -> Instruction {
-	return Instruction{mnemonic = .B_COND, operand_count = 2, length = 4,
-					   ops = {op_cond(c), op_label(label_id, 4), {}, {}}}
-}
-
-// CBZ/CBNZ: Rt, label.
-@(require_results)
-inst_cbz :: #force_inline proc "contextless" (m: Mnemonic, rt: Register, label_id: u32) -> Instruction {
-	return Instruction{mnemonic = m, operand_count = 2, length = 4,
-					   ops = {op_reg(rt), op_label(label_id, 4), {}, {}}}
-}
-
-// TBZ/TBNZ: Rt, bit, label.
-@(require_results)
-inst_tbz :: #force_inline proc "contextless" (m: Mnemonic, rt: Register, bit: u8, label_id: u32) -> Instruction {
-	return Instruction{mnemonic = m, operand_count = 3, length = 4,
-					   ops = {op_reg(rt), op_imm(i64(bit), 1), op_label(label_id, 4), {}}}
-}
-
-// CSEL/CSINC/CSINV/CSNEG: Rd, Rn, Rm, cond.
-@(require_results)
-inst_csel :: #force_inline proc "contextless" (m: Mnemonic, rd, rn, rm: Register, c: Cond) -> Instruction {
-	return Instruction{mnemonic = m, operand_count = 4, length = 4,
-					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), op_cond(c)}}
-}
+// NOTE: inst_b_cond / inst_cbz (+cbnz) / inst_tbz (+tbnz) /
+// inst_csel (+csinc/csinv/csneg) are now generated per-mnemonic in
+// mnemonic_builders.odin (e.g. inst_cbz(rt, label), inst_cbnz(rt, label),
+// inst_csinc(rd, rn, rm, cond)). They are no longer hand-written here so the
+// generator can own those names for full mnemonic coverage.

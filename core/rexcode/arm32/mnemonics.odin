@@ -306,7 +306,7 @@ Mnemonic :: enum u16 {
 	SHA256H, SHA256H2, SHA256SU0, SHA256SU1,
 
 	// -- VFP rounding (ARMv8 FEAT_FP) ----------------------------------------
-	VRINT,   VJCVT,                        // VJCVT: F64-to-S32 with FPSCR.RM rounding
+	VJCVT,                                 // VJCVT: F64-to-S32 with FPSCR.RM rounding
 
 	// -- Dot Product (FEAT_DotProd) ------------------------------------------
 	VSDOT,   VUDOT,
@@ -405,8 +405,13 @@ Mnemonic :: enum u16 {
 	LETP,                                  // loop end with tail predication
 	LCTP,                                  // loop clear tail predication
 
-	BF,                                    // branch future (ARMv8.1-M)
-	BFI_BR,                                // branch future indirect
+	// Branch Future (ARMv8.1-M). T32, encoded via REL_BF + BF_BOFF/BF_BLOC/BF_RM
+	// operand encodings and BF_BOFF_T32/BF_BLOC_T32 relocations (see encoder.odin).
+	// bf-point imm4 at hw0[10:7]; branch target J:imm10 at hw1[11]:[10:1]; BFLX/BFX
+	// use a register target Rm at hw0[3:0]; BFCSEL adds a 4-bit condition at
+	// hw0[5:2] (its else-target is the implicit fall-through). Byte-exact vs llvm-mc.
+	BF,                                    // branch future
+	BFI_BR,                                // branch future indirect (bfx)
 	BFL,                                   // branch future and link
 	BFLX,                                  // branch future link and exchange
 	BFCSEL,                                // branch future conditional select
@@ -465,7 +470,6 @@ Mnemonic :: enum u16 {
 	// Bit reverse + shifts unique to MVE
 	VBRSR,                                 // bit reverse with shift right
 	VSHLC,                                 // shift left with carry
-	VRSHL_MVE,                             // (placeholder if needed; usually VRSHL)
 	VDDUP,                                 // decrement and duplicate
 	VIDUP,                                 // increment and duplicate
 	VDWDUP,                                // decrement-wrap and duplicate
@@ -501,7 +505,6 @@ Mnemonic :: enum u16 {
 	VQRDMLSDH,  VQRDMLSDHX,
 
 	// Misc
-	VPRINT,                                // printf-like debug op (rare)
 	VHCADD_SAT,                            // (rarely used)
 	VCMLA_MVE,                             // (MVE form; VCMLA already exists)
 

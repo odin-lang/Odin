@@ -164,6 +164,14 @@ Operand_Type :: enum u8 {
 
 	// ---- Condition code ----
 	COND,
+
+	// ---- NEON shift-by-immediate amount (encoded into immh:immb together
+	//      with the element size: left = esize+shift, right = 2*esize-shift) ----
+	VEC_SHIFT,
+
+	// ---- NEON element lane index (DUP/INS/EXT). The element-size marker
+	//      lives in the entry `bits`; the operand drives only the index bits. ----
+	VEC_INDEX,
 }
 
 // Where each operand's bits land in the 32-bit word.
@@ -221,6 +229,54 @@ Operand_Encoding :: enum u8 {
 	NEON_INDEX_H,         // 2-bit H lane index
 	NEON_INDEX_S,         // S lane index
 	NEON_INDEX_D,         // D lane index
+
+	// ---- NEON shift-by-immediate (immh:immb at bits 22:16) ----
+	// The element-size marker bit is fixed in the entry's `bits`; the operand
+	// drives only the low bits. Left: low = shift. Right: low = esize - shift.
+	NEON_SHL_IMM,
+	NEON_SHR_IMM,
+
+	// ---- NEON copy/permute index fields ----
+	// The element-size marker bit lives in the entry `bits`; the lane index
+	// operand drives the bits above it (DUP/INS imm5, INS imm4) or the plain
+	// imm4 (EXT). The decoder recovers the element size from imm5's marker.
+	VN_VM_DUP,        // one V reg packed into BOTH Vn (9:5) and Vm (20:16) (MOV = ORR alias)
+	NEON_IDX5,        // element lane index in imm5 (20:16); index << (markerbit+1)
+	NEON_IDX4,        // INS source lane index in imm4 (14:11); index << markerbit
+	NEON_EXT_IDX,     // EXT byte index in imm4 (14:11)
+
+	// ---- MSR (immediate to PSTATE): pstate field selector op1:op2 ----
+	// User passes the combined 6-bit selector (op1<<3 | op2); op1 lands at
+	// bits 18:16, op2 at bits 7:5. The #imm goes to CRm (bits 11:8) via
+	// BARRIER_FIELD, which it shares with the DMB/DSB barrier encoding.
+	IMM5_HI,          // generic 5-bit immediate at bits 20:16 (CCMP/CCMN immediate)
+	MSR_PSTATE,       // PSTATE field selector: op1 at 18:16, op2 at 7:5
+	FMOV_SCALAR_IMM,  // scalar FMOV 8-bit float immediate at bits 20:13
+
+	// ---- SVE alias duplicated predicate/Z fields + EXT byte index ----
+	// MOV/NOT/MOVS predicate aliases are EOR/ORR/AND with a duplicated field;
+	// MOV (predicated) is SEL with Zm = Zd. The source register is packed into
+	// every slot it occupies so the alias round-trips to the canonical bytes.
+	PG4_PM_DUP,       // Pg at 10:13 AND Pm at 16:19 (NOT = EOR Pd,Pg/z,Pn,Pg)
+	PN_PM_DUP,        // Pn at 5:8 AND Pm at 16:19 (MOVS/MOV-pred: Pm = Pn)
+	PN_PG_PM_DUP,     // Pn at 5:8, Pg at 10:13, Pm at 16:19 (MOV Pd,Pn)
+	ZD_ZM_DUP,        // Zd at 0:4 AND Zm at 16:20 (MOV Zd,Pg/m,Zn = SEL ...,Zd)
+	SVE_EXT_IMM,      // SVE EXT byte index: imm8h at 20:16, imm8l at 12:10
+	ZA_TILE_LOW,      // SME ZA accumulator tile number at bits 2:0 (ADDHA/ADDVA)
+
+	// ---- NEON single-structure lane index (LD1..4_LANE / ST1..4_LANE) ----
+	// The lane index is split across Q (bit 30), S (bit 12) and size (bits
+	// 11:10) in an element-size-dependent way; the structure-size/count opcode
+	// bits stay fixed in the entry `bits`.
+	NEON_LANE_B,      // .B[i]: Q<<3 | S<<2 | size  (i in 0..15)
+	NEON_LANE_H,      // .H[i]: Q<<2 | S<<1 | bit11 (i in 0..7)
+	NEON_LANE_S,      // .S[i]: Q<<1 | S            (i in 0..3)
+	NEON_LANE_D,      // .D[i]: Q                   (i in 0..1)
+
+	// ---- SVE2 XAR rotate amount (tszh:tszl:imm3 split) ----
+	// V = 2*esize - amount placed as tszh(23:22):tszl(20:19):imm3(18:16);
+	// esize comes from the form's Z register (highest set bit of tszh:tszl).
+	SVE_XAR_SHIFT,
 
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20

@@ -268,7 +268,7 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
 	     .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM, .IMM16_LO_HI:
 		return op.kind == .IMMEDIATE
-	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL:
+	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .REL_BF:
 		return op.kind == .RELATIVE
 	case .COND:
 		return op.kind == .IMMEDIATE
@@ -419,6 +419,32 @@ pack_operand_inline :: #force_inline proc(
 		n := u32(reg_hw(op.reg)) & 0x1F
 		if reg_class(op.reg) == REG_QPR { n = (n & 0xF) * 2 }
 		return (n & 0xF) | ((n >> 4) & 1) << 5
+	case .NEON_VM_SCALAR16:
+		// Dm in D0..D7 at bits 2:0; lane = bit5(lane[1]) : bit3(lane[0]).
+		return (u32(reg_hw(op.reg)) & 0x7) | ((u32(op.lane) >> 1) & 1) << 5 | (u32(op.lane) & 1) << 3
+	case .NEON_VM_SCALAR32:
+		// Dm in D0..D15 at bits 3:0; lane = bit5.
+		return (u32(reg_hw(op.reg)) & 0xF) | (u32(op.lane) & 1) << 5
+	case .VMOV_LANE_8, .VMOV_LANE_16, .VMOV_LANE_32:
+		n := u32(reg_hw(op.reg)) & 0x1F                       // Dd
+		v := (n & 0xF) << 16 | ((n >> 4) & 1) << 7
+		l := u32(op.lane)
+		if enc == .VMOV_LANE_8 {
+			v |= ((l >> 2) & 1) << 21 | ((l >> 1) & 1) << 6 | (l & 1) << 5
+		} else if enc == .VMOV_LANE_16 {
+			v |= ((l >> 1) & 1) << 21 | (l & 1) << 6
+		} else {
+			v |= (l & 1) << 21
+		}
+		return v
+	case .MVE_ROT_HCADD:
+		return (u32(op.immediate) == 270 ? 1 : 0) << 12
+	case .MVE_ROT_CMLA:
+		return ((u32(op.immediate) / 90) & 0x3) << 23
+	case .VN_Q_MVE:
+		return (u32(reg_hw(op.reg)) & 0x7) << 17
+	case .VM_Q_MVE:
+		return (u32(reg_hw(op.reg)) & 0x7) << 1
 	case .VFP_IMM8:
 		// Run the VFP 8-bit float encoder; the user supplies the wire-format
 		// 32-bit float bit pattern (for F32). The encoder finds the abcdefgh.
@@ -535,6 +561,24 @@ pack_operand_inline :: #force_inline proc(
 			type = .BRANCH_T16_CBZ, size = 2, inst_idx = inst_idx,
 		})
 		return 0
+
+	// ---- ARMv8.1-M Branch Future -------------------------------------------
+	case .BF_BOFF:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .BF_BOFF_T32, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .BF_BLOC:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .BF_BLOC_T32, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .BF_RM:
+		return (u32(reg_hw(op.reg)) & 0xF) << 16   // Rm at hw0[3:0] (word bits 19:16)
+	case .BFCSEL_COND:
+		return (u32(op.immediate) & 0xF) << 18     // cond at hw0[5:2] (word bits 21:18)
 
 	// ---- Misc --------------------------------------------------------------
 	case .PSR_FIELD_MASK:   return encode_psr_field(u8(op.immediate))
@@ -700,6 +744,31 @@ resolve_relocation_inline :: #force_inline proc(
 		imm11 := u16(u32(rel >> 1) & 0x7FF)
 		existing := read_u16_le(code, r.offset + 2)
 		write_u16_le(code, r.offset + 2, existing | (imm11 << 1))
+		return true
+
+	case .BF_BOFF_T32:
+		// Branch Future bf-point: imm4 = (label-(PC+4))/2 at hw0[10:7].
+		rel := i32(target) - (i32(r.offset) + 4) + r.addend
+		if rel & 1 != 0 || rel < 0 || rel >= (1 << 5) {
+			append(errors, Error{inst_idx = u32(r.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		imm4 := u16(u32(rel >> 1) & 0xF)
+		hw0  := read_u16_le(code, r.offset)
+		write_u16_le(code, r.offset, hw0 | (imm4 << 7))
+		return true
+
+	case .BF_BLOC_T32:
+		// Branch Future target: val=(label-(PC+4))/2; J at hw1[11], imm10 at hw1[10:1].
+		rel := i32(target) - (i32(r.offset) + 4) + r.addend
+		if rel & 1 != 0 || rel < -(1 << 11) || rel >= (1 << 11) {
+			append(errors, Error{inst_idx = u32(r.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		val   := u32(rel >> 1)
+		hw1   := read_u16_le(code, r.offset + 2)
+		hw1 |= u16((val & 1) << 11) | u16(((val >> 1) & 0x3FF) << 1)
+		write_u16_le(code, r.offset + 2, hw1)
 		return true
 
 	case .LDR_LITERAL_A32:

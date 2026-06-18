@@ -94,6 +94,13 @@ x86.inst_r_m(.MOV, x86.RAX, x86.mem_base_disp(x86.RBP, -8), 8)
 x86.inst_rel(.JMP, label_id, 1)
 ```
 
+These are hand-written **operand-shape** constructors (one `inst_r_r` serves
+every two-register mnemonic). Each package additionally ships **generated,
+per-mnemonic typed builders** in `mnemonic_builders.odin` — `inst_<mnemonic>` /
+`emit_<mnemonic>` overload sets with the operand types baked in — produced by
+`<arch>/tools/gen_mnemonic_builders.odin` and regenerated with
+`luajit build.lua --builders`.
+
 ## Memory Operands
 
 ```odin
@@ -149,14 +156,16 @@ current platform.
 
 ```sh
 luajit build.lua                 # help + platform availability
-luajit build.lua all             # everything: generate -> validate -> test, all ISAs
+luajit build.lua all             # everything: generate -> builders -> validate -> test
 luajit build.lua --gen --isa x86 # only regenerate one ISA's tables
+luajit build.lua --builders      # regenerate the typed mnemonic builders (all ISAs)
 luajit build.lua --check --test  # validate + test the committed tables
 luajit build.lua --verify        # external-tool round-trip where the tool is installed
 luajit build.lua --list          # ISA x task availability matrix for this platform
 ```
 
-Tasks: `--gen` (table metaprograms), `--check` (compile + structural invariants),
+Tasks: `--gen` (table metaprograms), `--builders` (regenerate each ISA's
+`mnemonic_builders.odin`), `--check` (compile + structural invariants),
 `--test` (run the suites), `--verify` (round-trip vs `llvm-mc`/`da65`/`ca65`/
 `armips`/…), `--idempotent` (re-gen and confirm byte-stable). Scope with
 `--isa <list>`. It uses the in-repo `./odin` — build that first.
@@ -217,7 +226,8 @@ Per-package layout (canonical, enforced by the cross-arch contract):
 	printer.odin         # sb/sbln/print/println/aprint/aprintln/tprint/tprintln/bprint/bprintln/fprint/fprintln/wprint/wprintln
 	registers.odin       # Register, REG_* classes, typed enums
 	operands.odin        # Operand, Memory, Operand_Kind, op_* constructors
-	instructions.odin    # Instruction, inst_* builders
+	instructions.odin    # Instruction, inst_* operand-shape builders
+	mnemonic_builders.odin # generated: inst_<mnem>/emit_<mnem> typed builders
 	encoding_types.odin  # Encoding, Encoding_Flags, isa re-exports
 	tables.odin          # generated: #load()s the binary tables into @(rodata) + accessors
 	tables/              # committed binary blobs (<arch>.*.bin) the library #loads
@@ -225,7 +235,7 @@ Per-package layout (canonical, enforced by the cross-arch contract):
 	reloc.odin           # Relocation_Type + Relocation
 	tablegen/            # ENCODING_TABLE (source of truth) + gen.odin metaprogram
 	tests/               # smoke, pipeline_smoke, sweep
-	tools/               # dump_verify_input, verify_against_*
+	tools/               # dump_verify_input, verify_against_*, gen_mnemonic_builders
 ```
 
 ## Cross-architecture API design

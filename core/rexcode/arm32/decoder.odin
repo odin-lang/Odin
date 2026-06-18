@@ -336,6 +336,30 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .VM_D:
 		n := ((word >> 5) & 1) << 4 | (word & 0xF)
 		return op_reg(Register(REG_DPR | u16(n)))
+	case .NEON_VM_SCALAR16:
+		lane := ((word >> 5) & 1) << 1 | ((word >> 3) & 1)
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)), u8(lane))
+	case .NEON_VM_SCALAR32:
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
+	case .VMOV_LANE_8, .VMOV_LANE_16, .VMOV_LANE_32:
+		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
+		lane: u32 = 0
+		if enc == .VMOV_LANE_8 {
+			lane = ((word >> 21) & 1) << 2 | ((word >> 6) & 1) << 1 | ((word >> 5) & 1)
+		} else if enc == .VMOV_LANE_16 {
+			lane = ((word >> 21) & 1) << 1 | ((word >> 6) & 1)
+		} else {
+			lane = (word >> 21) & 1
+		}
+		return op_dpr_lane(Register(REG_DPR | u16(n)), u8(lane))
+	case .MVE_ROT_HCADD:
+		return op_imm(((word >> 12) & 1) == 1 ? 270 : 90)
+	case .MVE_ROT_CMLA:
+		return op_imm(i64((word >> 23) & 0x3) * 90)
+	case .VN_Q_MVE:
+		return op_reg(Register(REG_QPR | u16((word >> 17) & 0x7)))
+	case .VM_Q_MVE:
+		return op_reg(Register(REG_QPR | u16((word >> 1) & 0x7)))
 	case .VD_Q:
 		n := (((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)) >> 1
 		return op_reg(Register(REG_QPR | u16(n)))
@@ -440,6 +464,19 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		imm5  := (word >> 3) & 0x1F
 		v := (i_bit << 6) | (imm5 << 1)
 		return op_rel_offset(i64(v))
+	// ---- ARMv8.1-M Branch Future ----
+	case .BF_BOFF:
+		imm4 := (word >> 23) & 0xF          // hw0[10:7]
+		return op_rel_offset(i64(imm4) << 1)
+	case .BF_BLOC:
+		j     := (word >> 11) & 1           // hw1[11]
+		imm10 := (word >> 1)  & 0x3FF       // hw1[10:1]
+		val   := (imm10 << 1) | j
+		return op_rel_offset(i64(val) << 1)
+	case .BF_RM:
+		return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
+	case .BFCSEL_COND:
+		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
 	case .SAT_IMM5, .SAT_IMM5_T32, .BFI_MSB:

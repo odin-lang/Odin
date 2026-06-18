@@ -75,15 +75,6 @@ inst_zp_rel :: #force_inline proc "contextless" (m: Mnemonic, zp: u8, label_id: 
 	}
 }
 
-// HuC6280 TST # imm, addr  (3 or 4 bytes depending on addressing mode).
-@(require_results)
-inst_tst :: #force_inline proc "contextless" (m: Mnemonic, imm: i64, mm: Memory) -> Instruction {
-	return Instruction{
-		mnemonic = m, operand_count = 2, length = 0,
-		ops = {op_imm8(imm), op_mem(mm), {}},
-	}
-}
-
 // HuC6280 block transfer: src, dst, length (7-byte encoding).
 @(require_results)
 inst_block :: #force_inline proc "contextless" (m: Mnemonic, src, dst, length_val: u16) -> Instruction {
