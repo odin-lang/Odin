@@ -103,6 +103,55 @@ for _, b in ipairs({
 	{"FTRUNC_S","ftrunc_s"},{"FTRUNC_U","ftrunc_u"},{"FFINT_S","ffint_s"},{"FFINT_U","ffint_u"},
 }) do family(b[1], b[2], WD, false) end
 
+-- ---- BIT: shift by immediate (Wd, Ws, m) -- marker per df in `bits` --------
+local BIT_SH = {b=7, h=15, w=31, d=63}
+for _, base in ipairs({{"SLLI","slli"},{"SRAI","srai"},{"SRLI","srli"}}) do
+	for _, d in ipairs(BHWD) do
+		local r = entry(base[1].."_"..d[1], "{.MSA_VEC,.MSA_VEC,.IMM5,.NONE}", "{.WD,.WS,.MSA_BIT_SHIFT,.NONE}", "MSA",
+			function(v) return string.format("%s.%s $w%d,$w%d,%d", base[2], d[2], v[1], v[2], v[3]) end, {31,31,BIT_SH[d[2]]})
+		if r then sections[#sections+1]=r end
+	end
+end
+
+-- ---- ELM: element broadcast/insert by immediate index (Wd, Ws[idx]) --------
+local ELM_IDX = {b=15, h=7, w=3, d=1}
+for _, base in ipairs({{"SPLATI","splati"},{"SLDI","sldi"}}) do
+	for _, d in ipairs(BHWD) do
+		local r = entry(base[1].."_"..d[1], "{.MSA_VEC,.MSA_VEC,.IMM5,.NONE}", "{.WD,.WS,.MSA_ELM_IDX,.NONE}", "MSA",
+			function(v) return string.format("%s.%s $w%d,$w%d[%d]", base[2], d[2], v[1], v[2], v[3]) end, {31,31,ELM_IDX[d[2]]})
+		if r then sections[#sections+1]=r end
+	end
+end
+
+-- ---- VSHF (3R vector shuffle) ----------------------------------------------
+for _, d in ipairs(BHWD) do
+	local r = entry("VSHF_"..d[1], OPS3, ENC3, "MSA",
+		function(v) return string.format("vshf.%s $w%d,$w%d,$w%d", d[2], v[1], v[2], v[3]) end, {31,31,31})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- SPLAT / SLD (element broadcast/slide by GPR index) --------------------
+for _, base in ipairs({{"SPLAT","splat"},{"SLD","sld"}}) do
+	for _, d in ipairs(BHWD) do
+		local r = entry(base[1].."_"..d[1], "{.MSA_VEC,.MSA_VEC,.GPR,.NONE}", "{.WD,.WS,.RT,.NONE}", "MSA",
+			function(v) return string.format("%s.%s $w%d,$w%d[$%d]", base[2], d[2], v[1], v[2], v[3]) end, {31,31,31})
+		if r then sections[#sections+1]=r end
+	end
+end
+
+-- ---- I8: 8-bit-immediate logical / shuffle ---------------------------------
+for _, base in ipairs({{"ANDI_B","andi.b"},{"ORI_B","ori.b"},{"XORI_B","xori.b"},{"NORI_B","nori.b"},
+	{"BMNZI_B","bmnzi.b"},{"BMZI_B","bmzi.b"},{"BSELI_B","bseli.b"}}) do
+	local r = entry(base[1], "{.MSA_VEC,.MSA_VEC,.IMM5,.NONE}", "{.WD,.WS,.MSA_I8,.NONE}", "MSA",
+		function(v) return string.format("%s $w%d,$w%d,%d", base[2], v[1], v[2], v[3]) end, {31,31,255})
+	if r then sections[#sections+1]=r end
+end
+for _, d in ipairs({{"B","b"},{"H","h"},{"W","w"}}) do
+	local r = entry("SHF_"..d[1], "{.MSA_VEC,.MSA_VEC,.IMM5,.NONE}", "{.WD,.WS,.MSA_I8,.NONE}", "MSA",
+		function(v) return string.format("shf.%s $w%d,$w%d,%d", d[2], v[1], v[2], v[3]) end, {31,31,255})
+	if r then sections[#sections+1]=r end
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "    // SPECGEN:BEGIN\n" .. table.concat(sections, "\n") .. "\n    // SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()

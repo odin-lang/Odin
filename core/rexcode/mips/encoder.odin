@@ -388,6 +388,12 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x3FF) << 16
 	case .MSA_BIT5:
 		return (u32(op.immediate) & 0x1F) << 11
+	case .MSA_BIT_SHIFT, .MSA_ELM_IDX:
+		// The marker (data format) is fixed in `bits`; the operand drives the
+		// low bits of the shift/index field at bit 16.
+		return (u32(op.immediate) & 0x3F) << 16
+	case .MSA_I8:
+		return (u32(op.immediate) & 0xFF) << 16
 
 	// MSA memory operand: base GPR at 15:11, signed-10 disp at 25:16
 	// (caller has already scaled the displacement by element size).

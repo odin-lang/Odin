@@ -313,6 +313,26 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
 	case .MSA_BIT5:
 		return Operand{immediate = i64((word >> 11) & 0x1F), kind = .IMMEDIATE, size = 1}
+	case .MSA_BIT_SHIFT:
+		// m at 22:16; df from the marker, shift = m - marker.
+		m := (word >> 16) & 0x7F
+		sh: u32
+		if      m >= 0x70 { sh = m & 0x07 }
+		else if m >= 0x60 { sh = m & 0x0F }
+		else if m >= 0x40 { sh = m & 0x1F }
+		else              { sh = m & 0x3F }
+		return Operand{immediate = i64(sh), kind = .IMMEDIATE, size = 1}
+	case .MSA_ELM_IDX:
+		// n at 21:16; df from the marker, index = n - marker.
+		n := (word >> 16) & 0x3F
+		idx: u32
+		if      n >= 0x38 { idx = n & 0x01 }
+		else if n >= 0x30 { idx = n & 0x03 }
+		else if n >= 0x20 { idx = n & 0x07 }
+		else              { idx = n & 0x0F }
+		return Operand{immediate = i64(idx), kind = .IMMEDIATE, size = 1}
+	case .MSA_I8:
+		return Operand{immediate = i64((word >> 16) & 0xFF), kind = .IMMEDIATE, size = 1}
 
 	case .MSA_OFFSET_BASE_B, .MSA_OFFSET_BASE_H, .MSA_OFFSET_BASE_W, .MSA_OFFSET_BASE_D:
 		shift: u32 = 0

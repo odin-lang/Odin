@@ -231,6 +231,12 @@ Operand_Encoding :: enum u8 {
 	MSA_I5,        // 5-bit immediate at bits 20:16 (LDI/I5 forms)
 	MSA_S10,       // signed 10-bit displacement at bits 25:16 (MI10 load/store)
 	MSA_BIT5,      // bit position (5-bit) at bits 16:11 (BIT form)
+	// The shift amount / element index sits at bits 22:16 / 21:16 with the data
+	// format encoded by the high (marker) bits; the operand drives the low bits
+	// (the marker is fixed in the entry `bits`). Decode infers df from the marker.
+	MSA_BIT_SHIFT, // BIT-format shift amount (.B m=0x70|sh, .H 0x60|sh, .W 0x40|sh, .D sh)
+	MSA_ELM_IDX,   // ELM-format element index (.B n, .H 0x20|n, .W 0x30|n, .D 0x38|n)
+	MSA_I8,        // 8-bit immediate at bits 23:16 (I8 forms: ANDI.B/SHF/...)
 
 	// MSA memory operand: base GPR at bits 15:11 + signed 10-bit disp at 25:16,
 	// scaled by element size (1/2/4/8 for B/H/W/D).
