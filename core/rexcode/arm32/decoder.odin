@@ -464,6 +464,22 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		imm5  := (word >> 3) & 0x1F
 		v := (i_bit << 6) | (imm5 << 1)
 		return op_rel_offset(i64(v))
+	// ---- ARMv8.1-M Branch Future ----
+	case .BF_BOFF:
+		imm4 := (word >> 23) & 0xF          // hw0[10:7]
+		return op_rel_offset(i64(imm4) << 1)
+	case .BF_BLOC:
+		j     := (word >> 11) & 1           // hw1[11]
+		imm10 := (word >> 1)  & 0x3FF       // hw1[10:1]
+		val   := (imm10 << 1) | j
+		return op_rel_offset(i64(val) << 1)
+	case .BF_BELSE:
+		imm   := (word >> 23) & 0xF
+		return op_rel_offset(i64(imm) << 1)
+	case .BF_RM:
+		return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
+	case .BFCSEL_COND:
+		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
 	case .SAT_IMM5, .SAT_IMM5_T32, .BFI_MSB:

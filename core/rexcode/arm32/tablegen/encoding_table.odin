@@ -3103,13 +3103,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 	.WLSTP = {
 		// WLSTP.<size>: bits 22:20 carry size selector (B/H/W/D)
-		{.WLSTP, {.GPR, .REL11, .NONE, .NONE}, {.RN_T32, .MVE_LOOP_IMM, .NONE, .NONE}, 0xF000C001, 0xFE80F001, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
+		{.WLSTP, {.GPR, .REL11, .NONE, .NONE}, {.RN_T32, .MVE_LOOP_IMM, .NONE, .NONE}, 0xF000C001, 0xFEC0F001, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
 	},
 	.DLS = {
 		{.DLS, {.GPR, .NONE, .NONE, .NONE}, {.RN_T32, .NONE, .NONE, .NONE}, 0xF040E001, 0xFFF0FFFF, .V81M, .T32, {thumb32=true, cond_in_28=false}},
 	},
 	.DLSTP = {
-		{.DLSTP, {.GPR, .NONE, .NONE, .NONE}, {.RN_T32, .NONE, .NONE, .NONE}, 0xF000E001, 0xFE80FFFF, .V81M, .T32, {thumb32=true, cond_in_28=false}},
+		{.DLSTP, {.GPR, .NONE, .NONE, .NONE}, {.RN_T32, .NONE, .NONE, .NONE}, 0xF000E001, 0xFEC0FFFF, .V81M, .T32, {thumb32=true, cond_in_28=false}},
 	},
 	.LE = {
 		{.LE, {.REL11, .NONE, .NONE, .NONE}, {.MVE_LOOP_IMM, .NONE, .NONE, .NONE}, 0xF00FC001, 0xFFFFF001, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
@@ -3121,10 +3121,22 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LCTP, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF00FE001, 0xFFFFFFFF, .V81M, .T32, {thumb32=true, cond_in_28=false}},
 	},
 
-	// BF / BFL / BFLX / BFCSEL / BFI_BR (branch future, ARMv8.1-M).
-	// These encodings are scattered/relative and are intentionally left as
-	// placeholders pending dedicated LLVM-verified bit-pattern work. The
-	// mnemonics remain in the enum so callers can refer to them.
+	// BF / BFL / BFLX / BFI_BR (Branch Future, ARMv8.1-M). T32, word = hw0<<16|hw1.
+	// bf-point: imm4 = (label-(PC+4))/2 at hw0[10:7]; branch target: val =
+	// (label-(PC+4))/2 with J at hw1[11] and imm10 at hw1[10:1]; BFLX/BFX target
+	// is a register Rm at hw0[3:0]. (BFCSEL has an extra else-target + condition.)
+	.BF = {
+		{.BF, {.REL_BF, .REL_BF, .NONE, .NONE}, {.BF_BOFF, .BF_BLOC, .NONE, .NONE}, 0xF040E001, 0xF87FF001, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
+	},
+	.BFL = {
+		{.BFL, {.REL_BF, .REL_BF, .NONE, .NONE}, {.BF_BOFF, .BF_BLOC, .NONE, .NONE}, 0xF000C001, 0xF87FF001, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
+	},
+	.BFLX = {
+		{.BFLX, {.REL_BF, .GPR, .NONE, .NONE}, {.BF_BOFF, .BF_RM, .NONE, .NONE}, 0xF070E001, 0xF870FFFF, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
+	},
+	.BFI_BR = {
+		{.BFI_BR, {.REL_BF, .GPR, .NONE, .NONE}, {.BF_BOFF, .BF_RM, .NONE, .NONE}, 0xF060E001, 0xF870FFFF, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
+	},
 
 	// =========================================================================
 	// Custom Datapath Extension (CDE) -- Cortex-M33+

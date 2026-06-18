@@ -267,7 +267,7 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
 	     .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM, .IMM16_LO_HI:
 		return op.kind == .IMMEDIATE
-	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL:
+	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .REL_BF:
 		return op.kind == .RELATIVE
 	case .COND:
 		return op.kind == .IMMEDIATE
@@ -561,6 +561,30 @@ pack_operand_inline :: #force_inline proc(
 		})
 		return 0
 
+	// ---- ARMv8.1-M Branch Future -------------------------------------------
+	case .BF_BOFF:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .BF_BOFF_T32, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .BF_BLOC:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .BF_BLOC_T32, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .BF_BELSE:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .BFCSEL_ELSE_T32, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .BF_RM:
+		return (u32(reg_hw(op.reg)) & 0xF) << 16   // Rm at hw0[3:0] (word bits 19:16)
+	case .BFCSEL_COND:
+		return (u32(op.immediate) & 0xF) << 18     // cond at hw0[5:2] (word bits 21:18)
+
 	// ---- Misc --------------------------------------------------------------
 	case .PSR_FIELD_MASK:   return encode_psr_field(u8(op.immediate))
 	case .SYSM_FIELD:       return u32(op.immediate) & 0xFF
@@ -725,6 +749,31 @@ resolve_relocation_inline :: #force_inline proc(
 		imm11 := u16(u32(rel >> 1) & 0x7FF)
 		existing := read_u16_le(code, r.offset + 2)
 		write_u16_le(code, r.offset + 2, existing | (imm11 << 1))
+		return true
+
+	case .BF_BOFF_T32:
+		// Branch Future bf-point: imm4 = (label-(PC+4))/2 at hw0[10:7].
+		rel := i32(target) - (i32(r.offset) + 4) + r.addend
+		if rel & 1 != 0 || rel < 0 || rel >= (1 << 5) {
+			append(errors, Error{inst_idx = u32(r.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		imm4 := u16(u32(rel >> 1) & 0xF)
+		hw0  := read_u16_le(code, r.offset)
+		write_u16_le(code, r.offset, hw0 | (imm4 << 7))
+		return true
+
+	case .BF_BLOC_T32:
+		// Branch Future target: val=(label-(PC+4))/2; J at hw1[11], imm10 at hw1[10:1].
+		rel := i32(target) - (i32(r.offset) + 4) + r.addend
+		if rel & 1 != 0 || rel < -(1 << 11) || rel >= (1 << 11) {
+			append(errors, Error{inst_idx = u32(r.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		val   := u32(rel >> 1)
+		hw1   := read_u16_le(code, r.offset + 2)
+		hw1 |= u16((val & 1) << 11) | u16(((val >> 1) & 0x3FF) << 1)
+		write_u16_le(code, r.offset + 2, hw1)
 		return true
 
 	case .LDR_LITERAL_A32:

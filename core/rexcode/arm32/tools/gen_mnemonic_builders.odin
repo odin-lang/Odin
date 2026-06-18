@@ -119,7 +119,7 @@ operand_class :: proc(ot: a.Operand_Type) -> Operand_Class {
 		return .MEM
 
 	// ---- PC-relative branch targets & low-overhead-loop targets ----
-	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .MVE_LOOP_TGT:
+	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .MVE_LOOP_TGT, .REL_BF:
 		return .REL
 
 	// ---- Plain registers (single Register value) ----
@@ -187,6 +187,7 @@ operand_suffix :: proc(ot: a.Operand_Type) -> string {
 	case .REL11:         return "rel"
 	case .REL8:          return "rel"
 	case .REL_LDR_LITERAL: return "rel"
+	case .REL_BF:        return "rel"
 	case .COPROC_REG:    return "crd"
 	case .COPROC_NUM:    return "cpn"
 	case .PSR_FIELD:     return "psr"

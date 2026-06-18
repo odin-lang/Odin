@@ -214,6 +214,7 @@ Operand_Type :: enum u8 {
 	REL11,                // T16 B<cond>
 	REL8,                 // T16 conditional branch (signed 8-bit)
 	REL_LDR_LITERAL,      // PC-relative literal load offset
+	REL_BF,               // ARMv8.1-M Branch Future label (bf-point / branch target)
 
 	// ---- Condition code ----
 	COND,                 // 4-bit cond field (for IT block / B<cond> / etc.)
@@ -352,6 +353,12 @@ Operand_Encoding :: enum u8 {
 	BRANCH_11_T16,         // T16 unconditional (imm11, scaled ×2, ±2KB)
 	BRANCH_8_T16,          // T16 conditional (cond + imm8, scaled ×2, ±256B)
 	BRANCH_CBZ,            // T16 CBZ/CBNZ (i + imm5 + Rn, scaled ×2)
+	// ARMv8.1-M Branch Future fields (T32):
+	BF_BOFF,               // bf-point offset: imm4 at hw0[10:7], (label-PC-4)/2
+	BF_BLOC,               // branch target: J at hw1[11] + imm10 at hw1[10:1]
+	BF_BELSE,              // BFCSEL else-target: imm4 at hw0[? ] (relative to bf-point)
+	BF_RM,                 // BFLX/BFX register target at hw0[3:0]
+	BFCSEL_COND,           // BFCSEL condition at hw0[5:2]
 
 	// ---- Misc ----
 	PSR_FIELD_MASK,        // APSR fields_mask at bits 19-16 (MSR)

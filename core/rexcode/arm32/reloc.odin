@@ -41,6 +41,11 @@ Relocation_Type :: enum u8 {
 	BRANCH_T32_WLS,        // WLS / WLSTP imm11
 	BRANCH_T32_LE,         // LE / LETP imm11
 
+	// T32 Branch Future (ARMv8.1-M)
+	BF_BOFF_T32,           // bf-point: imm4 at hw0[10:7] = (label - (PC+4))/2
+	BF_BLOC_T32,           // branch target: J at hw1[11] + imm10 at hw1[10:1]
+	BFCSEL_ELSE_T32,       // BFCSEL else-target relative to the bf-point
+
 	// Literal load (ADR / LDR PC-rel)
 	LDR_LITERAL_A32,       // signed 12-bit (U bit + imm12)
 	LDR_LITERAL_T32,       // signed 12-bit (U bit + imm12) Thumb-2

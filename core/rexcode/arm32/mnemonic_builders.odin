@@ -1174,6 +1174,14 @@ inst_letp_rel                    :: #force_inline proc "contextless" (offset: i6
 emit_letp_rel                    :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64) { append(instructions, inst_letp_rel(offset)) }
 inst_lctp_none                   :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .LCTP, operand_count = 0, mode = .T32, cond = 14, length = 4, ops = {{}, {}, {}, {}}} }
 emit_lctp_none                   :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_lctp_none()) }
+inst_bf_rel_rel                  :: #force_inline proc "contextless" (offset: i64, offset2: i64) -> Instruction { return Instruction{mnemonic = .BF, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_rel_offset(offset), op_rel_offset(offset2), {}, {}}} }
+emit_bf_rel_rel                  :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, offset2: i64) { append(instructions, inst_bf_rel_rel(offset, offset2)) }
+inst_bfi_br_rel_r                :: #force_inline proc "contextless" (offset: i64, src: Register) -> Instruction { return Instruction{mnemonic = .BFI_BR, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_rel_offset(offset), op_reg(src), {}, {}}} }
+emit_bfi_br_rel_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, src: Register) { append(instructions, inst_bfi_br_rel_r(offset, src)) }
+inst_bfl_rel_rel                 :: #force_inline proc "contextless" (offset: i64, offset2: i64) -> Instruction { return Instruction{mnemonic = .BFL, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_rel_offset(offset), op_rel_offset(offset2), {}, {}}} }
+emit_bfl_rel_rel                 :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, offset2: i64) { append(instructions, inst_bfl_rel_rel(offset, offset2)) }
+inst_bflx_rel_r                  :: #force_inline proc "contextless" (offset: i64, src: Register) -> Instruction { return Instruction{mnemonic = .BFLX, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_rel_offset(offset), op_reg(src), {}, {}}} }
+emit_bflx_rel_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, src: Register) { append(instructions, inst_bflx_rel_r(offset, src)) }
 inst_cx1_cp_r_imm                :: #force_inline proc "contextless" (imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .CX1, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_imm(imm), op_reg(src), op_imm(imm2), {}}} }
 emit_cx1_cp_r_imm                :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, src: Register, imm2: i64) { append(instructions, inst_cx1_cp_r_imm(imm, src, imm2)) }
 inst_cx1a_cp_r_imm               :: #force_inline proc "contextless" (imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .CX1A, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_imm(imm), op_reg(src), op_imm(imm2), {}}} }
@@ -2431,6 +2439,14 @@ inst_letp                             :: inst_letp_rel
 emit_letp                             :: emit_letp_rel
 inst_lctp                             :: inst_lctp_none
 emit_lctp                             :: emit_lctp_none
+inst_bf                               :: inst_bf_rel_rel
+emit_bf                               :: emit_bf_rel_rel
+inst_bfi_br                           :: inst_bfi_br_rel_r
+emit_bfi_br                           :: emit_bfi_br_rel_r
+inst_bfl                              :: inst_bfl_rel_rel
+emit_bfl                              :: emit_bfl_rel_rel
+inst_bflx                             :: inst_bflx_rel_r
+emit_bflx                             :: emit_bflx_rel_r
 inst_cx1                              :: inst_cx1_cp_r_imm
 emit_cx1                              :: emit_cx1_cp_r_imm
 inst_cx1a                             :: inst_cx1a_cp_r_imm
