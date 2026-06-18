@@ -3625,6 +3625,17 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VST43, {.QPR_MVE_LIST, .MEM, .NONE, .NONE}, {.VD_Q, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0xFC801E61, 0xFFB01EFF, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}},
 	},
 
+	// Unprivileged (translate) post-indexed loads/stores: the post-index form
+	// with the W bit (21) set. Word/byte use imm12, half/signed use imm8 split.
+	.LDRT   = { {.LDRT,   {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04B00000, 0x0F700000, .BASE, .A32, {}} },
+	.LDRBT  = { {.LDRBT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04F00000, 0x0F700000, .BASE, .A32, {}} },
+	.STRT   = { {.STRT,   {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04A00000, 0x0F700000, .BASE, .A32, {}} },
+	.STRBT  = { {.STRBT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04E00000, 0x0F700000, .BASE, .A32, {}} },
+	.LDRHT  = { {.LDRHT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000B0, 0x0F7000F0, .BASE, .A32, {}} },
+	.STRHT  = { {.STRHT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00E000B0, 0x0F7000F0, .BASE, .A32, {}} },
+	.LDRSBT = { {.LDRSBT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000D0, 0x0F7000F0, .BASE, .A32, {}} },
+	.LDRSHT = { {.LDRSHT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000F0, 0x0F7000F0, .BASE, .A32, {}} },
+
 	// SPECGEN:BEGIN
 	.VADDL = {
 		{.VADDL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2800000, 0xFFB01F50, .NEON, .A32, {cond_in_28=false}},

@@ -530,6 +530,22 @@ inst_strd_r_mem                  :: #force_inline proc "contextless" (dst: Regis
 inst_strd_r_r_mem                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Memory) -> Instruction { return Instruction{mnemonic = .STRD, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_mem(src2), {}}} }
 emit_strd_r_mem                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_strd_r_mem(dst, src)) }
 emit_strd_r_r_mem                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Memory) { append(instructions, inst_strd_r_r_mem(dst, src, src2)) }
+inst_ldrt_r_mem                  :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .LDRT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_ldrt_r_mem                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_ldrt_r_mem(dst, src)) }
+inst_strt_r_mem                  :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .STRT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_strt_r_mem                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_strt_r_mem(dst, src)) }
+inst_ldrbt_r_mem                 :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .LDRBT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_ldrbt_r_mem                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_ldrbt_r_mem(dst, src)) }
+inst_strbt_r_mem                 :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .STRBT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_strbt_r_mem                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_strbt_r_mem(dst, src)) }
+inst_ldrht_r_mem                 :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .LDRHT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_ldrht_r_mem                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_ldrht_r_mem(dst, src)) }
+inst_strht_r_mem                 :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .STRHT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_strht_r_mem                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_strht_r_mem(dst, src)) }
+inst_ldrsbt_r_mem                :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .LDRSBT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_ldrsbt_r_mem                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_ldrsbt_r_mem(dst, src)) }
+inst_ldrsht_r_mem                :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .LDRSHT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
+emit_ldrsht_r_mem                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_ldrsht_r_mem(dst, src)) }
 inst_lda_r_mem                   :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .LDA, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
 emit_lda_r_mem                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_lda_r_mem(dst, src)) }
 inst_stl_r_mem                   :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .STL, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
@@ -1775,6 +1791,22 @@ inst_ldrd                             :: proc{ inst_ldrd_r_mem, inst_ldrd_r_r_me
 emit_ldrd                             :: proc{ emit_ldrd_r_mem, emit_ldrd_r_r_mem }
 inst_strd                             :: proc{ inst_strd_r_mem, inst_strd_r_r_mem }
 emit_strd                             :: proc{ emit_strd_r_mem, emit_strd_r_r_mem }
+inst_ldrt                             :: inst_ldrt_r_mem
+emit_ldrt                             :: emit_ldrt_r_mem
+inst_strt                             :: inst_strt_r_mem
+emit_strt                             :: emit_strt_r_mem
+inst_ldrbt                            :: inst_ldrbt_r_mem
+emit_ldrbt                            :: emit_ldrbt_r_mem
+inst_strbt                            :: inst_strbt_r_mem
+emit_strbt                            :: emit_strbt_r_mem
+inst_ldrht                            :: inst_ldrht_r_mem
+emit_ldrht                            :: emit_ldrht_r_mem
+inst_strht                            :: inst_strht_r_mem
+emit_strht                            :: emit_strht_r_mem
+inst_ldrsbt                           :: inst_ldrsbt_r_mem
+emit_ldrsbt                           :: emit_ldrsbt_r_mem
+inst_ldrsht                           :: inst_ldrsht_r_mem
+emit_ldrsht                           :: emit_ldrsht_r_mem
 inst_lda                              :: inst_lda_r_mem
 emit_lda                              :: emit_lda_r_mem
 inst_stl                              :: inst_stl_r_mem
