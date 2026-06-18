@@ -252,6 +252,7 @@ Operand_Encoding :: enum u8 {
 	// BARRIER_FIELD, which it shares with the DMB/DSB barrier encoding.
 	IMM5_HI,          // generic 5-bit immediate at bits 20:16 (CCMP/CCMN immediate)
 	MSR_PSTATE,       // PSTATE field selector: op1 at 18:16, op2 at 7:5
+	FMOV_SCALAR_IMM,  // scalar FMOV 8-bit float immediate at bits 20:13
 
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20

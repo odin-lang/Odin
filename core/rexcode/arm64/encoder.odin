@@ -484,6 +484,8 @@ pack_operand_inline :: #force_inline proc(
 	case .MSR_PSTATE:
 		v := u32(op.immediate)
 		return ((v >> 3) & 0x7) << 16 | (v & 0x7) << 5
+	case .FMOV_SCALAR_IMM:
+		return (u32(op.immediate) & 0xFF) << 13
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:

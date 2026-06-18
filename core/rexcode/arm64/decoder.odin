@@ -239,6 +239,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .MSR_PSTATE:
 		v := ((word >> 16) & 0x7) << 3 | ((word >> 5) & 0x7)
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .FMOV_SCALAR_IMM:
+		return Operand{immediate = i64((word >> 13) & 0xFF), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:

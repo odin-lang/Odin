@@ -318,6 +318,20 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.USDOT, {.V_2S, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E809C00, 0xFFE0FC00, .DOT, {}},
 		{.USDOT, {.V_4S, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E809C00, 0xFFE0FC00, .DOT, {}},
 	},
+	// FMOV (immediate): scalar Hd/Sd/Dd, #imm (8-bit float at 20:13).
+	.FMOV_IMM = {
+		{.FMOV_IMM, {.S_REG, .IMM_8, .NONE, .NONE}, {.RD, .FMOV_SCALAR_IMM, .NONE, .NONE}, 0x1E201000, 0xFFE01FE0, .FP, {}},
+		{.FMOV_IMM, {.D_REG, .IMM_8, .NONE, .NONE}, {.RD, .FMOV_SCALAR_IMM, .NONE, .NONE}, 0x1E601000, 0xFFE01FE0, .FP, {}},
+		{.FMOV_IMM, {.H_REG, .IMM_8, .NONE, .NONE}, {.RD, .FMOV_SCALAR_IMM, .NONE, .NONE}, 0x1EE01000, 0xFFE01FE0, .FP16, {}},
+	},
+	// FMOV (vector, immediate): Vd.<T>, #imm (8-bit float in abc:defgh, cmode=1111).
+	.FMOV_V_IMM = {
+		{.FMOV_V_IMM, {.V_2S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x0F00F400, 0xFFF8FC00, .NEON, {}},
+		{.FMOV_V_IMM, {.V_4S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x4F00F400, 0xFFF8FC00, .NEON, {}},
+		{.FMOV_V_IMM, {.V_2D, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x6F00F400, 0xFFF8FC00, .NEON, {}},
+		{.FMOV_V_IMM, {.V_4H_FP16, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x0F00FC00, 0xFFF8FC00, .FP16, {}},
+		{.FMOV_V_IMM, {.V_8H_FP16, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x4F00FC00, 0xFFF8FC00, .FP16, {}},
+	},
 
 	// =========================================================================
 	// Byte / half / signed scalar loads & stores (pre / post / register offset)
@@ -4551,6 +4565,23 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.FCVTPU, {.X_REG, .S_REG, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x9E290000, 0xFFFFFC00, .FP, {}},
 		{.FCVTPU, {.X_REG, .D_REG, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x9E690000, 0xFFFFFC00, .FP, {}},
 		{.FCVTPU, {.X_REG, .H_REG, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x9EE90000, 0xFFFFFC00, .FP16, {}},
+	},
+
+	// NEON modified immediate (MOVI/MVNI).
+	.MOVI = {
+		{.MOVI, {.V_8B, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x0F00E400, 0xFFF8FC00, .NEON, {}},
+		{.MOVI, {.V_16B, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x4F00E400, 0xFFF8FC00, .NEON, {}},
+		{.MOVI, {.V_4H, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x0F008400, 0xFFF8FC00, .NEON, {}},
+		{.MOVI, {.V_8H, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x4F008400, 0xFFF8FC00, .NEON, {}},
+		{.MOVI, {.V_2S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x0F000400, 0xFFF8FC00, .NEON, {}},
+		{.MOVI, {.V_4S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x4F000400, 0xFFF8FC00, .NEON, {}},
+		{.MOVI, {.V_2D, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x6F00E400, 0xFFF8FC00, .NEON, {}},
+	},
+	.MVNI = {
+		{.MVNI, {.V_4H, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x2F008400, 0xFFF8FC00, .NEON, {}},
+		{.MVNI, {.V_8H, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x6F008400, 0xFFF8FC00, .NEON, {}},
+		{.MVNI, {.V_2S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x2F000400, 0xFFF8FC00, .NEON, {}},
+		{.MVNI, {.V_4S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x6F000400, 0xFFF8FC00, .NEON, {}},
 	},
 	// SPECGEN:END
 }

@@ -237,6 +237,8 @@ inst_eret_none                  :: #force_inline proc "contextless" () -> Instru
 emit_eret_none                  :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_eret_none()) }
 inst_fmov_reg_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FMOV_REG, dst, src) }
 emit_fmov_reg_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fmov_reg_r_r(dst, src)) }
+inst_fmov_imm_r_i               :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.FMOV_IMM, dst, imm) }
+emit_fmov_imm_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_fmov_imm_r_i(dst, imm)) }
 inst_fmov_gen_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FMOV_GEN, dst, src) }
 emit_fmov_gen_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fmov_gen_r_r(dst, src)) }
 inst_fabs_r_r                   :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FABS, dst, src) }
@@ -1273,6 +1275,12 @@ inst_urecpe_v_r_r               :: #force_inline proc "contextless" (dst: Regist
 emit_urecpe_v_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_urecpe_v_r_r(dst, src)) }
 inst_ursqrte_v_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .URSQRTE_V, operand_count = 2, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), {}, {}}} }
 emit_ursqrte_v_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_ursqrte_v_r_r(dst, src)) }
+inst_movi_r_i                   :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .MOVI, operand_count = 2, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_imm(imm, 1), {}, {}}} }
+emit_movi_r_i                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_movi_r_i(dst, imm)) }
+inst_mvni_r_i                   :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .MVNI, operand_count = 2, length = 4, ops = {op_v_4h(u8(reg_hw(dst))), op_imm(imm, 1), {}, {}}} }
+emit_mvni_r_i                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_mvni_r_i(dst, imm)) }
+inst_fmov_v_imm_r_i             :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .FMOV_V_IMM, operand_count = 2, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_imm(imm, 1), {}, {}}} }
+emit_fmov_v_imm_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_fmov_v_imm_r_i(dst, imm)) }
 inst_ld1_r_m                    :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1, operand_count = 2, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_mem(mem), {}, {}}} }
 emit_ld1_r_m                    :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ld1_r_m(dst, mem)) }
 inst_st1_r_m                    :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1, operand_count = 2, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_mem(mem), {}, {}}} }
@@ -2304,6 +2312,8 @@ inst_eret                            :: inst_eret_none
 emit_eret                            :: emit_eret_none
 inst_fmov_reg                        :: inst_fmov_reg_r_r
 emit_fmov_reg                        :: emit_fmov_reg_r_r
+inst_fmov_imm                        :: inst_fmov_imm_r_i
+emit_fmov_imm                        :: emit_fmov_imm_r_i
 inst_fmov_gen                        :: inst_fmov_gen_r_r
 emit_fmov_gen                        :: emit_fmov_gen_r_r
 inst_fabs                            :: inst_fabs_r_r
@@ -3336,6 +3346,12 @@ inst_urecpe_v                        :: inst_urecpe_v_r_r
 emit_urecpe_v                        :: emit_urecpe_v_r_r
 inst_ursqrte_v                       :: inst_ursqrte_v_r_r
 emit_ursqrte_v                       :: emit_ursqrte_v_r_r
+inst_movi                            :: inst_movi_r_i
+emit_movi                            :: emit_movi_r_i
+inst_mvni                            :: inst_mvni_r_i
+emit_mvni                            :: emit_mvni_r_i
+inst_fmov_v_imm                      :: inst_fmov_v_imm_r_i
+emit_fmov_v_imm                      :: emit_fmov_v_imm_r_i
 inst_ld1                             :: inst_ld1_r_m
 emit_ld1                             :: emit_ld1_r_m
 inst_st1                             :: inst_st1_r_m

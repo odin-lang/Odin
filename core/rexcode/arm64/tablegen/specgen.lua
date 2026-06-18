@@ -510,6 +510,34 @@ do
 	sections[#sections+1] = "\t// Scalar FP round/reciprocal + FP-to-GPR convert.\n" .. table.concat(blk, "\n")
 end
 
+-- ---- NEON modified immediate (MOVI / MVNI) --------------------------------
+-- imm8 split abc(18:16):defgh(9:5); cmode/op/Q are static per arrangement.
+-- (LSL/MSL-shifted variants share the operand signature and are omitted here.)
+do
+	local blk = {}
+	local function imm8_block(mnem, llvm, arrs)
+		local rows = {}
+		for _, a in ipairs(arrs) do
+			-- For .2D the asm immediate is the full 64-bit value (each imm8 bit
+			-- replicates to a byte), so probe with all-ones to toggle every imm8
+			-- bit; other arrangements take the imm8 directly. The builder/encoder
+			-- treat the operand as the raw 8-bit pattern regardless.
+			local vmax = (a == "2D") and "0xffffffffffffffff" or "255"
+			local function mk(r,v) return string.format("%s v%d.%s, #%s", llvm, r, ARR[a].asm, tostring(v)) end
+			local b0, bR, bI = word(mk(0,"0")), word(mk(31,"0")), word(mk(0,vmax))
+			if b0 and bR and bI then
+				rows[#rows+1] = string.format("\t\t{.%s, {.%s, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x%s, 0x%s, .NEON, {}},",
+					mnem, ARR[a].vt, bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{bR,bI})):upper())
+				n_forms = n_forms + 1
+			else skips[#skips+1] = mnem.." "..a end
+		end
+		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
+	end
+	imm8_block("MOVI", "movi", {"8B","16B","4H","8H","2S","4S","2D"})
+	imm8_block("MVNI", "mvni", {"4H","8H","2S","4S"})
+	sections[#sections+1] = "\t// NEON modified immediate (MOVI/MVNI).\n" .. table.concat(blk, "\n")
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "\t// SPECGEN:BEGIN\n" .. table.concat(sections, "\n\n") .. "\n\t// SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()
