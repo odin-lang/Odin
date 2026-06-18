@@ -82,21 +82,21 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 					if v.module_name != "" {
 						fmt.sbprintf(sb, "  module: %q\n", v.module_name)
 					}
-					if len(v.functions) > 0 {
-						fmt.sbprintf(sb, "  functions:\n")
-						for f in v.functions {
-							fmt.sbprintf(sb, "    [%d] %q\n", f.id, f.name)
-						}
-					}
-					if len(v.locals) > 0 {
-						fmt.sbprintf(sb, "  locals:\n")
-						for fl in v.locals {
-							fmt.sbprintf(sb, "    [%d] function\n", fl.func_idx)
-							for local in fl.locals {
-								fmt.sbprintf(sb, "      [%d] %q\n", local.idx, local.name)
-							}
-						}
-					}
+					// if len(v.functions) > 0 {
+					// 	fmt.sbprintf(sb, "  functions:\n")
+					// 	for f in v.functions {
+					// 		fmt.sbprintf(sb, "    [%d] %q\n", f.id, f.name)
+					// 	}
+					// }
+					// if len(v.locals) > 0 {
+					// 	fmt.sbprintf(sb, "  locals:\n")
+					// 	for fl in v.locals {
+					// 		fmt.sbprintf(sb, "    [%d] function\n", fl.func_idx)
+					// 		for local in fl.locals {
+					// 			fmt.sbprintf(sb, "      [%d] %q\n", local.idx, local.name)
+					// 		}
+					// 	}
+					// }
 				case Custom_Section_Target_Features:
 					for f in v.features {
 						fmt.sbprintf(sb, "  \"%c%s\"\n", u8(f.prefix), f.feature)
@@ -104,7 +104,6 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 				}
 				break
 			}
-			strings.write_byte(sb, '\n')
 
 		case .DATA:
 			r := reader(section_data, 0)
