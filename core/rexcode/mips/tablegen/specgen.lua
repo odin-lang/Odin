@@ -272,6 +272,28 @@ for _, b in ipairs({{"SHRA_QB","shra.qb",7},{"SHRA_R_QB","shra_r.qb",7},{"SHRA_R
 	if r then sections[#sections+1]=r end
 end
 
+-- ---- DSP ASE accumulator ops (ac0..ac3 at bits 12:11, modeled as imm) ------
+for _, b in ipairs({
+	{"DPA_W_PH","dpa.w.ph"},{"DPAX_W_PH","dpax.w.ph"},{"DPS_W_PH","dps.w.ph"},{"DPSX_W_PH","dpsx.w.ph"},
+	{"MAQ_S_W_PHL","maq_s.w.phl"},{"MAQ_S_W_PHR","maq_s.w.phr"},{"MAQ_SA_W_PHL","maq_sa.w.phl"},{"MAQ_SA_W_PHR","maq_sa.w.phr"},
+}) do
+	local r = entry(b[1], "{.IMM5,.GPR,.GPR,.NONE}", "{.AC_NUM,.RS,.RT,.NONE}", "DSP_R2",
+		function(v) return string.format("%s $ac%d,$%d,$%d", b[2], v[1], v[2], v[3]) end, {3,31,31})
+	if r then sections[#sections+1]=r end
+end
+do
+	local r = entry("MTHLIP", "{.GPR,.IMM5,.NONE,.NONE}", "{.RS,.AC_NUM,.NONE,.NONE}", "DSP_R2",
+		function(v) return string.format("mthlip $%d,$ac%d", v[1], v[2]) end, {31,3})
+	if r then sections[#sections+1]=r end
+	r = entry("SHILOV", "{.IMM5,.GPR,.NONE,.NONE}", "{.AC_NUM,.RS,.NONE,.NONE}", "DSP_R2",
+		function(v) return string.format("shilov $ac%d,$%d", v[1], v[2]) end, {3,31})
+	if r then sections[#sections+1]=r end
+	-- SHILO immediate is signed 6-bit; vary to -1 so all six field bits toggle.
+	r = entry("SHILO", "{.IMM5,.IMM5,.NONE,.NONE}", "{.AC_NUM,.SHILO_IMM,.NONE,.NONE}", "DSP_R2",
+		function(v) return string.format("shilo $ac%d,%d", v[1], v[2]) end, {3,-1})
+	if r then sections[#sections+1]=r end
+end
+
 -- ---- Branches: derive bits/regs, then mark the PC-relative offset variable.
 -- Compact (R6) branches need the r6 ISA, so each family passes its own mattr.
 local function bword(line, mattr)

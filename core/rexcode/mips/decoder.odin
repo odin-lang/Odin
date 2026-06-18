@@ -210,6 +210,12 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64((word >> 21) & 0xF), kind = .IMMEDIATE, size = 1}
 	case .RS_RT:
 		return reg_operand(decode_reg(word, 16, ot), ot)
+	case .AC_NUM:
+		return Operand{immediate = i64((word >> 11) & 0x3), kind = .IMMEDIATE, size = 1}
+	case .SHILO_IMM:
+		v := i32((word >> 20) & 0x3F)
+		if v & 0x20 != 0 { v |= ~i32(0x3F) }
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 
 	// Immediates ------------------------------------------------------------
 	case .IMM_16:

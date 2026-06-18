@@ -405,6 +405,10 @@ pack_operand_inline :: #force_inline proc(
 	case .RS_RT:
 		r := u32(reg_hw(op.reg)) & 0x1F
 		return r << 21 | r << 16
+	case .AC_NUM:
+		return (u32(op.immediate) & 0x3) << 11
+	case .SHILO_IMM:
+		return (u32(op.immediate) & 0x3F) << 20
 
 	// MSA memory operand: base GPR at 15:11, signed-10 disp at 25:16
 	// (caller has already scaled the displacement by element size).
