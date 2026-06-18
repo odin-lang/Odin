@@ -478,6 +478,13 @@ pack_operand_inline :: #force_inline proc(
 	case .NEON_EXT_IDX:
 		return (u32(op.immediate) & 0xF) << 11
 
+	// CCMP/CCMN immediate (imm5 at 20:16) and MSR-immediate PSTATE selector.
+	case .IMM5_HI:
+		return (u32(op.immediate) & 0x1F) << 16
+	case .MSR_PSTATE:
+		v := u32(op.immediate)
+		return ((v >> 3) & 0x7) << 16 | (v & 0x7) << 5
+
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:
 		v := u32(op.immediate) & 0xFF

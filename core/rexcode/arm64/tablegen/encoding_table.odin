@@ -300,6 +300,24 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.CCMN_REG, {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM, .NZCV_FIELD, .COND_HI}, 0x3A400000, 0xFFE00C10, .BASE, {sets_flags=true}},
 		{.CCMN_REG, {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM, .NZCV_FIELD, .COND_HI}, 0xBA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}},
 	},
+	// Conditional compare (immediate): imm5 at 20:16 replaces Rm; bit 11 = 1.
+	.CCMP_IMM = {
+		{.CCMP_IMM, {.W_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0x7A400800, 0xFFE00C10, .BASE, {sets_flags=true}},
+		{.CCMP_IMM, {.X_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0xFA400800, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}},
+	},
+	.CCMN_IMM = {
+		{.CCMN_IMM, {.W_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0x3A400800, 0xFFE00C10, .BASE, {sets_flags=true}},
+		{.CCMN_IMM, {.X_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0xBA400800, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}},
+	},
+	// HINT #imm7 (imm at 11:5); NOP/YIELD/etc. are specific values of this.
+	.HINT = { {.HINT, {.IMM_8, .NONE, .NONE, .NONE}, {.HINT_FIELD, .NONE, .NONE, .NONE}, 0xD503201F, 0xFFFFF01F, .BASE, {}} },
+	// MSR <pstatefield>, #imm: op1:op2 selector (combined) + CRm immediate.
+	.MSR_IMM = { {.MSR_IMM, {.SYS_REG, .IMM_4, .NONE, .NONE}, {.MSR_PSTATE, .BARRIER_FIELD, .NONE, .NONE}, 0xD500401F, 0xFFF8F01F, .BASE, {}} },
+	// USDOT (unsigned-by-signed dot product, I8MM): Vd.<2S|4S>, Vn.<8B|16B>, Vm.<8B|16B>.
+	.USDOT = {
+		{.USDOT, {.V_2S, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E809C00, 0xFFE0FC00, .DOT, {}},
+		{.USDOT, {.V_4S, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E809C00, 0xFFE0FC00, .DOT, {}},
+	},
 
 	// =========================================================================
 	// §8 Branches

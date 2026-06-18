@@ -234,6 +234,11 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = 1}
 	case .NEON_EXT_IDX:
 		return Operand{immediate = i64((word >> 11) & 0xF), kind = .IMMEDIATE, size = 1}
+	case .IMM5_HI:
+		return Operand{immediate = i64((word >> 16) & 0x1F), kind = .IMMEDIATE, size = 1}
+	case .MSR_PSTATE:
+		v := ((word >> 16) & 0x7) << 3 | ((word >> 5) & 0x7)
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:

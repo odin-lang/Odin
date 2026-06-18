@@ -246,6 +246,13 @@ Operand_Encoding :: enum u8 {
 	NEON_IDX4,        // INS source lane index in imm4 (14:11); index << markerbit
 	NEON_EXT_IDX,     // EXT byte index in imm4 (14:11)
 
+	// ---- MSR (immediate to PSTATE): pstate field selector op1:op2 ----
+	// User passes the combined 6-bit selector (op1<<3 | op2); op1 lands at
+	// bits 18:16, op2 at bits 7:5. The #imm goes to CRm (bits 11:8) via
+	// BARRIER_FIELD, which it shares with the DMB/DSB barrier encoding.
+	IMM5_HI,          // generic 5-bit immediate at bits 20:16 (CCMP/CCMN immediate)
+	MSR_PSTATE,       // PSTATE field selector: op1 at 18:16, op2 at 7:5
+
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20
 	ATOMIC_RT,            // Rt (target) at bits 0-4

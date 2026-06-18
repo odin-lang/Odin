@@ -121,8 +121,12 @@ inst_csneg_r_r_r_c              :: #force_inline proc "contextless" (dst: Regist
 emit_csneg_r_r_r_c              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, cond: Cond) { append(instructions, inst_csneg_r_r_r_c(dst, src, src2, cond)) }
 inst_ccmp_reg_r_r_i_c           :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMP_REG, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), op_cond(cond)}} }
 emit_ccmp_reg_r_r_i_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64, cond: Cond) { append(instructions, inst_ccmp_reg_r_r_i_c(dst, src, imm, cond)) }
+inst_ccmp_imm_r_i_i_c           :: #force_inline proc "contextless" (dst: Register, imm: i64, imm2: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMP_IMM, operand_count = 4, length = 4, ops = {op_reg(dst), op_imm(imm, 1), op_imm(imm2, 1), op_cond(cond)}} }
+emit_ccmp_imm_r_i_i_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, imm2: i64, cond: Cond) { append(instructions, inst_ccmp_imm_r_i_i_c(dst, imm, imm2, cond)) }
 inst_ccmn_reg_r_r_i_c           :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMN_REG, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), op_cond(cond)}} }
 emit_ccmn_reg_r_r_i_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64, cond: Cond) { append(instructions, inst_ccmn_reg_r_r_i_c(dst, src, imm, cond)) }
+inst_ccmn_imm_r_i_i_c           :: #force_inline proc "contextless" (dst: Register, imm: i64, imm2: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMN_IMM, operand_count = 4, length = 4, ops = {op_reg(dst), op_imm(imm, 1), op_imm(imm2, 1), op_cond(cond)}} }
+emit_ccmn_imm_r_i_i_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, imm2: i64, cond: Cond) { append(instructions, inst_ccmn_imm_r_i_i_c(dst, imm, imm2, cond)) }
 inst_extr_r_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .EXTR, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_imm(imm, 1)}} }
 emit_extr_r_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_extr_r_r_r_i(dst, src, src2, imm)) }
 inst_b_l                        :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B, label) }
@@ -205,8 +209,12 @@ inst_sev_none                   :: #force_inline proc "contextless" () -> Instru
 emit_sev_none                   :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_sev_none()) }
 inst_sevl_none                  :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SEVL) }
 emit_sevl_none                  :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_sevl_none()) }
+inst_hint_i                     :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .HINT, operand_count = 1, length = 4, ops = {op_imm(imm, 1), {}, {}, {}}} }
+emit_hint_i                     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_hint_i(imm)) }
 inst_mrs_r_i                    :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.MRS, dst, imm) }
 emit_mrs_r_i                    :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_mrs_r_i(dst, imm)) }
+inst_msr_imm_i_i                :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .MSR_IMM, operand_count = 2, length = 4, ops = {op_imm(imm, 4), op_imm(imm2, 1), {}, {}}} }
+emit_msr_imm_i_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_msr_imm_i_i(imm, imm2)) }
 inst_msr_reg_i_r                :: #force_inline proc "contextless" (imm: i64, src: Register) -> Instruction { return Instruction{mnemonic = .MSR_REG, operand_count = 2, length = 4, ops = {op_imm(imm, 4), op_reg(src), {}, {}}} }
 emit_msr_reg_i_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, src: Register) { append(instructions, inst_msr_reg_i_r(imm, src)) }
 inst_isb_i                      :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .ISB, operand_count = 1, length = 4, ops = {op_imm(imm, 1), {}, {}, {}}} }
@@ -953,6 +961,8 @@ inst_sdot_r_r_r                 :: #force_inline proc "contextless" (dst: Regist
 emit_sdot_r_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sdot_r_r_r(dst, src, src2)) }
 inst_udot_r_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UDOT, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_v_8b(u8(reg_hw(src2))), {}}} }
 emit_udot_r_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_udot_r_r_r(dst, src, src2)) }
+inst_usdot_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .USDOT, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_v_8b(u8(reg_hw(src2))), {}}} }
+emit_usdot_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_usdot_r_r_r(dst, src, src2)) }
 inst_fadd_v_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADD_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
 emit_fadd_v_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fadd_v_r_r_r(dst, src, src2)) }
 inst_fsub_v_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FSUB_V, operand_count = 3, length = 4, ops = {op_v_2s(u8(reg_hw(dst))), op_v_2s(u8(reg_hw(src))), op_v_2s(u8(reg_hw(src2))), {}}} }
@@ -2142,8 +2152,12 @@ inst_csneg                           :: inst_csneg_r_r_r_c
 emit_csneg                           :: emit_csneg_r_r_r_c
 inst_ccmp_reg                        :: inst_ccmp_reg_r_r_i_c
 emit_ccmp_reg                        :: emit_ccmp_reg_r_r_i_c
+inst_ccmp_imm                        :: inst_ccmp_imm_r_i_i_c
+emit_ccmp_imm                        :: emit_ccmp_imm_r_i_i_c
 inst_ccmn_reg                        :: inst_ccmn_reg_r_r_i_c
 emit_ccmn_reg                        :: emit_ccmn_reg_r_r_i_c
+inst_ccmn_imm                        :: inst_ccmn_imm_r_i_i_c
+emit_ccmn_imm                        :: emit_ccmn_imm_r_i_i_c
 inst_extr                            :: inst_extr_r_r_r_i
 emit_extr                            :: emit_extr_r_r_r_i
 inst_b                               :: inst_b_l
@@ -2224,8 +2238,12 @@ inst_sev                             :: inst_sev_none
 emit_sev                             :: emit_sev_none
 inst_sevl                            :: inst_sevl_none
 emit_sevl                            :: emit_sevl_none
+inst_hint                            :: inst_hint_i
+emit_hint                            :: emit_hint_i
 inst_mrs                             :: inst_mrs_r_i
 emit_mrs                             :: emit_mrs_r_i
+inst_msr_imm                         :: inst_msr_imm_i_i
+emit_msr_imm                         :: emit_msr_imm_i_i
 inst_msr_reg                         :: inst_msr_reg_i_r
 emit_msr_reg                         :: emit_msr_reg_i_r
 inst_isb                             :: inst_isb_i
@@ -2972,6 +2990,8 @@ inst_sdot                            :: inst_sdot_r_r_r
 emit_sdot                            :: emit_sdot_r_r_r
 inst_udot                            :: inst_udot_r_r_r
 emit_udot                            :: emit_udot_r_r_r
+inst_usdot                           :: inst_usdot_r_r_r
+emit_usdot                           :: emit_usdot_r_r_r
 inst_fadd_v                          :: inst_fadd_v_r_r_r
 emit_fadd_v                          :: emit_fadd_v_r_r_r
 inst_fsub_v                          :: inst_fsub_v_r_r_r
