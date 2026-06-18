@@ -405,13 +405,11 @@ Mnemonic :: enum u16 {
 	LETP,                                  // loop end with tail predication
 	LCTP,                                  // loop clear tail predication
 
-	// Branch Future (ARMv8.1-M). INTENTIONALLY NOT ENCODED: this feature is
-	// deprecated and effectively dead -- llvm-objdump cannot even disassemble
-	// these, so they can't be round-trip-verified, and a correct encoder would
-	// need dual-offset PC-relative relocation infrastructure (a `boff` bf-point
-	// plus a separate branch target, both linker fixups) that does not exist
-	// here. Left as enum-only on purpose; revisit only if BF is ever needed,
-	// by first adding BRANCH_BF_* relocation types + a resolver.
+	// Branch Future (ARMv8.1-M). T32, encoded via REL_BF + BF_BOFF/BF_BLOC/BF_RM
+	// operand encodings and BF_BOFF_T32/BF_BLOC_T32 relocations (see encoder.odin).
+	// bf-point imm4 at hw0[10:7]; branch target J:imm10 at hw1[11]:[10:1]; BFLX/BFX
+	// use a register target Rm at hw0[3:0]; BFCSEL adds a 4-bit condition at
+	// hw0[5:2] (its else-target is the implicit fall-through). Byte-exact vs llvm-mc.
 	BF,                                    // branch future
 	BFI_BR,                                // branch future indirect (bfx)
 	BFL,                                   // branch future and link

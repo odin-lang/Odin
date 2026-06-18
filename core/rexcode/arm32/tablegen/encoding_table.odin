@@ -3137,6 +3137,12 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.BFI_BR = {
 		{.BFI_BR, {.REL_BF, .GPR, .NONE, .NONE}, {.BF_BOFF, .BF_RM, .NONE, .NONE}, 0xF060E001, 0xF870FFFF, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
 	},
+	// BFCSEL: bf-point + true-target (hw1, like BF) + 4-bit condition at hw0[5:2];
+	// hw0[1] is a static marker. The else-target is the architectural fall-through
+	// (implicit) so it is not a separate operand.
+	.BFCSEL = {
+		{.BFCSEL, {.REL_BF, .REL_BF, .IMM4, .NONE}, {.BF_BOFF, .BF_BLOC, .BFCSEL_COND, .NONE}, 0xF002E001, 0xF843F001, .V81M, .T32, {thumb32=true, cond_in_28=false, branch=true}},
+	},
 
 	// =========================================================================
 	// Custom Datapath Extension (CDE) -- Cortex-M33+

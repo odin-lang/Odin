@@ -1182,6 +1182,8 @@ inst_bfl_rel_rel                 :: #force_inline proc "contextless" (offset: i6
 emit_bfl_rel_rel                 :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, offset2: i64) { append(instructions, inst_bfl_rel_rel(offset, offset2)) }
 inst_bflx_rel_r                  :: #force_inline proc "contextless" (offset: i64, src: Register) -> Instruction { return Instruction{mnemonic = .BFLX, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_rel_offset(offset), op_reg(src), {}, {}}} }
 emit_bflx_rel_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, src: Register) { append(instructions, inst_bflx_rel_r(offset, src)) }
+inst_bfcsel_rel_rel_imm4         :: #force_inline proc "contextless" (offset: i64, offset2: i64, imm: i64) -> Instruction { return Instruction{mnemonic = .BFCSEL, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_rel_offset(offset), op_rel_offset(offset2), op_imm(imm), {}}} }
+emit_bfcsel_rel_rel_imm4         :: #force_inline proc(instructions: ^[dynamic]Instruction, offset: i64, offset2: i64, imm: i64) { append(instructions, inst_bfcsel_rel_rel_imm4(offset, offset2, imm)) }
 inst_cx1_cp_r_imm                :: #force_inline proc "contextless" (imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .CX1, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_imm(imm), op_reg(src), op_imm(imm2), {}}} }
 emit_cx1_cp_r_imm                :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, src: Register, imm2: i64) { append(instructions, inst_cx1_cp_r_imm(imm, src, imm2)) }
 inst_cx1a_cp_r_imm               :: #force_inline proc "contextless" (imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .CX1A, operand_count = 3, mode = .T32, cond = 14, length = 4, ops = {op_imm(imm), op_reg(src), op_imm(imm2), {}}} }
@@ -2447,6 +2449,8 @@ inst_bfl                              :: inst_bfl_rel_rel
 emit_bfl                              :: emit_bfl_rel_rel
 inst_bflx                             :: inst_bflx_rel_r
 emit_bflx                             :: emit_bflx_rel_r
+inst_bfcsel                           :: inst_bfcsel_rel_rel_imm4
+emit_bfcsel                           :: emit_bfcsel_rel_rel_imm4
 inst_cx1                              :: inst_cx1_cp_r_imm
 emit_cx1                              :: emit_cx1_cp_r_imm
 inst_cx1a                             :: inst_cx1a_cp_r_imm
