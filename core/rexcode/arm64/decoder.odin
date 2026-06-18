@@ -250,6 +250,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .SVE_EXT_IMM:
 		v := ((word >> 16) & 0x1F) << 3 | ((word >> 10) & 0x7)
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .ZA_TILE_LOW:
+		return Operand{immediate = i64(word & 0x7), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:

@@ -263,6 +263,7 @@ Operand_Encoding :: enum u8 {
 	PN_PG_PM_DUP,     // Pn at 5:8, Pg at 10:13, Pm at 16:19 (MOV Pd,Pn)
 	ZD_ZM_DUP,        // Zd at 0:4 AND Zm at 16:20 (MOV Zd,Pg/m,Zn = SEL ...,Zd)
 	SVE_EXT_IMM,      // SVE EXT byte index: imm8h at 20:16, imm8l at 12:10
+	ZA_TILE_LOW,      // SME ZA accumulator tile number at bits 2:0 (ADDHA/ADDVA)
 
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20

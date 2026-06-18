@@ -503,6 +503,8 @@ pack_operand_inline :: #force_inline proc(
 	case .SVE_EXT_IMM:
 		v := u32(op.immediate)
 		return ((v >> 3) & 0x1F) << 16 | (v & 0x7) << 10
+	case .ZA_TILE_LOW:
+		return (u32(op.immediate) & 0x7) << 0
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:

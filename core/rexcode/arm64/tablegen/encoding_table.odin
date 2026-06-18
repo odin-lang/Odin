@@ -2645,6 +2645,11 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SME_MOVA_TILE_FROM_Z, {.SME_SLICE_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.SME_SLICE_B, .PG, .VN, .NONE}, 0xC0000000, 0xFFE08010, .SME, {}},
 	},
 
+	// SME ZA outer-sum accumulate: ADDHA/ADDVA ZAda.S, Pn/m, Pm/m, Zn.S.
+	// ZAda tile at bits 2:0, Pn (Pg) at 12:10, Pm at 15:13, Zn at 9:5.
+	.SME_ADDHA = { {.SME_ADDHA, {.ZA_TILE_S, .P_REG_MERGE, .P_REG_MERGE, .Z_REG_S}, {.ZA_TILE_LOW, .PG, .PM3, .VN}, 0xC0900000, 0xFFFF001C, .SME, {}} },
+	.SME_ADDVA = { {.SME_ADDVA, {.ZA_TILE_S, .P_REG_MERGE, .P_REG_MERGE, .Z_REG_S}, {.ZA_TILE_LOW, .PG, .PM3, .VN}, 0xC0910000, 0xFFFF001C, .SME, {}} },
+
 	// =========================================================================
 	// §34 NEON complex FP multiply-add (v8.3-A FCMA extension)
 	// =========================================================================

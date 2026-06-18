@@ -1669,6 +1669,10 @@ inst_sme_smstop_none            :: #force_inline proc "contextless" () -> Instru
 emit_sme_smstop_none            :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_sme_smstop_none()) }
 inst_sme_rdsvl_r_i              :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.SME_RDSVL, dst, imm) }
 emit_sme_rdsvl_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_sme_rdsvl_r_i(dst, imm)) }
+inst_sme_addha_i_p_p_z          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SME_ADDHA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
+emit_sme_addha_i_p_p_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_sme_addha_i_p_p_z(imm, rz1, rz2, rz3)) }
+inst_sme_addva_i_p_p_z          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SME_ADDVA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
+emit_sme_addva_i_p_p_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_sme_addva_i_p_p_z(imm, rz1, rz2, rz3)) }
 inst_sme_zero_i                 :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .SME_ZERO, operand_count = 1, length = 4, ops = {op_imm(imm, 4), {}, {}, {}}} }
 emit_sme_zero_i                 :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_sme_zero_i(imm)) }
 inst_sme_fmopa_i_p_p_z          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SME_FMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
@@ -3834,6 +3838,10 @@ inst_sme_smstop                      :: inst_sme_smstop_none
 emit_sme_smstop                      :: emit_sme_smstop_none
 inst_sme_rdsvl                       :: inst_sme_rdsvl_r_i
 emit_sme_rdsvl                       :: emit_sme_rdsvl_r_i
+inst_sme_addha                       :: inst_sme_addha_i_p_p_z
+emit_sme_addha                       :: emit_sme_addha_i_p_p_z
+inst_sme_addva                       :: inst_sme_addva_i_p_p_z
+emit_sme_addva                       :: emit_sme_addva_i_p_p_z
 inst_sme_zero                        :: inst_sme_zero_i
 emit_sme_zero                        :: emit_sme_zero_i
 inst_sme_fmopa                       :: inst_sme_fmopa_i_p_p_z
