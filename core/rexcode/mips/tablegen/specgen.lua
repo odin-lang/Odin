@@ -272,6 +272,43 @@ for _, b in ipairs({{"SHRA_QB","shra.qb",7},{"SHRA_R_QB","shra_r.qb",7},{"SHRA_R
 	if r then sections[#sections+1]=r end
 end
 
+-- ---- Branches: derive bits/regs, then mark the PC-relative offset variable.
+-- Compact (R6) branches need the r6 ISA, so each family passes its own mattr.
+local function bword(line, mattr)
+	local p = io.popen(string.format("printf '%%s\\n' '%s' | llvm-mc --assemble --triple=mips --mattr=%s --show-encoding 2>/dev/null", line, mattr))
+	local out = p:read("*a"); p:close()
+	local b1,b2,b3,b4 = out:match("0x(%x%x),0x(%x%x),0x(%x%x),0x(%x%x)")
+	if not b1 then return nil end
+	return tonumber(b1..b2..b3..b4, 16)
+end
+local function branch_block(mnem, ops, enc, feat, asm, maxes, offbits, mattr)
+	local zero={}; for i=1,#maxes do zero[i]=0 end
+	local b0 = bword(asm(zero), mattr)
+	if not b0 then skips[#skips+1]=mnem; return end
+	local vs={}
+	for i=1,#maxes do
+		local v={}; for j=1,#maxes do v[j]=0 end; v[i]=maxes[i]
+		local w=bword(asm(v), mattr); if not w then skips[#skips+1]=mnem; return end; vs[#vs+1]=w
+	end
+	local m = bit.band(mask_of(b0,vs), bit.bnot((2^offbits)-1))  -- offset field = variable
+	n_forms=n_forms+1
+	sections[#sections+1]=string.format("    .%s = { {.%s, %s, %s, 0x%s, 0x%s, .%s, {}} },",
+		mnem, mnem, ops, enc, bit.tohex(b0):upper(), bit.tohex(m):upper(), feat)
+end
+
+-- NOTE: the R6 two-/one-register compact branches (BEQC/BNEC/BLTC/BGEC/BLTUC/
+-- BGEUC/BLEZC/BGTZC/BGEZC/BLTZC) are intentionally NOT generated here. They
+-- pack into shared "POP" major opcodes (e.g. BGEC/BLTC/BLEZC/BGEZC all live in
+-- 0x58/0x5C) and are disambiguated only by the rs/rt *relationship* (rs==rt,
+-- rs==0, rs<rt) -- which the opcode+mask decode model cannot express without
+-- operand-aware logic. Deferred until the decoder grows POP-branch handling.
+for _, b in ipairs({{"BZ","bz"},{"BNZ","bnz"}}) do
+	for _, d in ipairs({{"B","b"},{"H","h"},{"W","w"},{"D","d"},{"V","v"}}) do
+		branch_block(b[1].."_"..d[1], "{.MSA_VEC,.REL16,.NONE,.NONE}", "{.WT,.BRANCH_16,.NONE,.NONE}", "MSA",
+			function(v) return string.format("%s.%s $w%d,0", b[2], d[2], v[1]) end, {31}, 16, "+msa")
+	end
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "    // SPECGEN:BEGIN\n" .. table.concat(sections, "\n") .. "\n    // SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()

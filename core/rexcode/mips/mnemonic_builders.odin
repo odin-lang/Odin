@@ -1624,6 +1624,26 @@ inst_splati_w_w_w_i5       :: #force_inline proc "contextless" (dst: Register, s
 emit_splati_w_w_w_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_splati_w_w_w_i5(dst, src, imm)) }
 inst_splati_d_w_w_i5       :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SPLATI_D, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), {}}} }
 emit_splati_d_w_w_i5       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_splati_d_w_w_i5(dst, src, imm)) }
+inst_bz_v_w_rel            :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BZ_V, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bz_v_w_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bz_v_w_rel(dst, target)) }
+inst_bnz_v_w_rel           :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BNZ_V, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bnz_v_w_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bnz_v_w_rel(dst, target)) }
+inst_bz_b_w_rel            :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BZ_B, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bz_b_w_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bz_b_w_rel(dst, target)) }
+inst_bz_h_w_rel            :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BZ_H, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bz_h_w_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bz_h_w_rel(dst, target)) }
+inst_bz_w_w_rel            :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BZ_W, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bz_w_w_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bz_w_w_rel(dst, target)) }
+inst_bz_d_w_rel            :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BZ_D, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bz_d_w_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bz_d_w_rel(dst, target)) }
+inst_bnz_b_w_rel           :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BNZ_B, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bnz_b_w_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bnz_b_w_rel(dst, target)) }
+inst_bnz_h_w_rel           :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BNZ_H, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bnz_h_w_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bnz_h_w_rel(dst, target)) }
+inst_bnz_w_w_rel           :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BNZ_W, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bnz_w_w_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bnz_w_w_rel(dst, target)) }
+inst_bnz_d_w_rel           :: #force_inline proc "contextless" (dst: Register, target: u32) -> Instruction { return Instruction{mnemonic = .BNZ_D, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(target), {}, {}}} }
+emit_bnz_d_w_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, target: u32) { append(instructions, inst_bnz_d_w_rel(dst, target)) }
 inst_nloc_b_w_w            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NLOC_B, operand_count = 2, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_nloc_b_w_w            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_nloc_b_w_w(dst, src)) }
 inst_nloc_h_w_w            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NLOC_H, operand_count = 2, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
@@ -3549,6 +3569,26 @@ inst_splati_w              :: inst_splati_w_w_w_i5
 emit_splati_w              :: emit_splati_w_w_w_i5
 inst_splati_d              :: inst_splati_d_w_w_i5
 emit_splati_d              :: emit_splati_d_w_w_i5
+inst_bz_v                  :: inst_bz_v_w_rel
+emit_bz_v                  :: emit_bz_v_w_rel
+inst_bnz_v                 :: inst_bnz_v_w_rel
+emit_bnz_v                 :: emit_bnz_v_w_rel
+inst_bz_b                  :: inst_bz_b_w_rel
+emit_bz_b                  :: emit_bz_b_w_rel
+inst_bz_h                  :: inst_bz_h_w_rel
+emit_bz_h                  :: emit_bz_h_w_rel
+inst_bz_w                  :: inst_bz_w_w_rel
+emit_bz_w                  :: emit_bz_w_w_rel
+inst_bz_d                  :: inst_bz_d_w_rel
+emit_bz_d                  :: emit_bz_d_w_rel
+inst_bnz_b                 :: inst_bnz_b_w_rel
+emit_bnz_b                 :: emit_bnz_b_w_rel
+inst_bnz_h                 :: inst_bnz_h_w_rel
+emit_bnz_h                 :: emit_bnz_h_w_rel
+inst_bnz_w                 :: inst_bnz_w_w_rel
+emit_bnz_w                 :: emit_bnz_w_w_rel
+inst_bnz_d                 :: inst_bnz_d_w_rel
+emit_bnz_d                 :: emit_bnz_d_w_rel
 inst_nloc_b                :: inst_nloc_b_w_w
 emit_nloc_b                :: emit_nloc_b_w_w
 inst_nloc_h                :: inst_nloc_h_w_w
