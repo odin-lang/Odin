@@ -17,6 +17,8 @@ Relocation_Type :: enum u8 {
 	REL16,  // 16-bit signed PC-rel branch offset (BEQ/BNE/BLEZ/BGTZ/...)
 	REL21,  // 21-bit signed PC-rel compact branch (R6 BEQZC/BNEZC)
 	REL26,  // 26-bit signed PC-rel compact branch (R6 BC/BALC)
+	REL_PC19, // 19-bit R6 PC-relative load offset ((target - PC) >> 2)  (LWPC/LWUPC)
+	REL_PC18, // 18-bit R6 PC-relative load offset ((target - (PC & ~7)) >> 3)  (LDPC)
 	J26,    // 26-bit J-type region target ((target_addr >> 2) & 0x3FFFFFF)
 	HI16,   // upper 16 of 32-bit absolute (LUI rt, %hi(sym)+0x8000 if LO16 paired)
 	LO16,   // lower 16 of 32-bit absolute (ADDIU rt, rt, %lo(sym))

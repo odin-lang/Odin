@@ -125,6 +125,8 @@ Operand_Type :: enum u8 {
 	REL_J26,             // 26-bit region jump (J / JAL)
 	REL21,               // R6 21-bit compact branch (BC1EQZ/NEZ)
 	REL26,               // R6 26-bit compact branch (BC/BALC)
+	REL19,               // R6 PC-relative load (LWPC/LWUPC, 19-bit << 2)
+	REL18,               // R6 PC-relative load (LDPC, 18-bit << 3)
 
 	// Memory: base GPR + 16-bit signed displacement
 	MEM,
@@ -164,6 +166,8 @@ Operand_Encoding :: enum u8 {
 	BRANCH_16,     // bits 15-0 as PC-relative word offset (delay-slot adjusted)
 	BRANCH_21,     // R6 compact branch: bits 20-0
 	BRANCH_26,     // R6 compact branch: bits 25-0
+	BRANCH_19,     // R6 PC-relative load: bits 18-0 (LWPC/LWUPC)
+	BRANCH_18,     // R6 PC-relative load: bits 17-0 (LDPC)
 
 	// FP condition code
 	FCC_BC,        // bits 20-18 (FP branches, MOVF/MOVT)

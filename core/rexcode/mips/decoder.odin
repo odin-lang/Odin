@@ -267,6 +267,18 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		if rel26 & (1 << 25) != 0 { rel26 |= ~i32(0x3FFFFFF) }
 		target := u32(i32(pc) + 4 + (rel26 << 2))
 		return Operand{relative = i64(target), kind = .RELATIVE, size = 4}
+	case .BRANCH_19:
+		// R6 PC-relative load: relative to this instruction (no +4), << 2.
+		rel19 := i32(word & 0x7FFFF)
+		if rel19 & (1 << 18) != 0 { rel19 |= ~i32(0x7FFFF) }
+		target := u32(i32(pc) + (rel19 << 2))
+		return Operand{relative = i64(target), kind = .RELATIVE, size = 4}
+	case .BRANCH_18:
+		// LDPC: relative to this instruction aligned down to 8, << 3.
+		rel18 := i32(word & 0x3FFFF)
+		if rel18 & (1 << 17) != 0 { rel18 |= ~i32(0x3FFFF) }
+		target := u32((i32(pc) &~ i32(7)) + (rel18 << 3))
+		return Operand{relative = i64(target), kind = .RELATIVE, size = 4}
 
 	// Misc small immediates -------------------------------------------------
 	case .FCC_BC:

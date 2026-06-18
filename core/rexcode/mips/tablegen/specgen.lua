@@ -350,27 +350,23 @@ end
 
 -- ---- Branches: derive bits/regs, then mark the PC-relative offset variable.
 -- Compact (R6) branches need the r6 ISA, so each family passes its own mattr.
-local function bword(line, mattr)
-	local p = io.popen(string.format("printf '%%s\\n' '%s' | llvm-mc --assemble --triple=mips --mattr=%s --show-encoding 2>/dev/null", line, mattr))
-	local out = p:read("*a"); p:close()
-	local b1,b2,b3,b4 = out:match("0x(%x%x),0x(%x%x),0x(%x%x),0x(%x%x)")
-	if not b1 then return nil end
-	return tonumber(b1..b2..b3..b4, 16)
-end
-local function branch_block(mnem, ops, enc, feat, asm, maxes, offbits, mattr)
+local function branch_block(mnem, ops, enc, feat, asm, maxes, offbits, cmd)
 	local zero={}; for i=1,#maxes do zero[i]=0 end
-	local b0 = bword(asm(zero), mattr)
+	local b0 = word(asm(zero), cmd)
 	if not b0 then skips[#skips+1]=mnem; return end
 	local vs={}
 	for i=1,#maxes do
 		local v={}; for j=1,#maxes do v[j]=0 end; v[i]=maxes[i]
-		local w=bword(asm(v), mattr); if not w then skips[#skips+1]=mnem; return end; vs[#vs+1]=w
+		local w=word(asm(v), cmd); if not w then skips[#skips+1]=mnem; return end; vs[#vs+1]=w
 	end
 	local m = bit.band(mask_of(b0,vs), bit.bnot((2^offbits)-1))  -- offset field = variable
 	n_forms=n_forms+1
 	sections[#sections+1]=string.format("    .%s = { {.%s, %s, %s, 0x%s, 0x%s, .%s, {}} },",
 		mnem, mnem, ops, enc, bit.tohex(b0):upper(), bit.tohex(m):upper(), feat)
 end
+local LLVM_MSA = "llvm-mc --assemble --triple=mips --mattr=+msa --show-encoding"
+local LLVM_R6  = "llvm-mc --assemble --triple=mips --mattr=+mips32r6 --show-encoding"
+local LLVM_64R6 = "llvm-mc --assemble --triple=mips64 --mattr=+mips64r6 --show-encoding"
 
 -- NOTE: the R6 two-/one-register compact branches (BEQC/BNEC/BLTC/BGEC/BLTUC/
 -- BGEUC/BLEZC/BGTZC/BGEZC/BLTZC) are intentionally NOT generated here. They
@@ -381,9 +377,17 @@ end
 for _, b in ipairs({{"BZ","bz"},{"BNZ","bnz"}}) do
 	for _, d in ipairs({{"B","b"},{"H","h"},{"W","w"},{"D","d"},{"V","v"}}) do
 		branch_block(b[1].."_"..d[1], "{.MSA_VEC,.REL16,.NONE,.NONE}", "{.WT,.BRANCH_16,.NONE,.NONE}", "MSA",
-			function(v) return string.format("%s.%s $w%d,0", b[2], d[2], v[1]) end, {31}, 16, "+msa")
+			function(v) return string.format("%s.%s $w%d,0", b[2], d[2], v[1]) end, {31}, 16, LLVM_MSA)
 	end
 end
+
+-- ---- R6 PC-relative loads (offset is a 19-/18-bit PC-relative label) --------
+branch_block("LWPC",  "{.GPR,.REL19,.NONE,.NONE}", "{.RS,.BRANCH_19,.NONE,.NONE}", "MIPS32_R6",
+	function(v) return string.format("lwpc $%d,0", v[1]) end, {31}, 19, LLVM_R6)
+branch_block("LWUPC", "{.GPR,.REL19,.NONE,.NONE}", "{.RS,.BRANCH_19,.NONE,.NONE}", "MIPS64_R6",
+	function(v) return string.format("lwupc $%d,0", v[1]) end, {31}, 19, LLVM_64R6)
+branch_block("LDPC",  "{.GPR,.REL18,.NONE,.NONE}", "{.RS,.BRANCH_18,.NONE,.NONE}", "MIPS64_R6",
+	function(v) return string.format("ldpc $%d,0", v[1]) end, {31}, 18, LLVM_64R6)
 
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "    // SPECGEN:BEGIN\n" .. table.concat(sections, "\n") .. "\n    // SPECGEN:END"

@@ -277,7 +277,7 @@ can_generate_operand :: proc(op: mips.Operand_Type) -> bool {
 		return true
 	case .IMM5, .IMM16S, .IMM16U, .IMM20, .SEL, .FCC:
 		return true
-	case .REL16, .REL21, .REL26, .REL_J26:
+	case .REL16, .REL21, .REL26, .REL_J26, .REL19, .REL18:
 		return true
 	case .MEM:
 		return true
@@ -313,7 +313,7 @@ operand_suffix :: proc(op: mips.Operand_Type) -> string {
 	case .IMM20:                          return "i20"
 	case .SEL:                            return "sel"
 	case .FCC:                            return "cc"
-	case .REL16:                          return "rel"
+	case .REL16, .REL19, .REL18:          return "rel"
 	case .REL21:                          return "rel21"
 	case .REL26:                          return "rel26"
 	case .REL_J26:                        return "j"
@@ -338,7 +338,7 @@ operand_param_type :: proc(op: mips.Operand_Type) -> string {
 		return "Register"
 	case .IMM5, .IMM16S, .IMM16U, .IMM20, .SEL, .FCC:
 		return "i64"
-	case .REL16, .REL21, .REL26, .REL_J26:
+	case .REL16, .REL21, .REL26, .REL_J26, .REL19, .REL18:
 		return "u32"
 	case .MEM:                            return "Memory"
 	}
@@ -377,7 +377,7 @@ write_op_expr :: proc(sb: ^strings.Builder, op: mips.Operand_Type, name: string)
 		fmt.sbprintf(sb, "op_reg(%s)", name)
 	case .IMM5, .IMM16S, .IMM16U, .IMM20, .SEL, .FCC:
 		fmt.sbprintf(sb, "op_imm(%s, %d)", name, operand_imm_size(op))
-	case .REL16, .REL21, .REL26, .REL_J26:
+	case .REL16, .REL21, .REL26, .REL_J26, .REL19, .REL18:
 		fmt.sbprintf(sb, "op_label(%s)", name)
 	case .MEM:
 		fmt.sbprintf(sb, "op_mem(%s, 4)", name)
@@ -403,7 +403,7 @@ param_names :: proc(sig: Operand_Signature) -> [4]string {
 		case .IMM5, .IMM16S, .IMM16U, .IMM20, .SEL, .FCC:
 			result[i] = imm_n == 0 ? "imm" : fmt.tprintf("imm%d", imm_n + 1)
 			imm_n += 1
-		case .REL16, .REL21, .REL26, .REL_J26:
+		case .REL16, .REL21, .REL26, .REL_J26, .REL19, .REL18:
 			result[i] = rel_n == 0 ? "target" : fmt.tprintf("target%d", rel_n + 1)
 			rel_n += 1
 		case .MEM:

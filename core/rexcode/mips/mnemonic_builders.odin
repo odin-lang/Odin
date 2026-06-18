@@ -412,6 +412,12 @@ inst_lsa_r_r_r_i5          :: #force_inline proc "contextless" (dst: GPR, src: G
 emit_lsa_r_r_r_i5          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, src2: GPR, imm: i64) { append(instructions, inst_lsa_r_r_r_i5(dst, src, src2, imm)) }
 inst_dlsa_r_r_r_i5         :: #force_inline proc "contextless" (dst: GPR, src: GPR, src2: GPR, imm: i64) -> Instruction { return Instruction{mnemonic = .DLSA, operand_count = 4, length = 4, ops = {op_gpr(dst), op_gpr(src), op_gpr(src2), op_imm(imm, 1)}} }
 emit_dlsa_r_r_r_i5         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, src2: GPR, imm: i64) { append(instructions, inst_dlsa_r_r_r_i5(dst, src, src2, imm)) }
+inst_lwpc_r_rel            :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .LWPC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_lwpc_r_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_lwpc_r_rel(dst, target)) }
+inst_lwupc_r_rel           :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .LWUPC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_lwupc_r_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_lwupc_r_rel(dst, target)) }
+inst_ldpc_r_rel            :: #force_inline proc "contextless" (dst: GPR, target: u32) -> Instruction { return Instruction{mnemonic = .LDPC, operand_count = 2, length = 4, ops = {op_gpr(dst), op_label(target), {}, {}}} }
+emit_ldpc_r_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, target: u32) { append(instructions, inst_ldpc_r_rel(dst, target)) }
 inst_seleqz_r_r_r          :: #force_inline proc "contextless" (dst: GPR, src: GPR, src2: GPR) -> Instruction { return Instruction{mnemonic = .SELEQZ, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_gpr(src2), {}}} }
 emit_seleqz_r_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: GPR, src: GPR, src2: GPR) { append(instructions, inst_seleqz_r_r_r(dst, src, src2)) }
 inst_selnez_r_r_r          :: #force_inline proc "contextless" (dst: GPR, src: GPR, src2: GPR) -> Instruction { return Instruction{mnemonic = .SELNEZ, operand_count = 3, length = 4, ops = {op_gpr(dst), op_gpr(src), op_gpr(src2), {}}} }
@@ -2427,6 +2433,12 @@ inst_lsa                   :: inst_lsa_r_r_r_i5
 emit_lsa                   :: emit_lsa_r_r_r_i5
 inst_dlsa                  :: inst_dlsa_r_r_r_i5
 emit_dlsa                  :: emit_dlsa_r_r_r_i5
+inst_lwpc                  :: inst_lwpc_r_rel
+emit_lwpc                  :: emit_lwpc_r_rel
+inst_lwupc                 :: inst_lwupc_r_rel
+emit_lwupc                 :: emit_lwupc_r_rel
+inst_ldpc                  :: inst_ldpc_r_rel
+emit_ldpc                  :: emit_ldpc_r_rel
 inst_seleqz                :: inst_seleqz_r_r_r
 emit_seleqz                :: emit_seleqz_r_r_r
 inst_selnez                :: inst_selnez_r_r_r
