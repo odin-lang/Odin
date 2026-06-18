@@ -659,6 +659,22 @@ main :: proc() {
 		}
 	}
 
+	// Builder aliases for redundant SME enum names that were removed from the
+	// Mnemonic enum: they are the same instructions as the canonical *_TILE /
+	// MOVA_*_FROM_* forms, so the convenient *_za / *_to_* names delegate to them.
+	sme_aliases := [][2]string{
+		{"sme_ld1b_za", "sme_ld1b_tile"}, {"sme_ld1h_za", "sme_ld1h_tile"},
+		{"sme_ld1w_za", "sme_ld1w_tile"}, {"sme_ld1d_za", "sme_ld1d_tile"},
+		{"sme_ld1q_za", "sme_ld1q_tile"}, {"sme_st1b_za", "sme_st1b_tile"},
+		{"sme_st1h_za", "sme_st1h_tile"}, {"sme_st1w_za", "sme_st1w_tile"},
+		{"sme_st1d_za", "sme_st1d_tile"}, {"sme_st1q_za", "sme_st1q_tile"},
+		{"sme_mova_to_z", "sme_mova_z_from_tile"}, {"sme_mova_to_za", "sme_mova_tile_from_z"},
+	}
+	strings.write_string(&sb, "\n// Aliases: redundant SME names -> canonical tile/MOVA builders.\n")
+	for al in sme_aliases {
+		fmt.sbprintf(&sb, "inst_%s :: inst_%s\nemit_%s :: emit_%s\n", al[0], al[1], al[0], al[1])
+	}
+
 	output := strings.to_string(sb)
 	err := os.write_entire_file(#directory + "/../mnemonic_builders.odin", transmute([]u8)strings.concatenate({GEN_ATTRIB, output}))
 	if err == nil {

@@ -4446,3 +4446,29 @@ inst_cmn_imm                         :: inst_cmn_imm_r_i
 emit_cmn_imm                         :: emit_cmn_imm_r_i
 inst_tst_sr                          :: inst_tst_sr_r_sh
 emit_tst_sr                          :: emit_tst_sr_r_sh
+
+// Aliases: redundant SME names -> canonical tile/MOVA builders.
+inst_sme_ld1b_za :: inst_sme_ld1b_tile
+emit_sme_ld1b_za :: emit_sme_ld1b_tile
+inst_sme_ld1h_za :: inst_sme_ld1h_tile
+emit_sme_ld1h_za :: emit_sme_ld1h_tile
+inst_sme_ld1w_za :: inst_sme_ld1w_tile
+emit_sme_ld1w_za :: emit_sme_ld1w_tile
+inst_sme_ld1d_za :: inst_sme_ld1d_tile
+emit_sme_ld1d_za :: emit_sme_ld1d_tile
+inst_sme_ld1q_za :: inst_sme_ld1q_tile
+emit_sme_ld1q_za :: emit_sme_ld1q_tile
+inst_sme_st1b_za :: inst_sme_st1b_tile
+emit_sme_st1b_za :: emit_sme_st1b_tile
+inst_sme_st1h_za :: inst_sme_st1h_tile
+emit_sme_st1h_za :: emit_sme_st1h_tile
+inst_sme_st1w_za :: inst_sme_st1w_tile
+emit_sme_st1w_za :: emit_sme_st1w_tile
+inst_sme_st1d_za :: inst_sme_st1d_tile
+emit_sme_st1d_za :: emit_sme_st1d_tile
+inst_sme_st1q_za :: inst_sme_st1q_tile
+emit_sme_st1q_za :: emit_sme_st1q_tile
+inst_sme_mova_to_z :: inst_sme_mova_z_from_tile
+emit_sme_mova_to_z :: emit_sme_mova_z_from_tile
+inst_sme_mova_to_za :: inst_sme_mova_tile_from_z
+emit_sme_mova_to_za :: emit_sme_mova_tile_from_z
