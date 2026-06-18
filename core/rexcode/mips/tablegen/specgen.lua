@@ -13,7 +13,7 @@
 --   Run: luajit tablegen/specgen.lua   (from mips/, or with a full path)
 
 local bit  = require("bit")
-local LLVM = "llvm-mc --assemble --triple=mips --mattr=+msa --show-encoding"
+local LLVM = "llvm-mc --assemble --triple=mips --mattr=+msa,+dsp,+dspr2 --show-encoding"
 local DIR   = (arg[0]:match("^(.*)/[^/]*$")) or "."
 local TABLE = DIR .. "/encoding_table.odin"
 
@@ -149,6 +149,50 @@ end
 for _, d in ipairs({{"B","b"},{"H","h"},{"W","w"}}) do
 	local r = entry("SHF_"..d[1], "{.MSA_VEC,.MSA_VEC,.IMM5,.NONE}", "{.WD,.WS,.MSA_I8,.NONE}", "MSA",
 		function(v) return string.format("shf.%s $w%d,$w%d,%d", d[2], v[1], v[2], v[3]) end, {31,31,255})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- INSVE: element insert from Ws[0] into Wd[idx] -------------------------
+for _, d in ipairs(BHWD) do
+	local r = entry("INSVE_"..d[1], "{.MSA_VEC,.MSA_VEC,.IMM5,.NONE}", "{.WD,.WS,.MSA_ELM_IDX,.NONE}", "MSA",
+		function(v) return string.format("insve.%s $w%d[%d],$w%d[0]", d[2], v[1], v[3], v[2]) end, {31,31,ELM_IDX[d[2]]})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- DSP ASE three-register (Rd, Rs, Rt) -----------------------------------
+local GPR3 = "{.GPR,.GPR,.GPR,.NONE}"
+local ENC_RDST = "{.RD,.RS,.RT,.NONE}"
+for _, b in ipairs({
+	{"ADDU_PH","addu.ph"},{"ADDU_S_PH","addu_s.ph"},{"SUBU_PH","subu.ph"},{"SUBU_S_PH","subu_s.ph"},
+	{"MULEQ_S_W_PHL","muleq_s.w.phl"},{"MULEQ_S_W_PHR","muleq_s.w.phr"},
+	{"MULEU_S_PH_QBL","muleu_s.ph.qbl"},{"MULEU_S_PH_QBR","muleu_s.ph.qbr"},
+	{"MULQ_RS_PH","mulq_rs.ph"},{"MULQ_S_PH","mulq_s.ph"},
+	{"PRECRQ_PH_W","precrq.ph.w"},{"PRECRQ_QB_PH","precrq.qb.ph"},
+	{"PRECRQ_RS_PH_W","precrq_rs.ph.w"},{"PRECRQU_S_QB_PH","precrqu_s.qb.ph"},
+	{"PICK_PH","pick.ph"},{"PICK_QB","pick.qb"},
+	{"CMPGU_EQ_QB","cmpgu.eq.qb"},{"CMPGU_LE_QB","cmpgu.le.qb"},{"CMPGU_LT_QB","cmpgu.lt.qb"},
+}) do
+	local r = entry(b[1], GPR3, ENC_RDST, "DSP_R2", function(v) return string.format("%s $%d,$%d,$%d", b[2], v[1], v[2], v[3]) end, {31,31,31})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- DSP ASE variable shifts: Rd, Rt (value), Rs (shift) -> enc {RD,RT,RS} --
+for _, b in ipairs({
+	{"SHLLV_PH","shllv.ph"},{"SHLLV_S_PH","shllv_s.ph"},{"SHLLV_S_W","shllv_s.w"},
+	{"SHRAV_PH","shrav.ph"},{"SHRAV_QB","shrav.qb"},{"SHRAV_R_PH","shrav_r.ph"},
+	{"SHRAV_R_QB","shrav_r.qb"},{"SHRAV_R_W","shrav_r.w"},{"SHRLV_PH","shrlv.ph"},
+}) do
+	local r = entry(b[1], GPR3, "{.RD,.RT,.RS,.NONE}", "DSP_R2", function(v) return string.format("%s $%d,$%d,$%d", b[2], v[1], v[2], v[3]) end, {31,31,31})
+	if r then sections[#sections+1]=r end
+end
+
+-- ---- DSP ASE compare (Rs, Rt -> DSP flags) ---------------------------------
+for _, b in ipairs({
+	{"CMP_EQ_PH","cmp.eq.ph"},{"CMP_LE_PH","cmp.le.ph"},{"CMP_LT_PH","cmp.lt.ph"},
+	{"CMPU_EQ_QB","cmpu.eq.qb"},{"CMPU_LE_QB","cmpu.le.qb"},{"CMPU_LT_QB","cmpu.lt.qb"},
+}) do
+	local r = entry(b[1], "{.GPR,.GPR,.NONE,.NONE}", "{.RS,.RT,.NONE,.NONE}", "DSP_R2",
+		function(v) return string.format("%s $%d,$%d", b[2], v[1], v[2]) end, {31,31})
 	if r then sections[#sections+1]=r end
 end
 
