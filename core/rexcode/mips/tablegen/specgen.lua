@@ -294,6 +294,18 @@ do
 	if r then sections[#sections+1]=r end
 end
 
+-- ---- DSP ASE replicate immediate (Rd <- broadcast imm) --------------------
+-- REPL.PH = signed 10-bit at 25:16 (reuse MSA_S10); REPL.QB = 8-bit at 23:16
+-- (reuse MSA_I8). Vary REPL.PH's imm to -1 so all ten field bits toggle.
+do
+	local r = entry("REPL_PH", "{.GPR,.IMM5,.NONE,.NONE}", "{.RD,.MSA_S10,.NONE,.NONE}", "DSP_R1",
+		function(v) return string.format("repl.ph $%d,%d", v[1], v[2]) end, {31,-1})
+	if r then sections[#sections+1]=r end
+	r = entry("REPL_QB", "{.GPR,.IMM5,.NONE,.NONE}", "{.RD,.MSA_I8,.NONE,.NONE}", "DSP_R1",
+		function(v) return string.format("repl.qb $%d,%d", v[1], v[2]) end, {31,255})
+	if r then sections[#sections+1]=r end
+end
+
 -- ---- DSP ASE extract-from-accumulator ops ---------------------------------
 do
 	local r = entry("EXTPDP", "{.GPR,.IMM5,.IMM5,.NONE}", "{.RT,.AC_NUM,.EXT_SIZE,.NONE}", "DSP_R2",
