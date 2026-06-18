@@ -1123,6 +1123,38 @@ inst_uxtl_r_r                   :: #force_inline proc "contextless" (dst: Regist
 emit_uxtl_r_r                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_uxtl_r_r(dst, src)) }
 inst_uxtl2_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .UXTL2, operand_count = 2, length = 4, ops = {op_v_8h(u8(reg_hw(dst))), op_v_16b(u8(reg_hw(src))), {}, {}}} }
 emit_uxtl2_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_uxtl2_r_r(dst, src)) }
+inst_shrn_r_r_i                 :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SHRN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_shrn_r_r_i                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_shrn_r_r_i(dst, src, imm)) }
+inst_shrn2_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SHRN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_shrn2_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_shrn2_r_r_i(dst, src, imm)) }
+inst_rshrn_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .RSHRN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_rshrn_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_rshrn_r_r_i(dst, src, imm)) }
+inst_rshrn2_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .RSHRN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_rshrn2_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_rshrn2_r_r_i(dst, src, imm)) }
+inst_sqshrn_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQSHRN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqshrn_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqshrn_r_r_i(dst, src, imm)) }
+inst_sqshrn2_r_r_i              :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQSHRN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqshrn2_r_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqshrn2_r_r_i(dst, src, imm)) }
+inst_uqshrn_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .UQSHRN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_uqshrn_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_uqshrn_r_r_i(dst, src, imm)) }
+inst_uqshrn2_r_r_i              :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .UQSHRN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_uqshrn2_r_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_uqshrn2_r_r_i(dst, src, imm)) }
+inst_sqrshrn_r_r_i              :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQRSHRN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqrshrn_r_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqrshrn_r_r_i(dst, src, imm)) }
+inst_sqrshrn2_r_r_i             :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQRSHRN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqrshrn2_r_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqrshrn2_r_r_i(dst, src, imm)) }
+inst_uqrshrn_r_r_i              :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .UQRSHRN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_uqrshrn_r_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_uqrshrn_r_r_i(dst, src, imm)) }
+inst_uqrshrn2_r_r_i             :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .UQRSHRN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_uqrshrn2_r_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_uqrshrn2_r_r_i(dst, src, imm)) }
+inst_sqshrun_r_r_i              :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQSHRUN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqshrun_r_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqshrun_r_r_i(dst, src, imm)) }
+inst_sqshrun2_r_r_i             :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQSHRUN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqshrun2_r_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqshrun2_r_r_i(dst, src, imm)) }
+inst_sqrshrun_r_r_i             :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQRSHRUN, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqrshrun_r_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqrshrun_r_r_i(dst, src, imm)) }
+inst_sqrshrun2_r_r_i            :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SQRSHRUN2, operand_count = 3, length = 4, ops = {op_v_16b(u8(reg_hw(dst))), op_v_8h(u8(reg_hw(src))), op_imm(imm, 4), {}}} }
+emit_sqrshrun2_r_r_i            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sqrshrun2_r_r_i(dst, src, imm)) }
 inst_zip1_r_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_v_8b(u8(reg_hw(src2))), {}}} }
 emit_zip1_r_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_r_r_r(dst, src, src2)) }
 inst_zip2_r_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_8b(u8(reg_hw(dst))), op_v_8b(u8(reg_hw(src))), op_v_8b(u8(reg_hw(src2))), {}}} }
@@ -3064,6 +3096,38 @@ inst_uxtl                            :: inst_uxtl_r_r
 emit_uxtl                            :: emit_uxtl_r_r
 inst_uxtl2                           :: inst_uxtl2_r_r
 emit_uxtl2                           :: emit_uxtl2_r_r
+inst_shrn                            :: inst_shrn_r_r_i
+emit_shrn                            :: emit_shrn_r_r_i
+inst_shrn2                           :: inst_shrn2_r_r_i
+emit_shrn2                           :: emit_shrn2_r_r_i
+inst_rshrn                           :: inst_rshrn_r_r_i
+emit_rshrn                           :: emit_rshrn_r_r_i
+inst_rshrn2                          :: inst_rshrn2_r_r_i
+emit_rshrn2                          :: emit_rshrn2_r_r_i
+inst_sqshrn                          :: inst_sqshrn_r_r_i
+emit_sqshrn                          :: emit_sqshrn_r_r_i
+inst_sqshrn2                         :: inst_sqshrn2_r_r_i
+emit_sqshrn2                         :: emit_sqshrn2_r_r_i
+inst_uqshrn                          :: inst_uqshrn_r_r_i
+emit_uqshrn                          :: emit_uqshrn_r_r_i
+inst_uqshrn2                         :: inst_uqshrn2_r_r_i
+emit_uqshrn2                         :: emit_uqshrn2_r_r_i
+inst_sqrshrn                         :: inst_sqrshrn_r_r_i
+emit_sqrshrn                         :: emit_sqrshrn_r_r_i
+inst_sqrshrn2                        :: inst_sqrshrn2_r_r_i
+emit_sqrshrn2                        :: emit_sqrshrn2_r_r_i
+inst_uqrshrn                         :: inst_uqrshrn_r_r_i
+emit_uqrshrn                         :: emit_uqrshrn_r_r_i
+inst_uqrshrn2                        :: inst_uqrshrn2_r_r_i
+emit_uqrshrn2                        :: emit_uqrshrn2_r_r_i
+inst_sqshrun                         :: inst_sqshrun_r_r_i
+emit_sqshrun                         :: emit_sqshrun_r_r_i
+inst_sqshrun2                        :: inst_sqshrun2_r_r_i
+emit_sqshrun2                        :: emit_sqshrun2_r_r_i
+inst_sqrshrun                        :: inst_sqrshrun_r_r_i
+emit_sqrshrun                        :: emit_sqrshrun_r_r_i
+inst_sqrshrun2                       :: inst_sqrshrun2_r_r_i
+emit_sqrshrun2                       :: emit_sqrshrun2_r_r_i
 inst_zip1                            :: inst_zip1_r_r_r
 emit_zip1                            :: emit_zip1_r_r_r
 inst_zip2                            :: inst_zip2_r_r_r

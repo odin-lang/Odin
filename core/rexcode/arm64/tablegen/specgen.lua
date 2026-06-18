@@ -290,7 +290,10 @@ local function emit_shift(mnem, llvm, dir, variants)
 	local rows = {}
 	for _, v in ipairs(variants) do
 		local dst, src = v[1], v[2]
-		local es = ESIZE[src]
+		-- Left shifts (incl. widening SSHLL) key immh on the source element;
+		-- right shifts (incl. narrowing SHRN) key it on the destination
+		-- (narrow result) element. For same-arrangement shifts these coincide.
+		local es = (dir == "L") and ESIZE[src] or ESIZE[dst]
 		local canon = (dir == "L") and 0 or es
 		local other = (dir == "L") and (es - 1) or 1
 		local da, sa = ARR[dst].asm, ARR[src].asm
@@ -314,6 +317,10 @@ local SAME_SH = {}
 for _, a in ipairs({"8B","16B","4H","8H","2S","4S","2D"}) do SAME_SH[#SAME_SH+1] = {a, a} end
 local WSHL_LO = {{"8H","8B"},{"4S","4H"},{"2D","2S"}}
 local WSHL_HI = {{"8H","16B"},{"4S","8H"},{"2D","4S"}}
+-- narrowing right shifts: {narrow dst, wide src}; the `2` variants write the
+-- high half (full 128-bit dst arrangement). esize keys on the narrow dst.
+local NSHR_LO = {{"8B","8H"},{"4H","4S"},{"2S","2D"}}
+local NSHR_HI = {{"16B","8H"},{"8H","4S"},{"4S","2D"}}
 local SHIFTS = {
 	{"SHL_V","shl","L",SAME_SH},{"SLI","sli","L",SAME_SH},{"SQSHLU","sqshlu","L",SAME_SH},{"SQSHL_V","sqshl","L",SAME_SH},
 	{"SSHR","sshr","R",SAME_SH},{"USHR","ushr","R",SAME_SH},{"SRSHR","srshr","R",SAME_SH},{"URSHR","urshr","R",SAME_SH},
@@ -321,6 +328,15 @@ local SHIFTS = {
 	{"SRI","sri","R",SAME_SH},
 	{"SSHLL","sshll","L",WSHL_LO},{"SSHLL2","sshll2","L",WSHL_HI},
 	{"USHLL","ushll","L",WSHL_LO},{"USHLL2","ushll2","L",WSHL_HI},
+	-- narrowing right shifts (immh keys on the narrow destination element).
+	{"SHRN","shrn","R",NSHR_LO},{"SHRN2","shrn2","R",NSHR_HI},
+	{"RSHRN","rshrn","R",NSHR_LO},{"RSHRN2","rshrn2","R",NSHR_HI},
+	{"SQSHRN","sqshrn","R",NSHR_LO},{"SQSHRN2","sqshrn2","R",NSHR_HI},
+	{"UQSHRN","uqshrn","R",NSHR_LO},{"UQSHRN2","uqshrn2","R",NSHR_HI},
+	{"SQRSHRN","sqrshrn","R",NSHR_LO},{"SQRSHRN2","sqrshrn2","R",NSHR_HI},
+	{"UQRSHRN","uqrshrn","R",NSHR_LO},{"UQRSHRN2","uqrshrn2","R",NSHR_HI},
+	{"SQSHRUN","sqshrun","R",NSHR_LO},{"SQSHRUN2","sqshrun2","R",NSHR_HI},
+	{"SQRSHRUN","sqrshrun","R",NSHR_LO},{"SQRSHRUN2","sqrshrun2","R",NSHR_HI},
 }
 do
 	local blk = {}
