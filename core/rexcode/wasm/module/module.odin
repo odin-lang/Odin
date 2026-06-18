@@ -1,6 +1,7 @@
 package rexcode_wasm_module
 
 import "base:runtime"
+import "core:fmt"
 import "core:rexcode/wasm"
 
 WASM_MAGIC   :: u32(0x6d736100)   // "\0asm" as a little-endian u32
@@ -155,13 +156,8 @@ Custom_Section_Target_Features :: struct {
 }
 
 
-// -----------------------------------------------------------------------------
-// Small display helpers
-// -----------------------------------------------------------------------------
-
-
 @(require_results)
-section_name :: proc(id: Section_Id) -> string {
+section_name :: #force_inline proc "contextless" (id: Section_Id) -> string {
 	switch id {
 	case .CUSTOM:     return "custom"
 	case .TYPE:       return "type"
@@ -181,7 +177,7 @@ section_name :: proc(id: Section_Id) -> string {
 }
 
 @(require_results)
-valtype_name :: proc(t: wasm.Value_Type) -> string {
+valtype_name :: #force_inline proc "contextless" (t: wasm.Value_Type) -> string {
 	switch t {
 	case .I32:       return "i32"
 	case .I64:       return "i64"
@@ -195,7 +191,7 @@ valtype_name :: proc(t: wasm.Value_Type) -> string {
 }
 
 @(require_results)
-external_kind_name :: proc(k: External_Kind) -> string {
+external_kind_name :: #force_inline proc "contextless" (k: External_Kind) -> string {
 	switch k {
 	case .FUNC:   return "func"
 	case .TABLE:  return "table"
@@ -203,4 +199,81 @@ external_kind_name :: proc(k: External_Kind) -> string {
 	case .GLOBAL: return "global"
 	}
 	return "?"
+}
+
+
+
+@(require_results)
+module_name :: proc "contextless" (m: Module) -> (string, bool) {
+	for c in m.customs {
+		#partial switch v in c.variant {
+		case Custom_Section_Name:
+			if v.module_name != "" {
+				return v.module_name, true
+			}
+		}
+	}
+	return "", false
+}
+
+@(require_results)
+count_import_kind :: proc "contextless" (m: Module, k: External_Kind) -> u32 {
+	n: u32 = 0
+	for imp in m.imports {
+		if imp.kind == k {
+			n += 1
+		}
+	}
+	return n
+}
+
+@(require_results)
+block_sig :: proc "contextless" (m: Module, imm: i64) -> (params: int, results: int) {
+	if imm < 0 {
+		if imm == i64(wasm.Block_Type.EMPTY) {
+			return 0, 0
+		}
+		return 0, 1 // single value-type result
+	}
+	if int(imm) < len(m.types) {
+		t := m.types[imm]
+		return len(t.params), len(t.results)
+	}
+	return 0, 0
+}
+
+
+
+// Stack arity (operands consumed, results produced) for non-control operators,
+// plus the control operators that flow through the plain path. Block/loop/if
+// are handled directly by `wat_fold_region`.
+@(require_results)
+instruction_arity :: proc(m: Module, inst: wasm.Instruction) -> (inputs: int, outputs: int) {
+	e := &wasm.ENCODING_TABLE[inst.mnemonic]
+	inputs, outputs = int(e.inputs), int(e.outputs)
+	if inputs < 0 || outputs < 0 {
+		#partial switch inst.mnemonic {
+		case .CALL, .RETURN_CALL:
+			if int(inst.ops[0].index) < len(m.functions) {
+				t := m.functions[inst.ops[0].index].type
+				return len(t.params), len(t.results)
+			}
+			return 0, 0
+		case .CALL_INDIRECT, .RETURN_CALL_INDIRECT:
+			if int(inst.ops[0].index) < len(m.types) {
+				t := m.types[inst.ops[0].index]
+				return len(t.params) + 1, len(t.results)
+			}
+			return 1, 0
+
+		case .RETURN:
+			if int(inst.ops[0].index) < len(m.types) {
+				t := m.types[inst.ops[0].index]
+				return len(t.results), 0
+			}
+			return 0, 0
+		}
+		fmt.panicf("Unknown optional arity handling %v", inst.mnemonic)
+	}
+	return
 }

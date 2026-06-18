@@ -124,12 +124,15 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 			for i in 0..<sec.count {
 				fmt.sbprintf(sb, "  [%d]\n", i)
 				kind := rd_u32(&r) or_break section_printing
+
 				switch kind {
-				case 2: // memidx + expr + []byte
+				case 2: // memidx + expr + bytes
 					memidx := rd_u32(&r) or_break section_printing
-					fmt.sbprintf(sb, "    memidx:%d\n", memidx)
+					if memidx != 0 {
+						fmt.sbprintf(sb, "  memidx:%d\n", memidx)
+					}
 					fallthrough
-				case 0: // expr + []byte
+				case 0: // expr + bytes
 					relocs: []wasm.Relocation
 					for rg in relocs_group {
 						if rg.target_section == sec.id {
@@ -146,15 +149,13 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 						}
 						wasm.sbprint(sb, {inst}, {info}, nil, &label_names)
 					}
-					size := rd_u32(&r) or_break section_printing
-					fmt.sbprintf(sb, "    %q\n", r.data[r.off:][:size])
-				case 1:  // []byte
-					fmt.sbprintf(sb, "    %q\n", r.data[r.off:])
-				case 48:
-					// fmt.sbprintf(sb, "    %q\n", r.data[r.off:])
-				case 49:
-					// fmt.sbprintf(sb, "    %q\n", r.data[r.off:])
+				case 1: // bytes
+					break
 				}
+
+				size := rd_u32(&r) or_break section_printing
+				fmt.sbprintf(sb, "    %q\n", r.data[r.off:][:size])
+				r.off += size
 			}
 		case .MEMORY:
 			r := reader(section_data, 0)
