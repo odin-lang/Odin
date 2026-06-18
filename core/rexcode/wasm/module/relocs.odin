@@ -58,6 +58,16 @@ relocations_destroy :: proc(groups: []Reloc_Group, allocator: runtime.Allocator)
 }
 
 @(require_results)
+relocations_from_section_id :: proc(reloc_groups: []Reloc_Group, sec_id: Section_Id) -> []wasm.Relocation {
+	for rg in reloc_groups {
+		if rg.target_section == sec_id {
+			return rg.relocs
+		}
+	}
+	return nil
+}
+
+@(require_results)
 reloc_type_from_wire :: proc(code: u8) -> (wasm.Relocation_Type, bool) {
 	switch code {
 	case 0:  return .FUNCTION_INDEX_LEB, true   // R_WASM_FUNCTION_INDEX_LEB

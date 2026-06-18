@@ -54,8 +54,6 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 		}
 	}
 
-	relocs_group, _ := parse_relocations(m, context.temp_allocator)
-
 	// sections
 	for sec in m.sections {
 		write_padded :: proc(sb: ^strings.Builder, s: string, width: int) {
@@ -133,14 +131,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 					}
 					fallthrough
 				case 0: // expr + bytes
-					relocs: []wasm.Relocation
-					for rg in relocs_group {
-						if rg.target_section == sec.id {
-							relocs = rg.relocs
-							break
-						}
-					}
-
+					relocs := relocations_from_section_id(m.reloc_groups, sec.id)
 					for r.off < u32(len(r.data)) {
 						inst, info, next := wasm.decode_one(r.data[r.off:], relocs=relocs, pc=0, targets_allocator=context.temp_allocator) or_break section_printing
 						r.off += next
@@ -211,13 +202,7 @@ sbprint_module :: proc(sb: ^strings.Builder, m: Module) {
 	// }
 
 
-	func_relocs: []wasm.Relocation
-	for rg in relocs_group {
-		if rg.target_section == .FUNCTION {
-			func_relocs = rg.relocs
-			break
-		}
-	}
+	func_relocs := relocations_from_section_id(m.reloc_groups, .FUNCTION)
 
 	for f in m.functions {
 		if f.exported {

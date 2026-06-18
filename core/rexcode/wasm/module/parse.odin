@@ -196,6 +196,9 @@ parse :: proc(data: []u8, allocator := context.allocator) -> (m: Module, err: Re
 
 	build_functions(&m, func_typeidx, codes, allocator) or_return
 	apply_name_section(&m)
+
+	m.reloc_groups = parse_relocations(m, allocator) or_return
+
 	return
 }
 
@@ -486,6 +489,8 @@ apply_name_section :: proc(m: ^Module) {
 }
 
 module_destroy :: proc(m: ^Module) {
+	relocations_destroy(m.reloc_groups, m.allocator)
+
 	for t in m.types {
 		delete(t.params,  m.allocator)
 		delete(t.results, m.allocator)

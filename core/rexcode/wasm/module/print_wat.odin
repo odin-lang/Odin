@@ -115,14 +115,7 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 
 	wat_write_imports(sb, m, unit)
 
-	relocs_group, _ := parse_relocations(m, context.temp_allocator)
-	func_relocs: []wasm.Relocation
-	for rg in relocs_group {
-		if rg.target_section == .FUNCTION {
-			func_relocs = rg.relocs
-			break
-		}
-	}
+	func_relocs := relocations_from_section_id(m.reloc_groups, .FUNCTION)
 
 	for f in m.functions {
 		if f.imported {
@@ -133,7 +126,7 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 
 	wat_write_tables  (sb, m, unit)
 	wat_write_memories(sb, m, unit)
-	wat_write_globals (sb, m, relocs_group, unit)
+	wat_write_globals (sb, m, unit)
 
 	for e in m.exports {
 		fmt.sbprintf(sb, "%s(export %q (%s %d))\n", unit, e.name, external_kind_name(e.kind), e.index)
@@ -143,8 +136,8 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 		fmt.sbprintf(sb, "%s(start %d)\n", unit, m.start)
 	}
 
-	wat_write_elements(sb, m, relocs_group, unit)
-	wat_write_data    (sb, m, relocs_group, unit)
+	wat_write_elements(sb, m, unit)
+	wat_write_data    (sb, m, unit)
 }
 
 wat_write_functype :: proc(sb: ^strings.Builder, t: Func_Type) {
@@ -526,19 +519,13 @@ wat_write_memories :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 	}
 }
 
-wat_write_globals :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Group, unit: string) {
+wat_write_globals :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 	idx := count_import_kind(m, .GLOBAL)
 	for sec in m.sections {
 		if sec.id != .GLOBAL {
 			continue
 		}
-		relocs: []wasm.Relocation
-		for rg in relocs_group {
-			if rg.target_section == sec.id {
-				relocs = rg.relocs
-				break
-			}
-		}
+		relocs := relocations_from_section_id(m.reloc_groups, sec.id)
 
 		r := reader(m.data, sec.offset)
 		count := rd_u32(&r) or_break
@@ -560,19 +547,14 @@ wat_write_globals :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc
 	}
 }
 
-wat_write_elements :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Group, unit: string) -> Parse_Error {
+wat_write_elements :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_Error {
 	elem_idx := 0
 	for sec in m.sections {
 		if sec.id != .ELEMENT {
 			continue
 		}
-		relocs: []wasm.Relocation
-		for rg in relocs_group {
-			if rg.target_section == sec.id {
-				relocs = rg.relocs
-				break
-			}
-		}
+
+		relocs := relocations_from_section_id(m.reloc_groups, sec.id)
 
 		r := reader(m.data, sec.offset)
 		count := rd_u32(&r) or_break
@@ -599,7 +581,7 @@ wat_write_elements :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Relo
 	return nil
 }
 
-wat_write_data :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Group, unit: string) -> Parse_Error {
+wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_Error {
 	data_idx := 0
 	for sec in m.sections {
 		if sec.id != .DATA {
@@ -620,19 +602,12 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Gr
 				memidx, _ = rd_u32(&r)
 				fallthrough
 			case 0:
-				relocs: []wasm.Relocation
-				for rg in relocs_group {
-					if rg.target_section == sec.id {
-						relocs = rg.relocs
-						break
-					}
-				}
-
 				// expr + bytes
 				if memidx != 0 {
 					fmt.sbprintf(sb, " (memory %d)", memidx)
 				}
 				strings.write_byte(sb, ' ')
+				relocs := relocations_from_section_id(m.reloc_groups, sec.id)
 				wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
 			case 1:
 				// bytes

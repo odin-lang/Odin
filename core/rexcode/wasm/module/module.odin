@@ -98,6 +98,8 @@ Module :: struct {
 	exports:   []Export,
 	start:     i64,        // -1 if absent, else the start funcidx
 
+	reloc_groups: []Reloc_Group,
+
 	data:      []u8,       // borrowed reference to the whole file (body decode reads from it)
 
 	allocator: runtime.Allocator,
