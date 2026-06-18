@@ -84,6 +84,31 @@ local function emit(mnem, llvm, enc_str, feature, variants)
 	return string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
 end
 
+-- Compare-against-zero: a 2-register shape whose asm carries a literal #0
+-- (integer) or #0.0 (FP) third operand that emits no bits. Modeled with two
+-- register operands (VD, VN); mask derived by varying the registers only.
+local function emit_cmp0(mnem, llvm, fp, arr)
+	local rows = {}
+	local suf = fp and ", #0.0" or ", #0"
+	for _, a in ipairs(arr) do
+		local function mk(r) return string.format("%s v%d.%s, v%d.%s%s", llvm, r, ARR[a].asm, r, ARR[a].asm, suf) end
+		local w0, w31 = word(mk(0)), word(mk(31))
+		if w0 and w31 then
+			local mask = bit.band(bit.bnot(bit.bxor(w0, w31)), 0xFFFFFFFF)
+			local f = ARR[a].feat or "NEON"
+			rows[#rows+1] = string.format(
+				"\t\t{.%s, {.%s, .%s, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}},",
+				mnem, ARR[a].vt, ARR[a].vt, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f)
+			n_forms = n_forms + 1
+		else
+			skips[#skips+1] = mnem.." "..a
+		end
+	end
+	if #rows == 0 then return nil end
+	n_mnem = n_mnem + 1
+	return string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
+end
+
 -- ---- Uniform shapes (all operands share one arrangement) -------------------
 local VD_VN_VM = padded({".VD",".VN",".VM"}, 3)
 local VD_VN    = padded({".VD",".VN"}, 2)
@@ -100,6 +125,9 @@ local UNIFORM = {
 		{"SQDMULH","sqdmulh"},{"SQRDMULH","sqrdmulh"},
 		{"ADDP_V","addp"},{"SMAXP","smaxp"},{"SMINP","sminp"},{"UMAXP","umaxp"},{"UMINP","uminp"},
 		{"SSHL","sshl"},{"USHL","ushl"},{"SRSHL","srshl"},{"URSHL","urshl"},
+	}},
+	{ title="permute (ZIP/UZP/TRN)", enc=VD_VN_VM, nreg=3, items={
+		{"ZIP1","zip1"},{"ZIP2","zip2"},{"UZP1","uzp1"},{"UZP2","uzp2"},{"TRN1","trn1"},{"TRN2","trn2"},
 	}},
 	{ title="two-register misc", enc=VD_VN, nreg=2, items={
 		{"ABS_V","abs"},{"NEG_V","neg"},
@@ -168,6 +196,10 @@ local FCVTN_LO  = {{"4HF","4S"},{"2S","2D"}}
 local FCVTN_HI  = {{"8HF","4S"},{"4S","2D"}}
 local FCVTXN_LO = {{"2S","2D"}}
 local FCVTXN_HI = {{"4S","2D"}}
+-- SXTL/UXTL widen (= SSHLL/USHLL #0): Vd.<wide>, Vn.<narrow>; shift is implicit
+-- in the static bits, so this is a plain 2-register form (no shift operand).
+local SXTL_LO = {{"8H","8B"},{"4S","4H"},{"2D","2S"}}
+local SXTL_HI = {{"8H","16B"},{"4S","8H"},{"2D","4S"}}
 
 local DIFF = {
 	{ title="three-different (long)", enc=VD_VN_VM, items={
@@ -203,6 +235,10 @@ local DIFF = {
 		{"UQXTN","uqxtn",XTN_LO},{"UQXTN2","uqxtn2",XTN_HI},
 		{"SQXTUN","sqxtun",XTN_LO},{"SQXTUN2","sqxtun2",XTN_HI},
 	}},
+	{ title="two-register widen (SXTL/UXTL = SSHLL/USHLL #0)", enc=VD_VN, items={
+		{"SXTL","sxtl",SXTL_LO},{"SXTL2","sxtl2",SXTL_HI},
+		{"UXTL","uxtl",SXTL_LO},{"UXTL2","uxtl2",SXTL_HI},
+	}},
 	{ title="two-register pairwise long", enc=VD_VN, items={
 		{"SADDLP","saddlp",PLONG},{"UADDLP","uaddlp",PLONG},
 		{"SADALP","sadalp",PLONG},{"UADALP","uadalp",PLONG},
@@ -229,6 +265,17 @@ for _, fam in ipairs(DIFF) do
 		if b then blk[#blk+1] = b end
 	end
 	sections[#sections+1] = "\t// Advanced SIMD "..fam.title..".\n" .. table.concat(blk, "\n")
+end
+
+-- ---- Compare against zero (integer + floating-point) -----------------------
+do
+	local FP_ARR = {"2S","4S","2D","4HF","8HF"}
+	local blk = {}
+	for _, b in ipairs({
+		emit_cmp0("CMLE","cmle",false,ALL_ARR), emit_cmp0("CMLT","cmlt",false,ALL_ARR),
+		emit_cmp0("FCMLE","fcmle",true,FP_ARR), emit_cmp0("FCMLT","fcmlt",true,FP_ARR),
+	}) do blk[#blk+1] = b end
+	sections[#sections+1] = "\t// Advanced SIMD compare against zero.\n" .. table.concat(blk, "\n")
 end
 
 -- ---- NEON shift-by-immediate ----------------------------------------------
