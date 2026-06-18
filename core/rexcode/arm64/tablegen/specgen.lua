@@ -538,6 +538,148 @@ do
 	sections[#sections+1] = "\t// NEON modified immediate (MOVI/MVNI).\n" .. table.concat(blk, "\n")
 end
 
+-- ---- SVE (predicated FP/round/compare, predicate logical/break, SVE2) -------
+-- These iterate element sizes; the predicate-destination forms select size via
+-- the Z-register operands. `bits`/`mask` come from llvm-mc: assemble all-zero,
+-- then one variant per field set to its max (Z reg 31, 3-bit Pg 7, 4-bit Pd/
+-- Pg/Pn/Pm 15, GPR 31 = wzr/xzr) and mask = ~union of the deltas.
+SVE_LLVM = "llvm-mc --assemble --arch=aarch64 --mattr=+sve,+sve2,+sve2-aes,+fullfp16 --show-encoding"
+local function sve_word(line)
+	local p = io.popen(string.format("printf '%%s\\n' '%s' | %s 2>/dev/null", line, SVE_LLVM))
+	local out = p:read("*a"); p:close()
+	local b1,b2,b3,b4 = out:match("0x(%x%x),0x(%x%x),0x(%x%x),0x(%x%x)")
+	if not b1 then return nil end
+	return tonumber(b4..b3..b2..b1, 16)
+end
+do
+	local blk = {}
+	local E_HSD  = {{"h","Z_REG_H",""},{"s","Z_REG_S",""},{"d","Z_REG_D","is_64=true"}}
+	local E_BHSD = {{"b","Z_REG_B",""},{"h","Z_REG_H",""},{"s","Z_REG_S",""},{"d","Z_REG_D","is_64=true"}}
+	local E_SD   = {{"s","Z_REG_S",""},{"d","Z_REG_D","is_64=true"}}
+	local function emit1(mnem, ops, enc, flags, fields, build)
+		local zero = {}; for i=1,#fields do zero[i]=0 end
+		local b0 = sve_word(build(zero)); if not b0 then skips[#skips+1]=mnem..":b0"; return nil end
+		local vs = {}
+		for i=1,#fields do
+			local v={}; for j=1,#fields do v[j]=0 end; v[i]=fields[i]
+			local w=sve_word(build(v)); if not w then skips[#skips+1]=mnem..":v"..i; return nil end; vs[#vs+1]=w
+		end
+		n_forms=n_forms+1
+		return string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .SVE, {%s}},",
+			mnem, ops, enc, bit.tohex(b0):upper(), bit.tohex(mask_of(b0,vs)):upper(), flags)
+	end
+	local function block(mnem, rows)
+		local r={}; for _,x in ipairs(rows) do if x then r[#r+1]=x end end
+		if #r>0 then blk[#blk+1]=string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(r,"\n")); n_mnem=n_mnem+1 end
+	end
+	local function g(v, x) if v==0 then return x and "x0" or "w0" else return x and "xzr" or "wzr" end end
+
+	-- predicated FP round: Zd.T, Pg/m, Zn.T  (H/S/D)
+	for _, it in ipairs({{"SVE_FRINTN","frintn"},{"SVE_FRINTP","frintp"},{"SVE_FRINTM","frintm"},
+		{"SVE_FRINTZ","frintz"},{"SVE_FRINTA","frinta"},{"SVE_FRINTX","frintx"},{"SVE_FRINTI","frinti"},{"SVE_FRECPX_Z","frecpx"}}) do
+		local rows={}
+		for _,e in ipairs(E_HSD) do local t=e[1]
+			rows[#rows+1]=emit1(it[1], string.format("{.%s, .P_REG_MERGE, .%s, .NONE}",e[2],e[2]),
+				"{.VD, .PG, .VN, .NONE}", e[3], {31,7,31},
+				function(v) return string.format("%s z%d.%s, p%d/m, z%d.%s", it[2], v[1],t, v[2], v[3],t) end)
+		end
+		block(it[1], rows)
+	end
+	-- reversed predicated shifts: Zd.T, Pg/m, Zd.T, Zm.T  (B/H/S/D)
+	for _, it in ipairs({{"SVE_ASRR_PRED","asrr"},{"SVE_LSLR_PRED","lslr"},{"SVE_LSRR_PRED","lsrr"}}) do
+		local rows={}
+		for _,e in ipairs(E_BHSD) do local t=e[1]
+			rows[#rows+1]=emit1(it[1], string.format("{.%s, .P_REG_MERGE, .%s, .%s}",e[2],e[2],e[2]),
+				"{.VD, .PG, .VD, .VN}", e[3], {31,7,31},
+				function(v) return string.format("%s z%d.%s, p%d/m, z%d.%s, z%d.%s", it[2], v[1],t, v[2], v[1],t, v[3],t) end)
+		end
+		block(it[1], rows)
+	end
+	-- reversed predicated FP: Zd.T, Pg/m, Zd.T, Zm.T  (H/S/D)
+	for _, it in ipairs({{"SVE_FSUBR_PRED","fsubr"},{"SVE_FDIVR_PRED","fdivr"}}) do
+		local rows={}
+		for _,e in ipairs(E_HSD) do local t=e[1]
+			rows[#rows+1]=emit1(it[1], string.format("{.%s, .P_REG_MERGE, .%s, .%s}",e[2],e[2],e[2]),
+				"{.VD, .PG, .VD, .VN}", e[3], {31,7,31},
+				function(v) return string.format("%s z%d.%s, p%d/m, z%d.%s, z%d.%s", it[2], v[1],t, v[2], v[1],t, v[3],t) end)
+		end
+		block(it[1], rows)
+	end
+	-- FP compare (reg) -> Pd.T: Pd.T, Pg/z, Zn.T, Zm.T  (H/S/D)
+	for _, it in ipairs({{"SVE_FCMEQ","fcmeq"},{"SVE_FCMGE","fcmge"},{"SVE_FCMGT","fcmgt"},{"SVE_FCMNE","fcmne"},{"SVE_FCMUO","fcmuo"}}) do
+		local rows={}
+		for _,e in ipairs(E_HSD) do local t=e[1]
+			rows[#rows+1]=emit1(it[1], string.format("{.P_REG, .P_REG_ZERO, .%s, .%s}",e[2],e[2]),
+				"{.PD, .PG, .VN, .VM}", e[3], {15,7,31,31},
+				function(v) return string.format("%s p%d.%s, p%d/z, z%d.%s, z%d.%s", it[2], v[1],t, v[2], v[3],t, v[4],t) end)
+		end
+		block(it[1], rows)
+	end
+	-- FP compare vs zero -> Pd.T: Pd.T, Pg/z, Zn.T, #0.0  (H/S/D)
+	for _, it in ipairs({{"SVE_FCMLE","fcmle"},{"SVE_FCMLT","fcmlt"}}) do
+		local rows={}
+		for _,e in ipairs(E_HSD) do local t=e[1]
+			rows[#rows+1]=emit1(it[1], string.format("{.P_REG, .P_REG_ZERO, .%s, .NONE}",e[2]),
+				"{.PD, .PG, .VN, .NONE}", e[3], {15,7,31},
+				function(v) return string.format("%s p%d.%s, p%d/z, z%d.%s, #0.0", it[2], v[1],t, v[2], v[3],t) end)
+		end
+		block(it[1], rows)
+	end
+	-- integer compare (reg) -> Pd.T: Pd.T, Pg/z, Zn.T, Zm.T  (B/H/S/D)
+	for _, it in ipairs({{"SVE_CMPLE","cmple"},{"SVE_CMPLO","cmplo"},{"SVE_CMPLS","cmpls"},{"SVE_CMPLT","cmplt"}}) do
+		local rows={}
+		for _,e in ipairs(E_BHSD) do local t=e[1]
+			rows[#rows+1]=emit1(it[1], string.format("{.P_REG, .P_REG_ZERO, .%s, .%s}",e[2],e[2]),
+				"{.PD, .PG, .VM, .VN}", "sets_flags=true"..(e[3]~="" and ", "..e[3] or ""), {15,7,31,31},
+				function(v) return string.format("%s p%d.%s, p%d/z, z%d.%s, z%d.%s", it[2], v[1],t, v[2], v[3],t, v[4],t) end)
+		end
+		block(it[1], rows)
+	end
+	-- predicate logical (3-source) -> Pd.B: Pd.B, Pg/z, Pn.B, Pm.B
+	for _, it in ipairs({{"SVE_NANDS_P","nands"},{"SVE_NORS_P","nors"},{"SVE_ORNS_P","orns"}}) do
+		block(it[1], { emit1(it[1], "{.P_REG, .P_REG_ZERO, .P_REG, .P_REG}", "{.PD, .PG4, .PN, .PM}", "sets_flags=true", {15,15,15,15},
+			function(v) return string.format("%s p%d.b, p%d/z, p%d.b, p%d.b", it[2], v[1], v[2], v[3], v[4]) end) })
+	end
+	-- predicate break (pair) -> Pd.B: Pd.B, Pg/z, Pn.B, Pm.B
+	for _, it in ipairs({{"SVE_BRKPA","brkpa"},{"SVE_BRKPB","brkpb"},{"SVE_BRKN","brkn"}}) do
+		block(it[1], { emit1(it[1], "{.P_REG, .P_REG_ZERO, .P_REG, .P_REG}", "{.PD, .PG4, .PN, .PM}", "", {15,15,15,15},
+			function(v) return string.format("%s p%d.b, p%d/z, p%d.b, p%d.b", it[2], v[1], v[2], v[3], v[4]) end) })
+	end
+	-- predicate break (single) -> Pd.B: Pd.B, Pg/m, Pn.B  (BRKA/BRKB merge; BRKAS/BRKBS /z+flags)
+	for _, it in ipairs({{"SVE_BRKA","brka","/m",""},{"SVE_BRKB","brkb","/m",""},
+		{"SVE_BRKAS","brkas","/z","sets_flags=true"},{"SVE_BRKBS","brkbs","/z","sets_flags=true"}}) do
+		local pred = it[3]=="/m" and ".P_REG_MERGE" or ".P_REG_ZERO"
+		block(it[1], { emit1(it[1], "{.P_REG, "..pred..", .P_REG, .NONE}", "{.PD, .PG4, .PN, .NONE}", it[4], {15,15,15},
+			function(v) return string.format("%s p%d.b, p%d%s, p%d.b", it[2], v[1], v[2], it[3], v[3]) end) })
+	end
+	-- SVE2 crypto three-source (.D): Zd.D, Zd.D, Zn.D, Zm.D
+	for _, it in ipairs({{"SVE_EOR3_Z","eor3"},{"SVE_BCAX_Z","bcax"}}) do
+		block(it[1], { emit1(it[1], "{.Z_REG_D, .Z_REG_D, .Z_REG_D, .Z_REG_D}", "{.VD, .VD, .VM, .VN}", "is_64=true", {31,31,31},
+			function(v) return string.format("%s z%d.d, z%d.d, z%d.d, z%d.d", it[2], v[1], v[1], v[2], v[3]) end) })
+	end
+	-- INSR: Zd.T, Wn/Xn  (X for .D)
+	do
+		local rows={}
+		for _,e in ipairs(E_BHSD) do local t=e[1]; local x=(t=="d")
+			rows[#rows+1]=emit1("SVE_INSR", string.format("{.%s, .%s, .NONE, .NONE}",e[2], x and "X_REG" or "W_REG"),
+				"{.VD, .VN, .NONE, .NONE}", e[3], {31,31},
+				function(v) return string.format("insr z%d.%s, %s", v[1],t, g(v[2],x)) end)
+		end
+		block("SVE_INSR", rows)
+	end
+	-- COMPACT: Zd.T, Pg, Zn.T  (S/D)
+	do
+		local rows={}
+		for _,e in ipairs(E_SD) do local t=e[1]
+			rows[#rows+1]=emit1("SVE_COMPACT", string.format("{.%s, .P_REG_GOV, .%s, .NONE}",e[2],e[2]),
+				"{.VD, .PG, .VN, .NONE}", e[3], {31,7,31},
+				function(v) return string.format("compact z%d.%s, p%d, z%d.%s", v[1],t, v[2], v[3],t) end)
+		end
+		block("SVE_COMPACT", rows)
+	end
+	sections[#sections+1] = "\t// SVE predicated / compare / predicate-logical / SVE2.\n" .. table.concat(blk, "\n")
+end
+
 -- ---- splice into the SoT ---------------------------------------------------
 local region = "\t// SPECGEN:BEGIN\n" .. table.concat(sections, "\n\n") .. "\n\t// SPECGEN:END"
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()

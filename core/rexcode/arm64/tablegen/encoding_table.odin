@@ -4583,5 +4583,177 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.MVNI, {.V_2S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x2F000400, 0xFFF8FC00, .NEON, {}},
 		{.MVNI, {.V_4S, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x6F000400, 0xFFF8FC00, .NEON, {}},
 	},
+
+	// SVE predicated / compare / predicate-logical / SVE2.
+	.SVE_FRINTN = {
+		{.SVE_FRINTN, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6540A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTN, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6580A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTN, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C0A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRINTP = {
+		{.SVE_FRINTP, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6541A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTP, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6581A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTP, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C1A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRINTM = {
+		{.SVE_FRINTM, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6542A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTM, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6582A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTM, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C2A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRINTZ = {
+		{.SVE_FRINTZ, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6543A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTZ, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6583A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTZ, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C3A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRINTA = {
+		{.SVE_FRINTA, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6544A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTA, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6584A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTA, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C4A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRINTX = {
+		{.SVE_FRINTX, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6546A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTX, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6586A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTX, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C6A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRINTI = {
+		{.SVE_FRINTI, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6547A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTI, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x6587A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRINTI, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65C7A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FRECPX_Z = {
+		{.SVE_FRECPX_Z, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN, .NONE}, 0x654CA000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRECPX_Z, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x658CA000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FRECPX_Z, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x65CCA000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_ASRR_PRED = {
+		{.SVE_ASRR_PRED, {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .Z_REG_B}, {.VD, .PG, .VD, .VN}, 0x04148000, 0xFFFFE000, .SVE, {}},
+		{.SVE_ASRR_PRED, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .Z_REG_H}, {.VD, .PG, .VD, .VN}, 0x04548000, 0xFFFFE000, .SVE, {}},
+		{.SVE_ASRR_PRED, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .Z_REG_S}, {.VD, .PG, .VD, .VN}, 0x04948000, 0xFFFFE000, .SVE, {}},
+		{.SVE_ASRR_PRED, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .Z_REG_D}, {.VD, .PG, .VD, .VN}, 0x04D48000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_LSLR_PRED = {
+		{.SVE_LSLR_PRED, {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .Z_REG_B}, {.VD, .PG, .VD, .VN}, 0x04178000, 0xFFFFE000, .SVE, {}},
+		{.SVE_LSLR_PRED, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .Z_REG_H}, {.VD, .PG, .VD, .VN}, 0x04578000, 0xFFFFE000, .SVE, {}},
+		{.SVE_LSLR_PRED, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .Z_REG_S}, {.VD, .PG, .VD, .VN}, 0x04978000, 0xFFFFE000, .SVE, {}},
+		{.SVE_LSLR_PRED, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .Z_REG_D}, {.VD, .PG, .VD, .VN}, 0x04D78000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_LSRR_PRED = {
+		{.SVE_LSRR_PRED, {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .Z_REG_B}, {.VD, .PG, .VD, .VN}, 0x04158000, 0xFFFFE000, .SVE, {}},
+		{.SVE_LSRR_PRED, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .Z_REG_H}, {.VD, .PG, .VD, .VN}, 0x04558000, 0xFFFFE000, .SVE, {}},
+		{.SVE_LSRR_PRED, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .Z_REG_S}, {.VD, .PG, .VD, .VN}, 0x04958000, 0xFFFFE000, .SVE, {}},
+		{.SVE_LSRR_PRED, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .Z_REG_D}, {.VD, .PG, .VD, .VN}, 0x04D58000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FSUBR_PRED = {
+		{.SVE_FSUBR_PRED, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .Z_REG_H}, {.VD, .PG, .VD, .VN}, 0x65438000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FSUBR_PRED, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .Z_REG_S}, {.VD, .PG, .VD, .VN}, 0x65838000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FSUBR_PRED, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .Z_REG_D}, {.VD, .PG, .VD, .VN}, 0x65C38000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FDIVR_PRED = {
+		{.SVE_FDIVR_PRED, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .Z_REG_H}, {.VD, .PG, .VD, .VN}, 0x654C8000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FDIVR_PRED, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .Z_REG_S}, {.VD, .PG, .VD, .VN}, 0x658C8000, 0xFFFFE000, .SVE, {}},
+		{.SVE_FDIVR_PRED, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .Z_REG_D}, {.VD, .PG, .VD, .VN}, 0x65CC8000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_FCMEQ = {
+		{.SVE_FCMEQ, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VN, .VM}, 0x65406000, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMEQ, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VN, .VM}, 0x65806000, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMEQ, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VN, .VM}, 0x65C06000, 0xFFE0E010, .SVE, {is_64=true}},
+	},
+	.SVE_FCMGE = {
+		{.SVE_FCMGE, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VN, .VM}, 0x65404000, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMGE, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VN, .VM}, 0x65804000, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMGE, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VN, .VM}, 0x65C04000, 0xFFE0E010, .SVE, {is_64=true}},
+	},
+	.SVE_FCMGT = {
+		{.SVE_FCMGT, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VN, .VM}, 0x65404010, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMGT, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VN, .VM}, 0x65804010, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMGT, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VN, .VM}, 0x65C04010, 0xFFE0E010, .SVE, {is_64=true}},
+	},
+	.SVE_FCMNE = {
+		{.SVE_FCMNE, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VN, .VM}, 0x65406010, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMNE, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VN, .VM}, 0x65806010, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMNE, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VN, .VM}, 0x65C06010, 0xFFE0E010, .SVE, {is_64=true}},
+	},
+	.SVE_FCMUO = {
+		{.SVE_FCMUO, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VN, .VM}, 0x6540C000, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMUO, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VN, .VM}, 0x6580C000, 0xFFE0E010, .SVE, {}},
+		{.SVE_FCMUO, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VN, .VM}, 0x65C0C000, 0xFFE0E010, .SVE, {is_64=true}},
+	},
+	.SVE_FCMLE = {
+		{.SVE_FCMLE, {.P_REG, .P_REG_ZERO, .Z_REG_H, .NONE}, {.PD, .PG, .VN, .NONE}, 0x65512010, 0xFFFFE010, .SVE, {}},
+		{.SVE_FCMLE, {.P_REG, .P_REG_ZERO, .Z_REG_S, .NONE}, {.PD, .PG, .VN, .NONE}, 0x65912010, 0xFFFFE010, .SVE, {}},
+		{.SVE_FCMLE, {.P_REG, .P_REG_ZERO, .Z_REG_D, .NONE}, {.PD, .PG, .VN, .NONE}, 0x65D12010, 0xFFFFE010, .SVE, {is_64=true}},
+	},
+	.SVE_FCMLT = {
+		{.SVE_FCMLT, {.P_REG, .P_REG_ZERO, .Z_REG_H, .NONE}, {.PD, .PG, .VN, .NONE}, 0x65512000, 0xFFFFE010, .SVE, {}},
+		{.SVE_FCMLT, {.P_REG, .P_REG_ZERO, .Z_REG_S, .NONE}, {.PD, .PG, .VN, .NONE}, 0x65912000, 0xFFFFE010, .SVE, {}},
+		{.SVE_FCMLT, {.P_REG, .P_REG_ZERO, .Z_REG_D, .NONE}, {.PD, .PG, .VN, .NONE}, 0x65D12000, 0xFFFFE010, .SVE, {is_64=true}},
+	},
+	.SVE_CMPLE = {
+		{.SVE_CMPLE, {.P_REG, .P_REG_ZERO, .Z_REG_B, .Z_REG_B}, {.PD, .PG, .VM, .VN}, 0x24008000, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLE, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VM, .VN}, 0x24408000, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLE, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VM, .VN}, 0x24808000, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLE, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VM, .VN}, 0x24C08000, 0xFFE0E010, .SVE, {sets_flags=true, is_64=true}},
+	},
+	.SVE_CMPLO = {
+		{.SVE_CMPLO, {.P_REG, .P_REG_ZERO, .Z_REG_B, .Z_REG_B}, {.PD, .PG, .VM, .VN}, 0x24000010, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLO, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VM, .VN}, 0x24400010, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLO, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VM, .VN}, 0x24800010, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLO, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VM, .VN}, 0x24C00010, 0xFFE0E010, .SVE, {sets_flags=true, is_64=true}},
+	},
+	.SVE_CMPLS = {
+		{.SVE_CMPLS, {.P_REG, .P_REG_ZERO, .Z_REG_B, .Z_REG_B}, {.PD, .PG, .VM, .VN}, 0x24000000, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLS, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VM, .VN}, 0x24400000, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLS, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VM, .VN}, 0x24800000, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLS, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VM, .VN}, 0x24C00000, 0xFFE0E010, .SVE, {sets_flags=true, is_64=true}},
+	},
+	.SVE_CMPLT = {
+		{.SVE_CMPLT, {.P_REG, .P_REG_ZERO, .Z_REG_B, .Z_REG_B}, {.PD, .PG, .VM, .VN}, 0x24008010, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLT, {.P_REG, .P_REG_ZERO, .Z_REG_H, .Z_REG_H}, {.PD, .PG, .VM, .VN}, 0x24408010, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLT, {.P_REG, .P_REG_ZERO, .Z_REG_S, .Z_REG_S}, {.PD, .PG, .VM, .VN}, 0x24808010, 0xFFE0E010, .SVE, {sets_flags=true}},
+		{.SVE_CMPLT, {.P_REG, .P_REG_ZERO, .Z_REG_D, .Z_REG_D}, {.PD, .PG, .VM, .VN}, 0x24C08010, 0xFFE0E010, .SVE, {sets_flags=true, is_64=true}},
+	},
+	.SVE_NANDS_P = {
+		{.SVE_NANDS_P, {.P_REG, .P_REG_ZERO, .P_REG, .P_REG}, {.PD, .PG4, .PN, .PM}, 0x25C04210, 0xFFF0C210, .SVE, {sets_flags=true}},
+	},
+	.SVE_NORS_P = {
+		{.SVE_NORS_P, {.P_REG, .P_REG_ZERO, .P_REG, .P_REG}, {.PD, .PG4, .PN, .PM}, 0x25C04200, 0xFFF0C210, .SVE, {sets_flags=true}},
+	},
+	.SVE_ORNS_P = {
+		{.SVE_ORNS_P, {.P_REG, .P_REG_ZERO, .P_REG, .P_REG}, {.PD, .PG4, .PN, .PM}, 0x25C04010, 0xFFF0C210, .SVE, {sets_flags=true}},
+	},
+	.SVE_BRKPA = {
+		{.SVE_BRKPA, {.P_REG, .P_REG_ZERO, .P_REG, .P_REG}, {.PD, .PG4, .PN, .PM}, 0x2500C000, 0xFFF0C210, .SVE, {}},
+	},
+	.SVE_BRKPB = {
+		{.SVE_BRKPB, {.P_REG, .P_REG_ZERO, .P_REG, .P_REG}, {.PD, .PG4, .PN, .PM}, 0x2500C010, 0xFFF0C210, .SVE, {}},
+	},
+	.SVE_BRKA = {
+		{.SVE_BRKA, {.P_REG, .P_REG_MERGE, .P_REG, .NONE}, {.PD, .PG4, .PN, .NONE}, 0x25104010, 0xFFFFC210, .SVE, {}},
+	},
+	.SVE_BRKB = {
+		{.SVE_BRKB, {.P_REG, .P_REG_MERGE, .P_REG, .NONE}, {.PD, .PG4, .PN, .NONE}, 0x25904010, 0xFFFFC210, .SVE, {}},
+	},
+	.SVE_BRKAS = {
+		{.SVE_BRKAS, {.P_REG, .P_REG_ZERO, .P_REG, .NONE}, {.PD, .PG4, .PN, .NONE}, 0x25504000, 0xFFFFC210, .SVE, {sets_flags=true}},
+	},
+	.SVE_BRKBS = {
+		{.SVE_BRKBS, {.P_REG, .P_REG_ZERO, .P_REG, .NONE}, {.PD, .PG4, .PN, .NONE}, 0x25D04000, 0xFFFFC210, .SVE, {sets_flags=true}},
+	},
+	.SVE_EOR3_Z = {
+		{.SVE_EOR3_Z, {.Z_REG_D, .Z_REG_D, .Z_REG_D, .Z_REG_D}, {.VD, .VD, .VM, .VN}, 0x04203800, 0xFFE0FC00, .SVE, {is_64=true}},
+	},
+	.SVE_BCAX_Z = {
+		{.SVE_BCAX_Z, {.Z_REG_D, .Z_REG_D, .Z_REG_D, .Z_REG_D}, {.VD, .VD, .VM, .VN}, 0x04603800, 0xFFE0FC00, .SVE, {is_64=true}},
+	},
+	.SVE_INSR = {
+		{.SVE_INSR, {.Z_REG_B, .W_REG, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x05243800, 0xFFFFFC00, .SVE, {}},
+		{.SVE_INSR, {.Z_REG_H, .W_REG, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x05643800, 0xFFFFFC00, .SVE, {}},
+		{.SVE_INSR, {.Z_REG_S, .W_REG, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x05A43800, 0xFFFFFC00, .SVE, {}},
+		{.SVE_INSR, {.Z_REG_D, .X_REG, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x05E43800, 0xFFFFFC00, .SVE, {is_64=true}},
+	},
+	.SVE_COMPACT = {
+		{.SVE_COMPACT, {.Z_REG_S, .P_REG_GOV, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x05A18000, 0xFFFFE000, .SVE, {}},
+		{.SVE_COMPACT, {.Z_REG_D, .P_REG_GOV, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x05E18000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
 	// SPECGEN:END
 }
