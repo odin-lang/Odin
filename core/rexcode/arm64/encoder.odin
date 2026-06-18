@@ -487,6 +487,23 @@ pack_operand_inline :: #force_inline proc(
 	case .FMOV_SCALAR_IMM:
 		return (u32(op.immediate) & 0xFF) << 13
 
+	// SVE alias duplicated predicate / Z fields + EXT byte index.
+	case .PG4_PM_DUP:
+		p := u32(reg_hw(op.reg)) & 0xF
+		return p << 10 | p << 16
+	case .PN_PM_DUP:
+		p := u32(reg_hw(op.reg)) & 0xF
+		return p << 5 | p << 16
+	case .PN_PG_PM_DUP:
+		p := u32(reg_hw(op.reg)) & 0xF
+		return p << 5 | p << 10 | p << 16
+	case .ZD_ZM_DUP:
+		z := u32(reg_hw(op.reg)) & 0x1F
+		return z << 0 | z << 16
+	case .SVE_EXT_IMM:
+		v := u32(op.immediate)
+		return ((v >> 3) & 0x1F) << 16 | (v & 0x7) << 10
+
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
 	case .NEON_IMM8_FMOV:
 		v := u32(op.immediate) & 0xFF

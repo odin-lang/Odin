@@ -1367,6 +1367,8 @@ inst_sve_clz_pred_z_p_z         :: #force_inline proc "contextless" (rz: u8, rz2
 emit_sve_clz_pred_z_p_z         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_clz_pred_z_p_z(rz, rz2, rz3)) }
 inst_sve_cnt_pred_z_p_z         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_CNT_PRED, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
 emit_sve_cnt_pred_z_p_z         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_cnt_pred_z_p_z(rz, rz2, rz3)) }
+inst_sve_mov_pred_z_p_z         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_MOV_PRED, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+emit_sve_mov_pred_z_p_z         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_mov_pred_z_p_z(rz, rz2, rz3)) }
 inst_sve_fadd_z_z_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_FADD_Z, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
 emit_sve_fadd_z_z_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_fadd_z_z_z_z(rz, rz2, rz3)) }
 inst_sve_fsub_z_z_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_FSUB_Z, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
@@ -1459,6 +1461,14 @@ inst_sve_nors_p_p_p_p_p         :: #force_inline proc "contextless" (rz: u8, rz2
 emit_sve_nors_p_p_p_p_p         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_nors_p_p_p_p_p(rz, rz2, rz3, rz4)) }
 inst_sve_orns_p_p_p_p_p         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_ORNS_P, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_sve_orns_p_p_p_p_p         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_orns_p_p_p_p_p(rz, rz2, rz3, rz4)) }
+inst_sve_not_p_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_NOT_P, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_sve_not_p_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_not_p_p_p_p(rz, rz2, rz3)) }
+inst_sve_mov_p_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_MOV_P, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_sve_mov_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .SVE_MOV_P, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), {}, {}}} }
+emit_sve_mov_p_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_mov_p_p_p_p(rz, rz2, rz3)) }
+emit_sve_mov_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_sve_mov_p_p_p(rz, rz2)) }
+inst_sve_movs_p_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_MOVS_P, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_sve_movs_p_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_movs_p_p_p_p(rz, rz2, rz3)) }
 inst_sve_ptrue_p_i              :: #force_inline proc "contextless" (rz: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .SVE_PTRUE, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_imm(imm, 4), {}, {}}} }
 emit_sve_ptrue_p_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64) { append(instructions, inst_sve_ptrue_p_i(rz, imm)) }
 inst_sve_ptrues_p_i             :: #force_inline proc "contextless" (rz: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .SVE_PTRUES, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_imm(imm, 4), {}, {}}} }
@@ -1481,6 +1491,14 @@ inst_sve_brkpa_p_p_p_p          :: #force_inline proc "contextless" (rz: u8, rz2
 emit_sve_brkpa_p_p_p_p          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_brkpa_p_p_p_p(rz, rz2, rz3, rz4)) }
 inst_sve_brkpb_p_p_p_p          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_BRKPB, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_sve_brkpb_p_p_p_p          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_brkpb_p_p_p_p(rz, rz2, rz3, rz4)) }
+inst_sve_brkn_p_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_BRKN, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_sve_brkn_p_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_brkn_p_p_p_p(rz, rz2, rz3, rz4)) }
+inst_sve_rdffr_p                :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .SVE_RDFFR, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
+emit_sve_rdffr_p                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_sve_rdffr_p(rz)) }
+inst_sve_wrffr_p                :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .SVE_WRFFR, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
+emit_sve_wrffr_p                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_sve_wrffr_p(rz)) }
+inst_sve_setffr_none            :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SVE_SETFFR) }
+emit_sve_setffr_none            :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_sve_setffr_none()) }
 inst_sve_cmpeq_p_p_z_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_CMPEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
 emit_sve_cmpeq_p_p_z_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sve_cmpeq_p_p_z_z(rz, rz2, rz3, rz4)) }
 inst_sve_cmpne_p_p_z_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SVE_CMPNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
@@ -1549,8 +1567,12 @@ inst_sve_trn1_p_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2
 emit_sve_trn1_p_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_trn1_p_p_p_p(rz, rz2, rz3)) }
 inst_sve_trn2_p_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_TRN2_P, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_sve_trn2_p_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_trn2_p_p_p_p(rz, rz2, rz3)) }
+inst_sve_cpy_z_z_p_r            :: #force_inline proc "contextless" (rz: u8, rz2: u8, src: Register) -> Instruction { return Instruction{mnemonic = .SVE_CPY_Z, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(src), {}}} }
+emit_sve_cpy_z_z_p_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, src: Register) { append(instructions, inst_sve_cpy_z_z_p_r(rz, rz2, src)) }
 inst_sve_compact_z_p_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_COMPACT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
 emit_sve_compact_z_p_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_compact_z_p_z(rz, rz2, rz3)) }
+inst_sve_ext_z_z_z_z_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .SVE_EXT_Z, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 4)}} }
+emit_sve_ext_z_z_z_z_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_sve_ext_z_z_z_z_i(rz, rz2, rz3, imm)) }
 inst_sve_ld1b_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .SVE_LD1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 emit_sve_ld1b_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_sve_ld1b_z_p_m(rz, rz2, mem)) }
 inst_sve_ld1h_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .SVE_LD1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
@@ -3512,6 +3534,8 @@ inst_sve_clz_pred                    :: inst_sve_clz_pred_z_p_z
 emit_sve_clz_pred                    :: emit_sve_clz_pred_z_p_z
 inst_sve_cnt_pred                    :: inst_sve_cnt_pred_z_p_z
 emit_sve_cnt_pred                    :: emit_sve_cnt_pred_z_p_z
+inst_sve_mov_pred                    :: inst_sve_mov_pred_z_p_z
+emit_sve_mov_pred                    :: emit_sve_mov_pred_z_p_z
 inst_sve_fadd_z                      :: inst_sve_fadd_z_z_z_z
 emit_sve_fadd_z                      :: emit_sve_fadd_z_z_z_z
 inst_sve_fsub_z                      :: inst_sve_fsub_z_z_z_z
@@ -3604,6 +3628,12 @@ inst_sve_nors_p                      :: inst_sve_nors_p_p_p_p_p
 emit_sve_nors_p                      :: emit_sve_nors_p_p_p_p_p
 inst_sve_orns_p                      :: inst_sve_orns_p_p_p_p_p
 emit_sve_orns_p                      :: emit_sve_orns_p_p_p_p_p
+inst_sve_not_p                       :: inst_sve_not_p_p_p_p
+emit_sve_not_p                       :: emit_sve_not_p_p_p_p
+inst_sve_mov_p                       :: proc{ inst_sve_mov_p_p_p_p, inst_sve_mov_p_p_p }
+emit_sve_mov_p                       :: proc{ emit_sve_mov_p_p_p_p, emit_sve_mov_p_p_p }
+inst_sve_movs_p                      :: inst_sve_movs_p_p_p_p
+emit_sve_movs_p                      :: emit_sve_movs_p_p_p_p
 inst_sve_ptrue                       :: inst_sve_ptrue_p_i
 emit_sve_ptrue                       :: emit_sve_ptrue_p_i
 inst_sve_ptrues                      :: inst_sve_ptrues_p_i
@@ -3626,6 +3656,14 @@ inst_sve_brkpa                       :: inst_sve_brkpa_p_p_p_p
 emit_sve_brkpa                       :: emit_sve_brkpa_p_p_p_p
 inst_sve_brkpb                       :: inst_sve_brkpb_p_p_p_p
 emit_sve_brkpb                       :: emit_sve_brkpb_p_p_p_p
+inst_sve_brkn                        :: inst_sve_brkn_p_p_p_p
+emit_sve_brkn                        :: emit_sve_brkn_p_p_p_p
+inst_sve_rdffr                       :: inst_sve_rdffr_p
+emit_sve_rdffr                       :: emit_sve_rdffr_p
+inst_sve_wrffr                       :: inst_sve_wrffr_p
+emit_sve_wrffr                       :: emit_sve_wrffr_p
+inst_sve_setffr                      :: inst_sve_setffr_none
+emit_sve_setffr                      :: emit_sve_setffr_none
 inst_sve_cmpeq                       :: inst_sve_cmpeq_p_p_z_z
 emit_sve_cmpeq                       :: emit_sve_cmpeq_p_p_z_z
 inst_sve_cmpne                       :: inst_sve_cmpne_p_p_z_z
@@ -3694,8 +3732,12 @@ inst_sve_trn1_p                      :: inst_sve_trn1_p_p_p_p
 emit_sve_trn1_p                      :: emit_sve_trn1_p_p_p_p
 inst_sve_trn2_p                      :: inst_sve_trn2_p_p_p_p
 emit_sve_trn2_p                      :: emit_sve_trn2_p_p_p_p
+inst_sve_cpy_z                       :: inst_sve_cpy_z_z_p_r
+emit_sve_cpy_z                       :: emit_sve_cpy_z_z_p_r
 inst_sve_compact                     :: inst_sve_compact_z_p_z
 emit_sve_compact                     :: emit_sve_compact_z_p_z
+inst_sve_ext_z                       :: inst_sve_ext_z_z_z_z_i
+emit_sve_ext_z                       :: emit_sve_ext_z_z_z_z_i
 inst_sve_ld1b                        :: inst_sve_ld1b_z_p_m
 emit_sve_ld1b                        :: emit_sve_ld1b_z_p_m
 inst_sve_ld1h                        :: inst_sve_ld1h_z_p_m

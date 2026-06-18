@@ -677,6 +677,16 @@ do
 		end
 		block("SVE_COMPACT", rows)
 	end
+	-- FFR (first-fault register): SETFFR (none), RDFFR Pd.B, WRFFR Pn.B
+	block("SVE_SETFFR", { emit1("SVE_SETFFR", "{.NONE, .NONE, .NONE, .NONE}", "{.NONE, .NONE, .NONE, .NONE}", "", {},
+		function(v) return "setffr" end) })
+	block("SVE_RDFFR", { emit1("SVE_RDFFR", "{.P_REG, .NONE, .NONE, .NONE}", "{.PD, .NONE, .NONE, .NONE}", "", {15},
+		function(v) return string.format("rdffr p%d.b", v[1]) end) })
+	block("SVE_WRFFR", { emit1("SVE_WRFFR", "{.P_REG, .NONE, .NONE, .NONE}", "{.PN, .NONE, .NONE, .NONE}", "", {15},
+		function(v) return string.format("wrffr p%d.b", v[1]) end) })
+	-- BRKN (destructive): Pdm.B, Pg/z, Pn.B, Pdm.B  (4th operand re-packs Pd)
+	block("SVE_BRKN", { emit1("SVE_BRKN", "{.P_REG, .P_REG_ZERO, .P_REG, .P_REG}", "{.PD, .PG4, .PN, .PD}", "", {15,15,15},
+		function(v) return string.format("brkn p%d.b, p%d/z, p%d.b, p%d.b", v[1], v[2], v[3], v[1]) end) })
 	sections[#sections+1] = "\t// SVE predicated / compare / predicate-logical / SVE2.\n" .. table.concat(blk, "\n")
 end
 

@@ -241,6 +241,15 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 	case .FMOV_SCALAR_IMM:
 		return Operand{immediate = i64((word >> 13) & 0xFF), kind = .IMMEDIATE, size = 1}
+	case .PG4_PM_DUP:
+		return Operand{reg = Register(REG_P | u16((word >> 10) & 0xF)), kind = .REGISTER, size = 4}
+	case .PN_PM_DUP, .PN_PG_PM_DUP:
+		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
+	case .ZD_ZM_DUP:
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = 4}
+	case .SVE_EXT_IMM:
+		v := ((word >> 16) & 0x1F) << 3 | ((word >> 10) & 0x7)
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:

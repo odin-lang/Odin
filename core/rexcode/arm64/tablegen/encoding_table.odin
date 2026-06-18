@@ -1780,6 +1780,33 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 
 	// -------------------------------------------------------------------------
+	// SVE alias / copy / permute stragglers (duplicated-field encodings).
+	// -------------------------------------------------------------------------
+	// CPY (predicated, from general register): Zd.T, Pg/m, Wn/Xn.
+	.SVE_CPY_Z = {
+		{.SVE_CPY_Z, {.Z_REG_B, .P_REG_MERGE, .W_REG, .NONE}, {.VD, .PG, .VN, .NONE}, 0x0528A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_CPY_Z, {.Z_REG_H, .P_REG_MERGE, .W_REG, .NONE}, {.VD, .PG, .VN, .NONE}, 0x0568A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_CPY_Z, {.Z_REG_S, .P_REG_MERGE, .W_REG, .NONE}, {.VD, .PG, .VN, .NONE}, 0x05A8A000, 0xFFFFE000, .SVE, {}},
+		{.SVE_CPY_Z, {.Z_REG_D, .P_REG_MERGE, .X_REG, .NONE}, {.VD, .PG, .VN, .NONE}, 0x05E8A000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	// EXT (destructive vector extract): Zdn.B, Zdn.B, Zm.B, #imm (imm8 split).
+	.SVE_EXT_Z = { {.SVE_EXT_Z, {.Z_REG_B, .Z_REG_B, .Z_REG_B, .VEC_SHIFT}, {.VD, .VD, .VN, .SVE_EXT_IMM}, 0x05200000, 0xFFE0E000, .SVE, {}} },
+	// MOV (predicated, = SEL Zd, Pg, Zn, Zd): Zd.T, Pg/m, Zn.T.
+	.SVE_MOV_PRED = {
+		{.SVE_MOV_PRED, {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.ZD_ZM_DUP, .PG, .VN, .NONE}, 0x0520C000, 0xFFE0E000, .SVE, {}},
+		{.SVE_MOV_PRED, {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.ZD_ZM_DUP, .PG, .VN, .NONE}, 0x0560C000, 0xFFE0E000, .SVE, {}},
+		{.SVE_MOV_PRED, {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.ZD_ZM_DUP, .PG, .VN, .NONE}, 0x05A0C000, 0xFFE0E000, .SVE, {}},
+		{.SVE_MOV_PRED, {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.ZD_ZM_DUP, .PG, .VN, .NONE}, 0x05E0C000, 0xFFE0E000, .SVE, {is_64=true}},
+	},
+	// Predicate aliases (EOR/ORR/AND with a duplicated predicate field).
+	.SVE_NOT_P  = { {.SVE_NOT_P,  {.P_REG, .P_REG_ZERO, .P_REG, .NONE}, {.PD, .PG4_PM_DUP, .PN, .NONE}, 0x25004200, 0xFFE0C210, .SVE, {}} },
+	.SVE_MOVS_P = { {.SVE_MOVS_P, {.P_REG, .P_REG_ZERO, .P_REG, .NONE}, {.PD, .PG4, .PN_PM_DUP, .NONE}, 0x25404000, 0xFFE0C210, .SVE, {sets_flags=true}} },
+	.SVE_MOV_P  = {
+		{.SVE_MOV_P, {.P_REG, .P_REG_ZERO, .P_REG, .NONE}, {.PD, .PG4, .PN_PM_DUP, .NONE}, 0x25004000, 0xFFE0C210, .SVE, {}},
+		{.SVE_MOV_P, {.P_REG, .P_REG, .NONE, .NONE}, {.PD, .PN_PG_PM_DUP, .NONE, .NONE}, 0x25804000, 0xFFE0C210, .SVE, {}},
+	},
+
+	// -------------------------------------------------------------------------
 	// §23.11 Integer compare (Zn vs Zm) -> Pd.T
 	//   CMPEQ Pd.T, Pg/Z, Zn.T, Zm.T  = 00100100 SS 1 Zm 101 Pg Zn O Pd
 	//   opc bits at 15:13 distinguish HI/HS/EQ/NE/GE/GT/LE/LT
@@ -4754,6 +4781,18 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.SVE_COMPACT = {
 		{.SVE_COMPACT, {.Z_REG_S, .P_REG_GOV, .Z_REG_S, .NONE}, {.VD, .PG, .VN, .NONE}, 0x05A18000, 0xFFFFE000, .SVE, {}},
 		{.SVE_COMPACT, {.Z_REG_D, .P_REG_GOV, .Z_REG_D, .NONE}, {.VD, .PG, .VN, .NONE}, 0x05E18000, 0xFFFFE000, .SVE, {is_64=true}},
+	},
+	.SVE_SETFFR = {
+		{.SVE_SETFFR, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x252C9000, 0xFFFFFFFF, .SVE, {}},
+	},
+	.SVE_RDFFR = {
+		{.SVE_RDFFR, {.P_REG, .NONE, .NONE, .NONE}, {.PD, .NONE, .NONE, .NONE}, 0x2519F000, 0xFFFFFFF0, .SVE, {}},
+	},
+	.SVE_WRFFR = {
+		{.SVE_WRFFR, {.P_REG, .NONE, .NONE, .NONE}, {.PN, .NONE, .NONE, .NONE}, 0x25289000, 0xFFFFFE1F, .SVE, {}},
+	},
+	.SVE_BRKN = {
+		{.SVE_BRKN, {.P_REG, .P_REG_ZERO, .P_REG, .P_REG}, {.PD, .PG4, .PN, .PD}, 0x25184000, 0xFFFFC210, .SVE, {}},
 	},
 	// SPECGEN:END
 }

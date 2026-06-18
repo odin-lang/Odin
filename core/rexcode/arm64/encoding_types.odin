@@ -254,6 +254,16 @@ Operand_Encoding :: enum u8 {
 	MSR_PSTATE,       // PSTATE field selector: op1 at 18:16, op2 at 7:5
 	FMOV_SCALAR_IMM,  // scalar FMOV 8-bit float immediate at bits 20:13
 
+	// ---- SVE alias duplicated predicate/Z fields + EXT byte index ----
+	// MOV/NOT/MOVS predicate aliases are EOR/ORR/AND with a duplicated field;
+	// MOV (predicated) is SEL with Zm = Zd. The source register is packed into
+	// every slot it occupies so the alias round-trips to the canonical bytes.
+	PG4_PM_DUP,       // Pg at 10:13 AND Pm at 16:19 (NOT = EOR Pd,Pg/z,Pn,Pg)
+	PN_PM_DUP,        // Pn at 5:8 AND Pm at 16:19 (MOVS/MOV-pred: Pm = Pn)
+	PN_PG_PM_DUP,     // Pn at 5:8, Pg at 10:13, Pm at 16:19 (MOV Pd,Pn)
+	ZD_ZM_DUP,        // Zd at 0:4 AND Zm at 16:20 (MOV Zd,Pg/m,Zn = SEL ...,Zd)
+	SVE_EXT_IMM,      // SVE EXT byte index: imm8h at 20:16, imm8l at 12:10
+
 	// ---- LSE atomics ------------------------------------------------------
 	ATOMIC_RS,            // Rs (source / compare) at bits 16-20
 	ATOMIC_RT,            // Rt (target) at bits 0-4
