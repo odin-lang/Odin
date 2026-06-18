@@ -115,16 +115,25 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 
 	wat_write_imports(sb, m, unit)
 
+	relocs_group, _ := parse_relocations(m, context.temp_allocator)
+	func_relocs: []wasm.Relocation
+	for rg in relocs_group {
+		if rg.target_section == .FUNCTION {
+			func_relocs = rg.relocs
+			break
+		}
+	}
+
 	for f in m.functions {
 		if f.imported {
 			continue
 		}
-		wat_write_function(sb, m, f, unit)
+		wat_write_function(sb, m, func_relocs, f, unit)
 	}
 
 	wat_write_tables  (sb, m, unit)
 	wat_write_memories(sb, m, unit)
-	wat_write_globals (sb, m, unit)
+	wat_write_globals (sb, m, relocs_group, unit)
 
 	for e in m.exports {
 		fmt.sbprintf(sb, "%s(export %q (%s %d))\n", unit, e.name, external_kind_name(e.kind), e.index)
@@ -134,8 +143,8 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 		fmt.sbprintf(sb, "%s(start %d)\n", unit, m.start)
 	}
 
-	wat_write_elements(sb, m, unit)
-	wat_write_data    (sb, m, unit)
+	wat_write_elements(sb, m, relocs_group, unit)
+	wat_write_data    (sb, m, relocs_group, unit)
 }
 
 wat_write_functype :: proc(sb: ^strings.Builder, t: Func_Type) {
@@ -234,7 +243,7 @@ wat_write_imports :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Pars
 	return nil
 }
 
-wat_write_function :: proc(sb: ^strings.Builder, m: Module, f: Function, unit: string) {
+wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []wasm.Relocation, f: Function, unit: string) {
 	strings.write_string(sb, unit)
 	strings.write_string(sb, "(func")
 	defer strings.write_string(sb, ")\n")
@@ -271,19 +280,19 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, f: Function, unit: s
 
 	if f.body_size != 0 {
 		body := m.data[f.body_offset:][:f.body_size]
-		wat_write_body(sb, m, body, unit, level0=2)
+		wat_write_body(sb, m, func_relocs, body, unit, level0=2)
 	}
 
 	strings.write_string(sb, unit)
 }
 
-wat_write_body :: proc(sb: ^strings.Builder, m: Module, body: []u8, unit: string, level0: int) {
+wat_write_body :: proc(sb: ^strings.Builder, m: Module, func_relocs: []wasm.Relocation, body: []u8, unit: string, level0: int) {
 	context.allocator = context.temp_allocator // scratch trees live in temp
 
 	insts: [dynamic]wasm.Instruction
 	info:  [dynamic]wasm.Instruction_Info
 	errs:  [dynamic]wasm.Error
-	wasm.decode(body, nil, &insts, &info, &errs, context.temp_allocator)
+	wasm.decode(body, func_relocs, &insts, &info, &errs, context.temp_allocator)
 
 	i := 0
 	stmts, _ := wat_fold_region(insts[:], m, &i)
@@ -517,12 +526,20 @@ wat_write_memories :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 	}
 }
 
-wat_write_globals :: proc(sb: ^strings.Builder, m: Module, unit: string) {
+wat_write_globals :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Group, unit: string) {
 	idx := count_import_kind(m, .GLOBAL)
 	for sec in m.sections {
 		if sec.id != .GLOBAL {
 			continue
 		}
+		relocs: []wasm.Relocation
+		for rg in relocs_group {
+			if rg.target_section == sec.id {
+				relocs = rg.relocs
+				break
+			}
+		}
+
 		r := reader(m.data, sec.offset)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
@@ -537,18 +554,26 @@ wat_write_globals :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 			} else {
 				fmt.sbprintf(sb, "%s ", valtype_name(wasm.Value_Type(vt)))
 			}
-			wat_write_const_expr(sb, m, m.data, &r.off, unit, context.temp_allocator)
+			wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
 			idx += 1
 		}
 	}
 }
 
-wat_write_elements :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_Error {
+wat_write_elements :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Group, unit: string) -> Parse_Error {
 	elem_idx := 0
 	for sec in m.sections {
 		if sec.id != .ELEMENT {
 			continue
 		}
+		relocs: []wasm.Relocation
+		for rg in relocs_group {
+			if rg.target_section == sec.id {
+				relocs = rg.relocs
+				break
+			}
+		}
+
 		r := reader(m.data, sec.offset)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
@@ -561,7 +586,7 @@ wat_write_elements :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Par
 			fmt.sbprintf(sb, "%s(elem (;%d;) ", unit, elem_idx)
 			defer strings.write_string(sb, ")\n")
 
-			wat_write_const_expr(sb, m, m.data, &r.off, unit, context.temp_allocator)
+			wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
 			strings.write_string(sb, " func")
 			n := rd_u32(&r) or_break
 			for _ in 0..<n {
@@ -574,7 +599,7 @@ wat_write_elements :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Par
 	return nil
 }
 
-wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_Error {
+wat_write_data :: proc(sb: ^strings.Builder, m: Module, relocs_group: []Reloc_Group, unit: string) -> Parse_Error {
 	data_idx := 0
 	for sec in m.sections {
 		if sec.id != .DATA {
@@ -595,12 +620,20 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_E
 				memidx, _ = rd_u32(&r)
 				fallthrough
 			case 0:
+				relocs: []wasm.Relocation
+				for rg in relocs_group {
+					if rg.target_section == sec.id {
+						relocs = rg.relocs
+						break
+					}
+				}
+
 				// expr + bytes
 				if memidx != 0 {
 					fmt.sbprintf(sb, " (memory %d)", memidx)
 				}
 				strings.write_byte(sb, ' ')
-				wat_write_const_expr(sb, m, m.data, &r.off, unit, context.temp_allocator)
+				wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
 			case 1:
 				// bytes
 			case:
@@ -620,7 +653,7 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_E
 }
 
 // Decode and fold a constant expression at `off^` (advancing past its `end`).
-wat_write_const_expr :: proc(sb: ^strings.Builder, m: Module, data: []u8, off: ^u32, unit: string, allocator: runtime.Allocator) {
+wat_write_const_expr :: proc(sb: ^strings.Builder, m: Module, relocs: []wasm.Relocation, data: []u8, off: ^u32, unit: string, allocator: runtime.Allocator) {
 	context.allocator = context.temp_allocator
 
 	exprs: [dynamic]wasm.Instruction
@@ -628,7 +661,7 @@ wat_write_const_expr :: proc(sb: ^strings.Builder, m: Module, data: []u8, off: ^
 	defer delete(exprs)
 
 	for off^ < u32(len(data)) {
-		inst, _, next := wasm.decode_one(data, nil, off^, allocator) or_break
+		inst, _, next := wasm.decode_one(data, relocs, off^, allocator) or_break
 		off^ = next
 		if inst.mnemonic == .END {
 			break
