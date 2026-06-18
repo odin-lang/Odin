@@ -353,10 +353,40 @@ inst_ldr_post_r_m               :: #force_inline proc "contextless" (dst: Regist
 emit_ldr_post_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldr_post_r_m(dst, mem)) }
 inst_str_post_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STR_POST, dst, mem) }
 emit_str_post_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_str_post_r_m(dst, mem)) }
+inst_ldrb_pre_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRB_PRE, dst, mem) }
+emit_ldrb_pre_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrb_pre_r_m(dst, mem)) }
+inst_strb_pre_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STRB_PRE, dst, mem) }
+emit_strb_pre_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_strb_pre_r_m(dst, mem)) }
+inst_ldrb_post_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRB_POST, dst, mem) }
+emit_ldrb_post_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrb_post_r_m(dst, mem)) }
+inst_strb_post_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STRB_POST, dst, mem) }
+emit_strb_post_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_strb_post_r_m(dst, mem)) }
+inst_ldrh_pre_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRH_PRE, dst, mem) }
+emit_ldrh_pre_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrh_pre_r_m(dst, mem)) }
+inst_strh_pre_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STRH_PRE, dst, mem) }
+emit_strh_pre_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_strh_pre_r_m(dst, mem)) }
+inst_ldrh_post_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRH_POST, dst, mem) }
+emit_ldrh_post_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrh_post_r_m(dst, mem)) }
+inst_strh_post_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STRH_POST, dst, mem) }
+emit_strh_post_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_strh_post_r_m(dst, mem)) }
 inst_ldr_reg_r_m                :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDR_REG, dst, mem) }
 emit_ldr_reg_r_m                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldr_reg_r_m(dst, mem)) }
 inst_str_reg_r_m                :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STR_REG, dst, mem) }
 emit_str_reg_r_m                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_str_reg_r_m(dst, mem)) }
+inst_ldrb_reg_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRB_REG, dst, mem) }
+emit_ldrb_reg_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrb_reg_r_m(dst, mem)) }
+inst_strb_reg_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STRB_REG, dst, mem) }
+emit_strb_reg_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_strb_reg_r_m(dst, mem)) }
+inst_ldrh_reg_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRH_REG, dst, mem) }
+emit_ldrh_reg_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrh_reg_r_m(dst, mem)) }
+inst_strh_reg_r_m               :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STRH_REG, dst, mem) }
+emit_strh_reg_r_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_strh_reg_r_m(dst, mem)) }
+inst_ldrsb_reg_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRSB_REG, dst, mem) }
+emit_ldrsb_reg_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrsb_reg_r_m(dst, mem)) }
+inst_ldrsh_reg_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRSH_REG, dst, mem) }
+emit_ldrsh_reg_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrsh_reg_r_m(dst, mem)) }
+inst_ldrsw_reg_r_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRSW_REG, dst, mem) }
+emit_ldrsw_reg_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrsw_reg_r_m(dst, mem)) }
 inst_ldp_pre_r_r_m              :: #force_inline proc "contextless" (dst: Register, src: Register, mem: Memory) -> Instruction { return inst_ldp_stp(.LDP_PRE, dst, src, mem) }
 emit_ldp_pre_r_r_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, mem: Memory) { append(instructions, inst_ldp_pre_r_r_m(dst, src, mem)) }
 inst_stp_pre_r_r_m              :: #force_inline proc "contextless" (dst: Register, src: Register, mem: Memory) -> Instruction { return inst_ldp_stp(.STP_PRE, dst, src, mem) }
@@ -1251,6 +1281,14 @@ inst_ldr_v_r_m                  :: #force_inline proc "contextless" (dst: Regist
 emit_ldr_v_r_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldr_v_r_m(dst, mem)) }
 inst_str_v_r_m                  :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STR_V, dst, mem) }
 emit_str_v_r_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_str_v_r_m(dst, mem)) }
+inst_ldp_v_r_r_m                :: #force_inline proc "contextless" (dst: Register, src: Register, mem: Memory) -> Instruction { return inst_ldp_stp(.LDP_V, dst, src, mem) }
+emit_ldp_v_r_r_m                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, mem: Memory) { append(instructions, inst_ldp_v_r_r_m(dst, src, mem)) }
+inst_stp_v_r_r_m                :: #force_inline proc "contextless" (dst: Register, src: Register, mem: Memory) -> Instruction { return inst_ldp_stp(.STP_V, dst, src, mem) }
+emit_stp_v_r_r_m                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, mem: Memory) { append(instructions, inst_stp_v_r_r_m(dst, src, mem)) }
+inst_ldur_v_r_m                 :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDUR_V, dst, mem) }
+emit_ldur_v_r_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldur_v_r_m(dst, mem)) }
+inst_stur_v_r_m                 :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STUR_V, dst, mem) }
+emit_stur_v_r_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_stur_v_r_m(dst, mem)) }
 inst_sve_add_z_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_ADD_Z, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
 emit_sve_add_z_z_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sve_add_z_z_z_z(rz, rz2, rz3)) }
 inst_sve_sub_z_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SVE_SUB_Z, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
@@ -2382,10 +2420,40 @@ inst_ldr_post                        :: inst_ldr_post_r_m
 emit_ldr_post                        :: emit_ldr_post_r_m
 inst_str_post                        :: inst_str_post_r_m
 emit_str_post                        :: emit_str_post_r_m
+inst_ldrb_pre                        :: inst_ldrb_pre_r_m
+emit_ldrb_pre                        :: emit_ldrb_pre_r_m
+inst_strb_pre                        :: inst_strb_pre_r_m
+emit_strb_pre                        :: emit_strb_pre_r_m
+inst_ldrb_post                       :: inst_ldrb_post_r_m
+emit_ldrb_post                       :: emit_ldrb_post_r_m
+inst_strb_post                       :: inst_strb_post_r_m
+emit_strb_post                       :: emit_strb_post_r_m
+inst_ldrh_pre                        :: inst_ldrh_pre_r_m
+emit_ldrh_pre                        :: emit_ldrh_pre_r_m
+inst_strh_pre                        :: inst_strh_pre_r_m
+emit_strh_pre                        :: emit_strh_pre_r_m
+inst_ldrh_post                       :: inst_ldrh_post_r_m
+emit_ldrh_post                       :: emit_ldrh_post_r_m
+inst_strh_post                       :: inst_strh_post_r_m
+emit_strh_post                       :: emit_strh_post_r_m
 inst_ldr_reg                         :: inst_ldr_reg_r_m
 emit_ldr_reg                         :: emit_ldr_reg_r_m
 inst_str_reg                         :: inst_str_reg_r_m
 emit_str_reg                         :: emit_str_reg_r_m
+inst_ldrb_reg                        :: inst_ldrb_reg_r_m
+emit_ldrb_reg                        :: emit_ldrb_reg_r_m
+inst_strb_reg                        :: inst_strb_reg_r_m
+emit_strb_reg                        :: emit_strb_reg_r_m
+inst_ldrh_reg                        :: inst_ldrh_reg_r_m
+emit_ldrh_reg                        :: emit_ldrh_reg_r_m
+inst_strh_reg                        :: inst_strh_reg_r_m
+emit_strh_reg                        :: emit_strh_reg_r_m
+inst_ldrsb_reg                       :: inst_ldrsb_reg_r_m
+emit_ldrsb_reg                       :: emit_ldrsb_reg_r_m
+inst_ldrsh_reg                       :: inst_ldrsh_reg_r_m
+emit_ldrsh_reg                       :: emit_ldrsh_reg_r_m
+inst_ldrsw_reg                       :: inst_ldrsw_reg_r_m
+emit_ldrsw_reg                       :: emit_ldrsw_reg_r_m
 inst_ldp_pre                         :: inst_ldp_pre_r_r_m
 emit_ldp_pre                         :: emit_ldp_pre_r_r_m
 inst_stp_pre                         :: inst_stp_pre_r_r_m
@@ -3276,6 +3344,14 @@ inst_ldr_v                           :: inst_ldr_v_r_m
 emit_ldr_v                           :: emit_ldr_v_r_m
 inst_str_v                           :: inst_str_v_r_m
 emit_str_v                           :: emit_str_v_r_m
+inst_ldp_v                           :: inst_ldp_v_r_r_m
+emit_ldp_v                           :: emit_ldp_v_r_r_m
+inst_stp_v                           :: inst_stp_v_r_r_m
+emit_stp_v                           :: emit_stp_v_r_r_m
+inst_ldur_v                          :: inst_ldur_v_r_m
+emit_ldur_v                          :: emit_ldur_v_r_m
+inst_stur_v                          :: inst_stur_v_r_m
+emit_stur_v                          :: emit_stur_v_r_m
 inst_sve_add_z                       :: inst_sve_add_z_z_z_z
 emit_sve_add_z                       :: emit_sve_add_z_z_z_z
 inst_sve_sub_z                       :: inst_sve_sub_z_z_z_z

@@ -320,6 +320,54 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 
 	// =========================================================================
+	// Byte / half / signed scalar loads & stores (pre / post / register offset)
+	// and vector LDP/STP/LDUR/STUR -- reusing the standard addressing encodings.
+	// =========================================================================
+	.LDRB_POST = { {.LDRB_POST, {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_POST, .NONE, .NONE}, 0x38400400, 0xFFE00C00, .BASE, {}} },
+	.LDRB_PRE  = { {.LDRB_PRE,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_PRE,  .NONE, .NONE}, 0x38400C00, 0xFFE00C00, .BASE, {}} },
+	.LDRB_REG  = { {.LDRB_REG,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG,       .NONE, .NONE}, 0x38600800, 0xFFE00C00, .BASE, {}} },
+	.LDRH_POST = { {.LDRH_POST, {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_POST, .NONE, .NONE}, 0x78400400, 0xFFE00C00, .BASE, {}} },
+	.LDRH_PRE  = { {.LDRH_PRE,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_PRE,  .NONE, .NONE}, 0x78400C00, 0xFFE00C00, .BASE, {}} },
+	.LDRH_REG  = { {.LDRH_REG,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG,       .NONE, .NONE}, 0x78600800, 0xFFE00C00, .BASE, {}} },
+	.STRB_POST = { {.STRB_POST, {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_POST, .NONE, .NONE}, 0x38000400, 0xFFE00C00, .BASE, {}} },
+	.STRB_PRE  = { {.STRB_PRE,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_PRE,  .NONE, .NONE}, 0x38000C00, 0xFFE00C00, .BASE, {}} },
+	.STRB_REG  = { {.STRB_REG,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG,       .NONE, .NONE}, 0x38200800, 0xFFE00C00, .BASE, {}} },
+	.STRH_POST = { {.STRH_POST, {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_POST, .NONE, .NONE}, 0x78000400, 0xFFE00C00, .BASE, {}} },
+	.STRH_PRE  = { {.STRH_PRE,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_PRE,  .NONE, .NONE}, 0x78000C00, 0xFFE00C00, .BASE, {}} },
+	.STRH_REG  = { {.STRH_REG,  {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG,       .NONE, .NONE}, 0x78200800, 0xFFE00C00, .BASE, {}} },
+	// Signed register-offset loads (sign-extend to W or X).
+	.LDRSB_REG = {
+		{.LDRSB_REG, {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG, .NONE, .NONE}, 0x38E00800, 0xFFE00C00, .BASE, {}},
+		{.LDRSB_REG, {.X_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG, .NONE, .NONE}, 0x38A00800, 0xFFE00C00, .BASE, {is_64=true}},
+	},
+	.LDRSH_REG = {
+		{.LDRSH_REG, {.W_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG, .NONE, .NONE}, 0x78E00800, 0xFFE00C00, .BASE, {}},
+		{.LDRSH_REG, {.X_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG, .NONE, .NONE}, 0x78A00800, 0xFFE00C00, .BASE, {is_64=true}},
+	},
+	.LDRSW_REG = { {.LDRSW_REG, {.X_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_REG, .NONE, .NONE}, 0xB8A00800, 0xFFE00C00, .BASE, {is_64=true}} },
+	// Vector load/store pair (S/D/Q) and unscaled (LDUR/STUR).
+	.LDP_V = {
+		{.LDP_V, {.S_REG, .S_REG, .MEM, .NONE}, {.RT, .RT2, .OFFSET_BASE_S9, .NONE}, 0x2D400000, 0xFFC00000, .NEON, {}},
+		{.LDP_V, {.D_REG, .D_REG, .MEM, .NONE}, {.RT, .RT2, .OFFSET_BASE_S9, .NONE}, 0x6D400000, 0xFFC00000, .NEON, {}},
+		{.LDP_V, {.Q_REG, .Q_REG, .MEM, .NONE}, {.RT, .RT2, .OFFSET_BASE_S9, .NONE}, 0xAD400000, 0xFFC00000, .NEON, {}},
+	},
+	.STP_V = {
+		{.STP_V, {.S_REG, .S_REG, .MEM, .NONE}, {.RT, .RT2, .OFFSET_BASE_S9, .NONE}, 0x2D000000, 0xFFC00000, .NEON, {}},
+		{.STP_V, {.D_REG, .D_REG, .MEM, .NONE}, {.RT, .RT2, .OFFSET_BASE_S9, .NONE}, 0x6D000000, 0xFFC00000, .NEON, {}},
+		{.STP_V, {.Q_REG, .Q_REG, .MEM, .NONE}, {.RT, .RT2, .OFFSET_BASE_S9, .NONE}, 0xAD000000, 0xFFC00000, .NEON, {}},
+	},
+	.LDUR_V = {
+		{.LDUR_V, {.S_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_S9, .NONE, .NONE}, 0xBC400000, 0xFFE00C00, .NEON, {}},
+		{.LDUR_V, {.D_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_S9, .NONE, .NONE}, 0xFC400000, 0xFFE00C00, .NEON, {}},
+		{.LDUR_V, {.Q_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_S9, .NONE, .NONE}, 0x3CC00000, 0xFFE00C00, .NEON, {}},
+	},
+	.STUR_V = {
+		{.STUR_V, {.S_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_S9, .NONE, .NONE}, 0xBC000000, 0xFFE00C00, .NEON, {}},
+		{.STUR_V, {.D_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_S9, .NONE, .NONE}, 0xFC000000, 0xFFE00C00, .NEON, {}},
+		{.STUR_V, {.Q_REG, .MEM, .NONE, .NONE}, {.RT, .OFFSET_BASE_S9, .NONE, .NONE}, 0x3C800000, 0xFFE00C00, .NEON, {}},
+	},
+
+	// =========================================================================
 	// §8 Branches
 	// =========================================================================
 
