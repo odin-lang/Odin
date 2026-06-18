@@ -405,8 +405,15 @@ Mnemonic :: enum u16 {
 	LETP,                                  // loop end with tail predication
 	LCTP,                                  // loop clear tail predication
 
-	BF,                                    // branch future (ARMv8.1-M)
-	BFI_BR,                                // branch future indirect
+	// Branch Future (ARMv8.1-M). INTENTIONALLY NOT ENCODED: this feature is
+	// deprecated and effectively dead -- llvm-objdump cannot even disassemble
+	// these, so they can't be round-trip-verified, and a correct encoder would
+	// need dual-offset PC-relative relocation infrastructure (a `boff` bf-point
+	// plus a separate branch target, both linker fixups) that does not exist
+	// here. Left as enum-only on purpose; revisit only if BF is ever needed,
+	// by first adding BRANCH_BF_* relocation types + a resolver.
+	BF,                                    // branch future
+	BFI_BR,                                // branch future indirect (bfx)
 	BFL,                                   // branch future and link
 	BFLX,                                  // branch future link and exchange
 	BFCSEL,                                // branch future conditional select
