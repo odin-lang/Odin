@@ -214,8 +214,9 @@ rexcode/
 		ppc_vle/        # Freescale VLE (sibling of ppc)
 		riscv/          # RISC-V
 		rsp/            # N64 RSP
+	ir/                 # shared IR core (parallels isa/; see docs/ir_design.md)
 	wasm/               # WebAssembly (an IR; destined for ir/wasm once the IR layer settles)
-	docs/               # cross-arch design + per-arch design docs
+	docs/               # cross-arch design + IR design + per-arch design docs
 ```
 
 Each ISA is imported as `core:rexcode/isa/<arch>` (e.g. `core:rexcode/isa/x86`); the
