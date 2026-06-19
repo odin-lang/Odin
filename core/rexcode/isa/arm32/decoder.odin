@@ -545,3 +545,30 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_imm(0)
 	}
 }
+
+
+// -----------------------------------------------------------------------------
+// Buffer-Sizing Helpers (let callers pre-size so the decode hot path never
+// reallocates; allocates no new buffers -- only the caller's arrays grow).
+// -----------------------------------------------------------------------------
+
+// Instruction-count ceiling for `data` (A32 is 4 bytes, Thumb 2; minimum 2).
+@(require_results)
+decode_max_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
+	return len(data) / 2
+}
+
+// Typical-case estimate of the instruction count for `data`.
+@(require_results)
+decode_estimate_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
+	return len(data) / 4 + 8
+}
+
+// Pre-size the caller's decode output arrays for `data` (reserves on top of any
+// existing elements; nil to skip; exact=true for the ceiling, else the estimate).
+decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic]Instruction_Info, label_defs: ^[dynamic]Label_Definition, data: []u8, exact: bool = false) {
+	n := exact ? decode_max_instruction_count(data) : decode_estimate_instruction_count(data)
+	if instructions != nil { reserve(instructions, len(instructions) + n) }
+	if inst_info    != nil { reserve(inst_info,    len(inst_info)    + n) }
+	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
+}

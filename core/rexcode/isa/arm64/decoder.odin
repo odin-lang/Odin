@@ -658,3 +658,29 @@ reg_from_field :: #force_inline proc "contextless" (
 	}
 	return Operand{reg = Register(cls | hw), kind = .REGISTER, size = 4}
 }
+
+// -----------------------------------------------------------------------------
+// Buffer-Sizing Helpers (let callers pre-size so the decode hot path never
+// reallocates; allocates no new buffers -- only the caller's arrays grow).
+// -----------------------------------------------------------------------------
+
+// Exact instruction-count ceiling for `data` (AArch64 instructions are 4 bytes).
+@(require_results)
+decode_max_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
+	return len(data) / 4
+}
+
+// Typical-case estimate (AArch64 is fixed 4 bytes/instruction, so this is exact).
+@(require_results)
+decode_estimate_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
+	return len(data) / 4 + 8
+}
+
+// Pre-size the caller's decode output arrays for `data` (reserves on top of any
+// existing elements; nil to skip; exact=true for the ceiling, else the estimate).
+decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic]Instruction_Info, label_defs: ^[dynamic]Label_Definition, data: []u8, exact: bool = false) {
+	n := exact ? decode_max_instruction_count(data) : decode_estimate_instruction_count(data)
+	if instructions != nil { reserve(instructions, len(instructions) + n) }
+	if inst_info    != nil { reserve(inst_info,    len(inst_info)    + n) }
+	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
+}

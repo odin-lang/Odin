@@ -48,14 +48,29 @@ package rexcode_mips
 MAX_INST_SIZE :: 4
 
 // Upper bound on bytes emitted for `n` instructions.
-encode_max_code_size :: #force_inline proc "contextless" (n: int) -> int {
-	return n * 4
+encode_max_code_size :: #force_inline proc "contextless" (instructions: []Instruction) -> int {
+	return len(instructions) * MAX_INST_SIZE
 }
 
 // Upper bound on pending relocations for `n` instructions
 // (each instruction has at most one label-referencing operand).
-encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int {
-	return n
+encode_max_relocation_count :: #force_inline proc "contextless" (instructions: []Instruction) -> int {
+	return len(instructions)
+}
+
+// Pre-size the caller's encode outputs (code grown by length so code[:] is a
+// valid emit target; relocs reserved by capacity) so the encode hot path never
+// reallocates. Allocates no new buffers; pass nil to skip either array.
+encode_reserve :: proc(code: ^[dynamic]u8, relocs: ^[dynamic]Relocation, instructions: []Instruction) {
+	if code != nil {
+		size := encode_max_code_size(instructions)
+		if len(code) < size {
+			resize(code, size)
+		}
+	}
+	if relocs != nil {
+		reserve(relocs, len(relocs) + encode_max_relocation_count(instructions))
+	}
 }
 
 // =============================================================================
