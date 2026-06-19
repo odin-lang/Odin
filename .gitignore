@@ -281,10 +281,12 @@ libLLVM*.so*
 
 # core:rexcode commits its generated encode/decode tables: each arch's tablegen
 # emits human-readable Odin, serialized to tables/*.bin, which the library
-# #loads at compile time. The blobs (and the rexcode x86 package, caught by the
-# broad x86/ rule above) must be tracked.
-!/core/rexcode/x86/
-!core/rexcode/*/tables/*.bin
+# #loads at compile time. ISA packages live under core/rexcode/isa/<arch>; the
+# broad x86/ rule above otherwise shadows the isa/x86 source package, so
+# un-ignore that directory tree and every arch's committed table blobs. Stray
+# *.bin build output inside the tree stays ignored -- only tables/*.bin is kept.
+!/core/rexcode/isa/x86/
+!core/rexcode/isa/*/tables/*.bin
 
 # WASM
 *.wasm
