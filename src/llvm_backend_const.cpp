@@ -1970,10 +1970,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 				for_array(i, cl->elems) {
 					Entity *f = type->Struct.fields[i];
 					TypeAndValue tav = cl->elems[i]->tav;
-					ExactValue val = {};
-					if (tav.mode != Addressing_Invalid) {
-						val = tav.value;
-					}
+
+					// INFO: dead code:
+	
+					// ExactValue val = {};
+					// if (tav.mode != Addressing_Invalid) {
+					// 	val = tav.value;
+					// }
 
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
