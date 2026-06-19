@@ -184,9 +184,10 @@ encode :: proc(
 		if form_index >= 0 && form_index < len(ENCODE_RECIPES) {
 			recipe := &ENCODE_RECIPES[form_index]
 			if recipe.flags.eligible && transmute(u8)inst.flags == 0 {
-				rm_reg  := recipe.rm_op  < 0 || inst.ops[recipe.rm_op].kind == .REGISTER
+				// r/m may now be a register or a memory operand; only a
+				// label/relative immediate (a relocation) still falls back.
 				imm_lit := recipe.imm_op < 0 || inst.ops[recipe.imm_op].kind == .IMMEDIATE
-				if rm_reg && imm_lit {
+				if imm_lit {
 					byte_count += emit_recipe(recipe, &inst, code[byte_count:])
 					continue
 				}

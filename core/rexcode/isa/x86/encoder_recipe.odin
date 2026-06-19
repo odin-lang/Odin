@@ -166,7 +166,12 @@ emit_recipe :: #force_inline proc "contextless" (recipe: ^Form_Recipe, inst: ^In
 	}
 	if recipe.rm_op >= 0 {
 		op := &inst.ops[recipe.rm_op]
-		rex |= bmask(op.kind == .REGISTER && reg_needs_rex(op.reg)) & 0x41
+		is_reg := op.kind == .REGISTER
+		is_mem := op.kind == .MEMORY
+		m := op.mem   // union bytes; only used when is_mem
+		rex |= bmask(is_reg && reg_needs_rex(op.reg))           & 0x41
+		rex |= bmask(is_mem && mem_has_base(m)  && m.base_ext)  & 0x41
+		rex |= bmask(is_mem && mem_has_index(m) && m.index_ext) & 0x42
 	}
 	if recipe.opr_op >= 0 {
 		op := &inst.ops[recipe.opr_op]
@@ -197,7 +202,8 @@ emit_recipe :: #force_inline proc "contextless" (recipe: ^Form_Recipe, inst: ^In
 		pos += 1
 	}
 
-	// ModR/M, register-direct (mod = 11).
+	// ModR/M (+ SIB + displacement); the r/m operand is a register or memory.
+	// The memory addressing mirrors the interpreter's path byte-for-byte.
 	if recipe.flags.has_modrm {
 		reg_field: u8 = recipe.ext & 0x7
 		if !recipe.flags.reg_from_ext {
@@ -207,13 +213,76 @@ emit_recipe :: #force_inline proc "contextless" (recipe: ^Form_Recipe, inst: ^In
 				if op.kind == .REGISTER { reg_field = reg_hw(op.reg) & 0x7 }
 			}
 		}
-		rm_field: u8 = 0
+
+		mod:               u8  = 0
+		rm:                u8  = 0
+		has_sib                := false
+		sib:               u8  = 0
+		disp:              i32 = 0
+		displacement_size: u8  = 0
+
 		if recipe.rm_op >= 0 {
-			op := &inst.ops[recipe.rm_op]
-			if op.kind == .REGISTER { rm_field = reg_hw(op.reg) & 0x7 }
+			mr_op := &inst.ops[recipe.rm_op]
+			#partial switch mr_op.kind {
+			case .REGISTER:
+				mod = 0b11
+				rm  = reg_hw(mr_op.reg) & 0x07
+			case .MEMORY:
+				m := mr_op.mem
+				if mem_is_rip_relative(m) {
+					mod = 0b00; rm = 0b101
+					disp = m.disp; displacement_size = 4
+				} else if !mem_has_base(m) && !mem_has_index(m) {
+					mod = 0b00; rm = 0b100
+					has_sib = true; sib = 0b00_100_101
+					disp = m.disp; displacement_size = 4
+				} else {
+					base_hw    := m.base_hw
+					has_index  := mem_has_index(m)
+					disp_value := m.disp
+					needs_sib  := has_index || (base_hw & 0x07) == 4
+					has_base   := mem_has_base(m)
+					is_rbp     := (base_hw & 0x07) == 5
+					is_zero    := disp_value == 0
+					fits8      := disp_value >= -128 && disp_value <= 127
+					disp = disp_value
+
+					if needs_sib {
+						has_sib = true
+						rm = 0b100
+						scale: u8 = 0
+						switch mem_scale(m) {
+						case 2: scale = 1
+						case 4: scale = 2
+						case 8: scale = 3
+						}
+						idx      := has_index ? (m.index_hw & 0x07) : u8(0b100)
+						base_sib := has_base  ? (base_hw   & 0x07) : u8(0b101)
+						sib = (scale << 6) | (idx << 3) | base_sib
+						no_disp := has_base && is_zero && !(has_base && is_rbp)
+						displacement_size = !has_base ? 4 : (no_disp ? 0 : (fits8 ? 1 : 4))
+						mod               = !has_base ? 0b00 : (no_disp ? 0b00 : (fits8 ? 0b01 : 0b10))
+					} else {
+						rm = base_hw & 0x07
+						no_disp := is_zero && !is_rbp
+						displacement_size = no_disp ? 0 : (fits8 ? 1 : 4)
+						mod               = no_disp ? 0b00 : (fits8 ? 0b01 : 0b10)
+					}
+				}
+			}
 		}
-		out[pos] = 0xC0 | (reg_field << 3) | rm_field
+
+		out[pos] = (mod << 6) | (reg_field << 3) | rm
 		pos += 1
+		if has_sib {
+			out[pos] = sib
+			pos += 1
+		}
+		for _ in 0..<displacement_size {
+			out[pos] = u8(disp & 0xFF)
+			disp >>= 8
+			pos += 1
+		}
 	}
 
 	// Immediate (literal; .RELATIVE/label immediates are rejected by the caller).
