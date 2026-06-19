@@ -901,16 +901,46 @@ imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 }
 
 // -----------------------------------------------------------------------------
-// SECTION: 7.8 Convenience Functions
+// SECTION: 7.8 Buffer-Sizing Helpers
 // -----------------------------------------------------------------------------
+//
+// encode() allocates nothing -- it writes machine code into the caller's `code`
+// and appends unresolved Relocations to the caller's dynamic array. These
+// helpers let the caller size those buffers from the instruction slice: either
+// the plain size (caller manages its own memory) or by pre-sizing the caller's
+// own dynamic arrays directly. No new buffers are ever allocated; only the
+// caller's arrays are grown, and only when they are not already large enough.
+// (The error array grows only on the failure path, so it is left out.)
 
-// Compute safe buffer sizes for encoding
-encode_max_code_size :: #force_inline proc "contextless" (n: int) -> int {
-	return n * MAX_INST_SIZE
+// Exact maximum number of code bytes encode() can emit for `instructions`
+// (the longest x64 instruction is MAX_INST_SIZE).
+@(require_results)
+encode_max_code_size :: #force_inline proc "contextless" (instructions: []Instruction) -> int {
+	return len(instructions) * MAX_INST_SIZE
 }
 
-encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int {
-	return n  // At most 1 reloc per instruction
+// Exact maximum number of relocations encode() can produce for `instructions`.
+@(require_results)
+encode_max_relocation_count :: #force_inline proc "contextless" (instructions: []Instruction) -> int {
+	return len(instructions)  // at most one reloc per instruction
+}
+
+// Pre-size the caller's encode output buffers so the encode hot path never
+// reallocates. `code` is the caller's dynamic []u8 (sliced as `code[:]` when
+// calling encode); its LENGTH is grown to hold the worst case so the slice is a
+// valid emit target. `relocs` capacity is reserved on top of whatever it
+// already holds. Both are optional (nil to skip). Grows only the caller's own
+// arrays, and is a no-op for any that are already big enough.
+encode_reserve :: proc(code: ^[dynamic]u8, relocs: ^[dynamic]Relocation, instructions: []Instruction) {
+	if code != nil {
+		size := encode_max_code_size(instructions)
+		if len(code) < size {
+			resize(code, size)
+		}
+	}
+	if relocs != nil {
+		reserve(relocs, len(relocs) + encode_max_relocation_count(instructions))
+	}
 }
 
 // -----------------------------------------------------------------------------
