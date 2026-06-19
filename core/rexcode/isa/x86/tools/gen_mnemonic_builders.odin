@@ -341,15 +341,16 @@ can_generate_builder :: proc(enc: x86.Encoding) -> bool {
 	return !has_any_operand || has_explicit
 }
 
-// A form is safe to pre-match (bake an enc_hint) only when the matcher's pick is
-// VALUE-independent: it has no immediate or relative operand. Those select
-// imm8-vs-imm32 / rel8-vs-rel32 by the runtime value, so the matcher may pick a
-// shorter form than a typed builder's nominal one -- baking would diverge from
-// the matcher (and from llvm-mc). Such forms keep enc_hint=0 (matcher path).
+// A form is safe to pre-match (bake an enc_hint) unless the pick depends on a
+// *relative* target whose size (rel8 vs rel32) the matcher chooses by value --
+// those keep enc_hint=0 (matcher path). Immediate forms ARE hinted: a typed
+// builder names its immediate width (inst_add_r32_imm32 vs _imm8), so honoring
+// that width is the builder's contract, and skipping the match scan makes the
+// very common immediate instructions as fast as the register ones.
 form_is_hintable :: proc(enc: x86.Encoding) -> bool {
 	for op in enc.ops {
 		#partial switch op {
-		case .IMM8, .IMM16, .IMM32, .IMM64, .IMM8SX, .REL8, .REL32:
+		case .REL8, .REL32:
 			return false
 		}
 	}

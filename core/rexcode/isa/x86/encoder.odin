@@ -192,13 +192,23 @@ encode :: proc(
 		mr_slot:  int = -1
 		reg_slot: int = -1
 		opr_slot: int = -1
+		imm_slot: int = -1
+		has_gpr16 := false   // any GPR16 operand -> 66h operand-size prefix
+		has_spl   := false   // any SPL/BPL/SIL/DIL (GPR8 hw 4-7) -> forces a REX
 		{
 			user_idx := 0
 			for op, i in enc.ops {
 				if op == .NONE { break }
 				if !is_implicit_op_inline(op) {
 					if user_idx < int(inst.operand_count) {
-						user_ops[i] = &inst.ops[user_idx]
+						uop := &inst.ops[user_idx]
+						user_ops[i] = uop
+						if uop.kind == .REGISTER {
+							cls := reg_class(uop.reg)
+							hw  := reg_hw(uop.reg)
+							has_gpr16 ||= cls == REG_GPR16
+							has_spl   ||= cls == REG_GPR8 && hw >= 4 && hw <= 7
+						}
 					}
 					user_idx += 1
 				}
@@ -207,6 +217,7 @@ encode :: proc(
 				case .MR:   mr_slot  = i
 				case .REG:  reg_slot = i
 				case .OP_R: opr_slot = i
+				case .IB, .IW, .ID, .IQ: imm_slot = i
 				}
 			}
 		}
@@ -214,34 +225,36 @@ encode :: proc(
 
 		// --- Legacy Prefixes ---
 		//
-		// Kept as predicted branches: in real instruction streams a legacy
-		// prefix is almost always absent, so these are ~100% predicted-not-taken
-		// (free), and the branchless speculative-write form only added four
-		// unconditional stores per instruction for no win. See git history.
+		// The vast majority of instructions carry no legacy prefix, so gate the
+		// whole block on a single flags-is-zero test instead of four separate
+		// predicted-not-taken branches per instruction. Inside, the branches are
+		// kept (a present prefix is rare enough that the branching form beats the
+		// branchless speculative-write one -- see git history).
+		if transmute(u8)inst.flags != 0 {
+			// Lock prefix (F0)
+			if inst.flags.lock && enc.flags.lock_ok {
+				out[pos] = 0xF0
+				pos += 1
+			}
 
-		// Lock prefix (F0)
-		if inst.flags.lock && enc.flags.lock_ok {
-			out[pos] = 0xF0
-			pos += 1
-		}
+			// Rep/Repne prefix
+			#partial switch inst.flags.rep {
+			case .REP:   out[pos] = 0xF3; pos += 1
+			case .REPNE: out[pos] = 0xF2; pos += 1
+			}
 
-		// Rep/Repne prefix
-		#partial switch inst.flags.rep {
-		case .REP:   out[pos] = 0xF3; pos += 1
-		case .REPNE: out[pos] = 0xF2; pos += 1
-		}
+			// Segment override
+			if inst.flags.segment != 0 {
+				seg_prefix := [8]u8{0, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0}
+				out[pos] = seg_prefix[inst.flags.segment]
+				pos += 1
+			}
 
-		// Segment override
-		if inst.flags.segment != 0 {
-			seg_prefix := [8]u8{0, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0}
-			out[pos] = seg_prefix[inst.flags.segment]
-			pos += 1
-		}
-
-		// Address size override (67h)
-		if inst.flags.addr32 {
-			out[pos] = 0x67
-			pos += 1
+			// Address size override (67h)
+			if inst.flags.addr32 {
+				out[pos] = 0x67
+				pos += 1
+			}
 		}
 
 		// --- VEX/EVEX or Legacy Encoding ---
@@ -374,14 +387,8 @@ encode :: proc(
 			pos += 4
 
 		case: // Legacy encoding
-			// Operand size override (66h)
-			needs_66 := false
-			for i in 0..<inst.operand_count {
-				if inst.ops[i].kind == .REGISTER && reg_class(inst.ops[i].reg) == REG_GPR16 {
-					needs_66 = enc.flags.prefix != 1  // PREFIX_66
-					break
-				}
-			}
+			// Operand size override (66h) -- has_gpr16 computed in the resolve pass
+			needs_66 := has_gpr16 && enc.flags.prefix != 1  // PREFIX_66
 			if needs_66 {
 				out[pos] = 0x66
 				pos += 1
@@ -398,46 +405,38 @@ encode :: proc(
 				pos += 1
 			}
 
-			// REX prefix (branchless: OR each operand's contribution via a mask).
-			// Both the register and memory contributions are computed and gated
-			// by operand kind, so the data-dependent REGISTER/MEMORY branch is
-			// gone; only the per-form enc_type switch (predictable) remains.
+			// REX prefix, straight-line from the precomputed slots (no scan over
+			// enc.enc). Contributions are OR-masked and gated by operand kind, so
+			// the REGISTER/MEMORY branch stays out of the hot path.
 			rex: u8 = bmask(enc.flags.force_rex_w) & 0x48
 
-			for enc_type, i in enc.enc {
-				if enc_type == .NONE { continue }
-				user_op := user_ops[i]
-				if user_op == nil { continue }
-
-				is_reg := user_op.kind == .REGISTER
-				is_mem := user_op.kind == .MEMORY
-				m := user_op.mem   // union bytes; only used when is_mem
-				reg_ext   := is_reg && reg_needs_rex(user_op.reg)
-				base_ext  := is_mem && mem_has_base(m)  && m.base_ext
-				index_ext := is_mem && mem_has_index(m) && m.index_ext
-
-				#partial switch enc_type {
-				case .REG:
-					rex |= bmask(reg_ext) & 0x44
-				case .MR:
-					rex |= bmask(reg_ext)   & 0x41   // register r/m -> REX.B
-					rex |= bmask(base_ext)  & 0x41
-					rex |= bmask(index_ext) & 0x42
-				case .OP_R:
-					rex |= bmask(reg_ext) & 0x41
+			if reg_slot >= 0 {
+				op := user_ops[reg_slot]
+				if op != nil {
+					rex |= bmask(op.kind == .REGISTER && reg_needs_rex(op.reg)) & 0x44
+				}
+			}
+			if mr_slot >= 0 {
+				op := user_ops[mr_slot]
+				if op != nil {
+					is_reg := op.kind == .REGISTER
+					is_mem := op.kind == .MEMORY
+					m := op.mem   // union bytes; only used when is_mem
+					rex |= bmask(is_reg && reg_needs_rex(op.reg))          & 0x41
+					rex |= bmask(is_mem && mem_has_base(m)  && m.base_ext) & 0x41
+					rex |= bmask(is_mem && mem_has_index(m) && m.index_ext) & 0x42
+				}
+			}
+			if opr_slot >= 0 {
+				op := user_ops[opr_slot]
+				if op != nil {
+					rex |= bmask(op.kind == .REGISTER && reg_needs_rex(op.reg)) & 0x41
 				}
 			}
 
-			// SPL/BPL/SIL/DIL (GPR8 hw 4-7) require an empty REX (long mode only).
-			if mode == ._64 {
-				spl_seen := false
-				for i in 0..<inst.operand_count {
-					op := &inst.ops[i]
-					hw := reg_hw(op.reg)
-					spl_seen ||= op.kind == .REGISTER && reg_class(op.reg) == REG_GPR8 && hw >= 4 && hw <= 7
-				}
-				rex |= bmask(rex == 0 && spl_seen) & 0x40
-			}
+			// SPL/BPL/SIL/DIL (has_spl, computed in the resolve pass) force an
+			// empty REX in long mode when no other REX bit is set.
+			rex |= bmask(mode == ._64 && rex == 0 && has_spl) & 0x40
 
 			// 32-bit mode forbids the REX prefix entirely. If any operand
 			// demanded REX bits (R8-R15, SPL/BPL/SIL/DIL, force_rex_w),
@@ -611,55 +610,44 @@ encode :: proc(
 			pos += 1
 		}
 
-		// --- Immediates ---
-		for enc_type, i in enc.enc {
-			#partial switch enc_type {
+		// --- Immediate (single precomputed slot, no scan over enc.enc) ---
+		if imm_slot >= 0 && user_ops[imm_slot] != nil {
+			user_op := user_ops[imm_slot]
+			#partial switch enc.enc[imm_slot] {
 			case .IB:
-				user_op := user_ops[i]
-				if user_op != nil {
-					#partial switch user_op.kind {
-					case .IMMEDIATE:
-						out[pos] = u8(user_op.immediate)
-						pos += 1
-					case .RELATIVE:
-						// Relative reference - record relocation
-						label_id := u32(user_op.relative)
-						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
-						out[pos] = 0
-						pos += 1
-					}
+				#partial switch user_op.kind {
+				case .IMMEDIATE:
+					out[pos] = u8(user_op.immediate)
+					pos += 1
+				case .RELATIVE:
+					label_id := u32(user_op.relative)
+					append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL8, 1, u16(instruction_index)})
+					out[pos] = 0
+					pos += 1
 				}
-
 			case .IW:
-				user_op := user_ops[i]
-				if user_op != nil && user_op.kind == .IMMEDIATE {
-					immediate_val := u16(user_op.immediate)
-					out[pos] = u8(immediate_val); out[pos+1] = u8(immediate_val >> 8)
+				if user_op.kind == .IMMEDIATE {
+					v := u16(user_op.immediate)
+					out[pos] = u8(v); out[pos+1] = u8(v >> 8)
 					pos += 2
 				}
-
 			case .ID:
-				user_op := user_ops[i]
-				if user_op != nil {
-					#partial switch user_op.kind {
-					case .IMMEDIATE:
-						immediate_val := u32(user_op.immediate)
-						out[pos] = u8(immediate_val); out[pos+1] = u8(immediate_val >> 8)
-						out[pos+2] = u8(immediate_val >> 16); out[pos+3] = u8(immediate_val >> 24)
-						pos += 4
-					case .RELATIVE:
-						label_id := u32(user_op.relative)
-						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
-						out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
-						pos += 4
-					}
+				#partial switch user_op.kind {
+				case .IMMEDIATE:
+					v := u32(user_op.immediate)
+					out[pos] = u8(v); out[pos+1] = u8(v >> 8); out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
+					pos += 4
+				case .RELATIVE:
+					label_id := u32(user_op.relative)
+					append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
+					out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+					pos += 4
 				}
-
 			case .IQ:
-				user_op := user_ops[i]
-				if user_op != nil && user_op.kind == .IMMEDIATE {
-					immediate_val := u64(user_op.immediate)
-					for j in u32(0)..<8 { out[pos + j] = u8(immediate_val >> (j * 8)) }
+				if user_op.kind == .IMMEDIATE {
+					v := u64(user_op.immediate)
+					out[pos]   = u8(v);       out[pos+1] = u8(v >> 8);  out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
+					out[pos+4] = u8(v >> 32); out[pos+5] = u8(v >> 40); out[pos+6] = u8(v >> 48); out[pos+7] = u8(v >> 56)
 					pos += 8
 				}
 			}

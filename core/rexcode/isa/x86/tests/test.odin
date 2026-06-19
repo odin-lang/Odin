@@ -3229,9 +3229,16 @@ run_typed_builder_tests :: proc() {
 	tb_check("push r64",    x86.inst_push_r64(.R11), x86.inst_r(.PUSH, x86.R11))
 	tb_check("pop r64",     x86.inst_pop_r64(.R12),  x86.inst_r(.POP,  x86.R12))
 
-	// immediate forms (no hint -- value-dependent; must still be correct)
-	tb_check("mov r32,imm32", x86.inst_mov_r32_imm32(.EAX, 0x12345678), x86.inst_r_i(.MOV, x86.EAX, 0x12345678, 4))
-	tb_check("mov r64,imm64", x86.inst_mov_r64_imm64(.RAX, 0x1122334455667788), x86.inst_r_i(.MOV, x86.RAX, 0x1122334455667788, 8))
+	// immediate forms -- hinted (the typed builder honors its declared width).
+	// Each must stay byte-identical to the generic same-width builder.
+	tb_check("mov r32,imm32",  x86.inst_mov_r32_imm32(.EAX, 0x12345678), x86.inst_r_i(.MOV, x86.EAX, 0x12345678, 4))
+	tb_check("mov r64,imm64",  x86.inst_mov_r64_imm64(.RAX, 0x1122334455667788), x86.inst_r_i(.MOV, x86.RAX, 0x1122334455667788, 8))
+	tb_check("mov r32,imm32 sm", x86.inst_mov_r32_imm32(.ECX, 5),       x86.inst_r_i(.MOV, x86.ECX, 5, 4))
+	tb_check("add r32,imm32",  x86.inst_add_r32_imm32(.EAX, 100000),    x86.inst_r_i(.ADD, x86.EAX, 100000, 4))
+	tb_check("add r64,imm32",  x86.inst_add_r64_imm32(.RAX, 42),        x86.inst_r_i(.ADD, x86.RAX, 42, 4))
+	tb_check("cmp r32,imm32",  x86.inst_cmp_r32_imm32(.EDX, 100),       x86.inst_r_i(.CMP, x86.EDX, 100, 4))
+	tb_check("sub r64,imm32",  x86.inst_sub_r64_imm32(.RBX, 256),       x86.inst_r_i(.SUB, x86.RBX, 256, 4))
+	tb_check("and r32,imm32",  x86.inst_and_r32_imm32(.ESI, 0xFF),      x86.inst_r_i(.AND, x86.ESI, 0xFF, 4))
 }
 
 // =============================================================================
