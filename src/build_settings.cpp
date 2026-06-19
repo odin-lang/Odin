@@ -1961,12 +1961,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			metrics->os == TargetOs_openbsd ||
 			metrics->os == TargetOs_netbsd) {
 		if (bc->stack_protector == StackProtector_Default) {
-			bc->stack_protector = StackProtector_SspStrong;
+			bc->stack_protector = StackProtector_None;
 		}
 	} else {
-		if (bc->stack_protector == StackProtector_Default) {
-			bc->stack_protector = StackProtector_None;
-		} else {
+		if (bc->stack_protector != StackProtector_Default &&
+		    bc->stack_protector != StackProtector_None) {
 			gb_printf_err("-stack-protector is not supported on this target\n");
 			gb_exit(1);
 		}
