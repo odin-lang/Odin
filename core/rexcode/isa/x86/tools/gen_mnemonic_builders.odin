@@ -42,6 +42,7 @@ Proc_Entry :: struct {
 	mnemonic:  x86.Mnemonic,
 	sig:       Operand_Signature,
 	proc_name: string,
+	enc_hint:  u16,   // biased global form index (idx+1) for the pre-match fast path; 0 = none
 }
 
 GEN_ATTRIB :: "// rexcode  ·  Brendan Punsky (dotbmp@github), original author\n\n"
@@ -74,9 +75,20 @@ main :: proc() {
 		encodings := x86.ENCODE_FORMS[_run.start:][:_run.count]
 		if len(encodings) == 0 { continue }
 
-		for enc in encodings {
+		for enc, enc_idx in encodings {
 			// Skip encodings we can't generate builders for (implicit-only operands, etc.)
 			can_generate_builder(enc) or_continue
+
+			// A typed builder may bake a pre-matched form hint only when the
+			// matcher's pick is value-INDEPENDENT (no immediate/relative size
+			// selection); otherwise the matcher might choose a shorter form for
+			// some values, so we leave enc_hint=0 (matcher path). The first form
+			// in run order that produces a given proc_name wins the dedup below,
+			// which mirrors the matcher's first-match-in-run-order pick.
+			hint: u16 = 0
+			if form_is_hintable(enc) {
+				hint = u16(int(_run.start) + enc_idx + 1)
+			}
 
 			// For RM operands, generate both register and memory variants
 			variants := get_operand_variants(enc)
@@ -95,6 +107,7 @@ main :: proc() {
 					mnemonic = mnemonic,
 					sig = sig,
 					proc_name = proc_name,
+					enc_hint = hint,
 				}
 
 				if mnemonic not_in procs_by_mnemonic {
@@ -326,6 +339,21 @@ can_generate_builder :: proc(enc: x86.Encoding) -> bool {
 
 	// Generate builder if: no operands at all, OR has explicit operands
 	return !has_any_operand || has_explicit
+}
+
+// A form is safe to pre-match (bake an enc_hint) only when the matcher's pick is
+// VALUE-independent: it has no immediate or relative operand. Those select
+// imm8-vs-imm32 / rel8-vs-rel32 by the runtime value, so the matcher may pick a
+// shorter form than a typed builder's nominal one -- baking would diverge from
+// the matcher (and from llvm-mc). Such forms keep enc_hint=0 (matcher path).
+form_is_hintable :: proc(enc: x86.Encoding) -> bool {
+	for op in enc.ops {
+		#partial switch op {
+		case .IMM8, .IMM16, .IMM32, .IMM64, .IMM8SX, .REL8, .REL32:
+			return false
+		}
+	}
+	return true
 }
 
 // Get all variants for an encoding (expands RM operands into reg and mem variants)
@@ -1366,7 +1394,18 @@ generate_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, max_name_padding:
 	strings.write_string(sb, " :: #force_inline proc \"contextless\" (")
 	strings.write_string(sb, params)
 	strings.write_string(sb, ") -> Instruction { return ")
-	generate_helper_call(sb, entry)
+	// Build via the typed op_* constructors (op_gpr64/op_xmm/...), which carry
+	// the register CLASS. The older inst_r_r(.., Register(dst), ..) shortcut cast
+	// the hw-only typed enum straight to Register and dropped the class, so every
+	// typed builder produced a class-0 operand the matcher rejected (encode -> empty).
+	if entry.enc_hint != 0 {
+		// Pre-matched form: bake the biased global index so encode() skips the scan.
+		strings.write_string(sb, "with_hint(")
+		generate_fallback_instruction(sb, entry)
+		fmt.sbprintf(sb, ", %d)", entry.enc_hint)
+	} else {
+		generate_fallback_instruction(sb, entry)
+	}
 	strings.write_string(sb, " }\n")
 }
 
@@ -1402,7 +1441,14 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, max_name_pad
 	}
 	strings.write_string(sb, " :: #force_inline proc(")
 	strings.write_string(sb, params)
-	strings.write_string(sb, ") { ")
-	generate_emit_helper_call(sb, entry)
-	strings.write_string(sb, " }\n")
+	// Reuse the (class-correct, hint-baked) inst_ builder rather than re-emitting
+	// the operands -- keeps emit_ in lockstep with inst_ and inherits the hint.
+	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, entry.proc_name)
+	strings.write_string(sb, "(")
+	for i in 0..<sig.count {
+		if i > 0 { strings.write_string(sb, ", ") }
+		strings.write_string(sb, names[i])
+	}
+	strings.write_string(sb, ")) }\n")
 }

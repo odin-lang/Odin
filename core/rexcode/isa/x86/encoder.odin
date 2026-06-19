@@ -33,13 +33,6 @@ import "core:rexcode/isa"
 
 MAX_INST_SIZE :: 15  // Maximum x64 instruction length
 
-// Extra bytes reserved past each instruction so the branchless emitters can
-// write a few speculative bytes beyond the logical end (e.g. a widened 4-byte
-// displacement store when only a disp8 is kept). The over-written tail is
-// reclaimed by the next emit; this slack just guarantees the wide store stays
-// in bounds even for the final instruction against a tight buffer.
-ENCODE_TAIL_SLACK :: 8
-
 
 // -----------------------------------------------------------------------------
 // SECTION: 7.6 Core Encoding Function
@@ -107,7 +100,7 @@ encode :: proc(
 		}
 
 		// Check buffer space
-		if byte_count + MAX_INST_SIZE + ENCODE_TAIL_SLACK > u32(len(code)) {
+		if byte_count + MAX_INST_SIZE > u32(len(code)) {
 			append(errors, Error{u32(instruction_index), .BUFFER_OVERFLOW, {}})
 			ok = false
 			continue
@@ -147,27 +140,38 @@ encode :: proc(
 			}
 		}
 
-		// Find matching encoding from table (O(1) mnemonic lookup)
-		encodings := encoding_forms(inst.mnemonic)
-		if len(encodings) == 0 {
-			append(errors, Error{u32(instruction_index), .INVALID_MNEMONIC, {}})
-			ok = false
-			continue
-		}
-
-		// Find the first encoding that matches operands
 		matched_enc: ^Encoding = nil
-		for &e in encodings {
-			if encoding_matches_inline(&inst, &e, mode) {
-				matched_enc = &e
-				break
-			}
-		}
 
-		if matched_enc == nil {
-			append(errors, Error{u32(instruction_index), .NO_MATCHING_ENCODING, {}})
-			ok = false
-			continue
+		// Pre-matched form fast-path: a typed builder that maps to a single
+		// encoding form bakes `global_index + 1` into enc_hint, letting us skip
+		// the O(forms) match scan entirely -- and with it the scan's branches,
+		// which are the unpredictable ones in a varied instruction stream. Only
+		// in long mode (the builders' target); bounds-checked; anything else
+		// (hand-built, generic builders, i386, decode) falls back to matching.
+		if mode == ._64 && inst.enc_hint != ENC_HINT_NONE && int(inst.enc_hint) <= len(ENCODE_FORMS) {
+			matched_enc = &ENCODE_FORMS[inst.enc_hint - 1]
+		} else {
+			// Find matching encoding from table (O(1) mnemonic lookup)
+			encodings := encoding_forms(inst.mnemonic)
+			if len(encodings) == 0 {
+				append(errors, Error{u32(instruction_index), .INVALID_MNEMONIC, {}})
+				ok = false
+				continue
+			}
+
+			// Find the first encoding that matches operands
+			for &e in encodings {
+				if encoding_matches_inline(&inst, &e, mode) {
+					matched_enc = &e
+					break
+				}
+			}
+
+			if matched_enc == nil {
+				append(errors, Error{u32(instruction_index), .NO_MATCHING_ENCODING, {}})
+				ok = false
+				continue
+			}
 		}
 
 		// =====================================================================
@@ -208,34 +212,37 @@ encode :: proc(
 		}
 		has_modrm := mr_slot >= 0 || reg_slot >= 0
 
-		// --- Legacy Prefixes (branchless) ---
+		// --- Legacy Prefixes ---
 		//
-		// Each optional prefix byte is written *speculatively* at `pos`, then
-		// `pos` advances only if the prefix is actually present. When absent the
-		// speculative byte is overwritten by the next emit (the opcode always
-		// writes at `pos`), so the final stream is identical to the branching
-		// form -- with four data-dependent branches removed. The buffer carries
-		// MAX_INST_SIZE slack (checked above), so the spec writes stay in bounds.
+		// Kept as predicted branches: in real instruction streams a legacy
+		// prefix is almost always absent, so these are ~100% predicted-not-taken
+		// (free), and the branchless speculative-write form only added four
+		// unconditional stores per instruction for no win. See git history.
 
 		// Lock prefix (F0)
-		out[pos] = 0xF0
-		pos += u32(inst.flags.lock && enc.flags.lock_ok)
+		if inst.flags.lock && enc.flags.lock_ok {
+			out[pos] = 0xF0
+			pos += 1
+		}
 
-		// Rep/Repne prefix (NONE -> 0, REP -> F3, REPNE -> F2)
-		REP_BYTE := [Rep]u8{ .NONE = 0, .REP = 0xF3, .REPNE = 0xF2 }
-		rep_b := REP_BYTE[inst.flags.rep]
-		out[pos] = rep_b
-		pos += u32(rep_b != 0)
+		// Rep/Repne prefix
+		#partial switch inst.flags.rep {
+		case .REP:   out[pos] = 0xF3; pos += 1
+		case .REPNE: out[pos] = 0xF2; pos += 1
+		}
 
-		// Segment override (table already maps 0 -> 0)
-		seg_prefix := [8]u8{0, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0}
-		seg_b := seg_prefix[inst.flags.segment]
-		out[pos] = seg_b
-		pos += u32(seg_b != 0)
+		// Segment override
+		if inst.flags.segment != 0 {
+			seg_prefix := [8]u8{0, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0}
+			out[pos] = seg_prefix[inst.flags.segment]
+			pos += 1
+		}
 
 		// Address size override (67h)
-		out[pos] = 0x67
-		pos += u32(inst.flags.addr32)
+		if inst.flags.addr32 {
+			out[pos] = 0x67
+			pos += 1
+		}
 
 		// --- VEX/EVEX or Legacy Encoding ---
 
@@ -580,15 +587,14 @@ encode :: proc(
 				pos += 1
 			}
 
-			// Displacement: four unconditional little-endian byte stores, then
-			// advance by the real size (0/1/4) -- no data-dependent loop. The
-			// untaken tail bytes are reclaimed by the next emit; ENCODE_TAIL_SLACK
-			// keeps the widened store in bounds.
-			out[pos+0] = u8(disp)
-			out[pos+1] = u8(disp >> 8)
-			out[pos+2] = u8(disp >> 16)
-			out[pos+3] = u8(disp >> 24)
-			pos += u32(displacement_size)
+			// Displacement: bounded little-endian emit. Kept as a counted loop
+			// (0/1/4 trips, highly predictable per code pattern) so no buffer
+			// tail-slack is needed and no bytes are written past the real size.
+			for _ in 0..<displacement_size {
+				out[pos] = u8(disp & 0xFF)
+				disp >>= 8
+				pos += 1
+			}
 		}
 
 		// Fixed ModR/M for special instructions. Triggered for:
@@ -912,7 +918,7 @@ imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 
 // Compute safe buffer sizes for encoding
 encode_max_code_size :: #force_inline proc "contextless" (n: int) -> int {
-	return n * MAX_INST_SIZE + ENCODE_TAIL_SLACK
+	return n * MAX_INST_SIZE
 }
 
 encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int {

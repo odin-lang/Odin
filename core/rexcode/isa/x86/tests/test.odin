@@ -3140,6 +3140,101 @@ print_summary :: proc() {
 }
 
 // =============================================================================
+// TYPED BUILDER CONSISTENCY
+// =============================================================================
+//
+// The generated typed builders (inst_<mnem>/emit_<mnem>) were previously
+// untested. A class-dropping register cast made every one of them encode to
+// nothing, and the pre-matched enc_hint fast path needs guarding. Each case
+// asserts the typed builder is byte-identical to the llvm-verified generic
+// builder AND that the baked enc_hint matches the matcher path (hint cleared).
+
+@(private="file") tb_a: [64]u8
+@(private="file") tb_b: [64]u8
+
+@(private="file")
+tb_enc :: proc(inst: x86.Instruction, buf: []u8) -> []u8 {
+	relocs: [dynamic]x86.Relocation; errors: [dynamic]x86.Error
+	defer { delete(relocs); delete(errors) }
+	n, _ := x86.encode({inst}, nil, buf, &relocs, &errors)
+	return buf[:n]
+}
+
+@(private="file")
+tb_eq :: proc(a, b: []u8) -> bool {
+	if len(a) != len(b) || len(a) == 0 { return false }
+	for x, i in a { if x != b[i] { return false } }
+	return true
+}
+
+@(private="file")
+tb_check :: proc(name: string, typed, generic: x86.Instruction) {
+	t := tb_enc(typed, tb_a[:])
+	g := tb_enc(generic, tb_b[:])
+	typed_ok := tb_eq(t, g)
+	// hint path must equal the matcher path for the very same instruction
+	cleared := typed; cleared.enc_hint = 0
+	hint_ok := tb_eq(t, tb_enc(cleared, tb_b[:]))
+	if typed_ok && hint_ok {
+		g_stats.passed += 1
+		g_stats.cases_validated += 1
+	} else {
+		g_stats.failed += 1
+		fmt.printf("    %sFAIL%s %s: typed=% x generic=% x (typed_ok=%v hint_ok=%v)\n",
+			RED, RESET, name, t, g, typed_ok, hint_ok)
+	}
+}
+
+run_typed_builder_tests :: proc() {
+	md8  := x86.mem_base_disp(x86.RBP, -16)
+	md32 := x86.mem_base_disp(x86.RCX, 100000)
+	mbi  := x86.mem_base_index_disp(x86.R8, x86.RDX, 4, 32)
+	mrip := x86.mem_rip_disp(0)
+
+	// GPR reg-reg, every size (r16 exercises the 66h class-dependent prefix)
+	tb_check("mov r8,r8",   x86.inst_mov_r8_r8(.AL,.BL),     x86.inst_r_r(.MOV, x86.AL, x86.BL))
+	tb_check("mov r16,r16", x86.inst_mov_r16_r16(.AX,.BX),   x86.inst_r_r(.MOV, x86.AX, x86.BX))
+	tb_check("mov r32,r32", x86.inst_mov_r32_r32(.EAX,.EDX), x86.inst_r_r(.MOV, x86.EAX, x86.EDX))
+	tb_check("mov r64,r64", x86.inst_mov_r64_r64(.RAX,.RBX), x86.inst_r_r(.MOV, x86.RAX, x86.RBX))
+	tb_check("mov r64 ext", x86.inst_mov_r64_r64(.R8,.R15),  x86.inst_r_r(.MOV, x86.R8, x86.R15))
+	tb_check("mov r32 ext", x86.inst_mov_r32_r32(.R9D,.R10D),x86.inst_r_r(.MOV, x86.R9D, x86.R10D))
+
+	// GPR arithmetic/logical reg-reg
+	tb_check("add r64,r64", x86.inst_add_r64_r64(.RAX,.RCX), x86.inst_r_r(.ADD, x86.RAX, x86.RCX))
+	tb_check("sub r64,r64", x86.inst_sub_r64_r64(.RSI,.RDI), x86.inst_r_r(.SUB, x86.RSI, x86.RDI))
+	tb_check("and r64,r64", x86.inst_and_r64_r64(.RBX,.RAX), x86.inst_r_r(.AND, x86.RBX, x86.RAX))
+	tb_check("or  r64,r64", x86.inst_or_r64_r64(.RBX,.RAX),  x86.inst_r_r(.OR,  x86.RBX, x86.RAX))
+	tb_check("xor r64,r64", x86.inst_xor_r64_r64(.R8,.R8),   x86.inst_r_r(.XOR, x86.R8, x86.R8))
+	tb_check("cmp r64,r64", x86.inst_cmp_r64_r64(.RAX,.RDX), x86.inst_r_r(.CMP, x86.RAX, x86.RDX))
+	tb_check("add r32,r32", x86.inst_add_r32_r32(.EAX,.ECX), x86.inst_r_r(.ADD, x86.EAX, x86.ECX))
+
+	// GPR reg-mem / mem-reg across addressing modes
+	tb_check("mov r64,[d8]",   x86.inst_mov_r64_m64(.RDX, x86.Mem64{md8}),  x86.inst_r_m(.MOV, x86.RDX, md8, 8))
+	tb_check("mov r64,[d32]",  x86.inst_mov_r64_m64(.RAX, x86.Mem64{md32}), x86.inst_r_m(.MOV, x86.RAX, md32, 8))
+	tb_check("mov r64,[b+i]",  x86.inst_mov_r64_m64(.RAX, x86.Mem64{mbi}),  x86.inst_r_m(.MOV, x86.RAX, mbi, 8))
+	tb_check("mov r64,[rip]",  x86.inst_mov_r64_m64(.RAX, x86.Mem64{mrip}), x86.inst_r_m(.MOV, x86.RAX, mrip, 8))
+	tb_check("mov [b+i],r64",  x86.inst_mov_m64_r64(x86.Mem64{mbi}, .R9),   x86.inst_m_r(.MOV, mbi, 8, x86.R9))
+	tb_check("add r64,[d8]",   x86.inst_add_r64_m64(.RAX, x86.Mem64{md8}),  x86.inst_r_m(.ADD, x86.RAX, md8, 8))
+
+	// SSE (legacy) + VEX vector
+	tb_check("movaps x,x",    x86.inst_movaps_xmm_xmm(.XMM0,.XMM1),         x86.inst_r_r(.MOVAPS, x86.XMM0, x86.XMM1))
+	tb_check("movaps x,m",    x86.inst_movaps_xmm_m128(.XMM3, x86.Mem128{mbi}), x86.inst_r_m(.MOVAPS, x86.XMM3, mbi, 16))
+	tb_check("movaps m,x",    x86.inst_movaps_m128_xmm(x86.Mem128{mbi}, .XMM8), x86.inst_m_r(.MOVAPS, mbi, 16, x86.XMM8))
+	tb_check("addps x,x",     x86.inst_addps_xmm_xmm(.XMM2,.XMM4),          x86.inst_r_r(.ADDPS, x86.XMM2, x86.XMM4))
+	tb_check("vaddps y,y,y",  x86.inst_vaddps_ymm_ymm_ymm(.YMM0,.YMM1,.YMM2), x86.inst_r_r_r(.VADDPS, x86.YMM0, x86.YMM1, x86.YMM2))
+	tb_check("vaddps y ext",  x86.inst_vaddps_ymm_ymm_ymm(.YMM8,.YMM12,.YMM15), x86.inst_r_r_r(.VADDPS, x86.YMM8, x86.YMM12, x86.YMM15))
+	tb_check("vmulps x,x,x",  x86.inst_vmulps_xmm_xmm_xmm(.XMM0,.XMM1,.XMM2), x86.inst_r_r_r(.VMULPS, x86.XMM0, x86.XMM1, x86.XMM2))
+
+	// opcode+reg
+	tb_check("push r64",    x86.inst_push_r64(.R11), x86.inst_r(.PUSH, x86.R11))
+	tb_check("pop r64",     x86.inst_pop_r64(.R12),  x86.inst_r(.POP,  x86.R12))
+
+	// immediate forms (no hint -- value-dependent; must still be correct)
+	tb_check("mov r32,imm32", x86.inst_mov_r32_imm32(.EAX, 0x12345678), x86.inst_r_i(.MOV, x86.EAX, 0x12345678, 4))
+	tb_check("mov r64,imm64", x86.inst_mov_r64_imm64(.RAX, 0x1122334455667788), x86.inst_r_i(.MOV, x86.RAX, 0x1122334455667788, 8))
+}
+
+// =============================================================================
 // MAIN
 // =============================================================================
 
@@ -3186,6 +3281,9 @@ main :: proc() {
 
 	log_header("LABEL_MAP TESTS")
 	run_label_map_tests()
+
+	log_header("TYPED BUILDER CONSISTENCY")
+	run_typed_builder_tests()
 
 	log_header("PERFORMANCE BENCHMARKS")
 	run_benchmarks()

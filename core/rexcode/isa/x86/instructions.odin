@@ -35,9 +35,24 @@ Instruction :: struct #packed {
 	operand_count: u8,                                //  1 byte
 	flags:         Instruction_Flags,                 //  1 byte
 	length:        u8,                                //  1 byte (filled by decoder, used for iteration)
-	_:             [11]u8,                            // 11 bytes
+	enc_hint:      u16,                               //  2 bytes (pre-matched form, +1 biased; 0 = none)
+	_:             [9]u8,                             //  9 bytes
 }
 #assert(size_of(Instruction) == 64)
+
+// Pre-matched encoding hint: a typed builder that maps to exactly one encoding
+// form (no value-dependent immediate selection) stores `global_form_index + 1`
+// in `Instruction.enc_hint`, letting encode() skip the form-match scan. 0 means
+// "no hint" -- the zero value, so every hand-built / generic-builder / decoded
+// instruction stays on the matching path unchanged.
+ENC_HINT_NONE :: u16(0)
+
+@(require_results)
+with_hint :: #force_inline proc "contextless" (inst: Instruction, hint: u16) -> Instruction {
+	inst := inst
+	inst.enc_hint = hint
+	return inst
+}
 
 // -----------------------------------------------------------------------------
 // SECTION: 7.9 Instruction Builder Helpers
