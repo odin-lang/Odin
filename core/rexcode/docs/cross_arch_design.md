@@ -178,6 +178,32 @@ print/println/aprint/tprint/bprint/fprint/wprint(+ln)(
     label_defs: []Label_Definition, tokens=nil, options=nil, label_names=nil)
 ```
 
+**Buffer-sizing helpers (identical names across arches).** `encode`/`decode`
+allocate nothing — the caller owns every buffer. These let the caller pre-size
+them so the hot path never reallocates, either as a plain size (caller manages
+its own memory) or by growing the caller's own dynamic arrays directly. They
+never allocate a fresh buffer; they only grow the caller's arrays, and Odin's
+`reserve` no-ops when capacity already suffices.
+
+```odin
+// size-only (caller does the resize/reserve)
+encode_max_code_size(instructions: []Instruction) -> int          // exact code bytes
+encode_max_relocation_count(instructions: []Instruction) -> int   // exact reloc ceiling
+decode_max_instruction_count(data: []u8) -> int                   // exact instr ceiling
+decode_estimate_instruction_count(data: []u8) -> int              // typical estimate
+
+// pre-size the caller's dynamic arrays (nil to skip any; reserves on top of existing)
+encode_reserve(code: ^[dynamic]u8, relocs: ^[dynamic]Relocation, instructions: []Instruction)
+decode_reserve(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic]Instruction_Info,
+               label_defs: ^[dynamic]Label_Definition, data: []u8, exact := false)
+```
+
+> `encode_reserve` grows `code` by *length* (so `code[:]` is a valid emit
+> target) and reserves `relocs` by *capacity*. The decode `*_count` pair differs
+> per arch by the min/typical instruction size; `decode_reserve(exact=true)`
+> uses the guaranteed ceiling, otherwise the lighter estimate. Error arrays grow
+> only on the failure path and are intentionally not covered.
+
 **Register/label/print helpers:** `reg_hw  reg_class  reg_size  register_name
 mnemonic_to_string  label  label_forward  label_named  label_reserve
 label_set`.
