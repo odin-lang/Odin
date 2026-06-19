@@ -1967,19 +1967,31 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					}
 				}
 			} else {
+				isize multiple_return_offset = 0;
 				for_array(i, cl->elems) {
-					Entity *f = type->Struct.fields[i];
+					Entity *f = type->Struct.fields[i+multiple_return_offset];
 					TypeAndValue tav = cl->elems[i]->tav;
-					ExactValue val = {};
-					if (tav.mode != Addressing_Invalid) {
-						val = tav.value;
+
+					// INFO: dead code:
+	
+					// ExactValue val = {};
+					// if (tav.mode != Addressing_Invalid) {
+					// 	val = tav.value;
+					// }
+
+					if (is_type_tuple(tav.type)){
+						multiple_return_offset += tav.type->Tuple.variables.count-1;
 					}
 
 					i32 index = field_remapping[f->Variable.field_index];
+
+
 					if (elem_type_can_be_constant(f->type)) {
 						lbValue value = lb_const_value(m, f->type, tav.value, tav.type, cc);
 						LLVMTypeRef value_type = LLVMTypeOf(value.value);
-						GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
+						isize lb_sizeof_value_type = lb_sizeof(value_type);
+						isize type_size_of_f_type =  type_size_of(f->type);
+						GB_ASSERT_MSG(lb_sizeof_value_type ==type_size_of_f_type, "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
 						values[index]  = value.value;
 						visited[index] = true;
 					}
