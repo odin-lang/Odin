@@ -279,7 +279,6 @@ enum RelocMode : u8 {
 };
 
 enum StackProtector : u8 {
-	StackProtector_Default,
 	StackProtector_None,
 	StackProtector_Ssp,
 	StackProtector_SspReq,
@@ -1955,17 +1954,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	if (metrics->os == TargetOs_windows ||
-			metrics->os == TargetOs_darwin ||
-			metrics->os == TargetOs_linux ||
-			metrics->os == TargetOs_freebsd ||
-			metrics->os == TargetOs_openbsd ||
-			metrics->os == TargetOs_netbsd) {
-		if (bc->stack_protector == StackProtector_Default) {
-			bc->stack_protector = StackProtector_None;
-		}
+	    metrics->os == TargetOs_darwin ||
+	    metrics->os == TargetOs_linux ||
+	    metrics->os == TargetOs_freebsd ||
+	    metrics->os == TargetOs_openbsd ||
+	    metrics->os == TargetOs_netbsd) {
+	    	// -stack-protector is supported
 	} else {
-		if (bc->stack_protector != StackProtector_Default &&
-		    bc->stack_protector != StackProtector_None) {
+		if (bc->stack_protector != StackProtector_None) {
 			gb_printf_err("-stack-protector is not supported on this target\n");
 			gb_exit(1);
 		}

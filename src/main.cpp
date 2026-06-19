@@ -1441,9 +1441,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_StackProtector: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String v = value.value_string;
-							if (v == "default") {
-								build_context.stack_protector = StackProtector_Default;
-							} else if (v == "none") {
+							if (v == "none") {
 								build_context.stack_protector = StackProtector_None;
 							} else if (v == "base") {
 								build_context.stack_protector = StackProtector_Ssp;
@@ -1453,7 +1451,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								build_context.stack_protector = StackProtector_SspStrong;
 							} else {
 								gb_printf_err("-stack-protector flag expected one of the following\n");
-								gb_printf_err("\tdefault\n");
 								gb_printf_err("\tnone\n");
 								gb_printf_err("\tbase\n");
 								gb_printf_err("\tall\n");
