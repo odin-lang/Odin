@@ -2043,7 +2043,8 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 		GB_ASSERT(!var.is_initialized);
 		Type *t = type_deref(var.var.type);
 
-		if (is_type_any(t)) {
+		// NOTE: 'any' literals or 'any's that point to other variables can be handled by the generic path
+		if (is_type_any(t) && !is_type_any(var.init.type) && init_expr->tav.mode != Addressing_Variable) {
 			// NOTE(bill): Edge case for 'any' type
 			Type *var_type = default_type(var.init.type);
 			gbString var_name = gb_string_make(permanent_allocator(), "__$global_any::");

@@ -3808,7 +3808,14 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 
 gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forbid_identical = false) {
 	if (!is_operand_value(*x)) {
+		ERROR_BLOCK();
 		error(x->expr, "Only values can be casted");
+		if (is_type_typeid(type)) {
+			gbString expr_str = expr_to_string(x->expr);
+			defer (gb_string_free(expr_str));
+
+			error_line("\tSuggestion: 'typeid_of(%s)'", expr_str);
+		}
 		x->mode = Addressing_Invalid;
 		return;
 	}
