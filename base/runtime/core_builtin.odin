@@ -715,10 +715,10 @@ _append_elem :: #force_no_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, a
 
 	if array.cap < array.len+1 {
 		// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
-		cap := 2 * array.cap + DEFAULT_DYNAMIC_ARRAY_CAPACITY
+		cap := max(2 * array.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
 
 		// do not 'or_return' here as it could be a partial success
-		err = _reserve_dynamic_array(array, size_of_elem, align_of_elem, cap, should_zero, loc)
+		err = _reserve_dynamic_array_unsafe(array, size_of_elem, align_of_elem, cap, should_zero, loc)
 	}
 	if array.cap-array.len > 0 {
 		data := ([^]byte)(array.data)
@@ -735,11 +735,37 @@ _append_elem :: #force_no_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, a
 @builtin
 append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (num_appended: int, err: Allocator_Error) #optional_allocator_error {
 	when size_of(E) == 0 {
+		if array == nil {
+			return
+		}
 		(^Raw_Dynamic_Array)(array).len += 1
 		return 1, nil
-	} else {
+	} else when ODIN_OPTIMIZATION_MODE <= .Size {
 		arg := arg
 		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, true, loc=loc)
+	} else {
+		if array == nil {
+			return
+		}
+		arg := arg
+		arr := (^Raw_Dynamic_Array)(array)
+		if arr.cap < arr.len+1 {
+			// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+			cap := max(2 * arr.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
+
+			// do not 'or_return' here as it could be a partial success
+			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, true, loc)
+		}
+		if arr.cap-arr.len > 0 {
+			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
+			// this code path cannot rely on type erasure and `mem_copy_non_overlapping`.
+			// So directly inlining the call and storing the argument like this helps the optimize a lot
+			assert(arr.data != nil, loc=loc)
+			([^]E)(arr.data)[arr.len] = arg
+			arr.len += 1
+			num_appended = 1
+		}
+		return
 	}
 }
 
@@ -1283,6 +1309,35 @@ _reserve_dynamic_array :: #force_no_inline proc(a: ^Raw_Dynamic_Array, size_of_e
 		return nil
 	}
 
+	if capacity <= a.cap {
+		return nil
+	}
+
+	if a.allocator.procedure == nil {
+		a.allocator = context.allocator
+		assert(a.allocator.procedure != nil)
+	}
+
+	old_size  := a.cap * size_of_elem
+	new_size  := capacity * size_of_elem
+	allocator := a.allocator
+
+	new_data: []byte
+	if should_zero {
+		new_data = mem_resize(a.data, old_size, new_size, align_of_elem, allocator, loc) or_return
+	} else {
+		new_data = non_zero_mem_resize(a.data, old_size, new_size, align_of_elem, allocator, loc) or_return
+	}
+	if new_data == nil && new_size > 0 {
+		return .Out_Of_Memory
+	}
+
+	a.data = raw_data(new_data)
+	a.cap = capacity
+	return nil
+}
+
+_reserve_dynamic_array_unsafe :: #force_no_inline proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, capacity: int, should_zero: bool, loc := #caller_location) -> Allocator_Error {
 	if capacity <= a.cap {
 		return nil
 	}
