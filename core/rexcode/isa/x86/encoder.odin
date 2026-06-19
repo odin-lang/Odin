@@ -141,6 +141,7 @@ encode :: proc(
 		}
 
 		matched_enc: ^Encoding = nil
+		form_index := -1   // index into ENCODE_FORMS / ENCODE_RECIPES; -1 = no recipe fast path
 
 		// Pre-matched form fast-path: a typed builder that maps to a single
 		// encoding form bakes `global_index + 1` into enc_hint, letting us skip
@@ -149,7 +150,8 @@ encode :: proc(
 		// in long mode (the builders' target); bounds-checked; anything else
 		// (hand-built, generic builders, i386, decode) falls back to matching.
 		if mode == ._64 && inst.enc_hint != ENC_HINT_NONE && int(inst.enc_hint) <= len(ENCODE_FORMS) {
-			matched_enc = &ENCODE_FORMS[inst.enc_hint - 1]
+			form_index = int(inst.enc_hint) - 1
+			matched_enc = &ENCODE_FORMS[form_index]
 		} else {
 			// Find matching encoding from table (O(1) mnemonic lookup)
 			encodings := encoding_forms(inst.mnemonic)
@@ -171,6 +173,23 @@ encode :: proc(
 				append(errors, Error{u32(instruction_index), .NO_MATCHING_ENCODING, {}})
 				ok = false
 				continue
+			}
+		}
+
+		// Recipe fast path: for a hinted, eligible form with a register r/m and a
+		// literal immediate, emit straight-line from the precomputed recipe and
+		// skip the interpreter (resolve scan, prefix/REX/escape selection) below.
+		// Anything outside that envelope falls through to the interpreter, which
+		// stays the byte-exact source of truth.
+		if form_index >= 0 && form_index < len(ENCODE_RECIPES) {
+			recipe := &ENCODE_RECIPES[form_index]
+			if recipe.flags.eligible && transmute(u8)inst.flags == 0 {
+				rm_reg  := recipe.rm_op  < 0 || inst.ops[recipe.rm_op].kind == .REGISTER
+				imm_lit := recipe.imm_op < 0 || inst.ops[recipe.imm_op].kind == .IMMEDIATE
+				if rm_reg && imm_lit {
+					byte_count += emit_recipe(recipe, &inst, code[byte_count:])
+					continue
+				}
 			}
 		}
 
@@ -715,8 +734,8 @@ encode :: proc(
 
 // Branchless select mask: 0xFF when `b`, else 0x00. Used to OR-accumulate
 // REX/VEX/EVEX bit contributions without a per-condition branch
-// (`x |= bmask(cond) & bits`).
-@(private="file")
+// (`x |= bmask(cond) & bits`). Package-private so the recipe emitter shares it.
+@(private)
 bmask :: #force_inline proc "contextless" (b: bool) -> u8 {
 	return -u8(b)
 }
