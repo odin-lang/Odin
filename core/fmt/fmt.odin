@@ -1456,9 +1456,11 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		prev_fi := fi^
 		defer fi^ = prev_fi
 		fi.hash = false
-		fi.width = bit_size
 		fi.zero = true
 		fi.plus = false
+		// force the width to always be bit_size/4 to accurately represent the number
+		fi.width = bit_size/4
+		fi.width_set = true
 
 		u: u64
 		switch bit_size {
