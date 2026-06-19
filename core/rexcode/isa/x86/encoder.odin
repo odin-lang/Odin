@@ -153,39 +153,31 @@ encode :: proc(
 			form_index = int(inst.enc_hint) - 1
 			matched_enc = &ENCODE_FORMS[form_index]
 		} else {
-			// Find matching encoding from table (O(1) mnemonic lookup)
-			encodings := encoding_forms(inst.mnemonic)
-			if len(encodings) == 0 {
-				append(errors, Error{u32(instruction_index), .INVALID_MNEMONIC, {}})
-				ok = false
-				continue
-			}
-
-			// Find the first encoding that matches operands
-			for &e in encodings {
-				if encoding_matches_inline(&inst, &e, mode) {
-					matched_enc = &e
-					break
-				}
-			}
-
-			if matched_enc == nil {
-				append(errors, Error{u32(instruction_index), .NO_MATCHING_ENCODING, {}})
+			// Resolve the form on the matcher path (memoizing cache + scan) in a
+			// separate, non-inlined proc so this hot loop stays lean for the hint
+			// path above. form_index is discarded: the matcher path uses the
+			// interpreter, not the recipe -- keeping it off the shared fast-path
+			// hook leaves the hint path's codegen untouched.
+			err: Error_Code
+			matched_enc, _, err = find_form(&inst, mode)
+			if err != .NONE {
+				append(errors, Error{u32(instruction_index), err, {}})
 				ok = false
 				continue
 			}
 		}
 
-		// Recipe fast path: for a hinted, eligible form with a register r/m and a
-		// literal immediate, emit straight-line from the precomputed recipe and
-		// skip the interpreter (resolve scan, prefix/REX/escape selection) below.
-		// Anything outside that envelope falls through to the interpreter, which
-		// stays the byte-exact source of truth.
+		// Recipe fast path (hint path only): a hinted, eligible form with a literal
+		// immediate emits straight-line from the precomputed recipe, skipping the
+		// interpreter below (resolve scan, prefix/REX/escape selection, ModR/M
+		// source choice). Only the hint branch sets form_index; the matcher branch
+		// leaves it -1 and emits via the interpreter, so this hook -- and the hot
+		// loop's codegen -- stays exactly what it was before the matcher cache.
+		// Anything outside the envelope falls through to the interpreter, the
+		// byte-exact source of truth.
 		if form_index >= 0 && form_index < len(ENCODE_RECIPES) {
 			recipe := &ENCODE_RECIPES[form_index]
 			if recipe.flags.eligible && transmute(u8)inst.flags == 0 {
-				// r/m may now be a register or a memory operand; only a
-				// label/relative immediate (a relocation) still falls back.
 				imm_lit := recipe.imm_op < 0 || inst.ops[recipe.imm_op].kind == .IMMEDIATE
 				if imm_lit {
 					byte_count += emit_recipe(recipe, &inst, code[byte_count:])
