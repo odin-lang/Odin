@@ -278,6 +278,13 @@ enum RelocMode : u8 {
 	RelocMode_DynamicNoPIC,
 };
 
+enum StackProtector : u8 {
+	StackProtector_None,
+	StackProtector_Ssp,
+	StackProtector_SspReq,
+	StackProtector_SspStrong,
+};
+
 enum BuildPath : u8 {
 	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
 	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
@@ -601,7 +608,9 @@ struct BuildContext {
 
 	bool   print_linker_flags;
 
-	RelocMode reloc_mode;
+	RelocMode      reloc_mode;
+	StackProtector stack_protector;
+
 	bool   disable_red_zone;
 	bool   disable_unwind;
 	bool   no_plt;
@@ -1901,16 +1910,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 				}
 				break;
 		}
-	} else if (metrics->os == TargetOs_linux) {
-		if (bc->reloc_mode == RelocMode_Default) {
-			bc->reloc_mode = RelocMode_PIC;
-		}
-		switch (metrics->arch) {
-		case TargetArch_arm64:
-		case TargetArch_amd64:
-			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
-			break;
-		}
 	} else if (metrics->os == TargetOs_openbsd) {
 		// Always use PIC for OpenBSD: it defaults to PIE
 		if (bc->reloc_mode == RelocMode_Default) {
@@ -1939,9 +1938,32 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->metrics.target_triplet = str_lit("i686-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
-		
 		default:
 			GB_PANIC("Unknown architecture for -subtarget:android");
+		}
+	} else if (metrics->os == TargetOs_linux) {
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_PIC;
+		}
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+		case TargetArch_amd64:
+			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
+			break;
+		}
+	}
+
+	if (metrics->os == TargetOs_windows ||
+	    metrics->os == TargetOs_darwin ||
+	    metrics->os == TargetOs_linux ||
+	    metrics->os == TargetOs_freebsd ||
+	    metrics->os == TargetOs_openbsd ||
+	    metrics->os == TargetOs_netbsd) {
+	    	// -stack-protector is supported
+	} else {
+		if (bc->stack_protector != StackProtector_None) {
+			gb_printf_err("-stack-protector is not supported on this target\n");
+			gb_exit(1);
 		}
 	}
 
