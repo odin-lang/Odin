@@ -33,6 +33,13 @@ import "core:rexcode/isa"
 
 MAX_INST_SIZE :: 15  // Maximum x64 instruction length
 
+// Extra bytes reserved past each instruction so the branchless emitters can
+// write a few speculative bytes beyond the logical end (e.g. a widened 4-byte
+// displacement store when only a disp8 is kept). The over-written tail is
+// reclaimed by the next emit; this slack just guarantees the wide store stays
+// in bounds even for the final instruction against a tight buffer.
+ENCODE_TAIL_SLACK :: 8
+
 
 // -----------------------------------------------------------------------------
 // SECTION: 7.6 Core Encoding Function
@@ -100,7 +107,7 @@ encode :: proc(
 		}
 
 		// Check buffer space
-		if byte_count + MAX_INST_SIZE > u32(len(code)) {
+		if byte_count + MAX_INST_SIZE + ENCODE_TAIL_SLACK > u32(len(code)) {
 			append(errors, Error{u32(instruction_index), .BUFFER_OVERFLOW, {}})
 			ok = false
 			continue
@@ -171,32 +178,64 @@ encode :: proc(
 		out := code[byte_count:]
 		pos: u32 = 0
 
-		// --- Legacy Prefixes ---
+		// Resolve every encoding slot to its user operand ONCE, and gather the
+		// ModR/M and opcode-reg slot roles in the same pass. The emission below
+		// indexes user_ops[slot] instead of re-deriving the mapping per pass --
+		// the previous code re-scanned enc.ops ~5-10x per instruction (once for
+		// REX bits, opcode +rb, ModR/M slots, reg/rm fields, immediates), which
+		// was a dominant per-instruction cost.
+		user_ops: [4]^Operand
+		mr_slot:  int = -1
+		reg_slot: int = -1
+		opr_slot: int = -1
+		{
+			user_idx := 0
+			for op, i in enc.ops {
+				if op == .NONE { break }
+				if !is_implicit_op_inline(op) {
+					if user_idx < int(inst.operand_count) {
+						user_ops[i] = &inst.ops[user_idx]
+					}
+					user_idx += 1
+				}
+				// Slot roles (parallel array enc.enc[i]) gathered in the same pass.
+				#partial switch enc.enc[i] {
+				case .MR:   mr_slot  = i
+				case .REG:  reg_slot = i
+				case .OP_R: opr_slot = i
+				}
+			}
+		}
+		has_modrm := mr_slot >= 0 || reg_slot >= 0
+
+		// --- Legacy Prefixes (branchless) ---
+		//
+		// Each optional prefix byte is written *speculatively* at `pos`, then
+		// `pos` advances only if the prefix is actually present. When absent the
+		// speculative byte is overwritten by the next emit (the opcode always
+		// writes at `pos`), so the final stream is identical to the branching
+		// form -- with four data-dependent branches removed. The buffer carries
+		// MAX_INST_SIZE slack (checked above), so the spec writes stay in bounds.
 
 		// Lock prefix (F0)
-		if inst.flags.lock && enc.flags.lock_ok {
-			out[pos] = 0xF0
-			pos += 1
-		}
+		out[pos] = 0xF0
+		pos += u32(inst.flags.lock && enc.flags.lock_ok)
 
-		// Rep/Repne prefix
-		#partial switch inst.flags.rep {
-		case .REP:   out[pos] = 0xF3; pos += 1
-		case .REPNE: out[pos] = 0xF2; pos += 1
-		}
+		// Rep/Repne prefix (NONE -> 0, REP -> F3, REPNE -> F2)
+		REP_BYTE := [Rep]u8{ .NONE = 0, .REP = 0xF3, .REPNE = 0xF2 }
+		rep_b := REP_BYTE[inst.flags.rep]
+		out[pos] = rep_b
+		pos += u32(rep_b != 0)
 
-		// Segment override
-		if inst.flags.segment != 0 {
-			seg_prefix := [8]u8{0, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0}
-			out[pos] = seg_prefix[inst.flags.segment]
-			pos += 1
-		}
+		// Segment override (table already maps 0 -> 0)
+		seg_prefix := [8]u8{0, 0x26, 0x2E, 0x36, 0x3E, 0x64, 0x65, 0}
+		seg_b := seg_prefix[inst.flags.segment]
+		out[pos] = seg_b
+		pos += u32(seg_b != 0)
 
 		// Address size override (67h)
-		if inst.flags.addr32 {
-			out[pos] = 0x67
-			pos += 1
-		}
+		out[pos] = 0x67
+		pos += u32(inst.flags.addr32)
 
 		// --- VEX/EVEX or Legacy Encoding ---
 
@@ -226,25 +265,28 @@ encode :: proc(
 			case .W1: w = 1
 			}
 
-			// Check operands for REX bits
+			// Operand-driven extension bits (branchless: compute reg & mem
+			// contributions, gate by kind, clear the inverted bit via AND-mask).
 			for enc_type, i in enc.enc {
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op == nil { continue }
+
+				is_reg := user_op.kind == .REGISTER
+				is_mem := user_op.kind == .MEMORY
+				m := user_op.mem
+				reg_ext   := is_reg && reg_needs_rex(user_op.reg)
+				base_ext  := is_mem && mem_has_base(m)  && m.base_ext
+				index_ext := is_mem && mem_has_index(m) && m.index_ext
 
 				#partial switch enc_type {
 				case .REG:
-					if user_op.kind == .REGISTER && reg_needs_rex(user_op.reg) { r = 0 }
+					r &= u8(!reg_ext)
 				case .MR:
-					#partial switch user_op.kind {
-					case .REGISTER:
-						if reg_needs_rex(user_op.reg) { b = 0 }
-					case .MEMORY:
-						m := user_op.mem
-						if mem_has_base(m)  && m.base_ext  { b = 0 }
-						if mem_has_index(m) && m.index_ext { x = 0 }
-					}
+					b &= u8(!reg_ext)
+					b &= u8(!base_ext)
+					x &= u8(!index_ext)
 				case .VVVV:
-					if user_op.kind == .REGISTER { vvvv = ~reg_hw(user_op.reg) & 0xF }
+					vvvv = is_reg ? (~reg_hw(user_op.reg) & 0xF) : vvvv
 				}
 			}
 
@@ -288,37 +330,34 @@ encode :: proc(
 			}
 
 			for i in 0..<4 {
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op == nil { continue }
+
+				is_reg := user_op.kind == .REGISTER
+				is_mem := user_op.kind == .MEMORY
+				m := user_op.mem
+				hw := reg_hw(user_op.reg)              // gated by is_reg below
+				reg8      := is_reg && hw >= 8
+				reg16     := is_reg && hw >= 16
+				base_ext  := is_mem && mem_has_base(m)  && m.base_ext
+				index_ext := is_mem && mem_has_index(m) && m.index_ext
 
 				#partial switch enc.enc[i] {
 				case .REG:
-					if user_op.kind == .REGISTER {
-						hw := reg_hw(user_op.reg)
-						if hw >= 8 { r = 0 }
-						if hw >= 16 { rr = 0 }
-					}
+					r  &= u8(!reg8)
+					rr &= u8(!reg16)
 				case .MR:
-					#partial switch user_op.kind {
-					case .REGISTER:
-						hw := reg_hw(user_op.reg)
-						if hw >= 8 { b = 0 }
-					case .MEMORY:
-						m := user_op.mem
-						if mem_has_base(m) && m.base_ext { b = 0 }
-						if mem_has_index(m) && m.index_ext { x = 0 }
-						if user_op.flags.broadcast != .NONE { bb = 1 }
-					}
+					b  &= u8(!reg8)
+					b  &= u8(!base_ext)
+					x  &= u8(!index_ext)
+					bb |= u8(is_mem && user_op.flags.broadcast != .NONE)
 				case .VVVV:
-					if user_op.kind == .REGISTER {
-						hw := reg_hw(user_op.reg)
-						vvvv = ~hw & 0xF
-						if hw >= 16 { vvv = 0 }
-					}
+					vvvv = is_reg ? (~hw & 0xF) : vvvv
+					vvv &= u8(!reg16)
 				case .AAA:
-					if user_op.kind == .REGISTER { aaa = reg_hw(user_op.reg) & 0x7 }
+					aaa = is_reg ? (hw & 0x7) : aaa
 				}
-				if user_op.flags.zeroing { z = 1 }
+				z |= u8(user_op.flags.zeroing)
 			}
 
 			out[pos] = 0x62
@@ -352,44 +391,45 @@ encode :: proc(
 				pos += 1
 			}
 
-			// REX prefix
-			rex: u8 = 0
-			if enc.flags.force_rex_w { rex |= 0x48 }
+			// REX prefix (branchless: OR each operand's contribution via a mask).
+			// Both the register and memory contributions are computed and gated
+			// by operand kind, so the data-dependent REGISTER/MEMORY branch is
+			// gone; only the per-form enc_type switch (predictable) remains.
+			rex: u8 = bmask(enc.flags.force_rex_w) & 0x48
 
 			for enc_type, i in enc.enc {
 				if enc_type == .NONE { continue }
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op == nil { continue }
+
+				is_reg := user_op.kind == .REGISTER
+				is_mem := user_op.kind == .MEMORY
+				m := user_op.mem   // union bytes; only used when is_mem
+				reg_ext   := is_reg && reg_needs_rex(user_op.reg)
+				base_ext  := is_mem && mem_has_base(m)  && m.base_ext
+				index_ext := is_mem && mem_has_index(m) && m.index_ext
 
 				#partial switch enc_type {
 				case .REG:
-					if user_op.kind == .REGISTER && reg_needs_rex(user_op.reg) { rex |= 0x44 }
+					rex |= bmask(reg_ext) & 0x44
 				case .MR:
-					#partial switch user_op.kind {
-					case .REGISTER:
-						if reg_needs_rex(user_op.reg) { rex |= 0x41 }
-					case .MEMORY:
-						m := user_op.mem
-						if mem_has_base(m) && m.base_ext { rex |= 0x41 }
-						if mem_has_index(m) && m.index_ext { rex |= 0x42 }
-					}
+					rex |= bmask(reg_ext)   & 0x41   // register r/m -> REX.B
+					rex |= bmask(base_ext)  & 0x41
+					rex |= bmask(index_ext) & 0x42
 				case .OP_R:
-					if user_op.kind == .REGISTER && reg_needs_rex(user_op.reg) { rex |= 0x41 }
+					rex |= bmask(reg_ext) & 0x41
 				}
 			}
 
-			// SPL, BPL, SIL, DIL require REX (long mode only).
+			// SPL/BPL/SIL/DIL (GPR8 hw 4-7) require an empty REX (long mode only).
 			if mode == ._64 {
+				spl_seen := false
 				for i in 0..<inst.operand_count {
 					op := &inst.ops[i]
-					if op.kind == .REGISTER {
-						class := reg_class(op.reg)
-						hw := reg_hw(op.reg)
-						if class == REG_GPR8 && hw >= 4 && hw <= 7 {
-							if rex == 0 { rex = 0x40 }
-						}
-					}
+					hw := reg_hw(op.reg)
+					spl_seen ||= op.kind == .REGISTER && reg_class(op.reg) == REG_GPR8 && hw >= 4 && hw <= 7
 				}
+				rex |= bmask(rex == 0 && spl_seen) & 0x40
 			}
 
 			// 32-bit mode forbids the REX prefix entirely. If any operand
@@ -429,14 +469,11 @@ encode :: proc(
 		x87_fixed_modrm := opcode >= 0xD8 && opcode <= 0xDF && enc.ext >= 0xC0
 		opr_index: u8 = 0
 		opr_seen := false
-		for enc_type, i in enc.enc {
-			if enc_type == .OP_R {
-				user_op := get_user_op_inline(&inst, enc, i)
-				if user_op != nil && user_op.kind == .REGISTER {
-					opr_index = reg_hw(user_op.reg) & 0x07
-					opr_seen  = true
-				}
-				break
+		if opr_slot >= 0 {
+			user_op := user_ops[opr_slot]
+			if user_op != nil && user_op.kind == .REGISTER {
+				opr_index = reg_hw(user_op.reg) & 0x07
+				opr_seen  = true
 			}
 		}
 		if opr_seen && !x87_fixed_modrm {
@@ -446,18 +483,7 @@ encode :: proc(
 		out[pos] = opcode
 		pos += 1
 
-		// --- ModR/M and SIB ---
-		has_modrm := false
-		mr_slot:  int = -1
-		reg_slot: int = -1
-
-		for enc_type, i in enc.enc {
-			#partial switch enc_type {
-			case .MR:  mr_slot  = i; has_modrm = true
-			case .REG: reg_slot = i; has_modrm = true
-			}
-		}
-
+		// --- ModR/M and SIB --- (mr_slot/reg_slot/has_modrm gathered above)
 		if has_modrm {
 			has_sib := false
 			mod:               u8  = 0
@@ -471,7 +497,7 @@ encode :: proc(
 			if enc.flags.modrm_reg_ext {
 				reg_field = enc.ext & 0x07
 			} else if reg_slot >= 0 {
-				reg_op := get_user_op_inline(&inst, enc, reg_slot)
+				reg_op := user_ops[reg_slot]
 				if reg_op != nil && reg_op.kind == .REGISTER {
 					reg_field = reg_hw(reg_op.reg) & 0x07
 				}
@@ -479,7 +505,7 @@ encode :: proc(
 
 			// R/M field
 			if mr_slot >= 0 {
-				mr_op := get_user_op_inline(&inst, enc, mr_slot)
+				mr_op := user_ops[mr_slot]
 				if mr_op != nil {
 					#partial switch mr_op.kind {
 					case .REGISTER:
@@ -507,6 +533,12 @@ encode :: proc(
 
 							needs_sib := has_index || (base_hw & 0x07) == 4
 
+							has_base := mem_has_base(m)
+							is_rbp   := (base_hw & 0x07) == 5
+							is_zero  := disp_value == 0
+							fits8    := disp_value >= -128 && disp_value <= 127
+							disp = disp_value
+
 							if needs_sib {
 								has_sib = true
 								rm = 0b100
@@ -518,37 +550,22 @@ encode :: proc(
 								case 8: scale = 3
 								}
 
-								idx: u8 = 0b100
-								if has_index { idx = m.index_hw & 0x07 }
-
-								base_sib := base_hw & 0x07
-								if !mem_has_base(m) { base_sib = 0b101 }
-
+								idx      := has_index ? (m.index_hw & 0x07) : u8(0b100)
+								base_sib := has_base  ? (base_hw   & 0x07) : u8(0b101)
 								sib = (scale << 6) | (idx << 3) | base_sib
 
-								if mem_has_base(m) && (base_hw & 0x07) == 5 && disp_value == 0 {
-									mod = 0b01; disp = 0; displacement_size = 1
-								} else if !mem_has_base(m) {
-									mod = 0b00; disp = disp_value; displacement_size = 4
-								} else if disp_value == 0 {
-									mod = 0b00
-								} else if disp_value >= -128 && disp_value <= 127 {
-									mod = 0b01; disp = disp_value; displacement_size = 1
-								} else {
-									mod = 0b10; disp = disp_value; displacement_size = 4
-								}
+								// mod / disp size, branchless. No base -> [disp32]
+								// (mod 00, size 4). Otherwise: no displacement when
+								// zero and not RBP-like; else disp8 if it fits, else
+								// disp32. (RBP-like base forces an explicit disp8.)
+								no_disp := has_base && is_zero && !(has_base && is_rbp)
+								displacement_size = !has_base ? 4 : (no_disp ? 0 : (fits8 ? 1 : 4))
+								mod               = !has_base ? 0b00 : (no_disp ? 0b00 : (fits8 ? 0b01 : 0b10))
 							} else {
 								rm = base_hw & 0x07
-
-								if (base_hw & 0x07) == 5 && disp_value == 0 {
-									mod = 0b01; disp = 0; displacement_size = 1
-								} else if disp_value == 0 {
-									mod = 0b00
-								} else if disp_value >= -128 && disp_value <= 127 {
-									mod = 0b01; disp = disp_value; displacement_size = 1
-								} else {
-									mod = 0b10; disp = disp_value; displacement_size = 4
-								}
+								no_disp := is_zero && !is_rbp
+								displacement_size = no_disp ? 0 : (fits8 ? 1 : 4)
+								mod               = no_disp ? 0b00 : (fits8 ? 0b01 : 0b10)
 							}
 						}
 					}
@@ -563,11 +580,15 @@ encode :: proc(
 				pos += 1
 			}
 
-			for _ in 0..<displacement_size {
-				out[pos] = u8(disp & 0xFF)
-				disp >>= 8
-				pos += 1
-			}
+			// Displacement: four unconditional little-endian byte stores, then
+			// advance by the real size (0/1/4) -- no data-dependent loop. The
+			// untaken tail bytes are reclaimed by the next emit; ENCODE_TAIL_SLACK
+			// keeps the widened store in bounds.
+			out[pos+0] = u8(disp)
+			out[pos+1] = u8(disp >> 8)
+			out[pos+2] = u8(disp >> 16)
+			out[pos+3] = u8(disp >> 24)
+			pos += u32(displacement_size)
 		}
 
 		// Fixed ModR/M for special instructions. Triggered for:
@@ -588,7 +609,7 @@ encode :: proc(
 		for enc_type, i in enc.enc {
 			#partial switch enc_type {
 			case .IB:
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op != nil {
 					#partial switch user_op.kind {
 					case .IMMEDIATE:
@@ -604,7 +625,7 @@ encode :: proc(
 				}
 
 			case .IW:
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op != nil && user_op.kind == .IMMEDIATE {
 					immediate_val := u16(user_op.immediate)
 					out[pos] = u8(immediate_val); out[pos+1] = u8(immediate_val >> 8)
@@ -612,7 +633,7 @@ encode :: proc(
 				}
 
 			case .ID:
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op != nil {
 					#partial switch user_op.kind {
 					case .IMMEDIATE:
@@ -629,7 +650,7 @@ encode :: proc(
 				}
 
 			case .IQ:
-				user_op := get_user_op_inline(&inst, enc, i)
+				user_op := user_ops[i]
 				if user_op != nil && user_op.kind == .IMMEDIATE {
 					immediate_val := u64(user_op.immediate)
 					for j in u32(0)..<8 { out[pos + j] = u8(immediate_val >> (j * 8)) }
@@ -697,6 +718,14 @@ encode :: proc(
 // -----------------------------------------------------------------------------
 // SECTION: 7.7 Inline Helper Functions
 // -----------------------------------------------------------------------------
+
+// Branchless select mask: 0xFF when `b`, else 0x00. Used to OR-accumulate
+// REX/VEX/EVEX bit contributions without a per-condition branch
+// (`x |= bmask(cond) & bits`).
+@(private="file")
+bmask :: #force_inline proc "contextless" (b: bool) -> u8 {
+	return -u8(b)
+}
 
 // Check if instruction matches encoding (inlined for hot path).
 // `mode` lets default_64 entries match 32-bit operands in i386 and
@@ -877,29 +906,13 @@ imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 	return false
 }
 
-get_user_op_inline :: #force_inline proc "contextless" (inst: ^Instruction, enc: ^Encoding, slot: int) -> ^Operand {
-	user_idx := 0
-	for op, i in enc.ops {
-		if op == .NONE { break }
-		if is_implicit_op_inline(op) { continue }
-		if i == slot {
-			if user_idx < int(inst.operand_count) {
-				return &inst.ops[user_idx]
-			}
-			return nil
-		}
-		user_idx += 1
-	}
-	return nil
-}
-
 // -----------------------------------------------------------------------------
 // SECTION: 7.8 Convenience Functions
 // -----------------------------------------------------------------------------
 
 // Compute safe buffer sizes for encoding
 encode_max_code_size :: #force_inline proc "contextless" (n: int) -> int {
-	return n * MAX_INST_SIZE
+	return n * MAX_INST_SIZE + ENCODE_TAIL_SLACK
 }
 
 encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int {

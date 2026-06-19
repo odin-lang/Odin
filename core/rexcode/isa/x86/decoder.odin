@@ -671,10 +671,7 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 
 	case .REG:
 		// Register encoded in ModR/M.reg
-		register_number := modrm_info.reg
-		if state.rex & 0x04 != 0 {  // REX.R
-			register_number += 8
-		}
+		register_number := modrm_info.reg + ((state.rex & 0x04) << 1)  // REX.R -> +8 (branchless)
 		reg := decode_register(register_number, op_type, state.rex)
 		op = op_reg(reg)
 		return
@@ -683,10 +680,7 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 		// Register or memory in ModR/M.rm
 		if modrm_info.mod == 3 {
 			// Register
-			register_number := modrm_info.rm
-			if state.rex & 0x01 != 0 {  // REX.B
-				register_number += 8
-			}
+			register_number := modrm_info.rm + ((state.rex & 0x01) << 3)  // REX.B -> +8 (branchless)
 			reg := decode_register(register_number, op_type, state.rex)
 			op = op_reg(reg)
 			return
@@ -755,20 +749,14 @@ decode_single_operand :: proc(state: ^Decoder_State, op_type: Operand_Type, op_e
 
 	case .OP_R:
 		// Register encoded in low 3 bits of opcode
-		register_number := state.opcode_reg
-		if state.rex & 0x01 != 0 {  // REX.B extends the register
-			register_number += 8
-		}
+		register_number := state.opcode_reg + ((state.rex & 0x01) << 3)  // REX.B -> +8 (branchless)
 		reg := decode_register(register_number, op_type, state.rex)
 		op = op_reg(reg)
 		return
 
 	case .VVVV:
 		// VEX.vvvv register
-		register_number := 15 - state.vex_vvvv
-		if state.evex_v2 {
-			register_number += 16
-		}
+		register_number := (15 - state.vex_vvvv) + (u8(state.evex_v2) << 4)  // EVEX.V' -> +16 (branchless)
 		reg := decode_register(register_number, op_type, state.rex)
 		op = op_reg(reg)
 		return
@@ -800,13 +788,8 @@ decode_single_operand_vex :: proc(state: ^Decoder_State, op_type: Operand_Type, 
 	case .REG:
 		// Register in ModR/M.reg, extended by VEX.R
 		// vex_r is true when the encoded bit is 0, meaning extension is active
-		register_number := modrm_info.reg
-		if state.vex_r {  // vex_r=true means extend (bit was 0 in inverted encoding)
-			register_number += 8
-		}
-		if state.vex_type == .EVEX && state.evex_r2 {  // evex_r2=true means extend
-			register_number += 16
-		}
+		// VEX.R -> +8, EVEX.R' -> +16 (branchless; vex_r/evex_r2 true means extend)
+		register_number := modrm_info.reg + (u8(state.vex_r) << 3) + (u8(state.vex_type == .EVEX && state.evex_r2) << 4)
 		reg := decode_register(register_number, op_type, 0)
 		return op_reg(reg), .NONE
 
@@ -814,10 +797,7 @@ decode_single_operand_vex :: proc(state: ^Decoder_State, op_type: Operand_Type, 
 		if modrm_info.mod == 3 {
 			// Register in ModR/M.rm, extended by VEX.B
 			// vex_b is true when the encoded bit is 0, meaning extension is active
-			register_number := modrm_info.rm
-			if state.vex_b {  // vex_b=true means extend
-				register_number += 8
-			}
+			register_number := modrm_info.rm + (u8(state.vex_b) << 3)  // VEX.B -> +8 (branchless)
 			reg := decode_register(register_number, op_type, 0)
 			return op_reg(reg), .NONE
 		} else {
@@ -857,10 +837,7 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 
 	if has_sib {
 		// SIB addressing
-		base_number := sib_info.base
-		if state.rex & 0x01 != 0 {  // REX.B
-			base_number += 8
-		}
+		base_number := sib_info.base + ((state.rex & 0x01) << 3)  // REX.B -> +8 (branchless)
 
 		// Special case: base=5 with mod=0 means no base (displacement32 only)
 		if sib_info.base == 5 && modrm_info.mod == 0 {
@@ -871,10 +848,7 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 
 		// Index register (0xFF means no index)
 		if sib_info.index != 0xFF {
-			index_number := sib_info.index
-			if state.rex & 0x02 != 0 {  // REX.X
-				index_number += 8
-			}
+			index_number := sib_info.index + ((state.rex & 0x02) << 2)  // REX.X -> +8 (branchless)
 			index_reg = addr_reg_from_num(index_number, state.mode)
 			scale = sib_info.scale
 		}
@@ -890,10 +864,7 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 				base_reg = NONE
 			}
 		} else {
-			base_number := modrm_info.rm
-			if state.rex & 0x01 != 0 {  // REX.B
-				base_number += 8
-			}
+			base_number := modrm_info.rm + ((state.rex & 0x01) << 3)  // REX.B -> +8 (branchless)
 			base_reg = addr_reg_from_num(base_number, state.mode)
 		}
 	}
