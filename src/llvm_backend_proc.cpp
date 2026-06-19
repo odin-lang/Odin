@@ -160,6 +160,18 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		lb_add_attribute_to_proc(m, p->value, "nonlazybind");
 	}
 
+	switch (build_context.stack_protector) {
+		case StackProtector_Ssp:
+			lb_add_attribute_to_proc(m, p->value, "ssp");
+			break;
+		case StackProtector_SspReq:
+			lb_add_attribute_to_proc(m, p->value, "sspreq");
+			break;
+		case StackProtector_SspStrong:
+			lb_add_attribute_to_proc(m, p->value, "sspstrong");
+			break;
+	}
+
 	if (build_context.disable_unwind) {
 		lb_add_attribute_to_proc(m, p->value, "nounwind");
 	}
