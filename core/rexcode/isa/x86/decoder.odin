@@ -287,21 +287,22 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		opcode = state.data[state.position]
 		state.position += 1
 
-		if opcode == 0x38 {
+		switch opcode {
+		case 0x38:
 			if state.position >= len(state.data) {
 				return nil, nil, .BUFFER_TOO_SHORT
 			}
 			opcode = state.data[state.position]
 			state.position += 1
 			esc = ._0F38
-		} else if opcode == 0x3A {
+		case 0x3A:
 			if state.position >= len(state.data) {
 				return nil, nil, .BUFFER_TOO_SHORT
 			}
 			opcode = state.data[state.position]
 			state.position += 1
 			esc = ._0F3A
-		} else {
+		case:
 			esc = ._0F
 		}
 	}
@@ -310,9 +311,11 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 	// For legacy (no escape), 0x66 is operand size override, not mandatory prefix
 	// For 0F/0F38/0F3A, 0x66 can be mandatory prefix - try with prefix first, fallback to no prefix
 	prefix: u8 = 0
-	if state.prefix_66 { prefix = 1 }
-	else if state.prefix_f3 { prefix = 2 }
-	else if state.prefix_f2 { prefix = 3 }
+	switch {
+	case state.prefix_66: prefix = 1
+	case state.prefix_f3: prefix = 2
+	case state.prefix_f2: prefix = 3
+	}
 
 	// Look up in index table
 	idx: Decode_Index
@@ -344,41 +347,41 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		idx = didx(DECODE_INDEX_LEGACY, prefix, base_opcode)
 
 		// Check if this is actually an Op_R encoding
-		if idx.count > 0 {
-			first := &LEGACY_DECODE_ENTRIES[idx.start]
-			if first.enc[0] == .OP_R {
-				// Store the register number for later operand decoding
-				state.opcode_reg = opcode & 0x07
+		if idx.count == 0 {
+			return nil, nil, .INVALID_OPCODE
+		}
+		if first := &LEGACY_DECODE_ENTRIES[idx.start]; first.enc[0] == .OP_R {
+			// Store the register number for later operand decoding
+			state.opcode_reg = opcode & 0x07
 
-				// For Op_R with multiple entries (e.g., PUSH/POP with R64 and R16),
-				// select based on prefix_66 and default_64 flag
-				if idx.count > 1 {
-					for i in 0..<int(idx.count) {
-						e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
-						op0 := e.ops[0]
+			// For Op_R with multiple entries (e.g., PUSH/POP with R64 and R16),
+			// select based on prefix_66 and default_64 flag
+			if idx.count > 1 {
+				for i in 0..<int(idx.count) {
+					e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
+					op0 := e.ops[0]
 
-						if state.prefix_66 {
-							if op0 == .R16 {
-								return e, nil, .NONE
-							}
-						} else {
-							is_64 := state.mode == ._64 && (e.flags.default_64 || (state.rex & 0x08 != 0))
-							if is_64 && op0 == .R64 {
-								return e, nil, .NONE
-							}
-							if !is_64 && op0 == .R32 {
-								return e, nil, .NONE
-							}
-							// i386: default_64 entries are the "default operand size" form,
-							// which is 32-bit; bytes encode the same as long-mode R64+default_64.
-							if state.mode == ._32 && op0 == .R64 && e.flags.default_64 {
-								return e, nil, .NONE
-							}
+					if state.prefix_66 {
+						if op0 == .R16 {
+							return e, nil, .NONE
+						}
+					} else {
+						is_64 := state.mode == ._64 && (e.flags.default_64 || (state.rex & 0x08 != 0))
+						if is_64 && op0 == .R64 {
+							return e, nil, .NONE
+						}
+						if !is_64 && op0 == .R32 {
+							return e, nil, .NONE
+						}
+						// i386: default_64 entries are the "default operand size" form,
+						// which is 32-bit; bytes encode the same as long-mode R64+default_64.
+						if state.mode == ._32 && op0 == .R64 && e.flags.default_64 {
+							return e, nil, .NONE
 						}
 					}
 				}
-				return first, nil, .NONE
 			}
+			return first, nil, .NONE
 		}
 		return nil, nil, .INVALID_OPCODE
 	}
@@ -475,12 +478,9 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			size_matches := false
 
 			#partial switch target_size {
-			case .RM64:
-				size_matches = op0 == .RM64 || op0 == .R64 || op0 == .RAX_IMPL
-			case .RM16:
-				size_matches = op0 == .RM16 || op0 == .R16 || op0 == .AX_IMPL
-			case .RM32:
-				size_matches = op0 == .RM32 || op0 == .R32 || op0 == .EAX_IMPL
+			case .RM64: size_matches = op0 == .RM64 || op0 == .R64 || op0 == .RAX_IMPL
+			case .RM16: size_matches = op0 == .RM16 || op0 == .R16 || op0 == .AX_IMPL
+			case .RM32: size_matches = op0 == .RM32 || op0 == .R32 || op0 == .EAX_IMPL
 			}
 
 			if size_matches {
@@ -502,7 +502,7 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 	return &LEGACY_DECODE_ENTRIES[idx.start], nil, .NONE
 }
 
-decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry: ^VEX_Decode_Entry, err: Error_Code) {
+decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry: ^VEX_Decode_Entry, err: Error_Code) #no_bounds_check {
 	if state.position >= len(state.data) {
 		return nil, nil, .BUFFER_TOO_SHORT
 	}
@@ -549,15 +549,15 @@ decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decod
 
 		// Check VEX.W constraint
 		w_match := e.vex_w == .WIG ||
-				   (e.vex_w == .W0 && !state.vex_w) ||
-				   (e.vex_w == .W1 && state.vex_w)
+		           (e.vex_w == .W0 && !state.vex_w) ||
+		           (e.vex_w == .W1 && state.vex_w)
 		if !w_match { continue }
 
 		// Check VEX.L constraint
 		l_match := e.vex_l == .LIG ||
-				   (e.vex_l == .L0 && state.vex_l == 0) ||
-				   (e.vex_l == .L1 && state.vex_l == 1) ||
-				   (e.vex_l == .L2 && state.vex_l == 2)
+		           (e.vex_l == .L0 && state.vex_l == 0) ||
+		           (e.vex_l == .L1 && state.vex_l == 1) ||
+		           (e.vex_l == .L2 && state.vex_l == 2)
 		if !l_match { continue }
 
 		return nil, e, .NONE
@@ -823,7 +823,7 @@ decode_single_operand_vex :: proc(state: ^Decoder_State, op_type: Operand_Type, 
 // -----------------------------------------------------------------------------
 
 decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
-							   sib_info: SIB_Info, has_sib: bool, op_type: Operand_Type) -> (op: Operand, err: Error_Code) {
+                              sib_info: SIB_Info, has_sib: bool, op_type: Operand_Type) -> (op: Operand, err: Error_Code) {
 
 	base_reg := NONE
 	index_reg := NONE
@@ -831,7 +831,8 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 	disp: i32 = 0
 
 	// Address-register width: 32-bit in i386, 64-bit in long mode.
-	addr_reg_from_num :: #force_inline proc(num: u8, mode: Mode) -> Register {
+	@(require_results)
+	addr_reg_from_num :: #force_inline proc "contextless" (num: u8, mode: Mode) -> Register {
 		return mode == ._32 ? gpr32_from_num(num) : gpr64_from_num(num)
 	}
 
@@ -872,13 +873,15 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 	// Read disp
 	if modrm_info.disp_size == 1 {
 		if state.position >= len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		disp = i32(i8(state.data[state.position]))
 		state.position += 1
 	} else if modrm_info.disp_size == 4 {
 		if state.position + 4 > len(state.data) {
-			return {}, .BUFFER_TOO_SHORT
+			err = .BUFFER_TOO_SHORT
+			return
 		}
 		disp = i32(u32(state.data[state.position]) |
 				   u32(state.data[state.position+1]) << 8 |
