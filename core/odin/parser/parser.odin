@@ -378,7 +378,14 @@ advance_token :: proc(p: ^Parser) -> tokenizer.Token {
 	prev := p.prev_tok
 
 	if next_token0(p) {
-		consume_comment_groups(p, prev)
+		#partial switch p.curr_tok.kind {
+		case .Comment:
+			consume_comment_groups(p, prev)
+		case .Semicolon:
+			if p.expr_level > 0 && p.curr_tok.text == "\n" {
+				advance_token(p)
+			}
+		}
 	}
 	return prev
 }
@@ -2366,10 +2373,10 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 	case .Open_Paren:
 		open := expect_token(p, .Open_Paren)
-		p.expr_level += 1
+		prev_expr_level := p.expr_level
+		p.expr_level = max(p.expr_level, 0) + 1
 		expr := parse_expr(p, false)
-		skip_possible_newline(p)
-		p.expr_level -= 1
+		p.expr_level = prev_expr_level
 		close := expect_token(p, .Close_Paren)
 
 		pe := ast.new(ast.Paren_Expr, open.pos, end_pos(close))
@@ -3208,11 +3215,12 @@ parse_elem_list :: proc(p: ^Parser) -> []^ast.Expr {
 parse_literal_value :: proc(p: ^Parser, type: ^ast.Expr) -> ^ast.Comp_Lit {
 	elems: []^ast.Expr
 	open := expect_token(p, .Open_Brace)
-	p.expr_level += 1
+	prev_expr_level := p.expr_level
+	p.expr_level = 0
 	if p.curr_tok.kind != .Close_Brace {
 		elems = parse_elem_list(p)
 	}
-	p.expr_level -= 1
+	p.expr_level = prev_expr_level
 
 	skip_possible_newline(p)
 	close := expect_closing_brace_of_field_list(p)
@@ -3231,7 +3239,8 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 
 	ellipsis: tokenizer.Token
 
-	p.expr_level += 1
+	prev_expr_level := p.expr_level
+	p.expr_level = 0
 	open := expect_token(p, .Open_Paren)
 
 	seen_ellipsis := false
@@ -3278,8 +3287,8 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 		allow_token(p, .Comma) or_break
 	}
 
+	p.expr_level = prev_expr_level
 	close := expect_closing_token_of_field_list(p, .Close_Paren, "argument list")
-	p.expr_level -= 1
 
 	ce := ast.new(ast.Call_Expr, operand.pos, end_pos(close))
 	ce.expr     = operand
@@ -3365,8 +3374,8 @@ parse_atom_expr :: proc(p: ^Parser, value: ^ast.Expr, lhs: bool) -> (operand: ^a
 				}
 			}
 
-			close := expect_token(p, .Close_Bracket)
 			p.expr_level -= 1
+			close := expect_token(p, .Close_Bracket)
 
 			if is_slice_op {
 				if interval.kind == .Comma {
