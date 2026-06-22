@@ -10179,6 +10179,10 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 		}
 	}
 
+	if (c->in_defer) {
+		error(node, "'%.*s' cannot be used within a 'defer'", LIT(name));
+	}
+
 	return Expr_Expr;
 }
 
