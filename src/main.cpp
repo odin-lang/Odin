@@ -3845,7 +3845,7 @@ int main(int arg_count, char const **arg_ptr) {
 		// NOTE(Jeroen): `odin root` omits it on purpose so that it can be used in scripts.
 		//               e.g. `ODIN_CORE="$(odin root)core"`.
 		//               Human convenience is not a consideration.
-		//               Further pull requests to a newline will be closed without comment.
+		//               Further pull requests to add a newline will be closed without comment.
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
 	} else if (command == "clear-cache") {
