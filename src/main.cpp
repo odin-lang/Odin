@@ -206,6 +206,9 @@ int run_subprocess(const char *name, const char **args) {
 		if (WIFEXITED(status)) {
 			return WEXITSTATUS(status);
 		} else if (WIFSIGNALED(status)) {
+			struct rlimit limit = { 0, 0, };
+			setrlimit(RLIMIT_CORE, &limit);
+			raise(WTERMSIG(status));
 			return -1;
 		} else if (WIFSTOPPED(status)) {
 			return -1;
