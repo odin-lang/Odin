@@ -3842,7 +3842,7 @@ int main(int arg_count, char const **arg_ptr) {
 			usage(args[0]);
 			return 1;
 		}
-		// NOTE(Jeroen): `odin root` omits it on purpose so that it can be used in scripts.
+		// NOTE(Jeroen): `odin root` omits a newline on purpose so that it can be used in scripts.
 		//               e.g. `ODIN_CORE="$(odin root)core"`.
 		//               Human convenience is not a consideration.
 		//               Further pull requests to add a newline will be closed without comment.
