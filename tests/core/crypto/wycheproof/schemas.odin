@@ -150,10 +150,10 @@ Eddsa_Key :: struct {
 }
 
 Eddsa_Jwk :: struct {
-	kid: string `json:"kid"`,
-	crv: string `json:"crv"`,
-	kty: string `json:"kty"`,
-	x:   string `json:"x"`,
+	kid: string           `json:"kid"`,
+	crv: string           `json:"crv"`,
+	kty: string           `json:"kty"`,
+	x:   common.Jwk_Bytes `json:"x"`,
 }
 
 Ecdsa_Key :: struct {
@@ -240,4 +240,68 @@ Mldsa_Test_Vector :: struct {
 	sig:     common.Hex_Bytes `json:"sig"`,
 	result:  Result           `json:"result"`,
 	flags:   []string         `json:"flags"`,
+}
+
+Rsa_Pkcs1_Sig_Test_Group :: struct {
+	private_key:       Rsa_Private_Key       `json:"privateKey"`,
+	key_asn:           common.Hex_Bytes      `json:"keyAsn"`,
+	key_der:           common.Hex_Bytes      `json:"keyDer"`,
+	key_pem:           string                `json:"keyPem"`,
+	key_size:          int                   `json:"keySize"`,
+	private_key_jwk:   Rsa_Jwk_Private_Key   `json:"privateKeyJwk"`,
+	private_key_pem:   string                `json:"privateKeyPem"`,
+	private_key_pkcs8: common.Hex_Bytes      `json:"privateKeyPkcs8"`,
+	sha:               string                `json:"sha"`,
+	type:              string                `json:"type"`,
+	source:            Test_Group_Source     `json:"source"`,
+	tests:             []Rsa_Sig_Test_Vector `json:"tests"`,
+}
+
+Rsa_Sig_Test_Vector :: struct {
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	sig:     common.Hex_Bytes `json:"sig"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
+}
+
+Rsa_Pss_Sig_Test_Group :: struct {
+	public_key:        Rsa_Public_Key        `json:"publicKey"`,
+	public_key_asn:    common.Hex_Bytes      `json:"publicKeyAsn"`,
+	public_key_der:    common.Hex_Bytes      `json:"publicKeyDer"`,
+	public_key_pem:    string                `json:"publicKeyPem"`,
+	key_size:          int                   `json:"keySize"`,
+	sha:               string                `json:"sha"`,
+	mgf:               string                `json:"mgf"`,
+	mfg_sha:           string                `json:"mgfSha"`,
+	s_len:             int                   `json:"sLen"`,
+	type:              string                `json:"type"`,
+	source:            Test_Group_Source     `json:"source"`,
+	tests:             []Rsa_Sig_Test_Vector `json:"tests"`,
+}
+
+Rsa_Public_Key :: struct {
+	modulus:          common.Hex_Bytes `json:"modulus"`,
+	public_exponent:  common.Hex_Bytes `json:"publicExponent"`,
+}
+
+Rsa_Private_Key :: struct {
+	private_exponent: common.Hex_Bytes `json:"privateExponent"`,
+	public_exponent:  common.Hex_Bytes `json:"publicExponent"`,
+	modulus:          common.Hex_Bytes `json:"modulus"`,
+}
+
+Rsa_Jwk_Private_Key :: struct {
+	akg: string           `json:"alg"`,
+	kid: string           `json:"kid"`,
+	kty: string           `json:"kty"`,
+	d:   common.Jwk_Bytes `json:"d"`,
+	dp:  common.Jwk_Bytes `json:"dp"`,
+	dq:  common.Jwk_Bytes `json:"dq"`,
+	e:   common.Jwk_Bytes `json:"e"`,
+	n:   common.Jwk_Bytes `json:"n"`,
+	p:   common.Jwk_Bytes `json:"p"`,
+	q:   common.Jwk_Bytes `json:"q"`,
+	qi:  common.Jwk_Bytes `json:"qi"`,
 }
