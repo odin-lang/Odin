@@ -178,11 +178,44 @@ gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, 
 	return exit_code;
 }
 
-gb_internal void system_must_exec_command_line_app(char const *name, char const *fmt, ...) {
-	va_list va;
-	va_start(va, fmt);
-	system_exec_command_line_app_internal(/* exit_on_err= */ true, name, fmt, va);
-	va_end(va);
+#if defined(GB_SYSTEM_WINDOWS)
+#include <process.h>
+#else
+#include <spawn.h>
+extern char **environ;
+#endif
+
+int run_subprocess(const char *name, const char **args) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return (int)_spawnv(_P_WAIT, name, args);
+#else
+	pid_t pid;
+	int status;
+	status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+	if (status != 0) {
+		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
+		return -1;
+	}
+
+	for (;;) {
+		if (waitpid(pid, &status, WUNTRACED) < 0) {
+			gb_printf_err("Could not wait on subprocess: (pid: %d): %s\n", pid, strerror(errno));
+			return -1;
+		}
+
+		if (WIFEXITED(status)) {
+			return WEXITSTATUS(status);
+		} else if (WIFSIGNALED(status)) {
+			struct rlimit limit = { 0, 0, };
+			setrlimit(RLIMIT_CORE, &limit);
+			raise(WTERMSIG(status));
+			return -1;
+		} else if (WIFSTOPPED(status)) {
+			return -1;
+		}
+	}
+	GB_PANIC("Subprocess failure");
+#endif
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -3653,10 +3686,11 @@ int main(int arg_count, char const **arg_ptr) {
 	init_build_context_error_pos_style();
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
+	Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
+	defer (array_free(&run_args));
 
 	String command = args[1];
 	String init_filename = {};
-	String run_args_string = {};
 	isize  last_non_run_arg = args.count;
 
 	for_array(i, args) {
@@ -3680,9 +3714,6 @@ int main(int arg_count, char const **arg_ptr) {
 			build_context.command_kind = Command_test;
 		}
 
-		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
-		defer (array_free(&run_args));
-
 		isize run_args_start_idx = -1;
 		for_array(i, args) {
 			if (args[i] == "--") {
@@ -3704,7 +3735,6 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 		}
 		args = array_slice(args, 0, last_non_run_arg);
-		run_args_string = string_join_and_quote(heap_allocator(), run_args);
 
 		init_filename = args[2];
 		run_output = true;
@@ -4293,8 +4323,23 @@ end_of_code_gen:;
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
-		system_must_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
+		const char* exe_name_cstring = alloc_cstring(heap_allocator(), exe_name);
+		Array<const char *> run_args_cstring = array_make<const char *>(heap_allocator(), 0, run_args.count);
+		defer({
+			for_array(i, run_args_cstring) { gb_free(heap_allocator(), (void*)run_args_cstring[i]);	}
+			array_free(&run_args_cstring);
+		});
 
+		array_add(&run_args_cstring, exe_name_cstring);
+		for_array(i, run_args) {
+			array_add(&run_args_cstring, alloc_cstring(heap_allocator(), run_args[i]));
+		}
+		array_add(&run_args_cstring, NULL);
+
+		int subprocess_res = run_subprocess(exe_name_cstring, run_args_cstring.data);
+		if (subprocess_res) {
+			gb_exit(subprocess_res);
+		}
 		if (!build_context.keep_executable) {
 			char const *filename = cast(char const *)exe_name.text;
 			gb_file_remove(filename);
