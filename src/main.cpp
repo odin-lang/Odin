@@ -3842,7 +3842,7 @@ int main(int arg_count, char const **arg_ptr) {
 			usage(args[0]);
 			return 1;
 		}
-		gb_printf("%.*s", LIT(odin_root_dir()));
+		gb_printf("%.*s\n", LIT(odin_root_dir()));
 		return 0;
 	} else if (command == "clear-cache") {
 		return try_clear_cache() ? 0 : 1;
