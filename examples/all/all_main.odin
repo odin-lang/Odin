@@ -157,6 +157,7 @@ package all
 @(require) import "core:time"
 @(require) import "core:time/datetime"
 @(require) import "core:time/timezone"
+@(require) import "core:time/tzdata"
 @(require) import "core:flags"
 
 @(require) import "core:sys/orca"
