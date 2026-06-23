@@ -39,7 +39,7 @@ expect_arena_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, a
 		arena.current_pos,
 		arena.bytes_left,
 	)
-	testing.expectf(t, uintptr(element) % uint(alignment) == 0, "Expected allocation to be aligned to %d byte boundary, got %v", alignment, element)
+	testing.expectf(t, uintptr(element) % uintptr(alignment) == 0, "Expected allocation to be aligned to %d byte boundary, got %v", alignment, element)
 
 	mem.dynamic_arena_destroy(&arena)
 	testing.expect(t, arena.used_blocks == nil)
