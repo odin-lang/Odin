@@ -276,5 +276,5 @@ foreign lib {
 	CreateGPURenderState              :: proc(renderer: ^Renderer, #by_ptr createinfo: GPURenderStateCreateInfo) -> ^GPURenderState ---
 	SetGPURenderStateFragmentUniforms :: proc(state: ^GPURenderState, slot_index: Uint32, data: rawptr, length: Uint32) -> bool ---
 	SetGPURenderState                 :: proc(renderer: ^Renderer, state: ^GPURenderState) -> bool ---
-	DestroyGPURenderState             :: proc(renderer: ^Renderer) ---
+	DestroyGPURenderState             :: proc(renderer: ^GPURenderer) ---
 }

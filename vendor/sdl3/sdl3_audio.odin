@@ -38,14 +38,14 @@ AudioFormat :: enum c.int {
 	F32 = F32LE when BYTEORDER == LIL_ENDIAN else F32BE,
 }
 
-@(require_results) AUDIO_BITSIZE        :: proc "c" (x: AudioFormat) -> Uint16 { return (Uint16(x) & AUDIO_MASK_BITSIZE)       }
-@(require_results) AUDIO_BYTESIZE       :: proc "c" (x: AudioFormat) -> Uint16 { return AUDIO_BITSIZE(x) / 8                   }
-@(require_results) AUDIO_ISFLOAT        :: proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_FLOAT) != 0      }
-@(require_results) AUDIO_ISBIGENDIAN    :: proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_BIG_ENDIAN) != 0 }
-@(require_results) AUDIO_ISLITTLEENDIAN :: proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISBIGENDIAN(x)                    }
-@(require_results) AUDIO_ISSIGNED       :: proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_SIGNED) != 0     }
-@(require_results) AUDIO_ISINT          :: proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISFLOAT(x)                        }
-@(require_results) AUDIO_ISUNSIGNED     :: proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISSIGNED(x)                       }
+@(require_results) AUDIO_BITSIZE        :: #force_inline proc "c" (x: AudioFormat) -> Uint16 { return (Uint16(x) & AUDIO_MASK_BITSIZE)       }
+@(require_results) AUDIO_BYTESIZE       :: #force_inline proc "c" (x: AudioFormat) -> Uint16 { return AUDIO_BITSIZE(x) / 8                   }
+@(require_results) AUDIO_ISFLOAT        :: #force_inline proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_FLOAT) != 0      }
+@(require_results) AUDIO_ISBIGENDIAN    :: #force_inline proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_BIG_ENDIAN) != 0 }
+@(require_results) AUDIO_ISLITTLEENDIAN :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISBIGENDIAN(x)                    }
+@(require_results) AUDIO_ISSIGNED       :: #force_inline proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_SIGNED) != 0     }
+@(require_results) AUDIO_ISINT          :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISFLOAT(x)                        }
+@(require_results) AUDIO_ISUNSIGNED     :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISSIGNED(x)                       }
 
 
 AudioDeviceID :: distinct Uint32
@@ -60,7 +60,7 @@ AudioSpec :: struct {
 }
 
 @(require_results)
-AUDIO_FRAMESIZE :: proc "c" (x: AudioSpec) -> c.int {
+AUDIO_FRAMESIZE :: #force_inline proc "c" (x: AudioSpec) -> c.int {
 	return c.int(AUDIO_BYTESIZE(x.format)) * x.channels
 }
 
