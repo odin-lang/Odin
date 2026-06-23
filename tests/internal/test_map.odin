@@ -1,5 +1,6 @@
 package test_internal
 
+import "base:runtime"
 import "core:log"
 import "base:intrinsics"
 import "core:math/rand"
@@ -211,6 +212,15 @@ map_reserve_correct_capacity :: proc(t: ^testing.T) {
 
 	reserve(&m, 13)
 	testing.expect_value(t, cap(m), 32)
+}
+
+@test
+map_reserve_error_on_overflow :: proc(t: ^testing.T) {
+	m: map[int]struct{}
+	defer delete(m)
+
+	err := reserve(&m, (max(uintptr) / 100) + 1)
+	testing.expect_value(t, err, runtime.Allocator_Error.Out_Of_Memory)
 }
 
 @test

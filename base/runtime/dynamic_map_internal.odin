@@ -594,7 +594,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 
 @(require_results)
-map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
+map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> (err: Allocator_Error) {
 	@(require_results)
 	ceil_log2 :: #force_inline proc "contextless" (x: uintptr) -> uintptr {
 		z := intrinsics.count_leading_zeros(x)
@@ -610,6 +610,9 @@ map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_
 
 	// Take into account the fact that the map will resize itself at
 	// MAP_LOAD_FACTOR capacity.
+	if new_capacity > (max(uintptr) / 100) {
+		return Allocator_Error.Out_Of_Memory
+	}
 	new_capacity_with_resize := new_capacity * 100 / MAP_LOAD_FACTOR
 	old_capacity := uintptr(map_cap(m^))
 
