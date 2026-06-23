@@ -11,6 +11,7 @@ import "core:terminal"
 import "core:terminal/ansi"
 import "core:time"
 
+// Strings to output when `.Level` is included in the logger options.
 Level_Headers := [?]string{
 	 0..<10 = "[DEBUG] --- ",
 	10..<20 = "[INFO ] --- ",
@@ -19,22 +20,49 @@ Level_Headers := [?]string{
 	40..<50 = "[FATAL] --- ",
 }
 
+/*
+The default option set for a console logger.
+
+It is similar to the file logger default option set, but the output includes colors.
+
+When you use this set of options you can expect the following output:
+
+	[LEVEL] --- [YYYY-MM-DD HH:MM:SS] [file.odin:L:proc()] Message
+
+For example:
+
+	[INFO ] --- [2025-01-02 12:34:56] [main.odin:8:main()] Hello World!
+*/
 Default_Console_Logger_Opts :: Options{
 	.Level,
 	.Terminal_Color,
 	.Short_File_Path,
 	.Line,
 	.Procedure,
-} | Full_Timestamp_Opts
+} + Full_Timestamp_Opts
 
+/*
+The default option set for a file logger.
+
+It is similar to the console logger default option set, but the output is not colored.
+
+When you use this set of options you can expect the following output:
+
+	[LEVEL] --- [YYYY-MM-DD HH:MM:SS] [file.odin:L:proc()] Message
+
+For example:
+
+	[INFO ] --- [2025-01-02 12:34:56] [main.odin:8:main()] Hello World!
+*/
 Default_File_Logger_Opts :: Options{
 	.Level,
 	.Short_File_Path,
 	.Line,
 	.Procedure,
-} | Full_Timestamp_Opts
+} + Full_Timestamp_Opts
 
 
+//Data backing a file or console logger.
 File_Console_Logger_Data :: struct {
 	file_handle: ^os.File,
 	ident: string,
@@ -67,6 +95,21 @@ init_standard_stream_status :: proc "contextless" () {
 	}
 }
 
+
+/*
+Create a logger that outputs to a file.
+
+*Allocates Using Provided Allocator*
+
+When no longer needed can be destroyed with `destroy_file_logger`.
+
+Inputs:
+- `h`: A handle to the output file
+- `lowest`: Log level to use (default is `.Debug`)
+- `opt`: Specifies additional data present in the log output (default is `log.Default_File_Logger_Opts`)
+- `ident`: Identifier to include in the output (default is `""`)
+- `allocator`: Allocator to use for data backing the logger (default is `context.allocator`)
+*/
 create_file_logger :: proc(f: ^os.File, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
 	data.file_handle = f
@@ -74,6 +117,13 @@ create_file_logger :: proc(f: ^os.File, lowest := Level.Debug, opt := Default_Fi
 	return Logger{file_logger_proc, data, lowest, opt}
 }
 
+/*
+Free the state allocated with `create_file_logger` and close the file handle.
+
+Inputs:
+- `log`: Logger created with `create_file_logger`
+- `allocator`: Allocator passed to `create_file_logger` (default is `context.allocator`)
+*/
 destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := cast(^File_Console_Logger_Data)log.data
 	if data.file_handle != nil {
@@ -82,6 +132,19 @@ destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 	free(data, allocator)
 }
 
+/*
+Create a logger that outputs to the terminal.
+
+*Allocates Using Provided Allocator*
+
+When no longer needed can be destroyed with `destroy_console_logger`.
+
+Inputs:
+- `lowest`: Log level to use (default is `.Debug`)
+- `opt`: Specifies additional data present in the log output (default is `log.Default_Console_Logger_Opts`)
+- `ident`: Identifier to include in the output (default is `""`)
+- `allocator`: Allocator to use for data backing the logger (default is `context.allocator`)
+*/
 create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
 	data.file_handle = nil
@@ -89,6 +152,13 @@ create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logg
 	return Logger{console_logger_proc, data, lowest, opt}
 }
 
+/*
+Free the state allocated with `create_console_logger`.
+
+Inputs:
+- `log`: Logger created with `create_console_logger`
+- `allocator`: Allocator passed to `create_console_logger` (default is `context.allocator`)
+*/
 destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 	free(log.data, allocator)
 }
@@ -117,6 +187,7 @@ _file_console_logger_proc :: proc(h: ^os.File, ident: string, level: Level, text
 	fmt.fprintf(h, "%s%s\n", strings.to_string(buf), text)
 }
 
+
 file_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
 	data := cast(^File_Console_Logger_Data)logger_data
 	_file_console_logger_proc(data.file_handle, data.ident, level, text, options, location)
@@ -136,6 +207,7 @@ console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, opt
 	_file_console_logger_proc(h, data.ident, level, text, options, location)
 }
 
+// Helper used to build the part of the message including the log level.
 do_level_header :: proc(opts: Options, str: ^strings.Builder, level: Level) {
 
 	RESET     :: ansi.CSI + ansi.RESET           + ansi.SGR
@@ -162,6 +234,7 @@ do_level_header :: proc(opts: Options, str: ^strings.Builder, level: Level) {
 	}
 }
 
+// Helper used to build the part of the message including the data and time.
 do_time_header :: proc(opts: Options, buf: ^strings.Builder, t: time.Time) {
 	when time.IS_SUPPORTED {
 		if Full_Timestamp_Opts & opts != nil {
@@ -180,6 +253,7 @@ do_time_header :: proc(opts: Options, buf: ^strings.Builder, t: time.Time) {
 	}
 }
 
+// Helper used to build the part of the message including the file location.
 do_location_header :: proc(opts: Options, buf: ^strings.Builder, location := #caller_location) {
 	if Location_Header_Opts & opts == nil {
 		return

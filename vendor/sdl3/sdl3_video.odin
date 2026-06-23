@@ -151,7 +151,7 @@ EGLSurface     :: distinct rawptr
 EGLAttrib      :: distinct uintptr
 EGLint         :: distinct c.int
 
-EGLAttribArrayCallback :: #type proc "c" (userdata: rawptr) -> ^EGLint
+EGLAttribArrayCallback :: #type proc "c" (userdata: rawptr) -> [^]EGLint
 EGLIntArrayCallback    :: #type proc "c" (userdata: rawptr, display: EGLDisplay, config: EGLConfig) -> [^]EGLint
 
 GLAttr :: enum c.int {
@@ -256,9 +256,12 @@ GL_CONTEXT_RESET_LOSE_CONTEXT    :: GLContextResetNotification{.LOSE_CONTEXT}
 
 PROP_DISPLAY_HDR_ENABLED_BOOLEAN             :: "SDL.display.HDR_enabled"
 PROP_DISPLAY_KMSDRM_PANEL_ORIENTATION_NUMBER :: "SDL.display.KMSDRM.panel_orientation"
+PROP_DISPLAY_WAYLAND_WL_OUTPUT_POINTER       :: "SDL.display.wayland.wl_output"
+PROP_DISPLAY_WINDOWS_HMONITOR_POINTER        :: "SDL.display.windows.hmonitor"
 
 PROP_WINDOW_CREATE_ALWAYS_ON_TOP_BOOLEAN               :: "SDL.window.create.always_on_top"
 PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN                  :: "SDL.window.create.borderless"
+PROP_WINDOW_CREATE_CONSTRAIN_POPUP_BOOLEAN             :: "SDL.window.create.constrain_popup"
 PROP_WINDOW_CREATE_FOCUSABLE_BOOLEAN                   :: "SDL.window.create.focusable"
 PROP_WINDOW_CREATE_EXTERNAL_GRAPHICS_CONTEXT_BOOLEAN   :: "SDL.window.create.external_graphics_context"
 PROP_WINDOW_CREATE_FLAGS_NUMBER                        :: "SDL.window.create.flags"
