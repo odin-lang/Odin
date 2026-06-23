@@ -431,17 +431,19 @@ foreign lib {
 	EnableTextureCubemap  :: proc(id: c.uint) ---                             // Enable texture cubemap
 	DisableTextureCubemap :: proc() ---                                       // Disable texture cubemap
 	TextureParameters     :: proc(id: c.uint, param: c.int, value: c.int) --- // Set texture parameters (filter, wrap)
-	CubemapParameters     :: proc(id: i32, param: c.int, value: c.int) ---    // Set cubemap parameters (filter, wrap)
+	CubemapParameters     :: proc(id: c.uint, param: c.int, value: c.int) --- // Set cubemap parameters (filter, wrap)
 
 	// Shader state
 	EnableShader  :: proc(id: c.uint) ---                                       // Enable shader program
 	DisableShader :: proc() ---                                                 // Disable shader program
 
 	// Framebuffer state
-	EnableFramebuffer  :: proc(id: c.uint) ---                                  // Enable render texture (fbo)
-	DisableFramebuffer :: proc() ---                                            // Disable render texture (fbo), return to default framebuffer
-	ActiveDrawBuffers  :: proc(count: c.int) ---                                // Activate multiple draw color buffers
-	BlitFramebuffer	 :: proc(srcX, srcY, srcWidth, srcHeight, dstX, dstY, dstWidth, dstHeight, bufferMask: c.int) --- // Blit active framebuffer to main framebuffer
+	EnableFramebuffer    :: proc(id: c.uint) ---                                  // Enable render texture (fbo)
+	DisableFramebuffer   :: proc() ---                                            // Disable render texture (fbo), return to default framebuffer
+	GetActiveFramebuffer :: proc() -> c.uint ---                                  // Get the currently active render texture (fbo), 0 for default framebuffer
+	ActiveDrawBuffers    :: proc(count: c.int) ---                                // Activate multiple draw color buffers
+	BlitFramebuffer	     :: proc(srcX, srcY, srcWidth, srcHeight: c.int, dstX, dstY, dstWidth, dstHeight: c.int, bufferMask: c.int) --- // Blit active framebuffer to main framebuffer
+	BindFramebuffer      :: proc(target, framebuffer: c.uint) ---                 // Bind framebuffer (FBO)
 
 	// General render state
 	EnableColorBlend       :: proc() ---                           // Enable color blending
@@ -452,12 +454,13 @@ foreign lib {
 	DisableDepthMask       :: proc() ---                           // Disable depth write
 	EnableBackfaceCulling  :: proc() ---                           // Enable backface culling
 	DisableBackfaceCulling :: proc() ---                           // Disable backface culling
+	ColorMask              :: proc(r, g, b, a: bool) ---           // Color mask control
 	SetCullFace            :: proc(mode: CullMode) ---             // Set face culling mode
 	EnableScissorTest      :: proc() ---                           // Enable scissor test
 	DisableScissorTest     :: proc() ---                           // Disable scissor test
 	Scissor                :: proc(x, y, width, height: c.int) --- // Scissor test
 	EnableWireMode         :: proc() ---                           // Enable wire mode
-	EnablePointMode        :: proc() --- 							 // Enable point mode
+	EnablePointMode        :: proc() ---                           // Enable point mode
 	DisableWireMode        :: proc() ---                           // Disable wire and point modes
 	SetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
 	GetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
@@ -503,7 +506,7 @@ foreign lib {
 	DrawRenderBatch       :: proc(batch: ^RenderBatch) ---                              // Draw render batch data (Update->Draw->Reset)
 	SetRenderBatchActive  :: proc(batch: ^RenderBatch) ---                              // Set the active render batch for rlgl (NULL for default internal)
 	DrawRenderBatchActive :: proc() ---                                                 // Update and draw internal render batch
-	CheckRenderBatchLimit :: proc(vCount: c.int) -> c.int ---                           // Check internal buffer overflow for a given number of vertex
+	CheckRenderBatchLimit :: proc(vCount: c.int) -> bool ---                            // Check internal buffer overflow for a given number of vertex
 
 	SetTexture :: proc(id: c.uint) --- // Set current texture for render batch and check buffers limits
 
@@ -528,7 +531,7 @@ foreign lib {
 	// Textures management
 	LoadTexture         :: proc(data: rawptr, width, height: c.int, format: c.int, mipmapCount: c.int) -> c.uint ---        // Load texture in GPU
 	LoadTextureDepth    :: proc(width, height: c.int, useRenderBuffer: bool) -> c.uint ---                                  // Load depth texture/renderbuffer (to be attached to fbo)
-	LoadTextureCubemap  :: proc(data: rawptr, size: c.int, format: c.int) -> c.uint ---                                     // Load texture cubemap
+	LoadTextureCubemap  :: proc(data: rawptr, size: c.int, format: c.int, mipmapCount: c.int) -> c.uint ---                 // Load texture cubemap
 	UpdateTexture       :: proc(id: c.uint, offsetX, offsetY: c.int, width, height: c.int, format: c.int, data: rawptr) --- // Update GPU texture with new data
 	GetGlTextureFormats :: proc(format: c.int, glInternalFormat, glFormat, glType: ^c.uint) ---                             // Get OpenGL internal formats
 	GetPixelFormatName  :: proc(format: c.uint) -> cstring ---                                                              // Get name string for pixel format
@@ -552,6 +555,7 @@ foreign lib {
 	GetLocationAttrib   :: proc(shaderId: c.uint, attribName: cstring) -> c.int ---                   // Get shader location attribute
 	SetUniform          :: proc(locIndex: c.int, value: rawptr, uniformType: c.int, count: c.int) --- // Set shader value uniform
 	SetUniformMatrix    :: proc(locIndex: c.int, mat: Matrix) ---                                     // Set shader value matrix
+	SetUniformMatrices  :: proc(locIndex: c.int, matrices: [^]Matrix, count: c.int) ---               // Set shader value matrices
 	SetUniformSampler   :: proc(locIndex: c.int, textureId: c.uint) ---                               // Set shader value sampler
 	SetShader           :: proc(id: c.uint, locs: [^]c.int) ---                                       // Set shader currently active (id and locations)
 
