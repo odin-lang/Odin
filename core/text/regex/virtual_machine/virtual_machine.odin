@@ -59,23 +59,23 @@ Split :: struct #packed {
 	right:  i16,
 }
 Wait_For_Byte :: struct #packed {
-	opcode: Opcode,
+	opcode:  Opcode,
 	operand: Opcode,
 }
 Wait_For_Rune :: struct #packed {
-	opcode: Opcode,
+	opcode:  Opcode,
 	operand: rune,
 }
 Wait_For_Rune_Class :: struct #packed {
-	opcode: Opcode,
+	opcode:  Opcode,
 	operand: Opcode,
 }
 Wait_For_Rune_Class_Negated :: struct #packed {
-	opcode: Opcode,
+	opcode:  Opcode,
 	operand: Opcode,
 }
 Save :: struct #packed {
-	opcode: Opcode,
+	opcode:  Opcode,
 	operand: Opcode,
 }
 
