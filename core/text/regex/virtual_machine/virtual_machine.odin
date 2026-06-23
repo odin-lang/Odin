@@ -49,6 +49,35 @@ Opcode :: enum u8 {
 	Wait_For_Rune_Class_Negated = 0x14, // | u8
 	Match_All_And_Escape        = 0x15, // |
 }
+Jump :: struct #packed {
+	opcode: Opcode,
+	target: i16,
+}
+Split :: struct #packed {
+	opcode: Opcode,
+	left:   i16,
+	right:  i16,
+}
+Wait_For_Byte :: struct #packed {
+	opcode: Opcode,
+	operand: Opcode,
+}
+Wait_For_Rune :: struct #packed {
+	opcode: Opcode,
+	operand: rune,
+}
+Wait_For_Rune_Class :: struct #packed {
+	opcode: Opcode,
+	operand: Opcode,
+}
+Wait_For_Rune_Class_Negated :: struct #packed {
+	opcode: Opcode,
+	operand: Opcode,
+}
+Save :: struct #packed {
+	opcode: Opcode,
+	operand: Opcode,
+}
 
 Thread :: struct {
 	pc: int,
