@@ -42,7 +42,7 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> 
 	case Float:
 		io.write_f64(w, v) or_return
 	case Boolean:
-	io.write_string(w, "true" if v else "false") or_return
+		io.write_string(w, "true" if v else "false") or_return
 	case String:
 		io.write_quoted_string(w, v, '"', nil, true) or_return
 	case Array:
