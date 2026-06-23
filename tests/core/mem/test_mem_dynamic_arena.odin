@@ -6,7 +6,7 @@ import "core:mem"
 
 expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, alignment: int) {
 	pool: mem.Dynamic_Pool
-	mem.dynamic_pool_init(&pool, alignment = alignment)
+	mem.dynamic_pool_init(&pool, minimum_alignment = alignment)
 	pool_allocator := mem.dynamic_pool_allocator(&pool)
 
 	element, err := mem.alloc(num_bytes, alignment, pool_allocator)
@@ -18,20 +18,20 @@ expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, al
 		`
 		Allocated data with size %v bytes, expected %v bytes left, got %v bytes left, off by %v bytes.
 		Pool:
-		block_size = %v
-		out_band_size = %v
-		alignment = %v
-		unused_blocks = %v
-		used_blocks = %v
+		block_size           = %v
+		out_band_size        = %v
+		minimum_alignment    = %v
+		unused_blocks        = %v
+		used_blocks          = %v
 		out_band_allocations = %v
-		current_block = %v
-		current_pos = %v
-		bytes_left = %v
+		current_block        = %v
+		current_pos          = %v
+		bytes_left           = %v
 		`,
 		num_bytes, expected_bytes_left, pool.bytes_left, expected_bytes_left - pool.bytes_left,
 		pool.block_size,
 		pool.out_band_size,
-		pool.alignment,
+		pool.minimum_alignment,
 		pool.unused_blocks,
 		pool.used_blocks,
 		pool.out_band_allocations,
@@ -39,6 +39,7 @@ expect_pool_allocation :: proc(t: ^testing.T, expected_used_bytes, num_bytes, al
 		pool.current_pos,
 		pool.bytes_left,
 	)
+	testing.expectf(t, uintptr(element) % uint(alignment) == 0, "Expected allocation to be aligned to %d byte boundary, got %v", alignment, element)
 
 	mem.dynamic_pool_destroy(&pool)
 	testing.expect(t, pool.used_blocks == nil)
