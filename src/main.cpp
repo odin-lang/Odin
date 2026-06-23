@@ -3693,13 +3693,38 @@ int main(int arg_count, char const **arg_ptr) {
 	String init_filename = {};
 	isize  last_non_run_arg = args.count;
 
+	isize double_dash_pos = -1;
 	for_array(i, args) {
 		if (args[i] == "--") {
+			double_dash_pos = i;
 			break;
 		}
+
 		if (args[i] == "-help" || args[i] == "--help") {
 			build_context.show_help = true;
 			return print_show_help(args[0], command);
+		}
+	}
+
+	if (args.count > 2) {
+		// NOTE(bill): Allow for both `odin command path -flags` and `odin command -flags path`
+		// To do this, if the first argument after the command and last argument is NOT a flag,
+		// then put that last parameter first
+		isize end_arg = double_dash_pos >= 0 ? double_dash_pos : args.count-1;
+		if (args[1] == "bundle" && args.count > 4) {
+			if (string_starts_with(args[3], str_lit("-")) &&
+			    !string_starts_with(args[end_arg], str_lit("-"))) {
+				String possible_path = args[end_arg];
+				array_ordered_remove(&args, end_arg);
+				array_inject_at(&args, 3, possible_path);
+			}
+		} else if (args.count > 3) {
+			if (string_starts_with(args[2], str_lit("-")) &&
+			    !string_starts_with(args[end_arg], str_lit("-"))) {
+				String possible_path = args[end_arg];
+				array_ordered_remove(&args, end_arg);
+				array_inject_at(&args, 2, possible_path);
+			}
 		}
 	}
 
