@@ -1621,20 +1621,6 @@ small_stack_allocator_proc :: proc(
 	return nil, nil
 }
 
-
-/* Preserved for compatibility */
-Dynamic_Pool                          :: Dynamic_Arena
-DYNAMIC_POOL_BLOCK_SIZE_DEFAULT       :: DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT
-DYNAMIC_POOL_OUT_OF_BAND_SIZE_DEFAULT :: DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT
-dynamic_pool_allocator_proc           :: dynamic_arena_allocator_proc
-dynamic_pool_free_all                 :: dynamic_arena_free_all
-dynamic_pool_reset                    :: dynamic_arena_reset
-dynamic_pool_alloc_bytes              :: dynamic_arena_alloc_bytes
-dynamic_pool_alloc                    :: dynamic_arena_alloc
-dynamic_pool_init                     :: dynamic_arena_init
-dynamic_pool_allocator                :: dynamic_arena_allocator
-dynamic_pool_destroy                  :: dynamic_arena_destroy
-
 /*
 Default block size for dynamic arena.
 */
@@ -1671,20 +1657,20 @@ arrays of blocks and out-band blocks. The blocks have the default size of
 will be aligned to a boundary specified by `alignment`.
 */
 dynamic_arena_init :: proc(
-	pool: ^Dynamic_Arena,
+	arena: ^Dynamic_Arena,
 	block_allocator := context.allocator,
 	array_allocator := context.allocator,
 	block_size      := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
 	out_band_size   := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
 	alignment       := DEFAULT_ALIGNMENT,
 ) {
-	pool.block_size                     = block_size
-	pool.out_band_size                  = out_band_size
-	pool.alignment                      = alignment
-	pool.block_allocator                = block_allocator
-	pool.out_band_allocations.allocator = array_allocator
-	pool.unused_blocks.allocator        = array_allocator
-	pool.used_blocks.allocator          = array_allocator
+	arena.block_size                     = block_size
+	arena.out_band_size                  = out_band_size
+	arena.alignment                      = alignment
+	arena.block_allocator                = block_allocator
+	arena.out_band_allocations.allocator = array_allocator
+	arena.unused_blocks.allocator        = array_allocator
+	arena.used_blocks.allocator          = array_allocator
 }
 
 /*
