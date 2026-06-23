@@ -1828,6 +1828,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->metrics = *metrics;
 
+	if (bc->metrics.os == TargetOs_freestanding &&
+		  bc->metrics.arch == TargetArch_arm32 &&
+			bc->microarch == str_lit("cortex-m7")) {
+			bc->metrics.target_triplet = str_lit("thumbv7em-none-eabihf");
+	}
+
 	bc->ODIN_OS           = target_os_names[metrics->os];
 	bc->ODIN_ARCH         = target_arch_names[metrics->arch];
 	bc->endian_kind       = target_endians[metrics->arch];
