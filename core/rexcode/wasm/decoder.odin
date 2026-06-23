@@ -66,6 +66,7 @@ decode :: proc(
 }
 
 
+@(require_results)
 decode_one :: proc(
 	data:      []u8,
 	relocs:    []Relocation,
@@ -230,7 +231,7 @@ decode_one :: proc(
 
 // Which index space the IDX immediate in operand slot `which` addresses, by
 // mnemonic. Mirrors how the builders in instructions.odin tag each operand.
-@(private="file")
+@(private="file", require_results)
 idx_kind_for :: #force_inline proc "contextless" (m: Mnemonic, which: int) -> Index_Kind {
 	#partial switch m {
 	case .BR, .BR_IF:                           return .LABEL
@@ -247,7 +248,7 @@ idx_kind_for :: #force_inline proc "contextless" (m: Mnemonic, which: int) -> In
 	return .NONE
 }
 
-@(private="file")
+@(private="file", require_results)
 reloc_label_at :: #force_inline proc "contextless" (relocs: []Relocation, offset: u32) -> (label_id: u32, found: bool) {
 	for r in relocs {
 		if r.offset == offset {

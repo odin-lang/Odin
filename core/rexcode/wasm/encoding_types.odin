@@ -132,6 +132,7 @@ write_uleb_padded5 :: #force_inline proc "contextless" (code: []u8, offset: ^u32
 	}
 }
 
+@(require_results)
 uleb_size :: #force_inline proc "contextless" (value: u64) -> u32 {
 	v := value
 	n: u32 = 1
@@ -141,6 +142,7 @@ uleb_size :: #force_inline proc "contextless" (value: u64) -> u32 {
 	return n
 }
 
+@(require_results)
 sleb_size :: #force_inline proc "contextless" (value: i64) -> u32 {
 	v := value
 	n: u32 = 0

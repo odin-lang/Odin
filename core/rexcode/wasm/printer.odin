@@ -41,6 +41,7 @@ Print_Options         :: isa.Print_Options
 Print_Result          :: isa.Print_Result
 DEFAULT_PRINT_OPTIONS :: isa.DEFAULT_PRINT_OPTIONS
 
+@(require_results)
 mnemonic_to_string :: proc(m: Mnemonic, lowercase: bool = true, allocator := context.temp_allocator) -> string {
 	sb := strings.builder_make(allocator)
 	write_mnemonic(&sb, m, !lowercase)
