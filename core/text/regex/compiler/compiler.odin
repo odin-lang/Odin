@@ -449,15 +449,14 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 
 		// `.*?`
 		split := Split{.Split, i16(SPLIT_SIZE + size_of(byte) + JUMP_SIZE), i16(SPLIT_SIZE)}
-		inject_raw(&code, pc_open, split)
-		pc_open += size_of(Split)
-
-		inject_at(&code, pc_open, Opcode.Wildcard)
-		pc_open += size_of(byte)
-
 		jump := Jump{.Jump, i16(-size_of(byte) - SPLIT_SIZE)}
-		inject_raw(&code, pc_open, jump)
-		pc_open += size_of(Jump)
+		pack := struct {
+			a: Split,
+			b: Opcode,
+			c: Jump,
+		} { split, Opcode.Wildcard, jump }
+		inject_raw(&code, pc_open, pack)
+		pc_open += size_of(Split) + size_of(byte) + size_of(Jump)
 	}
 
 	if .No_Capture not_in flags {
