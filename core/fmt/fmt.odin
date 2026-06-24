@@ -1203,7 +1203,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
 	if fi.plus                           { flags += {.Plus}   }
-	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
+	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
 		c: byte = 0

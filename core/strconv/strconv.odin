@@ -1512,7 +1512,7 @@ Output:
 - The resulting string after writing the unsigned integer value
 */
 write_uint :: proc(buf: []byte, u: u64, base: int) -> string {
-	return write_bits(buf, u, base, false, 8*size_of(uint), digits, nil)
+	return write_bits(buf, u, base, false, 8*size_of(uint))
 }
 /*
 Writes a signed integer value as a string to the given buffer with the specified base
@@ -1540,13 +1540,13 @@ Output:
 - The resulting string after writing the signed integer value
 */
 write_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return write_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
+	return write_bits(buf, u64(i), base, true, 8*size_of(int))
 }
 
 
 
 write_u128 :: proc(buf: []byte, u: u128, base: int) -> string {
-	return write_bits_128(buf, u, base, false, 8*size_of(uint), digits, nil)
+	return write_bits(buf, u, base, false, 8*size_of(uint))
 }
 
 /*
@@ -1640,8 +1640,8 @@ quote :: proc(buf: []byte, str: string) -> string {
 		}
 		if width == 1 && r == utf8.RUNE_ERROR {
 			write_byte(buf, &i, '\\', 'x')
-			write_byte(buf, &i, digits[s[0]>>4])
-			write_byte(buf, &i, digits[s[0]&0xf])
+			write_byte(buf, &i, DIGITS[s[0]>>4])
+			write_byte(buf, &i, DIGITS[s[0]&0xf])
 		}
 		if i < len(buf) {
 			x := quote_rune(buf[i:], r)
@@ -1716,7 +1716,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 		if r < 32 {
 			write_string(buf, &i, "\\x")
 			b: [2]byte
-			s := write_bits(b[:], u64(r), 16, true, 64, digits, nil)
+			s := write_bits(b[:], u64(r), 16, true, 64)
 			switch len(s) {
 			case 0: write_string(buf, &i, "00")
 			case 1: write_rune(buf, &i, '0')
