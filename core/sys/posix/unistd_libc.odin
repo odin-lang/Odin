@@ -1,4 +1,4 @@
-#+build linux, windows, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, windows, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"

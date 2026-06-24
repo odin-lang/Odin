@@ -23,6 +23,23 @@ package runtime
 
 import "base:intrinsics"
 
+/*
+Fast_Math_Flag :: enum u8 {
+	Allow_Reassoc    = 0,
+	No_NaNs          = 1,
+	No_Infs          = 2,
+	No_Signed_Zeros  = 3,
+	Allow_Reciprocal = 4,
+	Allow_Contract   = 5,
+	Approx_Func      = 6,
+}
+*/
+Fast_Math_Flag  :: intrinsics.Fast_Math_Flag
+
+// Fast_Math_Flags :: distinct bit_set[Fast_Math_Flag; u32]
+Fast_Math_Flags :: intrinsics.Fast_Math_Flags
+
+
 // NOTE(bill): This must match the compiler's
 
 /*
@@ -588,7 +605,6 @@ Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 		FreeBSD,
 		OpenBSD,
 		NetBSD,
-		Haiku,
 		WASI,
 		JS,
 		Orca,
@@ -655,7 +671,6 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	.FreeBSD,
 	.OpenBSD,
 	.NetBSD,
-	.Haiku,
 	.WASI,
 	.JS,
 	.Orca,

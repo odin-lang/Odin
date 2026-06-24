@@ -240,8 +240,8 @@ foreign lib {
 	RenderTextureTiled               :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), scale: f32, dstrect: Maybe(^FRect)) -> bool ---
 	RenderTexture9Grid               :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), left_width, right_width, top_height, bottom_height: f32, scale: f32, dstrect: Maybe(^FRect)) -> bool ---
 	RenderTexture9GridTiled          :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: Maybe(^FRect), left_width, right_width, top_height, bottom_height: f32, scale: f32, dstrect: Maybe(^FRect), tileScale: f32) -> bool ---
-	RenderGeometry                   :: proc(renderer: ^Renderer, texture: ^Texture, vertices: [^]Vertex, num_vertices: c.int, indices: [^]c.int, num_indices: c.int) -> bool ---
-	RenderGeometryRaw                :: proc(renderer: ^Renderer, texture: ^Texture, xy: [^]f32, xy_stride: c.int, color: [^]FColor, color_stride: c.int, uv: [^]f32, uv_stride: c.int, num_vertices: c.int, indices: rawptr, num_indices: c.int, size_indices: c.int) -> bool ---
+	RenderGeometry                   :: proc(renderer: ^Renderer, texture: Maybe(^Texture), vertices: [^]Vertex, num_vertices: c.int, indices: [^]c.int, num_indices: c.int) -> bool ---
+	RenderGeometryRaw                :: proc(renderer: ^Renderer, texture: Maybe(^Texture), xy: [^]f32, xy_stride: c.int, color: [^]FColor, color_stride: c.int, uv: [^]f32, uv_stride: c.int, num_vertices: c.int, indices: rawptr, num_indices: c.int, size_indices: c.int) -> bool ---
 	SetRenderTextureAddressMode      :: proc(renderer: ^Renderer, u_mode, v_mode: TextureAddressMode) -> bool ---
 	GetRenderTextureAddressMode      :: proc(renderer: ^Renderer, u_mode, v_mode: ^TextureAddressMode) -> bool ---
 	RenderPresent                    :: proc(renderer: ^Renderer) -> bool ---
@@ -276,5 +276,5 @@ foreign lib {
 	CreateGPURenderState              :: proc(renderer: ^Renderer, #by_ptr createinfo: GPURenderStateCreateInfo) -> ^GPURenderState ---
 	SetGPURenderStateFragmentUniforms :: proc(state: ^GPURenderState, slot_index: Uint32, data: rawptr, length: Uint32) -> bool ---
 	SetGPURenderState                 :: proc(renderer: ^Renderer, state: ^GPURenderState) -> bool ---
-	DestroyGPURenderState             :: proc(renderer: ^Renderer) ---
+	DestroyGPURenderState             :: proc(renderer: ^GPURenderState) ---
 }

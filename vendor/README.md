@@ -114,7 +114,7 @@ This package is available under the Zlib license. See `LICENSE` for more details
 
 ## SDL2
 
-Bindings for the cross platform multimedia API [SDL3](https://github.com/libsdl-org/SDL) and its sub-projects.
+Bindings for the cross platform multimedia API [SDL2](https://github.com/libsdl-org/SDL) and its sub-projects.
 
 `SDL2.dll` and `SDL2.lib` are available under SDL's [zlib](https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt) license.
 
@@ -144,7 +144,7 @@ SDL2 TTF relies on 3rd party libraries `zlib`, available under the ZLIB license,
 
 ## SDL3
 
-Bindings for the cross platform multimedia API [SDL2](https://github.com/libsdl-org/SDL) and its sub-projects.
+Bindings for the cross platform multimedia API [SDL3](https://github.com/libsdl-org/SDL) and its sub-projects.
 
 `SDL3.dll` and `SDL3.lib` are available under SDL's [zlib](https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt) license.
 

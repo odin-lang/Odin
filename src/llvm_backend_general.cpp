@@ -1,5 +1,6 @@
 gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token);
 gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len);
+gb_internal LLVMRelocMode get_reloc_mode();
 
 gb_global Entity *lb_global_type_info_data_entity   = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
@@ -59,6 +60,18 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	m->ctx = LLVMContextCreate();
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
+	if (build_context.no_plt) {
+		LLVMAddModuleFlag(m->mod,
+			LLVMModuleFlagBehaviorWarning,
+			"RtLibUseGOT", 11, 
+			LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true)));
+	}
+	
+	LLVMAddModuleFlag(m->mod,
+		LLVMModuleFlagBehaviorWarning,
+		"PIC Level", 9, 
+		LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), get_reloc_mode(), true)));
+
 	if (build_context.ODIN_DEBUG) {
 		enum {DEBUG_METADATA_VERSION = 3};
 
@@ -951,6 +964,113 @@ gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef ty
 	return result;
 }
 
+// gb_internal void OdinLLVMBuildUnalignedStore(lbProcedure *p, LLVMValueRef dst, LLVMValueRef src, Type *ptr_type) {
+// 	Type *t = type_deref(ptr_type);
+
+// 	if (is_type_simd_vector(t)) {
+// 		LLVMValueRef store = LLVMBuildStore(p->builder, src, dst);
+// 		LLVMSetAlignment(store, 1);
+// 	} else {
+// 		lb_mem_copy_non_overlapping(p, {dst, ptr_type}, {src, ptr_type}, lb_const_int(p->module, t_int, type_size_of(t)), false);
+// 	}
+
+// }
+gb_internal LLVMValueRef OdinLLVMBuildUnalignedLoad(lbProcedure *p, LLVMValueRef src, Type *ptr_type) {
+	LLVMTypeRef type = lb_type(p->module, type_deref(ptr_type));
+
+	src = LLVMBuildPointerCast(p->builder, src, lb_type(p->module, ptr_type), "");
+	LLVMValueRef load = LLVMBuildLoad2(p->builder, type, src, "");
+	LLVMSetAlignment(load, 1);
+	return load;
+}
+
+gb_internal void lb_copy_bits(lbProcedure *p,
+	LLVMValueRef dst,
+	LLVMValueRef src,
+	u64 buf_bytes,
+	u64 dst_bit,
+	u64 src_bit,
+	u64 size_bits
+) {
+	if (size_bits == 0) {
+		return;
+	}
+	GB_ASSERT(size_bits <= 64); // this routine assembles the field in a single u64
+
+	auto ptr_offset = [](lbProcedure *p, LLVMValueRef ptr, u64 offset) -> LLVMValueRef {
+		LLVMValueRef indices[1] = {LLVMConstInt(lb_type(p->module, t_u64), offset, false)};
+		ptr = LLVMBuildPointerCast(p->builder, ptr, lb_type(p->module, t_u8_ptr), "");
+		return LLVMBuildGEP2(p->builder, lb_type(p->module, t_u8), ptr, indices, 1, "");
+	};
+
+	LLVMTypeRef llvm_u8  = lb_type(p->module, t_u8);
+	LLVMTypeRef llvm_u64 = lb_type(p->module, t_u64);
+
+	dst = LLVMBuildPointerCast(p->builder, dst, lb_type(p->module, t_u8_ptr), "");
+	src = LLVMBuildPointerCast(p->builder, src, lb_type(p->module, t_u8_ptr), "");
+
+	u64 src_byte  = src_bit >> 3;
+	u64 dst_byte  = dst_bit >> 3;
+	u64 src_shift = src_bit & 7;
+	u64 dst_shift = dst_bit & 7;
+
+	u64 src_need_bytes = (src_shift + size_bits + 7) >> 3; // 1..9, exact span of the field
+	u64 dst_need_bytes = (dst_shift + size_bits + 7) >> 3; // 1..9, exact span of the field
+
+	// These spans are exactly the bytes the field occupies, so they are in bounds
+	// whenever the field is. (buf_bytes must bound the buffer each pointer refers to.)
+	GB_ASSERT(src_byte + src_need_bytes <= buf_bytes);
+	GB_ASSERT(dst_byte + dst_need_bytes <= buf_bytes);
+
+	u64 mask = ~cast(u64)0;
+	if (size_bits < 64) {
+		mask = ((cast(u64)1) << size_bits) - 1;
+	}
+
+	// Gather: read exactly src_need_bytes bytes, pack the field into the low size_bits of `bits` ---
+	LLVMValueRef bits = LLVMConstInt(llvm_u64, 0, false);
+	for (u64 i = 0; i < src_need_bytes; i++) {
+		LLVMValueRef byte = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, src, src_byte + i), t_u8_ptr);
+		byte = LLVMBuildZExt(p->builder, byte, llvm_u64, "");
+
+		// byte i sits at frame bit i*8; the field starts at frame bit src_shift
+		if (i*8 >= src_shift) {
+			u64 sh = i*8 - src_shift; // 0..63 (sh==64 only needs i==8, which requires src_shift>=1)
+			byte = LLVMBuildShl (p->builder, byte, LLVMConstInt(llvm_u64, sh, false), "");
+		} else {
+			u64 sh = src_shift - i*8; // 1..7
+			byte = LLVMBuildLShr(p->builder, byte, LLVMConstInt(llvm_u64, sh, false), "");
+		}
+		bits = LLVMBuildOr(p->builder, bits, byte, "");
+	}
+	bits = LLVMBuildAnd(p->builder, bits, LLVMConstInt(llvm_u64, mask, false), "");
+
+	// Scatter: write exactly dst_need_bytes bytes, each a masked read-modify-write ---
+	for (u64 i = 0; i < dst_need_bytes; i++) {
+		LLVMValueRef contrib = nullptr;
+		u64 byte_mask = 0; // which bits (0..7) of this byte belong to the field
+
+		if (i*8 >= dst_shift) {
+			u64 sh = i*8 - dst_shift;
+			contrib   = LLVMBuildLShr(p->builder, bits, LLVMConstInt(llvm_u64, sh, false), "");
+			byte_mask = (mask >> sh) & 0xff;
+		} else {
+			u64 sh = dst_shift - i*8; // 1..7
+			contrib   = LLVMBuildShl(p->builder, bits, LLVMConstInt(llvm_u64, sh, false), "");
+			byte_mask = (mask << sh) & 0xff;
+		}
+		contrib = LLVMBuildTrunc(p->builder, contrib, llvm_u8, "");
+		contrib = LLVMBuildAnd(p->builder, contrib, LLVMConstInt(llvm_u8, byte_mask, false), "");
+
+		LLVMValueRef old = OdinLLVMBuildUnalignedLoad(p, ptr_offset(p, dst, dst_byte + i), t_u8_ptr);
+		old = LLVMBuildAnd(p->builder, old, LLVMConstInt(llvm_u8, (~byte_mask) & 0xff, false), "");
+
+		LLVMValueRef merged = LLVMBuildOr(p->builder, old, contrib, "");
+		LLVMValueRef store = LLVMBuildStore(p->builder, merged, ptr_offset(p, dst, dst_byte + i));
+		LLVMSetAlignment(store, 1);
+	}
+}
+
 gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
 		return;
@@ -968,6 +1088,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 	if (addr.kind == lbAddr_BitField) {
 		lbValue dst = addr.addr;
+		lbValue src = {};
 		if (is_type_endian_big(addr.bitfield.type)) {
 			i64 shift_amount = 8*type_size_of(value.type) - addr.bitfield.bit_size;
 			lbValue shifted_value = value;
@@ -975,33 +1096,17 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 				shifted_value.value,
 				LLVMConstInt(LLVMTypeOf(shifted_value.value), shift_amount, false), "");
 
-			lbValue src = lb_address_from_load_or_generate_local(p, shifted_value);
-
-			auto args = array_make<lbValue>(temporary_allocator(), 4);
-			args[0] = dst;
-			args[1] = src;
-			args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
-			args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
-			lb_emit_runtime_call(p, "__write_bits", args);
-		} else if ((addr.bitfield.bit_offset % 8) == 0 &&
-		           (addr.bitfield.bit_size   % 8) == 0) {
-			lbValue src = lb_address_from_load_or_generate_local(p, value);
-
-			lbValue byte_offset = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset/8);
-			lbValue byte_size = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size/8);
-			lbValue dst_offset = lb_emit_conv(p, dst, t_u8_ptr);
-			dst_offset = lb_emit_ptr_offset(p, dst_offset, byte_offset);
-			lb_mem_copy_non_overlapping(p, dst_offset, src, byte_size);
+			src = lb_address_from_load_or_generate_local(p, shifted_value);
 		} else {
-			lbValue src = lb_address_from_load_or_generate_local(p, value);
-
-			auto args = array_make<lbValue>(temporary_allocator(), 4);
-			args[0] = dst;
-			args[1] = src;
-			args[2] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
-			args[3] = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
-			lb_emit_runtime_call(p, "__write_bits", args);
+			src = lb_address_from_load_or_generate_local(p, value);
 		}
+
+		u64 buf_bytes = cast(u64)type_size_of(type_deref(dst.type));
+		u64 dst_bit   = cast(u64)addr.bitfield.bit_offset;
+		u64 src_bit   = cast(u64)0;
+		u64 size_bits = cast(u64)addr.bitfield.bit_size;
+
+		lb_copy_bits(p, dst.value, src.value, buf_bytes, dst_bit, src_bit, size_bits);
 		return;
 	} else if (addr.kind == lbAddr_Map) {
 		lb_internal_dynamic_map_set(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
@@ -1283,53 +1388,28 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			}
 		}
 
-		i64 total_bitfield_bit_size = 8*type_size_of(lb_addr_type(addr));
 		i64 dst_byte_size = type_size_of(addr.bitfield.type);
 		lbAddr dst = lb_add_local_generated(p, addr.bitfield.type, true);
 		lbValue src = addr.addr;
 
-		lbValue bit_offset  = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_offset);
-		lbValue bit_size    = lb_const_int(p->module, t_uintptr, addr.bitfield.bit_size);
-		lbValue byte_offset = lb_const_int(p->module, t_uintptr, (addr.bitfield.bit_offset+7)/8);
-		lbValue byte_size   = lb_const_int(p->module, t_uintptr, (addr.bitfield.bit_size+7)/8);
-
 		GB_ASSERT(type_size_of(addr.bitfield.type) >= ((addr.bitfield.bit_size+7)/8));
 
 		lbValue r = {};
-		if (is_type_endian_big(addr.bitfield.type)) {
-			auto args = array_make<lbValue>(temporary_allocator(), 4);
-			args[0] = dst.addr;
-			args[1] = src;
-			args[2] = bit_offset;
-			args[3] = bit_size;
-			lb_emit_runtime_call(p, "__read_bits", args);
 
+		u64 buf_bytes = cast(u64)type_size_of(type_deref(src.type));
+		u64 dst_bit   = cast(u64)0;
+		u64 src_bit   = cast(u64)addr.bitfield.bit_offset;
+		u64 size_bits = cast(u64)addr.bitfield.bit_size;
+
+		lb_copy_bits(p, dst.addr.value, src.value, buf_bytes, dst_bit, src_bit, size_bits);
+		r = lb_addr_load(p, dst);
+		if (is_type_endian_big(addr.bitfield.type)) {
 			LLVMValueRef shift_amount = LLVMConstInt(
 				lb_type(p->module, lb_addr_type(dst)),
 				8*dst_byte_size - addr.bitfield.bit_size,
 				false
 			);
-			r = lb_addr_load(p, dst);
 			r.value = LLVMBuildShl(p->builder, r.value, shift_amount, "");
-		} else if ((addr.bitfield.bit_offset % 8) == 0) {
-			do_mask = 8*dst_byte_size != addr.bitfield.bit_size;
-
-			lbValue copy_size = byte_size;
-			lbValue src_offset = lb_emit_conv(p, src, t_u8_ptr);
-			src_offset = lb_emit_ptr_offset(p, src_offset, byte_offset);
-			if (addr.bitfield.bit_offset + 8*dst_byte_size <= total_bitfield_bit_size) {
-				copy_size = lb_const_int(p->module, t_uintptr, dst_byte_size);
-			}
-			lb_mem_copy_non_overlapping(p, dst.addr, src_offset, copy_size, false);
-			r = lb_addr_load(p, dst);
-		} else {
-			auto args = array_make<lbValue>(temporary_allocator(), 4);
-			args[0] = dst.addr;
-			args[1] = src;
-			args[2] = bit_offset;
-			args[3] = bit_size;
-			lb_emit_runtime_call(p, "__read_bits", args);
-			r = lb_addr_load(p, dst);
 		}
 
 		Type *t = addr.bitfield.type;
@@ -3660,4 +3740,26 @@ gb_internal void lb_set_linkage_from_entity_flags(lbModule *m, LLVMValueRef valu
 	} else if (flags & EntityFlag_CustomLinkage_LinkOnce) {
 		LLVMSetLinkage(value, LLVMLinkOnceAnyLinkage);
 	}
+}
+
+LLVMRelocMode get_reloc_mode() {
+	// NOTE(dweiler): Dynamic libraries require position-independent code.
+	LLVMRelocMode reloc_mode = LLVMRelocDefault;
+	if (build_context.build_mode == BuildMode_DynamicLibrary) {
+		reloc_mode = LLVMRelocPIC;
+	}
+	switch (build_context.reloc_mode) {
+	case RelocMode_Default:
+		break;
+	case RelocMode_Static:
+		reloc_mode = LLVMRelocStatic;
+		break;
+	case RelocMode_PIC:
+		reloc_mode = LLVMRelocPIC;
+		break;
+	case RelocMode_DynamicNoPIC:
+		reloc_mode = LLVMRelocDynamicNoPic;
+		break;
+	}
+	return reloc_mode;
 }

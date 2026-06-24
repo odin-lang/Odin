@@ -1,4 +1,4 @@
-#+build darwin, linux, openbsd, freebsd, netbsd, haiku
+#+build darwin, linux, openbsd, freebsd, netbsd
 package posix
 
 import "core:c"
@@ -46,7 +46,7 @@ FNM_Flag_Bits :: enum c.int {
 }
 FNM_Flags :: bit_set[FNM_Flag_Bits; c.int]
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 
 	FNM_NOMATCH  :: 1
 

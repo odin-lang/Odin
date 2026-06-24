@@ -81,7 +81,7 @@ gb_internal String string_interner_load(InternedString interned) {
 	u8 *base = cast(u8 *)interner + interned.value;
 	u32 str_len = *cast(u32 *)base;
 	u8 *text = base + 4;
-	String str = { text, str_len };
+	String str = { text, cast(isize)str_len };
 	return str;
 }
 

@@ -279,10 +279,8 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error
 
 @(no_sanitize_memory)
 _file_size :: proc(f: ^File_Impl) -> (n: i64, err: Error) {
-	// TODO: Identify 0-sized "pseudo" files and return No_Size. This would
-	//       eliminate the need for the _read_entire_pseudo_file procs.
-	s: linux.Stat = ---
-	errno := linux.fstat(f.fd, &s)
+	s: linux.Statx = ---
+	errno := linux.statx(f.fd, "", {.EMPTY_PATH}, {.SIZE, .TYPE}, &s)
 	if errno != .NONE {
 		return 0, _get_platform_error(errno)
 	}

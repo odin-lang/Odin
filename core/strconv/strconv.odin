@@ -342,6 +342,7 @@ Parses a signed integer value from the input string, using the specified base or
 - base: The base of the number system to use for parsing (default: 0)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
 	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
 
@@ -385,6 +386,7 @@ Parses an unsigned integer value from the input string, using the specified base
 - base: The base of the number system to use for parsing (default: 0, inferred)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
 	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
 

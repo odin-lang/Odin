@@ -270,6 +270,55 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	optimization of Odin programs	
 **************************************************************************/
 
+gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
+	Entity *e = p->entity;
+	if (e == nullptr) {
+		return;
+	}
+	GB_ASSERT(e->kind == Entity_Procedure);
+
+
+	u64 fast_math_flags = e->Procedure.fast_math_flags;
+	LLVMFastMathFlags llvm_flags = 0;
+	if (fast_math_flags & OdinFastMath_Allow_Reassoc)    llvm_flags |= LLVMFastMathAllowReassoc;
+	if (fast_math_flags & OdinFastMath_No_NaNs)          llvm_flags |= LLVMFastMathNoNaNs;
+	if (fast_math_flags & OdinFastMath_No_Infs)          llvm_flags |= LLVMFastMathNoInfs;
+	if (fast_math_flags & OdinFastMath_No_Signed_Zeros)  llvm_flags |= LLVMFastMathNoSignedZeros;
+	if (fast_math_flags & OdinFastMath_Allow_Reciprocal) llvm_flags |= LLVMFastMathAllowReciprocal;
+	if (fast_math_flags & OdinFastMath_Allow_Contract)   llvm_flags |= LLVMFastMathAllowContract;
+	if (fast_math_flags & OdinFastMath_Approx_Func)      llvm_flags |= LLVMFastMathApproxFunc;
+
+	if (llvm_flags == 0) {
+		return;
+	}
+
+	for (LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(p->value);
+	     block != nullptr;
+	     block = LLVMGetNextBasicBlock(block)) {
+		for (LLVMValueRef instr = LLVMGetFirstInstruction(block);
+		     instr != nullptr;
+		     instr = LLVMGetNextInstruction(instr))  {
+			switch (LLVMGetInstructionOpcode(instr)) {
+			case LLVMFNeg:
+			case LLVMFAdd:
+			case LLVMFSub:
+			case LLVMFMul:
+			case LLVMFDiv:
+			case LLVMFRem:
+			case LLVMFPToUI:
+			case LLVMFPToSI:
+			case LLVMUIToFP:
+			case LLVMSIToFP:
+			case LLVMFPTrunc:
+			case LLVMFPExt:
+			case LLVMFCmp:
+				LLVMSetFastMathFlags(instr, llvm_flags);
+				break;
+			}
+		}
+	}
+}
+
 gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	unsigned debug_declare_id = LLVMLookupIntrinsicID("llvm.dbg.declare", 16);
 	GB_ASSERT(debug_declare_id != 0);
@@ -475,6 +524,9 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	if (p == nullptr) {
 		return;
 	}
+
+	lb_run_fast_float_math_pass(p);
+
 	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
 	// which means we cannot rely upon it
 	// This is also useful for read the .ll for debug purposes because a lot of instructions

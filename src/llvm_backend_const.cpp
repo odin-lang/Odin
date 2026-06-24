@@ -1,3 +1,12 @@
+gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
+	GB_ASSERT(bit_count <= 64);
+	if (bit_count == 0) {
+		return LLVMConstInt(type, 0, false);
+	}
+	u64 mask = bit_count == 64 ? ~0ull : (1ull<<bit_count)-1;
+	return LLVMConstInt(type, mask, false);
+}
+
 gb_internal bool lb_is_const(lbValue value) {
 	LLVMValueRef v = value.value;
 	if (is_type_untyped_nil(value.type)) {
@@ -678,13 +687,13 @@ LLVMValueRef llvm_const_pad_to_size(lbModule *m, LLVMValueRef val, LLVMTypeRef d
 }
 #endif
 
-gb_internal void lb_const_array_spread(lbModule *m, lbConstContext cc, Type *array, ExactValue value, lbValue *res) {
+gb_internal void lb_const_array_spread(lbModule *m, lbConstContext cc, Type *array, ExactValue value, lbValue *res, Type *value_type) {
 	GB_ASSERT(array->kind == Type_Array);
 	
 	i64 count  = array->Array.count;
 	Type *elem = array->Array.elem;
 
-	lbValue single_elem = lb_const_value(m, elem, value, cc);
+	lbValue single_elem = lb_const_value(m, elem, value, value_type, cc);
 
 	LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 	for (i64 i = 0; i < count; i++) {
@@ -716,7 +725,174 @@ gb_internal LLVMValueRef lb_fill_fixed_capacity_dynamic_array(lbModule *m, i64 e
 	return llvm_const_named_struct(m, original_type, svalues, svalue_count);
 }
 
-gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc, Type *value_type) {
+gb_internal lbValue lb_const_value_bit_field(lbModule *m, Type *type, Ast *value_compound) {
+	ast_node(cl, CompoundLit, value_compound);
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	Type *bt = base_type(type);
+
+	// Type *backing_type = core_type(bt->BitField.backing_type);
+
+	struct FieldData {
+		Type *field_type;
+		u64 bit_offset;
+		u64 bit_size;
+	};
+	auto values = array_make<lbValue>(temporary_allocator(), 0, cl->elems.count);
+	auto fields = array_make<FieldData>(temporary_allocator(), 0, cl->elems.count);
+
+	for (Ast *elem : cl->elems) {
+		ast_node(fv, FieldValue, elem);
+		InternedString interned = fv->field->Ident.interned;
+		Selection sel = lookup_field(bt, interned, false);
+		GB_ASSERT(sel.is_bit_field);
+		GB_ASSERT(!sel.indirect);
+		GB_ASSERT(sel.index.count == 1);
+		GB_ASSERT(sel.entity != nullptr);
+
+		i64 index = sel.index[0];
+		Entity *f = bt->BitField.fields[index];
+		GB_ASSERT(f == sel.entity);
+		i64 bit_offset = bt->BitField.bit_offsets[index];
+		i64 bit_size   = bt->BitField.bit_sizes[index];
+		GB_ASSERT(bit_size > 0);
+
+		Type *field_type = sel.entity->type;
+		if (fv->value->tav.mode != Addressing_Constant) {
+			continue;
+		}
+		lbValue field_expr = lb_const_value(m, field_type, fv->value->tav.value, field_type);
+		array_add(&values, field_expr);
+		array_add(&fields, FieldData{field_type, cast(u64)bit_offset, cast(u64)bit_size});
+	}
+
+	// NOTE(bill): inline insertion sort should be good enough, right?
+	for (isize i = 1; i < values.count; i++) {
+		for (isize j = i;
+		     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+		     j--) {
+			auto vtmp = values[j];
+			values[j] = values[j-1];
+			values[j-1] = vtmp;
+
+			auto ftmp = fields[j];
+			fields[j] = fields[j-1];
+			fields[j-1] = ftmp;
+		}
+	}
+
+	bool any_fields_different_endian = false;
+	for (auto const &f : fields) {
+		if (is_type_different_to_arch_endianness(f.field_type)) {
+			// NOTE(bill): Just be slow for this, to be correct
+			any_fields_different_endian = true;
+			break;
+		}
+	}
+	GB_ASSERT(!any_fields_different_endian);
+
+
+	Type *backing_type = core_type(bt->BitField.backing_type);
+	GB_ASSERT(is_type_integer(backing_type) ||
+	          (is_type_array(backing_type) && is_type_integer(backing_type->Array.elem)));
+
+	if (is_type_integer(backing_type)) {
+		// SINGLE INTEGER BACKING ONLY
+
+		LLVMTypeRef lit = lb_type(m, backing_type);
+
+		LLVMValueRef res = LLVMConstInt(lit, 0, false);
+
+		for (isize i = 0; i < fields.count; i++) {
+			auto const &f = fields[i];
+
+			LLVMValueRef mask = lb_const_low_bits_mask(lit, f.bit_size);
+
+			LLVMValueRef elem = values[i].value;
+			if (lb_sizeof(lit) < lb_sizeof(LLVMTypeOf(elem))) {
+				elem = LLVMBuildTrunc(m->const_dummy_builder, elem, lit, "");
+			} else {
+				elem = LLVMBuildZExt(m->const_dummy_builder, elem, lit, "");
+			}
+			elem = LLVMBuildAnd(m->const_dummy_builder, elem, mask, "");
+
+			elem = LLVMBuildShl(m->const_dummy_builder, elem, LLVMConstInt(lit, f.bit_offset, false), "");
+
+			res = LLVMBuildOr(m->const_dummy_builder, res, elem, "");
+		}
+
+		return {res, type};
+	} else if (is_type_array(backing_type)) {
+		// ARRAY OF INTEGER BACKING
+
+		i64 array_count = backing_type->Array.count;
+		LLVMTypeRef lit = lb_type(m, core_type(backing_type->Array.elem));
+
+		LLVMValueRef *elems = gb_alloc_array(temporary_allocator(), LLVMValueRef, array_count);
+		for (i64 i = 0; i < array_count; i++) {
+			elems[i] = LLVMConstInt(lit, 0, false);
+		}
+
+		u64 elem_bit_size = cast(u64)(8*type_size_of(backing_type->Array.elem));
+		u64 curr_bit_offset = 0;
+		for (isize i = 0; i < fields.count; i++) {
+			auto const &f = fields[i];
+
+			LLVMValueRef val = values[i].value;
+			LLVMTypeRef vt = lb_type(m, values[i].type);
+
+			curr_bit_offset = f.bit_offset;
+
+			for (u64 bits_to_set = f.bit_size;
+			     bits_to_set > 0;
+			     /**/) {
+				i64 elem_idx = curr_bit_offset/elem_bit_size;
+				u64 elem_bit_offset = curr_bit_offset%elem_bit_size;
+
+				u64 mask_width = gb_min(bits_to_set, elem_bit_size-elem_bit_offset);
+				GB_ASSERT(mask_width > 0);
+				bits_to_set -= mask_width;
+
+				LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
+
+				LLVMValueRef to_set = LLVMBuildAnd(m->const_dummy_builder, val, mask, "");
+
+				if (elem_bit_offset != 0) {
+					to_set = LLVMBuildShl(m->const_dummy_builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+				}
+				to_set = LLVMBuildTrunc(m->const_dummy_builder, to_set, lit, "");
+
+				if (LLVMIsNull(elems[elem_idx])) {
+					elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
+				} else {
+					elems[elem_idx] = LLVMBuildOr(m->const_dummy_builder, elems[elem_idx], to_set, "");
+				}
+
+				if (mask_width != 0) {
+					val = LLVMBuildLShr(m->const_dummy_builder, val, LLVMConstInt(vt, mask_width, false), "");
+				}
+				curr_bit_offset += mask_width;
+			}
+
+			GB_ASSERT_MSG(curr_bit_offset == f.bit_offset + f.bit_size, "%llu == %llu + %llu",
+			              cast(unsigned long long)curr_bit_offset,
+			              cast(unsigned long long)f.bit_offset,
+			              cast(unsigned long long)f.bit_size
+			);
+		}
+
+		LLVMValueRef res = LLVMConstArray(lit, elems, cast(unsigned)array_count);
+		return {res, type};
+	} else {
+		// SLOW STORAGE
+		GB_PANIC("TODO(bill): bit_field storage of an unknown kind");
+		return {};
+	}
+}
+
+
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Type *value_type, lbConstContext cc) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
 	}
@@ -728,8 +904,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 	lbValue res = {};
 	res.type = original_type;
-	type = core_type(type);
-	value = convert_exact_value_for_type(value, type);
+	if (!is_type_bit_field(original_type)) {
+		type = core_type(type);
+		value = convert_exact_value_for_type(value, type);
+	}
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
@@ -756,7 +934,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			}
 
 			Type *t = bt->Union.variants[0];
-			lbValue cv =  lb_const_value(m, t, value, cc);
+			lbValue cv =  lb_const_value(m, t, value, value_type, cc);
 			GB_ASSERT(LLVMIsConstant(cv.value));
 
 			LLVMTypeRef llvm_type = lb_type(m, original_type);
@@ -817,7 +995,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				GB_PANIC("%s vs %s", type_to_string(value_type), type_to_string(original_type));
 			}
 
-			lbValue cv = lb_const_value(m, value_type, value, cc, value_type);
+			lbValue cv = lb_const_value(m, value_type, value, value_type, cc);
 			Type *variant_type = cv.type;
 
 			LLVMValueRef values[4] = {};
@@ -922,7 +1100,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			count = gb_max(cast(isize)cl->max_count, count);
 			Type *elem = base_type(type)->Slice.elem;
 			Type *t = alloc_type_array(elem, count);
-			lbValue backing_array = lb_const_value(m, t, value, cc, nullptr);
+			lbValue backing_array = lb_const_value(m, t, value, nullptr, cc);
 
 			LLVMValueRef array_data = nullptr;
 
@@ -1061,7 +1239,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		value.kind != ExactValue_Invalid &&
 		value.kind != ExactValue_Compound) {
 			
-		lb_const_array_spread(m, cc, type, value, &res);
+		lb_const_array_spread(m, cc, type, value, &res, value_type);
 		return res;
 	} else if (is_type_matrix(type) &&
 		value.kind != ExactValue_Invalid &&
@@ -1072,7 +1250,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		
 		Type *elem = type->Matrix.elem;
 		
-		lbValue single_elem = lb_const_value(m, elem, value, cc);
+		lbValue single_elem = lb_const_value(m, elem, value, value_type, cc);
 		single_elem.value = llvm_const_cast(m, single_elem.value, lb_type(m, elem), /*failure_*/nullptr);
 				
 		i64 total_elem_count = matrix_type_total_internal_elems(type);
@@ -1094,7 +1272,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		i64 count = type->SimdVector.count;
 		Type *elem = type->SimdVector.elem;
 
-		lbValue single_elem = lb_const_value(m, elem, value, cc);
+		lbValue single_elem = lb_const_value(m, elem, value, value_type, cc);
 		single_elem.value = llvm_const_cast(m, single_elem.value, lb_type(m, elem), /*failure_*/nullptr);
 
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
@@ -1278,8 +1456,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		return res;
 
 	case ExactValue_Compound:
-		if (is_type_slice(type)) {
-			return lb_const_value(m, type, value, cc);
+		if (is_type_bit_field(original_type)) {
+			return lb_const_value_bit_field(m, original_type, value.value_compound);
+		} else if (is_type_slice(type)) {
+			return lb_const_value(m, type, value, value_type, cc);
 		} else if (is_type_soa_struct(type)) {
 			GB_ASSERT(type->kind == Type_Struct);
 			GB_ASSERT(type->Struct.soa_kind == StructSoa_Fixed);
@@ -1320,7 +1500,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								for (i64 k = lo; k < hi; k++) {
 									aos_values[value_index++] = val;
 								}
@@ -1335,7 +1515,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								aos_values[value_index++] = val;
 								found = true;
 								break;
@@ -1388,7 +1568,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					aos_values[i] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+					aos_values[i] = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 				}
 				for (isize i = elem_count; i < type->Struct.soa_count; i++) {
 					aos_values[i] = nullptr;
@@ -1455,7 +1635,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -1470,7 +1650,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -1490,7 +1670,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
 
 				for (isize i = 0; i < type->Array.count; i++) {
-					values[i] = lb_const_value(m, elem_type, value, cc, elem_type).value;
+					values[i] = lb_const_value(m, elem_type, value, elem_type, cc).value;
 				}
 
 				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
@@ -1508,7 +1688,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					if (is_type_tuple(tav.type)) {
 						elem_index += tav.type->Tuple.variables.count;
 					} else {
-						values[elem_index++] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+						values[elem_index++] = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 					}
 				}
 				for (isize i = 0; i < type->Array.count; i++) {
@@ -1557,7 +1737,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -1572,7 +1752,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -1600,7 +1780,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					if (is_type_tuple(tav.type)) {
 						elem_index += tav.type->Tuple.variables.count;
 					} else {
-						values[elem_index++] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+						values[elem_index++] = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 					}
 				}
 				for (isize i = 0; i < type->EnumeratedArray.count; i++) {
@@ -1649,7 +1829,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -1667,7 +1847,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -1691,7 +1871,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)capacity);
 
 				for (isize i = 0; i < capacity; i++) {
-					values[i] = lb_const_value(m, elem_type, value, cc, elem_type).value;
+					values[i] = lb_const_value(m, elem_type, value, elem_type, cc).value;
 				}
 
 				res.value = lb_fill_fixed_capacity_dynamic_array(m, capacity, original_type, values, cc);
@@ -1709,7 +1889,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					if (is_type_tuple(tav.type)) {
 						elem_index += tav.type->Tuple.variables.count;
 					} else {
-						values[elem_index++] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+						values[elem_index++] = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 					}
 				}
 				for (isize i = 0; i < capacity; i++) {
@@ -1757,7 +1937,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							}
 							if (lo == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								for (i64 k = lo; k < hi; k++) {
 									values[value_index++] = val;
 								}
@@ -1772,7 +1952,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							i64 index = exact_value_to_i64(index_tav.value);
 							if (index == i) {
 								TypeAndValue tav = fv->value->tav;
-								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 								values[value_index++] = val;
 								found = true;
 								break;
@@ -1791,7 +1971,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					values[i] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+					values[i] = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 				}
 				LLVMTypeRef et = lb_type(m, elem_type);
 
@@ -1821,7 +2001,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 
 					TypeAndValue tav = fv->value->tav;
 					if (tav.value.kind != ExactValue_Invalid) {
-						lbValue value = lb_const_value(m, f->type, tav.value, cc, f->type);
+						lbValue value = lb_const_value(m, f->type, tav.value, f->type, cc);
 
 						LLVMValueRef values[2];
 						unsigned value_count = 0;
@@ -1874,7 +2054,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					i32 index = field_remapping[f->Variable.field_index];
 					if (elem_type_can_be_constant(f->type)) {
 						if (sel.index.count == 1) {
-							lbValue value = lb_const_value(m, f->type, tav.value, cc, tav.type);
+							lbValue value = lb_const_value(m, f->type, tav.value, tav.type, cc);
 							LLVMTypeRef value_type = LLVMTypeOf(value.value);
 							GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
 							values[index]  = value.value;
@@ -1883,7 +2063,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							if (!visited[index]) {
 								auto new_cc = cc;
 								new_cc.allow_local = false;
-								values[index]  = lb_const_value(m, f->type, {}, new_cc).value;
+								values[index]  = lb_const_value(m, f->type, {}, nullptr, new_cc).value;
 								visited[index] = true;
 							}
 
@@ -1923,7 +2103,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 									}
 								}
 								if (is_constant) {
-									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, cc, tav.type).value;
+									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, tav.type, cc).value;
 									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
 										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else if (is_local) {
@@ -1967,19 +2147,31 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					}
 				}
 			} else {
+				isize multiple_return_offset = 0;
 				for_array(i, cl->elems) {
-					Entity *f = type->Struct.fields[i];
+					Entity *f = type->Struct.fields[i+multiple_return_offset];
 					TypeAndValue tav = cl->elems[i]->tav;
-					ExactValue val = {};
-					if (tav.mode != Addressing_Invalid) {
-						val = tav.value;
+
+					// INFO: dead code:
+	
+					// ExactValue val = {};
+					// if (tav.mode != Addressing_Invalid) {
+					// 	val = tav.value;
+					// }
+
+					if (is_type_tuple(tav.type)){
+						multiple_return_offset += tav.type->Tuple.variables.count-1;
 					}
 
 					i32 index = field_remapping[f->Variable.field_index];
+
+
 					if (elem_type_can_be_constant(f->type)) {
-						lbValue value = lb_const_value(m, f->type, tav.value, cc, tav.type);
+						lbValue value = lb_const_value(m, f->type, tav.value, tav.type, cc);
 						LLVMTypeRef value_type = LLVMTypeOf(value.value);
-						GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
+						isize lb_sizeof_value_type = lb_sizeof(value_type);
+						isize type_size_of_f_type =  type_size_of(f->type);
+						GB_ASSERT_MSG(lb_sizeof_value_type ==type_size_of_f_type, "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
 						values[index]  = value.value;
 						visited[index] = true;
 					}
@@ -2116,7 +2308,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 						
 						
 						TypeAndValue tav = fv->value->tav;
-						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 						for (i64 k = lo; k < hi; k++) {
 							i64 offset = matrix_row_major_index_to_offset(type, k);
 							GB_ASSERT(values[offset] == nullptr);
@@ -2128,7 +2320,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 						i64 index = exact_value_to_i64(index_tav.value);
 						GB_ASSERT(index < max_count);
 						TypeAndValue tav = fv->value->tav;
-						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+						LLVMValueRef val = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 						i64 offset = matrix_row_major_index_to_offset(type, index);
 						GB_ASSERT(values[offset] == nullptr);
 						values[offset] = val;
@@ -2152,7 +2344,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					GB_ASSERT(tav.mode != Addressing_Invalid);
 					i64 offset = 0;
 					offset = matrix_row_major_index_to_offset(type, i);
-					values[offset] = lb_const_value(m, elem_type, tav.value, cc, tav.type).value;
+					values[offset] = lb_const_value(m, elem_type, tav.value, tav.type, cc).value;
 				}
 				for (isize i = 0; i < total_count; i++) {
 					if (values[i] == nullptr) {

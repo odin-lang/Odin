@@ -808,6 +808,34 @@ gb_global Type *t_atomic_memory_order = nullptr;
 
 
 
+enum OdinFastMathFlag : u8 {
+	OdinFastMath_Allow_Reassoc    = 0,
+	OdinFastMath_No_NaNs          = 1,
+	OdinFastMath_No_Infs          = 2,
+	OdinFastMath_No_Signed_Zeros  = 3,
+	OdinFastMath_Allow_Reciprocal = 4,
+	OdinFastMath_Allow_Contract   = 5,
+	OdinFastMath_Approx_Func      = 6,
+
+	OdinFastMath_COUNT,
+};
+
+char const *OdinFastMathFlag_strings[OdinFastMath_COUNT] = {
+	"Allow_Reassoc",
+	"No_NaNs",
+	"No_Infs",
+	"No_Signed_Zeros",
+	"Allow_Reciprocal",
+	"Allow_Contract",
+	"Approx_Func",
+};
+
+gb_global Type *t_fast_math_flag  = nullptr; // named enum
+gb_global Type *t_fast_math_flags = nullptr; // named bit_set
+
+
+
+
 gb_global RecursiveMutex g_type_mutex;
 
 struct TypePath;
@@ -2631,6 +2659,40 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type);
+
+gb_internal bool is_type_constant_type_for_unions(Type *t) {
+	t = core_type(t);
+	if (t == nullptr) { return false; }
+	switch (t->kind) {
+	case Type_Basic:
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
+	case Type_BitSet:
+		return true;
+	case Type_Proc:
+		return true;
+	case Type_Array:
+		return is_type_constant_type(t->Array.elem);
+	case Type_EnumeratedArray:
+		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_Struct:
+		{
+			for (Entity *field : t->Struct.fields) {
+				if (!is_type_constant_type_for_unions(field->type)) {
+					return false;
+				}
+			}
+			return true;
+		}
+	case Type_Union:
+		return is_type_union_constantable(t);
+	}
+	return false;
+}
+
 gb_internal bool is_type_union_constantable(Type *type) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
@@ -2642,7 +2704,7 @@ gb_internal bool is_type_union_constantable(Type *type) {
 	}
 
 	for (Type *v : bt->Union.variants) {
-		if (!is_type_constant_type(v)) {
+		if (!is_type_constant_type_for_unions(v)) {
 			return false;
 		}
 	}
@@ -2655,7 +2717,7 @@ gb_internal bool is_type_raw_union_constantable(Type *type) {
 	GB_ASSERT(bt->Struct.is_raw_union);
 
 	for (Entity *f : bt->Struct.fields) {
-		if (!is_type_constant_type(f->type)) {
+		if (!is_type_constant_type_for_unions(f->type)) {
 			return false;
 		}
 	}
@@ -3035,7 +3097,7 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 					return true;
 				}
 			}
-			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(f->type)) {
+			if ((f->flags & EntityFlags_IsSubtype) != 0 && is_type_struct(f->type)) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					array_add(&sel->index, cast(i32)i);
@@ -3770,8 +3832,22 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			}
 		} else if (type->kind == Type_BitSet) {
 			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel, allow_blank_ident);
-		}
+		} else if (type->kind == Type_BitField) {
+			for_array(i, type->BitField.fields) {
+				Entity *f = type->BitField.fields[i];
+				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+					continue;
+				}
+				auto str = entity_interned_name(f);
+				if (field_name == str) {
+					selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+					sel.entity = f;
+					sel.is_bit_field = true;
+					return sel;
+				}
+			}
 
+		}
 
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
@@ -3870,7 +3946,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 				return sel;
 			}
 		}
-
 	} else if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
@@ -4971,9 +5046,11 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
-		if (nested_level > 0) {
-			return nested_level;
+		if (f->flags & EntityFlags_IsSubtype) {
+			isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
+			if (nested_level > 0) {
+				return nested_level;
+			}
 		}
 	}
 

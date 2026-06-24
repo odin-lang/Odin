@@ -20,7 +20,6 @@ enum TargetOsKind : u16 {
 	TargetOs_freebsd,
 	TargetOs_openbsd,
 	TargetOs_netbsd,
-	TargetOs_haiku,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -39,7 +38,6 @@ gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit("freebsd"),
 	str_lit("openbsd"),
 	str_lit("netbsd"),
-	str_lit("haiku"),
 
 	str_lit("wasi"),
 	str_lit("js"),
@@ -280,6 +278,13 @@ enum RelocMode : u8 {
 	RelocMode_DynamicNoPIC,
 };
 
+enum StackProtector : u8 {
+	StackProtector_None,
+	StackProtector_Ssp,
+	StackProtector_SspReq,
+	StackProtector_SspStrong,
+};
+
 enum BuildPath : u8 {
 	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
 	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
@@ -457,6 +462,7 @@ enum IntegerDivisionByZeroKind : u8 {
 	IntegerDivisionByZero_AllBits,
 };
 
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -540,6 +546,8 @@ struct BuildContext {
 	bool   disallow_do;
 	bool   show_import_graph;
 
+	bool   webkit_switch_workaround;
+
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
 	LinkerChoice linker_choice;
@@ -600,9 +608,12 @@ struct BuildContext {
 
 	bool   print_linker_flags;
 
-	RelocMode reloc_mode;
+	RelocMode      reloc_mode;
+	StackProtector stack_protector;
+
 	bool   disable_red_zone;
 	bool   disable_unwind;
+	bool   no_plt;
 
 	isize max_error_count;
 
@@ -778,12 +789,6 @@ gb_global TargetMetrics target_netbsd_arm64 = {
 	str_lit("aarch64-unknown-netbsd-elf"),
 };
 
-gb_global TargetMetrics target_haiku_amd64 = {
-	TargetOs_haiku,
-	TargetArch_amd64,
-	8, 8, AMD64_MAX_ALIGNMENT, 32,
-	str_lit("x86_64-unknown-haiku"),
-};
 
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
@@ -910,7 +915,6 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("netbsd_arm64"),        &target_netbsd_arm64   },
 
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
-	{ str_lit("haiku_amd64"),         &target_haiku_amd64    },
 
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
@@ -1168,58 +1172,6 @@ gb_internal String internal_odin_root_dir(void) {
 
 
 	array_free(&path_buf);
-
-	return path;
-}
-
-#elif defined(GB_SYSTEM_HAIKU)
-
-#include <FindDirectory.h>
-
-gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_);
-
-gb_internal String internal_odin_root_dir(void) {
-	String path = global_module_path;
-	isize len, i;
-	u8 *text;
-
-	if (global_module_path_set) {
-		return global_module_path;
-	}
-
-	TEMPORARY_ALLOCATOR_GUARD();
-	auto path_buf = array_make<char>(temporary_allocator(), 300);
-
-	len = 0;
-	for (;;) {
-		u32 sz = path_buf.count;
-		int res = find_path(B_APP_IMAGE_SYMBOL, B_FIND_PATH_IMAGE_PATH, nullptr, &path_buf[0], sz);
-		if(res == B_OK) {
-			len = sz;
-			break;
-		} else {
-			array_resize(&path_buf, sz + 1);
-		}
-	}
-
-	mutex_lock(&string_buffer_mutex);
-	defer (mutex_unlock(&string_buffer_mutex));
-
-	text = permanent_alloc_array<u8>(len + 1);
-	gb_memmove(text, &path_buf[0], len);
-
-	path = path_to_fullpath(heap_allocator(), make_string(text, len), nullptr);
-
-	for (i = path.len-1; i >= 0; i--) {
-		u8 c = path[i];
-		if (c == '/' || c == '\\') {
-			break;
-		}
-		path.len--;
-	}
-
-	global_module_path = path;
-	global_module_path_set = true;
 
 	return path;
 }
@@ -1762,6 +1714,32 @@ gb_internal String normalize_minimum_os_version_string(String version) {
 	return make_string_c(normalized);
 }
 
+gb_internal void init_build_context_error_pos_style() {
+	build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
+	
+	char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
+	if (found) {
+		ErrorPosStyle kind = ErrorPosStyle_Default;
+		String style = make_string_c(found);
+		style = string_trim_whitespace(style);
+		if (style == "" || style == "default" || style == "odin") {
+			kind = ErrorPosStyle_Default;
+		} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
+			kind = ErrorPosStyle_Unix;
+		} else {
+			gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
+			gb_printf_err("Valid formats:\n");
+			gb_printf_err("\t\"default\" or \"odin\"\n");
+			gb_printf_err("\t\tpath(line:column) message\n");
+			gb_printf_err("\t\"unix\"\n");
+			gb_printf_err("\t\tpath:line:column: message\n");
+			gb_exit(1);
+		}
+
+		build_context.ODIN_ERROR_POS_STYLE = kind;
+	}
+}
+
 gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
 	BuildContext *bc = &build_context;
 
@@ -1776,30 +1754,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (bc->max_error_count <= 0) {
 		bc->max_error_count = DEFAULT_MAX_ERROR_COLLECTOR_COUNT;
-	}
-
-	{
-		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
-		if (found) {
-			ErrorPosStyle kind = ErrorPosStyle_Default;
-			String style = make_string_c(found);
-			style = string_trim_whitespace(style);
-			if (style == "" || style == "default" || style == "odin") {
-				kind = ErrorPosStyle_Default;
-			} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
-				kind = ErrorPosStyle_Unix;
-			} else {
-				gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
-				gb_printf_err("Valid formats:\n");
-				gb_printf_err("\t\"default\" or \"odin\"\n");
-				gb_printf_err("\t\tpath(line:column) message\n");
-				gb_printf_err("\t\"unix\"\n");
-				gb_printf_err("\t\tpath:line:column: message\n");
-				gb_exit(1);
-			}
-
-			build_context.ODIN_ERROR_POS_STYLE = kind;
-		}
 	}
 
 	bc->copy_file_contents = true;
@@ -1829,8 +1783,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			#else
 				metrics = &target_netbsd_amd64;
 			#endif
-		#elif defined(GB_SYSTEM_HAIKU)
-			metrics = &target_haiku_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#elif defined(GB_CPU_RISCV)
@@ -1964,6 +1916,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 				}
 				break;
 		}
+	} else if (metrics->os == TargetOs_openbsd) {
+		// Always use PIC for OpenBSD: it defaults to PIE
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_PIC;
+		}
+	} else if (metrics->arch == TargetArch_riscv64) {
+		// NOTE(laytan): didn't seem to work without this.
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_PIC;
+		}
 	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
 		switch (metrics->arch) {
 		case TargetArch_arm64:
@@ -1982,9 +1944,32 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->metrics.target_triplet = str_lit("i686-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
-		
 		default:
 			GB_PANIC("Unknown architecture for -subtarget:android");
+		}
+	} else if (metrics->os == TargetOs_linux) {
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_PIC;
+		}
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+		case TargetArch_amd64:
+			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
+			break;
+		}
+	}
+
+	if (metrics->os == TargetOs_windows ||
+	    metrics->os == TargetOs_darwin ||
+	    metrics->os == TargetOs_linux ||
+	    metrics->os == TargetOs_freebsd ||
+	    metrics->os == TargetOs_openbsd ||
+	    metrics->os == TargetOs_netbsd) {
+	    	// -stack-protector is supported
+	} else {
+		if (bc->stack_protector != StackProtector_None) {
+			gb_printf_err("-stack-protector is not supported on this target\n");
+			gb_exit(1);
 		}
 	}
 
@@ -2599,7 +2584,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
-		case TargetOs_haiku:
 			gb_printf_err("-no-crt on Unix systems requires either -default-to-nil-allocator or -default-to-panic-allocator to also be present, because the default allocator requires CRT\n");
 			no_crt_checks_failed = true;
 		}
@@ -2612,7 +2596,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
-		case TargetOs_haiku:
 			gb_printf_err("-no-crt on Unix systems requires the -no-thread-local flag to also be present, because the TLS is inaccessible without CRT\n");
 			no_crt_checks_failed = true;
 		}

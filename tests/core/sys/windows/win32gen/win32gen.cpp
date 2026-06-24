@@ -55,6 +55,10 @@ static std::string ConvertLPCWSTRToString(const LPCWSTR lpcwszStr)
 	<< '\t' << "expect_value(t, win32." << #s << ", " \
 	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
 
+#define expect_value_bool(s) out \
+	<< '\t' << "expect_value(t, uint(win32." << #s << "), " \
+	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
+
 #define expect_value_32(s) out \
 	<< '\t' << "expect_value(t, u32(win32." << #s << "), " \
 	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << (ULONG)(ULONG_PTR)(s) << ")" << endl
@@ -882,17 +886,17 @@ static void verify_error_helpers(ofstream& out) {
 	test_proc_begin();
 	test_proc_comment("winerror.h");
 
-	expect_value(SUCCEEDED(-1));
-	expect_value(SUCCEEDED(0));
-	expect_value(SUCCEEDED(1));
+	expect_value_bool(SUCCEEDED(-1));
+	expect_value_bool(SUCCEEDED(0));
+	expect_value_bool(SUCCEEDED(1));
 	out << endl;
-	expect_value(FAILED(-1));
-	expect_value(FAILED(0));
-	expect_value(FAILED(1));
+	expect_value_bool(FAILED(-1));
+	expect_value_bool(FAILED(0));
+	expect_value_bool(FAILED(1));
 	out << endl;
-	expect_value(IS_ERROR(-1));
-	expect_value(IS_ERROR(0));
-	expect_value(IS_ERROR(1));
+	expect_value_bool(IS_ERROR(-1));
+	expect_value_bool(IS_ERROR(0));
+	expect_value_bool(IS_ERROR(1));
 	out << endl;
 	expect_value(HRESULT_CODE(0xFFFFCCCC));
 	expect_value(HRESULT_FACILITY(0xFFFFCCCC));
