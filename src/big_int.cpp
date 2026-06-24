@@ -432,6 +432,14 @@ gb_internal void big_int_rem(BigInt *z, BigInt const *x, BigInt const *y) {
 	big_int_quo_rem(x, y, &q, z);
 	big_int_dealloc(&q);
 }
+gb_internal void big_int_mod_mod(BigInt *z, BigInt const *x, BigInt const *y) {
+	BigInt q = {};
+	big_int_rem(&q, x, y);
+	big_int_add(&q, &q, y);
+	big_int_rem(z, &q, y);
+	big_int_dealloc(&q);
+
+}
 
 gb_internal void big_int_euclidean_mod(BigInt *z, BigInt const *x, BigInt const *y) {
 	BigInt y0 = {};
