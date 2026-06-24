@@ -1792,6 +1792,13 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 		advance_token(p)
 		return .Using
 	case .Hash:
+		if tok := peek_token(p); tok.kind == .Ident {
+			switch tok.text {
+			case "simd", "type", "row_major", "column_major", "sparse", "soa":
+				return .Invalid
+			}
+		}
+
 		tok: tokenizer.Token
 		advance_token(p)
 		tok = p.curr_tok
