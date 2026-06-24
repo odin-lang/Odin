@@ -1072,6 +1072,12 @@ gb_internal bool is_arch_wasm(void) {
 	return false;
 }
 
+gb_internal bool is_cortex_m7(void) {
+	return build_context.metrics.os == TargetOs_freestanding &&
+	       build_context.metrics.arch == TargetArch_arm32 &&
+	       build_context.microarch == str_lit("cortex-m7");
+}
+
 gb_internal bool is_arch_x86(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_i386:
@@ -1832,9 +1838,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	bc->metrics = *metrics;
 
-	if (bc->metrics.os == TargetOs_freestanding &&
-		  bc->metrics.arch == TargetArch_arm32 &&
-			bc->microarch == str_lit("cortex-m7")) {
+	if (is_cortex_m7()) {
 			bc->metrics.target_triplet = str_lit("thumbv7em-none-eabihf");
 	}
 

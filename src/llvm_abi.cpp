@@ -186,9 +186,11 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// TODO(bill): Clean up this logic
-	if (!is_arch_wasm()) {
+	if (is_cortex_m7()) {
+		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
+	} else if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[calling_convention];
-	} 
+	}
 	// if (build_context.metrics.arch == TargetArch_amd64) {
 	// 	if (build_context.metrics.os == TargetOs_windows) {
 	// 		if (cc_kind == lbCallingConvention_C) {
@@ -1554,14 +1556,14 @@ namespace lbAbiWasm {
 
 namespace lbAbiArm32 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention);
-	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(c, return_type, return_is_defined, calling_convention);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -1604,7 +1606,10 @@ namespace lbAbiArm32 {
 			} else {
 				i64 sz = lb_sizeof(t);
 				i64 a = lb_alignof(t);
-				if (is_calling_convention_odin(calling_convention) && sz > 8) {
+				// Added to support hard floats included in the playdates cortex-m7.
+				if (calling_convention == ProcCC_CDecl && is_cortex_m7()) {
+					args[i] = lb_arg_type_direct(t);
+				} else if (is_calling_convention_odin(calling_convention) && sz > 8) {
 					// Minor change to improve performance using the Odin calling conventions
 					args[i] = lb_arg_type_indirect(t, nullptr);
 				} else if (a <= 4) {
@@ -1619,10 +1624,13 @@ namespace lbAbiArm32 {
 		return args;
 	}
 
-	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (!is_register(return_type, true)) {
+			if (calling_convention == ProcCC_CDecl && is_cortex_m7()) {
+				return lb_arg_type_direct(return_type);
+			}
 			switch (lb_sizeof(return_type)) {
 			case 1:         return lb_arg_type_direct(LLVMIntTypeInContext(c, 8),  return_type, nullptr, nullptr);
 			case 2:         return lb_arg_type_direct(LLVMIntTypeInContext(c, 16), return_type, nullptr, nullptr);
