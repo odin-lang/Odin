@@ -2707,6 +2707,19 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-bedrock")) {
+			print_usage_line(2, "Disables numerous features. List of disabled features:");
+			print_usage_line(3, "`map` types");
+			print_usage_line(3, "128-bit integer types");
+			print_usage_line(3, "runtime type information (-no-rtti)");
+			print_usage_line(3, "non-constant global variables (-disable-non-constant-globals)");
+			print_usage_line(3, "@(init) @(fini) (-disable-init-fini)");
+			print_usage_line(3, "Anything Objective-C related");
+			print_usage_line(3, "The default paths to the library collections 'core' and 'vendor'");
+		}
+	}
+
 	if (build) {
 		if (print_flag("-build-mode:<mode>")) {
 			print_usage_line(2, "Sets the build mode.");
@@ -2773,7 +2786,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-disable-assert")) {
 			print_usage_line(2, "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
 		}
+	}
 
+	if (check) {
+		if (print_flag("-disable-init-fini")) {
+			print_usage_line(2, "Disables the ability to use @(init) and @(fini) procedures");
+		}
+	}
+
+	if (run_or_build) {
 		if (print_flag("-disable-red-zone")) {
 			print_usage_line(2, "Disables red zone on a supported freestanding target.");
 		}
@@ -2783,7 +2804,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-disallow-do")) {
 			print_usage_line(2, "Disallows the 'do' keyword in the project.");
 		}
+
+		if (print_flag("-disable-non-constant-globals")) {
+			print_usage_line(2, "Disables any global variables which are not initialized with global constants");
+		}
 	}
+
 
 	if (doc) {
 		if (print_flag("-doc-format")) {
