@@ -1121,10 +1121,10 @@ gb_internal void init_universal(void) {
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		String const &name = basic_types[i].Basic.name;
-	    	if (build_context.bedrock) {
+		if (build_context.bedrock) {
 			if ((basic_types[i].Basic.flags & BasicFlag_Integer) != 0 &&
 			    basic_types[i].Basic.size == 16) {
-			    	// disallow 128-bit integers
+				// disallow 128-bit integers
 				continue;
 			}
 		}
