@@ -448,6 +448,17 @@ gb_internal void big_int_euclidean_mod(BigInt *z, BigInt const *x, BigInt const 
 	}
 }
 
+gb_internal void big_int_floor_mod(BigInt *z, BigInt const *x, BigInt const *y) {
+	BigInt y0 = {};
+	big_int_init(&y0, y);
+
+	BigInt q = {};
+	big_int_quo_rem(x, y, &q, z);
+	if (z->sign != y0.sign && !mp_iszero(z)) {
+		big_int_add(z, z, &y0);
+	}
+	big_int_dealloc(&q);
+}
 
 
 gb_internal void big_int_and(BigInt *dst, BigInt const *x, BigInt const *y) {
