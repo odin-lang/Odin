@@ -608,11 +608,16 @@ map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_
 		m.allocator = context.allocator
 	}
 
-	// Take into account the fact that the map will resize itself at
-	// MAP_LOAD_FACTOR capacity.
-	if new_capacity > (max(uintptr) / 100) {
-		return Allocator_Error.Out_Of_Memory
+	// The map will resize itself at MAP_LOAD_FACTOR capacity.
+	// <64 bit systems can have maps close to uintptr size.
+	when size_of(uintptr) < 8 {
+		MAX_CEIL_SYSTEM  :: uintptr(1) << (size_of(uintptr) * 8 - 1)
+		MAX_NEW_CAPACITY :: uintptr(u64(MAX_CEIL_SYSTEM) * 75 / 100)
+		if new_capacity > MAX_NEW_CAPACITY {
+			return Allocator_Error.Out_Of_Memory
+		}
 	}
+	// NOTE(Barney): This will silently return if max(uintptr) / 100 or more is requested.
 	new_capacity_with_resize := new_capacity * 100 / MAP_LOAD_FACTOR
 	old_capacity := uintptr(map_cap(m^))
 

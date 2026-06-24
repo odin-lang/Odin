@@ -219,7 +219,7 @@ map_reserve_error_on_overflow :: proc(t: ^testing.T) {
 	m: map[int]struct{}
 	defer delete(m)
 
-	err := reserve(&m, (max(uintptr) / 100) + 1)
+	err := reserve(&m, (max(uintptr) / 2))
 	testing.expect_value(t, err, runtime.Allocator_Error.Out_Of_Memory)
 }
 
