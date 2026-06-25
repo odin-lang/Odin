@@ -1609,7 +1609,17 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
 				return lb_const_nil(m, original_type);
 			}
-			if (cl->elems[0]->kind == Ast_FieldValue) {
+			if (are_types_identical(value.value_compound->tav.type, elem_type)) {
+				// Compound is of array item type; expand its value to all items in array.
+				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
+
+				for (isize i = 0; i < type->Array.count; i++) {
+					values[i] = lb_const_value(m, elem_type, value, elem_type, cc).value;
+				}
+
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
+				return res;
+			} else if (cl->elems[0]->kind == Ast_FieldValue) {
 				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
 
@@ -1661,16 +1671,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					if (!found) {
 						values[value_index++] = LLVMConstNull(lb_type(m, elem_type));
 					}
-				}
-
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
-				return res;
-			} else if (are_types_identical(value.value_compound->tav.type, elem_type)) {
-				// Compound is of array item type; expand its value to all items in array.
-				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
-
-				for (isize i = 0; i < type->Array.count; i++) {
-					values[i] = lb_const_value(m, elem_type, value, elem_type, cc).value;
 				}
 
 				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
