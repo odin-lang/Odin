@@ -73,7 +73,7 @@ import "core:testing"
 // - crypto/legacy/md5
 // - crypto/tuplehash
 
-ARENA_SIZE :: 4 * 1024 * 1024 // There is no kill like overkill.
+ARENA_SIZE :: 8 * 1024 * 1024 // There is no kill like overkill.
 
 BASE_PATH :: ODIN_ROOT + "tests/core/assets/Wycheproof"
 SUFFIX_TEST_JSON :: "_test.json"

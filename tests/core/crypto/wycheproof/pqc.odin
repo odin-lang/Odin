@@ -494,6 +494,7 @@ test_mldsa :: proc(t: ^testing.T) {
 
 test_mldsa_sign :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Mldsa_Test_Group)) -> bool {
 	FLAG_INTERNAL :: "Internal"
+	FLAG_RANDOMIZED :: "Randomized"
 
 	dummy_rnd: [_mldsa.RNDBYTES]byte
 
@@ -511,17 +512,31 @@ test_mldsa_sign :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Mldsa_Test_Gr
 		priv_key: mldsa.Private_Key
 
 		tg_len := len(test_group.tests)
-		if !testing.expectf(
-			t,
-			mldsa.private_key_set_bytes(&priv_key, params, seed),
-			"%s/Sign/%d: failed to set private key from seed: %s",
-			params_str,
-			tg_id,
-			test_group.private_seed,
-		) {
-			num_ran += tg_len
-			num_failed += tg_len
+		switch len(test_group.public_key) {
+		case 0:
+			for &test_vector in test_group.tests {
+				num_ran += 1
+				switch result_is_invalid(test_vector.result) {
+				case true:
+					num_passed += 1
+				case false:
+					num_failed += 1
+				}
+			}
 			continue
+		case:
+			if !testing.expectf(
+				t,
+				mldsa.private_key_set_bytes(&priv_key, params, seed),
+				"%s/Sign/%d: failed to set private key from seed: %s",
+				params_str,
+				tg_id,
+				test_group.private_seed,
+			) {
+				num_ran += tg_len
+				num_failed += tg_len
+				continue
+			}
 		}
 
 		pub_bytes := make([]byte, mldsa.PUBLIC_KEY_SIZES[params])
@@ -575,7 +590,7 @@ test_mldsa_sign :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Mldsa_Test_Gr
 			ctx := common.hexbytes_decode(test_vector.ctx)
 			msg := common.hexbytes_decode(test_vector.msg)
 
-			is_external_mu := slice.contains(test_vector.flags, FLAG_INTERNAL)
+			is_external_mu := slice.contains(test_vector.flags, FLAG_INTERNAL) || slice.contains(test_vector.flags, FLAG_RANDOMIZED)
 			switch is_external_mu {
 			case false:
 				ok = mldsa.sign(
@@ -586,11 +601,16 @@ test_mldsa_sign :: proc(t: ^testing.T, test_vectors: ^Test_Vectors(Mldsa_Test_Gr
 					true,
 				)
 			case true:
+				rnd := dummy_rnd[:]
+				if len(test_vector.rnd) != 0 {
+					rnd = common.hexbytes_decode(test_vector.rnd)
+				}
+
 				ok = _mldsa.dsa_sign_internal(
 					sig,
 					msg,
 					ctx,
-					dummy_rnd[:],
+					rnd,
 					&priv_key,
 					common.hexbytes_decode(test_vector.mu),
 				)
