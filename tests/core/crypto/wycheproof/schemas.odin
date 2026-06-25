@@ -234,6 +234,7 @@ Mldsa_Test_Vector :: struct {
 	tc_id:   int              `json:"tcId"`,
 	comment: string           `json:"comment"`,
 	msg:     common.Hex_Bytes `json:"msg"`,
+	rnd:     common.Hex_Bytes `json:"rnd"`,
 	ctx:     common.Hex_Bytes `json:"ctx"`,
 	mu:      common.Hex_Bytes `json:"mu"`,
 	sig:     common.Hex_Bytes `json:"sig"`,
