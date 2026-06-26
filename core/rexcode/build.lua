@@ -135,6 +135,13 @@ local ISAS = {
 }
 local ISA_BY_NAME = {}; for _, a in ipairs(ISAS) do ISA_BY_NAME[a.name] = a end
 
+-- IR packages live under <root>/ir/<name>. Unlike the ISAs they have a single-
+-- stage generator (gen.odin emits Odin source directly) and no mnemonic builders
+-- or external-assembler verify -- only gen / check / test apply.
+local IRS = {
+  { name="spirv", dir="ir/spirv" },
+}
+
 -- ----------------------------------------------------------------------------
 -- argument parsing
 -- ----------------------------------------------------------------------------
@@ -316,6 +323,27 @@ local function do_idempotent(isa)
   return false, "changed on re-gen: "..table.concat(changed, ", ")
 end
 
+-- IR package tasks (ir/<name>): single-stage gen, plain check, plain test.
+local function ir_pkg(ir, sub) return ROOT .. "/" .. ir.dir .. (sub and ("/"..sub) or "") end
+local function do_ir_gen(ir)
+  local ok, out = run(odin_run(ir_pkg(ir, "tablegen")))
+  if not ok then return false, "gen failed:\n"..out:sub(-400) end
+  return true, (out:match("tablegen:%s*(.-)\n") or "generated"):gsub("%s+$","")
+end
+local function do_ir_check(ir)
+  local ok, out = run(odin_check(ir_pkg(ir)))
+  if not ok then return false, "odin check failed:\n"..(out:match("(.-Error:.-)\n") or out) end
+  return true, "compile"
+end
+local function do_ir_test(ir)
+  local ok, out = run(odin_run(ir_pkg(ir, "tests")))
+  local fails = out:match("([1-9]%d* failed)")
+  if not ok or fails then return false, (fails or "test run failed").."\n"..out:sub(-400) end
+  local n = 0; for p in out:gmatch("(%d+) passed") do n = n + tonumber(p) end
+  return true, (n > 0 and (n.." passed") or "passed")
+end
+local IR_TASK_FN = { gen=do_ir_gen, check=do_ir_check, test=do_ir_test }
+
 local TASK_FN = { gen=do_gen, builders=do_builders, check=do_check, test=do_test, verify=do_verify, idempotent=do_idempotent }
 local TASK_ORDER = { "gen", "builders", "check", "test", "verify", "idempotent" }
 local TASK_LABEL = { gen="generate", builders="builders", check="validate", test="test", verify="verify", idempotent="idempotent" }
@@ -432,6 +460,17 @@ local function main()
         else nfail = nfail + 1; print(red("FAIL") .. "  " .. (detail or ""):gsub("\n", "\n            ")) end
       end
     end
+    for _, ir in ipairs(IRS) do
+      local fn = IR_TASK_FN[task]
+      if fn then
+        results[ir.name] = results[ir.name] or {}
+        io.write(("  %-10s %-11s "):format(ir.name, task)); io.flush()
+        local ok, detail = fn(ir)
+        results[ir.name][task] = ok and "ok" or "fail"
+        if ok then print(green("ok") .. "    " .. dim(detail or ""))
+        else nfail = nfail + 1; print(red("FAIL") .. "  " .. (detail or ""):gsub("\n", "\n            ")) end
+      end
+    end
   end
 
   -- summary matrix
@@ -444,6 +483,15 @@ local function main()
     io.write(("  %-10s"):format(isa.name))
     for _, t in ipairs(tasks) do
       local s = results[isa.name][t] or "--"
+      local c = (s == "ok" and green("ok")) or (s == "fail" and red("FAIL")) or (s == "skip" and yellow("skip")) or dim("--")
+      io.write(c .. string.rep(" ", math.max(2, 12 - #s)))
+    end
+    print()
+  end
+  for _, ir in ipairs(IRS) do
+    io.write(("  %-10s"):format(ir.name))
+    for _, t in ipairs(tasks) do
+      local s = (results[ir.name] or {})[t] or "--"
       local c = (s == "ok" and green("ok")) or (s == "fail" and red("FAIL")) or (s == "skip" and yellow("skip")) or dim("--")
       io.write(c .. string.rep(" ", math.max(2, 12 - #s)))
     end
