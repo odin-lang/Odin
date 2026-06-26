@@ -26,20 +26,12 @@ print :: proc(m: Module, sb: ^strings.Builder, options: ^Print_Options = nil) {
 	if options != nil { opts = options^ }
 	if opts.value_prefix == "" { opts.value_prefix = "%" }
 
-	// encode to a scratch buffer, doubling on overflow.
-	size := 4096
-	buf: []u8
-	n:   u32
-	ok:  bool
-	for {
-		buf = make([]u8, size, context.temp_allocator)
-		relocs: [dynamic]Relocation
-		errors: [dynamic]Error
-		n, ok = encode(m, buf, &relocs, &errors)
-		delete(relocs); delete(errors)
-		if ok || size >= 64 * 1024 * 1024 { break }
-		size *= 2
-	}
+	// encode to an exactly-sized scratch buffer.
+	buf := make([]u8, encoded_size(m), context.temp_allocator)
+	relocs: [dynamic]Relocation
+	errors: [dynamic]Error
+	n, ok := encode(m, buf, &relocs, &errors)
+	delete(relocs); delete(errors)
 	if !ok {
 		strings.write_string(sb, "; <encode failed>\n")
 		return

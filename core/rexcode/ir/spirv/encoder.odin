@@ -25,13 +25,18 @@ import "base:intrinsics"
 // -----------------------------------------------------------------------------
 
 Writer :: struct {
-	code: []u8,
-	pos:  u32,    // byte offset; always a multiple of 4
-	ok:   bool,
+	code:       []u8,
+	pos:        u32,    // byte offset; always a multiple of 4
+	ok:         bool,
+	count_only: bool,   // measure mode: advance pos without writing (encoded_size)
 }
 
 @(private="file")
 w_word :: #force_inline proc "contextless" (w: ^Writer, word: u32) {
+	if w.count_only {
+		w.pos += 4
+		return
+	}
 	if int(w.pos) + 4 > len(w.code) {
 		w.ok = false
 		return
@@ -70,7 +75,7 @@ inst_begin :: #force_inline proc "contextless" (w: ^Writer) -> u32 {
 
 @(private="file")
 inst_end :: #force_inline proc "contextless" (w: ^Writer, start: u32, opcode: Opcode) {
-	if !w.ok { return }
+	if w.count_only || !w.ok { return }
 	count := (w.pos - start) / 4
 	intrinsics.unaligned_store(cast(^u32)&w.code[start], inst_head(count, opcode))
 }
@@ -353,15 +358,33 @@ compute_bound :: proc "contextless" (m: ^Module) -> u32 {
 // encode: serialize `m` into `code` in spec layout order, returning the byte
 // count written. `bound` is computed when left 0 (else taken as-is, so a decoded
 // module re-encodes with its original bound).
+@(private="file")
+emit_module :: proc "contextless" (w: ^Writer, m: ^Module) {
+	emit_header(w, m)
+	emit_preamble(w, m)
+	emit_debug(w, m)
+	emit_annotations(w, m)
+	emit_definitions(w, m)
+	emit_functions(w, m)
+}
+
 encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (byte_count: u32, ok: bool) {
 	m := m
 	if m.bound == 0 { m.bound = compute_bound(&m) }
 	w := Writer{code = code, ok = true}
-	emit_header(&w, &m)
-	emit_preamble(&w, &m)
-	emit_debug(&w, &m)
-	emit_annotations(&w, &m)
-	emit_definitions(&w, &m)
-	emit_functions(&w, &m)
+	emit_module(&w, &m)
 	return w.pos, w.ok
+}
+
+// encoded_size: the exact number of bytes `encode` produces for `m` -- the module
+// is walked in measure mode (no writes), so a caller can size the output buffer
+// precisely. The SPIR-V analog of an ISA's encode_max_code_size (here exact, not
+// an upper bound).
+@(require_results)
+encoded_size :: proc "contextless" (m: Module) -> u32 {
+	m := m
+	if m.bound == 0 { m.bound = compute_bound(&m) }
+	w := Writer{count_only = true, ok = true}
+	emit_module(&w, &m)
+	return w.pos
 }
