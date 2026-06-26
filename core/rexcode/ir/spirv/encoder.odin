@@ -156,14 +156,139 @@ emit_annotations :: proc "contextless" (w: ^Writer, m: ^Module) {
 }
 
 // -----------------------------------------------------------------------------
+// Types / constants / globals  (the <id>-defining body, before functions)
+// -----------------------------------------------------------------------------
+
+// Type_Ref -> the type's wire <id>, via the side table.
+@(private="file")
+tid :: #force_inline proc "contextless" (m: ^Module, t: Type_Ref) -> Id {
+	i := u32(t)
+	return i < u32(len(m.type_ids)) ? m.type_ids[i] : ID_NONE
+}
+
+// Lower ir.Type -> OpTypeXxx. INT signedness and POINTER storage class ride in
+// Type.aux. (ARRAY/OPAQUE/REF need a length constant / extra modelling and are
+// skipped for now.)
+@(private="file")
+emit_types :: proc "contextless" (w: ^Writer, m: ^Module) {
+	for t, i in m.types {
+		s := inst_begin(w)
+		w_id(w, i < len(m.type_ids) ? m.type_ids[i] : ID_NONE)
+		op: Opcode
+		switch t.kind {
+		case .VOID:    op = .OpTypeVoid
+		case .INT:     w_word(w, u32(t.bits)); w_word(w, u32(t.aux & 1)); op = .OpTypeInt
+		case .FLOAT:   w_word(w, u32(t.bits)); op = .OpTypeFloat
+		case .VECTOR:  w_id(w, tid(m, t.elem)); w_word(w, t.count); op = .OpTypeVector
+		case .POINTER: w_word(w, u32(t.aux)); w_id(w, tid(m, t.elem)); op = .OpTypePointer
+		case .STRUCT:
+			for f in t.fields { w_id(w, tid(m, f)) }
+			op = .OpTypeStruct
+		case .FUNCTION:
+			w_id(w, tid(m, t.fields[t.count]))              // return type
+			for pi in 0 ..< int(t.count) { w_id(w, tid(m, t.fields[pi])) }
+			op = .OpTypeFunction
+		case .ARRAY, .OPAQUE, .REF:
+			w.pos = s    // rewind the placeholder; not yet lowered
+			continue
+		}
+		inst_end(w, s, op)
+	}
+}
+
+@(private="file")
+emit_constants :: proc "contextless" (w: ^Writer, m: ^Module) {
+	for c in m.constants {
+		s := inst_begin(w)
+		w_id(w, tid(m, c.result.type))
+		w_id(w, c.result.id)
+		#partial switch c.opcode {
+		case .OpConstant:
+			t := m.types[u32(c.result.type)]
+			w_word(w, u32(c.value))
+			if (t.kind == .INT || t.kind == .FLOAT) && t.bits > 32 {
+				w_word(w, u32(c.value >> 32))   // context-dependent number, second word
+			}
+		case .OpConstantComposite:
+			for e in c.elements { w_id(w, e) }
+		}
+		inst_end(w, s, c.opcode)
+	}
+}
+
+@(private="file")
+emit_globals :: proc "contextless" (w: ^Writer, m: ^Module) {
+	for g, gi in m.globals {
+		s := inst_begin(w)
+		w_id(w, tid(m, g.type))   // a pointer type
+		w_id(w, gi < len(m.global_ids) ? m.global_ids[gi] : ID_NONE)
+		w_word(w, u32(m.types[u32(g.type)].aux))   // storage class = the pointer's address space
+		if g.init != ID_NONE { w_id(w, g.init) }
+		inst_end(w, s, .OpVariable)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Function bodies  (the generic, table-driven operation emit)
+// -----------------------------------------------------------------------------
+
+// Emit one ir.Operand by its kind. Type refs resolve through the type-id table;
+// entity refs and literals are emitted as-is.
+@(private="file")
+emit_operand :: #force_inline proc "contextless" (w: ^Writer, m: ^Module, o: Operand) {
+	switch o.kind {
+	case .NONE:
+	case .LIT_INT, .LIT_FLOAT, .ATTRIBUTE: w_word(w, u32(o.imm))
+	case .REF:                             w_id(w, operand_id(o))
+	case .TYPE:                            w_id(w, tid(m, operand_type(o)))
+	}
+}
+
+// Emit one Operation. The opcode's layout (INSTRUCTION_INDEX) supplies the
+// leading IdResultType/IdResult from `result`; the remaining operands are
+// `op.operands` in order (the producer built them correctly, so no per-operand
+// spec match is needed -- only whether a result type/id prefix exists).
+@(private="file")
+emit_operation :: proc "contextless" (w: ^Writer, m: ^Module, op: ^Operation) {
+	run: Spec_Run
+	if int(op.opcode) < len(INSTRUCTION_INDEX) { run = INSTRUCTION_INDEX[op.opcode] }
+	s := inst_begin(w)
+	si := 0
+	if si < int(run.count) && INSTRUCTION_SPECS[int(run.start) + si].kind == .IdResultType {
+		w_id(w, tid(m, op.result.type)); si += 1
+	}
+	if si < int(run.count) && INSTRUCTION_SPECS[int(run.start) + si].kind == .IdResult {
+		w_id(w, op.result.id); si += 1
+	}
+	for o in op.operands { emit_operand(w, m, o) }
+	inst_end(w, s, Opcode(op.opcode))
+}
+
+@(private="file")
+emit_functions :: proc "contextless" (w: ^Writer, m: ^Module) {
+	for fn, fi in m.functions {
+		sig := m.types[u32(fn.signature)]   // a FUNCTION type: fields = params ++ [result]
+		s := inst_begin(w)
+		w_id(w, tid(m, sig.fields[sig.count]))                          // result = return type
+		w_id(w, fi < len(m.function_ids) ? m.function_ids[fi] : ID_NONE)
+		w_word(w, 0)                                                    // FunctionControl (none)
+		w_id(w, tid(m, fn.signature))
+		inst_end(w, s, .OpFunction)
+		// (OpFunctionParameter not yet modelled in ir.Function)
+		for blk in fn.blocks {
+			sl := inst_begin(w); w_id(w, blk.id); inst_end(w, sl, .OpLabel)
+			for &op in blk.ops { emit_operation(w, m, &op) }
+		}
+		se := inst_begin(w); inst_end(w, se, .OpFunctionEnd)
+	}
+}
+
+// -----------------------------------------------------------------------------
 // Entry point
 // -----------------------------------------------------------------------------
 
-// encode: serialize `m` into `code`, returning the byte count written.
-//
-// (Types / constants / globals / function bodies are not yet emitted -- that
-// half needs the <id> assignment + ir.Type -> OpTypeXxx lowering, which lands
-// next. The header + preamble / debug / annotation sections are complete.)
+// encode: serialize `m` into `code` in spec layout order, returning the byte
+// count written. `m.bound` must be the exclusive upper bound on all <id>s.
 encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (byte_count: u32, ok: bool) {
 	m := m
 	w := Writer{code = code, ok = true}
@@ -171,6 +296,9 @@ encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dy
 	emit_preamble(&w, &m)
 	emit_debug(&w, &m)
 	emit_annotations(&w, &m)
-	// TODO(codec): emit_types_constants_globals + emit_functions (the lowered body).
+	emit_types(&w, &m)
+	emit_constants(&w, &m)
+	emit_globals(&w, &m)
+	emit_functions(&w, &m)
 	return w.pos, w.ok
 }

@@ -44,6 +44,16 @@ Module :: struct {
 	// --- Debug + annotations ---
 	debug:       Debug,
 	decorations: []Decoration_Inst,
+
+	// --- <id> side tables ---
+	// SPIR-V has one flat <id> space (types, constants, globals, functions, and
+	// SSA results all draw from it), but ir.Type/Global/Function carry no id of
+	// their own. These parallel the ir core arrays and hold each entity's wire
+	// <id>, so decode->encode preserves them. (Results carry their own id in
+	// Result.id / Constant.result.id; only these three need a side table.)
+	type_ids:     []Id,   // parallel to base.types
+	global_ids:   []Id,   // parallel to base.globals
+	function_ids: []Id,   // parallel to base.functions
 }
 
 // Member index sentinel: a whole-target decoration / name (OpDecorate / OpName)
