@@ -18,6 +18,7 @@ GRAMMAR_PATH :: #directory + "/spirv.core.grammar.json"
 OPCODES_OUT  :: #directory + "/../opcodes.odin"
 KINDS_OUT    :: #directory + "/../operand_kinds.odin"
 TABLE_OUT    :: #directory + "/../encoding_table.odin"
+BUILDERS_OUT :: #directory + "/../builders_gen.odin"
 
 HDR ::
 `// rexcode  ·  Brendan Punsky (dotbmp@github), original author
@@ -49,7 +50,8 @@ main :: proc() {
 	n_op := gen_opcodes(insts)
 	n_k  := gen_operand_kinds(kinds)
 	n_sp := gen_encoding_table(insts, kinds)
-	fmt.printfln("spirv tablegen: %d opcodes, %d operand kinds, %d operand specs", n_op, n_k, n_sp)
+	n_b  := gen_builders(insts, kinds)
+	fmt.printfln("spirv tablegen: %d opcodes, %d operand kinds, %d operand specs, %d builders", n_op, n_k, n_sp, n_b)
 }
 
 write_file :: proc(path: string, sb: ^strings.Builder) {
@@ -259,6 +261,168 @@ gen_encoding_table :: proc(insts: json.Array, kinds: json.Array) -> int {
 
 	write_file(TABLE_OUT, &sb)
 	return len(specs)
+}
+
+// --- builders_gen.odin : typed per-opcode constructors (low level) + Builder
+//     methods (high level). Opcodes whose operands aren't yet expressible as
+//     simple typed params (optional, Pair* composites, LiteralString, ...) are
+//     skipped -- those stay hand-written, like an ISA's can_generate_builder. ---
+@(private="file")
+B_Param :: struct { typ: string, emit: string }
+
+gen_builders :: proc(insts: json.Array, kinds: json.Array) -> int {
+	category: map[string]string; defer delete(category)
+	for kv in kinds {
+		k := kv.(json.Object)
+		category[string(k["kind"].(json.String))] = string(k["category"].(json.String))
+	}
+
+	sb := strings.builder_make(); defer strings.builder_destroy(&sb)
+	strings.write_string(&sb, HDR)
+
+	seen: map[i64]bool;        defer delete(seen)
+	verb_seen: map[string]bool; defer delete(verb_seen)
+	count := 0
+	for v in insts {
+		inst := v.(json.Object)
+		op := i64(inst["opcode"].(json.Integer))
+		if op in seen { continue }
+		seen[op] = true
+		opname := string(inst["opname"].(json.String))
+
+		// Type-declaration opcodes are ir.Type, not Operations -- skip them (their
+		// verbs would also collide with the re-exported ir.type_* constructors).
+		if c, hc := inst["class"]; hc && string(c.(json.String)) == "Type-Declaration" { continue }
+
+		has_rt, has_r, variadic, ok := false, false, false, true
+		fixed: [dynamic]B_Param; defer delete(fixed)
+		if ops, hop := inst["operands"]; hop {
+			oparr := ops.(json.Array)
+			for ov, oi in oparr {
+				o := ov.(json.Object)
+				kind := string(o["kind"].(json.String))
+				quant := ""
+				if q, hq := o["quantifier"]; hq { quant = string(q.(json.String)) }
+				switch {
+				case kind == "IdResultType": has_rt = true
+				case kind == "IdResult":     has_r = true
+				case quant == "*":
+					if oi != len(oparr) - 1 || kind != "IdRef" { ok = false } else { variadic = true }
+				case quant == "?":
+					ok = false   // optional operands not expressible yet
+				case kind == "IdRef" || kind == "IdScope" || kind == "IdMemorySemantics":
+					append(&fixed, B_Param{"Id", "id"})
+				case kind == "LiteralInteger":
+					append(&fixed, B_Param{"i64", "int"})
+				case category[kind] == "ValueEnum":
+					append(&fixed, B_Param{snake(kind), "venum"})
+				case category[kind] == "BitEnum":
+					append(&fixed, B_Param{snake(kind), "benum"})
+				case:
+					ok = false   // Composite / LiteralString / context-dependent number
+				}
+				if !ok { break }
+			}
+		}
+		if !ok { continue }
+
+		verb := verb_name(opname)
+		if verb in verb_seen { continue }   // skip a name collision rather than shadow
+		verb_seen[verb] = true
+		gen_one_builder(&sb, opname, verb, has_rt, has_r, fixed[:], variadic)
+		count += 1
+	}
+
+	write_file(BUILDERS_OUT, &sb)
+	return count
+}
+
+@(private="file")
+gen_one_builder :: proc(sb: ^strings.Builder, opname, verb: string, has_rt, has_r: bool, fixed: []B_Param, variadic: bool) {
+	nfix := len(fixed)
+	has_buf := nfix > 0 || variadic
+
+	// --- low-level constructor ---
+	ll: [dynamic]string; defer delete(ll)
+	if has_buf { append(&ll, "buf: []Operand") }
+	if has_rt  { append(&ll, "result_type: Type_Ref") }
+	if has_r   { append(&ll, "result: Id") }
+	for p, i in fixed { append(&ll, fmt.tprintf("op%d: %s", i + 1, p.typ)) }
+	if variadic { append(&ll, "args: []Id") }
+
+	fmt.sbprintf(sb, "\ninst_%s :: #force_inline proc \"contextless\" (%s) -> Operation {{\n",
+		opname, join(ll[:]))
+	for p, i in fixed {
+		switch p.emit {
+		case "id":    fmt.sbprintf(sb, "\tbuf[%d] = op_value(op%d)\n", i, i + 1)
+		case "int":   fmt.sbprintf(sb, "\tbuf[%d] = op_int(op%d)\n", i, i + 1)
+		case "venum": fmt.sbprintf(sb, "\tbuf[%d] = op_int(i64(op%d))\n", i, i + 1)
+		case "benum": fmt.sbprintf(sb, "\tbuf[%d] = op_int(i64(transmute(u32)op%d))\n", i, i + 1)
+		}
+	}
+	if variadic { fmt.sbprintf(sb, "\tfor v, i in args {{ buf[%d + i] = op_value(v) }}\n", nfix) }
+	result_str := has_r ? (has_rt ? "{result, result_type}" : "{id = result}") : "{id = ID_NONE}"
+	operands_str := ""
+	if has_buf { operands_str = variadic ? fmt.tprintf(", operands = buf[:%d + len(args)]", nfix) : fmt.tprintf(", operands = buf[:%d]", nfix) }
+	fmt.sbprintf(sb, "\treturn Operation{{opcode = u16(Opcode.%s), result = %s%s}}\n}}\n", opname, result_str, operands_str)
+
+	// --- high-level Builder method ---
+	hl: [dynamic]string; defer delete(hl)
+	append(&hl, "b: ^Builder")
+	if has_rt { append(&hl, "result_type: Type_Ref") }
+	for p, i in fixed { append(&hl, fmt.tprintf("op%d: %s", i + 1, p.typ)) }
+	if variadic { append(&hl, "args: []Id") }
+
+	call: [dynamic]string; defer delete(call)
+	if has_buf { append(&call, variadic ? fmt.tprintf("opbuf(b, %d + len(args))", nfix) : fmt.tprintf("opbuf(b, %d)", nfix)) }
+	if has_rt { append(&call, "result_type") }
+	if has_r  { append(&call, "r") }
+	for _, i in fixed { append(&call, fmt.tprintf("op%d", i + 1)) }
+	if variadic { append(&call, "args") }
+
+	fmt.sbprintf(sb, "\n%s :: proc(%s)%s {{\n", verb, join(hl[:]), has_r ? " -> Id" : "")
+	if has_r { strings.write_string(sb, "\tr := alloc_id(b)\n") }
+	fmt.sbprintf(sb, "\tappend(&b.ops, inst_%s(%s))\n", opname, join(call[:]))
+	if has_r { strings.write_string(sb, "\treturn r\n") }
+	strings.write_string(sb, "}\n")
+}
+
+// The high-level verb: the OpName minus "Op", snake-cased + lowercased, with a
+// trailing "_" if it collides with an Odin keyword (return, switch, ...).
+@(private="file")
+verb_name :: proc(opname: string) -> string {
+	s := opname
+	if len(s) > 2 && s[0] == 'O' && s[1] == 'p' { s = s[2:] }
+	out := to_lower(snake(s))
+	return is_keyword(out) ? strings.concatenate({out, "_"}) : out
+}
+
+@(private="file")
+to_lower :: proc(s: string) -> string {
+	b := make([]u8, len(s))
+	for i in 0 ..< len(s) { b[i] = (s[i] >= 'A' && s[i] <= 'Z') ? s[i] + 32 : s[i] }
+	return string(b)
+}
+
+// Odin keywords AND builtins a generated verb must not shadow (e.g. OpSizeOf ->
+// size_of would shadow the size_of builtin and break the package).
+@(private="file")
+is_keyword :: proc(s: string) -> bool {
+	switch s {
+	case "return", "switch", "in", "map", "for", "if", "else", "when", "case",
+	     "struct", "enum", "union", "proc", "import", "package", "using", "defer",
+	     "context", "distinct", "bit_set", "matrix", "or_else", "or_return",
+	     "size_of", "align_of", "offset_of", "type_of", "typeid_of", "type_info_of",
+	     "len", "cap", "min", "max", "abs", "clamp", "swizzle", "make", "new",
+	     "delete", "append", "copy", "assert", "transmute", "cast", "raw_data":
+		return true
+	}
+	return false
+}
+
+@(private="file")
+join :: proc(parts: []string) -> string {
+	return strings.join(parts, ", ")
 }
 
 // -----------------------------------------------------------------------------

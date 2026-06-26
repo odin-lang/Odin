@@ -274,6 +274,27 @@ main :: proc() {
 		roundtrip("image_type", m)
 	}
 
+	// (10) a function body constructed with the generated high-level builders
+	//      (i_add / return_), then round-tripped.
+	{
+		b := spirv.builder_make(8)
+		spirv.i_add(&b, spirv.Type_Ref(1), spirv.Id(5), spirv.Id(6))   // %8 = OpIAdd %int %5 %6
+		spirv.return_(&b)
+		blk := spirv.take_block(&b, spirv.Id(7))
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {{kind = .VOID}, {kind = .INT, bits = 32, aux = 1}, {kind = .FUNCTION, fields = {spirv.Type_Ref(0)}, count = 0}}
+		m.type_ids = {spirv.Id(1), spirv.Id(2), spirv.Id(3)}
+		m.constants = {
+			{result = {spirv.Id(5), spirv.Type_Ref(1)}, opcode = .OpConstant, value = 10},
+			{result = {spirv.Id(6), spirv.Type_Ref(1)}, opcode = .OpConstant, value = 20},
+		}
+		m.functions = {{signature = spirv.Type_Ref(2), blocks = {blk}}}
+		m.function_ids = {spirv.Id(4)}
+		m.bound = b.next_id
+		roundtrip("builder_made", m)
+	}
+
 	fmt.printf("\n%d passed, %d failed\n", ok_count, fail_count)
 	if fail_count > 0 { os.exit(1) }
 }
