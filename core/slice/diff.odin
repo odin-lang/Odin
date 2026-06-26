@@ -187,15 +187,18 @@ diff :: proc(
 		delta := n - m
 		odd := (delta % 2 != 0)
 
-		// TODO: Convert to fixed-length slices.
-		vf := make(map[int]int, allocator)
-		defer delete(vf)
+		max := n + m
+		
+		vf := make([]int, 2 * max + 1, allocator)
+		defer delete(vf, allocator)
+		fill(vf[:], -1)
 
-		vr := make(map[int]int, allocator)
+		vr := make([]int, 2 * max + 1, allocator)
 		defer delete(vr)
+		fill(vr[:], -1)
 
-		vf[1] = 0
-		vr[delta] = n
+		vf[1 + max] = 0
+		vr[delta + max] = n
 
 		max_d := (n + m + 1) / 2
 
@@ -203,11 +206,11 @@ diff :: proc(
 			for k := -d; k <= d; k += 2 {
 				x: int
 				if d == 0 {
-					x = vf[1]
-				} else if k == -d || (k != d && vf[k - 1] < vf[k + 1]) {
-					x = vf[k + 1]
+					x = vf[1 + max]
+				} else if k == -d || (k != d && vf[k - 1 + max] < vf[k + 1 + max]) {
+					x = vf[k + 1 + max]
 				} else {
-					x = vf[k - 1] + 1
+					x = vf[k - 1 + max] + 1
 				}
 
 				y := x - k
@@ -218,10 +221,10 @@ diff :: proc(
 					x += 1
 					y += 1
 				}
-				vf[k] = x
+				vf[k + max] = x
 
 				if odd && (delta - d < k) && (k < delta + d) {
-					if k in vf && vf[k] >= vr[k] {
+					if vf[k + max] >= vr[k + max] {
 						return Middle_Snake {
 								x = p.ax + x_start,
 								y = p.ay + y_start,
@@ -236,11 +239,11 @@ diff :: proc(
 			for k := -d + delta; k <= d + delta; k += 2 {
 				x: int
 				if d == 0 {
-					x = vr[delta]
-				} else if k == d + delta || (k != -d + delta && vr[k - 1] > vr[k + 1]) {
-					x = vr[k - 1]
+					x = vr[delta + max]
+				} else if k == d + delta || (k != -d + delta && vr[k - 1 + max] > vr[k + 1 + max]) {
+					x = vr[k - 1 + max]
 				} else {
-					x = vr[k + 1] - 1
+					x = vr[k + 1 + max] - 1
 				}
 				y := x - k
 
@@ -250,10 +253,10 @@ diff :: proc(
 					x -= 1
 					y -= 1
 				}
-				vr[k] = x
+				vr[k + max] = x
 
 				if !odd && -d <= k && k <= d {
-					if k in vf && vf[k] >= vr[k] {
+					if vf[k + max] >= vr[k + max] {
 						return Middle_Snake {
 								x = p.ax + x,
 								y = p.ay + y,
