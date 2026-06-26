@@ -39,7 +39,7 @@ Returns:
 - err: An `Allocator_Error`, if allocation failed.
 */
 diff :: proc(
-	value, expected: []$T,
+	value, expected: $S/[]$T,
 	allocator := context.allocator,
 ) -> (
 	result: []Diff(T),
@@ -274,7 +274,7 @@ diff :: proc(
 
 	append_diff :: proc(
 		diffs: ^[dynamic]Diff(T),
-		a, b: []T,
+		a, b: S,
 		kind: Diff_Kind,
 		position: int,
 	) -> (
@@ -297,7 +297,7 @@ diff :: proc(
 			}
 		}
 
-		values: []T
+		values: S
 		switch kind {
 		case .Insert:
 			values = b[position:position + 1]
