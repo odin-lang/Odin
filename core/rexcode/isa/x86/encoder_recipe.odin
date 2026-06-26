@@ -18,10 +18,9 @@ package rexcode_x86
 // marked `eligible = false` and falls back to the existing interpreter, which
 // stays the source of truth for correctness.
 //
-// NOTE(interim): ENCODE_RECIPES is currently built at startup from the #loaded
-// ENCODE_FORMS (static storage, no heap). Once the fast path is validated this
-// moves into the table generator -- serialized and #loaded like every other
-// table, with no @init.
+// ENCODE_RECIPES is produced by the tablegen (form_to_recipe over every form)
+// and #loaded from x86.encode_recipes.bin like every other table -- see the note
+// by form_to_recipe below.
 
 Form_Recipe :: struct {
 	prefix:     u8,      // mandatory legacy prefix emitted before REX (0 = none)
@@ -121,23 +120,10 @@ form_to_recipe :: proc "contextless" (enc: ^Encoding) -> (r: Form_Recipe) {
 	return
 }
 
-// -----------------------------------------------------------------------------
-// Interim recipe table: built once at startup from the #loaded forms into static
-// storage (no heap). ENCODE_RECIPES is parallel to ENCODE_FORMS.
-// -----------------------------------------------------------------------------
-
-@(private) ENCODE_RECIPE_CAP :: 4096
-@(private) encode_recipes_storage: [ENCODE_RECIPE_CAP]Form_Recipe
-ENCODE_RECIPES: []Form_Recipe
-
-@(init)
-build_encode_recipes :: proc "contextless" () {
-	n := min(len(ENCODE_FORMS), ENCODE_RECIPE_CAP)
-	for i in 0..<n {
-		encode_recipes_storage[i] = form_to_recipe(&ENCODE_FORMS[i])
-	}
-	ENCODE_RECIPES = encode_recipes_storage[:n]
-}
+// ENCODE_RECIPES (parallel to ENCODE_FORMS) is generated, not built here: the
+// tablegen runs form_to_recipe over every form, serializes the result to
+// x86.encode_recipes.bin, and tables.odin #loads it. So form_to_recipe above is
+// a tablegen-time helper -- it is not called on the encode hot path.
 
 @(private)
 op_is_spl :: #force_inline proc "contextless" (op: ^Operand) -> bool {

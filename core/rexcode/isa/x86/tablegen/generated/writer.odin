@@ -24,6 +24,7 @@ w :: proc(file: string, data: []u8) {
 main :: proc() {
 	w(TABLES + "x86.encode_forms.bin", raw(&ENCODE_FORMS, size_of(ENCODE_FORMS)))
 	w(TABLES + "x86.encode_runs.bin", raw(&ENCODE_RUNS, size_of(ENCODE_RUNS)))
+	w(TABLES + "x86.encode_recipes.bin", raw(&ENCODE_RECIPES, size_of(ENCODE_RECIPES)))
 	w(TABLES + "x86.modrm.bin", raw(&MODRM_TABLE, size_of(MODRM_TABLE)))
 	w(TABLES + "x86.sib.bin", raw(&SIB_TABLE, size_of(SIB_TABLE)))
 	w(TABLES + "x86.legacy.bin", raw(&LEGACY_DECODE_ENTRIES, size_of(LEGACY_DECODE_ENTRIES)))

@@ -4720,3 +4720,11 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.RDRAND           = { 2349,   3},
 	.RDSEED           = { 2352,   3},
 }
+
+// Emit descriptor per form (derived from ENCODE_FORMS via lib.form_to_recipe).
+ENCODE_RECIPES: [2355]lib.Form_Recipe
+@(init) _fill_recipes :: proc "contextless" () {
+	for i in 0 ..< len(ENCODE_FORMS) {
+		ENCODE_RECIPES[i] = lib.form_to_recipe(&ENCODE_FORMS[i])
+	}
+}

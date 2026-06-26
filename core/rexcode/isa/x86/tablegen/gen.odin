@@ -44,8 +44,9 @@ Blob :: struct { global, file, typ: string }
 
 @(rodata)
 BLOBS := [?]Blob{
-	{"ENCODE_FORMS",          "x86.encode_forms.bin", "Encoding"},
-	{"ENCODE_RUNS",           "x86.encode_runs.bin",  "Encode_Run"},
+	{"ENCODE_FORMS",          "x86.encode_forms.bin",   "Encoding"},
+	{"ENCODE_RUNS",           "x86.encode_runs.bin",    "Encode_Run"},
+	{"ENCODE_RECIPES",        "x86.encode_recipes.bin", "Form_Recipe"},
 	{"MODRM_TABLE",           "x86.modrm.bin",        "ModRM_Info"},
 	{"SIB_TABLE",             "x86.sib.bin",          "SIB_Info"},
 	{"LEGACY_DECODE_ENTRIES", "x86.legacy.bin",       "Decode_Entry"},
@@ -123,6 +124,18 @@ emit_encode_tables :: proc() {
 		start += n
 	}
 	strings.write_string(&sb, "}\n")
+
+	// Emit descriptor per form: the flattened recipe the encoder replays, derived
+	// from the forms via the library's form_to_recipe (single source of truth).
+	// Filled here at startup and serialized to x86.encode_recipes.bin; the loader
+	// #loads it, so the library itself needs no @init.
+	strings.write_string(&sb, "\n// Emit descriptor per form (derived from ENCODE_FORMS via lib.form_to_recipe).\n")
+	fmt.sbprintfln(&sb, "ENCODE_RECIPES: [%d]lib.Form_Recipe", total_forms())
+	strings.write_string(&sb, "@(init) _fill_recipes :: proc \"contextless\" () {\n")
+	strings.write_string(&sb, "\tfor i in 0 ..< len(ENCODE_FORMS) {\n")
+	strings.write_string(&sb, "\t\tENCODE_RECIPES[i] = lib.form_to_recipe(&ENCODE_FORMS[i])\n")
+	strings.write_string(&sb, "\t}\n}\n")
+
 	emit_file(DIR_GEN + "encode_tables.odin", &sb)
 }
 
