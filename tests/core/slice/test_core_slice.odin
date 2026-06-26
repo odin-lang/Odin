@@ -395,16 +395,50 @@ test_diff :: proc(t: ^testing.T) {
 		defer delete(script)
 
 		testing.expect_value(t, err, nil)
-		if !testing.expect_value(t, len(script), 9) {return}
-		testing.expect_value(t, script[0], slice.Diff(rune){kind = .Delete, value = 'A'})
-		testing.expect_value(t, script[1], slice.Diff(rune){kind = .Delete, value = 'B'})
-		testing.expect_value(t, script[2], slice.Diff(rune){kind = .Keep, value = 'C'})
-		testing.expect_value(t, script[3], slice.Diff(rune){kind = .Delete, value = 'A'})
-		testing.expect_value(t, script[4], slice.Diff(rune){kind = .Keep, value = 'B'})
-		testing.expect_value(t, script[5], slice.Diff(rune){kind = .Insert, value = 'A'})
-		testing.expect_value(t, script[6], slice.Diff(rune){kind = .Keep, value = 'B'})
-		testing.expect_value(t, script[7], slice.Diff(rune){kind = .Keep, value = 'A'})
-		testing.expect_value(t, script[8], slice.Diff(rune){kind = .Insert, value = 'C'})
+		if !testing.expect_value(t, len(script), 7) {return}
+		testing.expect_value(t, script[0].kind, slice.Diff_Kind.Delete)
+		testing.expect_value(t, script[0].begin, 0)
+		testing.expect_value(t, script[0].end, 2)
+		if !testing.expect_value(t, len(script[0].values), 2) {return}
+		testing.expect_value(t, script[0].values[0], 'A')
+		testing.expect_value(t, script[0].values[1], 'B')
+
+		testing.expect_value(t, script[1].kind, slice.Diff_Kind.Keep)
+		testing.expect_value(t, script[1].begin, 2)
+		testing.expect_value(t, script[1].end, 3)
+		if !testing.expect_value(t, len(script[1].values), 1) {return}
+		testing.expect_value(t, script[1].values[0], 'C')
+
+		testing.expect_value(t, script[2].kind, slice.Diff_Kind.Delete)
+		testing.expect_value(t, script[2].begin, 3)
+		testing.expect_value(t, script[2].end, 4)
+		if !testing.expect_value(t, len(script[2].values), 1) {return}
+		testing.expect_value(t, script[2].values[0], 'A')
+
+		testing.expect_value(t, script[3].kind, slice.Diff_Kind.Keep)
+		testing.expect_value(t, script[3].begin, 4)
+		testing.expect_value(t, script[3].end, 5)
+		if !testing.expect_value(t, len(script[3].values), 1) {return}
+		testing.expect_value(t, script[3].values[0], 'B')
+
+		testing.expect_value(t, script[4].kind, slice.Diff_Kind.Insert)
+		testing.expect_value(t, script[4].begin, 2)
+		testing.expect_value(t, script[4].end, 3)
+		if !testing.expect_value(t, len(script[4].values), 1) {return}
+		testing.expect_value(t, script[4].values[0], 'A')
+
+		testing.expect_value(t, script[5].kind, slice.Diff_Kind.Keep)
+		testing.expect_value(t, script[5].begin, 5)
+		testing.expect_value(t, script[5].end, 7)
+		if !testing.expect_value(t, len(script[5].values), 2) {return}
+		testing.expect_value(t, script[5].values[0], 'B')
+		testing.expect_value(t, script[5].values[1], 'A')
+
+		testing.expect_value(t, script[6].kind, slice.Diff_Kind.Insert)
+		testing.expect_value(t, script[6].begin, 5)
+		testing.expect_value(t, script[6].end, 6)
+		if !testing.expect_value(t, len(script[6].values), 1) {return}
+		testing.expect_value(t, script[6].values[0], 'C')
 	}
 
 	{
@@ -412,10 +446,14 @@ test_diff :: proc(t: ^testing.T) {
 		defer delete(script)
 
 		testing.expect_value(t, err, nil)
-		if !testing.expect_value(t, len(script), 3) {return}
-		testing.expect_value(t, script[0], slice.Diff(rune){kind = .Insert, value = 'A'})
-		testing.expect_value(t, script[1], slice.Diff(rune){kind = .Insert, value = 'B'})
-		testing.expect_value(t, script[2], slice.Diff(rune){kind = .Insert, value = 'C'})
+		if !testing.expect_value(t, len(script), 1) {return}
+		testing.expect_value(t, script[0].kind, slice.Diff_Kind.Insert)
+		testing.expect_value(t, script[0].begin, 0)
+		testing.expect_value(t, script[0].end, 3)
+		if !testing.expect_value(t, len(script[0].values), 3) {return}
+		testing.expect_value(t, script[0].values[0], 'A')
+		testing.expect_value(t, script[0].values[1], 'B')
+		testing.expect_value(t, script[0].values[2], 'C')
 	}
 
 	{
@@ -423,10 +461,14 @@ test_diff :: proc(t: ^testing.T) {
 		defer delete(script)
 
 		testing.expect_value(t, err, nil)
-		if !testing.expect_value(t, len(script), 3) {return}
-		testing.expect_value(t, script[0], slice.Diff(rune){kind = .Delete, value = 'A'})
-		testing.expect_value(t, script[1], slice.Diff(rune){kind = .Delete, value = 'B'})
-		testing.expect_value(t, script[2], slice.Diff(rune){kind = .Delete, value = 'C'})
+		if !testing.expect_value(t, len(script), 1) {return}
+		testing.expect_value(t, script[0].kind, slice.Diff_Kind.Delete)
+		testing.expect_value(t, script[0].begin, 0)
+		testing.expect_value(t, script[0].end, 3)
+		if !testing.expect_value(t, len(script[0].values), 3) {return}
+		testing.expect_value(t, script[0].values[0], 'A')
+		testing.expect_value(t, script[0].values[1], 'B')
+		testing.expect_value(t, script[0].values[2], 'C')
 	}
 
 	{
@@ -434,11 +476,15 @@ test_diff :: proc(t: ^testing.T) {
 		defer delete(script)
 
 		testing.expect_value(t, err, nil)
-		if !testing.expect_value(t, len(script), 4) {return}
-		testing.expect_value(t, script[0], slice.Diff(rune){kind = .Keep, value = 'O'})
-		testing.expect_value(t, script[1], slice.Diff(rune){kind = .Keep, value = 'd'})
-		testing.expect_value(t, script[2], slice.Diff(rune){kind = .Keep, value = 'i'})
-		testing.expect_value(t, script[3], slice.Diff(rune){kind = .Keep, value = 'n'})
+		if !testing.expect_value(t, len(script), 1) {return}
+		testing.expect_value(t, script[0].kind, slice.Diff_Kind.Keep)
+		testing.expect_value(t, script[0].begin, 0)
+		testing.expect_value(t, script[0].end, 4)
+		if !testing.expect_value(t, len(script[0].values), 4) {return}
+		testing.expect_value(t, script[0].values[0], 'O')
+		testing.expect_value(t, script[0].values[1], 'd')
+		testing.expect_value(t, script[0].values[2], 'i')
+		testing.expect_value(t, script[0].values[3], 'n')
 	}
 
 	{

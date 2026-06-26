@@ -20,8 +20,9 @@ Diff_Kind :: enum {
 
 // A difference in an edit script.
 Diff :: struct($T: typeid) {
-	kind:  Diff_Kind,
-	value: T,
+	kind:       Diff_Kind,
+	begin, end: int,
+	values:     []T,
 }
 
 /*
@@ -47,9 +48,9 @@ diff :: proc(
 	a := value
 	b := expected
 
-	deletes := make(map[int]T, allocator)
+	deletes := make(map[int]int, allocator)
 	defer delete(deletes)
-	inserts := make(map[int][dynamic]T, allocator)
+	inserts := make(map[int][dynamic]int, allocator)
 	defer {
 		for k in inserts {
 			delete(inserts[k])
@@ -57,9 +58,9 @@ diff :: proc(
 
 		delete(inserts)
 	}
-	keeps := make(map[int]T, allocator)
+	keeps := make(map[int]int, allocator)
 	defer delete(keeps)
-	end_inserts := make([dynamic]T, allocator)
+	end_inserts := make([dynamic]int, allocator)
 	defer delete(end_inserts)
 
 	stack := make([dynamic]Subproblem, allocator)
@@ -74,7 +75,7 @@ diff :: proc(
 
 		if n > 0 && m == 0 {
 			for i in p.ax ..< p.bx {
-				deletes[i] = a[i]
+				deletes[i] = i
 			}
 
 			continue
@@ -83,15 +84,15 @@ diff :: proc(
 		if n == 0 && m > 0 {
 			if p.ax < len(a) {
 				if !(p.ax in inserts) {
-					inserts[p.ax] = make([dynamic]T, allocator)
+					inserts[p.ax] = make([dynamic]int, allocator)
 				}
 
 				for j in p.ay ..< p.by {
-					append(&inserts[p.ax], b[j]) or_return
+					append(&inserts[p.ax], j) or_return
 				}
 			} else {
 				for j in p.ay ..< p.by {
-					append(&end_inserts, b[j]) or_return
+					append(&end_inserts, j) or_return
 				}
 			}
 
@@ -106,20 +107,20 @@ diff :: proc(
 
 		if sms == nil {
 			for i in p.ax ..< p.bx {
-				deletes[i] = a[i]
+				deletes[i] = i
 			}
 
 			if p.ax < len(a) {
 				for j in p.ay ..< p.by {
 					if !(p.ax in inserts) {
-						inserts[p.ax] = make([dynamic]T, allocator)
+						inserts[p.ax] = make([dynamic]int, allocator)
 					}
 
-					append(&inserts[p.ax], b[j]) or_return
+					append(&inserts[p.ax], j) or_return
 				}
 			} else {
 				for j in p.ay ..< p.by {
-					append(&end_inserts, b[j]) or_return
+					append(&end_inserts, j) or_return
 				}
 			}
 
@@ -127,7 +128,7 @@ diff :: proc(
 		}
 
 		for i in sms.?.x ..< sms.?.u {
-			keeps[i] = a[i]
+			keeps[i] = i
 		}
 
 		append(&stack, Subproblem{ax = sms.?.u, ay = sms.?.v, bx = p.bx, by = p.by}) or_return
@@ -140,21 +141,21 @@ diff :: proc(
 	for i in 0 ..= len(a) {
 		if i in inserts {
 			for insert in inserts[i] {
-				append(&script, Diff(T){kind = .Insert, value = insert}) or_return
+				append_diff(&script, a, b, .Insert, insert) or_return
 			}
 		}
 
 		if i < len(a) {
 			if i in deletes {
-				append(&script, Diff(T){kind = .Delete, value = deletes[i]}) or_return
+				append_diff(&script, a, b, .Delete, deletes[i]) or_return
 			} else if i in keeps {
-				append(&script, Diff(T){kind = .Keep, value = keeps[i]}) or_return
+				append_diff(&script, a, b, .Keep, keeps[i]) or_return
 			}
 		}
 	}
 
 	for insert in end_inserts {
-		append(&script, Diff(T){kind = .Insert, value = insert}) or_return
+		append_diff(&script, a, b, .Insert, insert) or_return
 	}
 
 	return script[:], nil
@@ -266,5 +267,43 @@ diff :: proc(
 		}
 
 		return nil, nil
+	}
+
+	append_diff :: proc(
+		diffs: ^[dynamic]Diff(T),
+		a, b: []T,
+		kind: Diff_Kind,
+		position: int,
+	) -> (
+		err: mem.Allocator_Error,
+	) {
+		if len(diffs) > 0 {
+			last := &diffs[len(diffs) - 1]
+
+			if last.kind == kind && last.end == position {
+				last.end = position + 1
+
+				switch last.kind {
+				case .Insert:
+					last.values = b[last.begin:last.end]
+				case .Delete, .Keep:
+					last.values = a[last.begin:last.end]
+				}
+
+				return nil
+			}
+		}
+
+		values: []T
+		switch kind {
+		case .Insert:
+			values = b[position:position+1]
+		case .Delete, .Keep:
+			values = a[position:position+1]
+		}
+
+		append(diffs, Diff(T){kind=kind, begin=position,end=position+1,values=values}) or_return
+
+		return nil
 	}
 }
