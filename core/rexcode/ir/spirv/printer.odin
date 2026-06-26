@@ -45,10 +45,10 @@ print :: proc(m: Module, sb: ^strings.Builder, options: ^Print_Options = nil) {
 		return
 	}
 
-	fmt.sbprintf(sb, "; SPIR-V\n; Version: %d.%d\n; Generator: 0x%08x\n; Bound: %d\n; Schema: 0\n",
-		(m.version >> 16) & 0xFF, (m.version >> 8) & 0xFF, m.generator, m.bound)
-
 	words := mem.slice_data_cast([]u32, buf[:n])
+	ver := words[1]   // header fields as actually encoded (bound is computed there)
+	fmt.sbprintf(sb, "; SPIR-V\n; Version: %d.%d\n; Generator: 0x%08x\n; Bound: %d\n; Schema: 0\n",
+		(ver >> 16) & 0xFF, (ver >> 8) & 0xFF, words[2], words[3])
 	wi := int(HEADER_WORDS)
 	for wi < len(words) {
 		head := words[wi]
@@ -105,8 +105,30 @@ fmt_operand :: proc(sb: ^strings.Builder, kind: Spec_Kind, w: []u32, opts: ^Prin
 		s, nwords := str_from_words(w)
 		fmt.sbprintf(sb, "%q", s); return nwords
 	case:
+		if fmt_enum(sb, kind, w[0]) { return 1 }
 		fmt.sbprintf(sb, "%d", w[0]); return 1
 	}
+}
+
+// Symbolic name for the common enum operand kinds (others fall back to numeric).
+// ValueEnums print their member name, BitEnums their set; an out-of-range value
+// prints numerically via fmt's enum handling.
+@(private="file")
+fmt_enum :: proc(sb: ^strings.Builder, kind: Spec_Kind, v: u32) -> bool {
+	#partial switch kind {
+	case .SourceLanguage:  fmt.sbprintf(sb, "%v", Source_Language(v))
+	case .ExecutionModel:  fmt.sbprintf(sb, "%v", Execution_Model(v))
+	case .AddressingModel: fmt.sbprintf(sb, "%v", Addressing_Model(v))
+	case .MemoryModel:     fmt.sbprintf(sb, "%v", Memory_Model(v))
+	case .ExecutionMode:   fmt.sbprintf(sb, "%v", Execution_Mode(v))
+	case .StorageClass:    fmt.sbprintf(sb, "%v", Storage_Class(v))
+	case .Decoration:      fmt.sbprintf(sb, "%v", Decoration(v))
+	case .Capability:      fmt.sbprintf(sb, "%v", Capability(v))
+	// BitEnums (FunctionControl, MemoryAccess, ...) stay numeric -- their bit_set
+	// %v form is too verbose to read inline.
+	case: return false
+	}
+	return true
 }
 
 @(private="file")
