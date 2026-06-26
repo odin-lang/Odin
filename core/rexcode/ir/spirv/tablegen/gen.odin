@@ -263,12 +263,14 @@ gen_encoding_table :: proc(insts: json.Array, kinds: json.Array) -> int {
 	return len(specs)
 }
 
-// --- builders_gen.odin : typed per-opcode constructors (low level) + Builder
-//     methods (high level). Opcodes whose operands aren't yet expressible as
-//     simple typed params (optional, Pair* composites, LiteralString, ...) are
-//     skipped -- those stay hand-written, like an ISA's can_generate_builder. ---
+// --- builders_gen.odin : a typed constructor (low level) + Builder method (high
+//     level) for EVERY opcode. Each operand maps to a typed parameter by its kind
+//     and quantifier; nothing is skipped. Operations are built with a running
+//     operand index `n`, so optional (Maybe), variadic ([]T), composite ([]Pair_*)
+//     and string operands all compose. A verb that would clash with a keyword,
+//     builtin, or re-exported name gets a trailing "_". ---
 @(private="file")
-B_Param :: struct { typ: string, emit: string }
+B_Op :: struct { class, quant, typ: string }   // class in {id,lit,venum,benum,string,pair_ii,pair_li,pair_il}; quant in {one,opt,var}
 
 gen_builders :: proc(insts: json.Array, kinds: json.Array) -> int {
 	category: map[string]string; defer delete(category)
@@ -280,8 +282,8 @@ gen_builders :: proc(insts: json.Array, kinds: json.Array) -> int {
 	sb := strings.builder_make(); defer strings.builder_destroy(&sb)
 	strings.write_string(&sb, HDR)
 
-	seen: map[i64]bool;        defer delete(seen)
-	verb_seen: map[string]bool; defer delete(verb_seen)
+	seen: map[i64]bool;       defer delete(seen)
+	verb_n: map[string]int;   defer delete(verb_n)   // base verb -> times used (dedup)
 	count := 0
 	for v in insts {
 		inst := v.(json.Object)
@@ -290,46 +292,31 @@ gen_builders :: proc(insts: json.Array, kinds: json.Array) -> int {
 		seen[op] = true
 		opname := string(inst["opname"].(json.String))
 
-		// Type-declaration opcodes are ir.Type, not Operations -- skip them (their
-		// verbs would also collide with the re-exported ir.type_* constructors).
-		if c, hc := inst["class"]; hc && string(c.(json.String)) == "Type-Declaration" { continue }
-
-		has_rt, has_r, variadic, ok := false, false, false, true
-		fixed: [dynamic]B_Param; defer delete(fixed)
-		if ops, hop := inst["operands"]; hop {
-			oparr := ops.(json.Array)
-			for ov, oi in oparr {
+		has_rt, has_r := false, false
+		ops: [dynamic]B_Op; defer delete(ops)
+		if oparr_v, hop := inst["operands"]; hop {
+			for ov in oparr_v.(json.Array) {
 				o := ov.(json.Object)
 				kind := string(o["kind"].(json.String))
-				quant := ""
-				if q, hq := o["quantifier"]; hq { quant = string(q.(json.String)) }
-				switch {
-				case kind == "IdResultType": has_rt = true
-				case kind == "IdResult":     has_r = true
-				case quant == "*":
-					if oi != len(oparr) - 1 || kind != "IdRef" { ok = false } else { variadic = true }
-				case quant == "?":
-					ok = false   // optional operands not expressible yet
-				case kind == "IdRef" || kind == "IdScope" || kind == "IdMemorySemantics":
-					append(&fixed, B_Param{"Id", "id"})
-				case kind == "LiteralInteger":
-					append(&fixed, B_Param{"i64", "int"})
-				case category[kind] == "ValueEnum":
-					append(&fixed, B_Param{snake(kind), "venum"})
-				case category[kind] == "BitEnum":
-					append(&fixed, B_Param{snake(kind), "benum"})
-				case:
-					ok = false   // Composite / LiteralString / context-dependent number
+				quant := "one"
+				if q, hq := o["quantifier"]; hq {
+					qs := string(q.(json.String))
+					quant = qs == "*" ? "var" : (qs == "?" ? "opt" : "one")
 				}
-				if !ok { break }
+				switch kind {
+				case "IdResultType": has_rt = true
+				case "IdResult":     has_r = true
+				case:
+					class, typ := classify_operand(kind, category[kind])
+					append(&ops, B_Op{class, quant, typ})
+				}
 			}
 		}
-		if !ok { continue }
 
-		verb := verb_name(opname)
-		if verb in verb_seen { continue }   // skip a name collision rather than shadow
-		verb_seen[verb] = true
-		gen_one_builder(&sb, opname, verb, has_rt, has_r, fixed[:], variadic)
+		base := verb_name(opname)
+		verb := verb_n[base] == 0 ? base : fmt.tprintf("%s_%d", base, verb_n[base] + 1)
+		verb_n[base] += 1
+		gen_one_builder(&sb, opname, verb, has_rt, has_r, ops[:])
 		count += 1
 	}
 
@@ -338,47 +325,108 @@ gen_builders :: proc(insts: json.Array, kinds: json.Array) -> int {
 }
 
 @(private="file")
-gen_one_builder :: proc(sb: ^strings.Builder, opname, verb: string, has_rt, has_r: bool, fixed: []B_Param, variadic: bool) {
-	nfix := len(fixed)
-	has_buf := nfix > 0 || variadic
+classify_operand :: proc(kind, cat: string) -> (class, typ: string) {
+	switch {
+	case kind == "IdRef" || kind == "IdScope" || kind == "IdMemorySemantics": return "id", "Id"
+	case kind == "LiteralString":            return "string", "string"
+	case kind == "PairIdRefIdRef":           return "pair_ii", "Pair_Id_Id"
+	case kind == "PairLiteralIntegerIdRef":  return "pair_li", "Pair_Lit_Id"
+	case kind == "PairIdRefLiteralInteger":  return "pair_il", "Pair_Id_Lit"
+	case cat == "ValueEnum":                 return "venum", snake(kind)
+	case cat == "BitEnum":                   return "benum", snake(kind)
+	}
+	return "lit", "i64"   // LiteralInteger / context-dependent / ext-inst / spec-op number
+}
+
+@(private="file")
+param_type :: proc(o: B_Op) -> string {
+	switch o.quant {
+	case "opt": return fmt.tprintf("Maybe(%s)", o.typ)
+	case "var": return fmt.tprintf("[]%s", o.typ)
+	}
+	return o.typ
+}
+
+// op_* constructor expression for a single scalar value `v` of `class`.
+@(private="file")
+one_emit :: proc(class, v: string) -> string {
+	switch class {
+	case "id":    return fmt.tprintf("op_value(%s)", v)
+	case "venum": return fmt.tprintf("op_int(i64(%s))", v)
+	case "benum": return fmt.tprintf("op_int(i64(transmute(u32)%s))", v)
+	}
+	return fmt.tprintf("op_int(%s)", v)   // lit
+}
+
+@(private="file")
+emit_op_body :: proc(sb: ^strings.Builder, o: B_Op, idx: int) {
+	v := fmt.tprintf("op%d", idx)
+	switch o.quant {
+	case "one":
+		if o.class == "string" { fmt.sbprintf(sb, "\tn += pack_string_operands(buf[n:], %s)\n", v) }
+		else                   { fmt.sbprintf(sb, "\tbuf[n] = %s; n += 1\n", one_emit(o.class, v)) }
+	case "opt":
+		if o.class == "string" { fmt.sbprintf(sb, "\tif s, sok := %s.?; sok {{ n += pack_string_operands(buf[n:], s) }}\n", v) }
+		else                   { fmt.sbprintf(sb, "\tif x, xok := %s.?; xok {{ buf[n] = %s; n += 1 }}\n", v, one_emit(o.class, "x")) }
+	case "var":
+		switch o.class {
+		case "pair_ii": fmt.sbprintf(sb, "\tfor p in %s {{ buf[n] = op_value(p.a); buf[n + 1] = op_value(p.b); n += 2 }}\n", v)
+		case "pair_li": fmt.sbprintf(sb, "\tfor p in %s {{ buf[n] = op_int(p.lit); buf[n + 1] = op_value(p.id); n += 2 }}\n", v)
+		case "pair_il": fmt.sbprintf(sb, "\tfor p in %s {{ buf[n] = op_value(p.id); buf[n + 1] = op_int(p.lit); n += 2 }}\n", v)
+		case:           fmt.sbprintf(sb, "\tfor x in %s {{ buf[n] = %s; n += 1 }}\n", v, one_emit(o.class, "x"))
+		}
+	}
+}
+
+// Upper bound on the operand words `op{idx}` contributes (for opbuf sizing).
+@(private="file")
+size_term :: proc(o: B_Op, idx: int) -> string {
+	v := fmt.tprintf("op%d", idx)
+	switch o.quant {
+	case "opt":
+		if o.class == "string" { return fmt.tprintf("(len(%s.? or_else \"\") + 4) / 4", v) }
+		return "1"
+	case "var":
+		if o.class == "pair_ii" || o.class == "pair_li" || o.class == "pair_il" { return fmt.tprintf("2 * len(%s)", v) }
+		return fmt.tprintf("len(%s)", v)
+	}
+	if o.class == "string" { return fmt.tprintf("(len(%s) + 4) / 4", v) }
+	return "1"
+}
+
+@(private="file")
+gen_one_builder :: proc(sb: ^strings.Builder, opname, verb: string, has_rt, has_r: bool, ops: []B_Op) {
+	has_buf := len(ops) > 0
 
 	// --- low-level constructor ---
 	ll: [dynamic]string; defer delete(ll)
 	if has_buf { append(&ll, "buf: []Operand") }
 	if has_rt  { append(&ll, "result_type: Type_Ref") }
 	if has_r   { append(&ll, "result: Id") }
-	for p, i in fixed { append(&ll, fmt.tprintf("op%d: %s", i + 1, p.typ)) }
-	if variadic { append(&ll, "args: []Id") }
+	for o, i in ops { append(&ll, fmt.tprintf("op%d: %s", i + 1, param_type(o))) }
 
-	fmt.sbprintf(sb, "\ninst_%s :: #force_inline proc \"contextless\" (%s) -> Operation {{\n",
-		opname, join(ll[:]))
-	for p, i in fixed {
-		switch p.emit {
-		case "id":    fmt.sbprintf(sb, "\tbuf[%d] = op_value(op%d)\n", i, i + 1)
-		case "int":   fmt.sbprintf(sb, "\tbuf[%d] = op_int(op%d)\n", i, i + 1)
-		case "venum": fmt.sbprintf(sb, "\tbuf[%d] = op_int(i64(op%d))\n", i, i + 1)
-		case "benum": fmt.sbprintf(sb, "\tbuf[%d] = op_int(i64(transmute(u32)op%d))\n", i, i + 1)
-		}
-	}
-	if variadic { fmt.sbprintf(sb, "\tfor v, i in args {{ buf[%d + i] = op_value(v) }}\n", nfix) }
+	fmt.sbprintf(sb, "\ninst_%s :: #force_inline proc \"contextless\" (%s) -> Operation {{\n", opname, join(ll[:]))
+	if has_buf { strings.write_string(sb, "\tn := 0\n") }
+	for o, i in ops { emit_op_body(sb, o, i + 1) }
 	result_str := has_r ? (has_rt ? "{result, result_type}" : "{id = result}") : "{id = ID_NONE}"
-	operands_str := ""
-	if has_buf { operands_str = variadic ? fmt.tprintf(", operands = buf[:%d + len(args)]", nfix) : fmt.tprintf(", operands = buf[:%d]", nfix) }
+	operands_str := has_buf ? ", operands = buf[:n]" : ""
 	fmt.sbprintf(sb, "\treturn Operation{{opcode = u16(Opcode.%s), result = %s%s}}\n}}\n", opname, result_str, operands_str)
 
 	// --- high-level Builder method ---
 	hl: [dynamic]string; defer delete(hl)
 	append(&hl, "b: ^Builder")
 	if has_rt { append(&hl, "result_type: Type_Ref") }
-	for p, i in fixed { append(&hl, fmt.tprintf("op%d: %s", i + 1, p.typ)) }
-	if variadic { append(&hl, "args: []Id") }
+	for o, i in ops { append(&hl, fmt.tprintf("op%d: %s", i + 1, param_type(o))) }
 
 	call: [dynamic]string; defer delete(call)
-	if has_buf { append(&call, variadic ? fmt.tprintf("opbuf(b, %d + len(args))", nfix) : fmt.tprintf("opbuf(b, %d)", nfix)) }
+	if has_buf {
+		size: [dynamic]string; defer delete(size)
+		for o, i in ops { append(&size, size_term(o, i + 1)) }
+		append(&call, fmt.tprintf("opbuf(b, %s)", strings.join(size[:], " + ")))
+	}
 	if has_rt { append(&call, "result_type") }
 	if has_r  { append(&call, "r") }
-	for _, i in fixed { append(&call, fmt.tprintf("op%d", i + 1)) }
-	if variadic { append(&call, "args") }
+	for _, i in ops { append(&call, fmt.tprintf("op%d", i + 1)) }
 
 	fmt.sbprintf(sb, "\n%s :: proc(%s)%s {{\n", verb, join(hl[:]), has_r ? " -> Id" : "")
 	if has_r { strings.write_string(sb, "\tr := alloc_id(b)\n") }
@@ -414,7 +462,14 @@ is_keyword :: proc(s: string) -> bool {
 	     "context", "distinct", "bit_set", "matrix", "or_else", "or_return",
 	     "size_of", "align_of", "offset_of", "type_of", "typeid_of", "type_info_of",
 	     "len", "cap", "min", "max", "abs", "clamp", "swizzle", "make", "new",
-	     "delete", "append", "copy", "assert", "transmute", "cast", "raw_data":
+	     "delete", "append", "copy", "assert", "transmute", "cast", "raw_data",
+	     // re-exported ir.type_* constructors (Type-Declaration verbs collide):
+	     "type_void", "type_bool", "type_int", "type_float", "type_vector",
+	     "type_pointer", "type_array",
+	     // builtin type names (OpString -> string would shadow the string type):
+	     "string", "cstring", "bool", "int", "uint", "uintptr", "rawptr", "rune",
+	     "byte", "any", "typeid", "i8", "i16", "i32", "i64", "i128", "u8", "u16",
+	     "u32", "u64", "u128", "f16", "f32", "f64", "b8", "b16", "b32", "b64":
 		return true
 	}
 	return false

@@ -63,3 +63,24 @@ take_block :: proc(b: ^Builder, label: Id) -> Block {
 opbuf :: #force_inline proc(b: ^Builder, n: int) -> []Operand {
 	return make([]Operand, n, b.alloc)
 }
+
+// Composite operand kinds: variadic pairs (used by OpPhi / OpSwitch /
+// OpGroupMemberDecorate). The generated builders take these as []Pair_*.
+Pair_Id_Id  :: struct { a, b: Id }          // PairIdRefIdRef
+Pair_Lit_Id :: struct { lit: i64, id: Id }  // PairLiteralIntegerIdRef
+Pair_Id_Lit :: struct { id: Id, lit: i64 }  // PairIdRefLiteralInteger
+
+// Pack a LiteralString operand into `buf` as op_int word operands (the UTF-8
+// bytes, NUL-terminated, little-endian, word-padded). Returns the count written.
+pack_string_operands :: proc "contextless" (buf: []Operand, s: string) -> int {
+	nwords := (len(s) + 4) / 4
+	for wi in 0 ..< nwords {
+		word: u32 = 0
+		for b in 0 ..< 4 {
+			idx := wi * 4 + b
+			if idx < len(s) { word |= u32(s[idx]) << uint(b * 8) }
+		}
+		buf[wi] = op_int(i64(word))
+	}
+	return nwords
+}
