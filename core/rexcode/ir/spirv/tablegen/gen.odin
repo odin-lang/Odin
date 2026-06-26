@@ -17,6 +17,7 @@ import "core:strconv"
 GRAMMAR_PATH :: #directory + "/spirv.core.grammar.json"
 OPCODES_OUT  :: #directory + "/../opcodes.odin"
 KINDS_OUT    :: #directory + "/../operand_kinds.odin"
+TABLE_OUT    :: #directory + "/../encoding_table.odin"
 
 HDR ::
 `// rexcode  ·  Brendan Punsky (dotbmp@github), original author
@@ -43,9 +44,12 @@ main :: proc() {
 	defer json.destroy_value(root)
 
 	g := root.(json.Object)
-	n_op := gen_opcodes(g["instructions"].(json.Array))
-	n_k  := gen_operand_kinds(g["operand_kinds"].(json.Array))
-	fmt.printfln("spirv tablegen: %d opcodes, %d operand kinds", n_op, n_k)
+	insts := g["instructions"].(json.Array)
+	kinds := g["operand_kinds"].(json.Array)
+	n_op := gen_opcodes(insts)
+	n_k  := gen_operand_kinds(kinds)
+	n_sp := gen_encoding_table(insts, kinds)
+	fmt.printfln("spirv tablegen: %d opcodes, %d operand kinds, %d operand specs", n_op, n_k, n_sp)
 }
 
 write_file :: proc(path: string, sb: ^strings.Builder) {
@@ -164,6 +168,97 @@ gen_bit_enum :: proc(sb: ^strings.Builder, name: string, k: json.Object) {
 		fmt.sbprintf(sb, " = %d,\n", r.pos)
 	}
 	strings.write_string(sb, "}\n")
+}
+
+// --- encoding_table.odin : the operand-layout table that drives the codec.
+//     INSTRUCTION_INDEX[opcode] -> a run of INSTRUCTION_SPECS (the opcode's
+//     operands). When an enum operand's value/bit is in ENUM_PARAMS, its
+//     PARAM_SPECS run follows as trailing operands. ---
+gen_encoding_table :: proc(insts: json.Array, kinds: json.Array) -> int {
+	Spec :: struct { kind, quant: string }
+	specs: [dynamic]Spec; defer delete(specs)
+	Run  :: struct { op, start, count: int }
+	runs: [dynamic]Run; defer delete(runs)
+	seen: map[i64]bool;  defer delete(seen)
+	maxop := 0
+	for v in insts {
+		inst := v.(json.Object)
+		op := int(inst["opcode"].(json.Integer))
+		if i64(op) in seen { continue }
+		seen[i64(op)] = true
+		if op > maxop { maxop = op }
+		start := len(specs)
+		if ops, ok := inst["operands"]; ok {
+			for ov in ops.(json.Array) {
+				o := ov.(json.Object)
+				q := "ONE"
+				if qv, qok := o["quantifier"]; qok {
+					qs := string(qv.(json.String))
+					q = qs == "?" ? "OPTIONAL" : (qs == "*" ? "VARIADIC" : "ONE")
+				}
+				append(&specs, Spec{string(o["kind"].(json.String)), q})
+			}
+		}
+		append(&runs, Run{op, start, len(specs) - start})
+	}
+
+	// enumerant -> trailing parameter operands (MemoryAccess.Aligned, ...).
+	Par :: struct { kind: string, value: i64, params: [dynamic]string }
+	pars: [dynamic]Par; defer delete(pars)
+	for kv in kinds {
+		k := kv.(json.Object)
+		cat := string(k["category"].(json.String))
+		if cat != "ValueEnum" && cat != "BitEnum" { continue }
+		kname := string(k["kind"].(json.String))
+		if ens, ok := k["enumerants"]; ok {
+			vseen: map[i64]bool; defer delete(vseen)
+			for ev in ens.(json.Array) {
+				e := ev.(json.Object)
+				ps, pok := e["parameters"]
+				if !pok { continue }
+				val := parse_value(e["value"])
+				if val in vseen { continue }
+				vseen[val] = true
+				pp: [dynamic]string
+				for pv in ps.(json.Array) {
+					append(&pp, string(pv.(json.Object)["kind"].(json.String)))
+				}
+				append(&pars, Par{kname, val, pp})
+			}
+		}
+	}
+
+	sb := strings.builder_make(); defer strings.builder_destroy(&sb)
+	strings.write_string(&sb, HDR)
+	strings.write_string(&sb, "\n// The operand-layout table that drives the codec. INSTRUCTION_INDEX[opcode]\n// gives the run of INSTRUCTION_SPECS describing that opcode's operands; an enum\n// operand whose value/bit appears in ENUM_PARAMS is followed by its PARAM_SPECS\n// run as trailing operands.\n\n")
+	strings.write_string(&sb, "Quantifier :: enum u8 { ONE, OPTIONAL, VARIADIC }\n\n")
+	strings.write_string(&sb, "Operand_Spec :: struct {\n\tkind:  Spec_Kind,\n\tquant: Quantifier,\n}\n\n")
+	strings.write_string(&sb, "Spec_Run :: struct {\n\tstart: u16,\n\tcount: u8,\n}\n\n")
+	strings.write_string(&sb, "Enum_Param :: struct {\n\tkind:   Spec_Kind,   // which enum kind\n\tvalue:  u32,         // enumerant value (ValueEnum) or bit mask (BitEnum)\n\tparams: Spec_Run,    // run in PARAM_SPECS\n}\n")
+
+	fmt.sbprintf(&sb, "\n@(rodata) INSTRUCTION_SPECS := [%d]Operand_Spec{{\n", len(specs))
+	for s in specs { fmt.sbprintf(&sb, "\t{{.%s, .%s}},\n", s.kind, s.quant) }
+	strings.write_string(&sb, "}\n")
+
+	fmt.sbprintf(&sb, "\n@(rodata) INSTRUCTION_INDEX := [%d]Spec_Run{{\n", maxop + 1)
+	for r in runs { fmt.sbprintf(&sb, "\t%d = {{%d, %d}},\n", r.op, r.start, r.count) }
+	strings.write_string(&sb, "}\n")
+
+	pspecs: [dynamic]string; defer delete(pspecs)
+	fmt.sbprintf(&sb, "\n@(rodata) ENUM_PARAMS := [%d]Enum_Param{{\n", len(pars))
+	for p in pars {
+		pstart := len(pspecs)
+		for pk in p.params { append(&pspecs, pk) }
+		fmt.sbprintf(&sb, "\t{{.%s, %d, {{%d, %d}}}},\n", p.kind, p.value, pstart, len(p.params))
+	}
+	strings.write_string(&sb, "}\n")
+
+	fmt.sbprintf(&sb, "\n@(rodata) PARAM_SPECS := [%d]Spec_Kind{{\n", len(pspecs))
+	for ps in pspecs { fmt.sbprintf(&sb, "\t.%s,\n", ps) }
+	strings.write_string(&sb, "}\n")
+
+	write_file(TABLE_OUT, &sb)
+	return len(specs)
 }
 
 // -----------------------------------------------------------------------------
