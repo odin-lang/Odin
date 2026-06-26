@@ -8,26 +8,20 @@ import "base:intrinsics"
 
 import "core:mem"
 
-// An edit script command to insert a value.
-Diff_Insert :: struct($T: typeid) {
-	value: T,
-}
-
-// An edit script command to delete a value.
-Diff_Delete :: struct($T: typeid) {
-	value: T,
-}
-
-// An edit script command to keep a value.
-Diff_Keep :: struct($T: typeid) {
-	value: T,
+// A kind of difference in an edit script.
+Diff_Kind :: enum {
+	// A value should be inserted in the original slice.
+	Insert,
+	// A value should be deleted from the original slice.
+	Delete,
+	// A value should be kept in the original slice.
+	Keep,
 }
 
 // A difference in an edit script.
-Diff :: union($T: typeid) #no_nil {
-	Diff_Insert(T),
-	Diff_Delete(T),
-	Diff_Keep(T),
+Diff :: struct($T: typeid) {
+	kind:  Diff_Kind,
+	value: T,
 }
 
 /*
@@ -70,7 +64,7 @@ diff :: proc(
 
 	stack := make([dynamic]Subproblem, allocator)
 	defer delete(stack)
-	append(&stack, Subproblem{ax = 0, ay = 0, bx = len(a), by = len(b)})
+	append(&stack, Subproblem{ax = 0, ay = 0, bx = len(a), by = len(b)}) or_return
 
 	for len(stack) != 0 {
 		p := pop(&stack)
@@ -146,21 +140,21 @@ diff :: proc(
 	for i in 0 ..= len(a) {
 		if i in inserts {
 			for insert in inserts[i] {
-				append(&script, Diff(T)(Diff_Insert(T){value = insert})) or_return
+				append(&script, Diff(T){kind = .Insert, value = insert}) or_return
 			}
 		}
 
 		if i < len(a) {
 			if i in deletes {
-				append(&script, Diff(T)(Diff_Delete(T){value = deletes[i]})) or_return
+				append(&script, Diff(T){kind = .Delete, value = deletes[i]}) or_return
 			} else if i in keeps {
-				append(&script, Diff(T)(Diff_Keep(T){value = keeps[i]})) or_return
+				append(&script, Diff(T){kind = .Keep, value = keeps[i]}) or_return
 			}
 		}
 	}
 
 	for insert in end_inserts {
-		append(&script, Diff(T)(Diff_Insert(T){value = insert})) or_return
+		append(&script, Diff(T){kind = .Insert, value = insert}) or_return
 	}
 
 	return script[:], nil
