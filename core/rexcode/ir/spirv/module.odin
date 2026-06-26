@@ -54,6 +54,22 @@ Module :: struct {
 	type_ids:     []Id,   // parallel to base.types
 	global_ids:   []Id,   // parallel to base.globals
 	function_ids: []Id,   // parallel to base.functions
+
+	// --- Definition order ---
+	// The interleaving of types / constants / globals as they appear in the stream.
+	// SPIR-V has one "types, constants, global variables" section that must be in
+	// dependency order (an array's length constant before the array type, a
+	// constant's result type before the constant, ...). decode records the order;
+	// encode replays it for byte-exact, spec-valid output. Empty => encode falls
+	// back to all-types, then all-constants, then all-globals.
+	defs: []Def,
+}
+
+// A node in Module.defs: which of the three definition arrays, and its index.
+Def_Kind :: enum u8 { TYPE, CONSTANT, GLOBAL }
+Def :: struct {
+	kind:  Def_Kind,
+	index: u32,
 }
 
 // Member index sentinel: a whole-target decoration / name (OpDecorate / OpName)

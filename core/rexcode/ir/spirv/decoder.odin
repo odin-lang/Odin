@@ -49,6 +49,7 @@ Decoder :: struct {
 	global_ids:   [dynamic]Id,
 	functions:    [dynamic]Function,
 	function_ids: [dynamic]Id,
+	defs:         [dynamic]Def,   // type/constant/global definition order
 
 	// in-flight function / block
 	in_fn:       bool,
@@ -107,8 +108,15 @@ tref :: proc(d: ^Decoder, id: u32) -> Type_Ref {
 @(private="file")
 add_type :: proc(d: ^Decoder, id: Id, t: Type) {
 	d.id_to_type[id] = Type_Ref(len(d.types))
+	append(&d.defs, Def{.TYPE, u32(len(d.types))})
 	append(&d.types, t)
 	append(&d.type_ids, id)
+}
+
+@(private="file")
+add_const :: proc(d: ^Decoder, c: Constant) {
+	append(&d.defs, Def{.CONSTANT, u32(len(d.constants))})
+	append(&d.constants, c)
 }
 
 // Decode a function-body operation generically, by its operand layout: the
@@ -218,6 +226,7 @@ lower :: proc(d: ^Decoder, opcode: Opcode, w: []u32) {
 	case .OpTypeInt:     add_type(d, Id(w[0]), Type{kind = .INT,   bits = u16(w[1]), aux = u16(w[2] & 1)})
 	case .OpTypeFloat:   add_type(d, Id(w[0]), Type{kind = .FLOAT, bits = u16(w[1])})
 	case .OpTypeVector:  add_type(d, Id(w[0]), Type{kind = .VECTOR, elem = tref(d, w[1]), count = w[2]})
+	case .OpTypeRuntimeArray: add_type(d, Id(w[0]), Type{kind = .ARRAY, elem = tref(d, w[1]), len_ref = ID_NONE})
 	case .OpTypePointer: add_type(d, Id(w[0]), Type{kind = .POINTER, aux = u16(w[1]), elem = tref(d, w[2])})
 	case .OpTypeStruct:
 		fields := make([]Type_Ref, len(w) - 1)
@@ -233,18 +242,19 @@ lower :: proc(d: ^Decoder, opcode: Opcode, w: []u32) {
 	case .OpConstant:
 		c := Constant{result = {Id(w[1]), tref(d, w[0])}, opcode = opcode, value = u64(w[2])}
 		if len(w) > 3 { c.value |= u64(w[3]) << 32 }
-		append(&d.constants, c)
+		add_const(d, c)
 	case .OpConstantTrue, .OpConstantFalse, .OpConstantNull:
-		append(&d.constants, Constant{result = {Id(w[1]), tref(d, w[0])}, opcode = opcode})
+		add_const(d, Constant{result = {Id(w[1]), tref(d, w[0])}, opcode = opcode})
 	case .OpConstantComposite:
 		elems := make([]Id, len(w) - 2)
 		for j in 2 ..< len(w) { elems[j - 2] = Id(w[j]) }
-		append(&d.constants, Constant{result = {Id(w[1]), tref(d, w[0])}, opcode = opcode, elements = elems})
+		add_const(d, Constant{result = {Id(w[1]), tref(d, w[0])}, opcode = opcode, elements = elems})
 
 	case .OpVariable:
 		if d.in_fn {
 			if d.have_blk { append(&d.blk_ops, decode_operation(d, opcode, w)) }
 		} else {
+			append(&d.defs, Def{.GLOBAL, u32(len(d.globals))})
 			append(&d.globals, Global{type = tref(d, w[0]), init = len(w) > 3 ? Id(w[3]) : ID_NONE})
 			append(&d.global_ids, Id(w[1]))
 		}
@@ -337,6 +347,7 @@ decode :: proc(data: []u8, m: ^Module, errors: ^[dynamic]Error, allocator := con
 	m.global_ids    = d.global_ids[:]
 	m.functions     = d.functions[:]
 	m.function_ids  = d.function_ids[:]
+	m.defs          = d.defs[:]
 
 	return u32(nwords * 4), true
 }

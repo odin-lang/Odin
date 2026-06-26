@@ -218,7 +218,21 @@ main :: proc() {
 		}
 		m.type_ids = {spirv.Id(1), spirv.Id(2), spirv.Id(3)}
 		m.constants = {{result = {spirv.Id(4), spirv.Type_Ref(1)}, opcode = .OpConstant, value = 4}}
+		// definition order: the length constant before the array type (spec-valid).
+		m.defs = {{.TYPE, 0}, {.TYPE, 1}, {.CONSTANT, 0}, {.TYPE, 2}}
 		roundtrip("bool_and_array", m)
+	}
+
+	// (7) a runtime array (OpTypeRuntimeArray): ARRAY with len_ref == ID_NONE.
+	{
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {
+			{kind = .INT, bits = 32, aux = 1},
+			{kind = .ARRAY, elem = spirv.Type_Ref(0), len_ref = spirv.ID_NONE},   // int32[]
+		}
+		m.type_ids = {spirv.Id(1), spirv.Id(2)}
+		roundtrip("runtime_array", m)
 	}
 
 	fmt.printf("\n%d passed, %d failed\n", ok_count, fail_count)

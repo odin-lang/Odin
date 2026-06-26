@@ -170,64 +170,85 @@ tid :: #force_inline proc "contextless" (m: ^Module, t: Type_Ref) -> Id {
 // Type.aux. (ARRAY/OPAQUE/REF need a length constant / extra modelling and are
 // skipped for now.)
 @(private="file")
-emit_types :: proc "contextless" (w: ^Writer, m: ^Module) {
-	for t, i in m.types {
-		s := inst_begin(w)
-		w_id(w, i < len(m.type_ids) ? m.type_ids[i] : ID_NONE)
-		op: Opcode
-		switch t.kind {
-		case .VOID:    op = .OpTypeVoid
-		case .BOOL:    op = .OpTypeBool
-		case .INT:     w_word(w, u32(t.bits)); w_word(w, u32(t.aux & 1)); op = .OpTypeInt
-		case .FLOAT:   w_word(w, u32(t.bits)); op = .OpTypeFloat
-		case .VECTOR:  w_id(w, tid(m, t.elem)); w_word(w, t.count); op = .OpTypeVector
-		case .ARRAY:   w_id(w, tid(m, t.elem)); w_id(w, t.len_ref); op = .OpTypeArray   // length: a constant <id>
-		case .POINTER: w_word(w, u32(t.aux)); w_id(w, tid(m, t.elem)); op = .OpTypePointer
-		case .STRUCT:
-			for f in t.fields { w_id(w, tid(m, f)) }
-			op = .OpTypeStruct
-		case .FUNCTION:
-			w_id(w, tid(m, t.fields[t.count]))              // return type
-			for pi in 0 ..< int(t.count) { w_id(w, tid(m, t.fields[pi])) }
-			op = .OpTypeFunction
-		case .OPAQUE, .REF:
-			w.pos = s    // rewind the placeholder; not yet lowered
-			continue
-		}
-		inst_end(w, s, op)
+emit_one_type :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
+	t := m.types[i]
+	s := inst_begin(w)
+	w_id(w, i < len(m.type_ids) ? m.type_ids[i] : ID_NONE)
+	op: Opcode
+	switch t.kind {
+	case .VOID:    op = .OpTypeVoid
+	case .BOOL:    op = .OpTypeBool
+	case .INT:     w_word(w, u32(t.bits)); w_word(w, u32(t.aux & 1)); op = .OpTypeInt
+	case .FLOAT:   w_word(w, u32(t.bits)); op = .OpTypeFloat
+	case .VECTOR:  w_id(w, tid(m, t.elem)); w_word(w, t.count); op = .OpTypeVector
+	case .ARRAY:
+		// length: an <id> (OpTypeArray) or absent (OpTypeRuntimeArray).
+		w_id(w, tid(m, t.elem))
+		if t.len_ref != ID_NONE { w_id(w, t.len_ref); op = .OpTypeArray }
+		else                    { op = .OpTypeRuntimeArray }
+	case .POINTER: w_word(w, u32(t.aux)); w_id(w, tid(m, t.elem)); op = .OpTypePointer
+	case .STRUCT:
+		for f in t.fields { w_id(w, tid(m, f)) }
+		op = .OpTypeStruct
+	case .FUNCTION:
+		w_id(w, tid(m, t.fields[t.count]))              // return type
+		for pi in 0 ..< int(t.count) { w_id(w, tid(m, t.fields[pi])) }
+		op = .OpTypeFunction
+	case .OPAQUE, .REF:
+		w.pos = s    // rewind the placeholder; not yet lowered
+		return
 	}
+	inst_end(w, s, op)
 }
 
 @(private="file")
-emit_constants :: proc "contextless" (w: ^Writer, m: ^Module) {
-	for c in m.constants {
-		s := inst_begin(w)
-		w_id(w, tid(m, c.result.type))
-		w_id(w, c.result.id)
-		#partial switch c.opcode {
-		case .OpConstant:
-			t := m.types[u32(c.result.type)]
-			w_word(w, u32(c.value))
-			if (t.kind == .INT || t.kind == .FLOAT) && t.bits > 32 {
-				w_word(w, u32(c.value >> 32))   // context-dependent number, second word
+emit_one_constant :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
+	c := m.constants[i]
+	s := inst_begin(w)
+	w_id(w, tid(m, c.result.type))
+	w_id(w, c.result.id)
+	#partial switch c.opcode {
+	case .OpConstant:
+		t := m.types[u32(c.result.type)]
+		w_word(w, u32(c.value))
+		if (t.kind == .INT || t.kind == .FLOAT) && t.bits > 32 {
+			w_word(w, u32(c.value >> 32))   // context-dependent number, second word
+		}
+	case .OpConstantComposite:
+		for e in c.elements { w_id(w, e) }
+	}
+	inst_end(w, s, c.opcode)
+}
+
+@(private="file")
+emit_one_global :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
+	g := m.globals[i]
+	s := inst_begin(w)
+	w_id(w, tid(m, g.type))   // a pointer type
+	w_id(w, i < len(m.global_ids) ? m.global_ids[i] : ID_NONE)
+	w_word(w, u32(m.types[u32(g.type)].aux))   // storage class = the pointer's address space
+	if g.init != ID_NONE { w_id(w, g.init) }
+	inst_end(w, s, .OpVariable)
+}
+
+// The "types, constants, global variables" section. When Module.defs records the
+// stream order (from decode), replay it -- byte-exact and dependency-correct.
+// Otherwise fall back to all-types, then all-constants, then all-globals.
+@(private="file")
+emit_definitions :: proc "contextless" (w: ^Writer, m: ^Module) {
+	if len(m.defs) > 0 {
+		for d in m.defs {
+			switch d.kind {
+			case .TYPE:     emit_one_type(w, m, int(d.index))
+			case .CONSTANT: emit_one_constant(w, m, int(d.index))
+			case .GLOBAL:   emit_one_global(w, m, int(d.index))
 			}
-		case .OpConstantComposite:
-			for e in c.elements { w_id(w, e) }
 		}
-		inst_end(w, s, c.opcode)
+		return
 	}
-}
-
-@(private="file")
-emit_globals :: proc "contextless" (w: ^Writer, m: ^Module) {
-	for g, gi in m.globals {
-		s := inst_begin(w)
-		w_id(w, tid(m, g.type))   // a pointer type
-		w_id(w, gi < len(m.global_ids) ? m.global_ids[gi] : ID_NONE)
-		w_word(w, u32(m.types[u32(g.type)].aux))   // storage class = the pointer's address space
-		if g.init != ID_NONE { w_id(w, g.init) }
-		inst_end(w, s, .OpVariable)
-	}
+	for i in 0 ..< len(m.types)     { emit_one_type(w, m, i) }
+	for i in 0 ..< len(m.constants) { emit_one_constant(w, m, i) }
+	for i in 0 ..< len(m.globals)   { emit_one_global(w, m, i) }
 }
 
 // -----------------------------------------------------------------------------
@@ -331,9 +352,7 @@ encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dy
 	emit_preamble(&w, &m)
 	emit_debug(&w, &m)
 	emit_annotations(&w, &m)
-	emit_types(&w, &m)
-	emit_constants(&w, &m)
-	emit_globals(&w, &m)
+	emit_definitions(&w, &m)
 	emit_functions(&w, &m)
 	return w.pos, w.ok
 }
