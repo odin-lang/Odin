@@ -7840,7 +7840,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					break;
 				}
 			}
-			if (all_the_same) {
+			if (all_the_same && first_results != nullptr) {
 				GB_ASSERT_MSG(is_type_tuple(first_results), "%s", type_to_string(first_results));
 				data.result_type = first_results;
 			}
