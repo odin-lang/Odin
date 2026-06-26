@@ -274,7 +274,13 @@ emit_functions :: proc "contextless" (w: ^Writer, m: ^Module) {
 		w_word(w, 0)                                                    // FunctionControl (none)
 		w_id(w, tid(m, fn.signature))
 		inst_end(w, s, .OpFunction)
-		// (OpFunctionParameter not yet modelled in ir.Function)
+		// Function parameters: the entry block's params are the OpFunctionParameters,
+		// emitted between OpFunction and the entry OpLabel.
+		if len(fn.blocks) > 0 {
+			for p in fn.blocks[0].params {
+				sp := inst_begin(w); w_id(w, tid(m, p.type)); w_id(w, p.id); inst_end(w, sp, .OpFunctionParameter)
+			}
+		}
 		for blk in fn.blocks {
 			sl := inst_begin(w); w_id(w, blk.id); inst_end(w, sl, .OpLabel)
 			for &op in blk.ops { emit_operation(w, m, &op) }
@@ -287,10 +293,37 @@ emit_functions :: proc "contextless" (w: ^Writer, m: ^Module) {
 // Entry point
 // -----------------------------------------------------------------------------
 
+@(private="file")
+max_id :: #force_inline proc "contextless" (cur: u32, id: Id) -> u32 {
+	return id != ID_NONE ? max(cur, u32(id)) : cur
+}
+
+// The exclusive upper bound on every <id> in the module (the header's `bound`).
+@(private="file")
+compute_bound :: proc "contextless" (m: ^Module) -> u32 {
+	hi := u32(0)
+	for id in m.type_ids     { hi = max_id(hi, id) }
+	for id in m.global_ids   { hi = max_id(hi, id) }
+	for id in m.function_ids { hi = max_id(hi, id) }
+	for ei in m.ext_imports  { hi = max_id(hi, ei.result) }
+	for s in m.debug.strings { hi = max_id(hi, s.result) }
+	for c in m.constants     { hi = max_id(hi, c.result.id) }
+	for fn in m.functions {
+		for blk in fn.blocks {
+			hi = max_id(hi, blk.id)
+			for p in blk.params { hi = max_id(hi, p.id) }
+			for op in blk.ops   { hi = max_id(hi, op.result.id) }
+		}
+	}
+	return hi + 1
+}
+
 // encode: serialize `m` into `code` in spec layout order, returning the byte
-// count written. `m.bound` must be the exclusive upper bound on all <id>s.
+// count written. `bound` is computed when left 0 (else taken as-is, so a decoded
+// module re-encodes with its original bound).
 encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (byte_count: u32, ok: bool) {
 	m := m
+	if m.bound == 0 { m.bound = compute_bound(&m) }
 	w := Writer{code = code, ok = true}
 	emit_header(&w, &m)
 	emit_preamble(&w, &m)

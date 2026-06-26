@@ -51,13 +51,16 @@ Decoder :: struct {
 	function_ids: [dynamic]Id,
 
 	// in-flight function / block
-	in_fn:     bool,
-	fn_sig:    Type_Ref,
-	fn_id:     Id,
-	fn_blocks: [dynamic]Block,
-	have_blk:  bool,
-	blk_id:    Id,
-	blk_ops:   [dynamic]Operation,
+	in_fn:       bool,
+	fn_sig:      Type_Ref,
+	fn_id:       Id,
+	fn_blocks:   [dynamic]Block,
+	fn_params:   [dynamic]Result,   // OpFunctionParameters, attached to the entry block
+	first_block: bool,
+	have_blk:    bool,
+	blk_id:      Id,
+	blk_params:  []Result,
+	blk_ops:     [dynamic]Operation,
 }
 
 @(private="file")
@@ -140,6 +143,13 @@ decode_operation :: proc(d: ^Decoder, opcode: Opcode, w: []u32) -> Operation {
 			wi += 1
 		}
 	}
+	// Trailing words beyond the fixed layout: the parameter operands an enum
+	// value/bit pulls in (MemoryAccess Aligned's alignment, etc.). Captured as
+	// literals -- enough to re-encode byte-exact (semantic typing is a refinement).
+	for wi < len(w) {
+		append(&ops, op_int(i64(w[wi])))
+		wi += 1
+	}
 	op.operands = ops[:]
 	return op
 }
@@ -147,8 +157,9 @@ decode_operation :: proc(d: ^Decoder, opcode: Opcode, w: []u32) -> Operation {
 @(private="file")
 finish_block :: proc(d: ^Decoder) {
 	if d.have_blk {
-		append(&d.fn_blocks, Block{id = d.blk_id, ops = d.blk_ops[:]})
+		append(&d.fn_blocks, Block{id = d.blk_id, ops = d.blk_ops[:], params = d.blk_params})
 		d.blk_ops = nil
+		d.blk_params = nil
 		d.have_blk = false
 	}
 }
@@ -240,10 +251,13 @@ lower :: proc(d: ^Decoder, opcode: Opcode, w: []u32) {
 	case .OpFunction:
 		d.in_fn = true
 		d.fn_id = Id(w[1]); d.fn_sig = tref(d, w[3])
-		d.fn_blocks = nil
+		d.fn_blocks = nil; d.fn_params = nil; d.first_block = true
+	case .OpFunctionParameter:
+		append(&d.fn_params, Result{id = Id(w[1]), type = tref(d, w[0])})
 	case .OpLabel:
 		finish_block(d)
 		d.have_blk = true; d.blk_id = Id(w[0]); d.blk_ops = nil
+		if d.first_block { d.blk_params = d.fn_params[:]; d.first_block = false }
 	case .OpFunctionEnd:
 		finish_function(d)
 

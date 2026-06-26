@@ -125,6 +125,64 @@ main :: proc() {
 		roundtrip("iadd_function", m)
 	}
 
+	// (4) a function with a parameter, and bound left 0 so encode computes it:
+	//     i32 @f(i32 %4) { %5: OpReturnValue %4 }
+	{
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {
+			{kind = .INT, bits = 32, aux = 1},
+			{kind = .FUNCTION, fields = {spirv.Type_Ref(0), spirv.Type_Ref(0)}, count = 1},
+		}
+		m.type_ids = {spirv.Id(1), spirv.Id(2)}
+		ret := spirv.Operation{
+			opcode   = u16(spirv.Opcode.OpReturnValue),
+			result   = {id = spirv.ID_NONE},
+			operands = {spirv.op_value(spirv.Id(4))},
+		}
+		m.functions = {
+			{signature = spirv.Type_Ref(1), blocks = {
+				{
+					id     = spirv.Id(5),
+					params = {{id = spirv.Id(4), type = spirv.Type_Ref(0)}},   // OpFunctionParameter
+					ops    = {ret},
+				},
+			}},
+		}
+		m.function_ids = {spirv.Id(3)}
+		// m.bound left 0 -> computed
+		roundtrip("param_function", m)
+	}
+
+	// (5) an enum-parameter operand: OpLoad ... MemoryAccess Aligned 16, where the
+	//     alignment (16) is a trailing operand pulled in by the Aligned bit.
+	{
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {
+			{kind = .VOID},
+			{kind = .FLOAT, bits = 32},
+			{kind = .POINTER, aux = 7, elem = spirv.Type_Ref(1)},   // Function* float
+			{kind = .FUNCTION, fields = {spirv.Type_Ref(0)}, count = 0},
+		}
+		m.type_ids = {spirv.Id(1), spirv.Id(2), spirv.Id(3), spirv.Id(4)}
+		var := spirv.Operation{   // %7 = OpVariable %ptr Function
+			opcode = u16(spirv.Opcode.OpVariable), result = {spirv.Id(7), spirv.Type_Ref(2)},
+			operands = {spirv.op_int(7)},
+		}
+		load := spirv.Operation{  // %8 = OpLoad %float %7 Aligned 16
+			opcode = u16(spirv.Opcode.OpLoad), result = {spirv.Id(8), spirv.Type_Ref(1)},
+			operands = {spirv.op_value(spirv.Id(7)), spirv.op_int(0x2), spirv.op_int(16)},
+		}
+		m.functions = {
+			{signature = spirv.Type_Ref(3), blocks = {
+				{id = spirv.Id(6), ops = {var, load, {opcode = u16(spirv.Opcode.OpReturn)}}},
+			}},
+		}
+		m.function_ids = {spirv.Id(5)}
+		roundtrip("load_aligned", m)
+	}
+
 	fmt.printf("\n%d passed, %d failed\n", ok_count, fail_count)
 	if fail_count > 0 { os.exit(1) }
 }
