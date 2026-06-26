@@ -49,6 +49,26 @@ roundtrip :: proc(name: string, m: spirv.Module) {
 		fail_count += 1
 		return
 	}
+
+	// big-endian: byte-swap every word and decode again. Endianness is detected
+	// from the magic, so the same module must be recovered -- re-encoding it
+	// (little-endian) reproduces buf1.
+	be := make([]u8, n1, context.temp_allocator)
+	for i := u32(0); i < n1; i += 4 {
+		be[i], be[i + 1], be[i + 2], be[i + 3] = buf1[i + 3], buf1[i + 2], buf1[i + 1], buf1[i]
+	}
+	mbe: spirv.Module
+	beerr: [dynamic]spirv.Error; defer delete(beerr)
+	if _, ok := spirv.decode(be[:n1], &mbe, &beerr, context.temp_allocator); !ok {
+		fmt.printf("  [FAIL] %s: big-endian decode failed\n", name); fail_count += 1; return
+	}
+	nbe, _ := spirv.encode(mbe, buf2, &relocs, &errors)
+	if nbe != n1 || !slice.equal(buf1[:n1], buf2[:nbe]) {
+		fmt.printf("  [FAIL] %s: big-endian round-trip mismatch (n1=%d nbe=%d)\n", name, n1, nbe)
+		fail_count += 1
+		return
+	}
+
 	fmt.printf("  [ok]   %-22s %d bytes\n", name, n1)
 	ok_count += 1
 }
