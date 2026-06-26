@@ -177,9 +177,11 @@ emit_types :: proc "contextless" (w: ^Writer, m: ^Module) {
 		op: Opcode
 		switch t.kind {
 		case .VOID:    op = .OpTypeVoid
+		case .BOOL:    op = .OpTypeBool
 		case .INT:     w_word(w, u32(t.bits)); w_word(w, u32(t.aux & 1)); op = .OpTypeInt
 		case .FLOAT:   w_word(w, u32(t.bits)); op = .OpTypeFloat
 		case .VECTOR:  w_id(w, tid(m, t.elem)); w_word(w, t.count); op = .OpTypeVector
+		case .ARRAY:   w_id(w, tid(m, t.elem)); w_id(w, t.len_ref); op = .OpTypeArray   // length: a constant <id>
 		case .POINTER: w_word(w, u32(t.aux)); w_id(w, tid(m, t.elem)); op = .OpTypePointer
 		case .STRUCT:
 			for f in t.fields { w_id(w, tid(m, f)) }
@@ -188,7 +190,7 @@ emit_types :: proc "contextless" (w: ^Writer, m: ^Module) {
 			w_id(w, tid(m, t.fields[t.count]))              // return type
 			for pi in 0 ..< int(t.count) { w_id(w, tid(m, t.fields[pi])) }
 			op = .OpTypeFunction
-		case .ARRAY, .OPAQUE, .REF:
+		case .OPAQUE, .REF:
 			w.pos = s    // rewind the placeholder; not yet lowered
 			continue
 		}

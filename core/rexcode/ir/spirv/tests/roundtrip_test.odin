@@ -203,6 +203,24 @@ main :: proc() {
 		roundtrip("load_aligned", m)
 	}
 
+	// (6) the extended ir types: Type_Kind.BOOL (OpTypeBool) and ARRAY with an
+	//     <id> length (OpTypeArray, len_ref -> a constant). NOTE: a spec-valid
+	//     module orders the length constant before the array type; the codec
+	//     round-trips this shape byte-exact regardless (dependency-ordered
+	//     types/constants emit is a separate follow-up).
+	{
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {
+			{kind = .BOOL},
+			{kind = .INT, bits = 32, aux = 1},
+			{kind = .ARRAY, elem = spirv.Type_Ref(1), len_ref = spirv.Id(4)},   // int32[4]
+		}
+		m.type_ids = {spirv.Id(1), spirv.Id(2), spirv.Id(3)}
+		m.constants = {{result = {spirv.Id(4), spirv.Type_Ref(1)}, opcode = .OpConstant, value = 4}}
+		roundtrip("bool_and_array", m)
+	}
+
 	fmt.printf("\n%d passed, %d failed\n", ok_count, fail_count)
 	if fail_count > 0 { os.exit(1) }
 }

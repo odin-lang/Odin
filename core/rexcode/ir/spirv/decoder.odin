@@ -213,7 +213,8 @@ lower :: proc(d: ^Decoder, opcode: Opcode, w: []u32) {
 		append(&d.decorations, Decoration_Inst{Id(w[0]), Decoration(w[2]), w[1], ops})
 
 	case .OpTypeVoid:    add_type(d, Id(w[0]), Type{kind = .VOID})
-	case .OpTypeBool:    add_type(d, Id(w[0]), Type{kind = .INT, bits = 1})   // ir has no BOOL kind
+	case .OpTypeBool:    add_type(d, Id(w[0]), Type{kind = .BOOL})
+	case .OpTypeArray:   add_type(d, Id(w[0]), Type{kind = .ARRAY, elem = tref(d, w[1]), len_ref = Id(w[2])})
 	case .OpTypeInt:     add_type(d, Id(w[0]), Type{kind = .INT,   bits = u16(w[1]), aux = u16(w[2] & 1)})
 	case .OpTypeFloat:   add_type(d, Id(w[0]), Type{kind = .FLOAT, bits = u16(w[1])})
 	case .OpTypeVector:  add_type(d, Id(w[0]), Type{kind = .VECTOR, elem = tref(d, w[1]), count = w[2]})
