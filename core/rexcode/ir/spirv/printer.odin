@@ -87,6 +87,12 @@ fmt_inst :: proc(sb: ^strings.Builder, opcode: Opcode, w: []u32, opts: ^Print_Op
 			wi += fmt_operand(&args, spec.kind, w[wi:], opts)
 		}
 	}
+	// trailing words beyond the fixed layout (enum-parameter operands, e.g.
+	// MemoryAccess Aligned's alignment) -- printed numerically.
+	for wi < len(w) {
+		fmt.sbprintf(&args, " %d", w[wi])
+		wi += 1
+	}
 
 	// right-align the "%id = " result column, then OpName + args.
 	COL :: 14
@@ -106,6 +112,7 @@ fmt_operand :: proc(sb: ^strings.Builder, kind: Spec_Kind, w: []u32, opts: ^Prin
 		fmt.sbprintf(sb, "%q", s); return nwords
 	case:
 		if fmt_enum(sb, kind, w[0]) { return 1 }
+		if fmt_bitenum(sb, kind, w[0]) { return 1 }
 		fmt.sbprintf(sb, "%d", w[0]); return 1
 	}
 }
@@ -124,11 +131,41 @@ fmt_enum :: proc(sb: ^strings.Builder, kind: Spec_Kind, v: u32) -> bool {
 	case .StorageClass:    fmt.sbprintf(sb, "%v", Storage_Class(v))
 	case .Decoration:      fmt.sbprintf(sb, "%v", Decoration(v))
 	case .Capability:      fmt.sbprintf(sb, "%v", Capability(v))
-	// BitEnums (FunctionControl, MemoryAccess, ...) stay numeric -- their bit_set
-	// %v form is too verbose to read inline.
 	case: return false
 	}
 	return true
+}
+
+// Symbolic name for the common BitEnum operands: the set bits' names joined with
+// '|', or "None" when empty (the spirv-dis convention; %v on the bit_set would
+// print the verbose "bit_set[X_Bit; u32]{...}").
+@(private="file")
+fmt_bitenum :: proc(sb: ^strings.Builder, kind: Spec_Kind, v: u32) -> bool {
+	#partial switch kind {
+	case .FunctionControl:  fmt_bits(sb, v, Function_Control_Bit)
+	case .MemoryAccess:     fmt_bits(sb, v, Memory_Access_Bit)
+	case .SelectionControl: fmt_bits(sb, v, Selection_Control_Bit)
+	case .LoopControl:      fmt_bits(sb, v, Loop_Control_Bit)
+	case .ImageOperands:    fmt_bits(sb, v, Image_Operands_Bit)
+	case: return false
+	}
+	return true
+}
+
+@(private="file")
+fmt_bits :: proc(sb: ^strings.Builder, v: u32, $E: typeid) {
+	if v == 0 {
+		strings.write_string(sb, "None")
+		return
+	}
+	first := true
+	for pos in 0 ..< 32 {
+		if v & (u32(1) << uint(pos)) != 0 {
+			if !first { strings.write_byte(sb, '|') }
+			fmt.sbprintf(sb, "%v", cast(E)pos)
+			first = false
+		}
+	}
 }
 
 @(private="file")
