@@ -194,7 +194,16 @@ emit_one_type :: proc "contextless" (w: ^Writer, m: ^Module, i: int) {
 		w_id(w, tid(m, t.fields[t.count]))              // return type
 		for pi in 0 ..< int(t.count) { w_id(w, tid(m, t.fields[pi])) }
 		op = .OpTypeFunction
-	case .OPAQUE, .REF:
+	case .OPAQUE:
+		// re-emit the captured instruction verbatim (image/sampler/event/...).
+		info := i < len(m.opaque_info) ? m.opaque_info[i] : Opaque_Info{}
+		if info.opcode == .OpNop {
+			w.pos = s    // no recorded detail; cannot lower
+			return
+		}
+		for word in info.words { w_word(w, word) }
+		op = info.opcode
+	case .REF:
 		w.pos = s    // rewind the placeholder; not yet lowered
 		return
 	}

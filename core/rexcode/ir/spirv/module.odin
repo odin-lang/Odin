@@ -63,6 +63,14 @@ Module :: struct {
 	// encode replays it for byte-exact, spec-valid output. Empty => encode falls
 	// back to all-types, then all-constants, then all-globals.
 	defs: []Def,
+
+	// --- Opaque type detail ---
+	// Verbatim operand words for type-defining instructions the codec does not
+	// model structurally (OpTypeImage / Sampler / SampledImage / Matrix / Event /
+	// Pipe / ...). Parallel to base.types; the entry is meaningful only where
+	// types[i].kind == OPAQUE. Lets any such type round-trip byte-exact without a
+	// dedicated field per SPIR-V opaque kind.
+	opaque_info: []Opaque_Info,
 }
 
 // A node in Module.defs: which of the three definition arrays, and its index.
@@ -70,6 +78,13 @@ Def_Kind :: enum u8 { TYPE, CONSTANT, GLOBAL }
 Def :: struct {
 	kind:  Def_Kind,
 	index: u32,
+}
+
+// An unmodeled type-defining instruction, captured verbatim (the operand words
+// after its result <id>) so it re-emits exactly.
+Opaque_Info :: struct {
+	opcode: Opcode,
+	words:  []u32,
 }
 
 // Member index sentinel: a whole-target decoration / name (OpDecorate / OpName)

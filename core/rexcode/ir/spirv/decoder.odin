@@ -50,6 +50,7 @@ Decoder :: struct {
 	functions:    [dynamic]Function,
 	function_ids: [dynamic]Id,
 	defs:         [dynamic]Def,   // type/constant/global definition order
+	opaque_info:  [dynamic]Opaque_Info,   // parallel to types; set for OPAQUE
 
 	// in-flight function / block
 	in_fn:       bool,
@@ -111,6 +112,17 @@ add_type :: proc(d: ^Decoder, id: Id, t: Type) {
 	append(&d.defs, Def{.TYPE, u32(len(d.types))})
 	append(&d.types, t)
 	append(&d.type_ids, id)
+	append(&d.opaque_info, Opaque_Info{})   // stay parallel; filled for OPAQUE
+}
+
+// A type-defining instruction the codec doesn't model: store it as OPAQUE plus
+// its verbatim operand words (after the result <id>) so it re-emits exactly.
+@(private="file")
+add_opaque :: proc(d: ^Decoder, opcode: Opcode, w: []u32) {
+	add_type(d, Id(w[0]), Type{kind = .OPAQUE})
+	words := make([]u32, len(w) - 1)
+	copy(words, w[1:])
+	d.opaque_info[len(d.opaque_info) - 1] = Opaque_Info{opcode = opcode, words = words}
 }
 
 @(private="file")
@@ -238,6 +250,10 @@ lower :: proc(d: ^Decoder, opcode: Opcode, w: []u32) {
 		for j in 0 ..< nparam { fields[j] = tref(d, w[2 + j]) }
 		fields[nparam] = tref(d, w[1])   // return type last: fields = params ++ [result]
 		add_type(d, Id(w[0]), Type{kind = .FUNCTION, fields = fields, count = u32(nparam)})
+	case .OpTypeMatrix, .OpTypeImage, .OpTypeSampler, .OpTypeSampledImage,
+	     .OpTypeOpaque, .OpTypeEvent, .OpTypeDeviceEvent, .OpTypeReserveId,
+	     .OpTypeQueue, .OpTypePipe:
+		add_opaque(d, opcode, w)   // captured verbatim -> OPAQUE
 
 	case .OpConstant:
 		c := Constant{result = {Id(w[1]), tref(d, w[0])}, opcode = opcode, value = u64(w[2])}
@@ -348,6 +364,7 @@ decode :: proc(data: []u8, m: ^Module, errors: ^[dynamic]Error, allocator := con
 	m.functions     = d.functions[:]
 	m.function_ids  = d.function_ids[:]
 	m.defs          = d.defs[:]
+	m.opaque_info   = d.opaque_info[:]
 
 	return u32(nwords * 4), true
 }

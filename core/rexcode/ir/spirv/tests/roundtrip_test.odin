@@ -235,6 +235,45 @@ main :: proc() {
 		roundtrip("runtime_array", m)
 	}
 
+	// (8) OpPhi -- SPIR-V's SSA merge (variadic value/parent-block pairs). The
+	//     generic codec round-trips it with no special handling; non-entry blocks
+	//     use OpPhi, not block params, so this is the whole story.
+	{
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {
+			{kind = .VOID}, {kind = .INT, bits = 32, aux = 1},
+			{kind = .FUNCTION, fields = {spirv.Type_Ref(0)}, count = 0},
+		}
+		m.type_ids = {spirv.Id(1), spirv.Id(2), spirv.Id(3)}
+		phi := spirv.Operation{   // %6 = OpPhi %int %7 %8 (value %7 from block %8)
+			opcode = u16(spirv.Opcode.OpPhi), result = {spirv.Id(6), spirv.Type_Ref(1)},
+			operands = {spirv.op_value(spirv.Id(7)), spirv.op_value(spirv.Id(8))},
+		}
+		m.functions = {
+			{signature = spirv.Type_Ref(2), blocks = {
+				{id = spirv.Id(5), ops = {phi, {opcode = u16(spirv.Opcode.OpReturn)}}},
+			}},
+		}
+		m.function_ids = {spirv.Id(4)}
+		roundtrip("phi", m)
+	}
+
+	// (9) an opaque type captured verbatim: OpTypeImage (sampled type + 6 enum/
+	//     literal operands) round-trips through the Opaque_Info side table, with no
+	//     per-image-field modelling.
+	{
+		m := spirv.make_module()
+		m.capabilities = {.Shader}
+		m.types = {{kind = .FLOAT, bits = 32}, {kind = .OPAQUE}}
+		m.type_ids = {spirv.Id(1), spirv.Id(2)}
+		m.opaque_info = {
+			{},
+			{opcode = .OpTypeImage, words = {1, 1, 0, 0, 0, 1, 0}},   // %1, Dim 2D, ..., Unknown
+		}
+		roundtrip("image_type", m)
+	}
+
 	fmt.printf("\n%d passed, %d failed\n", ok_count, fail_count)
 	if fail_count > 0 { os.exit(1) }
 }
