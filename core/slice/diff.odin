@@ -67,6 +67,12 @@ diff :: proc(
 	defer delete(stack)
 	append(&stack, Subproblem{ax = 0, ay = 0, bx = len(a), by = len(b)}) or_return
 
+	max := len(a) + len(b)
+	vf := make([]int, 2 * max + 1, allocator) or_return
+	defer delete(vf, allocator)
+	vr := make([]int, 2 * max + 1, allocator) or_return
+	defer delete(vr, allocator)
+
 	for len(stack) != 0 {
 		p := pop(&stack)
 
@@ -103,7 +109,7 @@ diff :: proc(
 			continue
 		}
 
-		sms := find_middle_snake(a, b, p, allocator) or_return
+		sms := find_middle_snake(a, b, p, vf, vr)
 
 		if sms == nil {
 			for i in p.ax ..< p.bx {
@@ -174,13 +180,12 @@ diff :: proc(
 
 	// Finds the middle snake.
 	@(require_results)
-	find_middle_snake :: proc(
+	find_middle_snake :: proc "contextless" (
 		a, b: []$T,
 		p: Subproblem,
-		allocator := context.allocator,
+		vf_buf, vr_buf: []int,
 	) -> (
 		result: Maybe(Middle_Snake),
-		err: mem.Allocator_Error,
 	) {
 		n := p.bx - p.ax
 		m := p.by - p.ay
@@ -188,14 +193,10 @@ diff :: proc(
 		odd := (delta % 2 != 0)
 
 		max := n + m
-		
-		vf := make([]int, 2 * max + 1, allocator)
-		defer delete(vf, allocator)
-		fill(vf[:], -1)
-
-		vr := make([]int, 2 * max + 1, allocator)
-		defer delete(vr)
-		fill(vr[:], -1)
+		vf := vf_buf[:2 * max + 1]
+		fill(vf, -1)
+		vr := vr_buf[:2 * max + 1]
+		fill(vr, -1)
 
 		vf[1 + max] = 0
 		vr[delta + max] = n
@@ -226,12 +227,11 @@ diff :: proc(
 				if odd && (delta - d < k) && (k < delta + d) {
 					if vf[k + max] >= vr[k + max] {
 						return Middle_Snake {
-								x = p.ax + x_start,
-								y = p.ay + y_start,
-								u = p.ax + x,
-								v = p.ay + y,
-							},
-							nil
+							x = p.ax + x_start,
+							y = p.ay + y_start,
+							u = p.ax + x,
+							v = p.ay + y,
+						}
 					}
 				}
 			}
@@ -240,7 +240,8 @@ diff :: proc(
 				x: int
 				if d == 0 {
 					x = vr[delta + max]
-				} else if k == d + delta || (k != -d + delta && vr[k - 1 + max] > vr[k + 1 + max]) {
+				} else if k == d + delta ||
+				   (k != -d + delta && vr[k - 1 + max] > vr[k + 1 + max]) {
 					x = vr[k - 1 + max]
 				} else {
 					x = vr[k + 1 + max] - 1
@@ -258,18 +259,17 @@ diff :: proc(
 				if !odd && -d <= k && k <= d {
 					if vf[k + max] >= vr[k + max] {
 						return Middle_Snake {
-								x = p.ax + x,
-								y = p.ay + y,
-								u = p.ax + x_start,
-								v = p.ay + y_start,
-							},
-							nil
+							x = p.ax + x,
+							y = p.ay + y,
+							u = p.ax + x_start,
+							v = p.ay + y_start,
+						}
 					}
 				}
 			}
 		}
 
-		return nil, nil
+		return nil
 	}
 
 	append_diff :: proc(
@@ -300,12 +300,15 @@ diff :: proc(
 		values: []T
 		switch kind {
 		case .Insert:
-			values = b[position:position+1]
+			values = b[position:position + 1]
 		case .Delete, .Keep:
-			values = a[position:position+1]
+			values = a[position:position + 1]
 		}
 
-		append(diffs, Diff(T){kind=kind, begin=position,end=position+1,values=values}) or_return
+		append(
+			diffs,
+			Diff(T){kind = kind, begin = position, end = position + 1, values = values},
+		) or_return
 
 		return nil
 	}
