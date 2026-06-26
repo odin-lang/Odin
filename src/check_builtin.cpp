@@ -8271,7 +8271,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Ast *call_expr = unparen_expr(ce->args[0]);
 			Operand op = {};
 			check_expr_base(c, &op, ce->args[0], nullptr);
-			if (op.mode != Addressing_Value && !(call_expr && call_expr->kind == Ast_CallExpr)) {
+			if (op.mode != Addressing_Value || call_expr == nullptr || call_expr->kind != Ast_CallExpr) {
 				error(ce->args[0], "Expected a call expression for '%.*s'", LIT(builtin_name));
 				return false;
 			}
