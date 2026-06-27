@@ -110,7 +110,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case f32be: (^f32be)(ptr)^ = cast(f32be) value
 		case f64be: (^f64be)(ptr)^ = cast(f64be) value
 		}
-	
+
 	case runtime.Type_Info_Complex:
 		value := strconv.parse_complex128(str) or_return
 		switch type_info.id {
@@ -118,7 +118,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case complex64:  (^complex64) (ptr)^ = (complex64)(value)
 		case complex128: (^complex128)(ptr)^ = value
 		}
-	
+
 	case runtime.Type_Info_Quaternion:
 		value := strconv.parse_quaternion256(str) or_return
 		switch type_info.id {
@@ -152,15 +152,16 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		}
 
 	case runtime.Type_Info_Bit_Set:
-		// Parse a string of 1's and 0's, from left to right,
+		// Parse a string of 1s and 0s, from left to right,
 		// least significant bit to most significant bit.
 		value: u128
 
 		// NOTE: `upper` is inclusive, i.e: `0..=31`
-		max_bit_index := u128(1 + specific_type_info.upper - specific_type_info.lower)
+		underscores := u128(strings.count(str, "_"))
+		bit_index_limit := u128(1 + specific_type_info.upper - specific_type_info.lower) + underscores
 		bit_index := u128(0)
 		#no_bounds_check for string_index in 0..<uint(len(str)) {
-			if bit_index == max_bit_index {
+			if bit_index == bit_index_limit {
 				// The string's too long for this bit_set.
 				return false
 			}
@@ -421,7 +422,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		} else {
 			parse_and_set_pointer_by_named_type(ptr, str, type_info.id, arg_tag, &error)
-			
+
 			if error != nil {
 				// So far, it's none of the types that we recognize.
 				// Check to see if we can set it by base type, if allowed.
@@ -470,6 +471,70 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 				fmt.tprintf("Invalid value name. Valid names are: %s", specific_type_info.names),
 			}
 		}
+
+	case runtime.Type_Info_Bit_Set:
+		if str[0] == '0' || str[0] == '1' {
+			if !parse_and_set_pointer_by_base_type(ptr, str, type_info) {
+				return Parse_Error {
+					// The caller will add more details.
+					.Bad_Value,
+					"",
+				}
+			} else {
+				error = nil
+				return
+			}
+		}
+
+		value: u128
+
+		et := runtime.type_info_base(specific_type_info.elem)
+		if enum_type_info, is_enum := et.variant.(runtime.Type_Info_Enum); is_enum {
+			names, _ := strings.split(str, ",", context.temp_allocator)
+			valid_names := enum_type_info.names
+			underlying_values := enum_type_info.values
+
+			#no_bounds_check outer_loop: for name in names {
+				found: bool
+				#no_bounds_check for valid_name, index in valid_names {
+					if name == valid_name {
+						shift := u128(underlying_values[index]) - u128(specific_type_info.lower)
+						value |= u128(1 << shift)
+						found = true
+						continue outer_loop
+					}
+				}
+				if !found {
+					return Parse_Error {
+						.Bad_Value,
+						fmt.tprintf(
+							"Invalid value name: `%s`. Valid names are: %s",
+							name,
+							valid_names,
+						),
+					}
+				}
+			}
+		} else {
+			return Parse_Error {
+				// The caller will add more details.
+				.Bad_Value,
+				"",
+			}
+		}
+
+		if specific_type_info.underlying != nil {
+			set_unbounded_integer_by_type(ptr, value, specific_type_info.underlying.id)
+		} else {
+			switch 8*type_info.size {
+			case 8:   (^u8)  (ptr)^ = cast(u8)   value
+			case 16:  (^u16) (ptr)^ = cast(u16)  value
+			case 32:  (^u32) (ptr)^ = cast(u32)  value
+			case 64:  (^u64) (ptr)^ = cast(u64)  value
+			case 128: (^u128)(ptr)^ =            value
+			}
+		}
+		error = nil
 
 	case:
 		if type_info.id == ^os.File {

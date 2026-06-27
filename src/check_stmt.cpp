@@ -1476,6 +1476,14 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		return;
 	}
 
+	if (switch_kind == TypeSwitch_Union) {
+		if (is_addressed) {
+			if (x.mode != Addressing_Variable && !is_type_pointer(x.type)) {
+				error(lhs->Ident.token, "The element variable '%.*s' cannot be made addressable", LIT(lhs->Ident.token.string));
+			}
+		}
+	}
+
 
 	Ast *nil_seen = nullptr;
 	TypeSet seen = {};

@@ -429,6 +429,10 @@ enum BuildFlagKind {
 
 	BuildFlag_BuildDiagnostics,
 
+	BuildFlag_Bedrock,
+	BuildFlag_DisableNonConstantGlobals,
+	BuildFlag_DisableInitFini,
+
 	// internal use only
 	BuildFlag_InternalFastISel,
 	BuildFlag_InternalIgnoreLazy,
@@ -663,6 +667,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IntegerDivisionByZero,   str_lit("integer-division-by-zero"),  BuildFlagParam_String, Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_BuildDiagnostics,        str_lit("build-diagnostics"),         BuildFlagParam_None,    Command__does_build);
+
+	add_flag(&build_flags, BuildFlag_Bedrock,                 str_lit("bedrock"),                   BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableNonConstantGlobals, str_lit("disable-non-constant-globals"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableInitFini,         str_lit("disable-init-fini"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
@@ -1657,6 +1665,20 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_BuildDiagnostics:
 							build_context.build_diagnostics = true;
+							break;
+
+						case BuildFlag_Bedrock:
+							build_context.bedrock = true;
+							build_context.no_rtti = true;
+							build_context.disable_non_constant_globals = true;
+							build_context.disable_init_fini = true;
+							break;
+
+						case BuildFlag_DisableNonConstantGlobals:
+							build_context.disable_non_constant_globals = true;
+							break;
+						case BuildFlag_DisableInitFini:
+							build_context.disable_init_fini = true;
 							break;
 
 						case BuildFlag_InternalFastISel:
@@ -2685,6 +2707,19 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-bedrock")) {
+			print_usage_line(2, "Disables numerous features. List of disabled features:");
+			print_usage_line(3, "`map` types");
+			print_usage_line(3, "128-bit integer types");
+			print_usage_line(3, "runtime type information (-no-rtti)");
+			print_usage_line(3, "non-constant global variables (-disable-non-constant-globals)");
+			print_usage_line(3, "@(init) @(fini) (-disable-init-fini)");
+			print_usage_line(3, "Anything Objective-C related");
+			print_usage_line(3, "The default paths to the library collections 'core' and 'vendor'");
+		}
+	}
+
 	if (build) {
 		if (print_flag("-build-mode:<mode>")) {
 			print_usage_line(2, "Sets the build mode.");
@@ -2751,7 +2786,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-disable-assert")) {
 			print_usage_line(2, "Disables the code generation of the built-in run-time 'assert' procedure, and defines the global constant ODIN_DISABLE_ASSERT to be 'true'.");
 		}
+	}
 
+	if (check) {
+		if (print_flag("-disable-init-fini")) {
+			print_usage_line(2, "Disables the ability to use @(init) and @(fini) procedures");
+		}
+	}
+
+	if (run_or_build) {
 		if (print_flag("-disable-red-zone")) {
 			print_usage_line(2, "Disables red zone on a supported freestanding target.");
 		}
@@ -2761,7 +2804,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-disallow-do")) {
 			print_usage_line(2, "Disallows the 'do' keyword in the project.");
 		}
+
+		if (print_flag("-disable-non-constant-globals")) {
+			print_usage_line(2, "Disables any global variables which are not initialized with global constants");
+		}
 	}
+
 
 	if (doc) {
 		if (print_flag("-doc-format")) {
@@ -3595,6 +3643,32 @@ gb_internal int strip_semicolons(Parser *parser) {
 	return cast(int)failed;
 }
 
+gb_internal void setup_bedrock_mode(void) {
+	if (!build_context.bedrock) {
+		return;
+	}
+
+	bool seen_core = false;
+	bool seen_vendor = false;
+	for (isize i = 0; i < library_collections.count; /**/) {
+		if (!seen_core && library_collections[i].name == "core") {
+			array_ordered_remove(&library_collections, i);
+			seen_core = true;
+			continue;
+		}
+
+		if (!seen_vendor && library_collections[i].name == "vendor") {
+			array_ordered_remove(&library_collections, i);
+			seen_vendor = true;
+			continue;
+		}
+
+		i += 1;
+	}
+
+	build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
+}
+
 gb_internal void init_terminal(void) {
 	TIME_SECTION("init terminal");
 	build_context.has_ansi_terminal_colours = false;
@@ -3693,13 +3767,38 @@ int main(int arg_count, char const **arg_ptr) {
 	String init_filename = {};
 	isize  last_non_run_arg = args.count;
 
+	isize double_dash_pos = -1;
 	for_array(i, args) {
 		if (args[i] == "--") {
+			double_dash_pos = i;
 			break;
 		}
+
 		if (args[i] == "-help" || args[i] == "--help") {
 			build_context.show_help = true;
 			return print_show_help(args[0], command);
+		}
+	}
+
+	if (args.count > 2) {
+		// NOTE(bill): Allow for both `odin command path -flags` and `odin command -flags path`
+		// To do this, if the first argument after the command and last argument is NOT a flag,
+		// then put that last parameter first
+		isize end_arg = double_dash_pos >= 0 ? double_dash_pos : args.count-1;
+		if (args[1] == "bundle" && args.count > 4) {
+			if (string_starts_with(args[3], str_lit("-")) &&
+			    !string_starts_with(args[end_arg], str_lit("-"))) {
+				String possible_path = args[end_arg];
+				array_ordered_remove(&args, end_arg);
+				array_inject_at(&args, 3, possible_path);
+			}
+		} else if (args.count > 3) {
+			if (string_starts_with(args[2], str_lit("-")) &&
+			    !string_starts_with(args[end_arg], str_lit("-"))) {
+				String possible_path = args[end_arg];
+				array_ordered_remove(&args, end_arg);
+				array_inject_at(&args, 2, possible_path);
+			}
 		}
 	}
 
@@ -3872,6 +3971,10 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.show_help) {
 		return print_show_help(args[0], command);
+	}
+
+	if (build_context.bedrock) {
+		setup_bedrock_mode();
 	}
 
 	if (init_filename.len > 0 && !build_context.show_help) {

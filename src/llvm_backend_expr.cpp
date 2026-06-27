@@ -6571,11 +6571,12 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					} else {
 						item = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
 					}
+
+					// make sure it's ^T and not [^]T
+					item.type = alloc_type_multi_pointer_to_pointer(item.type);
 					if (sub_sel.index.count > 0) {
 						item = lb_emit_deep_field_gep(p, item, sub_sel);
 					}
-				// make sure it's ^T and not [^]T
-				item.type = alloc_type_multi_pointer_to_pointer(item.type);
 
 					return lb_addr(item);
 				} else if (addr.kind == lbAddr_Swizzle) {

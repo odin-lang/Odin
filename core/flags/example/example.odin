@@ -20,6 +20,14 @@ Optimization_Level :: enum {
 	Ludicrous_Speed,
 }
 
+Vet_Flag :: enum {
+	Unused,
+	Unused_Variables,
+	Unused_Imports,
+	Shadowing,
+	Using_Stmt,
+}
+
 // It's simple but powerful.
 my_custom_type_setter :: proc(
 	data: rawptr,
@@ -83,6 +91,8 @@ main :: proc() {
 		schedule: datetime.DateTime `usage:"Launch tasks at this time."`,
 
 		opt: Optimization_Level `usage:"Optimization level."`,
+		vet_flags: bit_set[Vet_Flag] `usage:"Vet flags. Example usage:
+			-vet-flags:Unused,Shadowing"`,
 		todo: [dynamic]string `usage:"Todo items."`,
 
 		accuracy: Fixed_Point1_1 `args:"required" usage:"Lenience in FLOP calculations."`,

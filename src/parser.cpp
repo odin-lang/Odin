@@ -2528,8 +2528,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
 
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
+				}
+
+				array_add(&args, elem);
 				if (!allow_field_separator(f)) {
 					break;
 				}
@@ -4214,18 +4220,33 @@ gb_internal FieldFlag is_token_field_prefix(AstFile *f) {
 		return FieldFlag_using;
 
 	case Token_Hash:
-		advance_token(f);
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-				auto const &mapping = parse_field_prefix_mappings[i];
-				if (mapping.token_kind == Token_Hash) {
-					if (f->curr_token.string == mapping.name) {
-						return mapping.flag;
-					}
+		{
+			// Check for types first before fields
+			Token tok = peek_token(f);
+			if (tok.kind == Token_Ident) {
+				if (tok.string == "simd" ||
+				    tok.string == "type" ||
+				    tok.string == "row_major" ||
+				    tok.string == "column_major" ||
+				    tok.string == "sparse" ||
+				    tok.string == "soa") {
+					return FieldFlag_Invalid;
 				}
 			}
-			break;
+
+			advance_token(f);
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+					auto const &mapping = parse_field_prefix_mappings[i];
+					if (mapping.token_kind == Token_Hash) {
+						if (f->curr_token.string == mapping.name) {
+							return mapping.flag;
+						}
+					}
+				}
+				break;
+			}
 		}
 		return FieldFlag_Unknown;
 	}
@@ -6386,6 +6407,11 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			}
 			if (p == "ignore") {
 				this_kind_correct = false;
+				continue;
+			}
+
+			if (p == "bedrock") {
+				this_kind_correct = build_context.bedrock == !is_notted;
 				continue;
 			}
 
