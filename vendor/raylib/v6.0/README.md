@@ -56,25 +56,22 @@ features
 
 basic example
 --------------
-This is a basic raylib example, it creates a window and draws the text `"Congrats! You created your first window!"` in the middle of the screen. Check this example [running live on web here](https://www.raylib.com/examples/core/loader.html?name=core_basic_window).
-```c
-#include "raylib.h"
+This is a basic raylib example, it creates a window and it draws the text `"Congrats! You created your first window!"` in the middle of the screen. Check this example [running live on web here](https://www.raylib.com/examples/core/loader.html?name=core_basic_window).
+```odin
+package example
 
-int main(void)
-{
-    InitWindow(800, 450, "raylib example - basic window");
+import rl "vendor:raylib"
 
-    while (!WindowShouldClose())
-    {
-        BeginDrawing();
-            ClearBackground(RAYWHITE);
-            DrawText("Congrats! You created your first window!", 190, 200, 20, LIGHTGRAY);
-        EndDrawing();
-    }
+main :: proc() {
+    rl.InitWindow(800, 450, "raylib [core] example - basic window")
 
-    CloseWindow();
-
-    return 0;
+    for !rl.WindowShouldClose() {
+        rl.BeginDrawing()
+            rl.ClearBackground(rl.RAYWHITE)
+            rl.DrawText("Congrats! You created your first window!", 190, 200, 20, rl.LIGHTGRAY)
+        rl.EndDrawing()
+      }
+    rl.CloseWindow()
 }
 ```
 

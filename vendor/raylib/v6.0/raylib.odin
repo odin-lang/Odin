@@ -1137,7 +1137,7 @@ foreign lib {
 	IsKeyUp        	   :: proc(key: KeyboardKey) -> bool --- // Detect if a key is NOT being pressed
 	GetKeyPressed  	   :: proc() -> KeyboardKey ---          // Get key pressed (keycode), call it multiple times for keys queued
 	GetCharPressed 	   :: proc() -> rune ---                 // Get char pressed (unicode), call it multiple times for chars queued
-	GetKeyName         :: proc(key: c.int) -> cstring ---    // Get name of a QWERTY key on the current keyboard layout (eg returns string 'q' for KEY_A on an AZERTY keyboard)
+	GetKeyName         :: proc(key: KeyboardKey) -> cstring ---    // Get name of a QWERTY key on the current keyboard layout (eg returns string 'q' for KEY_A on an AZERTY keyboard)
 	SetExitKey     	   :: proc(key: KeyboardKey) ---         // Set a custom key to exit program (default is ESC)
 
 	// Input-related functions: gamepads
@@ -1483,7 +1483,7 @@ foreign lib {
 	SetTextLineSpacing :: proc(spacing: c.int) ---                                                             // Set vertical line spacing when drawing with line-breaks
 	MeasureText        :: proc(text: cstring, fontSize: c.int) -> c.int ---                                    // Measure string width for default font
 	MeasureTextEx      :: proc(font: Font, text: cstring, fontSize: f32, spacing: f32) -> Vector2 ---          // Measure string size for Font
-	MeasureTextCodepoints :: proc(font: Font, codepoints: [^]c.int, length: c.int, fontSize, spacing: f32) --- // Measure string size for an existing array of codepoints for Font
+	MeasureTextCodepoints :: proc(font: Font, codepoints: [^]c.int, length: c.int, fontSize, spacing: f32) -> Vector2 --- // Measure string size for an existing array of codepoints for Font
 	GetGlyphIndex      :: proc(font: Font, codepoint: rune) -> c.int ---                                       // Get glyph index position in font for a codepoint (unicode character), fallback to '?' if not found
 	GetGlyphInfo       :: proc(font: Font, codepoint: rune) -> GlyphInfo ---                                   // Get glyph font info data for a codepoint (unicode character), fallback to '?' if not found
 	GetGlyphAtlasRec   :: proc(font: Font, codepoint: rune) -> Rectangle ---                                   // Get glyph rectangle in font atlas for a codepoint (unicode character), fallback to '?' if not found

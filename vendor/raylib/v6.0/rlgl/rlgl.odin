@@ -484,7 +484,7 @@ foreign lib {
 	@(link_prefix="rlgl")
 	Close                :: proc() ---                     // De-initialize rlgl (buffers, shaders, textures)
 	LoadExtensions       :: proc(loader: rawptr) ---       // Load OpenGL extensions (loader function required)
-	GetProcAddress       :: proc(procName: cstring)        // Get OpenGL procedure address
+	GetProcAddress       :: proc(procName: cstring) -> rawptr ---        // Get OpenGL procedure address
 	GetVersion           :: proc() -> GlVersion ---        // Get current OpenGL version
 	SetFramebufferWidth  :: proc(width: c.int) ---         // Set current framebuffer width
 	GetFramebufferWidth  :: proc() -> c.int ---            // Get default framebuffer width
