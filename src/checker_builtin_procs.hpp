@@ -314,6 +314,7 @@ BuiltinProc__type_simple_boolean_begin,
 	BuiltinProc_type_is_raw_union,
 	BuiltinProc_type_is_fixed_capacity_dynamic_array,
 
+	BuiltinProc_type_is_internally_pointer_like,
 
 	BuiltinProc_type_is_specialized_polymorphic_record,
 	BuiltinProc_type_is_unspecialized_polymorphic_record,
@@ -718,6 +719,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("type_is_matrix"),            1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_raw_union"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_fixed_capacity_dynamic_array"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("type_is_internally_pointer_like"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("type_is_specialized_polymorphic_record"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_unspecialized_polymorphic_record"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
