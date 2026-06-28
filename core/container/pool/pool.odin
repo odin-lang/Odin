@@ -39,6 +39,20 @@ Pool :: struct($T: typeid) {
 	free_list:       ^T,
 }
 
+/*
+Initialize the `Pool` `p`.
+
+This procedure initializes the `Pool` `p` for elements of type `T`, 
+which must include an intrusive link node of type `^T` named `link_field`.
+
+Inputs:
+- `p`: The pointer to the `Pool`
+- `link_field`: The name of the pointer to a `T` used for a free list 
+- `block_size`: The block size used for the arena
+
+Returns:
+- `err`: Nil or an error if an allocation failed
+*/
 @(require_results)
 init :: proc(p: ^Pool($T), $link_field: string, block_size: uint = DEFAULT_BLOCK_SIZE) -> (err: runtime.Allocator_Error)
 	where intrinsics.type_has_field(T, link_field),
@@ -47,6 +61,14 @@ init :: proc(p: ^Pool($T), $link_field: string, block_size: uint = DEFAULT_BLOCK
 	return _pool_arena_init(&p.arena, block_size)
 }
 
+/*
+Destroy the `Pool` `p`.
+
+This proc removes all elements and destroys the underlyin arena.
+
+Inputs:
+- `p`: A pointer to the `Pool`
+*/
 destroy :: proc(p: ^Pool($T)) {
 	elem := sync.atomic_exchange_explicit(&p.free_list, nil, .Acquire)
 
@@ -64,6 +86,20 @@ destroy :: proc(p: ^Pool($T)) {
 	p.arena = {}
 }
 
+/*
+Get a pointer to an unused Item from the pool.
+
+This proc returns a pointer to an unused item, 
+allocating using the arena if necessary.
+
+**NOTE**: The Items memory is zeroed.
+
+Inputs:
+- `p`: A pointer to the `Pool`
+
+Returns:
+- `err` Nil or an Error if the allocation failed.
+*/
 @(require_results)
 get :: proc(p: ^Pool($T)) -> (elem: ^T, err: runtime.Allocator_Error) #optional_allocator_error {
 	defer sync.atomic_add_explicit(&p.num_outstanding, 1, .Relaxed)
@@ -84,6 +120,18 @@ get :: proc(p: ^Pool($T)) -> (elem: ^T, err: runtime.Allocator_Error) #optional_
 	return
 }
 
+/*
+Put the element back into the pool.
+
+This procedure zeroes the given element and marks it as free.
+The intrusive link node may used to link to more free items.
+
+**Note**: Use only for elements from this Pool.
+
+Inputs: 
+- `p`: A pointer to the `Pool`
+- 'elem': The element to be put into the pool.
+*/
 put :: proc(p: ^Pool($T), elem: ^T) {
 	intrinsics.mem_zero(elem, size_of(T))
 	_poison_elem(p, elem)
@@ -97,14 +145,24 @@ put :: proc(p: ^Pool($T), elem: ^T) {
 	sync.mutex_unlock(&p.mu)
 }
 
+/*
+Get the number of elements in use.
+*/
 num_outstanding :: proc(p: ^Pool($T)) -> int {
 	return sync.atomic_load(&p.num_outstanding)
 }
 
+/*
+Get the number of elements in the pool, but not in use.
+*/
 num_ready :: proc(p: ^Pool($T)) -> int {
 	return sync.atomic_load(&p.num_ready)
 }
 
+
+/*
+Get the total number of lements, both in use and not.
+*/
 cap :: proc(p: ^Pool($T)) -> int {
 	return sync.atomic_load(&p.num_ready) + sync.atomic_load(&p.num_outstanding)
 }
