@@ -3421,6 +3421,8 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 				x->expr = node;
 				x->value = exact_value_shift(be->op.kind, exact_value_to_integer(x->value), exact_value_to_integer(y->value));
 
+				check_is_expressible(c, x, x->type);
+
 				return;
 			}
 
