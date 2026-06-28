@@ -787,7 +787,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller
 			cap := max(2 * arr.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
 
 			// do not 'or_return' here as it could be a partial success
-			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, should_zero=true, loc)
+			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, should_zero=true, loc=loc)
 		}
 		if arr.cap-arr.len > 0 {
 			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
@@ -826,7 +826,7 @@ non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc :
 			cap := max(2 * arr.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
 
 			// do not 'or_return' here as it could be a partial success
-			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, should_zero=false, loc)
+			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, should_zero=false, loc=loc)
 		}
 		if arr.cap-arr.len > 0 {
 			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
