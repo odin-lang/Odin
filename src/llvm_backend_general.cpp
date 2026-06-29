@@ -1636,32 +1636,22 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	GB_ASSERT_MSG(is_type_pointer(t) &&
 	              is_type_union(type_deref(t)), "%s", type_to_string(t));
 	Type *ut = type_deref(t);
-	Type *bt = base_type(ut);
 
 	GB_ASSERT(!is_type_union_maybe_pointer_original_alignment(ut));
 	GB_ASSERT(!is_type_union_maybe_pointer(ut));
 	GB_ASSERT(type_size_of(ut) > 0);
-	GB_ASSERT(bt->kind == Type_Union);
 
 	Type *tag_type = union_tag_type(ut);
 
 	LLVMTypeRef uvt = llvm_addr_type(p->module, u);
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
-	if (LLVM_VERSION_MAJOR == 14 || bt->Union.variants.count == 1) {
-		GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
-	} else {
-		GB_ASSERT_MSG(element_count >= 3, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
-	}
+	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
 	LLVMValueRef ptr = u.value;
 	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
 
 	lbValue tag_ptr = {};
-	if (LLVM_VERSION_MAJOR == 14 || bt->Union.variants.count == 1) {
-		tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
-	} else {
-		tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 2, "");
-	}
+	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }
@@ -2507,6 +2497,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef fields[] = {lb_type(m, type->Union.variants[0])};
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
+			bool is_packed = false;
 
 			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 4);
 			if (is_type_union_maybe_pointer(type)) {
@@ -2524,17 +2515,18 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
 					array_add(&fields, padding_type);
 				}
+				is_packed = true;
 			} else {
 				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
-				#if LLVM_VERSION_MAJOR > 14
-				{ // NOTE(bill): always add a zero-byte pad to make inline constant unions work
-					LLVMTypeRef padding_type = lb_type_padding_filler(m, 0, 1);
-					array_add(&fields, padding_type);
-				}
-				#endif
+				// #if LLVM_VERSION_MAJOR > 14
+				// { // NOTE(bill): always add a zero-byte pad to make inline constant unions work
+				// 	LLVMTypeRef padding_type = lb_type_padding_filler(m, 0, 1);
+				// 	array_add(&fields, padding_type);
+				// }
+				// #endif
 				array_add(&fields, tag_type);
 				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
 				i64 padding = size - used_size;
@@ -2542,9 +2534,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
 					array_add(&fields, padding_type);
 				}
+				is_packed = true;
 			}
 			
-			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, /*packed*/true);
+			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, is_packed);
 		}
 		break;
 
