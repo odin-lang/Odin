@@ -99,16 +99,53 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 		return LLVMConstNull(dst);
 	}
 
-	GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "%s vs %s", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src));
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind: {
+		GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "dst:%s vs src:%s (dst:%lld vs src:%lld)", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src),
+		              cast(long long)lb_sizeof(dst),
+		              cast(long long)lb_sizeof(src));
+
 		return LLVMConstPointerCast(val, dst);
 	}
 	case LLVMStructTypeKind: {
+		GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "dst:%s vs src:%s (dst:%lld vs src:%lld)", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src),
+		              cast(long long)lb_sizeof(dst),
+		              cast(long long)lb_sizeof(src));
+
 		unsigned src_n = LLVMCountStructElementTypes(src);
 		unsigned dst_n = LLVMCountStructElementTypes(dst);
 		if (src_n != dst_n) goto failure;
+
+		bool skip_cast = true;
+		for (unsigned i = 0; i < dst_n; i++) {
+			LLVMTypeKind dt = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(dst, i));
+			LLVMTypeKind st = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(src, i));
+			if (dt != st) {
+				skip_cast = false;
+			}
+			if (dt == LLVMIntegerTypeKind) {
+				continue;
+			}
+			if (dt != LLVMArrayTypeKind) {
+				skip_cast = false;
+				break;
+			}
+
+			LLVMValueRef field_val = llvm_const_extract_value(m, val, i);
+			if (field_val == nullptr) goto failure;
+
+			LLVMTypeRef dst_elem_ty = LLVMStructGetTypeAtIndex(dst, i);
+			LLVMTypeRef src_elem_ty = LLVMTypeOf(field_val);
+			if (lb_sizeof(dst_elem_ty) > lb_sizeof(src_elem_ty)) {
+				skip_cast = true;
+				continue;
+			}
+
+		}
+		if (skip_cast) {
+			return val;
+		}
 
 		LLVMValueRef *field_vals = temporary_alloc_array<LLVMValueRef>(dst_n);
 		for (unsigned i = 0; i < dst_n; i++) {
@@ -116,6 +153,15 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 			if (field_val == nullptr) goto failure;
 
 			LLVMTypeRef dst_elem_ty = LLVMStructGetTypeAtIndex(dst, i);
+			LLVMTypeRef src_elem_ty = LLVMTypeOf(field_val);
+
+			GB_ASSERT_MSG(lb_sizeof(dst_elem_ty) == lb_sizeof(src_elem_ty), "dst:%s vs src:%s (dst:%lld vs src:%lld) to %s from %s", LLVMPrintTypeToString(dst_elem_ty), LLVMPrintTypeToString(src_elem_ty),
+			              cast(long long)lb_sizeof(dst_elem_ty),
+			              cast(long long)lb_sizeof(src_elem_ty),
+			              LLVMPrintTypeToString(dst),
+			              LLVMPrintTypeToString(src)
+			              );
+
 			field_vals[i] = llvm_const_cast(m, field_val, dst_elem_ty, failure_);
 			if (failure_ && *failure_) goto failure;
 		}
@@ -125,6 +171,9 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 		} else {
 			return LLVMConstStructInContext(m->ctx, field_vals, dst_n, LLVMIsPackedStruct(dst));
 		}
+	}
+	case LLVMArrayTypeKind: {
+		goto failure;
 	}
 	}
 
@@ -946,21 +995,26 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 				res.type = original_type;
 				return res;
 			} else {
+				LLVMValueRef values[4] = {};
+				isize value_count = 0;
+
+				// Payload
+				values[value_count++] = cv.value;
 
 				unsigned tag_value = 1;
 				if (bt->Union.kind == UnionType_no_nil) {
 					tag_value = 0;
 				}
-				LLVMValueRef tag = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);
-				LLVMValueRef padding = nullptr;
 
-				isize value_count = 2;
+				// Tag
+				values[value_count++] = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);;
+
 				if (LLVMCountStructElementTypes(llvm_type) > 2) {
-					value_count = 3;
-					padding = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
+					GB_ASSERT(LLVMCountStructElementTypes(llvm_type) == 3);
+					// Padding
+					values[value_count++] = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
 				}
 
-				LLVMValueRef values[3] = {cv.value, tag, padding};
 				res.value = llvm_const_named_struct_internal(m, llvm_type, values, value_count);
 				res.type = original_type;
 				return res;

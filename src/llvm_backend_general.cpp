@@ -1636,22 +1636,32 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	GB_ASSERT_MSG(is_type_pointer(t) &&
 	              is_type_union(type_deref(t)), "%s", type_to_string(t));
 	Type *ut = type_deref(t);
+	Type *bt = base_type(ut);
 
 	GB_ASSERT(!is_type_union_maybe_pointer_original_alignment(ut));
 	GB_ASSERT(!is_type_union_maybe_pointer(ut));
 	GB_ASSERT(type_size_of(ut) > 0);
+	GB_ASSERT(bt->kind == Type_Union);
 
 	Type *tag_type = union_tag_type(ut);
 
 	LLVMTypeRef uvt = llvm_addr_type(p->module, u);
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
-	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
+	if (LLVM_VERSION_MAJOR == 14 || bt->Union.variants.count == 1) {
+		GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
+	} else {
+		GB_ASSERT_MSG(element_count >= 3, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
+	}
 
 	LLVMValueRef ptr = u.value;
 	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
 
 	lbValue tag_ptr = {};
-	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
+	if (LLVM_VERSION_MAJOR == 14 || bt->Union.variants.count == 1) {
+		tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
+	} else {
+		tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 2, "");
+	}
 	tag_ptr.type = alloc_type_pointer(tag_type);
 	return tag_ptr;
 }
