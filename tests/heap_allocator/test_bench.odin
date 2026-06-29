@@ -854,13 +854,11 @@ main :: proc() {
 	opt: Options
 	flags.parse_or_exit(&opt, os.args)
 
-	logger_data := log.File_Console_Logger_Data{
-		file_handle = os.INVALID_HANDLE,
-		ident = "",
-	}
-	context.logger = log.Logger{log.file_console_logger_proc, &logger_data, .Debug, {
+	file_logger := log.create_file_logger(f=nil, lowest=.Debug, opt={
 		.Level, .Terminal_Color, .Line, .Procedure,
-	}}
+	})
+	defer log.destroy_file_logger(file_logger)
+	context.logger = file_logger
 
 	if !runtime.ODIN_VIRTUAL_MEMORY_SUPPORTED {
 		log.info("Virtual memory is not supported on this platform.")
