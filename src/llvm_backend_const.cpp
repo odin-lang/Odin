@@ -972,6 +972,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					if (cl->elems.count == 0) {
 						return lb_const_nil(m, original_type);
 					}
+					value_type = type_of_expr(value.value_compound);
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}
@@ -983,18 +984,31 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 
 			i64 block_size = bt->Union.variant_block_size;
 
-			if (are_types_identical(value_type, original_type)) {
+			while (are_types_identical(value_type, original_type)) {
 				if (value.kind == ExactValue_Compound) {
 					ast_node(cl, CompoundLit, value.value_compound);
 					if (cl->elems.count == 0) {
 						return lb_const_nil(m, original_type);
 					}
+
+					value_type = type_of_expr(value.value_compound);
+					if (!are_types_identical(value_type, original_type)) {
+						break;
+					}
+
+					GB_PANIC("%s --> %s vs %s",
+					         expr_to_string(value.value_compound),
+					         temp_canonical_string(value_type), temp_canonical_string(original_type));
+
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}
 
-				GB_PANIC("%s vs %s", type_to_string(value_type), type_to_string(original_type));
+				GB_PANIC("(value.kind=%s) %s vs %s",
+				         exact_value_kind_string[value.kind],
+				         temp_canonical_string(value_type), temp_canonical_string(original_type));
 			}
+		// union_multiple_allow_compound:;
 
 			lbValue cv = lb_const_value(m, value_type, value, value_type, cc);
 			Type *variant_type = cv.type;

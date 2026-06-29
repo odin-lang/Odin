@@ -32,6 +32,22 @@ enum ExactValueKind {
 	ExactValue_Count,
 };
 
+gb_global char const *exact_value_kind_string[ExactValue_Count] = {
+	"Invalid",
+
+	"Bool",
+	"String",
+	"Integer",
+	"Float",
+	"Complex",
+	"Quaternion",
+	"Pointer",
+	"Compound",
+	"Procedure",
+	"Typeid",
+	"String16",
+};
+
 struct ExactValue {
 	ExactValueKind kind;
 	union {
