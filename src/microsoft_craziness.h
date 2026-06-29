@@ -763,8 +763,8 @@ gb_internal Find_Result find_visual_studio_and_windows_sdk() {
 	find_windows_kit_paths(&r);
 
 	// Prefer the toolset exported into the environment (e.g. by vsdevcmd) so the
-	// linker uses the same MSVC toolset that compiled our C++ dependencies. The COM
-	// autodetection grabs the first installed Visual Studio, which may be an older
+	// linker uses the same MSVC toolset of other externally compiled C++ dependencies.
+	// The COM autodetection grabs the first installed Visual Studio, which may be an older
 	// toolset whose runtime libraries lack symbols that the newer-built libraries
 	// reference. Fall back to autodetection when the environment is bare.
 	find_visual_studio_paths_from_env_vars(&r);
