@@ -1,12 +1,10 @@
-#+build darwin, linux, freebsd, openbsd, netbsd, haiku
+#+build darwin, linux, freebsd, openbsd, netbsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
-} else when ODIN_OS == .Haiku {
-	foreign import lib "system:network"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }
@@ -50,7 +48,6 @@ foreign lib {
 		af:   AF,        // INET or INET6
 		src:  cstring,
 		dst:  rawptr,    // either ^in_addr or ^in_addr6
-		size: socklen_t, // size_of(dst^)
 	) -> pton_result ---
 }
 

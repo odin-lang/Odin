@@ -1,12 +1,10 @@
 package timezone
 
-import "base:intrinsics"
-
-import "core:slice"
-import "core:strings"
-import "core:os"
-import "core:strconv"
-import "core:time/datetime"
+import    "base:intrinsics"
+import    "core:slice"
+import    "core:strings"
+import    "core:strconv"
+import    "core:time/datetime"
 
 // Implementing RFC8536 [https://datatracker.ietf.org/doc/html/rfc8536]
 
@@ -66,13 +64,6 @@ tzif_data_block_size :: proc(hdr: ^TZif_Header, version: TZif_Version) -> (block
 		   (int(hdr.leapcnt) * (time_size + 4))        +
 		   int(hdr.isstdcnt)                           +
 		   int(hdr.isutcnt), true
-}
-
-
-load_tzif_file :: proc(filename: string, region_name: string, allocator := context.allocator) -> (out: ^datetime.TZ_Region, ok: bool) {
-	tzif_data := os.read_entire_file_from_filename(filename, allocator) or_return
-	defer delete(tzif_data, allocator)
-	return parse_tzif(tzif_data, region_name, allocator)
 }
 
 @private
@@ -577,12 +568,7 @@ parse_tzif :: proc(_buffer: []u8, region_name: string, allocator := context.allo
 	footer_str := string(buffer[:end_idx])
 
 	// UTC is a special case, we don't need to alloc
-	if len(local_time_types) == 1 {
-		name := cstring(raw_data(timezone_string_table[local_time_types[0].idx:]))
-		if name != "UTC" {
-			return
-		}
-
+	if len(local_time_types) == 1 && local_time_types[0].utoff == 0 {
 		return nil, true
 	}
 

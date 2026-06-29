@@ -1,3 +1,4 @@
+// A reader for the Windows `PE` executable format for debug purposes.
 package debug_pe
 
 PE_SIGNATURE_OFFSET_INDEX_POS :: 0x3c

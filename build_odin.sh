@@ -6,7 +6,6 @@ set -eu
 : ${LDFLAGS=}
 : ${LLVM_CONFIG=}
 
-CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 LDFLAGS="$LDFLAGS -pthread -lm"
@@ -15,47 +14,54 @@ OS_NAME="$(uname -s)"
 
 if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
 	GIT_SHA=$(git show --pretty='%h' --no-patch --no-notes HEAD)
+	GIT_DATE=$(git show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
+else
+	GIT_DATE=$(date +"%Y-%m")
 fi
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$GIT_DATE\""
 
 error() {
 	printf "ERROR: %s\n" "$1"
 	exit 1
 }
 
+SUPPORTED_LLVM_VERSIONS="22 21 20 19 18 17 14"
+
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
-    if   [ -n "$(command -v $(brew --prefix llvm@20)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@20)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@19)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@19)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@18)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@17)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@17)/bin/llvm-config"
-    elif [ -n "$(command -v $(brew --prefix llvm@14)/bin/llvm-config)" ]; then LLVM_CONFIG="$(brew --prefix llvm@14)/bin/llvm-config"
-    fi
+	for V in $SUPPORTED_LLVM_VERSIONS; do
+		if [ -n "$(command -v $(brew --prefix llvm@$V)/bin/llvm-config)" ]; then
+			LLVM_CONFIG="$(brew --prefix llvm@$V)/bin/llvm-config"
+			break
+		fi
+	done
 fi
 
 if [ -z "$LLVM_CONFIG" ]; then
-	# darwin, linux, openbsd
-	if   [ -n "$(command -v llvm-config-20)" ]; then LLVM_CONFIG="llvm-config-20"
-	elif [ -n "$(command -v llvm-config-19)" ]; then LLVM_CONFIG="llvm-config-19"
-	elif [ -n "$(command -v llvm-config-18)" ]; then LLVM_CONFIG="llvm-config-18"
-	elif [ -n "$(command -v llvm-config-17)" ]; then LLVM_CONFIG="llvm-config-17"
-	elif [ -n "$(command -v llvm-config-14)" ]; then LLVM_CONFIG="llvm-config-14"
-	elif [ -n "$(command -v llvm-config-13)" ]; then LLVM_CONFIG="llvm-config-13"
-	elif [ -n "$(command -v llvm-config-12)" ]; then LLVM_CONFIG="llvm-config-12"
-	elif [ -n "$(command -v llvm-config-11)" ]; then LLVM_CONFIG="llvm-config-11"
-	# freebsd
-	elif [ -n "$(command -v llvm-config20)" ]; then  LLVM_CONFIG="llvm-config20"
-	elif [ -n "$(command -v llvm-config19)" ]; then  LLVM_CONFIG="llvm-config19"
-	elif [ -n "$(command -v llvm-config18)" ]; then  LLVM_CONFIG="llvm-config18"
-	elif [ -n "$(command -v llvm-config17)" ]; then  LLVM_CONFIG="llvm-config17"
-	elif [ -n "$(command -v llvm-config14)" ]; then  LLVM_CONFIG="llvm-config14"
-	elif [ -n "$(command -v llvm-config13)" ]; then  LLVM_CONFIG="llvm-config13"
-	elif [ -n "$(command -v llvm-config12)" ]; then  LLVM_CONFIG="llvm-config12"
-	elif [ -n "$(command -v llvm-config11)" ]; then  LLVM_CONFIG="llvm-config11"
-	# fallback
-	elif [ -n "$(command -v llvm-config)" ]; then LLVM_CONFIG="llvm-config"
-	else
-		error "No llvm-config command found. Set LLVM_CONFIG to proceed."
+	DEFAULT_VERSION=""
+
+	if [ -n "$(command -v llvm-config)" ]; then
+		DEFAULT_VERSION=$(llvm-config --version | awk -F. '{print $1}')
+	fi
+
+	for V in $SUPPORTED_LLVM_VERSIONS; do
+		if [ "$DEFAULT_VERSION" = "$V" ]; then
+			LLVM_CONFIG="llvm-config"
+			break
+		# darwin, linux, openbsd
+		elif [ -n "$(command -v "llvm-config-$V")" ]; then
+			LLVM_CONFIG="llvm-config-$V"
+			break
+		# freebsd
+		elif [ -n "$(command -v "llvm-config$V")" ]; then
+			LLVM_CONFIG="llvm-config$V"
+			break
+		fi
+	done
+
+	if [ -z "$LLVM_CONFIG" ]; then
+		error "No supported llvm-config command found. Set LLVM_CONFIG to proceed."
 	fi
 fi
 
@@ -72,18 +78,12 @@ LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 11 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 20 ]; then
-	error "Invalid LLVM version $LLVM_VERSION: must be 11, 12, 13, 14, 17, 18, 19 or 20"
+if [ $LLVM_VERSION_MAJOR -lt 14 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 22 ]; then
+	error "Invalid LLVM version $LLVM_VERSION: must be 14, 17, 18, 19, 20, 21 or 22"
 fi
 
 case "$OS_NAME" in
 Darwin)
-	if [ "$OS_ARCH" = "arm64" ]; then
-		if [ $LLVM_VERSION_MAJOR -lt 13 ]; then
-			error "Invalid LLVM version $LLVM_VERSION: Darwin Arm64 requires LLVM 13, 14, 17, 18, 19 or 20"
-		fi
-	fi
-
 	darwin_sysroot=
 	if [ $(which xcrun) ]; then
 		darwin_sysroot="--sysroot $(xcrun --sdk macosx --show-sdk-path)"
@@ -114,12 +114,7 @@ Linux)
 	;;
 OpenBSD)
 	CXXFLAGS="$CXXFLAGS -I/usr/local/include $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -lstdc++ -L/usr/local/lib -liconv"
-	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
-	;;
-Haiku)
-	CXXFLAGS="$CXXFLAGS -D_GNU_SOURCE $($LLVM_CONFIG --cxxflags --ldflags) -I/system/develop/headers/private/shared -I/system/develop/headers/private/kernel"
-	LDFLAGS="$LDFLAGS -lstdc++ -liconv"
+	LDFLAGS="$LDFLAGS -lstdc++ -L/usr/local/lib -Wl,-rpath,$($LLVM_CONFIG --libdir) -liconv"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 	;;
 *)

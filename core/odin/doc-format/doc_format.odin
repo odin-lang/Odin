@@ -1,3 +1,4 @@
+// The `.odin-doc` file format, as used by these package docs at `pkg.odin-lang.org`.
 package odin_doc_format
 
 import "core:mem"
@@ -11,7 +12,7 @@ String :: distinct Array(byte)
 
 Version_Type_Major :: 0
 Version_Type_Minor :: 3
-Version_Type_Patch :: 1
+Version_Type_Patch :: 2
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -167,32 +168,33 @@ Attribute :: struct {
 }
 
 Type_Kind :: enum u32le {
-	Invalid                = 0,
-	Basic                  = 1,
-	Named                  = 2,
-	Generic                = 3,
-	Pointer                = 4,
-	Array                  = 5,
-	Enumerated_Array       = 6,
-	Slice                  = 7,
-	Dynamic_Array          = 8,
-	Map                    = 9,
-	Struct                 = 10,
-	Union                  = 11,
-	Enum                   = 12,
-	Parameters             = 13,
-	Proc                   = 14,
-	Bit_Set                = 15,
-	Simd_Vector            = 16,
-	SOA_Struct_Fixed       = 17,
-	SOA_Struct_Slice       = 18,
-	SOA_Struct_Dynamic     = 19,
-	Relative_Pointer       = 20,
-	Relative_Multi_Pointer = 21,
-	Multi_Pointer          = 22,
-	Matrix                 = 23,
-	Soa_Pointer            = 24,
-	Bit_Field              = 25,
+	Invalid                      = 0,
+	Basic                        = 1,
+	Named                        = 2,
+	Generic                      = 3,
+	Pointer                      = 4,
+	Array                        = 5,
+	Enumerated_Array             = 6,
+	Slice                        = 7,
+	Dynamic_Array                = 8,
+	Map                          = 9,
+	Struct                       = 10,
+	Union                        = 11,
+	Enum                         = 12,
+	Parameters                   = 13,
+	Proc                         = 14,
+	Bit_Set                      = 15,
+	Simd_Vector                  = 16,
+	SOA_Struct_Fixed             = 17,
+	SOA_Struct_Slice             = 18,
+	SOA_Struct_Dynamic           = 19,
+	Relative_Pointer             = 20,
+	Relative_Multi_Pointer       = 21,
+	Multi_Pointer                = 22,
+	Matrix                       = 23,
+	Soa_Pointer                  = 24,
+	Bit_Field                    = 25,
+	Fixed_Capacity_Dynamic_Array = 26,
 }
 
 Type_Elems_Cap :: 4
@@ -218,12 +220,14 @@ Type :: struct {
 	custom_align: String,
 
 	// Used by:
-	// .Array            - 1 count: 0=len
-	// .Enumerated_Array - 1 count: 0=len
-	// .SOA_Struct_Fixed - 1 count: 0=len
-	// .Bit_Set          - 2 count: 0=lower, 1=upper
-	// .Simd_Vector      - 1 count: 0=len
-	// .Matrix           - 2 count: 0=row_count, 1=column_count
+	// .Array                        - 1   count: 0=len
+	// .Enumerated_Array             - 1   count: 0=len
+	// .SOA_Struct_Fixed             - 1   count: 0=len
+	// .Bit_Set                      - 2   count: 0=lower, 1=upper
+	// .Simd_Vector                  - 1   count: 0=len
+	// .Matrix                       - 2   count: 0=row_count, 1=column_count
+	// .Struct                       - <=2 count: 0=min_field_align, 1=max_field_align
+	// .Fixed_Capacity_Dynamic_Array - 1   count: 0=cap
 	elem_count_len: u32le,
 	elem_counts:    [Type_Elems_Cap]i64le,
 
@@ -232,27 +236,28 @@ Type :: struct {
 	calling_convention: String,
 
 	// Used by:
-	// .Named              - 1 type:    0=base type
-	// .Generic            - <1 type:   0=specialization
-	// .Pointer            - 1 type:    0=element
-	// .Array              - 1 type:    0=element
-	// .Enumerated_Array   - 2 types:   0=index and 1=element
-	// .Slice              - 1 type:    0=element
-	// .Dynamic_Array      - 1 type:    0=element
-	// .Map                - 2 types:   0=key, 1=value
-	// .SOA_Struct_Fixed   - 1 type:    underlying SOA struct element
-	// .SOA_Struct_Slice   - 1 type:    underlying SOA struct element
-	// .SOA_Struct_Dynamic - 1 type:    underlying SOA struct element
-	// .Union              - 0+ types:  variants
-	// .Enum               - <1 type:   0=base type
-	// .Proc               - 2 types:   0=parameters, 1=results
-	// .Bit_Set            - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
-	// .Simd_Vector        - 1 type:    0=element
-	// .Relative_Pointer   - 2 types:   0=pointer type, 1=base integer
-	// .Multi_Pointer      - 1 type:    0=element
-	// .Matrix             - 1 type:    0=element
-	// .Soa_Pointer        - 1 type:    0=element
-	// .Bit_Field          - 1 type:    0=backing type
+	// .Named                        - 1 type:    0=base type
+	// .Generic                      - <1 type:   0=specialization
+	// .Pointer                      - 1 type:    0=element
+	// .Array                        - 1 type:    0=element (and 1=generic index (if exists))
+	// .Enumerated_Array             - 2 types:   0=index and 1=element
+	// .Slice                        - 1 type:    0=element
+	// .Dynamic_Array                - 1 type:    0=element
+	// .Map                          - 2 types:   0=key, 1=value
+	// .SOA_Struct_Fixed             - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Slice             - 1 type:    underlying SOA struct element
+	// .SOA_Struct_Dynamic           - 1 type:    underlying SOA struct element
+	// .Union                        - 0+ types:  variants
+	// .Enum                         - <1 type:   0=base type
+	// .Proc                         - 2 types:   0=parameters, 1=results
+	// .Bit_Set                      - <=2 types: 0=element type, 1=underlying type (Underlying_Type flag will be set)
+	// .Simd_Vector                  - 1 type:    0=element
+	// .Relative_Pointer             - 2 types:   0=pointer type, 1=base integer
+	// .Multi_Pointer                - 1 type:    0=element
+	// .Matrix                       - 1 type:    0=element
+	// .Soa_Pointer                  - 1 type:    0=element
+	// .Bit_Field                    - 1 type:    0=backing type
+	// .Fixed_Capacity_Dynamic_Array - 1 type:    0=element (and 1=generic index (if exists))
 	types: Array(Type_Index),
 
 	// Used by:
@@ -280,6 +285,7 @@ Type_Flag_Struct :: enum u32le {
 	Polymorphic = 0,
 	Packed      = 1,
 	Raw_Union   = 2,
+	All_Or_None = 3,
 }
 
 Type_Flags_Union :: distinct bit_set[Type_Flag_Union; u32le]

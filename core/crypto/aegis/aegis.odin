@@ -1,6 +1,7 @@
 /*
-package aegis implements the AEGIS-128L and AEGIS-256 Authenticated
-Encryption with Additional Data algorithms.
+`AEGIS-128L` and `AEGIS-256` AEAD algorithms.
+
+Where AEAD stands for Authenticated Encryption with Additional Data.
 
 See:
 - [[ https://www.ietf.org/archive/id/draft-irtf-cfrg-aegis-aead-12.txt ]]
@@ -10,7 +11,6 @@ package aegis
 import "core:bytes"
 import "core:crypto"
 import "core:crypto/aes"
-import "core:mem"
 
 // KEY_SIZE_128L is the AEGIS-128L key size in bytes.
 KEY_SIZE_128L :: 16
@@ -144,7 +144,7 @@ seal :: proc(ctx: ^Context, dst, tag, iv, aad, plaintext: []byte) {
 
 // open authenticates the aad and ciphertext, and decrypts the ciphertext,
 // with the provided Context, iv, and tag, and stores the output in dst,
-// returning true iff the authentication was successful.  If authentication
+// returning true if and only if (⟺) the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
 // dst and plaintext MUST alias exactly or not at all.
@@ -196,8 +196,8 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 	}
 
 	if crypto.compare_constant_time(tag, derived_tag) != 1 {
-		mem.zero_explicit(raw_data(derived_tag), len(derived_tag))
-		mem.zero_explicit(raw_data(dst), ct_len)
+		crypto.zero_explicit(raw_data(derived_tag), len(derived_tag))
+		crypto.zero_explicit(raw_data(dst), ct_len)
 		return false
 	}
 
@@ -207,7 +207,7 @@ open :: proc(ctx: ^Context, dst, iv, aad, ciphertext, tag: []byte) -> bool {
 // reset sanitizes the Context.  The Context must be
 // re-initialized to be used again.
 reset :: proc "contextless" (ctx: ^Context) {
-	mem.zero_explicit(&ctx._key, len(ctx._key))
+	crypto.zero_explicit(&ctx._key, len(ctx._key))
 	ctx._key_len = 0
 	ctx._is_initialized = false
 }

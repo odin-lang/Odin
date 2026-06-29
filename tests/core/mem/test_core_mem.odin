@@ -58,6 +58,33 @@ test_align_bumping_block_limit :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_large_minimum_block_size :: proc(t: ^testing.T) {
+	a: virtual.Arena
+	defer virtual.arena_destroy(&a)
+
+	init_err := virtual.arena_init_growing(&a, 16*mem.Megabyte)
+	testing.expect_value(t, init_err, nil)
+
+	align : uint = 4
+	for _ in 0..<6 {
+		data, err := virtual.arena_alloc(&a, 18874368, align)
+		testing.expect_value(t, err, nil)
+		testing.expect(t, len(data) == 18874368)
+		testing.expect(t, uintptr(raw_data(data)) & uintptr(align-1) == 0)
+		align *= 2
+		virtual.arena_free_all(&a)
+	}
+
+	align = 4
+	for _ in 0..<32 {
+		data, err := virtual.arena_alloc(&a, 1048576, align)
+		testing.expect_value(t, err, nil)
+		testing.expect(t, len(data) == 1048576)
+		testing.expect(t, uintptr(raw_data(data)) & uintptr(align-1) == 0)
+	}
+}
+
+@(test)
 tlsf_test_overlap_and_zero :: proc(t: ^testing.T) {
 	default_allocator := context.allocator
 	alloc: tlsf.Allocator
@@ -192,4 +219,117 @@ fail_if_allocations_overlap :: proc(t: ^testing.T, a, b: []byte) {
 	if a_end >= b_end && b_end >= a_start {
 		testing.fail_now(t, "Allocations overlapped")
 	}
+}
+
+
+// This merely does a few simple operations to test basic sanity.
+//
+// A serious test of an allocator would require hooking it up to a benchmark or
+// a large, complicated program in order to get all manner of usage patterns.
+basic_sanity_test :: proc(t: ^testing.T, allocator: mem.Allocator, limit: int, loc := #caller_location) -> bool {
+	context.allocator = allocator
+
+	{
+		a := make([dynamic]u8)
+		for i in 0..<limit {
+			append(&a, u8(i))
+		}
+		testing.expect_value(t, len(a), limit, loc) or_return
+		for i in 0..<limit {
+			testing.expect_value(t, a[i], u8(i), loc) or_return
+		}
+		delete(a)
+	}
+
+	{
+		v := make([]u8, limit)
+		testing.expect_value(t, len(v), limit, loc) or_return
+		for i in 0..<limit {
+			v[i] = u8(i)
+			testing.expect_value(t, v[i], u8(i), loc) or_return
+		}
+		delete(v)
+	}
+
+	{
+		for i in 0..<limit {
+			v := make([]u8, 1)
+			v[0] = u8(i)
+			testing.expect_value(t, v[0], u8(i), loc) or_return
+			delete(v)
+		}
+	}
+
+	return true
+}
+
+@test
+test_scratch :: proc(t: ^testing.T) {
+	N :: 4096
+	sa: mem.Scratch_Allocator
+	mem.scratch_init(&sa, N)
+	defer mem.scratch_destroy(&sa)
+	basic_sanity_test(t, mem.scratch_allocator(&sa), N / 4)
+	basic_sanity_test(t, mem.scratch_allocator(&sa), N / 4)
+}
+
+@test
+test_stack :: proc(t: ^testing.T) {
+	N :: 4096
+	buf: [N]u8
+
+	sa: mem.Stack
+	mem.stack_init(&sa, buf[:])
+	basic_sanity_test(t, mem.stack_allocator(&sa), N / 4)
+	basic_sanity_test(t, mem.stack_allocator(&sa), N / 4)
+}
+
+@test
+test_small_stack :: proc(t: ^testing.T) {
+	N :: 4096
+	buf: [N]u8
+
+	ss: mem.Small_Stack
+	mem.small_stack_init(&ss, buf[:])
+	basic_sanity_test(t, mem.small_stack_allocator(&ss), N / 4)
+	// The test cannot be run a second time on top of the last for a Small
+	// Stack because the dynamic array inside will resize and leave a gap, thus
+	// limiting the amount of space.
+	basic_sanity_test(t, mem.small_stack_allocator(&ss), N / 8)
+}
+
+@test
+test_dynamic_arena :: proc(t: ^testing.T) {
+	da: mem.Dynamic_Arena
+	mem.dynamic_arena_init(&da)
+	defer mem.dynamic_arena_destroy(&da)
+	basic_sanity_test(t, mem.dynamic_arena_allocator(&da), da.block_size / 4)
+	basic_sanity_test(t, mem.dynamic_arena_allocator(&da), da.block_size / 4)
+}
+
+@test
+test_buddy :: proc(t: ^testing.T) {
+	N :: 8192
+	buf: [N]u8
+
+	base := &buf[0]
+	address := mem.align_forward(base, size_of(mem.Buddy_Block))
+	delta := uintptr(address) - uintptr(base)
+
+	ba: mem.Buddy_Allocator
+
+	mem.buddy_allocator_init(&ba, buf[delta:delta+N/2], size_of(mem.Buddy_Block))
+	basic_sanity_test(t, mem.buddy_allocator(&ba), N / 16)
+	basic_sanity_test(t, mem.buddy_allocator(&ba), N / 16)
+}
+
+@test
+test_rollback :: proc(t: ^testing.T) {
+	N :: 4096
+	buf: [N]u8
+
+	rb: mem.Rollback_Stack
+	mem.rollback_stack_init(&rb, buf[:])
+	basic_sanity_test(t, mem.rollback_stack_allocator(&rb), N / 8)
+	basic_sanity_test(t, mem.rollback_stack_allocator(&rb), N / 8)
 }

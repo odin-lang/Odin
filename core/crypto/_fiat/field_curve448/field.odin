@@ -1,6 +1,6 @@
 package field_curve448
 
-import "core:mem"
+import "core:crypto"
 
 fe_relax_cast :: #force_inline proc "contextless" (
 	arg1: ^Tight_Field_Element,
@@ -17,7 +17,7 @@ fe_tighten_cast :: #force_inline proc "contextless" (
 fe_clear :: proc "contextless" (
 	arg1: $T,
 ) where T == ^Tight_Field_Element || T == ^Loose_Field_Element {
-	mem.zero_explicit(arg1, size_of(arg1^))
+	crypto.zero_explicit(arg1, size_of(arg1^))
 }
 
 fe_clear_vec :: proc "contextless" (

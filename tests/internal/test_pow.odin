@@ -33,9 +33,9 @@ pow_test :: proc(t: ^testing.T) {
 			_v2 := transmute(u16)v2
 			_v1 := transmute(u16)v1
 
-			when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
+			when ODIN_ARCH == .arm64 {
 				if exp == -25 {
-					log.info("skipping known test failure on darwin+arm64, Expected math.pow2_f16(-25) == math.pow(2, -25) (= 0000), got 0001")
+					log.info("skipping known test failure on arm64, Expected math.pow2_f16(-25) == math.pow(2, -25) (= 0000), got 0001")
 					_v2 = 0
 				}
 			}

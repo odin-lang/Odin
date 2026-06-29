@@ -288,7 +288,7 @@ Rename_Flags :: bit_set[Rename_Flags_Bits; u32]
 
 /*
 	Directory entry record.
-	Recommended iterate these with `dirent_iterator()`,
+	Recommended to iterate these with `dirent_iterate_buf()`,
 	and obtain the name via `dirent_name()`.
 */
 Dirent :: struct {
@@ -368,6 +368,8 @@ Mem_Protection :: bit_set[Mem_Protection_Bits; i32]
 
 /*
 	Flags for mmap.
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags :: bit_set[Map_Flags_Bits; i32]
 
@@ -745,10 +747,10 @@ Sig_Action_Special :: enum uint {
 }
 
 Sig_Action_Flags :: bit_set[Sig_Action_Flag; uint]
-Sig_Action :: struct($T: typeid) {
+Sig_Action :: struct {
 	using _u: struct #raw_union {
 		handler: Sig_Handler_Fn,
-		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: ^T),
+		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
 		special: Sig_Action_Special,
 	},
 	flags: Sig_Action_Flags,
@@ -761,7 +763,7 @@ Sig_Action :: struct($T: typeid) {
 	Note, on linux these are technically passed by OR'ing together
 	with Socket_Type, our wrapper does this under the hood.
 */
-Socket_FD_Flags :: bit_set[Socket_FD_Flags_Bits; int]
+Socket_FD_Flags :: bit_set[Socket_FD_Flags_Bits; i32]
 
 /*
 	Address family for the socket.
@@ -930,22 +932,17 @@ RUsage :: struct {
 	Struct used for IO operations
 */
 IO_Vec :: struct {
-	base: rawptr,
+	base: [^]byte,
 	len:  uint,
 }
 
 /*
-	Access mode for shared memory
-*/
-IPC_Mode :: bit_set[IPC_Mode_Bits; u32]
-
-/*
-	Flags used by IPC objects
+	Access modes and flags used by SystemV IPC procedures.
 */
 IPC_Flags :: bit_set[IPC_Flags_Bits; i16]
 
 /*
-	Permissions for IPC objects
+	Permissions for SystemV IPC primitives.
 */
 IPC_Perm :: struct {
 	key:  Key,
@@ -953,7 +950,7 @@ IPC_Perm :: struct {
 	gid:  u32,
 	cuid: u32,
 	cgid: u32,
-	mode: IPC_Mode,
+	mode: IPC_Flags, // Only contains mode flags.
 	seq:  u16,
 	_:    [2 + 2*size_of(int)]u8,
 }
@@ -1449,9 +1446,25 @@ EPoll_Data :: struct #raw_union {
 	u64: u64,
 }
 
-EPoll_Event :: struct #packed {
-	events: EPoll_Event_Set,
-	data:   EPoll_Data,
+/*
+	Linux kernel only packs this struct on x86_64.
+	include/uapi/linux/eventpoll.h:	
+		#ifdef __x86_64__
+		#define EPOLL_PACKED __attribute__((packed))
+		#else
+		#define EPOLL_PACKED
+		#endif
+*/
+when ODIN_ARCH == .amd64 {
+	EPoll_Event :: struct #packed {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
+} else {
+	EPoll_Event :: struct {
+		events: EPoll_Event_Set,
+		data:   EPoll_Data,
+	}
 }
 
 /*
@@ -1475,3 +1488,295 @@ RISCV_HWProbe :: struct {
 		raw:                    u64,
 	},
 }
+
+IO_Uring_Params :: struct {
+	sq_entries:     u32,
+	cq_entries:     u32,
+	flags:          IO_Uring_Setup_Flags,
+	sq_thread_cpu:  u32,
+	sq_thread_idle: u32,
+	features:       IO_Uring_Features,
+	wq_fd:          u32,
+	resv:           [3]u32,
+	sq_off:         IO_SQ_Ring_Offsets,
+	cq_off:         IO_CQ_Ring_Offsets,
+}
+
+IO_Uring_Setup_Flags :: bit_set[IO_Uring_Setup_Flags_Bits; u32]
+
+IO_Uring_Features :: bit_set[IO_Uring_Features_Bits; u32]
+
+IO_SQ_Ring_Offsets :: struct {
+	head:         u32,
+	tail:         u32,
+	ring_mask:    u32,
+	ring_entries: u32,
+	flags:        u32,
+	dropped:      u32,
+	array:        u32,
+	resv1:        u32,
+	user_addr:    u64,
+}
+
+IO_CQ_Ring_Offsets :: struct {
+	head:         u32,
+	tail:         u32,
+	ring_mask:    u32,
+	ring_entries: u32,
+	overflow:     u32,
+	cqes:         u32,
+	flags:        u32,
+	resv1:        u32,
+	user_addr:    u64,
+}
+
+IO_Uring_Enter_Flags :: bit_set[IO_Uring_Enter_Flags_Bits; u32]
+
+IO_Uring_Getevents_Arg :: struct #min_field_align(8) {
+	sigmask:    ^Sig_Set,
+	sigmask_sz: u32,
+	// pad:     u32,
+	ts:         ^Time_Spec,
+}
+#assert(align_of(IO_Uring_Getevents_Arg) == 8)
+
+IO_Uring_Rsrc_Register :: struct($T: typeid) {
+	nr:    u32,
+	resv:  u32,
+	resv2: u64,
+	using _: struct #min_field_align(8) {
+		data:  [^]T,
+		tags:  [^]u64,
+	},
+}
+
+IO_Uring_Rsrc_Update2 :: struct($T: typeid) {
+	offset: u32,
+	resv:   u32,
+	using _: struct #min_field_align(8) {
+		data: [^]T,
+		tags: [^]u64,
+	},
+	nr:    u32,
+	resv2: u32,
+}
+
+// The completion queue entry when the .CQE32 flag is not set on setup.
+IO_Uring_CQE :: struct {
+	// sq.data submission passed back.
+	user_data: u64,
+	// result code for this event.
+	res:       i32,
+	flags:     IO_Uring_CQE_Flags,
+}
+#assert(size_of(IO_Uring_CQE) == 16)
+
+// The completion queue entry when the .CQE32 flag is set on setup.
+IO_Uring_CQE32 :: struct {
+	using _: IO_Uring_CQE,
+	pad:     u64,
+	pad2:    u64,
+}
+#assert(size_of(IO_Uring_CQE32) == 32)
+
+IO_Uring_CQE_Flags :: bit_set[IO_Uring_CQE_Flags_Bits; u32]
+IO_Uring_SQE_Flags :: bit_set[IO_Uring_SQE_Flags_Bits; u8]
+
+// The submission queue entry when the .SQE128 flag is not set on setup.
+IO_Uring_SQE :: struct {
+	opcode:           IO_Uring_OP,
+	flags:            IO_Uring_SQE_Flags,
+	using __ioprio: struct #raw_union {
+		ioprio:             u16,
+		sq_accept_flags:    IO_Uring_Accept_Flags,
+		sq_send_recv_flags: IO_Uring_Send_Recv_Flags `raw_union_tag:"opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV"`,
+	},
+	fd: Fd,
+	using __offset: struct #raw_union {
+		// Offset into file.
+		off:     u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.TIMEOUT, opcode=.ACCEPT, opcode=.CONNECT, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		addr2:   u64 `raw_union_tag:"opcode=.SEND, opcode=.BIND"`,
+		using _: struct {
+			cmd_op: u32,
+			__pad1: u32,
+		},
+		statx: ^Statx `raw_union_tag:"opcode=.STATX"`,
+	},
+	using __iovecs:   struct #raw_union {
+		// Pointer to buffer or iovecs.
+		addr:          u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.ACCEPT, opcode=.ASYNC_CANCEL, opcode=.LINK_TIMEOUT, opcode=.CONNECT, opcode=.MADVISE, opcode=.OPENAT, opcode=.STATX, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.BIND, opcode=.LISTEN"`,
+		splice_off_in: u64 `raw_union_tag:"opcode=.SPLICE"`,
+		using _: struct {
+			level:   u32,
+			optname: u32,
+		},
+	},
+	using __len: struct #raw_union {
+		// Buffer size or number of iovecs.
+		len:          u32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.LINK_TIMEOUT, opcode=.MADVISE, opcode=.OPENAT, opcode=.READ, opcode=.WRITE, opcode=.TEE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		poll_flags:   IO_Uring_Poll_Add_Flags `raw_union_tag:"opcode=.POLL_ADD, opcode=.POLL_REMOVE"`,
+		statx_mask:   Statx_Mask              `raw_union_tag:"opcode=.STATX"`,
+		epoll_ctl_op: EPoll_Ctl_Opcode        `raw_union_tag:"opcode=.EPOLL_CTL"`,
+		shutdown_how: Shutdown_How            `raw_union_tag:"opcode=.SHUTDOWN"`,
+	},
+	using __contents: struct #raw_union {
+		rw_flags:         i32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SOCKET"`,
+		fsync_flags:      IO_Uring_Fsync_Flags    `raw_union_tag:"opcode=.FSYNC"`,
+		// compatibility.
+		poll_events:      Fd_Poll_Events          `raw_union_tag:"opcode=.POLL_ADD, opcode=.POLL_REMOVE"`,
+		// word-reversed for BE.
+		poll32_events:    u32,
+		sync_range_flags: u32,
+		msg_flags:        Socket_Msg              `raw_union_tag:"opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV"`,
+		timeout_flags:    IO_Uring_Timeout_Flags  `raw_union_tag:"opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.LINK_TIMEOUT"`,
+		accept_flags:     Socket_FD_Flags         `raw_union_tag:"opcode=.ACCEPT"`,
+		cancel_flags:     u32,
+		open_flags:       Open_Flags              `raw_union_tag:"opcode=.OPENAT"`,
+		statx_flags:      FD_Flags                `raw_union_tag:"opcode=.STATX"`,
+		fadvise_advice:   u32                     `raw_union_tag:"opcode=.MADVISE"`,
+		splice_flags:     IO_Uring_Splice_Flags   `raw_union_tag:"opcode=.SPLICE, opcode=.TEE"`,
+		rename_flags:     u32,
+		unlink_flags:     u32,
+		hardlink_flags:   u32,
+		xattr_flags:      u32,
+		msg_ring_flags:   u32,
+		uring_cmd_flags:  IO_Uring_Cmd_Flags,
+	},
+	// Data to be passed back at completion time.
+	user_data: u64,
+	using __buffer: struct #raw_union {
+		// Index into fixed buffers, if used.
+		buf_index: u16,
+		// For grouped buffer selection.
+		buf_group: u16,
+	},
+	// Personality to use, if used.
+	personality: u16,
+	using _: struct #raw_union {
+		splice_fd_in: Fd  `raw_union_tag:"opcode=.SPLICE, opcode=.TEE"`,
+		file_index:   u32 `raw_union_tag:"opcode=.ACCEPT, opcode=.OPENAT, opcode=.CLOSE, opcode=.SOCKET"`,
+		using _:      struct {
+			addr_len: u16    `raw_union_tag:"opcode=.SEND"`,
+			__pad3:   [1]u16,
+		},
+	},
+	using __: struct #raw_union {
+		using _: struct {
+			addr3:  u64,
+			__pad2: [1]u64,
+		},
+	},
+}
+#assert(size_of(IO_Uring_SQE) == 64)
+
+// The submission queue entry when the .SQE128 flag is set on setup.
+IO_Uring_SQE128 :: struct {
+	using _: IO_Uring_SQE,
+	cmd:     [64]byte,
+}
+#assert(size_of(IO_Uring_SQE128) == 128)
+
+IO_Uring_Poll_Add_Flags :: bit_set[IO_Uring_Poll_Add_Flags_Bits; u32]
+
+IO_Uring_Fsync_Flags :: bit_set[IO_Uring_Fsync_Flags_Bits; u32]
+
+IO_Uring_Timeout_Flags :: bit_set[IO_Uring_Timeout_Flags_Bits; u32]
+
+IO_Uring_Cmd_Flags :: bit_set[IO_Uring_Cmd_Flags_Bits; u32]
+
+IO_Uring_Splice_Flags :: bit_set[IO_Uring_Splice_Flags_Bits; u32]
+
+IO_Uring_Accept_Flags :: bit_set[IO_Uring_Accept_Flags_Bits; u16]
+
+IO_Uring_Send_Recv_Flags :: bit_set[IO_Uring_Send_Recv_Flags_Bits; u16]
+
+IO_Uring_Submission_Queue_Flags :: bit_set[IO_Uring_Submission_Queue_Flags_Bits; u32]
+
+Clock_State :: enum i32 {
+	TIME_OK = 0,
+	TIME_INS = 1,
+	TIME_DEL = 2,
+	TIME_OOP = 3,
+	TIME_WAIT = 4,
+	TIME_ERROR = 5,
+}
+
+Timex :: struct {
+	modes:     u32,
+	offset:    int,
+	freq:      int,
+	maxerror:  int,
+	esterror:  int,
+	status:    i32,
+	constant:  int,
+	precision: int,
+	tolerance: int,
+	time:      Time_Val,
+	tick:      int,
+	ppsfreq:   int,
+	jitter:    int,
+	shift:     i32,
+	stabil:    int,
+	jitcnt:    int,
+	calcnt:    int,
+	errcnt:    int,
+	stbcnt:    int,
+	tai:       i32,
+}
+
+Reboot_Magic :: enum u64 {
+	RB_MAGIC_1     = 0xfee1dead,
+	RB_MAGIC_2     = 672274793,
+	RB_MAGIC_2A    = 85072278, // Since Linux 2.1.17
+	RB_MAGIC_2B    = 369367448, // Since Linux 2.1.97
+	RB_MAGIC_2C    = 537993216, // Since Linux 2.5.71
+}
+
+Reboot_Operation :: enum u64 {
+	RB_DISABLE_CAD = 0,
+	RB_ENABLE_CAD  = 0x89abcdef,
+	RB_HALT_SYSTEM = 0xcdef0123,
+	RB_KEXEC       = 0x45584543,
+	RB_POWER_OFF   = 0x4321fedc,
+	RB_AUTOBOOT    = 0x01234567,
+	RB_AUTOBOOT_2  = 0xa1b2c3d4,
+	RB_SW_SUSPEND  = 0xd000fce2,
+}
+
+Mount_Flags :: bit_set[Mount_Flags_Bits; uint]
+
+Umount2_Flags :: bit_set[Umount2_Flags_Bits; u32]
+
+Swap_Flags :: bit_set[Swap_Flags_Bits; u32]
+
+Eventfd_Flags :: bit_set[Eventfd_Flags_Bits; i32]
+
+Cpu_Set :: bit_set[0 ..< 128]
+
+Sched_Param :: struct {
+	sched_priority: i32,
+}
+
+Sched_Flags :: bit_set[Sched_Flag_Bits; u32]
+
+Sched_Attr :: struct {
+	size:           u32,
+
+	sched_policy:   Sched_Policy,
+	sched_flags:    Sched_Flags,
+	sched_nice:     i32,
+	sched_priority: u32,
+
+	/* For the DEADLINE policy */
+	sched_runtime:  u64,
+	sched_deadline: u64,
+	sched_period:   u64,
+
+	/* Utilization hints */
+	sched_util_min: u32,
+	sched_util_max: u32,
+}
+
+Sched_Attr_Flags :: bit_set[Sched_Attr_Flag_Bits; u32]
+
+Memfd_Create_Flags :: bit_set[Memfd_Create_Flag_Bits; u32]

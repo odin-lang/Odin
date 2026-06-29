@@ -46,7 +46,7 @@ GPUIndexElementSize :: enum c.int {
 GPUTextureFormat :: enum c.int {
 	INVALID,
 
-    /* Unsigned Normalized Float Color Formats */
+	/* Unsigned Normalized Float Color Formats */
 	A8_UNORM,
 	R8_UNORM,
 	R8G8_UNORM,
@@ -59,34 +59,41 @@ GPUTextureFormat :: enum c.int {
 	B5G5R5A1_UNORM,
 	B4G4R4A4_UNORM,
 	B8G8R8A8_UNORM,
-    /* Compressed Unsigned Normalized Float Color Formats */
+
+	/* Compressed Unsigned Normalized Float Color Formats */
 	BC1_RGBA_UNORM,
 	BC2_RGBA_UNORM,
 	BC3_RGBA_UNORM,
 	BC4_R_UNORM,
 	BC5_RG_UNORM,
 	BC7_RGBA_UNORM,
-    /* Compressed Signed Float Color Formats */
+
+	/* Compressed Signed Float Color Formats */
 	BC6H_RGB_FLOAT,
-    /* Compressed Unsigned Float Color Formats */
+
+	/* Compressed Unsigned Float Color Formats */
 	BC6H_RGB_UFLOAT,
-    /* Signed Normalized Float Color Formats  */
+
+	/* Signed Normalized Float Color Formats  */
 	R8_SNORM,
 	R8G8_SNORM,
 	R8G8B8A8_SNORM,
 	R16_SNORM,
 	R16G16_SNORM,
 	R16G16B16A16_SNORM,
-    /* Signed Float Color Formats */
+
+	/* Signed Float Color Formats */
 	R16_FLOAT,
 	R16G16_FLOAT,
 	R16G16B16A16_FLOAT,
 	R32_FLOAT,
 	R32G32_FLOAT,
 	R32G32B32A32_FLOAT,
-    /* Unsigned Float Color Formats */
+
+	/* Unsigned Float Color Formats */
 	R11G11B10_UFLOAT,
-    /* Unsigned Integer Color Formats */
+
+	/* Unsigned Integer Color Formats */
 	R8_UINT,
 	R8G8_UINT,
 	R8G8B8A8_UINT,
@@ -96,7 +103,8 @@ GPUTextureFormat :: enum c.int {
 	R32_UINT,
 	R32G32_UINT,
 	R32G32B32A32_UINT,
-    /* Signed Integer Color Formats */
+
+	/* Signed Integer Color Formats */
 	R8_INT,
 	R8G8_INT,
 	R8G8B8A8_INT,
@@ -106,21 +114,25 @@ GPUTextureFormat :: enum c.int {
 	R32_INT,
 	R32G32_INT,
 	R32G32B32A32_INT,
-    /* SRGB Unsigned Normalized Color Formats */
+
+	/* SRGB Unsigned Normalized Color Formats */
 	R8G8B8A8_UNORM_SRGB,
 	B8G8R8A8_UNORM_SRGB,
-    /* Compressed SRGB Unsigned Normalized Color Formats */
+
+	/* Compressed SRGB Unsigned Normalized Color Formats */
 	BC1_RGBA_UNORM_SRGB,
 	BC2_RGBA_UNORM_SRGB,
 	BC3_RGBA_UNORM_SRGB,
 	BC7_RGBA_UNORM_SRGB,
-    /* Depth Formats */
+
+	/* Depth Formats */
 	D16_UNORM,
 	D24_UNORM,
 	D32_FLOAT,
 	D24_UNORM_S8_UINT,
 	D32_FLOAT_S8_UINT,
-    /* Compressed ASTC Normalized Float Color Formats*/
+
+	/* Compressed ASTC Normalized Float Color Formats*/
 	ASTC_4x4_UNORM,
 	ASTC_5x4_UNORM,
 	ASTC_5x5_UNORM,
@@ -135,7 +147,8 @@ GPUTextureFormat :: enum c.int {
 	ASTC_10x10_UNORM,
 	ASTC_12x10_UNORM,
 	ASTC_12x12_UNORM,
-    /* Compressed SRGB ASTC Normalized Float Color Formats*/
+
+	/* Compressed SRGB ASTC Normalized Float Color Formats*/
 	ASTC_4x4_UNORM_SRGB,
 	ASTC_5x4_UNORM_SRGB,
 	ASTC_5x5_UNORM_SRGB,
@@ -150,7 +163,8 @@ GPUTextureFormat :: enum c.int {
 	ASTC_10x10_UNORM_SRGB,
 	ASTC_12x10_UNORM_SRGB,
 	ASTC_12x12_UNORM_SRGB,
-    /* Compressed ASTC Signed Float Color Formats*/
+
+	/* Compressed ASTC Signed Float Color Formats*/
 	ASTC_4x4_FLOAT,
 	ASTC_5x4_FLOAT,
 	ASTC_5x5_FLOAT,
@@ -610,10 +624,10 @@ GPURasterizerState :: struct {
 
 
 GPUMultisampleState :: struct {
-	sample_count: GPUSampleCount,  /**< The number of samples to be used in rasterization. */
-	sample_mask:  Uint32,          /**< Reserved for future use. Must be set to 0. */
-	enable_mask:  bool,            /**< Reserved for future use. Must be set to false. */
-	_: Uint8,
+	sample_count:             GPUSampleCount,  /**< The number of samples to be used in rasterization. */
+	sample_mask:              Uint32,          /**< Reserved for future use. Must be set to 0. */
+	enable_mask:              bool,            /**< Reserved for future use. Must be set to false. */
+	enable_alpha_to_coverage: bool,            /**< true enables the alpha-to-coverage feature. */
 	_: Uint8,
 	_: Uint8,
 }
@@ -704,8 +718,8 @@ GPUDepthStencilTargetInfo :: struct {
 	stencil_store_op: GPUStoreOp,   /**< What is done with the stencil results of the render pass. */
 	cycle:            bool,         /**< true cycles the texture if the texture is bound and any load ops are not LOAD */
 	clear_stencil:    Uint8,        /**< The value to clear the stencil component to at the beginning of the render pass. Ignored if GPU_LOADOP_CLEAR is not used. */
-	_: Uint8,
-	_: Uint8,
+	mip_level:        Uint8,        /**< The mip level to use as the depth stencil target. */
+	layer:            Uint8,        /**< The layer index to use as the depth stencil target. */
 }
 
 
@@ -751,30 +765,56 @@ GPUStorageTextureReadWriteBinding :: struct {
 }
 
 
-PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN          :: "SDL.gpu.device.create.debugmode"
-PROP_GPU_DEVICE_CREATE_PREFERLOWPOWER_BOOLEAN     :: "SDL.gpu.device.create.preferlowpower"
-PROP_GPU_DEVICE_CREATE_NAME_STRING                :: "SDL.gpu.device.create.name"
-PROP_GPU_DEVICE_CREATE_SHADERS_PRIVATE_BOOLEAN    :: "SDL.gpu.device.create.shaders.private"
-PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN      :: "SDL.gpu.device.create.shaders.spirv"
-PROP_GPU_DEVICE_CREATE_SHADERS_DXBC_BOOLEAN       :: "SDL.gpu.device.create.shaders.dxbc"
-PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN       :: "SDL.gpu.device.create.shaders.dxil"
-PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN        :: "SDL.gpu.device.create.shaders.msl"
-PROP_GPU_DEVICE_CREATE_SHADERS_METALLIB_BOOLEAN   :: "SDL.gpu.device.create.shaders.metallib"
-PROP_GPU_DEVICE_CREATE_D3D12_SEMANTIC_NAME_STRING :: "SDL.gpu.device.create.d3d12.semantic"
+PROP_GPU_DEVICE_CREATE_DEBUGMODE_BOOLEAN                            :: "SDL.gpu.device.create.debugmode"
+PROP_GPU_DEVICE_CREATE_PREFERLOWPOWER_BOOLEAN                       :: "SDL.gpu.device.create.preferlowpower"
+PROP_GPU_DEVICE_CREATE_VERBOSE_BOOLEAN                              :: "SDL.gpu.device.create.verbose"
+PROP_GPU_DEVICE_CREATE_NAME_STRING                                  :: "SDL.gpu.device.create.name"
+PROP_GPU_DEVICE_CREATE_FEATURE_CLIP_DISTANCE_BOOLEAN                :: "SDL.gpu.device.create.feature.clip_distance"
+PROP_GPU_DEVICE_CREATE_FEATURE_DEPTH_CLAMPING_BOOLEAN               :: "SDL.gpu.device.create.feature.depth_clamping"
+PROP_GPU_DEVICE_CREATE_FEATURE_INDIRECT_DRAW_FIRST_INSTANCE_BOOLEAN :: "SDL.gpu.device.create.feature.indirect_draw_first_instance"
+PROP_GPU_DEVICE_CREATE_FEATURE_ANISOTROPY_BOOLEAN                   :: "SDL.gpu.device.create.feature.anisotropy"
+PROP_GPU_DEVICE_CREATE_SHADERS_PRIVATE_BOOLEAN                      :: "SDL.gpu.device.create.shaders.private"
+PROP_GPU_DEVICE_CREATE_SHADERS_SPIRV_BOOLEAN                        :: "SDL.gpu.device.create.shaders.spirv"
+PROP_GPU_DEVICE_CREATE_SHADERS_DXBC_BOOLEAN                         :: "SDL.gpu.device.create.shaders.dxbc"
+PROP_GPU_DEVICE_CREATE_SHADERS_DXIL_BOOLEAN                         :: "SDL.gpu.device.create.shaders.dxil"
+PROP_GPU_DEVICE_CREATE_SHADERS_MSL_BOOLEAN                          :: "SDL.gpu.device.create.shaders.msl"
+PROP_GPU_DEVICE_CREATE_SHADERS_METALLIB_BOOLEAN                     :: "SDL.gpu.device.create.shaders.metallib"
+PROP_GPU_DEVICE_CREATE_D3D12_ALLOW_FEWER_RESOURCE_SLOTS_BOOLEAN     :: "SDL.gpu.device.create.d3d12.allowtier1resourcebinding"
+PROP_GPU_DEVICE_CREATE_D3D12_SEMANTIC_NAME_STRING                   :: "SDL.gpu.device.create.d3d12.semantic"
+PROP_GPU_DEVICE_CREATE_D3D12_AGILITY_SDK_VERSION_NUMBER             :: "SDL.gpu.device.create.d3d12.agility_sdk_version"
+PROP_GPU_DEVICE_CREATE_D3D12_AGILITY_SDK_PATH_STRING                :: "SDL.gpu.device.create.d3d12.agility_sdk_path"
+PROP_GPU_DEVICE_CREATE_VULKAN_REQUIRE_HARDWARE_ACCELERATION_BOOLEAN :: "SDL.gpu.device.create.vulkan.requirehardwareacceleration"
+PROP_GPU_DEVICE_CREATE_VULKAN_OPTIONS_POINTER                       :: "SDL.gpu.device.create.vulkan.options"
+PROP_GPU_DEVICE_CREATE_METAL_ALLOW_MACFAMILY1_BOOLEAN               :: "SDL.gpu.device.create.metal.allowmacfamily1"
 
-PROP_GPU_COMPUTEPIPELINE_CREATE_NAME_STRING       :: "SDL.gpu.computepipeline.create.name"
-PROP_GPU_GRAPHICSPIPELINE_CREATE_NAME_STRING      :: "SDL.gpu.graphicspipeline.create.name"
-PROP_GPU_SAMPLER_CREATE_NAME_STRING               :: "SDL.gpu.sampler.create.name"
-PROP_GPU_SHADER_CREATE_NAME_STRING                :: "SDL.gpu.shader.create.name"
-PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_R_FLOAT       :: "SDL.gpu.texture.create.d3d12.clear.r"
-PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_G_FLOAT       :: "SDL.gpu.texture.create.d3d12.clear.g"
-PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_B_FLOAT       :: "SDL.gpu.texture.create.d3d12.clear.b"
-PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_A_FLOAT       :: "SDL.gpu.texture.create.d3d12.clear.a"
-PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT   :: "SDL.gpu.texture.create.d3d12.clear.depth"
-PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_UINT8 :: "SDL.gpu.texture.create.d3d12.clear.stencil"
-PROP_GPU_TEXTURE_CREATE_NAME_STRING               :: "SDL.gpu.texture.create.name"
-PROP_GPU_BUFFER_CREATE_NAME_STRING                :: "SDL.gpu.buffer.create.name"
-PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING        :: "SDL.gpu.transferbuffer.create.name"
+GPUVulkanOptions :: struct {
+	vulkan_api_version:                 Uint32,       /**< The Vulkan API version to request for the instance. Use Vulkan's VK_MAKE_VERSION or VK_MAKE_API_VERSION. */
+	feature_list:                       rawptr,       /**< Pointer to the first element of a chain of Vulkan feature structs. (Requires API version 1.1 or higher.)*/
+	vulkan_10_physical_device_features: rawptr,       /**< Pointer to a VkPhysicalDeviceFeatures struct to enable additional Vulkan 1.0 features. */
+	device_extension_count:             Uint32,       /**< Number of additional device extensions to require. */
+	device_extension_names:             [^]cstring,   /**< Pointer to a list of additional device extensions to require. */
+	instance_extension_count:           Uint32,       /**< Number of additional instance extensions to require. */
+	instance_extension_names:           [^]cstring,   /**< Pointer to a list of additional instance extensions to require. */
+}
+
+PROP_GPU_COMPUTEPIPELINE_CREATE_NAME_STRING        :: "SDL.gpu.computepipeline.create.name"
+PROP_GPU_GRAPHICSPIPELINE_CREATE_NAME_STRING       :: "SDL.gpu.graphicspipeline.create.name"
+PROP_GPU_SAMPLER_CREATE_NAME_STRING                :: "SDL.gpu.sampler.create.name"
+PROP_GPU_SHADER_CREATE_NAME_STRING                 :: "SDL.gpu.shader.create.name"
+PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_R_FLOAT        :: "SDL.gpu.texture.create.d3d12.clear.r"
+PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_G_FLOAT        :: "SDL.gpu.texture.create.d3d12.clear.g"
+PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_B_FLOAT        :: "SDL.gpu.texture.create.d3d12.clear.b"
+PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_A_FLOAT        :: "SDL.gpu.texture.create.d3d12.clear.a"
+PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_DEPTH_FLOAT    :: "SDL.gpu.texture.create.d3d12.clear.depth"
+PROP_GPU_TEXTURE_CREATE_D3D12_CLEAR_STENCIL_NUMBER :: "SDL.gpu.texture.create.d3d12.clear.stencil"
+PROP_GPU_TEXTURE_CREATE_NAME_STRING                :: "SDL.gpu.texture.create.name"
+PROP_GPU_BUFFER_CREATE_NAME_STRING                 :: "SDL.gpu.buffer.create.name"
+PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING         :: "SDL.gpu.transferbuffer.create.name"
+
+PROP_GPU_DEVICE_NAME_STRING               :: "SDL.gpu.device.name"
+PROP_GPU_DEVICE_DRIVER_NAME_STRING        :: "SDL.gpu.device.driver_name"
+PROP_GPU_DEVICE_DRIVER_VERSION_STRING     :: "SDL.gpu.device.driver_version"
+PROP_GPU_DEVICE_DRIVER_INFO_STRING        :: "SDL.gpu.device.driver_info"
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
@@ -787,6 +827,7 @@ foreign lib {
 	GetGPUDriver                          :: proc(index: c.int) -> cstring ---
 	GetGPUDeviceDriver                    :: proc(device: ^GPUDevice) -> cstring ---
 	GetGPUShaderFormats                   :: proc(device: ^GPUDevice) -> GPUShaderFormat ---
+	GetGPUDeviceProperties                :: proc(device: ^GPUDevice) -> PropertiesID ---
 	CreateGPUComputePipeline              :: proc(device: ^GPUDevice, #by_ptr createinfo: GPUComputePipelineCreateInfo) -> ^GPUComputePipeline ---
 	CreateGPUGraphicsPipeline             :: proc(device: ^GPUDevice, #by_ptr createinfo: GPUGraphicsPipelineCreateInfo) -> ^GPUGraphicsPipeline ---
 	CreateGPUSampler                      :: proc(device: ^GPUDevice, #by_ptr createinfo: GPUSamplerCreateInfo) -> ^GPUSampler ---
@@ -870,6 +911,8 @@ foreign lib {
 	GPUTextureSupportsFormat              :: proc(device: ^GPUDevice, format: GPUTextureFormat, type: GPUTextureType, usage: GPUTextureUsageFlags) -> bool ---
 	GPUTextureSupportsSampleCount         :: proc(device: ^GPUDevice, format: GPUTextureFormat, sample_count: GPUSampleCount) -> bool ---
 	CalculateGPUTextureFormatSize         :: proc(format: GPUTextureFormat, width, height: Uint32, depth_or_layer_count: Uint32) -> Uint32 ---
+	GetPixelFormatFromGPUTextureFormat    :: proc(format: GPUTextureFormat) -> PixelFormat ---
+	GetGPUTextureFormatFromPixelFormat    :: proc(format: PixelFormat) -> GPUTextureFormat ---
 }
 
 

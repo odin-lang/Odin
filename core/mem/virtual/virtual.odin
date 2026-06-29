@@ -2,27 +2,20 @@ package mem_virtual
 
 import "core:mem"
 import "base:intrinsics"
-import "base:sanitizer"
+// import "base:sanitizer"
 import "base:runtime"
 _ :: runtime
-
-DEFAULT_PAGE_SIZE := uint(4096)
-
-@(init, private)
-platform_memory_init :: proc() {
-	_platform_memory_init()
-}
 
 Allocator_Error :: mem.Allocator_Error
 
 @(require_results, no_sanitize_address)
-reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	return _reserve(size)
+reserve :: proc "contextless" (size: uint, address_hint := uintptr(0)) -> (data: []byte, err: Allocator_Error) {
+	return _reserve(size, address_hint)
 }
 
 @(no_sanitize_address)
 commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
-	sanitizer.address_unpoison(data, size)
+	// sanitizer.address_unpoison(data, size)
 	return _commit(data, size)
 }
 
@@ -35,13 +28,13 @@ reserve_and_commit :: proc "contextless" (size: uint) -> (data: []byte, err: All
 
 @(no_sanitize_address)
 decommit :: proc "contextless" (data: rawptr, size: uint) {
-	sanitizer.address_poison(data, size)
+	// sanitizer.address_poison(data, size)
 	_decommit(data, size)
 }
 
 @(no_sanitize_address)
 release :: proc "contextless" (data: rawptr, size: uint) {
-	sanitizer.address_unpoison(data, size)
+	// sanitizer.address_unpoison(data, size)
 	_release(data, size)
 }
 
@@ -79,7 +72,7 @@ align_formula :: #force_inline proc "contextless" (size, align: uint) -> uint {
 
 @(require_results, no_sanitize_address)
 memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags: Memory_Block_Flags = {}) -> (block: ^Memory_Block, err: Allocator_Error) {
-	page_size := DEFAULT_PAGE_SIZE
+	page_size := uint(mem.PAGE_SIZE)
 	assert(mem.is_power_of_two(uintptr(page_size)))
 
 	committed := committed
@@ -89,8 +82,8 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
 	
-	total_size     := uint(reserved + max(alignment, size_of(Platform_Memory_Block)))
-	base_offset    := uintptr(max(alignment, size_of(Platform_Memory_Block)))
+	total_size     := reserved + alignment + size_of(Platform_Memory_Block)
+	base_offset    := mem.align_forward_uintptr(size_of(Platform_Memory_Block), max(uintptr(alignment), align_of(Platform_Memory_Block)))
 	protect_offset := uintptr(0)
 	
 	do_protection := false
@@ -115,7 +108,7 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	}
 	
 	pmblock.block.committed = committed
-	pmblock.block.reserved  = reserved
+	pmblock.block.reserved  = total_size - uint(base_offset)
 
 	
 	return &pmblock.block, nil
@@ -144,7 +137,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 			// TODO(bill): determine a better heuristic for this behaviour
 			extra_size := max(size, block.committed>>1)
 			platform_total_commit := base_offset + block.used + extra_size
-			platform_total_commit = align_formula(platform_total_commit, DEFAULT_PAGE_SIZE)
+			platform_total_commit = align_formula(platform_total_commit, uint(mem.PAGE_SIZE))
 			platform_total_commit = min(max(platform_total_commit, default_commit_size), pmblock.reserved)
 
 			assert(pmblock.committed <= pmblock.reserved)
@@ -154,7 +147,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 
 			pmblock.committed = platform_total_commit
 			block.committed = pmblock.committed - base_offset
-
+			assert(block.committed <= block.reserved)
 		}
 		return
 	}
@@ -174,12 +167,12 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 		err = .Out_Of_Memory
 		return
 	}
-	assert(block.committed <= block.reserved)
+
 	do_commit_if_necessary(block, size, default_commit_size) or_return
 
 	data = block.base[block.used+alignment_offset:][:min_size]
 	block.used += size
-	sanitizer.address_unpoison(data)
+	// sanitizer.address_unpoison(data)
 	return
 }
 

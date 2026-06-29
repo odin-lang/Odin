@@ -1,7 +1,7 @@
 package field_poly1305
 
+import "core:crypto"
 import "core:encoding/endian"
-import "core:mem"
 
 fe_relax_cast :: #force_inline proc "contextless" (
 	arg1: ^Tight_Field_Element,
@@ -57,7 +57,7 @@ fe_from_u64s :: proc "contextless" (out1: ^Tight_Field_Element, lo, hi: u64) {
 	_fe_from_bytes(out1, &tmp)
 
 	// This routine is only used to deserialize `r` which is confidential.
-	mem.zero_explicit(&tmp, size_of(tmp))
+	crypto.zero_explicit(&tmp, size_of(tmp))
 }
 
 fe_zero :: proc "contextless" (out1: ^Tight_Field_Element) {

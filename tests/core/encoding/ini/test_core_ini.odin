@@ -1,8 +1,7 @@
+#+feature dynamic-literals
 package test_core_ini
 
-import "base:runtime"
 import "core:encoding/ini"
-import "core:mem/virtual"
 import "core:strings"
 import "core:testing"
 
@@ -64,7 +63,7 @@ ini_to_string :: proc(t: ^testing.T) {
 
 	testing.expectf(
 		t,
-		strings.contains(str, "[LEVEL]LOG = debug"),
+		strings.contains(str, "[LEVEL]\nLOG = debug"),
 		"Expected `ini.save_map_to_string` to return a string equal to \"[LEVEL]LOG = debug\", got %v",
 		str,
 	)

@@ -19,16 +19,6 @@ X_OK  :: c.int((1 << 0))  /* test for execute or search permission */
 W_OK  :: c.int((1 << 1))  /* test for write permission */
 R_OK  :: c.int((1 << 2))  /* test for read permission */
 
-/* copyfile flags */
-COPYFILE_ACL   :: (1 << 0)
-COPYFILE_STAT  :: (1 << 1)
-COPYFILE_XATTR :: (1 << 2)
-COPYFILE_DATA  :: (1 << 3)
-
-COPYFILE_SECURITY :: (COPYFILE_STAT | COPYFILE_ACL)
-COPYFILE_METADATA :: (COPYFILE_SECURITY | COPYFILE_XATTR)
-COPYFILE_ALL	  :: (COPYFILE_METADATA | COPYFILE_DATA)
-
 /* syslimits.h */
 PATH_MAX	:: 1024	/* max bytes in pathname */
 
@@ -233,6 +223,11 @@ _Proc_Bsdinfo :: struct {
 
 /*--==========================================================================--*/
 
+/* Get window size */
+TIOCGWINSZ :: 0x40087468
+
+/*--==========================================================================--*/
+
 syscall_fsync :: #force_inline proc "contextless" (fildes: c.int) -> bool {
 	return !(cast(bool)intrinsics.syscall(unix_offset_syscall(.fsync), uintptr(fildes)))
 }
@@ -283,6 +278,10 @@ syscall_rename_at :: #force_inline proc "contextless" (from_fd: c.int, from: cst
 
 syscall_lseek :: #force_inline proc "contextless" (fd: c.int, offset: i64, whence: c.int) -> i64 {
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.lseek), uintptr(fd), uintptr(offset), uintptr(whence))
+}
+
+syscall_ioctl :: #force_inline proc "contextless" (fd: c.int, request: u32, arg: rawptr) -> c.int {
+	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.ioctl), uintptr(fd), uintptr(request), uintptr(arg)))
 }
 
 syscall_gettid :: #force_inline proc "contextless" () -> u64 {

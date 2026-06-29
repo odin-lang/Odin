@@ -1,6 +1,8 @@
+// Defines the basic types used by `C` programs for foreign function and data structure interop.
 package c
 
-import builtin "base:builtin"
+import builtin    "base:builtin"
+import intrinsics "base:intrinsics"
 
 char           :: builtin.u8  // assuming -funsigned-char
 
@@ -48,13 +50,22 @@ int_least64_t  :: builtin.i64
 uint_least64_t :: builtin.u64
 
 // Same on Windows, Linux, and FreeBSD
-when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
+when ODIN_ARCH == .i386 {
 	int_fast8_t    :: builtin.i8
 	uint_fast8_t   :: builtin.u8
 	int_fast16_t   :: builtin.i32
 	uint_fast16_t  :: builtin.u32
 	int_fast32_t   :: builtin.i32
 	uint_fast32_t  :: builtin.u32
+	int_fast64_t   :: builtin.i64
+	uint_fast64_t  :: builtin.u64
+} else when ODIN_ARCH == .amd64 {
+	int_fast8_t    :: builtin.i8
+	uint_fast8_t   :: builtin.u8
+	int_fast16_t   :: long
+	uint_fast16_t  :: ulong
+	int_fast32_t   :: long
+	uint_fast32_t  :: ulong
 	int_fast64_t   :: builtin.i64
 	uint_fast64_t  :: builtin.u64
 } else {
@@ -105,14 +116,6 @@ NDEBUG         :: !ODIN_DEBUG
 
 CHAR_BIT :: 8
 
-// Since there are no types in C with an alignment larger than that of
-// max_align_t, which cannot be larger than sizeof(long double) as any other
-// exposed type wouldn't be valid C, the maximum alignment possible in a
-// strictly conformant C implementation is 16 on the platforms we care about.
-// The choice of 4096 bytes for storage of this type is more than enough on all
-// relevant platforms.
-va_list :: struct #align(16) {
-	_: [4096]u8,
-}
+va_list :: intrinsics.c_va_list
 
 FILE :: struct {}

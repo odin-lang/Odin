@@ -195,7 +195,13 @@ gb_internal void mutex_lock(RecursiveMutex *m) {
 			// inside the lock
 			return;
 		}
-		futex_wait(&m->owner, prev_owner);
+
+		// NOTE(lucas): we are doing spin lock since futex signal is expensive on OSX. The recursive locks are
+		// very short lived so we don't hit this mega often and I see no perform regression on windows (with
+		// a performance uplift on OSX).
+
+		//futex_wait(&m->owner, prev_owner);
+		yield_thread();
 	}
 }
 gb_internal bool mutex_try_lock(RecursiveMutex *m) {
@@ -216,7 +222,9 @@ gb_internal void mutex_unlock(RecursiveMutex *m) {
 		return;
 	}
 	m->owner.exchange(0, std::memory_order_release);
-	futex_signal(&m->owner);
+	// NOTE(lucas): see comment about spin lock in mutex_lock above
+
+	// futex_signal(&m->owner);
 	// outside the lock
 }
 
@@ -367,8 +375,8 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 	gb_internal bool mutex_try_lock(BlockingMutex *m) {
 		ANNOTATE_LOCK_PRE(m, 1);
-		i32 v = m->state().exchange(Internal_Mutex_State_Locked, std::memory_order_acquire);
-		if (v == Internal_Mutex_State_Unlocked) {
+		i32 expected = Internal_Mutex_State_Unlocked;
+		if (m->state().compare_exchange_strong(expected, Internal_Mutex_State_Locked, std::memory_order_acquire)) {
 			ANNOTATE_LOCK_POST(m);
 			return true;
 		}
@@ -448,6 +456,45 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 #endif
 
+static const int RWLOCK_WRITER   = 1<<0;
+static const int RWLOCK_UPGRADED = 1<<1;
+static const int RWLOCK_READER   = 1<<2;
+struct RWSpinLock {
+	Futex bits;
+};
+
+void rwlock_release_write(RWSpinLock *l) {
+	l->bits.fetch_and(~(RWLOCK_WRITER | RWLOCK_UPGRADED), std::memory_order_release);
+	futex_signal(&l->bits);
+}
+
+bool rwlock_try_acquire_upgrade(RWSpinLock *l) {
+	int value = l->bits.fetch_or(RWLOCK_UPGRADED, std::memory_order_acquire);
+	return (value & (RWLOCK_UPGRADED | RWLOCK_WRITER)) == 0;
+}
+
+void rwlock_acquire_upgrade(RWSpinLock *l) {
+	while (!rwlock_try_acquire_upgrade(l)) {
+		futex_wait(&l->bits, RWLOCK_UPGRADED | RWLOCK_WRITER);
+	}
+}
+void rwlock_release_upgrade(RWSpinLock *l) {
+	l->bits.fetch_add(-RWLOCK_UPGRADED, std::memory_order_acq_rel);
+	futex_signal(&l->bits);
+}
+
+bool rwlock_try_release_upgrade_and_acquire_write(RWSpinLock *l) {
+	int expect = RWLOCK_UPGRADED;
+	return l->bits.compare_exchange_strong(expect, RWLOCK_WRITER, std::memory_order_acq_rel);
+}
+
+void rwlock_release_upgrade_and_acquire_write(RWSpinLock *l) {
+	while (!rwlock_try_release_upgrade_and_acquire_write(l)) {
+		futex_wait(&l->bits, RWLOCK_UPGRADED);
+	}
+}
+
+
 struct Parker {
 	Futex state;
 };
@@ -502,8 +549,6 @@ gb_internal u32 thread_current_id(void) {
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #elif defined(GB_SYSTEM_LINUX)
 	thread_id = gettid();
-#elif defined(GB_SYSTEM_HAIKU)
-	thread_id = find_thread(NULL);
 #elif defined(GB_SYSTEM_FREEBSD)
 	thread_id = pthread_getthreadid_np();
 #elif defined(GB_SYSTEM_NETBSD)
@@ -980,177 +1025,46 @@ gb_internal void futex_wait(Futex *f, Footex val) {
 	} while (f->load() == val);
 }
 
-#elif defined(GB_SYSTEM_HAIKU)
-
-// Futex implementation taken from https://tavianator.com/2023/futex.html
-
-#include <pthread.h>
-#include <atomic>
-
-struct _Spinlock {
-	std::atomic_flag state;
-
-	void init() {
-		state.clear();
-	}
-
-	void lock() {
-		while (state.test_and_set(std::memory_order_acquire)) {
-			#if defined(GB_CPU_X86)
-			_mm_pause();
-			#else
-			(void)0; // spin...
-			#endif
-		}
-	}
-
-	void unlock() {
-		state.clear(std::memory_order_release);
-	}
-};
-
-struct Futex_Waitq;
- 
-struct Futex_Waiter {
-	_Spinlock lock;
-	pthread_t thread;
-	Futex *futex;
-	Futex_Waitq *waitq;
-	Futex_Waiter *prev, *next;	
-};
- 
-struct Futex_Waitq {
-	_Spinlock lock;
-	Futex_Waiter list;
- 
-	void init() {
-		auto head = &list;
-		head->prev = head->next = head;
-	}
-};
-
-// FIXME: This approach may scale badly in the future,
-// possible solution - hash map (leads to deadlocks now).
- 
-Futex_Waitq g_waitq = {
-	.lock = ATOMIC_FLAG_INIT,
-	.list = {
-		.prev = &g_waitq.list,
-		.next = &g_waitq.list,
-	},
-};
- 
-Futex_Waitq *get_waitq(Futex *f) {
-	// Future hash map method...
-	return &g_waitq;
-}
- 
-void futex_signal(Futex *f) {
-	auto waitq = get_waitq(f);
- 
-	waitq->lock.lock();
- 
-	auto head = &waitq->list;
-	for (auto waiter = head->next; waiter != head; waiter = waiter->next) {
-		if (waiter->futex != f) {
-			continue;
-		}
-		waitq->lock.unlock();
-		pthread_kill(waiter->thread, SIGCONT);
-		return;
-	}
- 
-	waitq->lock.unlock();
-}
- 
-void futex_broadcast(Futex *f) {
-	auto waitq = get_waitq(f);
- 
-	waitq->lock.lock();
- 
-	auto head = &waitq->list;
-	for (auto waiter = head->next; waiter != head; waiter = waiter->next) {
-		if (waiter->futex != f) {
-			continue;
-		}
-		if (waiter->next == head) {
-			waitq->lock.unlock();
-			pthread_kill(waiter->thread, SIGCONT);
-			return;
-		} else {
-			pthread_kill(waiter->thread, SIGCONT);
-		}
-	}
- 
-	waitq->lock.unlock();
-}
- 
-void futex_wait(Futex *f, Footex val) {
-	Futex_Waiter waiter;
-	waiter.thread = pthread_self();
-	waiter.futex = f;
-
-	auto waitq = get_waitq(f);
-	while (waitq->lock.state.test_and_set(std::memory_order_acquire)) {
-		if (f->load(std::memory_order_relaxed) != val) {
-			return;
-		}
-		#if defined(GB_CPU_X86)
-		_mm_pause();
-		#else
-		(void)0; // spin...
-		#endif
-	}
-
-	waiter.waitq = waitq;
-	waiter.lock.init();
-	waiter.lock.lock();
- 
-	auto head = &waitq->list;
-	waiter.prev = head->prev;
-	waiter.next = head;
-	waiter.prev->next = &waiter;
-	waiter.next->prev = &waiter;
- 
-	waiter.prev->next = &waiter;
-	waiter.next->prev = &waiter;
- 
-	sigset_t old_mask, mask;
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGCONT);
-	pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
-
-	if (f->load(std::memory_order_relaxed) == val) {
-			waiter.lock.unlock();
-			waitq->lock.unlock();
-
-			int sig;
-			sigwait(&mask, &sig);
-
-			waitq->lock.lock();
-			waiter.lock.lock();
-
-			while (waitq != waiter.waitq) {
-				auto req = waiter.waitq;
-				waiter.lock.unlock();
-				waitq->lock.unlock();
-				waitq = req;
-				waitq->lock.lock();
-				waiter.lock.lock();
-			}
-	}
- 
-	waiter.prev->next = waiter.next;
-	waiter.next->prev = waiter.prev;
- 
-	pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
- 
-	waiter.lock.unlock();
-	waitq->lock.unlock();
-}
-
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
+
+
+
+template <typename T>
+struct AtomicFreelist {
+	T value;
+	std::atomic<AtomicFreelist<T> *> next;
+};
+
+template <typename T>
+AtomicFreelist<T> *atomic_freelist_get(std::atomic<AtomicFreelist<T> *> &head) {
+	AtomicFreelist<T> *elem = nullptr;
+
+	for (;;) {
+		elem = head.load(std::memory_order_acquire);
+		if (elem == nullptr) {
+			return nullptr;
+		}
+
+		if (head.compare_exchange_weak(elem, elem->next.load(std::memory_order_acquire), std::memory_order_acquire, std::memory_order_relaxed)) {
+			elem->next.store(nullptr, std::memory_order_relaxed);
+			return elem;
+		}
+
+	}
+}
+
+template <typename T>
+void atomic_freelist_put(std::atomic<AtomicFreelist<T> *> &head_list, AtomicFreelist<T> *elem) {
+	for (;;) {
+		auto *head = head_list.load(std::memory_order_relaxed);
+		elem->next.store(head, std::memory_order_relaxed);
+		if (head_list.compare_exchange_weak(head, elem, std::memory_order_release, std::memory_order_relaxed)) {
+			return;
+		}
+
+	}
+}

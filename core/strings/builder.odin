@@ -3,7 +3,6 @@ package strings
 import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
-import "core:mem"
 import "core:io"
 /*
 Type definition for a procedure that flushes a Builder
@@ -35,7 +34,7 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_make_none :: proc(allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
+builder_make_none :: proc(allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, allocator, loc) or_return }, nil
 }
 /*
@@ -51,7 +50,7 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_make_len :: proc(len: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
+builder_make_len :: proc(len: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, len, allocator, loc) or_return }, nil
 }
 /*
@@ -68,7 +67,7 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
+builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, len, cap, allocator, loc) or_return }, nil
 }
 /*
@@ -116,7 +115,7 @@ Returns:
 - res: A pointer to the initialized Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_init_none :: proc(b: ^Builder, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
+builder_init_none :: proc(b: ^Builder, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	b.buf = make([dynamic]byte, allocator, loc) or_return
 	return b, nil
 }
@@ -135,7 +134,7 @@ Returns:
 - res: A pointer to the initialized Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
+builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	b.buf = make([dynamic]byte, len, allocator, loc) or_return
 	return b, nil
 }
@@ -153,7 +152,7 @@ Returns:
 - res: A pointer to the initialized Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: mem.Allocator_Error) #optional_allocator_error {
+builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: ^Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	b.buf = make([dynamic]byte, len, cap, allocator, loc) or_return
 	return b, nil
 }
@@ -182,7 +181,7 @@ _builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byt
 	case .Query:
 		return io.query_utility({.Write, .Size, .Destroy, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 /*
@@ -269,8 +268,19 @@ Output:
 
 */
 builder_from_bytes :: proc(backing: []byte) -> (res: Builder) {
-	return Builder{ buf = mem.buffer_from_slice(backing) }
+	return Builder{
+		buf = transmute([dynamic]byte)runtime.Raw_Dynamic_Array{
+			data      = raw_data(backing),
+			len       = 0,
+			cap       = len(backing),
+			allocator = runtime.Allocator{
+				procedure = runtime.nil_allocator_proc,
+				data = nil,
+			},
+		},
+	}
 }
+
 // Alias to `builder_from_bytes`
 builder_from_slice :: builder_from_bytes
 /*
@@ -296,8 +306,8 @@ Inputs:
 Returns:
 - res: A cstring of the Builder's buffer
 */
-unsafe_to_cstring :: proc(b: ^Builder) -> (res: cstring) {
-	append(&b.buf, 0)
+unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
+	append(&b.buf, 0, loc)
 	pop(&b.buf)
 	return cstring(raw_data(b.buf))
 }
@@ -311,8 +321,8 @@ Returns:
 - res: A cstring of the Builder's buffer upon success
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-to_cstring :: proc(b: ^Builder) -> (res: cstring, err: mem.Allocator_Error) {
-	n := append(&b.buf, 0) or_return
+to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
+	n := append(&b.buf, 0, loc) or_return
 	if n != 1 {
 		return nil, .Out_Of_Memory
 	}
@@ -518,9 +528,9 @@ Output:
 	abc
 
 */
-write_string :: proc(b: ^Builder, s: string) -> (n: int) {
+write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int) {
 	n0 := len(b.buf)
-	append(&b.buf, s)
+	append(&b.buf, s, loc)
 	n1 := len(b.buf)
 	return n1-n0
 }
@@ -675,7 +685,7 @@ Returns:
 */
 write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f, fmt, prec, bit_size)
+	s := strconv.write_float(buf[:], f, fmt, prec, bit_size)
 	// If the result starts with a `+` then unless we always want signed results,
 	// we skip it unless it's followed by an `I` (because of +Inf).
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
@@ -699,7 +709,7 @@ Returns:
 */
 write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
@@ -739,7 +749,7 @@ Output:
 */
 write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
@@ -761,7 +771,7 @@ Returns:
 */
 write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
-	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
@@ -782,7 +792,7 @@ Returns:
 */
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
-	s := strconv.append_bits(buf[:], i, base, false, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(b, s)
 }
 /*
@@ -800,7 +810,7 @@ Returns:
 */
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 	buf: [32]byte
-	s := strconv.append_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(b, s)
 }
 /*
@@ -834,4 +844,126 @@ Returns:
 */
 write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
 	return write_i64(b, i64(i), base)
+}
+
+
+/*
+Replaces all instances of `old` in the string in a Builder `b` with the `new` string
+
+*Allocates Using The Allocator On The Builder*
+
+Inputs:
+- b: The input `Builder`
+- old: The substring to be replaced
+- new: The replacement string
+
+Returns:
+- replaced: The number of replacements
+- err: if any allocation errors occurred
+*/
+builder_replace_all :: proc(b: ^Builder, old, new: string) -> (replaced: int, err: runtime.Allocator_Error) {
+	return builder_replace(b, old, new, -1)
+}
+
+/*
+Replaces n instances of `old` in the string in a Builder `b` with the `new` string
+
+*Allocates Using The Allocator On The Builder*
+
+Inputs:
+- b: The input `Builder`
+- old: The substring to be replaced
+- new: The replacement string
+- n: The number of instances to replace (if `n < 0`, no limit on the number of replacements)
+
+Returns:
+- replaced: The number of replacements
+- err: if any allocation errors occurred
+*/
+builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_location) -> (replaced: int, err: runtime.Allocator_Error) {
+	if old == new || n == 0 {
+		return
+	}
+
+	if m := count(to_string(b^), old); m == 0 {
+		return
+	}
+
+	if len(old) == 0 {
+		// NOTE(bill): reserve the necessary memory
+		found := 0
+		for i := 0; i <= len(b.buf); i += len(new)+1 {
+			if n > 0 && found == n {
+				break
+			}
+			found += 1
+		}
+		if found == 0 {
+			return
+		}
+		reserve(&b.buf, len(b.buf) + len(new)*found) or_return
+
+
+		for i := 0; i <= len(b.buf); i += len(new)+1 {
+			if n > 0 && replaced == n {
+				break
+			}
+
+			resize(&b.buf, len(b.buf)+len(new), loc) or_return
+			copy(b.buf[i+len(new):], b.buf[i:])
+			copy(b.buf[i:], new)
+			replaced += 1
+		}
+	} else {
+		if len(new) > len(old) {
+			// NOTE(bill): reserve the necessary memory
+			found := 0
+			for i := 0; i < len(b.buf); /**/ {
+				if n > 0 && found == n {
+					break
+				}
+
+				j := index(string(b.buf[i:]), old)
+				if j < 0 {
+					break
+				}
+				i += j+len(old)
+				found += 1
+			}
+			if found == 0 {
+				return
+			}
+			reserve(&b.buf, len(b.buf) + (len(new)-len(old))*found) or_return
+		}
+
+		for i := 0; i < len(b.buf); /**/ {
+			if n > 0 && replaced == n {
+				break
+			}
+
+			j := index(string(b.buf[i:]), old)
+			if j < 0 {
+				break
+			}
+
+			if len(new) > len(old) {
+				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+			}
+
+			cur := b.buf[i+j:]
+			src := cur[len(old):]
+			dst := cur[len(new):]
+			copy(dst, src)
+			copy(cur, new)
+
+			i += j+len(new)
+
+			replaced += 1
+
+			if len(new) < len(old) {
+				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+			}
+		}
+	}
+	return
 }

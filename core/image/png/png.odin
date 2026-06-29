@@ -1,15 +1,16 @@
+#+feature using-stmt
+// Reader for `PNG` images.
+// The PNG specification is at [[ https://www.w3.org/TR/PNG/ ]].
+package png
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
-
-
-#+vet !using-stmt
-package png
 
 import "core:compress"
 import "core:compress/zlib"
@@ -138,14 +139,6 @@ Text :: struct {
 	text:              string,
 }
 
-Exif :: struct {
-	byte_order: enum {
-		little_endian,
-		big_endian,
-	},
-	data: []u8,
-}
-
 iCCP :: struct {
 	name:    string,
 	profile: []u8,
@@ -250,8 +243,12 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
-	if width == 0 || height == 0 || u128(width) * u128(height) > image.MAX_DIMENSIONS {
+	if width == 0 || height == 0 {
 		return {}, .Invalid_Image_Dimensions
+	}
+
+	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
+		return {}, .Image_Dimensions_Too_Large
 	}
 
 	if compression_method != 0 {
@@ -1212,7 +1209,6 @@ Filter_Params :: struct #packed {
 
 depth_scale_table :: []u8{0, 0xff, 0x55, 0, 0x11, 0,0,0, 0x01}
 
-// @(optimization_mode="speed")
 defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
 	using params
@@ -1273,7 +1269,6 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 	return
 }
 
-// @(optimization_mode="speed")
 defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 
 	using params
@@ -1436,7 +1431,6 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 	return true
 }
 
-// @(optimization_mode="speed")
 defilter_16 :: proc(params: ^Filter_Params) -> bool {
 	using params
 
@@ -1614,6 +1608,6 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 }
 
 @(init, private)
-_register :: proc() {
+_register :: proc "contextless" () {
 	image.register(.PNG, load_from_bytes, destroy)
 }

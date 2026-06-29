@@ -1,14 +1,16 @@
+// Yann Collet's `xxhash`.
+//
+// [[ xxhash Fast Hash Algorithm; https://cyan4973.github.io/xxHash/ ]]
+package xxhash
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 
-	Made available under Odin's BSD-3 license, based on the original C code.
+	Made available under Odin's license, based on the original C code.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-
-// An implementation of Yann Collet's [[ xxhash Fast Hash Algorithm; https://cyan4973.github.io/xxHash/ ]].
-package xxhash
 
 import "base:intrinsics"
 import "base:runtime"
@@ -99,5 +101,37 @@ XXH64_read64 :: #force_inline proc(buf: []u8, alignment := Alignment.Unaligned) 
 		b: u64le
 		mem_copy(&b, raw_data(buf[:]), 8)
 		return u64(b)
+	}
+}
+
+XXH64_read64_simd :: #force_inline proc(buf: []$E, $W: uint, alignment := Alignment.Unaligned) -> (res: #simd[W]u64) {
+	if alignment == .Aligned {
+		res = (^#simd[W]u64)(raw_data(buf))^
+	} else {
+		res = intrinsics.unaligned_load((^#simd[W]u64)(raw_data(buf)))
+	}
+
+	when ODIN_ENDIAN == .Big {
+		bytes := transmute(#simd[W*8]u8)res
+		bytes = intrinsics.simd_lanes_reverse(bytes)
+		res = transmute(#simd[W]u64)bytes
+		res = intrinsics.simd_lanes_reverse(res)
+	}
+	return
+}
+
+XXH64_write64_simd :: #force_inline proc(buf: []$E, value: $V/#simd[$W]u64, alignment := Alignment.Unaligned) {
+	value := value
+	when ODIN_ENDIAN == .Big {
+		bytes := transmute(#simd[W*8]u8)value
+		bytes = intrinsics.simd_lanes_reverse(bytes)
+		value = transmute(#simd[W]u64)bytes
+		value = intrinsics.simd_lanes_reverse(value)
+	}
+
+	if alignment == .Aligned {
+		(^V)(raw_data(buf))^ = value
+	} else {
+		intrinsics.unaligned_store((^V)(raw_data(buf)), value)
 	}
 }

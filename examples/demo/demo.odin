@@ -1,5 +1,5 @@
 #+vet !using-stmt !using-param
-#+feature dynamic-literals
+#+feature dynamic-literals using-stmt
 package main
 
 import "core:fmt"
@@ -11,6 +11,7 @@ import "core:reflect"
 import "base:runtime"
 import "base:intrinsics"
 import "core:math/big"
+import "core:math/rand"
 
 /*
 	Odin is a general-purpose programming language with distinct typing built
@@ -750,6 +751,11 @@ union_type :: proc() {
 }
 
 using_statement :: proc() {
+	// IMPORTANT NOTE: `using` as a statement is an opt-in feature which can be abled
+	// by adding `#+feature using-stmt` to be beginning of the file
+	//
+	// `using` as a struct field modifier remains available always
+
 	fmt.println("\n# using statement")
 	// using can used to bring entities declared in a scope/namespace
 	// into the current scope. This can be applied to import names, struct
@@ -1215,19 +1221,6 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
-
-		{
-			// Wait a moment before we cancel a thread
-			time.sleep(5 * time.Millisecond)
-
-			// Allow one thread to print at a time.
-			for !did_acquire(&print_mutex) { thread.yield() }
-
-			thread.terminate(pool.threads[N - 1], 0)
-			fmt.println("Canceled last thread")
-			print_mutex = false
-		}
-
 		thread.pool_finish(&pool)
 	}
 }
@@ -1613,7 +1606,7 @@ where_clauses :: proc() {
 			where intrinsics.type_is_numeric(E) {
 			x := a.y*b.z - a.z*b.y
 			y := a.z*b.x - a.x*b.z
-			z := a.x*b.y - a.y*b.z
+			z := a.x*b.y - a.y*b.x
 			return T{x, y, z}
 		}
 
@@ -2254,7 +2247,7 @@ arbitrary_precision_mathematics :: proc() {
 
 		cb := big.internal_count_bits(a)
 		if print_name {
-			fmt.printf(name)
+			fmt.print(name)
 		}
 		if err != nil {
 			fmt.printf(" (Error: %v) ", err)
@@ -2270,6 +2263,10 @@ arbitrary_precision_mathematics :: proc() {
 
 	a, b, c, d, e, f, res := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
 	defer big.destroy(a, b, c, d, e, f, res)
+
+	// Set the context RNG to something that does not require
+	// cryptographic entropy (not supported on all targets).
+	context.random_generator = rand.xoshiro256_random_generator()
 
 	// How many bits should the random prime be?
 	bits   := 64

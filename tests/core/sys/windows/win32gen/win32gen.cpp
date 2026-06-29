@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 #include <timeapi.h>
+#include <mmreg.h>
 #include <mmeapi.h>
 #include <windns.h>
 #include <commdlg.h>
@@ -52,6 +53,10 @@ static std::string ConvertLPCWSTRToString(const LPCWSTR lpcwszStr)
 
 #define expect_value(s) out \
 	<< '\t' << "expect_value(t, win32." << #s << ", " \
+	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
+
+#define expect_value_bool(s) out \
+	<< '\t' << "expect_value(t, uint(win32." << #s << "), " \
 	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
 
 #define expect_value_32(s) out \
@@ -702,8 +707,10 @@ static void verify_winmm(ofstream& out) {
 	test_proc_comment("mmsyscom.h");
 	expect_size(MMVERSION);
 	expect_size(MMTIME);
-	test_proc_comment("mmeapi.h");
+	test_proc_comment("mmreg.h");
 	expect_size(WAVEFORMATEX);
+	expect_size(WAVEFORMATEXTENSIBLE);
+	test_proc_comment("mmeapi.h");
 	expect_size(WAVEHDR);
 	expect_size(WAVEINCAPSW);
 	expect_size(WAVEOUTCAPSW);
@@ -879,17 +886,17 @@ static void verify_error_helpers(ofstream& out) {
 	test_proc_begin();
 	test_proc_comment("winerror.h");
 
-	expect_value(SUCCEEDED(-1));
-	expect_value(SUCCEEDED(0));
-	expect_value(SUCCEEDED(1));
+	expect_value_bool(SUCCEEDED(-1));
+	expect_value_bool(SUCCEEDED(0));
+	expect_value_bool(SUCCEEDED(1));
 	out << endl;
-	expect_value(FAILED(-1));
-	expect_value(FAILED(0));
-	expect_value(FAILED(1));
+	expect_value_bool(FAILED(-1));
+	expect_value_bool(FAILED(0));
+	expect_value_bool(FAILED(1));
 	out << endl;
-	expect_value(IS_ERROR(-1));
-	expect_value(IS_ERROR(0));
-	expect_value(IS_ERROR(1));
+	expect_value_bool(IS_ERROR(-1));
+	expect_value_bool(IS_ERROR(0));
+	expect_value_bool(IS_ERROR(1));
 	out << endl;
 	expect_value(HRESULT_CODE(0xFFFFCCCC));
 	expect_value(HRESULT_FACILITY(0xFFFFCCCC));

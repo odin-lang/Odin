@@ -449,7 +449,7 @@ FLock_Type :: enum i16 {
 /*
 	Bits for FD_Notifications
 */
-FD_Notifications_Bits :: enum {
+FD_Notifications_Bits :: enum i32 {
 	ACCESS    = 0,
 	MODIFY    = 1,
 	CREATE    = 2,
@@ -579,7 +579,7 @@ Inotify_Event_Bits :: enum u32 {
 /*
 	Bits for Mem_Protection bitfield
 */
-Mem_Protection_Bits :: enum{
+Mem_Protection_Bits :: enum {
 	READ      = 0,
 	WRITE     = 1,
 	EXEC      = 2,
@@ -594,11 +594,13 @@ Mem_Protection_Bits :: enum{
 
 /*
 	Bits for Map_Flags
+
+	See `constants.odin` for `MAP_SHARED_VALIDATE` and `MAP_HUGE_16KB`, et al.
 */
 Map_Flags_Bits :: enum {
 	SHARED          = 0,
 	PRIVATE         = 1,
-	SHARED_VALIDATE = 2,
+	DROPPABLE       = 3,
 	FIXED           = 4,
 	ANONYMOUS       = 5,
 	// platform-dependent section start
@@ -1616,36 +1618,39 @@ PER_HPUX        :: 0x0010
 PER_MASK        :: 0x00ff
 
 /*
-	Bits for access modes for shared memory
+	Bits for SystemV IPC flags.
+
+	In this enum, access modes are common for any shared memory. Prefixed
+	entries (i.e. `IPC_` or `SHM_`) denote flags, where `IPC_` are common flags
+	for all SystemV IPC primitives, and `SHM_`, `SEM_` and `MSG_` are specific
+	to shared memory segments, semaphores and message queues respectively.
+	
+	These bits overlap, because they are meant to be used within the
+	context of specific procedures. Creation flags, used for `*get` procedures,
+	and usage flags used by all other IPC procedures. Do not mix creation and
+	usage flags, as well as flags prefixed differently (excluding `IPC_`
+	prefix).
 */
-IPC_Mode_Bits :: enum {
+IPC_Flags_Bits :: enum {
+	// Access modes for shared memory.
 	WROTH  = 1,
 	RDOTH  = 2,
 	WRGRP  = 4,
 	RDGRP  = 5,
 	WRUSR  = 7,
 	RDUSR  = 8,
-	DEST   = 9,
-	LOCKED = 10,
-}
-
-/*
-	Shared memory flags bits
-*/
-IPC_Flags_Bits :: enum {
+	// Creation flags for shared memory.
 	IPC_CREAT     = 9,
 	IPC_EXCL      = 10,
-	IPC_NOWAIT    = 11,
-	// Semaphore
-	SEM_UNDO      = 9,
-	// Shared memory
 	SHM_HUGETLB   = 11,
 	SHM_NORESERVE = 12,
+	// Usage flags for shared memory.
+	IPC_NOWAIT    = 11,
+	SEM_UNDO      = 9,
 	SHM_RDONLY    = 12,
 	SHM_RND       = 13,
 	SHM_REMAP     = 14,
 	SHM_EXEC      = 15,
-	// Message queue
 	MSG_NOERROR   = 12,
 	MSG_EXCEPT    = 13,
 	MSG_COPY      = 14,
@@ -1685,17 +1690,17 @@ IPC_Cmd :: enum i16 {
 /*
 	File locking operation bits
 */
-FLock_Op_Bits :: enum {
-	SH = 1,
-	EX = 2,
-	NB = 4,
-	UN = 8,
+FLock_Op_Bits :: enum i32 {
+	SH = 0,
+	EX = 1,
+	NB = 2,
+	UN = 3,
 }
 
 /*
 	ptrace requests
 */
-PTrace_Request :: enum {
+PTrace_Request :: enum i32 {
 	TRACEME                = 0,
 	PEEKTEXT               = 1,
 	PEEKDATA               = 2,
@@ -1742,7 +1747,7 @@ PTrace_Request :: enum {
 /*
 	ptrace options
 */
-PTrace_Options_Bits :: enum {
+PTrace_Options_Bits :: enum i32 {
 	TRACESYSGOOD    = 0,
 	TRACEFORK       = 1,
 	TRACEVFORK      = 2,
@@ -1833,7 +1838,7 @@ Clock_Id :: enum {
 	Bits for POSIX interval timer flags.
 */
 ITimer_Flags_Bits :: enum {
-	ABSTIME = 1,
+	ABSTIME = 0,
 }
 
 /*
@@ -1957,5 +1962,347 @@ RISCV_HWProbe_Misaligned_Scalar_Perf :: enum {
 	SLOW,
 	FAST,
 	UNSUPPORTED,
+}
+
+IO_Uring_Enter_Flags_Bits :: enum {
+	GETEVENTS,
+	SQ_WAKEUP,
+	SQ_WAIT,
+	EXT_ARG, // Available since Linux 5.11
+	REGISTERED_RING,
+}
+
+IO_Uring_Register_Opcode :: enum uint {
+	REGISTER_BUFFERS = 0,
+	UNREGISTER_BUFFERS = 1,
+	REGISTER_FILES = 2,
+	UNREGISTER_FILES = 3,
+	REGISTER_EVENTFD = 4,
+	UNREGISTER_EVENTFD = 5,
+	REGISTER_FILES_UPDATE = 6,
+	REGISTER_EVENTFD_ASYNC = 7,
+	REGISTER_PROBE = 8,
+	REGISTER_PERSONALITY = 9,
+	UNREGISTER_PERSONALITY = 10,
+	REGISTER_RESTRICTIONS = 11,
+	REGISTER_ENABLE_RINGS = 12,
+	/* extended with tagging */
+	REGISTER_FILES2 = 13,
+	REGISTER_FILES_UPDATE2 = 14,
+	REGISTER_BUFFERS2 = 15,
+	REGISTER_BUFFERS_UPDATE = 16,
+	/* set/clear io-wq thread affinities */
+	REGISTER_IOWQ_AFF = 17,
+	UNREGISTER_IOWQ_AFF = 18,
+	/* set/get max number of io-wq workers */
+	REGISTER_IOWQ_MAX_WORKERS = 19,
+	/* register/unregister io_uring fd with the ring */
+	REGISTER_RING_FDS = 20,
+	UNREGISTER_RING_FDS = 21,
+	/* register ring based provide buffer group */
+	REGISTER_PBUF_RING = 22,
+	UNREGISTER_PBUF_RING = 23,
+	/* sync cancelation API */
+	REGISTER_SYNC_CANCEL = 24,
+	/* register a range of fixed file slots for automatic slot allocation */
+	REGISTER_FILE_ALLOC_RANGE = 25,
+	/* this goes last */
+	REGISTER_LAST,
+	/* flag added to the opcode to use a registered ring fd */
+	REGISTER_USE_REGISTERED_RING = 1 << 31,
+}
+
+IO_Uring_Setup_Flags_Bits :: enum {
+	// io_context is polled.
+	IOPOLL,
+	// SQ poll thread.
+	SQPOLL,
+	// sq_thread_cpu is valid.
+	SQ_AFF,
+	// app defines CQ size.
+	CQSIZE,
+	// clamp SQ/CQ ring sizes.
+	CLAMP,
+	// attach to existing wq.
+	ATTACH_WQ,
+	// start with ring disabled.
+	R_DISABLED,
+	// continue submit on error.
+	SUBMIT_ALL,
+	// Cooperative task running. When requests complete, they often require
+	// forcing the submitter to transition to the kernel to complete. If this
+	// flag is set, work will be done when the task transitions anyway, rather
+	// than force an inter-processor interrupt reschedule. This avoids interrupting
+	// a task running in userspace, and saves an IPI.
+	COOP_TASKRUN,
+	// If COOP_TASKRUN is set, get notified if task work is available for
+	// running and a kernel transition would be needed to run it. This sets
+	// IORING_SQ_TASKRUN in the sq ring flags. Not valid with COOP_TASKRUN.
+	TASKRUN_FLAG,
+	// SQEs are 128 bytes.
+	SQE128,
+	// CQEs are 32 bytes.
+	CQE32,
+	// Only one task is allowed to submit requests
+	SINGLE_ISSUER,
+	// Defer running task work to get events.
+	// Rather than running bits of task work whenever the task transitions
+	// try to do it just before it is needed.
+	DEFER_TASKRUN,
+}
+
+IO_Uring_Features_Bits :: enum {
+	SINGLE_MMAP,
+	NODROP,
+	SUBMIT_STABLE,
+	RW_CUR_POS,
+	CUR_PERSONALITY,
+	FAST_POLL,
+	POLL_32BITS,
+	SQPOLL_NONFIXED,
+	EXT_ARG,
+	NATIVE_WORKERS,
+	RSRC_TAGS,
+}
+
+IO_Uring_CQE_Flags_Bits :: enum {
+	// If set, the upper 16 bits are the buffer ID.
+	BUFFER,
+	// If set, parent SQE will generate more CQE entries.
+	MORE,
+	// If set, more data to read after socket recv.
+	SOCK_NONEMPTY,
+	// Set for notification CQEs. Can be used to distinct them from sends.
+	NOTIF,
+}
+
+IO_Uring_OP :: enum u8 {
+	NOP,
+	READV,
+	WRITEV,
+	FSYNC,
+	READ_FIXED,
+	WRITE_FIXED,
+	POLL_ADD,
+	POLL_REMOVE,
+	SYNC_FILE_RANGE,
+	SENDMSG,
+	RECVMSG,
+	TIMEOUT,
+	TIMEOUT_REMOVE,
+	ACCEPT,
+	ASYNC_CANCEL,
+	LINK_TIMEOUT,
+	CONNECT,
+	FALLOCATE,
+	OPENAT,
+	CLOSE,
+	FILES_UPDATE,
+	STATX,
+	READ,
+	WRITE,
+	FADVISE,
+	MADVISE,
+	SEND,
+	RECV,
+	OPENAT2,
+	EPOLL_CTL,
+	SPLICE,
+	PROVIDE_BUFFERS,
+	REMOVE_BUFFERS,
+	TEE,
+	SHUTDOWN,
+	RENAMEAT,
+	UNLINKAT,
+	MKDIRAT,
+	SYMLINKAT,
+	LINKAT,
+	MSG_RING,
+	FSETXATTR,
+	SETXATTR,
+	FGETXATTR,
+	GETXATTR,
+	SOCKET,
+	URING_CMD,
+	SEND_ZC,
+	SENDMSG_ZC,
+	READ_MULTISHOT,
+	WAITID,
+	FUTEX_WAIT,
+	FUTEX_WAKE,
+	FUTEX_WAITV,
+	FIXED_FD_INSTALL,
+	FTRUNCATE,
+	BIND,
+	LISTEN,
+}
+
+IO_Uring_SQE_Flags_Bits :: enum {
+	// Use fixed fileset.
+	FIXED_FILE,
+	// Issue after inflight IO.
+	IO_DRAIN,
+	// Links next sqe.
+	IO_LINK,
+	// Like LINK, but stronger.
+	IO_HARDLINK,
+	// Always go async.
+	ASYNC,
+	// Select buffer from sq.buf_group.
+	BUFFER_SELECT,
+	// Don't post CQE if request succeeded.
+	CQE_SKIP_SUCCESS,
+}
+
+IO_Uring_Poll_Add_Flags_Bits :: enum {
+	ADD_MULTI,
+	UPDATE_EVENTS,
+	UPDATE_USER_DATA,
+	ADD_LEVEL,
+}
+
+IO_Uring_Fsync_Flags_Bits :: enum {
+	DATASYNC,
+}
+
+IO_Uring_Timeout_Flags_Bits :: enum {
+	ABS,
+	UPDATE,
+	BOOTTIME,
+	REALTIME,
+	LINK_TIMEOUT_UPDATE,
+	ETIME_SUCCESS,
+}
+
+IO_Uring_Cmd_Flags_Bits :: enum {
+	// use registered buffer; pass this flag along with setting sqe.buf_index.
+	FIXED,
+}
+
+IO_Uring_Splice_Flags_Bits :: enum {
+	MOVE,
+	NONBLOCK,
+	MORE,
+	GIFT,
+	F_FD_IN_FIXED = 31,
+}
+
+IO_Uring_Accept_Flags_Bits :: enum {
+	MULTISHOT,
+}
+
+IO_Uring_Send_Recv_Flags_Bits :: enum {
+	/*
+		If set, instead of first attempting to send
+		or receive and arm poll if that yields an
+		-EAGAIN result, arm poll upfront and skip
+		the initial transfer attempt.
+	 */
+	RECVSEND_POLL_FIRST,
+	/*
+		Multishot recv. Sets IORING_CQE_F_MORE if
+		the handler will continue to report
+		CQEs on behalf of the same SQE.
+	*/
+	RECV_MULTISHOT,
+	/*
+		Use registered buffers, the index is stored in
+		the buf_index field.
+	*/
+	RECVSEND_FIXED_BUF,
+	/*
+		If set, SEND[MSG]_ZC should report
+		the zerocopy usage in cqe.res
+		for the IORING_CQE_F_NOTIF cqe.
+		0 is reported if zerocopy was actually possible.
+		IORING_NOTIF_USAGE_ZC_COPIED if data was copied
+		(at least partially).
+	*/
+	SEND_ZC_REPORT_USAGE,
+}
+
+IO_Uring_Submission_Queue_Flags_Bits :: enum {
+	NEED_WAKEUP,
+	CQ_OVERFLOW,
+	TASKRUN,
+}
+
+Mount_Flags_Bits :: enum {
+	RDONLY      = log2(1),
+	NOSUID      = log2(2),
+	NODEV       = log2(4),
+	NOEXEC      = log2(8),
+	SYNCHRONOUS = log2(16),
+	REMOUNT     = log2(32),
+	MANDLOCK    = log2(64),
+	DIRSYNC     = log2(128),
+	NOATIME     = log2(1024),
+	NODIRATIME  = log2(2048),
+	BIND        = log2(4096),
+	MOVE        = log2(8192),
+	REC         = log2(16384),
+	SILENT      = log2(32768),
+	POSIXACL    = log2(1<<16),
+	UNBINDABLE  = log2(1<<17),
+	PRIVATE     = log2(1<<18),
+	SLAVE       = log2(1<<19),
+	SHARED      = log2(1<<20),
+	RELATIME    = log2(1<<21),
+	KERNMOUNT   = log2(1<<22),
+	I_VERSION   = log2(1<<23),
+	STRICTATIME = log2(1<<24),
+	LAZYTIME    = log2(1<<25),
+	ACTIVE      = log2(1<<30),
+	NOUSER      = log2(1<<31),
+	NOSYMFOLLOW = log2(256),
+}
+
+Umount2_Flags_Bits :: enum {
+	MNT_FORCE       = log2(0x00000001),
+	MNT_DETACH      = log2(0x00000002),
+	MNT_EXPIRE      = log2(0x00000004),
+	UMOUNT_NOFOLLOW = log2(0x00000008),
+	UMOUNT_UNUSED   = log2(0x80000000),
+}
+
+Swap_Flags_Bits :: enum {
+	PREFER  = log2(0x8000),
+	DISCARD = log2(0x10000),
+}
+
+Eventfd_Flags_Bits :: enum {
+	SEMAPHORE,
+	CLOEXEC  = auto_cast Open_Flags_Bits.CLOEXEC,
+	NONBLOCK = auto_cast Open_Flags_Bits.NONBLOCK,
+}
+
+Sched_Policy :: enum u32 {
+	OTHER    = 0,
+	BATCH    = 3,
+	IDLE     = 5,
+	FIFO     = 1,
+	RR       = 2,
+	DEADLINE = 6,
+}
+
+Sched_Flag_Bits :: enum {
+	RESET_ON_FORK  = log2(0x01),
+	RECLAIM        = log2(0x02),
+	DL_OVERRUN     = log2(0x04),
+	KEEP_POLICY    = log2(0x08),
+	KEEP_PARAMS    = log2(0x10),
+	UTIL_CLAMP_MIN = log2(0x20),
+	UTIL_CLAMP_MAX = log2(0x40),
+}
+
+Sched_Attr_Flag_Bits :: enum {}
+
+/*
+	See `constants.odin` for `MFD_HUGE_16KB`, et al.
+*/
+Memfd_Create_Flag_Bits :: enum {
+	CLOEXEC       = log2(0x1),
+	ALLOW_SEALING = log2(0x2),
+	HUGETLB       = log2(0x4),
 }
 

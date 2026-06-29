@@ -1,12 +1,12 @@
-/*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
-*/
-
-
 package math_big
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+*/
+
 import "base:intrinsics"
+import "base:runtime"
 
 /*
 	TODO: Make the tunables runtime adjustable where practical.
@@ -14,32 +14,10 @@ import "base:intrinsics"
 	This allows to benchmark and/or setting optimized values for a certain CPU without recompiling.
 */
 
-/*
-	==========================    TUNABLES     ==========================
-
-	`initialize_constants` returns `#config(MUL_KARATSUBA_CUTOFF, _DEFAULT_MUL_KARATSUBA_CUTOFF)`
-	and we initialize this cutoff that way so that the procedure is used and called,
-	because it handles initializing the constants ONE, ZERO, MINUS_ONE, NAN and INF.
-
-	`initialize_constants` also replaces the other `_DEFAULT_*` cutoffs with custom compile-time values if so `#config`ured.
-
-*/
-
-/*
-	There is a bug with DLL globals. They don't get set.
-	To allow tests to run we add `-define:MATH_BIG_EXE=false` to hardcode the cutoffs for now.
-*/
-when #config(MATH_BIG_EXE, true) {
-	MUL_KARATSUBA_CUTOFF := initialize_constants()
-	SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF
-	MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF
-	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF
-} else {
-	MUL_KARATSUBA_CUTOFF := _DEFAULT_MUL_KARATSUBA_CUTOFF
-	SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF
-	MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF
-	SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF	
-}
+MUL_KARATSUBA_CUTOFF := _DEFAULT_MUL_KARATSUBA_CUTOFF
+SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF
+MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF
+SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF
 
 /*
 	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
@@ -49,9 +27,6 @@ when #config(MATH_BIG_EXE, true) {
 	It would also be cool if we collected some data across various processor families.
 	This would let uss set reasonable defaults at runtime as this library initializes
 	itself by using `cpuid` or the ARM equivalent.
-
-	IMPORTANT: The 32_BIT path has largely gone untested. It needs to be tested and
-	debugged where necessary.
 */
 
 _DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MATH_BIG_MUL_KARATSUBA_CUTOFF,  80)
@@ -65,7 +40,7 @@ MAX_ITERATIONS_ROOT_N := 500
 /*
 	Largest `N` for which we'll compute `N!`
 */
-FACTORIAL_MAX_N       := 1_000_000
+FACTORIAL_MAX_N := 1_000_000
 
 /*
 	Cutoff to switch to int_factorial_binary_split, and its max recursion level.
@@ -98,21 +73,9 @@ MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000
 @thread_local RANDOM_PRIME_ITERATIONS_USED: int
 
 /*
-	We don't allow these to be switched at runtime for two reasons:
-
-	1) 32-bit and 64-bit versions of procedures use different types for their storage,
-		so we'd have to double the number of procedures, and they couldn't interact.
-
-	2) Optimizations thanks to precomputed masks wouldn't work.
-*/
-MATH_BIG_FORCE_64_BIT   :: #config(MATH_BIG_FORCE_64_BIT, false)
-MATH_BIG_FORCE_32_BIT   :: #config(MATH_BIG_FORCE_32_BIT, false)
-when (MATH_BIG_FORCE_32_BIT && MATH_BIG_FORCE_64_BIT) { #panic("Cannot force 32-bit and 64-bit big backend simultaneously.") }
-
-/*
 	Trade a smaller memory footprint for more processing overhead?
 */
-_LOW_MEMORY             :: #config(MATH_BIG_SMALL_MEMORY, false)
+_LOW_MEMORY :: #config(MATH_BIG_SMALL_MEMORY, false)
 when _LOW_MEMORY {
 	_DEFAULT_DIGIT_COUNT ::   8
 	_TAB_SIZE            ::  32
@@ -150,11 +113,12 @@ Flags :: bit_set[Flag; u8]
 /*
 	Errors are a strict superset of runtime.Allocation_Error.
 */
-Error :: enum int {
-	Okay                    = 0,
+Error :: enum byte {
+	None                    = 0,
 	Out_Of_Memory           = 1,
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
+	Mode_Not_Implemented    = 4, // Allocation
 
 	Assignment_To_Immutable = 10,
 	Max_Iterations_Reached  = 11,
@@ -170,13 +134,19 @@ Error :: enum int {
 	Cannot_Write_File       = 52,
 
 	Unimplemented           = 127,
+
+	Okay = None,
 }
 
+#assert(intrinsics.type_is_superset_of(Error, runtime.Allocator_Error))
+
+
 Error_String :: #sparse[Error]string{
-	.Okay                    = "Okay",
+	.None                    = "None",
 	.Out_Of_Memory           = "Out of memory",
 	.Invalid_Pointer         = "Invalid pointer",
 	.Invalid_Argument        = "Invalid argument",
+	.Mode_Not_Implemented    = "Allocation mode not implemented",
 
 	.Assignment_To_Immutable = "Assignment to immutable",
 	.Max_Iterations_Reached  = "Max iterations reached",
@@ -221,22 +191,19 @@ _MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS)
 _MAX_BIT_COUNT   :: (max(int) - 2)
 _MAX_DIGIT_COUNT :: _MAX_BIT_COUNT / _DIGIT_BITS
 
-when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
-	/*
-		We can use u128 as an intermediary.
-	*/
-	DIGIT        :: distinct u64
-	_WORD        :: distinct u128
-} else {
-	DIGIT        :: distinct u32
-	_WORD        :: distinct u64
-}
+// We use u128 as an intermediary.
+DIGIT        :: distinct u64
+_WORD        :: distinct u128
+
+// Base 10 extraction constants
+ITOA_DIVISOR :: DIGIT(1_000_000_000_000_000_000)
+ITOA_COUNT   :: 18
 #assert(size_of(_WORD) == 2 * size_of(DIGIT))
 
 _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT)
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD)
 
-_DIGIT_NAILS     :: 4
+_DIGIT_NAILS     :: 1
 _DIGIT_BITS      :: _DIGIT_TYPE_BITS - _DIGIT_NAILS
 _WORD_BITS       :: 2 * _DIGIT_BITS
 

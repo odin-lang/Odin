@@ -1,3 +1,4 @@
+// Fixed-point rational numbers and conversion to/from `f64`.
 package math_fixed
 
 import "core:math"
@@ -28,7 +29,7 @@ Fixed32_32 :: distinct Fixed(i64, 32)
 Fixed52_12 :: distinct Fixed(i64, 12)
 
 
-init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
+init_from_f64 :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 	i, f := math.modf(math.abs(val))
 	x.i  = Backing(f * (1<<Fraction_Width))
 	x.i &= 1<<Fraction_Width - 1
@@ -38,13 +39,13 @@ init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 	}
 }
 
-init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
+init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
 	x.i  = fraction
 	x.i &= 1<<Fraction_Width - 1
 	x.i |= (integer << Fraction_Width)
 }
 
-to_f64 :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
+to_f64 :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
 	sign := -1.0 if x.i < 0 else 1.0
 	num := math.abs(x.i)
 	res := f64(num >> Fraction_Width)
@@ -54,39 +55,39 @@ to_f64 :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
 
 
 @(require_results)
-add :: proc(x, y: $T/Fixed) -> T {
+add :: proc "contextless" (x, y: $T/Fixed) -> T {
 	return {x.i + y.i}
 }
 @(require_results)
-sub :: proc(x, y: $T/Fixed) -> T {
+sub :: proc "contextless" (x, y: $T/Fixed) -> T {
 	return {x.i - y.i}
 }
 
 @(require_results)
-mul :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+mul :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_mul(x.i, y.i, Fraction_Width)
 	return
 }
 @(require_results)
-mul_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+mul_sat :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_mul_sat(x.i, y.i, Fraction_Width)
 	return
 }
 
 @(require_results)
-div :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+div :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_div(x.i, y.i, Fraction_Width)
 	return
 }
 @(require_results)
-div_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+div_sat :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_div_sat(x.i, y.i, Fraction_Width)
 	return
 }
 
 
 @(require_results)
-floor :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
+floor :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	if x.i >= 0 {
 		return x.i >> Fraction_Width
 	} else {
@@ -94,16 +95,16 @@ floor :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	}
 }
 @(require_results)
-ceil :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
+ceil :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	return (x.i + (1 << Fraction_Width - 1)) >> Fraction_Width
 }
 @(require_results)
-round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
+round :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	return (x.i + (1 << (Fraction_Width - 1))) >> Fraction_Width
 }
 
 @(require_results)
-append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
+write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	Integer_Width :: 8*size_of(Backing) - Fraction_Width
 
 	x := x
@@ -124,16 +125,16 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 
 		when size_of(Backing) < 16 {
 			T :: u64
-			append_uint :: strconv.append_uint
+			write_uint :: strconv.write_uint
 		} else {
 			T :: u128
-			append_uint :: strconv.append_u128
+			write_uint :: strconv.write_u128
 		}
 
 		integer := T(x.i) >> Fraction_Width
 		fraction := T(x.i) & (1<<Fraction_Width - 1)
 
-		s := append_uint(buf[i:], integer, 10)
+		s := write_uint(buf[i:], integer, 10)
 		i += len(s)
 		if fraction != 0 {
 			buf[i] = '.'
@@ -155,14 +156,14 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 @(require_results)
 to_string :: proc(x: $T/Fixed($Backing, $Fraction_Width), allocator := context.allocator) -> string {
 	buf: [48]byte
-	s := append(buf[:], x)
+	s := write(buf[:], x)
 	str := make([]byte, len(s), allocator)
 	copy(str, s)
 	return string(str)
 }
 
 
-@(private)
+@(rodata, private)
 _power_of_two_table := [129]string{
 	"0.5",
 	"1",

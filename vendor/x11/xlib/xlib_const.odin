@@ -1,6 +1,15 @@
 #+build linux, freebsd, openbsd
 package xlib
 
+XNClientWindow: cstring : "clientWindow"
+XNInputStyle:   cstring : "inputStyle"
+XNFocusWindow:  cstring : "focusWindow"
+XNSpotLocation: cstring : "spotLocation"
+XNPreeditAttributes: cstring : "preeditAttributes"
+
+XIMPreeditNothing :: 0x0008
+XIMStatusNothing  :: 0x0400
+
 /* ----  X11/extensions/XKB.h ---------------------------------------------------------*/
 
 XkbMinLegalKeyCode     :: 8
@@ -101,6 +110,8 @@ PropModePrepend :: 1
 PropModeAppend  :: 2
 
 XA_ATOM              :: Atom(4)
+XA_CARDINAL          :: Atom(6)
+XA_INTEGER           :: Atom(19)
 XA_WM_CLASS          :: Atom(67)
 XA_WM_CLIENT_MACHINE :: Atom(36)
 XA_WM_COMMAND        :: Atom(34)
@@ -136,6 +147,14 @@ Status :: enum i32 {
 	BadImplementation   = 17,
 	FirstExtensionError = 128,
 	LastExtensionError  = 255,
+}
+
+LookupStringStatus :: enum i32 {
+	BufferOverflow = -1,
+	LookupNone = 1,
+	LookupChars = 2,
+	LookupKeySym = 3,
+	LookupBoth = 4,
 }
 
 ByteOrder :: enum i32 {
@@ -694,7 +713,7 @@ AllHints :: WMHints{
 	.WindowGroupHint,
 }
 
-SizeHints :: bit_set[SizeHintsBits; uint]
+SizeHints :: bit_set[SizeHintsBits; int]
 SizeHintsBits :: enum {
 	USPosition  = 0,
 	USSize      = 1,

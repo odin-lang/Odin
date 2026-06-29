@@ -1,5 +1,7 @@
 package objc_Foundation
 
+foreign import "system:Foundation.framework"
+
 @(objc_class="NSColorSpace")
 ColorSpace :: struct {using _: Object}
 
@@ -146,4 +148,9 @@ Color_numberOfComponents :: proc "c" (self: ^Color) -> Integer {
 @(objc_type=Color, objc_name="getComponents")
 Color_getComponents :: proc "c" (self: ^Color, components: [^]Float) {
 	msgSend(nil, self, "getComponents:", components)
+}
+
+@(link_prefix="NS", default_calling_convention="c")
+foreign Foundation {
+	DeviceRGBColorSpace: ^String
 }

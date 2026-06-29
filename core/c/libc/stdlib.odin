@@ -5,7 +5,7 @@ package libc
 when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }
@@ -41,22 +41,6 @@ when ODIN_OS == .Linux {
 		return size_t(__ctype_get_mb_cur_max())
 	}
 }
-
-when ODIN_OS == .Haiku {
-	RAND_MAX :: 0x7fffffff
-
-	// GLIBC and MUSL only
-	@(private="file")
-	@(default_calling_convention="c")
-	foreign libc {
-		__ctype_get_mb_cur_max :: proc() -> ushort ---
-	}
-
-	MB_CUR_MAX :: #force_inline proc() -> size_t {
-		return size_t(__ctype_get_mb_cur_max())
-	}
-}
-
 
 when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
 	RAND_MAX :: 0x7fffffff

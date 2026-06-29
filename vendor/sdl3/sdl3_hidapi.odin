@@ -75,6 +75,7 @@ hid_device_info :: struct {
 	next: ^hid_device_info,
 }
 
+PROP_HIDAPI_LIBUSB_DEVICE_HANDLE_POINTER :: "SDL.hidapi.libusb.device.handle"
 
 @(default_calling_convention="c", link_prefix="SDL_", require_results)
 foreign lib {
@@ -85,6 +86,7 @@ foreign lib {
 	hid_free_enumeration         :: proc(devs: ^hid_device_info) ---
 	hid_open                     :: proc(vendor_id, product_id: c.ushort, serial_number: [^]c.wchar_t) -> ^hid_device ---
 	hid_open_path                :: proc(path: cstring) -> ^hid_device ---
+	hid_get_properties           :: proc(dev: ^hid_device) -> PropertiesID ---
 	hid_write                    :: proc(dev: ^hid_device, data: [^]byte, length: uint) -> c.int ---
 	hid_read_timeout             :: proc(dev: ^hid_device, data: [^]byte, length: uint, milliseconds: c.int) -> c.int ---
 	hid_read                     :: proc(dev: ^hid_device, data: [^]byte, length: uint) -> c.int ---

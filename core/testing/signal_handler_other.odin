@@ -5,12 +5,11 @@
 #+build !freebsd
 #+build !openbsd
 #+build !netbsd
-#+build !haiku
 package testing
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Feoramund:   Total rewrite.

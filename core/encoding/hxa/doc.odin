@@ -1,5 +1,6 @@
 /*
-Implementation of the HxA 3D asset format
+Eskil Steenberg's `HxA` 3D asset interchange format.
+
 HxA is a interchangeable graphics asset format.
 Designed by Eskil Steenberg. @quelsolaar / eskil 'at' obsession 'dot' se / www.quelsolaar.com
 

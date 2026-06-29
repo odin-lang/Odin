@@ -1,6 +1,8 @@
 package unicode
 
-MAX_RUNE         :: '\U00010fff' // Maximum valid unicode code point
+import "base:runtime"
+
+MAX_RUNE         :: '\U0010ffff' // Maximum valid unicode code point
 REPLACEMENT_CHAR :: '\ufffd'     // Represented an invalid code point
 MAX_ASCII        :: '\u007f'     // Maximum ASCII value
 MAX_LATIN1       :: '\u00ff'     // Maximum Latin-1 value
@@ -11,7 +13,8 @@ ZERO_WIDTH_JOINER     :: '\u200D'
 WORD_JOINER           :: '\u2060'
 
 @(require_results)
-binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
+binary_search :: proc(c: $T, table: []T, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
+	runtime.bounds_check_error_loc(loc, length*stride-1, len(table))
 	n := length
 	t := 0
 	for n > 1 {
@@ -31,7 +34,7 @@ binary_search :: proc(c: i32, table: []i32, length, stride: int) -> int {
 }
 
 @(require_results)
-to_lower :: proc(r: rune) -> rune {
+to_lower :: proc(r: rune) -> rune #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
 	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
@@ -44,7 +47,7 @@ to_lower :: proc(r: rune) -> rune {
 	return rune(c)
 }
 @(require_results)
-to_upper :: proc(r: rune) -> rune {
+to_upper :: proc(r: rune) -> rune #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
 	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
@@ -57,7 +60,7 @@ to_upper :: proc(r: rune) -> rune {
 	return rune(c)
 }
 @(require_results)
-to_title :: proc(r: rune) -> rune {
+to_title :: proc(r: rune) -> rune #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, to_upper_singlets[:], len(to_title_singlets)/2, 2)
 	if p >= 0 && c == to_upper_singlets[p] {
@@ -68,42 +71,36 @@ to_title :: proc(r: rune) -> rune {
 
 
 @(require_results)
-is_lower :: proc(r: rune) -> bool {
+is_lower :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
 		return u32(r)-'a' < 26
 	}
-	c := i32(r)
-	p := binary_search(c, to_upper_ranges[:], len(to_upper_ranges)/3, 3)
-	if p >= 0 && to_upper_ranges[p] <= c && c <= to_upper_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_upper_singlets[:], len(to_upper_singlets)/2, 2)
-	if p >= 0 && c == to_upper_singlets[p] {
-		return true
-	}
-	return false
+	return in_range(r, ll_ranges) || in_range(r, other_lowercase_ranges)
 }
 
 @(require_results)
-is_upper :: proc(r: rune) -> bool {
+is_upper :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
 		return u32(r)-'A' < 26
 	}
-	c := i32(r)
-	p := binary_search(c, to_lower_ranges[:], len(to_lower_ranges)/3, 3)
-	if p >= 0 && to_lower_ranges[p] <= c && c <= to_lower_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, to_lower_singlets[:], len(to_lower_singlets)/2, 2)
-	if p >= 0 && c == to_lower_singlets[p] {
-		return true
-	}
-	return false
+	return in_range(r, lu_ranges) || in_range(r, other_uppercase_ranges)
 }
 
 is_alpha :: is_letter
+
+/*
+Return true if the rune `r` is a letter. Being a letter means that the rune has
+the Unicode general category property of L. In practice, the character will have
+a general category property of Ll, Lm, Lo, Lt, or Lu.
+
+Inputs:
+- r: The rune which will be check for having the property of being a letter.
+
+Returns:
+`true` when the rune `r` is a letter. `false` will be returned in all other cases.
+*/
 @(require_results)
-is_letter :: proc(r: rune) -> bool {
+is_letter :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pLmask != 0
 	}
@@ -111,16 +108,9 @@ is_letter :: proc(r: rune) -> bool {
 		return true
 	}
 
-	c := i32(r)
-	p := binary_search(c, alpha_ranges[:], len(alpha_ranges)/2, 2)
-	if p >= 0 && alpha_ranges[p] <= c && c <= alpha_ranges[p+1] {
-		return true
-	}
-	p = binary_search(c, alpha_singlets[:], len(alpha_singlets), 1)
-	if p >= 0 && c == alpha_singlets[p] {
-		return true
-	}
-	return false
+	ll_lu := in_range(r, ll_ranges) || in_range(r, lu_ranges) 	
+
+	return ll_lu || in_range(r, lo_ranges) || in_range(r, lt_ranges) || in_range(r, lm_ranges) 
 }
 
 @(require_results)
@@ -128,18 +118,52 @@ is_title :: proc(r: rune) -> bool {
 	return is_upper(r) && is_lower(r)
 }
 
+/*
+Returns true if the rune `r` is in the General Category Nd
+
+Inputs:
+- r: The run to check if it is in the general category Nd.
+
+Returns:
+`true` if the rune is in the general category Nd and `false` otherwise
+
+*/
+is_decimal :: proc(r: rune) -> bool {
+	return in_range(r, nd_ranges)
+}
+
+/*
+This function determincs if a rune is a digit. To be a digit the 
+charage either has a Numeric_Type of Digit or Decimal. 
+
+Inputs:
+- r: The rune to check if it is a digit.
+
+Returns:
+`true` if the rune `r` is a digit, `false` in all other cases
+
+*/
 @(require_results)
 is_digit :: proc(r: rune) -> bool {
 	if r <= MAX_LATIN1 {
-		return '0' <= r && r <= '9'
+		return ('0' <= r && r <= '9') || r == 0x00B9 || (r >= 0x00B2 && r <= 0x0B3)
 	}
+
+	if in_range(r, nd_ranges) {
+		return true
+	}
+	
+	if in_range(r, extra_digits_ranges) {
+		return true
+	}
+
 	return false
 }
 
 
 is_white_space :: is_space
 @(require_results)
-is_space :: proc(r: rune) -> bool {
+is_space :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		switch r {
 		case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0:
@@ -173,11 +197,20 @@ is_graphic :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pg != 0
 	}
+
+	if is_letter(r) || is_number(r) || is_punct(r) || is_symbol(r) || in_range(r, zs_ranges) {
+		return true
+	}
+
+	if  in_range(r, mc_ranges) || in_range(r, me_ranges) || in_range(r, mn_ranges) {
+		return true
+	}
+
 	return false
 }
 
 @(require_results)
-is_print :: proc(r: rune) -> bool {
+is_print :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pp != 0
 	}
@@ -185,34 +218,63 @@ is_print :: proc(r: rune) -> bool {
 }
 
 @(require_results)
-is_control :: proc(r: rune) -> bool {
+is_control :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pC != 0
 	}
 	return false
 }
 
+/*
+Checks to see if the rune `r` is a number. This means the rune is a member
+of the general category Nd, Nl, or No.
+
+Inputs:
+r: The rune to check if it is number.
+
+Returns:
+`true` if the ruen belongs to the general category Nd, Nl, or No. `false`
+is return in all other cases.
+
+*/
 @(require_results)
-is_number :: proc(r: rune) -> bool {
+is_number :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pN != 0
 	}
-	return false
+
+	return in_range(r, nd_ranges) || in_range(r, nl_ranges) || in_range(r, no_ranges)
 }
 
 @(require_results)
-is_punct :: proc(r: rune) -> bool {
+is_punct :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pP != 0
 	}
-	return false
+
+	if in_range(r, pc_ranges) || in_range(r, pd_ranges) || in_range(r, pe_ranges) {
+		return true
+	}
+	
+	if in_range(r, pf_ranges) || in_range(r, pi_ranges) || in_range(r, po_ranges) {
+		return true
+	}
+
+	return in_range(r, ps_ranges)
 }
 
 @(require_results)
-is_symbol :: proc(r: rune) -> bool {
+is_symbol :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pS != 0
 	}
+
+	s := in_range(r, sc_ranges) || in_range(r, sm_ranges) 
+	
+	if s || in_range(r, so_ranges) || in_range(r, sk_ranges) {
+		return true
+	}
+
 	return false
 }
 
@@ -267,7 +329,7 @@ is_prepended_concatenation_mark :: proc(r: rune) -> bool {
 
 // General_Category=Spacing_Mark
 @(require_results)
-is_spacing_mark :: proc(r: rune) -> bool {
+is_spacing_mark :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, spacing_mark_ranges[:], len(spacing_mark_ranges)/2, 2)
 	if p >= 0 && spacing_mark_ranges[p] <= c && c <= spacing_mark_ranges[p+1] {
@@ -278,7 +340,7 @@ is_spacing_mark :: proc(r: rune) -> bool {
 
 // General_Category=Nonspacing_Mark
 @(require_results)
-is_nonspacing_mark :: proc(r: rune) -> bool {
+is_nonspacing_mark :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, nonspacing_mark_ranges[:], len(nonspacing_mark_ranges)/2, 2)
 	if p >= 0 && nonspacing_mark_ranges[p] <= c && c <= nonspacing_mark_ranges[p+1] {
@@ -289,7 +351,7 @@ is_nonspacing_mark :: proc(r: rune) -> bool {
 
 // Extended_Pictographic
 @(require_results)
-is_emoji_extended_pictographic :: proc(r: rune) -> bool {
+is_emoji_extended_pictographic :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, emoji_extended_pictographic_ranges[:], len(emoji_extended_pictographic_ranges)/2, 2)
 	if p >= 0 && emoji_extended_pictographic_ranges[p] <= c && c <= emoji_extended_pictographic_ranges[p+1] {
@@ -300,7 +362,7 @@ is_emoji_extended_pictographic :: proc(r: rune) -> bool {
 
 // Grapheme_Extend
 @(require_results)
-is_grapheme_extend :: proc(r: rune) -> bool {
+is_grapheme_extend :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, grapheme_extend_ranges[:], len(grapheme_extend_ranges)/2, 2)
 	if p >= 0 && grapheme_extend_ranges[p] <= c && c <= grapheme_extend_ranges[p+1] {
@@ -330,7 +392,7 @@ is_hangul_syllable_trailing :: proc(r: rune) -> bool {
 
 // Hangul_Syllable_Type=LV_Syllable
 @(require_results)
-is_hangul_syllable_lv :: proc(r: rune) -> bool {
+is_hangul_syllable_lv :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, hangul_syllable_lv_singlets[:], len(hangul_syllable_lv_singlets), 1)
 	if p >= 0 && c == hangul_syllable_lv_singlets[p] {
@@ -341,7 +403,7 @@ is_hangul_syllable_lv :: proc(r: rune) -> bool {
 
 // Hangul_Syllable_Type=LVT_Syllable
 @(require_results)
-is_hangul_syllable_lvt :: proc(r: rune) -> bool {
+is_hangul_syllable_lvt :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, hangul_syllable_lvt_ranges[:], len(hangul_syllable_lvt_ranges)/2, 2)
 	if p >= 0 && hangul_syllable_lvt_ranges[p] <= c && c <= hangul_syllable_lvt_ranges[p+1] {
@@ -397,7 +459,7 @@ is_indic_conjunct_break_linker :: proc(r: rune) -> bool {
 
 // Indic_Conjunct_Break=Consonant
 @(require_results)
-is_indic_conjunct_break_consonant :: proc(r: rune) -> bool {
+is_indic_conjunct_break_consonant :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, indic_conjunct_break_consonant_ranges[:], len(indic_conjunct_break_consonant_ranges)/2, 2)
 	if p >= 0 && indic_conjunct_break_consonant_ranges[p] <= c && c <= indic_conjunct_break_consonant_ranges[p+1] {
@@ -408,7 +470,7 @@ is_indic_conjunct_break_consonant :: proc(r: rune) -> bool {
 
 // Indic_Conjunct_Break=Extend
 @(require_results)
-is_indic_conjunct_break_extend :: proc(r: rune) -> bool {
+is_indic_conjunct_break_extend :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
 	p := binary_search(c, indic_conjunct_break_extend_ranges[:], len(indic_conjunct_break_extend_ranges)/2, 2)
 	if p >= 0 && indic_conjunct_break_extend_ranges[p] <= c && c <= indic_conjunct_break_extend_ranges[p+1] {
@@ -459,7 +521,7 @@ is_gcb_extend_class :: proc(r: rune) -> bool {
 // - 1 in all other cases.
 //
 @(require_results)
-normalized_east_asian_width :: proc(r: rune) -> int {
+normalized_east_asian_width :: proc(r: rune) -> int #no_bounds_check {
 	// This is a different interpretation of the BOM which occurs in the middle of text.
 	ZERO_WIDTH_NO_BREAK_SPACE :: '\uFEFF'
 

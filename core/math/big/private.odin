@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -16,11 +18,7 @@
 	These aren't exported for the same reasons.
 */
 
-
-package math_big
-
 import "base:intrinsics"
-import "core:mem"
 
 /*
 	Multiplies |a| * |b| and only computes upto digs digits of result.
@@ -441,8 +439,14 @@ _private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := contex
 		return _private_int_mul_high_comba(dest, a, b, digits)
 	}
 
-	internal_grow(dest, a.used + b.used + 1) or_return
-	dest.used = a.used + b.used + 1
+	/*
+		Set up temporary output `Int`, which we'll swap for `dest` when done.
+	*/
+
+	t := &Int{}
+
+	internal_grow(t, a.used + b.used + 1) or_return
+	t.used = a.used + b.used + 1
 
 	pa := a.used
 	pb := b.used
@@ -453,20 +457,23 @@ _private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := contex
 			/*
 				Calculate the double precision result.
 			*/
-			r := _WORD(dest.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + _WORD(carry)
+			r := _WORD(t.digit[ix + iy]) + _WORD(a.digit[ix]) * _WORD(b.digit[iy]) + _WORD(carry)
 
 			/*
 				Get the lower part.
 			*/
-			dest.digit[ix + iy] = DIGIT(r & _WORD(_MASK))
+			t.digit[ix + iy] = DIGIT(r & _WORD(_MASK))
 
 			/*
 				Carry the carry.
 			*/
 			carry = DIGIT(r >> _WORD(_DIGIT_BITS))
 		}
-		dest.digit[ix + pb] = carry
+		t.digit[ix + pb] = carry
 	}
+
+	internal_swap(dest, t)
+	internal_destroy(t)
 	return internal_clamp(dest)
 }
 
@@ -818,7 +825,7 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 	x1.used = src.used - B
 
 	#force_inline internal_copy_digits(x0, src, x0.used)
-	#force_inline mem.copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used)
+	intrinsics.mem_copy_non_overlapping(&x1.digit[0], &src.digit[B], size_of(DIGIT) * x1.used)
 	#force_inline internal_clamp(x0)
 
 	/*
@@ -883,9 +890,9 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	a1.used = B
 	a2.used = src.used - 2 * B
 
-	#force_inline mem.copy_non_overlapping(&a0.digit[0], &src.digit[    0], size_of(DIGIT) * a0.used)
-	#force_inline mem.copy_non_overlapping(&a1.digit[0], &src.digit[    B], size_of(DIGIT) * a1.used)
-	#force_inline mem.copy_non_overlapping(&a2.digit[0], &src.digit[2 * B], size_of(DIGIT) * a2.used)
+	intrinsics.mem_copy_non_overlapping(&a0.digit[0], &src.digit[    0], size_of(DIGIT) * a0.used)
+	intrinsics.mem_copy_non_overlapping(&a1.digit[0], &src.digit[    B], size_of(DIGIT) * a1.used)
+	intrinsics.mem_copy_non_overlapping(&a2.digit[0], &src.digit[2 * B], size_of(DIGIT) * a2.used)
 
 	internal_clamp(a0)
 	internal_clamp(a1)
@@ -1051,7 +1058,6 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		Normalize both x and y, ensure that y >= b/2, [b == 2**MP_DIGIT_BIT]
 	*/
 	norm := internal_count_bits(y) % _DIGIT_BITS
-
 	if norm < _DIGIT_BITS - 1 {
 		norm = (_DIGIT_BITS - 1) - norm
 		internal_shl(x, x, norm) or_return
@@ -1071,33 +1077,29 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		y = y*b**{n-t}
 	*/
 
+
 	_private_int_shl_leg(y, n - t) or_return
 
-	gte := internal_gte(x, y)
-	for gte {
+	for internal_gte(x, y) {
 		q.digit[n - t] += 1
 		internal_sub(x, x, y) or_return
-		gte = internal_gte(x, y)
 	}
 
 	/*
 		Reset y by shifting it back down.
 	*/
 	_private_int_shr_leg(y, n - t)
-
 	/*
 		Step 3. for i from n down to (t + 1).
 	*/
 	#no_bounds_check for i := n; i >= (t + 1); i -= 1 {
 		if i > x.used { continue }
-
 		/*
 			step 3.1 if xi == yt then set q{i-t-1} to b-1, otherwise set q{i-t-1} to (xi*b + x{i-1})/yt
 		*/
 		if x.digit[i] == y.digit[t] {
-			q.digit[(i - t) - 1] = 1 << (_DIGIT_BITS - 1)
+			q.digit[(i - t) - 1] = 1 << _DIGIT_BITS - 1
 		} else {
-
 			tmp := _WORD(x.digit[i]) << _DIGIT_BITS
 			tmp |= _WORD(x.digit[i - 1])
 			tmp /= _WORD(y.digit[t])
@@ -1370,8 +1372,8 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 
 /*
 	Slower bit-bang division... also smaller.
+	Prefer `_int_div_school` for speed.
 */
-@(deprecated="Use `_int_div_school`, it's 3.5x faster.")
 _private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
 
 	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{}
@@ -1668,7 +1670,7 @@ _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -
 	defer internal_destroy(bracket_low, bracket_high, bracket_mid, t, bi_base)
 
 	ic := #force_inline internal_cmp(a, base)
-	if ic == -1 || ic == 0 {
+	if ic <= 0 {
 		return 1 if ic == 0 else 0, nil
 	}
 	defer if err != nil {
@@ -2346,7 +2348,7 @@ _private_int_dr_reduce :: proc(x, n: ^Int, k: DIGIT, allocator := context.alloca
 		/*
 			Zero words above m.
 		*/
-		mem.zero_slice(x.digit[m + 1:][:x.used - m])
+		_zero(x.digit[m + 1:][:x.used - m])
 
 		/*
 			Clamp, sub and return.
@@ -2498,9 +2500,9 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 		bitcnt -= 1
 		if bitcnt == 0 {
 			/*
-				If digidx == -1 we are out of digits.
+				If digidx < 0 we are out of digits.
 			*/
-			if digidx == -1 { break }
+			if digidx < 0 { break }
 
 			/*
 				Read next digit and reset the bitcnt.
@@ -2754,9 +2756,9 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 		bitcnt -= 1
 		if bitcnt == 0 {
 			/*
-				If digidx == -1 we are out of digits so break.
+				If digidx < 0 we are out of digits so break.
 			*/
-			if digidx == -1 { break }
+			if digidx < 0 { break }
 
 			/*
 				Read next digit and reset the bitcnt.
@@ -3143,7 +3145,7 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0)) -> 
 	}
 
 	digits = min(digits, len(src.digit), len(dest.digit))
-	mem.copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits)
+	intrinsics.mem_copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits)
 	return nil
 }
 
@@ -3181,7 +3183,7 @@ _private_int_shl_leg :: proc(quotient: ^Int, digits: int, allocator := context.a
 	}
 
 	quotient.used += digits
-	mem.zero_slice(quotient.digit[:digits])
+	_zero(quotient.digit[:digits])
 	return nil
 }
 
@@ -3223,6 +3225,7 @@ _private_int_shr_leg :: proc(quotient: ^Int, digits: int, allocator := context.a
 	Tables used by `internal_*` and `_*`.
 */
 
+@(rodata)
 _private_int_rem_128 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1,
@@ -3235,6 +3238,7 @@ _private_int_rem_128 := [?]DIGIT{
 }
 #assert(128 * size_of(DIGIT) == size_of(_private_int_rem_128))
 
+@(rodata)
 _private_int_rem_105 := [?]DIGIT{
 	0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1,
 	0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1,
@@ -3247,6 +3251,7 @@ _private_int_rem_105 := [?]DIGIT{
 #assert(105 * size_of(DIGIT) == size_of(_private_int_rem_105))
 
 _PRIME_TAB_SIZE :: 256
+@(rodata)
 _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 	0x0002, 0x0003, 0x0005, 0x0007, 0x000B, 0x000D, 0x0011, 0x0013,
 	0x0017, 0x001D, 0x001F, 0x0025, 0x0029, 0x002B, 0x002F, 0x0035,
@@ -3286,8 +3291,8 @@ _private_prime_table := [_PRIME_TAB_SIZE]DIGIT{
 }
 #assert(_PRIME_TAB_SIZE * size_of(DIGIT) == size_of(_private_prime_table))
 
-when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
-	_factorial_table := [35]_WORD{
+@(rodata)
+_factorial_table := [35]_WORD{
 /* f(00): */                                                     1,
 /* f(01): */                                                     1,
 /* f(02): */                                                     2,
@@ -3323,32 +3328,8 @@ when MATH_BIG_FORCE_64_BIT || (!MATH_BIG_FORCE_32_BIT && size_of(rawptr) == 8) {
 /* f(32): */       263_130_836_933_693_530_167_218_012_160_000_000,
 /* f(33): */     8_683_317_618_811_886_495_518_194_401_280_000_000,
 /* f(34): */   295_232_799_039_604_140_847_618_609_643_520_000_000,
-	}
-} else {
-	_factorial_table := [21]_WORD{
-/* f(00): */                                                     1,
-/* f(01): */                                                     1,
-/* f(02): */                                                     2,
-/* f(03): */                                                     6,
-/* f(04): */                                                    24,
-/* f(05): */                                                   120,
-/* f(06): */                                                   720,
-/* f(07): */                                                 5_040,
-/* f(08): */                                                40_320,
-/* f(09): */                                               362_880,
-/* f(10): */                                             3_628_800,
-/* f(11): */                                            39_916_800,
-/* f(12): */                                           479_001_600,
-/* f(13): */                                         6_227_020_800,
-/* f(14): */                                        87_178_291_200,
-/* f(15): */                                     1_307_674_368_000,
-/* f(16): */                                    20_922_789_888_000,
-/* f(17): */                                   355_687_428_096_000,
-/* f(18): */                                 6_402_373_705_728_000,
-/* f(19): */                               121_645_100_408_832_000,
-/* f(20): */                             2_432_902_008_176_640_000,
-	}
 }
+
 
 /*
 	=========================  End of private tables  ========================

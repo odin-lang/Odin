@@ -54,6 +54,28 @@ test_small_array_push_back_elems :: proc(t: ^testing.T) {
 	testing.expect(t, slice_equal(small_array.slice(&array), []int { 1, 2 }))
 }
 
+@(test)
+test_small_array_resize :: proc(t: ^testing.T) {
+
+	array: small_array.Small_Array(4, int)
+
+	for i in 0..<4 {
+		small_array.append(&array, i+1)
+	}
+	testing.expect(t, slice_equal(small_array.slice(&array), []int{1, 2, 3, 4}), "Expected to initialize the array with 1, 2, 3, 4")
+
+	small_array.clear(&array)
+	testing.expect(t, slice_equal(small_array.slice(&array), []int{}), "Expected to clear the array")
+
+	small_array.non_zero_resize(&array, 4)
+	testing.expect(t, slice_equal(small_array.slice(&array), []int{1, 2, 3, 4}), "Expected non_zero_resize to set length 4 with previous values")
+
+	small_array.clear(&array)
+	small_array.resize(&array, 4)
+	testing.expect(t, slice_equal(small_array.slice(&array), []int{0, 0, 0, 0}), "Expected resize to set length 4 with zeroed values")
+}
+
+
 slice_equal :: proc(a, b: []int) -> bool {
 	if len(a) != len(b) {
 		return false

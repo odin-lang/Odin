@@ -1,4 +1,4 @@
-#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd
 #+private
 package thread
 
@@ -22,32 +22,21 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
-		// We need to give the thread a moment to start up before we enable cancellation.
-		// NOTE(laytan): setting to .DISABLE on darwin, with .ENABLE pthread_cancel would deadlock
-		// most of the time, don't ask me why.
-		can_set_thread_cancel_state := posix.pthread_setcancelstate(.DISABLE when ODIN_OS == .Darwin else .ENABLE, nil) == nil
-
 		t.id = sync.current_thread_id()
 
-		if .Started not_in sync.atomic_load(&t.flags) {
+		for (.Started not_in sync.atomic_load(&t.flags)) {
 			sync.wait(&t.start_ok)
 		}
 
-		if .Joined in sync.atomic_load(&t.flags) {
-			return nil
-		}
-
 		// Enable thread's cancelability.
-		// NOTE(laytan): Darwin does not correctly/fully support all of this, not doing this does
-		// actually make pthread_cancel work in the capacity of my tests, while executing this would
-		// basically always make it deadlock.
-		if ODIN_OS != .Darwin && can_set_thread_cancel_state {
-			err := posix.pthread_setcancelstate(.ENABLE, nil)
-			assert_contextless(err == nil)
+		err := posix.pthread_setcancelstate(.ENABLE, nil)
+		assert_contextless(err == nil)
 
-			err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
-			assert_contextless(err == nil)
-		}
+		// NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
+		// instead of waiting for a cancellation point.
+		// This does not seem to work on at least Darwin and NetBSD though.
+		err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
+		assert_contextless(err == nil)
 
 		{
 			init_context := t.init_context
@@ -85,11 +74,16 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	}
 	defer posix.pthread_attr_destroy(&attrs)
 
-	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
+	stacksize: posix.rlimit
+	if res := posix.getrlimit(.STACK, &stacksize); res == .OK && stacksize.rlim_cur > 0 {
+		_ = posix.pthread_attr_setstacksize(&attrs, uint(stacksize.rlim_cur))
+	}
+
 	res: posix.Errno
+	// NOTE(tetra, 2019-11-01): These only fail if their argument is invalid.
 	res = posix.pthread_attr_setdetachstate(&attrs, .CREATE_JOINABLE)
 	assert(res == nil)
-	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
+	when ODIN_OS != .NetBSD {
 		res = posix.pthread_attr_setinheritsched(&attrs, .EXPLICIT_SCHED)
 		assert(res == nil)
 	}
@@ -102,7 +96,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 	// Set thread priority.
 	policy: posix.Sched_Policy
-	when ODIN_OS != .Haiku && ODIN_OS != .NetBSD {
+	when ODIN_OS != .NetBSD {
 		res = posix.pthread_attr_getschedpolicy(&attrs, &policy)
 		assert(res == nil)
 	}
@@ -113,7 +107,11 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	high := posix.sched_get_priority_max(policy)
 	switch priority {
 	case .Normal: // Okay
-	case .Low:  params.sched_priority = low + 1
+	case .Low:
+		params.sched_priority = low + 1
+		if params.sched_priority >= high {
+			params.sched_priority = low
+		}
 	case .High: params.sched_priority = high
 	}
 	res = posix.pthread_attr_setschedparam(&attrs, &params)
@@ -124,7 +122,6 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
-
 	return thread
 }
 
@@ -149,10 +146,13 @@ _join :: proc(t: ^Thread) {
 
 	// Prevent non-started threads from blocking main thread with initial wait
 	// condition.
-	if .Started not_in sync.atomic_load(&t.flags) {
+	for (.Started not_in sync.atomic_load(&t.flags)) {
 		_start(t)
 	}
+
 	posix.pthread_join(t.unix_thread, nil)
+
+	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {

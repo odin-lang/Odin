@@ -2,6 +2,42 @@ package math_linalg_hlsl
 
 import "core:math"
 
+@(require_results) cos_half         :: proc "c" (x: half)    -> half { return math.cos(x) }
+@(require_results) sin_half         :: proc "c" (x: half)    -> half { return math.sin(x) }
+@(require_results) tan_half         :: proc "c" (x: half)    -> half { return math.tan(x) }
+@(require_results) acos_half        :: proc "c" (x: half)    -> half { return math.acos(x) }
+@(require_results) asin_half        :: proc "c" (x: half)    -> half { return math.asin(x) }
+@(require_results) atan_half        :: proc "c" (x: half)    -> half { return math.atan(x) }
+@(require_results) atan2_half       :: proc "c" (y, x: half) -> half { return math.atan2(y, x) }
+@(require_results) cosh_half        :: proc "c" (x: half)    -> half { return math.cosh(x) }
+@(require_results) sinh_half        :: proc "c" (x: half)    -> half { return math.sinh(x) }
+@(require_results) tanh_half        :: proc "c" (x: half)    -> half { return math.tanh(x) }
+@(require_results) acosh_half       :: proc "c" (x: half)    -> half { return math.acosh(x) }
+@(require_results) asinh_half       :: proc "c" (x: half)    -> half { return math.asinh(x) }
+@(require_results) atanh_half       :: proc "c" (x: half)    -> half { return math.atanh(x) }
+@(require_results) sqrt_half        :: proc "c" (x: half)    -> half { return math.sqrt(x) }
+@(require_results) rsqrt_half       :: proc "c" (x: half)    -> half { return 1.0/math.sqrt(x) }
+@(require_results) rcp_half         :: proc "c" (x: half)    -> half { return 1.0/x }
+@(require_results) pow_half         :: proc "c" (x, y: half) -> half { return math.pow(x, y) }
+@(require_results) exp_half         :: proc "c" (x: half)    -> half { return math.exp(x) }
+@(require_results) log_half         :: proc "c" (x: half)    -> half { return math.ln(x) }
+@(require_results) log2_half        :: proc "c" (x: half)    -> half { return math.log(x, 2) }
+@(require_results) log10_half       :: proc "c" (x: half)    -> half { return math.log(x, 10) }
+@(require_results) exp2_half        :: proc "c" (x: half)    -> half { return math.pow(half(2), x) }
+@(require_results) sign_half        :: proc "c" (x: half)    -> half { return math.sign(x) }
+@(require_results) floor_half       :: proc "c" (x: half)    -> half { return math.floor(x) }
+@(require_results) round_half       :: proc "c" (x: half)    -> half { return math.round(x) }
+@(require_results) ceil_half        :: proc "c" (x: half)    -> half { return math.ceil(x) }
+@(require_results) isnan_half       :: proc "c" (x: half)    -> bool  { return math.classify(x) == .NaN}
+@(require_results) fmod_half        :: proc "c" (x, y: half) -> half { return math.mod(x, y) }
+@(require_results)
+frac_half :: proc "c" (x: half) -> half {
+	if x >= 0 {
+		return x - math.trunc(x)
+	}
+	return math.trunc(-x) + x
+}
+
 @(require_results) cos_float         :: proc "c" (x: float)    -> float { return math.cos(x) }
 @(require_results) sin_float         :: proc "c" (x: float)    -> float { return math.sin(x) }
 @(require_results) tan_float         :: proc "c" (x: float)    -> float { return math.tan(x) }

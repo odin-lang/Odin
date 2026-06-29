@@ -1,6 +1,9 @@
+// Arbitrary precision integers and rationals.
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -8,9 +11,6 @@
 
 	This file contains basic arithmetic operations like `add`, `sub`, `mul`, `div`, ...
 */
-
-
-package math_big
 
 import "base:intrinsics"
 
@@ -593,7 +593,7 @@ int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) 
 	c: int
 	c, err = cmp(a, b)
 
-	return c == -1, err
+	return c < 0, err
 }
 
 /*
@@ -608,7 +608,7 @@ int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := contex
 	c: int
 	c, err = cmp(a, b)
 
-	return c == -1, err
+	return c < 0, err
 }
 
 /*
@@ -624,7 +624,7 @@ int_less_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocat
 	c: int
 	c, err = cmp_mag(a, b)
 
-	return c == -1, err
+	return c < 0, err
 }
 
 less_than :: proc {

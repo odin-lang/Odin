@@ -11,7 +11,7 @@ package net
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
 	Copyright 2024 Feoramund       <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
@@ -253,6 +253,22 @@ _shutdown_error :: proc(errno: linux.Errno) -> Shutdown_Error {
 	#partial switch errno {
 	case .EBADF, .EINVAL, .ENOTSOCK, .ENOTCONN:
 		return .Invalid_Argument
+	case:
+		return .Unknown
+	}
+}
+
+_socket_info_error :: proc(errno: linux.Errno) -> Socket_Info_Error {
+	assert(errno != nil)
+	_last_error = errno
+
+	#partial switch errno {
+	case .EBADF, .ENOTSOCK, .EFAULT, .EINVAL:
+		return .Invalid_Argument
+	case .ENOTCONN:
+		return .Network_Unreachable
+	case .ENOBUFS:
+		return .Insufficient_Resources
 	case:
 		return .Unknown
 	}

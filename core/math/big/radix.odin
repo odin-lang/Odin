@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	An arbitrary precision mathematics implementation in Odin.
 	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
@@ -13,12 +15,7 @@
 		- Also look at extracting and splatting several digits at once.
 */
 
-
-package math_big
-
 import "base:intrinsics"
-import "core:mem"
-import "core:os"
 
 /*
 	This version of `itoa` allocates on behalf of the caller. The caller must free the string.
@@ -45,7 +42,11 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 	/*
 		Allocate the buffer we need.
 	*/
-	buffer := make([]u8, size)
+	buffer, mem_err := make([]u8, size)
+	if mem_err != nil {
+		err = cast(Error)mem_err
+		return
+	}
 
 	/*
 		Write the digits out into the buffer.
@@ -107,7 +108,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	/*
 		We weren't given a size. Let's compute it.
 	*/
-	if size == -1 {
+	if size < 0 {
 		size = radix_size(a, radix, zero_terminate) or_return
 	}
 
@@ -141,7 +142,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		written = len(buffer) - available
 		if written < size {
 			diff := size - written
-			mem.copy(&buffer[0], &buffer[diff], written)
+			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 		}
 		return written, nil
 	}
@@ -174,7 +175,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		written = len(buffer) - available
 		if written < size {
 			diff := size - written
-			mem.copy(&buffer[0], &buffer[diff], written)
+			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 		}
 		return written, nil
 	}
@@ -182,16 +183,15 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	/*
 		Fast path for radixes that are a power of two.
 	*/
+	count := count_bits(a) or_return
+
 	if is_power_of_two(int(radix)) {
 		if zero_terminate {
 			available -= 1
 			buffer[available] = 0
 		}
 
-		shift, count: int
-		// mask  := _WORD(radix - 1);
-		shift, err = log(DIGIT(radix), 2)
-		count, err = count_bits(a)
+		shift := log(DIGIT(radix), 2) or_return
 		digit: _WORD
 
 		for offset := 0; offset < count; offset += shift {
@@ -216,12 +216,22 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		written = len(buffer) - available
 		if written < size {
 			diff := size - written
-			mem.copy(&buffer[0], &buffer[diff], written)
+			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 		}
 		return written, nil
 	}
 
-	return _itoa_raw_full(a, radix, buffer, zero_terminate)
+	// NOTE(Jeroen): The new method is faster for an `Int` up to ~32768 bits in size with optimizations.
+	//               At `.None` or `.Minimal`, it appears to always be faster.
+	//               If we optimize `itoa` further, this needs to be evaluated.
+	itoa_method := _itoa_raw_full
+
+	when ODIN_OPTIMIZATION_MODE >= .Size {
+		if count >= 32768 {
+			itoa_method = _itoa_raw_old
+		}
+	}
+	return itoa_method(a, radix, buffer, zero_terminate)
 }
 
 itoa :: proc{int_itoa_string, int_itoa_raw}
@@ -280,7 +290,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		}
 
 		pos := ch - '+'
-		if RADIX_TABLE_REVERSE_SIZE <= pos {
+		if RADIX_TABLE_REVERSE_SIZE <= u32(pos) {
 			break
 		}
 		y := RADIX_TABLE_REVERSE[pos]
@@ -310,7 +320,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		res.sign = sign
 	}
 
-	return nil
+	return internal_clamp(res)
 }
 
 
@@ -354,8 +364,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 		internal_set(la, bit_count) or_return
 
 		/* k = floor(2^29/log_2(radix)) + 1 */
-		lb := _log_bases
-		internal_set(k, lb[radix]) or_return
+		internal_set(k, _log_bases[radix]) or_return
 
 		/* n = floor((la *  k) / 2^29) + 1 */
 		internal_mul(k, la, k) or_return
@@ -375,64 +384,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	return size, nil
 }
 
-/*
-	We might add functions to read and write byte-encoded Ints from/to files, using `int_to_bytes_*` functions.
 
-	LibTomMath allows exporting/importing to/from a file in ASCII, but it doesn't support a much more compact representation in binary, even though it has several pack functions int_to_bytes_* (which I expanded upon and wrote Python interoperable versions of as well), and (un)pack, which is GMP compatible.
-	Someone could implement their own read/write binary int procedures, of course.
-
-	Could be worthwhile to add a canonical binary file representation with an optional small header that says it's an Odin big.Int, big.Rat or Big.Float, byte count for each component that follows, flag for big/little endian and a flag that says a checksum exists at the end of the file.
-	For big.Rat and big.Float the header couldn't be optional, because we'd have no way to distinguish where the components end.
-*/
-
-/*
-	Read an Int from an ASCII file.
-*/
-internal_int_read_from_ascii_file :: proc(a: ^Int, filename: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	/*
-		We can either read the entire file at once, or read a bunch at a time and keep multiplying by the radix.
-		For now, we'll read the entire file. Eventually we'll replace this with a copy that duplicates the logic
-		of `atoi` so we don't need to read the entire file.
-	*/
-
-	res, ok := os.read_entire_file(filename, allocator)
-	defer delete(res, allocator)
-
-	if !ok {
-		return .Cannot_Read_File
-	}
-
-	as := string(res)
-	return atoi(a, as, radix)
-}
-
-/*
-	Write an Int to an ASCII file.
-*/
-internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	/*
-		For now we'll convert the Int using itoa and writing the result in one go.
-		If we want to preserve memory we could duplicate the itoa logic and write backwards.
-	*/
-
-	as := itoa(a, radix) or_return
-	defer delete(as)
-
-	l := len(as)
-	assert(l > 0)
-
-	data := transmute([]u8)mem.Raw_Slice{
-		data = raw_data(as),
-		len  = l,
-	}
-
-	ok := os.write_entire_file(filename, data, truncate=true)
-	return nil if ok else .Cannot_Write_File
-}
 
 /*
 	Calculate the size needed for `internal_int_pack`.
@@ -561,8 +513,9 @@ internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_F
  */
 
 _RADIX_SIZE_SCALE :: 29
-_log_bases :: [65]u32{
-			0,         0, 0x20000001, 0x14309399, 0x10000001,
+@(rodata)
+_log_bases := [65]u32{
+	0,         0,          0x20000001, 0x14309399, 0x10000001,
 	0xdc81a35, 0xc611924,  0xb660c9e,  0xaaaaaab,  0xa1849cd,
 	0x9a209a9, 0x94004e1,  0x8ed19c2,  0x8a5ca7d,  0x867a000,
 	0x830cee3, 0x8000001,  0x7d42d60,  0x7ac8b32,  0x7887847,
@@ -581,6 +534,7 @@ _log_bases :: [65]u32{
 	Characters used in radix conversions.
 */
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
+@(rodata)
 RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
 	0x3e, 0xff, 0xff, 0xff, 0x3f, 0x00, 0x01, 0x02, 0x03, 0x04, /* +,-./01234 */
 	0x05, 0x06, 0x07, 0x08, 0x09, 0xff, 0xff, 0xff, 0xff, 0xff, /* 56789:;<=> */
@@ -597,14 +551,108 @@ RADIX_TABLE_REVERSE_SIZE :: 80
 	Stores a bignum as a ASCII string in a given radix (2..64)
 	The buffer must be appropriately sized. This routine doesn't check.
 */
+
 _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	temp, denominator := &Int{}, &Int{}
+	// Calculate largest radix^n that fits within _DIGIT_BITS
+	divisor     := _WORD(ITOA_DIVISOR)
+	digit_count := ITOA_COUNT
+	_radix      := DIGIT(radix)
 
-	internal_copy(temp, a)           or_return
-	internal_set(denominator, radix) or_return
+	if radix != 10 {
+		i := _WORD(1)
+		digit_count = -1
+		for i < _WORD(1 << _DIGIT_BITS) {
+			divisor = _WORD(i)
+			i *= _WORD(radix)
+			digit_count += 1
+		}
+	}
+
+	temp := &Int{}
+	internal_copy(temp, a) or_return
+	defer internal_destroy(temp)
+
+	available := len(buffer)
+	if zero_terminate {
+		available -= 1
+		buffer[available] = 0
+	}
+
+	if a.sign == .Negative {
+		temp.sign = .Zero_or_Positive
+	}
+
+	q := &Int{}
+	defer internal_destroy(q)
+
+	remainder: DIGIT
+	for {
+		internal_grow(q, temp.used) or_return
+		q.used = temp.used
+		q.sign = temp.sign
+
+		w := _WORD(0)
+
+		for ix := temp.used - 1; ix >= 0; ix -= 1 {
+			t := DIGIT(0)
+			w = (w << _WORD(_DIGIT_BITS) | _WORD(temp.digit[ix]))
+			if w >= divisor {
+				t = DIGIT(w / divisor)
+				w -= _WORD(t) * divisor
+			}
+			q.digit[ix] = t
+		}
+		remainder = DIGIT(w)
+
+		internal_clamp(q)
+		q, temp = temp, q
+
+		count := digit_count
+		for available > 0 && count > 0 {
+			available -= 1
+			buffer[available] = RADIX_TABLE[remainder % _radix]
+			remainder /= _radix
+			count -= 1
+		}
+
+		if temp.used == 0 {
+			break
+		}
+	}
+
+	// Remove leading zero if we ended up with one.
+	if buffer[available] == '0' {
+		available += 1
+	}
+
+	if a.sign == .Negative {
+		available -= 1
+		buffer[available] = '-'
+	}
+
+	/*
+		If we overestimated the size, we need to move the buffer left.
+	*/
+	written = len(buffer) - available
+	if written < len(buffer) {
+		diff := len(buffer) - written
+		intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
+	}
+	return written, nil
+}
+
+// Old internal digit extraction procedure.
+// We're keeping this around as ground truth for the tests.
+_itoa_raw_old :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
+	assert_if_nil(a)
+	context.allocator = allocator
+
+	temp := &Int{}
+	internal_copy(temp, a) or_return
+	defer internal_destroy(temp)
 
 	available := len(buffer)
 	if zero_terminate {
@@ -619,7 +667,6 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	remainder: DIGIT
 	for {
 		if remainder, err = #force_inline internal_divmod(temp, temp, DIGIT(radix)); err != nil {
-			internal_destroy(temp, denominator)
 			return len(buffer) - available, err
 		}
 		available -= 1
@@ -634,15 +681,13 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		buffer[available] = '-'
 	}
 
-	internal_destroy(temp, denominator)
-
 	/*
 		If we overestimated the size, we need to move the buffer left.
 	*/
 	written = len(buffer) - available
 	if written < len(buffer) {
 		diff := len(buffer) - written
-		mem.copy(&buffer[0], &buffer[diff], written)
+		intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
 	}
 	return written, nil
 }

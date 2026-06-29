@@ -26,7 +26,18 @@ _mm_blendv_epi8 :: #force_inline proc "c" (a, b, mask: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_blend_epi16 :: #force_inline proc "c" (a, b: __m128i, $IMM8: u8) -> __m128i {
-	return transmute(__m128i)pblendw(transmute(i16x8)a, transmute(i16x8)b, IMM8)
+	return transmute(__m128i)simd.shuffle(
+		transmute(i16x8)b,
+		transmute(i16x8)a,
+		0 when (IMM8 >> 0) & 1 == 1 else 8,
+		1 when (IMM8 >> 1) & 1 == 1 else 9,
+		2 when (IMM8 >> 2) & 1 == 1 else 10,
+		3 when (IMM8 >> 3) & 1 == 1 else 11,
+		4 when (IMM8 >> 4) & 1 == 1 else 12,
+		5 when (IMM8 >> 5) & 1 == 1 else 13,
+		6 when (IMM8 >> 6) & 1 == 1 else 14,
+		7 when (IMM8 >> 7) & 1 == 1 else 15,
+	)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_blendv_pd :: #force_inline proc "c" (a, b, mask: __m128d) -> __m128d {
@@ -303,8 +314,6 @@ foreign _ {
 	blendpd    :: proc(a, b: __m128d, #const imm2: u8) -> __m128d ---
 	@(link_name = "llvm.x86.sse41.blendps")
 	blendps    :: proc(a, b: __m128, #const imm4: u8) -> __m128 ---
-	@(link_name = "llvm.x86.sse41.pblendw")
-	pblendw    :: proc(a: i16x8, b: i16x8, #const imm8: u8) -> i16x8 ---
 	@(link_name = "llvm.x86.sse41.insertps")
 	insertps   :: proc(a, b: __m128, #const imm8: u8) -> __m128 ---
 	@(link_name = "llvm.x86.sse41.pmaxsb")

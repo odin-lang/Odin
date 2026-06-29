@@ -1,5 +1,15 @@
 // thread_pool.cpp
 
+// TODO(bill): make work on MSVC
+// #if defined(__SANITIZE_THREAD__) || (defined(__has_feature) && __has_feature(thread_sanitizer))
+// #include <sanitizer/tsan_interface.h>
+// #define TSAN_RELEASE(addr) __tsan_release(addr)
+// #define TSAN_ACQUIRE(addr) __tsan_acquire(addr)
+// #else
+#define TSAN_RELEASE(addr)
+#define TSAN_ACQUIRE(addr)
+// #endif
+
 struct WorkerTask;
 struct ThreadPool;
 
@@ -17,6 +27,11 @@ enum GrabState {
 	Grab_Success = 0,
 	Grab_Empty   = 1,
 	Grab_Failed  = 2,
+};
+
+enum BroadcastWaitState {
+	Nobody_Waiting  = 0,
+	Someone_Waiting = 1,
 };
 
 struct ThreadPool {
@@ -54,8 +69,8 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 
 	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
-		pool->tasks_available.fetch_add(1, std::memory_order_acquire);
-		futex_broadcast(&pool->tasks_available);
+		pool->tasks_available.store(Nobody_Waiting);
+		futex_broadcast(&t->pool->tasks_available);
 		thread_join_and_destroy(t);
 	}
 
@@ -83,12 +98,15 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 	}
 
 	cur_ring->buffer[bot % cur_ring->size] = task;
+	TSAN_RELEASE(cur_ring->buffer[bot % cur_ring->size]);
 	std::atomic_thread_fence(std::memory_order_release);
 	thread->queue.bottom.store(bot + 1, std::memory_order_relaxed);
 
 	thread->pool->tasks_left.fetch_add(1, std::memory_order_release);
-	thread->pool->tasks_available.fetch_add(1, std::memory_order_relaxed);
-	futex_broadcast(&thread->pool->tasks_available);
+	i32 state = Someone_Waiting;
+	if (thread->pool->tasks_available.compare_exchange_strong(state, Nobody_Waiting)) {
+		futex_broadcast(&thread->pool->tasks_available);
+	}
 }
 
 GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
@@ -101,6 +119,7 @@ GrabState thread_pool_queue_take(Thread *thread, WorkerTask *task) {
 	if (top <= bot) {
 
 		// Queue is not empty
+		TSAN_ACQUIRE(cur_ring->buffer[bot % cur_ring->size]);
 		*task = cur_ring->buffer[bot % cur_ring->size];
 		if (top == bot) {
 			// Only one entry left in queue
@@ -132,6 +151,8 @@ GrabState thread_pool_queue_steal(Thread *thread, WorkerTask *task) {
 	if (top < bot) {
 		// Queue is not empty
 		TaskRingBuffer *cur_ring = thread->queue.ring.load(std::memory_order_consume);
+
+		TSAN_ACQUIRE(&cur_ring->buffer[top % cur_ring->size]);
 		*task = cur_ring->buffer[top % cur_ring->size];
 
 		if (!thread->queue.top.compare_exchange_strong(top, top + 1, std::memory_order_seq_cst, std::memory_order_relaxed)) {
@@ -230,12 +251,13 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 		}
 
 		// if we've done all our work, and there's nothing to steal, go to sleep
-		state = pool->tasks_available.load(std::memory_order_acquire);
+		pool->tasks_available.store(Someone_Waiting);
 		if (!pool->running) { break; }
-		futex_wait(&pool->tasks_available, state);
+		futex_wait(&pool->tasks_available, Someone_Waiting);
 
 		main_loop_continue:;
 	}
 
 	return 0;
 }
+

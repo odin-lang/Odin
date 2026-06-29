@@ -4,8 +4,8 @@ package mem_virtual
 
 import "core:sys/linux"
 
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	addr, errno := linux.mmap(0, size, {}, {.PRIVATE, .ANONYMOUS})
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
+	addr, errno := linux.mmap(address_hint, size, {}, {.PRIVATE, .ANONYMOUS})
 	if errno == .ENOMEM {
 		return nil, .Out_Of_Memory
 	} else if errno == .EINVAL {
@@ -43,13 +43,6 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return errno == .NONE
 }
 
-_platform_memory_init :: proc() {
-	DEFAULT_PAGE_SIZE = 4096
-	// is power of two
-	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
-}
-
-
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	prot: linux.Mem_Protection
 	if .Read in flags {
@@ -65,4 +58,8 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 		return nil, .Map_Failure
 	}
 	return ([^]byte)(addr)[:size], nil
+}
+
+_unmap_file :: proc "contextless" (data: []byte) {
+	_release(raw_data(data), uint(len(data)))
 }

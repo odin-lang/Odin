@@ -1,17 +1,18 @@
 #+private
 package flags
 
-import "base:intrinsics"
-import "base:runtime"
-import "core:fmt"
-import "core:mem"
-import "core:os"
-import "core:reflect"
-import "core:strconv"
-import "core:strings"
-@require import "core:time"
-@require import "core:time/datetime"
-import "core:unicode/utf8"
+import            "base:intrinsics"
+import            "base:runtime"
+import            "core:fmt"
+import            "core:mem"
+import            "core:net"
+@(require) import "core:os"
+import            "core:reflect"
+import            "core:strconv"
+import            "core:strings"
+@(require) import "core:time"
+@(require) import "core:time/datetime"
+import            "core:unicode/utf8"
 
 @(optimization_mode="favor_size")
 parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info) -> bool {
@@ -109,7 +110,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case f32be: (^f32be)(ptr)^ = cast(f32be) value
 		case f64be: (^f64be)(ptr)^ = cast(f64be) value
 		}
-	
+
 	case runtime.Type_Info_Complex:
 		value := strconv.parse_complex128(str) or_return
 		switch type_info.id {
@@ -117,7 +118,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case complex64:  (^complex64) (ptr)^ = (complex64)(value)
 		case complex128: (^complex128)(ptr)^ = value
 		}
-	
+
 	case runtime.Type_Info_Quaternion:
 		value := strconv.parse_quaternion256(str) or_return
 		switch type_info.id {
@@ -127,6 +128,8 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		}
 
 	case runtime.Type_Info_String:
+		assert(specific_type_info.encoding == .UTF_8)
+
 		if specific_type_info.is_cstring {
 			cstr_ptr := (^cstring)(ptr)
 			if cstr_ptr != nil {
@@ -149,15 +152,16 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		}
 
 	case runtime.Type_Info_Bit_Set:
-		// Parse a string of 1's and 0's, from left to right,
+		// Parse a string of 1s and 0s, from left to right,
 		// least significant bit to most significant bit.
 		value: u128
 
 		// NOTE: `upper` is inclusive, i.e: `0..=31`
-		max_bit_index := u128(1 + specific_type_info.upper - specific_type_info.lower)
+		underscores := u128(strings.count(str, "_"))
+		bit_index_limit := u128(1 + specific_type_info.upper - specific_type_info.lower) + underscores
 		bit_index := u128(0)
 		#no_bounds_check for string_index in 0..<uint(len(str)) {
-			if bit_index == max_bit_index {
+			if bit_index == bit_index_limit {
 				// The string's too long for this bit_set.
 				return false
 			}
@@ -206,7 +210,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type: typeid, arg_tag: string, out_error: ^Error) {
 	// Core types currently supported:
 	//
-	// - os.Handle
+	// - ^os.File
 	// - time.Time
 	// - datetime.DateTime
 	// - net.Host_Or_Endpoint
@@ -214,64 +218,61 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 	GENERIC_RFC_3339_ERROR :: "Invalid RFC 3339 string. Try this format: `yyyy-mm-ddThh:mm:ssZ`, for example `2024-02-29T16:30:00Z`."
 
 	out_error^ = nil
-
-	if data_type == os.Handle {
+	if data_type == ^os.File {
 		// NOTE: `os` is hopefully available everywhere, even if it might panic on some calls.
-		wants_read := false
-		wants_write := false
-		mode: int
+		flags: os.File_Flags
 
 		if file, ok := get_struct_subtag(arg_tag, SUBTAG_FILE); ok {
 			for i in 0..<len(file) {
 				#no_bounds_check switch file[i] {
-				case 'r': wants_read = true
-				case 'w': wants_write = true
-				case 'c': mode |= os.O_CREATE
-				case 'a': mode |= os.O_APPEND
-				case 't': mode |= os.O_TRUNC
+				case 'r': flags |= {.Read}
+				case 'w': flags |= {.Write}
+				case 'c': flags |= {.Create}
+				case 'a': flags |= {.Append}
+				case 't': flags |= {.Trunc}
 				}
 			}
 		}
 
 		// Sane default.
 		// owner/group/other: r--r--r--
-		perms: int = 0o444
+		octal_perms: int = 0o444
 
-		if wants_read && wants_write {
-			mode |= os.O_RDWR
-			perms |= 0o200
-		} else if wants_write {
-			mode |= os.O_WRONLY
-			perms |= 0o200
+		if flags >= {.Read, .Write} {
+			octal_perms |= 0o200
+		} else if .Write in flags {
+			octal_perms |= 0o200
 		} else {
-			mode |= os.O_RDONLY
+			flags |= {.Read}
 		}
 
 		if permstr, ok := get_struct_subtag(arg_tag, SUBTAG_PERMS); ok {
 			if value, parse_ok := strconv.parse_u64_of_base(permstr, 8); parse_ok {
-				perms = int(value)
+				octal_perms = int(value)
 			}
 		}
 
-		handle, errno := os.open(str, mode, perms)
-		if errno != nil {
+		perms := os.perm(octal_perms)
+
+		f, error := os.open(str, flags, perms)
+		if error != nil {
 			// NOTE(Feoramund): os.Error is system-dependent, and there's
 			// currently no good way to translate them all into strings.
 			//
-			// The upcoming `os2` package will hopefully solve this.
+			// The upcoming `core:os` package will hopefully solve this.
 			//
 			// We can at least provide the number for now, so the user can look
 			// it up.
 			out_error^ = Open_File_Error {
 				str,
-				errno,
-				mode,
+				error,
+				flags,
 				perms,
 			}
 			return
 		}
 
-		(^os.Handle)(ptr)^ = handle
+		(^^os.File)(ptr)^ = f
 		return
 	}
 
@@ -308,7 +309,18 @@ parse_and_set_pointer_by_named_type :: proc(ptr: rawptr, str: string, data_type:
 	}
 
 	when IMPORTING_NET {
-		if try_net_parse_workaround(data_type, str, ptr, out_error) {
+		if data_type == net.Host_Or_Endpoint {
+			addr, net_error := net.parse_hostname_or_endpoint(str)
+			if net_error != nil {
+				// We pass along `net.Error` here.
+				out_error^ = Parse_Error {
+					net_error,
+					"Invalid Host/Endpoint.",
+				}
+				return
+			}
+
+			(cast(^net.Host_Or_Endpoint)ptr)^ = addr
 			return
 		}
 	}
@@ -410,7 +422,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		} else {
 			parse_and_set_pointer_by_named_type(ptr, str, type_info.id, arg_tag, &error)
-			
+
 			if error != nil {
 				// So far, it's none of the types that we recognize.
 				// Check to see if we can set it by base type, if allowed.
@@ -460,7 +472,76 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 
+	case runtime.Type_Info_Bit_Set:
+		if str[0] == '0' || str[0] == '1' {
+			if !parse_and_set_pointer_by_base_type(ptr, str, type_info) {
+				return Parse_Error {
+					// The caller will add more details.
+					.Bad_Value,
+					"",
+				}
+			} else {
+				error = nil
+				return
+			}
+		}
+
+		value: u128
+
+		et := runtime.type_info_base(specific_type_info.elem)
+		if enum_type_info, is_enum := et.variant.(runtime.Type_Info_Enum); is_enum {
+			names, _ := strings.split(str, ",", context.temp_allocator)
+			valid_names := enum_type_info.names
+			underlying_values := enum_type_info.values
+
+			#no_bounds_check outer_loop: for name in names {
+				found: bool
+				#no_bounds_check for valid_name, index in valid_names {
+					if name == valid_name {
+						shift := u128(underlying_values[index]) - u128(specific_type_info.lower)
+						value |= u128(1 << shift)
+						found = true
+						continue outer_loop
+					}
+				}
+				if !found {
+					return Parse_Error {
+						.Bad_Value,
+						fmt.tprintf(
+							"Invalid value name: `%s`. Valid names are: %s",
+							name,
+							valid_names,
+						),
+					}
+				}
+			}
+		} else {
+			return Parse_Error {
+				// The caller will add more details.
+				.Bad_Value,
+				"",
+			}
+		}
+
+		if specific_type_info.underlying != nil {
+			set_unbounded_integer_by_type(ptr, value, specific_type_info.underlying.id)
+		} else {
+			switch 8*type_info.size {
+			case 8:   (^u8)  (ptr)^ = cast(u8)   value
+			case 16:  (^u16) (ptr)^ = cast(u16)  value
+			case 32:  (^u32) (ptr)^ = cast(u32)  value
+			case 64:  (^u64) (ptr)^ = cast(u64)  value
+			case 128: (^u128)(ptr)^ =            value
+			}
+		}
+		error = nil
+
 	case:
+		if type_info.id == ^os.File {
+			parse_and_set_pointer_by_named_type(ptr, str, type_info.id, arg_tag, &error)
+			return
+		}
+
 		if !parse_and_set_pointer_by_base_type(ptr, str, type_info) {
 			return Parse_Error {
 				// The caller will add more details.

@@ -1,4 +1,6 @@
 /*
+Bindings for [[ GGPO ; https://www.ggpo.net ]] rollback networking.
+
 Created in 2009, the GGPO networking SDK pioneered the use of rollback networking in peer-to-peer games.
 It's designed specifically to hide network latency in fast paced, twitch style games which require very
 precise inputs and frame perfect execution.
@@ -57,11 +59,11 @@ Player :: struct {
 	type:       PlayerType,
 	player_num: c.int,
 	using u: struct #raw_union {
-		local: struct {},
+		local: struct {} `raw_union_tag:"type=.LOCAL"`,
 		remote: struct {
 			ip_address: [32]byte,
 			port: u16,
-		},
+		} `raw_union_tag:"type=.REMOTE"`,
 	},
 }
 
@@ -130,28 +132,28 @@ Event :: struct {
 	using u: struct #raw_union {
 		connected: struct {
 			player: PlayerHandle,
-		},
+		} `raw_union_tag:"code=.CONNECTED_TO_PEER"`,
 		synchronizing: struct {
 			player: PlayerHandle,
 			count:  c.int,
 			total:  c.int,
-		},
+		} `raw_union_tag:"code=.SYNCHRONIZING_WITH_PEER"`,
 		synchronized: struct {
 			player: PlayerHandle,
-		},
+		} `raw_union_tag:"code=.SYNCHRONIZED_WITH_PEER"`,
 		disconnected: struct {
 			player: PlayerHandle,
-		},
+		} `raw_union_tag:"code=.DISCONNECTED_FROM_PEER"`,
 		timesync: struct {
 			frames_ahead: c.int,
-		},
+		} `raw_union_tag:"code=.TIMESYNC"`,
 		connection_interrupted: struct {
 			player:             PlayerHandle,
 			disconnect_timeout: c.int,
-		},
+		} `raw_union_tag:"code=.connection_interrupted"`,
 		connection_resumed: struct {
 			player: PlayerHandle,
-		},
+		} `raw_union_tag:"code=.connection_resumed"`,
 	},
 }
 

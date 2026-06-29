@@ -54,6 +54,8 @@ PRIO_MIN :: -20
 SIGRTMIN :: Signal(32)
 SIGRTMAX :: Signal(64)
 
+_NSIG :: 65
+
 S_IFMT   :: Mode{.IFREG, .IFDIR, .IFCHR, .IFIFO}
 S_IFSOCK :: Mode{.IFREG, .IFDIR}
 S_IFLNK  :: Mode{.IFREG, .IFCHR}
@@ -373,3 +375,52 @@ PTRACE_SECCOMP_GET_FILTER     :: PTrace_Seccomp_Get_Filter_Type(.SECCOMP_GET_FIL
 PTRACE_SECCOMP_GET_METADATA   :: PTrace_Seccomp_Get_Metadata_Type(.SECCOMP_GET_METADATA)
 PTRACE_GET_SYSCALL_INFO       :: PTrace_Get_Syscall_Info_Type(.GET_SYSCALL_INFO)
 PTRACE_GET_RSEQ_CONFIGURATION :: PTrace_Get_RSeq_Configuration_Type(.GET_RSEQ_CONFIGURATION)
+
+MAP_SHARED_VALIDATE :: Map_Flags{.SHARED, .PRIVATE}
+
+MAP_HUGE_SHIFT :: 26
+MAP_HUGE_MASK  :: 63
+
+MAP_HUGE_16KB       :: transmute(Map_Flags)(u32(14) << MAP_HUGE_SHIFT)
+MAP_HUGE_64KB       :: transmute(Map_Flags)(u32(16) << MAP_HUGE_SHIFT)
+MAP_HUGE_512KB      :: transmute(Map_Flags)(u32(19) << MAP_HUGE_SHIFT)
+MAP_HUGE_1MB        :: transmute(Map_Flags)(u32(20) << MAP_HUGE_SHIFT)
+MAP_HUGE_2MB        :: transmute(Map_Flags)(u32(21) << MAP_HUGE_SHIFT)
+MAP_HUGE_8MB        :: transmute(Map_Flags)(u32(23) << MAP_HUGE_SHIFT)
+MAP_HUGE_16MB       :: transmute(Map_Flags)(u32(24) << MAP_HUGE_SHIFT)
+MAP_HUGE_32MB       :: transmute(Map_Flags)(u32(25) << MAP_HUGE_SHIFT)
+MAP_HUGE_256MB      :: transmute(Map_Flags)(u32(28) << MAP_HUGE_SHIFT)
+MAP_HUGE_512MB      :: transmute(Map_Flags)(u32(29) << MAP_HUGE_SHIFT)
+MAP_HUGE_1GB        :: transmute(Map_Flags)(u32(30) << MAP_HUGE_SHIFT)
+MAP_HUGE_2GB        :: transmute(Map_Flags)(u32(31) << MAP_HUGE_SHIFT)
+MAP_HUGE_16GB       :: transmute(Map_Flags)(u32(34) << MAP_HUGE_SHIFT)
+
+MFD_HUGE_16KB       :: transmute(Memfd_Create_Flags)(u32(14) << MAP_HUGE_SHIFT)
+MFD_HUGE_64KB       :: transmute(Memfd_Create_Flags)(u32(16) << MAP_HUGE_SHIFT)
+MFD_HUGE_512KB      :: transmute(Memfd_Create_Flags)(u32(19) << MAP_HUGE_SHIFT)
+MFD_HUGE_1MB        :: transmute(Memfd_Create_Flags)(u32(20) << MAP_HUGE_SHIFT)
+MFD_HUGE_2MB        :: transmute(Memfd_Create_Flags)(u32(21) << MAP_HUGE_SHIFT)
+MFD_HUGE_8MB        :: transmute(Memfd_Create_Flags)(u32(23) << MAP_HUGE_SHIFT)
+MFD_HUGE_16MB       :: transmute(Memfd_Create_Flags)(u32(24) << MAP_HUGE_SHIFT)
+MFD_HUGE_32MB       :: transmute(Memfd_Create_Flags)(u32(25) << MAP_HUGE_SHIFT)
+MFD_HUGE_256MB      :: transmute(Memfd_Create_Flags)(u32(28) << MAP_HUGE_SHIFT)
+MFD_HUGE_512MB      :: transmute(Memfd_Create_Flags)(u32(29) << MAP_HUGE_SHIFT)
+MFD_HUGE_1GB        :: transmute(Memfd_Create_Flags)(u32(30) << MAP_HUGE_SHIFT)
+MFD_HUGE_2GB        :: transmute(Memfd_Create_Flags)(u32(31) << MAP_HUGE_SHIFT)
+MFD_HUGE_16GB       :: transmute(Memfd_Create_Flags)(u32(34) << MAP_HUGE_SHIFT)
+
+/* Get window size */
+TIOCGWINSZ :: 0x5413
+
+IORING_TIMEOUT_CLOCK_MASK  :: IO_Uring_Timeout_Flags{.BOOTTIME, .REALTIME}
+IORING_TIMEOUT_UPDATE_MASK :: IO_Uring_Timeout_Flags{.UPDATE, .LINK_TIMEOUT_UPDATE}
+
+IORING_OFF_SQ_RING    :: 0
+IORING_OFF_CQ_RING    :: 0x8000000
+IORING_OFF_SQES       :: 0x10000000
+IORING_OFF_PBUF_RING  :: 0x80000000
+IORING_OFF_PBUF_SHIFT :: 16
+IORING_OFF_MMAP_MASK  :: 0xf8000000
+
+SWAP_FLAG_PRIO_SHIFT :: u32(0)
+SWAP_FLAG_PRIO_MASK  :: u32(0x7fff)

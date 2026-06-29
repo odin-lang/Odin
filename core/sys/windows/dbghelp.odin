@@ -55,23 +55,54 @@ MINIDUMP_CALLBACK_INFORMATION :: struct {
 	CallbackParam:   PVOID,
 }
 
+MINIDUMP_CALLBACK_TYPE :: enum ULONG {
+	ModuleCallback,
+	ThreadCallback,
+	ThreadExCallback,
+	IncludeThreadCallback,
+	IncludeModuleCallback,
+	MemoryCallback,
+	CancelCallback,
+	WriteKernelMinidumpCallback,
+	KernelMinidumpStatusCallback,
+	RemoveMemoryCallback,
+	IncludeVmRegionCallback,
+	IoStartCallback,
+	IoWriteAllCallback,
+	IoFinishCallback,
+	ReadMemoryFailureCallback,
+	SecondaryFlagsCallback,
+	IsProcessSnapshotCallback,
+	VmStartCallback,
+	VmQueryCallback,
+	VmPreReadCallback,
+	VmPostReadCallback,
+}
+
+MINIDUMP_SECONDARY_FLAG :: enum ULONG {
+	WithoutPowerInfo = 0,
+}
+MINIDUMP_SECONDARY_FLAGS :: distinct bit_set[MINIDUMP_SECONDARY_FLAG; ULONG]
+MiniSecondaryWithoutPowerInfo :: MINIDUMP_SECONDARY_FLAGS{.WithoutPowerInfo}
+MiniSecondaryValidFlags       :: MINIDUMP_SECONDARY_FLAGS{.WithoutPowerInfo}
+
 MINIDUMP_CALLBACK_INPUT :: struct {
 	ProcessId:     ULONG,
 	ProcessHandle: HANDLE,
-	CallbackType:  ULONG,
+	CallbackType:  MINIDUMP_CALLBACK_TYPE,
 	using _: struct #raw_union {
-		Status:            HRESULT,
-		Thread:            MINIDUMP_THREAD_CALLBACK,
-		ThreadEx:          MINIDUMP_THREAD_EX_CALLBACK,
-		Module:            MINIDUMP_MODULE_CALLBACK,
-		IncludeThread:     MINIDUMP_INCLUDE_THREAD_CALLBACK,
-		IncludeModule:     MINIDUMP_INCLUDE_MODULE_CALLBACK,
-		Io:                MINIDUMP_IO_CALLBACK,
-		ReadMemoryFailure: MINIDUMP_READ_MEMORY_FAILURE_CALLBACK,
-		SecondaryFlags:    ULONG,
-		VmQuery:           MINIDUMP_VM_QUERY_CALLBACK,
-		VmPreRead:         MINIDUMP_VM_PRE_READ_CALLBACK,
-		VmPostRead:        MINIDUMP_VM_POST_READ_CALLBACK,
+		Status:            HRESULT                               `raw_union_tag:"KernelMinidumpStatusCallback"`,
+		Thread:            MINIDUMP_THREAD_CALLBACK              `raw_union_tag:"ThreadCallback"`,
+		ThreadEx:          MINIDUMP_THREAD_EX_CALLBACK           `raw_union_tag:"ThreadExCallback"`,
+		Module:            MINIDUMP_MODULE_CALLBACK              `raw_union_tag:"ModuleCallback"`,
+		IncludeThread:     MINIDUMP_INCLUDE_THREAD_CALLBACK      `raw_union_tag:"IncludeThreadCallback"`,
+		IncludeModule:     MINIDUMP_INCLUDE_MODULE_CALLBACK      `raw_union_tag:"IncludeModuleCallback"`,
+		Io:                MINIDUMP_IO_CALLBACK                  `raw_union_tag:"IoStartCallback,IoWriteAllCallback,IoFinishCallback"`,
+		ReadMemoryFailure: MINIDUMP_READ_MEMORY_FAILURE_CALLBACK `raw_union_tag:"ReadMemoryFailureCallback"`,
+		SecondaryFlags:    MINIDUMP_SECONDARY_FLAGS              `raw_union_tag:"SecondaryFlagsCallback"`,
+		VmQuery:           MINIDUMP_VM_QUERY_CALLBACK            `raw_union_tag:"VmQueryCallback"`,
+		VmPreRead:         MINIDUMP_VM_PRE_READ_CALLBACK         `raw_union_tag:"VmPreReadCallback"`,
+		VmPostRead:        MINIDUMP_VM_POST_READ_CALLBACK        `raw_union_tag:"VmPostReadCallback"`,
 	},
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-VERSION="3.1.0"
+VERSION="3.1.1"
 RELEASE="https://github.com/erincatto/box2d/archive/refs/tags/v$VERSION.tar.gz"
 
 cd "$(dirname "$0")"

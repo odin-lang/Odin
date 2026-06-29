@@ -1,26 +1,57 @@
-
-/*
-Package core:math/rand implements various random number generators
-*/
+// Random number generators.
 package rand
 
 import "base:intrinsics"
 import "base:runtime"
 import "core:math"
-import "core:mem"
 
 Generator :: runtime.Random_Generator
 
 Generator_Query_Info :: runtime.Random_Generator_Query_Info
 
 Default_Random_State :: runtime.Default_Random_State
+
+/*
+Returns an instance of the runtime pseudorandom generator.  If no
+initial state is provided, the PRNG will be lazily initialized with
+entropy from the system entropy source on first-use.
+
+The cryptographic security of the returned random number generator
+is directly dependent on the quality of the initialization entropy.
+Calling `reset`/`create` SHOULD be done with no seed/state, or
+32-bytes of high-quality entropy.
+
+WARNING:
+- The lazy initialization will panic if there is no system entropy
+  source available.
+- While the generator is cryptographically secure, developers SHOULD
+  prefer `crypto.random_generator()` for cryptographic use cases such
+  as key generation.
+
+Inputs:
+- state: Optional initial PRNG state.
+
+Returns:
+- A `Generator` instance.
+*/
 default_random_generator :: runtime.default_random_generator
 
 @(require_results)
-create :: proc(seed: u64) -> (state: Default_Random_State) {
+create_u64 :: proc(seed: u64) -> (state: Default_Random_State) {
 	seed := seed
 	runtime.default_random_generator_proc(&state, .Reset, ([^]byte)(&seed)[:size_of(seed)])
 	return
+}
+
+@(require_results)
+create_bytes :: proc(seed: []byte) -> (state: Default_Random_State) {
+	runtime.default_random_generator_proc(&state, .Reset, seed)
+	return
+}
+
+create :: proc {
+	create_u64,
+	create_bytes,
 }
 
 /*
@@ -42,10 +73,14 @@ Possible Output:
 
 	10
 */
-reset :: proc(seed: u64, gen := context.random_generator) {
-	runtime.random_generator_reset_u64(gen, seed)
+reset :: proc {
+	reset_u64,
+	reset_bytes,
 }
 
+reset_u64 :: proc(seed: u64, gen := context.random_generator) {
+	runtime.random_generator_reset_u64(gen, seed)
+}
 
 reset_bytes :: proc(bytes: []byte, gen := context.random_generator) {
 	runtime.random_generator_reset_bytes(gen, bytes)
@@ -55,13 +90,6 @@ query_info :: proc(gen := context.random_generator) -> Generator_Query_Info {
 	return runtime.random_generator_query_info(gen)
 }
 
-
-@(private)
-_random_u64 :: proc(gen := context.random_generator) -> (res: u64) {
-	ok := runtime.random_generator_read_ptr(gen, &res, size_of(res))
-	assert(ok, "uninitialized gen/context.random_generator")
-	return
-}
 
 /*
 Generates a random 32 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -84,7 +112,7 @@ Possible Output:
 
 */
 @(require_results)
-uint32 :: proc(gen := context.random_generator) -> (val: u32) { return u32(_random_u64(gen)) }
+uint32 :: proc(gen := context.random_generator) -> (val: u32) {return u32(uint64(gen))}
 
 /*
 Generates a random 64 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -107,7 +135,11 @@ Possible Output:
 
 */
 @(require_results)
-uint64 :: proc(gen := context.random_generator) -> (val: u64) { return _random_u64(gen) }
+uint64 :: proc(gen := context.random_generator) -> (val: u64) {
+	ok := runtime.random_generator_read_ptr(gen, &val, size_of(val))
+	assert(ok, "uninitialized gen/context.random_generator")
+	return
+}
 
 /*
 Generates a random 128 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
@@ -131,13 +163,13 @@ Possible Output:
 */
 @(require_results)
 uint128 :: proc(gen := context.random_generator) -> (val: u128) {
-	a := u128(_random_u64(gen))
-	b := u128(_random_u64(gen))
+	a := u128(uint64(gen))
+	b := u128(uint64(gen))
 	return (a<<64) | b
 }
 
 /*
-Generates a random 31 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 31 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 The sign bit will always be set to 0, thus all generated numbers will be positive.
 
 Returns:
@@ -160,7 +192,7 @@ Possible Output:
 @(require_results) int31  :: proc(gen := context.random_generator) -> (val: i32)  { return i32(uint32(gen) << 1 >> 1) }
 
 /*
-Generates a random 63 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 63 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 The sign bit will always be set to 0, thus all generated numbers will be positive.
 
 Returns:
@@ -183,7 +215,7 @@ Possible Output:
 @(require_results) int63  :: proc(gen := context.random_generator) -> (val: i64)  { return i64(uint64(gen) << 1 >> 1) }
 
 /*
-Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Generates a random 127 bit value using the provided random number generator. If no generator is provided the global random number generator will be used.
 The sign bit will always be set to 0, thus all generated numbers will be positive.
 
 Returns:
@@ -214,7 +246,7 @@ Inputs:
 Returns:
 - val: A random 31 bit value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -227,7 +259,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -255,7 +287,7 @@ Inputs:
 Returns:
 - val: A random 63 bit value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -268,7 +300,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -296,7 +328,7 @@ Inputs:
 Returns:
 - val: A random 127 bit value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -309,7 +341,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -337,7 +369,7 @@ Inputs:
 Returns:
 - val: A random integer value in the range `[0, n)`
 
-WARNING: Panics if n is less than 0
+WARNING: Panics if n is less than or equal to 0
 
 Example:
 	import "core:math/rand"
@@ -350,7 +382,7 @@ Example:
 Possible Output:
 
 	6
-	500
+	13
 
 */
 @(require_results)
@@ -362,6 +394,478 @@ int_max :: proc(n: int, gen := context.random_generator) -> (val: int) {
 		return int(int31_max(i32(n), gen))
 	} else {
 		return int(int63_max(i64(n), gen))
+	}
+}
+
+/*
+Generates a random 32 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 32 bit value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint32_max_example :: proc() {
+		fmt.println(rand.uint32_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint32_max :: proc(n: u32, gen := context.random_generator) -> (val: u32) {
+	if n == 0 {
+		panic("Invalid argument to uint32_max")
+	}
+	if n & (n - 1) == 0 {
+		return uint32(gen) & (n - 1)
+	}
+	min := (-n) % n
+	v := uint32(gen)
+	for v < min {
+		v = uint32(gen)
+	}
+	return v % n
+}
+
+/*
+Generates a random 64 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 64 bit value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint64_max_example :: proc() {
+		fmt.println(rand.uint64_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint64_max :: proc(n: u64, gen := context.random_generator) -> (val: u64) {
+	if n == 0 {
+		panic("Invalid argument to uint64_max")
+	}
+	if n & (n - 1) == 0 {
+		return uint64(gen) & (n - 1)
+	}
+	min := (-n) % n
+	v := uint64(gen)
+	for v < min {
+		v = uint64(gen)
+	}
+	return v % n
+}
+
+/*
+Generates a random 128 bit value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 128 bit value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint128_max_example :: proc() {
+		fmt.println(rand.uint128_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint128_max :: proc(n: u128, gen := context.random_generator) -> (val: u128) {
+	if n == 0 {
+		panic("Invalid argument to uint128_max")
+	}
+	if n & (n - 1) == 0 {
+		return uint128(gen) & (n - 1)
+	}
+	min := (-n) % n
+	v := uint128(gen)
+	for v < min {
+		v = uint128(gen)
+	}
+	return v % n
+}
+
+/*
+Generates a random integer value in the range `[0, n)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- n: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random integer value in the range `[0, n)`
+
+WARNING: Panics if n is equal to 0
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint_max_example :: proc() {
+		fmt.println(rand.uint_max(16))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint_max :: proc(n: uint, gen := context.random_generator) -> (val: uint) {
+	if n <= 0 {
+		panic("Invalid argument to uint_max")
+	}
+	when size_of(int) == 4 {
+		return uint(uint32_max(u32(n), gen))
+	} else {
+		return uint(uint64_max(u64(n), gen))
+	}
+}
+
+/*
+Generates a random unsigned 32 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 32 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint32_range_example :: proc() {
+		fmt.println(rand.uint32_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+uint32_range :: proc(lo, hi: u32, gen := context.random_generator) -> (val: u32) {
+	assert(lo < hi, "Invalid arguments to uint32_range: lo must be less than hi")
+	range := hi - lo
+	if (range & (range - 1)) == 0 {
+		return lo + (uint32(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint32(gen)
+	for v < threshold {
+		v = uint32(gen)
+	}
+	return lo + (v % range)
+}
+
+/*
+Generates a random unsigned 64 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 64 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint64_range_example :: proc() {
+		fmt.println(rand.uint64_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+uint64_range :: proc(lo, hi: u64, gen := context.random_generator) -> (val: u64) {
+	assert(lo < hi, "Invalid arguments to uint64_range: lo must be less than hi")
+	range := hi - lo
+	if (range & (range - 1)) == 0 {
+		return lo + (uint64(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint64(gen)
+	for v < threshold {
+		v = uint64(gen)
+	}
+	return lo + (v % range)
+}
+
+/*
+Generates a random unsigned 128 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 128 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint128_range_example :: proc() {
+		fmt.println(rand.uint128_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+uint128_range :: proc(lo, hi: u128, gen := context.random_generator) -> (val: u128) {
+	assert(lo < hi, "Invalid arguments to uint128_range: lo must be less than hi")
+	range := hi - lo
+	if (range & (range - 1)) == 0 {
+		return lo + (uint128(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint128(gen)
+	for v < threshold {
+		v = uint128(gen)
+	}
+	return lo + (v % range)
+}
+
+/*
+Generates a random unsigned integer value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random integer value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	uint_range_example :: proc() {
+		fmt.println(rand.uint_range(5,15))
+	}
+
+Possible Output:
+
+	6
+	13
+
+*/
+@(require_results)
+uint_range :: proc(lo, hi: uint, gen := context.random_generator) -> (val: uint) {
+	assert(lo < hi, "Invalid arguments to uint_range: lo must be less than hi")
+	when size_of(int) == 4 {
+		return uint(uint32_range(u32(lo), u32(hi), gen))
+	} else {
+		return uint(uint64_range(u64(lo), u64(hi), gen))
+	}
+}
+
+/*
+Generates a random signed 32 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 32 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int32_range_example :: proc() {
+		fmt.println(rand.int32_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+int32_range :: proc(lo, hi: i32, gen := context.random_generator) -> (val: i32) {
+	assert(lo < hi, "Invalid arguments to int32_range: lo must be less than hi")
+	range := u32(hi) - u32(lo)
+	if (range & (range - 1)) == 0 {
+		return lo + i32(uint32(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint32(gen)
+	for v < threshold {
+		v = uint32(gen)
+	}
+	return lo + i32(v % range)
+}
+
+/*
+Generates a random signed 64 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 64 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int64_range_example :: proc() {
+		fmt.println(rand.int64_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+int64_range :: proc(lo, hi: i64, gen := context.random_generator) -> (val: i64) {
+	assert(lo < hi, "Invalid arguments to int64_range: lo must be less than hi")
+	range := u64(hi) - u64(lo)
+	if (range & (range - 1)) == 0 {
+		return lo + i64(uint64(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint64(gen)
+	for v < threshold {
+		v = uint64(gen)
+	}
+	return lo + i64(v % range)
+}
+
+/*
+Generates a random signed 128 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random 128 bit value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int128_range_example :: proc() {
+		fmt.println(rand.int128_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+int128_range :: proc(lo, hi: i128, gen := context.random_generator) -> (val: i128) {
+	assert(lo < hi, "Invalid arguments to int128_range: lo must be less than hi")
+	range := u128(hi) - u128(lo)
+	if (range & (range - 1)) == 0 {
+		return lo + i128(uint128(gen) & (range - 1))
+	}
+	threshold := -range % range
+	v := uint128(gen)
+	for v < threshold {
+		v = uint128(gen)
+	}
+	return lo + i128(v % range)
+}
+
+/*
+Generates a random signed integer value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
+
+Inputs:
+- lo: The lower bound of the generated number, this value is inclusice
+- hi: The upper bound of the generated number, this value is exclusive
+
+Returns:
+- val: A random integer value in the range `[lo, hi)`
+
+WARNING: Panics if `lo` is greater or equal to `hi`
+
+Example:
+	import "core:math/rand"
+	import "core:fmt"
+
+	int_range_example :: proc() {
+		fmt.println(rand.int_range(-10,10))
+	}
+
+Possible Output:
+
+	6
+	-9
+
+*/
+@(require_results)
+int_range :: proc(lo, hi: int, gen := context.random_generator) -> (val: int) {
+	assert(lo < hi, "Invalid arguments to int_range: lo must be less than hi")
+	when size_of(int) == 4 {
+		return int(int32_range(i32(lo), i32(hi), gen))
+	} else {
+		return int(int64_range(i64(lo), i64(hi), gen))
 	}
 }
 
@@ -480,8 +984,8 @@ Possible Output:
 }
 
 /*
-Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
-Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.  
+Fills a byte slice with random values using the provided random number generator. If no generator is provided the global random number generator will be used.
+Due to floating point precision there is no guarantee if the upper and lower bounds are inclusive/exclusive with the exact floating point value.
 
 Inputs:
 - p: The byte slice to fill
@@ -508,22 +1012,12 @@ Possible Output:
 */
 @(require_results)
 read :: proc(p: []byte, gen := context.random_generator) -> (n: int) {
-	pos := i8(0)
-	val := i64(0)
-	for n = 0; n < len(p); n += 1 {
-		if pos == 0 {
-			val = int63(gen)
-			pos = 7
-		}
-		p[n] = byte(val)
-		val >>= 8
-		pos -= 1
-	}
-	return
+	if !runtime.random_generator_read_bytes(gen, p) {return 0}
+	return len(p)
 }
 
 /*
-Creates a slice of `int` filled with random values using the provided random number generator. If no generator is provided the global random number generator will be used.  
+Creates a slice of `int` filled with random values using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 *Allocates Using Provided Allocator*
 
@@ -536,11 +1030,11 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise
 
 Example:
+	import "base:runtime"
 	import "core:math/rand"
-	import "core:mem"
 	import "core:fmt"
 
-	perm_example :: proc() -> (err: mem.Allocator_Error) {
+	perm_example :: proc() -> (err: runtime.Allocator_Error) {
 		data := rand.perm(4) or_return
 		fmt.println(data)
 		defer delete(data, context.allocator)
@@ -555,7 +1049,7 @@ Possible Output:
 
 */
 @(require_results)
-perm :: proc(n: int, allocator := context.allocator, gen := context.random_generator) -> (res: []int, err: mem.Allocator_Error) #optional_allocator_error {
+perm :: proc(n: int, allocator := context.allocator, gen := context.random_generator) -> (res: []int, err: runtime.Allocator_Error) #optional_allocator_error {
 	m := make([]int, n, allocator) or_return
 	for i := 0; i < n; i += 1 {
 		j := int_max(i+1, gen)
@@ -566,7 +1060,7 @@ perm :: proc(n: int, allocator := context.allocator, gen := context.random_gener
 }
 
 /*
-Randomizes the ordering of elements for the provided slice. If no generator is provided the global random number generator will be used.  
+Randomizes the ordering of elements for the provided slice. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - array: The slice to randomize
@@ -607,7 +1101,7 @@ shuffle :: proc(array: $T/[]$E, gen := context.random_generator) {
 }
 
 /*
-Returns a random element from the provided slice. If no generator is provided the global random number generator will be used.  
+Returns a random element from the provided slice. If no generator is provided the global random number generator will be used.
 
 Inputs:
 - array: The slice to choose an element from
@@ -704,11 +1198,14 @@ choice_bit_set :: proc(set: $T/bit_set[$E], gen := context.random_generator) -> 
 		return {}, false
 	}
 
-	core_set := transmute(intrinsics.type_bit_set_underlying_type(T))set
+	target := int_max(total_set, gen)
 
-	for target := int_max(total_set, gen); target > 0; target -= 1 {
-		core_set &= core_set - 1
+	for value in set {
+		if target == 0 {
+			return value, true
+		}
+		target -= 1
 	}
 
-	return E(intrinsics.count_trailing_zeros(core_set)), true
+	return {}, false
 }

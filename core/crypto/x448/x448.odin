@@ -1,14 +1,13 @@
 /*
-package x448 implements the X448 (aka curve448) Elliptic-Curve
-Diffie-Hellman key exchange protocol.
+`X448` (aka `curve448`) Elliptic-Curve Diffie-Hellman key exchange protocol.
 
 See:
 - [[ https://www.rfc-editor.org/rfc/rfc7748 ]]
 */
 package x448
 
+import "core:crypto"
 import field "core:crypto/_fiat/field_curve448"
-import "core:mem"
 
 // SCALAR_SIZE is the size of a X448 scalar (private key) in bytes.
 SCALAR_SIZE :: 56
@@ -144,8 +143,8 @@ scalarmult :: proc(dst, scalar, point: []byte) {
 	_scalarmult(&d, &e, &p)
 	copy_slice(dst, d[:])
 
-	mem.zero_explicit(&e, size_of(e))
-	mem.zero_explicit(&d, size_of(d))
+	crypto.zero_explicit(&e, size_of(e))
+	crypto.zero_explicit(&d, size_of(d))
 }
 
 // scalarmult_basepoint "multiplies" the provided scalar with the X448

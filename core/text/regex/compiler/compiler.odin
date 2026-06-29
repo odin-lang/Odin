@@ -2,7 +2,7 @@ package regex_compiler
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Feoramund: Initial implementation.
@@ -43,9 +43,16 @@ Node_Match_All_And_Escape   :: parser.Node_Match_All_And_Escape
 Opcode :: virtual_machine.Opcode
 Program  :: [dynamic]Opcode
 
-JUMP_SIZE  :: size_of(Opcode) + 1 * size_of(u16)
-SPLIT_SIZE :: size_of(Opcode) + 2 * size_of(u16)
+Jump :: virtual_machine.Jump
+Split :: virtual_machine.Split
+Wait_For_Byte :: virtual_machine.Wait_For_Byte
+Wait_For_Rune :: virtual_machine.Wait_For_Rune
+Wait_For_Rune_Class :: virtual_machine.Wait_For_Rune_Class
+Wait_For_Rune_Class_Negated :: virtual_machine.Wait_For_Rune_Class_Negated
+Save :: virtual_machine.Save
 
+JUMP_SIZE  :: size_of(Jump)
+SPLIT_SIZE :: size_of(Split)
 
 Compiler :: struct {
 	flags: common.Flags,
@@ -141,15 +148,13 @@ map_all_classes :: proc(tree: Node, collection: ^[dynamic]Rune_Class_Data) {
 
 append_raw :: #force_inline proc(code: ^Program, data: $T) {
 	// NOTE: This is system-dependent endian.
-	for b in transmute([size_of(T)]byte)data {
-		append(code, cast(Opcode)b)
-	}
+	data := transmute([size_of(T)]Opcode)data
+	append(code, ..data[:])
 }
 inject_raw :: #force_inline proc(code: ^Program, start: int, data: $T) {
 	// NOTE: This is system-dependent endian.
-	for b, i in transmute([size_of(T)]byte)data {
-		inject_at(code, start + i, cast(Opcode)b)
-	}
+	data := transmute([size_of(T)]Opcode)data
+	inject_at(code, start, ..data[:])
 }
 
 @require_results
@@ -195,8 +200,12 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 
 	case ^Node_Anchor:
 		if .Multiline in c.flags {
-			append(&code, Opcode.Multiline_Open)
-			append(&code, Opcode.Multiline_Close)
+			if specific.start {
+				append(&code, Opcode.Assert_Start_Multiline)
+			} else {
+				append(&code, Opcode.Multiline_Open)
+				append(&code, Opcode.Multiline_Close)
+			}
 		} else {
 			if specific.start {
 				append(&code, Opcode.Assert_Start)
@@ -216,8 +225,8 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 		code = generate_code(c, specific.inner)
 
 		if specific.capture && .No_Capture not_in c.flags {
-			inject_at(&code, 0, Opcode.Save)
-			inject_at(&code, 1, Opcode(2 * specific.capture_id))
+			save := Save{.Save, Opcode(2 * specific.capture_id)}
+			inject_raw(&code, 0, save)
 
 			append(&code, Opcode.Save)
 			append(&code, Opcode(2 * specific.capture_id + 1))
@@ -232,9 +241,8 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 		// Avoiding duplicate allocation by reusing `left`.
 		code = left
 
-		inject_at(&code, 0, Opcode.Split)
-		inject_raw(&code, size_of(byte)               , i16(SPLIT_SIZE))
-		inject_raw(&code, size_of(byte) + size_of(i16), i16(SPLIT_SIZE + left_len + JUMP_SIZE))
+		split := Split{.Split, i16(SPLIT_SIZE), i16(SPLIT_SIZE + left_len + JUMP_SIZE)}
+		inject_raw(&code, 0, split)
 
 		append(&code, Opcode.Jump)
 		append_raw(&code, i16(len(right) + JUMP_SIZE))
@@ -255,9 +263,8 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 		code = generate_code(c, specific.inner)
 		original_len := len(code)
 
-		inject_at(&code, 0, Opcode.Split)
-		inject_raw(&code, size_of(byte)               , i16(SPLIT_SIZE))
-		inject_raw(&code, size_of(byte) + size_of(i16), i16(SPLIT_SIZE + original_len + JUMP_SIZE))
+		split := Split{.Split, i16(SPLIT_SIZE), i16(SPLIT_SIZE + original_len + JUMP_SIZE)}
+		inject_raw(&code, 0, split)
 
 		append(&code, Opcode.Jump)
 		append_raw(&code, i16(-original_len - SPLIT_SIZE))
@@ -266,9 +273,8 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 		code = generate_code(c, specific.inner)
 		original_len := len(code)
 
-		inject_at(&code, 0, Opcode.Split)
-		inject_raw(&code, size_of(byte)               , i16(SPLIT_SIZE + original_len + JUMP_SIZE))
-		inject_raw(&code, size_of(byte) + size_of(i16), i16(SPLIT_SIZE))
+		split := Split{.Split, i16(SPLIT_SIZE + original_len + JUMP_SIZE), i16(SPLIT_SIZE)}
+		inject_raw(&code, 0, split)
 
 		append(&code, Opcode.Jump)
 		append_raw(&code, i16(-original_len - SPLIT_SIZE))
@@ -355,17 +361,15 @@ generate_code :: proc(c: ^Compiler, node: Node) -> (code: Program) {
 		code = generate_code(c, specific.inner)
 		original_len := len(code)
 
-		inject_at(&code, 0, Opcode.Split)
-		inject_raw(&code, size_of(byte)               , i16(SPLIT_SIZE))
-		inject_raw(&code, size_of(byte) + size_of(i16), i16(SPLIT_SIZE + original_len))
+		split := Split{.Split, i16(SPLIT_SIZE), i16(SPLIT_SIZE + original_len)}
+		inject_raw(&code, 0, split)
 
 	case ^Node_Optional_Non_Greedy:
 		code = generate_code(c, specific.inner)
 		original_len := len(code)
 
-		inject_at(&code, 0, Opcode.Split)
-		inject_raw(&code, size_of(byte)               , i16(SPLIT_SIZE + original_len))
-		inject_raw(&code, size_of(byte) + size_of(i16), i16(SPLIT_SIZE))
+		split := Split{.Split, i16(SPLIT_SIZE + original_len), i16(SPLIT_SIZE)}
+		inject_raw(&code, 0, split)
 
 	case ^Node_Match_All_And_Escape:
 		append(&code, Opcode.Match_All_And_Escape)
@@ -401,70 +405,64 @@ compile :: proc(tree: Node, flags: common.Flags) -> (code: Program, class_data: 
 
 	pc_open := 0
 
-	add_global: if .Global in flags {
+	optimize_opening: {
 		// Check if the opening to the pattern is predictable.
 		// If so, use one of the optimized Wait opcodes.
 		iter := virtual_machine.Opcode_Iterator{ code[:], 0 }
 		seek_loop: for opcode, pc in virtual_machine.iterate_opcodes(&iter) {
 			#partial switch opcode {
 			case .Byte:
-				inject_at(&code, pc_open, Opcode.Wait_For_Byte)
-				pc_open += size_of(Opcode)
-				inject_at(&code, pc_open, Opcode(code[pc + size_of(Opcode) + pc_open]))
-				pc_open += size_of(u8)
-				break add_global
+				wait := Wait_For_Byte{.Wait_For_Byte, code[pc + size_of(Opcode) + pc_open]}
+				inject_raw(&code, pc_open, wait)
+				pc_open += size_of(Wait_For_Byte)
+				break optimize_opening
 
 			case .Rune:
 				operand := intrinsics.unaligned_load(cast(^rune)&code[pc+1])
-				inject_at(&code, pc_open, Opcode.Wait_For_Rune)
-				pc_open += size_of(Opcode)
-				inject_raw(&code, pc_open, operand)
-				pc_open += size_of(rune)
-				break add_global
+				wait := Wait_For_Rune{.Wait_For_Rune, operand}
+				inject_raw(&code, pc_open, wait)
+				pc_open += size_of(Wait_For_Rune)
+				break optimize_opening
 
 			case .Rune_Class:
-				inject_at(&code, pc_open, Opcode.Wait_For_Rune_Class)
-				pc_open += size_of(Opcode)
-				inject_at(&code, pc_open, Opcode(code[pc + size_of(Opcode) + pc_open]))
-				pc_open += size_of(u8)
-				break add_global
+				wait := Wait_For_Rune_Class{.Wait_For_Rune_Class, code[pc + size_of(Opcode) + pc_open]}
+				inject_raw(&code, pc_open, wait)
+				pc_open += size_of(Wait_For_Rune_Class)
+				break optimize_opening
 
 			case .Rune_Class_Negated:
-				inject_at(&code, pc_open, Opcode.Wait_For_Rune_Class_Negated)
-				pc_open += size_of(Opcode)
-				inject_at(&code, pc_open, Opcode(code[pc + size_of(Opcode) + pc_open]))
-				pc_open += size_of(u8)
-				break add_global
+				wait := Wait_For_Rune_Class_Negated{.Wait_For_Rune_Class_Negated, code[pc + size_of(Opcode) + pc_open]}
+				inject_raw(&code, pc_open, wait)
+				pc_open += size_of(Wait_For_Rune_Class_Negated)
+				break optimize_opening
 
 			case .Save:
 				continue
+
+			case .Assert_Start, .Assert_Start_Multiline:
+				break optimize_opening
+
 			case:
 				break seek_loop
 			}
 		}
 
 		// `.*?`
-		inject_at(&code, pc_open, Opcode.Split)
-		pc_open += size_of(byte)
-		inject_raw(&code, pc_open, i16(SPLIT_SIZE + size_of(byte) + JUMP_SIZE))
-		pc_open += size_of(i16)
-		inject_raw(&code, pc_open, i16(SPLIT_SIZE))
-		pc_open += size_of(i16)
-
-		inject_at(&code, pc_open, Opcode.Wildcard)
-		pc_open += size_of(byte)
-
-		inject_at(&code, pc_open, Opcode.Jump)
-		pc_open += size_of(byte)
-		inject_raw(&code, pc_open, i16(-size_of(byte) - SPLIT_SIZE))
-		pc_open += size_of(i16)
-
+		split := Split{.Split, i16(SPLIT_SIZE + size_of(byte) + JUMP_SIZE), i16(SPLIT_SIZE)}
+		jump := Jump{.Jump, i16(-size_of(byte) - SPLIT_SIZE)}
+		pack := struct {
+			a: Split,
+			b: Opcode,
+			c: Jump,
+		} { split, Opcode.Wildcard, jump }
+		inject_raw(&code, pc_open, pack)
+		pc_open += size_of(Split) + size_of(byte) + size_of(Jump)
 	}
 
 	if .No_Capture not_in flags {
 		// `(` <generated code>
-		inject_at(&code, pc_open, Opcode.Save)
-		inject_at(&code, pc_open + size_of(byte), Opcode(0x00))
+		save := Save{.Save, Opcode(0x00)}
+		inject_raw(&code, pc_open, save)
 
 		// `)`
 		append(&code, Opcode.Save); append(&code, Opcode(0x01))

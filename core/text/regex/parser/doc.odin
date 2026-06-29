@@ -1,6 +1,5 @@
 /*
-package regex_parser implements a Pratt parser, also known as a Top-Down
-Operator Precedence parser, for parsing tokenized regular expression patterns.
+A `Pratt` parser (a.k.a. Top-Down Operator Precedence parser) for parsing tokenized regular expression patterns.
 
 References:
 - https://dl.acm.org/doi/10.1145/512927.512931

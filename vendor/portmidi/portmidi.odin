@@ -119,8 +119,8 @@ DeviceInfo :: struct {
 	structVersion: c.int,   /**< this internal structure version */ 
 	interf:        cstring, /**< underlying MIDI API, e.g. MMSystem or DirectX */
 	name:          cstring, /**< device name, e.g. USB MidiSport 1x1 */
-	input:         b32,     /**< true iff input is available */
-	output:        b32,     /**< true iff output is available */
+	input:         b32,     /**< true if and only if (⟺) input is available */
+	output:        b32,     /**< true if and only if (⟺) output is available */
 	opened:        b32,     /**< used by generic PortMidi code to do error checking on arguments */
 }
 

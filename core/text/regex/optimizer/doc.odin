@@ -1,6 +1,7 @@
 /*
-package regex_optimizer implements an optimizer which acts upon the AST of a
-parsed regular expression pattern, transforming it in-place without moving to a
+An optimizer for the regular expression AST.
+
+Acts upon the AST of a parsed regular expression pattern, transforming it in-place without moving to a
 compilation step.
 
 Where possible, it aims to reduce branching as much as possible in the

@@ -1,6 +1,6 @@
 package encoding_hxa
 
-import "core:mem"
+import "base:runtime"
 
 LATEST_VERSION :: 3
 VERSION_API :: "0.3"
@@ -16,7 +16,7 @@ Header :: struct #packed {
 File :: struct {
 	using header: Header,
 	backing:   []byte,
-	allocator: mem.Allocator,
+	allocator: runtime.Allocator,
 	nodes:     []Node,
 }
 

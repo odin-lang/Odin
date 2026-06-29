@@ -1,4 +1,4 @@
-#+build linux, darwin, freebsd
+#+build linux, darwin, freebsd, openbsd, netbsd
 package net
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
@@ -10,7 +10,7 @@ package net
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
 	Copyright 2024 Feoramund       <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
@@ -42,14 +42,19 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 	}
 
 	hosts, hosts_ok := load_hosts(dns_configuration.hosts_file)
-	defer delete(hosts)
 	if !hosts_ok {
 		return nil, .Invalid_Hosts_Config_Error
+	}
+	defer {
+		for h in hosts {
+			delete(h.name)
+		}
+		delete(hosts)
 	}
 
 	host_overrides := make([dynamic]DNS_Record)
 	for host in hosts {
-		if strings.compare(host.name, hostname) != 0 {
+		if host.name != hostname {
 			continue
 		}
 

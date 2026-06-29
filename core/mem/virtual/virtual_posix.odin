@@ -28,15 +28,6 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return posix.mprotect(data, size, transmute(posix.Prot_Flags)flags) == .OK
 }
 
-_platform_memory_init :: proc() {
-	// NOTE: `posix.PAGESIZE` due to legacy reasons could be wrong so we use `sysconf`.
-	size := posix.sysconf(._PAGESIZE)
-	DEFAULT_PAGE_SIZE = uint(max(size, posix.PAGESIZE))
-
-	// is power of two
-	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
-}
-
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	#assert(i32(posix.Prot_Flag_Bits.READ)  == i32(Map_File_Flag.Read))
 	#assert(i32(posix.Prot_Flag_Bits.WRITE) == i32(Map_File_Flag.Write))
@@ -46,4 +37,8 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 		return nil, .Map_Failure
 	}
 	return ([^]byte)(addr)[:size], nil
+}
+
+_unmap_file :: proc "contextless" (data: []byte) {
+	_release(raw_data(data), uint(len(data)))
 }

@@ -4,6 +4,7 @@ package intrinsics
 
 import "base:runtime"
 
+
 // Package-Related
 is_package_imported :: proc(package_name: string) -> bool ---
 
@@ -32,11 +33,14 @@ trap       :: proc() -> ! ---
 alloca             :: proc(size, align: int) -> [^]u8 ---
 cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
+read_cycle_counter_frequency :: proc() -> i64 ---
 
 count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_trailing_ones  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_leading_ones   :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
@@ -74,7 +78,9 @@ prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=
 prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
 
 // Compiler Hints
-expect :: proc(val, expected_val: $T) -> T ---
+expect   :: proc(val, expected_val: $T) -> T ---
+likely   :: proc(val: $T) -> T where type_is_boolean(T) ---
+unlikely :: proc(val: $T) -> T where type_is_boolean(T) ---
 
 // Linux and Darwin Only
 syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
@@ -137,9 +143,13 @@ type_is_rune       :: proc($T: typeid) -> bool ---
 type_is_float      :: proc($T: typeid) -> bool ---
 type_is_complex    :: proc($T: typeid) -> bool ---
 type_is_quaternion :: proc($T: typeid) -> bool ---
-type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
+type_is_string     :: proc($T: typeid) -> bool ---
+type_is_string16   :: proc($T: typeid) -> bool ---
+type_is_cstring    :: proc($T: typeid) -> bool ---
+type_is_cstring16  :: proc($T: typeid) -> bool ---
+
 
 type_is_endian_platform       :: proc($T: typeid) -> bool ---
 type_is_endian_little         :: proc($T: typeid) -> bool ---
@@ -152,6 +162,7 @@ type_is_indexable             :: proc($T: typeid) -> bool ---
 type_is_sliceable             :: proc($T: typeid) -> bool ---
 type_is_comparable            :: proc($T: typeid) -> bool ---
 type_is_simple_compare        :: proc($T: typeid) -> bool --- // easily compared using memcmp (== and !=)
+type_is_nearly_simple_compare :: proc($T: typeid) -> bool --- // easily compared using memcmp (including floats)
 type_is_dereferenceable       :: proc($T: typeid) -> bool ---
 type_is_valid_map_key         :: proc($T: typeid) -> bool ---
 type_is_valid_matrix_elements :: proc($T: typeid) -> bool ---
@@ -169,8 +180,12 @@ type_is_union            :: proc($T: typeid) -> bool ---
 type_is_enum             :: proc($T: typeid) -> bool ---
 type_is_proc             :: proc($T: typeid) -> bool ---
 type_is_bit_set          :: proc($T: typeid) -> bool ---
+type_is_bit_field        :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_is_matrix           :: proc($T: typeid) -> bool ---
+type_is_fixed_capacity_dynamic_array :: proc($T: typeid) -> bool ---
+
+type_is_internally_pointer_like :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
@@ -193,11 +208,16 @@ type_bit_set_underlying_type :: proc($T: typeid) -> typeid where type_is_bit_set
 type_has_field  :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
+type_field_bit_size :: proc($T: typeid, $name: string) -> int where type_is_bit_field(T) ---
+type_field_bit_offset :: proc($T: typeid, $name: string) -> int where type_is_bit_field(T) ---
+
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 
 type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
+
+type_proc_calling_convention :: proc($T: typeid) -> Odin_Calling_Convention where type_is_proc(T) ---
 
 type_struct_field_count          :: proc($T: typeid) -> int  where type_is_struct(T) ---
 type_struct_has_implicit_padding :: proc($T: typeid) -> bool where type_is_struct(T) ---
@@ -208,9 +228,16 @@ type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V --
 type_is_specialized_polymorphic_record   :: proc($T: typeid) -> bool ---
 type_is_unspecialized_polymorphic_record :: proc($T: typeid) -> bool ---
 
-type_is_subtype_of :: proc($T, $U: typeid) -> bool ---
+type_is_subtype_of  :: proc($T, $U: typeid) -> bool ---
+type_is_superset_of :: proc($Super, $Sub: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
+
+type_fixed_capacity_dynamic_array_len_offset :: proc($T: typeid/[dynamic; $N]$E) -> uintptr ---
+
+// "Contiguous" means that the set of enum constants, when sorted, have a difference of either 0 or 1 between consecutive values.
+// This is the exact opposite of "sparse".
+type_enum_is_contiguous :: proc($T: typeid) -> bool where type_is_enum(T) ---
 
 type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
@@ -221,11 +248,24 @@ type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
+type_integer_to_unsigned :: proc($T: typeid) -> type where type_is_integer(T), !type_is_unsigned(T) ---
+type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), type_is_unsigned(T) ---
+
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
+
+
+
+// Returns the canonicalized name of the type, of which is used to produce the pseudo-unique 'typeid'
+type_canonical_name :: proc($T: typeid) -> string ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 constant_log2 :: proc($v: $T) -> T where type_is_integer(T) ---
+
+constant_floor :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_trunc :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_ceil  :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+constant_round :: proc($v: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
 // SIMD related
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
@@ -306,6 +346,7 @@ simd_indices :: proc($T: typeid/#simd[$N]$E) -> T where type_is_numeric(T) ---
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
+simd_runtime_swizzle :: proc(table: #simd[N]T, indices: #simd[N]T) -> #simd[N]T where type_is_integer(T) ---
 
 // Lane-wise operations
 simd_ceil    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
@@ -314,13 +355,30 @@ simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 // rounding to the nearest integral value; if two values are equally near, rounds to the even one
 simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
-simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
+simd_approx_recip      :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T)) ---
+simd_approx_recip_sqrt :: proc(x: #simd[N]T) -> #simd[N]T where type_is_float(T)) ---
+
+simd_to_bits        :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
+simd_to_bits_signed :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), !type_is_unsigned(Integer) ---
 
 // equivalent to a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
 simd_lanes_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
 simd_lanes_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+
+// return {b[0], a[1], b[2], a[3], ...}
+simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+// Returns the sums of N consecutive lanes
+simd_sums_of_n :: proc(a: #simd[LANES]T, $N: uint) -> #simd[LANES/N]T where is_power_of_two(N) ---
+
+simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+
+simd_interleave   :: proc(a, ..#simd[LANES/N]T)       -> #simd[LANES]T where N >= 1 ---
+simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (..#simd[LANES/N]T) where N >= 1, LANES % N == 0 --- // returns N multiple vectors
+
 
 // Checks if the current target supports the given target features.
 //
@@ -329,6 +387,9 @@ simd_lanes_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
 // if all listed features are supported.
 has_target_feature :: proc($test: $T) -> bool where type_is_string(T) || type_is_proc(T) ---
 
+
+// Utility Calls
+concatenate :: proc(x, y: $T, z: ..T) -> T where type_is_array(T) || type_is_slice(T) ---
 
 // Returns the value of the procedure where `x` must be a call expression
 procedure_of :: proc(x: $T) -> T where type_is_proc(T) ---
@@ -353,22 +414,34 @@ x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
 
+// C specific things
+c_va_list  :: struct{/*platform specific implementation*/}
+
+c_va_start :: proc(list: ^c_va_list, /*#c_vararg parameter*/ args: ..$T) ---
+c_va_end   :: proc(list: ^c_va_list)                                     ---
+c_va_copy  :: proc(dst, src: ^c_va_list)                                 ---
+c_va_arg   :: proc(list: ^c_va_list, $T: typeid) -> T                    ---
+
+
 // Darwin targets only
 objc_object   :: struct{}
 objc_selector :: struct{}
 objc_class    :: struct{}
 objc_ivar     :: struct{}
 
-objc_id    :: ^objc_object
-objc_SEL   :: ^objc_selector
-objc_Class :: ^objc_class
-objc_Ivar  :: ^objc_ivar
+objc_id           :: ^objc_object
+objc_SEL          :: ^objc_selector
+objc_Class        :: ^objc_class
+objc_Ivar         :: ^objc_ivar
+objc_instancetype :: distinct objc_id
 
 objc_find_selector     :: proc($name: string) -> objc_SEL   ---
 objc_register_selector :: proc($name: string) -> objc_SEL   ---
 objc_find_class        :: proc($name: string) -> objc_Class ---
 objc_register_class    :: proc($name: string) -> objc_Class ---
 objc_ivar_get          :: proc(self: ^$T) -> ^$U ---
+objc_block             :: proc(invoke: $T, ..any) -> ^Objc_Block(T) where type_is_proc(T) ---
+objc_super             :: proc(obj: ^$T) -> ^$U where type_is_subtype_of(T, objc_object) && type_is_subtype_of(U, objc_object) ---
 
 valgrind_client_request :: proc(default: uintptr, request: uintptr, a0, a1, a2, a3, a4: uintptr) -> uintptr ---
 

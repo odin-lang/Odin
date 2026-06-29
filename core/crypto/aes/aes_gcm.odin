@@ -4,8 +4,8 @@ import "core:bytes"
 import "core:crypto"
 import "core:crypto/_aes"
 import "core:crypto/_aes/ct64"
+import aes_hw "core:crypto/_aes/hw"
 import "core:encoding/endian"
-import "core:mem"
 
 // GCM_IV_SIZE is the default size of the GCM IV in bytes.
 GCM_IV_SIZE :: 12
@@ -27,6 +27,10 @@ Context_GCM :: struct {
 
 // init_gcm initializes a Context_GCM with the provided key.
 init_gcm :: proc(ctx: ^Context_GCM, key: []byte, impl := DEFAULT_IMPLEMENTATION) {
+	when aes_hw.HAS_GHASH {
+		impl := aes_hw.is_ghash_supported() ? impl : .Portable
+
+	}
 	init_impl(&ctx._impl, key, impl)
 	ctx._is_initialized = true
 }
@@ -59,14 +63,14 @@ seal_gcm :: proc(ctx: ^Context_GCM, dst, tag, iv, aad, plaintext: []byte) {
 	final_ghash_ct64(&s, &h, &j0_enc, len(aad), len(plaintext))
 	copy(tag, s[:])
 
-	mem.zero_explicit(&h, len(h))
-	mem.zero_explicit(&j0, len(j0))
-	mem.zero_explicit(&j0_enc, len(j0_enc))
+	zero_explicit(&h, len(h))
+	zero_explicit(&j0, len(j0))
+	zero_explicit(&j0_enc, len(j0_enc))
 }
 
 // open_gcm authenticates the aad and ciphertext, and decrypts the ciphertext,
 // with the provided Context_GCM, iv, and tag, and stores the output in dst,
-// returning true iff the authentication was successful.  If authentication
+// returning true if and only if (⟺) the authentication was successful.  If authentication
 // fails, the destination buffer will be zeroed.
 //
 // dst and plaintext MUST alias exactly or not at all.
@@ -94,13 +98,13 @@ open_gcm :: proc(ctx: ^Context_GCM, dst, iv, aad, ciphertext, tag: []byte) -> bo
 
 	ok := crypto.compare_constant_time(s[:], tag) == 1
 	if !ok {
-		mem.zero_explicit(raw_data(dst), len(dst))
+		zero_explicit(raw_data(dst), len(dst))
 	}
 
-	mem.zero_explicit(&h, len(h))
-	mem.zero_explicit(&j0, len(j0))
-	mem.zero_explicit(&j0_enc, len(j0_enc))
-	mem.zero_explicit(&s, len(s))
+	zero_explicit(&h, len(h))
+	zero_explicit(&j0, len(j0))
+	zero_explicit(&j0_enc, len(j0_enc))
+	zero_explicit(&s, len(s))
 
 	return ok
 }
@@ -249,6 +253,6 @@ gctr_ct64 :: proc(
 		}
 	}
 
-	mem.zero_explicit(&tmp, size_of(tmp))
-	mem.zero_explicit(&tmp2, size_of(tmp2))
+	zero_explicit(&tmp, size_of(tmp))
+	zero_explicit(&tmp2, size_of(tmp2))
 }

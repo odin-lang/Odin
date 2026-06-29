@@ -9,7 +9,7 @@ when ODIN_OS == .Windows {
 		"system:legacy_stdio_definitions.lib",
 	}
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }
@@ -200,36 +200,6 @@ when ODIN_OS == .Darwin {
 	}
 }
 
-when ODIN_OS == .Haiku {
-	fpos_t :: distinct i64
-	
-	_IOFBF        :: 0
-	_IOLBF        :: 1
-	_IONBF        :: 2
-
-	BUFSIZ        :: 8192
-
-	EOF           :: int(-1)
-
-	FOPEN_MAX     :: 128
-
-	FILENAME_MAX  :: 256
-
-	L_tmpnam      :: 512
-
-	SEEK_SET      :: 0
-	SEEK_CUR      :: 1
-	SEEK_END      :: 2
-
-	TMP_MAX       :: 32768
-
-	foreign libc {
-		stderr: ^FILE
-		stdin:  ^FILE
-		stdout: ^FILE
-	}
-}
-
 when ODIN_OS == .NetBSD {
 	@(private) LRENAME  :: "__posix_rename"
 	@(private) LFGETPOS :: "__fgetpos50"
@@ -275,7 +245,7 @@ foreign libc {
 	// 7.21.7 Character input/output functions
 	fgetc     :: proc(stream: ^FILE) -> int ---
 	fgets     :: proc(s: [^]char, n: int, stream: ^FILE) -> [^]char ---
-	fputc     :: proc(s: cstring, stream: ^FILE) -> int ---
+	fputc     :: proc(s: c.int, stream: ^FILE) -> int ---
 	getc      :: proc(stream: ^FILE) -> int ---
 	getchar   :: proc() -> int ---
 	putc      :: proc(c: int, stream: ^FILE) -> int ---
@@ -390,7 +360,7 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 			}
 
 		case .Destroy:
-			return 0, .Empty
+			return 0, .Unsupported
 		
 		case .Query:
 			return io.query_utility({ .Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query })

@@ -1,5 +1,5 @@
 /*
-package siphash Implements the SipHash hashing algorithm.
+`SipHash` hashing algorithm.
 
 Use the specific procedures for a certain setup. The generic procedures will default to Siphash 2-4.
 
@@ -10,11 +10,11 @@ See:
 package siphash
 
 /*
-    Copyright 2022 zhibog
-    Made available under the BSD-3 license.
+	Copyright 2022 zhibog
+	Made available under Odin's license.
 
-    List of contributors:
-        zhibog:  Initial implementation.
+	List of contributors:
+		zhibog:  Initial implementation.
 */
 
 import "core:crypto"
@@ -22,7 +22,7 @@ import "core:encoding/endian"
 import "core:math/bits"
 
 /*
-    High level API
+	High level API
 */
 
 KEY_SIZE :: 16
@@ -215,7 +215,7 @@ verify_4_8 :: proc {
 }
 
 /*
-    Low level API
+	Low level API
 */
 
 init :: proc(ctx: ^Context, key: []byte, c_rounds, d_rounds: int) {

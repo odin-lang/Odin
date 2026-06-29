@@ -1,13 +1,12 @@
-/*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
-*/
-
-
 package math_big
 
+/*
+	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+*/
+
 import "base:intrinsics"
-import rnd "core:math/rand"
+import "base:runtime"
 
 /*
 	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
@@ -362,17 +361,7 @@ platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
 
 count_lsb :: proc { int_count_lsb, platform_count_lsb, }
 
-int_random_digit :: proc() -> (res: DIGIT) {
-	when _DIGIT_BITS == 60 { // DIGIT = u64
-		return DIGIT(rnd.uint64()) & _MASK
-	} else when _DIGIT_BITS == 28 { // DIGIT = u32
-		return DIGIT(rnd.uint32()) & _MASK
-	} else {
-		panic("Unsupported DIGIT size.")
-	}
-
-	return 0 // We shouldn't get here.
-}
+int_random_digit :: internal_int_random_digit
 
 int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
 	/*
@@ -777,32 +766,36 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 */
 INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 
-@(init, private)
-_init_constants :: proc() {
-	initialize_constants()
-}
+@(private)
+constant_allocator: runtime.Allocator
 
-initialize_constants :: proc() -> (res: int) {
-	internal_set(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable}
-	internal_set(      INT_ONE,  1);       INT_ONE.flags = {.Immutable}
-	internal_set(INT_MINUS_ONE, -1); INT_MINUS_ONE.flags = {.Immutable}
+@(init, private)
+initialize_constants :: proc "contextless" () {
+	context = runtime.default_context()
+	constant_allocator = context.allocator
+
+	internal_int_set_from_integer(     INT_ZERO,  0);      INT_ZERO.flags = {.Immutable}
+	internal_int_set_from_integer(      INT_ONE,  1);       INT_ONE.flags = {.Immutable}
+	internal_int_set_from_integer(INT_MINUS_ONE, -1); INT_MINUS_ONE.flags = {.Immutable}
 
 	/*
 		We set these special values to -1 or 1 so they don't get mistake for zero accidentally.
 		This allows for shortcut tests of is_zero as .used == 0.
 	*/
-	internal_set(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
-	internal_set(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
-	internal_set(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
-
-	return _DEFAULT_MUL_KARATSUBA_CUTOFF
+	internal_int_set_from_integer(      INT_NAN,  1);       INT_NAN.flags = {.Immutable, .NaN}
+	internal_int_set_from_integer(      INT_INF,  1);       INT_INF.flags = {.Immutable, .Inf}
+	internal_int_set_from_integer(INT_MINUS_INF, -1); INT_MINUS_INF.flags = {.Immutable, .Inf}
 }
 
 /*
 	Destroy constants.
 	Optional for an EXE, as this would be called at the very end of a process.
 */
-destroy_constants :: proc() {
+@(fini, private)
+destroy_constants :: proc "contextless" () {
+	context = runtime.default_context()
+	context.allocator = constant_allocator
+
 	internal_destroy(INT_ONE, INT_ZERO, INT_MINUS_ONE, INT_INF, INT_MINUS_INF, INT_NAN)
 }
 

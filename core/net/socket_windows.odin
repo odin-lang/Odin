@@ -11,7 +11,7 @@ package net
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
 	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
 	Copyright 2024 Feoramund       <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Tetralux:        Initial implementation
@@ -24,62 +24,33 @@ import "core:c"
 import win "core:sys/windows"
 import "core:time"
 
-Socket_Option :: enum c.int {
-	// bool: Whether the address that this socket is bound to can be reused by other sockets.
-	//       This allows you to bypass the cooldown period if a program dies while the socket is bound.
-	Reuse_Address             = win.SO_REUSEADDR,
+_SOCKET_OPTION_BROADCAST                 :: win.SO_BROADCAST
+_SOCKET_OPTION_REUSE_ADDRESS             :: win.SO_REUSEADDR
+_SOCKET_OPTION_KEEP_ALIVE                :: win.SO_KEEPALIVE
+_SOCKET_OPTION_OUT_OF_BOUNDS_DATA_INLINE :: win.SO_OOBINLINE
+_SOCKET_OPTION_LINGER                    :: win.SO_LINGER
+_SOCKET_OPTION_RECEIVE_BUFFER_SIZE       :: win.SO_RCVBUF
+_SOCKET_OPTION_SEND_BUFFER_SIZE          :: win.SO_SNDBUF
+_SOCKET_OPTION_RECEIVE_TIMEOUT           :: win.SO_RCVTIMEO
+_SOCKET_OPTION_SEND_TIMEOUT              :: win.SO_SNDTIMEO
 
-	// bool: Whether other programs will be inhibited from binding the same endpoint as this socket.
-	Exclusive_Addr_Use        = win.SO_EXCLUSIVEADDRUSE,
+_SOCKET_OPTION_TCP_NODELAY :: win.TCP_NODELAY
 
-	// bool: When true, keepalive packets will be automatically be sent for this connection. TODO: verify this understanding
-	Keep_Alive                = win.SO_KEEPALIVE, 
+_SOCKET_OPTION_USE_LOOPBACK              :: -1
+_SOCKET_OPTION_REUSE_PORT                :: -1
+_SOCKET_OPTION_NO_SIGPIPE_FROM_EPIPE     :: -1
+_SOCKET_OPTION_REUSE_PORT_LOAD_BALANCING :: -1
 
-	// bool: When true, client connections will immediately be sent a TCP/IP RST response, rather than being accepted.
-	Conditional_Accept        = win.SO_CONDITIONAL_ACCEPT,
+_SOCKET_OPTION_EXCLUSIVE_ADDR_USE :: win.SO_EXCLUSIVEADDRUSE
+_SOCKET_OPTION_CONDITIONAL_ACCEPT :: win.SO_CONDITIONAL_ACCEPT
+_SOCKET_OPTION_DONT_LINGER        :: win.SO_DONTLINGER
 
-	// bool: If true, when the socket is closed, but data is still waiting to be sent, discard that data.
-	Dont_Linger               = win.SO_DONTLINGER,
-
-	// bool: When true, 'out-of-band' data sent over the socket will be read by a normal net.recv() call, the same as normal 'in-band' data.
-	Out_Of_Bounds_Data_Inline = win.SO_OOBINLINE,   
-
-	// bool: When true, disables send-coalescing, therefore reducing latency.
-	TCP_Nodelay               = win.TCP_NODELAY, 
-
-	// win.LINGER: Customizes how long (if at all) the socket will remain open when there
-	// is some remaining data waiting to be sent, and net.close() is called.
-	Linger                    = win.SO_LINGER, 
-
-	// win.DWORD: The size, in bytes, of the OS-managed receive-buffer for this socket.
-	Receive_Buffer_Size       = win.SO_RCVBUF, 
-
-	// win.DWORD: The size, in bytes, of the OS-managed send-buffer for this socket.
-	Send_Buffer_Size          = win.SO_SNDBUF,
-
-	// win.DWORD: For blocking sockets, the time in milliseconds to wait for incoming data to be received, before giving up and returning .Timeout.
-	//            For non-blocking sockets, ignored.
-	//            Use a value of zero to potentially wait forever.
-	Receive_Timeout           = win.SO_RCVTIMEO,
-
-	// win.DWORD: For blocking sockets, the time in milliseconds to wait for outgoing data to be sent, before giving up and returning .Timeout.
-	//            For non-blocking sockets, ignored.
-	//            Use a value of zero to potentially wait forever.
-	Send_Timeout              = win.SO_SNDTIMEO,
-
-	// bool: Allow sending to, receiving from, and binding to, a broadcast address.
-	Broadcast                 = win.SO_BROADCAST, 
-}
-
-
-Shutdown_Manner :: enum c.int {
-	Receive = win.SD_RECEIVE,
-	Send    = win.SD_SEND,
-	Both    = win.SD_BOTH,
-}
+_SHUTDOWN_MANNER_RECEIVE :: win.SD_RECEIVE
+_SHUTDOWN_MANNER_SEND    :: win.SD_SEND
+_SHUTDOWN_MANNER_BOTH    :: win.SD_BOTH
 
 @(init, private)
-ensure_winsock_initialized :: proc() {
+ensure_winsock_initialized :: proc "contextless" () {
 	win.ensure_winsock_initialized()
 }
 
@@ -177,11 +148,25 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 }
 
 @(private)
-_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Listen_Error) {
+_bound_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Socket_Info_Error) {
 	sockaddr: win.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 	if win.getsockname(win.SOCKET(any_socket_to_socket(sock)), &sockaddr, &sockaddrlen) == win.SOCKET_ERROR {
-		err = _listen_error()
+		err = _socket_info_error()
+		return
+	}
+
+	ep = _sockaddr_to_endpoint(&sockaddr)
+	return
+}
+
+@(private)
+_peer_endpoint :: proc(sock: Any_Socket) -> (ep: Endpoint, err: Socket_Info_Error) {
+	sockaddr: win.SOCKADDR_STORAGE_LH
+	sockaddrlen := c.int(size_of(sockaddr))
+	res := win.getpeername(win.SOCKET(any_socket_to_socket(sock)), &sockaddr, &sockaddrlen)
+	if res < 0 {
+		err = _socket_info_error()
 		return
 	}
 
@@ -308,7 +293,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	ptr: rawptr
 	len: c.int
 
-	switch option {
+	#partial switch option {
 	case
 		.Reuse_Address,
 		.Exclusive_Addr_Use,
@@ -369,6 +354,8 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			}
 			ptr = &int_value
 			len = size_of(int_value)
+	case:
+		return .Invalid_Option
 	}
 
 	socket := any_socket_to_socket(s)

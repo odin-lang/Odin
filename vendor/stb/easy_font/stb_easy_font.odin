@@ -1,26 +1,7 @@
-package stb_easy_font
-
 /*
-	Source port of stb_easy_font.h
+An Odin-native source port of [[ stb_easy_font.h ; https://github.com/nothings/stb/blob/master/stb_easy_font.h ]].
 
-	Original port: gingerBill
-	Bugfixes:      Florian Behr & Jeroen van Rijn
-	Additions:     Jeroen van Rijn
-
-	Changelog:
-	2022-04-03
-		Bug fixes
-		Add `print(x, y, text, color, quad_buffer)` version that takes `[]quad`.
-			(Same internal memory layout as []u8 API, but more convenient for the caller.)
-		Add optional `scale := f32(1.0)` param to `print` to embiggen the glyph quads.
-
-	2021-09-14
-		Original Odin version
-*/
-
-/*
-	// Example for use with vendor:raylib
-
+Example:
 	quads: [999]easy_font.Quad = ---
 
 	color := rl.GREEN
@@ -38,7 +19,24 @@ package stb_easy_font
 		// And in practice this code will likely not live as close to the `easy_font` call.
 		rl.DrawRectangleRec(r, color)
 	}
+
+
+Changelog:
+	2022-04-03
+		Bug fixes
+		Add `print(x, y, text, color, quad_buffer)` version that takes `[]quad`.
+			(Same internal memory layout as []u8 API, but more convenient for the caller.)
+		Add optional `scale := f32(1.0)` param to `print` to embiggen the glyph quads.
+
+	2021-09-14
+		Original Odin version
+
+Credits:
+	Original port: gingerBill
+	Bugfixes:      Florian Behr & Jeroen van Rijn
+	Additions:     Jeroen van Rijn
 */
+package stb_easy_font
 
 import "core:math"
 import "core:mem"

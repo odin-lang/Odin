@@ -86,3 +86,16 @@ ID_EQUALS :: #force_inline proc "c" (id1, id2: $T) -> bool
 	      intrinsics.type_has_field(T, "generation") {
 	return id1.index1 == id2.index1 && id1.world0 == id2.world0 && id1.generation == id2.generation
 }
+
+// Store a world id into a u32.
+StoreWorldId :: #force_inline proc "c" (id: WorldId) -> u32 {
+	return (u32(id.index1) << 16) | u32(id.generation)
+}
+
+// Load a u32 into a world id.
+LoadWorldId :: #force_inline proc "c" (x: u32) -> WorldId {
+	return {
+		u16(x >> 16),
+		u16(x),
+	}
+}

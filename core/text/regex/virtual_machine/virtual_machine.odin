@@ -2,7 +2,7 @@ package regex_vm
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Feoramund: Initial implementation.
@@ -37,16 +37,46 @@ Opcode :: enum u8 {
 	Split                       = 0x08, // | u16, u16
 	Save                        = 0x09, // | u8
 	Assert_Start                = 0x0A, // |
-	Assert_End                  = 0x0B, // |
-	Assert_Word_Boundary        = 0x0C, // |
-	Assert_Non_Word_Boundary    = 0x0D, // |
-	Multiline_Open              = 0x0E, // |
-	Multiline_Close             = 0x0F, // |
-	Wait_For_Byte               = 0x10, // | u8
-	Wait_For_Rune               = 0x11, // | i32
-	Wait_For_Rune_Class         = 0x12, // | u8
-	Wait_For_Rune_Class_Negated = 0x13, // | u8
-	Match_All_And_Escape        = 0x14, // |
+	Assert_Start_Multiline      = 0x0B, // |
+	Assert_End                  = 0x0C, // |
+	Assert_Word_Boundary        = 0x0D, // |
+	Assert_Non_Word_Boundary    = 0x0E, // |
+	Multiline_Open              = 0x0F, // |
+	Multiline_Close             = 0x10, // |
+	Wait_For_Byte               = 0x11, // | u8
+	Wait_For_Rune               = 0x12, // | i32
+	Wait_For_Rune_Class         = 0x13, // | u8
+	Wait_For_Rune_Class_Negated = 0x14, // | u8
+	Match_All_And_Escape        = 0x15, // |
+}
+Jump :: struct #packed {
+	opcode: Opcode,
+	target: i16,
+}
+Split :: struct #packed {
+	opcode: Opcode,
+	left:   i16,
+	right:  i16,
+}
+Wait_For_Byte :: struct #packed {
+	opcode:  Opcode,
+	operand: Opcode,
+}
+Wait_For_Rune :: struct #packed {
+	opcode:  Opcode,
+	operand: rune,
+}
+Wait_For_Rune_Class :: struct #packed {
+	opcode:  Opcode,
+	operand: Opcode,
+}
+Wait_For_Rune_Class_Negated :: struct #packed {
+	opcode:  Opcode,
+	operand: Opcode,
+}
+Save :: struct #packed {
+	opcode:  Opcode,
+	operand: Opcode,
 }
 
 Thread :: struct {
@@ -77,6 +107,8 @@ Machine :: struct {
 	current_rune_size: int,
 	next_rune: rune,
 	next_rune_size: int,
+
+	last_rune: rune,
 }
 
 
@@ -169,6 +201,12 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 				pc += size_of(Opcode)
 				continue
 			}
+		case .Assert_Start_Multiline:
+			sp := vm.string_pointer+vm.current_rune_size
+			if sp == 0 || vm.last_rune == '\n' || vm.last_rune == '\r' {
+				pc += size_of(Opcode)
+				continue
+			}
 		case .Assert_End:
 			sp := vm.string_pointer+vm.current_rune_size
 			if sp == len(vm.memory) {
@@ -177,24 +215,12 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 			}
 		case .Multiline_Open:
 			sp := vm.string_pointer+vm.current_rune_size
-			if sp == 0 || sp == len(vm.memory) {
-				if vm.next_rune == '\r' || vm.next_rune == '\n' {
-					// The VM is currently on a newline at the string boundary,
-					// so consume the newline next frame.
-					when common.ODIN_DEBUG_REGEX {
-						io.write_string(common.debug_stream, "*** New thread added [PC:")
-						common.write_padded_hex(common.debug_stream, pc, 4)
-						io.write_string(common.debug_stream, "]\n")
-					}
-					vm.next_threads[vm.top_thread] = Thread{ pc = pc, saved = saved }
-					vm.top_thread += 1
-				} else {
-					// Skip the `Multiline_Close` opcode.
-					pc += 2 * size_of(Opcode)
-					continue
-				}
+			if sp == len(vm.memory) {
+				// Skip the `Multiline_Close` opcode.
+				pc += 2 * size_of(Opcode)
+				continue
 			} else {
-				// Not on a string boundary.
+				// Not at the end of the string.
 				// Try to consume a newline next frame in the other opcode loop.
 				when common.ODIN_DEBUG_REGEX {
 					io.write_string(common.debug_stream, "*** New thread added [PC:")
@@ -206,28 +232,24 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 			}
 		case .Assert_Word_Boundary:
 			sp := vm.string_pointer+vm.current_rune_size
-			if sp == 0 || sp == len(vm.memory) {
+
+			left_is_wc := sp > 0 && is_word_class(vm.current_rune)
+			right_is_wc := sp < len(vm.memory) && is_word_class(vm.next_rune)
+
+			if left_is_wc != right_is_wc {
 				pc += size_of(Opcode)
 				continue
-			} else {
-				last_rune_is_wc := is_word_class(vm.current_rune)
-				this_rune_is_wc := is_word_class(vm.next_rune)
-
-				if last_rune_is_wc && !this_rune_is_wc || !last_rune_is_wc && this_rune_is_wc {
-					pc += size_of(Opcode)
-					continue
-				}
 			}
+
 		case .Assert_Non_Word_Boundary:
 			sp := vm.string_pointer+vm.current_rune_size
-			if sp != 0 && sp != len(vm.memory) {
-				last_rune_is_wc := is_word_class(vm.current_rune)
-				this_rune_is_wc := is_word_class(vm.next_rune)
 
-				if last_rune_is_wc && this_rune_is_wc || !last_rune_is_wc && !this_rune_is_wc {
-					pc += size_of(Opcode)
-					continue
-				}
+			left_is_wc := sp > 0 && is_word_class(vm.current_rune)
+			right_is_wc := sp < len(vm.memory) && is_word_class(vm.next_rune)
+
+			if left_is_wc == right_is_wc {
+				pc += size_of(Opcode)
+				continue
 			}
 
 		case .Wait_For_Byte:
@@ -329,10 +351,10 @@ add_thread :: proc(vm: ^Machine, saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, pc:
 
 run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTURE_GROUPS]int, ok: bool) #no_bounds_check {
 	when UNICODE_MODE {
-		vm.next_rune, vm.next_rune_size = utf8.decode_rune_in_string(vm.memory)
+		vm.next_rune, vm.next_rune_size = utf8.decode_rune_in_string(vm.memory[vm.string_pointer:])
 	} else {
 		if len(vm.memory) > 0 {
-			vm.next_rune = cast(rune)vm.memory[0]
+			vm.next_rune = cast(rune)vm.memory[vm.string_pointer]
 			vm.next_rune_size = 1
 		}
 	}
@@ -613,6 +635,7 @@ run :: proc(vm: ^Machine, $UNICODE_MODE: bool) -> (saved: ^[2 * common.MAX_CAPTU
 			break
 		}
 
+		vm.last_rune = vm.current_rune
 		vm.string_pointer += vm.current_rune_size
 	}
 

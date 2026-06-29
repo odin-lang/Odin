@@ -35,6 +35,7 @@ TOKEN_KIND(Token__OperatorBegin, ""), \
 	TOKEN_KIND(Token_Shr,      ">>"), \
 	TOKEN_KIND(Token_CmpAnd,   "&&"), \
 	TOKEN_KIND(Token_CmpOr,    "||"), \
+	TOKEN_KIND(Token_MulMul,   "**"), \
 \
 TOKEN_KIND(Token__AssignOpBegin, ""), \
 	TOKEN_KIND(Token_AddEq,    "+="), \
@@ -379,6 +380,7 @@ gb_internal void advance_to_next_rune(Tokenizer *t) {
 
 gb_internal void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *data, isize size) {
 	t->fullpath = fullpath;
+	t->column_minus_one = -1;
 	t->line_count = 1;
 
 	t->start = cast(u8 *)data;
@@ -878,6 +880,9 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			if (t->curr_rune == '=') {
 				advance_to_next_rune(t);
 				token->kind = Token_MulEq;
+			} else if (t->curr_rune == '*') {
+				advance_to_next_rune(t);
+				token->kind = Token_MulMul;
 			}
 			break;
 		case '=':
@@ -968,6 +973,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				advance_to_next_rune(t);
 				for (isize comment_scope = 1; comment_scope > 0; /**/) {
 					if (t->curr_rune == GB_RUNE_EOF) {
+						tokenizer_err(t, "Multi-line comment not terminated");
 						break;
 					} else if (t->curr_rune == '/') {
 						advance_to_next_rune(t);
@@ -1113,6 +1119,7 @@ semicolon_check:;
 		/*fallthrough*/
 	case Token_Increment:
 	case Token_Decrement:
+	case Token_Not:
 		/*fallthrough*/
 		t->insert_semicolon = true;
 		break;

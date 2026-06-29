@@ -6,7 +6,7 @@ InitFlags :: distinct bit_set[InitFlag; Uint32]
 InitFlag :: enum Uint32 {
 	AUDIO     = 4,  /**< `SDL_INIT_AUDIO` implies `SDL_INIT_EVENTS` */
 	VIDEO     = 5,  /**< `SDL_INIT_VIDEO` implies `SDL_INIT_EVENTS`, should be initialized on the main thread */
-	JOYSTICK  = 9,  /**< `SDL_INIT_JOYSTICK` implies `SDL_INIT_EVENTS`, should be initialized on the same thread as SDL_INIT_VIDEO on Windows if you don't set SDL_HINT_JOYSTICK_THREAD */
+	JOYSTICK  = 9,  /**< `SDL_INIT_JOYSTICK` implies `SDL_INIT_EVENTS` */
 	HAPTIC    = 12,
 	GAMEPAD   = 13, /**< `SDL_INIT_GAMEPAD` implies `SDL_INIT_JOYSTICK` */
 	EVENTS    = 14,

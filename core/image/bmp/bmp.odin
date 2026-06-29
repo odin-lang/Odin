@@ -1,4 +1,4 @@
-// package bmp implements a Microsoft BMP image reader
+// Reader and writer for Microsoft `BMP` images.
 package core_image_bmp
 
 import "core:image"
@@ -741,6 +741,6 @@ destroy :: proc(img: ^Image) {
 }
 
 @(init, private)
-_register :: proc() {
+_register :: proc "contextless" () {
 	image.register(.BMP, load_from_bytes, destroy)
 }

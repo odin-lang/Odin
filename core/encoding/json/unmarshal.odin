@@ -26,6 +26,88 @@ Unmarshal_Error :: union {
 	Unsupported_Type_Error,
 }
 
+User_Unmarshaler :: #type proc(p: ^Parser, v: any) -> Unmarshal_Error
+
+Register_User_Unmarshaler_Error :: enum {
+	None,
+	No_User_Unmarshaler,
+	Unmarshaler_Previously_Found,
+}
+
+// NOTE(Jeroen): This is a pointer to prevent accidental additions
+// it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
+_user_unmarshalers: ^map[typeid]User_Unmarshaler
+
+// Sets user-defined unmarshalers for custom json unmarshaling of specific types
+//
+// Inputs:
+// - m: A pointer to a map of typeids to User_Unmarshaler procs.
+//
+// NOTE: Must be called before using `register_user_unmarshaler`.
+//
+set_user_unmarshalers :: proc(m: ^map[typeid]User_Unmarshaler) {
+	assert(_user_unmarshalers == nil, "set_user_unmarshalers must not be called more than once.")
+	_user_unmarshalers = m
+}
+
+/*
+Registers a user-defined unmarshaler for a specific `typeid`.
+
+WARNING: set_user_unmarshalers must be called before using this procedure.
+
+Inputs:
+- id: The `typeid` of the custom type.
+- unmarshaler: The `User_Unmarshaler` function for the custom type.
+
+Example:
+	import "core:fmt"
+	import "core:encoding/json"
+	import "core:strconv"
+
+	// Custom Unmarshaler for `int`
+	some_unmarshaler :: proc(p: ^json.Parser, v: any) -> json.Unmarshal_Error {
+		token := p.curr_token.text
+		i, ok := strconv.parse_i64_of_base(token, 2)
+		if !ok {
+			return .Invalid_Data
+		}
+
+		(^int)(v.data)^ = int(i)
+
+		json.advance_token(p)
+		return nil
+	}
+
+	register_user_unmarshaler_example :: proc() {
+		// Ensure the `json._user_unmarshalers` map is initialized.
+		json.set_user_unmarshalers(new(map[typeid]json.User_Unmarshaler))
+		reg_err := json.register_user_unmarshaler(typeid_of(int), some_unmarshaler)
+		assert(reg_err == .None)
+
+		data := `{"value":101010}`
+		SomeType :: struct {
+			value: int,
+		}
+		y: SomeType
+
+		unmarshal_err := json.unmarshal(transmute([]byte)data, &y)
+		fmt.println(y, unmarshal_err)
+	}
+
+Output:
+	SomeType{value = 42} nil
+*/
+register_user_unmarshaler :: proc(id: typeid, unmarshaler: User_Unmarshaler) -> Register_User_Unmarshaler_Error {
+	if _user_unmarshalers == nil {
+		return .No_User_Unmarshaler
+	}
+	if prev, found := _user_unmarshalers[id]; found && prev != nil {
+		return .Unmarshaler_Previously_Found
+	}
+	_user_unmarshalers[id] = unmarshaler
+	return .None
+}
+
 unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, allocator := context.allocator) -> Unmarshal_Error {
 	v := v
 	if v == nil || v.id == nil {
@@ -37,8 +119,10 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 		return .Non_Pointer_Parameter
 	}
 	PARSE_INTEGERS :: true
-	
-	if !is_valid(data, spec, PARSE_INTEGERS) {
+
+	// If we have custom unmarshalers, we skip validation in case the custom data is not quite up to spec.
+	have_custom := _user_unmarshalers != nil && len(_user_unmarshalers) > 0
+	if !have_custom && !is_valid(data, spec, PARSE_INTEGERS) {
 		return .Invalid_Data
 	}
 	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
@@ -188,8 +272,18 @@ assign_float :: proc(val: any, f: $T) -> bool {
 
 
 @(private)
-unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
-	val := val
+unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
+	str: string
+	switch {
+	case token.kind == .String:
+		str = unquote_string(token, p.spec, p.allocator) or_return
+	case:
+		str = clone_string(token.text, p.allocator) or_return
+	}
+	defer if !ok || (val.id != string && val.id != cstring) {
+		delete(str, p.allocator)
+	}
+
 	switch &dst in val {
 	case string:
 		dst = str
@@ -215,6 +309,15 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 		}
 		ok = true
 		return
+	case rune:
+		for rne, i in str {
+			if i > 0 {
+				dst = {}
+				return false, .Invalid_Rune
+			}
+			dst = rne
+		}
+		return true, nil
 	}
 	
 	#partial switch variant in ti.variant {
@@ -255,11 +358,17 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.T
 	return false, nil
 }
 
-
 @(private)
 unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token
+
+	if _user_unmarshalers != nil {
+		unmarshaler := _user_unmarshalers[v.id]
+		if unmarshaler != nil {
+			return unmarshaler(p, v)
+		}
+	}
 
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))
@@ -339,7 +448,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .Ident:
 		advance_token(p)
 		if p.spec == .MJSON {
-			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) or_return {
+			if unmarshal_string_token(p, any{v.data, ti.id}, token, ti) or_return {
 				return nil
 			}
 		}
@@ -347,18 +456,10 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		
 	case .String:
 		advance_token(p)
-		str  := unquote_string(token, p.spec, p.allocator) or_return
-		dest := any{v.data, ti.id}
-		if !(unmarshal_string_token(p, dest, str, ti) or_return) {
-			delete(str, p.allocator)
-			return UNSUPPORTED_TYPE
+		if unmarshal_string_token(p, any{v.data, ti.id}, token, ti) or_return {
+			return nil
 		}
-
-		switch destv in dest {
-		case string, cstring:
-		case: delete(str, p.allocator)
-		}
-		return nil
+		return UNSUPPORTED_TYPE
 
 	case .Open_Brace:
 		return unmarshal_object(p, v, .Close_Brace)
@@ -406,6 +507,9 @@ unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_loca
 	return prev
 }
 
+// Struct tags can include not only the name of the JSON key, but also a tag such as `omitempty`.
+// Example: `json:"key_name,omitempty"`
+// This returns the first field as `json_name`, and the rest are returned as `extra`.
 @(private)
 json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 	json_name = value
@@ -441,12 +545,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			defer delete(key, p.allocator)
 			
 			unmarshal_expect_token(p, .Colon)						
-			
-			field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
-				prev_set := field_used[offset/8] & byte(offset&7) != 0
-				field_used[offset/8] |= byte(offset&7)
-				return prev_set
-			}
 
 			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
 			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
@@ -465,7 +563,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			if use_field_idx < 0 {
 				for field, field_idx in fields {
-					if key == field.name {
+					tag_value := reflect.struct_tag_get(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if json_name == "" && key == field.name {
 						use_field_idx = field_idx
 						break
 					}
@@ -486,7 +586,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						}
 					}
 
-					if field.name == key || (field.tag != "" && reflect.struct_tag_get(field.tag, "json") == key) {
+					tag_value := reflect.struct_tag_get(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if (json_name == "" && field.name == key) || json_name == key {
 						offset = field.offset
 						type = field.type
 						found = true
@@ -508,6 +610,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 
 			if field_found {
+				field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
+					prev_set := field_used[offset/8] & byte(offset&7) != 0
+					field_used[offset/8] |= byte(offset&7)
+					return prev_set
+				}
 				if field_test(field_used, offset) {
 					return .Multiple_Use_Field
 				}
@@ -528,7 +635,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				defer p.allocator = allocator
 				p.allocator = mem.nil_allocator()
 
-				parse_value(p) or_return
+				_ = parse_value(p) or_return
 				if parse_comma(p) {
 					break struct_loop
 				}
@@ -564,7 +671,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			key_ptr: rawptr
 
 			#partial switch tk in t.key.variant {
-				case runtime.Type_Info_String:			
+				case runtime.Type_Info_String:
+					assert(tk.encoding == .UTF_8)
+
 					key_ptr = rawptr(&key)
 					key_cstr: cstring
 					if reflect.is_cstring(t.key) {
@@ -699,6 +808,16 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		raw.allocator = p.allocator
 		
 		return assign_array(p, raw.data, t.elem, length)
+
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		if int(length) > t.capacity {
+			return UNSUPPORTED_TYPE
+		}
+		base_ptr := cast(uintptr)v.data
+		len_ptr := base_ptr + t.len_offset
+		len_val := cast(^int)len_ptr
+		len_val^ = int(length)
+		return assign_array(p, rawptr(base_ptr), t.elem, length)
 		
 	case reflect.Type_Info_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array

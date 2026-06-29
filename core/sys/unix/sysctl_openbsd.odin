@@ -9,7 +9,7 @@ foreign libc {
 	@(link_name="sysctl")	_unix_sysctl    :: proc(name: [^]i32, namelen: u32, oldp: rawptr, oldlenp: ^c.size_t, newp: rawptr, newlen: c.size_t) -> i32 ---
 }
 
-sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
+sysctl :: proc "contextless" (mib: []i32, val: ^$T) -> (ok: bool) {
 	mib := mib
 	result_size := c.size_t(size_of(T))
 	res := _unix_sysctl(raw_data(mib), u32(len(mib)), val, &result_size, nil, 0)
@@ -47,3 +47,4 @@ CTL_HW     :: 6
 	HW_SERIALNO  :: 17
 	HW_UUID      :: 18
 	HW_PHYSMEM64 :: 19
+	HW_USERMEM64 :: 20

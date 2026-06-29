@@ -1,20 +1,8 @@
 package objc_Foundation
 
-foreign import "system:Foundation.framework"
-
 import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
-
-RunLoopMode :: ^String
-
-@(link_prefix="NS")
-foreign Foundation {
-	RunLoopCommonModes:       RunLoopMode
-	DefaultRunLoopMode:       RunLoopMode
-	EventTrackingRunLoopMode: RunLoopMode
-	ModalPanelRunLoopMode:    RunLoopMode
-}
 
 ActivationPolicy :: enum UInteger {
 	Regular    = 0,
@@ -82,7 +70,6 @@ Application_setActivationPolicy :: proc "c" (self: ^Application, activationPolic
 // NOTE: this is technically deprecated but still actively used (Sokol, glfw, SDL, etc.)
 // and has no clear alternative although `activate` is what Apple tells you to use,
 // that does not work the same way.
-// @(deprecated="Use NSApplication method activate instead.")
 @(objc_type=Application, objc_name="activateIgnoringOtherApps")
 Application_activateIgnoringOtherApps :: proc "c" (self: ^Application, ignoreOtherApps: BOOL) {
 	msgSend(nil, self, "activateIgnoringOtherApps:", ignoreOtherApps)
@@ -93,19 +80,53 @@ Application_activate :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "activate")
 }
 
+@(objc_type=Application, objc_name="active")
+Application_active :: proc "c" (self: ^Application) -> BOOL {
+	return msgSend(BOOL, self, "isActive")
+}
+
 @(objc_type=Application, objc_name="setTitle")
 Application_setTitle :: proc "c" (self: ^Application, title: ^String) {
 	msgSend(nil, self, "setTitle", title)
 }
 
 @(objc_type=Application, objc_name="mainMenu")
-Window_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
+Application_mainMenu :: proc "c" (self: ^Application) -> ^Menu {
 	return msgSend(^Menu, self, "mainMenu")
 }
 
 @(objc_type=Application, objc_name="setMainMenu")
 Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)
+}
+
+// This property is actually not exposed in AppKit's public API.
+// But there is basically no other way to configure the apple menu without using NIB files.
+// Therefore, an Odin binding for this non-public API was created.
+// Note: SDL also calls this non-public method.
+@(objc_type=Application, objc_name="setAppleMenu")
+Application_setAppleMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setAppleMenu:", menu)
+}
+
+@(objc_type=Application, objc_name="servicesMenu")
+Application_servicesMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "servicesMenu")
+}
+
+@(objc_type=Application, objc_name="setServicesMenu")
+Application_setServicesMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setServicesMenu:", menu)
+}
+
+@(objc_type=Application, objc_name="windowsMenu")
+Application_windowsMenu :: proc "c" (self: ^Application) -> ^Menu {
+	return msgSend(^Menu, self, "windowsMenu")
+}
+
+@(objc_type=Application, objc_name="setWindowsMenu")
+Application_setWindowsMenu :: proc "c" (self: ^Application, menu: ^Menu) {
+	msgSend(nil, self, "setWindowsMenu:", menu)
 }
 
 @(objc_type=Application, objc_name="mainWindow")
@@ -133,6 +154,11 @@ Application_finishLaunching :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "finishLaunching")
 }
 
+@(objc_type=Application, objc_name="stop")
+Application_stop :: proc "c" (self: ^Application, sender: ^Object) {
+	msgSend(nil, self, "stop:", sender)
+}
+
 @(objc_type=Application, objc_name="terminate")
 Application_terminate :: proc "c" (self: ^Application, sender: ^Object) {
 	msgSend(nil, self, "terminate:", sender)
@@ -157,10 +183,23 @@ Application_nextEventMatchingMask :: proc "c" (self: ^Application, mask: EventMa
 Application_sendEvent :: proc "c" (self: ^Application, event: ^Event) {
 	msgSend(nil, self, "sendEvent:", event)
 }
+
+@(objc_type=Application, objc_name="postEvent")
+Application_postEvent :: proc "c" (self: ^Application, event: ^Event, atStart: BOOL) {
+	msgSend(nil, self, "postEvent:atStart:", event, atStart)
+}
+
 @(objc_type=Application, objc_name="updateWindows")
 Application_updateWindows :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "updateWindows")
 }
+
+@(objc_type=Application, objc_name="sendAction")
+Application_sendAction :: proc "c" (self: ^Application, action: SEL, to: id, from: id) {
+	msgSend(nil, self, "sendAction:to:from:", action, to, from)
+}
+
+
 
 
 @(objc_class="NSRunningApplication")
@@ -174,6 +213,11 @@ RunningApplication_currentApplication :: proc "c" () -> ^RunningApplication {
 @(objc_type=RunningApplication, objc_name="localizedName")
 RunningApplication_localizedName :: proc "c" (self: ^RunningApplication) -> ^String {
 	return msgSend(^String, self, "localizedName")
+}
+
+@(objc_type=RunningApplication, objc_name="finishedLaunching")
+RunningApplication_finishedLaunching :: proc "c" (self: ^RunningApplication) -> BOOL {
+	return msgSend(BOOL, self, "isFinishedLaunching")
 }
 
 ApplicationDelegateTemplate :: struct {
@@ -256,7 +300,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		return nil
 	}
 	if template.applicationWillFinishLaunching != nil {
-		applicationWillFinishLaunching :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillFinishLaunching :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillFinishLaunching(notification)
@@ -264,7 +308,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillFinishLaunching:"), auto_cast applicationWillFinishLaunching, "v@:@")
 	}
 	if template.applicationDidFinishLaunching != nil {
-		applicationDidFinishLaunching :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidFinishLaunching :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidFinishLaunching(notification)
@@ -272,7 +316,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidFinishLaunching:"), auto_cast applicationDidFinishLaunching, "v@:@")
 	}
 	if template.applicationWillBecomeActive != nil {
-		applicationWillBecomeActive :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillBecomeActive :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillBecomeActive(notification)
@@ -280,7 +324,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillBecomeActive:"), auto_cast applicationWillBecomeActive, "v@:@")
 	}
 	if template.applicationDidBecomeActive != nil {
-		applicationDidBecomeActive :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidBecomeActive :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidBecomeActive(notification)
@@ -288,7 +332,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidBecomeActive:"), auto_cast applicationDidBecomeActive, "v@:@")
 	}
 	if template.applicationWillResignActive != nil {
-		applicationWillResignActive :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillResignActive :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillResignActive(notification)
@@ -296,7 +340,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillResignActive:"), auto_cast applicationWillResignActive, "v@:@")
 	}
 	if template.applicationDidResignActive != nil {
-		applicationDidResignActive :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidResignActive :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidResignActive(notification)
@@ -304,7 +348,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidResignActive:"), auto_cast applicationDidResignActive, "v@:@")
 	}
 	if template.applicationShouldTerminate != nil {
-		applicationShouldTerminate :: proc "c" (self: id, sender: ^Application) -> ApplicationTerminateReply {
+		applicationShouldTerminate :: proc "c" (self: id, cmd: SEL, sender: ^Application) -> ApplicationTerminateReply {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationShouldTerminate(sender)
@@ -312,7 +356,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationShouldTerminate:"), auto_cast applicationShouldTerminate, _UINTEGER_ENCODING+"@:@")
 	}
 	if template.applicationShouldTerminateAfterLastWindowClosed != nil {
-		applicationShouldTerminateAfterLastWindowClosed :: proc "c" (self: id, sender: ^Application) -> BOOL {
+		applicationShouldTerminateAfterLastWindowClosed :: proc "c" (self: id, cmd: SEL, sender: ^Application) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationShouldTerminateAfterLastWindowClosed(sender)
@@ -320,7 +364,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationShouldTerminateAfterLastWindowClosed:"), auto_cast applicationShouldTerminateAfterLastWindowClosed, "B@:@")
 	}
 	if template.applicationWillTerminate != nil {
-		applicationWillTerminate :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillTerminate :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillTerminate(notification)
@@ -328,7 +372,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillTerminate:"), auto_cast applicationWillTerminate, "v@:@")
 	}
 	if template.applicationWillHide != nil {
-		applicationWillHide :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillHide :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillHide(notification)
@@ -336,7 +380,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillHide:"), auto_cast applicationWillHide, "v@:@")
 	}
 	if template.applicationDidHide != nil {
-		applicationDidHide :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidHide :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidHide(notification)
@@ -344,7 +388,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidHide:"), auto_cast applicationDidHide, "v@:@")
 	}
 	if template.applicationWillUnhide != nil {
-		applicationWillUnhide :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillUnhide :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillUnhide(notification)
@@ -352,7 +396,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillUnhide:"), auto_cast applicationWillUnhide, "v@:@")
 	}
 	if template.applicationDidUnhide != nil {
-		applicationDidUnhide :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidUnhide :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidUnhide(notification)
@@ -360,7 +404,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidUnhide:"), auto_cast applicationDidUnhide, "v@:@")
 	}
 	if template.applicationWillUpdate != nil {
-		applicationWillUpdate :: proc "c" (self: id, notification: ^Notification) {
+		applicationWillUpdate :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillUpdate(notification)
@@ -368,7 +412,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationWillUpdate:"), auto_cast applicationWillUpdate, "v@:@")
 	}
 	if template.applicationDidUpdate != nil {
-		applicationDidUpdate :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidUpdate :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidUpdate(notification)
@@ -376,7 +420,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidUpdate:"), auto_cast applicationDidUpdate, "v@:@")
 	}
 	if template.applicationShouldHandleReopenHasVisibleWindows != nil {
-		applicationShouldHandleReopenHasVisibleWindows :: proc "c" (self: id, sender: ^Application, flag: BOOL) -> BOOL {
+		applicationShouldHandleReopenHasVisibleWindows :: proc "c" (self: id, cmd: SEL, sender: ^Application, flag: BOOL) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationShouldHandleReopenHasVisibleWindows(sender, flag)
@@ -384,7 +428,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationShouldHandleReopen:hasVisibleWindows:"), auto_cast applicationShouldHandleReopenHasVisibleWindows, "B@:@B")
 	}
 	if template.applicationDockMenu != nil {
-		applicationDockMenu :: proc "c" (self: id, sender: ^Application) -> ^Menu {
+		applicationDockMenu :: proc "c" (self: id, cmd: SEL, sender: ^Application) -> ^Menu {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationDockMenu(sender)
@@ -392,7 +436,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDockMenu:"), auto_cast applicationDockMenu, "@@:@")
 	}
 	if template.applicationShouldAutomaticallyLocalizeKeyEquivalents != nil {
-		applicationShouldAutomaticallyLocalizeKeyEquivalents :: proc "c" (self: id, application: ^Application) -> BOOL {
+		applicationShouldAutomaticallyLocalizeKeyEquivalents :: proc "c" (self: id, cmd: SEL, application: ^Application) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationShouldAutomaticallyLocalizeKeyEquivalents(application)
@@ -400,7 +444,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationShouldAutomaticallyLocalizeKeyEquivalents:"), auto_cast applicationShouldAutomaticallyLocalizeKeyEquivalents, "B@:@")
 	}
 	if template.applicationWillPresentError != nil {
-		applicationWillPresentError :: proc "c" (self: id, application: ^Application, error: ^Error) -> ^Error {
+		applicationWillPresentError :: proc "c" (self: id, cmd: SEL, application: ^Application, error: ^Error) -> ^Error {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationWillPresentError(application, error)
@@ -408,7 +452,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:willPresentError:"), auto_cast applicationWillPresentError, "@@:@@")
 	}
 	if template.applicationDidChangeScreenParameters != nil {
-		applicationDidChangeScreenParameters :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidChangeScreenParameters :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidChangeScreenParameters(notification)
@@ -416,7 +460,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidChangeScreenParameters:"), auto_cast applicationDidChangeScreenParameters, "v@:@")
 	}
 	if template.applicationWillContinueUserActivityWithType != nil {
-		applicationWillContinueUserActivityWithType :: proc "c" (self: id, application: ^Application, userActivityType: ^String) -> BOOL {
+		applicationWillContinueUserActivityWithType :: proc "c" (self: id, cmd: SEL, application: ^Application, userActivityType: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationWillContinueUserActivityWithType(application, userActivityType)
@@ -424,7 +468,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:willContinueUserActivityWithType:"), auto_cast applicationWillContinueUserActivityWithType, "B@:@@")
 	}
 	if template.applicationContinueUserActivityRestorationHandler != nil {
-		applicationContinueUserActivityRestorationHandler :: proc "c" (self: id, application: ^Application, userActivity: ^UserActivity, restorationHandler: ^Block) -> BOOL {
+		applicationContinueUserActivityRestorationHandler :: proc "c" (self: id, cmd: SEL, application: ^Application, userActivity: ^UserActivity, restorationHandler: ^Block) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationContinueUserActivityRestorationHandler(application, userActivity, restorationHandler)
@@ -432,7 +476,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:continueUserActivity:restorationHandler:"), auto_cast applicationContinueUserActivityRestorationHandler, "B@:@@?")
 	}
 	if template.applicationDidFailToContinueUserActivityWithTypeError != nil {
-		applicationDidFailToContinueUserActivityWithTypeError :: proc "c" (self: id, application: ^Application, userActivityType: ^String, error: ^Error) {
+		applicationDidFailToContinueUserActivityWithTypeError :: proc "c" (self: id, cmd: SEL, application: ^Application, userActivityType: ^String, error: ^Error) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidFailToContinueUserActivityWithTypeError(application, userActivityType, error)
@@ -440,7 +484,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:didFailToContinueUserActivityWithType:error:"), auto_cast applicationDidFailToContinueUserActivityWithTypeError, "v@:@@@")
 	}
 	if template.applicationDidUpdateUserActivity != nil {
-		applicationDidUpdateUserActivity :: proc "c" (self: id, application: ^Application, userActivity: ^UserActivity) {
+		applicationDidUpdateUserActivity :: proc "c" (self: id, cmd: SEL, application: ^Application, userActivity: ^UserActivity) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidUpdateUserActivity(application, userActivity)
@@ -448,7 +492,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:didUpdateUserActivity:"), auto_cast applicationDidUpdateUserActivity, "v@:@@")
 	}
 	if template.applicationDidRegisterForRemoteNotificationsWithDeviceToken != nil {
-		applicationDidRegisterForRemoteNotificationsWithDeviceToken :: proc "c" (self: id, application: ^Application, deviceToken: ^Data) {
+		applicationDidRegisterForRemoteNotificationsWithDeviceToken :: proc "c" (self: id, cmd: SEL, application: ^Application, deviceToken: ^Data) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidRegisterForRemoteNotificationsWithDeviceToken(application, deviceToken)
@@ -456,7 +500,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:didRegisterForRemoteNotificationsWithDeviceToken:"), auto_cast applicationDidRegisterForRemoteNotificationsWithDeviceToken, "v@:@@")
 	}
 	if template.applicationDidFailToRegisterForRemoteNotificationsWithError != nil {
-		applicationDidFailToRegisterForRemoteNotificationsWithError :: proc "c" (self: id, application: ^Application, error: ^Error) {
+		applicationDidFailToRegisterForRemoteNotificationsWithError :: proc "c" (self: id, cmd: SEL, application: ^Application, error: ^Error) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidFailToRegisterForRemoteNotificationsWithError(application, error)
@@ -464,7 +508,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:didFailToRegisterForRemoteNotificationsWithError:"), auto_cast applicationDidFailToRegisterForRemoteNotificationsWithError, "v@:@@")
 	}
 	if template.applicationDidReceiveRemoteNotification != nil {
-		applicationDidReceiveRemoteNotification :: proc "c" (self: id, application: ^Application, userInfo: ^Dictionary) {
+		applicationDidReceiveRemoteNotification :: proc "c" (self: id, cmd: SEL, application: ^Application, userInfo: ^Dictionary) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidReceiveRemoteNotification(application, userInfo)
@@ -472,7 +516,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:didReceiveRemoteNotification:"), auto_cast applicationDidReceiveRemoteNotification, "v@:@@")
 	}
 	// if template.applicationUserDidAcceptCloudKitShareWithMetadata != nil {
-	// 	applicationUserDidAcceptCloudKitShareWithMetadata :: proc "c" (self: id, application: ^Application, metadata: ^CKShareMetadata) {
+	// 	applicationUserDidAcceptCloudKitShareWithMetadata :: proc "c" (self: id, cmd: SEL, application: ^Application, metadata: ^CKShareMetadata) {
 	// 		del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 	// 		context = del._context
 	// 		del.applicationUserDidAcceptCloudKitShareWithMetadata(application, metadata)
@@ -480,7 +524,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 	// 	class_addMethod(class, intrinsics.objc_find_selector("application:userDidAcceptCloudKitShareWithMetadata:"), auto_cast applicationUserDidAcceptCloudKitShareWithMetadata, "v@:@@")
 	// }
 	// if template.applicationHandlerForIntent != nil {
-	// 	applicationHandlerForIntent :: proc "c" (self: id, application: ^Application, intent: ^INIntent) -> id {
+	// 	applicationHandlerForIntent :: proc "c" (self: id, cmd: SEL, application: ^Application, intent: ^INIntent) -> id {
 	// 		del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 	// 		context = del._context
 	// 		return del.applicationHandlerForIntent(application, intent)
@@ -488,7 +532,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 	// 	class_addMethod(class, intrinsics.objc_find_selector("application:handlerForIntent:"), auto_cast applicationHandlerForIntent, "@@:@@")
 	// }
 	if template.applicationOpenURLs != nil {
-		applicationOpenURLs :: proc "c" (self: id, application: ^Application, urls: ^Array) {
+		applicationOpenURLs :: proc "c" (self: id, cmd: SEL, application: ^Application, urls: ^Array) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationOpenURLs(application, urls)
@@ -496,7 +540,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:openURLs:"), auto_cast applicationOpenURLs, "v@:@@")
 	}
 	if template.applicationOpenFile != nil {
-		applicationOpenFile :: proc "c" (self: id, sender: ^Application, filename: ^String) -> BOOL {
+		applicationOpenFile :: proc "c" (self: id, cmd: SEL, sender: ^Application, filename: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationOpenFile(sender, filename)
@@ -504,7 +548,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:openFile:"), auto_cast applicationOpenFile, "B@:@@")
 	}
 	if template.applicationOpenFileWithoutUI != nil {
-		applicationOpenFileWithoutUI :: proc "c" (self: id, sender: id, filename: ^String) -> BOOL {
+		applicationOpenFileWithoutUI :: proc "c" (self: id, cmd: SEL, sender: id, filename: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationOpenFileWithoutUI(sender, filename)
@@ -512,7 +556,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:openFileWithoutUI:"), auto_cast applicationOpenFileWithoutUI, "B@:@@")
 	}
 	if template.applicationOpenTempFile != nil {
-		applicationOpenTempFile :: proc "c" (self: id, sender: ^Application, filename: ^String) -> BOOL {
+		applicationOpenTempFile :: proc "c" (self: id, cmd: SEL, sender: ^Application, filename: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationOpenTempFile(sender, filename)
@@ -520,7 +564,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:openTempFile:"), auto_cast applicationOpenTempFile, "B@:@@")
 	}
 	if template.applicationOpenFiles != nil {
-		applicationOpenFiles :: proc "c" (self: id, sender: ^Application, filenames: ^Array) {
+		applicationOpenFiles :: proc "c" (self: id, cmd: SEL, sender: ^Application, filenames: ^Array) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationOpenFiles(sender, filenames)
@@ -528,7 +572,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:openFiles:"), auto_cast applicationOpenFiles, "v@:@@")
 	}
 	if template.applicationShouldOpenUntitledFile != nil {
-		applicationShouldOpenUntitledFile :: proc "c" (self: id, sender: ^Application) -> BOOL {
+		applicationShouldOpenUntitledFile :: proc "c" (self: id, cmd: SEL, sender: ^Application) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationShouldOpenUntitledFile(sender)
@@ -536,7 +580,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationShouldOpenUntitledFile:"), auto_cast applicationShouldOpenUntitledFile, "B@:@")
 	}
 	if template.applicationOpenUntitledFile != nil {
-		applicationOpenUntitledFile :: proc "c" (self: id, sender: ^Application) -> BOOL {
+		applicationOpenUntitledFile :: proc "c" (self: id, cmd: SEL, sender: ^Application) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationOpenUntitledFile(sender)
@@ -544,7 +588,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationOpenUntitledFile:"), auto_cast applicationOpenUntitledFile, "B@:@")
 	}
 	if template.applicationPrintFile != nil {
-		applicationPrintFile :: proc "c" (self: id, sender: ^Application, filename: ^String) -> BOOL {
+		applicationPrintFile :: proc "c" (self: id, cmd: SEL, sender: ^Application, filename: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationPrintFile(sender, filename)
@@ -552,7 +596,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:printFile:"), auto_cast applicationPrintFile, "B@:@@")
 	}
 	if template.applicationPrintFilesWithSettingsShowPrintPanels != nil {
-		applicationPrintFilesWithSettingsShowPrintPanels :: proc "c" (self: id, application: ^Application, fileNames: ^Array, printSettings: ^Dictionary, showPrintPanels: BOOL) -> ApplicationPrintReply {
+		applicationPrintFilesWithSettingsShowPrintPanels :: proc "c" (self: id, cmd: SEL, application: ^Application, fileNames: ^Array, printSettings: ^Dictionary, showPrintPanels: BOOL) -> ApplicationPrintReply {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationPrintFilesWithSettingsShowPrintPanels(application, fileNames, printSettings, showPrintPanels)
@@ -560,7 +604,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:printFiles:withSettings:showPrintPanels:"), auto_cast applicationPrintFilesWithSettingsShowPrintPanels, _UINTEGER_ENCODING+"@:@@@B")
 	}
 	if template.applicationSupportsSecureRestorableState != nil {
-		applicationSupportsSecureRestorableState :: proc "c" (self: id, app: ^Application) -> BOOL {
+		applicationSupportsSecureRestorableState :: proc "c" (self: id, cmd: SEL, app: ^Application) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationSupportsSecureRestorableState(app)
@@ -568,7 +612,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationSupportsSecureRestorableState:"), auto_cast applicationSupportsSecureRestorableState, "B@:@")
 	}
 	if template.applicationProtectedDataDidBecomeAvailable != nil {
-		applicationProtectedDataDidBecomeAvailable :: proc "c" (self: id, notification: ^Notification) {
+		applicationProtectedDataDidBecomeAvailable :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationProtectedDataDidBecomeAvailable(notification)
@@ -576,7 +620,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationProtectedDataDidBecomeAvailable:"), auto_cast applicationProtectedDataDidBecomeAvailable, "v@:@")
 	}
 	if template.applicationProtectedDataWillBecomeUnavailable != nil {
-		applicationProtectedDataWillBecomeUnavailable :: proc "c" (self: id, notification: ^Notification) {
+		applicationProtectedDataWillBecomeUnavailable :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationProtectedDataWillBecomeUnavailable(notification)
@@ -584,7 +628,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationProtectedDataWillBecomeUnavailable:"), auto_cast applicationProtectedDataWillBecomeUnavailable, "v@:@")
 	}
 	if template.applicationWillEncodeRestorableState != nil {
-		applicationWillEncodeRestorableState :: proc "c" (self: id, app: ^Application, coder: ^Coder) {
+		applicationWillEncodeRestorableState :: proc "c" (self: id, cmd: SEL, app: ^Application, coder: ^Coder) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationWillEncodeRestorableState(app, coder)
@@ -592,7 +636,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:willEncodeRestorableState:"), auto_cast applicationWillEncodeRestorableState, "v@:@@")
 	}
 	if template.applicationDidDecodeRestorableState != nil {
-		applicationDidDecodeRestorableState :: proc "c" (self: id, app: ^Application, coder: ^Coder) {
+		applicationDidDecodeRestorableState :: proc "c" (self: id, cmd: SEL, app: ^Application, coder: ^Coder) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidDecodeRestorableState(app, coder)
@@ -600,7 +644,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:didDecodeRestorableState:"), auto_cast applicationDidDecodeRestorableState, "v@:@@")
 	}
 	if template.applicationDidChangeOcclusionState != nil {
-		applicationDidChangeOcclusionState :: proc "c" (self: id, notification: ^Notification) {
+		applicationDidChangeOcclusionState :: proc "c" (self: id, cmd: SEL, notification: ^Notification) {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			del.applicationDidChangeOcclusionState(notification)
@@ -608,7 +652,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidChangeOcclusionState:"), auto_cast applicationDidChangeOcclusionState, "v@:@")
 	}
 	if template.applicationDelegateHandlesKey != nil {
-		applicationDelegateHandlesKey :: proc "c" (self: id, sender: ^Application, key: ^String) -> BOOL {
+		applicationDelegateHandlesKey :: proc "c" (self: id, cmd: SEL, sender: ^Application, key: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationDelegateHandlesKey(sender, key)

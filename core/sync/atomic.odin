@@ -27,7 +27,7 @@ multiple memory locations between two cores. Which is why CPU's allow for
 stronger memory ordering guarantees if certain instructions or instruction
 variants are used.
 
-In Odin there are 5 different memory ordering guaranties that can be provided
+In Odin there are 5 different memory ordering guarantees that can be provided
 to an atomic operation:
 
 - `Relaxed`: The memory access (load or store) is unordered with respect to

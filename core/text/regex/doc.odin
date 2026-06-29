@@ -1,6 +1,5 @@
 /*
-package regex implements a complete suite for using Regular Expressions to
-match and capture text.
+A complete suite for using Regular Expressions to match and capture text.
 
 Regular expressions are used to describe how a piece of text can match to
 another, using a pattern language.

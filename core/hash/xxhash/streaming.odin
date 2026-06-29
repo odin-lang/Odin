@@ -1,16 +1,16 @@
+package xxhash
+
 /*
 	An implementation of Yann Collet's [xxhash Fast Hash Algorithm](https://cyan4973.github.io/xxHash/).
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 
-	Made available under Odin's BSD-3 license, based on the original C code.
+	Made available under Odin's license, based on the original C code.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
 
-package xxhash
-
-import "core:mem"
+import "base:runtime"
 import "base:intrinsics"
 
 /*
@@ -121,7 +121,7 @@ XXH3_init_state :: proc(state: ^XXH3_state) {
 }
 
 XXH3_create_state :: proc(allocator := context.allocator) -> (res: ^XXH3_state, err: Error) {
-	state, mem_error := mem.new_aligned(XXH3_state, 64, allocator)
+	state, mem_error := runtime.new_aligned(XXH3_state, 64, allocator)
 	err = nil if mem_error == nil else .Error
 
 	XXH3_init_state(state)

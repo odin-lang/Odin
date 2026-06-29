@@ -41,30 +41,32 @@ CPU_Feature :: enum u64 {
 
 CPU_Features :: distinct bit_set[CPU_Feature; u64]
 
-cpu_features: Maybe(CPU_Features)
-cpu_name: Maybe(string)
+// Retrieving CPU features on ARM is even more expensive than on Intel, so we're doing this lookup only once, before `main()`
+@(private) _features:    CPU_Features
+
+
+@(private) _name_buf: [256]u8
+@(private) _name:     string
 
 @(private)
-cpu_name_buf: [128]byte
+_cpu_name :: proc() -> (name: string) {
+	return _name
+}
 
 @(init, private)
-init_cpu_name :: proc "contextless" () {
-	generic := true
-
+_init_cpu_name :: proc "contextless" () {
 	when ODIN_OS == .Darwin {
-		if unix.sysctlbyname("machdep.cpu.brand_string", &cpu_name_buf) {
-			cpu_name = string(cstring(rawptr(&cpu_name_buf)))
-			generic = false
+		if unix.sysctlbyname("machdep.cpu.brand_string", &_name_buf) {
+			_name = string(cstring(rawptr(&_name_buf)))
+			return
 		}
 	}
 
-	if generic {
-		when ODIN_ARCH == .arm64 {
-			copy(cpu_name_buf[:], "ARM64")
-			cpu_name = string(cpu_name_buf[:len("ARM64")])
-		} else {
-			copy(cpu_name_buf[:], "ARM")
-			cpu_name = string(cpu_name_buf[:len("ARM")])
-		}
+	when ODIN_ARCH == .arm64 {
+		copy(_name_buf[:], "ARM64")
+		_name = string(_name_buf[:len("ARM64")])
+	} else {
+		copy(_name_buf[:], "ARM")
+		_name = string(_name_buf[:len("ARM")])
 	}
 }

@@ -1,4 +1,6 @@
 /*
+Readers and writers for `PBM`, `PGM`, `PPM`, `PAM` and `PFM` images.
+
 Formats:
 
 	PBM (P1, P4): Portable Bit Map,       stores black and white images   (1 channel)

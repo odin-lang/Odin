@@ -1,5 +1,5 @@
 /*
-package blake2b implements the BLAKE2b hash algorithm.
+`BLAKE2b` hash algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/rfc7693 ]]
@@ -9,7 +9,7 @@ package blake2b
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
@@ -28,10 +28,21 @@ Context :: _blake2.Blake2b_Context
 
 // init initializes a Context with the default BLAKE2b config.
 init :: proc(ctx: ^Context, digest_size := DIGEST_SIZE) {
-	ensure(digest_size <= _blake2.MAX_SIZE, "crypto/blake2b: invalid digest size")
+	ensure(digest_size <= DIGEST_SIZE, "crypto/blake2b: invalid digest size")
 
 	cfg: _blake2.Blake2_Config
 	cfg.size = u8(digest_size)
+	_blake2.init(ctx, &cfg)
+}
+
+// init_mac initializes a Context with a user provided key.
+init_mac :: proc(ctx: ^Context, key: []byte, digest_size := DIGEST_SIZE) {
+	ensure(digest_size <= DIGEST_SIZE, "crypto/blake2b: invalid digest size")
+	ensure(len(key) <= DIGEST_SIZE, "crypto/blake2b: invalid key size")
+
+	cfg: _blake2.Blake2_Config
+	cfg.size = u8(digest_size)
+	cfg.key = key
 	_blake2.init(ctx, &cfg)
 }
 
@@ -43,7 +54,7 @@ update :: proc(ctx: ^Context, data: []byte) {
 // final finalizes the Context, writes the digest to hash, and calls
 // reset on the Context.
 //
-// Iff finalize_clone is set, final will work on a copy of the Context,
+// If and only if (⟺) finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	_blake2.final(ctx, hash, finalize_clone)

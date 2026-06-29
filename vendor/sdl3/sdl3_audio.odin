@@ -38,14 +38,14 @@ AudioFormat :: enum c.int {
 	F32 = F32LE when BYTEORDER == LIL_ENDIAN else F32BE,
 }
 
-@(require_results) AUDIO_BITSIZE        :: proc "c" (x: AudioFormat) -> Uint16 { return (Uint16(x) & AUDIO_MASK_BITSIZE)       }
-@(require_results) AUDIO_BYTESIZE       :: proc "c" (x: AudioFormat) -> Uint16 { return AUDIO_BITSIZE(x) / 8                   }
-@(require_results) AUDIO_ISFLOAT        :: proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_FLOAT) != 0      }
-@(require_results) AUDIO_ISBIGENDIAN    :: proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_BIG_ENDIAN) != 0 }
-@(require_results) AUDIO_ISLITTLEENDIAN :: proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISBIGENDIAN(x)                    }
-@(require_results) AUDIO_ISSIGNED       :: proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_SIGNED) != 0     }
-@(require_results) AUDIO_ISINT          :: proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISFLOAT(x)                        }
-@(require_results) AUDIO_ISUNSIGNED     :: proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISSIGNED(x)                       }
+@(require_results) AUDIO_BITSIZE        :: #force_inline proc "c" (x: AudioFormat) -> Uint16 { return (Uint16(x) & AUDIO_MASK_BITSIZE)       }
+@(require_results) AUDIO_BYTESIZE       :: #force_inline proc "c" (x: AudioFormat) -> Uint16 { return AUDIO_BITSIZE(x) / 8                   }
+@(require_results) AUDIO_ISFLOAT        :: #force_inline proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_FLOAT) != 0      }
+@(require_results) AUDIO_ISBIGENDIAN    :: #force_inline proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_BIG_ENDIAN) != 0 }
+@(require_results) AUDIO_ISLITTLEENDIAN :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISBIGENDIAN(x)                    }
+@(require_results) AUDIO_ISSIGNED       :: #force_inline proc "c" (x: AudioFormat) -> bool { return (Uint16(x) & AUDIO_MASK_SIGNED) != 0     }
+@(require_results) AUDIO_ISINT          :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISFLOAT(x)                        }
+@(require_results) AUDIO_ISUNSIGNED     :: #force_inline proc "c" (x: AudioFormat) -> bool { return !AUDIO_ISSIGNED(x)                       }
 
 
 AudioDeviceID :: distinct Uint32
@@ -60,15 +60,18 @@ AudioSpec :: struct {
 }
 
 @(require_results)
-AUDIO_FRAMESIZE :: proc "c" (x: AudioSpec) -> c.int {
+AUDIO_FRAMESIZE :: #force_inline proc "c" (x: AudioSpec) -> c.int {
 	return c.int(AUDIO_BYTESIZE(x.format)) * x.channels
 }
 
 
 AudioStream :: struct {}
 
-AudioStreamCallback  :: #type proc "c" (userdata: rawptr, stream: ^AudioStream, additional_amount, total_amount: c.int)
-AudioPostmixCallback :: #type proc "c" (userdata: rawptr, spec: ^AudioSpec, buffer: [^]f32, buflen: c.int)
+AudioStreamCallback             :: #type proc "c" (userdata: rawptr, stream: ^AudioStream, additional_amount, total_amount: c.int)
+AudioStreamDataCompleteCallback :: #type proc "c" (userdata: rawptr, buf: rawptr, buflen: c.int)
+AudioPostmixCallback            :: #type proc "c" (userdata: rawptr, spec: ^AudioSpec, buffer: [^]f32, buflen: c.int)
+
+AUDIOSTREAM_AUTO_CLEANUP_BOOLEAN :: "SDL.audiostream.auto_cleanup"
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -107,6 +110,8 @@ foreign lib {
 	SetAudioStreamInputChannelMap  :: proc(stream: ^AudioStream, chmap: [^]c.int, count: c.int) -> bool ---
 	SetAudioStreamOutputChannelMap :: proc(stream: ^AudioStream, chmap: [^]c.int, count: c.int) -> bool ---
 	PutAudioStreamData             :: proc(stream: ^AudioStream, buf: rawptr, len: c.int) -> bool ---
+	PutAudioStreamDataNoCopy       :: proc(stream: ^AudioStream, buf: rawptr, len: c.int, callback: AudioStreamDataCompleteCallback, userdata: rawptr) -> bool ---
+	PutAudioStreamPlanarData       :: proc(stream: ^AudioStream, channel_buffers: [^]rawptr, num_channels, num_samples: c.int) -> bool ---
 	GetAudioStreamData             :: proc(stream: ^AudioStream, buf: rawptr, len: c.int) -> c.int ---
 	GetAudioStreamAvailable        :: proc(stream: ^AudioStream) -> c.int ---
 	GetAudioStreamQueued           :: proc(stream: ^AudioStream) -> c.int ---

@@ -1,10 +1,10 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Linux {
 	foreign import lib "system:pthread"
 } else {
@@ -124,7 +124,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_attr_getscope.html ]]
 	*/
-	pthread_attr_setscope :: proc(attr: ^pthread_attr_t, contentionscope: ^Thread_Scope) -> Errno ---
+	pthread_attr_setscope :: proc(attr: ^pthread_attr_t, contentionscope: Thread_Scope) -> Errno ---
 
 	/*
 	Get the area of storage to be used for the created thread's stack.
@@ -400,7 +400,7 @@ when ODIN_OS == .Darwin {
 	PTHREAD_SCOPE_PROCESS   :: 2
 	PTHREAD_SCOPE_SYSTEM    :: 1
 
-	pthread_t :: distinct u64
+	pthread_t :: distinct rawptr
 
 	pthread_attr_t :: struct {
 		__sig:    c.long,
@@ -554,56 +554,6 @@ when ODIN_OS == .Darwin {
 		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
 	}
 
-} else when ODIN_OS == .Haiku {
-
-	PTHREAD_CANCEL_ASYNCHRONOUS :: 2
-	PTHREAD_CANCEL_DEFERRED     :: 0
-
-	PTHREAD_CANCEL_DISABLE      :: 1
-	PTHREAD_CANCEL_ENABLE       :: 0
-
-	PTHREAD_CANCELED :: rawptr(uintptr(1))
-
-	PTHREAD_CREATE_DETACHED :: 0x1
-	PTHREAD_CREATE_JOINABLE :: 0
-
-	PTHREAD_EXPLICIT_SCHED :: 0
-	PTHREAD_INHERIT_SCHED  :: 0x4
-
-	PTHREAD_PRIO_INHERIT :: 1
-	PTHREAD_PRIO_NONE    :: 0
-	PTHREAD_PRIO_PROTECT :: 2
-
-	PTHREAD_PROCESS_SHARED  :: 1
-	PTHREAD_PROCESS_PRIVATE :: 0
-
-	PTHREAD_SCOPE_PROCESS   :: 0
-	PTHREAD_SCOPE_SYSTEM    :: 0x2
-
-	pthread_t       :: distinct rawptr
-	pthread_attr_t  :: distinct rawptr
-	pthread_key_t   :: distinct c.int
-	
-	pthread_mutex_t :: struct {
-		flags:       u32,
-		lock:        i32,
-		unused:      i32,
-		owner:       i32,
-		owner_count: i32,
-	}
-	
-	pthread_cond_t :: struct {
-		flags:        u32,
-		unused:       i32,
-		mutex:        ^pthread_mutex_t,
-		waiter_count: i32,
-		lock:         i32,
-	}
-
-	sched_param :: struct {
-		sched_priority: c.int,     /* [PSX] process or thread execution scheduling priority */
-	}
-
 } else when ODIN_OS == .Linux {
 
 	PTHREAD_CANCEL_DEFERRED     :: 0
@@ -632,8 +582,16 @@ when ODIN_OS == .Darwin {
 
 	pthread_t :: distinct c.ulong
 
+	when ODIN_ARCH == .arm64 {
+		@(private)
+		__SIZEOF_PTHREAD_ATTR_T :: 64
+	} else {
+		@(private)
+		__SIZEOF_PTHREAD_ATTR_T :: 56
+	}
+
 	pthread_attr_t :: struct #raw_union {
-		__size: [56]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+		__size: [__SIZEOF_PTHREAD_ATTR_T]c.char,
 		__align: c.long,
 	}
 

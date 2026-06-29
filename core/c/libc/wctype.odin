@@ -5,7 +5,7 @@ package libc
 when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }
@@ -29,10 +29,6 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .FreeBSD {
 	wctrans_t :: distinct int
 	wctype_t  :: distinct ulong
-
-} else when ODIN_OS == .Haiku {
-	wctrans_t :: distinct i32
-	wctype_t  :: distinct i32
 
 }
 

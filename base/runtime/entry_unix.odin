@@ -1,5 +1,5 @@
 #+private
-#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd
 #+no-instrumentation
 package runtime
 
@@ -10,13 +10,15 @@ when ODIN_BUILD_MODE == .Dynamic {
 	_odin_entry_point :: proc "c" (argc: i32, argv: [^]cstring) {
 		args__ = argv[:argc]
 		context = default_context()
-		#force_no_inline _startup_runtime()
+		when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
 		intrinsics.__entry_point()
 	}
 	@(link_name="_odin_exit_point", linkage="strong", require/*, link_section=".fini"*/)
 	_odin_exit_point :: proc "c" () {
 		context = default_context()
-		#force_no_inline _cleanup_runtime()
+		when !ODIN_BEDROCK {
+			#force_no_inline _cleanup_runtime()
+		}
 	}
 	@(link_name="main", linkage="strong", require)
 	main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
@@ -43,9 +45,9 @@ when ODIN_BUILD_MODE == .Dynamic {
 		_start_odin :: proc "c" (argc: i32, argv: [^]cstring) -> ! {
 			args__ = argv[:argc]
 			context = default_context()
-			#force_no_inline _startup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
 			intrinsics.__entry_point()
-			#force_no_inline _cleanup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _cleanup_runtime() }
 			intrinsics.syscall(SYS_exit, 0)
 			unreachable()
 		}
@@ -54,9 +56,9 @@ when ODIN_BUILD_MODE == .Dynamic {
 		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
 			args__ = argv[:argc]
 			context = default_context()
-			#force_no_inline _startup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
 			intrinsics.__entry_point()
-			#force_no_inline _cleanup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _cleanup_runtime() }
 			return 0
 		}
 	}

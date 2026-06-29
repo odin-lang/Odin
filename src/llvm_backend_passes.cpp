@@ -3,7 +3,18 @@
 		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 0:
-		array_add(&passes, "always-inline");
+		if (build_context.internal_llvm_no_sroa) {
+			// Old -o:minimal behavior
+			array_add(&passes, "always-inline");
+		} else {
+			array_add(&passes, "annotation2metadata");
+			array_add(&passes, "inferattrs");
+			array_add(&passes, "forceattrs");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,early-cse<>)");
+			array_add(&passes, "always-inline");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instsimplify,simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>)");
+			// array_add(&passes, "verify");
+		}
 		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 1:
@@ -263,7 +274,7 @@ function(
 ),
 verify
 )");
-#else
+#elif LLVM_VERSION_MAJOR < 22 // LLVM 20 & 21 (same config)
 	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -385,6 +396,144 @@ function<eager-inv>(
 	tailcallelim,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;speculate-unpredictables>
 ),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+
+#else // LLVM 22
+// Passes removed: coro, openmp
+	array_add(&passes, u8R"(
+memprof-remove-attributes,
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	ee-instrument<>,
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+	sroa<modify-cfg>,
+	early-cse<>
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>
+),
+always-inline,
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline,
+		function-attrs<skip-non-recursive-function-attrs>,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution<only-if-divergent-target>,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			aggressive-instcombine,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			reassociate,
+			constraint-elimination,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			loop(
+				loop-idiom,
+				indvars,
+				extra-simple-loop-unswitch-passes,
+				loop-deletion,
+				loop-unroll-full
+			),
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;no-switch-to-lookup;keep-loops;hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	drop-unnecessary-assumes,
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	drop-unnecessary-assumes,
+	infer-alignment,
+	loop-load-elim,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;switch-to-lookup;no-keep-loops;hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	loop-unroll<O2>,
+	transform-warning,
+	sroa<preserve-cfg>,
+	infer-alignment,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;speculate-unpredictables>
+),
+alloc-token,
 globaldce,
 constmerge,
 cg-profile,
@@ -656,7 +805,7 @@ function(
 ),
 verify
 )");
-#else
+#elif LLVM_VERSION_MAJOR < 22 // LLVM 20 & 21 (same config)
 	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -780,6 +929,145 @@ function<eager-inv>(
 	tailcallelim,
 	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;speculate-unpredictables>
 ),
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
+)");
+
+#else // LLVM 22
+// Passes removed: coro, openmp
+	array_add(&passes, u8R"(
+memprof-remove-attributes,
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	ee-instrument<>,
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+	sroa<modify-cfg>,
+	early-cse<>
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>
+),
+always-inline,
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline,
+		function-attrs<skip-non-recursive-function-attrs>,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution<only-if-divergent-target>,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			aggressive-instcombine,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			reassociate,
+			constraint-elimination,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<no-nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			loop(
+				loop-idiom,
+				indvars,
+				extra-simple-loop-unswitch-passes,
+				loop-deletion,
+				loop-unroll-full
+			),
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;no-switch-to-lookup;keep-loops;hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	drop-unnecessary-assumes,
+	float2int,
+	lower-constant-intrinsics,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	drop-unnecessary-assumes,
+	infer-alignment,
+	loop-load-elim,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;switch-to-lookup;no-keep-loops;hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	loop-unroll<O2>,
+	transform-warning,
+	sroa<preserve-cfg>,
+	infer-alignment,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;speculate-unpredictables>
+),
+alloc-token,
 globaldce,
 constmerge,
 cg-profile,
@@ -1052,7 +1340,7 @@ function(
 ),
 verify
 )");
-#else
+#elif LLVM_VERSION_MAJOR < 22 // LLVM 20 & 21 (same config)
 	array_add(&passes, u8R"(
 annotation2metadata,
 forceattrs,
@@ -1188,6 +1476,148 @@ function(
 ),
 verify
 
+)");
+
+#else // LLVM 22
+// Passes removed: coro, openmp
+	array_add(&passes, u8R"(
+memprof-remove-attributes,
+annotation2metadata,
+forceattrs,
+inferattrs,
+function<eager-inv>(
+	ee-instrument<>,
+	lower-expect,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;no-switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+	sroa<modify-cfg>,
+	early-cse<>,
+	callsite-splitting
+),
+ipsccp,
+called-value-propagation,
+globalopt,
+function<eager-inv>(
+	mem2reg,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>
+),
+always-inline,
+require<globals-aa>,
+function(
+	invalidate<aa>
+),
+require<profile-summary>,
+cgscc(
+	devirt<4>(
+		inline,
+		function-attrs<skip-non-recursive-function-attrs>,
+		argpromotion,
+		function<eager-inv;no-rerun>(
+			sroa<modify-cfg>,
+			early-cse<memssa>,
+			speculative-execution<only-if-divergent-target>,
+			jump-threading,
+			correlated-propagation,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			aggressive-instcombine,
+			libcalls-shrinkwrap,
+			tailcallelim,
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			reassociate,
+			constraint-elimination,
+			loop-mssa(
+				loop-instsimplify,
+				loop-simplifycfg,
+				licm<no-allowspeculation>,
+				loop-rotate<header-duplication;no-prepare-for-lto>,
+				licm<allowspeculation>,
+				simple-loop-unswitch<nontrivial;trivial>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			loop(
+				loop-idiom,
+				indvars,
+				extra-simple-loop-unswitch-passes,
+				loop-deletion,
+				loop-unroll-full
+			),
+			sroa<modify-cfg>,
+			vector-combine,
+			mldst-motion<no-split-footer-bb>,
+			gvn<>,
+			sccp,
+			bdce,
+			instcombine<max-iterations=1;no-verify-fixpoint>,
+			jump-threading,
+			correlated-propagation,
+			adce,
+			memcpyopt,
+			dse,
+			move-auto-init,
+			loop-mssa(
+				licm<allowspeculation>
+			),
+			simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;no-switch-to-lookup;keep-loops;hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+			instcombine<max-iterations=1;no-verify-fixpoint>
+		),
+		function-attrs,
+		function(
+			require<should-not-run-function-passes>
+		)
+	)
+),
+deadargelim,
+globalopt,
+globaldce,
+elim-avail-extern,
+rpo-function-attrs,
+recompute-globalsaa,
+function<eager-inv>(
+	drop-unnecessary-assumes,
+	float2int,
+	lower-constant-intrinsics,
+	chr,
+	loop(
+		loop-rotate<header-duplication;no-prepare-for-lto>,
+		loop-deletion
+	),
+	loop-distribute,
+	inject-tli-mappings,
+	loop-vectorize<no-interleave-forced-only;no-vectorize-forced-only;>,
+	drop-unnecessary-assumes,
+	infer-alignment,
+	loop-load-elim,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	simplifycfg<bonus-inst-threshold=1;forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;switch-to-lookup;no-keep-loops;hoist-common-insts;no-hoist-loads-stores-with-cond-faulting;sink-common-insts;speculate-blocks;simplify-cond-branch;no-speculate-unpredictables>,
+	slp-vectorizer,
+	vector-combine,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	loop-unroll<O3>,
+	transform-warning,
+	sroa<preserve-cfg>,
+	infer-alignment,
+	instcombine<max-iterations=1;no-verify-fixpoint>,
+	loop-mssa(
+		licm<allowspeculation>
+	),
+	alignment-from-assumptions,
+	loop-sink,
+	instsimplify,
+	div-rem-pairs,
+	tailcallelim,
+	simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;switch-to-arithmetic;no-switch-to-lookup;keep-loops;no-hoist-common-insts;hoist-loads-stores-with-cond-faulting;no-sink-common-insts;speculate-blocks;simplify-cond-branch;speculate-unpredictables>
+),
+alloc-token,
+globaldce,
+constmerge,
+cg-profile,
+rel-lookup-table-converter,
+function(
+	annotation-remarks
+),
+verify
 )");
 
 #endif

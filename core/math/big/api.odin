@@ -1,12 +1,12 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	This file collects public proc maps and their aliases.
 */
 
-
-package math_big
 /*
 
 	=== === === === === === === === === === === === === === === === === === === === === === === ===
@@ -160,6 +160,5 @@ destroy :: proc {
 		int_destroy :: proc(integers: ..^Int)
 	*/
 	int_destroy,
+	internal_rat_destroy,
 }
-
-

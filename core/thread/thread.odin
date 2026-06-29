@@ -1,10 +1,14 @@
+// Multi-threading operations to spawn threads and thread pools.
 package thread
 
 import "base:runtime"
 import "core:mem"
 import "base:intrinsics"
 
-_ :: intrinsics
+@(private)
+unall :: intrinsics.unaligned_load
+@(private)
+unals :: intrinsics.unaligned_store
 
 /*
 Value, specifying whether `core:thread` functionality is available on the
@@ -39,7 +43,8 @@ Type representing a thread handle and the associated with that thread data.
 Thread :: struct {
 	using specific: Thread_Os_Specific,
 	flags: bit_set[Thread_State; u8],
-	// Thread ID.
+	// Thread ID. Depending on the platform, may start out as 0 (zero) until the thread
+	// has had a chance to run.
 	id: int,
 	// The thread procedure.
 	procedure: Thread_Proc,
@@ -257,8 +262,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -290,8 +297,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -327,8 +336,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -339,7 +350,9 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(T))t.data
 		assert(t.user_index >= 1)
-		data := (^T)(&t.user_args[0])^
+
+		data := unall((^T)(&t.user_args))
+
 		fn(data)
 	}
 	if t = create(thread_proc, priority); t == nil {
@@ -348,9 +361,7 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 	t.data = rawptr(fn)
 	t.user_index = 1
 
-	data := data
-
-	mem.copy(&t.user_args[0], &data, size_of(T))
+	unals((^T)(&t.user_args), data)
 
 	if self_cleanup {
 		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
@@ -370,8 +381,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -383,9 +396,10 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 		fn := cast(proc(T1, T2))t.data
 		assert(t.user_index >= 2)
 		
-		user_args := mem.slice_to_bytes(t.user_args[:])
-		arg1 := (^T1)(raw_data(user_args))^
-		arg2 := (^T2)(raw_data(user_args[size_of(T1):]))^
+		ptr := uintptr(&t.user_args)
+
+		arg1 := unall((^T1)(rawptr(ptr)))
+		arg2 := unall((^T2)(rawptr(ptr + size_of(T1))))
 
 		fn(arg1, arg2)
 	}
@@ -395,11 +409,10 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 	t.data = rawptr(fn)
 	t.user_index = 2
 
-	arg1, arg2 := arg1, arg2
-	user_args := mem.slice_to_bytes(t.user_args[:])
+	ptr := uintptr(&t.user_args)
 
-	n := copy(user_args,     mem.ptr_to_bytes(&arg1))
-	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg2))
+	unals((^T1)(rawptr(ptr)), arg1)
+	unals((^T2)(rawptr(ptr + size_of(T1))), arg2)
 
 	if self_cleanup {
 		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
@@ -419,8 +432,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
@@ -432,10 +447,11 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 		fn := cast(proc(T1, T2, T3))t.data
 		assert(t.user_index >= 3)
 
-		user_args := mem.slice_to_bytes(t.user_args[:])
-		arg1 := (^T1)(raw_data(user_args))^
-		arg2 := (^T2)(raw_data(user_args[size_of(T1):]))^
-		arg3 := (^T3)(raw_data(user_args[size_of(T1) + size_of(T2):]))^
+		ptr := uintptr(&t.user_args)
+
+		arg1 := unall((^T1)(rawptr(ptr)))
+		arg2 := unall((^T2)(rawptr(ptr + size_of(T1))))
+		arg3 := unall((^T3)(rawptr(ptr + size_of(T1) + size_of(T2))))
 
 		fn(arg1, arg2, arg3)
 	}
@@ -445,12 +461,11 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 	t.data = rawptr(fn)
 	t.user_index = 3
 
-	arg1, arg2, arg3 := arg1, arg2, arg3
-	user_args := mem.slice_to_bytes(t.user_args[:])
+	ptr := uintptr(&t.user_args)
 
-	n := copy(user_args,     mem.ptr_to_bytes(&arg1))
-	n += copy(user_args[n:], mem.ptr_to_bytes(&arg2))
-	_  = copy(user_args[n:], mem.ptr_to_bytes(&arg3))
+	unals((^T1)(rawptr(ptr)), arg1)
+	unals((^T2)(rawptr(ptr + size_of(T1))), arg2)
+	unals((^T3)(rawptr(ptr + size_of(T1) + size_of(T2))), arg3)
 
 	if self_cleanup {
 		intrinsics.atomic_or(&t.flags, {.Self_Cleanup})
@@ -470,8 +485,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 
 If `self_cleanup` is specified, after the thread finishes the execution of the
 `fn` procedure, the resources associated with the thread are going to be
-automatically freed. **Do not** dereference the `^Thread` pointer, if this
-flag is specified.
+automatically freed.
+
+**Do not** dereference the `^Thread` pointer, if this flag is specified.
+That includes calling `join`, which needs to dereference ^Thread`.
 
 **IMPORTANT**: If `init_context` is specified and the default temporary allocator
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`

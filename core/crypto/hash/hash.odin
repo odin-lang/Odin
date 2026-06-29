@@ -2,14 +2,14 @@ package crypto_hash
 
 /*
 	Copyright 2021 zhibog
-	Made available under the BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		zhibog, dotbmp:  Initial implementation.
 */
 
+import "core:crypto"
 import "core:io"
-import "core:mem"
 
 // hash_bytes will hash the given input and return the computed digest
 // in a newly allocated slice.
@@ -21,8 +21,7 @@ hash_string :: proc(algorithm: Algorithm, data: string, allocator := context.all
 // in a newly allocated slice.
 hash_bytes :: proc(algorithm: Algorithm, data: []byte, allocator := context.allocator) -> []byte {
 	dst := make([]byte, DIGEST_SIZES[algorithm], allocator)
-	hash_bytes_to_buffer(algorithm, data, dst)
-	return dst
+	return hash_bytes_to_buffer(algorithm, data, dst)
 }
 
 // hash_string_to_buffer will hash the given input and assign the
@@ -46,7 +45,7 @@ hash_bytes_to_buffer :: proc(algorithm: Algorithm, data, hash: []byte) -> []byte
 	update(&ctx, data)
 	final(&ctx, hash)
 
-	return hash
+	return hash[:DIGEST_SIZES[algorithm]]
 }
 
 // hash_stream will incrementally fully consume a stream, and return the
@@ -62,7 +61,7 @@ hash_stream :: proc(
 	ctx: Context
 
 	buf: [MAX_BLOCK_SIZE * 4]byte
-	defer mem.zero_explicit(&buf, size_of(buf))
+	defer crypto.zero_explicit(&buf, size_of(buf))
 
 	init(&ctx, algorithm)
 

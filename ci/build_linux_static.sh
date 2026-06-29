@@ -6,7 +6,14 @@ LLVM_CONFIG="llvm-config-20"
 
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 
-CPPFLAGS="-DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
+if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
+	GIT_SHA=$(git show --pretty='%h' --no-patch --no-notes HEAD)
+	GIT_DATE=$(git show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
+	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
+else
+	GIT_DATE=$(date +"%Y-%m")
+fi
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"dev-$GIT_DATE\""
 CXXFLAGS="-std=c++14 $($LLVM_CONFIG --cxxflags --ldflags)"
 
 LDFLAGS="-static -lm -lzstd -lz -lffi -pthread -ldl -fuse-ld=mold"

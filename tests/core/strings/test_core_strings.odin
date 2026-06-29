@@ -1,9 +1,10 @@
 package test_core_strings
 
+import "base:runtime"
 import "core:mem"
 import "core:strings"
 import "core:testing"
-import "base:runtime"
+import "core:unicode/utf8"
 
 @test
 test_index_any_small_string_not_found :: proc(t: ^testing.T) {
@@ -163,11 +164,16 @@ test_substring :: proc(t: ^testing.T) {
 		{s = "Hello", end = len("Hello"), sub = "Hello", ok = true},
 		{s = "Hello", start = 1, end = len("Hello"), sub = "ello", ok = true},
 		{s = "Hello", start = 1, end = len("Hello") - 1, sub = "ell", ok = true},
+		{s = "Hello", start = 0, end = 0, sub = "", ok = true},
+		{s = "Hello", start = 3, end = 3, sub = "", ok = true},
+		{s = "Hello", start = len("Hello"), end = len("Hello"), sub = "", ok = true},
 		{s = "Hello", end = len("Hello") + 1, sub = "Hello", ok = false},
 		{s = "小猫咪", start = 0, end = 3, sub = "小猫咪", ok = true},
 		{s = "小猫咪", start = 1, end = 3, sub = "猫咪", ok = true},
 		{s = "小猫咪", start = 1, end = 5, sub = "猫咪", ok = false},
 		{s = "小猫咪", start = 1, end = 1, sub = "", ok = true},
+		{s = "小猫咪", start = 1, end = 1, sub = "", ok = true},
+		{s = "小猫咪", start = 3, end = 3, sub = "", ok = true},
 	}
 
 	for tc in cases {
@@ -216,5 +222,53 @@ test_builder_to_cstring :: proc(t: ^testing.T) {
 		cstr, err := strings.to_cstring(&b)
 		testing.expect(t, cstr == nil)
 		testing.expect(t, err == .Out_Of_Memory)
+	}
+}
+
+@test
+test_prefix_length :: proc(t: ^testing.T) {
+	prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
+		_len := min(len(a), len(b))
+
+		// Scan for matches including partial codepoints.
+		#no_bounds_check for n < _len && a[n] == b[n] {
+			n += 1
+		}
+
+		// Now scan to ignore partial codepoints.
+		if n > 0 {
+			s := a[:n]
+			n = 0
+			for {
+				r0, w := utf8.decode_rune(s[n:])
+				if r0 != utf8.RUNE_ERROR {
+					n += w
+				} else {
+					break
+				}
+			}
+		}
+		return
+	}
+
+	cases := [][2]string{
+		{"Hellope, there!", "Hellope, world!"},
+		{"Hellope, there!", "Foozle"},
+		{"Hellope, there!", "Hell"},
+		{"Hellope! 🦉",     "Hellope! 🦉"},
+	}
+
+	for v in cases {
+		p_scalar := prefix_length(v[0], v[1])
+		p_simd   := strings.prefix_length(v[0], v[1])
+		testing.expect_value(t, p_simd, p_scalar)
+
+		s := v[0]
+		for len(s) > 0 {
+			p_scalar = prefix_length(v[0], s)
+			p_simd   = strings.prefix_length(v[0], s)
+			testing.expect_value(t, p_simd, p_scalar)
+			s = s[:len(s) - 1]
+		}
 	}
 }

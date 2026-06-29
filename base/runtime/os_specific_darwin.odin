@@ -4,6 +4,8 @@ package runtime
 
 import "base:intrinsics"
 
+_HAS_RAND_BYTES :: true
+
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	STDERR :: 2
 	when ODIN_NO_CRT {
@@ -25,4 +27,26 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 
 		return 0, _OS_Errno(__error()^)
 	}
+}
+
+foreign import libc "system:System"
+
+_rand_bytes :: proc "contextless" (dst: []byte) {
+	// This process used to use Security/RandomCopyBytes, however
+	// on every version of MacOS (>= 10.12) that we care about,
+	// arc4random is implemented securely.
+
+	@(default_calling_convention="c")
+	foreign libc {
+		arc4random_buf :: proc(buf: [^]byte, nbytes: uint) ---
+	}
+	arc4random_buf(raw_data(dst), len(dst))
+}
+
+_exit :: proc "contextless" (code: int) -> ! {
+	@(default_calling_convention="c")
+	foreign libc {
+		exit :: proc(status: i32) -> ! ---
+	}
+	exit(i32(code))
 }

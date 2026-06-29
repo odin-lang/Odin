@@ -3,7 +3,7 @@ package testing
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Ginger Bill: Initial implementation.
@@ -83,7 +83,31 @@ format_log_text :: proc(level: runtime.Logger_Level, text: string, options: runt
 
 	log.do_level_header(options, &buf, level)
 	log.do_time_header(options, &buf, at_time)
-	log.do_location_header(options, &buf, location)
-
+	when GO_TO_ERROR {
+		do_go_to_error_friendly_location(options, &buf, location)
+	} else {
+		log.do_location_header(options, &buf, location)
+	}
 	return fmt.aprintf("%s%s", strings.to_string(buf), text, allocator = allocator)
+}
+
+do_go_to_error_friendly_location :: proc(opts: log.Options, buf: ^strings.Builder, location := #caller_location) {
+	if log.Location_Header_Opts & opts == nil {
+		return
+	}
+	fmt.sbprint(buf, "\n")
+
+	file := location.file_path
+	fmt.sbprint(buf, file)
+
+	fmt.sbprint(buf, "(")
+	fmt.sbprint(buf, location.line)
+	fmt.sbprint(buf, ":")
+	fmt.sbprint(buf, location.column)
+	fmt.sbprint(buf, ")")
+
+	if .Procedure in opts {
+		fmt.sbprintf(buf, ":%s()", location.procedure)
+	}
+	fmt.sbprint(buf, " ")
 }

@@ -65,12 +65,6 @@ get_build_arch_from_string :: proc(str: string) -> runtime.Odin_Arch_Type {
 
 @require_results
 parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags: File_Tags) {
-	context.allocator = allocator
-
-	if file.docs == nil && file.tags == nil {
-		return
-	}
-
 	next_char :: proc(src: string, i: ^int) -> (ch: u8) {
 		if i^ < len(src) {
 			ch = src[i^]
@@ -101,15 +95,6 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 			}
 		}
 	}
-
-	build_kinds: [dynamic]Build_Kind
-	defer shrink(&build_kinds)
-
-	build_project_name_strings: [dynamic]string
-	defer shrink(&build_project_name_strings)
-
-	build_project_names: [dynamic][]string
-	defer shrink(&build_project_names)
 
 	parse_tag :: proc(text: string, tags: ^File_Tags, build_kinds: ^[dynamic]Build_Kind,
 	                  build_project_name_strings: ^[dynamic]string,
@@ -143,7 +128,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 					for {
 						skip_whitespace(text, &i)
 						name_start := i
-	
+
 						switch next_char(text, &i) {
 						case 0, '\r', '\n':
 							i -= 1
@@ -155,7 +140,7 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 						case:
 							i -= 1
 						}
-	
+
 						scan_value(text, &i)
 						append(build_project_name_strings, text[name_start:i])
 					}
@@ -220,6 +205,18 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 		}
 	}
 
+	context.allocator = allocator
+
+	if file.docs == nil && file.tags == nil {
+		return
+	}
+
+	build_kinds: [dynamic]Build_Kind
+	build_project_names: [dynamic][]string
+
+	build_project_name_strings: [dynamic]string
+
+
 	if file.docs != nil {
 		for comment in file.docs.list {
 			if len(comment.text) < 3 || comment.text[:2] != "//" {
@@ -240,6 +237,10 @@ parse_file_tags :: proc(file: ast.File, allocator := context.allocator) -> (tags
 
 		parse_tag(text, &tags, &build_kinds, &build_project_name_strings, &build_project_names)
 	}
+
+	shrink(&build_kinds)
+	shrink(&build_project_names)
+	delete(build_project_name_strings)
 
 	tags.build = build_kinds[:]
 	tags.build_project_name = build_project_names[:]

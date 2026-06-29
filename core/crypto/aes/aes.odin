@@ -1,5 +1,5 @@
 /*
-package aes implements the AES block cipher and some common modes.
+The `AES` block cipher and some common modes.
 
 See:
 - [[ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197-upd1.pdf ]]

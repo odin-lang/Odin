@@ -1,4 +1,3 @@
-#+build js
 package qoi
 
 save :: proc{save_to_buffer}

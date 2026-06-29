@@ -3,9 +3,9 @@ package tests_core
 import rlibc "core:c/libc"
 
 @(init)
-download_assets :: proc() {
+download_assets :: proc "contextless" () {
 	if rlibc.system("python3 " + ODIN_ROOT + "tests/core/download_assets.py " + ODIN_ROOT + "tests/core/assets") != 0 {
-		panic("downloading test assets failed!")
+		panic_contextless("downloading test assets failed!")
 	}
 }
 
@@ -13,10 +13,12 @@ download_assets :: proc() {
 @(require) import "c/libc"
 @(require) import "compress"
 @(require) import "container"
+@(require) import "encoding/base32"
 @(require) import "encoding/base64"
 @(require) import "encoding/cbor"
 @(require) import "encoding/hex"
 @(require) import "encoding/hxa"
+@(require) import "encoding/ini"
 @(require) import "encoding/json"
 @(require) import "encoding/uuid"
 @(require) import "encoding/varint"
@@ -26,15 +28,16 @@ download_assets :: proc() {
 @(require) import "io"
 @(require) import "math"
 @(require) import "math/big"
+@(require) import "math/bits"
 @(require) import "math/linalg/glsl"
 @(require) import "math/noise"
 @(require) import "math/rand"
 @(require) import "mem"
+@(require) import "nbio"
 @(require) import "net"
 @(require) import "odin"
 @(require) import "os"
-@(require) import "os/os2"
-@(require) import "path/filepath"
+@(require) import "os/old"
 @(require) import "reflect"
 @(require) import "runtime"
 @(require) import "slice"
@@ -43,6 +46,7 @@ download_assets :: proc() {
 @(require) import "sync"
 @(require) import "sync/chan"
 @(require) import "sys/posix"
+@(require) import "sys/kqueue"
 @(require) import "sys/windows"
 @(require) import "text/i18n"
 @(require) import "text/match"

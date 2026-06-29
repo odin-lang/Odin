@@ -87,10 +87,6 @@ extern "C" {
 		#ifndef GB_SYSTEM_NETBSD
 		#define GB_SYSTEM_NETBSD 1
 		#endif
-	#elif defined(__HAIKU__) || defined(__haiku__)
-		#ifndef GB_SYSTEM_HAIKU
-		#define GB_SYSTEM_HAIKU 1
-		#endif
 	#else
 		#error This UNIX operating system is not supported
 	#endif
@@ -219,7 +215,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__HAIKU__)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -267,13 +263,6 @@ extern "C" {
 	#define lseek64 lseek
 #endif
 
-#if defined(GB_SYSTEM_HAIKU)
-	#include <stdio.h>
-	#include <pthread.h>
-	#include <kernel/OS.h>
-	#define lseek64 lseek
-#endif
-    
 #if defined(GB_SYSTEM_UNIX)
 	#include <semaphore.h>
 #endif
@@ -497,7 +486,11 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 
 #if !defined(gb_no_asan)
 	#if defined(_MSC_VER)
-		#define gb_no_asan __declspec(no_sanitize_address)
+		#if _MSC_VER >= 1930
+			#define gb_no_asan __declspec(no_sanitize_address)
+		#else
+			#define gb_no_asan
+		#endif
 	#else
 		#define gb_no_asan __attribute__((disable_sanitizer_instrumentation))
 	#endif
@@ -710,13 +703,15 @@ extern "C++" {
 } while (0)
 #endif
 
+
+#if defined(DISABLE_ASSERT)
+#define GB_ASSERT(cond) gb_unused(cond)
+#endif
+
 #ifndef GB_ASSERT
 #define GB_ASSERT(cond) GB_ASSERT_MSG(cond, NULL)
 #endif
 
-#ifndef GB_ASSERT_NOT_NULL
-#define GB_ASSERT_NOT_NULL(ptr) GB_ASSERT_MSG((ptr) != NULL, #ptr " must not be NULL")
-#endif
 
 // NOTE(bill): Things that shouldn't happen with a message!
 #ifndef GB_PANIC
@@ -837,13 +832,6 @@ typedef struct gbAffinity {
 #elif defined(GB_SYSTEM_NETBSD)
 typedef struct gbAffinity {
 	b32 is_accurate;
-	isize core_count;
-	isize thread_count;
-	isize threads_per_core;
-} gbAffinity;
-#elif defined(GB_SYSTEM_HAIKU)
-typedef struct gbAffinity {
-	b32   is_accurate;
 	isize core_count;
 	isize thread_count;
 	isize threads_per_core;
@@ -2505,7 +2493,13 @@ extern "C" {
 #pragma warning(disable:4127) // Conditional expression is constant
 #endif
 
+gb_internal void print_all_errors(void);
+gb_internal bool any_errors(void);
+gb_internal bool any_warnings(void);
 void gb_assert_handler(char const *prefix, char const *condition, char const *file, i32 line, char const *msg, ...) {
+	if (any_errors() || any_warnings()) {
+		print_all_errors();
+	}
 	gb_printf_err("%s(%d): %s: ", file, line, prefix);
 	if (condition)
 		gb_printf_err( "`%s` ", condition);
@@ -2516,6 +2510,7 @@ void gb_assert_handler(char const *prefix, char const *condition, char const *fi
 		va_end(va);
 	}
 	gb_printf_err("\n");
+	gb_printf_err("This is a compiler error. Please report this.\n");
 }
 
 b32 gb_is_power_of_two(isize x) {
@@ -3035,8 +3030,6 @@ gb_inline u32 gb_thread_current_id(void) {
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #elif defined(GB_SYSTEM_LINUX)
 	thread_id = gettid();
-#elif defined(GB_SYSTEM_HAIKU)
-	thread_id = find_thread(NULL);
 #elif defined(GB_SYSTEM_FREEBSD)
 	thread_id = pthread_getthreadid_np();
 #elif defined(GB_SYSTEM_NETBSD)
@@ -3249,9 +3242,6 @@ b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 	//info.affinity_tag = cast(integer_t)index;
 	//result = thread_policy_set(thread, THREAD_AFFINITY_POLICY, cast(thread_policy_t)&info, THREAD_AFFINITY_POLICY_COUNT);
 
-#if !defined(GB_SYSTEM_HAIKU)
-	result = pthread_setaffinity_np(thread, sizeof(cpuset_t), &mn);
-#endif
 	return result == 0;
 }
 
@@ -3332,29 +3322,6 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 	return a->threads_per_core;
 }
 
-#elif defined(GB_SYSTEM_HAIKU)
-#include <unistd.h>
-
-void gb_affinity_init(gbAffinity *a) {
-	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
-	a->threads_per_core = 1;
-	a->is_accurate      = a->core_count > 0;
-	a->core_count       = a->is_accurate ? a->core_count : 1;
-	a->thread_count     = a->core_count;
-}
-
-void gb_affinity_destroy(gbAffinity *a) {
-	gb_unused(a);
-}
-
-b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
-	return true;
-}
-
-isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
-	GB_ASSERT(0 <= core && core < a->core_count);
-	return a->threads_per_core;
-}
 #else
 #error TODO(bill): Unknown system
 #endif
@@ -3715,7 +3682,7 @@ gb_inline i32 gb_strcmp(char const *s1, char const *s2) {
 }
 
 gb_inline char *gb_strcpy(char *dest, char const *source) {
-	GB_ASSERT_NOT_NULL(dest);
+	GB_ASSERT(dest != NULL);
 	if (source) {
 		char *str = dest;
 		while (*source) *str++ = *source++;
@@ -3725,7 +3692,7 @@ gb_inline char *gb_strcpy(char *dest, char const *source) {
 
 
 gb_inline char *gb_strncpy(char *dest, char const *source, isize len) {
-	GB_ASSERT_NOT_NULL(dest);
+	GB_ASSERT(dest != NULL);
 	if (source) {
 		char *str = dest;
 		while (len > 0 && *source) {
@@ -3742,7 +3709,7 @@ gb_inline char *gb_strncpy(char *dest, char const *source, isize len) {
 
 gb_inline isize gb_strlcpy(char *dest, char const *source, isize len) {
 	isize result = 0;
-	GB_ASSERT_NOT_NULL(dest);
+	GB_ASSERT(dest != NULL);
 	if (source) {
 		char const *source_start = source;
 		char *str = dest;
@@ -4865,8 +4832,8 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 	u64 h = seed ^ (len * m);
 
 	u64 const *data = cast(u64 const *)data_;
-	u8  const *data2 = cast(u8 const *)data_;
 	u64 const* end = data + (len / 8);
+	u8  const *data2 = cast(u8 const *)end;
 
 	while (data != end) {
 		u64 k = *data++;
@@ -5632,7 +5599,7 @@ gbFileContents gb_file_read_contents(gbAllocator a, b32 zero_terminate, char con
 
 void gb_file_free_contents(gbFileContents *fc) {
     if (fc == NULL || fc->size == 0) return;
-	GB_ASSERT_NOT_NULL(fc->data);
+	GB_ASSERT(fc->data != NULL);
 	gb_free(fc->allocator, fc->data);
 	fc->data = NULL;
 	fc->size = 0;
@@ -5644,7 +5611,7 @@ void gb_file_free_contents(gbFileContents *fc) {
 
 gb_inline b32 gb_path_is_absolute(char const *path) {
 	b32 result = false;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
 	result == (gb_strlen(path) > 2) &&
 	          gb_char_is_alpha(path[0]) &&
@@ -5659,7 +5626,7 @@ gb_inline b32 gb_path_is_relative(char const *path) { return !gb_path_is_absolut
 
 gb_inline b32 gb_path_is_root(char const *path) {
 	b32 result = false;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
 	result = gb_path_is_absolute(path) && (gb_strlen(path) == 3);
 #else
@@ -5670,14 +5637,14 @@ gb_inline b32 gb_path_is_root(char const *path) {
 
 gb_inline char const *gb_path_base_name(char const *path) {
 	char const *ls;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 	ls = gb_char_last_occurence(path, '/');
 	return (ls == NULL) ? path : ls+1;
 }
 
 gb_inline char const *gb_path_extension(char const *path) {
 	char const *ld;
-	GB_ASSERT_NOT_NULL(path);
+	GB_ASSERT(path != NULL);
 	ld = gb_char_last_occurence(path, '.');
 	return (ld == NULL) ? NULL : ld+1;
 }

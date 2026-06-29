@@ -1,10 +1,10 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }
@@ -18,7 +18,7 @@ foreign lib {
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/semctl.html ]]
 	*/
 	@(link_name=LSEMCTL)
-	semctl :: proc(semid: FD, semnum: c.int, cmd: Sem_Cmd, arg: ^semun = nil) -> c.int ---
+	semctl :: proc(semid: FD, semnum: c.int, cmd: Sem_Cmd, #c_vararg args: ..semun) -> c.int ---
 
 	/*
 	Returns the semaphore identifier associated with key.
@@ -39,6 +39,9 @@ foreign lib {
 }
 
 Sem_Cmd :: enum c.int {
+	RMID    = IPC_RMID,
+	SET     = IPC_SET,
+	STAT    = IPC_STAT,
 	// Returns the value of semncnt.
 	GETNCNT = GETNCNT,
 	// Returns the value of sempid.
@@ -137,41 +140,26 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	SETVAL  :: 16
 	SETALL  :: 17
 
-	semid_ds :: struct {
-		sem_perm:  ipc_perm,  // [PSX] operation permission structure
-		sem_otime: time_t,    // [PSX] last semop()
-		__sem_otime_high: c.ulong,
-		sem_ctime: time_t,    // [PSX] last time changed by semctl()
-		__sem_ctime_high: c.ulong,
-		sem_nsems: c.ulong, // [PSX] number of semaphores in set
-		__glibc_reserved3: c.ulong,
-		__glibc_reserved4: c.ulong,
-	}
-
-	sembuf :: struct {
-		sem_num: c.ushort, /* [PSX] semaphore number */
-		sem_op:  c.short,  /* [PSX] semaphore operation */
-		sem_flg: c.short,  /* [PSX] operation flags */
-	}
-
-} else when ODIN_OS == .Haiku {
-
-	SEM_UNDO :: 10 // undo the operation on exit
-
-	// Commands for `semctl'.
-	GETPID  :: 3
-	GETVAL  :: 4
-	GETALL  :: 5
-	GETNCNT :: 6
-	GETZCNT :: 7
-	SETVAL  :: 8
-	SETALL  :: 9
-
-	semid_ds :: struct {
-		sem_perm:  ipc_perm,  // [PSX] operation permission structure
-		sem_nsems: c.ushort, // [PSX] number of semaphores in set
-		sem_otime: time_t,    // [PSX] last semop()
-		sem_ctime: time_t,    // [PSX] last time changed by semctl()
+	when ODIN_ARCH == .arm64 {
+		semid_ds :: struct {
+			sem_perm:  ipc_perm,  // [PSX] operation permission structure
+			sem_otime: time_t,    // [PSX] last semop()
+			sem_ctime: time_t,    // [PSX] last time changed by semctl()
+			sem_nsems: c.ulong, // [PSX] number of semaphores in set
+			__glibc_reserved3: c.ulong,
+			__glibc_reserved4: c.ulong,
+		}
+	} else {
+		semid_ds :: struct {
+			sem_perm:  ipc_perm,  // [PSX] operation permission structure
+			sem_otime: time_t,    // [PSX] last semop()
+			__sem_otime_high: c.ulong,
+			sem_ctime: time_t,    // [PSX] last time changed by semctl()
+			__sem_ctime_high: c.ulong,
+			sem_nsems: c.ulong, // [PSX] number of semaphores in set
+			__glibc_reserved3: c.ulong,
+			__glibc_reserved4: c.ulong,
+		}
 	}
 
 	sembuf :: struct {

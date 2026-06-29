@@ -1,8 +1,9 @@
 /*
-Package small_array implements a dynamic array like
-interface on a stack-allocated, fixed-size array.
+Deprecation Notice: Prefer using `[dynamic; N]T` (fixed capacity dynamic arrays).
 
-The Small_Array type is optimal for scenarios where you need
+A dynamic array-like interface on a stack-allocated, fixed-size array.
+
+The `Small_Array` type is optimal for scenarios where you need
 a container for a fixed number of elements of a specific type,
 with the total number known at compile time but the exact
 number to be used determined at runtime.
@@ -33,7 +34,7 @@ Example:
 		return
 	}
 
-	// the Small_Array can be an ordinary parameter 'generic' over
+	// the `Small_Array` can be an ordinary parameter 'generic' over
 	// the actual length to be usable with different sizes
 	print_elements :: proc(arr: ^small_array.Small_Array($N, rune)) {
 		for r in small_array.slice(arr) {

@@ -540,6 +540,7 @@ gb_internal void report_os_info() {
 		}
 
 		switch (major) {
+		case 26: gb_printf("macOS Tahoe"); break;
 		case 15: gb_printf("macOS Sequoia"); break;
 		case 14: gb_printf("macOS Sonoma"); break;
 		case 13: gb_printf("macOS Ventura"); break;
@@ -667,8 +668,14 @@ gb_internal void print_bug_report_help() {
 	gb_printf("-nightly");
 	#endif
 
+	String version = {};
+
 	#ifdef GIT_SHA
-	gb_printf(":%s", GIT_SHA);
+	version.text = cast(u8 *)GIT_SHA;
+	version.len  = gb_strlen(GIT_SHA);
+	if (version != "") {
+		gb_printf(":%.*s", LIT(version));
+	}
 	#endif
 
 	gb_printf("\n");

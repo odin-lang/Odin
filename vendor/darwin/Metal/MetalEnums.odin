@@ -1050,3 +1050,9 @@ VertexStepFunction :: enum NS.UInteger {
 	PerPatch             = 3,
 	PerPatchControlPoint = 4,
 }
+
+ShaderValidation :: enum NS.UInteger {
+	Default  = 0,
+	Enabled  = 1,
+	Disabled = 2,
+}

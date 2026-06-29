@@ -1,7 +1,7 @@
 package runtime
 
 import "base:intrinsics"
-import "base:sanitizer"
+// import "base:sanitizer"
 
 DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE :: uint(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE)
 
@@ -44,7 +44,7 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint
 	block.base = ([^]byte)(uintptr(block) + base_offset)
 	block.capacity = uint(end - uintptr(block.base))
 
-	sanitizer.address_poison(block.base, block.capacity)
+	// sanitizer.address_poison(block.base, block.capacity)
 
 	// Should be zeroed
 	assert(block.used == 0)
@@ -52,10 +52,13 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint
 	return
 }
 
-memory_block_dealloc :: proc(block_to_free: ^Memory_Block, loc := #caller_location) {
+memory_block_dealloc :: proc "contextless" (block_to_free: ^Memory_Block, loc := #caller_location) {
 	if block_to_free != nil {
+
 		allocator := block_to_free.allocator
-		sanitizer.address_unpoison(block_to_free.base, block_to_free.capacity)
+		// sanitizer.address_unpoison(block_to_free.base, block_to_free.capacity)
+		context = default_context()
+		context.allocator = allocator
 		mem_free(block_to_free, allocator, loc)
 	}
 }
@@ -87,22 +90,13 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		return
 	}
 	data = block.base[block.used+alignment_offset:][:min_size]
-	sanitizer.address_unpoison(block.base[block.used:block.used+size])
+	// sanitizer.address_unpoison(block.base[block.used:block.used+size])
 	block.used += size
 	return
 }
 
 @(require_results)
 arena_alloc :: proc(arena: ^Arena, size, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
-	align_forward_uint :: proc "contextless" (ptr, align: uint) -> uint {
-		p := ptr
-		modulo := p & (align-1)
-		if modulo != 0 {
-			p += align - modulo
-		}
-		return p
-	}
-
 	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
 
 	size := size
@@ -167,12 +161,12 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	if arena.curr_block != nil {
 		intrinsics.mem_zero(arena.curr_block.base, arena.curr_block.used)
 		arena.curr_block.used = 0
-		sanitizer.address_poison(arena.curr_block.base, arena.curr_block.capacity)
+		// sanitizer.address_poison(arena.curr_block.base, arena.curr_block.capacity)
 	}
 	arena.total_used = 0
 }
 
-arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
+arena_destroy :: proc "contextless" (arena: ^Arena, loc := #caller_location) {
 	for arena.curr_block != nil {
 		free_block := arena.curr_block
 		arena.curr_block = free_block.prev
@@ -184,6 +178,7 @@ arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
 	arena.total_capacity = 0
 }
 
+@(require_results)
 arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	return Allocator{arena_allocator_proc, arena}
 }
@@ -231,8 +226,9 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 				if start < old_end && old_end == block.used && new_end <= block.capacity {
 					// grow data in-place, adjusting next allocation
 					block.used = uint(new_end)
+					arena.total_used = uint(new_end)
 					data = block.base[start:new_end]
-					sanitizer.address_unpoison(data)
+					// sanitizer.address_unpoison(data)
 					return
 				}
 			}
@@ -306,7 +302,7 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
 			amount_to_zero := block.used-temp.used
 			intrinsics.mem_zero(block.base[temp.used:], amount_to_zero)
-			sanitizer.address_poison(block.base[temp.used:block.capacity])
+			// sanitizer.address_poison(block.base[temp.used:block.capacity])
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}

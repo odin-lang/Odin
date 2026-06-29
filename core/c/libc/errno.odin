@@ -5,7 +5,7 @@ package libc
 when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
 } else when ODIN_OS == .Darwin {
-	foreign import libc "system:System.framework"
+	foreign import libc "system:System"
 } else {
 	foreign import libc "system:c"
 }
@@ -78,25 +78,6 @@ when ODIN_OS == .Darwin {
 	EDOM   :: 33
 	EILSEQ :: 92
 	ERANGE :: 34
-}
-
-when ODIN_OS == .Haiku {
-	@(private="file")
-	@(default_calling_convention="c")
-	foreign libc {
-		@(link_name="_errnop")
-		_get_errno :: proc() -> ^int ---
-	}
-
-	_HAIKU_USE_POSITIVE_POSIX_ERRORS :: #config(HAIKU_USE_POSITIVE_POSIX_ERRORS, false)
-	_POSIX_ERROR_FACTOR              :: -1 when _HAIKU_USE_POSITIVE_POSIX_ERRORS else 1
-
-	@(private="file") _GENERAL_ERROR_BASE :: min(int)
-	@(private="file") _POSIX_ERROR_BASE   :: _GENERAL_ERROR_BASE + 0x7000
-
-	EDOM   :: _POSIX_ERROR_FACTOR * (_POSIX_ERROR_BASE + 16)
-	EILSEQ :: _POSIX_ERROR_FACTOR * (_POSIX_ERROR_BASE + 38)
-	ERANGE :: _POSIX_ERROR_FACTOR * (_POSIX_ERROR_BASE + 17)
 }
 
 when ODIN_OS == .JS {

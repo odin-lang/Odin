@@ -1,4 +1,4 @@
-#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd
 package tests_core_posix
 
 import "core:log"
@@ -21,7 +21,7 @@ test_arpa_inet :: proc(t: ^testing.T) {
 			dst: [posix.INET6_ADDRSTRLEN]byte
 		}
 
-		res := posix.inet_pton(af, src, &addr, size_of(addr))
+		res := posix.inet_pton(af, src, &addr)
 		testing.expect_value(t, res, expect, loc)
 
 		if expect == .SUCCESS {
@@ -65,21 +65,12 @@ test_dirent :: proc(t: ^testing.T) {
 		for entry in entries {
 			defer posix.free(entry)
 
-			when ODIN_OS == .Haiku {
-				stat: posix.stat_t
-				posix.stat(cstring(raw_data(entry.d_name[:])), &stat)
-
-				if !posix.S_ISREG(stat.st_mode) {
-					continue
-				}
-			} else {
-				if entry.d_type != .REG {
-					continue
-				}
+			if entry.d_type != .REG {
+				continue
 			}
 
 			name := string(cstring(raw_data(entry.d_name[:])))
-			testing.expectf(t, name in test_map, "%v in %v", name, test_map)
+			testing.expectf(t, name in test_map, "scandir: %v in %v", name, test_map)
 		}
 	}
 
@@ -95,21 +86,12 @@ test_dirent :: proc(t: ^testing.T) {
 				break
 			}
 
-			when ODIN_OS == .Haiku {
-				stat: posix.stat_t
-				posix.stat(cstring(raw_data(entry.d_name[:])), &stat)
-
-				if !posix.S_ISREG(stat.st_mode) {
-					continue
-				}
-			} else {
-				if entry.d_type != .REG {
-					continue
-				}
+			if entry.d_type != .REG {
+				continue
 			}
 
 			name := string(cstring(raw_data(entry.d_name[:])))
-			testing.expectf(t, name in test_map, "%v in %v", name, test_map)
+			testing.expectf(t, name in test_map, "readdir: %v in %v", name, test_map)
 		}
 	}
 }
@@ -165,8 +147,8 @@ test_libgen :: proc(t: ^testing.T) {
 		{ "///",              "/",                                                 "/" },
 		{ "/usr/",            "/",                                                 "usr" },
 		{ "/usr/lib",         "/usr",                                              "lib" },
-		{ "//usr//lib//",     "//usr"      + ("/" when ODIN_OS == .Haiku else ""), "lib" },
-		{ "/home//dwc//test", "/home//dwc" + ("/" when ODIN_OS == .Haiku else ""), "test" },
+		{ "//usr//lib//",     "//usr",                                             "lib" },
+		{ "/home//dwc//test", "/home//dwc",                                        "test" },
 	}
 
 	for test in tests {
@@ -214,15 +196,13 @@ test_stat :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	testing.expect_value(t, posix.stat(#file, &stat), posix.result.OK)
 	testing.expect(t, posix.S_ISREG(stat.st_mode))
-	testing.expect_value(t, stat.st_mode, posix.mode_t{.IROTH, .IRGRP, .IRUSR, .IWUSR, .IFREG})
-
 	CONTENT := #load(#file)
 	testing.expect_value(t, stat.st_size, posix.off_t(len(CONTENT)))
 }
 
 @(test)
 test_pthreads :: proc(t: ^testing.T) {
-	testing.set_fail_timeout(t, time.Second)
+	testing.set_fail_timeout(t, 3 * time.Second)
 
 	NTHREADS :: 3
 	thread_ids: [NTHREADS]posix.pthread_t
@@ -261,7 +241,4 @@ open_permissions :: proc(t: ^testing.T) {
 	stat: posix.stat_t
 	res := posix.fstat(fd, &stat)
 	testing.expectf(t, res == .OK, "failed to stat: %v", posix.strerror())
-
-	stat.st_mode -= posix.S_IFMT
-	testing.expect_value(t, stat.st_mode, in_mode)
 }

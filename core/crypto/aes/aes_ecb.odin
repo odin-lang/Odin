@@ -21,7 +21,7 @@ init_ecb :: proc(ctx: ^Context_ECB, key: []byte, impl := DEFAULT_IMPLEMENTATION)
 encrypt_ecb :: proc(ctx: ^Context_ECB, dst, src: []byte) {
 	ensure(ctx._is_initialized)
 	ensure(len(dst) == BLOCK_SIZE, "crypto/aes: invalid dst size")
-	ensure(len(dst) == BLOCK_SIZE, "crypto/aes: invalid src size")
+	ensure(len(src) == BLOCK_SIZE, "crypto/aes: invalid src size")
 
 	switch &impl in ctx._impl {
 	case ct64.Context:
@@ -35,7 +35,7 @@ encrypt_ecb :: proc(ctx: ^Context_ECB, dst, src: []byte) {
 decrypt_ecb :: proc(ctx: ^Context_ECB, dst, src: []byte) {
 	ensure(ctx._is_initialized)
 	ensure(len(dst) == BLOCK_SIZE, "crypto/aes: invalid dst size")
-	ensure(len(dst) == BLOCK_SIZE, "crypto/aes: invalid src size")
+	ensure(len(src) == BLOCK_SIZE, "crypto/aes: invalid src size")
 
 	switch &impl in ctx._impl {
 	case ct64.Context:

@@ -2,6 +2,8 @@
 #+build !linux
 #+build !freebsd
 #+build !windows
+#+build !netbsd
+#+build !openbsd
 package net
 
 @(private="file", thread_local)

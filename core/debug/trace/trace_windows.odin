@@ -6,7 +6,6 @@ import "base:intrinsics"
 import "base:runtime"
 
 import win32 "core:sys/windows"
-import "core:fmt"
 
 _Context :: struct {
 	hProcess: win32.HANDLE,
@@ -54,9 +53,9 @@ _resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> (
 	symbol.SizeOfStruct = size_of(symbol^)
 	symbol.MaxNameLen = 255
 	if win32.SymFromAddrW(ctx.impl.hProcess, win32.DWORD64(frame), &{}, symbol) {
-		fl.procedure, _ = win32.wstring_to_utf8(&symbol.Name[0], -1, allocator)
+		fl.procedure, _ = win32.wstring_to_utf8(cstring16(&symbol.Name[0]), -1, allocator)
 	} else {
-		fl.procedure = fmt.aprintf("(procedure: 0x%x)", frame, allocator=allocator)
+		fl.procedure = _format_missing_proc(uintptr(frame), allocator)
 	}
 
 	line: win32.IMAGEHLP_LINE64

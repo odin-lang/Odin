@@ -3,9 +3,16 @@ package sync_chan
 import "base:builtin"
 import "base:intrinsics"
 import "base:runtime"
-import "core:mem"
 import "core:sync"
 import "core:math/rand"
+
+when ODIN_TEST {
+/*
+Hook for testing _try_select_raw allowing the test harness to manipulate the
+channels prior to the select actually operating on them.
+*/
+__try_select_raw_pause : proc() = nil
+}
 
 /*
 Determines what operations `Chan` supports.
@@ -74,6 +81,8 @@ Raw_Chan :: struct {
 	w_cond:          sync.Cond,
 	r_waiting:       int,  // guarded by `mutex`
 	w_waiting:       int,  // guarded by `mutex`
+
+	did_read: bool, // lets a sender know if the value was read
 
 	// Buffered
 	queue: ^Raw_Queue,
@@ -245,20 +254,20 @@ Example:
 	}
 */
 @(require_results)
-create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
+create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator, loc := #caller_location) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
 	assert(msg_size <= int(max(u16)))
 	align := max(align_of(Raw_Chan), msg_alignment)
 
-	size := mem.align_forward_int(size_of(Raw_Chan), align)
+	size := runtime.align_forward_int(size_of(Raw_Chan), align)
 	offset := size
 	size += msg_size
-	size = mem.align_forward_int(size, align)
+	size = runtime.align_forward_int(size, align)
 
-	ptr := mem.alloc(size, align, allocator) or_return
-	c = (^Raw_Chan)(ptr)
+	data := runtime.mem_alloc(size, align, allocator, loc) or_return
+	c = (^Raw_Chan)(raw_data(data))
 	c.allocator = allocator
 	c.allocation_size = size
-	c.unbuffered_data = ([^]byte)(ptr)[offset:]
+	c.unbuffered_data = raw_data(data[offset:])
 	c.msg_size = u16(msg_size)
 	return
 }
@@ -290,7 +299,7 @@ Example:
 	}
 */
 @(require_results)
-create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap: int, allocator: runtime.Allocator) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
+create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap: int, allocator: runtime.Allocator, loc := #caller_location) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
 	assert(msg_size <= int(max(u16)))
 	if cap <= 0 {
 		return create_raw_unbuffered(msg_size, msg_alignment, allocator)
@@ -298,15 +307,16 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 
 	align := max(align_of(Raw_Chan), msg_alignment, align_of(Raw_Queue))
 
-	size := mem.align_forward_int(size_of(Raw_Chan), align)
+	size := runtime.align_forward_int(size_of(Raw_Chan), align)
 	q_offset := size
-	size = mem.align_forward_int(q_offset + size_of(Raw_Queue), msg_alignment)
+	size = runtime.align_forward_int(q_offset + size_of(Raw_Queue), msg_alignment)
 	offset := size
 	size += msg_size * cap
-	size = mem.align_forward_int(size, align)
+	size = runtime.align_forward_int(size, align)
 
-	ptr := mem.alloc(size, align, allocator) or_return
-	c = (^Raw_Chan)(ptr)
+	data := runtime.mem_alloc(size, align, allocator, loc) or_return
+	ptr  := raw_data(data)
+	c = (^Raw_Chan)(raw_data(data))
 	c.allocator = allocator
 	c.allocation_size = size
 
@@ -329,10 +339,10 @@ Destroys the Channel.
 **Returns**:
 - An `Allocator_Error`
 */
-destroy :: proc(c: ^Raw_Chan) -> (err: runtime.Allocator_Error) {
+destroy :: proc(c: ^Raw_Chan, loc := #caller_location) -> (err: runtime.Allocator_Error) {
 	if c != nil {
 		allocator := c.allocator
-		err = mem.free_with_size(c, c.allocation_size, allocator)
+		err = runtime.mem_free_with_size(c, c.allocation_size, allocator, loc)
 	}
 	return
 }
@@ -412,8 +422,8 @@ as_recv :: #force_inline proc "contextless" (c: $C/Chan($T, $D)) -> (r: Chan(T, 
 Sends the specified message, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is full
-until the channel is being read from. `send` will return
-`false` when attempting to send on an already closed channel.
+until the channel is being read from or the channel is closed. `send` will
+return `false` when attempting to send on an already closed channel.
 
 **Inputs**
 - `c`: The channel
@@ -484,8 +494,9 @@ try_send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where
 Reads a message from the channel, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is empty
-until the channel is being written to. `recv` will return
-`false` when attempting to receive a message on an already closed channel.
+until the channel is being written to or the channel is closed. `recv` will
+return `false` when attempting to receive a message on an already closed
+channel.
 
 **Inputs**
 - `c`: The channel
@@ -558,8 +569,8 @@ try_recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D
 Sends the specified message, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is full
-until the channel is being read from. `send_raw` will return
-`false` when attempting to send on an already closed channel.
+until the channel is being read from or the channel is closed. `send_raw` will
+return `false` when attempting to send on an already closed channel.
 
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -619,12 +630,23 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 			return false
 		}
 
-		mem.copy(c.unbuffered_data, msg_in, int(c.msg_size))
+		c.did_read = false
+		defer c.did_read = false
+
+		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
+
 		c.w_waiting += 1
+
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
+
 		sync.wait(&c.w_cond, &c.mutex)
+
+		if c.closed && !c.did_read {
+			return false
+		}
+
 		ok = true
 	}
 	return
@@ -634,8 +656,9 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 Reads a message from the channel, blocking the current thread if:
 - the channel is unbuffered
 - the channel's buffer is empty
-until the channel is being written to. `recv_raw` will return
-`false` when attempting to receive a message on an already closed channel.
+until the channel is being written to or the channel is closed. `recv_raw`
+will return `false` when attempting to receive a message on an already closed
+channel.
 
 Note: The location pointed to by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -688,7 +711,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 
 		msg := raw_queue_pop(c.queue)
 		if msg != nil {
-			mem.copy(msg_out, msg, int(c.msg_size))
+			intrinsics.mem_copy(msg_out, msg, int(c.msg_size))
 		}
 
 		if c.w_waiting > 0 {
@@ -698,8 +721,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		for !c.closed &&
-			c.w_waiting == 0 {
+		for !c.closed && c.w_waiting == 0 {
 			c.r_waiting += 1
 			sync.wait(&c.r_cond, &c.mutex)
 			c.r_waiting -= 1
@@ -709,9 +731,10 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 			return
 		}
 
-		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
+		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
 		c.w_waiting -= 1
 
+		c.did_read = true
 		sync.signal(&c.w_cond)
 		ok = true
 	}
@@ -771,11 +794,11 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		if c.closed {
+		if c.closed || c.r_waiting - c.w_waiting <= 0 {
 			return false
 		}
 
-		mem.copy(c.unbuffered_data, msg_in, int(c.msg_size))
+		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
 		c.w_waiting += 1
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
@@ -825,7 +848,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 
 		msg := raw_queue_pop(c.queue)
 		if msg != nil {
-			mem.copy(msg_out, msg, int(c.msg_size))
+			intrinsics.mem_copy(msg_out, msg, int(c.msg_size))
 		}
 
 		if c.w_waiting > 0 {
@@ -835,11 +858,11 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	} else if c.unbuffered_data != nil { // unbuffered
 		sync.guard(&c.mutex)
 
-		if c.closed || c.w_waiting == 0 {
+		if c.closed || c.w_waiting - c.r_waiting <= 0 {
 			return false
 		}
 
-		mem.copy(msg_out, c.unbuffered_data, int(c.msg_size))
+		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
 		c.w_waiting -= 1
 
 		sync.signal(&c.w_cond)
@@ -1038,8 +1061,9 @@ is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 }
 
 /*
-Returns whether a message is ready to be read, i.e.,
-if a call to `recv` or `recv_raw` would block
+Returns whether a message can be read without blocking the current
+thread. Specifically, it checks if the channel is buffered and not full,
+or if there is already a writer attempting to send a message.
 
 **Inputs**
 - `c`: The channel
@@ -1067,7 +1091,7 @@ can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len > 0
 	}
-	return c.w_waiting > 0
+	return c.w_waiting - c.r_waiting > 0
 }
 
 
@@ -1080,7 +1104,7 @@ or if there is already a reader waiting for a message.
 - `c`: The channel
 
 **Returns**
-- `true` if a message can be send, `false` otherwise
+- `true` if a message can be sent, `false` otherwise
 
 Example:
 
@@ -1102,18 +1126,30 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if is_buffered(c) {
 		return c.queue.len < c.queue.cap
 	}
-	return c.w_waiting == 0
+	return c.r_waiting - c.w_waiting > 0
+}
+
+/*
+Specifies the direction of the selected channel.
+*/
+Select_Status :: enum {
+	None,
+	Recv,
+	Send,
 }
 
 
 /*
-Attempts to either send or receive messages on the specified channels.
+Attempts to either send or receive messages on the specified channels without blocking.
 
-`select_raw` first identifies which channels have messages ready to be received
+`try_select_raw` first identifies which channels have messages ready to be received
 and which are available for sending. It then randomly selects one operation
 (either a send or receive) to perform.
 
+If no channels have messages ready, the procedure is a noop.
+
 Note: Each message in `send_msgs` corresponds to the send channel at the same index in `sends`.
+If the message is nil, corresponding send channel will be skipped.
 
 **Inputs**
 - `recv`: A slice of channels to read from
@@ -1130,7 +1166,7 @@ Example:
 	import "core:sync/chan"
 	import "core:fmt"
 
-	select_raw_example :: proc() {
+	try_select_raw_example :: proc() {
 		c, err := chan.create(chan.Chan(int), 1, context.allocator)
 		assert(err == .None)
 		defer chan.destroy(c)
@@ -1145,32 +1181,32 @@ Example:
 		// where the value from the read should be stored
 		received_value: int
 
-		idx, ok := chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok := chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 		fmt.println("RECEIVED VALUE ", received_value)
 
-		idx, ok = chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok = chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 		fmt.println("RECEIVED VALUE ", received_value)
 
 		// closing of a channel also affects the select operation
 		chan.close(c)
 
-		idx, ok = chan.select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
+		idx, ok = chan.try_select_raw(receive_chans[:], send_chans[:], msgs[:], &received_value)
 		fmt.println("SELECT:        ", idx, ok)
 	}
 
 Output:
 
-	SELECT:         0 true
+	SELECT:         0 Send
 	RECEIVED VALUE  0
-	SELECT:         0 true
+	SELECT:         0 Recv
 	RECEIVED VALUE  1
-	SELECT:         0 false
+	SELECT:         -1 None
 
 */
 @(require_results)
-select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, ok: bool) #no_bounds_check {
+try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
 		is_recv: bool,
@@ -1178,43 +1214,66 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 
 	candidate_count := builtin.len(recvs)+builtin.len(sends)
 	candidates := ([^]Select_Op)(intrinsics.alloca(candidate_count*size_of(Select_Op), align_of(Select_Op)))
-	count := 0
 
-	for c, i in recvs {
-		if can_recv(c) {
-			candidates[count] = {
-				is_recv = true,
-				idx     = i,
+	try_loop: for {
+		count := 0
+
+		for c, i in recvs {
+			if !c.closed && can_recv(c) {
+				candidates[count] = {
+					is_recv = true,
+					idx     = i,
+				}
+				count += 1
 			}
-			count += 1
 		}
-	}
 
-	for c, i in sends {
-		if can_send(c) {
-			candidates[count] = {
-				is_recv = false,
-				idx     = i,
+		for c, i in sends {
+			if i > builtin.len(send_msgs)-1 || send_msgs[i] == nil {
+				continue
 			}
-			count += 1
+			if !c.closed && can_send(c)  {
+				candidates[count] = {
+					is_recv = false,
+					idx     = i,
+				}
+				count += 1
+			}
 		}
-	}
 
-	if count == 0 {
-		return
-	}
+		if count == 0 {
+			return -1, .None
+		}
 
-	select_idx = rand.int_max(count) if count > 0 else 0
+		when ODIN_TEST {
+			if __try_select_raw_pause != nil {
+				__try_select_raw_pause()
+			}
+		}
 
-	sel := candidates[select_idx]
-	if sel.is_recv {
-		ok = recv_raw(recvs[sel.idx], recv_out)
-	} else {
-		ok = send_raw(sends[sel.idx], send_msgs[sel.idx])
+		candidate_idx := rand.int_max(count) if count > 0 else 0
+
+		sel := candidates[candidate_idx]
+		if sel.is_recv {
+			status = .Recv
+			if !try_recv_raw(recvs[sel.idx], recv_out) {
+				continue try_loop
+			}
+		} else {
+			status = .Send
+			if !try_send_raw(sends[sel.idx], send_msgs[sel.idx]) {
+				continue try_loop
+			}
+		}
+
+		return sel.idx, status
 	}
-	return
 }
 
+@(require_results, deprecated = "use try_select_raw")
+select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
+	return try_select_raw(recvs, sends, send_msgs, recv_out)
+}
 
 /*
 `Raw_Queue` is a non-thread-safe queue implementation designed to store messages
@@ -1300,7 +1359,7 @@ raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
 	}
 
 	val_ptr := q.data[pos*q.size:]
-	mem.copy(val_ptr, data, q.size)
+	intrinsics.mem_copy(val_ptr, data, q.size)
 	q.len += 1
 	return true
 }

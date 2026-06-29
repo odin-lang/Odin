@@ -1,5 +1,5 @@
 /*
-package ed25519 implements the Ed25519 EdDSA signature algorithm.
+`Ed25519` EdDSA signature algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/rfc8032 ]]
@@ -11,7 +11,6 @@ package ed25519
 import "core:crypto"
 import grp "core:crypto/_edwards25519"
 import "core:crypto/sha2"
-import "core:mem"
 
 // PRIVATE_KEY_SIZE is the byte-encoded private key size.
 PRIVATE_KEY_SIZE :: 32
@@ -48,8 +47,27 @@ Public_Key :: struct {
 	_is_initialized: bool,
 }
 
+// private_key_generate uses the system entropy source to generate a new
+// Private_Key.  This will only fail if and only if (⟺) the system entropy source is
+// missing or broken.
+private_key_generate :: proc(priv_key: ^Private_Key) -> bool {
+	private_key_clear(priv_key)
+
+	if !crypto.HAS_RAND_BYTES {
+		return false
+	}
+
+	b: [PRIVATE_KEY_SIZE]byte
+	defer crypto.zero_explicit(&b, size_of(b))
+
+	crypto.rand_bytes(b[:])
+	private_key_set_bytes(priv_key, b[:])
+
+	return true
+}
+
 // private_key_set_bytes decodes a byte-encoded private key, and returns
-// true iff the operation was successful.
+// true if and only if (⟺) the operation was successful.
 private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 	if len(b) != PRIVATE_KEY_SIZE {
 		return false
@@ -79,6 +97,21 @@ private_key_set_bytes :: proc(priv_key: ^Private_Key, b: []byte) -> bool {
 	return true
 }
 
+// private_key_set sets priv_key to src.
+private_key_set :: proc(priv_key, src: ^Private_Key) {
+	if src == nil || !src._is_initialized {
+		private_key_clear(priv_key)
+		return
+	}
+
+	copy(priv_key._b[:], src._b[:])
+	grp.sc_set(&priv_key._s, &src._s)
+	copy(priv_key._hdigest2[:], src._hdigest2[:])
+	public_key_set(&priv_key._pub_key, &src._pub_key)
+
+	priv_key._is_initialized = true
+}
+
 // private_key_bytes sets dst to byte-encoding of priv_key.
 private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
@@ -87,9 +120,15 @@ private_key_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
 	copy(dst, priv_key._b[:])
 }
 
+// private_key_public_bytes sets dst to the byte-encoding of the public
+// key corresponding to priv_key.
+private_key_public_bytes :: proc(priv_key: ^Private_Key, dst: []byte) {
+	public_key_bytes(&priv_key._pub_key, dst)
+}
+
 // private_key_clear clears priv_key to the uninitialized state.
 private_key_clear :: proc "contextless" (priv_key: ^Private_Key) {
-	mem.zero_explicit(priv_key, size_of(Private_Key))
+	crypto.zero_explicit(priv_key, size_of(Private_Key))
 }
 
 // sign writes the signature by priv_key over msg to sig.
@@ -149,7 +188,7 @@ sign :: proc(priv_key: ^Private_Key, msg, sig: []byte) {
 }
 
 // public_key_set_bytes decodes a byte-encoded public key, and returns
-// true iff the operation was successful.
+// true if and only if (⟺) the operation was successful.
 public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> bool {
 	if len(b) != PUBLIC_KEY_SIZE {
 		return false
@@ -168,9 +207,19 @@ public_key_set_bytes :: proc "contextless" (pub_key: ^Public_Key, b: []byte) -> 
 	return true
 }
 
+// public_key_set sets pub_key to src.
+public_key_set :: proc(pub_key, src: ^Public_Key) {
+	if src == nil || !src._is_initialized {
+		public_key_clear(pub_key)
+		return
+	}
+
+	pub_key^ = src^
+}
+
 // public_key_set_priv sets pub_key to the public component of priv_key.
 public_key_set_priv :: proc(pub_key: ^Public_Key, priv_key: ^Private_Key) {
-	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized public key")
+	ensure(priv_key._is_initialized, "crypto/ed25519: uninitialized private key")
 
 	src := &priv_key._pub_key
 	copy(pub_key._b[:], src._b[:])
@@ -187,14 +236,19 @@ public_key_bytes :: proc(pub_key: ^Public_Key, dst: []byte) {
 	copy(dst, pub_key._b[:])
 }
 
-// public_key_equal returns true iff pub_key is equal to other.
+// public_key_equal returns true if and only if (⟺) pub_key is equal to other.
 public_key_equal :: proc(pub_key, other: ^Public_Key) -> bool {
 	ensure(pub_key._is_initialized && other._is_initialized, "crypto/ed25519: uninitialized public key")
 
 	return crypto.compare_constant_time(pub_key._b[:], other._b[:]) == 1
 }
 
-// verify returns true iff sig is a valid signature by pub_key over msg.
+// public_key_clear clears pub_key to the uninitialized state.
+public_key_clear :: proc "contextless" (pub_key: ^Public_Key) {
+	crypto.zero_explicit(pub_key, size_of(Public_Key))
+}
+
+// verify returns true if and only if (⟺) sig is a valid signature by pub_key over msg.
 //
 // The optional `allow_small_order_A` parameter will make this
 // implementation strictly compatible with FIPS 186-5, at the expense of

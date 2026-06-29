@@ -335,6 +335,8 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, add: Add, allocator := context.allocator, loc := #caller_location) -> (err: Unmarshal_Error) {
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_String:
+		assert(t.encoding == .UTF_8)
+
 		bytes := err_conv(_decode_bytes(d, add, allocator=allocator, loc=loc)) or_return
 
 		if t.is_cstring {
@@ -386,6 +388,23 @@ _unmarshal_bytes :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		slice := ([^]byte)(v.data)[:len(bytes)]
 		n := copy(slice, bytes)
 		assert(n == len(bytes))
+		return
+
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		elem_base := reflect.type_info_base(t.elem)
+
+		if elem_base.id != byte { return _unsupported(v, hdr) }
+
+		bytes := err_conv(_decode_bytes(d, add, allocator=context.temp_allocator)) or_return
+		defer delete(bytes, context.temp_allocator)
+
+		if len(bytes) > t.capacity { return _unsupported(v, hdr) }
+
+		// Copy into array type, delete original.
+		slice := ([^]byte)(v.data)[:len(bytes)]
+		n := copy(slice, bytes)
+		assert(n == len(bytes))
+		(^int)(uintptr(v.data) + t.len_offset)^ = n
 		return
 	}
 
@@ -551,6 +570,21 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > t.capacity {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+
+		(^int)(uintptr(v.data) + t.len_offset)^ = length
+
+		return
+
 	case reflect.Type_Info_Complex:
 		length, _ := err_conv(_decode_len_container(d, add)) or_return
 		if length > 2 {
@@ -588,6 +622,31 @@ _unmarshal_array :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header
 		}
 
 		out_of_space := assign_array(d, &da, info, 4, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Matrix:
+		count := t.column_count * t.elem_stride
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
+		if out_of_space { return _unsupported(v, hdr) }
+		return
+
+	case reflect.Type_Info_Simd_Vector:
+		length, _ := err_conv(_decode_len_container(d, add)) or_return
+		if length > t.count {
+			return _unsupported(v, hdr)
+		}
+
+		da := mem.Raw_Dynamic_Array{rawptr(v.data), 0, length, allocator }
+
+		out_of_space := assign_array(d, &da, t.elem, length, growable=false) or_return
 		if out_of_space { return _unsupported(v, hdr) }
 		return
 
@@ -634,8 +693,7 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 		unknown := length == -1
 		fields := reflect.struct_fields_zipped(ti.id)
 
-		idx := 0
-		for ; idx < len(fields) && (unknown || idx < length); idx += 1 {
+		for idx := 0; unknown || idx < length; idx += 1 {
 			// Decode key, keys can only be strings.
 			key: string
 			if keyv, kerr := decode_key(d, v, context.temp_allocator); unknown && kerr == .Break {
@@ -681,16 +739,6 @@ _unmarshal_map :: proc(d: Decoder, v: any, ti: ^reflect.Type_Info, hdr: Header, 
 			ptr   := rawptr(uintptr(v.data) + field.offset)
 			fany  := any{ptr, field.type.id}
 			_unmarshal_value(d, fany, _decode_header(r) or_return) or_return
-		}
-
-		// If there are fields left in the map that did not get decoded into the struct, decode and discard them.
-		if !unknown {
-			for _ in idx..<length {
-				key := err_conv(_decode_from_decoder(d, allocator=context.temp_allocator)) or_return
-				destroy(key, context.temp_allocator)
-				val := err_conv(_decode_from_decoder(d, allocator=context.temp_allocator)) or_return
-				destroy(val, context.temp_allocator)
-			}
 		}
 
 		return

@@ -72,7 +72,7 @@ foreign Kernel32 {
 		flProtect:               u32,
 		dwMaximumSizeHigh:       u32,
 		dwMaximumSizeLow:        u32,
-		lpName:                  [^]u16,
+		lpName:                  cstring16,
 	) -> rawptr ---
 
 	MapViewOfFile :: proc(
@@ -82,11 +82,13 @@ foreign Kernel32 {
 		dwFileOffsetLow:      u32,
 		dwNumberOfBytesToMap: uint,
 	) -> rawptr ---
+
+	UnmapViewOfFile :: proc(lpBaseAddress: rawptr) -> b32 ---
 }
 
 @(no_sanitize_address)
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	result := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
+	result := VirtualAlloc(rawptr(address_hint), size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
 		err = .Out_Of_Memory
 		return
@@ -144,18 +146,6 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	return bool(ok)
 }
 
-
-@(no_sanitize_address)
-_platform_memory_init :: proc() {
-	sys_info: SYSTEM_INFO
-	GetSystemInfo(&sys_info)
-	DEFAULT_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, uint(sys_info.dwPageSize))
-	
-	// is power of two
-	assert(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
-}
-
-
 @(no_sanitize_address)
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {
 	page_flags: u32
@@ -184,4 +174,9 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 
 	file_data := MapViewOfFile(handle, desired_access, 0, 0, uint(size))
 	return ([^]byte)(file_data)[:size], nil
+}
+
+@(no_sanitize_address)
+_unmap_file :: proc "contextless" (data: []byte) {
+	UnmapViewOfFile(raw_data(data))
 }

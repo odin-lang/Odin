@@ -2,8 +2,8 @@ package wgpu
 
 import "base:runtime"
 
-BINDINGS_VERSION        :: [4]u8{24, 0, 0, 2}
-BINDINGS_VERSION_STRING :: "24.0.0.2"
+BINDINGS_VERSION        :: [4]u8{29, 0, 0, 0}
+BINDINGS_VERSION_STRING :: "29.0.0.0"
 
 LogLevel :: enum i32 {
 	Off,
@@ -19,21 +19,29 @@ InstanceBackend :: enum i32 {
 	GL,
 	Metal,
 	DX12,
-	DX11,
-	BrowserWebGPU,
+	// DX11,
+	BrowserWebGPU = 5,
 }
 InstanceBackendFlags :: bit_set[InstanceBackend; Flags]
 InstanceBackendFlags_All :: InstanceBackendFlags{}
 InstanceBackendFlags_Primary :: InstanceBackendFlags{ .Vulkan, .Metal, .DX12, .BrowserWebGPU }
-InstanceBackendFlags_Secondary :: InstanceBackendFlags{ .GL, .DX11 }
+InstanceBackendFlags_Secondary :: InstanceBackendFlags{ .GL }
 
 InstanceFlag :: enum i32 {
 	Debug,
 	Validation,
 	DiscardHalLabels,
+	AllowUnderlyingNoncompliantAdapter,
+	GPUBasedValidation,
+	ValidationIndirectCall,
+	AutomaticTimestampNormalization,
+	Default = 24,
+	Debugging,
+	AdvancedDebugging,
+	WithEnv,
 }
 InstanceFlags :: bit_set[InstanceFlag; Flags]
-InstanceFlags_Default :: InstanceFlags{}
+InstanceFlags_Empty :: InstanceFlags{}
 
 Dx12Compiler :: enum i32 {
 	Undefined,
@@ -56,14 +64,71 @@ PipelineStatisticName :: enum i32 {
 	ComputeShaderInvocations,
 }
 
+DxcMaxShaderModel :: enum i32 {
+	V6_0,
+	V6_1,
+	V6_2,
+	V6_3,
+	V6_4,
+	V6_5,
+	V6_6,
+	V6_7,
+}
+
+GLFenceBehaviour :: enum i32 {
+	Normal,
+	AutoFinish,
+}
+
+Dx12SwapchainKind :: enum i32 {
+	Undefined,
+	DxgiFromHwnd,
+	DxgiFromVisual,
+}
+
+NativeDisplayHandleType :: enum i32 {
+	None,
+	Xlib,
+	Xcb,
+	Wayland,
+}
+
+XlibDisplayHandle :: struct {
+	display: rawptr,
+	screen: i32,
+}
+
+XcbDisplayHandle :: struct {
+	connection: rawptr,
+	screen: i32,
+}
+
+WaylandDisplayHandle :: struct {
+	display: rawptr,
+}
+
+NativeDisplayHandle :: struct {
+	type: NativeDisplayHandleType,
+	using data: struct #raw_union {
+		xlib: XlibDisplayHandle,
+		xcb: XcbDisplayHandle,
+		wayland: WaylandDisplayHandle,
+	},
+}
+
 InstanceExtras :: struct {
 	using chain: ChainedStruct,
 	backends: InstanceBackendFlags,
 	flags: InstanceFlags,
 	dx12ShaderCompiler: Dx12Compiler,
 	gles3MinorVersion: Gles3MinorVersion,
-	dxilPath: StringView,
+	glFenceBehaviour: GLFenceBehaviour,
 	dxcPath: StringView,
+	dcxMaxShaderModel: DxcMaxShaderModel,
+	dx12PresentationSystem: Dx12SwapchainKind,
+	budgetForDeviceCreation: ^u8,
+	budgetForDeviceLoss: ^u8,
+	displayHandle: NativeDisplayHandle,
 }
 
 DeviceExtras :: struct {
@@ -72,21 +137,15 @@ DeviceExtras :: struct {
 }
 
 NativeLimits :: struct {
-	using chain: ChainedStructOut,
-	maxPushConstantSize: u32,
+	using chain: ChainedStruct,
+	maxImmediateSize: u32,
 	maxNonSamplerBindings: u32,
-}
-
-PushConstantRange :: struct {
-	stages: ShaderStageFlags,
-	start: u32,
-	end: u32,
+	maxBindingArrayElementsPerShaderStage: u32,
 }
 
 PipelineLayoutExtras :: struct {
 	using chain: ChainedStruct,
-	pushConstantRangeCount: uint,
-	pushConstantRanges: [^]PushConstantRange `fmt:"v,pushConstantRangeCount"`,
+	immediateDataSize: u32,
 }
 
 SubmissionIndex :: distinct u64
@@ -96,7 +155,7 @@ ShaderDefine :: struct {
 	value: StringView,
 }
 
-ShaderModuleGLSLDescriptor :: struct {
+ShaderSourceGLSL :: struct {
 	using chain: ChainedStruct,
 	stage: ShaderStage,
 	code: StringView,
@@ -171,6 +230,30 @@ QuerySetDescriptorExtras :: struct {
 SurfaceConfigurationExtras :: struct {
 	using chain: ChainedStruct,
 	desiredMaximumFrameLatency: u32,
+}
+
+/**
+* Chained in `SurfaceDescriptor` to make a `Surface` wrapping a WinUI [[ SwapChainPanel ; https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.controls.swapchainpanel ]].
+*/
+SurfaceSourceSwapChainPanel :: struct {
+	using chain: ChainedStruct,
+    /**
+     * A pointer to the [[ ISwapChainPanelNative ; https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/win32/microsoft.ui.xaml.media.dxinterop/nn-microsoft-ui-xaml-media-dxinterop-iswapchainpanelnative ]]
+     * interface of the `SwapChainPanel` that will be wrapped by the `Surface`.
+     */
+	panelNative: rawptr,
+}
+
+PolygonMode :: enum i32 {
+	Fill,
+	Line,
+	Point,
+}
+
+PrimitiveStateExtras :: struct {
+	using chain: ChainedStruct,
+	polygonMode: PolygonMode,
+	conservative: b32,
 }
 
 LogCallback :: #type proc "c" (level: LogLevel, message: StringView, userdata: rawptr)

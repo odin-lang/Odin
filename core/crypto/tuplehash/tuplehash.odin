@@ -1,5 +1,5 @@
 /*
-package tuplehash implements the TupleHash and TupleHashXOF algorithms.
+`TupleHash` and `TupleHashXOF` algorithms.
 
 See:
 - [[ https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.800-185.pdf ]]
@@ -31,7 +31,7 @@ write_element :: proc(ctx: ^Context, data: []byte) {
 // final finalizes the Context, writes the digest to hash, and calls
 // reset on the Context.
 //
-// Iff finalize_clone is set, final will work on a copy of the Context,
+// If and only if (⟺) finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	_sha3.final_cshake((^_sha3.Context)(ctx), hash, finalize_clone)

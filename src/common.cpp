@@ -9,7 +9,9 @@
 
 #if defined(GB_SYSTEM_WINDOWS)
 
-#define NOMINMAX            1
+#define NOMINMAX 1
+#define WINDOWS_LEAN_AND_MEAN 1
+#define VC_EXTRALEAN 1
 #include <windows.h>
 #undef NOMINMAX
 #endif
@@ -59,6 +61,11 @@ template <typename T> struct TypeIsPtrSizedInteger { enum {value = false}; };
 template <> struct TypeIsPtrSizedInteger<isize> { enum {value = true}; };
 template <> struct TypeIsPtrSizedInteger<usize> { enum {value = true}; };
 
+template <typename T> struct TypeIs64BitInteger { enum {value = false}; };
+template <> struct TypeIs64BitInteger<u64> { enum {value = true}; };
+template <> struct TypeIs64BitInteger<i64> { enum {value = true}; };
+
+
 
 #include "unicode.cpp"
 #include "array.cpp"
@@ -75,6 +82,13 @@ template <> struct TypeIsPtrSizedInteger<usize> { enum {value = true}; };
 
 gb_internal gb_inline bool is_power_of_two(i64 x) {
 	if (x <= 0) {
+		return false;
+	}
+	return !(x & (x-1));
+}
+
+gb_internal gb_inline bool is_power_of_two_u64(u64 x) {
+	if (x == 0) {
 		return false;
 	}
 	return !(x & (x-1));
@@ -350,9 +364,11 @@ gb_global bool global_module_path_set = false;
 #include "ptr_map.cpp"
 #include "ptr_set.cpp"
 #include "string_map.cpp"
+#include "string16_map.cpp"
 #include "string_set.cpp"
 #include "priority_queue.cpp"
 #include "thread_pool.cpp"
+#include "string_interner.cpp"
 
 
 gb_internal String obfuscate_string(String const &s, char const *prefix) {
@@ -373,48 +389,6 @@ gb_internal i32 obfuscate_i32(i32 i) {
 	}
 	return cast(i32)x;
 }
-
-
-
-struct StringIntern {
-	StringIntern *next;
-	isize len;
-	char str[1];
-};
-
-PtrMap<uintptr, StringIntern *> string_intern_map = {}; // Key: u64
-gb_global Arena string_intern_arena = {};
-
-gb_internal char const *string_intern(char const *text, isize len) {
-	u64 hash = gb_fnv64a(text, len);
-	uintptr key = cast(uintptr)(hash ? hash : 1);
-	StringIntern **found = map_get(&string_intern_map, key);
-	if (found) {
-		for (StringIntern *it = *found; it != nullptr; it = it->next) {
-			if (it->len == len && gb_strncmp(it->str, (char *)text, len) == 0) {
-				return it->str;
-			}
-		}
-	}
-
-	StringIntern *new_intern = cast(StringIntern *)arena_alloc(&string_intern_arena, gb_offset_of(StringIntern, str) + len + 1, gb_align_of(StringIntern));
-	new_intern->len = len;
-	new_intern->next = found ? *found : nullptr;
-	gb_memmove(new_intern->str, text, len);
-	new_intern->str[len] = 0;
-	map_set(&string_intern_map, key, new_intern);
-	return new_intern->str;
-}
-
-gb_internal char const *string_intern(String const &string) {
-	return string_intern(cast(char const *)string.text, string.len);
-}
-
-gb_internal void init_string_interner(void) {
-	map_init(&string_intern_map);
-}
-
-
 
 
 gb_internal i32 next_pow2(i32 n) {
@@ -669,7 +643,7 @@ gb_internal gb_inline f64 gb_sqrt(f64 x) {
 gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	u32 i, j;
 
-	u32 len = cast(u32)string16_len(cmd_line);
+	u32 len = cast(u32)string16_len(cast(u16 *)cmd_line);
 	i = ((len+2)/2)*gb_size_of(void *) + gb_size_of(void *);
 
 	wchar_t **argv = cast(wchar_t **)GlobalAlloc(GMEM_FIXED, i + (len+2)*gb_size_of(wchar_t));

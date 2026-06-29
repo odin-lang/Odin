@@ -3,12 +3,12 @@ package i18n
 	Internationalization helpers.
 
 	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
-import "core:strings"
+import    "core:strings"
 
 // Currently active catalog.
 ACTIVE: ^Translation

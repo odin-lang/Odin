@@ -6,6 +6,13 @@ import string
 import os.path
 import math
 
+PACKAGE_LINE = "package vulkan"
+
+BASE = """
+// Vulkan wrapper generated from [[ vulkan_core.h ; https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h ]].
+"""[1::]
+
+
 file_and_urls = [
     ("vk_platform.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h',    True),
     ("vulkan_core.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h',    False),
@@ -29,6 +36,8 @@ file_and_urls = [
     ("vulkan_video_codec_h265std.h",        'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
     ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
     ("vulkan_video_codec_h265std_encode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_encode.h', False),
+    ("vulkan_video_codec_vp9std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_vp9std_decode.h', False),
+    ("vulkan_video_codec_vp9std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_vp9std.h', False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -91,6 +100,7 @@ def convert_type(t, prev_name, curr_name):
         "const AccelerationStructureGeometryKHR* const*": "^[^]AccelerationStructureGeometryKHR",
         "const AccelerationStructureBuildRangeInfoKHR* const*": "^[^]AccelerationStructureBuildRangeInfoKHR",
         "const MicromapUsageEXT* const*": "^[^]MicromapUsageEXT",
+        "const MicromapUsageKHR* const*": "^[^]MicromapUsageKHR",
         "struct BaseOutStructure": "BaseOutStructure",
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
@@ -155,7 +165,7 @@ def to_snake_case(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE", "KHX"]
+ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE", "KHX", "ARM", "QCOM"]
 ext_suffixes_title = [ext.title() for ext in ext_suffixes]
 
 
@@ -301,7 +311,7 @@ def parse_constants(f):
 
     f.write("\n// Vendor Constants\n")
     fixes = '|'.join(ext_suffixes)
-    inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
+    inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+(?:" + fixes + r")\b))"
     pattern = r"#define\s+VK_" + inner + r"\s*(.*?)\n"
     data = re.findall(pattern, src, re.S)
 
@@ -311,7 +321,11 @@ def parse_constants(f):
     for name, value in data:
         value = remove_prefix(value, 'VK_')
         v = number_suffix_re.findall(value)
-        if v:
+        if value == "(~0U)":
+            value = "~u32(0)"
+        elif value == "(~0ULL)":
+            value = "~u64(0)"
+        elif v:
             value = v[0]
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
     f.write("\n")
@@ -362,10 +376,17 @@ def parse_enums(f):
 
         names_and_values = re.findall(r"VK_(\w+?) = (.*?)(?:,|})", fields, re.S)
 
+        ignore_names = set([
+            "HOST_IMAGE_COPY_MEMCPY_EXT",
+            "PIPELINE_CREATE_DISPATCH_BASE_KHR"
+        ])
         groups = []
         flags = {}
 
         for name, value in names_and_values:
+            if name in ignore_names:
+                continue
+
             n = fix_enum_name(name, prefix, suffix, is_flag_bit)
             try:
                 v = fix_enum_value(value, prefix, suffix, is_flag_bit)
@@ -885,18 +906,10 @@ load_proc_addresses :: proc{
 }\n
 """[1::])
 
-
-
-BASE = """
-//
-// Vulkan wrapper generated from "https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h"
-//
-package vulkan
-"""[1::]
-
-
 with open("../core.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
+    f.write(PACKAGE_LINE)
+    f.write("\n")
     f.write("""
 // Core API
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
@@ -905,8 +918,36 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 API_VERSION_1_4 :: (1<<22) | (4<<12) | (0)
 
-MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
+MAKE_API_VERSION :: proc "contextless" (variant, major, minor, patch: u32) -> u32 {
+\treturn (variant<<29) | (major<<22) | (minor<<12) | (patch)
+}
+
+MAKE_VERSION :: proc "contextless" (major, minor, patch: u32) -> u32 {
 \treturn (major<<22) | (minor<<12) | (patch)
+}
+
+API_VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>22) & 0x7F
+}
+
+VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>22)
+}
+
+API_VERSION_MINOR :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>12) & 0x3FF
+}
+
+VERSION_MINOR :: API_VERSION_MINOR
+
+API_VERSION_PATCH :: proc "contextless" (version: u32) -> u32 {
+\treturn (version & 0xFFF)
+}
+
+VERSION_PATCH :: API_VERSION_PATCH
+
+API_VERSION_VARIANT :: proc "contextless" (version: u32) -> u32 {
+\treturn (version>>29)
 }
 
 // Base types
@@ -935,7 +976,6 @@ FALSE                                 :: 0
 QUEUE_FAMILY_IGNORED                  :: ~u32(0)
 SUBPASS_EXTERNAL                      :: ~u32(0)
 MAX_PHYSICAL_DEVICE_NAME_SIZE         :: 256
-MAX_SHADER_MODULE_IDENTIFIER_SIZE_EXT :: 32
 UUID_SIZE                             :: 16
 MAX_MEMORY_TYPES                      :: 32
 MAX_MEMORY_HEAPS                      :: 16
@@ -946,7 +986,6 @@ LUID_SIZE_KHX                         :: 8
 LUID_SIZE                             :: 8
 MAX_QUEUE_FAMILY_EXTERNAL             :: ~u32(1)
 MAX_GLOBAL_PRIORITY_SIZE              :: 16
-MAX_GLOBAL_PRIORITY_SIZE_EXT          :: MAX_GLOBAL_PRIORITY_SIZE
 QUEUE_FAMILY_EXTERNAL                 :: MAX_QUEUE_FAMILY_EXTERNAL
 
 // Vulkan Video API Constants
@@ -972,13 +1011,14 @@ MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
     f.write("\n\n")
     parse_flags_def(f)
 with open("../enums.odin", 'w', encoding='utf-8') as f:
-    f.write(BASE)
-    f.write("\n")
+    f.write(PACKAGE_LINE)
+    f.write("\n\n")
     parse_enums(f)
     parse_fake_enums(f)
     f.write("\n\n")
 with open("../structs.odin", 'w', encoding='utf-8') as f:
-    f.write(BASE)
+    f.write(PACKAGE_LINE)
+    f.write("\n")
     f.write("""
 import "core:c"
 
@@ -1039,8 +1079,8 @@ MTLCommandQueue_id :: rawptr
     parse_structs(f)
     f.write("\n\n")
 with open("../procedures.odin", 'w', encoding='utf-8') as f:
-    f.write(BASE)
-    f.write("\n")
+    f.write(PACKAGE_LINE)
+    f.write("\n\n")
     parse_procedures(f)
     f.write("\n")
     group_functions(f)

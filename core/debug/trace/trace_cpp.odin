@@ -5,11 +5,10 @@ package debug_trace
 import "base:intrinsics"
 import "base:runtime"
 import "core:strings"
-import "core:fmt"
 import "core:c"
 
 // NOTE: Relies on C++23 which adds <stacktrace> and becomes ABI and that can be used
-foreign import stdcpplibbacktrace "system:stdc++_libbacktrace"
+foreign import stdcpplibbacktrace "system:stdc++exp"
 
 foreign import libdl "system:dl"
 
@@ -164,7 +163,7 @@ _resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> F
 			} else if info: Dl_info; dladdr(rawptr(address), &info) != 0 && info.dli_sname != "" {
 				frame.procedure = strings.clone_from_cstring(info.dli_sname, btc.allocator)
 			} else {
-				frame.procedure = fmt.aprintf("(procedure: 0x%x)", allocator=btc.allocator)
+				frame.procedure = _format_missing_proc(address, btc.allocator)
 			}
 			frame.line = i32(line)
 			return 0

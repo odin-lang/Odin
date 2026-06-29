@@ -30,18 +30,18 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		is_positional: bool,
 		is_required: bool,
 		is_boolean: bool,
-		is_variadic: bool,
-		variadic_length: int,
+		is_manifold: bool,
+		manifold_length: int,
 	}
 
 	//
 	// POSITIONAL+REQUIRED, POSITIONAL, REQUIRED, NON_REQUIRED+NON_POSITIONAL, ...
 	//
 	sort_flags :: proc(i, j: Flag) -> slice.Ordering {
-		// `varg` goes to the end.
-		if i.name == INTERNAL_VARIADIC_FLAG {
+		// `overflow` goes to the end.
+		if i.name == INTERNAL_OVERFLOW_FLAG {
 			return .Greater
-		} else if j.name == INTERNAL_VARIADIC_FLAG {
+		} else if j.name == INTERNAL_OVERFLOW_FLAG {
 			return .Less
 		}
 
@@ -120,10 +120,10 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 				flag.is_required = true
 				flag.required_min, flag.required_max, _ = parse_requirements(requirement)
 			}
-			if length_str, is_variadic := get_struct_subtag(args_tag, SUBTAG_VARIADIC); is_variadic {
-				flag.is_variadic = true
+			if length_str, is_manifold := get_struct_subtag(args_tag, SUBTAG_MANIFOLD); is_manifold {
+				flag.is_manifold = true
 				if length, parse_ok := strconv.parse_u64_of_base(length_str, 10); parse_ok {
-					flag.variadic_length = cast(int)length
+					flag.manifold_length = cast(int)length
 				}
 			}
 		}
@@ -147,15 +147,15 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		case runtime.Type_Info_Dynamic_Array:
 			requirement_spec := describe_array_requirements(flag)
 
-			if flag.is_variadic || flag.name == INTERNAL_VARIADIC_FLAG {
-				if flag.variadic_length == 0 {
+			if flag.is_manifold || flag.name == INTERNAL_OVERFLOW_FLAG {
+				if flag.manifold_length == 0 {
 					flag.type_description = fmt.tprintf("<%v, ...>%s",
 						specific_type_info.elem.id,
 						requirement_spec)
 				} else {
 					flag.type_description = fmt.tprintf("<%v, %i at once>%s",
 						specific_type_info.elem.id,
-						flag.variadic_length,
+						flag.manifold_length,
 						requirement_spec)
 				}
 			} else {
@@ -177,7 +177,7 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 			}
 		}
 
-		if flag.name == INTERNAL_VARIADIC_FLAG {
+		if flag.name == INTERNAL_OVERFLOW_FLAG {
 			flag.full_length = len(flag.type_description)
 		} else if flag.is_boolean {
 			flag.full_length = len(flag_prefix) + len(flag.name) + len(flag.type_description)
@@ -201,13 +201,13 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		strings.write_string(&builder, program)
 
 		for flag in visible_flags {
-			if keep_it_short && !(flag.is_required || flag.is_positional || flag.name == INTERNAL_VARIADIC_FLAG) {
+			if keep_it_short && !(flag.is_required || flag.is_positional || flag.name == INTERNAL_OVERFLOW_FLAG) {
 				continue
 			}
 
 			strings.write_byte(&builder, ' ')
 
-			if flag.name == INTERNAL_VARIADIC_FLAG {
+			if flag.name == INTERNAL_OVERFLOW_FLAG {
 				strings.write_string(&builder, "...")
 				continue
 			}
@@ -252,7 +252,7 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 
 		strings.write_byte(&builder, '\t')
 
-		if flag.name == INTERNAL_VARIADIC_FLAG {
+		if flag.name == INTERNAL_OVERFLOW_FLAG {
 			strings.write_string(&builder, flag.type_description)
 		} else {
 			strings.write_string(&builder, flag_prefix)

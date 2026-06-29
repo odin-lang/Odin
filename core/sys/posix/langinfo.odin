@@ -1,10 +1,10 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
 
 when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }
@@ -143,7 +143,7 @@ nl_item :: enum nl_item_t {
 	CRNCYSTR    = CRNCYSTR,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 
 	// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
 	nl_item_t :: distinct c.int
@@ -210,7 +210,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .Haiku {
 	YESEXPR :: 52
 	NOEXPR  :: 53
 
-	CRNCYSTR :: 54 when ODIN_OS == .Haiku else 56
+	CRNCYSTR :: 56
 
 } else when ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 

@@ -96,5 +96,6 @@ CPU_Feature :: enum u64 {
 
 CPU_Features :: distinct bit_set[CPU_Feature; u64]
 
-cpu_features: Maybe(CPU_Features)
-cpu_name: Maybe(string)
+// Looking up CPU features is expensive on RISCV, and `atomic_load_explicit`
+// is also a barrier, so we're doing this lookup only once, before `main()`
+@(private) _features: CPU_Features

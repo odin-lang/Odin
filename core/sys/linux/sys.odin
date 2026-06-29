@@ -213,7 +213,7 @@ rt_sigreturn :: proc "c" () -> ! {
 /*
 	Alter an action taken by a process.
 */
-rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action($T), old_sigaction: ^Sig_Action($U)) -> Errno {
+rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action, old_sigaction: ^Sig_Action) -> Errno {
 	// NOTE(jason): It appears that the restorer is required for i386 and amd64
 	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
 		sigaction.flags += {.RESTORER}
@@ -419,7 +419,15 @@ dup :: proc "contextless" (fd: Fd) -> (Fd, Errno) {
 dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 		ret := syscall(SYS_dup3, old, new, 0)
-		return errno_unwrap(ret, Fd)
+
+		// Differences between dup2 and dup3 are:
+		//   - dup3 takes a flags argument
+		//   - dup2 does not return EINVAL
+		fd, errno := errno_unwrap(ret, Fd)
+		if errno == .EINVAL {
+			errno = .NONE
+		}
+		return fd, errno
 	} else {
 		ret := syscall(SYS_dup2, old, new)
 		return errno_unwrap(ret, Fd)
@@ -510,7 +518,7 @@ sendfile :: proc "contextless" (out_fd: Fd, in_fd: Fd, offset: ^i64, count: uint
 	Available since Linux 2.0.
 */
 socket :: proc "contextless" (domain: Address_Family, socktype: Socket_Type, sockflags: Socket_FD_Flags, protocol: Protocol) -> (Fd, Errno) {
-	sock_type_flags: int = cast(int) socktype | transmute(int) sockflags
+	sock_type_flags: int = cast(int) socktype | cast(int) transmute(i32) sockflags
 	ret := syscall(SYS_socket, domain, sock_type_flags, protocol)
 	return errno_unwrap(ret, Fd)
 }
@@ -543,7 +551,7 @@ where
 	T == Sock_Addr_Any
 {
 	addr_len: i32 = size_of(T)
-	ret := syscall(SYS_accept4, sock, addr, &addr_len, transmute(int) sockflags)
+	ret := syscall(SYS_accept4, sock, addr, &addr_len, transmute(i32) sockflags)
 	return errno_unwrap(ret, Fd)
 }
 
@@ -1413,7 +1421,7 @@ umask :: proc "contextless" (mask: Mode) -> Mode {
 	Available since Linux 1.0.
 */
 gettimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
-	ret := syscall(SYS_gettimeofday, tv)
+	ret := syscall(SYS_gettimeofday, tv, rawptr(nil))
 	return Errno(-ret)
 }
 
@@ -2043,22 +2051,71 @@ setpriority :: proc "contextless" (which: Priority_Which, who: i32, prio: i32) -
 	return Errno(-ret)
 }
 
-// TODO(flysand): sched_setparam
-
-// TODO(flysand): sched_getparam
-
-// TODO(flysand): sched_setscheduler
-
-// TODO(flysand): sched_getscheduler
-
-// TODO(flysand): sched_get_priority_max
-
-// TODO(flysand): sched_get_priority_min
-
-// TODO(flysand): sched_rr_get_interval
+/*
+	Set scheduling parameters.
+	Available since Linux 2.0.
+*/
+sched_setparam :: proc "contextless" (pid: Pid, param: ^Sched_Param) -> (Errno) {
+	ret := syscall(SYS_sched_setparam, pid, param)
+	return Errno(-ret)
+}
 
 /*
-	Lock and memory.
+	Get scheduling parameters.
+	Available since Linux 2.0.
+*/
+sched_getparam :: proc "contextless" (pid: Pid, param: ^Sched_Param) -> (Errno) {
+	ret := syscall(SYS_sched_getparam, pid, param)
+	return Errno(-ret)
+}
+
+/*
+	Set scheduling policy/parameters.
+	Available since Linux 2.0.
+*/
+sched_setscheduler :: proc "contextless" (pid: Pid, policy: i32, param: ^Sched_Param) -> (Errno) {
+	ret := syscall(SYS_sched_setscheduler, pid, policy, param)
+	return Errno(-ret)
+}
+
+/*
+	Get scheduling policy/parameters.
+	Available since Linux 2.0.
+*/
+sched_getscheduler :: proc "contextless" (pid: Pid, policy: i32, param: ^Sched_Param) -> (i32, Errno) {
+	ret := syscall(SYS_sched_getscheduler, pid)
+	return errno_unwrap(ret, i32)
+}
+
+/*
+	Get static priority range.
+	Available since Linux 2.0.
+*/
+sched_get_priority_max :: proc "contextless" (policy: i32) -> (i32, Errno) {
+	ret := syscall(SYS_sched_get_priority_max, policy)
+	return errno_unwrap(ret, i32)
+}
+
+/*
+	Get static priority range.
+	Available since Linux 2.0.
+*/
+sched_get_priority_min :: proc "contextless" (policy: i32) -> (i32, Errno) {
+	ret := syscall(SYS_sched_get_priority_min, policy)
+	return errno_unwrap(ret, i32)
+}
+
+/*
+	get the SCHED_RR interval for the named process.
+	Available since Linux 2.0.
+*/
+sched_rr_get_interval :: proc "contextless" (pid: Pid, tp: ^Time_Spec) -> (Errno) {
+	ret := syscall(SYS_sched_rr_get_interval, pid, tp)
+	return Errno(-ret)
+}
+
+/*
+	Lock memory.
 	Available since Linux 2.0.
 	If flags specified, available since Linux 4.4.
 */
@@ -2100,19 +2157,67 @@ munlockall :: proc "contextless" () -> (Errno) {
 	return Errno(-ret)
 }
 
-// TODO(flysand): vhangup
+/*
+	Virtually hangup the current terminal
+	Available since Linux 1.0.
+*/
+vhangup :: proc "contextless" () -> (Errno) {
+	ret := syscall(SYS_vhangup)
+	return Errno(-ret)
+}
 
-// TODO(flysand): modify_ldt
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	/*
+		Get or set local descriptor table
+		Available since Linux 2.1
+	*/
+	modify_ldt :: proc "contextless" (func: i32, ptr: rawptr, bytecount: uint) -> (int, Errno) {
+		ret := syscall(SYS_modify_ldt, func, ptr, bytecount)
+		return errno_unwrap(ret, int)
+	}
+}
 
-// TODO(flysand): pivot_root
+/*
+	Change the root mount
+	Available since Linux 2.3.41
+*/
+pivot_root :: proc "contextless" (new_root: cstring, old_root: cstring) -> (Errno) {
+	ret := syscall(SYS_pivot_root, cast(rawptr) new_root, cast(rawptr) old_root)
+	return Errno(-ret)
+}
 
 // TODO(flysand): _sysctl
+// Deprecated and discouraged
 
-// TODO(flysand): prctl
+/*
+	Operations on a process or thread
+	Available since Linux 2.1.57
+*/
+prctl :: proc "contextless" (op: i32, args: ..uint) -> (Errno) {
+	assert_contextless(len(args) <= 4)
+	ret := syscall(SYS_prctl, op, args[0], args[1], args[2], args[3])
+	return Errno(-ret)
+}
 
-// TODO(flysand): arch_prctl
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	/* 
+		Set architecture-specific thread state
+		Available since Linux 2.6.19
+	*/
+	arch_prctl :: proc "contextless" (op: i32, addr: uint) -> (Errno) {
+		ret := syscall(SYS_arch_prctl, op, addr)
+		return Errno(-ret)
+	}
+}
 
-// TODO(flysand): adj_timex
+/* 
+	Display or set the kernel time variables
+	Available since Linux 1.0.
+*/
+adjtimex :: proc "contextless" (buf: ^Timex) -> (Clock_State, Errno) {
+	ret := syscall(SYS_adjtimex, buf)
+	return errno_unwrap(ret, Clock_State)
+}
 
 /*
 	Set limits on resources.
@@ -2123,21 +2228,86 @@ setrlimit :: proc "contextless" (kind: RLimit_Kind, resource: ^RLimit) -> (Errno
 	return Errno(-ret)
 }
 
-// TODO(flysand): sync
+/*
+	Change root directory
+	Available since Linux 1.0.
+*/
+chroot :: proc "contextless" (pathname: cstring) -> (Errno) {
+	ret := syscall(SYS_chroot, cast(rawptr) pathname)
+	return Errno(-ret)
+}
 
-// TODO(flysand): acct
+/*
+	Commit filesystem caches to disk
+	Available since Linux 1.0.
+*/
+sync :: proc "contextless" () -> (Errno) {
+	ret := syscall(SYS_sync)
+	return Errno(-ret)
+}
 
-// TODO(flysand): settimeofday
+/* 
+	Switch process accounting on or off
+	Available since Linux 2.3.23
+*/
+acct :: proc "contextless" (filename: cstring) -> (Errno) {
+	ret := syscall(SYS_acct, cast(rawptr) filename)
+	return Errno(-ret)
+}
 
-// TODO(flysand): mount
+/*
+	Set Time
+	Available since Linux 1.0
+*/
+settimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
+	ret := syscall(SYS_settimeofday, tv, rawptr(nil))
+	return Errno(-ret)
+}
 
-// TODO(flysand): umount2
+/* 
+	Mount filesystem
+	Available since Linux 1.0
+*/
+mount :: proc "contextless" (source: cstring, target: cstring, filesystemtype: cstring, mountflags: Mount_Flags, data: rawptr) -> (Errno) {
+	ret := syscall(SYS_mount, cast(rawptr) source, cast(rawptr) target, cast(rawptr) filesystemtype, transmute(uint) mountflags, data)
+	return Errno(-ret)
+}
 
-// TODO(flysand): swapon
+/* 
+	Unmount filesystem
+	Available since Linux 2.1
+*/
+umount2 :: proc "contextless" (target: cstring, flags: Umount2_Flags) -> (Errno) {
+	ret := syscall(SYS_umount2, cast(rawptr) target, transmute(u32) flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): swapoff
+/* 
+	Start swapping to file/device
+	Available since Linux 2.0
+*/
+swapon :: proc "contextless" (path: cstring, swapflags: Swap_Flags) -> (Errno) {
+	ret := syscall(SYS_swapon, cast(rawptr) path, transmute(u32) swapflags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): reboot
+/* 
+	Stop swapping to file/device
+	Available since Linux 2.0
+*/
+swapoff :: proc "contextless" (path: cstring) -> (Errno) {
+	ret := syscall(SYS_swapoff, cast(rawptr) path)
+	return Errno(-ret)
+}
+
+/* 
+	Reboot or enable/disable Ctrl-Alt-Del
+	Available since Linux 1.0
+*/
+reboot :: proc "contextless" (magic: Reboot_Magic, magic2: Reboot_Magic, op: Reboot_Operation, arg: rawptr) -> (Errno) {
+	ret := syscall(SYS_reboot, cast(i32)magic, cast(i32)magic2, cast(i32)op, arg)
+	return Errno(-ret)
+}
 
 /*
 	Set hostname.
@@ -2160,16 +2330,48 @@ setdomainname :: proc "contextless" (name: string) -> (Errno) {
 }
 
 // TODO(flysand): iopl
+// deprecated
 
-// TODO(flysand): ioperm
+when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+	/*
+		Set port input/output permissions
+		Available since Linux 1.0
+	*/
+	ioperm :: proc "contextless" (form: u32, num: u32, turn_on: i32) -> (Errno) {
+		ret := syscall(SYS_ioperm, form, num, turn_on)
+		return Errno(-ret)
+	}
+}
 
-// TODO(flysand): init_module
+/* 
+	Load a kernel module
+	Available since Linux 2.2
+*/
+init_module :: proc "contextless" (module_image: rawptr, size: u32, param_values: cstring) -> (Errno) {
+	ret := syscall(SYS_init_module, module_image, size, cast(rawptr) param_values)
+	return Errno(-ret)	
+}
 
-// TODO(flysand): delete_module
+/* 
+	Unload a kernel module
+	Available since Linux 2.2
+*/
+delete_module :: proc "contextless" (name: cstring, flags: u32) -> (Errno) {
+	ret := syscall(SYS_delete_module, cast(rawptr) name, flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): quotactl
+/*
+	Manipulate disk quotas
+	Available since Linux 2.0
+*/
+quotactl :: proc "contextless" (op: i32, special: cstring, id: i32, addr: rawptr) -> (Errno) {
+	ret := syscall(SYS_quotactl, op, cast(rawptr) special, id, addr)
+	return Errno(-ret)
+}
 
 // TODO(flysand): nfsservctl
+/// No longer present after 3.1
 
 // TODO(flysand): getpmsg
 
@@ -2193,31 +2395,122 @@ gettid :: proc "contextless" () -> Pid {
 	return cast(Pid) syscall(SYS_gettid)
 }
 
-// TODO(flysand): readahead
+/*
+	Initiate a file readahead into page cache
+	Available since Linux 2.1
+*/
+readahead :: proc "contextless" (fd: Fd, offset: int, count: uint) -> (Errno) {
+	ret := syscall(SYS_readahead, fd, offset, count)
+	return Errno(-ret)
+}
 
-// TODO(flysand): setxattr
+/*
+	Set an extended attribute value
+	Available since Linux 2.6.25
+*/
+setxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint, flags: i32) -> (Errno) {
+	ret := syscall(SYS_setxattr, cast(rawptr) path, cast(rawptr) name, value, size, flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): lsetxattr
+/*
+	Set an extended attribute value
+	Available since Linux 2.6.25
+*/
+lsetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint, flags: i32) -> (Errno) {
+	ret := syscall(SYS_lsetxattr, cast(rawptr) path, cast(rawptr) name, value, size, flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): fsetxattr
+/*
+	Set an extended attribute value
+	Available since Linux 2.6.25
+*/
+fsetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: uint, flags: i32) -> (Errno) {
+	ret := syscall(SYS_fsetxattr, fd, cast(rawptr) name, value, size, flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): getxattr
+/*
+	Retrieve an extended attribute
+	Available since Linux 2.6.25
+*/
+getxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint) -> (Errno) {
+	ret := syscall(SYS_getxattr, cast(rawptr) path, cast(rawptr) name, value, size)
+	return Errno(-ret)
+}
 
-// TODO(flysand): lgetxattr
+/*
+	Retrieve an extended attribute
+	Available since Linux 2.6.25
+*/
+lgetxattr :: proc "contextless" (path: cstring, name: cstring, value: rawptr, size: uint) -> (Errno) {
+	ret := syscall(SYS_lgetxattr, cast(rawptr) path, cast(rawptr) name, value, size)
+	return Errno(-ret)
+}
 
-// TODO(flysand): fgetxattr
+/*
+	Retrieve an extended attribute
+	Available since Linux 2.6.25
+*/
+fgetxattr :: proc "contextless" (fd: Fd, name: cstring, value: rawptr, size: uint) -> (Errno) {
+	ret := syscall(SYS_fgetxattr, fd, cast(rawptr) name, value, size)
+	return Errno(-ret)
+}
 
-// TODO(flysand): listxattr
+/*
+	List extended attribute names
+	Available since Linux 2.6.25
+*/
+listxattr :: proc "contextless" (path: cstring, list: cstring, size: uint) -> (Errno) {
+	ret := syscall(SYS_listxattr, cast(rawptr) path, cast(rawptr) list, size)
+	return Errno(-ret)
+}
 
-// TODO(flysand): llistxattr
+/*
+	List extended attribute names
+	Available since Linux 2.6.25
+*/
+llistxattr :: proc "contextless" (path: cstring, list: cstring, size: uint) -> (Errno) {
+	ret := syscall(SYS_llistxattr, cast(rawptr) path, cast(rawptr) list, size)
+	return Errno(-ret)
+}
 
-// TODO(flysand): flistxattr
+/*
+	List extended attribute names
+	Available since Linux 2.6.25
+*/
+flistxattr :: proc "contextless" (fd: Fd, list: cstring, size: uint) -> (Errno) {
+	ret := syscall(SYS_flistxattr, fd, cast(rawptr) list, size)
+	return Errno(-ret)
+}
 
-// TODO(flysand): removexattr
+/*
+	Remove an extended attribute
+	Available since Linux 2.6.25
+*/
+removexattr :: proc "contextless" (path: cstring, name: cstring) -> (Errno) {
+	ret := syscall(SYS_removexattr, cast(rawptr) path, cast(rawptr) name)
+	return Errno(-ret)
+}
 
-// TODO(flysand): lremovexattr
+/*
+	Remove an extended attribute
+	Available since Linux 2.6
+*/
+lremovexattr :: proc "contextless" (path: cstring, name: cstring) -> (Errno) {
+	ret := syscall(SYS_lremovexattr, cast(rawptr) path, cast(rawptr) name)
+	return Errno(-ret)
+}
 
-// TODO(flysand): fremovexattr
+/*
+	Remove an extended attribute
+	Available since Linux 2.6.25
+*/
+fremovexattr :: proc "contextless" (fd: Fd, name: cstring) -> (Errno) {
+	ret := syscall(SYS_fremovexattr, fd, cast(rawptr) name)
+	return Errno(-ret)
+}
 
 /*
 	Get current time in seconds.
@@ -2324,9 +2617,29 @@ futex :: proc{
 	futex_wake_bitset,
 }
 
-// TODO(flysand): sched_setaffinity
+/*
+	Set a thread's CPU affinity mask.
+	Available since Linux 2.6.
+	
+	If you are running on a system with less than 128 cores you can use `linux.Cpu_Set` as the type for the mask argument.
+	Otherwise use an array of integers.
+*/
+sched_setaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (int, Errno) {
+	ret := syscall(SYS_sched_setaffinity, pid, cpusetsize, mask)
+	return errno_unwrap(ret, int)
+}
 
-// TODO(flysand): sched_getaffinity
+/*
+	Get a thread's CPU affinity mask.
+	Available since Linux 2.6.
+	
+	If you are running on a system with less than 128 cores you can use `linux.Cpu_Set` as the type for the mask argument.
+	Otherwise use an array of integers.
+*/
+sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawptr) -> (int, Errno) {
+	ret := syscall(SYS_sched_getaffinity, pid, cpusetsize, mask)
+	return errno_unwrap(ret, int)
+}
 
 // TODO(flysand): set_thread_area
 
@@ -2756,15 +3069,39 @@ epoll_pwait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32, 
 
 // TODO(flysand): signalfd
 
-// TODO(flysand): timerfd_create
+/*
+	Create Linux file descriptor based timer.
+	Available since Linux 2.6.25
+*/
+timerfd_create :: proc "contextless" (clock_id: Clock_Id, flags: Open_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_timerfd_create, clock_id, transmute(u32)flags)
+	return errno_unwrap2(ret, Fd)
+}
 
-// TODO(flysand): eventfd
+eventfd :: proc "contextless" (initval: u32, flags: Eventfd_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_eventfd2, initval, transmute(i32)flags)
+	return errno_unwrap2(ret, Fd)
+}
 
 // TODO(flysand): fallocate
 
-// TODO(flysand): timerfd_settime
+/*
+	Arm/disarm the state of the Linux file descriptor based timer.
+	Available since Linux 2.6.25
+*/
+timerfd_settime :: proc "contextless" (fd: Fd, flags: ITimer_Flags, new_value: ^ITimer_Spec, old_value: ^ITimer_Spec) -> Errno {
+	ret := syscall(SYS_timerfd_settime, fd, transmute(u32)flags, new_value, old_value)
+	return Errno(-ret)
+}
 
-// TODO(flysand): timerfd_gettime
+/*
+	Get the state of the Linux file descriptor based timer.
+	Available since Linux 2.6.25
+*/
+timerfd_gettime :: proc "contextless" (fd: Fd, curr_value: ^ITimer_Spec) -> Errno {
+	ret := syscall(SYS_timerfd_gettime, fd, curr_value)
+	return Errno(-ret)
+}
 
 // TODO(flysand): accept4
 
@@ -2843,7 +3180,14 @@ sendmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg
 
 // TODO(flysand): setns
 
-// TODO(flysand): getcpu
+/*
+	Determine CPU and NUMA node on which the calling thread is running.
+	Available since Linux 2.6.19.
+*/
+getcpu :: proc "contextless" (cpu, node: ^u32) -> (Errno) {
+	ret := syscall(SYS_getcpu, cpu, node)
+	return Errno(-ret)
+}
 
 // TODO(flysand): process_vm_readv
 
@@ -2853,9 +3197,23 @@ sendmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg
 
 // TODO(flysand): finit_module
 
-// TODO(flysand): sched_setattr
+/*
+	Set scheduling policy and attributes.
+	Available since Linux 3.14.
+*/
+sched_setattr :: proc "contextless" (pid: Pid, attr: ^Sched_Attr, flags: Sched_Attr_Flags) -> (Errno) {
+	ret := syscall(SYS_sched_setattr, pid, attr, transmute(u32)flags)
+	return Errno(-ret)
+}
 
-// TODO(flysand): sched_getattr
+/*
+	Get scheduling policy and attributes.
+	Available since Linux 3.14.
+*/
+sched_getattr :: proc "contextless" (pid: Pid, attr: ^Sched_Attr, size: u32, flags: Sched_Attr_Flags) -> (Errno) {
+	ret := syscall(SYS_sched_getattr, pid, attr, transmute(u32)flags)
+	return Errno(-ret)
+}
 
 /*
 	Rename the file with names relative to the specified dirfd's with other options.
@@ -2873,7 +3231,14 @@ getrandom :: proc "contextless" (buf: []u8, flags: Get_Random_Flags) -> (int, Er
 	return errno_unwrap(ret, int)
 }
 
-// TODO(flysand): memfd_create
+/*
+	Create an anonymous file.
+	Available since Linux 3.17.
+*/
+memfd_create :: proc "contextless" (name: cstring, flags: Memfd_Create_Flags) -> (Fd, Errno) {
+	ret := syscall(SYS_memfd_create, cast(rawptr)name, transmute(u32)flags)
+	return errno_unwrap(ret, Fd)
+}
 
 // TODO(flysand): kexec_file_load
 
@@ -2927,11 +3292,46 @@ statx :: proc "contextless" (dir: Fd, pathname: cstring, flags: FD_Flags, mask: 
 
 // TODO(flysand): pidfd_send_signal
 
-// TODO(flysand): io_uring_setup
+/*
+	Setup a context for performing asynchronous I/O.
 
-// TODO(flysand): io_uring_enter
+	Available since Linux 5.1
+*/
+io_uring_setup :: proc "contextless" (entries: u32, params: ^IO_Uring_Params) -> (Fd, Errno) {
+	ret := syscall(SYS_io_uring_setup, entries, params)
+	return errno_unwrap(ret, Fd)
+}
 
-// TODO(flysand): io_uring_register
+/*
+	Initiate and/or complete I/O using the shared submission and completion queues.
+
+	Available since Linux 5.1
+*/
+io_uring_enter :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32, flags: IO_Uring_Enter_Flags, sig: ^Sig_Set) -> (int, Errno) {
+	ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, sig, size_of(Sig_Set) if sig != nil else 0)
+	return errno_unwrap(ret, int)
+}
+
+/*
+	Initiate and.or complete I/O using the shared submission and completion queues.
+
+	Available since Linux 5.11
+*/
+io_uring_enter2 :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32, flags: IO_Uring_Enter_Flags, arg: ^IO_Uring_Getevents_Arg) -> (int, Errno) {
+	assert_contextless(.EXT_ARG in flags)
+	ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, arg, size_of(IO_Uring_Getevents_Arg))
+	return errno_unwrap(ret, int)
+}
+
+/*
+	Register files or user buffers for asynchronous I/O.
+
+	Available since Linux 5.1
+*/
+io_uring_register :: proc "contextless" (fd: Fd, opcode: IO_Uring_Register_Opcode, arg: rawptr, nr_args: u32) -> Errno {
+	ret := syscall(SYS_io_uring_register, fd, opcode, arg, nr_args)
+	return Errno(-ret)
+}
 
 // TODO(flysand): open_tree
 

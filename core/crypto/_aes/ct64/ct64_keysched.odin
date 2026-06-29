@@ -22,9 +22,9 @@
 
 package aes_ct64
 
+import "core:crypto"
 import "core:crypto/_aes"
 import "core:encoding/endian"
-import "core:mem"
 
 @(private, require_results)
 sub_word :: proc "contextless" (x: u32) -> u32 {
@@ -35,7 +35,7 @@ sub_word :: proc "contextless" (x: u32) -> u32 {
 	orthogonalize(&q)
 	ret := u32(q[0])
 
-	mem.zero_explicit(&q[0], size_of(u64))
+	crypto.zero_explicit(&q[0], size_of(u64))
 
 	return ret
 }
@@ -97,8 +97,8 @@ keysched :: proc "contextless" (comp_skey: []u64, key: []byte) -> int {
 			(q[7] & 0x8888888888888888)
 	}
 
-	mem.zero_explicit(&skey, size_of(skey))
-	mem.zero_explicit(&q, size_of(q))
+	crypto.zero_explicit(&skey, size_of(skey))
+	crypto.zero_explicit(&q, size_of(q))
 
 	return num_rounds
 }

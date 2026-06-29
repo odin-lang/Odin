@@ -3,6 +3,7 @@ bits 64
 extern _start_odin
 global _start
 
+section .note.GNU-stack
 section .text
 
 ;; Entry point for programs that specify -no-crt option
@@ -35,7 +36,7 @@ _start:
     xor rbp, rbp
     ;; Load argc into 1st param reg, argv into 2nd param reg
     pop rdi
-    mov rdx, rsi
+    mov rsi, rsp
     ;; Align stack pointer down to 16-bytes (sysv calling convention)
     and rsp, -16
     ;; Call into odin entry point

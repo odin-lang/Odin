@@ -2,6 +2,10 @@ package reflect
 
 import "base:runtime"
 
+// An iterator to dynamically iterate across something that is array-like (or pointer-to-array-like)
+// Example:
+// 	it: int // used as a tracking value
+// 	for elem, idx in iterate_array(any_array_val, &it) { ... }
 @(require_results)
 iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 	if val == nil || it == nil {
@@ -40,11 +44,24 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 			index = it^
 			it^ += 1
 		}
+	case Type_Info_Fixed_Capacity_Dynamic_Array:
+		count := (^int)(uintptr(val.data) + info.len_offset)^
+		if it^ < count {
+			elem.data = rawptr(uintptr(val.data) + uintptr(it^ * info.elem_size))
+			elem.id = info.elem.id
+			ok = true
+			index = it^
+			it^ += 1
+		}
 	}
 
 	return
 }
 
+// An iterator to dynamically iterate across map (or pointer-to-map)
+// Example:
+// 	it: int // used as a tracking value
+// 	for key, val in iterate_map(any_map_val, &it) { ... }
 @(require_results)
 iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 	if val == nil || it == nil {

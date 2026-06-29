@@ -2,7 +2,7 @@ package sys_freebsd
 
 /*
 	(c) Copyright 2024 Feoramund <rune@swevencraft.org>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Feoramund: Initial implementation.
@@ -23,6 +23,7 @@ SYS_recvfrom   : uintptr : 29
 SYS_accept     : uintptr : 30
 SYS_getpeername: uintptr : 31
 SYS_getsockname: uintptr : 32
+SYS_ioctl      : uintptr : 54
 SYS_fcntl      : uintptr : 92
 SYS_fsync      : uintptr : 95
 SYS_socket     : uintptr : 97
@@ -62,7 +63,7 @@ read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 //
 // The write() function appeared in Version 1 AT&T UNIX.
 write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
-	result, ok := intrinsics.syscall_bsd(SYS_pwrite,
+	result, ok := intrinsics.syscall_bsd(SYS_write,
 		cast(uintptr)fd,
 		cast(uintptr)raw_data(buf),
 		cast(uintptr)len(buf))
@@ -204,21 +205,21 @@ accept_nil :: proc "contextless" (s: Fd) -> (Fd, Errno) {
 accept :: proc { accept_T, accept_nil }
 
 getsockname_or_peername :: proc "contextless" (s: Fd, sockaddr: ^$T, is_peer: bool) -> Errno {
-    // sockaddr must contain a valid pointer, or this will segfault because
-    // we're telling the syscall that there's memory available to write to.
-    addrlen: socklen_t = size_of(T)
+	// sockaddr must contain a valid pointer, or this will segfault because
+	// we're telling the syscall that there's memory available to write to.
+	addrlen: socklen_t = size_of(T)
 
-    result, ok := intrinsics.syscall_bsd(
-        is_peer ? SYS_getpeername : SYS_getsockname,
-        cast(uintptr)s,
-        cast(uintptr)sockaddr,
-        cast(uintptr)&addrlen)
+	result, ok := intrinsics.syscall_bsd(
+		is_peer ? SYS_getpeername : SYS_getsockname,
+		cast(uintptr)s,
+		cast(uintptr)sockaddr,
+		cast(uintptr)&addrlen)
 
-    if !ok {
-            return cast(Errno)result
-    }
+	if !ok {
+			return cast(Errno)result
+	}
 
-    return nil
+	return nil
 }
 
 // Get name of connected peer
@@ -634,3 +635,13 @@ accept4_nil :: proc "contextless" (s: Fd, flags: Socket_Flags = {}) -> (Fd, Errn
 }
 
 accept4 :: proc { accept4_nil, accept4_T }
+
+ioctl :: proc "contextless" (fd: Fd, request: c.ulong, arg: uintptr) -> (int, Errno) {
+	result, ok := intrinsics.syscall_bsd(SYS_ioctl, cast(uintptr)fd, arg)
+
+	if !ok {
+		return -1, cast(Errno)result		
+	}
+
+	return cast(int)result, nil
+}

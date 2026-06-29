@@ -39,7 +39,7 @@ when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
 
 // Some targets lack runtime feature detection, and will flat out refuse
 // to load binaries that have unknown instructions.  This is distinct from
-// `simd.IS_EMULATED` as actually good designs support runtime feature
+// `simd.HAS_HARDWARE_SIMD` as actually good designs support runtime feature
 // detection and that constant establishes a baseline.
 //
 // See:
@@ -215,7 +215,7 @@ _store_simd128 :: #force_inline proc "contextless" (
 	intrinsics.unaligned_store((^simd.u32x4)(dst[3:]), v3)
 }
 
-// is_performant returns true iff the target and current host both support
+// is_performant returns true if and only if (⟺) the target and current host both support
 // "enough" 128-bit SIMD to make this implementation performant.
 is_performant :: proc "contextless" () -> bool {
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 || ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 || ODIN_ARCH == .riscv64 {
@@ -227,12 +227,7 @@ is_performant :: proc "contextless" () -> bool {
 			req_features :: info.CPU_Features{.V}
 		}
 
-		features, ok := info.cpu_features.?
-		if !ok {
-			return false
-		}
-
-		return features >= req_features
+		return info.cpu_features() >= req_features
 	} else when ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm32 {
 		return intrinsics.has_target_feature("simd128")
 	} else {

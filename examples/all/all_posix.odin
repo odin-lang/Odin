@@ -1,8 +1,5 @@
 #+build darwin, openbsd, freebsd, netbsd
 package all
 
-import posix  "core:sys/posix"
-import kqueue "core:sys/kqueue"
-
-_ :: posix
-_ :: kqueue
+@(require) import "core:sys/posix"
+@(require) import "core:sys/kqueue"

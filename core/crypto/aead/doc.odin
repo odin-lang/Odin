@@ -1,6 +1,5 @@
 /*
-package aead provides a generic interface to the supported Authenticated
-Encryption with Associated Data algorithms.
+A generic interface to Authenticated Encryption with Associated Data (`AEAD`) algorithms.
 
 Both a one-shot and context based interface are provided, with similar
 usage.  If multiple messages are to be sealed/opened via the same key,

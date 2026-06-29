@@ -1,5 +1,5 @@
 /*
-package sm3 implements the SM3 hash algorithm.
+`SM3` hash algorithm.
 
 See:
 - [[ https://datatracker.ietf.org/doc/html/draft-sca-cfrg-sm3-02 ]]
@@ -8,15 +8,15 @@ package sm3
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
 */
 
+import "core:crypto"
 import "core:encoding/endian"
 import "core:math/bits"
-import "core:mem"
 
 // DIGEST_SIZE is the SM3 digest size in bytes.
 DIGEST_SIZE :: 32
@@ -80,7 +80,7 @@ update :: proc(ctx: ^Context, data: []byte) {
 // final finalizes the Context, writes the digest to hash, and calls
 // reset on the Context.
 //
-// Iff finalize_clone is set, final will work on a copy of the Context,
+// If and only if (⟺) finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	ensure(ctx.is_initialized)
@@ -126,7 +126,7 @@ reset :: proc(ctx: ^Context) {
 		return
 	}
 
-	mem.zero_explicit(ctx, size_of(ctx^))
+	crypto.zero_explicit(ctx, size_of(ctx^))
 }
 
 /*

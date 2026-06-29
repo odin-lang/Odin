@@ -3,14 +3,13 @@
 package sysinfo
 
 import "base:intrinsics"
-
+import "base:runtime"
 import "core:sys/linux"
+import "core:strconv"
+import "core:strings"
 
 @(init, private)
-init_cpu_features :: proc() {
-	_features: CPU_Features
-	defer cpu_features = _features
-
+_init_cpu_features :: proc "contextless" () {
 	HWCAP_Bits :: enum u64 {
 		I = 'I' - 'A',
 		M = 'M' - 'A',
@@ -81,11 +80,11 @@ init_cpu_features :: proc() {
 		}
 		err := linux.riscv_hwprobe(raw_data(pairs), len(pairs), 0, nil, {})
 		if err != nil {
-			assert(err == .ENOSYS, "unexpected error from riscv_hwprobe()")
+			assert_contextless(err == .ENOSYS, "unexpected error from riscv_hwprobe()")
 			return
 		}
 
-		assert(pairs[0].key == .IMA_EXT_0)
+		assert_contextless(pairs[0].key == .IMA_EXT_0)
 		exts := pairs[0].value.ima_ext_0
 		exts -= { .FD, .C, .V }
 		_features += transmute(CPU_Features)exts
@@ -97,7 +96,7 @@ init_cpu_features :: proc() {
 				_features += { .Misaligned_Supported }
 			}
 		} else {
-			assert(pairs[1].key == .CPUPERF_0)
+			assert_contextless(pairs[1].key == .CPUPERF_0)
 			if .FAST in pairs[1].value.cpu_perf_0 {
 				_features += { .Misaligned_Supported, .Misaligned_Fast }
 			} else if .UNSUPPORTED not_in pairs[1].value.cpu_perf_0 {
@@ -107,7 +106,43 @@ init_cpu_features :: proc() {
 	}
 }
 
-@(init, private)
-init_cpu_name :: proc() {
-	cpu_name = "RISCV64"
+@(private)
+_cpu_features :: proc "contextless" () -> (features: CPU_Features) {
+	return _features
+}
+
+@(private)
+_cpu_name :: proc() -> (name: string) {
+	return "RISCV64"
+}
+
+@(private)
+_cpu_core_count :: proc "contextless" () -> (physical: int, logical: int, ok: bool) {
+	context = runtime.default_context() // No allocations, only needed because `core:strings` wants it.
+	fd, err := linux.open("/proc/cpuinfo", {})
+	if err != .NONE { return }
+	defer linux.close(fd)
+
+	// This is probably enough right?
+	buf: [4096]byte
+	n, rerr := linux.read(fd, buf[:])
+	if rerr != .NONE || n == 0 { return }
+
+	physical_ok, logical_ok: bool
+
+	str := string(buf[:n])
+	for line in strings.split_lines_iterator(&str) {
+		key, _, value := strings.partition(line, ":")
+		key   = strings.trim_space(key)
+		value = strings.trim_space(value)
+
+		if key == "cpu cores" && !physical_ok{
+			physical, physical_ok = strconv.parse_int(value)
+		}
+
+		if key == "siblings" && !logical_ok{
+			logical, logical_ok = strconv.parse_int(value)
+		}
+	}
+	return physical, logical, physical_ok || logical_ok
 }

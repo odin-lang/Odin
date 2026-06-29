@@ -1,23 +1,13 @@
 package runtime
 
-Thread_Local_Cleaner :: #type proc "odin" ()
+Thread_Local_Cleaner_Odin :: #type proc "odin" ()
+Thread_Local_Cleaner_Contextless :: #type proc "contextless" ()
+
+Thread_Local_Cleaner :: union #shared_nil {Thread_Local_Cleaner_Odin, Thread_Local_Cleaner_Contextless}
 
 @(private="file")
 thread_local_cleaners: [8]Thread_Local_Cleaner
 
-// The thread ID is cached here to save time from making syscalls with every
-// call.
-@(thread_local) local_thread_id: int
-
-// Return the current thread ID.
-@(require_results)
-get_current_thread_id :: proc "contextless" () -> int {
-	if local_thread_id == 0 {
-		local_thread_id = _get_current_thread_id()
-		assert_contextless(local_thread_id != 0, "_get_current_thread_id returned 0.")
-	}
-	return local_thread_id
-}
 
 // Add a procedure that will be run at the end of a thread for the purpose of
 // deallocating state marked as `thread_local`.
@@ -43,6 +33,9 @@ run_thread_local_cleaners :: proc "odin" () {
 		if p == nil {
 			break
 		}
-		p()
+		switch v in p {
+		case Thread_Local_Cleaner_Odin:        v()
+		case Thread_Local_Cleaner_Contextless: v()
+		}
 	}
 }

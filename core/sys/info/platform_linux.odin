@@ -1,19 +1,16 @@
 package sysinfo
 
 import "base:intrinsics"
-
+import "base:runtime"
 import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 
 @(private)
-version_string_buf: [1024]u8
+_os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (res: OS_Version, ok: bool) {
+	res.platform = .Linux
 
-@(init, private)
-init_os_version :: proc () {
-	os_version.platform = .Linux
-
-	b := strings.builder_from_bytes(version_string_buf[:])
+	b := strings.builder_make_none(allocator = allocator, loc = loc)
 
 	// Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
 	pretty_parse: {
@@ -23,10 +20,7 @@ init_os_version :: proc () {
 			break pretty_parse
 		}
 
-		defer {
-			cerrno := linux.close(fd)
-			assert(cerrno == .NONE, "Failed to close the file descriptor")
-		}
+		defer linux.close(fd)
 
 		os_release_buf: [2048]u8
 		n, read_errno := linux.read(fd, os_release_buf[:])
@@ -36,17 +30,27 @@ init_os_version :: proc () {
 		}
 		release := string(os_release_buf[:n])
 
-		// Search the line in the file until we find "PRETTY_NAME="
-		NEEDLE :: "PRETTY_NAME=\""
-		_, _, post := strings.partition(release, NEEDLE)
-		if len(post) > 0 {
-			end := strings.index_any(post, "\"\n")
-			if end > -1 && post[end] == '"' {
-				strings.write_string(&b, post[:end])
+		{
+			// Search the line in the file until we find "PRETTY_NAME="
+			_, _, post := strings.partition(release, `PRETTY_NAME="`)
+			if len(post) > 0 {
+				end := strings.index_any(post, "\"\n")
+				if end > -1 && post[end] == '"' {
+					strings.write_string(&b, post[:end])
+				}
+			}
+			if strings.builder_len(b) == 0 {
+				strings.write_string(&b, "Unknown Linux Distro")
 			}
 		}
-		if strings.builder_len(b) == 0 {
-			strings.write_string(&b, "Unknown Linux Distro")
+
+		{
+			// Search the line in the file until we find "VERSION="
+			_, _, post := strings.partition(release, `VERSION="`)
+			if len(post) > 0 {
+				pre, _, _ := strings.partition(post, ` `)
+				res.os = _parse_version(pre)
+			}
 		}
 	}
 
@@ -63,43 +67,112 @@ init_os_version :: proc () {
 	strings.write_string(&b, string(cstring(&uts.release[0])))
 	release_str := string(b.buf[release_i:])
 
-	os_version.as_string = strings.to_string(b)
+	res.full = strings.to_string(b)
 
 	// Parse the Linux version out of the release string
 	version_loop: {
 		version_num, _, version_suffix := strings.partition(release_str, "-")
-		os_version.version = version_suffix
+		res.release = version_suffix
+		res.kernel = _parse_version(version_num)
 
-		i: int
-		for part in strings.split_iterator(&version_num, ".") {
-			defer i += 1
-
-			dst: ^int
-			switch i {
-			case 0: dst = &os_version.major
-			case 1: dst = &os_version.minor
-			case 2: dst = &os_version.patch
-			case:   break version_loop
-			}
-
-			num, ok := strconv.parse_int(part)
-			if !ok { break version_loop }
-
-			dst^ = num
-		}
 	}
+	return res, true
 }
 
-@(init, private)
-init_ram :: proc() {
-	// Retrieve RAM info using `sysinfo`
-	sys_info: linux.Sys_Info
-	errno := linux.sysinfo(&sys_info)
-	assert(errno == .NONE, "Good luck to whoever's debugging this, something's seriously cucked up!")
-	ram = RAM{
-		total_ram  = int(sys_info.totalram)  * int(sys_info.mem_unit),
-		free_ram   = int(sys_info.freeram)   * int(sys_info.mem_unit),
-		total_swap = int(sys_info.totalswap) * int(sys_info.mem_unit),
-		free_swap  = int(sys_info.freeswap)  * int(sys_info.mem_unit),
+@(private)
+_ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
+	// This is here for some of the strings procedures
+	context = runtime.default_context()
+
+	// The approach is to read /proc/meminfo for the memory information. We do this over
+	// reading sysinfo() since sysinfo() only returns MemFree, which is based on the amount
+	// of free pages. The value we actually want is MemAvailable inside meminfo since it is
+	// estimated around being about to evict things out of the page cache.
+	fd, errno := linux.open("/proc/meminfo", {})
+	if errno != .NONE {
+		// This should never happen since something would be wrong with the system
+		// if /proc/meminfo wasn't able to be opened for any reason. But, in the
+		// event that this _does_ happen, let's just try to recover through the
+		// syscall
+		sys_info: linux.Sys_Info
+		sysinfo_errno := linux.sysinfo(&sys_info)
+		assert_contextless(sysinfo_errno == .NONE, "If this has failed, there is no recovery from this")
+
+		total_ram = i64(sys_info.totalram) * i64(sys_info.mem_unit)
+		free_ram = i64(sys_info.freeram) * i64(sys_info.mem_unit)
+		total_swap = i64(sys_info.totalswap) * i64(sys_info.mem_unit)
+		free_swap = i64(sys_info.freeswap) * i64(sys_info.mem_unit)
+
+		ok = true
+
+		return
 	}
+
+	defer linux.close(fd)
+
+	// We need a relatively large size to store all the info
+	meminfo_buf: [4096]u8
+	n, read_errno := linux.read(fd, meminfo_buf[:])
+	if read_errno != .NONE {
+		sys_info: linux.Sys_Info
+		sysinfo_errno := linux.sysinfo(&sys_info)
+		assert_contextless(sysinfo_errno == .NONE, "If this has failed, there is no recovery from this")
+
+		total_ram = i64(sys_info.totalram) * i64(sys_info.mem_unit)
+		free_ram = i64(sys_info.freeram) * i64(sys_info.mem_unit)
+		total_swap = i64(sys_info.totalswap) * i64(sys_info.mem_unit)
+		free_swap = i64(sys_info.freeswap) * i64(sys_info.mem_unit)
+
+		ok = true
+
+		return
+	}
+	meminfo := string(meminfo_buf[:n])
+
+	// Fallback in the event MemAvailable is not found or is invalid in its value
+	mem_free: i64
+
+	mem_unit :: 1024
+	for line in strings.split_lines_iterator(&meminfo) {
+		if len(line) == 0 {
+			continue
+		}
+
+		colon_idx := strings.index(line, ":")
+		if colon_idx < 0 {
+			continue
+		}
+
+		key := strings.trim_space(line[:colon_idx])
+		value_str := strings.trim_space(strings.trim_suffix(line[colon_idx + 1:], "kB"))
+
+		value, conv_ok := strconv.parse_i64(value_str, 10)
+		if !conv_ok {
+			continue
+		}
+
+		switch key {
+		case "MemTotal":
+			total_ram = value * mem_unit
+		case "MemFree":
+			mem_free = value * mem_unit
+		case "MemAvailable":
+			free_ram = value * mem_unit
+		case "SwapTotal":
+			total_swap = value * mem_unit
+		case "SwapFree":
+			free_swap = value * mem_unit
+		}
+	}
+
+	if free_ram == 0 || free_ram > total_ram {
+		// We opt to return MemFree here if MemAvailable is not found or is broken to some degree.
+		// This will act as a predictable fallback, but shouldn't ever really occur unless the user
+		// is on Linux < 3.14
+		free_ram = mem_free
+	}
+
+	ok = true
+
+	return
 }

@@ -15,7 +15,7 @@
 //
 // IMPORTANT NOTE(bill): `type_info_of` cannot be used within a
 // #shared_global_scope due to  the internals of the compiler.
-// This could change at a later date if the all these data structures are
+// This could change at a later date if all these data structures are
 // implemented within the compiler rather than in this "preload" file
 //
 #+no-instrumentation
@@ -23,8 +23,27 @@ package runtime
 
 import "base:intrinsics"
 
+/*
+Fast_Math_Flag :: enum u8 {
+	Allow_Reassoc    = 0,
+	No_NaNs          = 1,
+	No_Infs          = 2,
+	No_Signed_Zeros  = 3,
+	Allow_Reciprocal = 4,
+	Allow_Contract   = 5,
+	Approx_Func      = 6,
+}
+*/
+Fast_Math_Flag  :: intrinsics.Fast_Math_Flag
+
+// Fast_Math_Flags :: distinct bit_set[Fast_Math_Flag; u32]
+Fast_Math_Flags :: intrinsics.Fast_Math_Flags
+
+
 // NOTE(bill): This must match the compiler's
-Calling_Convention :: enum u8 {
+
+/*
+enum u8 {
 	Invalid     = 0,
 	Odin        = 1,
 	Contextless = 2,
@@ -39,7 +58,13 @@ Calling_Convention :: enum u8 {
 
 	Win64       = 9,
 	SysV        = 10,
+
+	Preserve_None = 11,
+	Preserve_Most = 12,
+	Preserve_All  = 13,
 }
+*/
+Calling_Convention :: type_of(ODIN_DEFAULT_CALLING_CONVENTION)
 
 Type_Info_Enum_Value :: distinct i64
 
@@ -61,6 +86,11 @@ Type_Info_Struct_Soa_Kind :: enum u8 {
 	Dynamic = 3,
 }
 
+Type_Info_String_Encoding_Kind :: enum u8 {
+	UTF_8  = 0,
+	UTF_16 = 1,
+}
+
 // Variant Types
 Type_Info_Named :: struct {
 	name: string,
@@ -73,7 +103,7 @@ Type_Info_Rune       :: struct {}
 Type_Info_Float      :: struct {endianness: Platform_Endianness}
 Type_Info_Complex    :: struct {}
 Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool}
+Type_Info_String     :: struct {is_cstring: bool, encoding: Type_Info_String_Encoding_Kind}
 Type_Info_Boolean    :: struct {}
 Type_Info_Any        :: struct {}
 Type_Info_Type_Id    :: struct {}
@@ -113,10 +143,11 @@ Type_Info_Parameters :: struct { // Only used for procedures parameters and resu
 
 Type_Info_Struct_Flags :: distinct bit_set[Type_Info_Struct_Flag; u8]
 Type_Info_Struct_Flag :: enum u8 {
-	packed    = 0,
-	raw_union = 1,
-	no_copy   = 2,
-	align     = 3,
+	packed      = 0,
+	raw_union   = 1,
+	all_or_none = 2,
+	align       = 3,
+	simple      = 4,
 }
 
 Type_Info_Struct :: struct {
@@ -131,7 +162,7 @@ Type_Info_Struct :: struct {
 
 	flags: Type_Info_Struct_Flags,
 
-	// These are only set iff this structure is an SOA structure
+	// These are only set if and only if (⟺) this structure is an SOA structure
 	soa_kind:      Type_Info_Struct_Soa_Kind,
 	soa_len:       i32,
 	soa_base_type: ^Type_Info,
@@ -160,10 +191,11 @@ Type_Info_Map :: struct {
 	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
-	elem:       ^Type_Info,
-	underlying: ^Type_Info, // Possibly nil
-	lower:      i64,
-	upper:      i64,
+	elem:                ^Type_Info,
+	underlying:          ^Type_Info,
+	explicit_underlying: bool, // false = bit_set[T], true = bit_set[T, U]
+	lower:               i64,
+	upper:               i64,
 }
 Type_Info_Simd_Vector :: struct {
 	elem:       ^Type_Info,
@@ -194,6 +226,14 @@ Type_Info_Bit_Field :: struct {
 	tags:         [^]string     `fmt:"v,field_count"`,
 	field_count:  int,
 }
+
+Type_Info_Fixed_Capacity_Dynamic_Array :: struct {
+	elem: ^Type_Info,
+	elem_size:  int,
+	capacity:   int,
+	len_offset: uintptr,
+}
+
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -235,6 +275,7 @@ Type_Info :: struct {
 		Type_Info_Matrix,
 		Type_Info_Soa_Pointer,
 		Type_Info_Bit_Field,
+		Type_Info_Fixed_Capacity_Dynamic_Array,
 	},
 }
 
@@ -259,7 +300,79 @@ when ODIN_OS == .Windows {
 	dll_instance: rawptr
 }
 
-// IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
+
+// This is safe to change. The log2 size of a cache-line. At minimum it has to
+// be six though. Higher cache line sizes are permitted.
+MAP_CACHE_LINE_LOG2 :: 6
+
+// The size of a cache-line.
+MAP_CACHE_LINE_SIZE :: 1 << MAP_CACHE_LINE_LOG2
+
+// The minimum cache-line size allowed by this implementation is 64 bytes since
+// we need 6 bits in the base pointer to store the integer log2 capacity, which
+// at maximum is 63. Odin uses signed integers to represent length and capacity,
+// so only 63 bits are needed in the maximum case.
+#assert(MAP_CACHE_LINE_SIZE >= 64)
+
+// Map_Cell type that packs multiple T in such a way to ensure that each T stays
+// aligned by align_of(T) and such that align_of(Map_Cell(T)) % MAP_CACHE_LINE_SIZE == 0
+//
+// This means a value of type T will never straddle a cache-line.
+//
+// When multiple Ts can fit in a single cache-line the data array will have more
+// than one element. When it cannot, the data array will have one element and
+// an array of Map_Cell(T) will be padded to stay a multiple of MAP_CACHE_LINE_SIZE.
+//
+// We rely on the type system to do all the arithmetic and padding for us here.
+//
+// The usual array[index] indexing for []T backed by a []Map_Cell(T) becomes a bit
+// more involved as there now may be internal padding. The indexing now becomes
+//
+//  N :: len(Map_Cell(T){}.data)
+//  i := index / N
+//  j := index % N
+//  cell[i].data[j]
+//
+// However, since len(Map_Cell(T){}.data) is a compile-time constant, there are some
+// optimizations we can do to eliminate the need for any divisions as N will
+// be bounded by [1, 64).
+//
+// In the optimal case, len(Map_Cell(T){}.data) = 1 so the cell array can be treated
+// as a regular array of T, which is the case for hashes.
+Map_Cell :: struct($T: typeid) #align(MAP_CACHE_LINE_SIZE) {
+	data: [MAP_CACHE_LINE_SIZE / size_of(T) when 0 < size_of(T) && size_of(T) < MAP_CACHE_LINE_SIZE else 1]T,
+}
+
+// So we can operate on a cell data structure at runtime without any type
+// information, we have a simple table that stores some traits about the cell.
+//
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
+Map_Cell_Info :: struct {
+	size_of_type:      uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+	align_of_type:     uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+	size_of_cell:      uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+	elements_per_cell: uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
+}
+
+Map_Hash :: uintptr
+
+// When working with the type-erased structure at runtime we need information
+// about the map to make working with it possible. This info structure stores
+// that.
+//
+// `Map_Info` and `Map_Cell_Info` are read only data structures and cannot be
+// modified after creation
+//
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
+Map_Info :: struct {
+	ks: ^Map_Cell_Info, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	vs: ^Map_Cell_Info, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_hasher: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_equal:  proc "contextless" (lhs, rhs: rawptr) -> bool,                // 8-bytes on 64-bit, 4-bytes on 32-bit
+}
+
 
 
 Source_Code_Location :: struct {
@@ -397,6 +510,11 @@ Raw_String :: struct {
 	len:  int,
 }
 
+Raw_String16 :: struct {
+	data: [^]u16,
+	len:  int,
+}
+
 Raw_Slice :: struct {
 	data: rawptr,
 	len:  int,
@@ -407,6 +525,11 @@ Raw_Dynamic_Array :: struct {
 	len:       int,
 	cap:       int,
 	allocator: Allocator,
+}
+
+Raw_Fixed_Capacity_Dynamic_Array :: struct($Capacity: uint, $T: typeid) {
+	data: [Capacity]T,
+	len:  int,
 }
 
 // The raw, type-erased representation of a map.
@@ -450,6 +573,12 @@ Raw_Cstring :: struct {
 }
 #assert(size_of(Raw_Cstring) == size_of(cstring))
 
+Raw_Cstring16 :: struct {
+	data: [^]u16,
+}
+#assert(size_of(Raw_Cstring16) == size_of(cstring16))
+
+
 Raw_Soa_Pointer :: struct {
 	data:  rawptr,
 	index: int,
@@ -473,11 +602,9 @@ Raw_Quaternion256_Vector_Scalar :: struct {vector: [3]f64, scalar: f64}
 		Windows,
 		Darwin,
 		Linux,
-		Essence,
 		FreeBSD,
 		OpenBSD,
 		NetBSD,
-		Haiku,
 		WASI,
 		JS,
 		Orca,
@@ -529,7 +656,6 @@ Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
 /*
 	// Defined internally by the compiler
 	Odin_Endian_Type :: enum int {
-		Unknown,
 		Little,
 		Big,
 	}
@@ -542,11 +668,9 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	.Windows,
 	.Darwin,
 	.Linux,
-	.Essence,
 	.FreeBSD,
 	.OpenBSD,
 	.NetBSD,
-	.Haiku,
 	.WASI,
 	.JS,
 	.Orca,
@@ -557,7 +681,8 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 	// Defined internally by the compiler
 	Odin_Platform_Subtarget_Type :: enum int {
 		Default,
-		iOS,
+		iPhone,
+		iPhoneSimulator
 		Android,
 	}
 */
@@ -565,6 +690,8 @@ Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)
 
 Odin_Platform_Subtarget_Types :: bit_set[Odin_Platform_Subtarget_Type]
 
+@(builtin)
+ODIN_PLATFORM_SUBTARGET_IOS :: ODIN_PLATFORM_SUBTARGET == .iPhone || ODIN_PLATFORM_SUBTARGET == .iPhoneSimulator
 
 /*
 	// Defined internally by the compiler
@@ -617,6 +744,8 @@ _cleanup_runtime_contextless :: proc "contextless" () {
 /////////////////////////////
 
 
+// type_info_base returns the base-type of a `^Type_Info` stripping the `distinct`ness from the first level
+@(require_results)
 type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil
@@ -632,7 +761,10 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	return base
 }
 
-
+// type_info_core returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum `^Type_Info`.
+// This is also aliased as `type_info_base_without_enum`
+@(require_results)
 type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	if info == nil {
 		return nil
@@ -649,8 +781,36 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	}
 	return base
 }
+
+
+
+// type_info_underlying returns the underlying (backing) type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum `^Type_Info` AND/OR the underlying integer type of a bit_set or bit_field.
+@(require_results)
+type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
+	if info == nil {
+		return nil
+	}
+
+	base := info
+	loop: for {
+		#partial switch i in base.variant {
+		case Type_Info_Named:     base = i.base
+		case Type_Info_Enum:      base = i.base
+		case Type_Info_Bit_Set:   base = i.underlying
+		case Type_Info_Bit_Field: base = i.backing_type
+		case: break loop
+		}
+	}
+	return base
+}
+
+// `type_info_base_without_enum` returns the core-type of a `^Type_Info` stripping the `distinct`ness from the first level AND/OR
+// returns the backing integer type of an enum or bit_set `^Type_Info`.
+// This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
+@(require_results)
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
 	n := u64(len(type_table))
 	i := transmute(u64)id % n
@@ -665,16 +825,32 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 }
 
 when !ODIN_NO_RTTI {
+	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
+	@(require_results)
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
 		return ti.id
 	}
+	// typeid_core returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
+	// returns the backing integer type of an enum `typeid`.
+	// This is also aliased as `typeid_base_without_enum`
+	@(require_results)
 	typeid_core :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_core(type_info_of(id))
 		return ti.id
 	}
+
+	// typeid_base_without_enum returns the core-type of a `typeid` stripping the `distinct`ness from the first level AND/OR
+	// returns the backing integer type of an enum or bit_set `typeid`.
+	// This is also aliased as `typeid_core`
 	typeid_base_without_enum :: typeid_core
+
+	@(require_results)
+	typeid_underlying :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_underlying(type_info_of(id))
+		return ti.id
+	}
 }
 
 
@@ -689,11 +865,15 @@ default_logger_proc :: proc(data: rawptr, level: Logger_Level, text: string, opt
 	// Nothing
 }
 
+// Returns the default logger used by `context.logger`
+@(require_results)
 default_logger :: proc() -> Logger {
 	return Logger{default_logger_proc, nil, Logger_Level.Debug, nil}
 }
 
 
+// Returns the default `context`
+@(require_results)
 default_context :: proc "contextless" () -> Context {
 	c: Context
 	__init_context(&c)

@@ -3,22 +3,40 @@
 if not exist "build\" mkdir build
 pushd build
 
-set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style
+set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables
 
 @echo on
 
 ..\..\..\odin test ..\test_issue_829.odin  %COMMON%   || exit /b
 ..\..\..\odin test ..\test_issue_1592.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_1730.odin %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_2056.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_2113.odin %COMMON% -debug || exit /b
 ..\..\..\odin test ..\test_issue_2466.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_2615.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_2637.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_2666.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_2694.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_3435.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_4210.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_4364.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_4584.odin %COMMON%  || exit /b
+..\..\..\odin build ..\test_issue_2395.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 ..\..\..\odin build ..\test_issue_5043.odin %COMMON% || exit /b
 ..\..\..\odin build ..\test_issue_5097.odin %COMMON% || exit /b
+..\..\..\odin build ..\test_issue_5097-2.odin %COMMON% || exit /b
+..\..\..\odin build ..\test_issue_5265.odin %COMMON% || exit /b
+..\..\..\odin test ..\test_issue_5699.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_6068.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_6101.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_6165.odin %COMMON%  || exit /b
+..\..\..\odin build ..\test_issue_6240.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+..\..\..\odin build ..\test_issue_6401.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+..\..\..\odin test ..\test_pr_6470.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+..\..\..\odin test ..\test_pr_6476.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_6484.odin -no-entry-point %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_6874.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
 @echo off
 

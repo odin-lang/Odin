@@ -43,7 +43,7 @@ struct OdinDocWriter {
 };
 
 gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e);
-gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type);
+gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool cache);
 
 template <typename T>
 gb_internal void odin_doc_writer_item_tracker_init(OdinDocWriterItemTracker<T> *t, isize size) {
@@ -370,7 +370,7 @@ gb_internal OdinDocString odin_doc_pkg_doc_string(OdinDocWriter *w, AstPackage *
 	if (pkg == nullptr) {
 		return {};
 	}
-	auto buf = array_make<u8>(permanent_allocator(), 0, 0); // Minor leak
+	auto buf = array_make<u8>(heap_allocator(), 0, 0);
 
 	for_array(i, pkg->files) {
 		AstFile *f = pkg->files[i];
@@ -380,31 +380,37 @@ gb_internal OdinDocString odin_doc_pkg_doc_string(OdinDocWriter *w, AstPackage *
 		}
 	}
 
-	return odin_doc_write_string_without_cache(w, make_string(buf.data, buf.count));
+	String str = string_intern_string(make_string(buf.data, buf.count));
+	array_free(&buf);
+	return odin_doc_write_string_without_cache(w, str);
 }
 
 gb_internal OdinDocString odin_doc_comment_group_string(OdinDocWriter *w, CommentGroup *g) {
 	if (g == nullptr) {
 		return {};
 	}
-	auto buf = array_make<u8>(permanent_allocator(), 0, 0); // Minor leak
+	auto buf = array_make<u8>(heap_allocator(), 0, 0);
 
 	odin_doc_append_comment_group_string(&buf, g);
 
-	return odin_doc_write_string_without_cache(w, make_string(buf.data, buf.count));
+	String str = string_intern_string(make_string(buf.data, buf.count));
+	array_free(&buf);
+	return odin_doc_write_string_without_cache(w, str);
 }
 
-gb_internal OdinDocString odin_doc_expr_string(OdinDocWriter *w, Ast *expr) {
+gb_internal OdinDocString odin_doc_expr_string(OdinDocWriter *w, Ast *expr, bool use_shorthand=false) {
 	if (expr == nullptr) {
 		return {};
 	}
-	gbString s = write_expr_to_string( // Minor leak
-		gb_string_make(permanent_allocator(), ""),
+	gbString s = write_expr_to_string(
+		gb_string_make(heap_allocator(), ""),
 		expr,
-		build_context.cmd_doc_flags & CmdDocFlag_Short
+		use_shorthand || (build_context.cmd_doc_flags & CmdDocFlag_Short)
 	);
+	String str = string_intern_string(make_string(cast(u8 *)s, gb_string_length(s)));
+	gb_string_free(s);
 
-	return odin_doc_write_string(w, make_string(cast(u8 *)s, gb_string_length(s)));
+	return odin_doc_write_string(w, str);
 }
 
 gb_internal OdinDocArray<OdinDocAttribute> odin_doc_attributes(OdinDocWriter *w, Array<Ast *> const &attributes) {
@@ -467,8 +473,8 @@ gb_internal OdinDocArray<OdinDocString> odin_doc_where_clauses(OdinDocWriter *w,
 	return odin_write_slice(w, clauses.data, clauses.count);
 }
 
-gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type_as_slice(OdinDocWriter *w, Type *type) {
-	OdinDocTypeIndex index = odin_doc_type(w, type);
+gb_internal OdinDocArray<OdinDocTypeIndex> odin_doc_type_as_slice(OdinDocWriter *w, Type *type, bool cache=true) {
+	OdinDocTypeIndex index = odin_doc_type(w, type, cache);
 	return odin_write_item_as_slice(w, index);
 }
 
@@ -479,7 +485,7 @@ gb_internal OdinDocArray<OdinDocEntityIndex> odin_doc_add_entity_as_slice(OdinDo
 
 
 
-gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
+gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type, bool cache=true) {
 	if (type == nullptr) {
 		return 0;
 	}
@@ -491,10 +497,13 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		}
 	}
 
-	u64 type_hash = type_hash_canonical_type(type);
-	OdinDocTypeIndex *found = map_get(&w->type_cache, type_hash);
-	if (found) {
-		return *found;
+	u64 type_hash = {0};
+	if (cache) {
+		type_hash = type_hash_canonical_type(type);
+		OdinDocTypeIndex *found = map_get(&w->type_cache, type_hash);
+		if (found) {
+			return *found;
+		}
 	}
 
 
@@ -502,7 +511,9 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	OdinDocType doc_type = {};
 	OdinDocTypeIndex type_index = 0;
 	type_index = odin_doc_write_item(w, &w->types, &doc_type, &dst);
-	map_set(&w->type_cache, type_hash, type_index);
+	if (cache) {
+		map_set(&w->type_cache, type_hash, type_index);
+	}
 
 	switch (type->kind) {
 	case Type_Basic:
@@ -527,7 +538,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.kind = OdinDocType_Generic;
 			doc_type.name = odin_doc_write_string(w, name);
 			if (type->Generic.specialized) {
-				doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
+				// NOTE(laytan): do not look at the cache for the specialization, it would resolve
+				// to the same entry as the type itself because `default_type` resolves to the
+				// specialization of a generic type.
+				doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized, cache=false);
 			}
 		}
 		break;
@@ -547,7 +561,14 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.kind = OdinDocType_Array;
 		doc_type.elem_count_len = 1;
 		doc_type.elem_counts[0] = type->Array.count;
-		doc_type.types = odin_doc_type_as_slice(w, type->Array.elem);
+		if (type->Array.generic_count != nullptr) {
+			OdinDocTypeIndex types[2] = {};
+			types[0] = odin_doc_type(w, type->Array.elem);
+			types[1] = odin_doc_type(w, type->Array.generic_count);
+			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
+		} else {
+			doc_type.types = odin_doc_type_as_slice(w, type->Array.elem);
+		}
 		break;
 	case Type_EnumeratedArray:
 		doc_type.kind = OdinDocType_EnumeratedArray;
@@ -567,6 +588,20 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	case Type_DynamicArray:
 		doc_type.kind = OdinDocType_DynamicArray;
 		doc_type.types = odin_doc_type_as_slice(w, type->DynamicArray.elem);
+		break;
+	case Type_FixedCapacityDynamicArray:
+		doc_type.kind = OdinDocType_FixedCapacityDynamicArray;
+		doc_type.elem_count_len = 1;
+		doc_type.elem_counts[0] = type->FixedCapacityDynamicArray.capacity;
+
+		if (type->FixedCapacityDynamicArray.generic_capacity != nullptr) {
+			OdinDocTypeIndex types[2] = {};
+			types[0] = odin_doc_type(w, type->FixedCapacityDynamicArray.elem);
+			types[1] = odin_doc_type(w, type->FixedCapacityDynamicArray.generic_capacity);
+			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
+		} else {
+			doc_type.types = odin_doc_type_as_slice(w, type->FixedCapacityDynamicArray.elem);
+		}
 		break;
 	case Type_Map:
 		doc_type.kind = OdinDocType_Map;
@@ -612,6 +647,13 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			if (type->Struct.is_polymorphic) { doc_type.flags |= OdinDocTypeFlag_Struct_polymorphic; }
 			if (type->Struct.is_packed)      { doc_type.flags |= OdinDocTypeFlag_Struct_packed; }
 			if (type->Struct.is_raw_union)   { doc_type.flags |= OdinDocTypeFlag_Struct_raw_union; }
+			if (type->Struct.is_all_or_none) { doc_type.flags |= OdinDocTypeFlag_Struct_all_or_none; }
+
+			if (type->Struct.custom_min_field_align > 0 || type->Struct.custom_max_field_align > 0) {
+				doc_type.elem_count_len = 2;
+				doc_type.elem_counts[0] = cast(u32)gb_max(type->Struct.custom_min_field_align, 0);
+				doc_type.elem_counts[1] = cast(u32)gb_max(type->Struct.custom_max_field_align, 0);
+			}
 
 			auto fields = array_make<OdinDocEntityIndex>(heap_allocator(), type->Struct.fields.count);
 			defer (array_free(&fields));
@@ -634,8 +676,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			auto tags = array_make<OdinDocString>(heap_allocator(), type->Struct.fields.count);
 			defer (array_free(&tags));
 
-			for_array(i, type->Struct.fields) {
-				tags[i] = odin_doc_write_string(w, type->Struct.tags[i]);
+			if (type->Struct.tags != nullptr) {
+				for_array(i, type->Struct.fields) {
+					tags[i] = odin_doc_write_string(w, type->Struct.tags[i]);
+				}
 			}
 
 			doc_type.tags = odin_write_slice(w, tags.data, tags.count);
@@ -882,7 +926,16 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 
 	OdinDocString init_string = {};
 	if (init_expr) {
-		init_string = odin_doc_expr_string(w, init_expr);
+		bool use_shorthand = false;
+		if (e->kind == Entity_Variable) {
+			Ast *expr = init_expr;
+			if (expr->kind == Ast_CompoundLit) {
+				if (expr->CompoundLit.elems.count > 512) {
+					use_shorthand = true;
+				}
+			}
+		}
+		init_string = odin_doc_expr_string(w, init_expr, use_shorthand);
 	} else {
 		if (e->kind == Entity_Constant) {
 			if (e->Constant.flags & EntityConstantFlag_ImplicitEnumValue) {
@@ -890,7 +943,10 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 			} else if (e->Constant.param_value.original_ast_expr) {
 				init_string = odin_doc_expr_string(w, e->Constant.param_value.original_ast_expr);
 			} else {
-				init_string = odin_doc_write_string(w, make_string_c(exact_value_to_string(e->Constant.value)));
+				gbString s = exact_value_to_string(e->Constant.value);
+				String str = string_intern_string(make_string(cast(u8 *)s, gb_string_length(s)));
+				gb_string_free(s);
+				init_string = odin_doc_write_string(w, str);
 			}
 		} else if (e->kind == Entity_Variable) {
 			if (e->Variable.param_value.original_ast_expr) {
@@ -1006,9 +1062,12 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.count);
 	defer (array_free(&entries));
 
-	for (auto const &element : pkg->scope->elements) {
-		String name = element.key;
-		Entity *e = element.value;
+	for (isize i = 0; i < pkg->scope->elements.cap; i++) {
+		if (!pkg->scope->elements.slots[i].hash) {
+			continue;
+		}
+		auto interned = pkg->scope->elements.keys[i];
+		Entity *e = pkg->scope->elements.slots[i].value;
 		switch (e->kind) {
 		case Entity_Invalid:
 		case Entity_Nil:
@@ -1036,7 +1095,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 		}
 
 		OdinDocScopeEntry entry = {};
-		entry.name = odin_doc_write_string(w, name);
+		entry.name = odin_doc_write_string(w, interned.string());
 		entry.entity = odin_doc_add_entity(w, e);
 		array_add(&entries, entry);
 	}

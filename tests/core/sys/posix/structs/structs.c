@@ -12,9 +12,7 @@
 #include <poll.h>
 #include <pwd.h>
 
-#ifndef __HAIKU__
 #include <sys/shm.h>
-#endif
 
 #include <sys/ipc.h>
 #include <sys/msg.h>
@@ -31,9 +29,7 @@
 #include <sys/time.h>
 #include <utime.h>
 
-#ifndef __HAIKU__
 #include <wordexp.h>
-#endif
 
 #include <sys/socket.h>
 
@@ -74,12 +70,11 @@ int main(int argc, char *argv[])
 	printf("ai_canonname %zu\n", offsetof(struct addrinfo, ai_canonname));
 
 	printf("pollfd %zu %zu\n", sizeof(struct pollfd), _Alignof(struct pollfd));
+	printf("nfds_t %zu %zu\n", sizeof(nfds_t), _Alignof(nfds_t));
 
 	printf("passwd %zu %zu\n", sizeof(struct passwd), _Alignof(struct passwd));
 
-#ifndef __HAIKU__
 	printf("shmid_ds %zu %zu\n", sizeof(struct shmid_ds), _Alignof(struct shmid_ds));
-#endif
 
 	printf("ipc_perm %zu %zu\n", sizeof(struct ipc_perm), _Alignof(struct ipc_perm));
 	printf("msqid_ds %zu %zu\n", sizeof(struct msqid_ds), _Alignof(struct msqid_ds));
@@ -102,15 +97,18 @@ int main(int argc, char *argv[])
 	printf("iovec %zu %zu\n", sizeof(struct iovec), _Alignof(struct iovec));
 
 	printf("semid_ds %zu %zu\n", sizeof(struct semid_ds), _Alignof(struct semid_ds));
+	printf("semid_ds.sem_perm %zu\n", offsetof(struct semid_ds, sem_perm));
+	printf("semid_ds.sem_otime %zu\n", offsetof(struct semid_ds, sem_otime));
+	printf("semid_ds.sem_ctime %zu\n", offsetof(struct semid_ds, sem_ctime));
+	printf("semid_ds.sem_nsems %zu\n", offsetof(struct semid_ds, sem_nsems));
+
 	printf("sembuf %zu %zu\n", sizeof(struct sembuf), _Alignof(struct sembuf));
 
 	printf("itimerval %zu %zu\n", sizeof(struct itimerval), _Alignof(struct itimerval));
 
 	printf("utimbuf %zu %zu\n", sizeof(struct utimbuf), _Alignof(struct utimbuf));
 
-#ifndef __HAIKU__
 	printf("wordexp_t %zu %zu\n", sizeof(wordexp_t), _Alignof(wordexp_t));
-#endif
 
 	printf("time_t %zu %zu\n", sizeof(time_t), _Alignof(time_t));
 	printf("timespec %zu %zu\n", sizeof(struct timespec), _Alignof(struct timespec));

@@ -1,14 +1,13 @@
+// A collection of utilities to aid with other `compress`ion packages.
+package compress
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 */
-
-
-// package compress is a collection of utilities to aid with other compression packages
-package compress
 
 import "core:io"
 import "core:bytes"
@@ -139,9 +138,6 @@ Context_Memory_Input :: struct #packed {
 }
 when size_of(rawptr) == 8 {
 	#assert(size_of(Context_Memory_Input) == 64)
-} else {
-	// e.g. `-target:windows_i386`
-	#assert(size_of(Context_Memory_Input) == 52)
 }
 
 Context_Stream_Input :: struct #packed {
@@ -301,7 +297,7 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	curr := z.input->impl_seek(0, .Current) or_return
 	r, e1 := io.to_reader_at(z.input)
 	if !e1 {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 	when size <= 128 {
 		b: [size]u8
@@ -310,7 +306,7 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	}
 	_, e2 := io.read_at(r, b[:], curr)
 	if e2 != .None {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 
 	res = (^T)(&b[0])^
@@ -328,7 +324,7 @@ peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, 
 
 	r, e3 := io.to_reader_at(z.input)
 	if !e3 {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 	when size <= 128 {
 		b: [size]u8
@@ -337,7 +333,7 @@ peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, 
 	}
 	_, e4 := io.read_at(r, b[:], pos)
 	if e4 != .None {
-		return T{}, .Empty
+		return T{}, .Unsupported
 	}
 
 	// Return read head to original position.
@@ -364,23 +360,26 @@ refill_lsb_from_memory :: #force_inline proc(z: ^Context_Memory_Input, width := 
 	refill := u64(width)
 	b      := u64(0)
 
-	if z.num_bits > refill {
-		return
-	}
-
 	for {
+		if z.num_bits > refill {
+			break
+		}
+		if z.code_buffer == 0 && z.num_bits > 63 {
+			z.num_bits = 0
+		}
+		if z.code_buffer >= 1 << uint(z.num_bits) {
+			// Code buffer is malformed.
+			z.num_bits = max(u64)
+			return
+		}
 		if len(z.input_data) != 0 {
 			b = u64(z.input_data[0])
 			z.input_data = z.input_data[1:]
 		} else {
-			b = 0
+			return
 		}
-
 		z.code_buffer |= b << u8(z.num_bits)
 		z.num_bits += 8
-		if z.num_bits > refill {
-			break
-		}
 	}
 }
 

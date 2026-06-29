@@ -164,25 +164,25 @@ orthogonal :: proc{vector2_orthogonal, vector3_orthogonal}
 
 @(require_results)
 vector4_srgb_to_linear_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
-	r := math.pow(col.x, 2.2)
-	g := math.pow(col.y, 2.2)
-	b := math.pow(col.z, 2.2)
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
 	a := col.w
 	return {r, g, b, a}
 }
 @(require_results)
 vector4_srgb_to_linear_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
-	r := math.pow(col.x, 2.2)
-	g := math.pow(col.y, 2.2)
-	b := math.pow(col.z, 2.2)
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
 	a := col.w
 	return {r, g, b, a}
 }
 @(require_results)
 vector4_srgb_to_linear_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
-	r := math.pow(col.x, 2.2)
-	g := math.pow(col.y, 2.2)
-	b := math.pow(col.z, 2.2)
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
 	a := col.w
 	return {r, g, b, a}
 }
@@ -192,70 +192,55 @@ vector4_srgb_to_linear :: proc{
 	vector4_srgb_to_linear_f64,
 }
 
+@(require_results)
+vector3_srgb_to_linear_f16 :: proc "contextless" (col: Vector3f16) -> Vector3f16 {
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
+	return {r, g, b}
+}
+@(require_results)
+vector3_srgb_to_linear_f32 :: proc "contextless" (col: Vector3f32) -> Vector3f32 {
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
+	return {r, g, b}
+}
+@(require_results)
+vector3_srgb_to_linear_f64 :: proc "contextless" (col: Vector3f64) -> Vector3f64 {
+	r := math.pow((col.x + 0.055) / 1.055, 2.4) if col.x > 0.04045 else col.x / 12.92
+	g := math.pow((col.y + 0.055) / 1.055, 2.4) if col.y > 0.04045 else col.y / 12.92
+	b := math.pow((col.z + 0.055) / 1.055, 2.4) if col.z > 0.04045 else col.z / 12.92
+	return {r, g, b}
+}
+vector3_srgb_to_linear :: proc{
+	vector3_srgb_to_linear_f16,
+	vector3_srgb_to_linear_f32,
+	vector3_srgb_to_linear_f64,
+}
+
 
 @(require_results)
 vector4_linear_to_srgb_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
-	a :: 2.51
-	b :: 0.03
-	c :: 2.43
-	d :: 0.59
-	e :: 0.14
-
-	x := col.x
-	y := col.y
-	z := col.z
-
-	x = (x * (a * x + b)) / (x * (c * x + d) + e)
-	y = (y * (a * y + b)) / (y * (c * y + d) + e)
-	z = (z * (a * z + b)) / (z * (c * z + d) + e)
-
-	x = math.pow(clamp(x, 0, 1), 1.0 / 2.2)
-	y = math.pow(clamp(y, 0, 1), 1.0 / 2.2)
-	z = math.pow(clamp(z, 0, 1), 1.0 / 2.2)
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
 
 	return {x, y, z, col.w}
 }
 @(require_results)
 vector4_linear_to_srgb_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
-	a :: 2.51
-	b :: 0.03
-	c :: 2.43
-	d :: 0.59
-	e :: 0.14
-
-	x := col.x
-	y := col.y
-	z := col.z
-
-	x = (x * (a * x + b)) / (x * (c * x + d) + e)
-	y = (y * (a * y + b)) / (y * (c * y + d) + e)
-	z = (z * (a * z + b)) / (z * (c * z + d) + e)
-
-	x = math.pow(clamp(x, 0, 1), 1.0 / 2.2)
-	y = math.pow(clamp(y, 0, 1), 1.0 / 2.2)
-	z = math.pow(clamp(z, 0, 1), 1.0 / 2.2)
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
 
 	return {x, y, z, col.w}
 }
 @(require_results)
 vector4_linear_to_srgb_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
-	a :: 2.51
-	b :: 0.03
-	c :: 2.43
-	d :: 0.59
-	e :: 0.14
-
-	x := col.x
-	y := col.y
-	z := col.z
-
-	x = (x * (a * x + b)) / (x * (c * x + d) + e)
-	y = (y * (a * y + b)) / (y * (c * y + d) + e)
-	z = (z * (a * z + b)) / (z * (c * z + d) + e)
-
-	x = math.pow(clamp(x, 0, 1), 1.0 / 2.2)
-	y = math.pow(clamp(y, 0, 1), 1.0 / 2.2)
-	z = math.pow(clamp(z, 0, 1), 1.0 / 2.2)
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
 
 	return {x, y, z, col.w}
 }
@@ -263,6 +248,36 @@ vector4_linear_to_srgb :: proc{
 	vector4_linear_to_srgb_f16,
 	vector4_linear_to_srgb_f32,
 	vector4_linear_to_srgb_f64,
+}
+
+@(require_results)
+vector3_linear_to_srgb_f16 :: proc "contextless" (col: Vector3f16) -> Vector3f16 {
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
+
+	return {x, y, z}
+}
+@(require_results)
+vector3_linear_to_srgb_f32 :: proc "contextless" (col: Vector3f32) -> Vector3f32 {
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
+
+	return {x, y, z}
+}
+@(require_results)
+vector3_linear_to_srgb_f64 :: proc "contextless" (col: Vector3f64) -> Vector3f64 {
+	x := 1.055 * math.pow(col.x, 1.0 / 2.4) - 0.055 if col.x > 0.0031308 else 12.92 * col.x
+	y := 1.055 * math.pow(col.y, 1.0 / 2.4) - 0.055 if col.y > 0.0031308 else 12.92 * col.y
+	z := 1.055 * math.pow(col.z, 1.0 / 2.4) - 0.055 if col.z > 0.0031308 else 12.92 * col.z
+
+	return {x, y, z}
+}
+vector3_linear_to_srgb :: proc{
+	vector3_linear_to_srgb_f16,
+	vector3_linear_to_srgb_f32,
+	vector3_linear_to_srgb_f64,
 }
 
 
@@ -497,7 +512,8 @@ quaternion_angle_axis :: proc{
 @(require_results)
 angle_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
-		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		angle := math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		return q.w < 0 ? math.TAU - angle : angle
 	}
 
 	return math.acos(q.w) * 2
@@ -505,7 +521,8 @@ angle_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
 @(require_results)
 angle_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> f32 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
-		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		angle := math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		return q.w < 0 ? math.TAU - angle : angle
 	}
 
 	return math.acos(q.w) * 2
@@ -513,7 +530,8 @@ angle_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> f32 {
 @(require_results)
 angle_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> f64 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
-		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		angle := math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
+		return q.w < 0 ? math.TAU - angle : angle
 	}
 
 	return math.acos(q.w) * 2
@@ -620,7 +638,7 @@ quaternion_from_forward_and_up_f16 :: proc "contextless" (forward, up: Vector3f1
 	case:
 		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
 		q.w = (m[0, 1] - m[1, 0]) / S
-		q.x = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[2, 0] + m[0, 2]) / S
 		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
@@ -664,7 +682,7 @@ quaternion_from_forward_and_up_f32 :: proc "contextless" (forward, up: Vector3f3
 	case:
 		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
 		q.w = (m[0, 1] - m[1, 0]) / S
-		q.x = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[2, 0] + m[0, 2]) / S
 		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
@@ -708,7 +726,7 @@ quaternion_from_forward_and_up_f64 :: proc "contextless" (forward, up: Vector3f6
 	case:
 		S := 2 * math.sqrt(1 + m[2, 2] - m[0, 0] - m[1, 1])
 		q.w = (m[0, 1] - m[1, 0]) / S
-		q.x = (m[2, 0] - m[0, 2]) / S
+		q.x = (m[2, 0] + m[0, 2]) / S
 		q.y = (m[2, 1] + m[1, 2]) / S
 		q.z = 0.25 * S
 	}
@@ -2750,58 +2768,43 @@ matrix2_orthonormalize :: proc{
 
 
 @(require_results)
-matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f16) #no_bounds_check {
-	r = m
-	r[0] = normalize(m[0])
-
-	d0 := dot(r[0], r[1])
-	r[1] -= r[0] * d0
-	r[1] = normalize(r[1])
-
-	d1 := dot(r[1], r[2])
-	d0 = dot(r[0], r[2])
-	r[2] -= r[0]*d0 + r[1]*d1
-	r[2] = normalize(r[2])
-
-	return
+matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> Matrix3f16 #no_bounds_check {
+	return matrix3_gram_schmidt(m, 0, 1, 2)
 }
 @(require_results)
-matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f32) #no_bounds_check {
-	r = m
-	r[0] = normalize(m[0])
-
-	d0 := dot(r[0], r[1])
-	r[1] -= r[0] * d0
-	r[1] = normalize(r[1])
-
-	d1 := dot(r[1], r[2])
-	d0 = dot(r[0], r[2])
-	r[2] -= r[0]*d0 + r[1]*d1
-	r[2] = normalize(r[2])
-
-	return
+matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> Matrix3f32 #no_bounds_check {
+	return matrix3_gram_schmidt(m, 0, 1, 2)
 }
 @(require_results)
-matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix3f64) #no_bounds_check {
-	r = m
-	r[0] = normalize(m[0])
-
-	d0 := dot(r[0], r[1])
-	r[1] -= r[0] * d0
-	r[1] = normalize(r[1])
-
-	d1 := dot(r[1], r[2])
-	d0 = dot(r[0], r[2])
-	r[2] -= r[0]*d0 + r[1]*d1
-	r[2] = normalize(r[2])
-
-	return
+matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> Matrix3f64 #no_bounds_check {
+	return matrix3_gram_schmidt(m, 0, 1, 2)
 }
 matrix3_orthonormalize :: proc{
 	matrix3_orthonormalize_f16,
 	matrix3_orthonormalize_f32,
 	matrix3_orthonormalize_f64,
 }
+
+
+@(require_results)
+matrix3_gram_schmidt :: proc "contextless" (m: matrix[3, 3]$E, $A, $B, $C: int) -> (r: matrix[3, 3]E)
+	where A != B, A != C, B != C #no_bounds_check
+{
+	r = m
+	r[A] = normalize(m[A])
+
+	d0 := dot(r[A], r[B])
+	r[B] -= r[A] * d0
+	r[B] = normalize(r[B])
+
+	d1 := dot(r[B], r[C])
+	d0 = dot(r[A], r[C])
+	r[C] -= r[A]*d0 + r[B]*d1
+	r[C] = normalize(r[C])
+
+	return
+}
+
 
 
 @(require_results)

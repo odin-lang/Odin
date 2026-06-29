@@ -102,6 +102,8 @@ gb_internal Type *type_set_add    (TypeSet *s, Type *ptr);
 gb_internal Type *type_set_add    (TypeSet *s, TypeInfoPair pair);
 gb_internal bool  type_set_update (TypeSet *s, Type *ptr); // returns true if it previously existed
 gb_internal bool  type_set_update (TypeSet *s, TypeInfoPair pair); // returns true if it previously existed
+gb_internal bool  type_set_update_with_mutex(TypeSet *s, TypeInfoPair pair, RWSpinLock *m);
+gb_internal bool  type_set_update_with_mutex(TypeSet *s, Type *ptr, RWSpinLock *m);
 gb_internal bool  type_set_exists (TypeSet *s, Type *ptr);
 gb_internal void  type_set_remove (TypeSet *s, Type *ptr);
 gb_internal void  type_set_clear  (TypeSet *s);

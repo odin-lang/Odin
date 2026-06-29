@@ -235,7 +235,7 @@ update :: proc(ctx: ^Context, data: []byte) {
 // final finalizes the Context, writes the digest to hash, and calls
 // reset on the Context.
 //
-// Iff finalize_clone is set, final will work on a copy of the Context,
+// If and only if (⟺) finalize_clone is set, final will work on a copy of the Context,
 // which is useful for for calculating rolling digests.
 final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 	switch &impl in ctx._impl {

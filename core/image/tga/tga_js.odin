@@ -1,4 +1,3 @@
-#+build js
 package tga
 
 save :: proc{save_to_buffer}

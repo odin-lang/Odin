@@ -3,7 +3,7 @@ package mem_virtual
 import "core:mem"
 import "core:sync"
 
-import "base:sanitizer"
+// import "base:sanitizer"
 
 Arena_Kind :: enum uint {
 	Growing = 0, // Chained memory blocks (singly linked list).
@@ -55,7 +55,7 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 	if arena.minimum_block_size == 0 {
 		arena.minimum_block_size = reserved
 	}
-	sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
+	// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 	return
 }
 
@@ -68,7 +68,7 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_R
 	arena.curr_block     = memory_block_alloc(commit_size, reserved, {}) or_return
 	arena.total_used     = 0
 	arena.total_reserved = arena.curr_block.reserved
-	sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
+	// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 	return
 }
 
@@ -82,7 +82,7 @@ arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Erro
 
 	arena.kind = .Buffer
 
-	sanitizer.address_poison(buffer[:])
+	// sanitizer.address_poison(buffer[:])
 
 	block_base := raw_data(buffer)
 	block := (^Memory_Block)(block_base)
@@ -108,6 +108,16 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 	}
 
 	sync.mutex_guard(&arena.mutex)
+	return arena_alloc_unguarded(arena, size, alignment, loc)
+}
+
+// Allocates memory from the provided arena.
+@(require_results, no_sanitize_address, private)
+arena_alloc_unguarded :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	size := size
+	if size == 0 {
+		return nil, nil
+	}
 
 	switch arena.kind {
 	case .Growing:
@@ -116,11 +126,11 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 		if err == .Out_Of_Memory {
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
-				arena.minimum_block_size = mem.align_forward_uint(arena.minimum_block_size, DEFAULT_PAGE_SIZE)
+				arena.minimum_block_size = mem.align_forward_uint(arena.minimum_block_size, uint(mem.PAGE_SIZE))
 			}
 			if arena.default_commit_size == 0 {
 				arena.default_commit_size = min(DEFAULT_ARENA_GROWING_COMMIT_SIZE, arena.minimum_block_size)
-				arena.default_commit_size = mem.align_forward_uint(arena.default_commit_size, DEFAULT_PAGE_SIZE)
+				arena.default_commit_size = mem.align_forward_uint(arena.default_commit_size, uint(mem.PAGE_SIZE))
 			}
 
 			if arena.default_commit_size != 0 {
@@ -133,7 +143,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 			needed = max(needed, arena.default_commit_size)
 			block_size := max(needed, arena.minimum_block_size)
 
-			new_block := memory_block_alloc(needed, block_size, alignment, {}) or_return
+			new_block := memory_block_alloc(needed, block_size, alignment) or_return
 			new_block.prev = arena.curr_block
 			arena.curr_block = new_block
 			arena.total_reserved += new_block.reserved
@@ -163,7 +173,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 		arena.total_used = arena.curr_block.used
 	}
 
-	sanitizer.address_unpoison(data)
+	// sanitizer.address_unpoison(data)
 	return
 }
 
@@ -182,7 +192,7 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 			mem.zero_slice(arena.curr_block.base[arena.curr_block.used:][:prev_pos-pos])
 		}
 		arena.total_used = arena.curr_block.used
-		sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
+		// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 		return true
 	} else if pos == 0 {
 		arena.total_used = 0
@@ -200,7 +210,7 @@ arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_locat
 		arena.total_reserved -= free_block.reserved
 
 		arena.curr_block = free_block.prev
-		sanitizer.address_poison(free_block.base[:free_block.committed])
+		// sanitizer.address_poison(free_block.base[:free_block.committed])
 		memory_block_dealloc(free_block)
 	}
 }
@@ -219,9 +229,9 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 		if arena.curr_block != nil {
 			curr_block_used := int(arena.curr_block.used)
 			arena.curr_block.used = 0
-			sanitizer.address_unpoison(arena.curr_block.base[:curr_block_used])
+			// sanitizer.address_unpoison(arena.curr_block.base[:curr_block_used])
 			mem.zero(arena.curr_block.base, curr_block_used)
-			sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
+			// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 		}
 		arena.total_used = 0
 	case .Static, .Buffer:
@@ -345,11 +355,15 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		case size == 0:
 			err = .Mode_Not_Implemented
 			return
-		case uintptr(old_data) & uintptr(alignment-1) == 0:
+		}
+
+		sync.mutex_guard(&arena.mutex)
+
+		if uintptr(old_data) & uintptr(alignment-1) == 0 {
 			if size < old_size {
 				// shrink data in-place
 				data = old_data[:size]
-				sanitizer.address_poison(old_data[size:old_size])
+				// sanitizer.address_poison(old_data[size:old_size])
 				return
 			}
 
@@ -363,18 +377,18 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 					_ = alloc_from_memory_block(block, new_end - old_end, 1, default_commit_size=arena.default_commit_size) or_return
 					arena.total_used += block.used - prev_used
 					data = block.base[start:new_end]
-					sanitizer.address_unpoison(data)
+					// sanitizer.address_unpoison(data)
 					return
 				}
 			}
 		}
 
-		new_memory := arena_alloc(arena, size, alignment, location) or_return
+		new_memory := arena_alloc_unguarded(arena, size, alignment, location) or_return
 		if new_memory == nil {
 			return
 		}
 		copy(new_memory, old_data[:old_size])
-		sanitizer.address_poison(old_data[:old_size])
+		// sanitizer.address_poison(old_data[:old_size])
 		return new_memory, nil
 	case .Query_Features:
 		set := (^mem.Allocator_Mode_Set)(old_memory)

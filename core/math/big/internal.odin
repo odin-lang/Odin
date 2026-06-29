@@ -1,6 +1,8 @@
+package math_big
+
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
-	Made available under Odin's BSD-3 license.
+	Made available under Odin's license.
 
 	==========================    Low-level routines    ==========================
 
@@ -25,12 +27,10 @@
 	TODO: Handle +/- Infinity and NaN.
 */
 
-package math_big
-
-import "core:mem"
-import "base:intrinsics"
-import rnd "core:math/rand"
 import "base:builtin"
+import "base:intrinsics"
+import "base:runtime"
+@(require) import rnd "core:math/rand"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -746,19 +746,15 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 
 	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
 		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.")
-		err = _private_int_div_recursive(quotient, remainder, numerator, denominator)
+		return _private_int_div_recursive(quotient, remainder, numerator, denominator)
 	} else {
-		when true {
-			err = #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
-		} else {
-			/*
-				NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
-				We'll keep it around for a bit until we're reasonably certain div_school is bug free.
-			*/
-			err = _private_int_div_small(quotient, remainder, numerator, denominator)
-		}
+		return #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
+		/*
+			NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
+			We'll keep it around for a bit until we're reasonably certain div_school is bug free.
+		*/
+		// err = _private_int_div_small(quotient, remainder, numerator, denominator)
 	}
-	return
 }
 
 /*
@@ -993,7 +989,8 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 		Zero remainder. Special case, can't use `internal_zero_unused`.
 	*/
 	if zero_count > 0 {
-		mem.zero_slice(remainder.digit[zero_count:])
+		data := remainder.digit[zero_count:]
+		_zero(data)
 	}
 
 	/*
@@ -1019,7 +1016,7 @@ internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator :
 	Assumes `a` not to be `nil`.
 */
 internal_int_allocated_cap :: #force_inline proc(a: ^Int) -> (cap: int) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit
+	raw := transmute(runtime.Raw_Dynamic_Array)a.digit
 	return raw.cap
 }
 
@@ -1181,6 +1178,8 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
+	internal_clamp(a)
+	internal_clamp(b)
 
 	// Compare based on used digits.
 	if a.used != b.used {
@@ -1203,14 +1202,14 @@ internal_cmp_mag :: internal_compare_magnitude
 	bool := a < b
 */
 internal_int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
-	return internal_cmp(a, b) == -1
+	return internal_cmp(a, b) < 0
 }
 
 /*
 	bool := a < b
 */
 internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool) {
-	return internal_cmp_digit(a, b) == -1
+	return internal_cmp_digit(a, b) < 0
 }
 
 /*
@@ -1218,7 +1217,7 @@ internal_int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_t
     Compares the magnitudes only, ignores the sign.
 */
 internal_int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool) {
-	return internal_cmp_mag(a, b) == -1
+	return internal_cmp_mag(a, b) < 0
 }
 
 internal_less_than :: proc {
@@ -1453,6 +1452,7 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
+	internal_clamp(a)
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
 	return _private_int_log(a, base)
@@ -1660,13 +1660,13 @@ internal_int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (e
 
 		if internal_gte(y, x) {
 			internal_swap(dest, x)
-			return nil
+			return internal_clamp(dest)
 		}
 		internal_swap(x, y)
 	}
 
 	internal_swap(dest, x)
-	return err
+	return internal_clamp(dest)
 }
 internal_sqrt :: proc { internal_int_sqrt, }
 
@@ -1688,7 +1688,7 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	*/
 	if n == 2 { return #force_inline internal_sqrt(dest, src) }
 
-	if n < 0 || n > int(_DIGIT_MAX) { return .Invalid_Argument }
+	if n < 0 || _WORD(n) > _WORD(_DIGIT_MAX) { return .Invalid_Argument }
 
 	if n & 1 == 0 && #force_inline internal_is_negative(src) { return .Invalid_Argument }
 
@@ -1849,7 +1849,7 @@ internal_int_destroy :: proc(integers: ..^Int) {
 
 	for &a in integers {
 		if internal_int_allocated_cap(a) > 0 {
-			mem.zero_slice(a.digit[:])
+			_zero(a.digit[:])
 			free(&a.digit[0])
 		}
 		a = &Int{}
@@ -2181,7 +2181,11 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 		If not yet initialized, initialize the `digit` backing with the allocator we were passed.
 	*/
 	if cap == 0 {
-		a.digit = make([dynamic]DIGIT, needed, allocator)
+		mem_err: runtime.Allocator_Error
+		a.digit, mem_err = make([dynamic]DIGIT, needed, allocator)
+		if mem_err != nil {
+			return cast(Error)mem_err
+		}
 	} else if cap < needed {
 		/*
 			`[dynamic]DIGIT` already knows what allocator was used for it, so resize will do the right thing.
@@ -2208,9 +2212,9 @@ internal_grow :: proc { internal_int_grow, }
 	Assumes `a` not to be `nil`.
 */
 internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
-	raw := transmute(mem.Raw_Dynamic_Array)a.digit
+	raw := transmute(runtime.Raw_Dynamic_Array)a.digit
 	if raw.cap != 0 {
-		mem.zero_slice(a.digit[:a.used])
+		_zero(a.digit[:a.used])
 	}
 	a.sign = .Zero_or_Positive
 	a.used = 0
@@ -2273,7 +2277,7 @@ internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allo
 	/*
 		Zero the entirety.
 	*/
-	mem.zero_slice(a.digit[:])
+	_zero(a.digit[:])
 
 	/*
 		Set the bit.
@@ -2791,7 +2795,8 @@ internal_int_count_lsb :: proc(a: ^Int) -> (count: int, err: Error) {
 		x *= _DIGIT_BITS
 		x += internal_count_lsb(q)
 	} else {
-		lnz := []int{
+		@(static, rodata)
+		lnz := [?]int{
    			4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0,
 		}
 
@@ -2818,9 +2823,9 @@ internal_platform_count_lsb :: #force_inline proc(a: $T) -> (count: int)
 internal_count_lsb :: proc { internal_int_count_lsb, internal_platform_count_lsb, }
 
 internal_int_random_digit :: proc() -> (res: DIGIT) {
-	when _DIGIT_BITS == 60 { // DIGIT = u64
+	when _DIGIT_TYPE_BITS == 64 { // DIGIT = u64
 		return DIGIT(rnd.uint64()) & _MASK
-	} else when _DIGIT_BITS == 28 { // DIGIT = u32
+	} else when _DIGIT_TYPE_BITS == 32 { // DIGIT = u32
 		return DIGIT(rnd.uint32()) & _MASK
 	} else {
 		panic("Unsupported DIGIT size.")
@@ -2885,12 +2890,12 @@ internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context
 }
 internal_clear_if_uninitialized :: proc {internal_clear_if_uninitialized_single, internal_clear_if_uninitialized_multi, }
 
-internal_error_if_immutable_single :: proc(arg: ^Int) -> (err: Error) {
+internal_error_if_immutable_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
 	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable }
 	return nil
 }
 
-internal_error_if_immutable_multi :: proc(args: ..^Int) -> (err: Error) {
+internal_error_if_immutable_multi :: proc "contextless" (args: ..^Int) -> (err: Error) {
 	for i in args {
 		if i != nil && .Immutable in i.flags { return .Assignment_To_Immutable }
 	}
@@ -2933,7 +2938,7 @@ internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 		If we don't pass the number of previously used DIGITs, we zero all remaining ones.
 	*/
 	zero_count: int
-	if old_used == -1 {
+	if old_used < 0 {
 		zero_count = len(dest.digit) - dest.used
 	} else {
 		zero_count = old_used - dest.used
@@ -2943,10 +2948,14 @@ internal_int_zero_unused :: #force_inline proc(dest: ^Int, old_used := -1) {
 		Zero remainder.
 	*/
 	if zero_count > 0 && dest.used < len(dest.digit) {
-		mem.zero_slice(dest.digit[dest.used:][:zero_count])
+		_zero(dest.digit[dest.used:][:zero_count])
 	}
 }
 internal_zero_unused :: proc { internal_int_zero_unused, }
+
+_zero :: proc(data: []DIGIT) {
+	intrinsics.mem_zero(raw_data(data), size_of(DIGIT)*len(data))
+}
 
 /*
 	==========================    End of low-level routines   ==========================

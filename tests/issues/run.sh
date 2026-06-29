@@ -4,19 +4,23 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
-COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style"
+COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 set -x
 
 $ODIN test ../test_issue_829.odin  $COMMON
 $ODIN test ../test_issue_1592.odin $COMMON
+$ODIN test ../test_issue_1730.odin $COMMON
 $ODIN test ../test_issue_2056.odin $COMMON
 $ODIN build ../test_issue_2113.odin $COMMON -debug
 $ODIN test ../test_issue_2466.odin $COMMON
 $ODIN test ../test_issue_2615.odin $COMMON
 $ODIN test ../test_issue_2637.odin $COMMON
 $ODIN test ../test_issue_2666.odin $COMMON
+$ODIN test ../test_issue_2694.odin $COMMON
+$ODIN test ../test_issue_3435.odin $COMMON
 $ODIN test ../test_issue_4210.odin $COMMON
+$ODIN test ../test_issue_4364.odin $COMMON
 $ODIN test ../test_issue_4584.odin $COMMON
 if [[ $($ODIN build ../test_issue_2395.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
 	echo "SUCCESSFUL 1/1"
@@ -26,6 +30,55 @@ else
 fi
 $ODIN build ../test_issue_5043.odin $COMMON
 $ODIN build ../test_issue_5097.odin $COMMON
+$ODIN build ../test_issue_5097-2.odin $COMMON
+$ODIN build ../test_issue_5265.odin $COMMON
+$ODIN test ../test_issue_5699.odin $COMMON
+$ODIN test ../test_issue_6068.odin $COMMON
+$ODIN test ../test_issue_6101.odin $COMMON
+$ODIN test ../test_issue_6165.odin $COMMON
+$ODIN test ../test_issue_6344.odin $COMMON
+$ODIN test ../test_issue_6344.odin $COMMON -o:speed
+$ODIN test ../test_issue_6396.odin $COMMON
+$ODIN test ../test_pr_6476.odin $COMMON
+
+if [[ $($ODIN build ../test_issue_6240.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN build ../test_issue_6401.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN build ../test_issue_6594.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN build ../test_issue_6621.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN test ../test_pr_6470.odin $COMMON
+if [[ $($ODIN test ../test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN check ../test_issue_6484.odin -no-entry-point $COMMON
+if [[ $($ODIN check ../test_issue_6874.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 set +x
 

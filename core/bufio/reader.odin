@@ -1,14 +1,14 @@
 package bufio
 
+import "base:runtime"
 import "core:io"
-import "core:mem"
 import "core:unicode/utf8"
 import "core:bytes"
 
 // Reader is a buffered wrapper for an io.Reader
 Reader :: struct {
 	buf:            []byte,
-	buf_allocator:  mem.Allocator,
+	buf_allocator:  runtime.Allocator,
 
 	rd:             io.Reader, // reader
 	r, w:           int, // read and write positions for buf
@@ -29,6 +29,7 @@ MIN_READ_BUFFER_SIZE :: 16
 @(private)
 DEFAULT_MAX_CONSECUTIVE_EMPTY_READS :: 128
 
+// reader_init initializes using an `allocator`
 reader_init :: proc(b: ^Reader, rd: io.Reader, size: int = DEFAULT_BUF_SIZE, allocator := context.allocator, loc := #caller_location) {
 	size := size
 	size = max(size, MIN_READ_BUFFER_SIZE)
@@ -37,22 +38,25 @@ reader_init :: proc(b: ^Reader, rd: io.Reader, size: int = DEFAULT_BUF_SIZE, all
 	b.buf = make([]byte, size, allocator, loc)
 }
 
+// reader_init initializes using a user provided bytes buffer `buf`
 reader_init_with_buf :: proc(b: ^Reader, rd: io.Reader, buf: []byte) {
 	reader_reset(b, rd)
 	b.buf_allocator = {}
 	b.buf = buf
 }
 
-// reader_destroy destroys the underlying buffer with its associated allocator IFF that allocator has been set
+// reader_destroy destroys the underlying buffer with its associated allocator if and only if (⟺) that allocator has been set
 reader_destroy :: proc(b: ^Reader) {
 	delete(b.buf, b.buf_allocator)
 	b^ = {}
 }
 
+// reader_size returns the number of bytes in the backing buffer
 reader_size :: proc(b: ^Reader) -> int {
 	return len(b.buf)
 }
 
+// reader_reset resets the read and write positions, and the error values
 reader_reset :: proc(b: ^Reader, r: io.Reader) {
 	b.rd = r
 	b.r, b.w = 0, 0
@@ -343,7 +347,7 @@ _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 	case .Query:
 		return io.query_utility({.Read, .Destroy, .Query})
 	}
-	return 0, .Empty
+	return 0, .Unsupported
 }
 
 //
@@ -351,16 +355,15 @@ _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 //
 
 
-// reader_read_slice reads until the first occurrence of delim from the reader
-// It returns a slice pointing at the bytes in the buffer
-// The bytes stop being valid at the next read
-// If reader_read_slice encounters an error before finding a delimiter
-// reader_read_slice fails with error .Buffer_Full if the buffer fills without a delim
-// Because the data returned from reader_read_slice will be overwritten on the
-// next IO operation, reader_read_bytes or reader_read_string is usually preferred
+// reader_read_slice reads until the first occurrence of delim in the input,
+// returning a slice pointing at the bytes in the internal buffer.
+// The returned slice is only valid until the next read call.
+// If the buffer fills without finding delim, it returns .Buffer_Full.
+// If the underlying reader returns an error before finding delim, that error is returned.
+// Because the returned data will be overwritten by the next I/O operation,
+// reader_read_bytes or reader_read_string is usually preferred.
 //
-// reader_read_slice returns err != nil if and only if line does not end in delim
-//
+// reader_read_slice returns err != nil if and only if line does not end in delim.
 reader_read_slice :: proc(b: ^Reader, delim: byte) -> (line: []byte, err: io.Error) {
 	s := 0
 	for {

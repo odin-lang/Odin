@@ -2,7 +2,7 @@ package _sha3
 
 /*
     Copyright 2021 zhibog
-    Made available under the BSD-3 license.
+    Made available under Odin's license.
 
     List of contributors:
         zhibog, dotbmp:  Initial implementation.
@@ -16,7 +16,7 @@ package _sha3
 */
 
 import "core:math/bits"
-import "core:mem"
+import "core:crypto"
 
 ROUNDS :: 24
 
@@ -179,7 +179,7 @@ reset :: proc "contextless" (ctx: ^Context) {
 		return
 	}
 
-	mem.zero_explicit(ctx, size_of(ctx^))
+	crypto.zero_explicit(ctx, size_of(ctx^))
 }
 
 shake_xof :: proc "contextless" (ctx: ^Context) {

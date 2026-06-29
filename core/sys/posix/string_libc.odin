@@ -1,10 +1,10 @@
-#+build linux, windows, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, windows, darwin, netbsd, openbsd, freebsd
 package posix
 
 when ODIN_OS == .Windows {
 	foreign import lib "system:libucrt.lib"
 } else when ODIN_OS == .Darwin {
-	foreign import lib "system:System.framework"
+	foreign import lib "system:System"
 } else {
 	foreign import lib "system:c"
 }

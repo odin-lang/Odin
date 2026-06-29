@@ -1,3 +1,4 @@
+// Relative pointers and slices.
 package relative_types
 
 import "base:intrinsics"

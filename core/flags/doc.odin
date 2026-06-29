@@ -1,5 +1,5 @@
 /*
-package flags implements a command-line argument parser.
+Command-line argument parser.
 
 It works by using Odin's run-time type information to determine where and how
 to store data on a struct provided by the program. Type conversion is handled
@@ -11,13 +11,32 @@ Command-Line Syntax:
 Arguments are treated differently depending on how they're formatted.
 The format is similar to the Odin binary's way of handling compiler flags.
 
-	type                  handling
-	------------          ------------------------
-	<positional>          depends on struct layout
-	-<flag>               set a bool true
-	-<flag:option>        set flag to option
-	-<flag=option>        set flag to option, alternative syntax
-	-<map>:<key>=<value>  set map[key] to value
+	type                    handling
+	------------            ------------------------
+	<positional>            depends on struct layout
+	-<flag>                 set a bool true
+	-<flag:option>          set flag to option
+	-<flag=option>          set flag to option, alternative syntax
+	-<flag:option1,opt...>  set bit_set flag to one or more options
+	-<flag=option1,opt...>  set bit_set flag to one or more options, alternative syntax
+	-<map>:<key>=<value>    set map[key] to value
+
+Underscores (`_`) in a flag will be replaced with dashes (`-`).
+
+Bit sets may be set with a strictly comma-separated list of options.
+
+Bit sets may also be set with a binary string of 0s and 1s, and will be parsed from left to right, from least significant bit to most significant bit. Underscores are allowed and will be ignored. However, starting with an underscore is disallowed.
+
+
+Unhandled Arguments:
+
+All unhandled positional arguments are placed into the `overflow` field on a
+struct, if it exists. In UNIX-style parsing, the existence of a `--` on the
+command line will also pass all arguments afterwards into this field.
+
+If desired, the name of the field may be changed from `overflow` to any string
+by setting the `ODIN_CORE_FLAGS_OVERFLOW_FLAG` compile-time config option with
+`-define:ODIN_CORE_FLAGS_OVERFLOW_FLAG=<name>`.
 
 
 Struct Tags:
@@ -32,7 +51,7 @@ Under the `args` tag, there are the following subtags:
 - `pos=N`: place positional argument `N` into this flag.
 - `hidden`: hide this flag from the usage documentation.
 - `required`: cause verification to fail if this argument is not set.
-- `variadic`: take all remaining arguments when set, UNIX-style only.
+- `manifold=N`: take several arguments at once, UNIX-style only.
 - `file`: for `os.Handle` types, file open mode.
 - `perms`: for `os.Handle` types, file open permissions.
 - `indistinct`: allow the setting of distinct types by their base type.
@@ -47,8 +66,9 @@ you want to require 3 and only 3 arguments in a dynamic array, you would
 specify `required=3<4`.
 
 
-`variadic` may be given a number (`variadic=N`) above 1 to limit how many extra
-arguments it consumes.
+`manifold` may be given a number (`manifold=N`) above 1 to limit how many extra
+arguments it consumes at once. If this number is not specified, it will take as
+many arguments as can be converted to the underlying element type.
 
 
 `file` determines the file open mode for an `os.Handle`.
@@ -160,7 +180,7 @@ at parse time.
 	--flag
 	--flag=argument
 	--flag argument
-	--flag argument repeating-argument
+	--flag argument (manifold-argument)
 
 `-flag` may also be substituted for `--flag`.
 
