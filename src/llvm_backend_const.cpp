@@ -911,6 +911,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
+
 	if (is_type_union(type) && is_type_union_constantable(type)) {
 		Type *bt = base_type(type);
 		GB_ASSERT(bt->kind == Type_Union);
@@ -1001,16 +1002,16 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			LLVMValueRef values[4] = {};
 			unsigned value_count = 0;
 
-			#if LLVM_VERSION_MAJOR == 14
+		#if LLVM_VERSION_MAJOR == 14
 			LLVMTypeRef block_type = lb_type_internal_union_block_type(m, bt);
 			values[value_count++] = llvm_const_pad_to_size(m, cv.value, block_type);
-			#else
+		#else
 			values[value_count++] = cv.value;
-			if (type_size_of(variant_type) != block_size) {
+			{
 				LLVMTypeRef padding_type = lb_type_padding_filler(m, block_size - type_size_of(variant_type), 1);
 				values[value_count++] = LLVMConstNull(padding_type);
 			}
-			#endif
+		#endif
 
 			Type *tag_type = union_tag_type(bt);
 			LLVMTypeRef llvm_tag_type = lb_type(m, tag_type);
@@ -1026,6 +1027,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			}
 
 			res.value = LLVMConstStructInContext(m->ctx, values, value_count, true);
+
 			return res;
 		}
 	}
@@ -2103,7 +2105,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 									}
 								}
 								if (is_constant) {
-									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, tav.type, cc).value;
+									LLVMValueRef elem_value = lb_const_value(m, cv_type, tav.value, tav.type, cc).value;
 									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
 										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else if (is_local) {
