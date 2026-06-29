@@ -1069,7 +1069,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			}
 
 			res.value = LLVMConstStructInContext(m->ctx, values, value_count, true);
-			gb_printf_err("%s\n", LLVMPrintValueToString(res.value));
 
 			return res;
 		}
