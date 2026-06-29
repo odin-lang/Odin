@@ -117,35 +117,9 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 		unsigned dst_n = LLVMCountStructElementTypes(dst);
 		if (src_n != dst_n) goto failure;
 
-		// bool skip_cast = true;
-		// for (unsigned i = 0; i < dst_n; i++) {
-		// 	LLVMTypeKind dt = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(dst, i));
-		// 	LLVMTypeKind st = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(src, i));
-		// 	if (dt != st) {
-		// 		skip_cast = false;
-		// 	}
-		// 	if (dt == LLVMIntegerTypeKind) {
-		// 		continue;
-		// 	}
-		// 	if (dt != LLVMArrayTypeKind) {
-		// 		skip_cast = false;
-		// 		break;
-		// 	}
-
-		// 	LLVMValueRef field_val = llvm_const_extract_value(m, val, i);
-		// 	if (field_val == nullptr) goto failure;
-
-		// 	LLVMTypeRef dst_elem_ty = LLVMStructGetTypeAtIndex(dst, i);
-		// 	LLVMTypeRef src_elem_ty = LLVMTypeOf(field_val);
-		// 	if (lb_sizeof(dst_elem_ty) > lb_sizeof(src_elem_ty)) {
-		// 		skip_cast = true;
-		// 		continue;
-		// 	}
-
-		// }
-		// if (skip_cast) {
-		// 	return val;
-		// }
+		if (LLVM_VERSION_MAJOR > 14) {
+			return val;
+		}
 
 		LLVMValueRef *field_vals = temporary_alloc_array<LLVMValueRef>(dst_n);
 		for (unsigned i = 0; i < dst_n; i++) {
@@ -1095,6 +1069,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			}
 
 			res.value = LLVMConstStructInContext(m->ctx, values, value_count, true);
+			gb_printf_err("%s\n", LLVMPrintValueToString(res.value));
 
 			return res;
 		}
