@@ -762,7 +762,7 @@ foreign lib {
 	 *
 	 *  After a frame is fully decoded, dctx can be used again to decompress another frame.
 	 */
-	F_decompress :: proc(dctx: F_dctx, dstBuffer: rawptr, dstSizePtr: ^c.size_t, srcBuffer: rawptr, srcSizePtr: ^c.size_t, dOptPtr: Maybe(^F_decompressOptions)) -> c.size_t ---
+	F_decompress :: proc(dctx: F_dctx, dstBuffer: rawptr, dstSizePtr: ^c.size_t, srcBuffer: rawptr, srcSizePtr: ^c.size_t, dOptPtr: Maybe(^F_decompressOptions_t)) -> c.size_t ---
 
 	/*! LZ4F_resetDecompressionContext() : added in v1.8.0
 	 *  In case of an error, the context is left in "undefined" state.
@@ -790,7 +790,7 @@ foreign lib {
 	 *  Same as LZ4F_decompress(), using a predefined dictionary.
 	 *  Dictionary is used "in place", without any preprocessing.
 	**  It must remain accessible throughout the entire frame decoding. */
-	F_decompress_usingDict :: proc(dctxPtr: F_dctx, dstBuffer: rawptr, dstSizePtr: ^c.size_t, srcBuffer: rawptr, srcSizePtr: ^c.size_t, dict: rawptr, dictSize: c.size_t, decompressOptionsPtr: Maybe(^F_decompressOptions)) -> c.size_t ---
+	F_decompress_usingDict :: proc(dctxPtr: F_dctx, dstBuffer: rawptr, dstSizePtr: ^c.size_t, srcBuffer: rawptr, srcSizePtr: ^c.size_t, dict: rawptr, dictSize: c.size_t, decompressOptionsPtr: Maybe(^F_decompressOptions_t)) -> c.size_t ---
 
 	/*! LZ4_createCDict() : stable since v1.10
 	 *  When compressing multiple messages / blocks using the same dictionary, it's recommended to initialize it just once.
@@ -857,7 +857,7 @@ F_blockChecksum_t :: enum c.int {
 
 F_frameType_t :: enum c.int {
 	frame = 0,
-	skippableFrame = 0,
+	skippableFrame,
 }
 
 /*! LZ4F_frameInfo_t :
@@ -893,7 +893,7 @@ F_INIT_FRAMEINFO :: F_frameInfo_t{
  *  All reserved fields must be set to zero. */
 F_preferences_t :: struct{
 	frameInfo:        F_frameInfo_t,
-	compressionLevel: int, /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
+	compressionLevel: c.int, /* 0: default (fast mode); values > LZ4HC_CLEVEL_MAX count as LZ4HC_CLEVEL_MAX; values < 0 trigger "fast acceleration" */
 	autoFlush:        c.uint, /* 1: always flush; reduces usage of internal buffers */
 	favorDecSpeed:    c.uint, /* 1: parser favors decompression speed vs compression ratio. Only works for high compression modes (>= LZ4HC_CLEVEL_OPT_MIN) */  /* v1.8.2+ */
 	reserved:         [3]c.uint, /* must be zero for forward compatibility */
@@ -932,7 +932,7 @@ F_CONTENT_CHECKSUM_SIZE :: 4
 F_dctx :: distinct rawptr /* incomplete type */
 F_decompressionContext_t :: F_dctx
 
-F_decompressOptions :: struct {
+F_decompressOptions_t :: struct {
 	/* pledges that last 64KB decompressed data is present right before @dstBuffer pointer.
          * This optimization skips internal storage operations.
          * Once set, this pledge must remain valid up to the end of current frame. */
