@@ -2497,8 +2497,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef fields[] = {lb_type(m, type->Union.variants[0])};
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
+			bool is_packed = false;
 
-			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 3);
+			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 4);
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
@@ -2514,11 +2515,18 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
 					array_add(&fields, padding_type);
 				}
+				is_packed = true;
 			} else {
 				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
+				// #if LLVM_VERSION_MAJOR > 14
+				// { // NOTE(bill): always add a zero-byte pad to make inline constant unions work
+				// 	LLVMTypeRef padding_type = lb_type_padding_filler(m, 0, 1);
+				// 	array_add(&fields, padding_type);
+				// }
+				// #endif
 				array_add(&fields, tag_type);
 				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
 				i64 padding = size - used_size;
@@ -2526,9 +2534,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
 					array_add(&fields, padding_type);
 				}
+				is_packed = true;
 			}
 			
-			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, false);
+			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, is_packed);
 		}
 		break;
 

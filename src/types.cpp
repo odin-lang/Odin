@@ -781,6 +781,9 @@ gb_global Type *t_c_va_list     = nullptr;
 gb_global Type *t_c_va_list_ptr = nullptr;
 
 
+gb_global Type *t_odin_calling_convention = nullptr;
+
+
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
 	OdinAtomicMemoryOrder_consume = 1, // monotonic
@@ -2696,8 +2699,6 @@ gb_internal bool is_type_union_constantable(Type *type) {
 
 	if (bt->Union.variants.count == 0) {
 		return true;
-	} else if (bt->Union.variants.count == 1) {
-		return is_type_constant_type(bt->Union.variants[0]);
 	}
 
 	for (Type *v : bt->Union.variants) {

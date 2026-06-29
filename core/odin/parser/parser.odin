@@ -1792,6 +1792,13 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 		advance_token(p)
 		return .Using
 	case .Hash:
+		if tok := peek_token(p); tok.kind == .Ident {
+			switch tok.text {
+			case "simd", "type", "row_major", "column_major", "sparse", "soa":
+				return .Invalid
+			}
+		}
+
 		tok: tokenizer.Token
 		advance_token(p)
 		tok = p.curr_tok
@@ -2546,6 +2553,17 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			for p.curr_tok.kind != .Close_Brace &&
 			    p.curr_tok.kind != .EOF {
 				elem := parse_expr(p, false)
+
+				if p.curr_tok.kind == .Where {
+					tok_where := expect_token(p, .Where)
+					cond := parse_expr(p, false)
+
+					be := ast.new(ast.Binary_Expr, elem.pos, end_pos(p.prev_tok))
+					be.left  = elem
+					be.op    = tok_where
+					be.right = cond
+					elem = be
+				}
 				append(&args, elem)
 
 				allow_token(p, .Comma) or_break

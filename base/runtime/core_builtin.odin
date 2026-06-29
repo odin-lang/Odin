@@ -2,6 +2,8 @@ package runtime
 
 import "base:intrinsics"
 
+MAP_ENABLED :: !ODIN_BEDROCK
+
 @builtin
 Maybe :: union($T: typeid) {T}
 
@@ -65,7 +67,7 @@ when !NO_DEFAULT_TEMP_ALLOCATOR {
 // Initializes the global temporary allocator used as the default `context.temp_allocator`.
 // This is ignored when `NO_DEFAULT_TEMP_ALLOCATOR` is true.
 @(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)
-init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
+init_global_temporary_allocator :: proc "odin" (size: int, backup_allocator := context.allocator) {
 	when !NO_DEFAULT_TEMP_ALLOCATOR {
 		default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
 	}
@@ -387,7 +389,7 @@ pop_front_safe :: proc {
 @builtin
 clear :: proc{
 	clear_dynamic_array,
-	clear_map,
+	clear_map where MAP_ENABLED,
 	clear_fixed_capacity_dynamic_array,
 
 	clear_soa_dynamic_array,
@@ -397,7 +399,7 @@ clear :: proc{
 @builtin
 reserve :: proc{
 	reserve_dynamic_array,
-	reserve_map,
+	reserve_map where MAP_ENABLED,
 
 	reserve_soa,
 }
@@ -430,7 +432,7 @@ non_zero_resize :: proc{
 @builtin
 shrink :: proc{
 	shrink_dynamic_array,
-	shrink_map,
+	shrink_map where MAP_ENABLED,
 }
 
 // `free` will try to free the passed pointer, with the given `allocator` if the allocator supports this operation.
@@ -471,14 +473,6 @@ delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) -> 
 delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	return mem_free_with_size(raw_data(array), len(array)*size_of(E), allocator, loc)
 }
-// `delete_map` will try to free the underlying data of the passed map, with the given `allocator` if the allocator supports this operation.
-//
-// Note: Prefer the procedure group `delete`.
-@builtin
-delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
-	return map_free_dynamic(transmute(Raw_Map)m, map_info(T), loc)
-}
-
 
 @builtin
 delete_string16 :: proc(str: string16, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -487,6 +481,16 @@ delete_string16 :: proc(str: string16, allocator := context.allocator, loc := #c
 @builtin
 delete_cstring16 :: proc(str: cstring16, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	return mem_free((^u16)(str), allocator, loc)
+}
+
+when MAP_ENABLED {
+	// `delete_map` will try to free the underlying data of the passed map, with the given `allocator` if the allocator supports this operation.
+	//
+	// Note: Prefer the procedure group `delete`.
+	@builtin
+	delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
+		return map_free_dynamic(transmute(Raw_Map)m, map_info(T), loc)
+	}
 }
 
 // `delete` will try to free the underlying data of the passed built-in data structure (string, cstring, dynamic array, slice, or map), with the given `allocator` if the allocator supports this operation.
@@ -498,7 +502,7 @@ delete :: proc{
 	delete_cstring,
 	delete_dynamic_array,
 	delete_slice,
-	delete_map,
+	delete_map where MAP_ENABLED,
 	delete_soa_slice,
 	delete_soa_dynamic_array,
 	delete_string16,
@@ -597,29 +601,32 @@ _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, ali
 	return
 }
 
-// `make_map` initializes a map with an allocator. Like `new`, the first argument is a type, not a value.
-// Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
-//
-// Note: Prefer using the procedure group `make`.
-@(builtin, require_results)
-make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator, loc := #caller_location) -> (m: T) {
-	m.allocator = allocator
-	return m
+when MAP_ENABLED {
+	// `make_map` initializes a map with an allocator. Like `new`, the first argument is a type, not a value.
+	// Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
+	//
+	// Note: Prefer using the procedure group `make`.
+	@(builtin, require_results)
+	make_map :: proc($T: typeid/map[$K]$E, allocator := context.allocator, loc := #caller_location) -> (m: T) {
+		m.allocator = allocator
+		return m
+	}
+
+	// `make_map_cap` initializes a map with an allocator and allocates space using `capacity`.
+	// Like `new`, the first argument is a type, not a value.
+	// Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
+	//
+	// Note: Prefer using the procedure group `make`.
+	@(builtin, require_results)
+	make_map_cap :: proc($T: typeid/map[$K]$E, #any_int capacity: int, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
+		make_map_expr_error_loc(loc, capacity)
+		context.allocator = allocator
+
+		err = reserve_map(&m, capacity, loc)
+		return
+	}
 }
 
-// `make_map_cap` initializes a map with an allocator and allocates space using `capacity`.
-// Like `new`, the first argument is a type, not a value.
-// Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
-//
-// Note: Prefer using the procedure group `make`.
-@(builtin, require_results)
-make_map_cap :: proc($T: typeid/map[$K]$E, #any_int capacity: int, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
-	make_map_expr_error_loc(loc, capacity)
-	context.allocator = allocator
-
-	err = reserve_map(&m, capacity, loc)
-	return
-}
 // `make_multi_pointer` allocates and initializes a multi-pointer. Like `new`, the first argument is a type, not a value.
 // Unlike `new`, `make`'s return value is the same as the type of its argument, not a pointer to it.
 //
@@ -649,8 +656,8 @@ make :: proc{
 	make_dynamic_array,
 	make_dynamic_array_len,
 	make_dynamic_array_len_cap,
-	make_map,
-	make_map_cap,
+	make_map     where MAP_ENABLED,
+	make_map_cap where MAP_ENABLED,
 	make_multi_pointer,
 
 	make_soa_slice,
@@ -659,53 +666,54 @@ make :: proc{
 	make_soa_dynamic_array_len_cap,
 }
 
+when MAP_ENABLED {
 
+	// `clear_map` will set the length of a passed map to `0`
+	//
+	// Note: Prefer the procedure group `clear`
+	@builtin
+	clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
+		if m == nil {
+			return
+		}
+		map_clear_dynamic((^Raw_Map)(m), map_info(T))
+	}
 
-// `clear_map` will set the length of a passed map to `0`
-//
-// Note: Prefer the procedure group `clear`
-@builtin
-clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
-	if m == nil {
+	// `reserve_map` will try to reserve memory of a passed map to the requested element count (setting the `cap`).
+	//
+	// Note: Prefer the procedure group `reserve`
+	@builtin
+	reserve_map :: proc(m: ^$T/map[$K]$V, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
+		return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
+	}
+
+	// Shrinks the capacity of a map down to the current length.
+	//
+	// Note: Prefer the procedure group `shrink`
+	@builtin
+	shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
+		if m != nil {
+			return map_shrink_dynamic((^Raw_Map)(m), map_info(T), loc)
+		}
 		return
 	}
-	map_clear_dynamic((^Raw_Map)(m), map_info(T))
-}
 
-// `reserve_map` will try to reserve memory of a passed map to the requested element count (setting the `cap`).
-//
-// Note: Prefer the procedure group `reserve`
-@builtin
-reserve_map :: proc(m: ^$T/map[$K]$V, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
-	return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
-}
-
-// Shrinks the capacity of a map down to the current length.
-//
-// Note: Prefer the procedure group `shrink`
-@builtin
-shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bool, err: Allocator_Error) {
-	if m != nil {
-		return map_shrink_dynamic((^Raw_Map)(m), map_info(T), loc)
-	}
-	return
-}
-
-// The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
-// If m is nil, or there is no such element, this procedure is a no-op
-// It is safe to use `delete_key` while iterating a map.
-// But if you iterate across a map and insert a new key, it could resize which means you are not iterating across all of the elements.
-@builtin
-delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
-	if m != nil {
-		key := key
-		old_k, old_v, ok := map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
-		if ok {
-			deleted_key   = (^K)(old_k)^
-			deleted_value = (^V)(old_v)^
+	// The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
+	// If m is nil, or there is no such element, this procedure is a no-op
+	// It is safe to use `delete_key` while iterating a map.
+	// But if you iterate across a map and insert a new key, it could resize which means you are not iterating across all of the elements.
+	@builtin
+	delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
+		if m != nil {
+			key := key
+			old_k, old_v, ok := map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
+			if ok {
+				deleted_key   = (^K)(old_k)^
+				deleted_value = (^V)(old_v)^
+			}
 		}
+		return
 	}
-	return
 }
 
 _append_elem :: #force_no_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, arg_ptr: rawptr, should_zero: bool, loc := #caller_location) -> (num_appended: int, err: Allocator_Error) #optional_allocator_error {
@@ -731,6 +739,29 @@ _append_elem :: #force_no_inline proc(array: ^Raw_Dynamic_Array, size_of_elem, a
 	return
 }
 
+_append_elem_ptr :: #force_no_inline proc(array: ^Raw_Dynamic_Array, arg: rawptr, should_zero: bool, loc := #caller_location) -> (num_appended: int, err: Allocator_Error) #optional_allocator_error {
+	if array == nil {
+		return
+	}
+
+	if array.cap < array.len+1 {
+		// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+		cap := max(2 * array.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
+
+		// do not 'or_return' here as it could be a partial success
+		err = _reserve_dynamic_array_unsafe(array, size_of(rawptr), align_of(rawptr), cap, should_zero, loc)
+	}
+	if array.cap-array.len > 0 {
+		data := ([^]rawptr)(array.data)
+		assert(data != nil, loc=loc)
+		data[array.len] = arg
+		array.len += 1
+		num_appended = 1
+	}
+	return
+}
+
+
 // `append_elem` appends an element to the end of a dynamic array.
 @builtin
 append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller_location) -> (num_appended: int, err: Allocator_Error) #optional_allocator_error {
@@ -740,9 +771,11 @@ append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller
 		}
 		(^Raw_Dynamic_Array)(array).len += 1
 		return 1, nil
+	} else when intrinsics.type_is_internally_pointer_like(E) {
+		return _append_elem_ptr((^Raw_Dynamic_Array)(array), rawptr(arg), should_zero=true, loc=loc)
 	} else when ODIN_OPTIMIZATION_MODE <= .Size {
 		arg := arg
-		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, true, loc=loc)
+		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, should_zero=true, loc=loc)
 	} else {
 		if array == nil {
 			return
@@ -754,7 +787,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc := #caller
 			cap := max(2 * arr.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
 
 			// do not 'or_return' here as it could be a partial success
-			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, true, loc)
+			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, should_zero=true, loc=loc)
 		}
 		if arr.cap-arr.len > 0 {
 			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
@@ -777,9 +810,34 @@ non_zero_append_elem :: proc(array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc :
 	when size_of(E) == 0 {
 		(^Raw_Dynamic_Array)(array).len += 1
 		return 1, nil
-	} else {
+	} else when intrinsics.type_is_internally_pointer_like(E) {
+		return _append_elem_ptr((^Raw_Dynamic_Array)(array), rawptr(arg), should_zero=false, loc=loc)
+	} else when ODIN_OPTIMIZATION_MODE <= .Size {
 		arg := arg
-		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, false, loc=loc)
+		return _append_elem((^Raw_Dynamic_Array)(array), size_of(E), align_of(E), &arg, should_zero=false, loc=loc)
+	} else {
+		if array == nil {
+			return
+		}
+		arg := arg
+		arr := (^Raw_Dynamic_Array)(array)
+		if arr.cap < arr.len+1 {
+			// Same behavior as _append_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
+			cap := max(2 * arr.cap, DEFAULT_DYNAMIC_ARRAY_CAPACITY)
+
+			// do not 'or_return' here as it could be a partial success
+			err = _reserve_dynamic_array_unsafe(arr, size_of(E), align_of(E), cap, should_zero=false, loc=loc)
+		}
+		if arr.cap-arr.len > 0 {
+			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
+			// this code path cannot rely on type erasure and `mem_copy_non_overlapping`.
+			// So directly inlining the call and storing the argument like this helps the optimize a lot
+			assert(arr.data != nil, loc=loc)
+			([^]E)(arr.data)[arr.len] = arg
+			arr.len += 1
+			num_appended = 1
+		}
+		return
 	}
 }
 
@@ -1525,53 +1583,54 @@ _shrink_dynamic_array :: proc(a: ^Raw_Dynamic_Array, size_of_elem, align_of_elem
 	return true, nil
 }
 
-@builtin
-map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (value_ptr: ^V, err: Allocator_Error) #optional_allocator_error {
-	key, value := key, value
-	value_ptr_raw, err_set :=__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
-	return (^V)(value_ptr_raw), err_set
-}
-
-// Explicitly inserts a key and value into a map `m`, the same as `map_insert`, but the return values differ.
-// - `prev_key` will return the previous pointer of a key if it exists, check `found_previous` if was previously found
-// - `value_ptr` will return the pointer of the memory where the insertion happens, and `nil` if the map failed to resize
-// - `found_previous` will be true a previous key was found
-@(builtin, require_results)
-map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (prev_key: K, value_ptr: ^V, found_previous: bool) {
-	key, value := key, value
-	kp, vp := __dynamic_map_set_extra_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
-	if kp != nil {
-		prev_key = (^K)(kp)^
-		found_previous = true
+when MAP_ENABLED {
+	@builtin
+	map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
+		key, value := key, value
+		return (^V)(__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc))
 	}
-	value_ptr = (^V)(vp)
-	return
-}
 
-/*
-Retrieves a pointer to the key and value for a possibly just inserted entry into the map.
+	// Explicitly inserts a key and value into a map `m`, the same as `map_insert`, but the return values differ.
+	// - `prev_key` will return the previous pointer of a key if it exists, check `found_previous` if was previously found
+	// - `value_ptr` will return the pointer of the memory where the insertion happens, and `nil` if the map failed to resize
+	// - `found_previous` will be true a previous key was found
+	@(builtin, require_results)
+	map_upsert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (prev_key: K, value_ptr: ^V, found_previous: bool) {
+		key, value := key, value
+		kp, vp := __dynamic_map_set_extra_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc)
+		if kp != nil {
+			prev_key = (^K)(kp)^
+			found_previous = true
+		}
+		value_ptr = (^V)(vp)
+		return
+	}
 
-If the `key` was not in the map `m`, an entry is inserted with the zero value and `just_inserted` will be `true`.
-Otherwise the existing entry is left untouched and pointers to its key and value are returned.
+	/*
+	Retrieves a pointer to the key and value for a possibly just inserted entry into the map.
 
-If the map has to grow in order to insert the entry and the allocation fails, `err` is set and returned.
+	If the `key` was not in the map `m`, an entry is inserted with the zero value and `just_inserted` will be `true`.
+	Otherwise the existing entry is left untouched and pointers to its key and value are returned.
 
-If `err` is `nil`, `key_ptr` and `value_ptr` are valid pointers and will not be `nil`.
+	If the map has to grow in order to insert the entry and the allocation fails, `err` is set and returned.
 
-WARN: User modification of the key pointed at by `key_ptr` should only be done if the new key is equal to (in hash) the old key.
-If that is not the case you will corrupt the map.
-*/
-@(builtin, require_results)
-map_entry :: proc(m: ^$T/map[$K]$V, key: K, loc := #caller_location) -> (key_ptr: ^K, value_ptr: ^V, just_inserted: bool, err: Allocator_Error) {
-	key := key
-	zero: V
+	If `err` is `nil`, `key_ptr` and `value_ptr` are valid pointers and will not be `nil`.
 
-	_key_ptr, _value_ptr: rawptr
-	_key_ptr, _value_ptr, just_inserted, err = __dynamic_map_entry((^Raw_Map)(m), map_info(T), &key, &zero, loc)
+	WARN: User modification of the key pointed at by `key_ptr` should only be done if the new key is equal to (in hash) the old key.
+	If that is not the case you will corrupt the map.
+	*/
+	@(builtin, require_results)
+	map_entry :: proc(m: ^$T/map[$K]$V, key: K, loc := #caller_location) -> (key_ptr: ^K, value_ptr: ^V, just_inserted: bool, err: Allocator_Error) {
+		key := key
+		zero: V
 
-	key_ptr   = (^K)(_key_ptr)
-	value_ptr = (^V)(_value_ptr)
-	return
+		_key_ptr, _value_ptr: rawptr
+		_key_ptr, _value_ptr, just_inserted, err = __dynamic_map_entry((^Raw_Map)(m), map_info(T), &key, &zero, loc)
+
+		key_ptr   = (^K)(_key_ptr)
+		value_ptr = (^V)(_value_ptr)
+		return
+	}
 }
 
 

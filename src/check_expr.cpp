@@ -3421,6 +3421,8 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 				x->expr = node;
 				x->value = exact_value_shift(be->op.kind, exact_value_to_integer(x->value), exact_value_to_integer(y->value));
 
+				check_is_expressible(c, x, x->type);
+
 				return;
 			}
 
@@ -7840,7 +7842,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					break;
 				}
 			}
-			if (all_the_same) {
+			if (all_the_same && first_results != nullptr) {
 				GB_ASSERT_MSG(is_type_tuple(first_results), "%s", type_to_string(first_results));
 				data.result_type = first_results;
 			}

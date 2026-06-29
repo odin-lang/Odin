@@ -1806,11 +1806,14 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, align
 		}
 		return memory, err
 	}
-	n := align_formula(size, max(a.minimum_alignment, alignment))
+	actual_alignment := max(a.minimum_alignment, alignment)
+	n := align_formula(size, actual_alignment)
 	if n > a.block_size {
 		return nil, .Invalid_Argument
 	}
-	if a.bytes_left < n {
+	memory := align_forward(a.current_pos, uintptr(actual_alignment))
+	margin := int(uintptr(memory) - uintptr(a.current_pos))
+	if a.bytes_left < margin + n {
 		err := _dynamic_arena_cycle_new_block(a, alignment, loc)
 		if err != nil {
 			return nil, err
@@ -1818,10 +1821,11 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, align
 		if a.current_block == nil {
 			return nil, .Out_Of_Memory
 		}
+		margin = 0
+		memory = a.current_pos
 	}
-	memory := a.current_pos
-	a.current_pos = ([^]byte)(a.current_pos)[n:]
-	a.bytes_left -= n
+	a.current_pos = ([^]byte)(memory)[n:]
+	a.bytes_left -= margin + n
 	result := ([^]byte)(memory)[:size]
 	// ensure_poisoned(result)
 	// sanitizer.address_unpoison(result)

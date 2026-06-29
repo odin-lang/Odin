@@ -99,16 +99,53 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 		return LLVMConstNull(dst);
 	}
 
-	GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "%s vs %s", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src));
 	LLVMTypeKind kind = LLVMGetTypeKind(dst);
 	switch (kind) {
 	case LLVMPointerTypeKind: {
+		GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "dst:%s vs src:%s (dst:%lld vs src:%lld)", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src),
+		              cast(long long)lb_sizeof(dst),
+		              cast(long long)lb_sizeof(src));
+
 		return LLVMConstPointerCast(val, dst);
 	}
 	case LLVMStructTypeKind: {
+		GB_ASSERT_MSG(lb_sizeof(dst) == lb_sizeof(src), "dst:%s vs src:%s (dst:%lld vs src:%lld)", LLVMPrintTypeToString(dst), LLVMPrintTypeToString(src),
+		              cast(long long)lb_sizeof(dst),
+		              cast(long long)lb_sizeof(src));
+
 		unsigned src_n = LLVMCountStructElementTypes(src);
 		unsigned dst_n = LLVMCountStructElementTypes(dst);
 		if (src_n != dst_n) goto failure;
+
+		// bool skip_cast = true;
+		// for (unsigned i = 0; i < dst_n; i++) {
+		// 	LLVMTypeKind dt = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(dst, i));
+		// 	LLVMTypeKind st = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(src, i));
+		// 	if (dt != st) {
+		// 		skip_cast = false;
+		// 	}
+		// 	if (dt == LLVMIntegerTypeKind) {
+		// 		continue;
+		// 	}
+		// 	if (dt != LLVMArrayTypeKind) {
+		// 		skip_cast = false;
+		// 		break;
+		// 	}
+
+		// 	LLVMValueRef field_val = llvm_const_extract_value(m, val, i);
+		// 	if (field_val == nullptr) goto failure;
+
+		// 	LLVMTypeRef dst_elem_ty = LLVMStructGetTypeAtIndex(dst, i);
+		// 	LLVMTypeRef src_elem_ty = LLVMTypeOf(field_val);
+		// 	if (lb_sizeof(dst_elem_ty) > lb_sizeof(src_elem_ty)) {
+		// 		skip_cast = true;
+		// 		continue;
+		// 	}
+
+		// }
+		// if (skip_cast) {
+		// 	return val;
+		// }
 
 		LLVMValueRef *field_vals = temporary_alloc_array<LLVMValueRef>(dst_n);
 		for (unsigned i = 0; i < dst_n; i++) {
@@ -116,6 +153,15 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 			if (field_val == nullptr) goto failure;
 
 			LLVMTypeRef dst_elem_ty = LLVMStructGetTypeAtIndex(dst, i);
+			LLVMTypeRef src_elem_ty = LLVMTypeOf(field_val);
+
+			GB_ASSERT_MSG(lb_sizeof(dst_elem_ty) == lb_sizeof(src_elem_ty), "dst:%s vs src:%s (dst:%lld vs src:%lld) to %s from %s", LLVMPrintTypeToString(dst_elem_ty), LLVMPrintTypeToString(src_elem_ty),
+			              cast(long long)lb_sizeof(dst_elem_ty),
+			              cast(long long)lb_sizeof(src_elem_ty),
+			              LLVMPrintTypeToString(dst),
+			              LLVMPrintTypeToString(src)
+			              );
+
 			field_vals[i] = llvm_const_cast(m, field_val, dst_elem_ty, failure_);
 			if (failure_ && *failure_) goto failure;
 		}
@@ -125,6 +171,9 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 		} else {
 			return LLVMConstStructInContext(m->ctx, field_vals, dst_n, LLVMIsPackedStruct(dst));
 		}
+	}
+	case LLVMArrayTypeKind: {
+		goto failure;
 	}
 	}
 
@@ -911,6 +960,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
+
 	if (is_type_union(type) && is_type_union_constantable(type)) {
 		Type *bt = base_type(type);
 		GB_ASSERT(bt->kind == Type_Union);
@@ -945,21 +995,26 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 				res.type = original_type;
 				return res;
 			} else {
+				LLVMValueRef values[4] = {};
+				isize value_count = 0;
+
+				// Payload
+				values[value_count++] = cv.value;
 
 				unsigned tag_value = 1;
 				if (bt->Union.kind == UnionType_no_nil) {
 					tag_value = 0;
 				}
-				LLVMValueRef tag = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);
-				LLVMValueRef padding = nullptr;
 
-				isize value_count = 2;
+				// Tag
+				values[value_count++] = LLVMConstInt(LLVMStructGetTypeAtIndex(llvm_type, 1), tag_value, false);;
+
 				if (LLVMCountStructElementTypes(llvm_type) > 2) {
-					value_count = 3;
-					padding = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
+					GB_ASSERT(LLVMCountStructElementTypes(llvm_type) == 3);
+					// Padding
+					values[value_count++] = LLVMConstNull(LLVMStructGetTypeAtIndex(llvm_type, 2));
 				}
 
-				LLVMValueRef values[3] = {cv.value, tag, padding};
 				res.value = llvm_const_named_struct_internal(m, llvm_type, values, value_count);
 				res.type = original_type;
 				return res;
@@ -971,6 +1026,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					if (cl->elems.count == 0) {
 						return lb_const_nil(m, original_type);
 					}
+					value_type = type_of_expr(value.value_compound);
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}
@@ -982,18 +1038,31 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 
 			i64 block_size = bt->Union.variant_block_size;
 
-			if (are_types_identical(value_type, original_type)) {
+			while (are_types_identical(value_type, original_type)) {
 				if (value.kind == ExactValue_Compound) {
 					ast_node(cl, CompoundLit, value.value_compound);
 					if (cl->elems.count == 0) {
 						return lb_const_nil(m, original_type);
 					}
+
+					value_type = type_of_expr(value.value_compound);
+					if (!are_types_identical(value_type, original_type)) {
+						break;
+					}
+
+					GB_PANIC("%s --> %s vs %s",
+					         expr_to_string(value.value_compound),
+					         temp_canonical_string(value_type), temp_canonical_string(original_type));
+
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}
 
-				GB_PANIC("%s vs %s", type_to_string(value_type), type_to_string(original_type));
+				GB_PANIC("(value.kind=%s) %s vs %s",
+				         exact_value_kind_string[value.kind],
+				         temp_canonical_string(value_type), temp_canonical_string(original_type));
 			}
+		// union_multiple_allow_compound:;
 
 			lbValue cv = lb_const_value(m, value_type, value, value_type, cc);
 			Type *variant_type = cv.type;
@@ -1001,16 +1070,16 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			LLVMValueRef values[4] = {};
 			unsigned value_count = 0;
 
-			#if LLVM_VERSION_MAJOR == 14
+		#if LLVM_VERSION_MAJOR == 14
 			LLVMTypeRef block_type = lb_type_internal_union_block_type(m, bt);
 			values[value_count++] = llvm_const_pad_to_size(m, cv.value, block_type);
-			#else
+		#else
 			values[value_count++] = cv.value;
-			if (type_size_of(variant_type) != block_size) {
+			if (block_size != type_size_of(variant_type)) {
 				LLVMTypeRef padding_type = lb_type_padding_filler(m, block_size - type_size_of(variant_type), 1);
 				values[value_count++] = LLVMConstNull(padding_type);
 			}
-			#endif
+		#endif
 
 			Type *tag_type = union_tag_type(bt);
 			LLVMTypeRef llvm_tag_type = lb_type(m, tag_type);
@@ -1026,6 +1095,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			}
 
 			res.value = LLVMConstStructInContext(m->ctx, values, value_count, true);
+
 			return res;
 		}
 	}
@@ -1609,7 +1679,17 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
 				return lb_const_nil(m, original_type);
 			}
-			if (cl->elems[0]->kind == Ast_FieldValue) {
+			if (are_types_identical(value.value_compound->tav.type, elem_type)) {
+				// Compound is of array item type; expand its value to all items in array.
+				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
+
+				for (isize i = 0; i < type->Array.count; i++) {
+					values[i] = lb_const_value(m, elem_type, value, elem_type, cc).value;
+				}
+
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
+				return res;
+			} else if (cl->elems[0]->kind == Ast_FieldValue) {
 				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
 
@@ -1661,16 +1741,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					if (!found) {
 						values[value_index++] = LLVMConstNull(lb_type(m, elem_type));
 					}
-				}
-
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
-				return res;
-			} else if (are_types_identical(value.value_compound->tav.type, elem_type)) {
-				// Compound is of array item type; expand its value to all items in array.
-				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
-
-				for (isize i = 0; i < type->Array.count; i++) {
-					values[i] = lb_const_value(m, elem_type, value, elem_type, cc).value;
 				}
 
 				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
@@ -2103,7 +2173,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 									}
 								}
 								if (is_constant) {
-									LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, tav.type, cc).value;
+									LLVMValueRef elem_value = lb_const_value(m, cv_type, tav.value, tav.type, cc).value;
 									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
 										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 									} else if (is_local) {

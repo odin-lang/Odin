@@ -296,8 +296,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 
 
 gb_internal bool big_int_can_be_represented_in_64_bits(BigInt const *x) {
-	int bits_used = (x->used-1) * MP_DIGIT_BIT;
-	return bits_used <= 64;
+	return mp_count_bits(x) <= 64;
 }
 
 gb_internal u64 big_int_to_u64(BigInt const *x) {
@@ -431,6 +430,14 @@ gb_internal void big_int_rem(BigInt *z, BigInt const *x, BigInt const *y) {
 	BigInt q = {};
 	big_int_quo_rem(x, y, &q, z);
 	big_int_dealloc(&q);
+}
+gb_internal void big_int_mod_mod(BigInt *z, BigInt const *x, BigInt const *y) {
+	BigInt q = {};
+	big_int_rem(&q, x, y);
+	big_int_add(&q, &q, y);
+	big_int_rem(z, &q, y);
+	big_int_dealloc(&q);
+
 }
 
 gb_internal void big_int_euclidean_mod(BigInt *z, BigInt const *x, BigInt const *y) {
