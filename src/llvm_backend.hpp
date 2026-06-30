@@ -4,6 +4,10 @@
 #include <llvm/Config/llvm-config.h>
 #endif
 
+#if LLVM_VERSION_MAJOR < 17
+#error "LLVM Version 17 is the minimum required"
+#endif
+
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
@@ -11,37 +15,11 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
-#if LLVM_VERSION_MAJOR >= 17
 #include <llvm-c/Transforms/PassBuilder.h>
-#else
-#include <llvm-c/Transforms/AggressiveInstCombine.h>
-#include <llvm-c/Transforms/InstCombine.h>
-#include <llvm-c/Transforms/IPO.h>
-#include <llvm-c/Transforms/PassManagerBuilder.h>
-#include <llvm-c/Transforms/Scalar.h>
-#include <llvm-c/Transforms/Utils.h>
-#include <llvm-c/Transforms/Vectorize.h>
-#endif
 
-#if LLVM_VERSION_MAJOR < 14
-#error "LLVM Version 14 is the minimum required"
-#endif
-
-#if LLVM_VERSION_MAJOR > 14 || (LLVM_VERSION_MAJOR == 14 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
+// These two are always available since we're on >= 17
 #define ODIN_LLVM_MINIMUM_VERSION_14 1
-#else
-#define ODIN_LLVM_MINIMUM_VERSION_14 0
-#endif
-
-#if LLVM_VERSION_MAJOR == 15 || LLVM_VERSION_MAJOR == 16
-#error "LLVM versions 15 and 16 are not supported"
-#endif
-
-#if LLVM_VERSION_MAJOR >= 17
 #define LB_USE_NEW_PASS_SYSTEM 1
-#else
-#define LB_USE_NEW_PASS_SYSTEM 0
-#endif
 
 #if LLVM_VERSION_MAJOR >= 19
 #define LLVMDIBuilderInsertDeclareAtEnd(...) LLVMDIBuilderInsertDeclareRecordAtEnd(__VA_ARGS__)

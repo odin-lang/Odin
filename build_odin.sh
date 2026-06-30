@@ -3,6 +3,7 @@ set -eu
 
 SUPPORTED_LLVM_VERSIONS="22 21 20 19 18 17"
 SUGGESTED_LLVM_VERSION="22"
+MINIMUM_LLVM_VERSION="17"
 
 : ${CPPFLAGS=}
 : ${CXXFLAGS=}
@@ -94,8 +95,8 @@ LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 17 ]; then
-	error "Invalid LLVM version $LLVM_VERSION: must be 17, 18, 19, 20, 21 or 22"
+if [ $LLVM_VERSION_MAJOR -lt $MINIMUM_LLVM_VERSION ]; then
+	error "Unsupported LLVM version $LLVM_VERSION: must be 17, 18, 19, 20, 21 or 22"
 fi
 
 case "$OS_NAME" in
