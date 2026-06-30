@@ -1968,6 +1968,14 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_Variable:
+		if ((e->flags & EntityFlag_CVarArg) && !c->allow_c_vararg_param) {
+			ERROR_BLOCK();
+			error(o->expr, "'#c_vararg' parameter '%.*s' cannot be used directly", LIT(name));
+			error_line("\tSuggestion: use c_va_start to convert C varargs to c_va_list\n");
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			return e;
+		}
 		e->flags |= EntityFlag_Used;
 		if (type == t_invalid) {
 			o->type = t_invalid;

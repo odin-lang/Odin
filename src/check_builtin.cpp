@@ -765,8 +765,10 @@ gb_internal bool check_builtin_c_procedure(CheckerContext *c, Operand *operand, 
 			return false;
 		}
 
+		c->allow_c_vararg_param = true;
 		Operand args = {};
 		check_expr(c, &args, ce->args[1]);
+		c->allow_c_vararg_param = false;
 		if (list.mode == Addressing_Invalid) {
 			return false;
 		}
