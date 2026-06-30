@@ -239,10 +239,15 @@ gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValue
 	return llvm_const_named_struct_internal(m, struct_type, values_with_padding, values_with_padding_count);
 }
 
-gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
+gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_, bool force_non_named) {
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(t);
 	GB_ASSERT_MSG(value_count == elem_count, "%s %u %u", LLVMPrintTypeToString(t), value_count, elem_count);
+
+	if (force_non_named) {
+		return LLVMConstStructInContext(m->ctx, values, value_count, true);
+	}
+
 	bool failure = false;
 	for (unsigned i = 0; i < elem_count; i++) {
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(t, i);
@@ -2079,6 +2084,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			
 			LLVMTypeRef struct_type = lb_type(m, original_type);
 
+			bool force_non_named = false;
+
 			auto field_remapping = lb_get_struct_remapping(m, type);
 			unsigned value_count = LLVMCountStructElementTypes(struct_type);
 			
@@ -2114,7 +2121,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 								values[index]  = lb_const_value(m, f->type, {}, nullptr, new_cc).value;
 								visited[index] = true;
 							}
-
 
 							unsigned idx_list_len = cast(unsigned)sel.index.count-1;
 							unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
@@ -2153,7 +2159,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 								if (is_constant) {
 									LLVMValueRef elem_value = lb_const_value(m, cv_type, tav.value, tav.type, cc).value;
 									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
-										values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
+										if (is_type_union(cv_type) || is_type_raw_union(cv_type)) {
+											force_non_named = true;
+											values[index] = llvm_const_insert_value_with_rebuild(m, values[index], elem_value, idx_list, idx_list_len);
+										} else {
+											values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
+										}
 									} else if (is_local) {
 									#if 1
 										lbProcedure *p = m->curr_procedure;
@@ -2200,13 +2211,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					Entity *f = type->Struct.fields[i+multiple_return_offset];
 					TypeAndValue tav = cl->elems[i]->tav;
 
-					// INFO: dead code:
-	
-					// ExactValue val = {};
-					// if (tav.mode != Addressing_Invalid) {
-					// 	val = tav.value;
-					// }
-
 					if (is_type_tuple(tav.type)){
 						multiple_return_offset += tav.type->Tuple.variables.count-1;
 					}
@@ -2246,7 +2250,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 			}
 
 			if (is_constant) {
-				res.value = llvm_const_named_struct_internal(m, struct_type, values, cast(unsigned)value_count);
+				res.value = llvm_const_named_struct_internal(m, struct_type, values, cast(unsigned)value_count, force_non_named);
 				LLVMTypeRef res_type = LLVMTypeOf(res.value);
 				GB_ASSERT(lb_sizeof(res_type) == lb_sizeof(struct_type));
 				return res;

@@ -461,6 +461,27 @@ gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, 
 	return extracted_value;
 }
 
+gb_internal LLVMValueRef llvm_const_insert_value_with_rebuild(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned *indices, isize count) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+	GB_ASSERT(count > 0);
+
+	unsigned value_count = LLVMCountStructElementTypes(LLVMTypeOf(agg));
+	LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, count);
+	defer (gb_free(heap_allocator(), values));
+
+	for (unsigned i = 0; i < value_count; i++) {
+		values[i] = llvm_const_extract_value(m, agg, i);
+	}
+	if (count == 1) {
+		values[indices[0]] = val;
+	} else {
+		values[indices[0]] = llvm_const_insert_value_with_rebuild(m, values[indices[0]], val, indices+1, count-1);
+	}
+
+	return LLVMConstStructInContext(m->ctx, values, value_count, true);
+}
+
 
 
 
