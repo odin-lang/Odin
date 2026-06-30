@@ -118,7 +118,7 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 		if (src_n != dst_n) goto failure;
 
 		if (LLVM_VERSION_MAJOR > 14) {
-			return val;
+			goto failure;
 		}
 
 		LLVMValueRef *field_vals = temporary_alloc_array<LLVMValueRef>(dst_n);
@@ -128,6 +128,10 @@ gb_internal LLVMValueRef llvm_const_cast(lbModule *m, LLVMValueRef val, LLVMType
 
 			LLVMTypeRef dst_elem_ty = LLVMStructGetTypeAtIndex(dst, i);
 			LLVMTypeRef src_elem_ty = LLVMTypeOf(field_val);
+
+			if (lb_sizeof(dst_elem_ty) != lb_sizeof(src_elem_ty)) {
+				goto failure;
+			}
 
 			GB_ASSERT_MSG(lb_sizeof(dst_elem_ty) == lb_sizeof(src_elem_ty), "dst:%s vs src:%s (dst:%lld vs src:%lld) to %s from %s", LLVMPrintTypeToString(dst_elem_ty), LLVMPrintTypeToString(src_elem_ty),
 			              cast(long long)lb_sizeof(dst_elem_ty),
