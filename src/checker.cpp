@@ -1109,7 +1109,6 @@ gb_internal i64 odin_compile_timestamp(void) {
 	return ns_after_1970;
 }
 
-gb_internal bool lb_use_new_pass_system(void);
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -1382,7 +1381,8 @@ gb_internal void init_universal(void) {
 	}
 
 	{
-		bool f16_supported = lb_use_new_pass_system();
+		// Available since LLVM 17 / new pass system, which is the minimum now.
+		bool f16_supported = true;
 		if (is_arch_wasm()) {
 			f16_supported = false;
 		} else if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {

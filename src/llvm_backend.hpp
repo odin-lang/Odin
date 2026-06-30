@@ -17,16 +17,11 @@
 #include <llvm-c/DebugInfo.h>
 #include <llvm-c/Transforms/PassBuilder.h>
 
-// These two are always available since we're on >= 17
-#define LB_USE_NEW_PASS_SYSTEM 1
+
 
 #if LLVM_VERSION_MAJOR >= 19
 #define LLVMDIBuilderInsertDeclareAtEnd(...) LLVMDIBuilderInsertDeclareRecordAtEnd(__VA_ARGS__)
 #endif
-
-gb_internal bool lb_use_new_pass_system(void) {
-	return LB_USE_NEW_PASS_SYSTEM;
-}
 
 struct lbProcedure;
 
@@ -611,11 +606,7 @@ gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, S
 gb_internal LLVMMetadataRef lb_debug_location_from_token_pos(lbProcedure *p, TokenPos pos);
 
 gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
-#if LB_USE_NEW_PASS_SYSTEM
 	return LLVMArrayType2(ElementType, ElementCount);
-#else
-	return LLVMArrayType(ElementType, cast(unsigned)ElementCount);
-#endif
 }
 
 gb_internal lbValue lb_emit_struct_iv(lbProcedure *p, lbValue agg, lbValue field, i32 index);
