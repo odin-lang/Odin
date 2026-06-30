@@ -18,7 +18,6 @@
 #include <llvm-c/Transforms/PassBuilder.h>
 
 // These two are always available since we're on >= 17
-#define ODIN_LLVM_MINIMUM_VERSION_14 1
 #define LB_USE_NEW_PASS_SYSTEM 1
 
 #if LLVM_VERSION_MAJOR >= 19
@@ -384,13 +383,6 @@ struct lbProcedure {
 
 #ifndef ABI_PKG_NAME_SEPARATOR
 #define ABI_PKG_NAME_SEPARATOR "."
-#endif
-
-
-#if !ODIN_LLVM_MINIMUM_VERSION_14
-#define LLVMConstGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstGEP(ConstantVal__, ConstantIndices__, NumIndices__)
-#define LLVMConstInBoundsGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstInBoundsGEP(ConstantVal__, ConstantIndices__, NumIndices__)
-#define LLVMBuildPtrDiff2(Builder__, Ty__, LHS__, RHS__, Name__) LLVMBuildPtrDiff(Builder__, LHS__, RHS__, Name__)
 #endif
 
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
