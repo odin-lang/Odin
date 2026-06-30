@@ -4762,14 +4762,22 @@ gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *sret_
 	return res;
 }
 
-gb_internal void lb_add_values_to_array(lbProcedure *p, Array<lbValue> *args, lbValue value) {
+gb_internal void lb_add_values_to_array(lbProcedure *p, Array<lbValue> *args, lbValue value, Type *c_vararg_type = nullptr) {
 	if (is_type_tuple(value.type)) {
 		for_array(i, value.type->Tuple.variables) {
 			lbValue sub_value = lb_emit_struct_ev(p, value, cast(i32)i);
-			array_add(args, sub_value);
+			if (c_vararg_type) {
+				array_add(args, lb_emit_c_vararg(p, sub_value, c_vararg_type));
+			} else {
+				array_add(args, sub_value);
+			}
 		}
 	} else {
-		array_add(args, value);
+		if (c_vararg_type) {
+			array_add(args, lb_emit_c_vararg(p, value, c_vararg_type));
+		} else {
+			array_add(args, value);
+		}
 	}
 }
 
@@ -4890,9 +4898,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 							if (is_type_untyped_nil(arg.type)) {
 								arg = lb_const_nil(p->module, t_rawptr);
 							}
-							array_add(&args, lb_emit_c_vararg(p, arg, arg.type));
+							lb_add_values_to_array(p, &args, arg, arg.type);
 						} else {
-							array_add(&args, lb_emit_c_vararg(p, arg, elem_type));
+							lb_add_values_to_array(p, &args, arg, elem_type);
 						}
 					}
 					break;
@@ -5018,15 +5026,15 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 						if (is_type_untyped_nil(arg.type)) {
 							arg = lb_const_nil(p->module, t_rawptr);
 						}
-						array_add(&args, lb_emit_c_vararg(p, arg, arg.type));
+						lb_add_values_to_array(p, &args, arg, arg.type);
 					} else {
-						array_add(&args, lb_emit_c_vararg(p, arg, elem_type));
+						lb_add_values_to_array(p, &args, arg, elem_type);
 					}
 				}
 			} else {
 				lbValue value = lb_build_expr(p, fv->value);
 				GB_ASSERT(!is_type_tuple(value.type));
-				array_add(&args, lb_emit_c_vararg(p, value, value.type));
+				lb_add_values_to_array(p, &args, value, value.type);
 			}
 		} else {
 			lbValue value = lb_build_expr(p, fv->value);

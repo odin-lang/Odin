@@ -134,6 +134,7 @@ register_user_marshaler :: proc(id: typeid, marshaler: User_Marshaler) -> Regist
 	return .None
 }
 
+@(require_results)
 marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator, loc)
 	defer if err != nil {

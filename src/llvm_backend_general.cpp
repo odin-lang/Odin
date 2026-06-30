@@ -461,6 +461,27 @@ gb_internal LLVMValueRef llvm_const_insert_value(lbModule *m, LLVMValueRef agg, 
 	return extracted_value;
 }
 
+gb_internal LLVMValueRef llvm_const_insert_value_with_rebuild(lbModule *m, LLVMValueRef agg, LLVMValueRef val, unsigned *indices, isize count) {
+	GB_ASSERT(LLVMIsConstant(agg));
+	GB_ASSERT(LLVMIsConstant(val));
+	GB_ASSERT(count > 0);
+
+	unsigned value_count = LLVMCountStructElementTypes(LLVMTypeOf(agg));
+	LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, count);
+	defer (gb_free(heap_allocator(), values));
+
+	for (unsigned i = 0; i < value_count; i++) {
+		values[i] = llvm_const_extract_value(m, agg, i);
+	}
+	if (count == 1) {
+		values[indices[0]] = val;
+	} else {
+		values[indices[0]] = llvm_const_insert_value_with_rebuild(m, values[indices[0]], val, indices+1, count-1);
+	}
+
+	return LLVMConstStructInContext(m->ctx, values, value_count, true);
+}
+
 
 
 
@@ -1647,12 +1668,14 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	unsigned element_count = LLVMCountStructElementTypes(uvt);
 	GB_ASSERT_MSG(element_count >= 2, "element_count=%u (%s) != (%s)", element_count, type_to_string(ut), LLVMPrintTypeToString(uvt));
 
+
 	LLVMValueRef ptr = u.value;
 	ptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(uvt, 0), "");
 
 	lbValue tag_ptr = {};
 	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
+	tag_ptr.value = LLVMBuildPointerCast(p->builder, tag_ptr.value, lb_type(p->module, tag_ptr.type), "");
 	return tag_ptr;
 }
 
@@ -2402,8 +2425,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			i64 full_type_align = type_align_of(type);
 			GB_ASSERT(full_type_size % full_type_align == 0);
 
-			if (type->Struct.is_raw_union) {
+			bool requires_packing = type->Struct.is_packed;
 
+			if (type->Struct.is_raw_union) {
 				lbStructFieldRemapping field_remapping = {};
 				slice_init(&field_remapping, permanent_allocator(), 1);
 
@@ -2411,7 +2435,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				fields[0] = lb_type_padding_filler(m, full_type_size, full_type_align);
 				field_remapping[0] = 0;
 
-				LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
+				LLVMTypeRef struct_type = LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), requires_packing);
 				map_set(&m->struct_field_remapping, cast(void *)struct_type, field_remapping);
 				map_set(&m->struct_field_remapping, cast(void *)type, field_remapping);
 				return struct_type;
@@ -2431,7 +2455,6 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			}
 
 			i64 prev_offset = 0;
-			bool requires_packing = type->Struct.is_packed;
 			for (i32 field_index : struct_fields_index_by_increasing_offset(temporary_allocator(), type)) {
 				Entity *field = type->Struct.fields[field_index];
 				i64 offset = type->Struct.offsets[field_index];
@@ -2497,8 +2520,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				LLVMTypeRef fields[] = {lb_type(m, type->Union.variants[0])};
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
 			}
+			bool is_packed = false;
 
-			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 3);
+			auto fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, 4);
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
@@ -2514,6 +2538,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
 					array_add(&fields, padding_type);
 				}
+				is_packed = true;
 			} else {
 				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
@@ -2526,9 +2551,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
 					array_add(&fields, padding_type);
 				}
+				is_packed = true;
 			}
 			
-			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, false);
+			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, is_packed);
 		}
 		break;
 
@@ -2639,6 +2665,13 @@ gb_internal LLVMTypeRef lb_type(lbModule *m, Type *type) {
 	m->internal_type_level += 1;
 	llvm_type = lb_type_internal(m, type);
 	m->internal_type_level -= 1;
+
+	// {
+	// 	i64 tsz = type_size_of(type);
+	// 	i64 lsz = lb_sizeof(llvm_type);
+	// 	GB_ASSERT_MSG(tsz == lsz, "%s %lld vs %lld %s", type_to_string(type), cast(long long)tsz, cast(long long)lsz, LLVMPrintTypeToString(llvm_type));
+	// }
+
 	if (m->internal_type_level == 0) {
 		map_set(&m->types, type, llvm_type);
 	}
