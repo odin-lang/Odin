@@ -1,6 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
+SUPPORTED_LLVM_VERSIONS="22 21 20 19 18 17"
+SUGGESTED_LLVM_VERSION="22"
+
 : ${CPPFLAGS=}
 : ${CXXFLAGS=}
 : ${LDFLAGS=}
@@ -25,8 +28,6 @@ error() {
 	printf "ERROR: %s\n" "$1"
 	exit 1
 }
-
-SUPPORTED_LLVM_VERSIONS="22 21 20 19 18 17 14"
 
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
@@ -61,7 +62,22 @@ if [ -z "$LLVM_CONFIG" ]; then
 	done
 
 	if [ -z "$LLVM_CONFIG" ]; then
-		error "No supported llvm-config command found. Set LLVM_CONFIG to proceed."
+		if [ -f "/etc/os-release" ]; then
+			. /etc/os-release
+			case "$ID" in
+			ubuntu|debian|linuxmint|pop|zorin|kali|elementary|raspbian)
+				echo "ERROR: No supported llvm-config command found. Set LLVM_CONFIG to proceed."
+				echo "We suggest installing LLVM $SUGGESTED_LLVM_VERSION from https://apt.llvm.org"
+				exit 1
+				;;
+			fedora|centos|rocky|almalinux|rhel|amzn|ol|centos-stream)
+				echo "ERROR: No supported llvm-config command found. Set LLVM_CONFIG to proceed."
+				echo "We suggest installing LLVM $SUGGESTED_LLVM_VERSION via COPR, e.g. dnf copr enable fedora-llvm-team/llvm-snapshots"
+				exit 1
+				;;
+			esac
+		fi
+		error "No supported llvm-config command found. Set LLVM_CONFIG to proceed. We suggest LLVM $SUGGESTED_LLVM_VERSION."
 	fi
 fi
 
@@ -78,8 +94,8 @@ LLVM_VERSION_MAJOR="$(echo $LLVM_VERSION | awk -F. '{print $1}')"
 LLVM_VERSION_MINOR="$(echo $LLVM_VERSION | awk -F. '{print $2}')"
 LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
-if [ $LLVM_VERSION_MAJOR -lt 14 ] || ([ $LLVM_VERSION_MAJOR -gt 14 ] && [ $LLVM_VERSION_MAJOR -lt 17 ]) || [ $LLVM_VERSION_MAJOR -gt 22 ]; then
-	error "Invalid LLVM version $LLVM_VERSION: must be 14, 17, 18, 19, 20, 21 or 22"
+if [ $LLVM_VERSION_MAJOR -lt 17 ]; then
+	error "Invalid LLVM version $LLVM_VERSION: must be 17, 18, 19, 20, 21 or 22"
 fi
 
 case "$OS_NAME" in
