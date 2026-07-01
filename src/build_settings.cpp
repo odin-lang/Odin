@@ -171,6 +171,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
+	Subtarget_Playdate,
 	
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
@@ -181,6 +182,7 @@ gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit("iphone"),
 	str_lit("iphonesimulator"),
 	str_lit("android"),
+	str_lit("playdate"),
 };
 
 
@@ -1956,6 +1958,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		case TargetArch_amd64:
 			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
 			break;
+		}
+	} else if (subtarget == Subtarget_Playdate) {
+		// Playdate uses the cortex-m7 as well and an FPU, requiring thumb instructions and hard floats.
+		bc->microarch = str_lit("cortex-m7");
+		bc->metrics.target_triplet = str_lit("thumbv7em-none-eabihf");
+		// Remove MOVW/MOVT instructions as playdate only handles R_ARM_ABS32 relocations.
+		if(bc->target_features_string.len > 0) {
+			bc->target_features_string = concatenate_strings(permanent_allocator(), bc->target_features_string, str_lit(",no-movt"));
+		} else {
+			bc->target_features_string = str_lit("no-movt");
 		}
 	}
 
