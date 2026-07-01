@@ -3926,6 +3926,11 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		}
 	}
 
+	// In this case, the cast involves array programming
+	// so the operand needs to be a computed value
+	if (!is_type_array_like(x->type) && is_type_array_like(type)) {
+		x->mode = Addressing_Value;
+	}
 	x->type = type;
 }
 
