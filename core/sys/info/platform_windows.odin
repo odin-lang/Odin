@@ -263,8 +263,8 @@ _ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_sw
 
 	total_ram  = i64(state.ullTotalPhys)
 	free_ram   = i64(state.ullAvailPhys)
-	total_swap = i64(state.ullTotalPageFil)
-	free_swap  = i64(state.ullAvailPageFil)
+	total_swap = i64(state.ullTotalPageFile)
+	free_swap  = i64(state.ullAvailPageFile)
 	ok         = true
 
 	return
