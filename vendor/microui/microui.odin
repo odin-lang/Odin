@@ -996,7 +996,7 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 	if ctx.focus_id == id {
 		/* create a builder backed by the user's buffer */
 		builder := strings.builder_from_bytes(textbuf)
-		non_zero_resize(&builder.buf, textlen^)
+		non_zero_resize(&builder, textlen^)
 		ctx.textbox_state.builder = &builder
 		if ctx.textbox_state.id != u64(id) {
 			ctx.textbox_state.id = u64(id)

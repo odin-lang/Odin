@@ -147,8 +147,8 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	opt := opt
 	marshal_to_builder(&b, v, &opt) or_return
 	
-	if len(b.buf) != 0 {
-		data = b.buf[:]
+	if len(b) != 0 {
+		data = b[:]
 	}
 
 	return data, nil

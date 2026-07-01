@@ -65,7 +65,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 
 	release_i := strings.builder_len(b)
 	strings.write_string(&b, string(cstring(&uts.release[0])))
-	release_str := string(b.buf[release_i:])
+	release_str := string(b[release_i:])
 
 	res.full = strings.to_string(b)
 
