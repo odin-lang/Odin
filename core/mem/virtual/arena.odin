@@ -241,7 +241,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 }
 
 // Frees all of the memory allocated by the arena and zeros all of the values of an arena.
-// A buffer based arena does not `delete` the provided `[]byte` bufffer.
+// A buffer based arena does not `delete` the provided `[]byte` buffer.
 @(no_sanitize_address)
 arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
 	sync.mutex_guard(&arena.mutex)
