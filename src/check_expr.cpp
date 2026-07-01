@@ -12833,6 +12833,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		} else {
 			str = gb_string_appendc(str, " ---");
 		}
+		// NOTE(tf2spi):
+		// Two proc literals with the same signature output the same expr above
+		// which poses challenges for name canonicalization. Include the below
+		// discriminator with the file ID and offset to help with this.
+		TokenPos pos = ast_token(node).pos;
+		str = gb_string_append_fmt(str, " /* %d!%d */", pos.file_id, pos.offset);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
