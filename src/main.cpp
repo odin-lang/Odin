@@ -875,7 +875,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							} else if (value.value_string == "speed") {
 								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 2;
-							} else if (value.value_string == "aggressive" && LB_USE_NEW_PASS_SYSTEM) {
+							} else if (value.value_string == "aggressive") {
 								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 3;
 							} else {
@@ -884,9 +884,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\tminimal\n");
 								gb_printf_err("\tsize\n");
 								gb_printf_err("\tspeed\n");
-								if (LB_USE_NEW_PASS_SYSTEM) {
-									gb_printf_err("\taggressive\n");
-								}
+								gb_printf_err("\taggressive\n");
 								gb_printf_err("\tnone (useful for -debug builds)\n");
 								bad_flags = true;
 							}
@@ -3041,9 +3039,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-o:minimal");
 				print_usage_line(3, "-o:size");
 				print_usage_line(3, "-o:speed");
-			if (LB_USE_NEW_PASS_SYSTEM) {
 				print_usage_line(3, "-o:aggressive (use this with caution)");
-			}
 			print_usage_line(2, "The default is -o:minimal. If -debug is set, the default is -o:none.");
 		}
 
@@ -4217,12 +4213,6 @@ int main(int arg_count, char const **arg_ptr) {
 		String disabled;
 		if (!check_target_feature_is_enabled(str_lit("64bit,f,d,m"), &disabled)) { // 64bit, floats, doubles, integer multiplication.
 			gb_printf_err("missing required target feature: \"%.*s\", enable it by setting a different -microarch or explicitly adding it through -target-features\n", LIT(disabled));
-			gb_exit(1);
-		}
-
-		// NOTE(laytan): some weird errors on LLVM 14 that LLVM 17 fixes.
-		if (LLVM_VERSION_MAJOR < 17) {
-			gb_printf_err("Invalid LLVM version %s, RISC-V targets require at least LLVM 17\n", LLVM_VERSION_STRING);
 			gb_exit(1);
 		}
 	}
