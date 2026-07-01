@@ -1241,6 +1241,16 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 			win.LPWSAOVERLAPPED(&op._impl.over),
 			nil,
 		)
+	case Unix_Socket:
+		status = win.WSARecv(
+			win.SOCKET(sock),
+			win_bufs,
+			u32(len(bufs)),
+			nil,
+			&op.recv._impl.flags,
+			win.LPWSAOVERLAPPED(&op._impl.over),
+			nil,
+		)
 	}
 
 	if status == win.SOCKET_ERROR {
@@ -1249,8 +1259,9 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			switch _ in op.recv.socket {
-			case TCP_Socket: op.recv.err = net._tcp_recv_error()
-			case UDP_Socket: op.recv.err = net._udp_recv_error()
+			case TCP_Socket:  op.recv.err = net._tcp_recv_error()
+			case UDP_Socket:  op.recv.err = net._udp_recv_error()
+			case Unix_Socket: op.recv.err = net._unix_recv_error()
 			}
 		}
 	}
@@ -1273,16 +1284,18 @@ recv_callback :: proc(op: ^Operation) -> Op_Result {
 		// This error could also happen when the user calls close on the socket.
 		if check_timed_out(op, op.recv.expires) {
 			switch _ in op.recv.socket {
-			case TCP_Socket: op.recv.err = net.TCP_Recv_Error.Timeout
-			case UDP_Socket: op.recv.err = net.UDP_Recv_Error.Timeout
+			case TCP_Socket:  op.recv.err = net.TCP_Recv_Error.Timeout
+			case UDP_Socket:  op.recv.err = net.UDP_Recv_Error.Timeout
+			case Unix_Socket: op.recv.err = net.Unix_Recv_Error.Timeout
 			}
 			return .Done
 		}
 		fallthrough
 	case:
 		switch _ in op.recv.socket {
-		case TCP_Socket: op.recv.err = net._tcp_recv_error()
-		case UDP_Socket: op.recv.err = net._udp_recv_error()
+		case TCP_Socket:  op.recv.err = net._tcp_recv_error()
+		case UDP_Socket:  op.recv.err = net._udp_recv_error()
+		case Unix_Socket: op.recv.err = net._unix_recv_error()
 		}
 		return .Done
 	}
@@ -1313,6 +1326,26 @@ recv_callback :: proc(op: ^Operation) -> Op_Result {
 	case UDP_Socket:
 		assert(op.recv._impl.source_len > 0)
 		op.recv.source = sockaddr_to_endpoint(&op.recv._impl.source)
+
+	case Unix_Socket:
+		if n == 0 {
+			// Connection closed.
+			return .Done
+		}
+
+		if op.recv.all {
+			total: int
+			for buf in op.recv.bufs {
+				total += len(buf)
+			}
+
+			if op.recv.received < total {
+				switch recv_exec(op) {
+				case .Done:    return recv_callback(op)
+				case .Pending: return .Pending
+				}
+			}
+		}
 	}
 
 	return .Done
@@ -1359,6 +1392,16 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 			win.LPWSAOVERLAPPED(&op._impl.over),
 			nil,
 		)
+	case Unix_Socket:
+		status = win.WSASend(
+			win.SOCKET(sock),
+			win_bufs,
+			u32(len(bufs)),
+			nil,
+			0,
+			win.LPWSAOVERLAPPED(&op._impl.over),
+			nil,
+		)
 	}
 
 	if status == win.SOCKET_ERROR {
@@ -1367,8 +1410,9 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			switch _ in op.send.socket {
-			case TCP_Socket: op.send.err = net._tcp_send_error()
-			case UDP_Socket: op.send.err = net._udp_send_error()
+			case TCP_Socket:  op.send.err = net._tcp_send_error()
+			case UDP_Socket:  op.send.err = net._udp_send_error()
+			case Unix_Socket: op.send.err = net._unix_send_error()
 			}
 		}
 	}
@@ -1391,16 +1435,18 @@ send_callback :: proc(op: ^Operation) -> Op_Result {
 		// This error could also happen when the user calls close on the socket.
 		if check_timed_out(op, op.send.expires) {
 			switch _ in op.send.socket {
-			case TCP_Socket: op.send.err = net.TCP_Send_Error.Timeout
-			case UDP_Socket: op.send.err = net.UDP_Send_Error.Timeout
+			case TCP_Socket:  op.send.err = net.TCP_Send_Error.Timeout
+			case UDP_Socket:  op.send.err = net.UDP_Send_Error.Timeout
+			case Unix_Socket: op.send.err = net.Unix_Send_Error.Timeout
 			}
 			return .Done
 		}
 		fallthrough
 	case:
 		switch _ in op.send.socket {
-		case TCP_Socket: op.send.err = net._tcp_send_error()
-		case UDP_Socket: op.send.err = net._udp_send_error()
+		case TCP_Socket:  op.send.err = net._tcp_send_error()
+		case UDP_Socket:  op.send.err = net._udp_send_error()
+		case Unix_Socket: op.send.err = net._unix_send_error()
 		}
 		return .Done
 	}

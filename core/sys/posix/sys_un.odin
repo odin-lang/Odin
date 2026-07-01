@@ -21,3 +21,5 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	}
 
 }
+
+UNIX_PATH_MAX :: 108

@@ -39,12 +39,20 @@ posix_tcp_send_error :: proc() -> TCP_Send_Error {
 	return net._tcp_send_error(freebsd.Errno(posix.errno()))
 }
 
+posix_unix_send_error :: proc() -> Unix_Send_Error {
+	return net._unix_send_error(freebsd.Errno(posix.errno()))
+}
+
 posix_udp_send_error :: proc() -> UDP_Send_Error {
 	return net._udp_send_error(freebsd.Errno(posix.errno()))
 }
 
 posix_tcp_recv_error :: proc() -> TCP_Recv_Error {
 	return net._tcp_recv_error(freebsd.Errno(posix.errno()))
+}
+
+posix_unix_recv_error :: proc() -> Unix_Recv_Error {
+	return net._unix_recv_error(freebsd.Errno(posix.errno()))
 }
 
 posix_udp_recv_error :: proc() -> UDP_Recv_Error {

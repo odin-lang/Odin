@@ -21,6 +21,7 @@ import "core:time"
 import "core:thread"
 import "core:fmt"
 import "core:log"
+import "core:os"
 
 @test
 address_parsing_test :: proc(t: ^testing.T) {
@@ -565,6 +566,124 @@ test_udp_echo :: proc(t: ^testing.T) {
 	}
 
 	testing.expect_value(t, msg, transmute(string)buf[:bytes_read])
+}
+
+@test
+test_unix_echo :: proc(t: ^testing.T) {
+	MSG :: `
+A socket is defined to be the unique identification to or from which
+information is transmitted in the network. The socket is specified as a 32
+bit number with even sockets identifying receiving sockets and odd sockets
+identifying sending sockets. A socket is also identified by the host in
+which the sending or receiving processer is located.
+
+Previous network papers postulated that a process running under control of
+the host's operating system would have access to a number of ports. A port
+might be a physical input or output device, or a logical I/O device
+supported by system calls to the host's operating system.  The latter
+category includes a) I/O directed to a physical device which is being
+spooled by the operating system, b) a physical device whose basic
+characteristics have not been altered but whose access has been limited and
+possibly transformed by a mapping algorithm (e.g. device address mapping or
+cylinder relocation as in virtual mini disks), c) access to a file system
+through a directory and access method maintained by the operating system,
+d) a procedure for process to process communications, e) a procedure for
+machine to machine communication (such as defined by the network protocol.)
+`
+	SOCKET_PATH :: "test_unix_socket.sock"
+
+	os.remove(SOCKET_PATH) // NOTE(tetra): remove old socket in case of previous crash
+	defer os.remove(SOCKET_PATH)
+
+	// NOTE(tetra, 2026-06-08): We want the threads to effectively to exchange a word,
+	// verify it's correct, then proceed together.
+	// The main thread uses this to block the worker until the round trip has been completed.
+	mu: sync.Parker
+
+	Worker_Data :: struct {
+		t:  ^testing.T,
+		mu: ^sync.Parker,
+	}
+	worker_data: Worker_Data
+	worker_data.mu = &mu
+	worker_data.t  = t
+
+	worker := thread.create_and_start_with_data(&worker_data, proc(data: rawptr) {
+		worker_data := cast(^Worker_Data)data
+
+		time.sleep(1 * time.Second)
+		client, dial_err := net.dial_unix(SOCKET_PATH)
+		if !testing.expect_value(worker_data.t, dial_err, nil) {
+			return
+		}
+		defer net.close(client)
+
+		tmp: [64]byte
+		left := MSG
+		for len(left) > 0 {
+			sync.unpark(worker_data.mu)
+
+			word := next_word(&left)
+			testing.expect_value(worker_data.t, send_full(client, word), nil)
+
+			num_recv, recv_err := net.recv_unix(client, tmp[:])
+			testing.expect_value(worker_data.t, recv_err, nil)
+			testing.expect_value(worker_data.t, num_recv, len(word))
+			got := string(tmp[:num_recv])
+			testing.expect_value(worker_data.t, got, word)
+
+		}
+	})
+	defer thread.destroy(worker)
+
+	server, listen_err := net.listen_unix(SOCKET_PATH)
+	if !testing.expect_value(t, listen_err, nil) {
+		return
+	}
+	defer net.close(server)
+
+	client, accept_err := net.accept_unix(server)
+	testing.expect_value(t, accept_err, nil)
+
+	tmp: [64]byte
+	left := MSG
+	for len(left) > 0 {
+		sync.park(&mu)
+		word := next_word(&left)
+
+		num_recv, recv_err := net.recv_unix(client, tmp[:])
+		if num_recv == 0 { break }
+		testing.expect_value(t, recv_err, nil)
+
+		got := string(tmp[:num_recv])
+		testing.expect_value(t, got, word)
+		testing.expect_value(t, send_full(client, got), nil)
+	}
+	testing.expect_value(t, left, "")
+
+
+	send_full :: proc(s: net.Unix_Socket, str: string) -> net.Network_Error {
+		// NOTE: send_*() already loops
+		n := net.send_unix(s, transmute([]byte)str) or_return
+		assert(n == len(str))
+		return nil
+	}
+
+	next_word :: proc(left: ^string) -> string {
+		l := left^
+		index := 0
+		loop: for r in l {
+			switch r {
+			case ' ', '\t', '\n': break loop
+			}
+			index += 1
+		}
+		index = max(index, 1)
+		index = min(index, 64)
+		part := l[:index]
+		left^ = l[index:]
+		return part
+	}
 }
 
 @test
