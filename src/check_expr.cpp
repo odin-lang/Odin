@@ -5161,16 +5161,12 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 			if (valid_count == 1) {
 				Type *new_type = t->Union.variants[first_success_index];
-				target_type = new_type;
-				if (is_type_union(new_type)) {
-					convert_to_typed(c, operand, new_type);
-					break;
-				}
-				operand->type = new_type;
 				if (operand->mode != Addressing_Constant ||
-				    !elem_type_can_be_constant(operand->type)) {
+				    !elem_type_can_be_constant(new_type)) {
 					operand->mode = Addressing_Value;
 				}
+				convert_to_typed(c, operand, new_type);
+				target_type = new_type;
 				break;
 			} else if (valid_count > 1) {
 				ERROR_BLOCK();
