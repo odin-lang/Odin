@@ -2221,8 +2221,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					if (!is_type_pointer(type) && !is_type_multi_pointer(type)) {
-						error(name, "'#no_alias' can only be applied pointer or multi-pointer typed parameters");
+					bool ok = is_type_internally_pointer_like(type);
+					if (!ok) {
+						error(name, "'#no_alias' can only be applied pointer-like type parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}

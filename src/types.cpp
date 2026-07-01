@@ -1529,7 +1529,7 @@ gb_internal bool is_type_multi_pointer(Type *t) {
 	return t->kind == Type_MultiPointer;
 }
 gb_internal bool is_type_internally_pointer_like(Type *t) {
-	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_cstring16(t) || is_type_proc(t);
 }
 
 gb_internal bool is_type_tuple(Type *t) {
