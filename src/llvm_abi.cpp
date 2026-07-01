@@ -186,7 +186,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
 	// TODO(bill): Clean up this logic
-	if (is_cortex_m7()) {
+	if (selected_subtarget == Subtarget_Playdate) {
 		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
 	} else if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[calling_convention];
@@ -1607,7 +1607,7 @@ namespace lbAbiArm32 {
 				i64 sz = lb_sizeof(t);
 				i64 a = lb_alignof(t);
 				// Added to support hard floats included in the playdates cortex-m7.
-				if (calling_convention == ProcCC_CDecl && is_cortex_m7()) {
+				if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 					args[i] = lb_arg_type_direct(t);
 				} else if (is_calling_convention_odin(calling_convention) && sz > 8) {
 					// Minor change to improve performance using the Odin calling conventions
@@ -1628,7 +1628,7 @@ namespace lbAbiArm32 {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (!is_register(return_type, true)) {
-			if (calling_convention == ProcCC_CDecl && is_cortex_m7()) {
+			if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 				return lb_arg_type_direct(return_type);
 			}
 			switch (lb_sizeof(return_type)) {

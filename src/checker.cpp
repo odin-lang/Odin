@@ -1247,6 +1247,7 @@ gb_internal void init_universal(void) {
 			{"iPhone",          Subtarget_iPhone},
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
 			{"Android",         Subtarget_Android},
+			{"Playdate",        Subtarget_Playdate},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));

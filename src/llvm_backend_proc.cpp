@@ -452,7 +452,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 
 	Type *pt = p->type;
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	if (is_cortex_m7()) {
+	if (selected_subtarget == Subtarget_Playdate) {
 		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
 	} else if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
@@ -996,7 +996,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
 		auto llvm_cc = lb_calling_convention_map[proc_type->Proc.calling_convention];
-		if (is_cortex_m7()) {
+		if (selected_subtarget == Subtarget_Playdate) {
 			llvm_cc = lbCallingConvention_ARM_AAPCS_VFP;
 		}
 		LLVMSetInstructionCallConv(ret, llvm_cc);
