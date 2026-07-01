@@ -1067,8 +1067,8 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 
 	case ExactValue_Procedure:
 		switch (op) {
-		case Token_CmpEq: return x.value_typeid == y.value_typeid;
-		case Token_NotEq: return x.value_typeid != y.value_typeid;
+		case Token_CmpEq: return x.value_procedure == y.value_procedure;
+		case Token_NotEq: return x.value_procedure != y.value_procedure;
 		}
 		break;
 
