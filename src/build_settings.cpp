@@ -1074,8 +1074,6 @@ gb_internal bool is_arch_wasm(void) {
 	return false;
 }
 
-
-
 gb_internal bool is_arch_x86(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_i386:
