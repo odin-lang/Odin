@@ -162,8 +162,6 @@ struct lbModule {
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
 
-	MPSCQueue<lbProcedure *> missing_procedures_to_check;
-
 	StringMap<LLVMValueRef>   const_strings;
 	String16Map<LLVMValueRef> const_string16s;
 
@@ -222,9 +220,13 @@ struct lbObjCGlobal {
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
+	bool do_threading;
+
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
+
+	lbModule *rtti_module;
 
 	lbModule *equal_module;
 
