@@ -1199,8 +1199,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bool found = false;
 
 								if (selected_target_metrics->metrics->os != TargetOs_darwin &&
-								    selected_target_metrics->metrics->os != TargetOs_linux ) {
-									gb_printf_err("-subtarget can only be used with darwin and linux based targets at the moment\n");
+										selected_target_metrics->metrics->os != TargetOs_linux &&
+									 (selected_target_metrics->metrics->os != TargetOs_freestanding ||
+										selected_target_metrics->metrics->arch != TargetArch_arm32)) {
+									gb_printf_err("-subtarget can only be used with darwin, linux or freestanding_arm32 based targets at the moment\n");
 									bad_flags = true;
 									break;
 								}
@@ -3202,7 +3204,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (build) {
 		if (print_flag("-subtarget:<subtarget>")) {
-			print_usage_line(2, "[Darwin and Linux only]");
+			print_usage_line(2, "[Darwin, Linux and Freestanding ARM32 only]");
 			print_usage_line(2, "Available subtargets:");
 			String prefix = str_lit("-subtarget:");
 			for (u32 i = 1; i < Subtarget_COUNT; i++) {
