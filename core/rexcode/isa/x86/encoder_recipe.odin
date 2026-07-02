@@ -60,6 +60,12 @@ form_to_recipe :: proc "contextless" (enc: ^Encoding) -> (r: Form_Recipe) {
 
 	mand := [4]u8{0, 0x66, 0xF3, 0xF2}
 	r.prefix = mand[enc.flags.prefix]
+	// Operand-less 16-bit forms (CBW/CWD/MOVSW/...) carry no GPR16 operand to
+	// trigger the operand-size prefix, so they request it explicitly via opsize_16.
+	// (None of them also carry a mandatory prefix, so this never clobbers one.)
+	if enc.flags.opsize_16 && r.prefix == 0 {
+		r.prefix = 0x66
+	}
 	r.ext = enc.ext
 	r.flags.reg_from_ext = enc.flags.modrm_reg_ext
 	r.flags.force_rex_w  = enc.flags.force_rex_w

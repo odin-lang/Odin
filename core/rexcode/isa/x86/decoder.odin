@@ -263,6 +263,92 @@ decode_evex :: #force_inline proc(state: ^Decoder_State) -> Error_Code {
 // 8.5 Opcode Decoding
 // -----------------------------------------------------------------------------
 
+// Normalize an operand type to its operand-size class (RM16/RM32/RM64) for
+// decode disambiguation; NONE for widths that don't participate (8-bit / vector /
+// etc.). Used to score which size variant a given prefix set selects.
+// (Deliberately excludes memory-only M16/M32/M64: matching the original op0
+// check, an ambiguous r/m-vs-memory form like VMPTRLD (M64) must NOT be treated
+// as a sized operand, or it would tie with / beat the true register form.)
+@(private)
+opsize_class_of :: proc "contextless" (op: Operand_Type) -> Operand_Type {
+	#partial switch op {
+	case .R16, .RM16, .AX_IMPL:  return .RM16
+	case .R32, .RM32, .EAX_IMPL: return .RM32
+	case .R64, .RM64, .RAX_IMPL: return .RM64
+	}
+	return .NONE
+}
+
+// True if any operand of the entry is opcode-register-encoded (+r / x87 ST(i) in
+// the ModR/M low 3 bits). Distinguishes ST(i)-*range* fixed-ModR/M forms (ext is
+// a C0-aligned base) from exact fixed forms (ext is the literal ModR/M byte).
+@(private)
+entry_has_opr :: proc "contextless" (e: ^Decode_Entry) -> bool {
+	for enc in e.enc { if enc == .OP_R { return true } }
+	return false
+}
+
+// Operand types that can ONLY be a register (need ModR/M.mod == 11) or ONLY be
+// memory (need mod != 11). Types not covered (RM*, XMM_M*, ...) accept either.
+@(private)
+op_is_reg_only :: proc "contextless" (t: Operand_Type) -> bool {
+	#partial switch t {
+	case .R8, .R16, .R32, .R64, .XMM, .YMM, .ZMM, .MM, .K, .STI, .CR, .DR, .SREG:
+		return true
+	}
+	return false
+}
+@(private)
+op_is_mem_only :: proc "contextless" (t: Operand_Type) -> bool {
+	#partial switch t {
+	case .M, .M8, .M16, .M32, .M64, .M80, .M128, .M256, .M512,
+	     .M16_16, .M16_32, .M16_64:
+		return true
+	}
+	return false
+}
+
+// Does any entry in `idx` have a reg/mem kind compatible with the (peeked)
+// ModR/M.mod? An entry with no r/m operand, or an r/m that accepts this mod, fits.
+// Used to tell a 66-mandatory form (VMCLEAR, mem-only) from a 66-operand-size form
+// (RDRAND r16, reg) at the same opcode+/digit.
+@(private)
+entries_fit_modrm :: proc "contextless" (idx: Decode_Index, state: ^Decoder_State) -> bool {
+	if state.position >= len(state.data) { return true } // can't peek; don't override
+	modrm := state.data[state.position]
+	mod3  := (modrm >> 6) == 3
+	for i in 0 ..< int(idx.count) {
+		e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
+		mrt := Operand_Type.NONE
+		for k in 0 ..< 4 { if e.enc[k] == .MR { mrt = e.ops[k]; break } }
+		if mrt == .NONE { return true }
+		if op_is_reg_only(mrt) && !mod3 { continue }
+		if op_is_mem_only(mrt) &&  mod3 { continue }
+		return true
+	}
+	return false
+}
+
+// Resolve a 0x66-prefixed escaped opcode to its index row, distinguishing a
+// mandatory 66 (SSE) from an operand-size 66. If a 66-mandatory row exists but its
+// forms don't fit the ModR/M while the no-prefix row's do, 66 is operand size --
+// e.g. `66 0F C7 /6` with a register ModR/M is RDRAND r16, not VMCLEAR (mem).
+@(private)
+resolve_66 :: proc "contextless" (table: []Decode_Index, opcode, prefix: u8, state: ^Decoder_State) -> (idx: Decode_Index, mand_66: bool) {
+	idx = didx(table, prefix, opcode)
+	if prefix != 1 { return idx, false }          // no 66 (or F2/F3 mandatory)
+	if idx.count == 0 {                            // no 66-mandatory form -> operand size
+		return didx(table, 0, opcode), false
+	}
+	if !entries_fit_modrm(idx, state) {
+		idx0 := didx(table, 0, opcode)
+		if idx0.count > 0 && entries_fit_modrm(idx0, state) {
+			return idx0, false
+		}
+	}
+	return idx, true
+}
+
 decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry: ^VEX_Decode_Entry, err: Error_Code) {
 	if state.position >= len(state.data) {
 		return nil, nil, .BUFFER_TOO_SHORT
@@ -310,35 +396,34 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 	// Determine mandatory prefix
 	// For legacy (no escape), 0x66 is operand size override, not mandatory prefix
 	// For 0F/0F38/0F3A, 0x66 can be mandatory prefix - try with prefix first, fallback to no prefix
+	// F2/F3 are always mandatory (part of opcode identity); 0x66 may be either a
+	// mandatory prefix (SSE) or an operand-size override, so it yields to F2/F3
+	// when both are present -- e.g. CRC32/POPCNT/LZCNT/TZCNT with a 16-bit operand
+	// (`66 F2/F3 ...`), where F2/F3 selects the opcode and 66h only sets operand
+	// size (tracked separately via state.prefix_66).
 	prefix: u8 = 0
 	switch {
-	case state.prefix_66: prefix = 1
 	case state.prefix_f3: prefix = 2
 	case state.prefix_f2: prefix = 3
+	case state.prefix_66: prefix = 1
 	}
 
-	// Look up in index table
+	// Look up in index table. Track whether 0x66 was actually consumed as a
+	// mandatory (opcode-selecting) prefix: only escaped opcodes found in the 66 row
+	// (SSE) do so. For legacy opcodes -- and escaped ones that fall back to the
+	// no-prefix row -- a present 0x66 is an operand-size override instead.
 	idx: Decode_Index
+	mand_66 := false
 	switch esc {
 	case .NONE:
 		// For legacy instructions, 0x66 is operand size override, use prefix=0
 		idx = didx(DECODE_INDEX_LEGACY, 0, opcode)
 	case ._0F:
-		idx = didx(DECODE_INDEX_ESC_0F, prefix, opcode)
-		// If not found with 66 prefix, try without (66 is operand size override)
-		if idx.count == 0 && prefix == 1 {
-			idx = didx(DECODE_INDEX_ESC_0F, 0, opcode)
-		}
+		idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F, opcode, prefix, state)
 	case ._0F38:
-		idx = didx(DECODE_INDEX_ESC_0F38, prefix, opcode)
-		if idx.count == 0 && prefix == 1 {
-			idx = didx(DECODE_INDEX_ESC_0F38, 0, opcode)
-		}
+		idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F38, opcode, prefix, state)
 	case ._0F3A:
-		idx = didx(DECODE_INDEX_ESC_0F3A, prefix, opcode)
-		if idx.count == 0 && prefix == 1 {
-			idx = didx(DECODE_INDEX_ESC_0F3A, 0, opcode)
-		}
+		idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F3A, opcode, prefix, state)
 	}
 
 	// If not found, try +r encoding (opcode with register in low 3 bits)
@@ -390,21 +475,26 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		return nil, nil, .INVALID_OPCODE
 	}
 
-	// Check if this is a +r encoding (register in low 3 bits of opcode)
-	// This needs to be checked BEFORE the ModR/M disambiguation
+	// Check if this is an opcode-embedded +r encoding (register in the opcode's low
+	// 3 bits). Scan ALL entries, not just the first: 0x90 holds NOP (no +r)
+	// alongside XCHG eAX,r (+r), and if NOP sorts first the +r path would be
+	// skipped. But x87 (D8-DF) uses OP_R in the ModR/M low 3 bits (fixed-ModR/M),
+	// NOT the opcode -- exclude it so the ModR/M disambiguation handles it.
 	first_entry := &LEGACY_DECODE_ENTRIES[idx.start]
 	uses_op_r := false
-	for enc in first_entry.enc {
-		if enc == .OP_R {
-			uses_op_r = true
-			break
+	if opcode < 0xD8 || opcode > 0xDF {
+		for i in 0 ..< int(idx.count) {
+			if entry_has_opr(&LEGACY_DECODE_ENTRIES[int(idx.start) + i]) {
+				uses_op_r = true
+				break
+			}
 		}
 	}
 	if uses_op_r {
 		state.opcode_reg = opcode & 0x07
-		// For NOP (0x90), if opcode_reg == 0, check if there's a NOP entry
-		if opcode == 0x90 && state.opcode_reg == 0 {
-			// Look for NOP entry (no operands)
+		// NOP is the BARE 0x90 only: with REX (incl. REX.W/REX.B), 0x66, or F3 it is
+		// XCHG rax,rax / xchg ax,ax / xchg r8,eax / PAUSE instead.
+		if opcode == 0x90 && state.opcode_reg == 0 && state.rex == 0 && !state.prefix_66 && !state.prefix_f3 {
 			for i in 0..<int(idx.count) {
 				e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
 				if e.mnemonic == .NOP {
@@ -413,90 +503,197 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			}
 		}
 
-		// For Op_R with multiple entries (e.g., PUSH/POP with R64 and R16 variants),
-		// we need to select based on prefix_66 and default_64 flag
+		// For Op_R with multiple entries (PUSH/POP R16/R64, XCHG eAX,r 16/32/64),
+		// select by operand size. The size lives on the R16/R32/R64 operand, which
+		// is op0 for PUSH/POP but the +r operand for XCHG (whose op0 is the implicit
+		// accumulator) -- so scan for the sized register rather than assuming op0.
 		if idx.count > 1 {
-			// In 64-bit mode: default_64=true means 64-bit without REX.W
-			// prefix_66 means 16-bit
 			for i in 0..<int(idx.count) {
 				e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
-				op0 := e.ops[0]
+				sized := Operand_Type.NONE
+				for t in e.ops {
+					#partial switch t { case .R16, .R32, .R64: sized = t }
+					if sized != .NONE { break }
+				}
 
 				if state.prefix_66 {
-					// 16-bit operand requested
-					if op0 == .R16 {
-						return e, nil, .NONE
-					}
+					if sized == .R16 { return e, nil, .NONE }
 				} else {
-					// No prefix - check if default_64 or REX.W
 					is_64 := state.mode == ._64 && (e.flags.default_64 || (state.rex & 0x08 != 0))
-					if is_64 && op0 == .R64 {
-						return e, nil, .NONE
-					}
-					if !is_64 && op0 == .R32 {
-						return e, nil, .NONE
-					}
+					if is_64 && sized == .R64 { return e, nil, .NONE }
+					if !is_64 && sized == .R32 { return e, nil, .NONE }
 					// i386: default_64 entries are the "default operand size" form (32-bit).
-					if state.mode == ._32 && op0 == .R64 && e.flags.default_64 {
-						return e, nil, .NONE
-					}
+					if state.mode == ._32 && sized == .R64 && e.flags.default_64 { return e, nil, .NONE }
 				}
 			}
 		}
 		return first_entry, nil, .NONE
 	}
 
-	// If there's a ModR/M extension, we need to peek at it
+	// Multi-entry opcode: disambiguate by the ModR/M byte (fixed byte / ST(i)
+	// range / /digit) and operand-size state.
 	if idx.count > 1 {
-		// Multiple entries - need to disambiguate by ModR/M.reg field and operand size
-		// Peek at ModR/M byte (don't consume it yet)
+		base := int(idx.start)
+
+		// Does this opcode carry a ModR/M byte at all? (any entry uses ModR/M
+		// reg/rm, a /digit, or a fixed/range ModR/M ext). If none do, it's a pure
+		// operand-size variant set with NO ModR/M byte (CBW/CWDE/CDQE, CWD/CDQ/CQO,
+		// string ops, PUSHF/POPF, IRET*, ...) -- select by operand-size state and
+		// mode default, without (wrongly) consuming the next byte as a ModR/M.
+		has_modrm_byte := false
+		for i in 0 ..< int(idx.count) {
+			e := &LEGACY_DECODE_ENTRIES[base + i]
+			if e.flags.needs_modrm || e.ext != 0xFF { has_modrm_byte = true; break }
+		}
+
+		if !has_modrm_byte {
+			// Select the size variant. Two families live here: flag-tagged forms
+			// with no operands (CBW/CWDE/CDQE, CWD/CDQ/CQO, string ops, PUSHF/POPF,
+			// IRET*) and accumulator+immediate forms whose size shows in the implied
+			// accumulator's type (AX_IMPL/EAX_IMPL/RAX_IMPL -> 16/32/64, e.g.
+			// ADD AX/EAX/RAX, imm at 0x05). Match either signal.
+			rexw := state.rex & 0x08 != 0
+			for i in 0 ..< int(idx.count) {
+				e := &LEGACY_DECODE_ENTRIES[base + i]
+				if entry_has_opr(e) { continue }   // +r forms (XCHG eAX,r / NOP) handled above
+				match: bool
+				if rexw {
+					match = e.flags.force_rex_w || opsize_class_of(e.ops[0]) == .RM64
+				} else if state.prefix_66 {
+					match = e.flags.opsize_16 || opsize_class_of(e.ops[0]) == .RM16
+				} else {
+					// No size prefix: the 32-bit accumulator form, or the plain
+					// no-flag form matching the mode default (PUSHFQ = 64-bit in
+					// long mode; CWDE/CDQ/IRETD = 32-bit).
+					match = opsize_class_of(e.ops[0]) == .RM32 ||
+						(!e.flags.force_rex_w && !e.flags.opsize_16 && bool(e.flags.default_64) == (state.mode == ._64))
+				}
+				if match { return e, nil, .NONE }
+			}
+			// Fallback: the plain 32-bit no-flag form (e.g. CWDE at 0x98, whose
+			// default_64 doesn't match 64-bit mode but is still the right pick).
+			for i in 0 ..< int(idx.count) {
+				e := &LEGACY_DECODE_ENTRIES[base + i]
+				if entry_has_opr(e) { continue }
+				sz := opsize_class_of(e.ops[0])
+				if !e.flags.force_rex_w && !e.flags.opsize_16 && sz != .RM16 && sz != .RM64 {
+					return e, nil, .NONE
+				}
+			}
+			return &LEGACY_DECODE_ENTRIES[base], nil, .NONE
+		}
+
+		// Peek the ModR/M byte (shared by all ModR/M-based matching below).
 		if state.position >= len(state.data) {
 			return nil, nil, .BUFFER_TOO_SHORT
 		}
 		modrm := state.data[state.position]
 		modrm_reg := (modrm >> 3) & 0x07
 
-		// Determine target operand size based on prefixes
-		// REX.W -> 64-bit, 0x66 -> 16-bit, default -> 32-bit
-		target_size: Operand_Type = .RM32  // default
-		if state.rex & 0x08 != 0 {  // REX.W
+		// mod==11 (ModR/M >= 0xC0): fixed-ModR/M and x87 ST(i)-range forms encode
+		// (part of) the ModR/M byte in `ext`; match and CONSUME that byte here so
+		// decode_operands (which sees needs_modrm=false) doesn't re-read it.
+		if modrm >= 0xC0 {
+			// Exact fixed byte: FNOP=D9 D0, VMCALL=0F 01 C1, LFENCE=0F AE E8,
+			// ENDBR64=F3 0F 1E FA, FADDP=DE C1, ... (ext 0xFF is the "no ModR/M
+			// constraint" sentinel, NOT a fixed byte -- exclude it, else a normal
+			// register-operand instruction whose ModR/M is 0xFF would false-match).
+			for i in 0 ..< int(idx.count) {
+				e := &LEGACY_DECODE_ENTRIES[base + i]
+				// A fixed form carries no ModR/M operand (needs_modrm=false); this
+				// distinguishes a real fixed byte 0xFF (FCOS = D9 FF) from the 0xFF
+				// "no constraint" sentinel on a normal register-operand instruction
+				// whose ModR/M merely happens to be 0xFF (e.g. mulps xmm7,xmm7).
+				if !e.flags.needs_modrm && !entry_has_opr(e) && e.ext == modrm {
+					state.position += 1
+					return e, nil, .NONE
+				}
+			}
+			// x87 ST(i) range: ext is the C0-aligned base; low 3 bits pick ST(i),
+			// delivered to the OP_R operand via state.opcode_reg.
+			for i in 0 ..< int(idx.count) {
+				e := &LEGACY_DECODE_ENTRIES[base + i]
+				if e.ext != 0xFF && e.ext >= 0xC0 && entry_has_opr(e) && (modrm & 0xF8) == e.ext {
+					state.opcode_reg = modrm & 0x07
+					state.position += 1
+					return e, nil, .NONE
+				}
+			}
+		}
+
+		// /digit + operand-size disambiguation (memory forms, group opcodes, and
+		// REX.W/66h-distinguished variants like FXSAVE vs FXSAVE64).
+		target_size: Operand_Type = .RM32
+		if state.rex & 0x08 != 0 {
 			target_size = .RM64
-		} else if state.prefix_66 {
+		} else if state.prefix_66 && !mand_66 {
+			// 66h is operand-size only when it wasn't consumed as the mandatory
+			// prefix. For 66-mandatory SSE ops (ADCX, MOVMSKPD, PMOVMSKB, ...) the
+			// GPR operand stays 32-bit unless REX.W.
 			target_size = .RM16
 		}
+		rexw := state.rex & 0x08 != 0
 
-		// Search for matching entry based on extension field AND operand size
-		for i in 0..<int(idx.count) {
-			e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
-
-			// Check if extension matches (or entry doesn't use extension)
-			ext_matches := e.ext == 0xFF || e.ext == modrm_reg
-			if !ext_matches { continue }
-
-			// Check if operand size matches
-			op0 := e.ops[0]
-			size_matches := false
-
-			#partial switch target_size {
-			case .RM64: size_matches = op0 == .RM64 || op0 == .R64 || op0 == .RAX_IMPL
-			case .RM16: size_matches = op0 == .RM16 || op0 == .R16 || op0 == .AX_IMPL
-			case .RM32: size_matches = op0 == .RM32 || op0 == .R32 || op0 == .EAX_IMPL
+		// Score ext-matching entries: operand-size match dominates (op0 usually,
+		// but CRC32 carries it on the r/m -> score all operands); size-flag
+		// agreement (REX.W/66h vs force_rex_w/opsize_16) breaks ties for /digit
+		// variants that differ only by width (FXSAVE/FXSAVE64, CMPXCHG8B/16B).
+		mod3 := (modrm >> 6) == 3
+		best: ^Decode_Entry
+		best_score := 0
+		for i in 0 ..< int(idx.count) {
+			e := &LEGACY_DECODE_ENTRIES[base + i]
+			// Only forms that actually consume this ModR/M byte as reg/mem (a /digit
+			// or plain ModR/M) belong here; fixed-ModR/M forms (FCOS etc., matched
+			// above when mod==11) have needs_modrm=false and must not be considered
+			// for a memory ModR/M, else they'd win the tie and drop the ModR/M byte.
+			if !e.flags.needs_modrm { continue }
+			if !(e.ext == 0xFF || e.ext == modrm_reg) { continue }
+			// Reg-vs-memory: forms sharing an opcode/digit but differing by whether
+			// the r/m is a register or memory (RDRAND vs VMPTRLD, MOVLHPS vs MOVHPS,
+			// MOVHLPS vs MOVLPS) are selected by ModR/M.mod.
+			mrt := Operand_Type.NONE
+			for k in 0 ..< 4 { if e.enc[k] == .MR { mrt = e.ops[k]; break } }
+			if op_is_reg_only(mrt) && !mod3 { continue }
+			if op_is_mem_only(mrt) &&  mod3 { continue }
+			sz := 0
+			for op in e.ops {
+				if op == .NONE { break }
+				if opsize_class_of(op) == target_size { sz += 1 }
 			}
-
-			if size_matches {
-				return e, nil, .NONE
+			fb := 0
+			if rexw {
+				fb = e.flags.force_rex_w ? 1 : 0
+			} else if state.prefix_66 {
+				fb = e.flags.opsize_16 ? 1 : 0
+			} else {
+				fb = (!e.flags.force_rex_w && !e.flags.opsize_16) ? 1 : 0
+			}
+			score := sz * 4 + fb
+			if score > best_score {
+				best_score = score
+				best = e
 			}
 		}
-
-		// Fall back to first entry with matching extension
-		for i in 0..<int(idx.count) {
-			e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
-			if e.ext == 0xFF || e.ext == modrm_reg {
-				return e, nil, .NONE
-			}
+		if best != nil {
+			return best, nil, .NONE
 		}
 
-		return &LEGACY_DECODE_ENTRIES[idx.start], nil, .NONE
+		// No size signal: first ModR/M-consuming entry with matching extension and
+		// a reg/mem kind consistent with ModR/M.mod (so a memory ModR/M doesn't fall
+		// back to a register-only form, e.g. PINSRW xmm,m16 vs xmm,r32).
+		for i in 0 ..< int(idx.count) {
+			e := &LEGACY_DECODE_ENTRIES[base + i]
+			if !e.flags.needs_modrm { continue }
+			if !(e.ext == 0xFF || e.ext == modrm_reg) { continue }
+			mrt := Operand_Type.NONE
+			for k in 0 ..< 4 { if e.enc[k] == .MR { mrt = e.ops[k]; break } }
+			if op_is_reg_only(mrt) && !mod3 { continue }
+			if op_is_mem_only(mrt) &&  mod3 { continue }
+			return e, nil, .NONE
+		}
+
+		return &LEGACY_DECODE_ENTRIES[base], nil, .NONE
 	}
 
 	return &LEGACY_DECODE_ENTRIES[idx.start], nil, .NONE
@@ -608,17 +805,33 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 		}
 	}
 
-	// Decode each operand
+	// Decode each operand. Implicit accumulators (AL/AX/EAX/RAX) are left
+	// implicit -- not materialized as explicit operands -- so a short-form
+	// instruction re-encodes to the same short form (its accumulator is implied),
+	// rather than picking up an explicit accumulator that would select the general
+	// ModR/M form. Other implicit operands (CL/DX/ST0/XMM0/1) ARE materialized, so
+	// they round-trip via positional matching.
 	op_count := entry.flags.op_count
+	out_idx: u8 = 0
 	for i in 0..<op_count {
+		if is_accumulator_impl(entry.ops[i]) { continue }
 		op_enc := entry.enc[i]
+
+		// PUSH/POP FS/GS: the segment operand is implicit in the opcode
+		// (0F A0/A1 -> FS, 0F A8/A9 -> GS); materialize it.
+		if entry.ops[i] == .SREG && op_enc == .IMPL {
+			inst.ops[out_idx] = op_reg((entry.opcode & 0x08) != 0 ? GS : FS)
+			out_idx += 1
+			continue
+		}
 
 		// i386: default_64 entries have R64/RM64 operand types but
 		// really mean R32/RM32 in 32-bit mode (same encoded bytes).
 		effective := mode_rewrite_op_type(entry.ops[i], state.mode, entry.flags.default_64)
-		inst.ops[i] = decode_single_operand(state, effective, op_enc, modrm_info, sib_info, has_sib) or_return
+		inst.ops[out_idx] = decode_single_operand(state, effective, op_enc, modrm_info, sib_info, has_sib) or_return
+		out_idx += 1
 	}
-	inst.operand_count += op_count
+	inst.operand_count += out_idx
 
 	return
 }
@@ -918,8 +1131,18 @@ decode_register :: #force_inline proc "contextless" (num: u8, op_type: Operand_T
 		return ymm_from_num(num)
 	case .ZMM, .ZMM_M512:
 		return zmm_from_num(num)
-	case .MM:
+	case .MM, .MM_M64:
 		return mm_from_num(num)
+	case .STI:
+		return num < 8 ? Register(REG_ST | u16(num)) : NONE
+	case .CR:
+		return Register(REG_CR | u16(num))
+	case .DR:
+		return Register(REG_DR | u16(num))
+	case .SREG:
+		return num < 6 ? Register(REG_SEG | u16(num)) : NONE
+	case .K, .K_M8, .K_M16, .K_M32, .K_M64:
+		return num < 8 ? Register(REG_K | u16(num)) : NONE
 	case:
 		return gpr64_from_num(num)
 	}
@@ -937,6 +1160,14 @@ decode_implicit_operand :: proc(op_type: Operand_Type) -> Operand {
 		return op_reg(RAX)
 	case .CL_IMPL:
 		return op_reg(CL)
+	case .DX_IMPL:
+		return op_reg(DX)
+	case .ST0_IMPL:
+		return op_reg(ST0)
+	case .XMM0_IMPL:
+		return op_reg(XMM0)
+	case .ONE_IMPL:
+		return Operand{kind = .IMMEDIATE, immediate = 1, size = 1}
 	case:
 		return {}
 	}
@@ -1071,6 +1302,23 @@ decode :: proc(
 
 		// Phase 1: Parse prefixes
 		err := decode_prefixes(&state)
+
+		// A LOCK (0xF0) prefix that prefixes no opcode (nothing follows) is the
+		// standalone LOCK "instruction" -- the round-trip of the .LOCK encoding
+		// form. Handle it before treating the missing opcode as an error. (When F0
+		// DOES prefix an instruction, position is still inside the buffer and this
+		// is skipped; the lock flag is applied to that instruction below.)
+		if state.has_lock && state.position >= len(state.data) {
+			inst.mnemonic      = .LOCK
+			inst.length        = u8(state.position)
+			info.rep           = .NONE
+			info.has_lock      = true
+			append(instructions, inst)
+			append(inst_info, info)
+			byte_count += u32(state.position)
+			continue
+		}
+
 		if err != nil {
 			append(errors, Error{inst_idx = u32(len(instructions)), code = err})
 			ok = false
@@ -1140,7 +1388,15 @@ decode :: proc(
 		// Fill instruction length and flags (for round-trip encode/decode)
 		inst.length = u8(state.position)
 		inst.flags.lock = state.has_lock
-		inst.flags.rep = state.prefix_f2 ? .REPNE : (state.prefix_f3 ? .REP : .NONE)
+		// F2/F3 is a REP/REPNE prefix only when it was NOT consumed as this
+		// instruction's mandatory prefix. POPCNT/LZCNT/TZCNT/CRC32 and the SSE ops
+		// carry F3/F2 as part of the opcode; flagging it as REP would duplicate the
+		// byte on re-encode. (entry.flags.prefix: 0=none, 1=66, 2=F3, 3=F2; VEX
+		// carries its prefix in the VEX bytes, so state.prefix_f2/f3 are false.)
+		mand_pfx: u8 = entry != nil ? entry.flags.prefix : 0
+		rep_f2 := state.prefix_f2 && mand_pfx != 3
+		rep_f3 := state.prefix_f3 && mand_pfx != 2
+		inst.flags.rep = rep_f2 ? .REPNE : (rep_f3 ? .REP : .NONE)
 		inst.flags.addr32 = state.prefix_67
 		// Segment: 0=none, 1=ES, 2=CS, 3=SS, 4=DS, 5=FS, 6=GS
 		inst.flags.segment = state.segment != NONE ? u8(reg_hw(state.segment)) + 1 : 0

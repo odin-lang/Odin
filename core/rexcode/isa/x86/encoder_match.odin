@@ -57,6 +57,10 @@ op_match_code :: #force_inline proc "contextless" (op: ^Operand) -> (code: u8, o
 	case .NONE:
 		return 0, true
 	case .REGISTER:
+		// Segment registers can select the encoding by their specific value
+		// (push fs = 0F A0 vs push gs = 0F A8), which a class-only key can't
+		// distinguish -- mark such instructions non-cacheable so the scan runs.
+		if reg_class(op.reg) == REG_SEG { return 0, false }
 		return (1 << 5) | u8((reg_class(op.reg) >> 8) & 0x1F), true
 	case .MEMORY:
 		switch op.size {

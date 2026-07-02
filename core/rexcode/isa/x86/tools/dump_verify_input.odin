@@ -145,14 +145,14 @@ main :: proc() {
 			clear(&relocs)
 			clear(&errors)
 			insts := [1]x.Instruction{inst}
-			r := x.encode(insts[:], nil, code_buf[:], &relocs, &errors)
-			if !r.success || r.byte_count == 0 {
+			byte_count, enc_ok := x.encode(insts[:], nil, code_buf[:], &relocs, &errors)
+			if !enc_ok || byte_count == 0 {
 				skipped += 1
 				continue
 			}
 
 			// Emit hex bytes (comma-separated, lowercase)
-			for i in 0..<r.byte_count {
+			for i in 0..<byte_count {
 				if i > 0 { strings.write_byte(&hex_buf, ',') }
 				fmt.sbprintf(&hex_buf, "0x%02x", code_buf[i])
 			}
@@ -160,7 +160,7 @@ main :: proc() {
 
 			// Meta: mnemonic, opcode hex, ext, entry index, byte count
 			fmt.sbprintf(&meta_buf, "%v\t%02x\t%d\t%d\t%d\n",
-						 mn, entry.opcode, entry.ext, ei, r.byte_count)
+						 mn, entry.opcode, entry.ext, ei, byte_count)
 			dumped += 1
 		}
 	}

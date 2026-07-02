@@ -177,7 +177,11 @@ emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 				esc      = enc.flags.esc,
 				prefix   = enc.flags.prefix,
 				opcode   = enc.opcode,
-				ext      = enc.flags.modrm_reg_ext ? enc.ext : 0xFF,
+				// ext carries: a /digit (0-7) for modrm_reg_ext forms, or a fixed
+				// ModR/M byte / ST(i)-range base (>= 0xC0) for x87 & fixed-ModR/M
+				// control ops (FNOP, VMCALL, LFENCE, FADD ST(i), ...). 0xFF = no
+				// ModR/M-byte constraint. The decoder distinguishes by value range.
+				ext      = enc.flags.modrm_reg_ext ? enc.ext : (enc.ext >= 0xC0 ? enc.ext : 0xFF),
 				mnemonic = enc.mnemonic,
 				ops      = enc.ops,
 				enc      = enc.enc,
@@ -389,6 +393,7 @@ write_flags :: proc(sb: ^strings.Builder, enc: union{lib.Encoding, Collected_Ent
 	if flags.vex_l != .LIG         { append(&parts, fmt.tprintf("vex_l=.%v", flags.vex_l)) }
 	if flags.default_64            { append(&parts, "default_64=true") }
 	if flags.force_rex_w           { append(&parts, "force_rex_w=true") }
+	if flags.opsize_16             { append(&parts, "opsize_16=true") }
 	if flags.no_rex                { append(&parts, "no_rex=true") }
 	if flags.lock_ok               { append(&parts, "lock_ok=true") }
 	if flags.rep_ok                { append(&parts, "rep_ok=true") }

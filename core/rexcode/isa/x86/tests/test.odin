@@ -3242,6 +3242,134 @@ run_typed_builder_tests :: proc() {
 }
 
 // =============================================================================
+// i386 (Mode._32) ENCODE/DECODE TESTS  (integrated from the former tests32 pkg)
+// =============================================================================
+
+i386_bytes_eq :: proc(a, b: []u8) -> bool {
+	if len(a) != len(b) { return false }
+	for v, i in a { if v != b[i] { return false } }
+	return true
+}
+
+i386_expect_encode :: proc(name: string, insts: []x86.Instruction, want: []u8) {
+	code: [64]u8
+	relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+	defer delete(relocs); defer delete(errs)
+	n, ok := x86.encode(insts, nil, code[:], &relocs, &errs, mode = ._32)
+	if !ok {
+		fmt.printf("%s[FAIL]%s i386 %s: encode failed (errors=%v)\n", RED, RESET, name, errs[:])
+		g_stats.failed += 1
+		return
+	}
+	if !i386_bytes_eq(code[:n], want) {
+		fmt.printf("%s[FAIL]%s i386 %s: got %x want %x\n", RED, RESET, name, code[:n], want)
+		g_stats.failed += 1
+		return
+	}
+	g_stats.passed += 1
+}
+
+i386_expect_encode_fails :: proc(name: string, insts: []x86.Instruction) {
+	code: [64]u8
+	relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+	defer delete(relocs); defer delete(errs)
+	n, ok := x86.encode(insts, nil, code[:], &relocs, &errs, mode = ._32)
+	if ok {
+		fmt.printf("%s[FAIL]%s i386 %s: expected encode to fail, got %x\n", RED, RESET, name, code[:n])
+		g_stats.failed += 1
+		return
+	}
+	g_stats.passed += 1
+}
+
+i386_expect_decode :: proc(name: string, bytes: []u8, want_mnemonic: x86.Mnemonic, want_ops: int, want_reg0: x86.Register = x86.NONE) {
+	insts: [dynamic]x86.Instruction; info: [dynamic]x86.Instruction_Info
+	labels: [dynamic]x86.Label_Definition; errs: [dynamic]x86.Error
+	defer delete(insts); defer delete(info); defer delete(labels); defer delete(errs)
+	_, ok := x86.decode(bytes, nil, &insts, &info, &labels, &errs, mode = ._32)
+	if !ok || len(insts) == 0 {
+		fmt.printf("%s[FAIL]%s i386 %s: decode failed (errors=%v)\n", RED, RESET, name, errs[:])
+		g_stats.failed += 1
+		return
+	}
+	got := insts[0]
+	if got.mnemonic != want_mnemonic || int(got.operand_count) != want_ops {
+		fmt.printf("%s[FAIL]%s i386 %s: got %v/%d ops, want %v/%d\n", RED, RESET, name, got.mnemonic, got.operand_count, want_mnemonic, want_ops)
+		g_stats.failed += 1
+		return
+	}
+	if want_reg0 != x86.NONE && got.ops[0].kind == .REGISTER && got.ops[0].reg != want_reg0 {
+		fmt.printf("%s[FAIL]%s i386 %s: got op0 %v, want %v\n", RED, RESET, name, got.ops[0].reg, want_reg0)
+		g_stats.failed += 1
+		return
+	}
+	g_stats.passed += 1
+}
+
+// i386 encode/decode paths: short-form INC/DEC (0x40-0x4F), operand-size 66h,
+// and rejection of 64-bit-only operands (R8-R15, XMM8+, SPL/BPL/SIL/DIL, REX.W).
+run_i386_tests :: proc() {
+	before := g_stats.failed
+
+	i386_expect_encode("MOV EAX, EBX",      {x86.inst_r_r(.MOV, x86.EAX, x86.EBX)},   {0x89, 0xD8})
+	i386_expect_encode("ADD EAX, 0x2A",     {x86.inst_r_i(.ADD, x86.EAX, 0x2A, 4)},   {0x81, 0xC0, 0x2A, 0x00, 0x00, 0x00})
+	i386_expect_encode("PUSH EAX",          {x86.inst_r(.PUSH, x86.EAX)},             {0x50})
+	i386_expect_encode("RET",               {x86.inst_none(.RET)},                    {0xC3})
+	i386_expect_encode("INC EAX (short)",   {x86.inst_r(.INC, x86.EAX)},              {0x40})
+	i386_expect_encode("DEC EDI (short)",   {x86.inst_r(.DEC, x86.EDI)},              {0x4F})
+	i386_expect_encode("INC AX (short,66)", {x86.inst_r(.INC, x86.AX)},               {0x66, 0x40})
+	i386_expect_encode("MOV AH, AL",        {x86.inst_r_r(.MOV, x86.AH, x86.AL)},     {0x88, 0xC4})
+
+	// 64-bit-only operands don't exist in i386 -> encode must reject them.
+	i386_expect_encode_fails("MOV RAX, RBX",         {x86.inst_r_r(.MOV, x86.RAX, x86.RBX)})
+	i386_expect_encode_fails("MOV EAX, R8D",         {x86.inst_r_r(.MOV, x86.EAX, x86.R8D)})
+	i386_expect_encode_fails("MOV SPL, AL",          {x86.inst_r_r(.MOV, x86.SPL, x86.AL)})
+	i386_expect_encode_fails("VMOVAPS XMM8, XMM0",   {x86.inst_r_r(.VMOVAPS, x86.XMM8, x86.XMM0)})
+	i386_expect_encode_fails("MOV EAX, [R8]",        {x86.inst_r_m(.MOV, x86.EAX, x86.mem_base_only(x86.R8), 4)})
+
+	// Short-form INC/DEC and operand-size decode in i386.
+	i386_expect_decode("40 -> INC EAX",       {0x40},       .INC,  1, x86.EAX)
+	i386_expect_decode("4F -> DEC EDI",       {0x4F},       .DEC,  1, x86.EDI)
+	i386_expect_decode("66 40 -> INC AX",     {0x66, 0x40}, .INC,  1, x86.AX)
+	i386_expect_decode("89 D8 -> MOV EAX,EBX",{0x89, 0xD8}, .MOV,  2, x86.EAX)
+	i386_expect_decode("50 -> PUSH EAX",      {0x50},       .PUSH, 1, x86.EAX)
+
+	// Round-trip a small i386 kernel.
+	{
+		insts := []x86.Instruction{
+			x86.inst_r_r(.MOV, x86.EAX, x86.EBX),
+			x86.inst_r_i(.ADD, x86.EAX, 0x2A, 4),
+			x86.inst_r(.INC, x86.ECX),
+			x86.inst_none(.RET),
+		}
+		code: [64]u8
+		relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+		defer delete(relocs); defer delete(errs)
+		enc_n, enc_ok := x86.encode(insts, nil, code[:], &relocs, &errs, mode = ._32)
+
+		decoded: [dynamic]x86.Instruction; info: [dynamic]x86.Instruction_Info
+		dlabels: [dynamic]x86.Label_Definition; derrs: [dynamic]x86.Error
+		defer delete(decoded); defer delete(info); defer delete(dlabels); defer delete(derrs)
+		_, dec_ok := x86.decode(code[:enc_n], nil, &decoded, &info, &dlabels, &derrs, mode = ._32)
+
+		ok := enc_ok && dec_ok && len(decoded) == len(insts)
+		if ok {
+			for d, i in decoded { if d.mnemonic != insts[i].mnemonic { ok = false; break } }
+		}
+		if ok {
+			g_stats.passed += 1
+		} else {
+			fmt.printf("%s[FAIL]%s i386 round-trip kernel\n", RED, RESET)
+			g_stats.failed += 1
+		}
+	}
+
+	if g_stats.failed == before {
+		fmt.printf("%s[PASS]%s i386 (Mode._32) encode/decode\n", GREEN, RESET)
+	}
+}
+
+// =============================================================================
 // MAIN
 // =============================================================================
 
@@ -3269,6 +3397,10 @@ main :: proc() {
 		run_memory_tests()
 		log_section("Compare/CMOV/SET")
 		run_compare_tests()
+		log_section("Narrow-width operand size (MOVSX/MOVZX, CBW/CWD, string ops)")
+		run_narrow_width_encoding_tests()
+		run_narrow_width_roundtrip_tests()
+		run_narrow_width_exec_tests()
 
 		log_header("SSE INSTRUCTION TESTS")
 		log_section("Scalar Float/Double")
@@ -3291,6 +3423,9 @@ main :: proc() {
 
 	log_header("TYPED BUILDER CONSISTENCY")
 	run_typed_builder_tests()
+
+	log_header("I386 (32-BIT MODE) TESTS")
+	run_i386_tests()
 
 	log_header("PERFORMANCE BENCHMARKS")
 	run_benchmarks()

@@ -593,7 +593,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.RET,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xC3, 0, {}},
 	{.RET,              {.IMM16,     .NONE,      .NONE,      .NONE}, {.IW,   .NONE, .NONE, .NONE}, 0xC2, 0, {explicit_count=1}},
 	// .IRET
-	{.IRET,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xCF, 0, {}},
+	{.IRET,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xCF, 0, {opsize_16=true}},
 	// .IRETD
 	{.IRETD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xCF, 0, {}},
 	// .IRETQ
@@ -797,7 +797,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .MOVSB
 	{.MOVSB,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA4, 0, {rep_ok=true}},
 	// .MOVSW
-	{.MOVSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
+	{.MOVSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {opsize_16=true, rep_ok=true}},
 	// .MOVSD
 	{.MOVSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
 	// .MOVSQ
@@ -807,7 +807,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .CMPSB
 	{.CMPSB,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA6, 0, {rep_ok=true}},
 	// .CMPSW
-	{.CMPSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
+	{.CMPSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {opsize_16=true, rep_ok=true}},
 	// .CMPSD
 	{.CMPSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
 	// .CMPSQ
@@ -817,7 +817,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .SCASB
 	{.SCASB,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAE, 0, {rep_ok=true}},
 	// .SCASW
-	{.SCASW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAF, 0, {rep_ok=true}},
+	{.SCASW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAF, 0, {opsize_16=true, rep_ok=true}},
 	// .SCASD
 	{.SCASD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAF, 0, {rep_ok=true}},
 	// .SCASQ
@@ -827,7 +827,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .LODSB
 	{.LODSB,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAC, 0, {rep_ok=true}},
 	// .LODSW
-	{.LODSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAD, 0, {rep_ok=true}},
+	{.LODSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAD, 0, {opsize_16=true, rep_ok=true}},
 	// .LODSD
 	{.LODSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAD, 0, {rep_ok=true}},
 	// .LODSQ
@@ -837,7 +837,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .STOSB
 	{.STOSB,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAA, 0, {rep_ok=true}},
 	// .STOSW
-	{.STOSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAB, 0, {rep_ok=true}},
+	{.STOSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAB, 0, {opsize_16=true, rep_ok=true}},
 	// .STOSD
 	{.STOSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAB, 0, {rep_ok=true}},
 	// .STOSQ
@@ -861,17 +861,17 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .SAHF
 	{.SAHF,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9E, 0, {}},
 	// .PUSHF
-	{.PUSHF,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {}},
+	{.PUSHF,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {opsize_16=true}},
 	// .PUSHFD
 	{.PUSHFD,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {}},
 	// .PUSHFQ
-	{.PUSHFQ,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {}},
+	{.PUSHFQ,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {default_64=true}},
 	// .POPF
-	{.POPF,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {}},
+	{.POPF,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {opsize_16=true}},
 	// .POPFD
 	{.POPFD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {}},
 	// .POPFQ
-	{.POPFQ,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {}},
+	{.POPFQ,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {default_64=true}},
 	// .NOP
 	{.NOP,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x90, 0, {}},
 	{.NOP,              {.RM16,      .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0x1F, 0, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
@@ -902,13 +902,13 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .XSETBV
 	{.XSETBV,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 209, {esc=._0F}},
 	// .CBW
-	{.CBW,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {}},
+	{.CBW,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {opsize_16=true}},
 	// .CWDE
 	{.CWDE,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {}},
 	// .CDQE
 	{.CDQE,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {force_rex_w=true}},
 	// .CWD
-	{.CWD,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x99, 0, {}},
+	{.CWD,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x99, 0, {opsize_16=true}},
 	// .CDQ
 	{.CDQ,              {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x99, 0, {}},
 	// .CQO
@@ -3514,8 +3514,8 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.XADD,             {.RM32,      .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xC1, 0, {esc=._0F, lock_ok=true, explicit_count=2}},
 	{.XADD,             {.RM64,      .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xC1, 0, {esc=._0F, force_rex_w=true, lock_ok=true, explicit_count=2}},
 	// .BOUND
-	{.BOUND,            {.R16,       .M16_16,    .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x62, 0, {explicit_count=2}},
-	{.BOUND,            {.R32,       .M32,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x62, 0, {explicit_count=2}},
+	{.BOUND,            {.R16,       .M16_16,    .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x62, 0, {mode_32_only=true, explicit_count=2}},
+	{.BOUND,            {.R32,       .M32,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x62, 0, {mode_32_only=true, explicit_count=2}},
 	// .ENTER
 	{.ENTER,            {.IMM16,     .IMM8,      .NONE,      .NONE}, {.IW,   .IB,   .NONE, .NONE}, 0xC8, 0, {explicit_count=2}},
 	// .LEAVE

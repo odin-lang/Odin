@@ -712,7 +712,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.RET, {.IMM16, .NONE, .NONE, .NONE}, {.IW  , .NONE, .NONE, .NONE}, 0xC2, 0, {}},
 	},
 	.IRET = {
-		{.IRET, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xCF, 0, {}},
+		{.IRET, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xCF, 0, {opsize_16=true}},
 	},
 	.IRETD = {
 		{.IRETD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xCF, 0, {}},
@@ -996,7 +996,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.MOVSB, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA4, 0, {rep_ok=true}},
 	},
 	.MOVSW = {
-		{.MOVSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
+		{.MOVSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true, opsize_16=true}},
 	},
 	.MOVSD = {
 		{.MOVSD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
@@ -1011,7 +1011,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.CMPSB, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA6, 0, {rep_ok=true}},
 	},
 	.CMPSW = {
-		{.CMPSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
+		{.CMPSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true, opsize_16=true}},
 	},
 	.CMPSD = {
 		{.CMPSD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
@@ -1026,7 +1026,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.SCASB, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAE, 0, {rep_ok=true}},
 	},
 	.SCASW = {
-		{.SCASW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAF, 0, {rep_ok=true}},
+		{.SCASW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAF, 0, {rep_ok=true, opsize_16=true}},
 	},
 	.SCASD = {
 		{.SCASD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAF, 0, {rep_ok=true}},
@@ -1041,7 +1041,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.LODSB, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAC, 0, {rep_ok=true}},
 	},
 	.LODSW = {
-		{.LODSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAD, 0, {rep_ok=true}},
+		{.LODSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAD, 0, {rep_ok=true, opsize_16=true}},
 	},
 	.LODSD = {
 		{.LODSD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAD, 0, {rep_ok=true}},
@@ -1056,7 +1056,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.STOSB, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAA, 0, {rep_ok=true}},
 	},
 	.STOSW = {
-		{.STOSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAB, 0, {rep_ok=true}},
+		{.STOSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAB, 0, {rep_ok=true, opsize_16=true}},
 	},
 	.STOSD = {
 		{.STOSD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAB, 0, {rep_ok=true}},
@@ -1096,22 +1096,22 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.SAHF,   {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9E, 0, {}},
 	},
 	.PUSHF = {
-		{.PUSHF,  {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {}},
+		{.PUSHF,  {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {opsize_16=true}},
 	},
 	.PUSHFD = {
 		{.PUSHFD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {}},
 	},
 	.PUSHFQ = {
-		{.PUSHFQ, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {}},
+		{.PUSHFQ, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9C, 0, {default_64=true}},
 	},
 	.POPF = {
-		{.POPF,   {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {}},
+		{.POPF,   {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {opsize_16=true}},
 	},
 	.POPFD = {
 		{.POPFD,  {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {}},
 	},
 	.POPFQ = {
-		{.POPFQ,  {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {}},
+		{.POPFQ,  {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x9D, 0, {default_64=true}},
 	},
 
 	// -------------------------------------------------------------------------
@@ -1160,7 +1160,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.XSETBV, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD1, {esc=._0F}},
 	},
 	.CBW = {
-		{.CBW,    {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {}},
+		{.CBW,    {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {opsize_16=true}},
 	},
 	.CWDE = {
 		{.CWDE,   {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {}},
@@ -1169,7 +1169,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.CDQE,   {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x98, 0, {force_rex_w=true}},
 	},
 	.CWD = {
-		{.CWD,    {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x99, 0, {}},
+		{.CWD,    {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x99, 0, {opsize_16=true}},
 	},
 	.CDQ = {
 		{.CDQ,    {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x99, 0, {}},
@@ -4810,8 +4810,8 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 	// SECTION: 8.22 Miscellaneous Encodings
 	// -----------------------------------------------------------------------------
 	.BOUND = {  // Invalid in 64-bit mode
-		{.BOUND, {.R16, .M16_16, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x62, 0, {}},
-		{.BOUND, {.R32, .M32,    .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x62, 0, {}},
+		{.BOUND, {.R16, .M16_16, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x62, 0, {mode_32_only=true}},
+		{.BOUND, {.R32, .M32,    .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x62, 0, {mode_32_only=true}},
 	},
 	.ENTER = {
 		{.ENTER, {.IMM16, .IMM8, .NONE, .NONE}, {.IW, .IB, .NONE, .NONE}, 0xC8, 0, {}},

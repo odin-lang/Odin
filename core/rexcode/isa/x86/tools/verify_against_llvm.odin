@@ -84,8 +84,9 @@ is_known_alias :: proc(ours, llvm: string) -> bool {
 		{"sysret", "sysretq"}, {"sysret", "sysretl"},
 		// Some 0x90 NOP printed as XCHG
 		{"nop",  "xchg"},
-		// IRET (16-bit) and IRETD (32-bit) share encoding; LLVM picks IRETD
-		{"iret", "iretd"},  {"iret", "iretq"},  {"iretd", "iretq"},
+		// IRET/IRETD/IRETQ now carry distinct operand sizes (66 CF / CF / 48 CF);
+		// LLVM spells them iretw / iretl / iretq.
+		{"iret", "iretw"},  {"iretd", "iretl"},
 		// CMOVcc / SETcc complete alias set (Intel-defined synonyms)
 		{"cmovna",  "cmovbe"}, {"cmovnae", "cmovb"},  {"cmovnb",  "cmovae"},
 		{"cmovnbe", "cmova"},  {"cmovnc",  "cmovae"}, {"cmovng",  "cmovle"},
@@ -100,23 +101,19 @@ is_known_alias :: proc(ours, llvm: string) -> bool {
 		{"jnbe",  "ja"},   {"jng",   "jle"},  {"jnge",  "jl"},
 		{"jnl",   "jge"},  {"jnle",  "jg"},
 		{"jpe",   "jp"},   {"jpo",   "jnp"},
-		// String ops: LLVM prints the explicit-size mnemonics
+		// String ops: LLVM prints the explicit-size mnemonics. (The 16-bit *W forms
+		// now carry 66h and disassemble to their own names -- no *w->*d alias.)
 		{"movs", "movsb"}, {"movs", "movsd"}, {"movs", "movsq"},
-		{"movsw","movsd"},
 		{"cmps", "cmpsb"}, {"cmps", "cmpsd"}, {"cmps", "cmpsq"},
-		{"cmpsw","cmpsd"},
 		{"scas", "scasb"}, {"scas", "scasd"}, {"scas", "scasq"},
-		{"scasw","scasd"},
 		{"lods", "lodsb"}, {"lods", "lodsd"}, {"lods", "lodsq"},
-		{"lodsw","lodsd"},
 		{"stos", "stosb"}, {"stos", "stosd"}, {"stos", "stosq"},
-		{"stosw","stosd"},
-		// 64-bit-mode default flag pushes
-		{"pushf","pushfq"}, {"pushfd","pushfq"},
-		{"popf", "popfq"},  {"popfd", "popfq"},
-		// CBW (16->32 alias in 64-bit mode where the 66h prefix is absent)
-		// and friends: LLVM picks the 32-bit form when we emit 1-byte 0x98/0x99
-		{"cbw",  "cwde"},   {"cwd", "cdq"},
+		// Flag pushes: PUSHF/POPF are 16-bit (66h -> LLVM pushfw/popfw); PUSHFD is
+		// 32-bit (invalid in 64-bit mode, so LLVM prints pushfq for the bare 0x9C);
+		// PUSHFQ is the 64-bit default. (CBW/CWD now emit 66h and alias to
+		// cbtw/cwtd above -- no cbw->cwde mask.)
+		{"pushf","pushfw"}, {"pushfd","pushfq"},
+		{"popf", "popfw"},  {"popfd", "popfq"},
 		// CMPxx with imm=0 collapses to the eq alias
 		{"cmpps","cmpeqps"}, {"cmppd","cmpeqpd"}, {"cmpss","cmpeqss"},
 		{"cmpsd","cmpeqsd"},

@@ -253,6 +253,7 @@ Encoding_Flags :: bit_field u32 {
 	vex_l:          VEX_L    | 2, // VEX.L requirement
 	default_64:     bool     | 1, // default to 64-bit operand size (PUSH, POP, etc.)
 	force_rex_w:    bool     | 1, // always emit REX.W
+	opsize_16:      bool     | 1, // always emit 66h (operand-less 16-bit forms: CBW/CWD/MOVSW/...)
 	no_rex:         bool     | 1, // REX prefix not allowed (high byte regs)
 	lock_ok:        bool     | 1, // LOCK prefix valid
 	rep_ok:         bool     | 1, // REP prefix valid
@@ -297,6 +298,7 @@ encoding_flags :: #force_inline proc "contextless" (
 	vex_l:         VEX_L    = .LIG,
 	default_64:    bool     = false,
 	force_rex_w:   bool     = false,
+	opsize_16:     bool     = false,
 	no_rex:        bool     = false,
 	lock_ok:       bool     = false,
 	rep_ok:        bool     = false,
@@ -311,6 +313,7 @@ encoding_flags :: #force_inline proc "contextless" (
 		vex_l         = vex_l,
 		default_64    = default_64,
 		force_rex_w   = force_rex_w,
+		opsize_16     = opsize_16,
 		no_rex        = no_rex,
 		lock_ok       = lock_ok,
 		rep_ok        = rep_ok,
@@ -329,6 +332,7 @@ op_type_to_size :: proc(op_type: Operand_Type) -> u8 {
 	case .R16, .RM16,     .M16, .IMM16:           return 2
 	case .R32, .RM32,     .M32, .IMM32, .XMM_M32: return 4
 	case .R64, .RM64,     .M64, .IMM64, .XMM_M64: return 8
+	case .M80:                                    return 10
 	case .XMM, .XMM_M128, .M128:                  return 16
 	case .YMM, .YMM_M256, .M256:                  return 32
 	case .ZMM, .ZMM_M512, .M512:                  return 64

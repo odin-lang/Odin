@@ -88,14 +88,25 @@ main :: proc() {
 			if enc.opcode == entry.opcode &&
 			   enc.flags.esc == entry.esc &&
 			   enc.flags.prefix == entry.prefix {
-				// Check if ext matches (if applicable)
+				// Check if ext matches. Decode entries carry ext for /digit forms
+				// (modrm_reg_ext) and for fixed-ModR/M / x87 ST(i) forms (enc.ext
+				// >= 0xC0); 0xFF is the "no ModR/M constraint" sentinel. Mirror the
+				// generator's rule: ext = modrm_reg_ext ? enc.ext
+				//   : (enc.ext >= 0xC0 ? enc.ext : 0xFF).
 				if entry.ext != 0xFF {
 					if enc.flags.modrm_reg_ext && enc.ext == entry.ext {
 						found = true
 						break
 					}
+					if !enc.flags.modrm_reg_ext && enc.ext >= 0xC0 && enc.ext == entry.ext {
+						found = true
+						break
+					}
 				} else {
-					if !enc.flags.modrm_reg_ext {
+					// entry.ext == 0xFF is either the sentinel (enc.ext < 0xC0) or a
+					// fixed form whose real ModR/M byte happens to be 0xFF (FCOS = D9
+					// FF), which the generator also stores as 0xFF.
+					if !enc.flags.modrm_reg_ext && (enc.ext < 0xC0 || enc.ext == 0xFF) {
 						found = true
 						break
 					}

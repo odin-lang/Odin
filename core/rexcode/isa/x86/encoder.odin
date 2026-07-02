@@ -208,21 +208,35 @@ encode :: proc(
 		has_gpr16 := false   // any GPR16 operand -> 66h operand-size prefix
 		has_spl   := false   // any SPL/BPL/SIL/DIL (GPR8 hw 4-7) -> forces a REX
 		{
+			// If the caller supplied every operand -- including the ones this form
+			// leaves implicit (which is what the decoder produces: it materializes
+			// AL/AX/EAX/RAX/DX/ST0/ST(i)/1) -- map form slot i directly to user
+			// operand i, so implicit slots consume their operand and the explicit
+			// slots stay aligned. Otherwise the implicit operands are absent, so map
+			// only the explicit slots (skipping implicit). For non-implicit forms
+			// the two are identical (operand_count == total), so nothing changes.
+			total_form_ops := 0
+			for op in enc.ops { if op == .NONE { break }; total_form_ops += 1 }
+			fully_explicit := int(inst.operand_count) == total_form_ops
+
 			user_idx := 0
 			for op, i in enc.ops {
 				if op == .NONE { break }
-				if !is_implicit_op_inline(op) {
-					if user_idx < int(inst.operand_count) {
-						uop := &inst.ops[user_idx]
-						user_ops[i] = uop
-						if uop.kind == .REGISTER {
-							cls := reg_class(uop.reg)
-							hw  := reg_hw(uop.reg)
-							has_gpr16 ||= cls == REG_GPR16
-							has_spl   ||= cls == REG_GPR8 && hw >= 4 && hw <= 7
-						}
-					}
+				uop: ^Operand
+				if fully_explicit {
+					uop = &inst.ops[i]
+				} else if !is_implicit_op_inline(op) {
+					if user_idx < int(inst.operand_count) { uop = &inst.ops[user_idx] }
 					user_idx += 1
+				}
+				if uop != nil {
+					user_ops[i] = uop
+					if uop.kind == .REGISTER {
+						cls := reg_class(uop.reg)
+						hw  := reg_hw(uop.reg)
+						has_gpr16 ||= cls == REG_GPR16
+						has_spl   ||= cls == REG_GPR8 && hw >= 4 && hw <= 7
+					}
 				}
 				// Slot roles (parallel array enc.enc[i]) gathered in the same pass.
 				#partial switch enc.enc[i] {
@@ -234,6 +248,21 @@ encode :: proc(
 			}
 		}
 		has_modrm := mr_slot >= 0 || reg_slot >= 0
+
+		// MOVSX/MOVZX/MOVSXD are *widening* moves: the r/m source is a fixed
+		// narrower width selected by the opcode (0F BE/BF/B6/B7, 63), so it must
+		// NOT drive the operand-size (66h) prefix -- only the destination width
+		// does. The generic "any GPR16 operand" scan above would otherwise treat a
+		// 16-bit *source* (e.g. `movsx eax, ax`) as a request for 16-bit operand
+		// size and emit 66h, mis-encoding it as `movsx ax, ax`. (Contrast CRC32,
+		// whose r/m source width legitimately selects operand size -- it keeps the
+		// generic behavior.) The destination is always op0 and always a register.
+		#partial switch inst.mnemonic {
+		case .MOVSX, .MOVZX, .MOVSXD:
+			has_gpr16 = inst.operand_count > 0 &&
+				inst.ops[0].kind == .REGISTER &&
+				reg_class(inst.ops[0].reg) == REG_GPR16
+		}
 
 		// --- Legacy Prefixes ---
 		//
@@ -399,8 +428,14 @@ encode :: proc(
 			pos += 4
 
 		case: // Legacy encoding
-			// Operand size override (66h) -- has_gpr16 computed in the resolve pass
-			needs_66 := has_gpr16 && enc.flags.prefix != 1  // PREFIX_66
+			// Operand size override (66h) -- has_gpr16 computed in the resolve pass.
+			// opsize_16 covers operand-less 16-bit forms (CBW/CWD/MOVSW/...) that
+			// carry no GPR16 operand to key off (matters on the interpreter path,
+			// e.g. `rep movsw`; the eligible no-prefix forms take the recipe path).
+			// Fixed-ModR/M forms (ext >= 0xC0: x87 like FSTSW AX, system ops) never
+			// take an operand-size prefix, even though an implicit accumulator
+			// operand may look like a GPR16.
+			needs_66 := (has_gpr16 || enc.flags.opsize_16) && enc.flags.prefix != 1 && enc.ext < 0xC0  // PREFIX_66
 			if needs_66 {
 				out[pos] = 0x66
 				pos += 1
@@ -622,10 +657,11 @@ encode :: proc(
 			pos += 1
 		}
 
-		// --- Immediate (single precomputed slot, no scan over enc.enc) ---
-		if imm_slot >= 0 && user_ops[imm_slot] != nil {
-			user_op := user_ops[imm_slot]
-			#partial switch enc.enc[imm_slot] {
+		// --- Immediate(s), in operand-slot order (ENTER = C8 has two: IMM16 then IMM8). ---
+		for slot in 0 ..< 4 {
+			if user_ops[slot] == nil { continue }
+			user_op := user_ops[slot]
+			#partial switch enc.enc[slot] {
 			case .IB:
 				#partial switch user_op.kind {
 				case .IMMEDIATE:
@@ -741,6 +777,16 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// when not in Mode._32.
 	if enc.flags.mode_32_only && mode != ._32 { return false }
 
+	// PUSH/POP FS/GS: the segment operand is fixed by the opcode (0F A0/A1 -> FS,
+	// 0F A8/A9 -> GS), so a form only matches when the user's segment agrees --
+	// otherwise `push gs` would take the first {SREG} form (FS) and mis-encode.
+	if enc.ops[0] == .SREG && enc.enc[0] == .IMPL {
+		want: Register = (enc.opcode & 0x08) != 0 ? GS : FS
+		if inst.operand_count == 0 || inst.ops[0].kind != .REGISTER || inst.ops[0].reg != want {
+			return false
+		}
+	}
+
 	explicit_count := enc.flags.explicit_count
 
 	if !enc.flags.has_implicit {
@@ -752,39 +798,37 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 		return true
 	}
 
-	// Special case: if user provides exactly one more operand than non-implicit count,
-	// check if the extra operand matches an implicit operand (e.g., CL for shifts)
-	if inst.operand_count == explicit_count + 1 {
-		// Check if the last user operand matches an implicit operand in the encoding
-		last_user_op := &inst.ops[inst.operand_count - 1]
-		found_matching_implicit := false
-		for op_type in enc.ops {
-			if op_type == .NONE { break }
-			if is_implicit_op_inline(op_type) && implicit_operand_matches(last_user_op, op_type) {
-				found_matching_implicit = true
-				break
-			}
-		}
-		if !found_matching_implicit { return false }
-
-		// Match the first (operand_count - 1) user operands against non-implicit encoding operands
-		user_idx: u8 = 0
-		for op_type in enc.ops {
-			if op_type == .NONE { break }
-			if is_implicit_op_inline(op_type) { continue }
-
-			if user_idx >= inst.operand_count - 1 { return false }
-			effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
-			operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
-			user_idx += 1
-		}
-		return user_idx == inst.operand_count - 1
+	// Total operand slots (implicit + explicit) in this form.
+	total_ops: u8 = 0
+	for op_type in enc.ops {
+		if op_type == .NONE { break }
+		total_ops += 1
 	}
 
-	// STandard case: operand count must match non-implicit count
-	if inst.operand_count != explicit_count { return false }
+	// Fully-explicit form: the caller provided every operand, including the ones
+	// this form encodes implicitly. This is what the decoder produces (it
+	// materializes AL/AX/EAX/RAX/DX/ST0/ST(i)/1). Match positionally; an implicit
+	// slot must equal its implied register/constant. Because the accumulator and
+	// x87 short forms are ordered ahead of their general-ModR/M siblings, this
+	// makes `add al, imm8` re-encode to 04 (not 80 /0), `fadd st0, st1` to D8 C1,
+	// and `xchg rax, rax` to 48 90 -- i.e. decode->encode is byte-stable. (The emit
+	// path maps slots positionally for this same operand_count == total_ops case.)
+	if inst.operand_count == total_ops {
+		for op_type, i in enc.ops {
+			if op_type == .NONE { break }
+			if is_implicit_op_inline(op_type) {
+				if !implicit_operand_matches(&inst.ops[i], op_type) { return false }
+			} else {
+				eff := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
+				operand_matches_inline(&inst.ops[i], eff) or_return
+			}
+		}
+		return true
+	}
 
-	// Match each user operand against non-implicit encoding operands
+	// Implicit operand(s) omitted by the caller (hand-built `add imm`, `shl rm`):
+	// operand count must match the explicit-only count; match those in order.
+	if inst.operand_count != explicit_count { return false }
 	user_idx: u8 = 0
 	for op_type in enc.ops {
 		if op_type == .NONE { break }
@@ -799,16 +843,30 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	return true
 }
 
-// Check if a user operand matches an implicit operand type (for explicit implicit operand matching)
+// Check if a user operand equals the register/constant an implicit operand slot
+// stands for -- used when a caller supplies an implicit operand explicitly and
+// when re-encoding a decoded instruction (which materializes all operands).
 implicit_operand_matches :: #force_inline proc "contextless" (op: ^Operand, op_type: Operand_Type) -> bool {
-	if op.kind != .REGISTER { return false }
 	#partial switch op_type {
-	case .CL_IMPL:   return op.reg == CL
-	case .DX_IMPL:   return op.reg == DX
-	case .ST0_IMPL:  return op.reg == ST0
-	case .XMM0_IMPL: return op.reg == XMM0
-	// Don't match AL/AX/EAX/RAX_Impl - those are for short-form encodings
-	// Don't match One_Impl - can't provide "1" as a register
+	case .CL_IMPL:   return op.kind == .REGISTER && op.reg == CL
+	case .DX_IMPL:   return op.kind == .REGISTER && op.reg == DX
+	case .ST0_IMPL:  return op.kind == .REGISTER && op.reg == ST0
+	case .XMM0_IMPL: return op.kind == .REGISTER && op.reg == XMM0
+	case .ONE_IMPL:  return op.kind == .IMMEDIATE && op.immediate == 1
+	// AL/AX/EAX/RAX are deliberately NOT matched here: the accumulator short
+	// forms (04/05/0C.../A8/A9) are reached via the explicit-omitted path, and
+	// the decoder does not materialize the implicit accumulator -- so hand-built
+	// `add eax, imm` stays the general 81 /0 form (consistent with the typed
+	// builders), while a decoded 1-operand `add imm` re-encodes to the short 05.
+	}
+	return false
+}
+
+// The implicit accumulators (AL/AX/EAX/RAX) that the decoder leaves implicit
+// rather than materializing, so short-form round-trips re-encode to the short form.
+is_accumulator_impl :: #force_inline proc "contextless" (op_type: Operand_Type) -> bool {
+	#partial switch op_type {
+	case .AL_IMPL, .AX_IMPL, .EAX_IMPL, .RAX_IMPL: return true
 	}
 	return false
 }
