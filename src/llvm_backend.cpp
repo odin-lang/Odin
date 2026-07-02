@@ -2713,9 +2713,12 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s.len  -= prefix.len;
 	}
 
-	path = concatenate_strings(permanent_allocator(), path, s);
-	path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
-
+	if (build_context.out_filepath.len > 0) {
+		path = concatenate_strings(permanent_allocator(), path, s);
+		path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
+	} else {
+		path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
+	}
 	return path;
 }
 
@@ -2735,6 +2738,8 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
 	path = gb_string_appendc(path, "/");
+
+	bool output_is_directory = path_is_directory(make_string_c(path));
 
 	if (USE_SEPARATE_MODULES) {
 		GB_ASSERT(m->module_name != nullptr);
@@ -2760,10 +2765,14 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	if (build_context.lto_kind != LTO_None) {
 		ext = STR_LIT("bc");
 	} else if (build_context.build_mode == BuildMode_Assembly) {
-		ext = STR_LIT("S");
+		// Allow a user override for the asm extension.
+		// If that's a directory, we force the `.S` extension
+		ext = output_is_directory ? STR_LIT("S") : build_context.build_paths[BuildPath_Output].ext;
 	} else if (build_context.build_mode == BuildMode_Object) {
 		// Allow a user override for the object extension.
-		ext = build_context.build_paths[BuildPath_Output].ext;
+		// If that's a directory, we force the `.obj` extension
+		ext = output_is_directory ? STR_LIT("obj") : build_context.build_paths[BuildPath_Output].ext;
+
 	} else {
 		ext = infer_object_extension_from_build_context();
 	}
