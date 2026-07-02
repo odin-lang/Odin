@@ -1693,15 +1693,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		return res;
 	case BuiltinProc_simd_min:
 		if (is_float) {
-			bool use_llvm_intrinsic = !is_arch_wasm();
-			if (use_llvm_intrinsic) {
-				LLVMValueRef args[2] = {arg0.value, arg1.value};
-				LLVMTypeRef types[1] = {lb_type(p->module, res.type)};
-				res.value = lb_call_intrinsic(p, "llvm.minnum", args, gb_count_of(args), types, gb_count_of(types));
-			} else {
-				LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOLT, arg0.value, arg1.value, "");
-				res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
-			}
+			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOLT, arg0.value, arg1.value, "");
+			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
 		} else {
 			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSLT : LLVMIntULT, arg0.value, arg1.value, "");
 			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
@@ -1709,15 +1702,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		return res;
 	case BuiltinProc_simd_max:
 		if (is_float) {
-			bool use_llvm_intrinsic = !is_arch_wasm();
-			if (use_llvm_intrinsic) {
-				LLVMValueRef args[2] = {arg0.value, arg1.value};
-				LLVMTypeRef types[1] = {lb_type(p->module, res.type)};
-				res.value = lb_call_intrinsic(p, "llvm.maxnum", args, gb_count_of(args), types, gb_count_of(types));
-			} else {
-				LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, arg0.value, arg1.value, "");
-				res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
-			}
+			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, arg0.value, arg1.value, "");
+			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
 		} else {
 			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSGT : LLVMIntUGT, arg0.value, arg1.value, "");
 			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
