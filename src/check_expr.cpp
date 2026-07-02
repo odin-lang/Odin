@@ -8573,18 +8573,17 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			operand->type = t;
 			operand->expr = call;
 
+			if(operand->mode == Addressing_Constant && is_type_any(t)) {
+				gbString s = expr_to_string(arg);
+				error(call, "Cannot cast constant '%s' to any", s);
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				gb_string_free(s);
+			}
 
 			if (operand->mode != Addressing_Invalid) {
-				if(operand->mode == Addressing_Constant && is_type_any(t)) {
-					gbString s = expr_to_string(arg);
-					error(call, "Cannot cast constant '%s' to any", s);
-					operand->mode = Addressing_Invalid;
-					operand->type = t_invalid;
-					gb_string_free(s);
-				} else {
-					update_untyped_expr_type(c, arg, t, false);
-					check_representable_as_constant(c, operand->value, t, &operand->value);
-				}
+				update_untyped_expr_type(c, arg, t, false);
+				check_representable_as_constant(c, operand->value, t, &operand->value);
 			}
 			break;
 		}
