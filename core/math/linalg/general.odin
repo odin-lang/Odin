@@ -244,27 +244,18 @@ quaternion_mul_quaternion :: proc "contextless" (q1, q2: $Q) -> Q where IS_QUATE
 
 @(require_results)
 quaternion64_mul_vector3 :: proc "contextless" (q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
-	q := transmute(runtime.Raw_Quaternion64_Vector_Scalar)q
-	v := v
-
-	t := cross(2*q.vector, v)
-	return V(v + q.scalar*t + cross(q.vector, t))
+	t := cross(2*q.xyz, v)
+	return V(v + q.w*t + cross(q.xyz, t))
 }
 @(require_results)
 quaternion128_mul_vector3 :: proc "contextless" (q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
-	q := transmute(runtime.Raw_Quaternion128_Vector_Scalar)q
-	v := v
-
-	t := cross(2*q.vector, v)
-	return V(v + q.scalar*t + cross(q.vector, t))
+	t := cross(2*q.xyz, v)
+	return V(v + q.w*t + cross(q.xyz, t))
 }
 @(require_results)
 quaternion256_mul_vector3 :: proc "contextless" (q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
-	q := transmute(runtime.Raw_Quaternion256_Vector_Scalar)q
-	v := v
-
-	t := cross(2*q.vector, v)
-	return V(v + q.scalar*t + cross(q.vector, t))
+	t := cross(2*q.xyz, v)
+	return V(v + q.w*t + cross(q.xyz, t))
 }
 quaternion_mul_vector3 :: proc{quaternion64_mul_vector3, quaternion128_mul_vector3, quaternion256_mul_vector3}
 
