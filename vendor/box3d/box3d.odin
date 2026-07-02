@@ -7,9 +7,16 @@ import "core:c"
 
 ENABLE_VALIDATION :: false
 
-@(export)
-foreign import lib {
-	"box3d.lib",
+when ODIN_OS == .Windows {
+	@(export)
+	foreign import lib {
+		"lib/box3d.lib",
+	}
+} else {
+	@(export)
+	foreign import lib {
+		"system:box3d",
+	}
 }
 
 // This is used to indicate null for interfaces that work with indices instead of pointers
