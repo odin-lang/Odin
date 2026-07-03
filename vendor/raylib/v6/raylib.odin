@@ -97,7 +97,7 @@ MAX_MATERIAL_MAPS      :: #config(RAYLIB_MAX_MATERIAL_MAPS, 12)
 #assert(size_of(rune) == size_of(c.int))
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
-RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.a")
+RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.web.a")
 
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
@@ -109,14 +109,26 @@ when ODIN_OS == .Windows {
 		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	foreign import lib {
-		// Note(bumbread): I'm not sure why in `linux/` folder there are
-		// multiple copies of raylib.so, but since these bindings are for
-		// particular version of the library, I better specify it. Ideally,
-		// though, it's best specified in terms of major (.so.4)
-		"linux/libraylib.so.600" when RAYLIB_SHARED else "linux/libraylib.a",
-		"system:dl",
-		"system:pthread",
+	when ODIN_ARCH == .arm64 {
+		foreign import lib {
+			// Note(bumbread): I'm not sure why in `linux/` folder there are
+			// multiple copies of raylib.so, but since these bindings are for
+			// particular version of the library, I better specify it. Ideally,
+			// though, it's best specified in terms of major (.so.4)
+			"linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "linux-arm/libraylib.a",
+			"system:dl",
+			"system:pthread",
+		}
+	} else {
+		foreign import lib {
+			// Note(bumbread): I'm not sure why in `linux/` folder there are
+			// multiple copies of raylib.so, but since these bindings are for
+			// particular version of the library, I better specify it. Ideally,
+			// though, it's best specified in terms of major (.so.4)
+			"linux/libraylib.so.600" when RAYLIB_SHARED else "linux/libraylib.a",
+			"system:dl",
+			"system:pthread",
+		}
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
