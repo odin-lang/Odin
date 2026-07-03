@@ -3308,7 +3308,7 @@ class WebGPUInterface {
 			 * @param {number} textureIdx
 			 * @returns {number}
 			 */
-			wgpuTextureDepthOrArrayLayers: (textureIdx) => {
+			wgpuTextureGetDepthOrArrayLayers: (textureIdx) => {
 				const texture = this.textures.get(textureIdx);
 				return texture.depthOrArrayLayers;
 			},

@@ -3411,8 +3411,20 @@ CONSOLE_READCONSOLE_CONTROL :: struct {
 	dwCtrlWakeupMask:  ULONG,
 	dwControlKeyState: ULONG,
 }
-
 PCONSOLE_READCONSOLE_CONTROL :: ^CONSOLE_READCONSOLE_CONTROL
+
+CONSOLE_SCREEN_BUFFER_INFOEX :: struct {
+	cbSize:               ULONG,
+	dwSize:               COORD,
+	dwCursorPosition:     COORD,
+	wAttributes:          WORD,
+	srWindow:             SMALL_RECT,
+	dwMaximumWindowSize:  COORD,
+	wPopupAttributes:     WORD,
+	bFullscreenSupported: BOOL,
+	ColorTable:           [16]COLORREF,
+}
+PCONSOLE_SCREEN_BUFFER_INFOEX :: ^CONSOLE_SCREEN_BUFFER_INFOEX
 
 BY_HANDLE_FILE_INFORMATION :: struct {
 	dwFileAttributes:     DWORD,
@@ -3426,7 +3438,6 @@ BY_HANDLE_FILE_INFORMATION :: struct {
 	nFileIndexHigh:       DWORD,
 	nFileIndexLow:        DWORD,
 }
-
 LPBY_HANDLE_FILE_INFORMATION :: ^BY_HANDLE_FILE_INFORMATION
 
 FILE_STANDARD_INFO :: struct {
@@ -4791,8 +4802,8 @@ MEMORYSTATUSEX :: struct {
 	dwMemoryLoad:            DWORD,
 	ullTotalPhys:            DWORDLONG,
 	ullAvailPhys:            DWORDLONG,
-	ullTotalPageFil:         DWORDLONG,
-	ullAvailPageFil:         DWORDLONG,
+	ullTotalPageFile:        DWORDLONG,
+	ullAvailPageFile:        DWORDLONG,
 	ullTotalVirtual:         DWORDLONG,
 	ullAvailVirtual:         DWORDLONG,
 	ullAvailExtendedVirtual: DWORDLONG,

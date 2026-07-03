@@ -4,6 +4,7 @@ package intrinsics
 
 import "base:runtime"
 
+
 // Package-Related
 is_package_imported :: proc(package_name: string) -> bool ---
 
@@ -184,6 +185,8 @@ type_is_simd_vector      :: proc($T: typeid) -> bool ---
 type_is_matrix           :: proc($T: typeid) -> bool ---
 type_is_fixed_capacity_dynamic_array :: proc($T: typeid) -> bool ---
 
+type_is_internally_pointer_like :: proc($T: typeid) -> bool ---
+
 type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_matrix_row_major    :: proc($T: typeid) -> bool where type_is_matrix(T) ---
@@ -213,6 +216,8 @@ type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 
 type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
+
+type_proc_calling_convention :: proc($T: typeid) -> Odin_Calling_Convention where type_is_proc(T) ---
 
 type_struct_field_count          :: proc($T: typeid) -> int  where type_is_struct(T) ---
 type_struct_has_implicit_padding :: proc($T: typeid) -> bool where type_is_struct(T) ---
@@ -247,6 +252,8 @@ type_integer_to_unsigned :: proc($T: typeid) -> type where type_is_integer(T), !
 type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), type_is_unsigned(T) ---
 
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
+
+
 
 // Returns the canonicalized name of the type, of which is used to produce the pseudo-unique 'typeid'
 type_canonical_name :: proc($T: typeid) -> string ---
@@ -366,8 +373,11 @@ simd_odd_even :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 // Returns the sums of N consecutive lanes
 simd_sums_of_n :: proc(a: #simd[LANES]T, $N: uint) -> #simd[LANES/N]T where is_power_of_two(N) ---
 
-simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
-simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES/N]T ---
+simd_pairwise_add :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 == 0 ---
+
+simd_interleave   :: proc(a, ..#simd[LANES/N]T)       -> #simd[LANES]T where N >= 1 ---
+simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (..#simd[LANES/N]T) where N >= 1, LANES % N == 0 --- // returns N multiple vectors
 
 
 // Checks if the current target supports the given target features.
@@ -403,6 +413,14 @@ wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_u
 x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
+
+// C specific things
+c_va_list  :: struct{/*platform specific implementation*/}
+
+c_va_start :: proc(list: ^c_va_list, /*#c_vararg parameter*/ args: ..$T) ---
+c_va_end   :: proc(list: ^c_va_list)                                     ---
+c_va_copy  :: proc(dst, src: ^c_va_list)                                 ---
+c_va_arg   :: proc(list: ^c_va_list, $T: typeid) -> T                    ---
 
 
 // Darwin targets only

@@ -1334,6 +1334,10 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		e->flags |= EntityFlag_Fini;
 	}
 
+	if (build_context.disable_init_fini && (e->flags & (EntityFlag_Init|EntityFlag_Fini))) {
+		error(e->token, "@(init) and @(fini) have been disabled with '-disable-init-fini'");
+	}
+
 	if (ac.set_cold) {
 		e->flags |= EntityFlag_Cold;
 	}
@@ -1480,9 +1484,16 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.no_sanitize_memory  = ac.no_sanitize_memory;
 	e->Procedure.no_sanitize_thread  = ac.no_sanitize_thread;
 
+	e->Procedure.fast_math_flags = ac.fast_math_flags;
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
+
+	if (ac.link_section.len > 0) {
+		e->Procedure.link_section = ac.link_section;
+	}
+
 	if (ac.has_disabled_proc) {
 		if (ac.disabled_proc) {
 			e->flags |= EntityFlag_Disabled;
@@ -1523,10 +1534,26 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
 				gb_string_free(str);
 			}
-			if (pt->calling_convention != default_calling_convention()) {
-				error(e->token, "Procedure 'main' cannot have a custom calling convention");
+			if (build_context.bedrock) {
+				switch (pt->calling_convention) {
+				case ProcCC_Odin:
+				case ProcCC_Contextless:
+					// Okay
+					break;
+				default:
+					error(e->token, "Procedure 'main' cannot have a custom calling convention beyond \"odin\" and \"contextless\" with '-bedrock'");
+					pt->calling_convention = ProcCC_Odin;
+					break;
+				}
+
+			} else {
+				if (pt->calling_convention != default_calling_convention()) {
+					error(e->token, "Procedure 'main' cannot have a custom calling convention");
+				}
+				pt->calling_convention = default_calling_convention();
+
 			}
-			pt->calling_convention = default_calling_convention();
+
 			if (e->pkg->kind == Package_Init) {
 				if (ctx->info->entry_point != nullptr) {
 					error(e->token, "Redeclaration of the entry pointer procedure 'main'");
@@ -1556,9 +1583,9 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		if (is_foreign) {
 			error(pl->body, "A foreign procedure cannot have a body");
 		}
-		if (proc_type->Proc.c_vararg) {
-			error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
-		}
+		// if (proc_type->Proc.c_vararg) {
+		// 	error(pl->body, "A procedure with a '#c_vararg' field cannot have a body and must be foreign");
+		// }
 
 		d->scope = ctx->scope;
 
@@ -1822,9 +1849,25 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 	PtrSet<Entity *> entity_set = {};
 	ptr_set_init(&entity_set, 2*pg->args.count);
 
-	for (Ast *arg : pg->args) {
+	for (Ast *arg_ : pg->args) {
+		Ast *arg = arg_;
 		Entity *e = nullptr;
 		Operand o = {};
+		if (arg->kind == Ast_BinaryExpr && arg->BinaryExpr.op.kind == Token_where) {
+			Ast *cond_expr = arg->BinaryExpr.right;
+			Operand cond = {};
+			check_expr(ctx, &cond, cond_expr);
+			if (cond.mode != Addressing_Invalid) {
+				if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type) || cond.value.kind != ExactValue_Bool) {
+					error(arg, "Expected a constant binary expression for the 'where' clause");
+				} else if (!cond.value.value_bool) {
+					continue;
+				}
+			}
+
+			arg = arg->BinaryExpr.left;
+		}
+
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
@@ -1889,7 +1932,8 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
-			if (p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
+			if (p->decl_info != nullptr && q->decl_info != nullptr &&
+			    p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
 				GB_ASSERT(p->decl_info->proc_lit->kind == Ast_ProcLit);
 				GB_ASSERT(q->decl_info->proc_lit->kind == Ast_ProcLit);
 				auto pl = &p->decl_info->proc_lit->ProcLit;

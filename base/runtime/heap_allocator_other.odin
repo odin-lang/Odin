@@ -1,4 +1,4 @@
-#+build js, wasi, freestanding, essence
+#+build js, wasi, freestanding
 #+private
 package runtime
 

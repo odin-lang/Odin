@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "base:intrinsics"
@@ -25,7 +25,7 @@ foreign lib {
 	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> c.int ---
 }
 
-when ODIN_OS == .Haiku || ODIN_OS == .Linux {
+when ODIN_OS == .Linux {
 	nfds_t :: c.ulong
 } else {
 	nfds_t :: c.uint
@@ -57,7 +57,7 @@ Poll_Event_Bits :: enum c.short {
 }
 Poll_Event :: bit_set[Poll_Event_Bits; c.short]
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Haiku {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
 
 	pollfd :: struct {
 		fd:      FD,         /* [PSX] the following descriptor being polled */
@@ -65,35 +65,17 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		revents: Poll_Event, /* [PSX] the output event flags */
 	}
 
-	when ODIN_OS == .Haiku {
+	POLLIN     :: 0x0001
+	POLLRDNORM :: 0x0040
+	POLLRDBAND :: 0x0080
+	POLLPRI    :: 0x0002
+	POLLOUT    :: 0x0004
+	POLLWRNORM :: POLLOUT
+	POLLWRBAND :: 0x0100
 
-		POLLIN     :: 0x0001 /* any readable data available */
-		POLLOUT    :: 0x0002 /* file descriptor is writeable */
-		POLLRDNORM :: POLLIN
-		POLLWRNORM :: POLLOUT
-		POLLRDBAND :: 0x0008 /* priority readable data */
-		POLLWRBAND :: 0x0010 /* priority data can be written */
-		POLLPRI    :: 0x0020 /* high priority readable data */
-
-		POLLERR    :: 0x0004 /* errors pending */
-		POLLHUP    :: 0x0080 /* disconnected */
-		POLLNVAL   :: 0x1000 /* invalid file descriptor */
-
-	} else {
-
-		POLLIN     :: 0x0001
-		POLLRDNORM :: 0x0040
-		POLLRDBAND :: 0x0080
-		POLLPRI    :: 0x0002
-		POLLOUT    :: 0x0004
-		POLLWRNORM :: POLLOUT
-		POLLWRBAND :: 0x0100
-
-		POLLERR    :: 0x0008
-		POLLHUP    :: 0x0010
-		POLLNVAL   :: 0x0020
-		
-	}
+	POLLERR    :: 0x0008
+	POLLHUP    :: 0x0010
+	POLLNVAL   :: 0x0020
 
 
 } else when ODIN_OS == .Linux {

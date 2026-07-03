@@ -329,6 +329,9 @@ gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 };
 
 gb_internal ProcCallingConvention default_calling_convention(void) {
+	if (build_context.bedrock) {
+		// return ProcCC_Contextless;
+	}
 	return ProcCC_Odin;
 }
 

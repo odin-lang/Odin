@@ -213,7 +213,7 @@ rt_sigreturn :: proc "c" () -> ! {
 /*
 	Alter an action taken by a process.
 */
-rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action($T), old_sigaction: ^Sig_Action($U)) -> Errno {
+rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action, old_sigaction: ^Sig_Action) -> Errno {
 	// NOTE(jason): It appears that the restorer is required for i386 and amd64
 	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
 		sigaction.flags += {.RESTORER}
@@ -419,7 +419,15 @@ dup :: proc "contextless" (fd: Fd) -> (Fd, Errno) {
 dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 		ret := syscall(SYS_dup3, old, new, 0)
-		return errno_unwrap(ret, Fd)
+
+		// Differences between dup2 and dup3 are:
+		//   - dup3 takes a flags argument
+		//   - dup2 does not return EINVAL
+		fd, errno := errno_unwrap(ret, Fd)
+		if errno == .EINVAL {
+			errno = .NONE
+		}
+		return fd, errno
 	} else {
 		ret := syscall(SYS_dup2, old, new)
 		return errno_unwrap(ret, Fd)

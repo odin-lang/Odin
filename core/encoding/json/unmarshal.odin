@@ -635,7 +635,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				defer p.allocator = allocator
 				p.allocator = mem.nil_allocator()
 
-				parse_value(p) or_return
+				_ = parse_value(p) or_return
 				if parse_comma(p) {
 					break struct_loop
 				}
@@ -808,6 +808,16 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		raw.allocator = p.allocator
 		
 		return assign_array(p, raw.data, t.elem, length)
+
+	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		if int(length) > t.capacity {
+			return UNSUPPORTED_TYPE
+		}
+		base_ptr := cast(uintptr)v.data
+		len_ptr := base_ptr + t.len_offset
+		len_val := cast(^int)len_ptr
+		len_val^ = int(length)
+		return assign_array(p, rawptr(base_ptr), t.elem, length)
 		
 	case reflect.Type_Info_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array

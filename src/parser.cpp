@@ -2039,9 +2039,6 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 }
 
 gb_internal Ast *parse_value(AstFile *f) {
-	if (f->curr_token.kind == Token_OpenBrace) {
-		return parse_literal_value(f, nullptr);
-	}
 	Ast *value;
 	bool prev_allow_range = f->allow_range;
 	f->allow_range = true;
@@ -2058,54 +2055,6 @@ gb_internal void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTa
 		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
-}
-
-gb_internal bool is_foreign_name_valid(String const &name) {
-	if (name.len == 0) {
-		return false;
-	}
-	isize offset = 0;
-	while (offset < name.len) {
-		Rune rune;
-		isize remaining = name.len - offset;
-		isize width = utf8_decode(name.text+offset, remaining, &rune);
-		if (rune == GB_RUNE_INVALID && width == 1) {
-			return false;
-		} else if (rune == GB_RUNE_BOM && remaining > 0) {
-			return false;
-		}
-
-		if (offset == 0) {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alpha(cast(char)rune))
-					return false;
-				break;
-			}
-		} else {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alphanumeric(cast(char)rune)) {
-					return false;
-				}
-				break;
-			}
-		}
-
-		offset += width;
-	}
-
-	return true;
 }
 
 gb_internal void parse_proc_tags(AstFile *f, u64 *tags) {
@@ -2579,8 +2528,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
 
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
+				}
+
+				array_add(&args, elem);
 				if (!allow_field_separator(f)) {
 					break;
 				}
@@ -2945,10 +2900,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		f->expr_level = prev_level;
 
-		if (is_raw_union && is_packed) {
-			is_packed = false;
-			syntax_error(token, "'#raw_union' cannot also be '#packed'");
-		}
 		if (is_raw_union && is_all_or_none) {
 			is_all_or_none = false;
 			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
@@ -3525,6 +3476,7 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Xor:
 	case Token_And:
 	case Token_Not:
+	case Token_MulMul: // 'expand_values' operator
 	case Token_Mul: // Used for error handling when people do C-like things
 	{
 		Token token = advance_token(f);
@@ -4106,6 +4058,71 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	return ProcCC_Invalid;
 }
 
+gb_internal bool is_ast_generic(Ast *a) {
+	bool is_generic = false;
+	if (a != nullptr) {
+		switch (a->kind) {
+		case Ast_TypeidType:
+			is_generic = a->TypeidType.specialization != nullptr;
+			break;
+		case Ast_PolyType:
+			is_generic = true;
+			break;
+		case Ast_ProcType:
+			is_generic = a->ProcType.generic;
+			break;
+		case Ast_PointerType:
+			is_generic = is_ast_generic(a->PointerType.type);
+			break;
+		case Ast_MultiPointerType:
+			is_generic = is_ast_generic(a->MultiPointerType.type);
+			break;
+		case Ast_ArrayType:
+			is_generic = is_ast_generic(a->ArrayType.elem) || is_ast_generic(a->ArrayType.count);
+			break;
+		case Ast_DynamicArrayType:
+			is_generic = is_ast_generic(a->DynamicArrayType.elem);
+			break;
+		case Ast_FixedCapacityDynamicArrayType:
+			is_generic = is_ast_generic(a->FixedCapacityDynamicArrayType.elem) || is_ast_generic(a->FixedCapacityDynamicArrayType.capacity);
+			break;
+		case Ast_BitSetType:
+			is_generic = is_ast_generic(a->BitSetType.elem);
+			break;
+		case Ast_MapType:
+			is_generic = is_ast_generic(a->MapType.key) || is_ast_generic(a->MapType.value);
+			break;
+		case Ast_MatrixType:
+			is_generic = is_ast_generic(a->MatrixType.row_count) || is_ast_generic(a->MatrixType.column_count) || is_ast_generic(a->MatrixType.elem);
+			break;
+		}
+	}
+	return is_generic;
+}
+
+gb_internal bool is_field_list_generic(AstFieldList *field_list, bool check_names) {
+	bool is_generic = false;
+
+	for (Ast *param : field_list->list) {
+		ast_node(field, Field, param);
+		if (is_ast_generic(field->type)) {
+			is_generic = true;
+			goto end;
+		}
+		if (!check_names || field->type == nullptr) {
+			continue;
+		}
+		for (Ast *name : field->names) {
+			if (name->kind == Ast_PolyType) {
+				is_generic = true;
+				goto end;
+			}
+		}
+	}
+end:
+	return is_generic;
+}
+
 gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	Ast *params = nullptr;
 	Ast *results = nullptr;
@@ -4141,24 +4158,11 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	results = parse_results(f, &diverging);
 
 	u64 tags = 0;
-	bool is_generic = false;
-
-	for (Ast *param : params->FieldList.list) {
-		ast_node(field, Field, param);
-		if (field->type != nullptr) {
-		    if (field->type->kind == Ast_PolyType) {
-				is_generic = true;
-				goto end;
-			}
-			for (Ast *name : field->names) {
-				if (name->kind == Ast_PolyType) {
-					is_generic = true;
-					goto end;
-				}
-			}
-		}
+	bool is_generic = is_field_list_generic(&params->FieldList, true);
+	if (!is_generic && (results != nullptr)) {
+		is_generic = is_field_list_generic(&results->FieldList, false);
 	}
-end:
+
 	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic, diverging);
 }
 
@@ -4216,18 +4220,33 @@ gb_internal FieldFlag is_token_field_prefix(AstFile *f) {
 		return FieldFlag_using;
 
 	case Token_Hash:
-		advance_token(f);
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-				auto const &mapping = parse_field_prefix_mappings[i];
-				if (mapping.token_kind == Token_Hash) {
-					if (f->curr_token.string == mapping.name) {
-						return mapping.flag;
-					}
+		{
+			// Check for types first before fields
+			Token tok = peek_token(f);
+			if (tok.kind == Token_Ident) {
+				if (tok.string == "simd" ||
+				    tok.string == "type" ||
+				    tok.string == "row_major" ||
+				    tok.string == "column_major" ||
+				    tok.string == "sparse" ||
+				    tok.string == "soa") {
+					return FieldFlag_Invalid;
 				}
 			}
-			break;
+
+			advance_token(f);
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+					auto const &mapping = parse_field_prefix_mappings[i];
+					if (mapping.token_kind == Token_Hash) {
+						if (f->curr_token.string == mapping.name) {
+							return mapping.flag;
+						}
+					}
+				}
+				break;
+			}
 		}
 		return FieldFlag_Unknown;
 	}
@@ -5393,7 +5412,10 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-	case Token_Mul: // Used for error handling when people do C-like things
+	// Used for error handling when people do C-like things
+	case Token_Mul:
+	case Token_Increment:
+	case Token_Decrement:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f);
 		return s;
@@ -6385,6 +6407,11 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			}
 			if (p == "ignore") {
 				this_kind_correct = false;
+				continue;
+			}
+
+			if (p == "bedrock") {
+				this_kind_correct = build_context.bedrock == !is_notted;
 				continue;
 			}
 

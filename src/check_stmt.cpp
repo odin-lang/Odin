@@ -1296,6 +1296,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
+					add_type_to_seen_map(ctx, &seen, y);
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -1473,6 +1474,14 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	if (lhs->kind != Ast_Ident) {
 		error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_strings[rhs->kind]));
 		return;
+	}
+
+	if (switch_kind == TypeSwitch_Union) {
+		if (is_addressed) {
+			if (x.mode != Addressing_Variable && !is_type_pointer(x.type)) {
+				error(lhs->Ident.token, "The element variable '%.*s' cannot be made addressable", LIT(lhs->Ident.token.string));
+			}
+		}
 	}
 
 
@@ -2260,7 +2269,9 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 					error(e->token, "'thread_local' variables cannot be declared within a defer statement");
 				}
 			}
-			e->Variable.thread_local_model = ac.thread_local_model;
+			if (!build_context.no_thread_local) {
+				e->Variable.thread_local_model = ac.thread_local_model;
+			}
 		}
 
 		if (ac.is_static && ac.thread_local_model != "") {

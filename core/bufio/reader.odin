@@ -355,16 +355,15 @@ _reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offse
 //
 
 
-// reader_read_slice reads until the first occurrence of delim from the reader
-// It returns a slice pointing at the bytes in the buffer
-// The bytes stop being valid at the next read
-// If reader_read_slice encounters an error before finding a delimiter
-// reader_read_slice fails with error .Buffer_Full if the buffer fills without a delim
-// Because the data returned from reader_read_slice will be overwritten on the
-// next IO operation, reader_read_bytes or reader_read_string is usually preferred
+// reader_read_slice reads until the first occurrence of delim in the input,
+// returning a slice pointing at the bytes in the internal buffer.
+// The returned slice is only valid until the next read call.
+// If the buffer fills without finding delim, it returns .Buffer_Full.
+// If the underlying reader returns an error before finding delim, that error is returned.
+// Because the returned data will be overwritten by the next I/O operation,
+// reader_read_bytes or reader_read_string is usually preferred.
 //
-// reader_read_slice returns err != nil if and only if line does not end in delim
-//
+// reader_read_slice returns err != nil if and only if line does not end in delim.
 reader_read_slice :: proc(b: ^Reader, delim: byte) -> (line: []byte, err: io.Error) {
 	s := 0
 	for {

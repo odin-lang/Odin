@@ -8,7 +8,7 @@ import "core:strings"
 import "core:c"
 
 // NOTE: Relies on C++23 which adds <stacktrace> and becomes ABI and that can be used
-foreign import stdcpplibbacktrace "system:stdc++_libbacktrace"
+foreign import stdcpplibbacktrace "system:stdc++exp"
 
 foreign import libdl "system:dl"
 

@@ -791,7 +791,10 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
-		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static|EntityFlag_Field)) == 0 && !e->Variable.is_global) {
+		} else if (e->kind == Entity_Variable &&
+		           ((e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static|EntityFlag_Field)) == 0 ||
+		            (e->flags & EntityFlag_Result) != 0) &&
+		          !e->Variable.is_global) {
 			i64 sz = type_size_of(e->type);
 			// TODO(bill): When is a good size warn?
 			// Is >256 KiB good enough?
@@ -1042,14 +1045,14 @@ struct GlobalEnumValue {
 	i64 value;
 };
 
-gb_internal Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr) {
+gb_internal Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr, Type *backing_type = nullptr) {
 	Scope *scope = create_scope(nullptr, builtin_pkg->scope);
 	Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
 
 	Type *enum_type = alloc_type_enum();
 	Type *named_type = alloc_type_named(type_name, enum_type, entity);
 	set_base_type(named_type, enum_type);
-	enum_type->Enum.base_type = t_int;
+	enum_type->Enum.base_type = backing_type ? backing_type : t_int;
 	enum_type->Enum.scope = scope;
 	entity->type = named_type;
 
@@ -1118,6 +1121,14 @@ gb_internal void init_universal(void) {
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		String const &name = basic_types[i].Basic.name;
+		if (build_context.bedrock) {
+			if ((basic_types[i].Basic.flags & BasicFlag_Integer) != 0 &&
+			    basic_types[i].Basic.size == 16) {
+				// disallow 128-bit integers
+				continue;
+			}
+		}
+
 		add_global_type_entity(name, &basic_types[i]);
 	}
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
@@ -1143,6 +1154,8 @@ gb_internal void init_universal(void) {
 	add_global_string_constant("ODIN_VERSION",                  bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",                     bc->ODIN_ROOT);
 	add_global_string_constant("ODIN_BUILD_PROJECT_NAME",       bc->ODIN_BUILD_PROJECT_NAME);
+
+	add_global_bool_constant("ODIN_BEDROCK", bc->bedrock);
 
 	{
 		GlobalEnumValue values[Windows_Subsystem_COUNT] = {
@@ -1170,9 +1183,7 @@ gb_internal void init_universal(void) {
 			{"Windows",      TargetOs_windows},
 			{"Darwin",       TargetOs_darwin},
 			{"Linux",        TargetOs_linux},
-			{"Essence",      TargetOs_essence},
 			{"FreeBSD",      TargetOs_freebsd},
-			{"Haiku",        TargetOs_haiku},
 			{"OpenBSD",      TargetOs_openbsd},
 			{"NetBSD",       TargetOs_netbsd},
 			{"WASI",         TargetOs_wasi},
@@ -1236,6 +1247,7 @@ gb_internal void init_universal(void) {
 			{"iPhone",          Subtarget_iPhone},
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
 			{"Android",         Subtarget_Android},
+			{"Playdate",        Subtarget_Playdate},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
@@ -1253,6 +1265,41 @@ gb_internal void init_universal(void) {
 	}
 
 	{
+		GlobalEnumValue values[OdinFastMath_COUNT] = {};
+		for (unsigned i = 0; i < OdinFastMath_COUNT; i++) {
+			values[i] = {OdinFastMathFlag_strings[i], i};
+		}
+
+		auto fields = add_global_enum_type(str_lit("Fast_Math_Flag"), values, gb_count_of(values), &t_fast_math_flag, t_u8);
+
+		GB_ASSERT(t_fast_math_flag->kind == Type_Named);
+		scope_insert(intrinsics_pkg->scope, t_fast_math_flag->Named.type_name);
+
+		Type *bs = alloc_type_bit_set();
+		bs->BitSet.elem = t_fast_math_flag;
+		bs->BitSet.underlying = t_u32;
+		bs->BitSet.lower = 0;
+		bs->BitSet.upper = OdinFastMath_COUNT-1;
+		bs->BitSet.node = nullptr;
+
+
+		{
+			String type_name = str_lit("Fast_Math_Flags");
+
+			Scope *scope = create_scope(nullptr, builtin_pkg->scope);
+			Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+
+			Type *named_type = alloc_type_named(type_name, bs, entity);
+			set_base_type(named_type, bs);
+			entity->type = named_type;
+
+			t_fast_math_flags = named_type;
+
+			scope_insert(intrinsics_pkg->scope, entity);
+		}
+	}
+
+	{
 		GlobalEnumValue values[OdinAtomicMemoryOrder_COUNT] = {
 			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_relaxed], OdinAtomicMemoryOrder_relaxed},
 			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_consume], OdinAtomicMemoryOrder_consume},
@@ -1265,6 +1312,32 @@ gb_internal void init_universal(void) {
 		add_global_enum_type(str_lit("Atomic_Memory_Order"), values, gb_count_of(values), &t_atomic_memory_order);
 		GB_ASSERT(t_atomic_memory_order->kind == Type_Named);
 		scope_insert(intrinsics_pkg->scope, t_atomic_memory_order->Named.type_name);
+	}
+
+	{
+		GlobalEnumValue values[ProcCC_MAX] = {
+			{"Invalid",       ProcCC_Invalid},
+			{"Odin",          ProcCC_Odin},
+			{"Contextless",   ProcCC_Contextless},
+			{"CDecl",         ProcCC_CDecl},
+			{"Std_Call",      ProcCC_StdCall},
+			{"Fast_Call",     ProcCC_FastCall},
+
+			{"None",          ProcCC_None},
+			{"Naked",         ProcCC_Naked},
+
+			{"_",             ProcCC_InlineAsm},
+
+			{"Win64",         ProcCC_Win64},
+			{"SysV",          ProcCC_SysV},
+
+			{"PreserveNone",  ProcCC_PreserveNone},
+			{"PreserveMost",  ProcCC_PreserveMost},
+			{"PreserveAll",   ProcCC_PreserveAll},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Calling_Convention"), values, gb_count_of(values), &t_odin_calling_convention, t_u8);
+		add_global_enum_constant(fields, "ODIN_DEFAULT_CALLING_CONVENTION", default_calling_convention());
 	}
 
 	{
@@ -1449,6 +1522,72 @@ gb_internal void init_universal(void) {
 		t_objc_Ivar     = alloc_type_pointer(t_objc_ivar);
 
 		t_objc_instancetype = add_global_type_name(intrinsics_pkg->scope, str_lit("objc_instancetype"), t_objc_id);
+	}
+
+	// intrinsics types for C stuff
+	{
+		Scope *scope = create_scope(nullptr, nullptr);
+
+		auto dummy_field = [](Scope *scope, Type *type, i32 field_index, char const *name = nullptr) -> Entity * {
+			auto token = blank_token;
+			if (name) {
+				token.string = make_string_c(name);
+			}
+			return alloc_entity_field(scope, token, type, false, 0, EntityState_Resolved);
+		};
+
+		auto fields = array_make<Entity *>(permanent_allocator(), 0, 8);
+
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+			switch (build_context.metrics.os) {
+			case TargetOs_freestanding:
+				/*check*/
+			case TargetOs_linux:
+			case TargetOs_freebsd:
+			case TargetOs_netbsd:
+			case TargetOs_openbsd:
+				array_add(&fields, dummy_field(scope, t_u32,    0, "gp_offset"));
+				array_add(&fields, dummy_field(scope, t_u32,    1, "fp_offset"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 2, "overflow_arg_area"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 3, "reg_save_area"));
+				break;
+			}
+			break;
+
+		case TargetArch_arm64:
+			switch (build_context.metrics.os) {
+			case TargetOs_darwin:
+				// AARCH64 architecture is different to other arm64 platforms
+				array_add(&fields, dummy_field(scope, t_rawptr, 0));
+				break;
+
+			case TargetOs_freestanding:
+			case TargetOs_linux:
+			case TargetOs_freebsd:
+			case TargetOs_netbsd:
+			case TargetOs_openbsd: // Not sure if this is correct
+				array_add(&fields, dummy_field(scope, t_rawptr, 0, "__stack"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 1, "__gr_top"));
+				array_add(&fields, dummy_field(scope, t_rawptr, 2, "__vr_top"));
+				array_add(&fields, dummy_field(scope, t_i32,    3, "__gr_offs"));
+				array_add(&fields, dummy_field(scope, t_i32,    4, "__vr_offs"));
+				break;
+			}
+			break;
+		}
+
+		if (fields.count == 0) {
+			array_add(&fields, dummy_field(scope, t_rawptr, 0));
+		}
+
+		Type *va_list_struct = alloc_type_struct_complete();
+		va_list_struct->Struct.scope  = scope;
+		va_list_struct->Struct.fields = slice_from_array(fields);
+		GB_ASSERT(type_size_of(va_list_struct) > 0);
+
+		t_c_va_list = add_global_type_name(intrinsics_pkg->scope, str_lit("c_va_list"), va_list_struct);
+		t_c_va_list_ptr = alloc_type_pointer(t_c_va_list);
 	}
 }
 
@@ -2776,9 +2915,11 @@ gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *p
 	InternedString interned = string_interner_insert(str_lit("Test_Signature"), 0, &hash);
 	Entity *test_signature = scope_lookup_current(testing_scope, interned, hash);
 
-	Scope *s = pkg->scope;
-	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;
+	for_array(i, c->info.entities) {
+		Entity *e = c->info.entities[i];
+		if (e->pkg != pkg) {
+			continue;
+		}
 		if (e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -3490,11 +3631,17 @@ gb_internal void init_preload(Checker *c) {
 	init_core_objc_c(c);
 }
 
-gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
+gb_internal void check_expr_with_type_hint(CheckerContext *c, Operand *o, Ast *e, Type *t);
+
+gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value, Type *type_hint = nullptr) {
 	ExactValue ev = {};
 	if (value != nullptr) {
 		Operand op = {};
-		check_expr(c, &op, value);
+		if (type_hint != nullptr) {
+			check_expr_with_type_hint(c, &op, value, type_hint);
+		} else {
+			check_expr(c, &op, value);
+		}
 		if (op.mode) {
 			if (op.mode == Addressing_Constant) {
 				ev = op.value;
@@ -3504,6 +3651,52 @@ gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value)
 		}
 	}
 	return ev;
+}
+
+gb_internal bool is_foreign_name_valid(String const &name) {
+	if (name.len == 0) {
+		return false;
+	}
+	isize offset = 0;
+	while (offset < name.len) {
+		Rune rune;
+		isize remaining = name.len - offset;
+		isize width = utf8_decode(name.text+offset, remaining, &rune);
+		if (rune == GB_RUNE_INVALID && width == 1) {
+			return false;
+		} else if (rune == GB_RUNE_BOM && remaining > 0) {
+			return false;
+		}
+
+		// TODO(bill, 2026-06-02): This entire logic needs to be completely figured out
+		// as to what should be allowed or not
+		// The original limitations of `-$._ +` and alphanumeric was more of an assumption
+		// than the actual technical limitations of all linkers.
+		if (offset == 0) {
+			switch (rune) {
+			case '-':
+			case '$':
+			case '.':
+			case '_':
+			case ':':
+				break;
+			default:
+				if (!gb_char_is_alpha(cast(char)rune))
+					return false;
+				break;
+			}
+		} else {
+			int n = utf8proc_charwidth(rune);
+			if (n <= 0) {
+				// not a printable character
+				return false;
+			}
+		}
+
+		offset += width;
+	}
+
+	return true;
 }
 
 
@@ -3866,6 +4059,17 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "link_section") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->link_section = ev.value_string;
+			if (!is_foreign_name_valid(ac->link_section)) {
+				error(elem, "Invalid link section: %.*s", LIT(ac->link_section));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
 	} else if (name == "deprecated") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 
@@ -4061,6 +4265,18 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(value, "'%.*s' expects no parameter", LIT(name));
 		}
 		ac->no_sanitize_thread = true;
+		return true;
+	} else if (name == "fast_math") {
+		if (value == nullptr) {
+			error(elem, "Expected a constant bit_set of type 'intrinsics.Fast_Math_Flags' for '%.*s'", LIT(name));
+		} else {
+			ExactValue ev = check_decl_attribute_value(c, value, t_fast_math_flags);
+			if (ev.kind != ExactValue_Integer) {
+				error(elem, "Expected a constant bit_set of type 'intrinsics.Fast_Math_Flags' for '%.*s'", LIT(name));
+			} else {
+				ac->fast_math_flags = exact_value_to_u64(ev);
+			}
+		}
 		return true;
 	}
 	return false;
@@ -6679,7 +6895,10 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
-		GB_ASSERT(is_type_proc(src->type));
+		if (!is_type_proc(src->type)) {
+			error(src->token, "Invalid procedure type found during deferred procedure checking");
+			continue;
+		}
 		GB_ASSERT(is_type_proc(dst->type));
 		Type *src_params = base_type(src->type)->Proc.params;
 		Type *src_results = base_type(src->type)->Proc.results;
@@ -7491,6 +7710,14 @@ gb_internal void check_parsed_files(Checker *c) {
 		Type *t = &basic_types[i];
 		if (t->Basic.size > 0 &&
 		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
+		    	if (build_context.bedrock) {
+				if ((t->Basic.flags & BasicFlag_Integer) != 0 &&
+				    t->Basic.size == 16) {
+				    	// disallow 128-bit integers
+					continue;
+				}
+			}
+
 			add_type_info_type(&c->builtin_ctx, t);
 		}
 	}
