@@ -1206,18 +1206,19 @@ gb_internal lbValue lb_emit_struct_ep_internal(lbProcedure *p, lbValue s, i32 in
 
 	i32 original_index = index;
 	index = lb_convert_struct_index(p->module, t, index);
+	lbModule *m = p->module;
 
 	if (lb_is_const(s)) {
 		// NOTE(bill): this cannot be replaced with lb_emit_epi
-		lbModule *m = p->module;
 		lbValue res = {};
 		LLVMValueRef indices[2] = {llvm_zero(m), LLVMConstInt(lb_type(m, t_i32), index, false)};
-		res.value = LLVMConstGEP2(lb_type(m, type_deref(s.type)), s.value, indices, gb_count_of(indices));
 		res.type = alloc_type_pointer(result_type);
+		res.value = LLVMConstGEP2(lb_type(m, type_deref(s.type)), s.value, indices, gb_count_of(indices));
+		res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
 		return res;
 	} else {
 		lbValue res = {};
-		LLVMTypeRef st = lb_type(p->module, type_deref(s.type));
+		LLVMTypeRef st = lb_type(m, type_deref(s.type));
 		// gb_printf_err("%s\n", type_to_string(s.type));
 		// gb_printf_err("%s\n", LLVMPrintTypeToString(LLVMTypeOf(s.value)));
 		// gb_printf_err("%d\n", index);
@@ -1225,8 +1226,9 @@ gb_internal lbValue lb_emit_struct_ep_internal(lbProcedure *p, lbValue s, i32 in
 		unsigned count = LLVMCountStructElementTypes(st);
 		GB_ASSERT_MSG(count >= cast(unsigned)index, "%u %d %d", count, index, original_index);
 
-		res.value = LLVMBuildStructGEP2(p->builder, st, s.value, cast(unsigned)index, "");
 		res.type = alloc_type_pointer(result_type);
+		res.value = LLVMBuildStructGEP2(p->builder, st, s.value, cast(unsigned)index, "");
+		res.value = LLVMBuildPointerCast(p->builder, res.value, lb_type(m, res.type), "");
 		return res;
 	}
 }
@@ -1274,6 +1276,17 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 1: result_type = ft; break;
 		case 2: result_type = ft; break;
 		case 3: result_type = ft; break;
+		case -1:
+			{
+				lbValue res = {};
+				res.type = alloc_type_pointer(alloc_type_array(ft, 3));
+				if (lb_is_const(s)) {
+					res.value = LLVMConstPointerCast(s.value, lb_type(p->module, res.type));
+				} else {
+					res.value = LLVMBuildPointerCast(p->builder, s.value, lb_type(p->module, res.type), "");
+				}
+				return res;
+			}
 		}
 	} else if (is_type_slice(t)) {
 		switch (index) {
@@ -1443,6 +1456,11 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 			case 1: result_type = ft; break;
 			case 2: result_type = ft; break;
 			case 3: result_type = ft; break;
+			case -1: {
+				lbValue ptr_q = lb_address_from_load_or_generate_local(p, s);
+				lbValue ptr_xyz = lb_emit_struct_ep(p, ptr_q, -1);
+				return lb_emit_load(p, ptr_xyz);
+			}
 			}
 			break;
 		}
