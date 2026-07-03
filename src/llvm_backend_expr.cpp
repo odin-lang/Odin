@@ -3878,6 +3878,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			break;
 		}
 
+		GB_ASSERT(res.value != nullptr);
 		return res;
 
 	} else if (is_type_soa_pointer(a)) {
