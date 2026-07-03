@@ -3799,7 +3799,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 	} else if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
-		} else if (is_type_slice(type) && is_type_string(x->type)) {
+		} else if ((is_type_slice(type) && is_type_string(x->type)) || is_type_any(type)) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
 			if (is_type_union_constantable(type)) {
@@ -8572,10 +8572,6 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			}
 			operand->type = t;
 			operand->expr = call;
-
-			if(operand->mode == Addressing_Constant && is_type_any(t)) {
-				operand->mode = Addressing_Value;
-			}
 
 			if (operand->mode != Addressing_Invalid) {
 				update_untyped_expr_type(c, arg, t, false);
