@@ -972,6 +972,12 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			type_writer_appendc(w, "->");
 			write_canonical_params(w, type->Proc.results);
 		}
+		if (type->Proc.diverging) {
+			type_writer_appendc(w, "!");
+		}
+		if (type->Proc.optional_ok) {
+			type_writer_appendc(w, "#optional_ok");
+		}
 		return;
 
 	case Type_Generic:
