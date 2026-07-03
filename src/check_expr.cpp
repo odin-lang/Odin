@@ -9908,6 +9908,7 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 				if (is_diverging_expr(y.expr)) {
 					// Allow
 					y.mode = Addressing_Value;
+					y.type = x.type;
 					y_is_diverging = true;
 				} else {
 					error_operand_no_value(&y);
