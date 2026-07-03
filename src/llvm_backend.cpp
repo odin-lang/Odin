@@ -2408,10 +2408,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			LLVMInitializeFunctionPassManager(m->function_pass_managers[i]);
 		}
 
-		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
-		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
-
 		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
 			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
 		}
@@ -2480,11 +2476,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
 
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
-	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
 
-
-#if LB_USE_NEW_PASS_SYSTEM
 	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
 	defer (array_free(&passes));
 
@@ -2560,7 +2553,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		exit_with_errors();
 		return 1;
 	}
-#endif
 
 	if (LLVM_IGNORE_VERIFICATION) {
 		return 0;
@@ -2864,7 +2856,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime, lbProcedure *cleanup_runtime) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 	Type *params  = alloc_type_tuple();
@@ -3173,9 +3164,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
 	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;
-	if (!LB_USE_NEW_PASS_SYSTEM) {
-		build_context.optimization_level = gb_clamp(build_context.optimization_level, -1, 2);
-	}
 	switch (build_context.optimization_level) {
 	default:/*fallthrough*/
 	case 0: code_gen_level = LLVMCodeGenLevelNone;       break;
