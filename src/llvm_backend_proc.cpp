@@ -846,8 +846,9 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	GB_ASSERT(pd->body != nullptr);
 	lbModule *m = p->module;
 
-	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+	if (e->min_dep_count.load(std::memory_order_relaxed) == 0 || e->code_gen_procedure != nullptr) {
 		// NOTE(bill): Nothing depends upon it so doesn't need to be built
+		// NOTE(tf2spi): Code may already be generated (i.e. loop unrolling), don't regen it
 		return;
 	}
 
