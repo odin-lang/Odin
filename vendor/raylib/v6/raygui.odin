@@ -1,4 +1,4 @@
-package raylib
+package raylib6
 
 import "core:c"
 
