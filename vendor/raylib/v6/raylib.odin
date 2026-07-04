@@ -118,6 +118,7 @@ when ODIN_OS == .Windows {
 			"linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "linux-arm/libraylib.a",
 			"system:dl",
 			"system:pthread",
+			"system:X11",
 		}
 	} else {
 		foreign import lib {
@@ -128,6 +129,7 @@ when ODIN_OS == .Windows {
 			"linux/libraylib.so.600" when RAYLIB_SHARED else "linux/libraylib.a",
 			"system:dl",
 			"system:pthread",
+			"system:X11",
 		}
 	}
 } else when ODIN_OS == .Darwin {
