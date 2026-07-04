@@ -2,8 +2,8 @@ package wgpu
 
 import "base:runtime"
 
-BINDINGS_VERSION        :: [4]u8{29, 0, 0, 0}
-BINDINGS_VERSION_STRING :: "29.0.0.0"
+BINDINGS_VERSION        :: [4]u8{29, 0, 1, 1}
+BINDINGS_VERSION_STRING :: "29.0.1.1"
 
 LogLevel :: enum i32 {
 	Off,
@@ -138,14 +138,10 @@ DeviceExtras :: struct {
 
 NativeLimits :: struct {
 	using chain: ChainedStruct,
-	maxImmediateSize: u32,
 	maxNonSamplerBindings: u32,
 	maxBindingArrayElementsPerShaderStage: u32,
-}
-
-PipelineLayoutExtras :: struct {
-	using chain: ChainedStruct,
-	immediateDataSize: u32,
+	maxBindingArraySamplerElementsPerShaderStage: u32,
+	maxMultiviewCount: u32,
 }
 
 SubmissionIndex :: distinct u64
@@ -257,6 +253,36 @@ PrimitiveStateExtras :: struct {
 }
 
 LogCallback :: #type proc "c" (level: LogLevel, message: StringView, userdata: rawptr)
+
+ImageSubresourceRange :: struct {
+	aspect:          TextureAspect,
+	baseMipLevel:    u32,
+	mipLevelCount:   u32,
+	baseArrayLayer:  u32,
+	arrayLayerCount: u32,
+}
+
+ShaderRuntimeCheck :: enum i32 {
+	BoundsChecks,
+	ForceLoopBounding,
+	RayQueryInitializationTracking,
+	TaskShaderDispatchTracking,
+	MeshShaderPrimitiveIndicesClamp,
+}
+ShaderRuntimeChecks :: bit_set[ShaderRuntimeCheck; Flags]
+
+SamplerBorderColor :: enum i32 {
+	Undefined,
+	TransparentBlack,
+	OpaqueBlack,
+	OpaqueWhite,
+	Zero,
+}
+
+SamplerDescriptorExtras :: struct {
+	using chain:       ChainedStruct,
+	samplerBoderColor: SamplerBorderColor,
+}
 
 // Wrappers
 
