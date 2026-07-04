@@ -19,6 +19,11 @@ when ODIN_OS == .Windows {
 	foreign import lib {
 		"lib/linux-amd64/libbox3d.a",
 	}
+} else when ODIN_OS == .Darwin && (ODIN_ARCH == .arm64 || ODIN_ARCH == .amd64) && !BOX3D_SHARED {
+	@(export)
+	foreign import lib {
+		"lib/darwin/libbox3d.a",
+	}
 } else {
 	@(export)
 	foreign import lib {
