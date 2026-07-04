@@ -2174,6 +2174,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {
 								poly_const = op.value;
+								if (poly_const.kind == ExactValue_Integer && is_type_float(type)) {
+									poly_const.kind = ExactValue_Float;
+									poly_const.value_float = big_int_to_f64(&poly_const.value_integer);
+								}
 							} else {
 								if (!ctx->in_proc_group) {
 									error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
