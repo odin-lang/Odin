@@ -1,4 +1,4 @@
-/*  kb_text_shape - v2.05 - text segmentation and shaping
+/*  kb_text_shape - v2.21 - text segmentation and shaping
     by Jimmy Lefevre
 
     SECURITY
@@ -243,22 +243,53 @@
           int kbts_SizeOfShapeContext()
             Tells you how big of a buffer you need to provide to kbts_PlaceShapeContext.
 
+          :kbts_PlaceShapeContext2
+          :PlaceShapeContext2
+          kbts_shape_context *kbts_PlaceShapeContext2(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory, kbts_shape_context_flags Flags)
+            Places a context at Memory and initializes it.
+            [Allocator] will be used for subsequent allocations.
+
+            [Flags] can be any combination of:
+              KBTS_SHAPE_CONTEXT_FLAG_NONE
+                No-op; default behavior.
+              KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP = (1 << 0)
+                The default priority order for the font stack is top-to-bottom, i.e.
+                fonts that were pushed later have higher priority.
+                If this flag is set, then this priority is reversed: fonts that are
+                pushed earlier, and are thus closer to the bottom of the stack, have
+                higher priority.
+                For more details on the font stack, see CONTEXT:FONT HANDLING.
+
           :kbts_PlaceShapeContext
           :PlaceShapeContext
           kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory)
+            Equivalent to calling kbts_PlaceShapeContext2 with Flags = KBTS_SHAPE_CONTEXT_FLAG_NONE.
+
+          :kbts_PlaceShapeContextFixedMemory2
+          :PlaceShapeContextFixedMemory2
+          kbts_shape_context *kbts_PlaceShapeContextFixedMemory(void *Memory, int Size, kbts_shape_context_flags Flags)
             Places a context at Memory and initializes it.
-            [Allocator] will be used for subsequent allocations.
+            This context will only use the [Size] bytes located at [Memory] for its allocations.
+
+            For more details on [Flags], see :kbts_PlaceShapeContext2.
 
           :kbts_PlaceShapeContextFixedMemory
           :PlaceShapeContextFixedMemory
           kbts_shape_context *kbts_PlaceShapeContextFixedMemory(void *Memory, int Size)
-            Places a context at Memory and initializes it.
-            This context will only use the [Size] bytes located at [Memory] for its allocations.
+            Equivalent to calling kbts_PlaceShapeContextFixedMemory2 with
+            Flags = KBTS_SHAPE_CONTEXT_FLAG_NONE.
+
+          :kbts_CreateShapeContext2
+          :CreateShapeContext2
+          kbts_shape_context *kbts_CreateShapeContext2(kbts_allocator_function *Allocator, void *AllocatorData, kbts_shape_context_flags Flags)
+            Allocates a context using [Allocator] and initializes it.
+
+            For more information on [Flags], see :kbts_PlaceShapeContext2.
 
           :kbts_CreateShapeContext
           :CreateShapeContext
           kbts_shape_context *kbts_CreateShapeContext(kbts_allocator_function *Allocator, void *AllocatorData)
-            Allocates a context using [Allocator] and initializes it.
+            Equivalent to calling kbts_CreateShapeContext2 with Flags = KBTS_SHAPE_CONTEXT_FLAG_NONE.
 
           :kbts_DestroyShapeContext
           :DestroyShapeContext
@@ -423,7 +454,7 @@
             User IDs for the corresponding codepoints start at [UserId].
             If [UserIdGenerationMode] is KBTS_USER_ID_GENERATION_MODE_CODEPOINT_INDEX,
             each codepoint will increment the user ID by 1.
-            If [UserIdGenerationMode] is KBTS_USER_ID_GENERATION_MODE_CODEPOINT_INDEX,
+            If [UserIdGenerationMode] is KBTS_USER_ID_GENERATION_MODE_SOURCE_INDEX,
             each codepoint will increment the user ID by the length of its encoding in
             UTF-8.
 
@@ -439,7 +470,7 @@
             user ID counter.
             If [UserIdGenerationMode] is KBTS_USER_ID_GENERATION_MODE_CODEPOINT_INDEX,
             each codepoint will increment the user ID by 1.
-            If [UserIdGenerationMode] is KBTS_USER_ID_GENERATION_MODE_CODEPOINT_INDEX,
+            If [UserIdGenerationMode] is KBTS_USER_ID_GENERATION_MODE_SOURCE_INDEX,
             each codepoint will increment the user ID by the length of its encoding in
             bytes in UTF-8.
 
@@ -458,7 +489,7 @@
 
             Call kbts_ShapeCodepointIteratorNext repeatedly to loop through the
             corresponding codepoints.
-
+  
           :kbts_ShapeCodepointIteratorIsValid
           :ShapeCodepointIteratorIsValid
           int kbts_ShapeCodepointIteratorIsValid(kbts_shape_codepoint_iterator *It)
@@ -553,7 +584,7 @@
             a set of active glyphs.
             The active glyph set part is used by the library. As a user, you only need to care
             about the memory allocation part.
-        - Scratch memory
+        - Scratch memory (kbts_shape_scratchpad)
             Unfortunately, shaping can have a very unpredictable memory footprint, so all shaping
             operations require some amount of scratch space that we cannot compute beforehand.
 
@@ -561,10 +592,8 @@
 
           :kbts_ShapeDirect
           :ShapeDirect
-          kbts_shape_error kbts_ShapeDirect(kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                            kbts_direction RunDirection,
-                                            kbts_allocator_function *Allocator, void *AllocatorData,
-                                            kbts_glyph_iterator *Output)
+          kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage,
+                                            kbts_direction RunDirection, kbts_glyph_iterator *Output)
             [RunDirection] is the direction of the specific run being shaped.
             If the [return value] is KBTS_SHAPE_ERROR_NONE, then the shaping operation
             completed successfully.
@@ -575,15 +604,6 @@
             Note that kbts_ShapeDirect does not care about the paragraph direction.
             Glyphs are always returned in left-to-right order. In other words, RTL runs
             are flipped so that visual order is consistent.
-
-
-          :kbts_ShapeDirectFixedMemory
-          :ShapeDirectFixedMemory
-          kbts_shape_error kbts_ShapeDirectFixedMemory(kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                                       kbts_direction RunDirection,
-                                                       void *Memory, int Size,
-                                                       kbts_glyph_iterator *Output)
-            Same as kbts_ShapeDirect, but only uses the [Size] bytes at [Memory] for allocations.
 
         The rest of the direct API is more or less about preparing the data you need to call
         kbts_ShapeDirect.
@@ -673,16 +693,21 @@
             returned by kbts_FontFromFile), frees all of [Font]'s buffers.
             Otherwise, does nothing.
 
-          :kbts_GetFontInfo
-          :GetFontInfo
-          void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info)
+          :kbts_GetFontInfo2
+          :GetFontInfo2
+          void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
             Writes a bunch of useful metadata about [Font] into [Info].
-            You can use this function to extract styling, name and licensing information
-            from a font.
 
-            We use a simplified representation for font weight and width that is fine for
-            classic font selection, e.g. "I need a bold font". OpenType fonts may feature
-            finer-grained metrics, and we currently do not expose/support those.
+            Before calling this function, you must fill out [Info].Size to be
+            sizeof([Info]).
+
+            [Info] can be one of several types:
+            - kbts_font_info2 describes styling, name and licensing information.
+              We use a simplified representation for font weight and width that is fine for
+              classic font selection, e.g. "I need a bold font". OpenType fonts may feature
+              finer-grained metrics, and we currently do not expose/support those.
+            - kbts_font_info2_1 also includes metrics and bounding box information.
+            - kbts_font_info2_2 also includes capital height.
 
             :kbts_font_style_flags
             :font_style_flags
@@ -694,7 +719,14 @@
             A given font can be bold and italic at the same time, but probably not regular
             and bold and probably not regular and italic.
 
-            If [Font] is not a valid font, then [Info] will be zeroed.
+            If [Font] is not a valid font, or some information could not be found in the
+            font, then the respective members will be zeroed (except Size).
+
+          :kbts_GetFontInfo
+          :GetFontInfo
+          void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info)
+            Equivalent to calling kbts_GetFontInfo2 with an Info struct of type
+            kbts_font_info2.
 
         DIRECT:SHAPE CONFIG
           :kbts_SizeOfShapeConfig
@@ -721,6 +753,51 @@
             If [Config] was allocated in kbts_CreateShapeConfig, frees all of [Config]'s data.
             Otherwise, nothing is done.
 
+        DIRECT:SHAPE SCRATCHPAD
+          :kbts_SizeOfShapeScratchpad
+          :SizeOfShapeScratchpad
+          kbts_un kbts_SizeOfShapeScratchpad(kbts_shape_config *Config)
+            Returns how large a scratchpad for [Config] will be initially.
+            This is the size of the initial memory footprint, used to hold basic bookkeeping data.
+            A scratchpad can always dynamically allocate memory during shaping.
+
+          :kbts_PlaceShapeScratchpad
+          :PlaceShapeScratchpad
+          kbts_shape_scratchpad *kbts_PlaceShapeScratchpad(kbts_shape_config *Config,
+                                                           void *Memory,
+                                                           kbts_allocator_function *Allocator, void *AllocatorData)
+            Initializes a scratchpad for [Config] at [Memory], and returns a pointer to it.
+            [Memory] should be kbts_SizeOfShapeScratchpad(Config) big.
+            [Allocator] will be used by the scratchpad during shaping.
+
+            If [Memory] is null, then the [return value] is null.
+
+          :kbts_PlaceShapeScratchpadFixedMemory
+          :PlaceShapeScratchpadFixedMemory
+          kbts_shape_scratchpad *kbts_PlaceShapeScratchpadFixedMemory(kbts_shape_config *Config,
+                                                                      void *Memory, int Size)
+            Same as kbts_PlaceShapeScratchpad, except the buffer [Memory] of size [Size]
+            is used for both initialization and dynamic allocation.
+
+            If [Size] is not large enough, then the [return value] is null.
+
+          :kbts_CreateShapeScratchpad
+          :CreateShapeScratchpad
+          kbts_shape_scratchpad *kbts_CreateShapeScratchpad(kbts_shape_config *Config,
+                                                            kbts_allocator_function *Allocator, void *AllocatorData)
+            Same as kbts_PlaceShapeScratchpad, except [Allocator] is used both for
+            initialization and for dynamic allocation.
+
+            If [Allocator] is null, then the default allocator is used.
+
+          :kbts_DestroyShapeScratchpad
+          :DestroyShapeScratchpad
+          void kbts_DestroyShapeScratchpad(kbts_shape_scratchpad *Scratchpad)
+            Frees all memory associated with [Scratchpad].
+
+            If [Scratchpad] itself was allocated with kbts_CreateShapeScratchpad, then
+            it will also free itself.
+
         DIRECT:GLYPH STORAGE
           kbts_glyph_storage is a public struct:
 
@@ -729,7 +806,7 @@
             typedef struct kbts_glyph_storage
             {
               kbts_arena Arena;
-
+            
               kbts_glyph GlyphSentinel;
               kbts_glyph FreeGlyphSentinel;
             } kbts_glyph_storage;
@@ -825,21 +902,19 @@
           is 0 or 1, but a few features actually care about the exact value. (You can think
           of a feature that is like "when I am enabled, change this letter to one of these
           alternatives". In that case, the value you provide in the feature override is used
-          as an index into the array of alternatives.)
+          as a one-based index into the array of alternatives.)
 
           :kbts_SizeOfGlyphConfig
           :SizeOfGlyphConfig
-          int kbts_SizeOfGlyphConfig(kbts_feature_override *Overrides, int OverrideCount)
+          int kbts_SizeOfGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount)
             Returns the buffer size needed to hold a kbts_glyph_config that describes [Overrides].
             This size can vary a lot depending on the kind of feature overrides you specify.
-            Built-in OpenType features with values of 0 or 1 are "free"; they are packed in a
-            fixed-size representation which does not change the config's memory footprint.
-            On the other hand, if you need non-binary values, or non-standard features, then
-            we need to store a description of the override itself, which requires memory.
+            Overrides with values of 0 or 1 are stored in a compact format, while other values
+            will be stored explicitly.
 
           :kbts_PlaceGlyphConfig
           :PlaceGlyphConfig
-          kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, void *Memory)
+          kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, void *Memory)
             Writes a kbts_glyph_config that describes [Overrides] into [Memory], and returns a
             pointer to it.
             The kbts_glyph_config uses its own representation for overrides, so you can modify
@@ -847,7 +922,7 @@
 
           :kbts_CreateGlyphConfig
           :CreateGlyphConfig
-          kbts_glyph_config *kbts_CreateGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData)
+          kbts_glyph_config *kbts_CreateGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData)
             Allocates a kbts_glyph_config that describes [Overrides] and returns a pointer to
             it.
             The kbts_glyph_config uses its own representation for overrides, so you can modify
@@ -954,7 +1029,7 @@
             value. If not, returns 0.
 
             kbts_break looks like this:
-
+            
               typedef struct kbts_break
               {
                 int Position;
@@ -1245,6 +1320,101 @@
      See https://unicode.org/reports/tr9 for more information.
 
    VERSION HISTORY
+     2.21  - Eliminate redundant typedefs for C99 compatibility.
+     2.20  - Properly check kbts__InputCodepoint return values.
+             Handle null shape configs in kbts_PlaceGlyphConfig.
+     2.19  - Fix the glyph config cache not taking shape_configs into account.
+     2.18  - Improved handling of default-ignorable codepoints.
+     2.17  - New function: kbts_PlaceShapeContextFixedMemory2.
+     2.16  - New type: kbts_shape_context_flags.
+             New functions: kbts_PlaceShapeContext2, kbts_CreateShapeContext2.
+             Fix a bug where ShapeCodepointIteratorNext() returned a null terminator when
+             the text ended on a block boundary.
+             Fix inconsistent break count/break flag count reporting in BreakEntireString.
+     2.15a - Fix GCC warnings
+     2.15  - Handle edge case when decomposing Thai/Lao Am vowels.
+     2.14  - Fix direction resolution for neutral characters surrounding digits.
+     2.13  - Extend NO_BREAK flag to include attached glyphs.
+     2.12  - Support fonts that use traditionally-GPOS features in GSUB.
+     2.11  - Reduce the size of Unicode lookup tables from ~577KiB to ~423KiB.
+             Fix a memory leak when recomposing glyphs in the shaper.
+             Remember shape and glyph configs in the shape context.
+     2.10  - Properly zero extended font_info2 types in GetFontInfo2.
+             Properly reset the glyph config cache in ShapeBegin.
+     2.09  - Fix use-after-free when a shape_scratchpad was freed after its respective shape_config.
+             Extended the GetFontInfo API to include metrics and bounding box information.
+               New types: kbts_font_info2, kbts_font_info2_1, kbts_font_info2_2.
+               New function: kbts_GetFontInfo2().
+     2.08  - Fix some UB.
+     2.07  - Performance improvements.
+             API CHANGES:
+             Struct layout changes for internal use: kbts_glyph, kbts_glyph_parent.
+
+             CONTEXT API
+             - kbts_shape_codepoint now holds bespoke feature overrides instead of a glyph config.
+               BEFORE:
+                 typedef struct kbts_shape_codepoint
+                 {
+                   kbts_font *Font; // Only set when (BreakFlags & KBTS_BREAK_FLAG_GRAPHEME) != 0.
+
+                   kbts_glyph_config *Config;
+   
+                   int Codepoint;
+                   int UserId;
+   
+                   kbts_break_flags BreakFlags;
+                   kbts_script Script; // Only set when (BreakFlags & KBTS_BREAK_FLAG_SCRIPT) != 0.
+                   kbts_direction Direction; // Only set when (BreakFlags & KBTS_BREAK_FLAG_DIRECTION) != 0.
+                   kbts_direction ParagraphDirection; // Only set when (BreakFlags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION) != 0.
+                 } kbts_shape_codepoint;
+               AFTER:
+                 typedef struct kbts_shape_codepoint
+                 {
+                   kbts_font *Font; // Only set when (BreakFlags & KBTS_BREAK_FLAG_GRAPHEME) != 0.
+   
+                   kbts_feature_override *FeatureOverrides;
+                   int FeatureOverrideCount;
+   
+                   int Codepoint;
+                   int UserId;
+   
+                   kbts_break_flags BreakFlags;
+                   kbts_script Script; // Only set when (BreakFlags & KBTS_BREAK_FLAG_SCRIPT) != 0.
+                   kbts_direction Direction; // Only set when (BreakFlags & KBTS_BREAK_FLAG_DIRECTION) != 0.
+                   kbts_direction ParagraphDirection; // Only set when (BreakFlags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION) != 0.
+                 } kbts_shape_codepoint;
+
+             DIRECT API
+             - Added a new (opaque pointer) type: kbts_shape_scratchpad.
+                 This type contains all the runtime data needed for shaping according to a specific kbts_shape_config.
+                 Unlike the kbts_shape_config, it is mutable, and so cannot be trivially shared across threads.
+                 It can be reused across different shaping calls as long as they all use the same shape_config.
+             - Added functions to manage scratchpads:
+                 kbts_un kbts_SizeOfShapeScratchpad(kbts_shape_config *Config)
+                 kbts_shape_scratchpad *kbts_PlaceShapeScratchpad(kbts_shape_config *Config, void *Memory, kbts_allocator_function *Allocator, void *AllocatorData)
+                 kbts_shape_scratchpad *kbts_PlaceShapeScratchpadFixedMemory(kbts_shape_config *Config, void *Memory, int Size)
+                 kbts_shape_scratchpad *kbts_CreateShapeScratchpad(kbts_shape_config *Config, kbts_allocator_function *Allocator, void *AllocatorData)
+                 void kbts_DestroyShapeScratchpad(kbts_shape_scratchpad *Scratchpad)
+             - kbts_ShapeDirect now takes a kbts_shape_scratchpad instead of a kbts_shape_config and an allocator.
+               BEFORE:
+                 kbts_shape_error kbts_ShapeDirect(kbts_shape_config *Config, kbts_glyph_storage *Storage,
+                                                   kbts_direction RunDirection,
+                                                   kbts_allocator_function *Allocator, void *AllocatorData,
+                                                   kbts_glyph_iterator *Output)
+               AFTER:
+                 kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage,
+                                                   kbts_direction RunDirection, kbts_glyph_iterator *Output)
+             - Removed kbts_ShapeDirectFixedMemory. (Use kbts_PlaceShapeScratchpadFixedMemory instead.)
+             - Glyph configs now correspond to exactly one shape config.
+               BEFORE:
+                 int kbts_SizeOfGlyphConfig(kbts_feature_override *Overrides, int OverrideCount)
+                 kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, void *Memory)
+                 kbts_glyph_config *kbts_CreateGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData)
+               AFTER:
+                 int kbts_SizeOfGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount)
+                 kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, void *Memory)
+                 kbts_glyph_config *kbts_CreateGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData)
+     2.06  - Faster GSUB and GPOS feature culling.
      2.05  - Fix custom allocator initialization for kbts_shape_context.PermanentArena.
      2.04  - Fix Indic syllable logic for small/single-character syllables.
              Fix wrong indirection in pointer code in Indic syllable logic.
@@ -1276,17 +1446,17 @@
 
    LICENSE
      zlib License
-
+     
      (C) Copyright 2024-2025 Jimmy Lefevre
-
+     
      This software is provided 'as-is', without any express or implied
      warranty.  In no event will the authors be held liable for any damages
      arising from the use of this software.
-
+     
      Permission is granted to anyone to use this software for any purpose,
      including commercial applications, and to alter it and redistribute it
      freely, subject to the following restrictions:
-
+     
      1. The origin of this software must not be misrepresented; you must not
         claim that you wrote the original software. If you use this software
         in a product, an acknowledgment in the product documentation would be
@@ -1331,6 +1501,9 @@
 #  ifndef kbts_s8
 #    define kbts_s8 signed char
 #  endif
+#  ifndef kbts_b32
+#    define kbts_b32 int
+#  endif
 
 #  ifndef KB_TEXT_SHAPE_POINTER_SIZE
 #    if defined(i386) || defined(__i386__) || defined(_M_IX86) || defined(_M_ARM) || defined(__arm__) || defined(__x86) || (defined(__APPLE__) && defined(__ppc)) || \
@@ -1344,18 +1517,20 @@
 #  if KB_TEXT_SHAPE_POINTER_SIZE == 4
 #    define kbts_un kbts_u32
 #    define kbts_sn kbts_s32
+#    define kbts_uptr kbts_u32
 #  else
 #    define kbts_un kbts_u64
 #    define kbts_sn kbts_s64
+#    define kbts_uptr kbts_u64
 #  endif
 
 #  ifdef __has_attribute
 #    if __has_attribute(fallthrough)
-#      define KBTS_FALLTHROUGH __attribute__((fallthrough))
+#      define KBTS__FALLTHROUGH __attribute__((fallthrough))
 #    endif
 #  endif
-#  ifndef KBTS_FALLTHROUGH
-#    define KBTS_FALLTHROUGH
+#  ifndef KBTS__FALLTHROUGH
+#    define KBTS__FALLTHROUGH
 #  endif
 
 #  ifndef KBTS_EXPORT
@@ -1389,7 +1564,7 @@
 #    define KBTS_INLINE static inline
 #  endif
 
-#  define KBTS_FOURCC(A, B, C, D) ((A) | ((B) << 8) | ((C) << 16) | ((D) << 24))
+#  define KBTS_FOURCC(A, B, C, D) ((kbts_u32)(A) | ((kbts_u32)(B) << 8) | ((kbts_u32)(C) << 16) | ((kbts_u32)(D) << 24))
 
 typedef kbts_u32 kbts_language;
 enum kbts_language_enum
@@ -2151,6 +2326,14 @@ enum kbts_break_state_flags_enum
   KBTS_BREAK_STATE_FLAG_LAST_WAS_BRACKET = 0x20,
 };
 
+typedef kbts_u32 kbts_shape_context_flags;
+enum kbts_shape_context_flags_enum
+{
+  KBTS_SHAPE_CONTEXT_FLAG_NONE,
+
+  KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP = (1 << 0), // Prioritize fonts that are pushed earlier, instead of the default which prioritizes fonts that are pushed later.
+};
+
 typedef kbts_u32 kbts_text_format;
 enum kbts_text_format_enum
 {
@@ -2257,8 +2440,9 @@ enum kbts_blob_version_enum
 {
   KBTS_BLOB_VERSION_INVALID,
   KBTS_BLOB_VERSION_INITIAL,
+  KBTS_BLOB_VERSION_REMOVED_SUBTABLE_INFOS_ALIGNED_TABLES,
 
-  KBTS_BLOB_VERSION_CURRENT = KBTS_BLOB_VERSION_INITIAL,
+  KBTS_BLOB_VERSION_CURRENT = KBTS_BLOB_VERSION_REMOVED_SUBTABLE_INFOS_ALIGNED_TABLES,
 };
 
 typedef kbts_u32 kbts_font_style_flags;
@@ -2335,18 +2519,18 @@ enum kbts_glyph_flags_enum
   KBTS_GLYPH_FLAG_CFAR = (1 << 19),
 
   // These can be anything.
-  KBTS_GLYPH_FLAG_DO_NOT_DECOMPOSE = (1 << 21),
-  KBTS_GLYPH_FLAG_FIRST_IN_MULTIPLE_SUBSTITUTION = (1 << 22),
-  KBTS_GLYPH_FLAG_NO_BREAK = (1 << 23),
-  KBTS_GLYPH_FLAG_CURSIVE = (1 << 24),
-  KBTS_GLYPH_FLAG_GENERATED_BY_GSUB = (1 << 25),
-  KBTS_GLYPH_FLAG_USED_IN_GPOS = (1 << 26),
+  KBTS_GLYPH_FLAG_DO_NOT_DECOMPOSE = (1 << 20),
+  KBTS_GLYPH_FLAG_FIRST_IN_MULTIPLE_SUBSTITUTION = (1 << 21),
+  KBTS_GLYPH_FLAG_NO_BREAK = (1 << 22),
+  KBTS_GLYPH_FLAG_CURSIVE = (1 << 23),
+  KBTS_GLYPH_FLAG_GENERATED_BY_GSUB = (1 << 24),
+  KBTS_GLYPH_FLAG_USED_IN_GPOS = (1 << 25),
 
-  KBTS_GLYPH_FLAG_STCH_ENDPOINT = (1 << 27),
-  KBTS_GLYPH_FLAG_STCH_EXTENSION = (1 << 28),
+  KBTS_GLYPH_FLAG_STCH_ENDPOINT = (1 << 26),
+  KBTS_GLYPH_FLAG_STCH_EXTENSION = (1 << 27),
 
-  KBTS_GLYPH_FLAG_LIGATURE = (1 << 29),
-  KBTS_GLYPH_FLAG_MULTIPLE_SUBSTITUTION = (1 << 30),
+  KBTS_GLYPH_FLAG_LIGATURE = (1 << 28),
+  KBTS_GLYPH_FLAG_MULTIPLE_SUBSTITUTION = (1 << 29),
 };
 
 typedef kbts_u8 kbts_joining_feature;
@@ -2379,7 +2563,7 @@ typedef kbts_u32 kbts_break_config_flags;
 enum kbts_break_config_flags_enum
 {
   KBTS_BREAK_CONFIG_FLAG_NONE,
-
+  
   KBTS_BREAK_CONFIG_FLAG_END_OF_TEXT_GENERATES_HARD_LINE_BREAK = 1,
 };
 
@@ -2522,7 +2706,7 @@ enum kbts_line_break_class_enum
   // NS is strict line breaking, used for long lines.
   // ID is normal line breaking, used for normal body text.
   /* 65 */ KBTS_LINE_BREAK_CLASS_CJ,
-
+  
   /* 66 */ KBTS_LINE_BREAK_CLASS_SOT,
   /* 67 */ KBTS_LINE_BREAK_CLASS_EOT,
 };
@@ -3206,6 +3390,7 @@ typedef struct kbts_glyph kbts_glyph;
 typedef struct kbts_glyph_config kbts_glyph_config;
 typedef struct kbts_shape_context kbts_shape_context;
 typedef struct kbts_glyph_storage kbts_glyph_storage;
+typedef struct kbts_shape_scratchpad kbts_shape_scratchpad;
 
 typedef struct kbts_allocator_op_allocate
 {
@@ -3231,12 +3416,6 @@ typedef struct kbts_allocator_op
 
 typedef void kbts_allocator_function(void *Data, kbts_allocator_op *Op);
 
-typedef struct kbts_lookup_subtable_info
-{
-  kbts_u16 MinimumBacktrackPlusOne;
-  kbts_u16 MinimumFollowupPlusOne;
-} kbts_lookup_subtable_info;
-
 typedef struct kbts_blob_table
 {
   kbts_u32 OffsetFromStartOfFile;
@@ -3253,7 +3432,7 @@ typedef struct kbts_load_font_state
   kbts_u32 LookupSubtableCount;
   kbts_u32 GlyphCount;
   kbts_u32 ScratchSize;
-
+  
   kbts_u32 GlyphLookupMatrixSizeInBytes;
   kbts_u32 GlyphLookupSubtableMatrixSizeInBytes;
   kbts_u32 TotalSize;
@@ -3303,6 +3482,57 @@ typedef struct kbts_font_info
   kbts_font_weight Weight;
   kbts_font_width Width;
 } kbts_font_info;
+
+typedef struct kbts_font_info2
+{
+  kbts_u32 Size;
+
+  char *Strings[KBTS_FONT_INFO_STRING_ID_COUNT];
+  kbts_u16 StringLengths[KBTS_FONT_INFO_STRING_ID_COUNT];
+
+  kbts_font_style_flags StyleFlags;
+  kbts_font_weight Weight;
+  kbts_font_width Width;
+} kbts_font_info2;
+
+typedef struct kbts_font_info2_1
+{
+  kbts_font_info2 Base;
+
+  kbts_u16 UnitsPerEm;
+
+  kbts_s16 XMin;
+  kbts_s16 YMin;
+  kbts_s16 XMax;
+  kbts_s16 YMax;
+
+  kbts_s16 Ascent;
+  kbts_s16 Descent;
+  kbts_s16 LineGap;
+} kbts_font_info2_1;
+
+typedef struct kbts_font_info2_2
+{
+  kbts_font_info2 Base;
+
+  // _1
+  kbts_u16 UnitsPerEm;
+
+  kbts_s16 XMin;
+  kbts_s16 YMin;
+  kbts_s16 XMax;
+  kbts_s16 YMax;
+
+  kbts_s16 Ascent;
+  kbts_s16 Descent;
+  kbts_s16 LineGap;
+
+  // _2
+
+  // For now, this is just OS2.sCapHeight.
+  // If/when this is zero, we might consider trying to communicate a useful height instead of simply passing the zero along.
+  kbts_s16 CapitalHeight;
+} kbts_font_info2_2;
 
 typedef struct kbts_feature_override
 {
@@ -3411,7 +3641,9 @@ typedef struct kbts_glyph_classes
   kbts_u16 MarkAttachmentClass;
 } kbts_glyph_classes;
 
-typedef struct kbts_glyph
+
+typedef struct kbts__bucketed_glyph kbts__bucketed_glyph;
+struct kbts_glyph
 {
   kbts_glyph *Prev;
   kbts_glyph *Next;
@@ -3446,6 +3678,7 @@ typedef struct kbts_glyph
 
   kbts_glyph_config *Config;
 
+  // @Memory: We definitely don't need to carry this around for the entire shaping process.
   kbts_u64 Decomposition;
 
   kbts_glyph_classes Classes;
@@ -3453,6 +3686,11 @@ typedef struct kbts_glyph
   kbts_glyph_flags Flags;
 
   kbts_u32 ParentInfo;
+
+  kbts__bucketed_glyph *Bucketed; 
+  kbts_u32 SortKey;
+  kbts_u32 SortKeyInterval;
+  kbts_u16 BucketedBucketIndex;
 
   // This is set by GSUB and used by GPOS.
   // A 0-index means that we should attach to the last component in the ligature.
@@ -3481,12 +3719,14 @@ typedef struct kbts_glyph
   kbts_u8 CombiningClass;
 
   kbts_u8 MarkOrdering; // Only used temporarily in NORMALIZE for Arabic mark reordering.
-} kbts_glyph;
+};
 
 typedef struct kbts_shape_codepoint
 {
   kbts_font *Font; // Only set when (BreakFlags & KBTS_BREAK_FLAG_GRAPHEME) != 0.
-  kbts_glyph_config *Config;
+
+  kbts_feature_override *FeatureOverrides;
+  int FeatureOverrideCount;
 
   int Codepoint;
   int UserId;
@@ -3537,7 +3777,7 @@ typedef struct kbts_arena
   int Error;
 } kbts_arena;
 
-typedef struct kbts_glyph_storage
+struct kbts_glyph_storage
 {
   kbts_arena Arena;
 
@@ -3545,12 +3785,12 @@ typedef struct kbts_glyph_storage
   kbts_glyph FreeGlyphSentinel;
 
   int Error;
-} kbts_glyph_storage;
+};
 
 typedef struct kbts_glyph_parent
 {
-  kbts_u64 Decomposition;
   kbts_u32 Codepoint;
+  kbts_u32 Codepoint1;
 } kbts_glyph_parent;
 
 typedef struct kbts_font_coverage_test
@@ -3582,8 +3822,11 @@ typedef struct kbts_run
 //
 
 KBTS_EXPORT int kbts_SizeOfShapeContext(void);
+KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext2(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory, kbts_shape_context_flags Flags);
 KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory);
+KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContextFixedMemory2(void *Memory, int Size, kbts_shape_context_flags Flags);
 KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContextFixedMemory(void *Memory, int Size);
+KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext2(kbts_allocator_function *Allocator, void *AllocatorData, kbts_shape_context_flags Flags);
 KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext(kbts_allocator_function *Allocator, void *AllocatorData);
 KBTS_EXPORT void kbts_DestroyShapeContext(kbts_shape_context *Context);
 #ifndef KB_TEXT_SHAPE_NO_CRT
@@ -3617,8 +3860,7 @@ KBTS_EXPORT int kbts_ShapeGetShapeCodepoint(kbts_shape_context *Context, int Cod
 // Direct API
 //
 
-KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_config *Config, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_allocator_function *Allocator, void *AllocatorData, kbts_glyph_iterator *Output);
-KBTS_EXPORT kbts_shape_error kbts_ShapeDirectFixedMemory(kbts_shape_config *Config, kbts_glyph_storage *Storage, kbts_direction RunDirection, void *Memory, int MemorySize, kbts_glyph_iterator *Output);
+KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_glyph_iterator *Output);
 
 // A font holds all data that corresponds to a given font file.
 #ifndef KB_TEXT_SHAPE_NO_CRT
@@ -3631,6 +3873,7 @@ KBTS_EXPORT int kbts_FontIsValid(kbts_font *Font);
 KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_state *State, void *FontData, int FontDataSize, int FontIndex, int *ScratchSize_, int *OutputSize_);
 KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_state *State, void *ScratchMemory, void *OutputMemory);
 KBTS_EXPORT void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info);
+KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info);
 
 // A shape_config is a bag of pre-computed data for a specific shaping setup.
 KBTS_EXPORT int kbts_SizeOfShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language);
@@ -3650,10 +3893,19 @@ KBTS_EXPORT kbts_glyph_iterator kbts_ActiveGlyphIterator(kbts_glyph_storage *Sto
 
 // A glyph_config specifies glyph-specific shaping parameters.
 // A single glyph_config can be shared by multiple glyphs.
-KBTS_EXPORT int kbts_SizeOfGlyphConfig(kbts_feature_override *Overrides, int OverrideCount);
-KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, void *Memory);
-KBTS_EXPORT kbts_glyph_config *kbts_CreateGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData);
+KBTS_EXPORT int kbts_SizeOfGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount);
+KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, void *Memory);
+KBTS_EXPORT kbts_glyph_config *kbts_CreateGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData);
 KBTS_EXPORT void kbts_DestroyGlyphConfig(kbts_glyph_config *Config);
+
+// A shape_scratchpad holds all transient runtime shaping data.
+// While the shape_config is immutable and can be trivially shared among threads, a
+// shape_scratchpad is mutable and needs to be per-thread.
+KBTS_EXPORT kbts_un kbts_SizeOfShapeScratchpad(kbts_shape_config *Config);
+KBTS_EXPORT kbts_shape_scratchpad *kbts_PlaceShapeScratchpad(kbts_shape_config *Config, void *Memory, kbts_allocator_function *Allocator, void *AllocatorData);
+KBTS_EXPORT kbts_shape_scratchpad *kbts_PlaceShapeScratchpadFixedMemory(kbts_shape_config *Config, void *Memory, int Size);
+KBTS_EXPORT kbts_shape_scratchpad *kbts_CreateShapeScratchpad(kbts_shape_config *Config, kbts_allocator_function *Allocator, void *AllocatorData);
+KBTS_EXPORT void kbts_DestroyShapeScratchpad(kbts_shape_scratchpad *Scratchpad);
 
 //
 // Glyph iterator
@@ -3700,8 +3952,10 @@ KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #ifdef KB_TEXT_SHAPE_IMPLEMENTATION
 #ifdef _MSC_VER
 #define KBTS__UNUSED(X) (void)sizeof((X))
+#define KBTS__RESTRICT __restrict
 #else
 #define KBTS__UNUSED(X) (void)(X)
+#define KBTS__RESTRICT __restrict__
 #endif
 #  define KBTS__FOR(I, Start, End) for(kbts_un I = (Start); I < (End); ++I)
 #  ifdef __cplusplus
@@ -3713,6 +3967,8 @@ KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #  endif
 #  define KBTS__MAX(A, B) (((A) < (B)) ? (B) : (A))
 #  define KBTS__MIN(A, B) (((A) < (B)) ? (A) : (B))
+#  define KBTS__IDIV_ROUND_UP(A, B) (((A) + ((B) - 1)) / (B))
+#  define KBTS__ROUND_UP_POW2(A, B) (((A) + ((B) - 1)) & ~((B) - 1))
 #  define KBTS__ARRAY_LENGTH(A) (sizeof(A)/sizeof(*(A)))
 #  define KBTS__POINTER_AFTER(Type, X) ((Type *)((X) + 1))
 #  define KBTS__POINTER_OFFSET(Type, Base, Offset) ((Type *)((char *)(Base) + (Offset)))
@@ -3736,8 +3992,12 @@ KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #  define KBTS__SET64(Args) (0u KBTS__PASTE(KBTS__SET64_0 Args, End))
 #define KBTS__U32BE(X) kbts__ByteSwap32((X))
 #define KBTS__U32LE(X) (X)
+#define KBTS__BIT_WIDTH(Type) (sizeof(Type)*8)
 
-#define KBTS_LOOKUP_STACK_SIZE 64
+#define KBTS__DELETED_SORT_KEY 0xFFFFFFFF
+
+#define KBTS__BUCKETED_GLYPHS_PER_BLOCK 64
+#define KBTS_LOOKUP_STACK_SIZE 32
 
 #  ifndef KBTS_ASSERT
 #ifndef KB_TEXT_SHAPE_NO_CRT
@@ -3814,6 +4074,15 @@ KBTS_INLINE kbts_u32 kbts__MsbPositionOrZero32(kbts_u32 X)
   }
   return (kbts_u32)Result;
 }
+KBTS_INLINE kbts_u32 kbts__LsbPositionOrBitWidth32(kbts_u32 X)
+{
+  unsigned long Result;
+  if(!_BitScanForward(&Result, X))
+  {
+    Result = 32;
+  }
+  return (kbts_u32)Result;
+}
 #  elif defined(__clang__) || defined(__GNUC__)
 KBTS_INLINE kbts_u32 kbts__MsbPositionOrZero32(kbts_u32 X)
 {
@@ -3821,6 +4090,15 @@ KBTS_INLINE kbts_u32 kbts__MsbPositionOrZero32(kbts_u32 X)
   if(X)
   {
     Result = 31 - __builtin_clz(X);
+  }
+  return Result;
+}
+KBTS_INLINE kbts_u32 kbts__LsbPositionOrBitWidth32(kbts_u32 X)
+{
+  kbts_u32 Result = 32;
+  if(X)
+  {
+    Result = __builtin_ctz(X);
   }
   return Result;
 }
@@ -4177,6 +4455,7 @@ enum kbts__op_kind_enum
   KBTS__OP_KIND_NORMALIZE,
   KBTS__OP_KIND_NORMALIZE_HANGUL,
   KBTS__OP_KIND_FLAG_JOINING_LETTERS,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES_WITH_USER,
   KBTS__OP_KIND_GPOS_METRICS,
@@ -4203,6 +4482,7 @@ typedef struct kbts__op_list
 } kbts__op_list;
 static kbts__op_kind kbts__Ops_Default[] = {
   KBTS__OP_KIND_NORMALIZE,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES_WITH_USER,
   KBTS__OP_KIND_GPOS_METRICS,
@@ -4211,13 +4491,14 @@ static kbts__op_kind kbts__Ops_Default[] = {
 };
 static kbts__feature_stage kbts__FeatureStages_Default[] = {
   {1, {{0ull, 0ull, 0ull, 0ull | KBTS__FEATURE_FLAG3(rvrn)}}},
-  {12, {{0ull | KBTS__FEATURE_FLAG0(frac) | KBTS__FEATURE_FLAG0(numr) | KBTS__FEATURE_FLAG0(dnom) | KBTS__FEATURE_FLAG0(ccmp) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(calt), 0ull, 0ull | KBTS__FEATURE_FLAG2(ltra) | KBTS__FEATURE_FLAG2(ltrm) | KBTS__FEATURE_FLAG2(locl) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(rclt), 0ull}}},
+  {19, {{0ull | KBTS__FEATURE_FLAG0(frac) | KBTS__FEATURE_FLAG0(numr) | KBTS__FEATURE_FLAG0(dnom) | KBTS__FEATURE_FLAG0(ccmp) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(ltra) | KBTS__FEATURE_FLAG2(ltrm) | KBTS__FEATURE_FLAG2(locl) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Default = {20, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Default), kbts__FeatureStages_Default, KBTS__ARRAY_LENGTH(kbts__Ops_Default), kbts__Ops_Default};
+static kbts__op_list kbts__OpList_Default = {27, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Default), kbts__FeatureStages_Default, KBTS__ARRAY_LENGTH(kbts__Ops_Default), kbts__Ops_Default};
 static kbts__op_kind kbts__Ops_Hangul[] = {
   KBTS__OP_KIND_NORMALIZE,
   KBTS__OP_KIND_NORMALIZE_HANGUL,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES_WITH_USER,
   KBTS__OP_KIND_GPOS_METRICS,
@@ -4226,13 +4507,14 @@ static kbts__op_kind kbts__Ops_Hangul[] = {
 };
 static kbts__feature_stage kbts__FeatureStages_Hangul[] = {
   {1, {{0ull, 0ull, 0ull, 0ull | KBTS__FEATURE_FLAG3(rvrn)}}},
-  {14, {{0ull | KBTS__FEATURE_FLAG0(frac) | KBTS__FEATURE_FLAG0(numr) | KBTS__FEATURE_FLAG0(dnom) | KBTS__FEATURE_FLAG0(ljmo) | KBTS__FEATURE_FLAG0(vjmo) | KBTS__FEATURE_FLAG0(tjmo) | KBTS__FEATURE_FLAG0(ccmp) | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(ltra) | KBTS__FEATURE_FLAG2(ltrm) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(locl) | KBTS__FEATURE_FLAG2(rclt), 0ull}}},
+  {21, {{0ull | KBTS__FEATURE_FLAG0(frac) | KBTS__FEATURE_FLAG0(numr) | KBTS__FEATURE_FLAG0(dnom) | KBTS__FEATURE_FLAG0(ljmo) | KBTS__FEATURE_FLAG0(vjmo) | KBTS__FEATURE_FLAG0(tjmo) | KBTS__FEATURE_FLAG0(ccmp) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(ltra) | KBTS__FEATURE_FLAG2(ltrm) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(locl) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Hangul = {22, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Hangul), kbts__FeatureStages_Hangul, KBTS__ARRAY_LENGTH(kbts__Ops_Hangul), kbts__Ops_Hangul};
+static kbts__op_list kbts__OpList_Hangul = {29, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Hangul), kbts__FeatureStages_Hangul, KBTS__ARRAY_LENGTH(kbts__Ops_Hangul), kbts__Ops_Hangul};
 static kbts__op_kind kbts__Ops_ArabicRclt[] = {
   KBTS__OP_KIND_NORMALIZE,
   KBTS__OP_KIND_FLAG_JOINING_LETTERS,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
@@ -4264,13 +4546,14 @@ static kbts__feature_stage kbts__FeatureStages_ArabicRclt[] = {
   {1, {{0ull | KBTS__FEATURE_FLAG0(med2), 0ull, 0ull, 0ull}}},
   {1, {{0ull | KBTS__FEATURE_FLAG0(init), 0ull, 0ull, 0ull}}},
   {1, {{0ull, 0ull, 0ull | KBTS__FEATURE_FLAG2(rlig), 0ull}}},
-  {5, {{0ull | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(mset) | KBTS__FEATURE_FLAG2(rclt), 0ull}}},
+  {12, {{0ull | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(mset) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
 };
-static kbts__op_list kbts__OpList_ArabicRclt = {29, KBTS__ARRAY_LENGTH(kbts__FeatureStages_ArabicRclt), kbts__FeatureStages_ArabicRclt, KBTS__ARRAY_LENGTH(kbts__Ops_ArabicRclt), kbts__Ops_ArabicRclt};
+static kbts__op_list kbts__OpList_ArabicRclt = {36, KBTS__ARRAY_LENGTH(kbts__FeatureStages_ArabicRclt), kbts__FeatureStages_ArabicRclt, KBTS__ARRAY_LENGTH(kbts__Ops_ArabicRclt), kbts__Ops_ArabicRclt};
 static kbts__op_kind kbts__Ops_ArabicNoRclt[] = {
   KBTS__OP_KIND_NORMALIZE,
   KBTS__OP_KIND_FLAG_JOINING_LETTERS,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
@@ -4304,13 +4587,14 @@ static kbts__feature_stage kbts__FeatureStages_ArabicNoRclt[] = {
   {1, {{0ull | KBTS__FEATURE_FLAG0(init), 0ull, 0ull, 0ull}}},
   {1, {{0ull, 0ull, 0ull | KBTS__FEATURE_FLAG2(rlig), 0ull}}},
   {1, {{0ull | KBTS__FEATURE_FLAG0(calt), 0ull, 0ull, 0ull}}},
-  {3, {{0ull | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(mset), 0ull}}},
+  {10, {{0ull | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(mset) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
 };
-static kbts__op_list kbts__OpList_ArabicNoRclt = {28, KBTS__ARRAY_LENGTH(kbts__FeatureStages_ArabicNoRclt), kbts__FeatureStages_ArabicNoRclt, KBTS__ARRAY_LENGTH(kbts__Ops_ArabicNoRclt), kbts__Ops_ArabicNoRclt};
+static kbts__op_list kbts__OpList_ArabicNoRclt = {35, KBTS__ARRAY_LENGTH(kbts__FeatureStages_ArabicNoRclt), kbts__FeatureStages_ArabicNoRclt, KBTS__ARRAY_LENGTH(kbts__Ops_ArabicNoRclt), kbts__Ops_ArabicNoRclt};
 static kbts__op_kind kbts__Ops_Indic[] = {
   KBTS__OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES,
   KBTS__OP_KIND_NORMALIZE,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_BEGIN_CLUSTER,
@@ -4348,13 +4632,14 @@ static kbts__feature_stage kbts__FeatureStages_Indic[] = {
   {1, {{0ull, 0ull, 0ull, 0ull | KBTS__FEATURE_FLAG3(vatu)}}},
   {1, {{0ull | KBTS__FEATURE_FLAG0(cjct), 0ull, 0ull, 0ull}}},
   {6, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(init), 0ull, 0ull | KBTS__FEATURE_FLAG2(haln) | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts), 0ull}}},
-  {5, {{0ull | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(locl) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(rclt), 0ull}}},
+  {12, {{0ull | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(locl) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Indic = {35, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Indic), kbts__FeatureStages_Indic, KBTS__ARRAY_LENGTH(kbts__Ops_Indic), kbts__Ops_Indic};
+static kbts__op_list kbts__OpList_Indic = {42, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Indic), kbts__FeatureStages_Indic, KBTS__ARRAY_LENGTH(kbts__Ops_Indic), kbts__Ops_Indic};
 static kbts__op_kind kbts__Ops_Khmer[] = {
   KBTS__OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES,
   KBTS__OP_KIND_NORMALIZE,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_BEGIN_CLUSTER,
@@ -4370,13 +4655,14 @@ static kbts__feature_stage kbts__FeatureStages_Khmer[] = {
   {1, {{0ull, 0ull, 0ull, 0ull | KBTS__FEATURE_FLAG3(rvrn)}}},
   {5, {{0ull | KBTS__FEATURE_FLAG0(frac) | KBTS__FEATURE_FLAG0(numr) | KBTS__FEATURE_FLAG0(dnom), 0ull, 0ull | KBTS__FEATURE_FLAG2(ltra) | KBTS__FEATURE_FLAG2(ltrm), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(ccmp) | KBTS__FEATURE_FLAG0(pref) | KBTS__FEATURE_FLAG0(blwf) | KBTS__FEATURE_FLAG0(abvf) | KBTS__FEATURE_FLAG0(pstf) | KBTS__FEATURE_FLAG0(cfar), 0ull, 0ull | KBTS__FEATURE_FLAG2(locl), 0ull}}},
-  {8, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(rlig), 0ull}}},
+  {15, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Khmer = {28, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Khmer), kbts__FeatureStages_Khmer, KBTS__ARRAY_LENGTH(kbts__Ops_Khmer), kbts__Ops_Khmer};
+static kbts__op_list kbts__OpList_Khmer = {35, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Khmer), kbts__FeatureStages_Khmer, KBTS__ARRAY_LENGTH(kbts__Ops_Khmer), kbts__Ops_Khmer};
 static kbts__op_kind kbts__Ops_Myanmar[] = {
   KBTS__OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES,
   KBTS__OP_KIND_NORMALIZE,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_BEGIN_CLUSTER,
@@ -4400,11 +4686,12 @@ static kbts__feature_stage kbts__FeatureStages_Myanmar[] = {
   {1, {{0ull | KBTS__FEATURE_FLAG0(pref), 0ull, 0ull, 0ull}}},
   {1, {{0ull | KBTS__FEATURE_FLAG0(blwf), 0ull, 0ull, 0ull}}},
   {1, {{0ull | KBTS__FEATURE_FLAG0(pstf), 0ull, 0ull, 0ull}}},
-  {9, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(rclt), 0ull}}},
+  {16, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Myanmar = {28, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Myanmar), kbts__FeatureStages_Myanmar, KBTS__ARRAY_LENGTH(kbts__Ops_Myanmar), kbts__Ops_Myanmar};
+static kbts__op_list kbts__OpList_Myanmar = {35, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Myanmar), kbts__FeatureStages_Myanmar, KBTS__ARRAY_LENGTH(kbts__Ops_Myanmar), kbts__Ops_Myanmar};
 static kbts__op_kind kbts__Ops_Tibetan[] = {
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES_WITH_USER,
@@ -4415,14 +4702,15 @@ static kbts__op_kind kbts__Ops_Tibetan[] = {
 static kbts__feature_stage kbts__FeatureStages_Tibetan[] = {
   {1, {{0ull, 0ull, 0ull | KBTS__FEATURE_FLAG2(locl), 0ull}}},
   {1, {{0ull | KBTS__FEATURE_FLAG0(ccmp), 0ull, 0ull, 0ull}}},
-  {4, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt), 0ull, 0ull | KBTS__FEATURE_FLAG2(liga), 0ull}}},
+  {8, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm), 0ull, 0ull | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
   {4, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm), 0ull, 0ull | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Tibetan = {10, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Tibetan), kbts__FeatureStages_Tibetan, KBTS__ARRAY_LENGTH(kbts__Ops_Tibetan), kbts__Ops_Tibetan};
+static kbts__op_list kbts__OpList_Tibetan = {14, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Tibetan), kbts__FeatureStages_Tibetan, KBTS__ARRAY_LENGTH(kbts__Ops_Tibetan), kbts__Ops_Tibetan};
 static kbts__op_kind kbts__Ops_Use[] = {
   KBTS__OP_KIND_PRE_NORMALIZE_DOTTED_CIRCLES,
   KBTS__OP_KIND_NORMALIZE,
   KBTS__OP_KIND_FLAG_JOINING_LETTERS,
+  KBTS__OP_KIND_BEGIN_GSUB,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_GSUB_FEATURES,
   KBTS__OP_KIND_BEGIN_CLUSTER,
@@ -4446,10 +4734,10 @@ static kbts__feature_stage kbts__FeatureStages_Use[] = {
   {1, {{0ull | KBTS__FEATURE_FLAG0(pref), 0ull, 0ull, 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvf) | KBTS__FEATURE_FLAG0(blwf) | KBTS__FEATURE_FLAG0(cjct) | KBTS__FEATURE_FLAG0(half) | KBTS__FEATURE_FLAG0(pstf), 0ull, 0ull | KBTS__FEATURE_FLAG2(rkrf), 0ull | KBTS__FEATURE_FLAG3(vatu)}}},
   {4, {{0ull | KBTS__FEATURE_FLAG0(fina) | KBTS__FEATURE_FLAG0(init) | KBTS__FEATURE_FLAG0(isol) | KBTS__FEATURE_FLAG0(medi), 0ull, 0ull, 0ull}}},
-  {10, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig), 0ull, 0ull | KBTS__FEATURE_FLAG2(haln) | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(rlig), 0ull}}},
+  {24, {{0ull | KBTS__FEATURE_FLAG0(abvs) | KBTS__FEATURE_FLAG0(blws) | KBTS__FEATURE_FLAG0(calt) | KBTS__FEATURE_FLAG0(clig) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs) | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(haln) | KBTS__FEATURE_FLAG2(pres) | KBTS__FEATURE_FLAG2(psts) | KBTS__FEATURE_FLAG2(liga) | KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(rlig) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk) | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
   {7, {{0ull | KBTS__FEATURE_FLAG0(abvm) | KBTS__FEATURE_FLAG0(blwm) | KBTS__FEATURE_FLAG0(curs), 0ull, 0ull | KBTS__FEATURE_FLAG2(dist) | KBTS__FEATURE_FLAG2(kern) | KBTS__FEATURE_FLAG2(mark) | KBTS__FEATURE_FLAG2(mkmk), 0ull}}},
 };
-static kbts__op_list kbts__OpList_Use = {40, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Use), kbts__FeatureStages_Use, KBTS__ARRAY_LENGTH(kbts__Ops_Use), kbts__Ops_Use};
+static kbts__op_list kbts__OpList_Use = {54, KBTS__ARRAY_LENGTH(kbts__FeatureStages_Use), kbts__FeatureStages_Use, KBTS__ARRAY_LENGTH(kbts__Ops_Use), kbts__Ops_Use};
 #define KBTS__MAXIMUM_DECOMPOSITION_CODEPOINTS 6
 typedef struct kbts__script_properties {
   kbts_u32 Tag;
@@ -5134,23 +5422,32 @@ static kbts_u8 kbts__ScriptExtensions[447] = {
   48,60,68,69,80,93,131,149,158,11,32,161,32,150,64,72,97,15,59,4,103,26,27,76,26,76,26,75,76,4,25,
 };
 
-static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
-  0,1,1,2,3,4,5,6,7,1,1,1,1,8,9,10,11,12,1,13,1,1,1,1,14,1,1,15,1,1,1,1,
-  1,1,1,1,16,17,1,18,19,20,1,1,1,21,1,22,1,23,1,24,1,25,1,26,1,1,1,1,1,27,28,1,
-  29,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,30,31,
-  1,1,1,1,1,1,1,1,1,1,1,1,32,33,1,1,1,1,1,1,1,1,1,1,34,35,36,37,38,39,40,41,
-  42,1,1,1,43,1,44,45,46,47,48,49,50,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,51,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,52,53,54,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+static kbts_u8 kbts__UnicodeDecomposition_PageIndices[12194] = {
+  0,1,1,1,1,1,1,1,1,1,1,1,2,3,4,5,6,7,8,9,10,11,12,13,1,1,14,15,16,17,18,19,
+  20,21,22,23,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,24,1,1,25,26,27,28,29,30,31,1,1,
+  32,33,1,34,1,35,1,36,1,1,1,1,37,38,39,40,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,41,1,1,1,1,1,1,1,1,1,42,43,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,44,45,1,46,1,1,1,1,1,1,47,48,1,1,
+  1,1,1,49,1,50,1,1,1,1,1,1,1,1,1,1,1,1,1,1,51,52,1,1,1,1,1,1,53,1,1,1,
+  1,1,1,1,54,1,1,1,1,1,1,1,55,1,1,1,1,1,1,1,56,1,1,1,1,1,1,1,1,57,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,58,59,60,61,62,63,64,65,1,1,1,1,
+  1,1,66,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,67,68,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,69,70,1,71,72,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,
+  105,106,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,107,1,1,1,1,1,1,108,109,1,110,1,1,1,
+  111,1,112,1,113,1,114,115,116,1,117,1,1,1,118,1,1,1,119,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,120,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,121,122,123,124,1,125,126,127,128,129,1,130,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5166,11 +5463,7 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,55,56,57,58,59,60,61,62,63,64,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,65,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,66,1,67,1,1,1,1,1,1,1,1,68,69,70,1,1,71,1,1,1,72,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,73,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5179,8 +5472,6 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,74,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,75,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5193,7 +5484,6 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,76,77,78,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5230,7 +5520,6 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  79,80,81,82,83,84,85,86,87,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5258,16 +5547,23 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,
+  147,148,149,150,151,152,153,154,155,156,157,158,159,160,1,1,1,161,162,163,164,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,165,1,166,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,167,168,1,1,1,1,1,1,1,169,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,170,1,1,1,171,172,1,1,173,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,174,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,175,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,176,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5303,11 +5599,13 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,177,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,178,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5357,6 +5655,7 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,179,180,1,1,1,1,181,182,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -5504,368 +5803,128 @@ static kbts_u8 kbts__UnicodeDecomposition_PageIndices[17407] = {
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,
+  215,216,
 };
 
-static kbts_u64 kbts__UnicodeDecomposition_Data[5632] = {
+static kbts_u64 kbts__UnicodeDecomposition_Data[3472] = {
   52776558133248ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   6442451206ull,6450839814ull,6459228422ull,6467617030ull,6509560070ull,6526337286ull,0ull,6769606926ull,6442451222ull,6450839830ull,6459228438ull,6509560086ull,6442451238ull,6450839846ull,6459228454ull,6509560102ull,0ull,6467617082ull,6442451262ull,6450839870ull,6459228478ull,6467617086ull,6509560126ull,0ull,0ull,6442451286ull,6450839894ull,6459228502ull,6509560150ull,6450839910ull,0ull,0ull,
   6442451334ull,6450839942ull,6459228550ull,6467617158ull,6509560198ull,6526337414ull,0ull,6769607054ull,6442451350ull,6450839958ull,6459228566ull,6509560214ull,6442451366ull,6450839974ull,6459228582ull,6509560230ull,0ull,6467617210ull,6442451390ull,6450839998ull,6459228606ull,6467617214ull,6509560254ull,0ull,0ull,6442451414ull,6450840022ull,6459228630ull,6509560278ull,6450840038ull,0ull,6509560294ull,
   6476005638ull,6476005766ull,6492782854ull,6492782982ull,6777995526ull,6777995654ull,6450839822ull,6450839950ull,6459228430ull,6459228558ull,6501171470ull,6501171598ull,6543114510ull,6543114638ull,6543114514ull,6543114642ull,0ull,0ull,6476005654ull,6476005782ull,6492782870ull,6492782998ull,6501171478ull,6501171606ull,6777995542ull,6777995670ull,6543114518ull,6543114646ull,6459228446ull,6459228574ull,6492782878ull,6492783006ull,
   6501171486ull,6501171614ull,6769606942ull,6769607070ull,6459228450ull,6459228578ull,0ull,0ull,6467617062ull,6467617190ull,6476005670ull,6476005798ull,6492782886ull,6492783014ull,6777995558ull,6777995686ull,6501171494ull,0ull,0ull,0ull,6459228458ull,6459228586ull,6769606958ull,6769607086ull,0ull,6450839858ull,6450839986ull,6769606962ull,6769607090ull,6543114546ull,6543114674ull,0ull,
   0ull,0ull,0ull,6450839866ull,6450839994ull,6769606970ull,6769607098ull,6543114554ull,6543114682ull,0ull,0ull,0ull,6476005694ull,6476005822ull,6492782910ull,6492783038ull,6534725950ull,6534726078ull,0ull,0ull,6450839882ull,6450840010ull,6769606986ull,6769607114ull,6543114570ull,6543114698ull,6450839886ull,6450840014ull,6459228494ull,6459228622ull,6769606990ull,6769607118ull,
   6543114574ull,6543114702ull,6769606994ull,6769607122ull,6543114578ull,6543114706ull,0ull,0ull,6467617110ull,6467617238ull,6476005718ull,6476005846ull,6492782934ull,6492783062ull,6526337366ull,6526337494ull,6534725974ull,6534726102ull,6777995606ull,6777995734ull,6459228510ull,6459228638ull,6459228518ull,6459228646ull,6509560166ull,6450839914ull,6450840042ull,6501171562ull,6501171690ull,6543114602ull,6543114730ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   6668943678ull,6668943806ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6668943702ull,6668943830ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6543114502ull,6543114630ull,6543114534ull,6543114662ull,6543114558ull,6543114686ull,6543114582ull,6543114710ull,6476006258ull,6476006386ull,6450840434ull,6450840562ull,6543115122ull,6543115250ull,6442451826ull,6442451954ull,0ull,6476006162ull,6476006290ull,
   6476007578ull,6476007582ull,6476006170ull,6476006298ull,0ull,0ull,6543114526ull,6543114654ull,6543114542ull,6543114670ull,6777995582ull,6777995710ull,6476007338ull,6476007342ull,6543115998ull,6543116874ull,6543114666ull,0ull,0ull,0ull,6450839838ull,6450839966ull,0ull,0ull,6442451258ull,6442451386ull,6450840342ull,6450840470ull,6450840346ull,6450840474ull,6450840418ull,6450840546ull,
   6568280326ull,6568280454ull,6585057542ull,6585057670ull,6568280342ull,6568280470ull,6585057558ull,6585057686ull,6568280358ull,6568280486ull,6585057574ull,6585057702ull,6568280382ull,6568280510ull,6585057598ull,6585057726ull,6568280394ull,6568280522ull,6585057610ull,6585057738ull,6568280406ull,6568280534ull,6585057622ull,6585057750ull,6761218382ull,6761218510ull,6761218386ull,6761218514ull,0ull,0ull,6543114530ull,6543114658ull,
   0ull,0ull,0ull,0ull,0ull,0ull,6501171462ull,6501171590ull,6769606934ull,6769607062ull,6476006234ull,6476006362ull,6476006230ull,6476006358ull,6501171518ull,6501171646ull,6476007610ull,6476007614ull,6476005734ull,6476005862ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  3073ull,3077ull,0ull,3149ull,6450842658ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,2789ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,237ull,0ull,
+  3073ull,3077ull,0ull,3149ull,6450842658ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,2789ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,237ull,0ull,
   0ull,0ull,0ull,0ull,0ull,6450840226ull,6450843206ull,733ull,6450843222ull,6450843230ull,6450843238ull,0ull,6450843262ull,0ull,6450843286ull,6450843302ull,6450843434ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6509563494ull,6509563542ull,6450843334ull,6450843350ull,6450843358ull,6450843366ull,6450843438ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6509563622ull,6509563670ull,6450843390ull,6450843414ull,6450843430ull,0ull,0ull,0ull,0ull,6450843466ull,6509563722ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   6442455126ull,6509563990ull,0ull,6450843726ull,0ull,0ull,0ull,6509563930ull,0ull,0ull,0ull,0ull,6450843754ull,6442455138ull,6492786830ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6492786786ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6492786914ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6442455254ull,6509564118ull,0ull,6450843854ull,0ull,0ull,0ull,6509564250ull,0ull,0ull,0ull,0ull,6450843882ull,6442455266ull,6492786958ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6568284626ull,6568284630ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,6492786778ull,6492786906ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6492786754ull,6492786882ull,6509563970ull,6509564098ull,0ull,0ull,6492786774ull,6492786902ull,0ull,0ull,6509564770ull,6509564774ull,6509563994ull,6509564122ull,6509563998ull,6509564126ull,
-  0ull,0ull,6476009570ull,6476009698ull,6509564002ull,6509564130ull,6509564026ull,6509564154ull,0ull,0ull,6509564834ull,6509564838ull,6509564086ull,6509564214ull,6476009614ull,6476009742ull,6509564046ull,6509564174ull,6534729870ull,6534729998ull,6509564062ull,6509564190ull,0ull,0ull,6509564078ull,6509564206ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,13581162654ull,13589551262ull,13589551394ull,13597939870ull,13589551402ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6492786914ull,0ull,0ull,0ull,0ull,0ull,0ull,6442455254ull,6509564118ull,0ull,6450843854ull,0ull,0ull,0ull,6509564250ull,0ull,0ull,0ull,0ull,6450843882ull,6442455266ull,6492786958ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,6568284626ull,6568284630ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6492786778ull,6492786906ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  6492786754ull,6492786882ull,6509563970ull,6509564098ull,0ull,0ull,6492786774ull,6492786902ull,0ull,0ull,6509564770ull,6509564774ull,6509563994ull,6509564122ull,6509563998ull,6509564126ull,0ull,0ull,6476009570ull,6476009698ull,6509564002ull,6509564130ull,6509564026ull,6509564154ull,0ull,0ull,6509564834ull,6509564838ull,6509564086ull,6509564214ull,6476009614ull,6476009742ull,
+  6509564046ull,6509564174ull,6534729870ull,6534729998ull,6509564062ull,6509564190ull,0ull,0ull,6509564078ull,6509564206ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,13581162654ull,13589551262ull,13589551394ull,13597939870ull,13589551402ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   13589551958ull,0ull,13589551878ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,13589551946ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,19830678690ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,19830678734ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,19830678614ull,19830678618ull,19830678622ull,19830678642ull,19830678662ull,19830678666ull,19830678702ull,19830678718ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,20921198366ull,21130913566ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,20904421054ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,21978163402ull,0ull,0ull,21978163426ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,21978163290ull,21978163294ull,21978163314ull,0ull,0ull,21978163374ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,24343751966ull,0ull,0ull,24142425374ull,24352140574ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,24125648006ull,24125648010ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,25216167706ull,25216167710ull,25425882906ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,26491236634ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  27556590334ull,0ull,0ull,0ull,0ull,0ull,0ull,27556590362ull,27564978970ull,0ull,27397206810ull,27556590378ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,28437394714ull,28437394718ull,28647109914ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,29611800422ull,0ull,29653743462ull,29611800434ull,29787961190ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,19830678614ull,19830678618ull,19830678622ull,19830678642ull,19830678662ull,19830678666ull,19830678702ull,19830678718ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,20921198366ull,21130913566ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,20904421054ull,0ull,0ull,0ull,21978163402ull,0ull,0ull,21978163426ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,21978163290ull,21978163294ull,21978163314ull,0ull,0ull,21978163374ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,24343751966ull,0ull,0ull,24142425374ull,24352140574ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,24125648006ull,24125648010ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,25216167706ull,25216167710ull,25425882906ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,26491236634ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,27556590334ull,0ull,0ull,0ull,0ull,0ull,0ull,27556590362ull,27564978970ull,0ull,27397206810ull,27556590378ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,28437394714ull,28437394718ull,28647109914ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,29611800422ull,0ull,29653743462ull,29611800434ull,29787961190ull,0ull,
   0ull,0ull,0ull,33747385610ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,33747385650ull,0ull,0ull,0ull,0ull,33747385670ull,0ull,0ull,0ull,0ull,33747385690ull,0ull,0ull,0ull,0ull,33747385710ull,0ull,0ull,0ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,33730608386ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,33168571846ull,0ull,33185349062ull,33286012618ull,0ull,33286012622ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
   0ull,33286012358ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,33747385930ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,33747385970ull,0ull,0ull,
   0ull,0ull,33747385990ull,0ull,0ull,0ull,0ull,33747386010ull,0ull,0ull,0ull,0ull,33747386030ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,33730608706ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,34745630870ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,35235358072582ull,35235366461190ull,
-  35235374849798ull,0ull,0ull,0ull,35235408404230ull,35235416792838ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,58426682390ull,0ull,58426682398ull,0ull,58426682406ull,0ull,58426682414ull,0ull,58426682422ull,0ull,0ull,0ull,58426682438ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,58426682602ull,0ull,58426682610ull,0ull,0ull,
-  58426682618ull,58426682622ull,0ull,58426682634ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  6752829702ull,6752829830ull,6501171466ull,6501171594ull,6736052490ull,6736052618ull,6853493002ull,6853493130ull,6450840350ull,6450840478ull,6501171474ull,6501171602ull,6736052498ull,6736052626ull,6853493010ull,6853493138ull,6769606930ull,6769607058ull,6819938578ull,6819938706ull,6442452042ull,6442452046ull,6450840650ull,6450840654ull,6819938582ull,6819938710ull,6845104406ull,6845104534ull,6492784802ull,6492784806ull,6501171482ull,6501171610ull,
-  6476005662ull,6476005790ull,6501171490ull,6501171618ull,6736052514ull,6736052642ull,6509560098ull,6509560226ull,6769606946ull,6769607074ull,6828327202ull,6828327330ull,6845104422ull,6845104550ull,6450840382ull,6450840510ull,6450839854ull,6450839982ull,6736052526ull,6736052654ull,6853493038ull,6853493166ull,6736052530ull,6736052658ull,6476036314ull,6476036318ull,6853493042ull,6853493170ull,6819938610ull,6819938738ull,6450839862ull,6450839990ull,
-  6501171510ull,6501171638ull,6736052534ull,6736052662ull,6501171514ull,6501171642ull,6736052538ull,6736052666ull,6853493050ull,6853493178ull,6819938618ull,6819938746ull,6450840406ull,6450840534ull,6509560662ull,6509560790ull,6442452274ull,6442452278ull,6450840882ull,6450840886ull,6450839874ull,6450840002ull,6501171522ull,6501171650ull,6501171530ull,6501171658ull,6736052554ull,6736052682ull,6476036458ull,6476036462ull,6853493066ull,6853493194ull,
-  6501171534ull,6501171662ull,6736052558ull,6736052686ull,6501172586ull,6501172590ull,6501172610ull,6501172614ull,6501202314ull,6501202318ull,6501171538ull,6501171666ull,6736052562ull,6736052690ull,6853493074ull,6853493202ull,6819938642ull,6819938770ull,6744441174ull,6744441302ull,6845104470ull,6845104598ull,6819938646ull,6819938774ull,6450840994ull,6450840998ull,6509561258ull,6509561262ull,6467617114ull,6467617242ull,6736052570ull,6736052698ull,
-  6442451294ull,6442451422ull,6450839902ull,6450840030ull,6509560158ull,6509560286ull,6501171550ull,6501171678ull,6736052574ull,6736052702ull,6501171554ull,6501171682ull,6509560162ull,6509560290ull,6501171558ull,6501171686ull,6459228522ull,6459228650ull,6736052586ull,6736052714ull,6853493098ull,6853493226ull,6853493154ull,6509560274ull,6526337502ull,6526337510ull,0ull,6501172734ull,0ull,0ull,0ull,0ull,
-  6736052486ull,6736052614ull,6517948678ull,6517948806ull,6450840330ull,6450840458ull,6442451722ull,6442451850ull,6517949194ull,6517949322ull,6467617546ull,6467617674ull,6459259522ull,6459259526ull,6450840586ull,6450840590ull,6442451978ull,6442451982ull,6517949450ull,6517949454ull,6467617802ull,6467617806ull,6492813954ull,6492813958ull,6736052502ull,6736052630ull,6517948694ull,6517948822ull,6467617046ull,6467617174ull,6450840362ull,6450840490ull,
-  6442451754ull,6442451882ull,6517949226ull,6517949354ull,6467617578ull,6467617706ull,6459259618ull,6459259622ull,6517948710ull,6517948838ull,6736052518ull,6736052646ull,6736052542ull,6736052670ull,6517948734ull,6517948862ull,6450840402ull,6450840530ull,6442451794ull,6442451922ull,6517949266ull,6517949394ull,6467617618ull,6467617746ull,6459259698ull,6459259702ull,6450841218ull,6450841222ull,6442452610ull,6442452614ull,6517950082ull,6517950086ull,
-  6467618434ull,6467618438ull,6736053890ull,6736053894ull,6736052566ull,6736052694ull,6517948758ull,6517948886ull,6450841278ull,6450841282ull,6442452670ull,6442452674ull,6517950142ull,6517950146ull,6467618494ull,6467618498ull,6736053950ull,6736053954ull,6442451302ull,6442451430ull,6736052582ull,6736052710ull,6517948774ull,6517948902ull,6467617126ull,6467617254ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  6601838278ull,6610226886ull,6442482690ull,6442482694ull,6450871298ull,6450871302ull,6996130818ull,6996130822ull,6601838150ull,6610226758ull,6442482722ull,6442482726ull,6450871330ull,6450871334ull,6996130850ull,6996130854ull,6601838294ull,6610226902ull,6442482754ull,6442482758ull,6450871362ull,6450871366ull,0ull,0ull,6601838166ull,6610226774ull,6442482786ull,6442482790ull,6450871394ull,6450871398ull,0ull,0ull,
-  6601838302ull,6610226910ull,6442482818ull,6442482822ull,6450871426ull,6450871430ull,6996130946ull,6996130950ull,6601838174ull,6610226782ull,6442482850ull,6442482854ull,6450871458ull,6450871462ull,6996130978ull,6996130982ull,6601838310ull,6610226918ull,6442482882ull,6442482886ull,6450871490ull,6450871494ull,6996131010ull,6996131014ull,6601838182ull,6610226790ull,6442482914ull,6442482918ull,6450871522ull,6450871526ull,6996131042ull,6996131046ull,
-  6601838334ull,6610226942ull,6442482946ull,6442482950ull,6450871554ull,6450871558ull,0ull,0ull,6601838206ull,6610226814ull,6442482978ull,6442482982ull,6450871586ull,6450871590ull,0ull,0ull,6601838358ull,6610226966ull,6442483010ull,6442483014ull,6450871618ull,6450871622ull,6996131138ull,6996131142ull,0ull,6610226838ull,0ull,6442483046ull,0ull,6450871654ull,0ull,6996131174ull,
-  6601838374ull,6610226982ull,6442483074ull,6442483078ull,6450871682ull,6450871686ull,6996131202ull,6996131206ull,6601838246ull,6610226854ull,6442483106ull,6442483110ull,6450871714ull,6450871718ull,6996131234ull,6996131238ull,6442454726ull,3761ull,6442454742ull,3765ull,6442454750ull,3769ull,6442454758ull,3773ull,6442454782ull,3889ull,6442454806ull,3893ull,6442454822ull,3897ull,0ull,0ull,
-  7021296642ull,7021296646ull,7021296650ull,7021296654ull,7021296658ull,7021296662ull,7021296666ull,7021296670ull,7021296674ull,7021296678ull,7021296682ull,7021296686ull,7021296690ull,7021296694ull,7021296698ull,7021296702ull,7021296770ull,7021296774ull,7021296778ull,7021296782ull,7021296786ull,7021296790ull,7021296794ull,7021296798ull,7021296802ull,7021296806ull,7021296810ull,7021296814ull,7021296818ull,7021296822ull,7021296826ull,7021296830ull,
-  7021297026ull,7021297030ull,7021297034ull,7021297038ull,7021297042ull,7021297046ull,7021297050ull,7021297054ull,7021297058ull,7021297062ull,7021297066ull,7021297070ull,7021297074ull,7021297078ull,7021297082ull,7021297086ull,6492786374ull,6476009158ull,7021297090ull,7021268678ull,7021268658ull,0ull,6996102854ull,7021297370ull,6492786246ull,6476009030ull,6442454598ull,3609ull,7021268550ull,0ull,3813ull,0ull,
-  0ull,6996099746ull,7021297106ull,7021268702ull,7021268666ull,0ull,6996102878ull,7021297434ull,6442454614ull,3617ull,6442454622ull,3621ull,7021268574ull,6442483454ull,6450872062ull,6996131582ull,6492786406ull,6476009190ull,6442454826ull,3649ull,0ull,0ull,6996102886ull,6996102954ull,6492786278ull,6476009062ull,6442454630ull,3625ull,0ull,6442483706ull,6450872314ull,6996131834ull,
-  6492786454ull,6476009238ull,6442454830ull,3777ull,6601838342ull,6610226950ull,6996102934ull,6996102958ull,6492786326ull,6476009110ull,6442454678ull,3641ull,6610226822ull,6442451618ull,3605ull,385ull,0ull,0ull,7021297138ull,7021268774ull,7021268794ull,0ull,6996102950ull,7021297626ull,6442454654ull,3633ull,6442454694ull,3645ull,7021268646ull,721ull,0ull,0ull,
-  32777ull,32781ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,32833ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,3749ull,0ull,0ull,0ull,301ull,789ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912247362ull,6912247370ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912247378ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912247618ull,6912247634ull,6912247626ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,6912247822ull,0ull,0ull,0ull,0ull,6912247842ull,0ull,0ull,6912247854ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,6912247950ull,0ull,6912247958ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,6912248050ull,0ull,0ull,6912248078ull,0ull,0ull,6912248086ull,0ull,6912248098ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,34745630870ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,35235358072582ull,35235366461190ull,
+  35235374849798ull,0ull,0ull,0ull,35235408404230ull,35235416792838ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,58426682390ull,0ull,58426682398ull,0ull,58426682406ull,0ull,58426682414ull,0ull,58426682422ull,0ull,
+  0ull,0ull,58426682438ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,58426682602ull,0ull,58426682610ull,0ull,0ull,
+  58426682618ull,58426682622ull,0ull,58426682634ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6752829702ull,6752829830ull,6501171466ull,6501171594ull,6736052490ull,6736052618ull,6853493002ull,6853493130ull,6450840350ull,6450840478ull,6501171474ull,6501171602ull,6736052498ull,6736052626ull,6853493010ull,6853493138ull,
+  6769606930ull,6769607058ull,6819938578ull,6819938706ull,6442452042ull,6442452046ull,6450840650ull,6450840654ull,6819938582ull,6819938710ull,6845104406ull,6845104534ull,6492784802ull,6492784806ull,6501171482ull,6501171610ull,6476005662ull,6476005790ull,6501171490ull,6501171618ull,6736052514ull,6736052642ull,6509560098ull,6509560226ull,6769606946ull,6769607074ull,6828327202ull,6828327330ull,6845104422ull,6845104550ull,6450840382ull,6450840510ull,
+  6450839854ull,6450839982ull,6736052526ull,6736052654ull,6853493038ull,6853493166ull,6736052530ull,6736052658ull,6476036314ull,6476036318ull,6853493042ull,6853493170ull,6819938610ull,6819938738ull,6450839862ull,6450839990ull,6501171510ull,6501171638ull,6736052534ull,6736052662ull,6501171514ull,6501171642ull,6736052538ull,6736052666ull,6853493050ull,6853493178ull,6819938618ull,6819938746ull,6450840406ull,6450840534ull,6509560662ull,6509560790ull,
+  6442452274ull,6442452278ull,6450840882ull,6450840886ull,6450839874ull,6450840002ull,6501171522ull,6501171650ull,6501171530ull,6501171658ull,6736052554ull,6736052682ull,6476036458ull,6476036462ull,6853493066ull,6853493194ull,6501171534ull,6501171662ull,6736052558ull,6736052686ull,6501172586ull,6501172590ull,6501172610ull,6501172614ull,6501202314ull,6501202318ull,6501171538ull,6501171666ull,6736052562ull,6736052690ull,6853493074ull,6853493202ull,
+  6819938642ull,6819938770ull,6744441174ull,6744441302ull,6845104470ull,6845104598ull,6819938646ull,6819938774ull,6450840994ull,6450840998ull,6509561258ull,6509561262ull,6467617114ull,6467617242ull,6736052570ull,6736052698ull,6442451294ull,6442451422ull,6450839902ull,6450840030ull,6509560158ull,6509560286ull,6501171550ull,6501171678ull,6736052574ull,6736052702ull,6501171554ull,6501171682ull,6509560162ull,6509560290ull,6501171558ull,6501171686ull,
+  6459228522ull,6459228650ull,6736052586ull,6736052714ull,6853493098ull,6853493226ull,6853493154ull,6509560274ull,6526337502ull,6526337510ull,0ull,6501172734ull,0ull,0ull,0ull,0ull,6736052486ull,6736052614ull,6517948678ull,6517948806ull,6450840330ull,6450840458ull,6442451722ull,6442451850ull,6517949194ull,6517949322ull,6467617546ull,6467617674ull,6459259522ull,6459259526ull,6450840586ull,6450840590ull,
+  6442451978ull,6442451982ull,6517949450ull,6517949454ull,6467617802ull,6467617806ull,6492813954ull,6492813958ull,6736052502ull,6736052630ull,6517948694ull,6517948822ull,6467617046ull,6467617174ull,6450840362ull,6450840490ull,6442451754ull,6442451882ull,6517949226ull,6517949354ull,6467617578ull,6467617706ull,6459259618ull,6459259622ull,6517948710ull,6517948838ull,6736052518ull,6736052646ull,6736052542ull,6736052670ull,6517948734ull,6517948862ull,
+  6450840402ull,6450840530ull,6442451794ull,6442451922ull,6517949266ull,6517949394ull,6467617618ull,6467617746ull,6459259698ull,6459259702ull,6450841218ull,6450841222ull,6442452610ull,6442452614ull,6517950082ull,6517950086ull,6467618434ull,6467618438ull,6736053890ull,6736053894ull,6736052566ull,6736052694ull,6517948758ull,6517948886ull,6450841278ull,6450841282ull,6442452670ull,6442452674ull,6517950142ull,6517950146ull,6467618494ull,6467618498ull,
+  6736053950ull,6736053954ull,6442451302ull,6442451430ull,6736052582ull,6736052710ull,6517948774ull,6517948902ull,6467617126ull,6467617254ull,0ull,0ull,0ull,0ull,0ull,0ull,6601838278ull,6610226886ull,6442482690ull,6442482694ull,6450871298ull,6450871302ull,6996130818ull,6996130822ull,6601838150ull,6610226758ull,6442482722ull,6442482726ull,6450871330ull,6450871334ull,6996130850ull,6996130854ull,
+  6601838294ull,6610226902ull,6442482754ull,6442482758ull,6450871362ull,6450871366ull,0ull,0ull,6601838166ull,6610226774ull,6442482786ull,6442482790ull,6450871394ull,6450871398ull,0ull,0ull,6601838302ull,6610226910ull,6442482818ull,6442482822ull,6450871426ull,6450871430ull,6996130946ull,6996130950ull,6601838174ull,6610226782ull,6442482850ull,6442482854ull,6450871458ull,6450871462ull,6996130978ull,6996130982ull,
+  6601838310ull,6610226918ull,6442482882ull,6442482886ull,6450871490ull,6450871494ull,6996131010ull,6996131014ull,6601838182ull,6610226790ull,6442482914ull,6442482918ull,6450871522ull,6450871526ull,6996131042ull,6996131046ull,6601838334ull,6610226942ull,6442482946ull,6442482950ull,6450871554ull,6450871558ull,0ull,0ull,6601838206ull,6610226814ull,6442482978ull,6442482982ull,6450871586ull,6450871590ull,0ull,0ull,
+  6601838358ull,6610226966ull,6442483010ull,6442483014ull,6450871618ull,6450871622ull,6996131138ull,6996131142ull,0ull,6610226838ull,0ull,6442483046ull,0ull,6450871654ull,0ull,6996131174ull,6601838374ull,6610226982ull,6442483074ull,6442483078ull,6450871682ull,6450871686ull,6996131202ull,6996131206ull,6601838246ull,6610226854ull,6442483106ull,6442483110ull,6450871714ull,6450871718ull,6996131234ull,6996131238ull,
+  6442454726ull,3761ull,6442454742ull,3765ull,6442454750ull,3769ull,6442454758ull,3773ull,6442454782ull,3889ull,6442454806ull,3893ull,6442454822ull,3897ull,0ull,0ull,7021296642ull,7021296646ull,7021296650ull,7021296654ull,7021296658ull,7021296662ull,7021296666ull,7021296670ull,7021296674ull,7021296678ull,7021296682ull,7021296686ull,7021296690ull,7021296694ull,7021296698ull,7021296702ull,
+  7021296770ull,7021296774ull,7021296778ull,7021296782ull,7021296786ull,7021296790ull,7021296794ull,7021296798ull,7021296802ull,7021296806ull,7021296810ull,7021296814ull,7021296818ull,7021296822ull,7021296826ull,7021296830ull,7021297026ull,7021297030ull,7021297034ull,7021297038ull,7021297042ull,7021297046ull,7021297050ull,7021297054ull,7021297058ull,7021297062ull,7021297066ull,7021297070ull,7021297074ull,7021297078ull,7021297082ull,7021297086ull,
+  6492786374ull,6476009158ull,7021297090ull,7021268678ull,7021268658ull,0ull,6996102854ull,7021297370ull,6492786246ull,6476009030ull,6442454598ull,3609ull,7021268550ull,0ull,3813ull,0ull,0ull,6996099746ull,7021297106ull,7021268702ull,7021268666ull,0ull,6996102878ull,7021297434ull,6442454614ull,3617ull,6442454622ull,3621ull,7021268574ull,6442483454ull,6450872062ull,6996131582ull,
+  6492786406ull,6476009190ull,6442454826ull,3649ull,0ull,0ull,6996102886ull,6996102954ull,6492786278ull,6476009062ull,6442454630ull,3625ull,0ull,6442483706ull,6450872314ull,6996131834ull,6492786454ull,6476009238ull,6442454830ull,3777ull,6601838342ull,6610226950ull,6996102934ull,6996102958ull,6492786326ull,6476009110ull,6442454678ull,3641ull,6610226822ull,6442451618ull,3605ull,385ull,
+  0ull,0ull,7021297138ull,7021268774ull,7021268794ull,0ull,6996102950ull,7021297626ull,6442454654ull,3633ull,6442454694ull,3645ull,7021268646ull,721ull,0ull,0ull,32777ull,32781ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,32833ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,3749ull,0ull,0ull,0ull,301ull,789ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912247362ull,6912247370ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912247378ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912247618ull,6912247634ull,6912247626ull,0ull,0ull,0ull,0ull,6912247822ull,0ull,0ull,0ull,0ull,6912247842ull,0ull,0ull,6912247854ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,6912247950ull,0ull,6912247958ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912248050ull,0ull,0ull,6912248078ull,0ull,0ull,6912248086ull,0ull,6912248098ull,0ull,0ull,0ull,0ull,0ull,0ull,
   6912213238ull,0ull,6912248198ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912248118ull,6912213234ull,6912213242ull,6912248210ull,6912248214ull,0ull,0ull,6912248266ull,6912248270ull,0ull,0ull,6912248282ull,6912248286ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  6912248298ull,6912248302ull,0ull,0ull,6912248330ull,6912248334ull,0ull,0ull,6912248346ull,6912248350ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912248458ull,6912248482ull,6912248486ull,6912248494ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  6912248306ull,6912248310ull,6912248390ull,6912248394ull,0ull,0ull,0ull,0ull,0ull,0ull,6912248522ull,6912248526ull,6912248530ull,6912248534ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,49185ull,49189ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912256886ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721582ull,0ull,104362721590ull,0ull,104362721598ull,0ull,104362721606ull,0ull,104362721614ull,0ull,104362721622ull,0ull,104362721630ull,0ull,104362721638ull,0ull,104362721646ull,0ull,104362721654ull,0ull,
-  104362721662ull,0ull,104362721670ull,0ull,0ull,104362721682ull,0ull,104362721690ull,0ull,104362721698ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721726ull,104371110334ull,0ull,104362721738ull,104371110346ull,0ull,104362721750ull,104371110358ull,0ull,104362721762ull,104371110370ull,0ull,104362721774ull,104371110382ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721562ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721910ull,0ull,
+  6912248298ull,6912248302ull,0ull,0ull,6912248330ull,6912248334ull,0ull,0ull,6912248346ull,6912248350ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912248458ull,6912248482ull,6912248486ull,6912248494ull,
+  6912248306ull,6912248310ull,6912248390ull,6912248394ull,0ull,0ull,0ull,0ull,0ull,0ull,6912248522ull,6912248526ull,6912248530ull,6912248534ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,49185ull,49189ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6912256886ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721582ull,0ull,104362721590ull,0ull,
+  104362721598ull,0ull,104362721606ull,0ull,104362721614ull,0ull,104362721622ull,0ull,104362721630ull,0ull,104362721638ull,0ull,104362721646ull,0ull,104362721654ull,0ull,104362721662ull,0ull,104362721670ull,0ull,0ull,104362721682ull,0ull,104362721690ull,0ull,104362721698ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  104362721726ull,104371110334ull,0ull,104362721738ull,104371110346ull,0ull,104362721750ull,104371110358ull,0ull,104362721762ull,104371110370ull,0ull,104362721774ull,104371110382ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721562ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721910ull,0ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721966ull,0ull,104362721974ull,0ull,104362721982ull,0ull,104362721990ull,0ull,104362721998ull,0ull,104362722006ull,0ull,104362722014ull,0ull,104362722022ull,0ull,104362722030ull,0ull,104362722038ull,0ull,
   104362722046ull,0ull,104362722054ull,0ull,0ull,104362722066ull,0ull,104362722074ull,0ull,104362722082ull,0ull,0ull,0ull,0ull,0ull,0ull,104362722110ull,104371110718ull,0ull,104362722122ull,104371110730ull,0ull,104362722134ull,104371110742ull,0ull,104362722146ull,104371110754ull,0ull,104362722158ull,104371110766ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,104362721946ull,0ull,0ull,104362722238ull,104362722242ull,104362722246ull,104362722250ull,0ull,0ull,0ull,104362722294ull,0ull,
-  143649ull,105425ull,146217ull,144161ull,113477ull,80073ull,85909ull,163441ull,163441ull,91461ull,149317ull,87581ull,91425ull,100313ull,121253ull,130581ull,137469ull,138985ull,140257ull,148029ull,108553ull,111725ull,115557ull,118649ull,135413ull,148905ull,157637ull,80393ull,85461ull,109585ull,116845ull,137397ull,
-  161913ull,95553ull,114605ull,137013ull,140689ull,101157ull,132961ull,139389ull,97065ull,105565ull,112041ull,117745ull,148281ull,81433ull,83677ull,84857ull,103185ull,109389ull,116801ull,121757ull,131077ull,137241ull,137585ull,145341ull,154825ull,159165ull,161769ull,123441ull,124413ull,128641ull,134949ull,150545ull,
-  162301ull,142169ull,91005ull,97297ull,127361ull,131577ull,117129ull,123689ull,144137ull,154589ull,90977ull,94601ull,108621ull,112489ull,113725ull,128189ull,129245ull,153901ull,84809ull,131629ull,83825ull,83761ull,125041ull,128761ull,135109ull,154069ull,142849ull,101181ull,108553ull,142329ull,80101ull,94109ull,
-  98377ull,118301ull,120257ull,85085ull,123885ull,81661ull,97957ull,79925ull,111409ull,103905ull,128137ull,85773ull,90489ull,121861ull,135461ull,141993ull,110313ull,147137ull,111137ull,101369ull,134037ull,102017ull,120213ull,80569ull,83365ull,83749ull,107013ull,127901ull,133565ull,142153ull,149309ull,84949ull,
-  86281ull,91597ull,97201ull,104213ull,114681ull,124073ull,153269ull,158121ull,162397ull,162617ull,84589ull,105241ull,110045ull,146825ull,96721ull,99905ull,100353ull,103017ull,113805ull,116005ull,119333ull,124713ull,128977ull,131517ull,146585ull,136121ull,147597ull,150825ull,84061ull,84621ull,86773ull,115489ull,
-  140041ull,141993ull,97061ull,98261ull,101869ull,110265ull,127225ull,118229ull,80785ull,89061ull,94109ull,95977ull,98417ull,118473ull,119205ull,130665ull,131353ull,149713ull,154585ull,154913ull,155745ull,81453ull,124601ull,149201ull,154337ull,99205ull,80409ull,82793ull,94137ull,94461ull,104037ull,108553ull,
-  116537ull,121097ull,136177ull,147953ull,163381ull,104993ull,153785ull,84517ull,105965ull,106445ull,111877ull,113265ull,118821ull,120165ull,123309ull,128065ull,156025ull,83381ull,100537ull,154081ull,82093ull,95333ull,112553ull,146601ull,97837ull,99601ull,106589ull,118301ull,154137ull,84133ull,86077ull,94613ull,
-  104525ull,105785ull,107169ull,111509ull,118809ull,120713ull,130533ull,140093ull,140165ull,149297ull,154505ull,85245ull,113385ull,86133ull,116545ull,119393ull,137193ull,154253ull,160093ull,162429ull,106077ull,112429ull,133025ull,125741ull,126081ull,127561ull,117505ull,115301ull,142689ull,80641ull,134361ull,84201ull,
-  83997ull,96921ull,101197ull,127833ull,93717ull,111737ull,105169ull,146669ull,139569ull,153909ull,140845ull,97101ull,83201ull,87809ull,0ull,0ull,90473ull,0ull,104913ull,0ull,0ull,83833ull,117929ull,121641ull,124145ull,124281ull,124309ull,124477ull,154969ull,127737ull,130805ull,0ull,
-  137289ull,0ull,142305ull,0ull,0ull,147681ull,148469ull,0ull,0ull,0ull,156605ull,156657ull,156833ull,161489ull,148345ull,154333ull,81593ull,82845ull,83253ull,84773ull,84881ull,85317ull,87669ull,88089ull,88481ull,90369ull,90785ull,94609ull,94649ull,98897ull,99745ull,99897ull,
-  100297ull,103741ull,104329ull,105029ull,107029ull,112093ull,112745ull,113801ull,116153ull,116909ull,118921ull,123461ull,124153ull,124197ull,124193ull,124225ull,124249ull,124277ull,124469ull,124473ull,125185ull,125445ull,126721ull,128977ull,129061ull,129285ull,130505ull,131093ull,133045ull,133605ull,133605ull,135517ull,
-  140353ull,140889ull,142341ull,142565ull,144205ull,144417ull,147161ull,147681ull,154509ull,155645ull,155885ull,98773ull,592825ull,133217ull,0ull,0ull,80025ull,83669ull,83361ull,81409ull,83221ull,83457ull,84765ull,84969ull,87669ull,87381ull,87653ull,87945ull,90473ull,90829ull,91409ull,91473ull,
-  92553ull,93345ull,97097ull,97125ull,97701ull,97973ull,99169ull,99641ull,99361ull,99897ull,99713ull,100297ull,100561ull,102161ull,102513ull,102729ull,103769ull,104913ull,105565ull,105581ull,105817ull,110053ull,110313ull,111877ull,113517ull,113453ull,113801ull,114809ull,116153ull,122525ull,116949ull,117437ull,
-  117929ull,119237ull,119833ull,120045ull,120949ull,120957ull,121641ull,121709ull,121809ull,122153ull,122113ull,123697ull,125637ull,126721ull,127469ull,128365ull,128977ull,130297ull,131093ull,134473ull,135101ull,138725ull,140549ull,140825ull,140889ull,142077ull,142305ull,142125ull,142341ull,142329ull,142261ull,142565ull,
-  142889ull,144417ull,146657ull,147913ull,149093ull,149977ull,154097ull,154509ull,154969ull,155501ull,155645ull,155693ull,155885ull,158793ull,163441ull,565545ull,565521ull,577365ull,61045ull,65633ull,65765ull,608549ull,619329ull,654157ull,163085ull,163385ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,12247373670ull,0ull,12272539594ull,
+  0ull,0ull,0ull,0ull,104362721946ull,0ull,0ull,104362722238ull,104362722242ull,104362722246ull,104362722250ull,0ull,0ull,0ull,104362722294ull,0ull,143649ull,105425ull,146217ull,144161ull,113477ull,80073ull,85909ull,163441ull,163441ull,91461ull,149317ull,87581ull,91425ull,100313ull,121253ull,130581ull,
+  137469ull,138985ull,140257ull,148029ull,108553ull,111725ull,115557ull,118649ull,135413ull,148905ull,157637ull,80393ull,85461ull,109585ull,116845ull,137397ull,161913ull,95553ull,114605ull,137013ull,140689ull,101157ull,132961ull,139389ull,97065ull,105565ull,112041ull,117745ull,148281ull,81433ull,83677ull,84857ull,
+  103185ull,109389ull,116801ull,121757ull,131077ull,137241ull,137585ull,145341ull,154825ull,159165ull,161769ull,123441ull,124413ull,128641ull,134949ull,150545ull,162301ull,142169ull,91005ull,97297ull,127361ull,131577ull,117129ull,123689ull,144137ull,154589ull,90977ull,94601ull,108621ull,112489ull,113725ull,128189ull,
+  129245ull,153901ull,84809ull,131629ull,83825ull,83761ull,125041ull,128761ull,135109ull,154069ull,142849ull,101181ull,108553ull,142329ull,80101ull,94109ull,98377ull,118301ull,120257ull,85085ull,123885ull,81661ull,97957ull,79925ull,111409ull,103905ull,128137ull,85773ull,90489ull,121861ull,135461ull,141993ull,
+  110313ull,147137ull,111137ull,101369ull,134037ull,102017ull,120213ull,80569ull,83365ull,83749ull,107013ull,127901ull,133565ull,142153ull,149309ull,84949ull,86281ull,91597ull,97201ull,104213ull,114681ull,124073ull,153269ull,158121ull,162397ull,162617ull,84589ull,105241ull,110045ull,146825ull,96721ull,99905ull,
+  100353ull,103017ull,113805ull,116005ull,119333ull,124713ull,128977ull,131517ull,146585ull,136121ull,147597ull,150825ull,84061ull,84621ull,86773ull,115489ull,140041ull,141993ull,97061ull,98261ull,101869ull,110265ull,127225ull,118229ull,80785ull,89061ull,94109ull,95977ull,98417ull,118473ull,119205ull,130665ull,
+  131353ull,149713ull,154585ull,154913ull,155745ull,81453ull,124601ull,149201ull,154337ull,99205ull,80409ull,82793ull,94137ull,94461ull,104037ull,108553ull,116537ull,121097ull,136177ull,147953ull,163381ull,104993ull,153785ull,84517ull,105965ull,106445ull,111877ull,113265ull,118821ull,120165ull,123309ull,128065ull,
+  156025ull,83381ull,100537ull,154081ull,82093ull,95333ull,112553ull,146601ull,97837ull,99601ull,106589ull,118301ull,154137ull,84133ull,86077ull,94613ull,104525ull,105785ull,107169ull,111509ull,118809ull,120713ull,130533ull,140093ull,140165ull,149297ull,154505ull,85245ull,113385ull,86133ull,116545ull,119393ull,
+  137193ull,154253ull,160093ull,162429ull,106077ull,112429ull,133025ull,125741ull,126081ull,127561ull,117505ull,115301ull,142689ull,80641ull,134361ull,84201ull,83997ull,96921ull,101197ull,127833ull,93717ull,111737ull,105169ull,146669ull,139569ull,153909ull,140845ull,97101ull,83201ull,87809ull,0ull,0ull,
+  90473ull,0ull,104913ull,0ull,0ull,83833ull,117929ull,121641ull,124145ull,124281ull,124309ull,124477ull,154969ull,127737ull,130805ull,0ull,137289ull,0ull,142305ull,0ull,0ull,147681ull,148469ull,0ull,0ull,0ull,156605ull,156657ull,156833ull,161489ull,148345ull,154333ull,
+  81593ull,82845ull,83253ull,84773ull,84881ull,85317ull,87669ull,88089ull,88481ull,90369ull,90785ull,94609ull,94649ull,98897ull,99745ull,99897ull,100297ull,103741ull,104329ull,105029ull,107029ull,112093ull,112745ull,113801ull,116153ull,116909ull,118921ull,123461ull,124153ull,124197ull,124193ull,124225ull,
+  124249ull,124277ull,124469ull,124473ull,125185ull,125445ull,126721ull,128977ull,129061ull,129285ull,130505ull,131093ull,133045ull,133605ull,133605ull,135517ull,140353ull,140889ull,142341ull,142565ull,144205ull,144417ull,147161ull,147681ull,154509ull,155645ull,155885ull,98773ull,592825ull,133217ull,0ull,0ull,
+  80025ull,83669ull,83361ull,81409ull,83221ull,83457ull,84765ull,84969ull,87669ull,87381ull,87653ull,87945ull,90473ull,90829ull,91409ull,91473ull,92553ull,93345ull,97097ull,97125ull,97701ull,97973ull,99169ull,99641ull,99361ull,99897ull,99713ull,100297ull,100561ull,102161ull,102513ull,102729ull,
+  103769ull,104913ull,105565ull,105581ull,105817ull,110053ull,110313ull,111877ull,113517ull,113453ull,113801ull,114809ull,116153ull,122525ull,116949ull,117437ull,117929ull,119237ull,119833ull,120045ull,120949ull,120957ull,121641ull,121709ull,121809ull,122153ull,122113ull,123697ull,125637ull,126721ull,127469ull,128365ull,
+  128977ull,130297ull,131093ull,134473ull,135101ull,138725ull,140549ull,140825ull,140889ull,142077ull,142305ull,142125ull,142341ull,142329ull,142261ull,142565ull,142889ull,144417ull,146657ull,147913ull,149093ull,149977ull,154097ull,154509ull,154969ull,155501ull,155645ull,155693ull,155885ull,158793ull,163441ull,565545ull,
+  565521ull,577365ull,61045ull,65633ull,65765ull,608549ull,619329ull,654157ull,163085ull,163385ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,12247373670ull,0ull,12272539594ull,
   0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,12356425638ull,12364814246ull,12356676902ull,12365065510ull,12272539458ull,12280928066ull,12314482498ull,12314482502ull,12314482506ull,12314482510ull,12314482514ull,12314482518ull,12314482522ull,0ull,12314482530ull,12314482534ull,12314482538ull,12314482542ull,12314482546ull,0ull,12314482554ull,0ull,
-  12314482562ull,12314482566ull,0ull,12314482574ull,12314482578ull,0ull,12314482586ull,12314482590ull,12314482594ull,12314482598ull,12314482602ull,12289316694ull,12339648326ull,12339648366ull,12339648402ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6501439306ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,6501439338ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,585676112486ull,0ull,585676112494ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,585676112534ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,586590471366ull,586590471370ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,591078378782ull,591288093982ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,592244395530ull,0ull,592126955026ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,592185675310ull,0ull,0ull,592244395586ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,592185675530ull,0ull,592101789450ull,592244395786ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,594266051302ull,594182165222ull,0ull,594291217126ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,596321261282ull,596321261286ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,603845846230ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,758313747578ull,758406022266ull,758322136186ull,758322136230ull,758330524794ull,758322136198ull,758322136202ull,758330524806ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,784695932318ull,784695932302ull,784695932326ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,999427622238ull,999427622242ull,
-  999503119742ull,999511508350ull,999519896958ull,999528285566ull,999536674174ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,999427622630ull,999427622634ull,999503120110ull,999503120114ull,999511508718ull,
-  999511508722ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
-  80117ull,80097ull,80133ull,525449ull,81281ull,81593ull,81645ull,81929ull,82409ull,82533ull,82845ull,82749ull,53881ull,530665ull,83253ull,83281ull,83345ull,83421ull,529521ull,53989ull,83357ull,83509ull,529709ull,83549ull,83601ull,80689ull,83633ull,83669ull,673661ull,83925ull,83981ull,54141ull,
-  84205ull,84249ull,84425ull,84445ull,54357ull,84765ull,84773ull,84881ull,84969ull,85013ull,85017ull,85085ull,85285ull,85317ull,85353ull,85453ull,85493ull,85501ull,85501ull,85501ull,534705ull,115137ull,85801ull,85885ull,535949ull,85933ull,85957ull,86041ull,86649ull,86241ull,86305ull,86433ull,
-  86665ull,87001ull,87105ull,87373ull,87437ull,87569ull,87569ull,87653ull,87725ull,87757ull,87817ull,89177ull,88089ull,89181ull,88389ull,88529ull,83997ull,91065ull,89913ull,90065ull,90165ull,89645ull,90313ull,90309ull,90801ull,545681ull,91081ull,91101ull,91161ull,91241ull,91273ull,91529ull,
-  547489ull,547753ull,92081ull,92269ull,92317ull,92001ull,92569ull,56249ull,56305ull,93217ull,93433ull,93433ull,550689ull,93965ull,94049ull,94109ull,94157ull,552033ull,94205ull,94233ull,97613ull,94345ull,56837ull,94593ull,94649ull,94977ull,94773ull,554897ull,95501ull,554905ull,95673ull,95661ull,
-  95729ull,96133ull,96137ull,57533ull,96245ull,96417ull,96501ull,96677ull,57737ull,558605ull,57841ull,96961ull,96973ull,96985ull,97065ull,691785ull,97273ull,560325ull,560325ull,133125ull,97417ull,97417ull,58141ull,576225ull,624489ull,97673ull,97709ull,58253ull,97897ull,98101ull,98141ull,98277ull,
-  98821ull,58601ull,58481ull,98897ull,564049ull,99101ull,99617ull,99633ull,99641ull,99633ull,99817ull,99897ull,100041ull,99985ull,100029ull,100217ull,100297ull,100313ull,100417ull,100461ull,100725ull,101061ull,101201ull,101697ull,568369ull,101621ull,101361ull,101793ull,101901ull,102289ull,569285ull,102537ull,
-  102165ull,102053ull,59577ull,102821ull,102905ull,103029ull,102877ull,59825ull,103741ull,103857ull,573481ull,104333ull,105441ull,104741ull,60517ull,105029ull,60449ull,60305ull,83529ull,83541ull,105473ull,105073ull,131765ull,69477ull,105565ull,105581ull,105605ull,105849ull,105805ull,577293ull,60709ull,106473ull,
-  106005ull,106825ull,107029ull,577973ull,107065ull,106621ull,107601ull,61045ull,107785ull,108173ull,108457ull,109217ull,580237ull,109421ull,61537ull,109701ull,582301ull,109905ull,61753ull,110025ull,110205ull,110313ull,110317ull,584245ull,554029ull,584681ull,110905ull,586481ull,111357ull,111413ull,111005ull,111705ull,
-  111865ull,112093ull,111877ull,112037ull,112097ull,112149ull,586873ull,111825ull,112829ull,113081ull,62669ull,113453ull,113437ull,588613ull,112613ull,114105ull,589177ull,589369ull,114457ull,114917ull,114809ull,114797ull,63065ull,114985ull,115189ull,115165ull,115381ull,529557ull,115989ull,592269ull,116337ull,593581ull,
-  116897ull,116949ull,117057ull,596001ull,117249ull,117333ull,597205ull,598097ull,118249ull,118317ull,64177ull,118421ull,64225ull,64225ull,119069ull,119153ull,119237ull,119317ull,119593ull,64621ull,119953ull,602329ull,120057ull,602697ull,120257ull,558717ull,120897ull,605829ull,605921ull,606481ull,65521ull,65569ull,
-  121809ull,607181ull,607177ull,607333ull,607437ull,121977ull,121981ull,121981ull,122153ull,65765ull,122413ull,65817ull,66137ull,610421ull,123193ull,123441ull,123697ull,66445ull,612505ull,124249ull,612969ull,613141ull,124477ull,124845ull,66749ull,125185ull,125225ull,125245ull,615921ull,617117ull,617117ull,125881ull,
-  67593ull,618157ull,126745ull,126757ull,67741ull,619009ull,127817ull,68225ull,127905ull,127885ull,128001ull,622105ull,128397ull,68613ull,128797ull,129033ull,129301ull,68817ull,624801ull,624925ull,68965ull,625509ull,130537ull,625913ull,130645ull,131049ull,131093ull,627561ull,627853ull,131457ull,628385ull,131521ull,
-  576893ull,69461ull,131785ull,132109ull,69677ull,132345ull,92885ull,630429ull,630485ull,577101ull,577137ull,133125ull,133137ull,147065ull,70061ull,133701ull,133677ull,133749ull,84685ull,133829ull,133837ull,133877ull,134041ull,634097ull,134037ull,134261ull,134541ull,134837ull,134285ull,134901ull,135069ull,135517ull,
-  134477ull,134953ull,134961ull,135025ull,635097ull,636333ull,635733ull,70829ull,136133ull,136141ull,136281ull,642857ull,136593ull,638129ull,71029ull,71045ull,638661ull,639817ull,71085ull,137537ull,137585ull,137629ull,137637ull,137893ull,137761ull,138297ull,138121ull,138725ull,138401ull,138669ull,138777ull,71517ull,
-  139141ull,139269ull,71653ull,139649ull,139661ull,645533ull,140125ull,140153ull,71893ull,140265ull,53997ull,647865ull,648601ull,72441ull,72477ull,141953ull,142261ull,142889ull,143701ull,651937ull,144045ull,144133ull,144493ull,144861ull,654525ull,532497ull,145197ull,145137ull,145345ull,533369ull,146257ull,146657ull,
-  661321ull,661429ull,148049ull,148421ull,148549ull,662713ull,148589ull,149729ull,150365ull,150369ull,150001ull,151525ull,151637ull,667625ull,153133ull,75349ull,153309ull,669149ull,75673ull,154381ull,95945ull,154765ull,673045ull,673897ull,76217ull,76249ull,155521ull,675881ull,76489ull,676441ull,155693ull,155693ull,
-  155813ull,677593ull,156553ull,77005ull,156837ull,157341ull,157449ull,157689ull,77625ull,683201ull,158793ull,160001ull,160757ull,78649ull,78773ull,161181ull,688953ull,78817ull,689173ull,690233ull,690757ull,162541ull,79193ull,162789ull,162809ull,162837ull,162877ull,162905ull,163053ull,694273ull,0ull,0ull,
-  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  12314482562ull,12314482566ull,0ull,12314482574ull,12314482578ull,0ull,12314482586ull,12314482590ull,12314482594ull,12314482598ull,12314482602ull,12289316694ull,12339648326ull,12339648366ull,12339648402ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,6501439306ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,6501439338ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,585676112486ull,0ull,585676112494ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,585676112534ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,586590471366ull,586590471370ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,591078378782ull,591288093982ull,0ull,0ull,0ull,0ull,0ull,0ull,592244395530ull,0ull,592126955026ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,592185675310ull,0ull,
+  0ull,592244395586ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,592185675530ull,0ull,592101789450ull,592244395786ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,594266051302ull,594182165222ull,0ull,594291217126ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,596321261282ull,596321261286ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,603845846230ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,758313747578ull,758406022266ull,758322136186ull,758322136230ull,758330524794ull,758322136198ull,758322136202ull,758330524806ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,
+  0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,784695932318ull,784695932302ull,784695932326ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,999427622238ull,999427622242ull,
+  999503119742ull,999511508350ull,999519896958ull,999528285566ull,999536674174ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,999427622630ull,999427622634ull,999503120110ull,999503120114ull,999511508718ull,
+  999511508722ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,0ull,80117ull,80097ull,80133ull,525449ull,81281ull,81593ull,81645ull,81929ull,82409ull,82533ull,82845ull,82749ull,53881ull,530665ull,83253ull,83281ull,
+  83345ull,83421ull,529521ull,53989ull,83357ull,83509ull,529709ull,83549ull,83601ull,80689ull,83633ull,83669ull,673661ull,83925ull,83981ull,54141ull,84205ull,84249ull,84425ull,84445ull,54357ull,84765ull,84773ull,84881ull,84969ull,85013ull,85017ull,85085ull,85285ull,85317ull,85353ull,85453ull,
+  85493ull,85501ull,85501ull,85501ull,534705ull,115137ull,85801ull,85885ull,535949ull,85933ull,85957ull,86041ull,86649ull,86241ull,86305ull,86433ull,86665ull,87001ull,87105ull,87373ull,87437ull,87569ull,87569ull,87653ull,87725ull,87757ull,87817ull,89177ull,88089ull,89181ull,88389ull,88529ull,
+  83997ull,91065ull,89913ull,90065ull,90165ull,89645ull,90313ull,90309ull,90801ull,545681ull,91081ull,91101ull,91161ull,91241ull,91273ull,91529ull,547489ull,547753ull,92081ull,92269ull,92317ull,92001ull,92569ull,56249ull,56305ull,93217ull,93433ull,93433ull,550689ull,93965ull,94049ull,94109ull,
+  94157ull,552033ull,94205ull,94233ull,97613ull,94345ull,56837ull,94593ull,94649ull,94977ull,94773ull,554897ull,95501ull,554905ull,95673ull,95661ull,95729ull,96133ull,96137ull,57533ull,96245ull,96417ull,96501ull,96677ull,57737ull,558605ull,57841ull,96961ull,96973ull,96985ull,97065ull,691785ull,
+  97273ull,560325ull,560325ull,133125ull,97417ull,97417ull,58141ull,576225ull,624489ull,97673ull,97709ull,58253ull,97897ull,98101ull,98141ull,98277ull,98821ull,58601ull,58481ull,98897ull,564049ull,99101ull,99617ull,99633ull,99641ull,99633ull,99817ull,99897ull,100041ull,99985ull,100029ull,100217ull,
+  100297ull,100313ull,100417ull,100461ull,100725ull,101061ull,101201ull,101697ull,568369ull,101621ull,101361ull,101793ull,101901ull,102289ull,569285ull,102537ull,102165ull,102053ull,59577ull,102821ull,102905ull,103029ull,102877ull,59825ull,103741ull,103857ull,573481ull,104333ull,105441ull,104741ull,60517ull,105029ull,
+  60449ull,60305ull,83529ull,83541ull,105473ull,105073ull,131765ull,69477ull,105565ull,105581ull,105605ull,105849ull,105805ull,577293ull,60709ull,106473ull,106005ull,106825ull,107029ull,577973ull,107065ull,106621ull,107601ull,61045ull,107785ull,108173ull,108457ull,109217ull,580237ull,109421ull,61537ull,109701ull,
+  582301ull,109905ull,61753ull,110025ull,110205ull,110313ull,110317ull,584245ull,554029ull,584681ull,110905ull,586481ull,111357ull,111413ull,111005ull,111705ull,111865ull,112093ull,111877ull,112037ull,112097ull,112149ull,586873ull,111825ull,112829ull,113081ull,62669ull,113453ull,113437ull,588613ull,112613ull,114105ull,
+  589177ull,589369ull,114457ull,114917ull,114809ull,114797ull,63065ull,114985ull,115189ull,115165ull,115381ull,529557ull,115989ull,592269ull,116337ull,593581ull,116897ull,116949ull,117057ull,596001ull,117249ull,117333ull,597205ull,598097ull,118249ull,118317ull,64177ull,118421ull,64225ull,64225ull,119069ull,119153ull,
+  119237ull,119317ull,119593ull,64621ull,119953ull,602329ull,120057ull,602697ull,120257ull,558717ull,120897ull,605829ull,605921ull,606481ull,65521ull,65569ull,121809ull,607181ull,607177ull,607333ull,607437ull,121977ull,121981ull,121981ull,122153ull,65765ull,122413ull,65817ull,66137ull,610421ull,123193ull,123441ull,
+  123697ull,66445ull,612505ull,124249ull,612969ull,613141ull,124477ull,124845ull,66749ull,125185ull,125225ull,125245ull,615921ull,617117ull,617117ull,125881ull,67593ull,618157ull,126745ull,126757ull,67741ull,619009ull,127817ull,68225ull,127905ull,127885ull,128001ull,622105ull,128397ull,68613ull,128797ull,129033ull,
+  129301ull,68817ull,624801ull,624925ull,68965ull,625509ull,130537ull,625913ull,130645ull,131049ull,131093ull,627561ull,627853ull,131457ull,628385ull,131521ull,576893ull,69461ull,131785ull,132109ull,69677ull,132345ull,92885ull,630429ull,630485ull,577101ull,577137ull,133125ull,133137ull,147065ull,70061ull,133701ull,
+  133677ull,133749ull,84685ull,133829ull,133837ull,133877ull,134041ull,634097ull,134037ull,134261ull,134541ull,134837ull,134285ull,134901ull,135069ull,135517ull,134477ull,134953ull,134961ull,135025ull,635097ull,636333ull,635733ull,70829ull,136133ull,136141ull,136281ull,642857ull,136593ull,638129ull,71029ull,71045ull,
+  638661ull,639817ull,71085ull,137537ull,137585ull,137629ull,137637ull,137893ull,137761ull,138297ull,138121ull,138725ull,138401ull,138669ull,138777ull,71517ull,139141ull,139269ull,71653ull,139649ull,139661ull,645533ull,140125ull,140153ull,71893ull,140265ull,53997ull,647865ull,648601ull,72441ull,72477ull,141953ull,
+  142261ull,142889ull,143701ull,651937ull,144045ull,144133ull,144493ull,144861ull,654525ull,532497ull,145197ull,145137ull,145345ull,533369ull,146257ull,146657ull,661321ull,661429ull,148049ull,148421ull,148549ull,662713ull,148589ull,149729ull,150365ull,150369ull,150001ull,151525ull,151637ull,667625ull,153133ull,75349ull,
+  153309ull,669149ull,75673ull,154381ull,95945ull,154765ull,673045ull,673897ull,76217ull,76249ull,155521ull,675881ull,76489ull,676441ull,155693ull,155693ull,155813ull,677593ull,156553ull,77005ull,156837ull,157341ull,157449ull,157689ull,77625ull,683201ull,158793ull,160001ull,160757ull,78649ull,78773ull,161181ull,
+  688953ull,78817ull,689173ull,690233ull,690757ull,162541ull,79193ull,162789ull,162809ull,162837ull,162877ull,162905ull,163053ull,694273ull,0ull,0ull,
 };
 
 KBTS_INLINE kbts_u64 kbts__GetUnicodeDecomposition(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeDecomposition_Data[((kbts_un)kbts__UnicodeDecomposition_PageIndices[Codepoint/64] * 64) | (Codepoint & 63)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeDecomposition_Data[((Codepoint < 195104) ? ((kbts_un)kbts__UnicodeDecomposition_PageIndices[Codepoint / 16] * 16) : 16) | (Codepoint & 15)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeWordBreakClass_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeWordBreakClass_PageIndices[7172] = {
   0,1,2,2,2,3,4,5,2,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,
   29,30,2,2,31,32,33,34,35,2,2,2,36,37,38,39,40,41,42,43,44,45,46,47,48,49,2,50,2,2,51,52,
   53,54,55,56,57,57,58,59,57,60,57,61,62,63,64,65,57,57,66,57,57,57,67,57,2,68,69,70,71,57,57,57,
@@ -6090,54 +6149,7 @@ static kbts_u8 kbts__UnicodeWordBreakClass_PageIndices[8703] = {
   57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
   57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
   57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  213,57,214,215,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
+  213,57,214,215,
 };
 
 static kbts_u8 kbts__UnicodeWordBreakClass_Data[27648] = {
@@ -6577,10 +6589,10 @@ static kbts_u8 kbts__UnicodeWordBreakClass_Data[27648] = {
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeWordBreakClass(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeWordBreakClass_Data[((kbts_un)kbts__UnicodeWordBreakClass_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeWordBreakClass_Data[((Codepoint < 918016) ? ((kbts_un)kbts__UnicodeWordBreakClass_PageIndices[Codepoint / 128] * 128) : 7296) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeLineBreakClass_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeLineBreakClass_PageIndices[7172] = {
   0,1,2,2,2,3,4,2,2,5,2,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,
   27,28,29,30,2,2,31,2,32,2,2,2,2,33,34,35,36,37,38,39,40,41,42,43,44,45,2,46,2,2,2,47,
   48,49,50,2,51,52,53,54,2,2,2,55,56,57,58,59,2,2,2,60,2,2,61,2,2,62,63,64,65,66,67,68,
@@ -6805,54 +6817,7 @@ static kbts_u8 kbts__UnicodeLineBreakClass_PageIndices[8703] = {
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  206,2,207,208,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+  206,2,207,208,
 };
 
 static kbts_u8 kbts__UnicodeLineBreakClass_Data[26752] = {
@@ -7278,10 +7243,10 @@ static kbts_u8 kbts__UnicodeLineBreakClass_Data[26752] = {
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeLineBreakClass(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeLineBreakClass_Data[((kbts_un)kbts__UnicodeLineBreakClass_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeLineBreakClass_Data[((Codepoint < 918016) ? ((kbts_un)kbts__UnicodeLineBreakClass_PageIndices[Codepoint / 128] * 128) : 256) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeGraphemeBreakClass_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeGraphemeBreakClass_PageIndices[7200] = {
   0,1,2,2,2,2,3,2,2,4,2,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
   26,27,28,29,2,2,30,2,2,2,2,2,2,2,31,32,33,34,35,2,36,37,38,39,40,41,2,42,2,2,2,2,
   43,44,45,46,2,2,47,48,2,49,2,50,51,52,53,54,2,2,55,2,2,2,56,2,2,57,58,59,2,2,2,2,
@@ -7507,53 +7472,6 @@ static kbts_u8 kbts__UnicodeGraphemeBreakClass_PageIndices[8703] = {
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
   153,154,155,156,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,154,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
 };
 
 static kbts_u8 kbts__UnicodeGraphemeBreakClass_Data[20096] = {
@@ -7875,305 +7793,143 @@ static kbts_u8 kbts__UnicodeGraphemeBreakClass_Data[20096] = {
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeGraphemeBreakClass(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeGraphemeBreakClass_Data[((kbts_un)kbts__UnicodeGraphemeBreakClass_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeGraphemeBreakClass_Data[((Codepoint < 921600) ? ((kbts_un)kbts__UnicodeGraphemeBreakClass_PageIndices[Codepoint / 128] * 128) : 256) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeSyllabicInfo_PageIndices[8703] = {
-  0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,3,4,2,5,6,7,8,9,10,11,12,13,14,15,16,17,18,
-  19,20,2,2,2,2,2,2,2,2,2,2,2,2,21,22,23,24,25,26,27,28,29,30,31,32,2,33,2,2,2,2,
-  34,35,2,2,2,2,2,2,2,2,2,36,2,2,2,2,2,2,2,2,2,2,2,2,2,2,37,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,38,39,40,41,42,43,2,44,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,45,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,46,47,2,2,2,2,2,2,2,2,48,49,2,2,2,2,50,51,2,52,53,54,
-  55,56,57,58,59,60,61,62,63,64,2,65,66,67,68,2,69,2,70,71,72,73,2,2,74,75,76,77,2,78,79,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,80,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,81,82,2,2,2,83,2,2,2,84,85,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,86,86,86,87,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,88,89,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,90,2,2,91,2,2,2,92,2,93,2,2,2,2,2,2,94,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+static kbts_u8 kbts__UnicodeSyllabicInfo_PageIndices[3915] = {
+  0,1,0,0,0,2,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,
+  5,0,6,0,0,0,0,0,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,
+  31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,0,50,51,52,0,53,54,55,56,57,58,59,0,
+  60,61,62,63,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65,66,67,68,69,70,71,72,
+  73,74,74,75,76,77,0,0,78,79,80,81,74,82,83,0,84,74,85,86,87,0,0,0,88,89,90,0,91,92,74,93,
+  74,94,95,0,0,0,96,97,0,0,0,0,0,0,0,98,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  99,100,0,101,102,0,0,103,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,104,105,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,106,74,107,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  108,109,110,111,112,113,114,115,116,117,118,0,119,120,121,122,123,124,125,126,74,127,128,129,0,0,0,0,0,0,130,131,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,132,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,133,134,135,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,136,137,138,0,0,0,55,139,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,74,140,141,142,143,0,0,0,0,0,0,0,74,144,0,0,0,106,145,106,146,0,0,0,
+  147,148,149,150,151,152,153,0,154,155,156,157,158,159,160,161,162,163,164,0,165,166,167,168,169,170,171,172,173,174,175,176,
+  177,178,179,180,181,182,183,0,0,0,0,0,177,184,185,0,177,186,187,0,188,189,190,191,192,193,194,0,0,0,0,0,
+  188,195,0,0,0,0,0,0,196,197,198,0,0,199,200,201,202,203,204,74,205,0,0,0,0,0,0,0,0,0,0,0,
+  206,207,208,209,210,211,0,0,212,213,214,215,216,72,0,0,0,0,0,0,0,0,0,217,218,219,220,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,221,222,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,72,0,74,223,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,224,225,0,0,0,0,0,0,0,0,0,0,0,0,74,74,226,227,228,0,0,229,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,74,74,74,74,74,74,74,74,
+  74,74,74,74,74,74,5,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  74,74,74,231,232,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,74,233,234,0,0,0,0,0,0,0,0,0,106,235,74,236,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,106,237,0,0,0,0,0,0,106,238,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,74,74,239,
 };
 
-static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
+static kbts_u16 kbts__UnicodeSyllabicInfo_Data[7680] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,1034,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3592,3592,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1034,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,3,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3,3,3,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,3592,3592,3592,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1039,1025,1025,1025,1025,1025,1025,1025,1025,1025,2311,2311,2307,3601,2311,519,
   2311,2311,2311,2311,2311,2311,2311,2311,2311,2311,2311,2311,2311,2308,519,2311,0,3593,3593,3592,3592,2311,2311,2311,1025,1025,1025,1025,1025,1025,1025,1025,
@@ -8217,11 +7973,9 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,
   519,519,519,519,519,7,0,7,3,3,3,3,7,3592,7,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,1025,1025,0,1025,0,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,0,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,0,7,7,7,7,7,7,7,7,7,7,7,7,1040,1040,0,0,
   519,519,519,519,519,0,0,0,3,3,3,3,0,3592,3592,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,1025,1025,1025,1025,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,0,0,1025,1025,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,3592,0,3592,0,3,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
@@ -8229,15 +7983,11 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   7,7,3592,3592,7,3601,3,3,1025,1025,1025,1025,1025,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,0,1040,1040,1040,1040,1040,1040,1040,
   1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,0,0,0,
   0,0,0,0,0,0,3592,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,1025,1025,1039,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1039,1025,1025,1025,1025,
   1025,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,23,23,20,20,21,21,22,3593,20,20,20,3593,3,1034,4,27,33,31,32,30,1025,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,1025,0,1025,1025,1026,1026,1026,1026,23,23,21,21,1039,1025,1025,1025,33,33,
   36,1025,23,34,34,1025,1025,23,23,34,34,34,34,34,1025,1025,1025,20,20,20,20,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,32,23,22,20,20,1034,1034,1034,1034,1034,1034,1034,1025,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,20,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,0,0,0,0,0,0,0,0,0,1025,
   1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -8248,63 +7998,38 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,0,0,0,0,0,0,1025,0,0,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,
   1034,1034,1034,1034,1034,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1034,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,
   7,7,7,7,7,7,7,7,7,1040,1040,1040,0,0,0,0,1040,1040,3592,1040,1040,1040,1040,1040,1040,1040,3592,3592,0,0,0,0,
   0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,7,7,7,7,7,519,519,519,7,7,519,7,7,7,7,7,
   7,1025,1025,1025,1025,1025,1025,1025,3,3,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1026,1026,1026,1026,1026,1026,1025,1025,1040,1040,1040,1040,1040,1025,1040,1040,1040,1040,0,
   4,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,3592,3,3,3,3,3,7,3,3,0,0,3,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,3592,3592,1040,3592,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3,7,7,7,7,7,7,7,7,7,7,7,
   7,7,7,7,4,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,1040,3592,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1040,1040,1040,7,7,7,7,7,7,7,4,1040,1040,1025,1025,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,3601,1025,1025,1025,1040,1040,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1026,1026,3,7,7,7,7,7,7,7,7,7,1040,1040,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1040,1040,7,7,7,7,7,7,7,1040,1040,1040,1040,1040,1040,1040,3592,3592,0,3,0,0,0,0,0,0,0,0,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,1025,1025,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3593,3593,3593,0,3593,3593,3593,3593,3593,3593,3593,3593,3593,3593,3593,3593,
   3593,3593,3593,3593,3593,3593,3593,3593,3593,3601,3601,3601,3601,3593,3601,3601,3601,3601,1025,1025,3593,1025,1025,3593,3593,3593,1034,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3592,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,5,6,0,0,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,0,0,0,0,
   0,0,1034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3592,0,0,0,0,0,0,0,0,0,0,0,
   0,0,3592,3592,3592,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3593,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,1035,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,
   1026,1026,7,1026,1026,1026,4,1025,1025,1025,1025,3592,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,7,7,7,7,7,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -8317,7 +8042,6 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1026,1026,1026,1026,1026,1026,1026,1026,1026,3,3,3,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,1040,1040,1040,1040,7,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,3592,1040,3592,1026,1026,1026,1026,1026,1025,1025,1025,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3,7,7,7,7,7,7,7,7,7,1040,1040,1040,
   4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
@@ -8326,54 +8050,26 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   1025,1025,1025,1025,1025,1025,1025,1025,1025,3592,7,7,7,7,7,7,7,7,7,1040,1040,1040,1040,0,0,0,0,0,0,0,0,0,
   1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1034,1034,1034,0,0,0,1025,34,3,3,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,1026,7,7,7,519,519,7,7,519,1026,519,519,1026,7,3,
   0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,0,0,0,0,0,3592,4,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1026,1026,1025,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1040,1040,1040,1040,1040,
   1040,1040,1040,7,7,7,7,7,7,7,7,0,3,7,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
   35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1287,7,7,0,7,1287,0,0,0,0,0,7,3592,3592,3592,1025,1025,1025,1025,0,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,3,3,3,0,0,0,0,4,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,3,3,3,3592,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,0,0,0,7,7,7,7,7,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,7,7,0,0,0,1025,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,3,3,3,3,3,3,3,3,3,3,3,1034,1034,1034,1034,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,3592,3592,1042,1042,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,
   7,7,7,7,7,7,4,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,
@@ -8381,7 +8077,6 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   3592,3592,3592,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,7,4,3,0,0,0,0,0,
   0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,3592,3592,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,7,7,7,7,4,3592,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,
   0,0,0,0,1025,7,7,1025,0,0,0,0,0,0,0,0,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
@@ -8393,7 +8088,6 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,3592,4,3,3592,0,0,0,0,0,0,3593,1025,
   1026,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1026,1025,1025,1025,0,1025,0,1025,1025,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3592,
@@ -8413,15 +8107,10 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   0,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,3592,
   3592,3592,4,3,3601,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,0,0,7,7,7,7,3592,3592,3592,4,
   3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1026,1026,1026,1026,7,7,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,7,7,7,7,7,3592,3592,4,
   7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3592,3592,7,7,7,7,7,7,7,7,7,4,3,1025,0,0,0,0,0,0,0,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,
@@ -8429,119 +8118,59 @@ static kbts_u16 kbts__UnicodeSyllabicInfo_Data[12160] = {
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,1040,1040,1040,
   7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,7,7,7,3592,3592,4,3,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1026,1026,1026,1026,0,0,1026,0,0,1025,1025,1025,1025,1025,1025,1025,1025,0,1025,1025,0,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,0,7,7,0,0,3592,3592,7,4,0,
   1040,14,1040,3,0,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1026,1026,1026,1026,1026,0,0,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,0,0,7,7,7,7,3592,3592,
   4,3601,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,7,7,7,7,7,7,7,7,7,7,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3592,7,3592,3592,3592,3592,3592,1042,1040,1040,1040,1040,1034,
   0,0,0,0,0,1034,0,4,0,0,0,0,0,0,0,0,1026,7,7,7,7,7,7,7,7,7,7,7,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,0,0,0,0,0,0,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,3592,3592,3592,4,0,0,0,3601,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1026,1026,1026,1026,1026,1026,0,1026,1026,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,7,0,7,7,7,7,3592,3592,3592,4,
   3601,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,
   1040,1040,1040,1040,1040,1040,1040,1040,0,1040,1040,1040,1040,1040,1040,1040,7,7,7,7,7,3592,3592,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1026,1026,1026,1026,1026,1026,0,1026,1026,0,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,0,0,0,7,0,7,7,0,7,
   3592,3592,3,7,7,4,14,1040,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
   1026,1026,1026,1026,1026,1026,0,1026,1026,0,1026,1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,0,7,7,0,7,7,3592,3592,4,0,0,0,0,0,0,0,0,
-  1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1034,7,7,7,7,0,0,0,0,0,0,0,0,0,
   3592,3592,14,3592,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,1026,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,7,7,7,0,0,0,7,7,
   7,7,4,0,0,0,0,0,0,0,0,0,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,3,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1026,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,
   7,7,7,7,7,7,7,7,7,7,1040,1040,1040,3592,1040,7,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   3592,3592,3592,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,7,7,7,7,7,7,7,7,7,7,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,3,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
   7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
   7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,1283,1283,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,0,0,0,3,3,3,3,3,3,3,1025,1025,1025,1025,1025,1025,1025,0,0,
   1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,1025,1025,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,3,3,3,3,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,7,7,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,7,7,1025,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
-  1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,1025,
   1025,1025,1025,1025,3,3,3,3,3,3,3,1025,0,0,0,0,1034,1034,1034,1034,1034,1034,1034,1034,1034,1034,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
 KBTS_INLINE kbts_u16 kbts__GetUnicodeSyllabicInfo(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeSyllabicInfo_Data[((kbts_un)kbts__UnicodeSyllabicInfo_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeSyllabicInfo_Data[((Codepoint < 125280) ? ((kbts_un)kbts__UnicodeSyllabicInfo_PageIndices[Codepoint / 32] * 32) : 0) | (Codepoint & 31)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeFlags_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeFlags_PageIndices[8193] = {
   0,1,2,3,2,4,5,6,2,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
   30,31,32,33,34,35,36,37,38,33,33,33,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,2,2,2,55,
   56,57,58,59,60,61,62,33,63,33,33,33,33,33,64,65,33,33,33,66,67,68,69,70,71,72,73,74,75,76,33,77,
@@ -8798,22 +8427,7 @@ static kbts_u8 kbts__UnicodeFlags_PageIndices[8703] = {
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
   2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,242,
-  83,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+  83,
 };
 
 static kbts_u8 kbts__UnicodeFlags_Data[31104] = {
@@ -9307,10 +8921,10 @@ static kbts_u8 kbts__UnicodeFlags_Data[31104] = {
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeFlags(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeFlags_Data[((kbts_un)kbts__UnicodeFlags_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeFlags_Data[((Codepoint < 1048704) ? ((kbts_un)kbts__UnicodeFlags_PageIndices[Codepoint / 128] * 128) : 256) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeBidirectionalClass_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeBidirectionalClass_PageIndices[8193] = {
   0,1,2,2,2,3,4,5,2,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,
   29,30,2,2,31,32,33,34,35,2,2,2,2,36,37,38,39,40,41,42,43,44,45,46,47,48,2,49,2,2,50,51,
   52,53,54,55,56,57,58,59,57,60,57,57,57,61,57,57,2,2,57,57,57,57,57,57,2,62,63,64,57,57,57,57,
@@ -9567,22 +9181,7 @@ static kbts_u8 kbts__UnicodeBidirectionalClass_PageIndices[8703] = {
   57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
   57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
   57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,231,
-  73,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
-  57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,57,
+  73,
 };
 
 static kbts_u8 kbts__UnicodeBidirectionalClass_Data[29696] = {
@@ -10054,10 +9653,10 @@ static kbts_u8 kbts__UnicodeBidirectionalClass_Data[29696] = {
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeBidirectionalClass(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeBidirectionalClass_Data[((kbts_un)kbts__UnicodeBidirectionalClass_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeBidirectionalClass_Data[((Codepoint < 1048704) ? ((kbts_un)kbts__UnicodeBidirectionalClass_PageIndices[Codepoint / 128] * 128) : 7296) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeJoiningType_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeJoiningType_PageIndices[7172] = {
   0,1,0,0,0,0,2,0,0,3,0,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,
   25,26,0,0,0,0,27,0,0,0,0,0,0,0,28,29,30,31,32,0,33,34,35,36,37,38,0,39,0,0,0,0,
   40,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,42,43,44,0,0,0,0,
@@ -10282,54 +9881,7 @@ static kbts_u8 kbts__UnicodeJoiningType_PageIndices[8703] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  114,0,115,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  114,0,115,2,
 };
 
 static kbts_u8 kbts__UnicodeJoiningType_Data[14848] = {
@@ -10569,41 +10121,40 @@ static kbts_u8 kbts__UnicodeJoiningType_Data[14848] = {
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeJoiningType(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeJoiningType_Data[((kbts_un)kbts__UnicodeJoiningType_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeJoiningType_Data[((Codepoint < 918016) ? ((kbts_un)kbts__UnicodeJoiningType_PageIndices[Codepoint / 128] * 128) : 0) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeCombiningClass_PageIndices[8703] = {
-  0,0,0,0,0,0,1,0,0,2,0,3,4,5,6,7,8,9,10,11,12,12,12,13,14,12,15,16,17,18,19,20,
-  21,22,0,0,0,0,23,0,0,0,0,0,0,0,24,25,0,26,27,0,28,29,30,31,32,33,0,34,0,0,0,0,
-  0,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,37,38,0,0,0,0,
-  39,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+static kbts_u8 kbts__UnicodeCombiningClass_PageIndices[3915] = {
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,0,0,0,0,
+  0,0,0,0,5,0,0,0,0,0,0,0,6,7,8,0,9,0,10,11,0,0,12,13,14,15,16,0,0,0,0,17,
+  18,19,20,0,21,0,22,23,0,24,25,0,0,24,26,27,0,24,26,0,0,24,26,0,0,24,26,0,0,0,26,0,
+  0,24,28,0,0,24,26,0,0,29,26,0,0,0,30,0,0,31,32,0,0,33,34,0,35,36,0,37,38,0,39,0,
+  0,40,0,0,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,42,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,43,44,0,0,0,0,45,0,
+  0,0,0,0,0,46,0,0,0,47,0,0,0,0,0,0,48,0,0,49,0,50,51,0,0,52,53,54,0,55,0,56,
+  0,57,0,0,0,0,58,59,0,0,0,0,0,0,60,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,62,63,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,64,0,0,0,65,0,0,0,66,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,67,0,0,68,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,41,42,0,0,43,44,45,46,0,47,0,48,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,0,0,0,0,0,50,0,0,0,
-  0,0,0,51,0,52,53,0,0,0,0,0,0,0,0,0,0,0,0,0,54,55,0,0,0,0,56,0,0,57,58,59,
-  60,61,62,63,64,65,66,67,68,69,0,70,71,72,73,0,61,0,74,75,76,77,0,0,71,0,78,79,0,0,80,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,81,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,82,83,0,0,0,0,0,0,0,0,84,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,85,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,86,87,88,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  89,90,83,0,0,91,0,0,0,92,0,93,0,0,0,0,0,94,95,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10615,6 +10166,8 @@ static kbts_u8 kbts__UnicodeCombiningClass_PageIndices[8703] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,69,70,0,0,71,0,0,0,0,0,0,0,0,
+  72,73,0,0,0,0,53,74,0,75,76,0,0,77,78,0,0,0,0,0,0,79,80,81,0,0,0,0,0,0,0,26,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10634,7 +10187,16 @@ static kbts_u8 kbts__UnicodeCombiningClass_PageIndices[8703] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,82,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,84,0,0,0,0,0,0,0,85,0,0,0,86,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,87,88,0,0,0,0,0,89,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,90,0,91,0,0,0,0,0,0,0,0,0,92,0,93,0,0,94,0,95,0,0,0,
+  0,0,72,96,0,97,0,0,98,99,0,77,0,0,100,0,0,101,0,0,0,0,0,102,0,103,26,104,0,0,105,0,
+  0,0,106,0,0,0,107,0,0,0,0,0,0,65,108,0,0,65,0,0,0,109,0,0,0,110,0,0,0,0,0,0,
+  0,97,0,0,0,0,0,0,0,111,112,0,0,0,0,78,0,44,113,0,114,0,0,0,0,0,0,0,0,0,0,0,
+  0,65,0,0,0,0,0,0,0,0,115,0,116,0,0,0,0,0,0,0,0,0,0,0,0,0,117,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10651,7 +10213,10 @@ static kbts_u8 kbts__UnicodeCombiningClass_PageIndices[8703] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,118,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,119,0,120,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,121,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10671,430 +10236,257 @@ static kbts_u8 kbts__UnicodeCombiningClass_PageIndices[8703] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,122,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,123,124,125,0,0,0,0,126,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  127,128,0,0,129,0,0,0,0,120,0,0,0,0,0,0,0,0,0,0,0,130,0,131,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,132,0,0,0,0,0,0,0,133,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,134,0,0,0,135,
 };
 
-static kbts_u8 kbts__UnicodeCombiningClass_Data[12288] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,232,220,220,220,220,232,216,220,220,220,220,220,202,202,220,220,220,220,202,202,220,220,220,220,220,220,220,220,220,220,220,1,1,1,1,1,220,220,220,220,230,230,230,
-  230,230,230,230,230,240,230,220,220,220,230,230,230,220,220,0,230,230,230,220,220,220,220,230,232,220,220,230,233,234,234,233,234,234,233,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+static kbts_u8 kbts__UnicodeCombiningClass_Data[4352] = {
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,232,220,220,220,220,232,216,220,220,220,220,
+  220,202,202,220,220,220,220,202,202,220,220,220,220,220,220,220,220,220,220,220,1,1,1,1,1,220,220,220,220,230,230,230,230,230,230,230,230,240,230,220,220,220,230,230,230,220,220,0,230,230,230,220,220,220,220,230,232,220,220,230,233,234,234,233,
+  234,234,233,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,230,230,230,230,220,230,230,230,222,220,230,230,230,230,230,230,220,220,220,220,220,220,230,230,220,230,230,222,228,230,22,15,16,17,23,18,19,20,21,14,14,24,12,25,0,13,
-  0,10,11,0,230,220,0,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,31,32,33,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,10,11,0,230,220,0,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,31,32,33,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,28,29,30,31,32,33,27,34,230,230,220,220,230,230,230,230,230,220,230,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,0,0,230,230,230,230,220,230,0,0,230,230,0,220,230,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,36,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,230,230,220,230,230,220,220,220,230,220,220,230,220,230,
-  230,230,220,230,220,230,220,230,220,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,220,230,0,0,0,0,0,0,0,0,0,220,0,0,
+  230,230,220,230,220,230,220,230,220,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,220,230,0,0,0,0,0,0,0,0,0,220,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,0,230,230,230,230,230,230,230,230,230,0,230,230,230,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,220,220,220,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,220,220,220,230,230,230,230,
   0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,220,220,220,220,220,230,230,230,230,230,230,230,230,230,230,230,230,230,230,0,220,230,230,220,230,230,220,230,230,230,220,220,220,28,29,30,230,230,230,220,230,230,220,220,230,230,230,230,230,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,230,220,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,230,220,230,230,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,4,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,9,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,107,107,107,107,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,118,118,9,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,122,122,122,122,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,220,0,127,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,129,132,0,131,0,0,0,0,0,132,132,132,132,0,0,
-  132,0,230,230,9,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,254,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,9,9,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,228,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,222,230,220,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,254,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,0,0,220,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,220,220,220,220,220,220,230,230,220,0,220,
-  220,230,230,220,220,230,230,230,230,230,220,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,4,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,9,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,107,107,107,107,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,118,118,9,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,122,122,122,122,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,220,0,127,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,129,132,0,131,0,0,0,0,0,132,132,132,132,0,0,
+  132,0,230,230,9,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,254,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,230,0,0,
+  0,0,0,0,0,0,0,0,0,228,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,222,230,220,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,0,0,0,0,0,0,0,254,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,0,0,220,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,220,220,220,220,220,220,230,230,220,0,220,220,230,230,220,220,230,230,230,230,230,220,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,230,220,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,0,1,220,220,220,220,220,230,230,220,220,220,220,230,0,1,1,1,1,1,1,1,0,0,0,0,220,0,0,0,0,0,0,230,0,0,0,230,230,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   230,230,220,230,230,230,230,230,230,230,220,230,230,234,214,220,202,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,232,228,228,220,218,230,233,220,230,220,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,1,1,230,230,230,230,1,1,1,230,230,0,0,0,0,230,0,0,0,1,1,230,220,230,1,1,220,220,220,220,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,218,228,232,222,224,224,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,230,230,230,230,230,230,230,230,230,230,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,
+  230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,218,228,232,222,224,224,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,230,230,230,230,230,230,230,230,230,230,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,
-  9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,230,230,220,0,0,230,230,0,0,0,0,0,230,230,
+  230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,
+  9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,230,230,220,0,0,230,230,0,0,0,0,0,230,230,
   0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,220,220,220,220,220,220,220,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,1,220,0,0,0,0,9,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,220,220,230,230,230,220,230,220,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,230,220,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,7,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26,0,230,230,230,230,230,230,230,220,220,220,220,220,220,220,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,0,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,1,220,0,0,0,0,9,0,0,0,0,0,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,
+  0,0,0,0,0,0,220,220,230,230,230,220,230,220,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,7,0,0,0,0,0,
   230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  9,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,7,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,9,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,9,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,
-  7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,7,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,
-  0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,7,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,216,216,1,1,1,0,0,0,226,216,216,216,216,216,0,0,0,0,0,0,0,0,220,220,220,220,220,
+  9,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,7,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,7,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,7,0,0,0,
+  0,0,0,0,0,0,230,230,230,230,230,230,230,0,0,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,9,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,9,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,7,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,9,0,
+  0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,7,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,216,216,1,1,1,0,0,0,226,216,216,216,216,216,0,0,0,0,0,0,0,0,220,220,220,220,220,
   220,220,220,0,0,230,230,230,230,230,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  230,230,230,230,230,230,230,0,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,230,230,230,230,230,230,230,0,230,230,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,232,232,220,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,220,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,230,230,230,230,230,230,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,230,0,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,230,0,0,230,230,230,230,230,
+  230,230,0,230,230,0,230,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,232,232,220,230,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,230,220,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,220,220,220,220,220,220,220,0,0,0,0,0,0,0,0,0,0,0,0,0,230,230,230,230,230,230,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeCombiningClass(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeCombiningClass_Data[((kbts_un)kbts__UnicodeCombiningClass_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeCombiningClass_Data[((Codepoint < 125280) ? ((kbts_un)kbts__UnicodeCombiningClass_PageIndices[Codepoint / 32] * 32) : 0) | (Codepoint & 31)]  : 0;
 }
 
-static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
-  0,1,2,3,0,4,5,6,7,0,8,9,0,10,0,11,0,12,0,0,13,14,0,0,15,0,0,0,16,17,18,0,
-  19,20,21,22,0,0,23,24,0,0,0,0,0,0,25,26,0,27,28,0,0,0,29,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,30,31,0,0,0,32,33,0,34,35,0,0,0,0,0,0,0,36,37,0,0,0,38,0,
-  0,0,39,0,0,40,41,0,0,0,38,0,0,0,42,0,0,0,0,0,0,0,0,0,0,0,43,44,45,46,0,0,
-  0,47,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,48,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,49,50,51,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52,53,54,0,55,56,0,57,58,59,60,0,61,62,63,
-  64,0,0,0,0,0,0,0,0,0,0,0,65,0,66,0,67,68,69,70,71,72,0,0,0,0,0,0,0,0,0,0,
+static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
+  0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,10,11,0,12,13,14,15,16,17,18,19,
+  20,0,21,0,0,0,0,0,0,22,0,23,24,25,0,26,0,0,0,0,27,28,29,0,0,0,0,0,0,30,0,0,
+  0,0,0,0,31,32,0,0,0,0,0,0,0,0,0,0,0,0,33,0,0,0,0,34,0,0,0,0,0,0,0,0,
+  35,36,37,0,0,0,0,0,0,0,0,0,0,0,0,0,38,39,40,41,42,43,44,45,46,47,48,0,0,0,0,0,
+  49,0,50,51,52,53,54,55,56,57,49,0,0,0,58,0,0,0,0,0,0,0,0,0,0,0,0,59,0,59,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,61,62,63,64,0,
+  0,0,0,0,65,0,0,0,0,66,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67,0,68,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,73,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  74,0,75,76,77,75,76,78,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,79,80,81,0,82,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,0,0,0,0,84,0,0,0,
-  0,85,0,86,0,0,87,88,89,90,0,0,0,0,0,0,0,91,0,92,0,0,0,93,94,0,95,0,96,0,0,0,
-  97,0,98,0,0,0,0,0,0,99,0,0,100,0,0,0,0,0,0,0,0,101,0,0,102,0,0,0,0,0,0,103,
-  104,105,106,0,107,0,0,108,0,109,0,0,0,0,0,0,110,111,0,0,0,112,0,0,113,114,115,0,0,0,116,0,
-  117,0,0,118,0,0,0,0,0,119,120,121,0,0,122,123,0,124,0,0,0,125,126,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,127,0,0,128,0,0,0,129,0,130,0,0,0,131,0,0,0,0,132,0,
-  0,0,0,0,0,0,133,134,0,0,135,0,0,0,0,0,136,137,138,0,139,140,141,142,0,0,0,143,144,145,0,0,
-  146,147,0,148,149,0,150,151,0,0,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,0,0,170,171,
-  172,173,174,175,176,177,0,178,179,0,180,181,182,183,184,185,186,0,187,188,0,0,0,189,190,0,0,0,191,0,192,193,
-  194,195,196,0,0,197,198,199,200,201,202,203,0,0,204,205,206,207,0,208,0,209,0,0,210,211,0,0,212,0,213,214,
-  215,216,0,217,218,0,219,0,220,0,221,222,0,223,0,224,0,225,0,226,0,227,228,229,230,231,232,233,234,235,236,237,
-  238,0,0,239,240,0,241,242,243,0,244,245,246,247,248,249,250,251,252,0,0,253,254,255,0,256,257,258,259,260,261,262,
-  263,264,265,266,267,0,268,0,0,0,269,270,271,0,272,273,274,0,275,276,277,278,279,280,281,282,283,284,285,0,0,286,
-  287,0,288,0,289,290,0,0,291,0,292,0,0,293,0,294,295,0,0,0,0,296,297,0,298,299,300,301,302,303,0,0,
-  0,0,304,305,306,307,308,309,310,311,312,313,314,0,315,316,317,318,0,319,320,321,322,0,323,324,0,325,0,0,326,327,
-  328,329,330,331,332,333,334,0,0,0,335,336,337,0,338,0,339,340,341,342,343,344,345,346,0,347,0,348,349,350,351,0,
-  352,353,354,355,356,0,357,0,358,359,360,361,0,0,0,362,363,0,364,365,0,0,366,367,368,0,369,0,370,371,0,0,
-  0,0,372,373,374,0,375,376,0,377,378,379,380,381,382,383,384,0,385,0,386,387,388,389,0,390,0,0,0,0,391,0,
-  0,392,0,393,394,395,396,397,398,399,400,401,0,402,403,404,405,406,407,0,0,0,0,0,0,408,0,409,410,411,0,412,
-  413,0,414,415,416,417,0,0,418,419,0,0,0,0,420,421,422,0,0,423,424,425,0,426,427,428,429,430,0,431,432,433,
-  0,434,435,0,0,0,0,436,437,0,0,438,0,0,439,440,441,442,443,444,445,446,0,447,448,449,0,450,451,452,0,453,
-  454,0,455,456,0,0,457,458,459,0,460,461,462,0,0,0,0,0,0,0,0,463,464,465,466,467,468,0,469,0,0,0,
-  0,0,470,0,0,471,472,0,473,0,0,474,0,475,476,477,0,0,0,0,0,0,478,0,0,479,0,480,481,482,0,0,
-  0,483,0,484,485,0,486,487,488,0,0,489,490,491,492,0,0,493,0,494,0,0,495,0,496,0,497,0,0,0,0,498,
-  499,0,0,0,0,0,0,0,0,0,0,0,500,501,0,0,0,502,503,504,505,506,507,508,0,509,510,0,0,0,511,512,
-  513,514,515,0,0,0,0,516,0,517,0,0,0,518,519,520,0,0,0,521,0,0,0,0,522,0,0,523,0,0,0,0,
-  0,0,524,0,0,0,0,525,0,0,0,526,0,527,0,528,529,0,0,530,531,532,533,534,535,536,537,0,538,0,0,0,
+  0,0,69,70,71,72,73,0,0,0,0,0,0,0,0,0,0,0,0,0,0,74,0,0,75,0,0,0,0,0,0,0,
+  0,0,76,70,0,77,78,79,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,71,0,0,0,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,81,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,82,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,84,78,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,81,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,85,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,86,87,88,73,0,0,89,0,0,0,86,87,88,73,90,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,91,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,92,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  93,94,67,0,0,0,0,95,78,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,96,0,0,0,0,30,97,0,0,0,0,0,0,0,98,0,0,99,0,100,0,0,0,0,0,0,
+  101,101,102,102,103,103,104,104,102,102,104,105,106,106,107,108,0,0,0,0,0,0,49,109,49,0,0,0,0,0,49,110,
+  111,0,112,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,113,0,0,0,0,0,0,0,114,0,0,0,0,0,
+  73,115,0,0,116,0,0,117,118,119,0,0,120,0,121,122,121,0,123,0,124,125,126,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,127,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,128,0,0,0,0,0,0,129,130,131,131,132,133,134,135,0,0,0,91,129,130,131,131,132,133,134,135,0,136,137,91,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,138,0,0,0,139,0,0,0,140,0,0,0,0,
+  0,0,141,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,142,0,143,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,145,0,0,0,0,0,0,146,0,0,147,0,0,0,0,0,0,0,0,148,0,0,0,149,0,0,0,
+  0,0,0,150,0,0,0,151,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,152,0,0,0,0,0,0,0,153,0,0,0,0,0,0,0,0,0,0,0,0,0,0,154,0,0,0,
+  0,155,0,156,0,0,0,0,0,157,0,0,0,0,0,0,0,0,0,158,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,159,0,0,0,0,0,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,161,0,0,0,0,0,0,0,0,0,0,0,162,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,163,0,164,0,0,0,0,0,0,0,0,
+  0,0,0,165,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,166,
+  0,167,0,168,0,0,0,169,170,0,0,0,0,0,0,0,0,0,171,0,0,0,0,0,0,0,0,0,172,0,0,0,
+  0,0,0,0,0,173,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  174,0,0,0,175,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,176,0,0,0,0,0,0,0,0,0,0,0,
+  177,0,0,0,0,0,178,0,0,0,0,179,0,0,0,0,0,0,0,0,0,0,0,0,0,0,180,181,0,0,0,0,
+  0,182,0,0,0,0,0,0,0,0,0,0,0,183,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,184,0,0,0,0,0,185,186,187,0,0,0,0,0,0,0,0,0,0,0,0,188,0,0,0,0,189,
+  0,0,0,0,0,0,190,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,191,192,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,193,0,0,0,0,0,0,0,0,0,194,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,195,196,0,0,0,0,0,0,0,197,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,198,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,199,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,200,0,0,0,201,0,202,
+  0,0,0,0,0,0,0,0,0,0,203,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,204,0,0,205,0,206,207,208,0,0,0,0,0,0,0,209,0,0,0,0,210,0,0,211,212,0,0,213,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,214,0,0,0,215,216,0,0,0,217,0,218,0,0,0,0,0,0,0,0,
+  219,0,0,0,0,220,0,0,0,0,0,0,0,0,0,221,0,0,0,222,0,0,0,0,0,223,0,224,225,0,0,0,
+  0,0,0,0,0,0,0,0,226,227,228,0,229,230,231,0,232,233,234,0,235,236,237,0,0,238,0,239,0,0,240,0,
+  241,0,242,0,0,243,0,244,245,0,0,0,0,0,246,0,0,247,0,248,249,0,250,0,251,252,253,254,255,0,256,257,
+  258,0,259,0,0,0,0,260,0,261,262,263,0,0,264,265,0,0,0,0,0,0,0,0,266,267,0,268,269,270,271,0,
+  272,273,0,274,0,0,0,275,276,277,0,0,0,278,0,0,0,0,0,279,280,0,0,281,0,0,0,0,0,0,282,0,
+  0,0,283,0,0,0,0,0,0,0,284,0,285,0,0,0,286,0,0,287,0,288,289,0,290,0,0,0,291,0,0,0,
+  292,0,0,0,0,0,0,0,0,0,293,0,0,294,295,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,296,
+  0,0,297,0,0,0,0,0,0,0,0,0,0,0,0,0,0,298,0,0,0,0,0,0,0,299,0,0,0,0,300,0,
+  0,301,0,0,0,0,302,0,303,0,0,304,0,0,0,0,0,0,0,0,0,305,306,0,0,0,0,307,0,308,309,0,
+  310,0,0,311,312,0,0,0,313,314,315,0,316,0,317,0,0,0,0,0,0,0,0,0,0,0,0,318,0,319,0,0,
+  0,0,0,320,321,0,0,0,0,0,0,0,322,0,0,0,0,0,0,0,0,0,323,0,0,0,0,0,0,0,0,0,
+  0,324,0,0,0,325,0,326,0,0,0,0,0,0,0,0,327,0,0,0,0,0,0,0,328,0,0,329,330,331,332,333,
+  334,0,0,0,335,0,0,336,0,0,0,0,337,338,0,0,0,339,0,0,0,0,0,0,340,0,0,0,0,0,0,0,
+  0,0,0,341,0,0,0,0,342,0,343,0,0,344,0,345,0,0,0,0,0,0,346,347,0,0,0,0,348,0,0,349,
+  0,0,0,0,0,350,0,351,0,0,0,0,0,352,353,0,0,0,0,0,354,0,355,0,0,356,357,358,0,359,0,360,
+  361,0,0,0,362,0,0,0,0,0,363,0,364,365,0,0,0,366,0,367,0,368,0,0,0,369,370,0,0,0,371,372,
+  0,0,373,374,0,0,0,0,0,0,0,0,0,0,375,0,376,0,377,0,0,0,0,0,378,0,0,379,380,0,0,0,
+  0,381,0,0,0,0,0,0,382,383,0,0,384,385,0,386,0,387,388,0,389,390,391,0,0,0,0,392,0,0,393,0,
+  394,0,395,396,0,397,398,0,0,0,0,399,0,0,0,0,0,0,0,0,0,0,400,0,0,401,402,0,0,0,0,403,
+  0,0,0,0,0,0,0,404,0,0,405,0,0,406,0,407,408,0,0,0,409,410,0,0,411,0,0,0,412,0,0,0,
+  0,0,0,413,414,0,0,0,0,0,415,0,0,416,417,418,0,0,0,419,0,0,0,0,420,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,421,422,0,0,423,0,424,0,0,0,425,0,0,0,0,426,0,0,0,427,0,0,0,
+  0,0,428,0,0,0,0,0,0,429,0,0,0,0,430,0,0,431,432,433,0,0,434,0,435,0,0,0,0,0,436,437,
+  437,0,438,439,440,0,0,0,0,441,442,443,0,0,0,444,445,0,446,0,0,0,0,0,0,0,0,0,0,0,447,448,
+  0,0,449,450,0,0,0,0,0,0,451,0,0,0,0,0,452,453,0,0,0,454,0,0,0,0,0,0,0,0,0,0,
+  0,0,455,0,0,0,0,0,456,0,0,0,0,0,0,0,0,0,0,0,457,0,0,0,0,0,0,0,0,458,0,0,
+  459,0,460,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,461,0,0,0,0,462,463,0,0,0,0,
+  464,0,0,0,465,0,0,0,0,0,466,0,0,0,467,468,0,0,0,469,0,470,0,471,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,472,0,0,473,0,0,0,0,474,0,0,0,0,0,475,0,476,0,0,477,0,0,0,
+  0,0,478,479,0,0,480,481,482,0,0,0,0,483,484,485,486,0,0,0,0,0,0,0,0,487,0,488,0,489,0,490,
+  0,0,0,491,0,492,0,0,0,0,0,0,0,493,0,0,0,0,0,494,0,0,0,495,496,497,498,499,0,0,0,0,
+  0,500,0,0,501,0,0,0,0,0,0,0,0,502,0,0,0,0,0,0,0,0,0,0,503,0,0,0,0,504,0,505,
+  0,0,0,506,0,0,0,507,0,508,0,0,0,0,509,510,0,0,0,511,0,512,0,0,0,513,0,514,0,0,0,0,
+  0,0,0,0,0,0,0,0,515,516,0,0,0,517,0,0,0,0,0,518,0,0,0,0,0,519,520,0,0,0,0,0,
+  0,0,521,522,0,523,524,0,0,0,525,0,526,0,0,0,527,0,528,0,0,529,0,0,530,0,0,0,0,0,0,531,
+  0,0,0,0,0,532,0,0,0,0,0,0,0,0,533,534,535,536,0,0,537,0,538,0,0,0,0,539,0,0,0,0,
+  540,541,0,0,542,0,0,0,543,0,0,544,0,545,546,0,547,548,0,549,0,0,0,0,0,550,0,0,0,0,0,0,
+  551,0,0,0,552,0,0,553,0,0,0,554,555,0,556,0,0,0,0,0,0,0,0,0,0,0,0,0,557,0,0,0,
+  0,0,558,559,0,0,0,0,560,0,0,0,0,561,0,0,0,0,0,0,0,0,0,0,0,562,0,563,564,0,565,0,
+  566,0,0,567,0,0,0,0,568,569,0,0,0,0,0,0,0,570,0,0,571,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,572,0,0,0,573,0,0,0,574,575,0,0,0,0,0,0,576,0,0,0,0,0,577,
+  0,0,0,0,0,578,0,579,0,580,581,582,583,0,0,584,0,585,0,0,0,586,0,0,0,587,0,0,0,588,0,0,
+  0,0,0,589,0,0,0,0,590,591,0,0,0,0,0,0,592,0,0,0,0,0,593,0,0,594,0,0,0,595,0,0,
+  0,0,0,0,596,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,597,598,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,599,0,0,0,0,600,0,0,601,0,0,602,0,0,0,0,603,0,0,604,0,605,606,0,0,
+  607,0,608,0,609,610,0,0,0,0,0,611,612,0,0,0,0,0,0,0,613,0,0,614,615,0,0,0,0,0,616,0,
+  617,618,0,0,0,0,619,0,620,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,621,0,0,0,0,0,0,622,623,624,0,625,626,0,0,0,627,0,0,0,0,0,0,0,628,
+  629,0,0,0,0,0,0,0,630,0,0,0,631,632,633,634,0,635,0,0,0,636,637,0,0,0,0,0,0,0,0,0,
+  638,0,0,0,0,0,0,639,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,640,0,641,0,0,
+  642,0,0,643,0,0,0,0,0,0,0,0,0,644,0,645,0,646,647,648,0,0,649,650,0,0,0,0,651,0,0,0,
+  0,0,0,652,653,0,654,0,0,0,655,0,656,0,0,0,0,0,0,0,0,657,0,658,0,659,0,660,661,662,663,0,
+  0,0,0,0,0,0,0,664,0,665,666,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,667,668,669,
+  0,0,670,0,0,0,0,0,0,0,0,0,671,0,0,0,0,0,0,0,0,0,0,0,0,672,0,0,0,0,0,673,
+  674,0,675,0,0,676,0,677,0,0,678,679,680,681,0,0,0,682,0,0,0,683,0,0,0,0,0,0,684,0,0,0,
+  0,685,0,0,0,686,0,0,0,0,0,0,0,687,0,688,689,0,0,0,0,0,0,690,0,0,0,0,691,0,0,0,
+  692,0,0,693,0,0,0,0,0,694,0,0,695,0,0,0,0,0,0,0,0,0,0,0,696,697,698,699,700,0,0,701,
+  0,0,702,0,0,0,0,0,703,0,0,0,704,0,0,0,705,706,707,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,708,709,0,710,0,711,712,0,0,713,0,714,
+  715,0,0,0,0,0,0,716,0,0,0,717,0,0,0,0,718,719,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,720,721,0,0,0,0,0,0,0,0,0,0,722,0,0,723,724,725,0,0,0,0,0,
+  0,726,0,727,0,0,0,0,0,0,0,0,0,0,728,0,0,0,0,0,0,0,0,729,0,730,0,0,0,731,732,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,733,734,0,0,0,0,0,
+  0,0,0,0,735,736,0,737,0,0,0,0,738,0,0,0,0,0,0,739,0,0,740,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,741,0,0,742,0,0,0,0,0,0,743,744,0,745,746,0,0,0,0,0,0,747,0,748,0,0,749,750,
+  0,0,751,752,0,0,0,0,0,0,0,0,0,753,0,0,0,0,0,754,0,0,755,0,0,756,757,0,0,0,0,0,
+  0,0,0,0,0,0,758,759,0,0,0,0,0,0,760,761,0,0,0,0,0,0,0,0,0,0,762,763,0,0,0,0,
+  764,0,0,0,0,0,0,0,0,765,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,766,
+  0,0,767,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,768,0,0,0,769,770,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,771,0,0,0,772,0,0,0,0,773,774,775,0,0,0,776,0,777,778,779,0,0,0,780,0,781,0,
+  0,0,0,0,782,0,783,0,0,784,785,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,786,787,0,0,788,
+  0,789,0,790,0,791,0,792,0,0,0,793,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,794,795,0,796,
+  0,0,0,0,0,797,0,0,0,0,0,0,0,0,0,0,0,0,0,0,798,0,0,0,799,0,0,0,0,0,800,801,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,802,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,803,0,0,0,0,0,0,0,0,0,0,804,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,805,0,806,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,807,
+  0,0,0,0,0,0,0,0,0,0,0,0,808,0,0,0,0,0,0,0,0,0,809,0,0,0,0,0,0,0,0,810,
+  0,0,0,811,0,0,0,0,0,0,0,0,0,0,0,812,0,0,813,814,0,0,0,815,0,816,0,0,0,0,0,817,
+  818,819,820,0,0,0,0,821,822,0,0,0,0,0,0,0,0,823,0,824,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11110,15 +10502,10 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,539,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,540,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,541,542,0,0,0,543,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,33,0,544,0,545,0,
-  0,0,0,0,0,546,0,0,0,0,0,0,0,23,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,547,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11136,10 +10523,8 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,548,549,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,550,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11164,7 +10549,6 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,551,0,0,552,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11176,48 +10560,11 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,553,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,554,555,556,0,0,0,0,0,0,557,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  558,0,0,0,0,0,559,0,0,0,0,0,0,0,0,0,0,560,0,0,0,0,0,0,0,0,0,561,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,562,0,0,0,0,0,0,0,0,0,0,0,0,0,563,0,564,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,565,0,0,0,0,0,0,0,0,0,566,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,567,0,0,0,0,0,0,568,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,569,0,0,0,0,0,0,0,0,0,0,0,0,570,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,571,0,0,0,0,0,0,0,0,0,
-  0,0,572,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,573,0,0,0,0,0,0,574,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  575,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,576,0,0,0,0,577,0,578,0,579,0,
-  0,0,0,580,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,581,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,582,0,0,0,0,0,0,0,0,0,0,0,0,0,0,583,0,0,584,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,585,0,0,586,0,0,0,0,0,0,0,0,0,0,0,0,0,587,0,0,0,588,0,589,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,590,0,0,0,591,0,0,0,0,0,592,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,593,0,0,0,0,0,0,0,0,594,0,0,0,0,0,0,
-  595,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,596,0,0,597,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,598,0,0,
-  0,0,599,0,0,0,0,600,601,602,0,0,0,0,0,0,0,0,603,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  604,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,605,0,0,606,0,607,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,608,0,0,0,0,0,0,0,0,0,609,0,0,0,0,0,0,0,610,0,0,
-  0,0,0,0,611,0,612,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,613,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,614,0,0,615,616,0,0,0,617,0,0,618,0,0,0,0,0,0,
-  0,0,0,0,0,0,619,0,0,620,0,0,0,621,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,622,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,623,0,0,0,0,0,0,
-  0,624,0,0,0,0,625,0,0,0,0,626,0,0,0,0,0,0,0,0,0,0,0,0,0,627,0,0,0,628,0,0,
-  0,0,0,0,0,0,629,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,630,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,631,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,632,0,0,0,0,0,633,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,634,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,635,0,0,636,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,637,638,0,0,0,0,0,0,0,0,0,639,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,640,
-  0,0,0,0,0,0,0,0,0,0,0,641,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,642,0,0,0,643,0,644,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  645,0,0,0,646,0,0,0,0,0,0,0,0,647,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,648,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,649,0,650,0,0,0,0,0,0,0,651,0,0,0,652,0,0,0,0,0,0,0,653,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11231,6 +10578,7 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,825,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11240,6 +10588,7 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,826,124,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11250,10 +10599,16 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,827,828,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,829,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,75,0,0,0,0,0,0,0,830,831,112,0,0,0,0,0,832,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,833,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,59,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,834,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11325,6 +10680,7 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,835,836,837,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11336,6 +10692,7 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,838,67,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11435,6 +10792,7 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,839,840,0,0,0,0,0,0,0,0,0,0,0,841,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11482,11 +10840,17 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,842,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,843,844,0,0,0,0,845,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,846,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  847,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,848,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,849,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,850,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -11495,1472 +10859,539 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[34815] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,851,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,852,0,0,0,0,0,0,0,853,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,854,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,855,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,856,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,857,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,858,0,0,859,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,860,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,861,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,862,863,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,864,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,865,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,866,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,867,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,868,0,0,0,0,0,0,869,870,0,0,0,0,871,0,872,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,873,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,874,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,875,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,876,0,0,0,0,0,0,0,0,0,0,0,0,0,877,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,878,0,0,0,0,0,0,0,0,
+  0,0,0,879,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,880,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,881,0,0,0,0,0,882,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,883,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,884,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,885,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,886,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,887,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,888,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,889,0,0,0,0,0,0,0,0,0,0,0,890,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,891,0,0,892,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,893,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,894,0,
+  0,0,0,895,0,0,896,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,897,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,898,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,899,0,0,0,0,0,0,0,0,0,0,0,0,0,0,900,0,0,0,0,901,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,902,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,903,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,904,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,905,0,0,0,0,0,0,0,0,0,906,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,907,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,908,0,0,0,0,
+  0,0,0,0,0,909,0,0,910,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,911,0,0,0,0,
+  0,0,0,0,0,0,0,912,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,913,0,0,0,0,
+  0,0,0,0,914,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,915,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,916,0,917,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,918,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,919,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,920,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,921,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,922,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,923,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,924,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,925,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,926,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,927,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,928,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,929,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,930,0,0,0,0,0,
+  0,0,0,0,0,931,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,675,0,0,932,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,933,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,934,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,937,0,0,0,0,
+  0,0,0,938,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,939,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,940,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,941,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,942,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,943,0,0,0,0,0,0,
+  944,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,945,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,946,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,947,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  948,
 };
 
-static kbts_u32 kbts__UnicodeParentInfo_Data[20960] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66400,66423,66421,66422,0,
-  0,1048664,197177,328094,393598,1114167,66418,459018,459046,983176,65810,393556,393562,197183,590017,1048696,131720,0,524539,459032,459067,1245203,131728,393604,131730,590026,393592,0,0,0,0,0,
-  66420,1048648,197171,328084,393586,1114150,66417,459011,524515,917655,131704,328109,393538,197180,590008,1048680,131414,0,524499,459025,524523,1245184,131724,459060,131726,655525,393580,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,197174,0,0,0,0,0,0,0,0,0,0,0,66419,0,0,66399,0,0,0,0,0,0,0,0,
+static kbts_u32 kbts__UnicodeParentInfo_Data[7592] = {
+  0,0,0,0,0,0,0,0,0,0,0,66400,66423,66421,66422,0,0,1048664,197177,328094,393598,1114167,66418,459018,459046,983176,65810,393556,393562,197183,590017,1048696,
+  131720,0,524539,459032,459067,1245203,131728,393604,131730,590026,393592,0,0,0,0,0,66420,1048648,197171,328084,393586,1114150,66417,459011,524515,917655,131704,328109,393538,197180,590008,1048680,
+  131414,0,524499,459025,524523,1245184,131724,459060,131726,655525,393580,0,0,0,0,0,197174,0,0,0,0,0,0,0,0,0,0,0,66419,0,0,66399,
   0,0,262650,0,66396,131722,131706,65959,0,0,262654,0,0,0,0,66416,0,0,0,0,262658,197168,66398,0,66397,0,0,0,262626,0,0,0,
   0,0,262638,0,66019,66395,131702,66415,0,0,262642,0,0,0,0,65963,0,0,0,0,262646,197165,66186,0,65816,0,0,0,262622,0,0,0,
-  0,0,262634,262634,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131716,131716,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,131718,131718,0,0,0,0,0,0,0,0,0,0,0,0,66412,66412,0,0,0,0,
-  66183,66183,0,0,0,0,0,0,66413,66413,66413,66413,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66414,
-  328104,328104,0,0,0,0,0,0,0,0,0,0,0,0,0,328099,328099,0,0,0,0,0,0,66381,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,65936,65936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66367,66367,66405,66405,0,0,0,0,65936,65936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66366,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66393,0,0,0,0,0,0,
-  65973,65973,0,0,0,0,0,0,66384,0,0,0,0,0,0,0,0,0,0,66379,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,66409,65949,0,65829,66406,65873,0,66411,0,66408,66410,65867,459053,0,0,0,262618,0,328089,0,459039,0,0,0,0,0,262610,
-  0,66407,0,0,0,393544,0,0,0,393550,0,0,131708,66403,131710,66404,65948,524531,0,0,0,262606,0,393568,0,589999,0,0,0,0,0,262630,
-  0,131714,0,0,0,524507,0,0,0,393574,197129,197132,66401,66402,131712,0,0,0,131471,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,65935,0,0,0,0,0,0,0,0,0,131227,0,0,66371,0,197150,131700,65953,262594,0,65945,0,0,0,66394,0,
+  0,0,262634,262634,0,0,0,0,0,0,131716,131716,0,0,0,0,0,0,0,0,131718,131718,0,0,0,0,66412,66412,0,0,0,0,
+  66183,66183,0,0,0,0,0,0,66413,66413,66413,66413,0,0,0,0,0,0,0,0,0,0,0,66414,328104,328104,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,328099,328099,0,0,0,0,0,0,66381,0,0,65936,65936,0,0,0,0,0,0,0,0,0,0,66367,66367,
+  66405,66405,0,0,0,0,65936,65936,0,0,66366,0,0,0,0,0,0,66393,0,0,0,0,0,0,65973,65973,0,0,0,0,0,0,
+  66384,0,0,0,0,0,0,0,0,0,0,66379,0,0,0,0,0,0,0,0,0,66409,65949,0,65829,66406,65873,0,66411,0,66408,66410,
+  65867,459053,0,0,0,262618,0,328089,0,459039,0,0,0,0,0,262610,0,66407,0,0,0,393544,0,0,0,393550,0,0,131708,66403,131710,66404,
+  65948,524531,0,0,0,262606,0,393568,0,589999,0,0,0,0,0,262630,0,131714,0,0,0,524507,0,0,0,393574,197129,197132,66401,66402,131712,0,
+  0,0,131471,0,0,0,0,0,0,0,0,0,0,0,65935,0,131227,0,0,66371,0,197150,131700,65953,262594,0,65945,0,0,0,66394,0,
   0,0,0,262586,0,0,0,65595,0,0,0,65595,0,65630,0,0,131696,0,0,66376,0,197162,131698,65943,262602,0,66377,0,0,0,66392,0,
-  0,0,0,262614,0,0,0,65578,0,0,0,65578,0,65614,0,0,0,0,0,0,0,0,65935,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65936,65936,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65936,65936,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,65936,65936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197216,131836,66134,66134,66134,131828,66134,0,66134,131820,66134,131826,66134,0,66134,0,
-  66134,66134,0,66134,131822,0,66134,66134,66134,197204,66134,0,0,0,0,0,0,0,66855,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,197135,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66370,0,66370,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,0,65978,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66387,66387,66387,0,0,0,0,66385,0,0,0,
-  0,66383,66383,0,0,0,0,0,65935,0,0,66380,0,0,0,66379,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66379,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,131474,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66387,66387,0,0,0,0,66385,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66380,0,0,0,0,0,0,65935,0,0,0,0,0,65931,0,0,0,0,0,0,0,
-  0,66383,66383,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,197147,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,131507,65934,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,65936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,
-  0,0,0,0,0,0,197138,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197141,0,0,65935,0,0,0,
-  66378,0,65935,0,0,0,0,0,0,0,0,0,65935,0,0,0,0,65935,0,0,0,0,65935,0,0,0,0,65935,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197153,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66378,0,65935,0,0,0,0,0,0,0,0,0,65935,0,0,0,
-  0,65935,0,0,0,0,65935,0,0,0,0,65935,0,0,0,0,0,0,66368,66369,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,328074,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,65935,0,65935,0,65935,0,65935,0,65935,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,65935,0,65936,65936,
-  0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65936,65936,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65936,65936,0,0,0,0,
-  0,0,65755,65755,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  131694,131694,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66087,66087,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,66158,66158,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  262598,262598,65609,65609,65609,65609,65609,65609,262598,262598,65609,65609,65609,65609,65609,65609,131506,131506,0,0,0,0,0,0,131506,131506,0,0,0,0,0,0,
-  262590,262590,65985,65985,65985,65985,65985,65985,262590,262590,65985,65985,65985,65985,65985,65985,197042,197042,0,0,0,0,0,0,197042,197042,0,0,0,0,0,0,
-  131506,131506,0,0,0,0,0,0,131506,131506,0,0,0,0,0,0,197042,197042,0,0,0,0,0,0,0,197042,0,0,0,0,0,0,
-  262578,262578,65973,65973,65973,65973,65973,65973,262578,262578,65973,65973,65973,65973,65973,65973,66386,0,0,0,66388,0,0,0,0,0,0,0,66391,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,0,0,0,0,0,0,0,197159,
-  0,0,0,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,0,0,0,0,0,0,197126,0,
-  0,0,65931,65931,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66374,0,66373,0,66375,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65930,0,65930,0,66372,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,65935,0,0,0,0,65935,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,65935,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65894,0,0,0,
-  0,0,0,65935,0,65936,0,0,65935,0,0,0,0,66376,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,65935,0,0,66158,66158,0,0,0,0,0,0,0,0,0,0,0,0,65936,65936,0,0,65936,65936,0,0,65755,65755,66390,66390,0,0,
-  0,0,65936,65936,0,0,65936,65936,0,0,0,0,0,0,0,0,0,66389,66389,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66374,0,0,0,0,0,65894,65894,0,65934,0,0,0,0,0,0,66382,66382,66382,66382,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65932,0,0,
-  0,0,0,0,0,0,0,0,66365,66365,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66388,0,0,0,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,
+  0,0,0,262614,0,0,0,65578,0,0,0,65578,0,65614,0,0,0,0,0,0,65936,65936,0,0,65936,65936,0,0,0,0,0,0,
+  197216,131836,66134,66134,66134,131828,66134,0,66134,131820,66134,131826,66134,0,66134,0,66134,66134,0,66134,131822,0,66134,66134,66134,197204,66134,0,0,0,0,0,
+  0,0,66855,0,0,0,0,0,0,0,0,0,0,0,0,197135,66370,0,66370,0,0,0,0,0,0,65935,0,0,0,0,0,0,
+  0,0,65935,0,0,65978,0,0,0,0,0,0,0,66387,66387,66387,0,0,0,0,66385,0,0,0,0,66383,66383,0,0,0,0,0,
+  65935,0,0,66380,0,0,0,66379,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,66379,0,0,0,0,0,0,0,131474,
+  0,0,0,0,0,0,66387,66387,0,0,0,66380,0,0,0,0,0,0,65935,0,0,0,0,0,65931,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,197147,0,0,0,0,0,0,131507,65934,0,0,0,0,0,0,65936,0,0,0,0,0,0,0,0,65935,
+  0,0,0,0,0,0,197138,0,0,197141,0,0,65935,0,0,0,66378,0,65935,0,0,0,0,0,0,0,0,0,65935,0,0,0,
+  0,65935,0,0,0,0,65935,0,0,197153,0,0,0,0,0,0,0,0,66368,66369,0,0,0,0,0,0,0,0,0,65935,0,0,
+  0,328074,0,0,0,0,0,0,0,0,0,0,0,65935,0,65935,0,65935,0,65935,0,65935,0,0,0,0,65935,0,65935,0,65936,65936,
+  0,0,0,0,0,0,65936,65936,0,0,65755,65755,0,0,0,0,131694,131694,0,0,0,0,0,0,66087,66087,0,0,0,0,0,0,
+  0,0,0,0,66158,66158,0,0,262598,262598,65609,65609,65609,65609,65609,65609,131506,131506,0,0,0,0,0,0,262590,262590,65985,65985,65985,65985,65985,65985,
+  197042,197042,0,0,0,0,0,0,0,197042,0,0,0,0,0,0,262578,262578,65973,65973,65973,65973,65973,65973,66386,0,0,0,66388,0,0,0,
+  0,0,0,0,66391,0,0,0,0,0,0,0,0,0,0,197159,0,0,0,0,0,0,197126,0,0,0,65931,65931,0,0,0,0,
+  65935,0,0,0,0,0,0,0,66374,0,66373,0,66375,0,0,0,65930,0,65930,0,66372,0,0,0,65935,0,0,65935,0,0,0,0,
+  0,0,0,65935,0,65935,0,0,0,0,0,0,65894,0,0,0,0,0,0,65935,0,65936,0,0,65935,0,0,0,0,66376,0,0,
+  0,65935,0,0,66158,66158,0,0,0,0,65936,65936,0,0,65936,65936,0,0,65755,65755,66390,66390,0,0,0,66389,66389,0,0,0,0,0,
+  0,0,66374,0,0,0,0,0,65894,65894,0,65934,0,0,0,0,0,0,66382,66382,66382,66382,0,0,0,0,0,0,0,65932,0,0,
+  66365,66365,0,0,0,0,0,0,0,0,0,0,0,0,66388,0,0,0,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,
   0,65935,0,0,65935,0,65935,0,65935,0,0,0,0,0,0,131471,0,0,131471,0,0,131471,0,0,131471,0,0,131471,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65756,65756,65756,65756,0,0,0,0,0,0,0,0,0,0,65935,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67213,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67212,0,67214,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67211,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67210,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67209,0,0,0,0,0,0,0,0,0,0,0,0,0,67208,0,0,0,
-  0,67207,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67206,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,67205,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67204,0,0,0,
-  0,0,0,0,0,0,0,67203,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,67202,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67201,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67200,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,67198,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,67197,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,67196,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67195,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,67194,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131892,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67193,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67192,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67191,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67190,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,67189,0,0,0,0,0,0,0,0,0,0,0,131890,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67188,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67187,0,0,0,
-  0,0,0,0,0,0,0,0,67186,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66821,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131888,0,0,0,0,0,0,
-  0,0,0,0,0,0,67185,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67184,0,0,0,0,0,0,0,0,0,
-  0,0,0,67183,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67182,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,67181,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,67180,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  67179,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,67178,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67177,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67176,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67175,0,0,0,67172,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,67174,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,67173,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,67171,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67170,0,0,
-  0,67169,0,0,0,0,0,0,0,0,0,67168,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67167,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67166,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67165,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67164,0,
-  0,0,0,0,0,0,0,67163,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67162,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,67161,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67160,0,0,0,0,0,0,0,67159,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67158,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67157,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67156,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67155,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,67154,0,0,0,0,0,0,0,0,0,0,67153,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67152,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66809,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66810,0,0,0,0,0,0,0,0,0,0,0,66804,0,0,0,0,0,67151,66806,0,0,0,67150,0,0,
-  0,67149,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66801,0,0,0,66807,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66803,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66808,0,0,0,0,0,0,0,0,0,0,0,67148,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66802,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  67147,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66805,0,0,0,0,0,66798,0,0,0,0,66800,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,131886,0,0,0,0,0,0,0,0,0,0,0,0,67146,0,0,0,66797,
-  0,0,67145,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66799,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67144,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67143,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67140,0,0,0,0,0,0,0,0,0,0,66790,0,0,0,0,0,
-  0,0,0,0,0,0,0,131882,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66789,0,0,0,0,66794,0,0,0,0,0,0,0,131878,0,0,0,0,0,0,67138,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,67136,0,0,67137,66793,66782,0,0,0,66788,0,0,0,0,0,0,0,0,0,67135,0,0,0,0,0,0,0,0,
-  66791,0,0,0,0,0,0,0,0,0,0,0,0,67134,0,0,0,0,67142,0,0,67141,0,67133,0,0,0,0,0,0,0,0,
-  0,0,0,0,67132,0,0,0,0,0,0,0,67131,0,0,0,0,0,0,0,0,131876,0,66775,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66779,0,0,66778,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66776,0,66785,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67130,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,67129,0,0,0,131874,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66777,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66780,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66781,67128,0,0,0,0,
-  0,0,0,0,0,0,67127,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67126,0,0,0,0,67125,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66774,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66772,0,0,0,0,
-  0,0,0,66773,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67139,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,131872,0,131870,0,0,0,0,0,0,0,0,66769,0,0,0,0,0,0,0,0,0,0,0,66768,0,
-  0,0,0,0,131866,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66770,0,0,0,0,131864,0,0,0,0,0,
-  0,0,0,0,0,67124,67124,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131862,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66771,
-  0,0,0,0,0,0,0,0,0,67123,0,0,0,0,0,0,0,131860,0,0,0,0,0,0,0,0,67122,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67121,0,66764,0,0,0,0,0,0,0,66154,0,197225,
-  0,0,0,66765,0,0,0,0,0,0,67120,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67119,
-  0,0,0,0,0,66760,0,0,0,0,0,67118,0,0,0,0,0,67117,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,67116,0,0,0,0,0,0,0,0,66766,0,0,0,0,0,0,0,0,0,0,0,0,0,66767,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67115,0,0,0,0,0,0,0,
-  0,0,66763,0,0,0,0,0,67114,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,67113,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67112,0,
-  0,0,67112,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66318,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67111,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67110,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67109,0,66761,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,67108,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,131884,0,0,66757,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131854,0,0,0,131800,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,67107,0,0,0,0,0,0,0,67106,0,0,0,0,0,0,0,0,0,0,0,0,
-  66759,0,67105,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66264,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,131852,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67104,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66758,0,0,0,0,0,0,0,0,0,0,0,67103,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66754,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67101,67102,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,67100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67099,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67098,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,67097,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67096,67095,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66752,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131798,0,0,0,66747,0,
-  0,0,0,0,0,0,0,0,66750,0,0,0,67094,0,0,0,0,0,0,66751,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66746,0,0,0,0,0,0,66745,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67091,0,0,0,67093,0,0,0,0,67092,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,67090,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67089,0,0,0,0,0,
-  0,0,67088,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66749,0,0,0,66741,0,0,0,0,0,0,0,0,66740,0,0,66748,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,67087,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66743,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67085,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,67084,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67083,0,0,0,0,
-  0,0,0,0,0,0,0,67082,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66744,0,0,0,67081,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67086,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,67080,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66739,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131880,0,
-  0,0,0,0,0,66738,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,67079,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67078,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,197222,0,0,0,0,0,0,66314,0,0,0,0,67077,0,0,0,0,0,0,0,0,0,0,0,67076,
-  0,0,0,0,0,0,67075,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,67074,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66735,
-  67072,0,66733,0,66737,66734,0,0,0,0,0,0,0,0,131850,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,67071,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  67070,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66731,0,0,0,0,0,0,
-  0,0,0,67069,0,0,0,0,0,0,0,0,0,0,0,0,66729,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,67068,0,0,67067,0,0,0,0,0,0,0,0,0,0,0,0,0,67066,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67073,0,0,0,0,0,0,0,66730,0,0,0,0,0,
-  0,67065,67065,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67064,0,0,
-  0,0,0,0,0,0,0,0,67063,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67062,0,0,
-  0,0,0,0,0,0,0,0,0,67061,0,0,0,0,0,0,0,0,0,0,66723,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66726,0,0,0,0,0,0,0,0,0,67060,0,0,67059,0,0,67058,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66722,131848,0,0,0,0,0,0,0,66728,66725,0,0,0,0,0,66727,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,66720,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67057,0,
-  0,0,0,0,66718,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,131868,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67054,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,67056,0,0,0,0,0,0,66724,0,67055,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66719,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67053,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66715,0,0,0,66721,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,67052,0,0,0,0,0,0,0,0,0,67051,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66714,0,0,0,67050,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66711,0,0,0,0,0,0,0,0,0,66713,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66717,0,0,0,0,0,0,0,0,0,0,
-  0,67049,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131846,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,67048,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66714,0,0,0,0,0,0,0,
-  0,66709,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66712,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66707,0,0,0,67047,0,0,0,131858,0,131844,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66710,0,0,0,0,0,0,0,66708,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67046,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,197219,0,66705,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,67045,0,0,0,0,0,0,0,0,0,0,67044,0,0,67043,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67042,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197213,0,0,0,131842,0,0,0,0,0,0,0,0,0,
-  66703,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67041,0,0,0,0,0,0,0,0,0,0,67040,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66704,0,0,0,0,0,66706,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67039,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67038,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66693,0,0,0,0,0,66696,0,0,0,66701,67037,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67036,0,66695,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67035,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67034,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,67033,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66690,0,0,0,0,
-  0,0,0,67032,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66689,0,0,0,0,0,0,0,0,67031,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66699,67030,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,67029,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66694,0,0,0,
-  0,0,67028,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66692,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,67027,0,0,0,0,0,0,0,0,0,0,0,0,0,67026,0,0,0,0,0,0,67025,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66687,0,0,67024,0,0,
-  0,0,0,0,66685,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131840,0,0,0,0,0,0,66688,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,67023,0,0,0,0,0,0,0,0,0,0,0,66681,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66682,0,0,0,0,0,0,
-  0,0,0,0,0,66678,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66684,67022,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66679,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,67021,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131790,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66675,0,0,0,0,0,0,0,0,131834,0,0,0,0,0,0,0,0,0,0,67020,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66677,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66674,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66670,0,0,0,67019,0,0,0,0,0,0,0,
-  67019,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197210,0,0,0,131832,0,0,0,0,
-  0,67018,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66673,0,0,0,0,67017,0,0,66676,0,0,0,0,0,0,0,67016,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66671,0,0,0,0,
-  0,0,0,0,0,67015,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66672,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66668,0,0,0,0,0,0,67014,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66666,0,0,0,0,0,0,0,67013,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67012,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,66664,0,0,0,131830,0,0,0,0,0,0,0,0,67011,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66665,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67010,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,67009,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,67008,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,67007,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,197201,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66663,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,67006,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66661,0,0,0,0,0,0,0,67005,0,0,0,0,
-  0,0,0,0,66659,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,67004,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67003,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67002,0,0,0,0,66658,0,66662,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67001,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66657,0,0,0,0,0,0,0,0,0,0,0,197198,66128,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,67000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66999,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66998,
-  0,0,0,0,0,0,0,0,0,0,0,0,66651,66997,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,66655,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66996,0,0,0,0,66647,0,0,66653,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66995,0,0,0,0,0,0,0,0,0,66994,0,
-  0,197195,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66993,66645,0,0,0,0,0,0,0,0,0,0,0,0,131824,66992,0,0,0,0,0,0,0,
-  0,0,0,0,0,66991,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66648,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66643,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66646,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66990,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66649,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66989,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66988,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66641,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66642,0,0,0,0,0,
+  0,0,0,0,0,0,0,65756,65756,65756,65756,0,0,0,0,0,0,0,0,0,0,0,67213,0,0,67212,0,67214,0,0,0,0,
+  0,0,0,0,0,0,0,67211,0,0,0,0,0,67210,0,0,0,0,0,0,0,0,67209,0,0,0,0,0,67208,0,0,0,
+  0,67207,0,0,0,0,0,0,0,0,0,0,0,0,0,67206,0,0,67205,0,0,0,0,0,0,0,0,0,67204,0,0,0,
+  0,0,0,0,0,0,0,67203,0,0,0,67202,0,0,0,0,0,0,0,0,67201,0,0,0,0,0,67200,0,0,0,0,0,
+  0,0,0,0,0,0,67199,0,0,0,0,0,67198,0,0,0,0,0,0,0,67197,0,0,0,67196,0,0,0,0,0,0,0,
+  0,67195,0,0,0,0,0,0,0,67194,0,0,0,0,0,0,0,0,0,0,0,131892,0,0,67193,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,67192,0,0,0,0,67191,0,0,0,0,0,0,0,0,0,0,67190,0,0,0,0,0,67189,0,0,0,
+  131890,0,0,0,0,0,0,0,0,0,0,67188,0,0,0,0,0,0,0,0,67187,0,0,0,67186,0,0,0,0,0,0,0,
+  66821,0,0,0,0,0,0,0,0,131888,0,0,0,0,0,0,0,0,0,0,0,0,67185,0,0,0,0,0,0,0,67184,0,
+  0,0,0,67183,0,0,0,0,0,0,0,0,0,0,0,67182,0,0,67181,0,0,0,0,0,0,0,0,0,0,0,0,67180,
+  67179,0,0,0,0,0,0,0,0,67178,0,0,0,0,0,0,0,0,0,0,67177,0,0,0,0,67176,0,0,0,0,0,0,
+  0,0,0,0,0,67175,0,0,0,67172,0,0,0,0,0,0,0,0,0,67174,0,0,0,0,0,0,0,67173,0,0,0,0,
+  0,0,0,67171,0,0,0,0,0,0,0,0,0,67170,0,0,0,67169,0,0,0,0,0,0,0,0,0,67168,0,0,0,0,
+  0,0,0,0,0,0,0,67167,0,67166,0,0,0,0,0,0,0,0,0,0,0,67165,0,0,0,0,0,0,0,0,67164,0,
+  0,0,0,0,0,0,0,67163,0,0,0,0,0,67162,0,0,0,0,0,0,0,0,67161,0,0,0,0,0,0,0,67160,0,
+  0,0,0,0,0,0,67159,0,0,0,67158,0,0,0,0,0,0,0,0,67157,0,0,0,0,0,0,0,0,0,0,67156,0,
+  0,0,0,0,0,0,67155,0,0,0,0,0,0,67154,0,0,67153,0,0,0,0,0,0,0,0,0,0,0,0,0,67152,0,
+  0,0,0,0,0,66809,0,0,0,0,0,0,0,0,66810,0,0,0,66804,0,0,0,0,0,67151,66806,0,0,0,67150,0,0,
+  0,67149,0,0,0,0,0,0,0,0,66801,0,0,0,66807,0,0,0,0,0,0,0,66803,0,66808,0,0,0,0,0,0,0,
+  0,0,0,0,67148,0,0,0,0,0,0,0,66802,0,0,0,67147,0,0,0,0,0,0,0,66805,0,0,0,0,0,66798,0,
+  0,0,0,66800,0,0,0,0,0,0,0,0,0,0,131886,0,0,0,0,67146,0,0,0,66797,0,0,67145,0,0,0,0,0,
+  0,0,0,66799,0,0,0,0,0,0,67144,0,0,0,0,0,0,67143,0,0,0,0,0,0,0,0,0,0,0,0,0,67140,
+  0,0,66790,0,0,0,0,0,0,0,0,0,0,0,0,131882,66789,0,0,0,0,66794,0,0,0,0,0,0,0,131878,0,0,
+  0,0,0,0,67138,0,0,0,0,0,0,0,67136,0,0,67137,66793,66782,0,0,0,66788,0,0,0,0,0,0,0,0,0,67135,
+  66791,0,0,0,0,0,0,0,0,0,0,0,0,67134,0,0,0,0,67142,0,0,67141,0,67133,0,0,0,0,67132,0,0,0,
+  0,0,0,0,67131,0,0,0,0,0,0,0,0,131876,0,66775,0,66779,0,0,66778,0,0,0,0,0,0,0,66776,0,66785,0,
+  0,0,0,0,0,67130,0,0,0,0,0,67129,0,0,0,131874,0,0,0,0,0,0,0,66777,0,66780,0,0,0,0,0,0,
+  0,0,66781,67128,0,0,0,0,0,0,0,0,0,0,67127,0,0,0,67126,0,0,0,0,67125,0,66774,0,0,0,0,0,0,
+  0,0,0,66772,0,0,0,0,0,0,0,66773,0,0,0,0,0,0,0,67139,0,0,0,0,0,0,0,0,0,0,0,131872,
+  0,131870,0,0,0,0,0,0,0,0,66769,0,0,0,0,0,0,0,0,0,0,0,66768,0,0,0,0,0,131866,0,0,0,
+  0,0,0,0,0,66770,0,0,0,0,131864,0,0,0,0,0,0,0,0,0,0,67124,67124,0,0,0,0,0,0,0,0,131862,
+  0,0,0,0,0,0,0,66771,0,67123,0,0,0,0,0,0,0,131860,0,0,0,0,0,0,0,0,67122,0,0,0,0,0,
+  0,0,0,67121,0,66764,0,0,0,0,0,0,0,66154,0,197225,0,0,0,66765,0,0,0,0,0,0,67120,0,0,0,0,0,
+  0,0,0,0,0,0,0,67119,0,0,0,0,0,66760,0,0,0,0,0,67118,0,0,0,0,0,67117,0,0,0,0,0,0,
+  0,0,0,0,0,0,67116,0,0,0,0,0,0,0,0,66766,0,0,0,0,0,66767,0,0,67115,0,0,0,0,0,0,0,
+  0,0,66763,0,0,0,0,0,67114,0,0,0,0,0,0,0,67113,0,0,0,0,0,0,0,0,0,0,0,0,0,67112,0,
+  0,0,67112,0,0,0,0,0,0,0,0,0,0,66318,0,0,0,0,0,0,0,0,67111,0,67110,0,0,0,0,0,0,0,
+  0,0,0,67109,0,66761,0,0,0,0,0,67108,0,0,0,0,0,0,0,0,131884,0,0,66757,0,131854,0,0,0,131800,0,0,
+  0,0,0,67107,0,0,0,0,0,0,0,67106,0,0,0,0,66759,0,67105,0,0,0,0,0,0,0,66264,0,0,0,0,0,
+  0,0,0,0,0,0,131852,0,0,67104,0,0,0,0,0,0,66758,0,0,0,0,0,0,0,0,0,0,0,67103,0,0,0,
+  0,66754,0,0,0,0,0,0,0,0,0,0,0,0,67101,67102,0,0,0,67100,0,0,0,0,0,0,0,0,0,0,67099,0,
+  0,0,0,0,67098,0,0,0,0,0,0,0,0,67097,0,0,0,67096,67095,0,0,0,0,0,66752,0,0,0,0,0,0,0,
+  0,0,131798,0,0,0,66747,0,66750,0,0,0,67094,0,0,0,0,0,0,66751,0,0,0,0,66746,0,0,0,0,0,0,66745,
+  0,0,0,0,0,0,67091,0,0,0,67093,0,0,0,0,67092,0,0,0,0,0,0,67090,0,0,0,67089,0,0,0,0,0,
+  0,0,67088,0,0,0,0,0,0,0,0,0,66749,0,0,0,66741,0,0,0,0,0,0,0,0,66740,0,0,66748,0,0,0,
+  0,0,67087,0,0,0,0,0,0,0,0,66743,0,0,0,0,67085,0,0,0,0,0,0,0,0,0,0,0,67084,0,0,0,
+  0,0,0,67083,0,0,0,0,0,0,0,0,0,0,0,67082,0,0,66744,0,0,0,67081,0,0,0,0,0,0,67086,0,0,
+  67080,0,0,0,0,0,0,0,66739,0,0,0,0,0,0,0,0,0,0,0,0,0,131880,0,0,0,0,0,0,66738,0,0,
+  0,0,0,67079,0,0,0,0,67078,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197222,0,0,0,0,0,0,66314,0,
+  0,0,0,67077,0,0,0,0,0,0,0,0,0,0,0,67076,0,0,0,0,0,0,67075,0,0,0,67074,0,0,0,0,0,
+  0,0,0,0,0,0,0,66735,67072,0,66733,0,66737,66734,0,0,0,0,0,0,0,0,131850,0,0,0,0,0,0,67071,0,0,
+  67070,0,0,0,0,0,0,0,0,66731,0,0,0,0,0,0,0,0,0,67069,0,0,0,0,66729,0,0,0,0,0,0,0,
+  0,0,0,67068,0,0,67067,0,0,0,0,0,67066,0,0,0,0,0,67073,0,0,0,0,0,0,0,66730,0,0,0,0,0,
+  0,67065,67065,0,0,0,0,0,0,0,0,0,0,67064,0,0,67063,0,0,0,0,0,0,0,0,0,0,0,0,67062,0,0,
+  0,67061,0,0,0,0,0,0,0,0,0,0,66723,0,0,0,0,0,0,0,0,0,66726,0,67060,0,0,67059,0,0,67058,0,
+  0,66722,131848,0,0,0,0,0,0,0,66728,66725,0,0,0,0,0,66727,0,0,0,0,0,0,0,0,0,0,66720,0,0,0,
+  0,0,0,0,0,0,67057,0,0,0,0,0,66718,0,0,0,0,0,131868,0,0,0,0,0,0,0,0,67054,0,0,0,0,
+  0,0,67056,0,0,0,0,0,0,66724,0,67055,0,0,0,0,0,0,0,66719,0,0,0,0,0,0,67053,0,0,0,0,0,
+  0,66715,0,0,0,66721,0,0,0,0,0,0,0,67052,0,0,0,0,0,0,0,0,0,67051,0,0,0,0,0,66714,0,0,
+  0,67050,0,0,0,0,0,0,0,0,66711,0,0,0,0,0,0,0,0,0,66713,0,0,0,0,0,0,0,0,66717,0,0,
+  0,67049,0,0,0,0,0,0,0,0,0,0,131846,0,0,0,0,0,0,0,0,0,0,67048,66714,0,0,0,0,0,0,0,
+  0,66709,0,0,0,0,0,0,66712,0,0,0,0,0,0,0,0,0,0,0,66707,0,0,0,67047,0,0,0,131858,0,131844,0,
+  66710,0,0,0,0,0,0,0,66708,0,0,0,0,0,0,0,0,0,67046,0,0,0,0,0,0,0,0,0,0,0,197219,0,
+  66705,0,0,0,0,0,0,0,0,0,0,0,67045,0,0,0,0,0,0,0,0,0,0,67044,0,0,67043,0,0,0,0,0,
+  0,0,0,0,0,0,67042,0,0,0,197213,0,0,0,131842,0,66703,0,0,0,0,0,0,0,67041,0,0,0,0,0,0,0,
+  0,0,0,67040,0,0,0,0,0,0,0,0,0,0,66704,0,0,0,0,0,66706,0,0,0,0,0,0,0,0,67039,0,0,
+  0,67038,0,0,0,0,0,0,0,66693,0,0,0,0,0,66696,0,0,0,66701,67037,0,0,0,0,0,0,0,67036,0,66695,0,
+  0,0,0,0,0,67035,0,0,67034,0,0,0,0,0,0,0,67033,0,0,0,0,0,0,0,0,0,0,66690,0,0,0,0,
+  0,0,0,67032,0,0,0,0,66689,0,0,0,0,0,0,0,0,67031,0,0,0,0,0,0,0,0,0,0,66699,67030,0,0,
+  0,0,0,0,67029,0,0,0,0,0,0,0,66694,0,0,0,0,0,67028,0,0,0,0,0,0,0,66692,0,0,0,0,0,
+  0,67027,0,0,0,0,0,0,0,0,0,0,0,0,0,67026,0,0,0,0,0,0,67025,0,0,0,66687,0,0,67024,0,0,
+  0,0,0,0,66685,0,0,0,0,0,0,0,0,0,0,131840,0,0,0,0,0,0,66688,0,0,0,0,0,67023,0,0,0,
+  66681,0,0,0,0,0,0,0,0,66682,0,0,0,0,0,0,0,0,0,0,0,66678,0,0,0,0,66684,67022,0,0,0,0,
+  0,0,0,66679,0,0,0,0,0,67021,0,0,0,0,0,0,0,0,0,0,131790,0,0,0,66675,0,0,0,0,0,0,0,
+  0,131834,0,0,0,0,0,0,0,0,0,0,67020,0,0,0,0,0,0,0,66677,0,0,0,0,0,0,0,0,0,66674,0,
+  0,0,0,0,66670,0,0,0,67019,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197210,0,0,0,131832,0,0,0,0,
+  0,67018,0,0,0,0,0,0,0,0,0,0,0,0,66673,0,0,0,0,67017,0,0,66676,0,0,0,0,0,0,0,67016,0,
+  0,0,0,66671,0,0,0,0,0,0,0,0,0,67015,0,0,0,0,0,0,0,0,0,66672,0,0,0,66668,0,0,0,0,
+  0,0,67014,0,0,0,0,0,0,0,0,0,0,0,0,66666,0,0,0,0,0,0,0,67013,0,0,67012,0,0,0,0,0,
+  0,66664,0,0,0,131830,0,0,0,0,0,0,0,0,67011,0,66665,0,0,0,0,0,0,0,0,0,0,0,67010,0,0,0,
+  0,0,67009,0,0,0,0,0,0,0,0,67008,0,0,0,0,0,0,67007,0,0,0,0,0,0,0,197201,0,0,0,0,0,
+  0,0,0,66663,0,0,0,0,67006,0,0,0,0,0,0,0,0,0,0,66661,0,0,0,0,0,0,0,67005,0,0,0,0,
+  0,0,0,0,66659,0,0,0,0,67004,0,0,0,0,0,0,0,0,0,0,67003,0,0,0,0,0,67002,0,0,0,0,66658,
+  0,66662,0,0,0,0,0,0,0,0,0,0,0,0,0,67001,0,0,0,0,0,0,66657,0,0,0,197198,66128,0,0,0,0,
+  0,0,0,0,0,0,67000,0,0,0,0,0,0,0,0,66999,66654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66998,
+  0,0,0,0,66651,66997,0,0,0,0,0,0,0,66655,0,0,0,0,0,0,0,0,66996,0,0,0,0,66647,0,0,66653,0,
+  0,0,0,0,66995,0,0,0,0,0,0,0,0,0,66994,0,0,197195,0,0,0,0,0,0,0,66993,66645,0,0,0,0,0,
+  0,0,0,0,0,0,0,131824,66992,0,0,0,0,0,0,0,0,0,0,0,0,66991,0,0,0,0,0,66648,0,0,0,0,
+  0,0,66643,0,0,0,0,0,0,0,66646,0,0,0,0,0,0,66990,0,0,0,0,0,0,0,0,66649,0,0,0,0,0,
+  0,0,0,0,0,0,0,66989,0,0,0,0,0,0,66988,0,0,0,0,0,66641,0,0,0,0,0,66642,0,0,0,0,0,
   0,0,0,0,0,0,0,66987,0,0,0,131818,0,0,0,0,0,66637,0,0,0,0,0,0,0,0,0,66644,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66638,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,131788,66639,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66986,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66985,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66633,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66635,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66984,0,0,131816,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66983,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66982,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66977,0,0,0,0,0,0,66981,0,0,0,0,0,66980,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66634,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66979,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66631,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66629,0,0,0,0,0,0,
-  0,0,0,0,0,66978,0,0,0,66630,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,131780,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66976,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66627,0,66628,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66624,0,0,0,0,0,0,0,0,0,0,66623,0,0,0,0,
-  0,0,0,0,0,0,0,0,66975,0,0,66628,0,0,0,0,0,0,0,0,0,131814,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66974,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66622,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66973,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66972,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66626,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66625,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66620,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,131774,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66621,0,0,0,0,66971,0,0,0,0,0,
-  0,0,0,0,0,0,0,131772,0,0,0,66970,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,66969,0,0,0,0,0,0,0,0,0,0,0,0,66618,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66610,0,
-  0,0,0,0,0,0,66616,0,0,66615,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66619,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66968,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66967,0,0,0,
-  0,0,0,0,0,0,0,0,0,66611,0,0,0,0,0,0,0,131812,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,66966,0,0,0,66609,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66612,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66965,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66614,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66964,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66613,0,0,66963,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66606,0,0,0,0,0,0,
-  0,0,0,0,0,66605,0,0,0,0,0,0,0,0,0,0,131810,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66604,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66962,0,0,0,0,0,0,0,0,0,0,0,0,66608,0,66607,
-  0,0,66602,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66598,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,131766,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66603,0,0,0,0,
-  0,0,0,0,0,0,0,66596,0,0,0,0,0,0,0,0,0,0,0,0,131808,0,0,0,0,0,0,0,0,0,0,0,
-  0,66597,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66320,131856,
-  66601,0,0,0,0,0,0,0,0,0,131806,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66961,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66599,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66960,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66594,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,131792,0,0,0,0,66595,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66583,0,131802,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66582,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66580,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66587,0,66592,0,
-  0,0,0,0,0,0,0,0,66591,66590,0,0,0,0,0,0,66589,0,0,0,0,0,131794,0,0,0,0,0,0,66588,66585,0,
-  0,0,0,0,0,66584,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66575,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66586,66586,131786,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66579,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66576,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66959,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66574,0,0,0,
-  131784,0,0,0,0,0,0,0,0,0,66958,0,0,0,0,66957,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,66577,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66578,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66573,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66956,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66572,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  131760,0,0,0,0,0,66955,0,0,66954,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66570,0,
-  66564,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66571,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66569,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66568,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66953,0,0,0,66566,0,0,0,0,0,0,0,0,0,
-  0,0,0,66952,0,0,0,66562,66951,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66950,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66563,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66560,0,0,0,0,0,0,0,0,0,0,0,0,66559,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66567,0,0,0,0,
-  0,0,0,66949,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66557,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66556,0,
-  0,0,0,0,0,0,0,66948,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197192,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66947,0,0,0,0,0,0,66561,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66554,0,0,0,0,0,0,0,0,
-  0,66558,0,0,0,66946,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66555,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66553,0,0,0,0,0,0,66551,66945,0,0,0,0,0,
-  0,0,0,0,0,66548,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66944,0,0,0,0,66549,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66550,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66943,0,0,0,0,0,
-  0,66546,0,0,0,197189,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66547,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66942,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66545,66941,0,0,0,0,0,0,0,0,0,0,0,0,0,66543,0,
-  0,0,0,0,0,0,0,0,0,0,0,66544,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66937,0,0,0,0,66940,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66939,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66938,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66538,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66540,0,0,0,0,66542,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,131838,0,0,66936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66541,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66537,0,0,0,0,0,0,0,0,0,131756,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66935,0,0,0,0,0,66934,0,0,0,0,0,0,0,0,0,0,0,66933,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66932,0,66931,0,0,0,0,0,0,0,0,0,66930,0,0,
-  0,0,0,0,0,131782,66929,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66928,0,0,
-  0,0,0,66927,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66536,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66539,66926,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66925,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66924,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66923,0,0,
-  0,0,0,0,0,0,0,0,0,66534,66922,0,66921,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66920,0,0,0,
-  0,0,0,0,0,0,0,66919,0,0,0,0,0,0,0,66535,0,66533,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66531,0,0,
-  0,0,0,0,0,0,0,0,0,66532,0,0,0,0,0,0,0,0,0,0,0,0,0,131778,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66529,0,0,66918,0,66917,0,0,0,0,0,0,0,0,66530,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66916,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66915,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66525,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66527,0,0,0,0,0,
-  0,0,0,0,0,0,66524,0,0,0,0,0,0,0,0,0,0,0,66528,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66523,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66522,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66914,0,0,0,0,0,0,0,0,0,0,0,131776,0,0,0,
-  0,0,0,0,0,0,0,66913,0,66912,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66911,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66910,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66909,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66908,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66907,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66906,0,0,0,0,0,0,0,0,0,0,0,0,0,131770,0,0,0,0,0,0,
-  0,0,0,0,0,0,66905,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66518,0,0,0,0,0,
-  0,66904,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,66903,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66514,
-  0,0,0,0,0,0,0,0,0,0,0,0,66520,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66902,0,0,66901,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,66638,0,0,131788,66639,0,0,0,0,0,0,0,0,0,0,66986,0,0,0,0,0,0,0,66985,0,
+  0,0,0,66633,0,0,0,0,0,0,0,0,0,0,66635,0,0,0,0,66984,0,0,131816,0,0,66983,0,0,0,0,0,0,
+  0,0,66982,0,0,0,0,0,66977,0,0,0,0,0,0,66981,0,0,0,0,0,66980,0,0,0,66634,0,0,0,0,0,0,
+  0,0,0,0,0,66979,0,0,66631,0,0,0,0,0,0,0,0,66629,0,0,0,0,0,0,0,0,0,0,0,66978,0,0,
+  0,66630,0,0,0,0,0,0,0,0,0,0,0,0,131780,0,0,0,0,0,66976,0,0,0,0,0,0,0,0,0,66627,0,
+  66628,0,0,0,0,0,0,0,66624,0,0,0,0,0,0,0,0,0,0,66623,0,0,0,0,66975,0,0,66628,0,0,0,0,
+  0,0,0,0,0,131814,0,0,66974,0,0,0,0,0,0,0,0,0,66622,0,0,0,0,0,66973,0,0,0,0,0,0,0,
+  0,0,0,0,0,66972,0,0,0,0,0,0,0,0,0,66626,66625,0,0,0,0,0,0,0,0,0,0,0,66620,0,0,0,
+  0,0,131774,0,0,0,0,0,0,0,0,0,0,66621,0,0,0,0,66971,0,0,0,0,0,0,0,0,0,0,0,0,131772,
+  0,0,0,66970,0,0,0,0,0,0,0,0,0,66969,0,0,0,0,66618,0,0,0,0,0,0,0,0,0,0,0,66610,0,
+  0,0,0,0,0,0,66616,0,0,66615,0,0,0,0,0,0,0,0,66619,0,0,0,0,0,0,0,0,0,0,0,0,66968,
+  0,0,0,0,66967,0,0,0,0,66611,0,0,0,0,0,0,0,131812,0,0,0,0,0,0,0,0,0,0,0,66966,0,0,
+  0,66609,0,0,0,0,0,0,66612,0,0,0,0,0,0,0,0,0,66965,0,0,0,0,0,0,0,0,0,0,0,66614,0,
+  0,0,0,0,66964,0,0,0,0,0,0,66613,0,0,66963,0,0,66606,0,0,0,0,0,0,0,0,0,0,0,66605,0,0,
+  131810,0,0,0,0,0,0,0,0,0,66604,0,0,0,0,0,66962,0,0,0,0,0,0,0,0,0,0,0,0,66608,0,66607,
+  0,0,66602,0,0,0,0,0,0,66598,0,0,0,0,0,0,0,0,131766,0,0,0,0,0,0,0,0,66603,0,0,0,0,
+  0,0,0,0,0,0,0,66596,0,0,0,0,131808,0,0,0,0,66597,0,0,0,0,0,0,0,0,0,0,0,0,66320,131856,
+  66601,0,0,0,0,0,0,0,0,0,131806,0,0,0,0,0,0,0,0,66961,0,0,0,0,0,0,0,0,0,0,0,66599,
+  0,0,0,0,0,0,66960,0,0,0,0,66594,0,0,0,0,0,0,0,0,131792,0,0,0,0,66595,0,0,0,0,0,0,
+  0,0,66583,0,131802,0,0,0,0,0,0,66582,0,0,0,0,0,0,66580,0,0,0,0,0,0,0,0,0,66587,0,66592,0,
+  66591,66590,0,0,0,0,0,0,66589,0,0,0,0,0,131794,0,0,0,0,0,0,66588,66585,0,0,0,0,0,0,66584,0,0,
+  0,0,0,0,0,0,0,66575,0,0,0,0,0,66586,66586,131786,0,0,0,0,0,0,66579,0,0,0,66576,0,0,0,0,0,
+  0,0,0,66959,0,0,0,0,0,0,0,0,66574,0,0,0,131784,0,0,0,0,0,0,0,0,0,66958,0,0,0,0,66957,
+  0,66577,0,0,0,0,0,0,0,66578,0,0,0,0,0,0,0,0,0,66573,0,0,0,0,0,0,0,0,0,0,66956,0,
+  66572,0,0,0,0,0,0,0,131760,0,0,0,0,0,66955,0,0,66954,0,0,0,0,0,0,0,0,0,0,0,0,66570,0,
+  66564,0,0,0,0,0,0,0,0,0,0,66571,0,0,0,0,0,0,66569,0,0,0,0,0,0,0,0,0,0,0,66568,0,
+  0,0,66953,0,0,0,66566,0,0,0,0,66952,0,0,0,66562,66951,0,0,0,0,0,0,0,66950,0,0,0,0,0,0,0,
+  66563,0,0,0,0,0,0,0,0,0,66560,0,0,0,0,0,0,0,0,0,0,0,0,66559,0,0,0,66567,0,0,0,0,
+  0,0,0,66949,0,0,0,0,66557,0,0,0,0,0,0,0,0,0,0,0,0,0,66556,0,0,0,0,0,0,0,0,66948,
+  0,0,0,0,197192,0,0,0,0,0,66947,0,0,0,0,0,0,66561,0,0,0,0,0,0,0,0,0,0,0,0,0,66554,
+  0,66558,0,0,0,66946,0,0,0,0,0,0,0,0,66555,0,0,0,66553,0,0,0,0,0,0,66551,66945,0,0,0,0,0,
+  0,0,0,0,0,66548,0,0,0,0,0,0,0,66944,0,0,0,0,66549,0,0,0,0,0,0,0,0,0,0,66550,0,0,
+  0,0,66943,0,0,0,0,0,0,66546,0,0,0,197189,0,0,0,0,0,0,0,0,66547,0,66942,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,66545,66941,0,0,0,0,0,0,0,0,0,0,0,0,0,66543,0,0,0,0,66544,0,0,0,0,
+  0,0,0,0,0,66937,0,0,0,0,66940,0,0,0,0,0,0,0,0,66939,0,0,0,0,0,0,0,0,0,0,66938,0,
+  66538,0,0,0,0,0,0,0,66540,0,0,0,0,66542,0,0,0,131838,0,0,66936,0,0,0,66541,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,66537,0,131756,0,0,0,0,0,0,0,0,0,66935,0,0,0,0,0,66934,0,0,0,0,0,0,
+  0,0,0,0,0,66933,0,0,0,66932,0,66931,0,0,0,0,0,0,0,0,0,66930,0,0,0,0,0,0,0,131782,66929,0,
+  0,0,0,0,0,66928,0,0,0,0,0,66927,0,0,0,0,0,0,0,0,0,0,66536,0,0,0,66539,66926,0,0,0,0,
+  0,0,0,66925,0,0,0,0,0,0,0,0,0,66924,0,0,0,0,0,0,0,66923,0,0,0,66534,66922,0,66921,0,0,0,
+  0,0,0,0,66920,0,0,0,0,0,0,0,0,0,0,66919,0,0,0,0,0,0,0,66535,0,66533,0,0,0,0,0,0,
+  0,0,0,0,0,66531,0,0,0,66532,0,0,0,0,0,0,0,0,0,0,0,0,0,131778,0,0,0,0,0,0,66529,0,
+  0,66918,0,66917,0,0,0,0,0,0,0,0,66530,0,0,0,0,0,0,0,0,0,66916,0,0,0,0,0,66915,0,0,0,
+  0,0,0,0,0,66525,0,0,0,0,66527,0,0,0,0,0,0,0,0,0,0,0,66524,0,0,0,66528,0,0,0,0,0,
+  0,0,0,0,0,66523,0,0,0,0,0,0,0,0,0,66522,66914,0,0,0,0,0,0,0,0,0,0,0,131776,0,0,0,
+  0,0,0,0,0,0,0,66913,0,66912,0,0,0,0,0,0,66911,0,0,0,0,0,0,0,0,66910,0,0,0,0,0,0,
+  0,0,66909,0,0,0,0,0,0,0,0,0,0,0,66908,0,66907,0,0,0,0,0,0,0,0,0,0,66906,0,0,0,0,
+  0,131770,0,0,0,0,0,0,0,0,0,0,0,0,66905,0,0,0,66518,0,0,0,0,0,0,66904,0,0,0,0,0,0,
+  0,66903,0,0,0,0,0,0,0,0,0,0,0,0,0,66514,0,0,0,0,66520,0,0,0,66902,0,0,66901,0,0,0,0,
   0,0,66512,0,0,0,0,0,0,0,0,0,0,0,0,66515,0,0,0,0,0,0,0,66900,0,0,0,0,0,0,66899,0,
-  0,66513,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66510,0,66898,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66517,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,66519,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66507,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66516,0,0,0,0,66511,0,0,0,0,0,0,0,0,0,0,131754,0,0,0,0,0,0,0,0,0,
-  66897,0,0,0,0,0,0,0,0,0,131746,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66509,
-  0,0,0,0,0,0,0,0,0,0,0,66508,0,0,0,0,0,0,66506,0,0,0,66504,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,131768,0,0,0,0,0,0,0,0,0,0,131750,0,0,0,0,0,131744,0,
-  0,131752,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131748,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66505,0,0,0,0,0,0,0,
-  66502,0,0,0,0,0,0,0,0,0,131764,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66500,0,0,0,0,0,0,0,0,0,0,0,0,66896,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66895,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,66894,66499,0,0,0,0,0,66497,0,0,0,0,0,0,0,0,0,0,66501,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,131742,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66893,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66892,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66891,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66890,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66496,66889,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66490,0,0,0,0,0,0,0,0,0,66888,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66492,0,0,0,66493,0,0,0,0,0,0,0,0,0,0,0,0,0,131762,0,0,66495,0,0,0,0,
-  0,0,66489,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66887,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66488,0,0,0,0,0,66494,0,0,0,0,0,0,0,0,0,
-  0,0,0,66487,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131740,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66491,0,0,0,0,0,0,0,0,0,66485,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66481,0,0,0,0,66886,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66480,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66486,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66885,0,0,0,0,0,0,0,0,0,0,0,66483,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66884,0,0,0,0,0,0,0,0,0,66883,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66475,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66484,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66477,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,66478,0,0,66475,0,66473,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66474,0,0,0,66882,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66479,0,0,0,0,0,66881,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66880,66880,0,0,0,0,0,0,0,
-  0,0,0,0,66470,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66472,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66879,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66878,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66877,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66465,0,0,0,0,0,0,0,0,0,66876,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66463,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66457,0,66464,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66454,0,0,66461,0,0,0,66466,0,0,0,
-  0,0,0,0,0,0,66460,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66459,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66462,66456,0,0,0,0,0,0,0,
-  0,0,0,66875,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66458,131738,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66453,66451,0,0,0,0,0,0,0,0,
-  0,0,0,66874,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66450,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66452,0,0,0,0,0,0,0,0,0,0,0,0,0,131736,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66455,0,0,0,0,
-  66873,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131734,
-  0,0,0,0,0,0,0,0,0,0,0,197207,0,0,0,0,0,0,0,0,0,0,0,0,66449,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66872,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131732,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66448,0,
-  0,0,66871,0,0,0,0,0,0,0,0,0,0,0,0,66447,0,0,0,0,0,0,0,0,0,0,0,0,66446,0,0,0,
-  0,0,0,0,0,0,0,0,66445,66870,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66869,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,66868,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66444,0,0,0,0,0,0,0,0,0,0,0,0,66867,0,
-  0,0,0,0,0,0,0,0,0,0,66443,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131758,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66441,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66866,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66440,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66865,0,0,
-  0,0,0,0,0,0,0,66864,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66439,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66435,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66434,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66432,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66433,0,0,0,0,0,0,0,66437,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66863,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66431,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66862,0,0,0,0,66861,0,
-  0,0,0,0,0,66860,0,0,0,0,0,0,0,0,0,66859,0,0,0,0,0,0,66858,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66857,0,0,0,0,
-  0,0,0,66438,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66430,66436,0,0,0,0,0,0,0,0,0,0,0,0,0,197186,0,0,0,
-  0,0,0,0,0,0,0,0,0,131692,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65888,0,0,0,0,0,0,0,66374,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65935,0,65935,0,0,0,0,
-  0,0,0,0,0,65755,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65930,65930,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,65935,0,65935,0,0,0,0,0,0,65933,0,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,197156,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197144,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65933,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,262582,0,
-  0,131512,65894,0,0,0,0,0,0,65779,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,65755,0,0,0,65935,0,65935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65977,65977,0,0,0,0,0,0,328079,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65936,65936,131506,131506,0,0,0,
-  0,0,66856,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66853,0,0,0,
-  0,0,0,0,0,66854,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66852,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66850,0,0,0,0,0,
-  0,0,0,0,66851,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66849,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,66848,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66847,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66846,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66845,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66844,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66843,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66842,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66841,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66840,0,66840,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66838,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66839,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131804,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66837,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,66364,0,0,0,0,0,66363,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,66836,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66835,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66834,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66830,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66833,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66832,0,0,0,0,0,0,0,0,66831,0,0,0,
-  0,0,0,66829,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66362,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66828,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66827,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66826,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66825,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66824,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66823,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66822,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66820,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66819,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66818,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,66817,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66361,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66816,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66815,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66814,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66813,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66812,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66811,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,66796,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66795,0,0,0,0,0,0,0,
-  0,0,0,0,66792,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66787,66786,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66784,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66783,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,66360,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66762,0,0,
-  0,0,0,0,0,0,66756,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66755,0,0,0,0,0,
-  0,0,0,0,0,66753,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66742,0,0,0,
-  0,0,0,0,0,0,0,131796,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66736,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66732,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66359,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66716,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66698,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66702,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66700,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66697,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66691,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66686,0,0,0,0,0,
-  0,0,0,66683,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66680,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66669,0,0,0,0,0,0,0,0,0,0,0,0,0,66667,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66660,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66656,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66652,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,66650,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,66640,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66636,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66632,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66617,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66600,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66593,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66581,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,66565,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66358,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66552,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66528,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,66526,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66521,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66503,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66498,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,66482,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66471,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66476,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,66469,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66468,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66467,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66442,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66429,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,66428,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,66427,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66426,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66425,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  66424,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,66513,0,0,0,0,0,0,66510,0,66898,0,0,0,0,0,66517,0,0,0,0,0,0,0,0,66519,0,0,0,0,0,0,
+  0,0,0,0,66507,0,0,0,0,0,0,0,0,0,66516,0,0,0,0,66511,0,0,0,0,0,0,0,0,0,0,131754,0,
+  66897,0,0,0,0,0,0,0,0,0,131746,0,0,0,0,0,0,0,0,0,0,0,0,66509,0,0,0,66508,0,0,0,0,
+  0,0,66506,0,0,0,66504,0,0,0,0,0,0,131768,0,0,131750,0,0,0,0,0,131744,0,0,131752,0,0,0,0,0,0,
+  0,131748,0,0,0,0,0,0,66505,0,0,0,0,0,0,0,66502,0,0,0,0,0,0,0,0,0,131764,0,0,0,0,0,
+  66500,0,0,0,0,0,0,0,0,0,0,0,0,66896,0,0,0,0,0,66895,0,0,0,0,0,66894,66499,0,0,0,0,0,
+  66497,0,0,0,0,0,0,0,0,0,0,66501,0,0,0,0,131742,0,0,0,0,0,0,0,0,0,0,66893,0,0,0,0,
+  0,0,0,0,0,0,0,66892,0,0,0,0,66891,0,0,0,0,0,0,66890,0,0,0,0,0,0,0,0,0,0,0,66496,
+  66889,0,0,0,0,0,0,0,0,0,66490,0,0,0,0,0,0,0,0,0,66888,0,0,0,0,0,0,0,0,0,66492,0,
+  0,0,66493,0,0,0,0,0,131762,0,0,66495,0,0,0,0,0,0,66489,0,0,0,0,0,0,0,0,0,0,0,66887,0,
+  66488,0,0,0,0,0,66494,0,0,0,0,66487,0,0,0,0,131740,0,0,0,0,0,0,0,0,0,66491,0,0,0,0,0,
+  0,0,0,0,66485,0,0,0,0,0,0,0,0,0,0,66481,0,0,0,0,66886,0,0,0,0,0,0,0,0,0,66480,0,
+  0,0,0,0,0,0,66486,0,0,66885,0,0,0,0,0,0,0,0,0,0,0,66483,0,0,0,66884,0,0,0,0,0,0,
+  0,0,0,66883,0,0,0,0,0,0,66475,0,0,0,0,0,0,66484,0,0,0,0,0,0,0,0,0,0,66477,0,0,0,
+  0,0,0,0,66478,0,0,66475,0,66473,0,0,0,0,0,0,0,0,0,0,66474,0,0,0,66882,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,66479,0,0,0,0,0,66881,0,0,0,0,0,0,0,0,0,0,66880,66880,0,0,0,0,0,0,0,
+  0,0,0,0,66470,0,0,0,0,0,66472,0,0,0,0,0,0,66879,0,0,0,0,0,0,0,0,0,0,0,66878,0,0,
+  0,0,0,66877,0,0,0,0,0,0,0,0,0,66465,0,0,0,0,0,0,0,0,0,66876,0,0,0,0,0,0,66463,0,
+  0,0,0,66457,0,66464,0,0,0,0,0,0,0,66454,0,0,66461,0,0,0,66466,0,0,0,0,0,0,0,0,0,66460,0,
+  0,0,0,66459,0,0,0,0,0,0,0,0,0,0,0,66462,66456,0,0,0,0,0,0,0,0,0,0,66875,0,0,0,0,
+  0,0,66458,131738,0,0,0,0,0,0,0,0,0,0,66453,66451,0,0,0,66874,0,0,0,0,0,0,66450,0,0,0,0,0,
+  66452,0,0,0,0,0,0,0,0,0,0,0,0,0,131736,0,0,0,0,66455,0,0,0,0,66873,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,131734,0,0,0,197207,0,0,0,0,66449,0,0,0,0,0,0,0,0,66872,0,0,0,0,0,0,
+  0,0,0,131732,0,0,0,0,0,0,0,0,0,0,66448,0,0,0,66871,0,0,0,0,0,0,0,0,0,0,0,0,66447,
+  0,0,0,0,66446,0,0,0,66445,66870,0,0,0,0,0,0,0,0,0,0,0,0,0,66869,0,0,66868,0,0,0,0,0,
+  0,66444,0,0,0,0,0,0,0,0,0,0,0,0,66867,0,0,0,66443,0,0,0,0,0,0,0,131758,0,0,0,0,0,
+  0,0,0,0,0,0,0,66441,66866,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66440,0,0,0,0,0,66865,0,0,
+  0,0,0,0,0,0,0,66864,0,0,0,0,66439,0,0,0,0,0,66435,0,0,0,0,0,0,0,0,0,0,0,66434,0,
+  0,0,0,0,0,0,0,66432,0,0,0,0,0,0,0,66433,0,0,0,0,0,0,0,66437,0,0,0,66863,0,0,0,0,
+  0,0,0,0,0,0,66431,0,0,66862,0,0,0,0,66861,0,0,0,0,0,0,66860,0,0,0,0,0,0,0,0,0,66859,
+  0,0,0,0,0,0,66858,0,0,0,0,66857,0,0,0,0,0,0,0,66438,0,0,0,0,0,0,0,0,0,66430,66436,0,
+  0,0,0,0,197186,0,0,0,0,131692,0,0,0,0,0,0,0,0,65888,0,0,0,0,0,0,65935,0,65935,0,0,0,0,
+  0,0,0,0,0,65755,0,0,0,65930,65930,0,0,0,0,0,0,0,65935,0,65935,0,0,0,0,0,0,65933,0,0,0,0,
+  0,0,197156,0,0,0,0,0,0,197144,0,0,0,0,0,0,0,0,0,0,0,65933,0,0,0,0,0,0,0,0,262582,0,
+  0,131512,65894,0,0,0,0,0,0,65779,0,0,0,0,0,0,0,0,0,65755,0,0,0,65935,0,0,0,0,0,0,0,65977,
+  65977,0,0,0,0,0,0,328079,0,65936,65936,131506,131506,0,0,0,0,0,66856,0,0,0,0,0,0,0,0,0,66853,0,0,0,
+  0,0,0,0,0,66854,0,0,0,0,0,66852,0,0,0,0,0,0,66850,0,0,0,0,0,0,0,0,0,66851,0,0,0,
+  0,0,0,0,0,0,66849,0,0,0,0,0,66848,0,0,0,0,0,0,66847,0,0,0,0,0,0,0,0,66846,0,0,0,
+  66845,0,0,0,0,0,0,0,0,0,66844,0,0,0,0,0,66843,0,0,0,0,0,0,0,66842,0,0,0,0,0,0,0,
+  0,0,0,66841,0,0,0,0,0,0,0,0,66840,0,66840,0,0,0,0,66838,0,0,0,0,0,0,0,0,0,0,0,66839,
+  0,131804,0,0,0,0,0,0,0,0,0,0,66837,0,0,0,0,0,0,0,66364,0,0,0,0,0,66363,0,0,0,0,0,
+  0,0,0,0,66836,0,0,0,0,66835,0,0,0,0,0,0,0,0,66834,0,0,0,0,0,66830,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,66833,0,0,0,66832,0,0,0,0,0,0,0,0,66831,0,0,0,0,0,0,66829,0,0,0,0,
+  0,0,0,0,0,66362,0,0,0,0,0,0,0,66828,0,0,0,0,0,66827,0,0,0,0,0,0,0,0,0,0,0,66826,
+  0,0,0,0,0,66825,0,0,0,0,66824,0,0,0,0,0,0,0,0,0,66823,0,0,0,0,0,0,0,0,0,66822,0,
+  0,66820,0,0,0,0,0,0,0,0,0,0,0,0,66819,0,0,0,0,0,0,0,66818,0,0,0,0,66817,0,0,0,0,
+  0,0,0,0,0,0,66361,0,0,0,0,66816,0,0,0,0,66815,0,0,0,0,0,0,0,0,0,0,0,0,66814,0,0,
+  0,0,0,0,66813,0,0,0,0,0,0,0,0,0,66812,0,0,0,66811,0,0,0,0,0,0,66796,0,0,0,0,0,0,
+  66795,0,0,0,0,0,0,0,0,0,0,0,66792,0,0,0,0,0,66787,66786,0,0,0,0,0,66784,0,0,0,0,0,0,
+  0,0,0,66783,0,0,0,0,0,66360,0,0,0,0,0,0,0,0,0,0,0,66762,0,0,0,0,0,0,0,0,66756,0,
+  0,0,66755,0,0,0,0,0,0,0,0,0,0,66753,0,0,0,0,0,0,66742,0,0,0,0,0,0,0,0,0,0,131796,
+  0,0,0,66736,0,0,0,0,66732,0,0,0,0,0,0,0,66359,0,0,0,0,0,0,0,0,0,0,0,0,0,66716,0,
+  0,0,66698,0,0,0,0,0,66702,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66700,0,66697,0,0,0,0,0,0,
+  0,0,0,0,0,0,66691,0,0,0,66686,0,0,0,0,0,0,0,0,66683,0,0,0,0,66680,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,66669,0,0,0,0,0,66667,0,0,0,0,0,0,66660,0,0,0,0,0,0,0,0,0,66656,0,
+  0,0,0,0,0,66652,0,0,0,0,0,66650,0,0,0,0,0,0,0,0,66640,0,0,0,0,66636,0,0,0,0,0,0,
+  0,0,66632,0,0,0,0,0,0,0,66617,0,0,0,0,0,0,0,0,0,0,0,0,66600,0,0,0,0,0,0,66593,0,
+  0,0,0,0,0,0,66581,0,66565,0,0,0,0,0,0,0,0,0,0,66358,0,0,0,0,0,0,0,0,0,0,0,66552,
+  0,0,0,0,0,66526,0,0,0,0,0,0,0,0,66521,0,0,0,66503,0,0,0,0,0,0,0,0,0,0,0,0,66498,
+  0,0,0,0,0,66482,0,0,0,0,0,0,0,0,0,66471,0,0,66476,0,0,0,0,0,0,0,66469,0,0,0,0,0,
+  0,0,0,0,0,0,66468,0,0,0,0,0,0,0,66467,0,66442,0,0,0,0,0,0,0,0,0,0,0,0,0,66429,0,
+  0,0,0,0,0,66428,0,0,0,0,0,0,0,0,66427,0,0,66426,0,0,0,0,0,0,0,0,66425,0,0,0,0,0,
+  66424,0,0,0,0,0,0,0,
 };
 
 KBTS_INLINE kbts_u32 kbts__GetUnicodeParentInfo(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeParentInfo_Data[((kbts_un)kbts__UnicodeParentInfo_PageIndices[Codepoint/32] * 32) | (Codepoint & 31)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeParentInfo_Data[((Codepoint < 173576) ? ((kbts_un)kbts__UnicodeParentInfo_PageIndices[Codepoint / 8] * 8) : 0) | (Codepoint & 7)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeUseClass_PageIndices[4351] = {
-  0,1,1,1,1,1,2,3,4,5,6,7,8,9,10,11,12,1,1,1,1,1,1,13,14,15,16,17,18,19,1,1,
-  20,1,1,1,1,21,1,22,1,1,1,1,1,23,24,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,25,26,27,28,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,29,1,1,1,1,30,31,1,32,33,34,35,36,37,38,39,40,41,42,43,44,45,1,46,47,48,49,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,50,50,50,50,51,50,50,50,50,50,50,50,50,50,50,50,
-  50,50,50,52,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,53,1,1,1,1,1,1,1,1,54,55,1,56,1,57,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,58,59,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,60,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,61,62,1,63,64,1,1,1,65,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+static kbts_u8 kbts__UnicodeUseClass_PageIndices[3915] = {
+  0,1,2,2,0,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,6,7,8,8,9,10,11,12,13,8,0,0,14,15,
+  16,0,17,18,19,20,21,0,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,
+  46,47,48,49,50,51,52,53,54,55,56,49,57,58,59,60,61,62,63,0,64,65,66,0,67,68,69,70,71,72,73,0,
+  8,74,75,76,77,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,78,79,80,81,8,82,83,84,
+  85,8,8,86,87,88,0,0,89,90,91,92,8,93,94,0,95,8,96,97,98,0,0,0,99,100,101,0,102,103,8,104,
+  8,105,106,0,0,0,107,108,0,0,0,0,0,0,0,109,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  110,111,0,112,113,0,0,114,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,115,116,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,117,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,118,8,119,0,0,0,0,0,120,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  121,122,8,123,124,125,126,127,8,128,129,0,130,131,132,133,8,134,135,136,8,137,138,139,0,0,0,0,0,0,8,140,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,141,142,143,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,144,145,21,0,0,0,69,146,0,0,0,0,147,148,0,0,
+  0,0,0,0,0,0,0,0,8,149,14,150,151,0,0,0,0,0,0,0,8,152,153,0,0,118,154,118,155,156,157,0,
+  158,159,160,161,162,163,164,0,165,166,167,168,162,169,170,171,172,173,174,0,175,176,177,178,179,180,181,182,183,184,185,186,
+  8,187,188,189,61,190,191,0,0,0,0,0,8,192,193,0,8,194,195,0,8,196,197,198,199,200,201,0,0,0,0,0,
+  8,202,0,0,0,0,0,0,203,204,205,0,0,206,207,208,209,210,211,8,212,0,0,0,0,0,0,0,0,0,0,0,
+  213,214,215,216,217,218,0,0,219,220,221,222,223,84,0,0,0,0,0,0,0,0,0,224,225,226,227,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,
+  228,229,230,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,
+  228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,
+  228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,
+  228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,228,231,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,232,233,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,84,0,8,234,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,235,236,0,0,0,0,0,0,0,0,0,0,0,0,8,8,237,238,239,0,0,240,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,8,8,8,8,8,8,8,
+  8,8,8,8,8,8,16,241,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  8,8,8,242,243,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,8,244,245,0,0,0,0,0,0,0,0,0,118,246,8,247,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,118,248,0,0,0,0,0,0,118,249,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,8,8,250,
 };
 
-static kbts_u8 kbts__UnicodeUseClass_Data[16896] = {
+static kbts_u8 kbts__UnicodeUseClass_Data[8032] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,0,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,0,21,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,0,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,29,29,29,29,29,29,29,29,0,0,0,0,0,0,1,0,0,29,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,0,0,0,0,1,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,0,0,0,0,
+  1,0,1,1,1,1,0,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   29,29,29,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,36,9,1,36,33,
   36,35,35,35,35,34,34,34,34,36,36,36,36,3,33,36,0,29,30,0,0,34,35,35,1,1,1,1,1,1,1,1,1,1,35,35,0,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   2,29,31,31,0,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,0,0,0,1,1,1,1,0,0,9,1,36,33,
@@ -12978,241 +11409,112 @@ static kbts_u8 kbts__UnicodeUseClass_Data[16896] = {
   1,29,31,31,0,1,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,0,9,1,36,34,
   34,36,36,36,36,0,34,34,34,0,34,34,34,3,0,0,0,0,0,0,0,36,36,0,0,0,0,0,0,0,1,0,1,1,35,35,0,0,1,1,1,1,1,1,1,1,1,1,0,37,37,31,0,0,0,0,0,0,0,0,0,0,0,0,
   29,29,31,31,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,1,36,36,
-  36,35,35,35,35,0,33,33,33,0,33,33,33,3,38,0,0,0,0,0,0,0,0,36,0,0,0,0,0,0,0,1,1,1,35,35,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,29,31,31,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,1,0,0,
-  1,1,1,1,1,1,1,0,0,0,4,0,0,0,0,36,36,36,34,34,35,0,35,0,36,33,33,33,33,33,33,36,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,36,36,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,34,1,1,34,34,34,34,35,35,35,0,0,0,0,0,
-  1,1,1,1,1,1,0,34,29,29,29,29,8,29,34,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  36,35,35,35,35,0,33,33,33,0,33,33,33,3,38,0,0,0,0,0,0,0,0,36,0,0,0,0,0,0,0,1,0,29,31,31,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,0,1,0,0,1,1,1,1,1,1,1,0,0,0,4,0,0,0,0,36,36,36,34,34,35,0,35,0,36,33,33,33,33,33,33,36,
+  0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,36,36,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,34,1,1,34,34,34,34,35,35,35,0,0,0,0,0,1,1,1,1,1,1,0,34,29,29,29,29,8,29,34,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
   0,1,1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,1,1,0,1,34,1,1,34,34,34,34,35,35,35,34,12,1,0,0,
-  1,1,1,1,1,0,0,0,29,29,29,29,0,29,6,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,6,0,6,0,8,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,9,35,34,34,35,34,34,34,34,35,35,35,35,29,0,
-  35,34,29,29,35,0,29,29,1,1,1,1,1,7,7,7,7,7,7,7,7,7,7,7,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,
-  0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,34,34,35,35,33,34,34,34,34,29,30,31,6,34,13,10,12,12,1,
-  1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,36,36,35,35,1,1,1,1,12,12,12,1,36,31,31,1,1,36,36,31,31,31,31,31,1,1,1,34,34,34,34,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,12,36,33,34,34,31,31,31,31,31,31,30,1,31,1,1,1,1,1,1,1,1,1,1,31,31,36,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,0,0,0,29,29,29,29,0,29,6,0,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,6,0,6,0,8,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,9,35,34,34,35,34,34,34,34,35,35,35,35,29,0,35,34,29,29,35,0,29,29,1,1,1,1,1,7,7,7,7,7,7,7,7,7,7,7,0,7,7,7,7,7,7,7,
+  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,36,36,34,34,35,35,33,34,34,34,34,29,30,31,6,34,13,10,12,12,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,36,36,35,35,1,1,1,1,12,12,
+  12,1,36,31,31,1,1,36,36,31,31,31,31,31,1,1,1,34,34,34,34,1,1,1,1,1,1,1,1,1,1,1,1,1,12,36,33,34,34,31,31,31,31,31,31,30,1,31,1,1,1,1,1,1,1,1,1,1,31,31,36,34,0,0,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,35,35,36,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,35,36,0,0,0,0,0,0,0,0,0,0,0,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,35,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,34,35,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,36,34,34,34,34,35,35,35,33,33,
-  33,33,33,33,33,33,29,31,36,29,29,6,14,8,6,29,6,34,6,6,0,0,0,0,0,0,0,0,1,6,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,
-  2,2,2,2,2,8,8,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,34,34,35,36,36,34,34,34,34,7,7,7,0,0,0,0,16,16,30,16,16,16,16,16,16,15,29,6,0,0,0,0,
-  0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,31,31,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,33,36,34,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,36,34,34,34,34,35,35,35,33,33,33,33,33,33,33,33,29,31,36,29,29,6,14,8,6,29,6,34,6,6,0,0,0,0,0,0,0,0,1,6,0,0,
+  1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,2,2,2,2,2,8,8,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,9,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,
+  34,34,35,36,36,34,34,34,34,7,7,7,0,0,0,0,16,16,30,16,16,16,16,16,16,15,29,6,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,31,31,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,33,36,34,0,0,0,0,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,10,12,7,14,14,11,7,7,7,7,0,5,36,34,36,36,34,34,34,34,35,35,34,35,36,33,33,33,33,33,34,29,29,29,29,29,29,34,29,29,0,0,30,
-  1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  29,29,29,14,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,8,36,34,34,35,35,35,35,34,34,33,33,
-  33,33,34,34,3,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,29,29,29,14,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,8,36,34,34,35,35,35,35,34,34,33,33,33,33,34,34,3,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
   29,14,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,7,7,7,34,35,33,36,34,34,36,6,7,7,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,8,36,34,34,36,36,36,34,36,34,14,14,17,17,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,7,7,36,33,33,33,36,36,35,14,14,14,14,14,14,14,32,32,0,9,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,29,29,0,30,30,30,30,30,30,29,29,30,30,30,30,29,31,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,37,37,31,29,29,2,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,
+  1,1,1,1,1,1,8,36,34,34,36,36,36,34,36,34,14,14,17,17,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,7,7,36,33,33,33,36,36,35,14,14,14,14,14,14,14,32,32,0,9,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,29,29,0,30,30,30,30,30,30,29,29,30,30,30,30,
+  29,31,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,37,37,31,29,29,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,39,1,0,0,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,21,19,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,21,19,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,34,1,1,1,3,1,1,1,1,29,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,35,34,36,0,0,0,0,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,6,6,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,0,19,21,19,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,
+  0,0,19,21,19,21,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,34,1,1,1,3,1,1,1,1,29,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,36,36,35,34,36,0,0,0,0,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,
   31,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,13,36,36,36,36,36,36,36,36,36,36,36,
   36,36,36,36,3,29,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,29,1,1,0,0,0,0,0,0,0,0,0,0,1,34,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,34,30,30,30,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,35,35,35,34,35,35,35,35,14,14,14,16,36,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,34,34,34,34,34,30,30,30,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,35,35,35,34,35,35,35,35,14,14,14,16,36,0,0,0,0,0,0,0,0,0,0,0,0,
   29,29,14,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,8,36,36,34,34,35,35,33,33,34,12,13,12,
   3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,34,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,34,34,34,35,34,33,33,34,35,13,10,11,12,0,0,0,0,0,0,0,0,0,
-  1,1,1,14,1,1,1,1,1,1,1,1,14,16,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,2,2,2,0,0,0,1,31,29,31,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,35,1,35,35,34,1,1,35,35,1,1,1,1,1,35,29,
+  1,1,1,1,1,1,1,1,1,29,34,34,34,35,34,33,33,34,35,13,10,11,12,0,0,0,0,0,0,0,0,0,1,1,1,14,1,1,1,1,1,1,1,1,14,16,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,2,2,2,0,0,0,1,31,29,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,35,1,35,35,34,1,1,35,35,1,1,1,1,1,35,29,
   1,29,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,33,35,34,33,36,0,0,0,0,0,31,6,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,34,36,36,35,36,36,0,31,35,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,
+  1,1,1,36,36,34,36,36,35,36,36,0,31,35,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   1,35,35,35,0,34,35,0,0,0,0,0,36,30,30,29,1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,9,9,9,0,0,0,0,6,
-  1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,29,29,8,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,34,34,34,34,34,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,34,34,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,30,30,30,30,30,30,30,30,30,30,30,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,
-  0,1,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,9,9,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,29,29,29,8,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,0,0,0,34,34,34,34,34,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,0,34,34,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,30,30,30,30,30,30,30,30,30,30,30,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,9,9,9,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,0,1,1,1,1,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   31,29,31,37,37,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,35,35,35,35,
   35,35,34,34,34,34,3,0,0,0,0,0,0,0,0,0,0,0,41,41,41,41,41,41,41,41,41,41,41,41,41,41,41,41,41,41,41,41,1,1,1,1,1,1,1,1,1,1,34,1,1,34,34,1,0,0,0,0,0,0,0,0,0,40,
   29,29,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,34,34,36,36,3,9,0,0,0,0,0,
-  0,0,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  29,29,29,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,35,35,35,34,34,33,35,34,34,35,34,34,6,8,0,1,1,1,1,1,1,1,1,1,1,
-  0,0,0,0,1,36,36,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,0,0,0,0,0,0,0,0,0,0,0,0,
-  29,29,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,35,35,34,34,34,34,
+  0,0,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,29,29,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,35,35,35,34,34,33,35,34,34,35,34,34,6,8,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,36,36,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,35,35,34,34,34,34,
   3,1,38,38,0,0,0,0,0,6,9,34,35,0,33,29,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,36,35,34,34,34,34,29,3,8,8,0,0,0,0,0,0,29,1,
-  1,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,0,1,0,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,36,33,36,35,35,34,34,34,34,9,35,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  29,29,31,31,0,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,0,9,9,1,36,36,
-  34,36,36,36,36,0,0,33,33,0,0,33,33,3,0,0,0,0,0,0,0,0,0,36,0,0,0,0,0,0,1,1,1,1,36,36,0,0,29,29,29,29,29,29,29,0,0,0,29,29,29,29,29,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,0,1,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,36,34,34,35,35,35,35,35,
-  35,0,33,0,0,33,0,33,33,36,31,0,31,31,29,9,6,38,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,29,30,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,35,35,34,34,
+  1,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,1,0,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,
+  1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,
+  36,33,36,35,35,34,34,34,34,9,35,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,29,29,31,31,0,1,1,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,0,9,9,1,36,36,34,36,36,36,36,0,0,33,33,0,0,33,33,3,0,0,0,0,0,0,0,0,0,36,0,0,0,0,0,0,1,1,
+  1,1,36,36,0,0,29,29,29,29,29,29,29,0,0,0,29,29,29,29,29,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,1,0,0,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,36,34,34,35,35,35,35,35,35,0,33,0,0,33,0,33,33,36,31,0,31,31,29,9,6,38,9,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,29,30,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,35,35,34,34,
   36,36,3,29,29,31,9,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,6,1,37,37,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,35,35,33,34,33,33,36,33,29,
-  29,31,3,9,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,0,0,33,33,33,33,29,29,31,3,
-  9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,35,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,36,35,35,35,35,35,35,34,34,36,36,29,31,3,
-  34,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,31,34,33,36,35,35,34,34,34,34,3,9,1,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,12,3,11,36,36,34,34,35,35,33,34,35,34,34,34,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,
-  1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,34,34,34,34,29,31,3,9,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,0,0,1,0,0,1,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,36,36,36,33,0,33,33,0,0,29,29,36,6,38,
-  13,38,13,9,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,0,0,34,34,36,36,31,31,3,1,0,0,33,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,34,35,35,34,34,34,34,34,34,35,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,6,35,29,29,29,29,31,37,7,7,7,7,0,
-  0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,1,34,35,35,34,34,34,36,36,35,35,35,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,38,38,38,38,38,38,15,15,15,15,15,15,15,15,15,15,15,15,29,31,8,6,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,34,34,35,35,35,35,35,0,34,34,34,34,29,29,31,3,
-  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,0,7,7,7,7,7,7,7,35,33,35,34,36,29,29,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,34,35,0,0,0,34,0,34,34,0,34,
-  29,29,9,34,35,6,38,12,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,36,36,36,36,36,0,34,34,0,36,36,29,31,6,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,34,35,33,36,0,0,0,0,0,0,0,0,0,
-  29,29,38,31,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,34,34,35,35,35,0,0,0,33,33,
-  34,36,6,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,35,35,33,34,33,33,36,33,29,29,31,3,9,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,0,0,33,33,33,33,29,29,31,3,9,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,35,35,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,36,35,35,35,35,35,35,34,34,36,36,29,31,3,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,29,31,34,33,36,35,35,34,34,34,34,3,9,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,12,3,11,
+  36,36,34,34,35,35,33,34,35,34,34,34,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,34,34,34,34,29,31,3,9,0,0,0,0,0,1,1,1,1,1,1,1,0,0,1,0,0,1,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,36,36,36,33,0,33,33,0,0,29,29,36,6,38,13,38,13,9,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,33,36,35,35,35,35,0,0,34,34,36,36,31,31,
+  3,1,0,0,33,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,34,35,35,34,34,34,34,34,34,35,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,6,35,29,29,29,29,31,37,7,7,7,7,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,1,34,35,35,34,34,34,36,36,35,35,35,1,1,1,1,
+  1,1,1,1,38,38,38,38,38,38,15,15,15,15,15,15,15,15,15,15,15,15,29,31,8,6,0,0,0,1,0,0,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,34,34,35,35,35,35,35,0,34,34,34,34,29,29,31,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
+  7,7,7,7,7,7,7,7,0,7,7,7,7,7,7,7,35,33,35,34,36,29,29,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,34,35,0,0,0,34,0,34,34,0,34,29,29,9,34,35,6,38,12,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,0,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,36,36,36,0,34,34,0,36,36,29,31,6,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,34,35,33,36,0,0,0,0,0,0,0,0,0,29,29,38,31,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,34,34,35,35,35,0,0,0,33,33,34,36,6,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,8,0,0,0,0,0,
   18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,22,22,22,22,22,22,22,19,21,22,22,22,18,18,18,18,
-  23,18,18,18,18,18,18,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,0,0,0,0,0,0,0,0,0,0,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,
-  18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,0,0,0,0,0,
+  23,18,18,18,18,18,18,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,0,0,0,0,0,0,0,0,0,0,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,18,0,0,0,0,0,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,34,34,34,34,34,34,34,34,10,10,13,29,12,35,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,29,29,29,29,29,29,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  31,31,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,36,36,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,9,0,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,
-  35,35,35,35,35,35,35,35,0,0,0,0,0,0,0,30,30,30,30,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,
-  1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,29,29,29,29,29,29,29,1,1,1,1,1,1,1,0,0,
-  1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,29,29,29,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,35,35,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,8,8,8,8,8,8,8,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,29,29,29,29,29,29,0,0,0,0,0,0,0,0,0,31,31,31,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,36,36,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,9,0,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,
+  35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,35,0,0,0,0,0,0,0,30,30,30,30,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,4,4,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,29,29,29,29,29,29,29,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,29,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,29,29,29,29,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
+  1,1,1,1,1,1,1,1,1,1,1,1,34,34,34,34,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,35,35,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,
+  1,1,1,1,8,8,8,8,8,8,8,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,
 };
 
 KBTS_INLINE kbts_u8 kbts__GetUnicodeUseClass(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeUseClass_Data[((kbts_un)kbts__UnicodeUseClass_PageIndices[Codepoint/256] * 256) | (Codepoint & 255)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeUseClass_Data[((Codepoint < 125280) ? ((kbts_un)kbts__UnicodeUseClass_PageIndices[Codepoint / 32] * 32) : 0) | (Codepoint & 31)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeScriptExtension_PageIndices[8703] = {
+static kbts_u8 kbts__UnicodeScriptExtension_PageIndices[7172] = {
   0,1,2,2,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
   30,31,32,32,33,34,35,36,37,37,37,37,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,2,2,53,54,
   55,56,57,58,59,59,59,59,60,59,59,59,59,59,59,59,61,61,59,59,59,59,62,63,64,65,66,67,68,61,61,69,
@@ -13437,54 +11739,7 @@ static kbts_u8 kbts__UnicodeScriptExtension_PageIndices[8703] = {
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  242,61,243,244,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
+  242,61,243,244,
 };
 
 static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
@@ -14472,313 +12727,88 @@ static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
 
 KBTS_INLINE kbts_u16 kbts__GetUnicodeScriptExtension(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeScriptExtension_Data[((kbts_un)kbts__UnicodeScriptExtension_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeScriptExtension_Data[((Codepoint < 918016) ? ((kbts_un)kbts__UnicodeScriptExtension_PageIndices[Codepoint / 128] * 128) : 7808) | (Codepoint & 127)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeMirrorCodepoint_PageIndices[8703] = {
-  0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,4,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  5,6,2,2,7,8,9,2,2,2,2,2,2,2,10,11,2,2,2,12,13,14,2,15,2,2,2,2,16,2,2,2,
-  17,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,18,2,19,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+static kbts_u8 kbts__UnicodeMirrorCodepoint_PageIndices[2044] = {
+  0,1,2,3,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,7,8,9,10,0,0,0,0,0,0,0,0,0,0,0,11,12,13,14,15,16,17,18,19,20,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,21,0,0,22,23,
+  0,0,0,0,0,0,0,0,0,0,0,0,24,25,26,27,0,28,0,29,30,31,32,33,0,0,0,0,0,0,0,34,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,35,36,37,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  38,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,39,40,0,0,0,0,41,42,43,44,
 };
 
-static kbts_u32 kbts__UnicodeMirrorCodepoint_Data[2560] = {
+static kbts_u32 kbts__UnicodeMirrorCodepoint_Data[1440] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,41,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,0,60,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,93,0,91,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,123,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,187,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,171,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3899,3898,3901,3900,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5788,5787,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8250,8249,0,0,0,0,0,
   0,0,0,0,0,8262,8261,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8318,8317,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,8334,8333,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,8715,8716,8717,8712,8713,8714,0,0,0,0,0,0,0,10741,0,0,0,0,0,0,0,0,0,11262,
   10659,10651,10656,0,10990,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8765,8764,0,0,
   0,0,0,8909,0,8780,0,0,0,0,0,0,8773,0,0,0,0,0,8787,8786,8789,8788,0,0,0,0,0,0,0,0,0,0,
@@ -14789,42 +12819,24 @@ static kbts_u32 kbts__UnicodeMirrorCodepoint_Data[2560] = {
   8929,8928,8931,8930,8933,8932,8935,8934,8937,8936,8939,8938,8941,8940,0,0,8945,8944,8954,8955,8956,0,8957,8958,0,0,8946,8947,8948,8950,8951,0,
   0,0,0,0,0,0,0,0,8969,8968,8971,8970,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,9002,9001,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,10089,10088,10091,10090,10093,10092,10095,10094,10097,10096,10099,10098,10101,10100,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,10180,10179,10182,10181,0,10185,10184,0,10189,0,10187,0,0,0,0,0,0,0,10198,10197,0,0,0,0,0,8888,10206,10205,0,
   0,0,10211,10210,10213,10212,10215,10214,10217,10216,10219,10218,10221,10220,10223,10222,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,10628,10627,10630,10629,10632,10631,10634,10633,10636,10635,10640,10639,10638,10637,10642,10641,10644,10643,10646,10645,10648,10647,0,0,8737,0,0,0,0,
   8738,0,0,8736,10661,10660,0,0,10665,10664,10667,10666,10669,10668,10671,10670,0,0,0,0,0,0,0,0,8856,0,0,0,0,0,0,0,
   10689,10688,0,0,10693,10692,0,0,0,0,0,0,0,0,0,10704,10703,10706,10705,0,10709,10708,0,0,10713,10712,10715,10714,0,0,0,0,
   0,0,0,0,0,0,0,0,10729,10728,0,0,0,0,0,0,0,0,0,0,0,8725,0,0,10745,10744,0,0,10749,10748,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,10796,10795,10798,10797,0,0,0,0,0,10805,10804,0,0,0,0,0,0,10813,10812,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,10853,10852,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,10874,10873,10876,10875,10878,10877,10880,
   10879,10882,10881,10884,10883,10886,10885,10888,10887,10890,10889,10892,10891,10894,10893,10896,10895,10898,10897,10900,10899,10902,10901,10904,10903,10906,10905,10908,10907,10910,10909,10912,
   10911,10914,10913,0,0,0,10919,10918,10921,10920,10923,10922,10925,10924,0,10928,10927,10930,10929,10932,10931,10934,10933,10936,10935,10938,10937,10940,10939,10942,10941,10944,
   10943,10946,10945,10948,10947,10950,10949,10952,10951,10954,10953,10956,10955,10958,10957,10960,10959,10962,10961,10964,10963,10966,10965,0,0,0,0,0,0,0,8870,0,
   0,0,0,8873,8872,8875,0,0,0,0,0,0,10989,10988,8740,0,0,0,0,0,0,0,0,11000,10999,11002,11001,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8735,0,
   0,0,11779,11778,11781,11780,0,0,0,11786,11785,0,11789,11788,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11805,11804,0,0,
   11809,11808,11811,11810,11813,11812,11815,11814,11817,11816,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,11862,11861,11864,11863,11866,11865,11868,11867,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,12297,12296,12299,12298,12301,12300,12303,12302,12305,12304,0,0,12309,12308,12311,12310,12313,12312,12315,12314,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65114,65113,65116,65115,65118,65117,0,
   0,0,0,0,65125,65124,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,65289,65288,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65310,0,65308,0,
@@ -14835,7 +12847,7 @@ static kbts_u32 kbts__UnicodeMirrorCodepoint_Data[2560] = {
 
 KBTS_INLINE kbts_u32 kbts__GetUnicodeMirrorCodepoint(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeMirrorCodepoint_Data[((kbts_un)kbts__UnicodeMirrorCodepoint_PageIndices[Codepoint/128] * 128) | (Codepoint & 127)] : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeMirrorCodepoint_Data[((Codepoint < 65408) ? ((kbts_un)kbts__UnicodeMirrorCodepoint_PageIndices[Codepoint / 32] * 32) : 0) | (Codepoint & 31)]  : 0;
 }
 
 KBTS_INLINE kbts_u32 kbts__GetDecompositionSize(kbts_u64 Decomposition)
@@ -14852,12 +12864,12 @@ KBTS_INLINE kbts_u32 kbts__GetDecompositionCodepoint(kbts_u64 Decomposition, kbt
 
 KBTS_INLINE kbts_u8 kbts__GetSyllabicClass(kbts_u16 SyllabicInfo)
 {
-  return SyllabicInfo & 0xFF;
+  return (kbts_u8)(SyllabicInfo & 0xFF);
 }
 
 KBTS_INLINE kbts_u8 kbts__GetSyllabicPosition(kbts_u16 SyllabicInfo)
 {
-  return SyllabicInfo >> 8;
+  return (kbts_u8)(SyllabicInfo >> 8);
 }
 
 KBTS_INLINE kbts_s32 *kbts__GetParentInfoDeltas(kbts_u32 ParentInfo)
@@ -15248,7 +13260,7 @@ KBTS_EXPORT void kbts_FontCoverageTestCodepoint(kbts_font_coverage_test *Test, i
         {
           kbts_glyph_parent *Parent = &Test->BaseParents[ParentIndex];
 
-          if(kbts__GetDecompositionCodepoint(Parent->Decomposition, 1) == UCodepoint)
+          if(Parent->Codepoint1 == UCodepoint)
           {
             Test->BaseCodepoint = Parent->Codepoint;
             RecomposeBase = 1;
@@ -15270,7 +13282,7 @@ KBTS_EXPORT void kbts_FontCoverageTestCodepoint(kbts_font_coverage_test *Test, i
       kbts_u16 BaseId = (kbts_u16)kbts_CodepointToGlyphId(Test->Font, (int)Test->BaseCodepoint);
       kbts_un BaseParentCount = 0;
 
-      int Done = 0;
+      kbts_b32 Done = 0;
       while(!Done)
       {
         kbts_u32 ParentInfo = kbts__GetUnicodeParentInfo(BaseCodepoint);
@@ -15284,12 +13296,15 @@ KBTS_EXPORT void kbts_FontCoverageTestCodepoint(kbts_font_coverage_test *Test, i
         {
           kbts_glyph_parent Parent = KBTS__ZERO;
           Parent.Codepoint = BaseCodepoint + (kbts_u32)ParentDeltas[ParentIndex];
-          Parent.Decomposition = kbts__GetUnicodeDecomposition(Parent.Codepoint);
+
+          kbts_u64 Decomposition = kbts__GetUnicodeDecomposition(Parent.Codepoint);
+          Parent.Codepoint1 = kbts__GetDecompositionCodepoint(Decomposition, 1);
+
           kbts_u16 RecompositionId = (kbts_u16)kbts_CodepointToGlyphId(Test->Font, (int)Parent.Codepoint);
 
           if(RecompositionId)
           {
-            if(kbts__GetDecompositionSize(Parent.Decomposition) == 1)
+            if(kbts__GetDecompositionSize(Decomposition) == 1)
             {
               BaseCodepoint = Parent.Codepoint;
               BaseId = RecompositionId;
@@ -15324,32 +13339,23 @@ KBTS_EXPORT int kbts_FontCoverageTestEnd(kbts_font_coverage_test *Test)
   return !Result;
 }
 
-typedef struct kbts__feature_override_header
+typedef struct kbts__enabled_lookup
 {
-  struct kbts__feature_override_header *Prev;
-  struct kbts__feature_override_header *Next;
-} kbts__feature_override_header;
+  kbts_u16 SequentialLookupIndex;
+  kbts_u16 Value;
+} kbts__enabled_lookup;
 
-typedef struct kbts__feature_override
+struct kbts_glyph_config
 {
-  kbts__feature_override_header Header;
-
-  kbts_u32 Tag;
-  int Value;
-} kbts__feature_override;
-
-typedef struct kbts_glyph_config
-{
-  kbts__feature_set EnabledFeatures;
-  kbts__feature_set DisabledFeatures;
-
-  kbts_u32 ExtraOverrideCount;
-
   kbts_allocator_function *Allocator;
   void *AllocatorData;
 
-  kbts__feature_override_header FeatureOverrideSentinel;
-} kbts_glyph_config;
+  kbts_u32 *EnabledLookupBits;
+  kbts_u32 *DisabledLookupBits;
+
+  kbts__enabled_lookup *NonBinaryEnabledLookups;
+  kbts_u32 NonBinaryEnabledLookupCount;
+};
 
 typedef struct kbts__arena_block
 {
@@ -15387,26 +13393,53 @@ typedef struct kbts__baked_feature
   kbts_u32 GlyphFilter;
 } kbts__baked_feature;
 
-typedef struct kbts__baked_feature_stage
+struct kbts__bucketed_glyph
 {
-  kbts_u16 FeatureCount;
-  kbts_u16 FeatureIndexCount;
-  kbts__baked_feature *Features; // [FeatureCount]
-  kbts_u16 *FeatureIndices; // [FeatureIndexCount]
-} kbts__baked_feature_stage;
+  kbts_glyph *Glyph;
+  kbts_u32 SortKey;
+  kbts_u16 FeatureValue;
+};
+
+typedef struct kbts__bucketed_glyph_block_header
+{
+  struct kbts__bucketed_glyph_block_header *Prev;
+  struct kbts__bucketed_glyph_block_header *Next;
+} kbts__bucketed_glyph_block_header;
+
+typedef struct kbts__bucketed_glyph_block
+{
+  kbts__bucketed_glyph_block_header Header;
+  kbts_b32 StartOfAllocation;
+  kbts_u32 Count;
+  kbts__bucketed_glyph Glyphs[KBTS__BUCKETED_GLYPHS_PER_BLOCK];
+} kbts__bucketed_glyph_block;
 
 #define KBTS_MAX_SIMULTANEOUS_FEATURES 32
-typedef struct kbts__shape_scratchpad
+struct kbts_shape_scratchpad
 {
-  kbts_arena *Arena;
+  kbts_allocator_function *Allocator;
+  void *AllocatorData;
+  kbts_b32 SelfAllocated;
+
+  void *ScratchMemory;
+
+  kbts_shape_config *Config;
+
+  kbts_u32 *GlyphLookupSubtableMatrix;
+  kbts_u32 *LookupSubtableIndexOffsets;
+  kbts_u32 GlyphIdCount;
+  kbts_u32 LookupSubtableCount;
+  kbts_u32 GposLookupIndexOffset;
+  kbts_u32 SequentialLookupCount;
+
+  kbts__bucketed_glyph_block_header *LookupGlyphBuckets;
+  kbts__bucketed_glyph_block_header FreeBucketedBlockSentinel;
 
   kbts__feature_set LookupFeatures;
-  kbts__feature_set UserFeatures;
-  kbts__feature_set ScratchFeatures;
 
   kbts__glyph_list Cluster;
-  int RealCluster;
-  int ClusterAtStartOfWord;
+  kbts_b32 RealCluster;
+  kbts_b32 ClusterAtStartOfWord;
 
   kbts_glyph *LookupOnePastLastGlyph;
   kbts_u32 LookupOnePastLastGlyphIndex;
@@ -15415,28 +13448,16 @@ typedef struct kbts__shape_scratchpad
 
   kbts_u32 Ip;
   kbts__op_kind OpKind;
-  kbts__feature_set *OpFeatures;
 
   kbts_direction RunDirection;
 
-  kbts_u32 FeatureIndexIndex;
+  kbts_u32 SequentialLookupIndexIndex;
   kbts_u32 FeatureStagesRead;
-  kbts_u16 BakedLookupSubtablesRead[KBTS_MAX_SIMULTANEOUS_FEATURES];
-
-  kbts_u32 UnregisteredFeatureCount;
-  kbts_feature_tag UnregisteredFeatureTags[KBTS_MAX_SIMULTANEOUS_FEATURES];
 
   kbts_shape_error Error;
-} kbts__shape_scratchpad;
+};
 
 #define KBTS_CONTEXT_MAX_FONT_COUNT 32
-
-typedef struct kbts__config_params
-{
-  kbts_u32 FontIndex;
-  kbts_script Script;
-  kbts_language Language;
-} kbts__config_params;
 
 #define KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB 6
 #define KBTS__INPUT_CODEPOINT_ONE_PAST_LAST_BLOCK_MSB 27
@@ -15465,7 +13486,45 @@ typedef struct kbts__context_font
   kbts__arena_lifetime Lifetime;
 } kbts__context_font;
 
-typedef struct kbts_shape_context
+typedef struct kbts__existing_glyph_config
+{
+  kbts_shape_config *ShapeConfig;
+  kbts_feature_override *FeatureOverrides;
+  int FeatureOverrideCount;
+  kbts_glyph_config *GlyphConfig;
+} kbts__existing_glyph_config;
+
+typedef struct kbts__existing_shape_config_block_header
+{
+  struct kbts__existing_shape_config_block_header *Prev;
+  struct kbts__existing_shape_config_block_header *Next;
+} kbts__existing_shape_config_block_header;
+
+#define KBTS__EXISTING_SHAPE_CONFIGS_PER_BLOCK 32
+typedef struct kbts__existing_shape_config_block
+{
+  kbts__existing_shape_config_block_header Header;
+
+  kbts_u32 Count;
+  kbts__existing_shape_config Items[KBTS__EXISTING_SHAPE_CONFIGS_PER_BLOCK];
+} kbts__existing_shape_config_block;
+
+typedef struct kbts__existing_glyph_config_block_header
+{
+  struct kbts__existing_glyph_config_block_header *Prev;
+  struct kbts__existing_glyph_config_block_header *Next;
+} kbts__existing_glyph_config_block_header;
+
+#define KBTS__EXISTING_GLYPH_CONFIGS_PER_BLOCK 32
+typedef struct kbts__existing_glyph_config_block
+{
+  kbts__existing_glyph_config_block_header Header;
+
+  kbts_u32 Count;
+  kbts__existing_glyph_config Items[KBTS__EXISTING_GLYPH_CONFIGS_PER_BLOCK];
+} kbts__existing_glyph_config_block;
+
+struct kbts_shape_context
 {
   kbts_arena PermanentArena;
   kbts_arena FontArena;
@@ -15483,32 +13542,19 @@ typedef struct kbts_shape_context
   kbts_u32 FontCount;
   kbts__context_font Fonts[KBTS_CONTEXT_MAX_FONT_COUNT];
 
-  kbts__config_params *ConfigTableKeys;
-  kbts_shape_config **ConfigTable;
-
-  kbts__feature_override_header FeatureOverrideSentinel;
-  kbts__feature_override_header FreeFeatureOverrideSentinel;
-
   kbts_un InputCodepointCount;
   int NextUserId;
   kbts_shape_codepoint *InputBlocks[KBTS__INPUT_CODEPOINT_ONE_PAST_LAST_BLOCK_MSB - KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB];
 
   kbts_glyph_storage GlyphStorage;
 
+  kbts_shape_context_flags PublicFlags; // Flags that can be set by the user at creation time.
   kbts__context_flags Flags;
   kbts_direction ManualRunDirection;
   kbts_script ManualRunScript;
 
-  kbts_u32 BeginClusterIp;
-  kbts_u32 BeginClusterFeatureStagesRead;
-  kbts_glyph *TopLevelGlyph;
-
-  kbts__feature_set *OpFeatures;
-  kbts__feature_set ScratchFeatures;
-  kbts__feature_set UserFeatures;
-  kbts__feature_set UserFeaturesEnabled;
-
-  kbts_glyph_config *CurrentGlyphConfig;
+  kbts_feature_override *CurrentFeatureOverrides;
+  kbts_u32 CurrentFeatureOverrideCount;
   int NeedNewGlyphConfig;
 
   kbts_direction ParagraphDirection;
@@ -15520,17 +13566,29 @@ typedef struct kbts_shape_context
   kbts_direction RunParagraphDirection;
   kbts_direction RunDirection;
   kbts_shape_codepoint_iterator RunCodepointIterator;
-  int DoneShapingRuns;
+  kbts_b32 DoneShapingRuns;
 
-  kbts_u32 ExistingShapeConfigCount;
-  kbts__existing_shape_config ExistingShapeConfigs[32];
+  kbts__existing_shape_config_block_header ExistingShapeConfigBlockSentinel;
+  kbts__existing_glyph_config_block_header ExistingGlyphConfigBlockSentinel;
+
+  kbts_u32 ScratchFeatureOverrideCount;
+  kbts_feature_override ScratchFeatureOverrides[KBTS_MAX_SIMULTANEOUS_FEATURES];
 
   kbts_break_state BreakState;
 
-  kbts_u32 FrameCount;
-
   kbts_shape_error Error;
-} kbts_shape_context;
+};
+
+KBTS_INLINE kbts_b32 kbts__ExistingShapeConfigBlockIsValid(kbts_shape_context *Context, kbts__existing_shape_config_block *Block)
+{
+  kbts_b32 Result = &Block->Header != &Context->ExistingShapeConfigBlockSentinel;
+  return Result;
+}
+KBTS_INLINE kbts_b32 kbts__ExistingGlyphConfigBlockIsValid(kbts_shape_context *Context, kbts__existing_glyph_config_block *Block)
+{
+  kbts_b32 Result = &Block->Header != &Context->ExistingGlyphConfigBlockSentinel;
+  return Result;
+}
 
 typedef struct kbts__indic_script_properties
 {
@@ -15543,7 +13601,14 @@ typedef struct kbts__indic_script_properties
   kbts__syllabic_position BelowBaseMatraPosition;
 } kbts__indic_script_properties;
 
-typedef struct kbts_shape_config
+typedef struct kbts__sequential_lookup
+{
+  kbts_u32 GlyphFilter;
+  kbts_u32 SkipFlags;
+  kbts_u16 LookupIndex;
+} kbts__sequential_lookup;
+
+struct kbts_shape_config
 {
   kbts_allocator_function *Allocator;
   void *AllocatorData;
@@ -15568,6 +13633,12 @@ typedef struct kbts_shape_config
   kbts__feature *Half;
   kbts__feature *Vatu;
 
+  kbts_u32 GlyphCount;
+  kbts_u32 LookupCount;
+  kbts_u16 *FeatureStageFirstLookupIndices; // [OpList.FeatureStageCount + 1]
+  kbts__sequential_lookup *SequentialLookups; // [LookupCount]
+  kbts_u32 *IdSequentialLookupMatrix;
+
   // Indic
   kbts_glyph Virama;
 
@@ -15577,9 +13648,7 @@ typedef struct kbts_shape_config
   // Thai
   kbts_glyph Nikhahit;
   kbts_glyph SaraAa;
-
-  kbts__baked_feature_stage *FeatureStages; // [OpList.FeatureStageCount]
-} kbts_shape_config;
+};
 
 static const kbts_u8 kbts__CmapFormatPrecedence[14] = {1, 0, 1, 0, 2, 0, 1, 0, 3, 0, 3, 0, 4, 5};
 
@@ -15686,11 +13755,39 @@ static kbts__indic_script_properties kbts__IndicScriptProperties(kbts_u32 Script
   return Result;
 }
 
+KBTS_INLINE kbts_u32 kbts__ReadU32Unaligned(kbts_u32 *Data)
+{
+  kbts_u32 Result;
+  KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_u32));
+  return Result;
+}
+KBTS_INLINE kbts_u16 kbts__ReadU16Unaligned(kbts_u16 *Data)
+{
+  kbts_u16 Result;
+  KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_u16));
+  return Result;
+}
+KBTS_INLINE kbts_s16 kbts__ReadS16Unaligned(kbts_s16 *Data)
+{
+  kbts_s16 Result;
+  KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_s16));
+  return Result;
+}
+KBTS_INLINE void kbts__WriteU32Unaligned(kbts_u32 *Dest, kbts_u32 Value)
+{
+  KBTS_MEMCPY((void *)Dest, &Value, sizeof(kbts_u32));
+}
+KBTS_INLINE void kbts__WriteU16Unaligned(kbts_u16 *Dest, kbts_u16 Value)
+{
+  KBTS_MEMCPY((void *)Dest, &Value, sizeof(kbts_u16));
+}
+
 static void kbts__ByteSwapArray16Unchecked(kbts_u16 *Array, kbts_un Count)
 {
   KBTS__FOR(It, 0, Count)
   {
-    Array[It] = kbts__ByteSwap16(Array[It]);
+    kbts_u16 X = kbts__ReadU16Unaligned(&Array[It]);
+    kbts__WriteU16Unaligned(&Array[It], kbts__ByteSwap16(X));
   }
 }
 
@@ -15708,9 +13805,21 @@ static int kbts__ByteSwapArray16(kbts_u16 *Array, kbts_un Count, char *End)
 
 static void kbts__ByteSwapArray32Unchecked(kbts_u32 *Array, kbts_un Count)
 {
-  KBTS__FOR(It, 0, Count)
+  // This is doing byte iteration to work with unaligned arrays.
+  char *At = (char *)Array;
+  KBTS__FOR(WordIndex, 0, Count)
   {
-    Array[It] = kbts__ByteSwap32(Array[It]);
+    char Byte0 = At[0];
+    char Byte1 = At[1];
+    char Byte2 = At[2];
+    char Byte3 = At[3];
+
+    At[0] = Byte3;
+    At[1] = Byte2;
+    At[2] = Byte1;
+    At[3] = Byte0;
+
+    At += sizeof(kbts_u32);
   }
 }
 
@@ -15833,13 +13942,13 @@ typedef struct kbts__langsys_record
   kbts_u16 Offset;
 } kbts__langsys_record;
 
-typedef struct kbts__langsys
+struct kbts__langsys
 {
   kbts_u16 LookupOrderOffset; // reserved
   kbts_u16 RequiredFeatureIndex;
   kbts_u16 FeatureIndexCount;
   // kbts_u16 FeatureIndices[FeatureIndexCount];
-} kbts__langsys;
+};
 
 typedef struct kbts__feature_list
 {
@@ -15853,12 +13962,12 @@ typedef struct kbts__feature_record
   kbts_u16 Offset;
 } kbts__feature_record;
 
-typedef struct kbts__feature
+struct kbts__feature
 {
   kbts_u16 FeatureParamsOffset;
   kbts_u16 LookupIndexCount;
   // kbts_u16 LookupIndices[LookupIndexCount];
-} kbts__feature;
+};
 
 typedef struct kbts_lookup_list
 {
@@ -16215,13 +14324,13 @@ typedef struct kbts__sequential_map_group
   kbts_u32 StartGlyphId;
 } kbts__sequential_map_group;
 
-typedef struct kbts__cmap_14
+struct kbts__cmap_14
 {
   kbts_u16 Format;
   kbts_u32 Length;
   kbts_u32 SelectorCount;
   // kbts__variation_selector Selectors[SelectorCount];
-} kbts__cmap_14;
+};
 
 typedef struct kbts__variation_selector
 {
@@ -16254,7 +14363,7 @@ typedef struct kbts__uvs_mapping
   kbts_u16 GlyphId;
 } kbts__uvs_mapping;
 
-typedef struct kbts__gsub_gpos
+struct kbts__gsub_gpos
 {
   kbts_u16 Major;
   kbts_u16 Minor;
@@ -16262,7 +14371,7 @@ typedef struct kbts__gsub_gpos
   kbts_u16 FeatureListOffset;
   kbts_u16 LookupListOffset;
   kbts_u32 FeatureVariationsOffset; // Only present in v1.1
-} kbts__gsub_gpos;
+};
 
 typedef struct kbts__single_substitution
 {
@@ -16352,7 +14461,7 @@ typedef struct kbts__mark_glyph_sets
   // kbts_u32 CoverageOffsets[MarkGlyphSetCount];
 } kbts__mark_glyph_sets;
 
-typedef struct kbts__gdef
+struct kbts__gdef
 {
   kbts_u16 Major;
   kbts_u16 Minor;
@@ -16362,7 +14471,7 @@ typedef struct kbts__gdef
   kbts_u16 MarkAttachmentClassDefinitionOffset; // May be 0
   kbts_u16 MarkGlyphSetsDefinitionOffset;       // v1.2 and up; may be 0
   kbts_u32 ItemVariationStoreOffset;            // v1.3 and up; may be 0
-} kbts__gdef;
+};
 
 typedef struct kbts__anchor
 {
@@ -16522,7 +14631,7 @@ struct kbts__head
   kbts_s16 GlyphDataFormat; // Only 0 is defined.
 };
 
-typedef struct kbts__hea
+struct kbts__hea
 {
   kbts_u16 Major;
   kbts_u16 Minor;
@@ -16546,7 +14655,7 @@ typedef struct kbts__hea
 
   kbts_s16 MetricDataFormat;
   kbts_u16 MetricCount;
-} kbts__hea;
+};
 
 typedef struct kbts__os2
 {
@@ -16566,17 +14675,17 @@ typedef struct kbts__os2
   kbts_s16 StrikeoutSize;
   kbts_s16 StrikeoutPosition;
   kbts_s16 FamilyClass;
-  kbts_u8 Panose[10];
-  kbts_u32 UnicodeRange[4];
-  kbts_u32 VendorId;
-  kbts_u16 Selection;
-  kbts_u16 FirstCharacterIndex;
-  kbts_u16 LastCharacterIndex;
+  kbts_u8 Panose[10]; // 32
+  kbts_u32 UnicodeRange[4]; // 42
+  kbts_u32 VendorId; // 58
+  kbts_u16 Selection; // 62
+  kbts_u16 FirstCharacterIndex; // 64
+  kbts_u16 LastCharacterIndex; // 66
 
   // Some version 0 fonts support this, others do not.
-  kbts_s16 TypoAscender;
-  kbts_s16 TypoDescender;
-  kbts_s16 TypoLineGap;
+  kbts_s16 TypoAscender; // 68
+  kbts_s16 TypoDescender; // 70
+  kbts_s16 TypoLineGap; // 72
   kbts_u16 WinAscent;
   kbts_u16 WinDescent;
 
@@ -16623,7 +14732,7 @@ typedef struct kbts__name
   // kbts__lang_tag_record LangTags[LangTagCount];
 } kbts__name;
 
-typedef struct kbts__maxp
+struct kbts__maxp
 {
   kbts_u16 Major;
   kbts_u16 Minor;
@@ -16643,7 +14752,7 @@ typedef struct kbts__maxp
   kbts_u16 MaximumInstructionSize;
   kbts_u16 MaximumTopLevelComponentCount;
   kbts_u16 MaximumComponentDepth;
-} kbts__maxp;
+};
 
 #  pragma pack(pop)
 
@@ -16927,7 +15036,8 @@ static kbts__unpacked_lookup kbts__UnpackLookup(kbts__gdef *Gdef, kbts__lookup *
       if(MarkGlyphSets->MarkGlyphSetCount > MarkFilteringSetIndex)
       {
         kbts_u32 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u32, MarkGlyphSets);
-        Result.MarkFilteringSet = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffsets[MarkFilteringSetIndex]);
+        kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkFilteringSetIndex]);
+        Result.MarkFilteringSet = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffset);
       }
     }
   }
@@ -17131,7 +15241,8 @@ static kbts__ligature_set *kbts__GetLigatureSet(kbts__ligature_substitution *Sub
 static kbts__ligature *kbts__GetLigature(kbts__ligature_set *Set, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Set + 1);
-  kbts__ligature *Result = KBTS__POINTER_OFFSET(kbts__ligature, Set, Offsets[Index]);
+  kbts_un Offset = kbts__ReadU16Unaligned(&Offsets[Index]);
+  kbts__ligature *Result = KBTS__POINTER_OFFSET(kbts__ligature, Set, Offset);
   return Result;
 }
 
@@ -17507,6 +15618,11 @@ static int kbts__ByteSwapLookup(kbts__byteswap_context *Context, kbts__lookup *L
   return Result;
 }
 
+#define KBTS__DLLIST_REMOVE(Node) do {(Node)->Prev->Next = (Node)->Next; (Node)->Next->Prev = (Node)->Prev;} while(0)
+#define KBTS__DLLIST_INSERT_BEFORE(A, B) do{(A)->Next = (B); (A)->Prev = (B)->Prev; (A)->Prev->Next = (A)->Next->Prev = (A);} while(0)
+#define KBTS__DLLIST_INSERT_AFTER(A, B) do{(A)->Prev = (B); (A)->Next = (B)->Next; (A)->Prev->Next = (A)->Next->Prev = (A);} while(0)
+#define KBTS__DLLIST_SENTINEL_INIT(Sentinel) do{(Sentinel)->Prev = (Sentinel)->Next = (Sentinel);} while(0)
+
 static void kbts__ByteSwapCoverage(kbts__byteswap_context *Context, kbts__coverage *Coverage)
 {
   if(!kbts__AlreadyVisited(Context, Coverage))
@@ -17708,9 +15824,9 @@ static kbts__glyph_class_from_table_result kbts__GlyphClassFromTable(kbts_u16 *C
   //   A class definition table (ClassDef) assigns glyphs into classes, beginning with Class 1, then Class 2, and so
   //   on. All glyphs not assigned to a class fall into Class 0.
   // So, we should be able to pretty reliably just subtract 1 from the class to get.
-
   if(*ClassDefinitionBase == 1)
   {
+    KBTS_INSTRUMENT_BLOCK_BEGIN(GlyphClassFromTable1);
     kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)ClassDefinitionBase;
     kbts_u16 *GlyphClasses = KBTS__POINTER_AFTER(kbts_u16, ClassDef);
 
@@ -17720,6 +15836,7 @@ static kbts__glyph_class_from_table_result kbts__GlyphClassFromTable(kbts_u16 *C
       Result.Class = GlyphClasses[Offset];
       Result.Found = 1;
     }
+    KBTS_INSTRUMENT_BLOCK_END(GlyphClassFromTable1);
   }
   else if(*ClassDefinitionBase == 2)
   {
@@ -17746,10 +15863,11 @@ static kbts__glyph_class_from_table_result kbts__GlyphClassFromTable(kbts_u16 *C
   return Result;
 }
 
-static kbts__cover_glyph_result kbts__CoverGlyph(kbts__coverage *Coverage, kbts_u32 GlyphId)
+static kbts__cover_glyph_result kbts__CoverGlyph(kbts__coverage *Coverage, kbts_u16 GlyphId)
 {
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
   kbts__cover_glyph_result Result = KBTS__ZERO;
+
   kbts_un Count = Coverage->Count;
 
   if(Count)
@@ -17907,6 +16025,7 @@ enum kbts__skip_flags_enum
   KBTS__SKIP_FLAG_NONE,
   KBTS__SKIP_FLAG_ZWNJ = (1 << 0),
   KBTS__SKIP_FLAG_ZWJ = (1 << 1),
+  KBTS__SKIP_FLAG_DEFAULT_IGNORABLES_NOT_SKIPPED_BY_GSUB = (1 << 2),
 };
 // The Harfbuzz behavior is:
 // - GPOS lookups always skip ZWNJ.
@@ -17915,12 +16034,18 @@ enum kbts__skip_flags_enum
 // - Regular lookups skip ZWJ when requested.
 #define KBTS__SKIP_FLAGS_GSUB_REGULAR(RequestedFlags) ((RequestedFlags) & KBTS__SKIP_FLAG_ZWJ)
 #define KBTS__SKIP_FLAGS_GSUB_SEQUENCE(RequestedFlags) (KBTS__SKIP_FLAG_ZWJ | ((RequestedFlags) & KBTS__SKIP_FLAG_ZWNJ))
-#define KBTS__SKIP_FLAGS_GPOS_REGULAR(RequestedFlags) (((RequestedFlags) & KBTS__SKIP_FLAG_ZWJ) | KBTS__SKIP_FLAG_ZWNJ)
-#define KBTS__SKIP_FLAGS_GPOS_SEQUENCE(RequestedFlags) (KBTS__SKIP_FLAG_ZWJ | KBTS__SKIP_FLAG_ZWNJ)
+#define KBTS__SKIP_FLAGS_GPOS_REGULAR(RequestedFlags) (((RequestedFlags) & KBTS__SKIP_FLAG_ZWJ) | KBTS__SKIP_FLAG_ZWNJ | KBTS__SKIP_FLAG_DEFAULT_IGNORABLES_NOT_SKIPPED_BY_GSUB)
+#define KBTS__SKIP_FLAGS_GPOS_SEQUENCE(RequestedFlags) (KBTS__SKIP_FLAG_ZWJ | KBTS__SKIP_FLAG_ZWNJ | KBTS__SKIP_FLAG_DEFAULT_IGNORABLES_NOT_SKIPPED_BY_GSUB)
 
-static kbts__skip_flags kbts__SkipFlags(kbts__feature_id FeatureId, kbts_shaper Shaper)
+static kbts__skip_flags kbts__SkipFlags(kbts_shaping_table ShapingTable, kbts__feature_id FeatureId, kbts_shaper Shaper)
 {
   kbts__skip_flags Result = 0;
+
+  if(ShapingTable == KBTS_SHAPING_TABLE_GPOS)
+  {
+    Result |= KBTS__SKIP_FLAG_DEFAULT_IGNORABLES_NOT_SKIPPED_BY_GSUB;
+  }
+
   switch(FeatureId)
   {
   case KBTS__FEATURE_ID_nukt:
@@ -17989,27 +16114,9 @@ static kbts__skip_flags kbts__SkipFlags(kbts__feature_id FeatureId, kbts_shaper 
   return Result;
 }
 
-static kbts_u32 kbts__GlyphIncludedInLookup(kbts_font *Font, int Gpos, kbts_un LookupIndex, kbts_u32 Id)
+static kbts_b32 kbts__GlyphPassesLookupFilter(kbts_glyph *Glyph, kbts__unpacked_lookup *Lookup)
 {
-  kbts_u32 Result = 1;
-  kbts_u32 GlyphCount = Font->Blob->GlyphCount;
-  if(Font->Blob->GlyphLookupMatrixOffsetFromStartOfFile && (Id < GlyphCount))
-  {
-    kbts_u32 *GlyphLookupMatrix = KBTS__POINTER_OFFSET(kbts_u32, Font->Blob, Font->Blob->GlyphLookupMatrixOffsetFromStartOfFile);
-
-    kbts_un FlatLookupIndex = (Gpos ? Font->Blob->GposLookupIndexOffset : 0) + LookupIndex;
-    kbts_un FlatIndex = FlatLookupIndex * Font->Blob->GlyphCount + Id;
-    kbts_un WordIndex = FlatIndex / 32;
-    kbts_un BitIndex = FlatIndex % 32;
-
-    Result = GlyphLookupMatrix[WordIndex] & (1 << BitIndex);
-  }
-  return Result;
-}
-
-static int kbts__GlyphPassesLookupFilter(kbts_glyph *Glyph, kbts__unpacked_lookup *Lookup)
-{
-  int Result = 1;
+  kbts_b32 Result = 1;
   kbts_u16 Class = Glyph->Classes.Class;
 
   if(Class && (Lookup->Flags & (1 << Class)))
@@ -18043,18 +16150,50 @@ static int kbts__GlyphPassesLookupFilter(kbts_glyph *Glyph, kbts__unpacked_looku
   return Result;
 }
 
-static int kbts__SkipGlyph(kbts_glyph *Glyph, kbts__unpacked_lookup *Lookup, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags)
+static kbts_b32 kbts__SkipGlyph(kbts_glyph *Glyph, kbts__unpacked_lookup *Lookup, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags)
 {
-  int Result = (Glyph->UnicodeFlags & SkipUnicodeFlags) ||
-               ((SkipFlags & KBTS__SKIP_FLAG_ZWNJ) && (Glyph->Codepoint == 0x200C)) ||
-               ((SkipFlags & KBTS__SKIP_FLAG_ZWJ) && (Glyph->Codepoint == 0x200D)) ||
-               !kbts__GlyphPassesLookupFilter(Glyph, Lookup);
+  kbts_b32 Result = 0;
+  if(!kbts__GlyphPassesLookupFilter(Glyph, Lookup))
+  {
+    Result = 1;
+  }
+  else
+  {
+    kbts_b32 SkipDefaultIgnorable = !(Glyph->Flags & KBTS_GLYPH_FLAG_GENERATED_BY_GSUB) && (Glyph->UnicodeFlags & SkipUnicodeFlags);
+    if(SkipDefaultIgnorable)
+    {
+      switch(Glyph->Codepoint)
+      {
+      // Even though they are default-ignorable codepoints, the following should not be skipped during GSUB:
+      // Combining grapheme joiner:
+      case 0x34F:
+      // Variation selectors:
+      case 0x180B: case 0x180C: case 0x180D: case 0x180F: // 0x180E is the Mongolian vowel separator; not a variation selector!
+      // Tags:
+      case 0xE0020: case 0xE0021: case 0xE0022: case 0xE0023: case 0xE0024: case 0xE0025: case 0xE0026: case 0xE0027: case 0xE0028: case 0xE0029: case 0xE002A: case 0xE002B: case 0xE002C: case 0xE002D: case 0xE002E: case 0xE002F:
+      case 0xE0030: case 0xE0031: case 0xE0032: case 0xE0033: case 0xE0034: case 0xE0035: case 0xE0036: case 0xE0037: case 0xE0038: case 0xE0039: case 0xE003A: case 0xE003B: case 0xE003C: case 0xE003D: case 0xE003E: case 0xE003F:
+      case 0xE0040: case 0xE0041: case 0xE0042: case 0xE0043: case 0xE0044: case 0xE0045: case 0xE0046: case 0xE0047: case 0xE0048: case 0xE0049: case 0xE004A: case 0xE004B: case 0xE004C: case 0xE004D: case 0xE004E: case 0xE004F:
+      case 0xE0050: case 0xE0051: case 0xE0052: case 0xE0053: case 0xE0054: case 0xE0055: case 0xE0056: case 0xE0057: case 0xE0058: case 0xE0059: case 0xE005A: case 0xE005B: case 0xE005C: case 0xE005D: case 0xE005E: case 0xE005F:
+      case 0xE0060: case 0xE0061: case 0xE0062: case 0xE0063: case 0xE0064: case 0xE0065: case 0xE0066: case 0xE0067: case 0xE0068: case 0xE0069: case 0xE006A: case 0xE006B: case 0xE006C: case 0xE006D: case 0xE006E: case 0xE006F:
+      case 0xE0070: case 0xE0071: case 0xE0072: case 0xE0073: case 0xE0074: case 0xE0075: case 0xE0076: case 0xE0077: case 0xE0078: case 0xE0079: case 0xE007A: case 0xE007B: case 0xE007C: case 0xE007D: case 0xE007E: case 0xE007F:
+      {
+        Result = SkipFlags & KBTS__SKIP_FLAG_DEFAULT_IGNORABLES_NOT_SKIPPED_BY_GSUB;
+      } break;
+
+      case 0x200C: Result = SkipFlags & KBTS__SKIP_FLAG_ZWNJ; break;
+      case 0x200D: Result = SkipFlags & KBTS__SKIP_FLAG_ZWJ; break;
+
+      default: Result = 1; break;
+      }
+    }
+  }
+
   return Result;
 }
 
-static int kbts__GlyphIsValid(kbts_glyph_storage *Storage, kbts_glyph *Glyph)
+static kbts_b32 kbts__GlyphIsValid(kbts_glyph_storage *Storage, kbts_glyph *Glyph)
 {
-  int Result = Glyph != &Storage->GlyphSentinel;
+  kbts_b32 Result = Glyph != &Storage->GlyphSentinel;
   return Result;
 }
 
@@ -18075,103 +16214,66 @@ static kbts__matrix_index kbts__GlyphLookupMatrixIndex(kbts_un LookupIndex, kbts
   return Result;
 }
 
-static kbts__matrix_index kbts__GlyphLookupSubtableMatrixIndex(kbts_un SubtableIndex, kbts_un SubtableCount, kbts_un GlyphIndex)
+static kbts__matrix_index kbts__IdSequentialLookupMatrixIndex(kbts_un SequentialLookupIndex, kbts_un GlyphIndex, kbts_un SequentialLookupCount)
 {
-  // Since we try many subtables in a row against the same glyphs, the rows are glyph-wise and the columns subtable-wise.
-  kbts_un FlatIndex = GlyphIndex * SubtableCount + SubtableIndex;
+  kbts_un BitsPerRow = (SequentialLookupCount + 31) & ~31;
+  kbts_un FlatIndex = GlyphIndex * BitsPerRow + SequentialLookupIndex;
 
   kbts__matrix_index Result = KBTS__ZERO;
   Result.WordIndex = FlatIndex / 32;
   Result.BitIndex = FlatIndex % 32;
+
   return Result;
 }
 
-static int kbts__GlyphsIncludedInLookupSubtable(kbts_glyph_storage *Storage, kbts_font *Font, int Gpos, kbts__unpacked_lookup *Lookup, kbts_un LookupIndex, kbts_un SubtableIndex, kbts_glyph *AtGlyph, kbts__skip_flags SkipFlags, kbts_unicode_flags SkipUnicodeFlags)
+static kbts__matrix_index kbts__GlyphLookupSubtableMatrixIndex(kbts_un SubtableIndex, kbts_un SubtableCount, kbts_un GlyphIndex, kbts_un GlyphCount)
 {
-  if(Font->Blob->GlyphLookupSubtableMatrixOffsetFromStartOfFile)
+  kbts_un FlatIndex = SubtableIndex * GlyphCount + GlyphIndex;
+
+  kbts__matrix_index Result = KBTS__ZERO;
+  Result.WordIndex = FlatIndex / 32;
+  Result.BitIndex = FlatIndex % 32;
+
+  return Result;
+}
+
+static kbts_un kbts__FlatLookupIndex(kbts_shape_scratchpad *Scratchpad, kbts_shaping_table ShapingTable, kbts_un LookupIndex)
+{
+  kbts_un Result = (ShapingTable == KBTS_SHAPING_TABLE_GSUB) ? LookupIndex : (LookupIndex + Scratchpad->GposLookupIndexOffset);
+  return Result;
+}
+
+static kbts_b32 kbts__GlyphIncludedInLookupSubtable(kbts_shape_scratchpad *Scratchpad,
+                                                    kbts_shaping_table ShapingTable, kbts_un LookupIndex, kbts_un SubtableIndex,
+                                                    kbts_glyph *AtGlyph)
+{
+  KBTS_INSTRUMENT_FUNCTION_BEGIN;
+  kbts_b32 Result = 1;
+
+  if(Scratchpad->GlyphLookupSubtableMatrix)
   {
-    kbts_u32 *GlyphLookupSubtableMatrix = KBTS__POINTER_OFFSET(kbts_u32, Font->Blob, Font->Blob->GlyphLookupSubtableMatrixOffsetFromStartOfFile);
-    kbts_u32 *LookupSubtableIndexOffsets = KBTS__POINTER_OFFSET(kbts_u32, Font->Blob, Font->Blob->LookupSubtableIndexOffsetsOffsetFromStartOfFile);
-    kbts_lookup_subtable_info *SubtableInfos = KBTS__POINTER_OFFSET(kbts_lookup_subtable_info, Font->Blob, Font->Blob->SubtableInfosOffsetFromStartOfFile);
-    kbts_un GlyphCount = Font->Blob->GlyphCount;
-    kbts_un SubtableCount = Font->Blob->LookupSubtableCount;
+    kbts_u32 *GlyphLookupSubtableMatrix = Scratchpad->GlyphLookupSubtableMatrix;
+    kbts_u32 *LookupSubtableIndexOffsets = Scratchpad->LookupSubtableIndexOffsets;
+    kbts_un GlyphCount = Scratchpad->GlyphIdCount;
+    kbts_un SubtableCount = Scratchpad->LookupSubtableCount;
 
-    kbts_un FlatLookupIndex = (Gpos ? Font->Blob->GposLookupIndexOffset : 0) + LookupIndex;
+    kbts_un FlatLookupIndex = kbts__FlatLookupIndex(Scratchpad, ShapingTable, LookupIndex);
     kbts_un FlatSubtableIndex = LookupSubtableIndexOffsets[FlatLookupIndex] + SubtableIndex;
-    kbts_lookup_subtable_info *Info = &SubtableInfos[FlatSubtableIndex];
-    kbts_un MinimumBacktrack = (Info->MinimumBacktrackPlusOne) ? Info->MinimumBacktrackPlusOne - 1 : 0;
-    kbts_un MinimumFollowup = (Info->MinimumFollowupPlusOne) ? Info->MinimumFollowupPlusOne - 1 : 0;
 
-    { // Check the current glyph.
-      kbts_un Id = AtGlyph->Id;
-      kbts__matrix_index MatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(FlatSubtableIndex, SubtableCount, Id);
-      if(Id >= GlyphCount)
-      {
-        return 1;
-      }
-      else if(!(GlyphLookupSubtableMatrix[MatrixIndex.WordIndex] & (1 << MatrixIndex.BitIndex)))
-      {
-        return 0;
-      }
-    }
+    kbts_un Id = AtGlyph->Id;
 
+    if(Id < GlyphCount)
     {
-      kbts_un BacktrackCounter = 0;
-      kbts_glyph *BacktrackGlyph = AtGlyph->Prev;
-      while(kbts__GlyphIsValid(Storage, BacktrackGlyph) &&
-            (BacktrackCounter < MinimumBacktrack))
+      kbts__matrix_index MatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(FlatSubtableIndex, SubtableCount, Id, GlyphCount);
+      if(!(GlyphLookupSubtableMatrix[MatrixIndex.WordIndex] & (1u << MatrixIndex.BitIndex)))
       {
-        kbts__matrix_index MatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(FlatSubtableIndex, SubtableCount, BacktrackGlyph->Id);
-
-        if((BacktrackGlyph->Id >= GlyphCount) ||
-           kbts__SkipGlyph(BacktrackGlyph, Lookup, SkipFlags, SkipUnicodeFlags) ||
-           GlyphLookupSubtableMatrix[MatrixIndex.WordIndex] & (1 << MatrixIndex.BitIndex))
-        {
-          BacktrackCounter += 1;
-        }
-        else
-        {
-          return 0;
-        }
-
-        BacktrackGlyph = BacktrackGlyph->Prev;
-      }
-
-      if(BacktrackCounter < MinimumBacktrack)
-      {
-        return 0;
-      }
-    }
-
-    {
-      kbts_un LookaheadCounter = 0;
-      kbts_glyph *LookaheadGlyph = AtGlyph->Next;
-      while(kbts__GlyphIsValid(Storage, LookaheadGlyph) && (LookaheadCounter < MinimumFollowup))
-      {
-        kbts__matrix_index MatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(FlatSubtableIndex, SubtableCount, LookaheadGlyph->Id);
-
-        if((LookaheadGlyph->Id >= GlyphCount) ||
-           kbts__SkipGlyph(LookaheadGlyph, Lookup, SkipFlags, SkipUnicodeFlags) ||
-           GlyphLookupSubtableMatrix[MatrixIndex.WordIndex] & (1 << MatrixIndex.BitIndex))
-        {
-          LookaheadCounter += 1;
-        }
-        else
-        {
-          return 0;
-        }
-
-        LookaheadGlyph = LookaheadGlyph->Next;
-      }
-
-      if(LookaheadCounter < MinimumFollowup)
-      {
-        return 0;
+        Result = 0;
       }
     }
   }
 
-  return 1;
+  KBTS_INSTRUMENT_FUNCTION_END;
+  return Result;
 }
 
 #  ifdef KBTS_DUMP
@@ -18611,8 +16713,7 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
           At += Unpacked.Size;
         }
       }
-    }
-    break;
+    } break;
 
     case 2:
     {
@@ -18675,8 +16776,7 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
           RecordPair += Size2;
         }
       }
-    }
-    break;
+    } break;
 
     case 3:
     {
@@ -18699,8 +16799,7 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
           kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit->ExitAnchorOffset));
         }
       }
-    }
-    break;
+    } break;
 
     case 4:
     case 6:
@@ -18711,8 +16810,7 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
       kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->BaseCoverageOffset));
       kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, Adjust->MarkArrayOffset));
       kbts__ByteSwapBaseArray(Context, Adjust->MarkClassCount, KBTS__POINTER_OFFSET(kbts__base_array, Adjust, Adjust->BaseArrayOffset));
-    }
-    break;
+    } break;
 
     case 5:
     {
@@ -18751,20 +16849,17 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
           }
         }
       }
-    }
-    break;
+    } break;
 
     case 7:
     {
       kbts__ByteSwapSequenceContextSubtable(Context, Base);
-    }
-    break;
+    } break;
 
     case 8:
     {
       kbts__ByteSwapChainedSequenceContextSubtable(Context, Base);
-    }
-    break;
+    } break;
 
     case 9:
     {
@@ -18775,8 +16870,7 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
       Adjust->Offset = kbts__ByteSwap32(Adjust->Offset);
 
       kbts__ByteSwapGposLookupSubtable(Context, LookupList, Adjust->LookupType, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->Offset));
-    }
-    break;
+    } break;
     }
   }
 }
@@ -18839,7 +16933,8 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
   kbts_u16 *CmapBase = Font->Cmap;
   if(CmapBase)
   {
-    switch(*CmapBase)
+    kbts_u16 CmapFormat = kbts__ReadU16Unaligned(CmapBase);
+    switch(CmapFormat)
     {
     case 0:
     {
@@ -18882,13 +16977,14 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
       if(Offset < SubHeader->EntryCount)
       {
         kbts_u16 *GlyphIds = KBTS__POINTER_OFFSET(kbts_u16, &SubHeader->IdRangeOffset, SubHeader->IdRangeOffset);
-        kbts_u16 GlyphId = GlyphIds[Offset];
+        kbts_un GlyphId = GlyphIds[Offset];
+
         if(GlyphId)
         {
           GlyphId += SubHeader->IdDelta;
         }
 
-        Result = GlyphId;
+        Result = (kbts_u16)GlyphId;
       }
     } break;
 
@@ -19057,15 +17153,15 @@ static kbts__iterate_features kbts__IterateFeatures(kbts_shape_config *Config, k
   return Result;
 }
 
-static int kbts__IsValidFeatureIteration(kbts__iterate_features *It)
+static kbts_b32 kbts__IsValidFeatureIteration(kbts__iterate_features *It)
 {
-  int Result = It->Langsys != 0;
+  kbts_b32 Result = It->Langsys != 0;
   return Result;
 }
 
-static int kbts__NextFeature(kbts__iterate_features *It)
+static kbts_b32 kbts__NextFeature(kbts__iterate_features *It)
 {
-  int Result = 0;
+  kbts_b32 Result = 0;
   It->Feature = 0;
 
   if(kbts__IsValidFeatureIteration(It))
@@ -19102,7 +17198,7 @@ static int kbts__NextFeature(kbts__iterate_features *It)
         It->CurrentFeatureTag = Feature.Tag;
         if(FeatureId && (FeatureId <= 32))
         {
-          It->CurrentFeatureFlag = (1 << (FeatureId - 1)) & KBTS__GLYPH_FEATURE_MASK;
+          It->CurrentFeatureFlag = (1u << (FeatureId - 1)) & KBTS__GLYPH_FEATURE_MASK;
         }
         Result = 1;
 
@@ -19134,9 +17230,9 @@ static kbts__iterate_lookups kbts__IterateLookups(kbts_lookup_list *List, kbts__
   return Result;
 }
 
-static int kbts__NextLookup(kbts__iterate_lookups *It)
+static kbts_b32 kbts__NextLookup(kbts__iterate_lookups *It)
 {
-  int Result = 0;
+  kbts_b32 Result = 0;
   kbts__feature *Feature = It->Feature;
 
   if(It->LookupList && Feature && (It->LookupIndexIndex < Feature->LookupIndexCount))
@@ -19153,74 +17249,48 @@ static int kbts__NextLookup(kbts__iterate_lookups *It)
   return Result;
 }
 
-KBTS_INLINE void kbts__GsubMutate(kbts_font *Font, kbts_glyph *Glyph, kbts_u16 NewId, kbts_u32 Flags)
+static void kbts__UnbucketGlyph(kbts_shape_scratchpad *Scratchpad, kbts_glyph *Glyph)
 {
-  Glyph->Id = NewId;
-  Glyph->Classes = kbts__GlyphClasses(Font, NewId);
-  Glyph->Flags = (Glyph->Flags & ~KBTS_GLYPH_FLAG_FIRST_IN_MULTIPLE_SUBSTITUTION) | Flags;
+  if(Glyph->Bucketed)
+  {
+    Glyph->Bucketed->SortKey = KBTS__DELETED_SORT_KEY;
+
+    Glyph->Bucketed = 0;
+  }
 }
 
-static kbts__op_list *kbts__ShaperOpLists[KBTS_SHAPER_COUNT] = {
-  /* DEFAULT, */ &kbts__OpList_Default,
-  /* ARABIC,  */ &kbts__OpList_ArabicRclt,
-  /* HANGUL,  */ &kbts__OpList_Hangul,
-  /* HEBREW,  */ &kbts__OpList_Default,
-  /* INDIC,   */ &kbts__OpList_Indic,
-  /* KHMER,   */ &kbts__OpList_Khmer,
-  /* MYANMAR, */ &kbts__OpList_Myanmar,
-  /* TIBETAN, */ &kbts__OpList_Tibetan,
-  /* USE,     */ &kbts__OpList_Use,
-};
-
-typedef struct kbts__gsub_frame
+static kbts_un kbts__IdLookupListIndex(kbts_un GlyphId, kbts_un GlyphCount)
 {
-  kbts_glyph *InputGlyph;
+  kbts_un Result = KBTS__MIN(GlyphId, GlyphCount);
+  return Result;
+}
 
-  // This isn't really an index into anything, per se.
-  // It is just an offset that allows reordering for ShapeState->LookupOnePastLastGlyph.
-  kbts_u32 StartIndex;
-
-  kbts_u16 LookupIndex;
-  kbts_u16 SubtableIndex;
-
-  // Defined for nested lookups.
-  kbts__sequence_lookup_record *Records;
-  kbts_u16 RecordCount;
-  kbts_u16 RecordIndex;
-} kbts__gsub_frame;
-
-#define KBTS__DLLIST_REMOVE(Node) do {(Node)->Prev->Next = (Node)->Next; (Node)->Next->Prev = (Node)->Prev;} while(0)
-#define KBTS__DLLIST_INSERT_BEFORE(A, B) do{(A)->Next = (B); (A)->Prev = (B)->Prev; (A)->Prev->Next = (A)->Next->Prev = (A);} while(0)
-#define KBTS__DLLIST_INSERT_AFTER(A, B) do{(A)->Prev = (B); (A)->Next = (B)->Next; (A)->Prev->Next = (A)->Next->Prev = (A);} while(0)
-#define KBTS__DLLIST_SENTINEL_INIT(Sentinel) do{(Sentinel)->Prev = (Sentinel)->Next = (Sentinel);} while(0)
 #define KBTS__DLLIST_SORT(First, OnePastLast, Member) \
   do \
   { \
-    kbts_glyph *DllistSort_OneBeforeFirst = (First)->Prev; \
+    kbts_glyph *DllistSort_First = (First); \
     kbts_glyph *DllistSort_OnePastLast = (OnePastLast); \
-    for(int DllistSort_Swapped = 1; \
-        DllistSort_Swapped; \
+    kbts_glyph *DllistSort_OneBeforeFirst = DllistSort_First->Prev; \
+    for(kbts_glyph *DllistSort_Forward = DllistSort_First; \
+        DllistSort_Forward != DllistSort_OnePastLast; \
         ) \
     { \
-      DllistSort_Swapped = 0; \
-      kbts_glyph *DllistSort_Glyph0 = DllistSort_OneBeforeFirst->Next; \
-      kbts_glyph *DllistSort_Glyph1 = DllistSort_Glyph0->Next; \
-      while(DllistSort_Glyph1 != DllistSort_OnePastLast) \
+      kbts_glyph *DllistSort_Next = DllistSort_Forward->Next; \
+      kbts_un DllistSort_Member = DllistSort_Forward->Member; \
+      for(kbts_glyph *DllistSort_Backward = DllistSort_Forward; \
+          DllistSort_Backward->Prev != DllistSort_OneBeforeFirst; \
+          ) \
       { \
-        kbts_glyph *DllistSort_Next = DllistSort_Glyph1->Next; \
- \
-        if(DllistSort_Glyph0->Member > DllistSort_Glyph1->Member) \
+        if(DllistSort_Backward->Prev->Member > DllistSort_Member) \
         { \
-          KBTS__DLLIST_SWAP(DllistSort_Glyph0, DllistSort_Glyph1); \
-          DllistSort_Swapped = 1; \
+          KBTS__DLLIST_SWAP(DllistSort_Backward, DllistSort_Backward->Prev); \
         } \
         else \
         { \
-          DllistSort_Glyph0 = DllistSort_Glyph1; \
+          break; \
         } \
- \
-        DllistSort_Glyph1 = DllistSort_Next; \
       } \
+      DllistSort_Forward = DllistSort_Next; \
     } \
   } while(0)
 
@@ -19243,6 +17313,69 @@ static void KBTS__DLLIST_SWAP(kbts_glyph *A, kbts_glyph *B)
 
   A->Prev->Next = A->Next->Prev = A;
   B->Prev->Next = B->Next->Prev = B;
+}
+
+static kbts__op_list *kbts__ShaperOpLists[KBTS_SHAPER_COUNT] = {
+  /* DEFAULT, */ &kbts__OpList_Default,
+  /* ARABIC,  */ &kbts__OpList_ArabicRclt,
+  /* HANGUL,  */ &kbts__OpList_Hangul,
+  /* HEBREW,  */ &kbts__OpList_Default,
+  /* INDIC,   */ &kbts__OpList_Indic,
+  /* KHMER,   */ &kbts__OpList_Khmer,
+  /* MYANMAR, */ &kbts__OpList_Myanmar,
+  /* TIBETAN, */ &kbts__OpList_Tibetan,
+  /* USE,     */ &kbts__OpList_Use,
+};
+
+typedef struct kbts__gsub_frame
+{
+  kbts_glyph *InputGlyph;
+  // This isn't really an index into anything, per se.
+  // It is just an offset that allows reordering for ShapeState->LookupOnePastLastGlyph.
+  kbts_u32 StartIndex;
+
+  kbts_u16 LookupIndex;
+  kbts_u16 SubtableIndex;
+
+  // Defined for nested lookups.
+  kbts__sequence_lookup_record *Records;
+  kbts_u16 RecordCount;
+  kbts_u16 RecordIndex;
+} kbts__gsub_frame;
+
+typedef struct kbts__pointer_bump_allocator
+{
+  kbts_uptr At;
+} kbts__pointer_bump_allocator;
+
+static kbts__pointer_bump_allocator kbts__PointerBumpAllocator(void *Pointer)
+{
+  kbts__pointer_bump_allocator Result;
+  Result.At = (kbts_uptr)Pointer;
+  return Result;
+}
+
+static void *kbts__PointerPush(kbts__pointer_bump_allocator *Alloc, kbts_un Size, kbts_un Align)
+{
+  kbts_uptr Aligned = (Alloc->At + (Align - 1)) & ~(Align - 1);
+  Alloc->At = Aligned + Size;
+
+  void *Result = (void *)Aligned;
+  return Result;
+}
+#define kbts__PointerPushType(Pointer, Type) (Type *)kbts__PointerPush((Pointer), sizeof(Type), KBTS_ALIGNOF(Type))
+#define kbts__PointerPushArray(Pointer, Type, Count) (Type *)kbts__PointerPush((Pointer), sizeof(Type) * (Count), KBTS_ALIGNOF(Type))
+
+KBTS_INLINE kbts_un kbts__GsubSequentialLookupCount(kbts_shape_config *Config)
+{
+  kbts_un Result = Config->FeatureStageFirstLookupIndices[Config->OpList.FeatureStageCount - 1];
+  return Result;
+}
+
+KBTS_INLINE kbts_un kbts__SequentialLookupCount(kbts_shape_config *Config)
+{
+  kbts_un Result = Config->FeatureStageFirstLookupIndices[Config->OpList.FeatureStageCount];
+  return Result;
 }
 
 static void kbts__NullAllocator(void *Data, kbts_allocator_op *Op)
@@ -19279,7 +17412,7 @@ static void *kbts__AllocatorAllocate(kbts_allocator_function *Allocator, void *A
   {
     Allocator = kbts__DefaultAllocator;
   }
-
+  
   Allocator(AllocatorData, &AllocatorOp);
 
   void *Result = AllocatorOp.Allocate.Pointer;
@@ -19300,7 +17433,7 @@ static void kbts__AllocatorFree(kbts_allocator_function *Allocator, void *Alloca
     {
       Allocator = kbts__DefaultAllocator;
     }
-
+    
     Allocator(AllocatorData, &AllocatorOp);
   }
 }
@@ -19573,6 +17706,436 @@ static int kbts__InitializeFixedMemoryArena(kbts_arena *Arena, void *Memory, kbt
   return Result;
 }
 
+KBTS_EXPORT kbts_un kbts_SizeOfShapeScratchpad(kbts_shape_config *Config)
+{
+  kbts_un DecompositionSize = sizeof(kbts_glyph) * KBTS__MAXIMUM_DECOMPOSITION_CODEPOINTS;
+  kbts_un GsubSize = sizeof(kbts__gsub_frame) * KBTS_LOOKUP_STACK_SIZE;
+  kbts_un ScratchSize = KBTS__MAX(DecompositionSize, GsubSize);
+
+  kbts_un Result = sizeof(kbts_shape_scratchpad) + ScratchSize;
+
+  if(Config)
+  {
+    kbts_un BucketHeadersSize = sizeof(kbts__bucketed_glyph_block_header) * kbts__SequentialLookupCount(Config);
+
+    Result += BucketHeadersSize;
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_scratchpad *kbts_PlaceShapeScratchpad(kbts_shape_config *Config, void *Memory, kbts_allocator_function *Allocator, void *AllocatorData)
+{
+  kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(Memory);
+  kbts_shape_scratchpad *Result = kbts__PointerPushType(&Bump, kbts_shape_scratchpad);
+  KBTS_MEMSET(Result, 0, sizeof(*Result));
+
+  if(!Allocator)
+  {
+    Allocator = kbts__DefaultAllocator;
+  }
+
+  Result->Allocator = Allocator;
+  Result->AllocatorData = AllocatorData;
+  Result->Config = Config;
+
+  // @Duplication with SizeOfShapeScratchpad().
+  kbts_un DecompositionSize = sizeof(kbts_glyph) * KBTS__MAXIMUM_DECOMPOSITION_CODEPOINTS;
+  kbts_un GsubSize = sizeof(kbts__gsub_frame) * KBTS_LOOKUP_STACK_SIZE;
+  kbts_un ScratchSize = KBTS__MAX(DecompositionSize, GsubSize);
+
+  Result->ScratchMemory = kbts__PointerPush(&Bump, ScratchSize, 1);
+
+  if(Config)
+  {
+    kbts_un SequentialLookupCount = kbts__SequentialLookupCount(Config);
+    Result->LookupGlyphBuckets = kbts__PointerPushArray(&Bump, kbts__bucketed_glyph_block_header, SequentialLookupCount);
+
+    {
+      kbts_blob_header *Blob = Config->Font->Blob;
+
+      Result->GlyphIdCount = Blob->GlyphCount;
+      Result->LookupSubtableCount = Blob->LookupSubtableCount;
+      Result->GposLookupIndexOffset = Blob->GposLookupIndexOffset;
+
+      if(Blob->GlyphLookupSubtableMatrixOffsetFromStartOfFile)
+      {
+        Result->GlyphLookupSubtableMatrix = KBTS__POINTER_OFFSET(kbts_u32, Blob, Blob->GlyphLookupSubtableMatrixOffsetFromStartOfFile);
+      }
+
+      if(Blob->LookupSubtableIndexOffsetsOffsetFromStartOfFile)
+      {
+        Result->LookupSubtableIndexOffsets = KBTS__POINTER_OFFSET(kbts_u32, Blob, Blob->LookupSubtableIndexOffsetsOffsetFromStartOfFile);
+      }
+    }
+
+    KBTS__FOR(LookupIndex, 0, SequentialLookupCount)
+    {
+      kbts__bucketed_glyph_block_header *Sentinel = &Result->LookupGlyphBuckets[LookupIndex];
+
+      KBTS__DLLIST_SENTINEL_INIT(Sentinel);
+    }
+
+    Result->SequentialLookupCount = (kbts_u32)SequentialLookupCount;
+  }
+
+  KBTS__DLLIST_SENTINEL_INIT(&Result->FreeBucketedBlockSentinel);
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_scratchpad *kbts_PlaceShapeScratchpadFixedMemory(kbts_shape_config *Config, void *Memory, int Size)
+{
+  kbts_shape_scratchpad *Result = 0;
+  kbts_un ScratchpadSize = kbts_SizeOfShapeScratchpad(Config);
+  kbts_un InitialSize = sizeof(kbts_arena) + ScratchpadSize;
+
+  if((Size >= 0) &&
+     ((kbts_un)Size >= InitialSize))
+  {
+    kbts_arena *Arena = (kbts_arena *)KBTS__POINTER_OFFSET(kbts_arena, Memory, ScratchpadSize);
+    kbts__InitializeFixedMemoryArena(Arena, KBTS__POINTER_AFTER(void, Arena), (kbts_un)Size - InitialSize);
+
+    Result = kbts_PlaceShapeScratchpad(Config, Memory, kbts__ArenaAllocator, Arena);
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_scratchpad *kbts_CreateShapeScratchpad(kbts_shape_config *Config, kbts_allocator_function *Allocator, void *AllocatorData)
+{
+  kbts_un Size = kbts_SizeOfShapeScratchpad(Config);
+  kbts_shape_scratchpad *Result = kbts_PlaceShapeScratchpad(Config, kbts__AllocatorAllocate(Allocator, AllocatorData, Size), Allocator, AllocatorData);
+  Result->SelfAllocated = 1;
+  return Result;
+}
+
+static kbts__bucketed_glyph_block *kbts__NewBucketedGlyphBlock(kbts_shape_scratchpad *Scratchpad)
+{
+  kbts__bucketed_glyph_block_header *New = Scratchpad->FreeBucketedBlockSentinel.Prev;
+  if(New == &Scratchpad->FreeBucketedBlockSentinel)
+  {
+    // Allocate new blocks.
+    kbts_un BlocksToAllocateCount = 4096 / sizeof(kbts__bucketed_glyph_block);
+    kbts__bucketed_glyph_block *NewBlocks = (kbts__bucketed_glyph_block *)kbts__AllocatorAllocate(Scratchpad->Allocator, Scratchpad->AllocatorData, sizeof(kbts__bucketed_glyph_block) * BlocksToAllocateCount);
+
+    if(NewBlocks)
+    {
+      KBTS__FOR(NewBlockIndex, 0, BlocksToAllocateCount)
+      {
+        kbts__bucketed_glyph_block *NewBlock = &NewBlocks[NewBlockIndex];
+        NewBlock->Count = 0;
+
+        if(NewBlockIndex)
+        {
+          KBTS__DLLIST_INSERT_BEFORE(&NewBlock->Header, &Scratchpad->FreeBucketedBlockSentinel);
+          NewBlock->StartOfAllocation = 0;
+        }
+        else
+        {
+          NewBlock->StartOfAllocation = 1;
+        }
+      }
+
+      kbts__bucketed_glyph_block *NewBlock = &NewBlocks[0];
+      New = &NewBlock->Header;
+    }
+    else
+    { 
+      Scratchpad->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
+      return 0;
+    }
+  }
+  else
+  {
+    KBTS__DLLIST_REMOVE(New);
+  }
+
+  kbts__bucketed_glyph_block *Result = (kbts__bucketed_glyph_block *)New;
+  Result->Count = 0;
+
+  return Result;
+}
+
+static kbts_shape_scratchpad *kbts__CreateShapeScratchpad(kbts_shape_config *Config, kbts_allocator_function *Allocator, void *AllocatorData)
+{
+  kbts_un ScratchpadSize = kbts_SizeOfShapeScratchpad(Config);
+  kbts_shape_scratchpad *Result = kbts_PlaceShapeScratchpad(Config, kbts__AllocatorAllocate(Allocator, AllocatorData, ScratchpadSize), Allocator, AllocatorData);
+  Result->SelfAllocated = 1;
+
+  return Result;
+}
+
+static kbts__bucketed_glyph *kbts__InsertGlyphIntoBucket(kbts_shape_scratchpad *Scratchpad, kbts_un BucketIndex, kbts_glyph *Glyph, kbts_u16 FeatureValue)
+{
+  kbts__bucketed_glyph_block_header *Sentinel = &Scratchpad->LookupGlyphBuckets[BucketIndex];
+  kbts__bucketed_glyph_block_header *Header = Sentinel->Prev;
+  kbts_b32 NeedNewBlock = (Header == Sentinel);
+  if(!NeedNewBlock)
+  {
+    kbts__bucketed_glyph_block *LastBlock = (kbts__bucketed_glyph_block *)Header;
+    NeedNewBlock = (LastBlock->Count == KBTS__BUCKETED_GLYPHS_PER_BLOCK);
+  }
+
+  if(NeedNewBlock)
+  {
+    kbts__bucketed_glyph_block *NewBlock = kbts__NewBucketedGlyphBlock(Scratchpad);
+    if(NewBlock)
+    {
+      KBTS__DLLIST_INSERT_BEFORE(&NewBlock->Header, Sentinel);
+      Header = &NewBlock->Header;
+    }
+  }
+
+  kbts__bucketed_glyph_block *Block = (kbts__bucketed_glyph_block *)Header;
+  kbts__bucketed_glyph *Result = &Block->Glyphs[Block->Count++];
+
+  Result->Glyph = Glyph;
+  Result->SortKey = Glyph->SortKey;
+  Result->FeatureValue = FeatureValue;
+
+  Glyph->Bucketed = Result;
+  Glyph->BucketedBucketIndex = (kbts_u16)BucketIndex;
+
+  return Result;
+}
+
+static kbts_b32 kbts__BucketGlyph(kbts_shape_scratchpad *Scratchpad, kbts_glyph *Glyph, kbts_un MinimumSequentialLookupIndex, kbts_b32 ScanBackwards)
+{
+  kbts_b32 Result = 0;
+  kbts_shape_config *Config = Scratchpad->Config;
+  kbts_un SequentialLookupCount = kbts__SequentialLookupCount(Config);
+
+  if(MinimumSequentialLookupIndex < SequentialLookupCount)
+  {
+    kbts__matrix_index LastIndex = kbts__IdSequentialLookupMatrixIndex(SequentialLookupCount - 1, Glyph->Id, SequentialLookupCount);
+    kbts_un OnePastLastWordIndex = LastIndex.WordIndex + 1;
+
+    if(Glyph->Id < Config->GlyphCount)
+    {
+      kbts_glyph_config *GlyphConfig = Glyph->Config;
+
+      if(!GlyphConfig)
+      {
+        kbts_u32 *IdSequentialLookupMatrix = Config->IdSequentialLookupMatrix;
+        kbts__matrix_index MatrixIndex = kbts__IdSequentialLookupMatrixIndex(MinimumSequentialLookupIndex, Glyph->Id, SequentialLookupCount);
+        kbts_u32 *At = &IdSequentialLookupMatrix[MatrixIndex.WordIndex];
+        // Mask out lookups < MinimumSequentialLookupIndex.
+        kbts_u32 BeforeFirstMask = ((1u << MatrixIndex.BitIndex) - 1);
+        kbts_u32 Bits = *At++ & ~BeforeFirstMask;
+        kbts_un SequentialLookupIndexOffset = 0;
+
+        kbts_un WordIndex = MatrixIndex.WordIndex + 1;
+        while((WordIndex < OnePastLastWordIndex) &&
+              !Bits)
+        {
+          Bits = *At++;
+
+          WordIndex += 1;
+          SequentialLookupIndexOffset += KBTS__BIT_WIDTH(kbts_u32);
+        }
+
+        if(Bits)
+        {
+          SequentialLookupIndexOffset += (kbts_un)kbts__LsbPositionOrBitWidth32(Bits) - (kbts_un)MatrixIndex.BitIndex;
+          kbts_un SequentialLookupIndex = MinimumSequentialLookupIndex + SequentialLookupIndexOffset;
+          kbts__InsertGlyphIntoBucket(Scratchpad, SequentialLookupIndex, Glyph, 1);
+          Result = 1;
+        }
+      }
+      else
+      {
+        kbts_u32 *IdSequentialLookupMatrix = Config->IdSequentialLookupMatrix;
+        kbts__matrix_index MatrixIndex = kbts__IdSequentialLookupMatrixIndex(MinimumSequentialLookupIndex, Glyph->Id, SequentialLookupCount);
+        kbts__matrix_index RowIndex = kbts__IdSequentialLookupMatrixIndex(MinimumSequentialLookupIndex, 0, SequentialLookupCount);
+
+        kbts_u32 *At = &IdSequentialLookupMatrix[MatrixIndex.WordIndex];
+        kbts_u32 *AtEnabled = &GlyphConfig->EnabledLookupBits[RowIndex.WordIndex];
+        kbts_u32 *AtDisabled = &GlyphConfig->DisabledLookupBits[RowIndex.WordIndex];
+
+        // Mask out lookups < MinimumSequentialLookupIndex.
+        kbts_u32 BeforeFirstMask = ((1u << MatrixIndex.BitIndex) - 1);
+
+        kbts_u32 Bits = ((*At++ | *AtEnabled++) & ~(*AtDisabled++)) & ~BeforeFirstMask;
+        kbts_un SequentialLookupIndexOffset = 0;
+
+        kbts_un WordIndex = MatrixIndex.WordIndex + 1;
+        while((WordIndex < OnePastLastWordIndex) &&
+              !Bits)
+        {
+          Bits = ((*At++ | *AtEnabled++) & ~(*AtDisabled++));
+
+          WordIndex += 1;
+          SequentialLookupIndexOffset += KBTS__BIT_WIDTH(kbts_u32);
+        }
+
+        if(Bits)
+        {
+          SequentialLookupIndexOffset += (kbts_un)kbts__LsbPositionOrBitWidth32(Bits) - (kbts_un)MatrixIndex.BitIndex;
+          kbts_un SequentialLookupIndex = MinimumSequentialLookupIndex + SequentialLookupIndexOffset;
+          kbts_u16 FeatureValue = 1;
+
+          KBTS__FOR(NonBinaryEnabledLookupIndex, 0, GlyphConfig->NonBinaryEnabledLookupCount)
+          {
+            kbts__enabled_lookup *Enabled = &GlyphConfig->NonBinaryEnabledLookups[NonBinaryEnabledLookupIndex];
+
+            if(Enabled->SequentialLookupIndex == SequentialLookupIndex)
+            {
+              FeatureValue = (kbts_u16)Enabled->Value;
+              
+              break;
+            }
+          }
+
+          kbts__InsertGlyphIntoBucket(Scratchpad, SequentialLookupIndex, Glyph, FeatureValue);
+          Result = 1;
+        }
+      }
+    }
+    else
+    {
+      // Out-of-bounds glyphs traverse every lookup, I guess.
+      kbts__InsertGlyphIntoBucket(Scratchpad, MinimumSequentialLookupIndex, Glyph, 1);
+    }
+  }
+
+  return Result;
+}
+
+KBTS_INLINE void kbts__GsubMutate(kbts_shape_scratchpad *Scratchpad, kbts_font *Font, kbts_glyph *Glyph, kbts_un CurrentSequentialLookupIndex, kbts_u16 NewId, kbts_u32 Flags)
+{
+  Glyph->Id = NewId;
+  Glyph->Classes = kbts__GlyphClasses(Font, NewId);
+  Glyph->Flags = (Glyph->Flags & ~KBTS_GLYPH_FLAG_FIRST_IN_MULTIPLE_SUBSTITUTION) | Flags;
+
+  kbts__UnbucketGlyph(Scratchpad, Glyph);
+  kbts__BucketGlyph(Scratchpad, Glyph, CurrentSequentialLookupIndex + 1, 0);
+}
+
+static kbts_b32 kbts__BucketedGlyphIsValid(kbts__bucketed_glyph *Bucketed)
+{
+  kbts_b32 Result = (Bucketed->SortKey != KBTS__DELETED_SORT_KEY);
+  return Result;
+}
+
+static void kbts__FreeBucketedGlyphBlock(kbts_shape_scratchpad *Scratchpad, kbts__bucketed_glyph_block *Block)
+{
+  KBTS__DLLIST_REMOVE(&Block->Header);
+  KBTS__DLLIST_INSERT_BEFORE(&Block->Header, &Scratchpad->FreeBucketedBlockSentinel);
+}
+
+static void kbts__SortGlyphBucket(kbts_shape_scratchpad *Scratchpad, kbts_un SequentialLookupIndex)
+{
+  kbts__bucketed_glyph_block_header *Sentinel = &Scratchpad->LookupGlyphBuckets[SequentialLookupIndex];
+
+  // @Speed: Use merge sort?
+  kbts__bucketed_glyph_block *ForwardBlock = (kbts__bucketed_glyph_block *)Sentinel->Next;
+
+  kbts_un DeletedCount = 0;
+  if(&ForwardBlock->Header != Sentinel)
+  {
+    DeletedCount += (ForwardBlock->Glyphs[0].SortKey == KBTS__DELETED_SORT_KEY);
+  }
+
+  kbts_un ForwardIndex = 1;
+  if(ForwardIndex == ForwardBlock->Count)
+  {
+    ForwardBlock = (kbts__bucketed_glyph_block *)ForwardBlock->Header.Next;
+    ForwardIndex = 0;
+  }
+
+  while(&ForwardBlock->Header != Sentinel)
+  {
+    kbts__bucketed_glyph Bucketed = ForwardBlock->Glyphs[ForwardIndex];
+    kbts_u32 SortKey = Bucketed.SortKey;
+
+    kbts__bucketed_glyph_block *BackwardBlock = ForwardBlock;
+    kbts_un BackwardIndex = ForwardIndex;
+    for(;;)
+    {
+      kbts__bucketed_glyph_block *NextBackwardBlock = BackwardBlock;
+      kbts_un NextBackwardIndex = BackwardIndex;
+      if(NextBackwardIndex)
+      {
+        NextBackwardIndex -= 1;
+      }
+      else
+      {
+        NextBackwardBlock = (kbts__bucketed_glyph_block *)BackwardBlock->Header.Prev;
+
+        if(&NextBackwardBlock->Header == Sentinel)
+        {
+          break;
+        }
+
+        NextBackwardIndex = NextBackwardBlock->Count - 1;
+      }
+
+      kbts_u32 ScanSortKey = NextBackwardBlock->Glyphs[NextBackwardIndex].SortKey;
+
+      if(ScanSortKey > SortKey)
+      {
+        kbts__bucketed_glyph *From = &NextBackwardBlock->Glyphs[NextBackwardIndex];
+        kbts__bucketed_glyph *To = &BackwardBlock->Glyphs[BackwardIndex];
+
+        BackwardBlock->Glyphs[BackwardIndex] = NextBackwardBlock->Glyphs[NextBackwardIndex];
+
+        if(From->SortKey != KBTS__DELETED_SORT_KEY)
+        {
+          To->Glyph->Bucketed = To;
+        }
+      }
+      else
+      {
+        break;
+      }
+
+      BackwardBlock = NextBackwardBlock;
+      BackwardIndex = NextBackwardIndex;
+    }
+
+    kbts__bucketed_glyph *To = &BackwardBlock->Glyphs[BackwardIndex];
+    *To = Bucketed;
+    if(SortKey != KBTS__DELETED_SORT_KEY)
+    {
+      To->Glyph->Bucketed = To;
+    }
+
+    DeletedCount += (SortKey == KBTS__DELETED_SORT_KEY);
+
+    ForwardIndex += 1;
+    if(ForwardIndex == ForwardBlock->Count)
+    {
+      ForwardBlock = (kbts__bucketed_glyph_block *)ForwardBlock->Header.Next;
+      ForwardIndex = 0;
+    }
+  }
+
+  for(kbts__bucketed_glyph_block_header *Header = Sentinel->Prev;
+      Header != Sentinel;
+      )
+  {
+    kbts__bucketed_glyph_block_header *Prev = Header->Prev;
+    kbts__bucketed_glyph_block *Block = (kbts__bucketed_glyph_block *)Header;
+
+    if(DeletedCount >= Block->Count)
+    {
+      DeletedCount -= Block->Count;
+
+      kbts__FreeBucketedGlyphBlock(Scratchpad, Block);
+    }
+    else
+    {
+      Block->Count -= (kbts_u32)DeletedCount;
+
+      break;
+    }
+
+    Header = Prev;
+  }
+}
+
 static kbts_glyph *kbts__InsertGlyph(kbts_glyph_storage *Storage, kbts_glyph *Anchor, int InsertBeforeAnchor, kbts_glyph *BaseGlyph)
 {
   kbts_glyph *Result = Storage->FreeGlyphSentinel.Next;
@@ -19591,6 +18154,9 @@ static kbts_glyph *kbts__InsertGlyph(kbts_glyph_storage *Storage, kbts_glyph *An
     if(BaseGlyph)
     {
       *Result = *BaseGlyph;
+
+      // No matter what, clear bucketing information on new glyphs.
+      Result->Bucketed = 0;
     }
 
     if(InsertBeforeAnchor)
@@ -19624,7 +18190,7 @@ static kbts_glyph *kbts__InsertGlyphAfter(kbts_glyph_storage *Storage, kbts_glyp
   return Result;
 }
 
-static kbts_glyph *kbts__FreeGlyph(kbts__shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_glyph *Glyph)
+static kbts_glyph *kbts__FreeGlyph(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_glyph *Glyph)
 {
   if(Glyph == Scratchpad->LookupOnePastLastGlyph)
   {
@@ -19638,6 +18204,8 @@ static kbts_glyph *kbts__FreeGlyph(kbts__shape_scratchpad *Scratchpad, kbts_glyp
   {
     Scratchpad->Cluster.SentinelNext = Glyph->Next;
   }
+
+  kbts__UnbucketGlyph(Scratchpad, Glyph);
 
   KBTS__DLLIST_REMOVE(Glyph);
   KBTS__DLLIST_INSERT_BEFORE(Glyph, (kbts_glyph *)&Storage->FreeGlyphSentinel);
@@ -19660,44 +18228,9 @@ static kbts_glyph *kbts__SetGlyphPreserveLinksAndUserId(kbts_glyph *Dest, kbts_g
   return Dest;
 }
 
-static int kbts__BeginFeatures(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_shaping_table ShapingTable)
-{
-  int Result = 0;
-  kbts_blob_table_id TableId = (ShapingTable == KBTS_SHAPING_TABLE_GSUB) ? KBTS_BLOB_TABLE_ID_GSUB : KBTS_BLOB_TABLE_ID_GPOS;
-  kbts__gsub_gpos *GsubGpos = kbts__BlobTableDataType(Config->Font->Blob, TableId, kbts__gsub_gpos);
-  kbts__langsys *Langsys = Config->Langsys[ShapingTable];
-  kbts_un FeatureStageIndex = Scratchpad->FeatureStagesRead - 1;
-
-  Scratchpad->FeatureIndexIndex = 0;
-
-  if(GsubGpos && Langsys && (FeatureStageIndex < Config->OpList.FeatureStageCount))
-  {
-    kbts__baked_feature_stage *BakedFeatureStage = &Config->FeatureStages[FeatureStageIndex];
-
-    // @Incomplete
-    // if(GsubGpos->Minor == 1)
-    // {
-    //   kbts__feature_variations *FeatureVariations = KBTS__POINTER_OFFSET(kbts__feature_variations, GsubGpos, GsubGpos->FeatureVariationsOffset);
-    // }
-
-
-    KBTS__FOR(FeatureIndex, 0, BakedFeatureStage->FeatureCount)
-    {
-      Scratchpad->BakedLookupSubtablesRead[FeatureIndex] = 0;
-    }
-
-    Result = 1;
-  }
-
-  return Result;
-}
-
 typedef struct kbts__sequence_lookup_result
 {
   kbts__sequence_lookup_record *Records;
-  kbts_un RecordCount;
-  kbts_un InputSequenceCountIncludingSkippedGlyphs;
-
   kbts_glyph *OnePastLastGlyphMatched;
 
   // This is specified _nowhere_ in the docs, BUT some sequence lookups have 0 records, and exist just to prevent the
@@ -19705,19 +18238,23 @@ typedef struct kbts__sequence_lookup_result
   // So, checking if we got any records is not enough to figure out whether we need to "apply" this lookup.
   // We need to have an explicit bool as well.
   // Sigh.
-  int Matched;
+  kbts_b32 Matched;
+
+  kbts_u16 RecordCount;
+  kbts_u16 InputSequenceCountIncludingSkippedGlyphs;
 } kbts__sequence_lookup_result;
 
 typedef struct kbts__sequence_match
 {
-  kbts_un MatchCount;
-  kbts_un MatchOrSkipCount;
   kbts_glyph *OnePastMatchGlyph;
+
+  kbts_u16 MatchCount;
+  kbts_u16 MatchOrSkipCount;
 } kbts__sequence_match;
 
 static kbts__sequence_match kbts__MatchCoverageSequence(kbts_glyph_storage *Storage, kbts__unpacked_lookup *Lookup, kbts_u32 SkipFlags, kbts_u32 SkipUnicodeFlags,
-                                                      void *Base, kbts_u16 *CoverageOffsets, kbts_un CoverageCount,
-                                                      kbts_glyph *AtGlyph, int Backward)
+                                                        void *Base, kbts_u16 *CoverageOffsets, kbts_un CoverageCount,
+                                                        kbts_glyph *AtGlyph, int Backward)
 {
   kbts_un CoverageIndex = 0;
   kbts_un GlyphCounter = 0;
@@ -19744,8 +18281,8 @@ static kbts__sequence_match kbts__MatchCoverageSequence(kbts_glyph_storage *Stor
   }
 
   kbts__sequence_match Result = KBTS__ZERO;
-  Result.MatchCount = CoverageIndex;
-  Result.MatchOrSkipCount = GlyphCounter;
+  Result.MatchCount = (kbts_u16)CoverageIndex;
+  Result.MatchOrSkipCount = (kbts_u16)GlyphCounter;
   Result.OnePastMatchGlyph = AtGlyph;
   return Result;
 }
@@ -19761,7 +18298,7 @@ static int kbts__BranchlessCompareArray16(kbts_u16 *A, kbts_u16 *B, kbts_un Coun
 }
 
 static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *Storage, kbts__unpacked_lookup *Lookup, kbts_u16 *Base, kbts__cover_glyph_result Cover,
-                                                         kbts_glyph *AtGlyph, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags)
+                                                           kbts_glyph *AtGlyph, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags)
 {
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
   kbts__sequence_lookup_result Result = KBTS__ZERO;
@@ -19984,9 +18521,12 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   case 0x80002:
   {
     kbts__chained_sequence_context_2 *Subst = (kbts__chained_sequence_context_2 *)Base;
-    kbts_u16 *BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->BacktrackClassDefOffset);
-    kbts_u16 *InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->InputClassDefOffset);
-    kbts_u16 *LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->LookaheadClassDefOffset);
+    kbts_u16 *BacktrackClassDefinition = 0;
+    kbts_u16 *InputClassDefinition = 0;
+    kbts_u16 *LookaheadClassDefinition = 0;
+    if(Subst->BacktrackClassDefOffset) {BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->BacktrackClassDefOffset);}
+    if(Subst->InputClassDefOffset) {InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->InputClassDefOffset);}
+    if(Subst->LookaheadClassDefOffset) {LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->LookaheadClassDefOffset);}
 
     // @Incomplete: Do this with all sequence types!
 
@@ -20046,7 +18586,7 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
             // and it doesn't matter whether those glyphs are in the input sequence or part of the lookahead.
             // This happens often enough that we care to special-case it.
             kbts__glyph_class_from_table_result LookaheadClass = InputClass;
-            if(LookaheadClassDefinition != InputClassDefinition)
+            if(LookaheadClassDefinition && (LookaheadClassDefinition != InputClassDefinition))
             {
               LookaheadClass = kbts__GlyphClassFromTable(LookaheadClassDefinition, InputGlyph->Id);
             }
@@ -20118,7 +18658,7 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
       {
         Result.Records = Unpacked.Records;
         Result.RecordCount = Unpacked.RecordCount;
-        Result.InputSequenceCountIncludingSkippedGlyphs = MatchedOrSkippedInputGlyphCount;
+        Result.InputSequenceCountIncludingSkippedGlyphs = (kbts_u16)MatchedOrSkippedInputGlyphCount;
         Result.OnePastLastGlyphMatched = InputMatch.OnePastMatchGlyph;
         Result.Matched = 1;
 
@@ -20142,7 +18682,7 @@ static void kbts__ApplyValueRecord(kbts_glyph *Glyph, kbts__unpacked_value_recor
   Glyph->AdvanceY += Unpacked->AdvanceY;
 }
 
-static int kbts__NextGlyph(kbts_glyph_storage *Storage, kbts__unpacked_lookup *Lookup, kbts_glyph *AtGlyph, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags, kbts_glyph **Match, int Backward)
+static kbts_b32 kbts__NextGlyph(kbts_glyph_storage *Storage, kbts__unpacked_lookup *Lookup, kbts_glyph *AtGlyph, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags, kbts_glyph **Match, int Backward)
 {
   kbts_glyph *MatchingGlyph = 0;
 
@@ -20170,7 +18710,7 @@ static void kbts__AttachGlyph(kbts_glyph_storage *Storage, kbts_glyph *Parent, k
 
   Child->OffsetX = X;
   Child->OffsetY = Y;
-  Child->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
+  Child->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS | KBTS_GLYPH_FLAG_NO_BREAK;
   Child->AttachGlyph = Parent;
 
   Parent->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
@@ -20197,7 +18737,7 @@ static void kbts__AttachGlyph(kbts_glyph_storage *Storage, kbts_glyph *Parent, k
   }
 }
 
-static void kbts__SetLookupOnePastLastGlyph(kbts__shape_scratchpad *Scratchpad, kbts_un Index, kbts_glyph *Glyph)
+static void kbts__SetLookupOnePastLastGlyph(kbts_shape_scratchpad *Scratchpad, kbts_un Index, kbts_glyph *Glyph)
 {
   if(Index > Scratchpad->LookupOnePastLastGlyphIndex)
   {
@@ -20225,21 +18765,21 @@ KBTS_INLINE void kbts__SetCursiveFlags(kbts_glyph *Glyph, kbts__cursive_flags Cu
   Glyph->MarkOrdering = (kbts_u8)CursiveFlags;
 }
 
-static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                   kbts_lookup_list *LookupList, kbts_un LookupIndex, kbts_un SubtableIndex, kbts__unpacked_lookup *Lookup, kbts_u16 *Base,
-                                   kbts_glyph *CurrentGlyph, kbts_un StartIndex, kbts__skip_flags RequestedSkipFlags)
+static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
+                                         kbts_lookup_list *LookupList, kbts_un LookupIndex, kbts_un SubtableIndex, kbts__unpacked_lookup *Lookup, kbts_u16 *Base,
+                                         kbts_glyph *CurrentGlyph, kbts_un StartIndex, kbts__skip_flags RequestedSkipFlags)
 {
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
-  kbts_unicode_flags SkipUnicodeFlags = KBTS_UNICODE_FLAG_DEFAULT_IGNORABLE;
+  enum{SkipUnicodeFlags = KBTS_UNICODE_FLAG_DEFAULT_IGNORABLE};
   kbts__skip_flags RegularSkipFlags = KBTS__SKIP_FLAGS_GPOS_REGULAR(RequestedSkipFlags);
   kbts__skip_flags SequenceSkipFlags = KBTS__SKIP_FLAGS_GPOS_SEQUENCE(RequestedSkipFlags);
 
-  int Result = 0;
+  kbts_b32 Result = 0;
 
   kbts_un OnePastLastGlyphIndex = StartIndex + 1;
   kbts_glyph *OnePastLastGlyph = CurrentGlyph->Next;
 
-  if(kbts__GlyphsIncludedInLookupSubtable(Storage, Config->Font, 1, Lookup, LookupIndex, SubtableIndex, CurrentGlyph, SequenceSkipFlags, SkipUnicodeFlags))
+  if(kbts__GlyphIncludedInLookupSubtable(Scratchpad, KBTS_SHAPING_TABLE_GPOS, LookupIndex, SubtableIndex, CurrentGlyph))
   {
     // CAREFUL: We want kbts__unpacked_lookup to be a useful bag-of-arguments type, but, for extension
     // lookups, each subtable may specify its own lookup type, so we save it here and restore it at
@@ -20267,83 +18807,146 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
     if(Cover.Valid)
     {
       kbts_un OnePastLastGlyphOffset = 0;
-
+      
       switch(Lookup->Type)
       {
       case 1:
       {
+        kbts_u16 ValueFormat = Base[2];
+
         kbts__unpacked_value_record Unpacked = KBTS__ZERO;
 
         if(Base[0] == 1)
         {
           kbts__single_adjustment_1 *Adjust = (kbts__single_adjustment_1 *)Base;
 
-          Unpacked = kbts__UnpackValueRecord(Adjust, Adjust->ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
+          Unpacked = kbts__UnpackValueRecord(Adjust, ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
         }
         else if(Base[0] == 2)
         {
           kbts__single_adjustment_2 *Adjust = (kbts__single_adjustment_2 *)Base;
 
-          kbts_un RecordSize = kbts__PopCount32(Adjust->ValueFormat);
+          kbts_un RecordSize = kbts__PopCount32(ValueFormat);
           kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, Adjust);
           kbts_u16 *Record = Records + RecordSize * Cover.Index;
 
-          Unpacked = kbts__UnpackValueRecord(Adjust, Adjust->ValueFormat, Record);
+          Unpacked = kbts__UnpackValueRecord(Adjust, ValueFormat, Record);
         }
 
         kbts__ApplyValueRecord(CurrentGlyph, &Unpacked);
+
         CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
 
         Result = 1;
-      }
-      break;
+      } break;
 
       case 2:
       {
+        KBTS_INSTRUMENT_BLOCK_BEGIN(PairPositioning);
+
         kbts_glyph *NextGlyph;
         if(kbts__NextGlyph(Storage, Lookup, CurrentGlyph->Next, RegularSkipFlags, SkipUnicodeFlags, &NextGlyph, 0))
         {
-          kbts_u32 NextGlyphId = NextGlyph->Id;
+          kbts_u16 NextGlyphId = NextGlyph->Id;
 
-          kbts__unpacked_value_record Unpacked1 = KBTS__ZERO;
-          kbts__unpacked_value_record Unpacked2 = KBTS__ZERO;
-          int Valid = 0;
+          kbts_u16 *Unpacked1Base;
+          kbts_u16 *Unpacked2Base;
+          kbts_u16 ValueFormat1;
+          kbts_u16 ValueFormat2 = 0;
+          kbts_un Size1;
+          kbts_un Size2;
+
+          {
+            kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
+            ValueFormat1 = Adjust->ValueFormat1;
+            ValueFormat2 = Adjust->ValueFormat2;
+
+            Size1 = kbts__PopCount32(ValueFormat1);
+            Size2 = kbts__PopCount32(ValueFormat2);
+          }
 
           if(Base[0] == 1)
           {
             kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
-
-            kbts_un Size1 = kbts__PopCount32(Adjust->ValueFormat1);
-            kbts_un Size2 = kbts__PopCount32(Adjust->ValueFormat2);
 
             kbts_u16 *SetOffsets = KBTS__POINTER_AFTER(kbts_u16, Adjust);
             kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, SetOffsets[Cover.Index]);
 
             kbts_un PairRecordSize = Size1 + Size2 + 1; // + 1 because each pair stores the next glyph ID.
             kbts__pair_value_record *PairRecords = KBTS__POINTER_AFTER(kbts__pair_value_record, Set);
-            KBTS__FOR(PairIndex, 0, Set->Count)
+
+            kbts_un PairCount = Set->Count;
+
+            KBTS_INSTRUMENT_BLOCK_BEGIN(PairSearch);
+
+            #define KBTS__PAIR_SEARCH(PairSize) \
+            kbts_un PairSizeTimesPairIndex = 0; \
+            while(PairCount > 1) \
+            { \
+              kbts_un HalfCount = PairCount / 2; \
+              PairSizeTimesPairIndex = (PairRecords[PairSizeTimesPairIndex + HalfCount*PairSize - PairSize].SecondGlyph < NextGlyphId) ? (PairSizeTimesPairIndex + HalfCount*PairSize) : PairSizeTimesPairIndex; \
+              PairCount -= HalfCount; \
+            } \
+            kbts__pair_value_record *PairRecord = PairRecords + PairSizeTimesPairIndex; \
+            if(PairRecord->SecondGlyph == NextGlyphId) \
+            { \
+              kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, PairRecord); \
+              Unpacked1Base = Records; \
+              Unpacked2Base = Records + Size1; \
+              KBTS_INSTRUMENT_BLOCK_END(PairSearch); \
+              goto ApplyPairPositioning; \
+            }
+
+            if(PairRecordSize == 2)
             {
-              kbts__pair_value_record *PairRecord = PairRecords + PairRecordSize * PairIndex;
+              KBTS__PAIR_SEARCH(2);
+            }
+            else if(PairRecordSize == 3)
+            {
+              KBTS__PAIR_SEARCH(3);
+            }
+            else
+            {
+              kbts__pair_value_record *PairRecord = PairRecords;
+
+              while(PairCount > 1)
+              {
+                kbts_un HalfCount = PairCount / 2;
+
+                kbts__pair_value_record *OnePastProbe = PairRecord + HalfCount * PairRecordSize;
+                kbts__pair_value_record *Probe = OnePastProbe - PairRecordSize;
+
+                if(Probe->SecondGlyph < NextGlyphId)
+                {
+                  PairRecord = OnePastProbe;
+                }
+
+                PairCount -= HalfCount;
+              }
 
               if(PairRecord->SecondGlyph == NextGlyphId)
               {
                 kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, PairRecord);
 
-                Unpacked1 = kbts__UnpackValueRecord(Adjust, Adjust->ValueFormat1, Records);
-                Records += Unpacked1.Size;
-                Unpacked2 = kbts__UnpackValueRecord(Adjust, Adjust->ValueFormat2, Records);
-                Valid = 1;
+                Unpacked1Base = Records;
+                Unpacked2Base = Records + Size1;
+                KBTS_INSTRUMENT_BLOCK_END(PairSearch);
+
+                goto ApplyPairPositioning;
               }
             }
+
+            #undef KBTS__PAIR_SEARCH
+            KBTS_INSTRUMENT_BLOCK_END(PairSearch);
           }
           else if(Base[0] == 2)
           {
+            KBTS_INSTRUMENT_BLOCK_BEGIN(PairClasses);
+
             kbts__pair_adjustment_2 *Adjust = (kbts__pair_adjustment_2 *)Base;
             kbts_u16 *ClassDef1 = KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition1Offset);
             kbts_u16 *ClassDef2 = KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition2Offset);
 
-            kbts_un Size1 = kbts__PopCount32(Adjust->ValueFormat1);
-            kbts_un Size2 = kbts__PopCount32(Adjust->ValueFormat2);
             kbts_un PairRecordSize = Size1 + Size2;
             kbts_u16 *PairRecords = KBTS__POINTER_AFTER(kbts_u16, Adjust);
 
@@ -20354,35 +18957,54 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
             // class definition table, then we should skip the lookup.
             // However, this seems wrong in practice. Undefined classes seem to just default to 0, and then
             // the bounds check takes care of deciding whether the lookup is okay to apply or not.
+            // @Speed: Interleave these lookups.
             kbts__glyph_class_from_table_result Class1 = kbts__GlyphClassFromTable(ClassDef1, CurrentGlyph->Id);
             kbts__glyph_class_from_table_result Class2 = kbts__GlyphClassFromTable(ClassDef2, NextGlyphId);
-            if((Class1.Class < Adjust->Class1Count) && (Class2.Class < Adjust->Class2Count))
+
+            if((Class1.Class < Adjust->Class1Count) &&
+               (Class2.Class < Adjust->Class2Count))
             {
               kbts_u16 *PairRecord = PairRecords + Class1.Class * PairRecordSize * Adjust->Class2Count + Class2.Class * PairRecordSize;
 
-              Unpacked1 = kbts__UnpackValueRecord(Adjust, Adjust->ValueFormat1, PairRecord);
-              PairRecord += Size1;
+              Unpacked1Base = PairRecord;
+              Unpacked2Base = PairRecord + Size1;
 
-              Unpacked2 = kbts__UnpackValueRecord(Adjust, Adjust->ValueFormat2, PairRecord);
-              PairRecord += Size2;
-              Valid = 1;
+              KBTS_INSTRUMENT_BLOCK_END(PairClasses);
+              goto ApplyPairPositioning;
             }
+
+            KBTS_INSTRUMENT_BLOCK_END(PairClasses);
           }
 
-          if(Valid)
+          if(0)
           {
-            kbts__ApplyValueRecord(CurrentGlyph, &Unpacked1);
-            CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
+            ApplyPairPositioning:;
 
-            kbts__ApplyValueRecord(NextGlyph, &Unpacked2);
+            KBTS_INSTRUMENT_BLOCK_BEGIN(ApplyPairPositioning);
+
+            kbts__unpacked_value_record Unpacked1 = kbts__UnpackValueRecord(Base, ValueFormat1, Unpacked1Base);
+            kbts__ApplyValueRecord(CurrentGlyph, &Unpacked1);
+
+            CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
             NextGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
 
+            OnePastLastGlyph = CurrentGlyph->Next;
+
+            if(ValueFormat2)
+            {
+              kbts__unpacked_value_record Unpacked2 = kbts__UnpackValueRecord(Base, ValueFormat2, Unpacked2Base);
+              kbts__ApplyValueRecord(NextGlyph, &Unpacked2);
+              OnePastLastGlyph = NextGlyph->Next;
+            }
+
+            KBTS_INSTRUMENT_BLOCK_END(ApplyPairPositioning);
+
             Result = 1;
-            OnePastLastGlyph = Unpacked2.Size ? NextGlyph->Next : CurrentGlyph->Next;
           }
         }
-      }
-      break;
+
+        KBTS_INSTRUMENT_BLOCK_END(PairPositioning);
+      } break;
 
       // All three types of attachment (cursive, mark-to-base, mark-to-ligature) look backward instead of forward.
       case 3:
@@ -20552,8 +19174,7 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
             }
           }
         }
-      }
-      break;
+      } break;
 
       case 4:
       case 6:
@@ -20567,12 +19188,14 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
         // We have to take that into account here, and only accumulate mark advances for shapers that
         // don't do that zeroing at the end (either because they do it at the beginning of GPOS, or
         // because they don't do it at all).
-        int CountMarkAdvances = !kbts__ShaperClearsMarkAdvancesInPostGposFixup(Config->Shaper);
+        kbts_b32 CountMarkAdvances = !kbts__ShaperClearsMarkAdvancesInPostGposFixup(Config->Shaper);
         kbts__coverage *BaseCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->BaseCoverageOffset);
+        kbts_un MarkClassCount = Adjust->MarkClassCount;
         kbts_s32 AdvanceSinceBaseX = 0;
         kbts_s32 AdvanceSinceBaseY = 0;
         kbts_u32 BaseClasses = Lookup->Type == 6 ? (1 << KBTS__GLYPH_CLASS_MARK) : (1 | (1 << KBTS__GLYPH_CLASS_BASE) | (1 << KBTS__GLYPH_CLASS_LIGATURE) | (1 << KBTS__GLYPH_CLASS_COMPONENT));
         kbts_glyph *BaseGlyph = 0;
+
         for(kbts_glyph *PrevGlyph = CurrentGlyph->Prev; kbts__GlyphIsValid(Storage, PrevGlyph); PrevGlyph = PrevGlyph->Prev)
         {
           if(CountMarkAdvances || (PrevGlyph->Classes.Class != KBTS__GLYPH_CLASS_MARK))
@@ -20600,8 +19223,12 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
                  (PrevGlyph->Prev->Classes.Class != KBTS__GLYPH_CLASS_MARK)) // Stop if we see any mark.
               {
                 // Otherwise, we allow skipping uncovered glyphs.
+                kbts_b32 ValidBase = 0;
+
                 kbts__cover_glyph_result BaseCover = kbts__CoverGlyph(BaseCoverage, PrevGlyph->Id);
-                if(BaseCover.Valid)
+                ValidBase = BaseCover.Valid;
+
+                if(ValidBase)
                 {
                   BaseGlyph = PrevGlyph;
                   break;
@@ -20623,18 +19250,20 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
 
         if(BaseGlyph)
         {
-          int Ok = (Lookup->Type == 4) || // This is a mark-to-base attachment
-                   ((BaseGlyph->LigatureUid == CurrentGlyph->LigatureUid) && (BaseGlyph->LigatureComponentIndexPlusOne == CurrentGlyph->LigatureComponentIndexPlusOne)) || // This is a mark-to-mark attachment, and both marks belong to the same ligature component
-                   ((BaseGlyph->Flags | CurrentGlyph->Flags) & KBTS_GLYPH_FLAG_LIGATURE); // This is a mark-to-mark attachment, and either mark was created by a ligature substitution
+          kbts_b32 Ok = (Lookup->Type == 4) || // This is a mark-to-base attachment
+                        ((BaseGlyph->LigatureUid == CurrentGlyph->LigatureUid) && (BaseGlyph->LigatureComponentIndexPlusOne == CurrentGlyph->LigatureComponentIndexPlusOne)) || // This is a mark-to-mark attachment, and both marks belong to the same ligature component
+                        ((BaseGlyph->Flags | CurrentGlyph->Flags) & KBTS_GLYPH_FLAG_LIGATURE); // This is a mark-to-mark attachment, and either mark was created by a ligature substitution
           if(Ok)
           {
             // @Speed: This is duplicating work in the :MultipleSubstSadness case.
             kbts__cover_glyph_result BaseCover = kbts__CoverGlyph(BaseCoverage, BaseGlyph->Id);
+            kbts_un BaseIndex = BaseCover.Index;
+            kbts_b32 ValidBase = BaseCover.Valid;
 
-            if(BaseCover.Valid)
+            if(ValidBase)
             {
               kbts__base_array *BaseArray = KBTS__POINTER_OFFSET(kbts__base_array, Adjust, Adjust->BaseArrayOffset);
-              kbts_u16 *BaseAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, BaseArray) + BaseCover.Index * Adjust->MarkClassCount;
+              kbts_u16 *BaseAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, BaseArray) + BaseIndex * MarkClassCount;
               kbts__mark_info MarkInfo = kbts__GetMarkInfo(Adjust, Adjust->MarkArrayOffset, Cover.Index);
 
               kbts_u16 BaseAnchorOffset = BaseAnchorOffsets[MarkInfo.Record->Class];
@@ -20658,13 +19287,11 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
             }
           }
         }
-      }
-      break;
+      } break;
 
       case 5:
       {
         kbts__mark_to_ligature_attachment *Adjust = (kbts__mark_to_ligature_attachment *)Base;
-
         kbts_s32 AdvanceSinceBaseX = 0;
         kbts_s32 AdvanceSinceBaseY = 0;
         kbts_u32 BaseClasses = (1 | (1 << KBTS__GLYPH_CLASS_BASE) | (1 << KBTS__GLYPH_CLASS_LIGATURE) | (1 << KBTS__GLYPH_CLASS_COMPONENT));
@@ -20675,21 +19302,28 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
         {
           AdvanceSinceBaseX += PrevGlyph->AdvanceX;
           AdvanceSinceBaseY += PrevGlyph->AdvanceY;
+
           if(!kbts__SkipGlyph(PrevGlyph, Lookup, RegularSkipFlags, SkipUnicodeFlags) && ((1 << PrevGlyph->Classes.Class) & BaseClasses))
           {
             LigatureGlyph = PrevGlyph;
+
             break;
           }
         }
 
         if(LigatureGlyph)
         {
+          kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, Adjust->LigatureArrayOffset);
+
           kbts__cover_glyph_result LigatureCover = kbts__CoverGlyph(KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->LigatureCoverageOffset),
-                                                                  LigatureGlyph->Id);
-          if(LigatureCover.Valid)
+                                                                    LigatureGlyph->Id);
+
+          kbts_un LigatureIndex = LigatureCover.Index;
+          kbts_b32 ValidLigature = LigatureCover.Valid;
+
+          if(ValidLigature)
           {
-            kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, Adjust->LigatureArrayOffset);
-            kbts__ligature_attach *LigatureAttach = kbts__GetLigatureAttach(LigatureArray, LigatureCover.Index);
+            kbts__ligature_attach *LigatureAttach = kbts__GetLigatureAttach(LigatureArray, LigatureIndex);
             kbts__mark_info MarkInfo = kbts__GetMarkInfo(Adjust, Adjust->MarkArrayOffset, Cover.Index);
             kbts_un LigatureComponentIndexPlusOne = CurrentGlyph->LigatureComponentIndexPlusOne;
 
@@ -20737,8 +19371,7 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
             }
           }
         }
-      }
-      break;
+      } break;
 
       case 7:
       case 8:
@@ -20746,11 +19379,13 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
         kbts__sequence_lookup_result SequenceLookup = kbts__DoSequenceLookup(Storage, Lookup, Base, Cover, CurrentGlyph, SequenceSkipFlags, SkipUnicodeFlags);
         if(SequenceLookup.RecordCount)
         {
+          kbts__gdef *Gdef = kbts__BlobTableDataType(Config->Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef);
+
           KBTS__FOR(RecordIndex, 0, SequenceLookup.RecordCount)
           {
             kbts__sequence_lookup_record *Record = &SequenceLookup.Records[RecordIndex];
             kbts__lookup *PackedRecordLookup = kbts__GetLookup(LookupList, Record->LookupListIndex);
-            kbts__unpacked_lookup RecordLookup = kbts__UnpackLookup(kbts__BlobTableDataType(Config->Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef), PackedRecordLookup);
+            kbts__unpacked_lookup RecordLookup = kbts__UnpackLookup(Gdef, PackedRecordLookup);
 
             kbts_glyph *NestedCurrentGlyph = CurrentGlyph;
             kbts_un NestedCurrentGlyphIndex = 0;
@@ -20781,16 +19416,15 @@ static int kbts__DoSingleAdjustment(kbts__shape_scratchpad *Scratchpad, kbts_sha
               kbts_u16 *NestedBase = KBTS__POINTER_OFFSET(kbts_u16, PackedRecordLookup, RecordLookup.SubtableOffsets[NestedSubtableIndex]);
 
               kbts__DoSingleAdjustment(Scratchpad, Config, Storage, LookupList,
-                                      Record->LookupListIndex, NestedSubtableIndex, &RecordLookup, NestedBase,
-                                      NestedCurrentGlyph, StartIndex + NestedCurrentGlyphIndex, RequestedSkipFlags);
+                                       Record->LookupListIndex, NestedSubtableIndex, &RecordLookup, NestedBase,
+                                       NestedCurrentGlyph, StartIndex + NestedCurrentGlyphIndex, RequestedSkipFlags);
             }
           }
 
           OnePastLastGlyphIndex = StartIndex + SequenceLookup.InputSequenceCountIncludingSkippedGlyphs;
           OnePastLastGlyph = SequenceLookup.OnePastLastGlyphMatched;
         }
-      }
-      break;
+      } break;
       }
 
       kbts__SetLookupOnePastLastGlyph(Scratchpad, OnePastLastGlyphIndex + OnePastLastGlyphOffset, OnePastLastGlyph);
@@ -20915,27 +19549,40 @@ enum kbts__substitution_result_flags_enum
 {
   KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SUBSTITUTION = (1 << 0),
   KBTS__SUBSTITUTION_RESULT_FLAG_TRIED_TO_INSERT_WHILE_CHECK_ONLY = (1 << 1),
+  KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SEQUENCE = (1 << 2),
 };
 
-static void kbts__BeginLookupApplication(kbts__shape_scratchpad *Scratchpad, kbts_glyph *Glyph)
+static void kbts__BeginLookupApplication(kbts_shape_scratchpad *Scratchpad, kbts_glyph *Glyph)
 {
   Scratchpad->LookupOnePastLastGlyph = Glyph->Next;
   Scratchpad->LookupOnePastLastGlyphIndex = 0;
 }
-
-static kbts_glyph *kbts__EndLookupApplication(kbts__shape_scratchpad *Scratchpad)
+static kbts_glyph *kbts__EndLookupApplication(kbts_shape_scratchpad *Scratchpad)
 {
   kbts_glyph *Result = Scratchpad->LookupOnePastLastGlyph;
   return Result;
 }
 
-static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                                          kbts_lookup_list *LookupList, kbts__gsub_frame *Frames, kbts_un *FrameCount_,
-                                                          int CheckOnly, kbts__skip_flags RequestedSkipFlags, kbts_u32 GeneratedGlyphFlags)
+static kbts_un kbts__CurrentBakedFeatureStageIndex(kbts_shape_scratchpad *Scratchpad)
+{
+  kbts_un Result = Scratchpad->FeatureStagesRead - 1;
+  return Result;
+}
+
+KBTS_INLINE kbts_u16 kbts__NextGlyphUid(kbts_shape_scratchpad *Scratchpad)
+{
+  kbts_u16 Result = (kbts_u16)++Scratchpad->NextGlyphUid;
+  return Result;
+}
+
+static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
+                                                            kbts_lookup_list *LookupList, kbts_un SequentialLookupIndex, kbts_u16 FeatureValue,
+                                                            kbts__gsub_frame *Frames, kbts_un *FrameCount_,
+                                                            int CheckOnly, kbts__skip_flags RequestedSkipFlags, kbts_u32 GeneratedGlyphFlags)
 {
   kbts__substitution_result_flags Result = 0;
   kbts_font *Font = Config->Font;
-  kbts_unicode_flags SkipUnicodeFlags = 0; // @Incomplete
+  enum {SkipUnicodeFlags = KBTS_UNICODE_FLAG_DEFAULT_IGNORABLE};
   kbts__skip_flags RegularSkipFlags = KBTS__SKIP_FLAGS_GSUB_REGULAR(RequestedSkipFlags);
   kbts__skip_flags SequenceSkipFlags = KBTS__SKIP_FLAGS_GSUB_SEQUENCE(RequestedSkipFlags);
   GeneratedGlyphFlags |= KBTS_GLYPH_FLAG_GENERATED_BY_GSUB;
@@ -20946,6 +19593,8 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
   kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, Frame->LookupIndex);
   kbts__unpacked_lookup Lookup = kbts__UnpackLookup(kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef), PackedLookup);
   kbts_u16 BaseLookupType = Lookup.Type;
+
+  kbts_glyph *CurrentGlyph = Frame->InputGlyph;
 
   while(Frame->SubtableIndex < Lookup.SubtableCount)
   {
@@ -20962,10 +19611,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
       Subtable = KBTS__POINTER_OFFSET(kbts_u16, Extension, Extension->Offset);
     }
 
-    kbts_glyph *CurrentGlyph = Frame->InputGlyph;
-
-    kbts__skip_flags SkipFlags = (Lookup.Type >= 5) ? SequenceSkipFlags : RegularSkipFlags;
-    if(kbts__GlyphsIncludedInLookupSubtable(Storage, Font, 0, &Lookup, Frame->LookupIndex, Frame->SubtableIndex, CurrentGlyph, SkipFlags, SkipUnicodeFlags))
+    if(kbts__GlyphIncludedInLookupSubtable(Scratchpad, KBTS_SHAPING_TABLE_GSUB, Frame->LookupIndex, Frame->SubtableIndex, CurrentGlyph))
     {
       kbts__cover_glyph_result Cover = KBTS__ZERO;
       Cover.Valid = kbts__GlyphPassesLookupFilter(CurrentGlyph, &Lookup);
@@ -21023,7 +19669,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
                 NewId = SubstituteGlyphIds[Cover.Index];
               }
 
-              kbts__GsubMutate(Font, CurrentGlyph, NewId, GeneratedGlyphFlags);
+              kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, NewId, GeneratedGlyphFlags);
             }
           } break;
 
@@ -21043,9 +19689,13 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
               {
                 kbts_glyph OriginalGlyph = *CurrentGlyph;
                 kbts_glyph *LastInsert = CurrentGlyph;
+
+                kbts_un RunningSortKey = CurrentGlyph->SortKey;
+                kbts_un SortKeyInterval = CurrentGlyph->SortKeyInterval / Sequence->GlyphCount;
                 KBTS__FOR(SubstGlyphIndex, 0, Sequence->GlyphCount)
                 {
                   kbts_u32 NewGlyphFlags = GeneratedGlyphFlags | KBTS_GLYPH_FLAG_MULTIPLE_SUBSTITUTION;
+                  kbts_u16 NewGlyphId = kbts__ReadU16Unaligned(&SubstGlyphIds[SubstGlyphIndex]);
 
                   kbts_glyph *NewGlyph = CurrentGlyph;
                   if(SubstGlyphIndex)
@@ -21058,15 +19708,20 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
                       return Result;
                     }
 
-                    NewGlyph->Uid = (kbts_u16)++Scratchpad->NextGlyphUid;
+                    NewGlyph->Uid = kbts__NextGlyphUid(Scratchpad);
                   }
                   else
                   {
                     NewGlyphFlags |= KBTS_GLYPH_FLAG_FIRST_IN_MULTIPLE_SUBSTITUTION;
                   }
 
-                  kbts__GsubMutate(Font, NewGlyph, SubstGlyphIds[SubstGlyphIndex], GeneratedGlyphFlags | NewGlyphFlags);
+                  NewGlyph->SortKey = (kbts_u32)RunningSortKey;
+                  NewGlyph->SortKeyInterval = (kbts_u32)SortKeyInterval;
+
+                  kbts__GsubMutate(Scratchpad, Font, NewGlyph, SequentialLookupIndex, NewGlyphId, GeneratedGlyphFlags | NewGlyphFlags);
+
                   LastInsert = NewGlyph;
+                  RunningSortKey += SortKeyInterval;
                 }
 
                 OnePastLastGlyph = LastInsert->Next;
@@ -21105,76 +19760,21 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
               kbts__alternate_set *Set = kbts__GetAlternateSet(Subst, Cover.Index);
               kbts_u16 *AltGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Set);
 
-              kbts_un AlternateIndex = 0;
-
-              {
-                kbts__feature_set *ShaperFeatures = &Config->Features;
-                kbts_glyph_config *GlyphConfig = CurrentGlyph->Config;
-                if(GlyphConfig)
-                {
-                  int HasOverride = 0;
-                  KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(GlyphConfig->EnabledFeatures.Flags))
-                  {
-                    kbts_u64 Flags = GlyphConfig->EnabledFeatures.Flags[WordIndex] & ShaperFeatures->Flags[WordIndex];
-                    if(Flags)
-                    {
-                      HasOverride = 1;
-                      break;
-                    }
-                  }
-
-                  if(HasOverride)
-                  {
-                    for(kbts__feature_override_header *OverrideHeader = GlyphConfig->FeatureOverrideSentinel.Next;
-                        OverrideHeader != &GlyphConfig->FeatureOverrideSentinel;
-                        OverrideHeader = OverrideHeader->Next)
-                    {
-                      kbts__feature_override *Override = (kbts__feature_override *)OverrideHeader;
-                      int Value = Override->Value;
-                      kbts__feature_id Id = kbts__FeatureTagToId(Override->Tag);
-
-                      if(Value &&
-                         kbts__ContainsFeature(&Scratchpad->LookupFeatures, Id))
-                      {
-                        int Match = 1;
-                        if(!Id)
-                        {
-                          // Slow path for unregistered features.
-                          Match = 0;
-                          KBTS__FOR(UnregisteredFeatureIndex, 0, Scratchpad->UnregisteredFeatureCount)
-                          {
-                            if(Override->Tag == Scratchpad->UnregisteredFeatureTags[UnregisteredFeatureIndex])
-                            {
-                              Match = 1;
-                              break;
-                            }
-                          }
-                        }
-
-                        if(Match)
-                        {
-                          AlternateIndex = (kbts_un)(Value - 1);
-
-                          break;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-
+              kbts_un AlternateIndex = FeatureValue - 1;
               if(AlternateIndex >= Set->GlyphCount)
               {
                 AlternateIndex = 0;
               }
 
               kbts_u16 NewId = AltGlyphIds[AlternateIndex];
-              kbts__GsubMutate(Font, CurrentGlyph, NewId, GeneratedGlyphFlags);
+              kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, NewId, GeneratedGlyphFlags);
             }
           } break;
 
           case 4:
           {
+            KBTS_INSTRUMENT_BLOCK_BEGIN(GSUB_Ligature);
+
             kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Subtable;
             kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, Cover.Index);
 
@@ -21182,17 +19782,19 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
             {
               kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
               kbts_u16 *ComponentIds = KBTS__POINTER_AFTER(kbts_u16, Ligature);
+              kbts_un ComponentCount = Ligature->ComponentCount;
 
               kbts_un MatchingGlyphCount = 1;
 
               {
                 kbts_glyph *LigatureGlyphCursor = CurrentGlyph->Next;
-                while(kbts__GlyphIsValid(Storage, LigatureGlyphCursor) && (MatchingGlyphCount < Ligature->ComponentCount))
+                while(kbts__GlyphIsValid(Storage, LigatureGlyphCursor) &&
+                      (MatchingGlyphCount < Ligature->ComponentCount))
                 {
                   // A ligature may contain an explicit ZWJ, which SkipGlyph() would probably skip.
                   // The expected behavior in that case is to assume the font designer knows what they are doing
                   // and match the ZWJ.
-                  if(LigatureGlyphCursor->Id == ComponentIds[MatchingGlyphCount - 1])
+                  if(LigatureGlyphCursor->Id == kbts__ReadU16Unaligned(&ComponentIds[MatchingGlyphCount - 1]))
                   {
                     MatchingGlyphCount += 1;
                   }
@@ -21205,14 +19807,13 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
                 }
               }
 
-              if(MatchingGlyphCount == Ligature->ComponentCount)
+              if(MatchingGlyphCount == ComponentCount)
               {
                 Result |= KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SUBSTITUTION;
 
                 if(!CheckOnly)
                 {
-                  kbts_u32 LigatureUid = ++Scratchpad->NextGlyphUid;
-                  kbts_un ComponentCount = Ligature->ComponentCount;
+                  kbts_u32 LigatureUid = kbts__NextGlyphUid(Scratchpad);
 
                   { // For glyphs that aren't part of the ligature, store which component it is attached to.
                     // For glyphs that _are_, eat them.
@@ -21320,7 +19921,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
 
                   // Currently, we only take the main glyph's config into account while making the ligature's config.
                   // Maybe we should merge all of the components' configs into one instead?
-                  kbts__GsubMutate(Font, CurrentGlyph, Ligature->Glyph, GeneratedGlyphFlags | KBTS_GLYPH_FLAG_LIGATURE);
+                  kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, Ligature->Glyph, GeneratedGlyphFlags | KBTS_GLYPH_FLAG_LIGATURE);
                   CurrentGlyph->Uid = (kbts_u16)LigatureUid;
                   CurrentGlyph->LigatureUid = (kbts_u16)LigatureUid;
                   CurrentGlyph->LigatureComponentCount = (kbts_u16)ComponentCount;
@@ -21332,6 +19933,8 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
                 break;
               }
             }
+
+            KBTS_INSTRUMENT_BLOCK_END(GSUB_Ligature);
           } break;
 
           case 8:
@@ -21344,13 +19947,13 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts__shape_scratchp
             {
               // Should we use regular or sequence skip flags here?
               kbts__sequence_match BacktrackMatch = kbts__MatchCoverageSequence(Storage, &Lookup, RegularSkipFlags, SkipUnicodeFlags, Subst, Unpacked.BacktrackCoverageOffsets, Unpacked.BacktrackCount,
-                                                                              CurrentGlyph->Prev, 1);
+                                                                                CurrentGlyph->Prev, 1);
               kbts__sequence_match LookaheadMatch = kbts__MatchCoverageSequence(Storage, &Lookup, RegularSkipFlags, SkipUnicodeFlags, Subst, Unpacked.LookaheadCoverageOffsets, Unpacked.LookaheadCount,
-                                                                              CurrentGlyph->Next, 0);
+                                                                                CurrentGlyph->Next, 0);
               if((BacktrackMatch.MatchCount == Unpacked.BacktrackCount) && (LookaheadMatch.MatchCount == Unpacked.LookaheadCount))
               {
                 Result |= KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SUBSTITUTION;
-                kbts__GsubMutate(Font, CurrentGlyph, Unpacked.SubstituteGlyphIds[Cover.Index], GeneratedGlyphFlags);
+                kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, Unpacked.SubstituteGlyphIds[Cover.Index], GeneratedGlyphFlags);
               }
             }
           } break;
@@ -21445,7 +20048,7 @@ static void kbts__PopGlyphList(kbts_glyph_storage *Storage, kbts__glyph_list *Li
 {
   List->OneBeforeFirst->Next = Storage->GlyphSentinel.Next;
   List->OnePastLast->Prev = Storage->GlyphSentinel.Prev;
-
+  
   // Storage->GlyphSentinel.Prev->Next = Storage->GlyphSentinel.Next->Prev = &Storage->GlyphSentinel;
 
   if((kbts_glyph *)&Storage->GlyphSentinel != List->OneBeforeFirst)
@@ -21462,7 +20065,7 @@ static void kbts__PopGlyphList(kbts_glyph_storage *Storage, kbts__glyph_list *Li
   *List = KBTS__ZERO_TYPE(kbts__glyph_list);
 }
 
-static int kbts__WouldSubstitute(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
+static int kbts__WouldSubstitute(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
                                      kbts_lookup_list *LookupList,
                                      kbts__gsub_frame *Frames, kbts__feature *Feature, kbts__skip_flags SkipFlags,
                                      kbts_glyph *Glyphs, kbts_un GlyphCount)
@@ -21508,7 +20111,7 @@ static int kbts__WouldSubstitute(kbts__shape_scratchpad *Scratchpad, kbts_shape_
 
       while(FrameCount)
       {
-        kbts__substitution_result_flags SubstitutionResult = kbts__DoSubstitution(Scratchpad, Config, Storage, LookupList, Frames, &FrameCount, 1, SkipFlags, 0);
+        kbts__substitution_result_flags SubstitutionResult = kbts__DoSubstitution(Scratchpad, Config, Storage, LookupList, 0, 0, Frames, &FrameCount, 1, SkipFlags, 0);
 
         if(SubstitutionResult & KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SUBSTITUTION)
         {
@@ -21523,120 +20126,6 @@ static int kbts__WouldSubstitute(kbts__shape_scratchpad *Scratchpad, kbts_shape_
 
 Done:;
   kbts__PopGlyphList(Storage, &OldList);
-
-  return Result;
-}
-
-static int kbts__NextLookupIndex(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_un *LookupIndex_, kbts_u32 *SkipFlags_, kbts_u32 *GlyphFilter_, kbts__feature_set *FeatureSet_)
-{
-  int Result = 0;
-
-  kbts_un FeatureStageIndex = Scratchpad->FeatureStagesRead - 1;
-  kbts_u32 SkipFlags = 0;
-  kbts_u32 GlyphFilter = 0;
-  Scratchpad->UnregisteredFeatureCount = 0;
-  kbts_un ResultLookupIndex = 0;
-  kbts__baked_feature_stage *FeatureStage = &Config->FeatureStages[FeatureStageIndex];
-
-  *FeatureSet_ = KBTS__ZERO_TYPE(kbts__feature_set);
-
-  while(Scratchpad->FeatureIndexIndex < FeatureStage->FeatureIndexCount)
-  {
-    KBTS_ASSERT(Scratchpad->FeatureIndexIndex < FeatureStage->FeatureIndexCount);
-
-    kbts_u16 FeatureIndex = FeatureStage->FeatureIndices[Scratchpad->FeatureIndexIndex];
-    KBTS_ASSERT(FeatureIndex < FeatureStage->FeatureIndexCount);
-
-    kbts__baked_feature *Feature = &FeatureStage->Features[FeatureIndex];
-    kbts_un Offset = Scratchpad->BakedLookupSubtablesRead[FeatureIndex];
-
-    KBTS_ASSERT(Offset < Feature->Count);
-    kbts_un LookupIndex = Feature->Indices[Offset];
-
-    if(!Result)
-    {
-      ResultLookupIndex = LookupIndex;
-      Result = 1;
-    }
-
-    if(LookupIndex == ResultLookupIndex)
-    {
-      kbts__AddFeature(FeatureSet_, Feature->FeatureId);
-      SkipFlags |= Feature->SkipFlags;
-      GlyphFilter |= Feature->GlyphFilter;
-
-      if(!Feature->FeatureId && (Scratchpad->UnregisteredFeatureCount < KBTS_MAX_SIMULTANEOUS_FEATURES))
-      {
-        Scratchpad->UnregisteredFeatureTags[Scratchpad->UnregisteredFeatureCount++] = Feature->FeatureTag;
-      }
-
-      Scratchpad->FeatureIndexIndex += 1;
-      Scratchpad->BakedLookupSubtablesRead[FeatureIndex] += 1;
-    }
-    else
-    {
-      break;
-    }
-  }
-
-  *LookupIndex_ = ResultLookupIndex;
-  *SkipFlags_ = SkipFlags;
-  *GlyphFilter_ = GlyphFilter;
-
-  return Result;
-}
-
-static int kbts__ConfigAllowsFeatures(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_config *GlyphConfig, kbts__feature_set *Features)
-{
-  kbts_glyph_config DummyGlyphConfig = KBTS__ZERO;
-  kbts_u64 UserEnabled = 0; // Whether the user enabled _any_ feature corresponding to this lookup.
-  kbts_u64 UserDisabled = 1; // Whether the user disabled _all_ features corresponding to this lookup.
-  kbts_u64 DefaultEnabled = 0; // Whether any feature is non-user.
-
-  if(!GlyphConfig)
-  {
-    GlyphConfig = &DummyGlyphConfig;
-  }
-
-  kbts_u64 Mask = 1; // Ignore unregistered features in the broad pass.
-  KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(GlyphConfig->EnabledFeatures.Flags))
-  {
-    kbts_u64 LookupFeatureFlags = Features->Flags[WordIndex] & ~Mask;
-    Mask = 0;
-
-    UserEnabled |= GlyphConfig->EnabledFeatures.Flags[WordIndex] & LookupFeatureFlags;
-    UserDisabled &= (GlyphConfig->DisabledFeatures.Flags[WordIndex] & LookupFeatureFlags) == LookupFeatureFlags;
-    DefaultEnabled |= Features->Flags[WordIndex] & Config->Features.Flags[WordIndex];
-  }
-
-  if(Features->Flags[0] & (GlyphConfig->EnabledFeatures.Flags[0] | GlyphConfig->DisabledFeatures.Flags[0]) & KBTS__FEATURE_FLAG0(UNREGISTERED))
-  {
-    // Slow path for unregistered features.
-    for(kbts__feature_override_header *Header = GlyphConfig->FeatureOverrideSentinel.Next;
-        Header != &GlyphConfig->FeatureOverrideSentinel;
-        Header = Header->Next)
-    {
-      kbts__feature_override *Override = (kbts__feature_override *)Header;
-      kbts__feature_id Id = kbts__FeatureTagToId(Override->Tag);
-
-      if(Id == KBTS__FEATURE_ID_UNREGISTERED)
-      {
-        kbts_feature_tag OverrideTag = Override->Tag;
-
-        KBTS__FOR(UnregisteredFeatureIndex, 0, Scratchpad->UnregisteredFeatureCount)
-        {
-          if(OverrideTag == Scratchpad->UnregisteredFeatureTags[UnregisteredFeatureIndex])
-          {
-            UserEnabled |= (kbts_u32)Override->Value;
-            UserDisabled &= !Override->Value;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  int Result = (!UserDisabled && (DefaultEnabled || UserEnabled));
 
   return Result;
 }
@@ -21672,9 +20161,28 @@ static void kbts__DllistReverseSublist(kbts_glyph *First, kbts_glyph *OnePastLas
   }
 }
 
-static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage)
+static void kbts__FreeGlyphBucket(kbts_shape_scratchpad *Scratchpad, kbts_un SequentialLookupIndex)
+{
+  kbts__bucketed_glyph_block_header *Sentinel = &Scratchpad->LookupGlyphBuckets[SequentialLookupIndex];
+
+  kbts__bucketed_glyph_block_header *First = Sentinel->Next;
+  kbts__bucketed_glyph_block_header *Last = Sentinel->Prev;
+  if(First != Sentinel)
+  {
+    First->Prev = Scratchpad->FreeBucketedBlockSentinel.Prev;
+    Last->Next = &Scratchpad->FreeBucketedBlockSentinel;
+
+    First->Prev->Next = First;
+    Last->Next->Prev = Last;
+
+    KBTS__DLLIST_SENTINEL_INIT(Sentinel);
+  }
+}
+
+static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage)
 {
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
+  kbts_shape_config *Config = Scratchpad->Config;
 
   if(Config)
   {
@@ -21820,25 +20328,10 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
     case KBTS__OP_KIND_NORMALIZE:
     {
       KBTS_INSTRUMENT_BLOCK_BEGIN(NORMALIZE);
-      // @Incomplete: We need to honor this.
-      //   HB_OT_SHAPE_NORMALIZATION_MODE_NONE,
-      //   HB_OT_SHAPE_NORMALIZATION_MODE_AUTO,
-      //   HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT, /* Always fully decomposes and then recompose back */
-      //
-      // hangul:  HB_OT_SHAPE_NORMALIZATION_MODE_NONE,
-      // arabic:  HB_OT_SHAPE_NORMALIZATION_MODE_AUTO,
-      // default: HB_OT_SHAPE_NORMALIZATION_MODE_AUTO,
-      // hebrew:  HB_OT_SHAPE_NORMALIZATION_MODE_AUTO,
-      // thai:    HB_OT_SHAPE_NORMALIZATION_MODE_AUTO,
-      // indic:   HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT,
-      // khmer:   HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT,
-      // myanmar: HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT,
-      // use:     HB_OT_SHAPE_NORMALIZATION_MODE_COMPOSED_DIACRITICS_NO_SHORT_CIRCUIT,
 
       KBTS_INSTRUMENT_BLOCK_BEGIN(Decompose);
       { // Full NFD decomposition
-        kbts__arena_lifetime Lifetime = kbts__BeginLifetime(Scratchpad->Arena);
-        kbts_glyph *DecompositionGlyphs = kbts__PushArray(Scratchpad->Arena, kbts_glyph, KBTS__MAXIMUM_DECOMPOSITION_CODEPOINTS);
+        kbts_glyph *DecompositionGlyphs = (kbts_glyph *)Scratchpad->ScratchMemory;
         kbts_un CodepointsToDecomposeCount = 0;
 
         KBTS__FOR_GLYPH(Storage, Glyph)
@@ -21911,8 +20404,6 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
             Glyph = PrevAnchor;
           }
         }
-
-        kbts__EndLifetime(&Lifetime);
       }
       KBTS_INSTRUMENT_BLOCK_END(Decompose);
 
@@ -21920,17 +20411,16 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
       { // Selective recomposition.
         // The OpenType shaping documents say that Hebrew Alphabetic Presentation Form compositions aren't canonical,
         // but looking at UnicodeData.txt, it seems like they totally are, so they are handled here.
-        kbts__arena_lifetime Lifetime = kbts__BeginLifetime(Scratchpad->Arena);
         kbts_glyph *LastBase = 0;
         kbts_un LastBaseParentCount = 0;
         kbts_un PreSlashDecimalDigitCount = 0;
         kbts_glyph *PreSlashGlyph = 0;
         kbts_glyph *DigitGlyph = 0;
         kbts_un DecimalDigitCount = 0;
-        int InFraction = 0;
+        kbts_b32 InFraction = 0;
         kbts_u32 LastBaseParentsLoaded = 0;
         kbts_glyph_parent LastBaseParents[KBTS_MAXIMUM_RECOMPOSITION_PARENTS];
-        kbts_glyph *Parents = kbts__PushArray(Scratchpad->Arena, kbts_glyph, KBTS_MAXIMUM_RECOMPOSITION_PARENTS);
+        kbts_u16 LastBaseParentIds[KBTS_MAXIMUM_RECOMPOSITION_PARENTS];
 
         kbts_u32 BeforeFractionSlashGlyphFlags = KBTS_GLYPH_FLAG_NUMR | KBTS_GLYPH_FLAG_FRAC;
         kbts_u32 AfterFractionSlashGlyphFlags = KBTS_GLYPH_FLAG_DNOM | KBTS_GLYPH_FLAG_FRAC;
@@ -21942,31 +20432,18 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
           AfterFractionSlashGlyphFlags = Swap;
         }
 
-        // We also collate user features here.
-        kbts__feature_set UserFeatures = KBTS__ZERO;
-        kbts__feature_set *DefaultFeatures = &Config->Features;
-
-        int ShouldFlip = (Scratchpad->RunDirection == KBTS_DIRECTION_RTL);
+        kbts_b32 ShouldFlip = (Scratchpad->RunDirection == KBTS_DIRECTION_RTL);
 
         KBTS__FOR_GLYPH(Storage, Glyph)
         {
-          Glyph->Uid = (kbts_u16)++Scratchpad->NextGlyphUid;
-
-          if(Glyph->Config)
-          {
-            kbts_glyph_config *GlyphConfig = Glyph->Config;
-            KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(UserFeatures.Flags))
-            {
-              UserFeatures.Flags[WordIndex] |= GlyphConfig->EnabledFeatures.Flags[WordIndex] & ~DefaultFeatures->Flags[WordIndex];
-            }
-          }
+          Glyph->Uid = kbts__NextGlyphUid(Scratchpad);
 
           // In RTL, mirror all glyphs when their mirror is covered.
           if(ShouldFlip &&
              (Glyph->UnicodeFlags & KBTS_UNICODE_FLAG_MIRRORED))
           {
             kbts_u32 MatchingBracketCodepoint = kbts__GetUnicodeMirrorCodepoint(Glyph->Codepoint);
-            kbts_glyph MatchingBracket = kbts_CodepointToGlyph(Font, (int)MatchingBracketCodepoint, 0, 0);
+            kbts_glyph MatchingBracket = kbts_CodepointToGlyph(Font, (int)MatchingBracketCodepoint, Glyph->Config, 0);
             if(MatchingBracket.Id)
             {
               kbts__SetGlyphPreserveLinksAndUserId(Glyph, &MatchingBracket);
@@ -21986,7 +20463,8 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
             // Cluster validation, is done based on the decomposed state of a split vowel.
             //
             // (Note: our Matra corresponds to Vowel_Dependent + Pure_Killer.)
-            if((Config->Shaper != KBTS_SHAPER_USE) || (Glyph->SyllabicClass != KBTS_INDIC_SYLLABIC_CLASS_MATRA))
+            if((Config->Shaper != KBTS_SHAPER_USE) ||
+               (Glyph->SyllabicClass != KBTS_INDIC_SYLLABIC_CLASS_MATRA))
             {
               kbts_s32 *LastBaseParentDeltas = kbts__GetParentInfoDeltas(Glyph->ParentInfo);
               kbts_un ParentCount = kbts__GetParentInfoCount(Glyph->ParentInfo);
@@ -21996,9 +20474,11 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
               {
                 kbts_glyph_parent Parent = KBTS__ZERO;
                 Parent.Codepoint = Glyph->Codepoint + (kbts_u32)LastBaseParentDeltas[ParentIndex];
-                Parent.Decomposition = kbts__GetUnicodeDecomposition(Parent.Codepoint);
 
-                kbts_un DecompositionSize = kbts__GetDecompositionSize(Parent.Decomposition);
+                kbts_u64 Decomposition = kbts__GetUnicodeDecomposition(Parent.Codepoint);
+                Parent.Codepoint1 = kbts__GetDecompositionCodepoint(Decomposition, 1);
+
+                kbts_un DecompositionSize = kbts__GetDecompositionSize(Decomposition);
                 if(DecompositionSize == 1)
                 {
                   SingleRecompositionCodepoints[SingleRecompositionCodepointCount++] = Parent.Codepoint;
@@ -22020,7 +20500,7 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
             DoubleRecompositionCount = 0;
           }
 
-          int Recomposed = 0;
+          kbts_b32 Recomposed = 0;
 
           if(!Recomposed)
           {
@@ -22028,28 +20508,32 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
             KBTS__FOR(ParentIndex, 0, DoubleRecompositionCount)
             {
               kbts_glyph_parent *Parent = &LastBaseParents[ParentIndex];
-              kbts_u32 Codepoint1 = kbts__GetDecompositionCodepoint(Parent->Decomposition, 1);
+              kbts_u32 Codepoint1 = Parent->Codepoint1;
 
               if(Glyph->Codepoint == Codepoint1)
               {
-                kbts_glyph *ParentGlyph = &Parents[ParentIndex];
-                if(!(LastBaseParentsLoaded & (1 << ParentIndex)))
+                kbts_u16 ParentId = LastBaseParentIds[ParentIndex];
+
+                if(!(LastBaseParentsLoaded & (1u << ParentIndex)))
                 {
-                  *ParentGlyph = kbts_CodepointToGlyph(Font, (int)Parent->Codepoint, 0, 0);
-                  ParentGlyph->Uid = LastBase->Uid;
-                  ParentGlyph->UserIdOrCodepointIndex = LastBase->UserIdOrCodepointIndex;
-                  ParentGlyph->Config = LastBase->Config;
+                  ParentId = (kbts_u16)kbts_CodepointToGlyphId(Font, (int)Parent->Codepoint);
+                  LastBaseParentIds[ParentIndex] = ParentId;
                 }
 
-                if(ParentGlyph->Id)
+                if(ParentId)
                 {
                   // Both match. Reclaim space.
+                  kbts_glyph ParentGlyph = kbts_CodepointToGlyph(Font, (int)Parent->Codepoint, 0, 0);
+                  ParentGlyph.Uid = LastBase->Uid;
+                  ParentGlyph.UserIdOrCodepointIndex = LastBase->UserIdOrCodepointIndex;
+                  ParentGlyph.Config = LastBase->Config;
+
                   kbts_glyph *Next = Glyph->Next;
-                  KBTS__DLLIST_REMOVE(Glyph);
+                  kbts__FreeGlyph(Scratchpad, Storage, Glyph);
                   Glyph = Next;
 
                   Recomposed = 1;
-                  kbts__SetGlyphPreserveLinksAndUserId(LastBase, ParentGlyph);
+                  kbts__SetGlyphPreserveLinksAndUserId(LastBase, &ParentGlyph);
 
                   break;
                 }
@@ -22057,10 +20541,10 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
                 {
                   // This glyph is never good. Forget it.
                   LastBaseParents[ParentIndex] = LastBaseParents[LastBaseParentCount - 1];
-                  Parents[ParentIndex] = Parents[LastBaseParentCount - 1];
-                  LastBaseParentsLoaded &= ~(1 << ParentIndex);
-                  LastBaseParentsLoaded |= (LastBaseParentsLoaded & (1 << (LastBaseParentCount - 1))) >> (LastBaseParentCount - 1 - ParentIndex);
-
+                  LastBaseParentIds[ParentIndex] = LastBaseParentIds[LastBaseParentCount - 1];
+                  LastBaseParentsLoaded &= ~(1u << ParentIndex);
+                  LastBaseParentsLoaded |= (LastBaseParentsLoaded & (1u << (LastBaseParentCount - 1))) >> (LastBaseParentCount - 1 - ParentIndex);
+                  
                   LastBaseParentCount -= 1;
                   DoubleRecompositionCount -= 1;
                   ParentIndex -= 1;
@@ -22074,9 +20558,11 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
           {
             KBTS__FOR(SingleRecompositionIndex, 0, SingleRecompositionCodepointCount)
             {
-              kbts_glyph ParentGlyph = kbts_CodepointToGlyph(Font, (int)SingleRecompositionCodepoints[SingleRecompositionIndex], 0, 0);
-              if(ParentGlyph.Id)
+              kbts_u16 ParentGlyphId = (kbts_u16)kbts_CodepointToGlyphId(Font, (int)SingleRecompositionCodepoints[SingleRecompositionIndex]);
+
+              if(ParentGlyphId)
               {
+                kbts_glyph ParentGlyph = kbts_CodepointToGlyph(Font, (int)SingleRecompositionCodepoints[SingleRecompositionIndex], 0, 0);
                 ParentGlyph.Config = Glyph->Config;
 
                 kbts__SetGlyphPreserveLinksAndUserId(Glyph, &ParentGlyph);
@@ -22108,7 +20594,8 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
             }
             DecimalDigitCount += 1;
           }
-          else if((Glyph->Codepoint == 0x2044) && (!InFraction || DecimalDigitCount))
+          else if((Glyph->Codepoint == 0x2044) &&
+                  (!InFraction || DecimalDigitCount))
           {
             // Fraction slash.
             Glyph->Flags |= KBTS_GLYPH_FLAG_FRAC;
@@ -22128,16 +20615,6 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
             Glyph = Glyph->Prev; // Handle recursive recomposition.
           }
         }
-
-        // Ignore added features that are already part of the shaper.
-        kbts__feature_set *ShaperFeatures = &Config->Features;
-        KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(UserFeatures.Flags))
-        {
-          UserFeatures.Flags[WordIndex] &= ~ShaperFeatures->Flags[WordIndex];
-        }
-
-        Scratchpad->UserFeatures = UserFeatures;
-        kbts__EndLifetime(&Lifetime);
       }
       KBTS_INSTRUMENT_BLOCK_END(Recompose);
 
@@ -22203,6 +20680,8 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
 
       if(Config->Script == KBTS_SCRIPT_ARABIC)
       {
+        enum {KBTS_REMAPPED_CCC_33 = 27};
+
         for(kbts_glyph *Glyph = Storage->GlyphSentinel.Next;
             kbts__GlyphIsValid(Storage, Glyph);
             )
@@ -22229,8 +20708,6 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
 
             kbts__mcm_sequence_state Mcm220SequenceState = 0;
             kbts__mcm_sequence_state Mcm230SequenceState = 0;
-
-  #  define KBTS_REMAPPED_CCC_33 27
 
             kbts_glyph *SequenceGlyph = Glyph;
             for(;
@@ -22301,7 +20778,7 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
 
             KBTS__DLLIST_SORT(Glyph, SequenceGlyph, MarkOrdering);
 
-  #ifdef KBTS_SANITY_CHECK
+            #ifdef KBTS_SANITY_CHECK
             {
               kbts_glyph *Glyph0 = OneBeforeGlyph->Next;
               for(kbts_glyph *Glyph1 = Glyph0->Next;
@@ -22339,13 +20816,22 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
           // the sara am codepoint.
           case 0xE33: case 0xEB3: // Sara am
           {
+            if(!AboveBaseGlyph)
+            {
+              AboveBaseGlyph = Glyph;
+            }
+
             kbts_glyph *NewGlyph = kbts__InsertGlyphBefore(Storage, AboveBaseGlyph, &Config->Nikhahit);
             if(!NewGlyph)
             {
               goto OutOfMemory;
             }
 
+            kbts_glyph_config *GlyphConfig = Glyph->Config;
             kbts__SetGlyphPreserveLinksAndUserId(Glyph, &Config->SaraAa);
+            Glyph->Config = GlyphConfig;
+
+            AboveBaseGlyph = 0;
           } break;
 
           case 0xE31: case 0xE34: case 0xE35: case 0xE36: case 0xE37: case 0xE3B:
@@ -22532,6 +21018,7 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
           {
             kbts_glyph *LvtGlyph = &LvtGlyphs[LvtGlyphIndex];
             kbts_glyph *NewGlyph = kbts__InsertGlyphBefore(Storage, Next, LvtGlyph);
+
             if(!NewGlyph)
             {
               goto OutOfMemory;
@@ -22541,72 +21028,133 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
 
         Glyph = Next;
       }
-      // KBTS_INSTRUMENT_BLOCK_END(NORMALIZE_HANGUL);
+
+      KBTS_INSTRUMENT_BLOCK_END(NORMALIZE_HANGUL);
     }
     break;
+
+    case KBTS__OP_KIND_BEGIN_GSUB:
+    {
+      enum{SortKeyInterval = 0x10000};
+      kbts_un RunningSortKey = SortKeyInterval;
+
+      KBTS__FOR_GLYPH(Storage, Glyph)
+      {
+        Glyph->SortKey = (kbts_u32)RunningSortKey;
+        Glyph->SortKeyInterval = SortKeyInterval;
+
+        kbts__BucketGlyph(Scratchpad, Glyph, 0, 0);
+
+        RunningSortKey += SortKeyInterval;
+      }
+    } break;
 
     case KBTS__OP_KIND_GSUB_FEATURES:
     {
       KBTS_INSTRUMENT_BLOCK_BEGIN(GSUB_FEATURES);
 
+      // @Duplication
       kbts__gsub_gpos *FontGsub = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GSUB, kbts__gsub_gpos);
-      kbts_lookup_list *LookupList; LookupList = kbts__GetLookupList(FontGsub);
-      kbts__arena_lifetime Lifetime = kbts__BeginLifetime(Scratchpad->Arena);
-      kbts__gsub_frame *Frames = kbts__PushArray(Scratchpad->Arena, kbts__gsub_frame, KBTS_LOOKUP_STACK_SIZE);
-      kbts_u32 GlyphFilter;
-      kbts__skip_flags SkipFlags;
-      kbts_un LookupIndex;
+      kbts_lookup_list *LookupList = kbts__GetLookupList(FontGsub);
 
-      if(kbts__BeginFeatures(Scratchpad, Config, KBTS_SHAPING_TABLE_GSUB))
+      kbts__gsub_frame *Frames = (kbts__gsub_frame *)Scratchpad->ScratchMemory;
+
+      kbts_u32 FilterMask = Config->Shaper == KBTS_SHAPER_USE ? KBTS__USE_GLYPH_FEATURE_MASK : KBTS__GLYPH_FEATURE_MASK;
+
+      kbts_un FeatureStageIndex = kbts__CurrentBakedFeatureStageIndex(Scratchpad);
+      kbts_un FirstSequentialLookupIndex = Config->FeatureStageFirstLookupIndices[FeatureStageIndex];
+      kbts_un OnePastLastSequentialLookupIndex = Config->FeatureStageFirstLookupIndices[FeatureStageIndex + 1];
+      KBTS__FOR(SequentialLookupIndex, FirstSequentialLookupIndex, OnePastLastSequentialLookupIndex)
       {
-        while(kbts__NextLookupIndex(Scratchpad, Config, &LookupIndex, &SkipFlags, &GlyphFilter, &Scratchpad->LookupFeatures))
+        kbts__sequential_lookup *SequentialLookup = &Config->SequentialLookups[SequentialLookupIndex];
+        kbts_un LookupIndex = SequentialLookup->LookupIndex;
+        kbts_u32 SkipFlags = SequentialLookup->SkipFlags;
+        kbts_u32 GlyphFilter = SequentialLookup->GlyphFilter;
+
+        kbts__bucketed_glyph_block_header *Sentinel = &Scratchpad->LookupGlyphBuckets[SequentialLookupIndex];
+
+        if(Sentinel->Next != Sentinel)
         {
-          kbts__lookup *Lookup = kbts__GetLookup(LookupList, LookupIndex);
+          kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
+          kbts_b32 LookupTypeIs8 = (PackedLookup->Type == 8);
 
-          // From the Microsoft docs:
-          //   If a Lookup table has multiple subtables, the subtables are processed in order, testing the glyph sequence
-          //   at the current glyph position for a match with the input sequence patterns specified by each subtable in
-          //   turn.
-          //
-          // This means the subtable loop is _inside_ of the loop over our glyphs.
+          KBTS_INSTRUMENT_BLOCK_BEGIN(GsubSortBucket);
 
-          // Reverse chaining substitutions are tricky.
-          // See the comment at :ReverseChaining.
-          for(kbts_glyph *Glyph = (Lookup->Type == 8) ? Storage->GlyphSentinel.Prev : Storage->GlyphSentinel.Next;
-              kbts__GlyphIsValid(Storage, Glyph);
-              )
+          if(PackedLookup->Type >= 4)
           {
-            kbts__BeginLookupApplication(Scratchpad, Glyph);
-            kbts_un FrameCount = 0;
-            kbts_u32 FilterMask = Config->Shaper == KBTS_SHAPER_USE ? KBTS__USE_GLYPH_FEATURE_MASK : KBTS__GLYPH_FEATURE_MASK;
-            kbts_u32 EffectiveGlyphFilter = GlyphFilter & FilterMask;
+            kbts__SortGlyphBucket(Scratchpad, SequentialLookupIndex);
+          }
 
-            if(kbts__GlyphIncludedInLookup(Font, 0, LookupIndex, Glyph->Id) &&
-               ((Glyph->Flags & EffectiveGlyphFilter) == EffectiveGlyphFilter) &&
-               kbts__ConfigAllowsFeatures(Scratchpad, Config, Glyph->Config, &Scratchpad->LookupFeatures))
+          KBTS_INSTRUMENT_BLOCK_END(GsubSortBucket);
+
+          for(kbts__bucketed_glyph_block_header *BlockHeader = (LookupTypeIs8) ? Sentinel->Prev : Sentinel->Next;
+              BlockHeader != Sentinel;
+              BlockHeader = (LookupTypeIs8) ? BlockHeader->Prev : BlockHeader->Next)
+          {
+            kbts__bucketed_glyph_block *Block = (kbts__bucketed_glyph_block *)BlockHeader;
+            kbts_un BlockGlyphCount = Block->Count;
+
+            KBTS__FOR(GlyphIndex_, 0, BlockGlyphCount)
             {
-              kbts__gsub_frame FirstFrame = KBTS__ZERO;
-              FirstFrame.LookupIndex = (kbts_u16)LookupIndex;
-              FirstFrame.InputGlyph = Glyph;
+              kbts_un GlyphIndex = (LookupTypeIs8) ? (BlockGlyphCount - 1 - GlyphIndex_) : GlyphIndex_;
+              kbts__bucketed_glyph *Bucketed = &Block->Glyphs[GlyphIndex];
 
-              Frames[0] = FirstFrame;
-              FrameCount = 1;
-
-              while(FrameCount)
+              if(kbts__BucketedGlyphIsValid(Bucketed))
               {
-                // These flags are used by USE.
-                kbts_u32 GeneratedGlyphFlags = GlyphFilter & (KBTS_GLYPH_FLAG_RPHF | KBTS_GLYPH_FLAG_PREF);
-                kbts__DoSubstitution(Scratchpad, Config, Storage, LookupList, Frames, &FrameCount, 0, SkipFlags, GeneratedGlyphFlags);
+                kbts_glyph *Glyph = Bucketed->Glyph;
+                kbts_u16 FeatureValue = Bucketed->FeatureValue;
+                kbts_u32 GlyphFlags = Glyph->Flags;
+                kbts_glyph *Prev = Glyph->Prev;
+
+                kbts__BeginLookupApplication(Scratchpad, Glyph);
+                kbts_u32 EffectiveGlyphFilter = GlyphFilter & FilterMask;
+
+                if((GlyphFlags & EffectiveGlyphFilter) == EffectiveGlyphFilter)
+                {
+                  kbts__gsub_frame FirstFrame = KBTS__ZERO;
+                  FirstFrame.LookupIndex = (kbts_u16)LookupIndex;
+                  FirstFrame.InputGlyph = Glyph;
+
+                  Frames[0] = FirstFrame;
+                  kbts_un FrameCount = 1;
+                  
+                  while(FrameCount)
+                  {
+                    // These flags are used by USE.
+                    kbts_u32 GeneratedGlyphFlags = GlyphFilter & (KBTS_GLYPH_FLAG_RPHF | KBTS_GLYPH_FLAG_PREF);
+                    kbts__DoSubstitution(Scratchpad, Config, Storage, LookupList, SequentialLookupIndex, FeatureValue, Frames, &FrameCount, 0, SkipFlags, GeneratedGlyphFlags);
+                  }
+                }
+
+                kbts_glyph *OnePastLast = kbts__EndLookupApplication(Scratchpad);
+
+                KBTS_INSTRUMENT_BLOCK_BEGIN(GsubRebucketTouchedGlyphs);
+
+                for(kbts_glyph *MatchedGlyph = Prev->Next;
+                    MatchedGlyph != OnePastLast;
+                    MatchedGlyph = MatchedGlyph->Next)
+                {
+                  // Queue for the next bucket.
+                  if(MatchedGlyph->Bucketed &&
+                     (MatchedGlyph->BucketedBucketIndex == SequentialLookupIndex))
+                  {
+                    // We are scheduled for the current bucket. Cancel that, and move on to the next.
+                    kbts__UnbucketGlyph(Scratchpad, MatchedGlyph);
+                    kbts__BucketGlyph(Scratchpad, MatchedGlyph, SequentialLookupIndex + 1, 0);
+                  }
+                }
+
+                KBTS_INSTRUMENT_BLOCK_END(GsubRebucketTouchedGlyphs);
               }
             }
-
-            kbts_glyph *OnePastLast = kbts__EndLookupApplication(Scratchpad);
-            Glyph = (Lookup->Type == 8) ? Glyph->Prev : OnePastLast;
           }
         }
+
+        kbts__FreeGlyphBucket(Scratchpad, SequentialLookupIndex);
       }
 
-      kbts__EndLifetime(&Lifetime);
+      Scratchpad->SequentialLookupIndexIndex = (kbts_u32)OnePastLastSequentialLookupIndex;
+
       KBTS_INSTRUMENT_BLOCK_END(GSUB_FEATURES);
     }
     break;
@@ -22661,7 +21209,7 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
     {
       KBTS_INSTRUMENT_BLOCK_BEGIN(GPOS_METRICS);
       // hmtx/vmtx pass.
-      int ClearMarkAdvances = (Config->Shaper == KBTS_SHAPER_MYANMAR) || (Config->Shaper == KBTS_SHAPER_USE);
+      kbts_b32 ClearMarkAdvances = (Config->Shaper == KBTS_SHAPER_MYANMAR) || (Config->Shaper == KBTS_SHAPER_USE);
 
       kbts_u32 Orientation = KBTS_ORIENTATION_HORIZONTAL; // @Hardcoded
       kbts_blob_table_id HeaTableId = KBTS_BLOB_TABLE_ID_HHEA;
@@ -22752,6 +21300,7 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
           }
         }
       }
+
       KBTS_INSTRUMENT_BLOCK_END(GPOS_METRICS);
     }
     break;
@@ -22759,44 +21308,96 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
     case KBTS__OP_KIND_GPOS_FEATURES:
     {
       KBTS_INSTRUMENT_BLOCK_BEGIN(GPOS_FEATURES);
-      kbts__gsub_gpos *Gpos = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GPOS, kbts__gsub_gpos);
 
-      if(kbts__BeginFeatures(Scratchpad, Config, KBTS_SHAPING_TABLE_GPOS))
+      kbts__gsub_gpos *Gpos = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GPOS, kbts__gsub_gpos);
+      kbts__gdef *Gdef = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef);
+
+      kbts_lookup_list *LookupList = kbts__GetLookupList(Gpos);
+      kbts_un FeatureStageIndex = kbts__CurrentBakedFeatureStageIndex(Scratchpad);
+
+      kbts_un FirstSequentialLookupIndex = Config->FeatureStageFirstLookupIndices[FeatureStageIndex];
+      kbts_un OnePastLastSequentialLookupIndex = Config->FeatureStageFirstLookupIndices[FeatureStageIndex + 1];
+      KBTS__FOR(SequentialLookupIndex, FirstSequentialLookupIndex, OnePastLastSequentialLookupIndex)
       {
-        kbts_lookup_list *LookupList = kbts__GetLookupList(Gpos);
-        kbts_un LookupIndex;
-        kbts__skip_flags SkipFlags;
-        kbts_u32 GlyphFilter;
-        kbts__feature_set LookupFeatures;
-        while(kbts__NextLookupIndex(Scratchpad, Config, &LookupIndex, &SkipFlags, &GlyphFilter, &LookupFeatures))
+        kbts__sequential_lookup *SequentialLookup = &Config->SequentialLookups[SequentialLookupIndex];
+        kbts_un LookupIndex = SequentialLookup->LookupIndex;
+        kbts_u32 SkipFlags = SequentialLookup->SkipFlags;
+
+        kbts__bucketed_glyph_block_header *Sentinel = &Scratchpad->LookupGlyphBuckets[SequentialLookupIndex];
+
+        if(Sentinel->Next != Sentinel)
         {
           kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
-          kbts__unpacked_lookup Lookup = kbts__UnpackLookup(kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef), PackedLookup);
+          kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
+          kbts_un SubtableCount = PackedLookup->SubtableCount;
 
-          kbts_glyph *Glyph = Storage->GlyphSentinel.Next;
-          while(kbts__GlyphIsValid(Storage, Glyph))
+          KBTS_INSTRUMENT_BLOCK_BEGIN(GposSortBucket);
+
+          if(PackedLookup->Type >= 2)
           {
-            kbts__BeginLookupApplication(Scratchpad, Glyph);
+            kbts__SortGlyphBucket(Scratchpad, SequentialLookupIndex);
+          }
 
-            if(kbts__GlyphIncludedInLookup(Config->Font, 1, LookupIndex, Glyph->Id) &&
-               kbts__ConfigAllowsFeatures(Scratchpad, Config, Glyph->Config, &LookupFeatures))
+          KBTS_INSTRUMENT_BLOCK_END(GposSortBucket);
+
+          for(kbts__bucketed_glyph_block_header *BlockHeader = Sentinel->Next;
+              BlockHeader != Sentinel;
+              BlockHeader = BlockHeader->Next)
+          {
+            kbts__bucketed_glyph_block *Block = (kbts__bucketed_glyph_block *)BlockHeader;
+            kbts_un BlockGlyphCount = Block->Count;
+
+            KBTS__FOR(GlyphIndex, 0, BlockGlyphCount)
             {
-              KBTS__FOR(SubtableIndex, 0, Lookup.SubtableCount)
-              {
-                kbts_u16 *Subtable = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubtableIndex]);
+              kbts__bucketed_glyph *Bucketed = &Block->Glyphs[GlyphIndex];
 
-                if(kbts__DoSingleAdjustment(Scratchpad, Config, Storage, LookupList,
-                                           LookupIndex, SubtableIndex, &Lookup, Subtable,
-                                           Glyph, 0, SkipFlags))
+              if(kbts__BucketedGlyphIsValid(Bucketed))
+              {
+                kbts_glyph *Glyph = Bucketed->Glyph;
+                kbts__BeginLookupApplication(Scratchpad, Glyph);
+
+                kbts_u16 *SubtableOffsets = KBTS__POINTER_AFTER(kbts_u16, PackedLookup);
+
+                KBTS__FOR(SubtableIndex, 0, SubtableCount)
                 {
-                  break;
+                  kbts_u16 *Subtable = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, SubtableOffsets[SubtableIndex]);
+
+                  if(kbts__DoSingleAdjustment(Scratchpad, Config, Storage,
+                                              LookupList, LookupIndex, SubtableIndex, &Lookup, Subtable,
+                                              Glyph, 0, SkipFlags))
+                  {
+                    break;
+                  }
                 }
+
+                kbts_glyph *OnePastLast = kbts__EndLookupApplication(Scratchpad);
+
+                KBTS_INSTRUMENT_BLOCK_BEGIN(GposRebucketTouchedGlyphs);
+
+                // @Speed: We can record just the IDs of the glyphs we traverse here into a flat array
+                // so that attachment lookups are faster.
+                for(kbts_glyph *MatchedGlyph = Glyph;
+                    MatchedGlyph != OnePastLast;
+                    MatchedGlyph = MatchedGlyph->Next)
+                {
+                  // Queue for the next bucket.
+
+                  if(MatchedGlyph->Bucketed &&
+                     (MatchedGlyph->BucketedBucketIndex == SequentialLookupIndex))
+                  {
+                    // We are scheduled for the current bucket. Cancel that, and move on to the next.
+                    kbts__UnbucketGlyph(Scratchpad, MatchedGlyph);
+                    kbts__BucketGlyph(Scratchpad, MatchedGlyph, SequentialLookupIndex + 1, 1);
+                  }
+                }
+
+                KBTS_INSTRUMENT_BLOCK_END(GposRebucketTouchedGlyphs);
               }
             }
-
-            Glyph = kbts__EndLookupApplication(Scratchpad);
           }
         }
+
+        kbts__FreeGlyphBucket(Scratchpad, SequentialLookupIndex);
       }
 
       KBTS_INSTRUMENT_BLOCK_END(GPOS_FEATURES);
@@ -22875,7 +21476,10 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
           if(WhitespaceGlyph.Id)
           {
             Keep = 1;
+
+            kbts_glyph_config *GlyphConfig = Glyph->Config;
             kbts__SetGlyphPreserveLinksAndUserId(Glyph, &WhitespaceGlyph);
+            Glyph->Config = GlyphConfig;
           }
         }
         else
@@ -22996,7 +21600,7 @@ static void kbts__ExecuteOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_confi
   KBTS_INSTRUMENT_FUNCTION_END;
 }
 
-static kbts_glyph kbts__Substitute1(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
+static kbts_glyph kbts__Substitute1(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
                                    kbts_lookup_list *LookupList, kbts__feature *Feature, kbts__skip_flags SkipFlags, kbts_glyph *Glyph)
 {
   kbts_glyph Result = *Glyph;
@@ -23022,7 +21626,7 @@ static kbts_glyph kbts__Substitute1(kbts__shape_scratchpad *Scratchpad, kbts_sha
     while(FrameCount)
     {
       kbts__substitution_result_flags SubstitutionResult = kbts__DoSubstitution(Scratchpad, Config, Storage,
-                                                                              LookupList, Frames, &FrameCount, 0, SkipFlags, 0);
+                                                                                LookupList, Scratchpad->SequentialLookupIndexIndex, 0, Frames, &FrameCount, 0, SkipFlags, 0);
       if(SubstitutionResult & KBTS__SUBSTITUTION_RESULT_FLAG_TRIED_TO_INSERT_WHILE_CHECK_ONLY)
       {
         goto Done;
@@ -23045,12 +21649,12 @@ typedef struct kbts__attach_state
   kbts_glyph *At;
 } kbts__attach_state;
 
-static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                              kbts_glyph *Glyph)
+static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage,
+                                      kbts_glyph *Glyph)
 {
+  kbts_shape_config *Config = Scratchpad->Config;
   kbts_font *Font = Config->Font;
   kbts_glyph *Result = Glyph->Next;
-  kbts__arena_lifetime Lifetime = kbts__BeginLifetime(Scratchpad->Arena);
 
   Scratchpad->RealCluster = 0;
 
@@ -23129,7 +21733,7 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
       // _strongly_ recommends that shapers use the font's tables instead, ie. doing tentative lookups
       // with specific features.
 
-      kbts__gsub_frame *Frames = kbts__PushArray(Scratchpad->Arena, kbts__gsub_frame, KBTS_LOOKUP_STACK_SIZE);
+      kbts__gsub_frame *Frames = (kbts__gsub_frame *)Scratchpad->ScratchMemory;
       kbts_glyph *OnePastLastSyllableGlyph = Glyph;
       kbts_glyph *FirstGlyph = FirstGlyphs[0];
       kbts_glyph *OneBeforeSyllableGlyph = FirstGlyph->Prev;
@@ -23327,6 +21931,7 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
               // Since half forms are always before the base, we can safely stop here.
               goto DoneScanningForBase;
             }
+            KBTS__FALLTHROUGH;
           case KBTS_INDIC_SYLLABIC_CLASS_NUKTA:
           case KBTS_INDIC_SYLLABIC_CLASS_ZWJ:
           case KBTS_INDIC_SYLLABIC_CLASS_ZWNJ:
@@ -23415,12 +22020,16 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
             Glyph != OnePastLastSyllableGlyph;
             Glyph = Glyph->Next)
         {
-          Glyph->SyllabicPosition <<= 4;
+          kbts_un SyllabicPosition = Glyph->SyllabicPosition;
 
-          if(Glyph->SyllabicPosition == (KBTS__SYLLABIC_POSITION_PREBASE_MATRA << 4))
+          SyllabicPosition <<= 4;
+
+          if(SyllabicPosition == (KBTS__SYLLABIC_POSITION_PREBASE_MATRA << 4))
           {
-            Glyph->SyllabicPosition += (15 - LeftMatraCount++) & 0xF;
+            SyllabicPosition += (15 - LeftMatraCount++) & 0xF;
           }
+
+          Glyph->SyllabicPosition = (kbts_u8)SyllabicPosition;
         }
       }
 
@@ -23482,6 +22091,7 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
                 {
                   Glyph->Prev->SyllabicPosition = Glyph->SyllabicPosition;
                 }
+                KBTS__FALLTHROUGH;
               case KBTS_INDIC_SYLLABIC_CLASS_MATRA:
                 Attach->CurrentPosition = Glyph->SyllabicPosition;
                 if((Attach->CurrentPosition >> 4) != KBTS__SYLLABIC_POSITION_PREBASE_MATRA)
@@ -23497,6 +22107,7 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
                   Glyph->SyllabicPosition = Attach->LastPositionThatWasNotPreBaseMatra;
                   break;
                 }
+                KBTS__FALLTHROUGH;
               case KBTS_INDIC_SYLLABIC_CLASS_NUKTA:
               case KBTS_INDIC_SYLLABIC_CLASS_ZWJ:
               case KBTS_INDIC_SYLLABIC_CLASS_ZWNJ:
@@ -23801,9 +22412,7 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
       {
         kbts_glyph *PreBaseGlyph = PreBaseGlyphs[--PreBaseGlyphCount];
         KBTS__DLLIST_REMOVE(PreBaseGlyph);
-        PreBaseGlyph->Prev = OneBeforeSyllableGlyph;
-        PreBaseGlyph->Next = OneBeforeSyllableGlyph->Next;
-        PreBaseGlyph->Prev->Next = PreBaseGlyph->Next->Prev = PreBaseGlyph;
+        KBTS__DLLIST_INSERT_AFTER(PreBaseGlyph, OneBeforeSyllableGlyph);
       }
 
       Result = OnePastLastSyllableGlyph;
@@ -23858,12 +22467,13 @@ static kbts_glyph *kbts__BeginCluster(kbts__shape_scratchpad *Scratchpad, kbts_s
     Scratchpad->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
   }
 
-  kbts__EndLifetime(&Lifetime);
   return Result;
 }
 
-static void kbts__EndCluster(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage)
+static void kbts__EndCluster(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage)
 {
+  kbts_shape_config *Config = Scratchpad->Config;
+
   switch(Config->Shaper)
   {
   case KBTS_SHAPER_INDIC:
@@ -24189,7 +22799,8 @@ static void kbts__EndCluster(kbts__shape_scratchpad *Scratchpad, kbts_shape_conf
         }
       }
 
-      if(To)
+      if(To &&
+         (First != To))
       {
         // Do the reorder!
         KBTS__DLLIST_REMOVE(First);
@@ -24437,11 +23048,11 @@ static void kbts__EndCluster(kbts__shape_scratchpad *Scratchpad, kbts_shape_conf
     }
 
     kbts_u64 BaseSet = KBTS__SET64((KBTS_INDIC_SYLLABIC_CLASS_CONSONANT)
-                                  (KBTS_INDIC_SYLLABIC_CLASS_CONSONANT_WITH_STACKER)
-                                  (KBTS_INDIC_SYLLABIC_CLASS_RA)
-                                  (KBTS_INDIC_SYLLABIC_CLASS_VOWEL)
-                                  (KBTS_INDIC_SYLLABIC_CLASS_PLACEHOLDER)
-                                  (KBTS_INDIC_SYLLABIC_CLASS_DOTTED_CIRCLE));
+                                   (KBTS_INDIC_SYLLABIC_CLASS_CONSONANT_WITH_STACKER)
+                                   (KBTS_INDIC_SYLLABIC_CLASS_RA)
+                                   (KBTS_INDIC_SYLLABIC_CLASS_VOWEL)
+                                   (KBTS_INDIC_SYLLABIC_CLASS_PLACEHOLDER)
+                                   (KBTS_INDIC_SYLLABIC_CLASS_DOTTED_CIRCLE));
 
     // Scan for a non-reph base glyph.
     for(kbts_glyph *Glyph = OnePastReph;
@@ -24569,37 +23180,56 @@ static void kbts__EndCluster(kbts__shape_scratchpad *Scratchpad, kbts_shape_conf
   }
 }
 
-static void *kbts__PointerPush(char **Pointer, kbts_un Size, kbts_un Align)
+static kbts_b32 kbts__ReadOp(kbts_shape_scratchpad *Scratchpad, kbts__op_kind End)
 {
-  char *At = *Pointer;
-  char *Aligned = KBTS__ALIGN_POINTER(char, At, Align);
-  *Pointer = Aligned + Size;
+  KBTS_INSTRUMENT_FUNCTION_BEGIN;
+  kbts_b32 Result = 0;
+  kbts_shape_config *Config = Scratchpad->Config;
 
-  void *Result = Aligned;
+  if(Config)
+  {
+    kbts__op_list *OpList = &Config->OpList;
+
+    if(Scratchpad->Ip < OpList->OpCount)
+    {
+      kbts__op_kind Kind = OpList->Ops[Scratchpad->Ip++];
+
+      // @Cleanup
+      if((Kind == KBTS__OP_KIND_GSUB_FEATURES_WITH_USER) ||
+         (Kind == KBTS__OP_KIND_GSUB_FEATURES) ||
+         (Kind == KBTS__OP_KIND_GPOS_FEATURES))
+      {
+        Scratchpad->FeatureStagesRead += 1;
+
+        if(Kind == KBTS__OP_KIND_GSUB_FEATURES_WITH_USER)
+        {
+          Kind = KBTS__OP_KIND_GSUB_FEATURES;
+        }
+      }
+
+      Scratchpad->OpKind = Kind;
+      Result = (Kind != End);
+    }
+  }
+
+  KBTS_INSTRUMENT_FUNCTION_END;
   return Result;
 }
-#define kbts__PointerPushType(Pointer, Type) (Type *)kbts__PointerPush((Pointer), sizeof(Type), KBTS_ALIGNOF(Type))
-#define kbts__PointerPushArray(Pointer, Type, Count) (Type *)kbts__PointerPush((Pointer), sizeof(Type) * (Count), KBTS_ALIGNOF(Type))
 
 static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, void *Memory, kbts_un *Size)
 {
   kbts_shape_config *Result = 0;
-  kbts_shape_config DummyConfig;
-  char *MemoryAt = (char *)Memory;
+  kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(Memory);
 
   if(Font)
   {
-    Result = kbts__PointerPushType(&MemoryAt, kbts_shape_config);
-    if(!Memory)
-    {
-      Result = &DummyConfig;
-    }
+    kbts_shape_config Config = KBTS__ZERO;
 
-    KBTS_MEMSET(Result, 0, sizeof(*Result));
+    Result = kbts__PointerPushType(&Bump, kbts_shape_config);
 
-    Result->Font = Font;
-    Result->Script = Script;
-    Result->Language = Language;
+    Config.Font = Font;
+    Config.Script = Script;
+    Config.Language = Language;
 
     kbts__gsub_gpos *ShapingTables[2] = {
       kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GSUB, kbts__gsub_gpos),
@@ -24649,7 +23279,6 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
             // It is tempting to try to look for another script if the one we want has no langsys.
             // However, it is possible for a script to purposefully have no langsys at all. In that case,
             // the shaper should not apply any GSUB features.
-            // In that case, the shaper should not apply any GSUB features.
             // So, store the result _regardless_ of whether Langsys is null or not.
             ChosenLangsys = Langsys;
             if(ShapingTableIndex == KBTS_SHAPING_TABLE_GSUB)
@@ -24665,206 +23294,218 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
           }
         }
 
-        Result->Langsys[ShapingTableIndex] = ChosenLangsys;
+        Config.Langsys[ShapingTableIndex] = ChosenLangsys;
       }
     }
+    
+    Config.IndicScriptProperties = kbts__IndicScriptProperties(Script);
+    Config.Shaper = FoundScriptIsIndic3 ? KBTS_SHAPER_USE : ScriptProperties->Shaper;
+    Config.OpList = *kbts__ShaperOpLists[Config.Shaper];
 
-    Result->IndicScriptProperties = kbts__IndicScriptProperties(Script);
-    Result->Shaper = FoundScriptIsIndic3 ? KBTS_SHAPER_USE : ScriptProperties->Shaper;
-    Result->OpList = *kbts__ShaperOpLists[Result->Shaper];
-
-    Result->Features = KBTS__ZERO_TYPE(kbts__feature_set);
-    KBTS__FOR(StageIndex, 0, Result->OpList.FeatureStageCount)
+    Config.Features = KBTS__ZERO_TYPE(kbts__feature_set);
+    KBTS__FOR(StageIndex, 0, Config.OpList.FeatureStageCount)
     {
-      kbts__feature_stage *Stage = &Result->OpList.FeatureStages[StageIndex];
+      kbts__feature_stage *Stage = &Config.OpList.FeatureStages[StageIndex];
 
-      KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(Result->Features.Flags))
+      KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(Config.Features.Flags))
       {
-        Result->Features.Flags[WordIndex] |= Stage->Features.Flags[WordIndex];
+        Config.Features.Flags[WordIndex] |= Stage->Features.Flags[WordIndex];
       }
     }
 
     kbts__feature *Rclt = 0;
     kbts__feature_set SyllableFeatureSet = {{KBTS__FEATURE_FLAG0(rphf) | KBTS__FEATURE_FLAG0(blwf) | KBTS__FEATURE_FLAG0(half) | KBTS__FEATURE_FLAG0(pstf) | KBTS__FEATURE_FLAG0(pref),
                                             0, KBTS__FEATURE_FLAG2(rclt) | KBTS__FEATURE_FLAG2(locl), KBTS__FEATURE_FLAG3(vatu)}};
-    kbts__iterate_features IterateFeatures = kbts__IterateFeatures(Result, KBTS_SHAPING_TABLE_GSUB, SyllableFeatureSet);
+    kbts__iterate_features IterateFeatures = kbts__IterateFeatures(&Config, KBTS_SHAPING_TABLE_GSUB, SyllableFeatureSet);
     while(kbts__NextFeature(&IterateFeatures))
     {
       switch(IterateFeatures.CurrentFeatureTag)
       {
-      case KBTS_FEATURE_TAG_blwf: Result->Blwf = IterateFeatures.Feature; break;
-      case KBTS_FEATURE_TAG_pref: Result->Pref = IterateFeatures.Feature; break;
-      case KBTS_FEATURE_TAG_pstf: Result->Pstf = IterateFeatures.Feature; break;
-      case KBTS_FEATURE_TAG_locl: Result->Locl = IterateFeatures.Feature; break;
-      case KBTS_FEATURE_TAG_rphf: Result->Rphf = IterateFeatures.Feature; break;
-      case KBTS_FEATURE_TAG_half: Result->Half = IterateFeatures.Feature; break;
-      case KBTS_FEATURE_TAG_vatu: Result->Vatu = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_blwf: Config.Blwf = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_pref: Config.Pref = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_pstf: Config.Pstf = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_locl: Config.Locl = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_rphf: Config.Rphf = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_half: Config.Half = IterateFeatures.Feature; break;
+      case KBTS_FEATURE_TAG_vatu: Config.Vatu = IterateFeatures.Feature; break;
       case KBTS_FEATURE_TAG_rclt: Rclt = IterateFeatures.Feature; break;
       }
     }
 
-    if((Result->Shaper == KBTS_SHAPER_ARABIC) && !Rclt)
+    if((Config.Shaper == KBTS_SHAPER_ARABIC) && !Rclt)
     {
-      Result->OpList = kbts__OpList_ArabicNoRclt;
+      Config.OpList = kbts__OpList_ArabicNoRclt;
     }
 
-    if(Result->IndicScriptProperties.ViramaCodepoint)
+    if(Config.IndicScriptProperties.ViramaCodepoint)
     {
-      kbts__shape_scratchpad DummyScratchpad = KBTS__ZERO;
+      kbts_shape_scratchpad DummyScratchpad = KBTS__ZERO;
       kbts_glyph_storage DummyStorage = KBTS__ZERO;
       KBTS__DLLIST_SENTINEL_INIT(&DummyStorage.GlyphSentinel);
       KBTS__DLLIST_SENTINEL_INIT(&DummyStorage.FreeGlyphSentinel);
 
       // Bake the locl-ized virama.
-      kbts_glyph Virama = kbts_CodepointToGlyph(Font, (int)Result->IndicScriptProperties.ViramaCodepoint, 0, 0);
-      Result->Virama = kbts__Substitute1(&DummyScratchpad, Result, &DummyStorage, kbts__GetLookupList(Gsub), Result->Locl, KBTS__SKIP_FLAG_ZWNJ | KBTS__SKIP_FLAG_ZWJ, &Virama);
+      kbts_glyph Virama = kbts_CodepointToGlyph(Font, (int)Config.IndicScriptProperties.ViramaCodepoint, 0, 0);
+      Config.Virama = kbts__Substitute1(&DummyScratchpad, &Config, &DummyStorage, kbts__GetLookupList(Gsub), Config.Locl, KBTS__SKIP_FLAG_ZWNJ | KBTS__SKIP_FLAG_ZWJ, &Virama);
     }
 
-    if((Result->Script == KBTS_SCRIPT_THAI) || (Result->Script == KBTS_SCRIPT_LAO))
+    if((Config.Script == KBTS_SCRIPT_THAI) || (Config.Script == KBTS_SCRIPT_LAO))
     {
-      kbts_u32 NikhahitCodepoint = (Result->Script == KBTS_SCRIPT_THAI) ? 0xE4D : 0xECD;
-      kbts_u32 SaraAaCodepoint = (Result->Script == KBTS_SCRIPT_THAI) ? 0xE32 : 0xEB2;
-      Result->Nikhahit = kbts_CodepointToGlyph(Font, (int)NikhahitCodepoint, 0, 0);
-      Result->SaraAa = kbts_CodepointToGlyph(Font, (int)SaraAaCodepoint, 0, 0);
+      kbts_u32 NikhahitCodepoint = (Config.Script == KBTS_SCRIPT_THAI) ? 0xE4D : 0xECD;
+      kbts_u32 SaraAaCodepoint = (Config.Script == KBTS_SCRIPT_THAI) ? 0xE32 : 0xEB2;
+      Config.Nikhahit = kbts_CodepointToGlyph(Font, (int)NikhahitCodepoint, 0, 0);
+      Config.SaraAa = kbts_CodepointToGlyph(Font, (int)SaraAaCodepoint, 0, 0);
     }
 
-    Result->DottedCircle = kbts_CodepointToGlyph(Font, 0x25CC, 0, 0);
-    Result->Whitespace = kbts_CodepointToGlyph(Font, ' ', 0, 0);
+    Config.DottedCircle = kbts_CodepointToGlyph(Font, 0x25CC, 0, 0);
+    Config.Whitespace = kbts_CodepointToGlyph(Font, ' ', 0, 0);
+
+    kbts_u16 *FeatureStageFirstLookupIndices = kbts__PointerPushArray(&Bump, kbts_u16, Config.OpList.FeatureStageCount + 1);
+    if(Memory)
+    {
+      KBTS__FOR(FeatureStageIndex, 0, Config.OpList.FeatureStageCount + 1)
+      {
+        FeatureStageFirstLookupIndices[FeatureStageIndex] = 0;
+      }
+    }
 
     if(ShapingTables[KBTS_SHAPING_TABLE_GSUB] || ShapingTables[KBTS_SHAPING_TABLE_GPOS])
-    { // Initialize the per-feature lookup lists.
-      kbts__baked_feature_stage *BakedStages = kbts__PointerPushArray(&MemoryAt, kbts__baked_feature_stage, Result->OpList.FeatureStageCount);
+    { // Initialize sequential lookups.
+      kbts_un GlyphCount = Font->Blob->GlyphCount;
 
-      kbts_un FeatureStageIndex = 0;
-      KBTS__FOR(OpIndex, 0, Result->OpList.OpCount)
+      kbts_u32 *GlyphLookupMatrix = KBTS__POINTER_OFFSET(kbts_u32, Font->Blob, Font->Blob->GlyphLookupMatrixOffsetFromStartOfFile);
+      kbts_un GposLookupIndexOffset = Font->Blob->GposLookupIndexOffset;
+
+      kbts__sequential_lookup *SequentialLookups = 0;
+      kbts_u32 *IdSequentialLookupMatrix = 0;
+      kbts_un SequentialLookupCount = 0;
+
+      KBTS__FOR(Iter, 0, 2)
       {
-        kbts__op_kind Op = Result->OpList.Ops[OpIndex];
-        int UserFeaturesAllowed = KBTS__IN_SET(Op, KBTS__SET32((KBTS__OP_KIND_GSUB_FEATURES_WITH_USER)
-                                                               (KBTS__OP_KIND_GPOS_FEATURES)));
+        kbts_un ThisSequentialLookupCount = 0;
+        kbts_un FeatureStageIndex = 0;
 
-        if(KBTS__IN_SET(Op, KBTS__SET32((KBTS__OP_KIND_GSUB_FEATURES)
-                                        (KBTS__OP_KIND_GSUB_FEATURES_WITH_USER)
-                                        (KBTS__OP_KIND_GPOS_FEATURES))))
+        KBTS__FOR(OpIndex, 0, Config.OpList.OpCount)
         {
-          kbts__feature_stage *FeatureStage = &Result->OpList.FeatureStages[FeatureStageIndex];
-          kbts_shaping_table ShapingTable = (kbts_shaping_table)((Op == KBTS__OP_KIND_GPOS_FEATURES) ? KBTS_SHAPING_TABLE_GPOS : KBTS_SHAPING_TABLE_GSUB);
-          kbts__gsub_gpos *GsubGpos = ShapingTables[ShapingTable];
-          kbts__langsys *Langsys = Result->Langsys[ShapingTable];
-          kbts_un BakedFeatureCount = 0;
-          kbts_un BakedFeatureLookupIndexCount = 0;
+          kbts__op_kind Op = Config.OpList.Ops[OpIndex];
+          kbts_b32 UserFeaturesAllowed = KBTS__IN_SET(Op, KBTS__SET32((KBTS__OP_KIND_GSUB_FEATURES_WITH_USER)
+                                                                      (KBTS__OP_KIND_GPOS_FEATURES)));
 
-          kbts__baked_feature_stage *BakedStage = &BakedStages[FeatureStageIndex];
-
-          if(GsubGpos && Langsys)
+          if(KBTS__IN_SET(Op, KBTS__SET32((KBTS__OP_KIND_GSUB_FEATURES)
+                                          (KBTS__OP_KIND_GSUB_FEATURES_WITH_USER)
+                                          (KBTS__OP_KIND_GPOS_FEATURES))))
           {
-            kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, GsubGpos, GsubGpos->FeatureListOffset);
-            kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, Langsys);
-            kbts__baked_feature *BakedFeatures;
+            kbts__feature_stage *FeatureStage = &Config.OpList.FeatureStages[FeatureStageIndex];
+            kbts_shaping_table ShapingTable = (kbts_shaping_table)((Op == KBTS__OP_KIND_GPOS_FEATURES) ? KBTS_SHAPING_TABLE_GPOS : KBTS_SHAPING_TABLE_GSUB);
+            kbts__gsub_gpos *GsubGpos = ShapingTables[ShapingTable];
+            kbts__langsys *Langsys = Config.Langsys[ShapingTable];
+            kbts_un BakedFeatureLookupIndexCount = 0;
 
-            // @Speed: Maybe we don't care about fragmentation and we just allocate Langsys->FeatureIndexCount in advance?
-            KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
+            kbts__baked_feature BakedFeatures[KBTS_MAX_SIMULTANEOUS_FEATURES];
+            kbts_u16 BakedFeatureLookupIndicesRead[KBTS_MAX_SIMULTANEOUS_FEATURES];
+            kbts_un BakedFeatureCount = 0;
+
+            if(GsubGpos && Langsys)
             {
-              kbts_un FeatureIndex = FeatureIndices[FeatureIndexIndex];
-              kbts__feature_pointer Feature = kbts__GetFeature(FeatureList, FeatureIndex);
+              kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, GsubGpos, GsubGpos->FeatureListOffset);
+              kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, Langsys);
 
-              kbts_u32 FeatureId = kbts__FeatureTagToId(Feature.Tag);
-
-              if(Feature.Feature->LookupIndexCount &&
-                 ((UserFeaturesAllowed &&
-                   !kbts__ContainsFeature(&Result->Features, FeatureId)) ||
-                  kbts__ContainsFeature(&FeatureStage->Features, FeatureId)))
+              // @Speed: Maybe we don't care about fragmentation and we just allocate Langsys->FeatureIndexCount in advance?
+              KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
               {
-                BakedFeatureCount += 1;
-              }
-            }
+                kbts_un FeatureIndex = FeatureIndices[FeatureIndexIndex];
+                kbts__feature_pointer Feature = kbts__GetFeature(FeatureList, FeatureIndex);
 
-            kbts_un BakedFeatureCapacity = KBTS__MIN(BakedFeatureCount, KBTS_MAX_SIMULTANEOUS_FEATURES);
+                kbts_u32 FeatureId = kbts__FeatureTagToId(Feature.Tag);
 
-            BakedFeatures = kbts__PointerPushArray(&MemoryAt, kbts__baked_feature, BakedFeatureCapacity);
-
-            BakedFeatureCount = 0;
-
-            KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
-            {
-              kbts_un FeatureIndex = FeatureIndices[FeatureIndexIndex];
-              kbts__feature_pointer Feature = kbts__GetFeature(FeatureList, FeatureIndex);
-
-              kbts_u32 FeatureId = kbts__FeatureTagToId(Feature.Tag);
-              // We add all features indiscriminately for ops that might incorporate user features.
-              if(Feature.Feature->LookupIndexCount &&
-                 // We add "all" features to user feature stages, except for features that are a default part of the shaper.
-                 // If a user asks for a default feature explicitly, it is unclear whether it should be applied now or in its
-                 // default stage.
-                 // Leaving the feature in its default stage seems like the better thing to do, because, supposedly, these features
-                 // will have been designed to apply at a specific point in the pipeline, and moving them makes little sense.
-                 ((UserFeaturesAllowed &&
-                   !kbts__ContainsFeature(&Result->Features, FeatureId)) ||
-                  kbts__ContainsFeature(&FeatureStage->Features, FeatureId)))
-              {
-                kbts__baked_feature BakedFeature = KBTS__ZERO;
-                BakedFeature.FeatureTag = Feature.Tag;
-                BakedFeature.FeatureId = FeatureId;
-                // CAREFUL: We use SkipFlags as a temporary index until the end of the stage.
-                BakedFeature.SkipFlags = kbts__SkipFlags(BakedFeature.FeatureId, Result->Shaper);
-                BakedFeature.Count = Feature.Feature->LookupIndexCount;
-                // These point directly into the file.
-                BakedFeature.Indices = KBTS__POINTER_AFTER(kbts_u16, Feature.Feature);
-
-                // @Incomplete
-                //if(FeatureVariations)
-                //{
-                //  KBTS__FOR(VariationIndex, 0, FeatureVariations->RecordCount)
-                //  {
-                //    kbts__feature_variation_pointer Variation = kbts__GetFeatureVariation(FeatureVariations, VariationIndex);
-                //    KBTS__FOR(ConditionIndex, 0, Variation.ConditionSet->Count)
-                //    {
-                //      kbts__condition_1 *Condition = kbts__GetCondition(Variation.ConditionSet, ConditionIndex);
-                //      KBTS_ASSERT(0);
-                //    }
-                //  }
-                //}
-
-                // For Myanmar, we could try and tag glyphs depending on their Indic properties in BeginCluster, just like we do for
-                // Indic scripts.
-                // However, Harfbuzz does _not_ do this, so it seems like a bunch of work that would, at best, make us diverge from
-                // Harfbuzz more often.
-                if((Result->Shaper != KBTS_SHAPER_MYANMAR) && (FeatureId >= 1) && (FeatureId <= 32))
+                if(Feature.Feature->LookupIndexCount &&
+                   ((UserFeaturesAllowed &&
+                     !kbts__ContainsFeature(&Config.Features, FeatureId)) ||
+                    kbts__ContainsFeature(&FeatureStage->Features, FeatureId)))
                 {
-                  // These must properly map KBTS__FEATURE_ID to kbts_glyph_flags!
-                  BakedFeature.GlyphFilter = (1 << (FeatureId - 1)) & KBTS__GLYPH_FEATURE_MASK;
+                  BakedFeatureCount += 1;
+
+                  if(BakedFeatureCount == KBTS_MAX_SIMULTANEOUS_FEATURES)
+                  {
+                    break;
+                  }
                 }
+              }
 
-                if(Memory)
+              BakedFeatureCount = 0;
+
+              KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
+              {
+                kbts_un FeatureIndex = FeatureIndices[FeatureIndexIndex];
+                kbts__feature_pointer Feature = kbts__GetFeature(FeatureList, FeatureIndex);
+
+                kbts_u32 FeatureId = kbts__FeatureTagToId(Feature.Tag);
+                // We add all features indiscriminately for ops that might incorporate user features.
+                if(Feature.Feature->LookupIndexCount &&
+                   // We add "all" features to user feature stages, except for features that are a default part of the shaper.
+                   // If a user asks for a default feature explicitly, it is unclear whether it should be applied now or in its
+                   // default stage.
+                   // Leaving the feature in its default stage seems like the better thing to do, because, supposedly, these features
+                   // will have been designed to apply at a specific point in the pipeline, and moving them makes little sense.
+                   ((UserFeaturesAllowed &&
+                     !kbts__ContainsFeature(&Config.Features, FeatureId)) ||
+                    kbts__ContainsFeature(&FeatureStage->Features, FeatureId)))
                 {
+                  kbts__baked_feature BakedFeature = KBTS__ZERO;
+                  BakedFeature.FeatureTag = Feature.Tag;
+                  BakedFeature.FeatureId = FeatureId;
+                  // CAREFUL: We use SkipFlags as a temporary index until the end of the stage.
+                  BakedFeature.SkipFlags = kbts__SkipFlags(ShapingTable, BakedFeature.FeatureId, Config.Shaper);
+                  BakedFeature.Count = Feature.Feature->LookupIndexCount;
+                  // These point directly into the file.
+                  BakedFeature.Indices = KBTS__POINTER_AFTER(kbts_u16, Feature.Feature);
+
+                  // @Incomplete
+                  //if(FeatureVariations)
+                  //{
+                  //  KBTS__FOR(VariationIndex, 0, FeatureVariations->RecordCount)
+                  //  {
+                  //    kbts__feature_variation_pointer Variation = kbts__GetFeatureVariation(FeatureVariations, VariationIndex);
+                  //    KBTS__FOR(ConditionIndex, 0, Variation.ConditionSet->Count)
+                  //    {
+                  //      kbts__condition_1 *Condition = kbts__GetCondition(Variation.ConditionSet, ConditionIndex);
+                  //      KBTS_ASSERT(0);
+                  //    }
+                  //  }
+                  //}
+
+                  // For Myanmar, we could try and tag glyphs depending on their Indic properties in BeginCluster, just like we do for
+                  // Indic scripts.
+                  // However, Harfbuzz does _not_ do this, so it seems like a bunch of work that would, at best, make us diverge from
+                  // Harfbuzz more often.
+                  if((Config.Shaper != KBTS_SHAPER_MYANMAR) && (FeatureId >= 1) && (FeatureId <= 32))
+                  {
+                    // These must properly map KBTS__FEATURE_ID to kbts_glyph_flags!
+                    BakedFeature.GlyphFilter = (1u << (FeatureId - 1)) & KBTS__GLYPH_FEATURE_MASK;
+                  }
+
                   BakedFeatures[BakedFeatureCount] = BakedFeature;
-                }
 
-                BakedFeatureCount += 1;
-                BakedFeatureLookupIndexCount += BakedFeature.Count;
+                  BakedFeatureCount += 1;
+                  BakedFeatureLookupIndexCount += BakedFeature.Count;
 
-                if(BakedFeatureCount >= BakedFeatureCapacity)
-                {
-                  break;
+                  if(BakedFeatureCount >= KBTS_MAX_SIMULTANEOUS_FEATURES)
+                  {
+                    break;
+                  }
                 }
               }
-            }
-
-            kbts_u16 *OrderedFeatureIndices = kbts__PointerPushArray(&MemoryAt, kbts_u16, BakedFeatureLookupIndexCount);
-            kbts_u16 *BakedFeatureLookupIndicesRead = kbts__PointerPushArray(&MemoryAt, kbts_u16, BakedFeatureCount);
-
-            if(Memory)
-            {
-              kbts_un OrderedFeatureIndicesWritten = 0;
 
               KBTS__FOR(BakedFeatureIndex, 0, BakedFeatureCount)
               {
                 BakedFeatureLookupIndicesRead[BakedFeatureIndex] = 0;
               }
 
-              KBTS__FOR(OrderedLookupIndex, 0, BakedFeatureLookupIndexCount)
+              kbts_u16 LastLowestLookupIndex = 0xFFFF;
+              kbts_un BakedFeatureLookupIndicesLeft = BakedFeatureLookupIndexCount;
+              while(BakedFeatureLookupIndicesLeft)
               {
                 kbts_u16 LowestLookupIndex = 0xFFFF;
-                kbts_un BestBakedFeatureIndex = 0;
 
                 KBTS__FOR(BakedFeatureIndex, 0, BakedFeatureCount)
                 {
@@ -24878,36 +23519,131 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
                     if(NextIndex < LowestLookupIndex)
                     {
                       LowestLookupIndex = NextIndex;
-                      BestBakedFeatureIndex = BakedFeatureIndex;
                     }
                   }
                 }
 
-                BakedFeatureLookupIndicesRead[BestBakedFeatureIndex] += 1;
-                OrderedFeatureIndices[OrderedFeatureIndicesWritten++] = (kbts_u16)BestBakedFeatureIndex;
+                // Handle the case where a single lookup is part of multiple features.
+                kbts_u32 GlyphFilter = 0;
+                kbts_u32 SkipFlags = 0;
+                kbts_b32 DefaultEnabled = 0;
+                KBTS__FOR(BakedFeatureIndex, 0, BakedFeatureCount)
+                {
+                  kbts__baked_feature *BakedFeature = &BakedFeatures[BakedFeatureIndex];
+                  kbts_un LookupIndicesRead = BakedFeatureLookupIndicesRead[BakedFeatureIndex];
+
+                  if(LookupIndicesRead < BakedFeature->Count)
+                  {
+                    kbts_u16 NextIndex = BakedFeature->Indices[LookupIndicesRead];
+
+                    if(NextIndex == LowestLookupIndex)
+                    {
+                      GlyphFilter |= BakedFeature->GlyphFilter;
+                      SkipFlags |= BakedFeature->SkipFlags;
+
+                      BakedFeatureLookupIndicesRead[BakedFeatureIndex] += 1;
+                      BakedFeatureLookupIndicesLeft -= 1;
+
+                      if(kbts__ContainsFeature(&FeatureStage->Features, BakedFeature->FeatureId))
+                      {
+                        DefaultEnabled = 1;
+                      }
+                    }
+                  }
+                }
+
+                if(LowestLookupIndex != LastLowestLookupIndex)
+                {
+                  if(Iter && Memory && DefaultEnabled)
+                  {
+                    kbts_un FlatLookupIndex = (ShapingTable == KBTS_SHAPING_TABLE_GSUB) ? LowestLookupIndex : (LowestLookupIndex + GposLookupIndexOffset);
+                    KBTS__FOR(GlyphIndex, 0, GlyphCount)
+                    {
+                      kbts__matrix_index MatrixIndex = kbts__GlyphLookupMatrixIndex(FlatLookupIndex, GlyphIndex, GlyphCount);
+                      if(GlyphLookupMatrix[MatrixIndex.WordIndex] & (1u << MatrixIndex.BitIndex))
+                      {
+                        kbts__matrix_index SequentialMatrixIndex = kbts__IdSequentialLookupMatrixIndex(ThisSequentialLookupCount, GlyphIndex, SequentialLookupCount);
+                        IdSequentialLookupMatrix[SequentialMatrixIndex.WordIndex] |= 1u << SequentialMatrixIndex.BitIndex;
+                      }
+                    }
+                  }
+
+                  if(!Iter)
+                  {
+                    ThisSequentialLookupCount += 1;
+                  }
+                  else
+                  {
+                    kbts__sequential_lookup *SequentialLookup = &SequentialLookups[ThisSequentialLookupCount++];
+                    if(Memory)
+                    {
+                      SequentialLookup->GlyphFilter = GlyphFilter;
+                      SequentialLookup->SkipFlags = SkipFlags;
+                      SequentialLookup->LookupIndex = LowestLookupIndex;
+                    }
+                  }
+                }
+
+                LastLowestLookupIndex = LowestLookupIndex;
               }
-
-              KBTS_ASSERT(OrderedFeatureIndicesWritten == BakedFeatureLookupIndexCount);
-
-              BakedStage->FeatureCount = (kbts_u16)BakedFeatureCount;
-              BakedStage->FeatureIndexCount = (kbts_u16)BakedFeatureLookupIndexCount;
-              BakedStage->Features = BakedFeatures;
-              BakedStage->FeatureIndices = OrderedFeatureIndices;
             }
+
+            if(Iter && Memory)
+            {
+              FeatureStageFirstLookupIndices[FeatureStageIndex + 1] = (kbts_u16)ThisSequentialLookupCount;
+            }
+
+            KBTS_ASSERT(FeatureStageIndex < Config.OpList.FeatureStageCount);
+            FeatureStageIndex += 1;
+          }
+        }
+
+        if(!Iter)
+        {
+          // We have the sequential lookup count. We can allocate our stuff.
+          SequentialLookupCount = ThisSequentialLookupCount;
+          SequentialLookups = kbts__PointerPushArray(&Bump, kbts__sequential_lookup, SequentialLookupCount);
+
+          kbts_un LastSequentialLookupIndex = 0;
+          if(SequentialLookupCount)
+          {
+            LastSequentialLookupIndex = SequentialLookupCount - 1;
+          }
+          kbts_un LastGlyphIndex = 0;
+          if(GlyphCount)
+          {
+            LastGlyphIndex = GlyphCount - 1;
           }
 
-          KBTS_ASSERT(FeatureStageIndex < Result->OpList.FeatureStageCount);
-          FeatureStageIndex += 1;
+          kbts__matrix_index LastMatrixIndex = kbts__IdSequentialLookupMatrixIndex(LastSequentialLookupIndex, LastGlyphIndex, SequentialLookupCount);
+          kbts_un IdSequentialLookupMatrixSizeInWords = LastMatrixIndex.WordIndex + 1;
+          kbts_un IdSequentialLookupMatrixSizeInBytes = sizeof(kbts_u32) * IdSequentialLookupMatrixSizeInWords;
+          IdSequentialLookupMatrix = (kbts_u32 *)kbts__PointerPush(&Bump, IdSequentialLookupMatrixSizeInBytes, KBTS_ALIGNOF(kbts_u32));
+          if(Memory)
+          {
+            KBTS_MEMSET(IdSequentialLookupMatrix, 0, IdSequentialLookupMatrixSizeInBytes);
+          }
         }
       }
 
-      Result->FeatureStages = BakedStages;
+      Config.SequentialLookups = SequentialLookups;
+      Config.IdSequentialLookupMatrix = IdSequentialLookupMatrix;
+      Config.GlyphCount = Font->Blob->GlyphCount;
+      Config.LookupCount = Font->Blob->LookupCount;
+    }
+
+    Config.FeatureStageFirstLookupIndices = FeatureStageFirstLookupIndices;
+
+    if(Memory)
+    {
+      *Result = Config;
     }
   }
 
   if(!Memory)
   {
-    *Size = (kbts_un)(MemoryAt - (char *)Memory) + KBTS_ALIGNOF(kbts_shape_config);
+    // We add the align, just to make sure we can accept any incoming pointer.
+    *Size = (Bump.At - (kbts_uptr)(void *)0) + KBTS_ALIGNOF(kbts_shape_config);
     Result = 0;
   }
 
@@ -24956,60 +23692,13 @@ KBTS_EXPORT void kbts_DestroyShapeConfig(kbts_shape_config *Config)
   }
 }
 
-static int kbts__ReadOp(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts__op_kind End)
-{
-  KBTS_INSTRUMENT_FUNCTION_BEGIN;
-  int Result = 0;
-
-  if(Config)
-  {
-    kbts__op_list *OpList = &Config->OpList;
-
-    if(Scratchpad->Ip < OpList->OpCount)
-    {
-      kbts__op_kind Kind = OpList->Ops[Scratchpad->Ip++];
-
-      if((Kind == KBTS__OP_KIND_GSUB_FEATURES_WITH_USER) ||
-         (Kind == KBTS__OP_KIND_GSUB_FEATURES) ||
-         (Kind == KBTS__OP_KIND_GPOS_FEATURES))
-      {
-        kbts__feature_stage *FeatureStage = &OpList->FeatureStages[Scratchpad->FeatureStagesRead++];
-        Scratchpad->OpFeatures = &FeatureStage->Features;
-
-        // We only have one GPOS_FEATURES op per op list, so it's fine to add user features like this.
-        if((Kind == KBTS__OP_KIND_GSUB_FEATURES_WITH_USER) ||
-           (Kind == KBTS__OP_KIND_GPOS_FEATURES))
-        {
-          if(Kind == KBTS__OP_KIND_GSUB_FEATURES_WITH_USER)
-          {
-            Kind = KBTS__OP_KIND_GSUB_FEATURES;
-          }
-
-          KBTS__FOR(WordIndex, 0, KBTS__ARRAY_LENGTH(Scratchpad->ScratchFeatures.Flags))
-          {
-            Scratchpad->ScratchFeatures.Flags[WordIndex] = Scratchpad->UserFeatures.Flags[WordIndex] | FeatureStage->Features.Flags[WordIndex];
-          }
-
-          Scratchpad->OpFeatures = &Scratchpad->ScratchFeatures;
-        }
-      }
-
-      Scratchpad->OpKind = Kind;
-      Result = (Kind != End);
-    }
-  }
-
-  KBTS_INSTRUMENT_FUNCTION_END;
-  return Result;
-}
-
 KBTS_EXPORT int kbts_SizeOfShapeContext(void)
 {
   int Result = sizeof(kbts_shape_context);
   return Result;
 }
 
-KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory)
+KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext2(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory, kbts_shape_context_flags Flags)
 {
   kbts_shape_context *Result = (kbts_shape_context *)Memory;
 
@@ -25037,14 +23726,22 @@ KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *
     Result->GlyphStorage.Arena.Allocator = Allocator;
     Result->GlyphStorage.Arena.AllocatorData = AllocatorData;
 
-    KBTS__DLLIST_SENTINEL_INIT(&Result->FeatureOverrideSentinel);
-    KBTS__DLLIST_SENTINEL_INIT(&Result->FreeFeatureOverrideSentinel);
+    Result->PublicFlags = Flags;
+
+    KBTS__DLLIST_SENTINEL_INIT(&Result->ExistingShapeConfigBlockSentinel);
+    KBTS__DLLIST_SENTINEL_INIT(&Result->ExistingGlyphConfigBlockSentinel);
   }
 
   return Result;
 }
 
-KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContextFixedMemory(void *Memory, int Size)
+KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext(kbts_allocator_function *Allocator, void *AllocatorData, void *Memory)
+{
+  kbts_shape_context *Result = kbts_PlaceShapeContext2(Allocator, AllocatorData, Memory, KBTS_SHAPE_CONTEXT_FLAG_NONE);
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContextFixedMemory2(void *Memory, int Size, kbts_shape_context_flags Flags)
 {
   kbts_shape_context *Result = 0;
   kbts_un SizeOfShapeContext = kbts_SizeOfShapeContext();
@@ -25055,22 +23752,34 @@ KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContextFixedMemory(void *Memory, 
     kbts_arena *Arena = (kbts_arena *)KBTS__POINTER_OFFSET(kbts_arena, Memory, SizeOfShapeContext);
     kbts__InitializeFixedMemoryArena(Arena, KBTS__POINTER_AFTER(void, Arena), (kbts_un)Size - ContextAndArenaSize);
 
-    Result = kbts_PlaceShapeContext(kbts__ArenaAllocator, Arena, Memory);
+    Result = kbts_PlaceShapeContext2(kbts__ArenaAllocator, Arena, Memory, Flags);
   }
 
   return Result;
 }
 
-KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext(kbts_allocator_function *Allocator, void *AllocatorData)
+KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContextFixedMemory(void *Memory, int Size)
+{
+  kbts_shape_context *Result = kbts_PlaceShapeContextFixedMemory2(Memory, Size, KBTS_SHAPE_CONTEXT_FLAG_NONE);
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext2(kbts_allocator_function *Allocator, void *AllocatorData, kbts_shape_context_flags Flags)
 {
   if(!Allocator)
   {
     Allocator = kbts__DefaultAllocator;
   }
 
-  kbts_shape_context *Result = kbts_PlaceShapeContext(Allocator, AllocatorData, kbts__AllocatorAllocate(Allocator, AllocatorData, (kbts_un)kbts_SizeOfShapeContext()));
+  kbts_shape_context *Result = kbts_PlaceShapeContext2(Allocator, AllocatorData, kbts__AllocatorAllocate(Allocator, AllocatorData, (kbts_un)kbts_SizeOfShapeContext()), Flags);
   Result->SelfAllocator = Allocator;
   Result->SelfAllocatorData = AllocatorData;
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext(kbts_allocator_function *Allocator, void *AllocatorData)
+{
+  kbts_shape_context *Result = kbts_CreateShapeContext2(Allocator, AllocatorData, KBTS_SHAPE_CONTEXT_FLAG_NONE);
   return Result;
 }
 
@@ -25326,95 +24035,176 @@ KBTS_EXPORT kbts_glyph *kbts_PushGlyph(kbts_glyph_storage *Storage, kbts_font *F
   return Result;
 }
 
-static int kbts__FeatureOverrideIsExtra(kbts_u32 Tag, int Value)
-{
-  int Result = 0;
-  kbts__feature_id Id = kbts__FeatureTagToId(Tag);
 
-  if(!Id || (kbts_u32)(Value > 1))
+KBTS_EXPORT int kbts_SizeOfGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount)
+{
+  kbts_un NonBinaryOverrideCount = 0;
+  KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
   {
-    Result = 1;
-  }
+    kbts_feature_override *Override = &Overrides[OverrideIndex];
 
-  return Result;
-}
-
-static void kbts__AddExtraFeatureOverride(kbts_glyph_config *Config, kbts__feature_override *Extra, kbts_u32 Tag, int Value)
-{
-  Extra->Tag = Tag;
-  Extra->Value = Value;
-
-  KBTS__DLLIST_INSERT_BEFORE(&Extra->Header, &Config->FeatureOverrideSentinel);
-}
-
-KBTS_EXPORT int kbts_SizeOfGlyphConfig(kbts_feature_override *Overrides, int OverrideCount)
-{
-  kbts_un StoredOverrideCount = 0;
-
-  if(OverrideCount > 0)
-  {
-    KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
+    if(Override->Value > 1)
     {
-      kbts_feature_override *Override = &Overrides[OverrideIndex];
-
-      if(kbts__FeatureOverrideIsExtra(Override->Tag, Override->Value))
-      {
-        StoredOverrideCount += 1;
-      }
+      NonBinaryOverrideCount += 1;
     }
   }
 
-  kbts_un Result = sizeof(kbts_glyph_config) + StoredOverrideCount * sizeof(kbts__feature_override);
+  kbts_un SequentialLookupCount = kbts__SequentialLookupCount(ShapeConfig);
+  kbts_un LastSequentialLookupIndex = (SequentialLookupCount) ? (SequentialLookupCount - 1) : 0;
+  kbts__matrix_index LastRowEntryMatrixIndex = kbts__IdSequentialLookupMatrixIndex(LastSequentialLookupIndex, 0, SequentialLookupCount);
+  kbts_un MatrixRowSizeInBytes = sizeof(kbts_u32) * (LastRowEntryMatrixIndex.WordIndex + 1);
+
+  kbts_un Result = sizeof(kbts_glyph_config) +
+                   NonBinaryOverrideCount * sizeof(kbts__enabled_lookup) +
+                   MatrixRowSizeInBytes * 2;
   return (int)Result;
 }
 
-KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, void *Memory)
+KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, void *Memory)
 {
-  kbts_glyph_config *Result = (kbts_glyph_config *)Memory;
-  if(Memory)
+  kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(Memory);
+  kbts_glyph_config *Result = kbts__PointerPushType(&Bump, kbts_glyph_config);
+
+  if(ShapeConfig && Memory)
   {
     KBTS_MEMSET(Result, 0, sizeof(*Result));
-    KBTS__DLLIST_SENTINEL_INIT(&Result->FeatureOverrideSentinel);
 
-    kbts__feature_override *ExtraOverrides = KBTS__POINTER_AFTER(kbts__feature_override, Result);
+    kbts_un SequentialLookupCount = kbts__SequentialLookupCount(ShapeConfig);
+    kbts_un LastSequentialLookupIndex = (SequentialLookupCount) ? (SequentialLookupCount - 1) : 0;
+    kbts__matrix_index LastRowEntryMatrixIndex = kbts__IdSequentialLookupMatrixIndex(LastSequentialLookupIndex, 0, SequentialLookupCount);
+    kbts_un MatrixRowSizeInBytes = sizeof(kbts_u32) * (LastRowEntryMatrixIndex.WordIndex + 1);
+    kbts_u32 *EnabledLookupBits = (kbts_u32 *)kbts__PointerPush(&Bump, MatrixRowSizeInBytes, KBTS_ALIGNOF(kbts_u32));
+    KBTS_MEMSET(EnabledLookupBits, 0, MatrixRowSizeInBytes);
+    kbts_u32 *DisabledLookupBits = (kbts_u32 *)kbts__PointerPush(&Bump, MatrixRowSizeInBytes, KBTS_ALIGNOF(kbts_u32));
+    KBTS_MEMSET(DisabledLookupBits, 0, MatrixRowSizeInBytes);
 
-    if(OverrideCount > 0)
+    kbts__enabled_lookup NonBinaryEnabledLookups[KBTS_MAX_SIMULTANEOUS_FEATURES];
+    kbts_un NonBinaryEnabledLookupCount = 0;
+
+    kbts__feature_set OverriddenFeatures = KBTS__ZERO;
+    KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
     {
-      KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
+      kbts_feature_override *Override = &Overrides[OverrideIndex];
+      kbts__AddFeature(&OverriddenFeatures, kbts__FeatureTagToId(Override->Tag));
+    }
+
+    KBTS__FOR(ShapingTable, 0, KBTS_SHAPING_TABLE_COUNT)
+    {
+      // @Duplication
+      kbts__gsub_gpos *GsubGpos = kbts__BlobTableDataType(ShapeConfig->Font->Blob, (ShapingTable == KBTS_SHAPING_TABLE_GSUB) ? KBTS_BLOB_TABLE_ID_GSUB : KBTS_BLOB_TABLE_ID_GPOS, kbts__gsub_gpos);
+
+      kbts_un FirstSequentialLookupIndex = 0;
+      kbts_un OnePastLastSequentialLookupIndex = kbts__GsubSequentialLookupCount(ShapeConfig);
+      if(ShapingTable == KBTS_SHAPING_TABLE_GPOS)
       {
-        kbts_feature_override *Override = &Overrides[OverrideIndex];
-        kbts__feature_id Id = kbts__FeatureTagToId(Override->Tag);
+        FirstSequentialLookupIndex = OnePastLastSequentialLookupIndex;
+        OnePastLastSequentialLookupIndex = kbts__SequentialLookupCount(ShapeConfig);
+      }
 
-        if(kbts__FeatureOverrideIsExtra(Override->Tag, Override->Value))
+      kbts_lookup_list *LookupList = kbts__GetLookupList(GsubGpos);
+
+      kbts__iterate_features IterateFeatures = kbts__IterateFeatures(ShapeConfig, (kbts_shaping_table)ShapingTable, OverriddenFeatures);
+
+      while(kbts__NextFeature(&IterateFeatures))
+      {
+        kbts_feature_override *FoundOverride = 0;
+
+        KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
         {
-          kbts__feature_override *ExtraOverride = &ExtraOverrides[Result->ExtraOverrideCount++];
+          kbts_feature_override *Override = &Overrides[OverrideIndex];
 
-          kbts__AddExtraFeatureOverride(Result, ExtraOverride, Override->Tag, Override->Value);
+          if(Override->Tag == IterateFeatures.CurrentFeatureTag)
+          {
+            FoundOverride = Override;
+
+            break;
+          }
         }
 
-        kbts__AddFeature((Override->Value) ? &Result->EnabledFeatures : &Result->DisabledFeatures, Id);
-      }
+        // @Robustness: Why did we check for unregistered features here?
+        // if(!FoundOverride &&
+        //    (kbts__FeatureTagToId(IterateFeatures.CurrentFeatureTag) == KBTS__FEATURE_ID_UNREGISTERED))
+        // {
+        //   continue;
+        // }
+        if(FoundOverride)
+        {
+          kbts__iterate_lookups IterateLookups = kbts__IterateLookups(LookupList, IterateFeatures.Feature);
 
-      if(Result->ExtraOverrideCount)
-      {
-        kbts__feature_override *Last = &ExtraOverrides[Result->ExtraOverrideCount - 1];
-        Last->Header.Next = &Result->FeatureOverrideSentinel;
-        Result->FeatureOverrideSentinel.Prev = &Last->Header;
+          while(kbts__NextLookup(&IterateLookups))
+          {
+            kbts_u16 LookupIndex = IterateLookups.LookupIndex;
+            kbts_un FoundSequentialLookupIndex = 0;
+            kbts_b32 Found = 0;
+            KBTS__FOR(SequentialLookupIndex, FirstSequentialLookupIndex, OnePastLastSequentialLookupIndex)
+            {
+              kbts__sequential_lookup *SequentialLookup = &ShapeConfig->SequentialLookups[SequentialLookupIndex];
+
+              if(SequentialLookup->LookupIndex == LookupIndex)
+              {
+                FoundSequentialLookupIndex = SequentialLookupIndex;
+                Found = 1;
+
+                break;
+              }
+            }
+
+            if(Found)
+            {
+              kbts__matrix_index SequentialMatrixIndex = kbts__IdSequentialLookupMatrixIndex(FoundSequentialLookupIndex, 0, SequentialLookupCount);
+              if(FoundOverride->Value)
+              {
+                EnabledLookupBits[SequentialMatrixIndex.WordIndex] |= 1u << SequentialMatrixIndex.BitIndex;
+
+                if((FoundOverride->Value > 1) &&
+                   (NonBinaryEnabledLookupCount < KBTS_MAX_SIMULTANEOUS_FEATURES))
+                {
+                  kbts__enabled_lookup *NewEnabled = &NonBinaryEnabledLookups[NonBinaryEnabledLookupCount++];
+                  NewEnabled->SequentialLookupIndex = (kbts_u16)FoundSequentialLookupIndex;
+                  NewEnabled->Value = (kbts_u16)FoundOverride->Value;
+                }
+              }
+              else
+              {
+                DisabledLookupBits[SequentialMatrixIndex.WordIndex] |= 1u << SequentialMatrixIndex.BitIndex;
+              }
+            }
+          }
+        }
       }
     }
+
+    kbts__enabled_lookup *OutNonBinaryEnabledLookups = 0;
+    if(NonBinaryEnabledLookupCount)
+    {
+      OutNonBinaryEnabledLookups = kbts__PointerPushArray(&Bump, kbts__enabled_lookup, NonBinaryEnabledLookupCount);
+      KBTS_MEMCPY(OutNonBinaryEnabledLookups, NonBinaryEnabledLookups, sizeof(*NonBinaryEnabledLookups) * NonBinaryEnabledLookupCount);
+    }
+
+    Result->NonBinaryEnabledLookups = OutNonBinaryEnabledLookups;
+    Result->NonBinaryEnabledLookupCount = (kbts_u32)NonBinaryEnabledLookupCount;
+    Result->EnabledLookupBits = EnabledLookupBits;
+    Result->DisabledLookupBits = DisabledLookupBits;
+  }
+
+  kbts__feature_set OverriddenFeatures = KBTS__ZERO;
+  KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
+  {
+    kbts_feature_override *Override = &Overrides[OverrideIndex];
+    kbts__AddFeature(&OverriddenFeatures, kbts__FeatureTagToId(Override->Tag));
   }
 
   return Result;
 }
 
-KBTS_EXPORT kbts_glyph_config *kbts_CreateGlyphConfig(kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData)
+KBTS_EXPORT kbts_glyph_config *kbts_CreateGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, kbts_allocator_function *Allocator, void *AllocatorData)
 {
   if(!Allocator)
   {
     Allocator = kbts__DefaultAllocator;
   }
 
-  kbts_glyph_config *Result = kbts_PlaceGlyphConfig(Overrides, OverrideCount, kbts__AllocatorAllocate(Allocator, AllocatorData, (kbts_un)kbts_SizeOfGlyphConfig(Overrides, OverrideCount)));
+  kbts_glyph_config *Result = kbts_PlaceGlyphConfig(ShapeConfig, Overrides, OverrideCount, kbts__AllocatorAllocate(Allocator, AllocatorData, (kbts_un)kbts_SizeOfGlyphConfig(ShapeConfig, Overrides, OverrideCount)));
 
   if(Result)
   {
@@ -25447,12 +24237,14 @@ KBTS_EXPORT void kbts_ShapeBegin(kbts_shape_context *Context, kbts_direction Par
     kbts_ClearActiveGlyphs(&Context->GlyphStorage);
 
     Context->BreakStartIndex = 0;
-    Context->CurrentGlyphConfig = 0;
+
+    // Scratch features persist across frames. Don't reset ScratchFeatureOverrideCount.
+    Context->CurrentFeatureOverrides = 0;
+    Context->CurrentFeatureOverrideCount = 0;
     Context->NeedNewGlyphConfig = 1;
 
     Context->ParagraphDirection = ParagraphDirection;
     Context->Language = Language;
-    Context->UserFeatures = KBTS__ZERO_TYPE(kbts__feature_set);
 
     Context->InputCodepointCount = 0;
     Context->NextUserId = 0;
@@ -25461,7 +24253,6 @@ KBTS_EXPORT void kbts_ShapeBegin(kbts_shape_context *Context, kbts_direction Par
     Context->RunFont = 0;
     Context->RunScript = 0;
     Context->RunDirection = 0;
-    Context->ExistingShapeConfigCount = 0;
 
     kbts_BreakBegin(&Context->BreakState, ParagraphDirection, KBTS_JAPANESE_LINE_BREAK_STYLE_NORMAL, 0);
   }
@@ -25483,19 +24274,19 @@ static kbts__input_codepoint_index kbts__InputCodepointIndex(kbts_un FlatCodepoi
   {
     Result.BlockIndex = 0;
     Result.CodepointIndex = (kbts_u32)FlatCodepointIndex;
-    Result.BlockCodepointCount = 1 << (KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB + 1);
+    Result.BlockCodepointCount = 1u << (KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB + 1);
   }
   else
   {
     Result.BlockIndex = (kbts_u32)(MsbPosition - KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB);
-    Result.CodepointIndex = (kbts_u32)(FlatCodepointIndex & ~(1 << MsbPosition));
-    Result.BlockCodepointCount = (kbts_u32)(1 << MsbPosition);
+    Result.CodepointIndex = (kbts_u32)(FlatCodepointIndex & ~(1ull << MsbPosition));
+    Result.BlockCodepointCount = (kbts_u32)(1u << MsbPosition);
   }
 
   return Result;
 }
 
-static kbts_shape_codepoint *kbts__InputCodepoint(kbts_shape_context *Context, kbts_un Index)
+static kbts_shape_codepoint *kbts__InputCodepoint(kbts_shape_context *Context, kbts_un Index, kbts_b32 AllocateIfNeeded)
 {
   kbts_shape_codepoint *Result = 0;
 
@@ -25504,7 +24295,7 @@ static kbts_shape_codepoint *kbts__InputCodepoint(kbts_shape_context *Context, k
     kbts__input_codepoint_index InputIndex = kbts__InputCodepointIndex(Index);
 
     kbts_shape_codepoint *Block = Context->InputBlocks[InputIndex.BlockIndex];
-    if(!Block)
+    if(!Block && AllocateIfNeeded)
     {
       Block = kbts__PushArray(&Context->PermanentArena, kbts_shape_codepoint, InputIndex.BlockCodepointCount);
       if(!Block)
@@ -25560,10 +24351,11 @@ static int kbts__NextInputCodepoint(kbts_shape_codepoint_iterator *It, int *Code
   {
     It->BlockIndex += 1;
     It->CodepointIndex = 0;
-    It->CurrentBlockCodepointCount = (It->BlockIndex == It->EndBlockIndex) ? It->OnePastLastCodepointIndex : (1 << (It->BlockIndex + KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB));
+    It->CurrentBlockCodepointCount = (It->BlockIndex == It->EndBlockIndex) ? It->OnePastLastCodepointIndex : (1u << (It->BlockIndex + KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB));
   }
 
-  if(It->BlockIndex <= It->EndBlockIndex)
+  if((It->BlockIndex <= It->EndBlockIndex) &&
+     (It->CodepointIndex < It->CurrentBlockCodepointCount))
   {
     if(CodepointIndex)
     {
@@ -25604,8 +24396,15 @@ KBTS_EXPORT int kbts_ShapeGetShapeCodepoint(kbts_shape_context *Context, int Cod
   if((CodepointIndex >= 0) &&
      ((kbts_un)CodepointIndex < Context->InputCodepointCount))
   {
-    kbts_shape_codepoint *Source = kbts__InputCodepoint(Context, (kbts_un)CodepointIndex);
-    *Codepoint = *Source;
+    kbts_shape_codepoint *Source = kbts__InputCodepoint(Context, (kbts_un)CodepointIndex, 0);
+    if(Source)
+    {
+      *Codepoint = *Source;
+    }
+    else
+    {
+      KBTS_MEMSET(Codepoint, 0, sizeof(*Codepoint));
+    }
 
     Result = 1;
   }
@@ -25622,7 +24421,7 @@ static void kbts__UpdateBreaks(kbts_shape_context *Context)
     {
       // Strictly speaking, we do not need all of the flags, but we record them all anyway so we can expose them to the user.
       kbts_un BreakPosition = (kbts_u32)Break.Position + Context->BreakStartIndex;
-      kbts_shape_codepoint *InputCodepoint = kbts__InputCodepoint(Context, BreakPosition);
+      kbts_shape_codepoint *InputCodepoint = kbts__InputCodepoint(Context, BreakPosition, 1);
 
       if(Break.Flags & KBTS_BREAK_FLAG_LINE_HARD)
       {
@@ -25633,12 +24432,12 @@ static void kbts__UpdateBreaks(kbts_shape_context *Context)
       {
         // Try fonts, potentially break run.
         kbts_font *MatchFont = 0;
+        kbts_shape_context_flags ShapeContextFlags = Context->PublicFlags;
 
-        for(kbts_un FontIndex = Context->FontCount;
-            FontIndex;
-            --FontIndex)
+        KBTS__FOR(FontIndex_, 0, Context->FontCount)
         {
-          kbts_font *Font = Context->Fonts[FontIndex - 1].Font;
+          kbts_un FontIndex = (ShapeContextFlags & KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP) ? FontIndex_ : (Context->FontCount - 1 - FontIndex_);
+          kbts_font *Font = Context->Fonts[FontIndex].Font;
           kbts_font_coverage_test CoverageTest;
           kbts_FontCoverageTestBegin(&CoverageTest, Font);
 
@@ -25666,18 +24465,21 @@ static void kbts__UpdateBreaks(kbts_shape_context *Context)
         Context->LastGraphemeBreakIndex = (kbts_u32)BreakPosition;
       }
 
-      InputCodepoint->BreakFlags |= Break.Flags;
-      if(Break.Flags & KBTS_BREAK_FLAG_SCRIPT)
+      if(InputCodepoint)
       {
-        InputCodepoint->Script = Break.Script;
-      }
-      if(Break.Flags & KBTS_BREAK_FLAG_DIRECTION)
-      {
-        InputCodepoint->Direction = Break.Direction;
-      }
-      if(Break.Flags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION)
-      {
-        InputCodepoint->ParagraphDirection = Break.ParagraphDirection;
+        InputCodepoint->BreakFlags |= Break.Flags;
+        if(Break.Flags & KBTS_BREAK_FLAG_SCRIPT)
+        {
+          InputCodepoint->Script = Break.Script;
+        }
+        if(Break.Flags & KBTS_BREAK_FLAG_DIRECTION)
+        {
+          InputCodepoint->Direction = Break.Direction;
+        }
+        if(Break.Flags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION)
+        {
+          InputCodepoint->ParagraphDirection = Break.ParagraphDirection;
+        }
       }
     }
   }
@@ -25737,44 +24539,51 @@ KBTS_EXPORT void kbts_ShapeCodepointWithUserId(kbts_shape_context *Context, int 
   {
     if(Context->NeedNewGlyphConfig)
     {
-      kbts_glyph_config *Config = kbts__PushType(&Context->ScratchArena, kbts_glyph_config);
-      if(!Config)
+      kbts_un NewFeatureOverrideCount = Context->ScratchFeatureOverrideCount;
+
+      if(Context->ScratchFeatureOverrideCount)
       {
-        Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
-        return;
-      }
+        kbts_feature_override UniqueFeatureOverrides[KBTS_MAX_SIMULTANEOUS_FEATURES];
+        kbts_un UniqueFeatureOverrideCount = 0;
 
-      *Config = KBTS__ZERO_TYPE(kbts_glyph_config);
-      KBTS__DLLIST_SENTINEL_INIT(&Config->FeatureOverrideSentinel);
-
-      kbts__feature_set Features = KBTS__ZERO;
-      for(kbts__feature_override_header *OverrideHeader = Context->FeatureOverrideSentinel.Prev;
-          OverrideHeader != &Context->FeatureOverrideSentinel;
-          OverrideHeader = OverrideHeader->Prev)
-      {
-        kbts__feature_override *Override = (kbts__feature_override *)OverrideHeader;
-        kbts__feature_id Id = kbts__FeatureTagToId(Override->Tag);
-
-        if(!Id || !kbts__ContainsFeature(&Features, Id))
+        for(kbts_un ScratchFeatureOverrideIndex = Context->ScratchFeatureOverrideCount;
+            ScratchFeatureOverrideIndex;
+            --ScratchFeatureOverrideIndex)
         {
-          if(kbts__FeatureOverrideIsExtra(Override->Tag, Override->Value))
-          {
-            kbts__feature_override *Insert = kbts__PushType(&Context->ScratchArena, kbts__feature_override);
-            if(!Insert)
-            {
-              Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
-              return;
-            }
+          kbts_feature_override *ScratchOverride = &Context->ScratchFeatureOverrides[ScratchFeatureOverrideIndex - 1];
+          kbts_u32 ScratchTag = ScratchOverride->Tag;
 
-            kbts__AddExtraFeatureOverride(Config, Insert, Override->Tag, Override->Value);
+          kbts_b32 Dupe = 0;
+          KBTS__FOR(UniqueFeatureOverrideIndex, 0, UniqueFeatureOverrideCount)
+          {
+            kbts_feature_override *UniqueOverride = &UniqueFeatureOverrides[UniqueFeatureOverrideIndex];
+
+            if(UniqueOverride->Tag == ScratchTag)
+            {
+              Dupe = 1;
+              break;
+            }
           }
 
-          kbts__AddFeature(&Features, Id);
-          kbts__AddFeature((Override->Value) ? &Config->EnabledFeatures : &Config->DisabledFeatures, Id);
+          if(!Dupe)
+          {
+            UniqueFeatureOverrides[UniqueFeatureOverrideCount++] = *ScratchOverride;
+          }
         }
+
+        kbts_feature_override *Hoisted = kbts__PushArray(&Context->ScratchArena, kbts_feature_override, UniqueFeatureOverrideCount);
+        if(!Hoisted)
+        {
+          Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+          return;
+        }
+        KBTS_MEMCPY(Hoisted, Context->ScratchFeatureOverrides, sizeof(*Hoisted) * UniqueFeatureOverrideCount);
+        
+        Context->CurrentFeatureOverrides = Hoisted;
+        NewFeatureOverrideCount = UniqueFeatureOverrideCount;
       }
 
-      Context->CurrentGlyphConfig = Config;
+      Context->CurrentFeatureOverrideCount = (kbts_u32)NewFeatureOverrideCount;
       Context->NeedNewGlyphConfig = 0;
     }
 
@@ -25783,7 +24592,8 @@ KBTS_EXPORT void kbts_ShapeCodepointWithUserId(kbts_shape_context *Context, int 
       kbts_shape_codepoint InputCodepoint = KBTS__ZERO;
       InputCodepoint.Codepoint = Codepoint;
       InputCodepoint.UserId = UserId;
-      InputCodepoint.Config = Context->CurrentGlyphConfig;
+      InputCodepoint.FeatureOverrides = Context->CurrentFeatureOverrides;
+      InputCodepoint.FeatureOverrideCount = Context->CurrentFeatureOverrideCount;
 
       // @Robustness: There is probably a saner way of doing this.
       // When we do a manual break, we may have line breaks go out-of-bounds, and we
@@ -25807,7 +24617,7 @@ KBTS_EXPORT void kbts_ShapeCodepointWithUserId(kbts_shape_context *Context, int 
         Context->Flags &= ~KBTS__CONTEXT_FLAG_START_OF_MANUAL_RUN;
       }
 
-      kbts_shape_codepoint *To = kbts__InputCodepoint(Context, FlatCodepointIndex);
+      kbts_shape_codepoint *To = kbts__InputCodepoint(Context, FlatCodepointIndex, 1);
       if(To)
       {
         *To = InputCodepoint;
@@ -25887,7 +24697,7 @@ KBTS_EXPORT void kbts_ShapeUtf8WithUserId(kbts_shape_context *Context, const cha
       kbts_decode Decode = kbts_DecodeUtf8(At, (kbts_un)(End - At));
 
       if(Decode.Valid)
-      {
+      { 
         kbts_ShapeCodepointWithUserId(Context, Decode.Codepoint, UserId);
 
         UserId += CodepointIncrement;
@@ -25932,23 +24742,12 @@ KBTS_EXPORT void kbts_ShapePushFeature(kbts_shape_context *Context, kbts_u32 Tag
 {
   if(!Context->Error)
   {
-    kbts__feature_override *Override;
-    kbts__feature_override_header *Header = Context->FreeFeatureOverrideSentinel.Prev;
-    if(Header != &Context->FreeFeatureOverrideSentinel)
+    if(Context->ScratchFeatureOverrideCount < KBTS__ARRAY_LENGTH(Context->ScratchFeatureOverrides))
     {
-      Override = (kbts__feature_override *)Header;
+      kbts_feature_override *Override = &Context->ScratchFeatureOverrides[Context->ScratchFeatureOverrideCount++];
+      Override->Tag = Tag;
+      Override->Value = Value;
     }
-    else
-    {
-      Override = kbts__PushType(&Context->PermanentArena, kbts__feature_override);
-    }
-
-    KBTS__DLLIST_INSERT_BEFORE(&Override->Header, &Context->FeatureOverrideSentinel);
-    Override->Tag = Tag;
-    Override->Value = Value;
-
-    kbts__feature_id Id = kbts__FeatureTagToId(Tag);
-    kbts__AddFeature(&Context->UserFeaturesEnabled, Id);
 
     Context->NeedNewGlyphConfig = 1;
   }
@@ -25960,19 +24759,20 @@ KBTS_EXPORT int kbts_ShapePopFeature(kbts_shape_context *Context, kbts_u32 Tag)
 
   if(!Context->Error)
   {
-    for(kbts__feature_override_header *Header = Context->FeatureOverrideSentinel.Prev;
-        Header != &Context->FeatureOverrideSentinel;
-        Header = Header->Prev)
+    for(kbts_un ScratchFeatureOverrideIndex = Context->ScratchFeatureOverrideCount;
+        ScratchFeatureOverrideIndex;
+        --ScratchFeatureOverrideIndex)
     {
-      kbts__feature_override *Override = (kbts__feature_override *)Header;
+      kbts_feature_override *Override = &Context->ScratchFeatureOverrides[ScratchFeatureOverrideIndex - 1];
 
       if(Override->Tag == Tag)
       {
-        Result = 1;
+        KBTS__FOR(MoveIndex, ScratchFeatureOverrideIndex, Context->ScratchFeatureOverrideCount)
+        {
+          Context->ScratchFeatureOverrides[ScratchFeatureOverrideIndex - 1] = Context->ScratchFeatureOverrides[ScratchFeatureOverrideIndex];
+        }
 
-        KBTS__DLLIST_REMOVE(Header);
-        KBTS__DLLIST_INSERT_BEFORE(Header, &Context->FreeFeatureOverrideSentinel);
-
+        Context->ScratchFeatureOverrideCount -= 1;
         break;
       }
     }
@@ -25982,98 +24782,139 @@ KBTS_EXPORT int kbts_ShapePopFeature(kbts_shape_context *Context, kbts_u32 Tag)
       Context->NeedNewGlyphConfig = 1;
     }
   }
-
+  
   return Result;
 }
 
-static void kbts__ShapeDirect(kbts__shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage)
+static void kbts__ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection)
 {
-  KBTS_INSTRUMENT_BLOCK_BEGIN(ReadOpLoop0);
+  KBTS_INSTRUMENT_FUNCTION_BEGIN;
 
-  // For simple shapers, all of the shaping happens in this single loop.
-  // For complex shapers, this loop is preparing the text for clustering logic, which happens below.
-  while(kbts__ReadOp(Scratchpad, Config, KBTS__OP_KIND_BEGIN_CLUSTER))
+  if(kbts__GlyphIsValid(Storage, Storage->GlyphSentinel.Next))
   {
-    kbts__ExecuteOp(Scratchpad, Config, Storage);
+    Scratchpad->Ip = 0;
+    Scratchpad->FeatureStagesRead = 0;
+    Scratchpad->OpKind = 0;
+    Scratchpad->RunDirection = RunDirection;
+    Scratchpad->NextGlyphUid = 0;
+    Scratchpad->SequentialLookupIndexIndex = 0;
 
-    if(Scratchpad->Error)
-    {
-      return;
-    }
-  }
-
-  KBTS_INSTRUMENT_BLOCK_END(ReadOpLoop0);
-
-  if(Scratchpad->OpKind == KBTS__OP_KIND_BEGIN_CLUSTER)
-  {
-    kbts_u32 BeginClusterIp = Scratchpad->Ip;
-    kbts_u32 BeginClusterFeatureStagesRead = Scratchpad->FeatureStagesRead;
-    kbts_glyph *TopLevelGlyph = Storage->GlyphSentinel.Next;
-
-    Scratchpad->ClusterAtStartOfWord = 1;
-
-    while(kbts__GlyphIsValid(Storage, TopLevelGlyph))
-    {
-      int WordBreak = 0;
-
-      Scratchpad->Ip = BeginClusterIp;
-      Scratchpad->FeatureStagesRead = BeginClusterFeatureStagesRead;
-
+    { // @Cleanup @Speed
+      kbts_un SequentialLookupCount = kbts__SequentialLookupCount(Scratchpad->Config);
+      KBTS__FOR(LookupIndex, 0, SequentialLookupCount)
       {
-        // We need to store this in case TopLevelGlyph is reordered.
-        kbts_glyph *OneBeforeFirstClusterGlyph = TopLevelGlyph->Prev;
-        kbts_glyph *OnePastLastClusterGlyph = kbts__BeginCluster(Scratchpad, Config, Storage, TopLevelGlyph);
-
-        if(Scratchpad->Error)
-        {
-          return;
-        }
-
-        WordBreak = !(OnePastLastClusterGlyph->Prev->UnicodeFlags & KBTS_UNICODE_FLAG_PART_OF_WORD);
-        Scratchpad->Cluster = kbts__PushGlyphList(Storage, OneBeforeFirstClusterGlyph->Next, OnePastLastClusterGlyph->Prev);
+        kbts__FreeGlyphBucket(Scratchpad, LookupIndex);
       }
-
-      while(kbts__ReadOp(Scratchpad, Config, KBTS__OP_KIND_END_CLUSTER))
-      {
-        kbts__ExecuteOp(Scratchpad, Config, Storage);
-
-        if(Scratchpad->Error)
-        {
-          return;
-        }
-      }
-
-      kbts__EndCluster(Scratchpad, Config, Storage);
-
-      while(kbts__ReadOp(Scratchpad, Config, KBTS__OP_KIND_END_SYLLABLE))
-      {
-        kbts__ExecuteOp(Scratchpad, Config, Storage);
-
-        if(Scratchpad->Error)
-        {
-          return;
-        }
-      }
-
-      // Reattach the cluster to the main list.
-      Storage->GlyphSentinel.Next->Prev = Scratchpad->Cluster.OneBeforeFirst;
-      Storage->GlyphSentinel.Prev->Next = Scratchpad->Cluster.OnePastLast;
-      TopLevelGlyph = Scratchpad->Cluster.OnePastLast;
-
-      kbts__PopGlyphList(Storage, &Scratchpad->Cluster);
-
-      Scratchpad->ClusterAtStartOfWord = WordBreak;
     }
 
-    // Post-clustering ops work across clusters.
-    // This is where Indic GPOS + post-passes happen.
-    while(kbts__ReadOp(Scratchpad, Config, 0))
+    KBTS_INSTRUMENT_BLOCK_BEGIN(ReadOpLoop0);
+
+    // For simple shapers, all of the shaping happens in this single loop.
+    // For complex shapers, this loop is preparing the text for clustering logic, which happens below.
+    while(kbts__ReadOp(Scratchpad, KBTS__OP_KIND_BEGIN_CLUSTER))
     {
-      kbts__ExecuteOp(Scratchpad, Config, Storage);
+      kbts__ExecuteOp(Scratchpad, Storage);
 
       if(Scratchpad->Error)
       {
         return;
+      }
+    }
+
+    KBTS_INSTRUMENT_BLOCK_END(ReadOpLoop0);
+
+    if(Scratchpad->OpKind == KBTS__OP_KIND_BEGIN_CLUSTER)
+    {
+      kbts_u32 BeginClusterSequentialLookupIndexIndex = Scratchpad->SequentialLookupIndexIndex;
+      kbts_u32 BeginClusterIp = Scratchpad->Ip;
+      kbts_u32 BeginClusterFeatureStagesRead = Scratchpad->FeatureStagesRead;
+      kbts_glyph *TopLevelGlyph = Storage->GlyphSentinel.Next;
+
+      { // @Cleanup @Speed
+        // We have been bucketing all glyphs into cluster lookups. That's no good!
+        // For now, we zero all the buckets here and bucket the glyphs again, one cluster at a time.
+        kbts_un SequentialLookupCount = kbts__SequentialLookupCount(Scratchpad->Config);
+        KBTS__FOR(LookupIndex, BeginClusterSequentialLookupIndexIndex, SequentialLookupCount)
+        {
+          kbts__FreeGlyphBucket(Scratchpad, LookupIndex);
+        }
+      }
+
+      Scratchpad->ClusterAtStartOfWord = 1;
+
+      while(kbts__GlyphIsValid(Storage, TopLevelGlyph))
+      {
+        kbts_b32 WordBreak = 0;
+
+        Scratchpad->Ip = BeginClusterIp;
+        Scratchpad->FeatureStagesRead = BeginClusterFeatureStagesRead;
+        Scratchpad->SequentialLookupIndexIndex = BeginClusterSequentialLookupIndexIndex;
+
+        {
+          // We need to store this in case TopLevelGlyph is reordered.
+          kbts_glyph *OneBeforeFirstClusterGlyph = TopLevelGlyph->Prev;
+          kbts_glyph *OnePastLastClusterGlyph = kbts__BeginCluster(Scratchpad, Storage, TopLevelGlyph);
+
+          if(Scratchpad->Error)
+          {
+            return;
+          }
+
+          WordBreak = !(OnePastLastClusterGlyph->Prev->UnicodeFlags & KBTS_UNICODE_FLAG_PART_OF_WORD);
+          Scratchpad->Cluster = kbts__PushGlyphList(Storage, OneBeforeFirstClusterGlyph->Next, OnePastLastClusterGlyph->Prev);
+        }
+
+        // Bucket cluster glyphs for the first cluster op (or later).
+        KBTS__FOR_GLYPH(Storage, Glyph)
+        {
+          if(!kbts__BucketGlyph(Scratchpad, Glyph, BeginClusterSequentialLookupIndexIndex, 0))
+          {
+            kbts__UnbucketGlyph(Scratchpad, Glyph);
+          }
+        }
+
+        while(kbts__ReadOp(Scratchpad, KBTS__OP_KIND_END_CLUSTER))
+        {
+          kbts__ExecuteOp(Scratchpad, Storage);
+
+          if(Scratchpad->Error)
+          {
+            return;
+          }
+        }
+
+        kbts__EndCluster(Scratchpad, Storage);
+
+        while(kbts__ReadOp(Scratchpad, KBTS__OP_KIND_END_SYLLABLE))
+        {
+          kbts__ExecuteOp(Scratchpad, Storage);
+
+          if(Scratchpad->Error)
+          {
+            return;
+          }
+        }
+
+        // Reattach the cluster to the main list.
+        Storage->GlyphSentinel.Next->Prev = Scratchpad->Cluster.OneBeforeFirst;
+        Storage->GlyphSentinel.Prev->Next = Scratchpad->Cluster.OnePastLast;
+        TopLevelGlyph = Scratchpad->Cluster.OnePastLast;
+
+        kbts__PopGlyphList(Storage, &Scratchpad->Cluster);
+
+        Scratchpad->ClusterAtStartOfWord = WordBreak;
+      }
+
+      // Post-clustering ops work across clusters.
+      // This is where Indic GPOS + post-passes happen.
+      while(kbts__ReadOp(Scratchpad, 0))
+      {
+        kbts__ExecuteOp(Scratchpad, Storage);
+
+        if(Scratchpad->Error)
+        {
+          return;
+        }
       }
     }
   }
@@ -26081,23 +24922,77 @@ static void kbts__ShapeDirect(kbts__shape_scratchpad *Scratchpad, kbts_shape_con
   KBTS_INSTRUMENT_FUNCTION_END;
 }
 
-KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_config *Config, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_allocator_function *Allocator, void *AllocatorData, kbts_glyph_iterator *Output)
+KBTS_EXPORT void kbts_DestroyShapeScratchpad(kbts_shape_scratchpad *Scratchpad)
 {
-  if(!Allocator)
+  if(Scratchpad)
   {
-    Allocator = kbts__DefaultAllocator;
+    kbts_allocator_function *Allocator = Scratchpad->Allocator;
+    void *AllocatorData = Scratchpad->AllocatorData;
+
+    // We cannot just free the blocks inline, because freeing a start-of-allocation block will
+    // invalidate a bunch of other, unrelated blocks.
+    // We first store all of the start-of-allocation blocks in this list, and we then free them all at the end.
+    kbts__bucketed_glyph_block_header StartOfAllocationSentinel;
+    KBTS__DLLIST_SENTINEL_INIT(&StartOfAllocationSentinel);
+
+    kbts_un SequentialLookupCount = Scratchpad->SequentialLookupCount;
+    KBTS__FOR(LookupIndex, 0, SequentialLookupCount)
+    {
+      kbts__bucketed_glyph_block_header *Sentinel = &Scratchpad->LookupGlyphBuckets[LookupIndex];
+      for(kbts__bucketed_glyph_block_header *Header = Sentinel->Next;
+          Header != Sentinel;
+          )
+      {
+        kbts__bucketed_glyph_block_header *Next = Header->Next;
+
+        kbts__bucketed_glyph_block *Block = (kbts__bucketed_glyph_block *)Header;
+        if(Block->StartOfAllocation)
+        {
+          KBTS__DLLIST_REMOVE(&Block->Header);
+          KBTS__DLLIST_INSERT_BEFORE(&Block->Header, &StartOfAllocationSentinel);
+        }
+
+        Header = Next;
+      }
+    }
+
+    for(kbts__bucketed_glyph_block_header *Header = Scratchpad->FreeBucketedBlockSentinel.Next;
+        Header != &Scratchpad->FreeBucketedBlockSentinel;
+        )
+    {
+      kbts__bucketed_glyph_block_header *Next = Header->Next;
+
+      kbts__bucketed_glyph_block *Block = (kbts__bucketed_glyph_block *)Header;
+      if(Block->StartOfAllocation)
+      {
+        KBTS__DLLIST_REMOVE(&Block->Header);
+        KBTS__DLLIST_INSERT_BEFORE(&Block->Header, &StartOfAllocationSentinel);
+      }
+
+      Header = Next;
+    }
+
+    for(kbts__bucketed_glyph_block_header *Header = StartOfAllocationSentinel.Next;
+        Header != &StartOfAllocationSentinel;
+        )
+    {
+      kbts__bucketed_glyph_block_header *Next = Header->Next;
+
+      kbts__AllocatorFree(Allocator, AllocatorData, Header);
+
+      Header = Next;
+    }
+
+    if(Scratchpad->SelfAllocated)
+    {
+      kbts__AllocatorFree(Allocator, AllocatorData, Scratchpad);
+    }
   }
+}
 
-  kbts_arena Arena = KBTS__ZERO;
-  Arena.Allocator = Allocator;
-  Arena.AllocatorData = AllocatorData;
-
-  kbts__shape_scratchpad *Scratchpad = kbts__PushType(&Arena, kbts__shape_scratchpad);
-  KBTS_MEMSET(Scratchpad, 0, sizeof(*Scratchpad));
-  Scratchpad->Arena = &Arena;
-  Scratchpad->RunDirection = RunDirection;
-
-  kbts__ShapeDirect(Scratchpad, Config, Storage);
+KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_glyph_iterator *Output)
+{
+  kbts__ShapeDirect(Scratchpad, Storage, RunDirection);
   kbts_shape_error Result = Scratchpad->Error;
 
   if(!Result)
@@ -26107,25 +25002,6 @@ KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_config *Config, kbts_gl
   else
   {
     *Output = KBTS__ZERO_TYPE(kbts_glyph_iterator);
-  }
-
-  kbts__FreeArena(&Arena);
-
-  return Result;
-}
-
-KBTS_EXPORT kbts_shape_error kbts_ShapeDirectFixedMemory(kbts_shape_config *Config, kbts_glyph_storage *Storage, kbts_direction RunDirection, void *Memory, int MemorySize, kbts_glyph_iterator *Output)
-{
-  kbts_shape_error Result = 0;
-
-  if(Config && Storage && !Storage->Error && Memory && (MemorySize > 0))
-  {
-    kbts_arena Arena;
-
-    if(kbts__InitializeFixedMemoryArena(&Arena, Memory, (kbts_un)MemorySize))
-    {
-      Result = kbts_ShapeDirect(Config, Storage, RunDirection, kbts__ArenaAllocator, &Arena, Output);
-    }
   }
 
   return Result;
@@ -26149,8 +25025,11 @@ KBTS_EXPORT void kbts_ShapeEnd(kbts_shape_context *Context)
   if(!Context->Error)
   {
     // We check the break flags of the one-past-last codepoint, so reset it here.
-    kbts_shape_codepoint *OnePastLastCodepoint = kbts__InputCodepoint(Context, Context->InputCodepointCount);
-    *OnePastLastCodepoint = KBTS__ZERO_TYPE(kbts_shape_codepoint);
+    kbts_shape_codepoint *OnePastLastCodepoint = kbts__InputCodepoint(Context, Context->InputCodepointCount, 1);
+    if(OnePastLastCodepoint)
+    {
+      KBTS_MEMSET(OnePastLastCodepoint, 0, sizeof(*OnePastLastCodepoint));
+    }
 
     kbts_BreakEnd(&Context->BreakState);
     kbts__UpdateBreaks(Context);
@@ -26160,6 +25039,119 @@ KBTS_EXPORT void kbts_ShapeEnd(kbts_shape_context *Context)
 
     kbts__BeginParagraph(Context);
   }
+}
+
+static kbts_shape_config *kbts__FindOrCreateShapeConfig(kbts_shape_context *Context, kbts_font *Font, kbts_script Script, kbts_language Language)
+{
+  kbts_shape_config *Result = 0;
+
+  for(kbts__existing_shape_config_block *ExistingBlock = (kbts__existing_shape_config_block *)Context->ExistingShapeConfigBlockSentinel.Next;
+      kbts__ExistingShapeConfigBlockIsValid(Context, ExistingBlock);
+      ExistingBlock = (kbts__existing_shape_config_block *)ExistingBlock->Header.Next)
+  {
+    KBTS__FOR(ExistingIndex, 0, ExistingBlock->Count)
+    {
+      kbts__existing_shape_config *Existing = &ExistingBlock->Items[ExistingIndex];
+
+      if((Existing->Font == Font) &&
+         (Existing->Script == Script))
+      {
+        Result = Existing->Config;
+
+        break;
+      }
+    }
+  }
+  
+  if(!Result)
+  {
+    kbts__existing_shape_config_block *Last = (kbts__existing_shape_config_block *)Context->ExistingShapeConfigBlockSentinel.Prev;
+    if(!kbts__ExistingShapeConfigBlockIsValid(Context, Last) ||
+       (Last->Count == KBTS__EXISTING_SHAPE_CONFIGS_PER_BLOCK))
+    {
+      kbts__existing_shape_config_block *NewBlock = kbts__PushType(&Context->ConfigArena, kbts__existing_shape_config_block);
+      if(!NewBlock)
+      {
+        Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
+        return 0;
+      }
+
+      KBTS__DLLIST_INSERT_BEFORE(&NewBlock->Header, &Context->ExistingShapeConfigBlockSentinel);
+      NewBlock->Count = 0;
+
+      Last = NewBlock;
+    }
+
+    Result = kbts_CreateShapeConfig(Font, Script, Language, kbts__ArenaAllocator, &Context->ConfigArena);
+
+    KBTS_ASSERT(Last->Count < KBTS__EXISTING_SHAPE_CONFIGS_PER_BLOCK);
+    kbts__existing_shape_config *NewExisting = &Last->Items[Last->Count++];
+    NewExisting->Config = Result;
+    NewExisting->Font = Font;
+    NewExisting->Script = Script;
+  }
+
+  return Result;
+}
+
+static kbts_glyph_config *kbts__FindOrCreateGlyphConfig(kbts_shape_context *Context, kbts_shape_config *ShapeConfig, kbts_feature_override *FeatureOverrides, int FeatureOverrideCount)
+{
+  kbts_glyph_config *Result = 0;
+
+  if(FeatureOverrideCount)
+  {
+    for(kbts__existing_glyph_config_block *ExistingBlock = (kbts__existing_glyph_config_block *)Context->ExistingGlyphConfigBlockSentinel.Next;
+        kbts__ExistingGlyphConfigBlockIsValid(Context, ExistingBlock);
+        ExistingBlock = (kbts__existing_glyph_config_block *)ExistingBlock->Header.Next)
+    {
+      KBTS__FOR(ExistingIndex, 0, ExistingBlock->Count)
+      {
+        kbts__existing_glyph_config *Existing = &ExistingBlock->Items[ExistingIndex];
+
+        if((Existing->ShapeConfig == ShapeConfig) &&
+           (Existing->FeatureOverrides == FeatureOverrides) &&
+           (Existing->FeatureOverrideCount == FeatureOverrideCount))
+        {
+          Result = Existing->GlyphConfig;
+
+          break;
+        }
+      }
+    }
+
+    if(!Result)
+    {
+      kbts__existing_glyph_config_block *Last = (kbts__existing_glyph_config_block *)Context->ExistingGlyphConfigBlockSentinel.Prev;
+      if(!kbts__ExistingGlyphConfigBlockIsValid(Context, Last) ||
+         (Last->Count == KBTS__EXISTING_GLYPH_CONFIGS_PER_BLOCK))
+      {
+        kbts__existing_glyph_config_block *NewBlock = kbts__PushType(&Context->ConfigArena, kbts__existing_glyph_config_block);
+        if(!NewBlock)
+        {
+          Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
+          return 0;
+        }
+
+        KBTS__DLLIST_INSERT_BEFORE(&NewBlock->Header, &Context->ExistingGlyphConfigBlockSentinel);
+        NewBlock->Count = 0;
+
+        Last = NewBlock;
+      }
+
+      Result = kbts_CreateGlyphConfig(ShapeConfig, FeatureOverrides, FeatureOverrideCount, kbts__ArenaAllocator, &Context->ConfigArena);
+
+      KBTS_ASSERT(Last->Count < KBTS__EXISTING_GLYPH_CONFIGS_PER_BLOCK);
+      kbts__existing_glyph_config *Existing = &Last->Items[Last->Count++];
+      Existing->ShapeConfig = ShapeConfig;
+      Existing->FeatureOverrides = FeatureOverrides;
+      Existing->FeatureOverrideCount = FeatureOverrideCount;
+      Existing->GlyphConfig = Result;
+    }
+  }
+
+  return Result;
 }
 
 KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
@@ -26174,6 +25166,7 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
     kbts_direction RunParagraphDirection = Context->RunParagraphDirection;
     kbts_direction RunDirection = Context->RunDirection;
     kbts_language Language = Context->Language;
+    kbts_shape_config *ShapeConfig = 0;
 
     Run->Flags = 0;
 
@@ -26261,13 +25254,13 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
             if(!It->CodepointIndex)
             {
               It->BlockIndex -= 1;
-              It->CodepointIndex = (1 << (It->BlockIndex + KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB)) - 1;
+              It->CodepointIndex = (1u << (It->BlockIndex + KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB)) - 1;
             }
             else
             {
               It->CodepointIndex -= 1;
             }
-
+            
             It->FlatCodepointIndex -= 1;
 
             goto FoundBreak;
@@ -26280,14 +25273,25 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
             RunDirection = Context->RunDirection;
             RunParagraphDirection = Context->RunParagraphDirection;
 
-            kbts_PushGlyph(&Context->GlyphStorage, RunFont, InputCodepoint->Codepoint, InputCodepoint->Config, InputCodepointIndex);
+            // Initialize the shape_config now, before pushing glyphs.
+            ShapeConfig = kbts__FindOrCreateShapeConfig(Context, RunFont, RunScript, Language);
+
+            kbts_glyph_config *GlyphConfig = kbts__FindOrCreateGlyphConfig(Context, ShapeConfig, InputCodepoint->FeatureOverrides, InputCodepoint->FeatureOverrideCount);
+            kbts_PushGlyph(&Context->GlyphStorage, RunFont, InputCodepoint->Codepoint, GlyphConfig, InputCodepointIndex);
 
             Initialized = 1;
           }
         }
         else
         {
-          kbts_PushGlyph(&Context->GlyphStorage, RunFont, InputCodepoint->Codepoint, InputCodepoint->Config, InputCodepointIndex);
+          // This is an exceptional case, but it can happen when we detect no script.
+          if(!ShapeConfig)
+          {
+            ShapeConfig = kbts__FindOrCreateShapeConfig(Context, RunFont, RunScript, Language);
+          }
+
+          kbts_glyph_config *GlyphConfig = kbts__FindOrCreateGlyphConfig(Context, ShapeConfig, InputCodepoint->FeatureOverrides, InputCodepoint->FeatureOverrideCount);
+          kbts_PushGlyph(&Context->GlyphStorage, RunFont, InputCodepoint->Codepoint, GlyphConfig, InputCodepointIndex);
         }
       }
 
@@ -26295,51 +25299,22 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
 
       if(Result)
       {
-        kbts_shape_config *Config = 0;
-        KBTS__FOR(ExistingConfigIndex, 0, Context->ExistingShapeConfigCount)
-        {
-          kbts__existing_shape_config *Existing = &Context->ExistingShapeConfigs[ExistingConfigIndex];
-
-          if((Existing->Font == RunFont) &&
-             (Existing->Script == RunScript))
-          {
-            Config = Existing->Config;
-
-            break;
-          }
-        }
-
-        if(!Config)
-        {
-          Config = kbts_CreateShapeConfig(RunFont, RunScript, Language, kbts__ArenaAllocator, &Context->ScratchArena);
-
-          if(Context->ExistingShapeConfigCount < KBTS__ARRAY_LENGTH(Context->ExistingShapeConfigs))
-          {
-            kbts__existing_shape_config *NewExisting = &Context->ExistingShapeConfigs[Context->ExistingShapeConfigCount++];
-
-            NewExisting->Config = Config;
-            NewExisting->Font = RunFont;
-            NewExisting->Script = RunScript;
-          }
-        }
-
         if(!RunDirection)
         {
           RunDirection = KBTS_DIRECTION_LTR;
 
-          if((Config->Shaper == KBTS_SHAPER_ARABIC) ||
-             (Config->Shaper == KBTS_SHAPER_HEBREW))
+          if((ShapeConfig->Shaper == KBTS_SHAPER_ARABIC) ||
+             (ShapeConfig->Shaper == KBTS_SHAPER_HEBREW))
           {
             RunDirection = KBTS_DIRECTION_RTL;
           }
         }
 
-        kbts__shape_scratchpad *Scratchpad = kbts__PushType(&Context->ScratchArena, kbts__shape_scratchpad);
-        KBTS_MEMSET(Scratchpad, 0, sizeof(*Scratchpad));
-        Scratchpad->Arena = &Context->ScratchArena;
-        Scratchpad->RunDirection = RunDirection;
+        // @Memory: Store this alongside the shape_config!
+        kbts_un ScratchpadSize = kbts_SizeOfShapeScratchpad(ShapeConfig);
+        kbts_shape_scratchpad *Scratchpad = kbts_PlaceShapeScratchpad(ShapeConfig, kbts__PushSize(&Context->ScratchArena, ScratchpadSize, 8), kbts__ArenaAllocator, &Context->ScratchArena);
 
-        kbts__ShapeDirect(Scratchpad, Config, &Context->GlyphStorage);
+        kbts__ShapeDirect(Scratchpad, &Context->GlyphStorage, RunDirection);
 
         if(Scratchpad->Error)
         {
@@ -26349,14 +25324,16 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
     }
     else
     {
-      kbts_shape_codepoint *OnePastLast = kbts__InputCodepoint(Context, Context->InputCodepointCount);
-
-      if(OnePastLast->BreakFlags & KBTS_BREAK_FLAG_LINE_HARD)
+      kbts_shape_codepoint *OnePastLast = kbts__InputCodepoint(Context, Context->InputCodepointCount, 1);
+      if(OnePastLast)
       {
-        // Signal the terminating line break with a 0-sized run.
-        Run->Flags = OnePastLast->BreakFlags;
+        if(OnePastLast->BreakFlags & KBTS_BREAK_FLAG_LINE_HARD)
+        {
+          // Signal the terminating line break with a 0-sized run.
+          Run->Flags = OnePastLast->BreakFlags;
 
-        Result = 1;
+          Result = 1;
+        }
       }
 
       Context->DoneShapingRuns = 1;
@@ -26440,16 +25417,16 @@ static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts_blob_header *He
       kbts__cmap_subtable_pointer Subtable = kbts__GetCmapSubtable(Cmap, It);
       if((char *)(Subtable.Subtable + 1) <= TableEnd)
       {
-        kbts_u16 Format = *Subtable.Subtable;
+        kbts_u16 Format = kbts__ReadU16Unaligned(Subtable.Subtable);
 
         // This is kind of iffy, but the statelessness is useful for selecting
         // the cmap from an already-prepared blob without having to deal with
         // the byteswap context.
-        if((Format > 0xFF) &&
+        if((Format > 0xFF) && 
            ((Format >> 8) <= 14))
         {
           Format = kbts__ByteSwap16(Format);
-          *Subtable.Subtable = Format;
+          kbts__WriteU16Unaligned(Subtable.Subtable, Format);
         }
 
         if(Format == 14)
@@ -26490,8 +25467,6 @@ static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts_blob_header *He
 KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_state *State, void *FontData, int FontDataSize, int FontIndex, int *ScratchSize_, int *OutputSize_)
 {
   kbts_load_font_error Result = 0;
-  kbts_un ScratchSize = 0;
-  kbts_un OutputSize = 0;
 
   if(FontDataSize >= 4)
   {
@@ -26618,30 +25593,48 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
         State->GlyphCount = (kbts_u32)GlyphCount;
       }
 
-      ScratchSize = (State->Tables[KBTS_BLOB_TABLE_ID_GSUB].Length +
-                     State->Tables[KBTS_BLOB_TABLE_ID_GPOS].Length +
-                     State->Tables[KBTS_BLOB_TABLE_ID_GDEF].Length) * sizeof(kbts_u32) / 2;
+      kbts_un ScratchSize = (State->Tables[KBTS_BLOB_TABLE_ID_GSUB].Length +
+                             State->Tables[KBTS_BLOB_TABLE_ID_GPOS].Length +
+                             State->Tables[KBTS_BLOB_TABLE_ID_GDEF].Length) * sizeof(kbts_u32) / 2;
 
-      kbts_un GlyphLookupMatrixSizeInBytes = ((((State->LookupCount * State->GlyphCount) + 7) / 8) + 3) & ~3u;
-      kbts_un GlyphLookupSubtableMatrixSizeInBytes = ((((State->LookupSubtableCount * State->GlyphCount) + 7) / 8) + 3) & ~3u;
-      OutputSize = sizeof(kbts_blob_header) +
-                   sizeof(kbts_blob_table) * KBTS_BLOB_TABLE_ID_COUNT +
-                   GlyphLookupMatrixSizeInBytes +
-                   GlyphLookupSubtableMatrixSizeInBytes +
-                   sizeof(kbts_u32) * State->LookupCount +
-                   sizeof(kbts_lookup_subtable_info) * State->LookupSubtableCount;
+      kbts_un GlyphLookupMatrixSizeInWords = 0;
+      if(State->LookupCount &&
+         State->GlyphCount)
+      {
+        kbts__matrix_index LastIndex = kbts__GlyphLookupMatrixIndex(State->LookupCount - 1, State->GlyphCount - 1, State->GlyphCount);
+        GlyphLookupMatrixSizeInWords = LastIndex.WordIndex + 1;
+      }
+
+      kbts_un GlyphLookupSubtableMatrixSizeInWords = 0;
+      if(State->LookupSubtableCount &&
+         State->GlyphCount)
+      {
+        kbts__matrix_index LastIndex = kbts__GlyphLookupSubtableMatrixIndex(State->LookupSubtableCount - 1, State->LookupSubtableCount, State->GlyphCount - 1, State->GlyphCount);
+        GlyphLookupSubtableMatrixSizeInWords = LastIndex.WordIndex + 1;
+      }
+
+      kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(0);
+
+      kbts__PointerPushType(&Bump, kbts_blob_header);
 
       KBTS__FOR(TableId, 0, KBTS_BLOB_TABLE_ID_COUNT)
       {
-        OutputSize += State->Tables[TableId].Length;
+        kbts__PointerPush(&Bump, State->Tables[TableId].Length, 4);
       }
+
+      kbts__PointerPushArray(&Bump, kbts_u32, GlyphLookupMatrixSizeInWords);
+      kbts__PointerPushArray(&Bump, kbts_u32, GlyphLookupSubtableMatrixSizeInWords);
+      kbts__PointerPushArray(&Bump, kbts_u32, State->LookupCount);
+
+      // Add the align just to make sure we can accept any pointer.
+      kbts_un OutputSize = Bump.At + KBTS_ALIGNOF(kbts_blob_header);
 
       *ScratchSize_ = (int)ScratchSize;
       *OutputSize_ = (int)OutputSize;
 
       State->ScratchSize = (kbts_u32)ScratchSize;
-      State->GlyphLookupMatrixSizeInBytes = (kbts_u32)GlyphLookupMatrixSizeInBytes;
-      State->GlyphLookupSubtableMatrixSizeInBytes = (kbts_u32)GlyphLookupSubtableMatrixSizeInBytes;
+      State->GlyphLookupMatrixSizeInBytes = (kbts_u32)(GlyphLookupMatrixSizeInWords * sizeof(kbts_u32));
+      State->GlyphLookupSubtableMatrixSizeInBytes = (kbts_u32)(GlyphLookupSubtableMatrixSizeInWords * sizeof(kbts_u32));
       State->TotalSize = (kbts_u32)OutputSize;
     }
     else if(Magic == KBTS_FOURCC('k', 'b', 't', 's'))
@@ -26681,13 +25674,13 @@ static void kbts__MarkMatrixCoverage(kbts_u32 *Matrix, kbts_un TableIndex, kbts_
       KBTS__FOR(GlyphIndex, 0, Coverage->Count)
       {
         kbts_un GlyphId = GlyphIds[GlyphIndex];
-        kbts__matrix_index MatrixIndex = SubtableMatrix ?
-          kbts__GlyphLookupSubtableMatrixIndex(TableIndex, TableCount, GlyphId) :
+        kbts__matrix_index MatrixIndex = SubtableMatrix ? 
+          kbts__GlyphLookupSubtableMatrixIndex(TableIndex, TableCount, GlyphId, GlyphCount) :
           kbts__GlyphLookupMatrixIndex(TableIndex, GlyphId, GlyphCount);
 
         if(GlyphId < GlyphCount)
         {
-          Matrix[MatrixIndex.WordIndex] |= 1 << MatrixIndex.BitIndex;
+          Matrix[MatrixIndex.WordIndex] |= 1u << MatrixIndex.BitIndex;
         }
       }
     }
@@ -26700,13 +25693,13 @@ static void kbts__MarkMatrixCoverage(kbts_u32 *Matrix, kbts_un TableIndex, kbts_
         kbts__range_record *Range = &Ranges[RangeIndex];
         KBTS__FOR(GlyphId, Range->StartGlyphId, (kbts_un)Range->EndGlyphId + 1)
         {
-          kbts__matrix_index MatrixIndex = SubtableMatrix ?
-            kbts__GlyphLookupSubtableMatrixIndex(TableIndex, TableCount, GlyphId) :
+          kbts__matrix_index MatrixIndex = SubtableMatrix ? 
+            kbts__GlyphLookupSubtableMatrixIndex(TableIndex, TableCount, GlyphId, GlyphCount) :
             kbts__GlyphLookupMatrixIndex(TableIndex, GlyphId, GlyphCount);
 
           if(GlyphId < GlyphCount)
           {
-            Matrix[MatrixIndex.WordIndex] |= 1 << MatrixIndex.BitIndex;
+            Matrix[MatrixIndex.WordIndex] |= 1u << MatrixIndex.BitIndex;
           }
         }
       }
@@ -26731,8 +25724,8 @@ static void kbts__MarkMatrixClassDef(kbts_u32 *Matrix, kbts_un SubtableIndex, kb
         if((GlyphId >= (ClassesIncludedLength * 64)) ||
            (ClassesIncluded[GlyphClass / 64] & (1ull << (GlyphClass % 64))))
         {
-          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId);
-          Matrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
+          Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
         }
       }
     }
@@ -26757,8 +25750,8 @@ static void kbts__MarkMatrixClassDef(kbts_u32 *Matrix, kbts_un SubtableIndex, kb
 
           KBTS__FOR(GlyphId, Range->StartGlyphId, OnePastLastGlyphId)
           {
-            kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId);
-            Matrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+            kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
+            Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
           }
         }
       }
@@ -26782,27 +25775,27 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
   if(Result == KBTS_LOAD_FONT_ERROR_NONE)
   {
-    kbts_blob_header *Header = (kbts_blob_header *)OutputMemory;
+    kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(OutputMemory);
+
+    kbts_blob_header *Header = kbts__PointerPushType(&Bump, kbts_blob_header);
     *Header = KBTS__ZERO_TYPE(kbts_blob_header);
     Header->Magic = KBTS_FOURCC('k', 'b', 't', 's');
-    Header->Version = 1;
+    Header->Version = KBTS_BLOB_VERSION_CURRENT;
     Header->LookupCount = State->LookupCount;
     Header->LookupSubtableCount = State->LookupSubtableCount;
 
     // Stamp packed font data.
-    char *OutData = KBTS__POINTER_AFTER(char, Header);
     KBTS__FOR(TableId, 0, KBTS_BLOB_TABLE_ID_COUNT)
     {
       kbts_blob_table InTable = State->Tables[TableId];
       kbts_blob_table *OutTable = &Header->Tables[TableId];
 
-      OutTable->OffsetFromStartOfFile = KBTS__POINTER_DIFF32(OutData, Header);
+      char *TableBase = (char *)kbts__PointerPush(&Bump, InTable.Length, 4);
+      OutTable->OffsetFromStartOfFile = KBTS__POINTER_DIFF32(TableBase, Header);
       OutTable->Length = InTable.Length;
 
       void *InData = KBTS__POINTER_OFFSET(void, State->FontData, InTable.OffsetFromStartOfFile);
-      KBTS_MEMCPY(OutData, InData, InTable.Length);
-
-      OutData += InTable.Length;
+      KBTS_MEMCPY(TableBase, InData, InTable.Length);
     }
 
     // Byteswap it.
@@ -26862,7 +25855,8 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
             kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtable(Header, CmapTable, &Font->Cmap14, &PreferredFormat);
             if(PreferredSubtable.Subtable)
             {
-              switch(*PreferredSubtable.Subtable)
+              kbts_u16 SubtableFormat = kbts__ReadU16Unaligned(PreferredSubtable.Subtable);
+              switch(SubtableFormat)
               {
               case 0:
               {
@@ -27222,7 +26216,8 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
           KBTS__FOR(MarkGlyphSetIndex, 0, MarkGlyphSets->MarkGlyphSetCount)
           {
-            kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffsets[MarkGlyphSetIndex]);
+            kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkGlyphSetIndex]);
+            kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffset);
             kbts__ByteSwapCoverage(&ByteSwapContext, Coverage);
           }
         }
@@ -27287,7 +26282,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
           KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
           {
             kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
-
+            
             KBTS_DUMPF("  Subtable %llu:\n", (kbts_un)SubstitutionIndex);
 
             kbts__ByteSwapGposLookupSubtable(&ByteSwapContext, LookupList, Lookup.Type, Base);
@@ -27306,15 +26301,13 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       kbts_un LookupCount = Header->LookupCount;
       kbts_un SubtableCount = Header->LookupSubtableCount;
 
-      kbts_u32 *GlyphLookupMatrix = (kbts_u32 *)OutData;
-      kbts_u32 *GlyphLookupSubtableMatrix = KBTS__POINTER_OFFSET(kbts_u32, GlyphLookupMatrix, State->GlyphLookupMatrixSizeInBytes);
-      kbts_u32 *LookupSubtableIndexOffsets = KBTS__POINTER_OFFSET(kbts_u32, GlyphLookupSubtableMatrix, State->GlyphLookupSubtableMatrixSizeInBytes);
-      kbts_lookup_subtable_info *SubtableInfos = KBTS__POINTER_OFFSET(kbts_lookup_subtable_info, LookupSubtableIndexOffsets, sizeof(kbts_u32) * Header->LookupCount);
+      kbts_u32 *GlyphLookupMatrix = kbts__PointerPushArray(&Bump, kbts_u32, State->GlyphLookupMatrixSizeInBytes / sizeof(kbts_u32));
+      kbts_u32 *GlyphLookupSubtableMatrix = kbts__PointerPushArray(&Bump, kbts_u32, State->GlyphLookupSubtableMatrixSizeInBytes / sizeof(kbts_u32));
+      kbts_u32 *LookupSubtableIndexOffsets = kbts__PointerPushArray(&Bump, kbts_u32, State->LookupCount);
 
-      KBTS_MEMSET(GlyphLookupMatrix, 0, State->GlyphLookupMatrixSizeInBytes +
-                                        State->GlyphLookupSubtableMatrixSizeInBytes +
-                                        sizeof(kbts_u32) * Header->LookupCount +
-                                        sizeof(kbts_lookup_subtable_info) * Header->LookupSubtableCount);
+      KBTS_MEMSET(GlyphLookupMatrix, 0, State->GlyphLookupMatrixSizeInBytes);
+      KBTS_MEMSET(GlyphLookupSubtableMatrix, 0, State->GlyphLookupSubtableMatrixSizeInBytes);
+      KBTS_MEMSET(LookupSubtableIndexOffsets, 0, sizeof(kbts_u32) * State->LookupCount);
 
       kbts_un GposLookupIndexOffset = 0;
       kbts_un RunningLookupIndex = 0;
@@ -27332,11 +26325,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
           int InGpos = (TableId == KBTS_BLOB_TABLE_ID_GPOS);
           kbts_shaping_table ShapingTableId = (kbts_shaping_table)(InGpos ? KBTS_SHAPING_TABLE_GPOS : KBTS_SHAPING_TABLE_GSUB);
 
-          if(InGpos)
-          {
-            GposLookupIndexOffset = RunningLookupIndex;
-          }
-
           if(ShapingTable)
           {
             kbts_lookup_list *LookupList = kbts__GetLookupList(ShapingTable);
@@ -27349,7 +26337,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
               KBTS__FOR(SubtableIndex, 0, Lookup.SubtableCount)
               {
-                kbts_lookup_subtable_info SubtableInfo = KBTS__ZERO;
                 kbts_u16 LookupType = Lookup.Type;
                 kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubtableIndex]);
 
@@ -27386,11 +26373,9 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                       {
                         kbts_un GlyphId = Ids[IdIndex - 1];
 
-                        kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId);
-                        GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+                        kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
+                        GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                       }
-
-                      SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Ligature->ComponentCount - 1) + 1;
                     }
                   }
                 }
@@ -27411,15 +26396,14 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                         KBTS__FOR(RuleIndex, 0, Set->Count)
                         {
                           kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
-                          SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Rule->GlyphCount - 1) + 1;
 
                           kbts_u16 *SequenceGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Rule);
                           KBTS__FOR(InputIndex, 1, Rule->GlyphCount)
                           {
                             kbts_un GlyphId = SequenceGlyphIds[InputIndex - 1];
 
-                            kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId);
-                            GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+                            kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
+                            GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                           }
                         }
                       }
@@ -27443,8 +26427,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                           kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
                           kbts_u16 *SequenceClasses = KBTS__POINTER_AFTER(kbts_u16, Rule);
 
-                          SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Rule->GlyphCount - 1) + 1;
-
                           KBTS__FOR(SequenceIndex, 1, Rule->GlyphCount)
                           {
                             kbts_un Class = SequenceClasses[SequenceIndex - 1];
@@ -27465,8 +26447,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   {
                     kbts__sequence_context_3 *Subst = (kbts__sequence_context_3 *)Base;
                     kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
-
-                    SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Subst->GlyphCount - 1) + 1;
 
                     KBTS__FOR(CoverageIndex, 1, Subst->GlyphCount)
                     {
@@ -27497,28 +26477,25 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                         kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
                         kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
 
-                        SubtableInfo.MinimumBacktrackPlusOne = KBTS__MIN(SubtableInfo.MinimumBacktrackPlusOne - 1, Unpacked.BacktrackCount) + 1;
-                        SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Unpacked.InputCount - 1 + Unpacked.LookaheadCount) + 1;
-
                         KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                         {
                           kbts_un GlyphId = Unpacked.Backtrack[BacktrackIndex];
-                          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId);
-                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+                          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
+                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                         }
 
                         KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
                         {
                           kbts_un GlyphId = Unpacked.Input[InputIndex - 1];
-                          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId);
-                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+                          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
+                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                         }
 
                         KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
                         {
                           kbts_un GlyphId = Unpacked.Lookahead[LookaheadIndex];
-                          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId);
-                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1 << SubtableMatrixIndex.BitIndex;
+                          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
+                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                         }
                       }
                     }
@@ -27559,9 +26536,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                         {
                           kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
                           kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
-
-                          SubtableInfo.MinimumBacktrackPlusOne = KBTS__MIN(SubtableInfo.MinimumBacktrackPlusOne - 1, Unpacked.BacktrackCount) + 1;
-                          SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Unpacked.InputCount - 1 + Unpacked.LookaheadCount) + 1;
 
                           KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                           {
@@ -27605,9 +26579,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                     Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.InputCoverageOffsets[0]);
 
-                    SubtableInfo.MinimumBacktrackPlusOne = KBTS__MIN(SubtableInfo.MinimumBacktrackPlusOne - 1, Unpacked.BacktrackCount) + 1;
-                    SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Unpacked.InputCount - 1 + Unpacked.LookaheadCount) + 1;
-
                     KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
                     {
                       kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]);
@@ -27633,8 +26604,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                 {
                   kbts__reverse_chain_substitution *Subst = (kbts__reverse_chain_substitution *)Base;
                   kbts__unpacked_reverse_chain_substitution Unpacked = kbts__UnpackReverseChainSubstitution(Subst, 0);
-                  SubtableInfo.MinimumBacktrackPlusOne = KBTS__MIN(SubtableInfo.MinimumBacktrackPlusOne - 1, Unpacked.BacktrackCount) + 1;
-                  SubtableInfo.MinimumFollowupPlusOne = KBTS__MIN(SubtableInfo.MinimumFollowupPlusOne - 1, Unpacked.LookaheadCount) + 1;
 
                   KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                   {
@@ -27652,12 +26621,16 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                 kbts__MarkMatrixCoverage(GlyphLookupMatrix, RunningLookupIndex, LookupCount, GlyphCount, Coverage, 0);
                 kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, Coverage, 1);
 
-                SubtableInfos[RunningSubtableIndex] = SubtableInfo;
                 RunningSubtableIndex += 1;
               }
 
               RunningLookupIndex += 1;
             }
+          }
+
+          if(!InGpos)
+          {
+            GposLookupIndexOffset = RunningLookupIndex;
           }
         }
       }
@@ -27666,7 +26639,6 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       Header->GlyphLookupMatrixOffsetFromStartOfFile = KBTS__POINTER_DIFF32(GlyphLookupMatrix, Header);
       Header->GlyphLookupSubtableMatrixOffsetFromStartOfFile = KBTS__POINTER_DIFF32(GlyphLookupSubtableMatrix, Header);
       Header->LookupSubtableIndexOffsetsOffsetFromStartOfFile = KBTS__POINTER_DIFF32(LookupSubtableIndexOffsets, Header);
-      Header->SubtableInfosOffsetFromStartOfFile = KBTS__POINTER_DIFF32(SubtableInfos, Header);
     }
   }
 
@@ -27679,119 +26651,181 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
   return Result;
 }
 
-KBTS_EXPORT void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info)
+KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
 {
-  KBTS_MEMSET(Info, 0, sizeof(*Info));
-  kbts_blob_header *Blob = Font->Blob;
-
-  if(kbts_FontIsValid(Font) && Blob)
+  if(Info && Info->Size)
   {
-    kbts_blob_table *NameTable = &Blob->Tables[KBTS_BLOB_TABLE_ID_NAME];
+    kbts_un InfoSize = Info->Size;
+    KBTS_MEMSET(Info, 0, InfoSize);
+    Info->Size = (kbts_u32)InfoSize;
 
-    if(NameTable->Length)
+    kbts_blob_header *Blob = Font->Blob;
+
+    if(Font && kbts_FontIsValid(Font) && Blob)
     {
-      kbts__name *Name = KBTS__POINTER_OFFSET(kbts__name, Blob, NameTable->OffsetFromStartOfFile);
-      kbts__name_record *Records = KBTS__POINTER_AFTER(kbts__name_record, Name);
-      char *StringBase = KBTS__POINTER_OFFSET(char, Name, Name->StringStorageOffset);
+      kbts__name *Name = kbts__BlobTableDataType(Blob, KBTS_BLOB_TABLE_ID_NAME, kbts__name);
+      kbts__os2 *Os2 = kbts__BlobTableDataType(Blob, KBTS_BLOB_TABLE_ID_OS2, kbts__os2);
+      // @Incomplete: Support vhea, too.
+      kbts__hea *Hhea = kbts__BlobTableDataType(Blob, KBTS_BLOB_TABLE_ID_HHEA, kbts__hea);
+      kbts__head *Head = kbts__BlobTableDataType(Blob, KBTS_BLOB_TABLE_ID_HEAD, kbts__head);
 
-      KBTS__FOR(RecordIndex, 0, Name->Count)
+      switch(InfoSize)
       {
-        kbts__name_record *Record = &Records[RecordIndex];
+      case sizeof(kbts_font_info2_2):
+      {
+        kbts_font_info2_2 *Info2_2 = (kbts_font_info2_2 *)Info;
 
-        if(!Record->LanguageId)
+        if(Os2)
         {
-          kbts_font_info_string_id Id = KBTS_FONT_INFO_STRING_ID_NONE;
-
-          switch(Record->NameId)
-          {
-          case 0: Id = KBTS_FONT_INFO_STRING_ID_COPYRIGHT; break;
-          case 1: Id = KBTS_FONT_INFO_STRING_ID_FAMILY; break;
-          case 2: Id = KBTS_FONT_INFO_STRING_ID_SUBFAMILY; break;
-          case 3: Id = KBTS_FONT_INFO_STRING_ID_UID; break;
-          case 4: Id = KBTS_FONT_INFO_STRING_ID_FULL_NAME; break;
-          case 5: Id = KBTS_FONT_INFO_STRING_ID_VERSION; break;
-          case 6: Id = KBTS_FONT_INFO_STRING_ID_POSTSCRIPT_NAME; break;
-          case 7: Id = KBTS_FONT_INFO_STRING_ID_TRADEMARK; break;
-          case 8: Id = KBTS_FONT_INFO_STRING_ID_MANUFACTURER; break;
-          case 9: Id = KBTS_FONT_INFO_STRING_ID_DESIGNER; break;
-          case 10: Id = KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY; break;
-          case 11: Id = KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY; break;
-          }
-
-          if(Id)
-          {
-            Info->Strings[Id] = KBTS__POINTER_OFFSET(char, StringBase, Record->StringOffset);
-            Info->StringLengths[Id] = Record->Length;
-          }
+          Info2_2->CapitalHeight = Os2->CapHeight;
         }
       }
+      KBTS__FALLTHROUGH;
 
-      if(!Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY])
+      case sizeof(kbts_font_info2_1):
       {
-        Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY] = Info->Strings[KBTS_FONT_INFO_STRING_ID_FAMILY];
-        Info->StringLengths[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY] = Info->StringLengths[KBTS_FONT_INFO_STRING_ID_FAMILY];
-      }
+        kbts_font_info2_1 *Info2_1 = (kbts_font_info2_1 *)Info;
 
-      if(!Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY])
+        if(Os2)
+        {
+          Info2_1->Ascent = Os2->TypoAscender;
+          Info2_1->Descent = Os2->TypoDescender;
+          Info2_1->LineGap = Os2->TypoLineGap;
+        }
+        else if(Hhea)
+        {
+          Info2_1->Ascent = Hhea->Ascent;
+          Info2_1->Descent = Hhea->Descent;
+          Info2_1->LineGap = Hhea->LineGap;
+        }
+
+        if(Head)
+        {
+          Info2_1->UnitsPerEm = Head->UnitsPerEm;
+
+          Info2_1->XMin = Head->XMin;
+          Info2_1->YMin = Head->YMin;
+          Info2_1->XMax = Head->XMax;
+          Info2_1->YMax = Head->YMax;
+        }
+      }
+      KBTS__FALLTHROUGH;
+
+      case sizeof(kbts_font_info2):
       {
-        Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY] = Info->Strings[KBTS_FONT_INFO_STRING_ID_SUBFAMILY];
-        Info->StringLengths[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY] = Info->StringLengths[KBTS_FONT_INFO_STRING_ID_SUBFAMILY];
-      }
-    }
+        if(Name)
+        {
+          kbts__name_record *Records = KBTS__POINTER_AFTER(kbts__name_record, Name);
+          char *StringBase = KBTS__POINTER_OFFSET(char, Name, Name->StringStorageOffset);
 
-    kbts_blob_table *Os2Table = &Blob->Tables[KBTS_BLOB_TABLE_ID_OS2];
+          KBTS__FOR(RecordIndex, 0, Name->Count)
+          {
+            kbts__name_record *Record = &Records[RecordIndex];
 
-    if(Os2Table->Length)
-    {
-      kbts__os2 *Os2 = KBTS__POINTER_OFFSET(kbts__os2, Blob, Os2Table->OffsetFromStartOfFile);
-      kbts_font_weight Weight = KBTS_FONT_WEIGHT_UNKNOWN;
-      kbts_font_width Width = KBTS_FONT_WIDTH_UNKNOWN;
-      kbts_font_style_flags StyleFlags = KBTS_FONT_STYLE_FLAG_NONE;
+            if(!Record->LanguageId)
+            {
+              kbts_font_info_string_id Id = KBTS_FONT_INFO_STRING_ID_NONE;
 
-      switch(Os2->WeightClass)
-      {
-      case 100: Weight = KBTS_FONT_WEIGHT_THIN; break;
-      case 200: Weight = KBTS_FONT_WEIGHT_EXTRA_LIGHT; break;
-      case 300: Weight = KBTS_FONT_WEIGHT_LIGHT; break;
-      case 400: Weight = KBTS_FONT_WEIGHT_NORMAL; break;
-      case 500: Weight = KBTS_FONT_WEIGHT_MEDIUM; break;
-      case 600: Weight = KBTS_FONT_WEIGHT_SEMI_BOLD; break;
-      case 700: Weight = KBTS_FONT_WEIGHT_BOLD; break;
-      case 800: Weight = KBTS_FONT_WEIGHT_EXTRA_BOLD; break;
-      case 900: Weight = KBTS_FONT_WEIGHT_BLACK; break;
-      }
+              switch(Record->NameId)
+              {
+              case 0: Id = KBTS_FONT_INFO_STRING_ID_COPYRIGHT; break;
+              case 1: Id = KBTS_FONT_INFO_STRING_ID_FAMILY; break;
+              case 2: Id = KBTS_FONT_INFO_STRING_ID_SUBFAMILY; break;
+              case 3: Id = KBTS_FONT_INFO_STRING_ID_UID; break;
+              case 4: Id = KBTS_FONT_INFO_STRING_ID_FULL_NAME; break;
+              case 5: Id = KBTS_FONT_INFO_STRING_ID_VERSION; break;
+              case 6: Id = KBTS_FONT_INFO_STRING_ID_POSTSCRIPT_NAME; break;
+              case 7: Id = KBTS_FONT_INFO_STRING_ID_TRADEMARK; break;
+              case 8: Id = KBTS_FONT_INFO_STRING_ID_MANUFACTURER; break;
+              case 9: Id = KBTS_FONT_INFO_STRING_ID_DESIGNER; break;
+              case 10: Id = KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY; break;
+              case 11: Id = KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY; break;
+              }
 
-      switch(Os2->WidthClass)
-      {
-      case 1: Width = KBTS_FONT_WIDTH_ULTRA_CONDENSED; break;
-      case 2: Width = KBTS_FONT_WIDTH_EXTRA_CONDENSED; break;
-      case 3: Width = KBTS_FONT_WIDTH_CONDENSED; break;
-      case 4: Width = KBTS_FONT_WIDTH_SEMI_CONDENSED; break;
-      case 5: Width = KBTS_FONT_WIDTH_NORMAL; break;
-      case 6: Width = KBTS_FONT_WIDTH_SEMI_EXPANDED; break;
-      case 7: Width = KBTS_FONT_WIDTH_EXPANDED; break;
-      case 8: Width = KBTS_FONT_WIDTH_EXTRA_EXPANDED; break;
-      case 9: Width = KBTS_FONT_WIDTH_ULTRA_EXPANDED; break;
-      }
+              if(Id)
+              {
+                Info->Strings[Id] = KBTS__POINTER_OFFSET(char, StringBase, Record->StringOffset);
+                Info->StringLengths[Id] = Record->Length;
+              }
+            }
+          }
 
-      if(Os2->Selection & (KBTS__OS2_SELECTION_FLAG_ITALIC | KBTS__OS2_SELECTION_FLAG_OBLIQUE))
-      {
-        StyleFlags |= KBTS_FONT_STYLE_FLAG_ITALIC;
-      }
-      if(Os2->Selection & KBTS__OS2_SELECTION_FLAG_BOLD)
-      {
-        StyleFlags |= KBTS_FONT_STYLE_FLAG_BOLD;
-      }
-      if(Os2->Selection & KBTS__OS2_SELECTION_FLAG_REGULAR)
-      {
-        StyleFlags |= KBTS_FONT_STYLE_FLAG_REGULAR;
-      }
+          if(!Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY])
+          {
+            Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY] = Info->Strings[KBTS_FONT_INFO_STRING_ID_FAMILY];
+            Info->StringLengths[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY] = Info->StringLengths[KBTS_FONT_INFO_STRING_ID_FAMILY];
+          }
 
-      Info->Weight = Weight;
-      Info->Width = Width;
-      Info->StyleFlags = StyleFlags;
+          if(!Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY])
+          {
+            Info->Strings[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY] = Info->Strings[KBTS_FONT_INFO_STRING_ID_SUBFAMILY];
+            Info->StringLengths[KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY] = Info->StringLengths[KBTS_FONT_INFO_STRING_ID_SUBFAMILY];
+          }
+        }
+
+        if(Os2)
+        {
+          kbts_font_weight Weight = KBTS_FONT_WEIGHT_UNKNOWN;
+          kbts_font_width Width = KBTS_FONT_WIDTH_UNKNOWN;
+          kbts_font_style_flags StyleFlags = KBTS_FONT_STYLE_FLAG_NONE;
+
+          switch(Os2->WeightClass)
+          {
+          case 100: Weight = KBTS_FONT_WEIGHT_THIN; break;
+          case 200: Weight = KBTS_FONT_WEIGHT_EXTRA_LIGHT; break;
+          case 300: Weight = KBTS_FONT_WEIGHT_LIGHT; break;
+          case 400: Weight = KBTS_FONT_WEIGHT_NORMAL; break;
+          case 500: Weight = KBTS_FONT_WEIGHT_MEDIUM; break;
+          case 600: Weight = KBTS_FONT_WEIGHT_SEMI_BOLD; break;
+          case 700: Weight = KBTS_FONT_WEIGHT_BOLD; break;
+          case 800: Weight = KBTS_FONT_WEIGHT_EXTRA_BOLD; break;
+          case 900: Weight = KBTS_FONT_WEIGHT_BLACK; break;
+          }
+
+          switch(Os2->WidthClass)
+          {
+          case 1: Width = KBTS_FONT_WIDTH_ULTRA_CONDENSED; break;
+          case 2: Width = KBTS_FONT_WIDTH_EXTRA_CONDENSED; break;
+          case 3: Width = KBTS_FONT_WIDTH_CONDENSED; break;
+          case 4: Width = KBTS_FONT_WIDTH_SEMI_CONDENSED; break;
+          case 5: Width = KBTS_FONT_WIDTH_NORMAL; break;
+          case 6: Width = KBTS_FONT_WIDTH_SEMI_EXPANDED; break;
+          case 7: Width = KBTS_FONT_WIDTH_EXPANDED; break;
+          case 8: Width = KBTS_FONT_WIDTH_EXTRA_EXPANDED; break;
+          case 9: Width = KBTS_FONT_WIDTH_ULTRA_EXPANDED; break;
+          }
+
+          if(Os2->Selection & (KBTS__OS2_SELECTION_FLAG_ITALIC | KBTS__OS2_SELECTION_FLAG_OBLIQUE))
+          {
+            StyleFlags |= KBTS_FONT_STYLE_FLAG_ITALIC;
+          }
+          if(Os2->Selection & KBTS__OS2_SELECTION_FLAG_BOLD)
+          {
+            StyleFlags |= KBTS_FONT_STYLE_FLAG_BOLD;
+          }
+          if(Os2->Selection & KBTS__OS2_SELECTION_FLAG_REGULAR)
+          {
+            StyleFlags |= KBTS_FONT_STYLE_FLAG_REGULAR;        
+          }
+
+          Info->Weight = Weight;
+          Info->Width = Width;
+          Info->StyleFlags = StyleFlags;
+        }
+      } break;
+      }
     }
   }
+}
+
+KBTS_EXPORT void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info)
+{
+  kbts_font_info2 Info2;
+  Info2.Size = sizeof(Info2);
+
+  kbts_GetFontInfo2(Font, &Info2);
+
+  KBTS_MEMCPY(Info, Info2.Strings, sizeof(*Info));
 }
 
 KBTS_EXPORT kbts_font kbts_FontFromMemory(void *FileData, int FileSize, int FontIndex, kbts_allocator_function *Allocator, void *AllocatorData)
@@ -27808,7 +26842,7 @@ KBTS_EXPORT kbts_font kbts_FontFromMemory(void *FileData, int FileSize, int Font
     kbts_load_font_state LoadFontState = KBTS__ZERO;
     int ScratchSize, OutputSize;
     kbts_load_font_error Error = kbts_LoadFont(&Result, &LoadFontState, FileData, (int)FileSize, FontIndex, &ScratchSize, &OutputSize);
-
+    
     if(Error == KBTS_LOAD_FONT_ERROR_NEED_TO_CREATE_BLOB)
     {
       void *ScratchMemory = kbts__AllocatorAllocate(Allocator, AllocatorData, (kbts_un)ScratchSize);
@@ -28151,7 +27185,7 @@ static void kbts__FlushDirection(kbts_break_state *State, kbts_direction *LastDi
     *LastDirection = Direction;
     kbts__DoBreak(State, PositionOffset, KBTS_BREAK_FLAG_DIRECTION, Direction, 0, 0);
   }
-
+  
   if((BreakFlags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION) &&
      !State->ParagraphDirection)
   {
@@ -28476,19 +27510,16 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
                                                            (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
                                                            (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))))
       {
+        // From the Unicode Bidirectional Algorithm:
+        //   European and Arabic numbers act as if they were R in terms of their influence on NIs.
+        //
         // Note that the way we resolve digits is different from the way the Unicode standard specifies it.
         // This is because the standard assumes the paragraph direction is always known, whereas in our case it isn't.
         // We want neutral surrounded by uncoerced digits to resolve to the paragraph direction, which may be DONT_KNOW.
         Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
       }
-      else if(((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L) ||
-               (BidirectionalClass == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L)) &&
-              KBTS__IN_SET(Bidirectional2, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_L)
-                                                       (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
-                                                       (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))) &&
-              KBTS__IN_SET(BidirectionalClass, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_L)
-                                                           (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
-                                                           (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))))
+      else if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L) &&
+              (BidirectionalClass == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L))
       {
         Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
       }
@@ -28496,6 +27527,7 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
       {
         if     (State->ParagraphDirection == KBTS_DIRECTION_LTR) Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
         else if(State->ParagraphDirection == KBTS_DIRECTION_RTL) Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
+        // Otherwise, don't coerce to anything.
       }
     }
 
@@ -28550,7 +27582,7 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
   // Word breaks.
   // We buffer 3 characters for word breaks.
   // Each character gets 3 bits (padded to 4) representing 3 levels of priority.
-  #define KBTS_WORD_BREAK_BITS(Priority, Position) (((1 << ((Priority) + 1)) - 1) << ((Position) * 4))
+  #define KBTS_WORD_BREAK_BITS(Priority, Position) (((1u << ((Priority) + 1)) - 1) << ((Position) * 4))
   #define KBTS_C2(A, B) case (KBTS_WORD_BREAK_CLASS_##A << 8) | (KBTS_WORD_BREAK_CLASS_##B)
   #define KBTS_C3(A, B, C) case (KBTS_WORD_BREAK_CLASS_##A << 16) | (KBTS_WORD_BREAK_CLASS_##B << 8) | (KBTS_WORD_BREAK_CLASS_##C)
 
@@ -28599,7 +27631,7 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
       // (RI RI)* RI x RI
       KBTS_C2(RI, RI):
         WordBreakHistory = 0;
-        // fallthrough
+        KBTS__FALLTHROUGH;
       KBTS_C2(HL, SQ):
       KBTS_C2(ALnep, ALnep): KBTS_C2(ALnep, ALep): KBTS_C2(ALnep, HL): KBTS_C2(ALnep, NM): KBTS_C2(ALnep, ENL):
       KBTS_C2(ALep, ALnep): KBTS_C2(ALep, ALep): KBTS_C2(ALep, HL): KBTS_C2(ALep, NM): KBTS_C2(ALep, ENL):
@@ -28847,7 +27879,7 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
     KBTS_C2(QUPf, BK):
     KBTS_C2(QUPf, CR):
     KBTS_C2(QUPf, LF):
-    KBTS_C2(QUPf, NL):
+    KBTS_C2(QUPf, NL): 
     KBTS_C2(QUPf, ZW):
     KBTS_C2(QUPf, WJ):
     KBTS_C2(QUPf, CLnea):
@@ -28860,7 +27892,7 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
       KBTS_LINE_UNBREAK(1, 1);
       break;
 
-    KBTS_C2(QUPf, QUPf):
+    KBTS_C2(QUPf, QUPf): 
       KBTS_LINE_UNBREAK(3, 2);
       KBTS_LINE_UNBREAK(1, 1);
       KBTS_LINE_UNBREAK(1, 0);
@@ -29080,7 +28112,7 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
     KBTS_C3(NU, CPnea, POea): KBTS_C3(NU, CPnea, POnea): KBTS_C3(NU, CPnea, PRea): KBTS_C3(NU, CPnea, PRnea):
     KBTS_C3(AK, VI, AK): KBTS_C3(AK, VI, DOTTED_CIRCLE): KBTS_C3(DOTTED_CIRCLE, VI, AK): KBTS_C3(DOTTED_CIRCLE, VI, DOTTED_CIRCLE): KBTS_C3(AS, VI, AK): KBTS_C3(AS, VI, DOTTED_CIRCLE):
       KBTS_LINE_UNBREAK(0, 1); break;
-
+    
     KBTS_C3(POea, OPea, NU): KBTS_C3(POea, OPnea, NU): KBTS_C3(POnea, OPea, NU): KBTS_C3(POnea, OPnea, NU):
     KBTS_C3(PRea, OPea, NU): KBTS_C3(PRea, OPnea, NU): KBTS_C3(PRnea, OPea, NU): KBTS_C3(PRnea, OPnea, NU):
       KBTS_LINE_UNBREAK(0, 2); break;
@@ -29527,11 +28559,11 @@ KBTS_EXPORT void kbts_BreakEntireString(kbts_direction Direction, kbts_japanese_
     }
   }
 
-  if(!Breaks && BreakCount)
+  if(BreakCount)
   {
     *BreakCount = (int)BreaksWritten;
   }
-  if(!BreakFlags && BreakFlagCount)
+  if(BreakFlagCount)
   {
     *BreakFlagCount = (int)(MaxBreakPosition + 1);
   }
@@ -29644,23 +28676,23 @@ KBTS_EXPORT kbts_encode_utf8 kbts_EncodeUtf8(int Codepoint)
     }
     else if(Codepoint <= 0x7FF)
     {
-        Result.Encoded[1] = (Codepoint & 0x3F) | 0x80;
-        Result.Encoded[0] = ((Codepoint >> 6) & 0x1F) | 0xC0;
+        Result.Encoded[1] = (char)((Codepoint & 0x3F) | 0x80);
+        Result.Encoded[0] = (char)(((Codepoint >> 6) & 0x1F) | 0xC0);
         Result.EncodedLength = 2;
     }
     else if(Codepoint <= 0xFFFF)
     {
-        Result.Encoded[2] = (Codepoint & 0x3F) | 0x80;
-        Result.Encoded[1] = ((Codepoint >> 6) & 0x3F) | 0x80;
-        Result.Encoded[0] = ((Codepoint >> 12) & 0xF) | 0xE0;
+        Result.Encoded[2] = (char)((Codepoint & 0x3F) | 0x80);
+        Result.Encoded[1] = (char)(((Codepoint >> 6) & 0x3F) | 0x80);
+        Result.Encoded[0] = (char)(((Codepoint >> 12) & 0xF) | 0xE0);
         Result.EncodedLength = 3;
     }
     else if(Codepoint <= 0x10FFFF)
     {
-        Result.Encoded[3] = (Codepoint & 0x3F) | 0x80;
-        Result.Encoded[2] = ((Codepoint >> 6) & 0x3F) | 0x80;
-        Result.Encoded[1] = ((Codepoint >> 12) & 0x3F) | 0x80;
-        Result.Encoded[0] = ((Codepoint >> 18) & 0x7) | 0xF0;
+        Result.Encoded[3] = (char)((Codepoint & 0x3F) | 0x80);
+        Result.Encoded[2] = (char)(((Codepoint >> 6) & 0x3F) | 0x80);
+        Result.Encoded[1] = (char)(((Codepoint >> 12) & 0x3F) | 0x80);
+        Result.Encoded[0] = (char)(((Codepoint >> 18) & 0x7) | 0xF0);
         Result.EncodedLength = 4;
     }
 
