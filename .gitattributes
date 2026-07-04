@@ -30,3 +30,4 @@ vendor/raylib/v6/windows/raylibdll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/v6/windows/raygui.dll filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/v6/windows/raygui.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/v6/windows/rayguidll.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box3d/lib/linux-amd64/libbox3d.a filter=lfs diff=lfs merge=lfs -text

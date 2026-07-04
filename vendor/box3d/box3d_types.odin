@@ -1958,13 +1958,13 @@ HullData :: struct {
 // Efficient box hull
 BoxHull :: struct {
 	// The embedded hull. So the offsets index into the arrays that follow.
-	base:        HullData,
-	boxVertices:  [8]HullVertex,   //< Box vertices.
-	boxPoints:    [8]Vec3,         //< Box points.
-	boxEdges:    [24]HullHalfEdge, //< Box half-edges.
-	boxFaces:     [6]HullFace,     //< Box faces.
-	padding:      [2]u8,           //< Explicit padding, see b3HullData::padding.
-	boxPlanes:    [6]Plane,        //< Box face planes.
+	base:         HullData,
+	boxVertices:  [8]HullVertex,    //< Box vertices.
+	boxPoints:    [8]Vec3,          //< Box points.
+	boxEdges:     [24]HullHalfEdge, //< Box half-edges.
+	boxFaces:     [6]HullFace,      //< Box faces.
+	padding:      [2]u8,            //< Explicit padding, see b3HullData::padding.
+	boxPlanes:    [6]Plane,         //< Box face planes.
 }
 
 /**@}*/ // hull

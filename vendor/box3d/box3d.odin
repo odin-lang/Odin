@@ -7,10 +7,17 @@ import "core:c"
 
 ENABLE_VALIDATION :: false
 
+BOX3D_SHARED :: #config(BOX3D_SHARED, false)
+
 when ODIN_OS == .Windows {
 	@(export)
 	foreign import lib {
 		"lib/box3d.lib",
+	}
+} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED {
+	@(export)
+	foreign import lib {
+		"lib/linux-amd64/libbox3d.a",
 	}
 } else {
 	@(export)
@@ -889,7 +896,7 @@ foreign lib {
 	// Create a convex hull shape and attach it to a body. The shape definition is fully cloned. Contacts are not created
 	// until the next time step.
 	// @return the shape id for accessing the shape
-	CreateHullShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr hull: HullData) -> ShapeId ---
+	CreateHullShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, hull: ^HullData) -> ShapeId ---
 
 	// Create a convex hull shape and attach it to a body. The hull is cloned then transformed with scale applied first.
 	// Use this for non-uniform or mirrored scale or a baked local transform. The baked result is shared through the
