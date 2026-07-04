@@ -886,12 +886,12 @@ foreign lib {
 	// Create a circle shape and attach it to a body. The shape definition and geometry are fully cloned.
 	// Contacts are not created until the next time step.
 	// @return the shape id for accessing the shape
-	CreateSphereShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr sphere: Sphere) -> ShapeId ---
+	CreateSphereShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, sphere: ^Sphere) -> ShapeId ---
 
 	// Create a capsule shape and attach it to a body. The shape definition and geometry are fully cloned.
 	// Contacts are not created until the next time step.
 	// @return the shape id for accessing the shape
-	CreateCapsuleShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr capsule: Capsule) -> ShapeId ---
+	CreateCapsuleShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, capsule: ^Capsule) -> ShapeId ---
 
 	// Create a convex hull shape and attach it to a body. The shape definition is fully cloned. Contacts are not created
 	// until the next time step.
@@ -902,24 +902,24 @@ foreign lib {
 	// Use this for non-uniform or mirrored scale or a baked local transform. The baked result is shared through the
 	// world hull database. The shape definition and geometry are fully cloned. Contacts are not created until the next time step.
 	// @return the shape id for accessing the shape
-	CreateTransformedHullShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr hull: HullData, transform: Transform, scale: Vec3) -> ShapeId ---
+	CreateTransformedHullShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, hull: ^HullData, transform: Transform, scale: Vec3) -> ShapeId ---
 
 	// Create a mesh hull shape and attach it to a body. The shape definition is fully cloned but the mesh is not.
 	// Contacts are not created until the next time step.
 	// Mesh collision only creates contacts on static bodies.
 	// @warning this holds reference to the input mesh data which must remain valid for the lifetime of this shape
 	// @return the shape id for accessing the shape
-	CreateMeshShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr mesh: MeshData, scale: Vec3) -> ShapeId ---
+	CreateMeshShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, mesh: ^MeshData, scale: Vec3) -> ShapeId ---
 
 	// Create a height-field shape and attach it to a body. The shape definition is fully cloned but the height field is not.
 	// Contacts are not created until the next time step.
 	// Height field is only allowed on static bodies.
 	// @warning this holds reference to the input height field which must remain valid for the lifetime of this shape
 	// @return the shape id for accessing the shape
-	CreateHeightFieldShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr heightField: HeightFieldData) -> ShapeId ---
+	CreateHeightFieldShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, heightField: ^HeightFieldData) -> ShapeId ---
 
 	// Compound shapes are only allowed on static bodies.
-	CreateCompoundShape :: proc(bodyId: BodyId, def: ^ShapeDef, #by_ptr compound: CompoundData) -> ShapeId ---
+	CreateCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
 
 	// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
 	//	body are destroyed at once.
