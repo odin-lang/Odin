@@ -757,7 +757,7 @@ using_statement :: proc() {
 	// `using` as a struct field modifier remains available always
 
 	fmt.println("\n# using statement")
-	// using can used to bring entities declared in a scope/namespace
+	// using can be used to bring entities declared in a scope/namespace
 	// into the current scope. This can be applied to import names, struct
 	// fields, procedure fields, and struct values.
 
