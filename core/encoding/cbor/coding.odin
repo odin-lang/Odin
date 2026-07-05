@@ -207,7 +207,7 @@ encode :: encode_into
 encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (data: []byte, err: Encode_Error) {
 	b := strings.builder_make(allocator, loc) or_return
 	encode_into_builder(&b, v, flags, temp_allocator) or_return
-	return b.buf[:], nil
+	return b[:], nil
 }
 
 // Encodes the CBOR value into binary CBOR written to the given builder.
@@ -396,7 +396,7 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 				if iter_n == -1 {
 					return nil, .Nested_Indefinite_Length
 				}
-				reserve(&buf.buf, len(buf.buf) + iter_cap) or_return
+				reserve(&buf, len(buf) + iter_cap) or_return
 				io.copy_n(buf_stream, d.reader, i64(iter_n)) or_return
 
 			case .Other:
@@ -411,12 +411,12 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 		io.copy_n(buf_stream, d.reader, i64(n)) or_return
 	}
 
-	v = buf.buf[:]
+	v = buf[:]
 
 	// Write zero byte so this can be converted to cstring.
 	strings.write_byte(&buf, 0)
 
-	if .Shrink_Excess in d.flags { shrink(&buf.buf) }
+	if .Shrink_Excess in d.flags { shrink(&buf) }
 	return
 }
 
@@ -561,7 +561,7 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 		ke.writer = strings.to_stream(&buf)
 
 		encode(ke, entry.entry.key) or_return
-		entry.encoded_key = buf.buf[:]
+		entry.encoded_key = buf[:]
 	}
 	
 	// Sort lexicographic on the bytes of the key.
