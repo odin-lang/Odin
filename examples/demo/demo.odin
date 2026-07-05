@@ -768,7 +768,7 @@ using_statement :: proc() {
 			orientation: quaternion128,
 		}
 
-		// It can used like this:
+		// It can be used like this:
 		foo0 :: proc(entity: ^Entity) {
 			fmt.println(entity.position.x, entity.position.y, entity.position.z)
 		}
