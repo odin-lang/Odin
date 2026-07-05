@@ -3799,7 +3799,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 	} else if (check_is_castable_to(c, x, type)) {
 		if (x->mode != Addressing_Constant) {
 			x->mode = Addressing_Value;
-		} else if (is_type_slice(type) && is_type_string(x->type)) {
+		} else if ((is_type_slice(type) && is_type_string(x->type)) || is_type_any(type)) {
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
 			if (is_type_union_constantable(type)) {
