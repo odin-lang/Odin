@@ -670,7 +670,7 @@ union_type :: proc() {
 	{
 		// NOTE(bill): A union can be used to achieve something similar. Instead
 		// of embedding the base data into the derived types, the derived data
-		// in embedded into the base type. Below is the same example of the
+		// is embedded into the base type. Below is the same example of the
 		// basic game Entity but using an union.
 
 		Entity :: struct {
