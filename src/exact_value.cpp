@@ -50,6 +50,7 @@ gb_global char const *exact_value_kind_string[ExactValue_Count] = {
 
 struct ExactValue {
 	ExactValueKind kind;
+	Type *variant;
 	union {
 		bool           value_bool;
 		String         value_string;

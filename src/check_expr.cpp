@@ -8579,6 +8579,9 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 				update_untyped_expr_type(c, arg, t, false);
 				check_representable_as_constant(c, operand->value, t, &operand->value);
 			}
+			if (operand->mode == Addressing_Constant && is_type_union(t)) {
+				operand->value.variant = arg->tav.type;
+			}
 			break;
 		}
 		}

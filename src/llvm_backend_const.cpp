@@ -1037,6 +1037,9 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					         expr_to_string(value.value_compound),
 					         temp_canonical_string(value_type), temp_canonical_string(original_type));
 
+				} else if (value.variant != nullptr) {
+					value_type = value.variant;
+					break;
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}
