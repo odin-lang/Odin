@@ -84,7 +84,7 @@ Bindings for [[ raylib v6.0 ; https://www.raylib.com ]].
 	*
 	**********************************************************************************************
 */
-package raylib6
+package raylib
 
 import "core:c"
 import "core:fmt"
