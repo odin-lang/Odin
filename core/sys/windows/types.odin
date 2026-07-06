@@ -220,6 +220,21 @@ FILE_ATTRIBUTE_OFFLINE             : DWORD : 0x00001000
 FILE_ATTRIBUTE_NOT_CONTENT_INDEXED : DWORD : 0x00002000
 FILE_ATTRIBUTE_ENCRYPTED           : DWORD : 0x00004000
 
+FINDEX_INFO_LEVELS :: enum c_int {
+	FindExInfoStandard,
+	FindExInfoBasic,
+	FindExInfoMaxInfoLevel,
+}
+
+FINDEX_SEARCH_OPS :: enum c_int {
+	FindExSearchNameMatch,
+	FindExSearchLimitToDirectories,
+	FindExSearchLimitToDevices,
+	FindExSearchMaxSearchOp,
+}
+
+FIND_FIRST_EX_LARGE_FETCH : DWORD : 0x00000002
+
 FILE_SHARE_READ      : DWORD : 0x00000001
 FILE_SHARE_WRITE     : DWORD : 0x00000002
 FILE_SHARE_DELETE    : DWORD : 0x00000004
