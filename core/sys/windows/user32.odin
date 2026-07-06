@@ -205,7 +205,7 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X, Y: INT) -> BOOL ---
 	SetCursor    :: proc(hCursor: HCURSOR) -> HCURSOR ---
-	when !intrinsics.is_package_imported("raylib") && !intrisincs.is_package_imported("raylib6") {
+	when !intrinsics.is_package_imported("raylib") && !intrinsics.is_package_imported("raylib6") {
 		ShowCursor :: proc(bShow: BOOL) -> INT ---
 	}
 
