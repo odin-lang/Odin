@@ -1767,7 +1767,7 @@ _head                :: struct {}
 _langsys             :: struct {}
 shape_config         :: struct {}
 glyph_config         :: struct {}
-bucketed_glyph :: struct {}
+bucketed_glyph       :: struct {}
 shape_context        :: struct {}
 shape_scratchpad     :: struct {}
 
@@ -2153,8 +2153,8 @@ glyph_storage :: struct {
 }
 
 glyph_parent :: struct {
-	Codepoint:     rune,
-	Codepoint1:     rune,
+	Codepoint:  rune,
+	Codepoint1: rune,
 }
 
 font_coverage_test :: struct {

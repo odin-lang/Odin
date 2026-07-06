@@ -271,9 +271,10 @@ Break :: proc "contextless" (State: ^break_state) -> (Break: break_type, Ok: b32
 
 
 BreakEntireString :: proc "c" (Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-	Input: []byte, InputFormat: text_format,
-	Breaks: []break_type, BreakCount: ^c.int,
-	BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+                               Input: []byte, InputFormat: text_format,
+                               Breaks: []break_type, BreakCount: ^c.int,
+                               BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_BreakEntireString :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
@@ -285,9 +286,10 @@ BreakEntireString :: proc "c" (Direction: direction, JapaneseLineBreakStyle: jap
 }
 
 BreakEntireStringUtf32 :: proc "c" (Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-	Utf32: []rune,
-	Breaks: []break_type, BreakCount: ^c.int,
-	BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+                                    Utf32: []rune
+                                    Breaks: []break_type, BreakCount: ^c.int
+                                    BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_BreakEntireStringUtf32 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
@@ -299,9 +301,10 @@ BreakEntireStringUtf32 :: proc "c" (Direction: direction, JapaneseLineBreakStyle
 }
 
 BreakEntireStringUtf8 :: proc "c" (Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-	Utf8: string,
-	Breaks: []break_type, BreakCount: ^c.int,
-	BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+                                   Utf8: string,
+                                   Breaks: []break_type, BreakCount: ^c.int,
+                                   BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_BreakEntireStringUtf8 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
