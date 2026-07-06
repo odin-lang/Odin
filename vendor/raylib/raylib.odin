@@ -84,7 +84,7 @@ Bindings for [[ raylib v6.0 ; https://www.raylib.com ]].
 	*
 	**********************************************************************************************
 */
-package raylib
+package raylib6
 
 import "core:c"
 import "core:fmt"
@@ -981,8 +981,7 @@ foreign lib {
 
 	// Cursor-related functions
 
-	// NOTE(Jeroen): Conflicts with `ShowCursor` in `core:sys/windows`
-	// ShowCursor       :: proc() ---                                              // Shows cursor
+	ShowCursor       :: proc() ---                                              // Shows cursor
 	HideCursor       :: proc() ---                                              // Hides cursor
 	IsCursorHidden   :: proc() -> bool ---                                      // Check if cursor is not visible
 	EnableCursor     :: proc() ---                                              // Enables cursor (unlock cursor)
