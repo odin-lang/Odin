@@ -11,9 +11,7 @@ package all
 @(require) import "vendor:microui"
 @(require) import "vendor:miniaudio"
 @(require) import "vendor:portmidi"
-// NOTE(jeroen): only one raylib version can be checked at a time
-// @(require) import "vendor:raylib/v55"
-@(require) import "vendor:raylib/v6"
+@(require) import "vendor:raylib"
 @(require) import "vendor:zlib"
 
 @(require) import "vendor:sdl2"
