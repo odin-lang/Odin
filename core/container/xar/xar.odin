@@ -265,7 +265,7 @@ array_push_back_elem :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc := #caller_
 
 	chunk_idx, elem_idx, chunk_cap := _meta_get(SHIFT, uint(x.len))
 	if x.chunks[chunk_idx] == nil {
-		x.chunks[chunk_idx] = make([^]T, chunk_cap, x.allocator) or_return
+		x.chunks[chunk_idx] = make([^]T, chunk_cap, x.allocator, loc) or_return
 	}
 	x.chunks[chunk_idx][elem_idx] = value
 	x.len += 1
@@ -328,7 +328,7 @@ array_push_back_elem_and_get_ptr :: proc(x: ^$X/Array($T, $SHIFT), value: T, loc
 
 	chunk_idx, elem_idx, chunk_cap := _meta_get(SHIFT, uint(x.len))
 	if x.chunks[chunk_idx] == nil {
-		x.chunks[chunk_idx] = make([^]T, chunk_cap, x.allocator) or_return
+		x.chunks[chunk_idx] = make([^]T, chunk_cap, x.allocator, loc) or_return
 	}
 	x.chunks[chunk_idx][elem_idx] = value
 	x.len += 1
