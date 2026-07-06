@@ -1078,7 +1078,7 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		}
 
 		if (x.kind != y.kind) {
-			return false;
+			return op == Token_NotEq;
 		}
 		return compare_exact_values_compound_lit(op, x, y);
 	}
