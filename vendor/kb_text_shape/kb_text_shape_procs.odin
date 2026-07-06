@@ -286,8 +286,8 @@ BreakEntireString :: proc "c" (Direction: direction, JapaneseLineBreakStyle: jap
 }
 
 BreakEntireStringUtf32 :: proc "c" (Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-                                    Utf32: []rune
-                                    Breaks: []break_type, BreakCount: ^c.int
+                                    Utf32: []rune,
+                                    Breaks: []break_type, BreakCount: ^c.int,
                                     BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
 
 	@(default_calling_convention="c", require_results)
