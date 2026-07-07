@@ -111,7 +111,7 @@ Vector2Distance :: proc "c" (v1, v2: Vector2) -> f32 {
 }
 // Calculate square distance between two vectors
 @(require_results)
-Vector2DistanceSqrt :: proc "c" (v1, v2: Vector2) -> f32 {
+Vector2DistanceSqr :: proc "c" (v1, v2: Vector2) -> f32 {
 	return linalg.length2(v2-v1)
 }
 // Calculate angle between two vectors
