@@ -468,7 +468,6 @@ VrStereoConfig :: struct #align(4) {
 
 // File path list
 FilePathList :: struct {
-	capacity: c.uint,                     // Filepaths max entries
 	count:    c.uint,                     // Filepaths entries count
 	paths:    [^]cstring,                 // Filepaths entries
 }
