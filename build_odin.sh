@@ -17,8 +17,10 @@ OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
 if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
-	GIT_SHA=$(git show --pretty='%h' --no-patch --no-notes HEAD)
-	GIT_DATE=$(git show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
+	# Counter the user's git config to show the signature in logs.
+	gitnosig="-c log.showSignature=false"
+	GIT_SHA=$(git $gitnosig show --pretty='%h' --no-patch --no-notes HEAD)
+	GIT_DATE=$(git $gitnosig show "--pretty=%cd" "--date=format:%Y-%m" --no-patch --no-notes HEAD)
 	CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 else
 	GIT_DATE=$(date +"%Y-%m")
