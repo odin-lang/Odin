@@ -8580,7 +8580,7 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 				check_representable_as_constant(c, operand->value, t, &operand->value);
 			}
 			if (operand->mode == Addressing_Constant && is_type_union(t)) {
-				operand->value.variant = arg->tav.type;
+				operand->value = exact_value_typecast(operand->expr);
 			}
 			break;
 		}
@@ -12389,6 +12389,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 				break;
 			}
 		}
+		if (o->mode == Addressing_Constant && is_type_union(type)) {
+			o->value = exact_value_typecast(tc->expr);
+		}
 		return Expr_Expr;
 	case_end;
 
@@ -12744,6 +12747,7 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 
 }
 
+
 gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y) {
 	ast_node(x_cl, CompoundLit, x.value_compound);
 	ast_node(y_cl, CompoundLit, y.value_compound);
@@ -12763,7 +12767,10 @@ gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, E
 	return test;
 }
 
-
+gb_internal bool compare_exact_values_typecast(TokenKind op, ExactValue x, ExactValue y) {
+	// TODO(tf2spi): Probably not the proper way to compare typecasts...
+	return compare_exact_values(op, x.value_typecast->tav.value, y.value_typecast->tav.value);
+}
 
 
 gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);

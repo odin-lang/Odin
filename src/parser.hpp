@@ -53,7 +53,6 @@ struct TypeAndValue {
 	ExactValue     value;
 };
 
-
 enum ParseFileError {
 	ParseFile_None,
 

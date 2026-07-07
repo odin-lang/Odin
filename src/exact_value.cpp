@@ -5,6 +5,7 @@ struct Ast;
 struct HashKey;
 struct Type;
 struct Entity;
+struct TypeAndValue;
 gb_internal bool are_types_identical(Type *x, Type *y);
 
 struct Complex128 {
@@ -28,6 +29,7 @@ enum ExactValueKind {
 	ExactValue_Procedure  = 9,
 	ExactValue_Typeid     = 10,
 	ExactValue_String16   = 11,
+	ExactValue_TypeCast   = 12,
 
 	ExactValue_Count,
 };
@@ -46,6 +48,7 @@ gb_global char const *exact_value_kind_string[ExactValue_Count] = {
 	"Procedure",
 	"Typeid",
 	"String16",
+	"TypeCast",
 };
 
 struct ExactValue {
@@ -63,6 +66,7 @@ struct ExactValue {
 		Ast *          value_procedure;
 		Type *         value_typeid;
 		String16       value_string16;
+		Ast *          value_typecast;
 	};
 };
 
@@ -111,12 +115,21 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 	case ExactValue_Typeid:
 		res = ptr_map_hash_key(v.value_typeid);
 		break;
+	case ExactValue_TypeCast:
+		res = ptr_map_hash_key(v.value_typecast);
+		break;
 	default:
 		res = gb_fnv32a(&v, gb_size_of(ExactValue));
 	}
 	return res & 0x7fffffff;
 }
 
+
+gb_internal ExactValue exact_value_typecast(Ast *typecast) {
+	ExactValue result = {ExactValue_TypeCast};
+	result.value_typecast = typecast;
+	return result;
+}
 
 gb_internal ExactValue exact_value_compound(Ast *node) {
 	ExactValue result = {ExactValue_Compound};
@@ -678,6 +691,7 @@ gb_internal i32 exact_value_order(ExactValue const &v) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
 	case ExactValue_Compound:
+	case ExactValue_TypeCast:
 		return 0;
 	case ExactValue_Bool:
 	case ExactValue_String:
@@ -719,6 +733,7 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 	case ExactValue_Quaternion:
 	case ExactValue_Pointer:
 	case ExactValue_Compound:
+	case ExactValue_TypeCast:
 	case ExactValue_Procedure:
 	case ExactValue_Typeid:
 		return;
@@ -963,6 +978,7 @@ gb_internal gb_inline i32 cmp_f64(f64 a, f64 b) {
 }
 
 gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y);
+gb_internal bool compare_exact_values_typecast(TokenKind op, ExactValue x, ExactValue y);
 
 gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
@@ -1082,6 +1098,15 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 			return op == Token_NotEq;
 		}
 		return compare_exact_values_compound_lit(op, x, y);
+	case ExactValue_TypeCast:
+		if (op != Token_CmpEq && op != Token_NotEq) {
+			return false;
+		}
+
+		if (x.kind != y.kind) {
+			return op == Token_NotEq;
+		}
+		return compare_exact_values_typecast(op, x, y);
 	}
 
 	GB_PANIC("Invalid comparison: %d", x.kind);
@@ -1142,6 +1167,8 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 
 	case ExactValue_Pointer:
 		return str;
+	case ExactValue_TypeCast:
+		return write_expr_to_string(str, v.value_typecast, false);
 	case ExactValue_Compound:
 		return write_expr_to_string(str, v.value_compound, false);
 	case ExactValue_Procedure:
