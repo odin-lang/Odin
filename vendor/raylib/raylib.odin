@@ -313,13 +313,15 @@ Mesh :: struct {
 	colors:     [^]u8,            // Vertex colors (RGBA - 4 components per vertex) (shader-location = 3)
 	indices:    [^]u16,           // Vertex indices (in case vertex data comes indexed)
 
-	// Animation vertex data
-	animVertices: [^]f32,         // Animated vertex positions (after bones transformations)
-	animNormals:  [^]f32,         // Animated normals (after bones transformations)
-	boneIds:      [^]u8,          // Vertex bone ids, up to 4 bones influence by vertex (skinning)
-	boneWeights:  [^]f32,         // Vertex bone weight, up to 4 bones influence by vertex (skinning)
-	boneMatrices: [^]Matrix,      // Bones animated transformation matrices
-	boneCount:    c.int,          // Number of bones
+  // Skin data for animation
+  boneCount: c.int,             // Number of bones (MAX: 256 bones)
+  boneIndices: [^]u8,           // Vertex bone indices, up to 4 bones influence by vertex (skinning) (shader-location = 6)
+  boneWeights: [^]f32,          // Vertex bone weight, up to 4 bones influence by vertex (skinning) (shader-location = 7)
+
+  // Runtime animation vertex data (CPU skinning)
+  // NOTE: In case of GPU skinning, not used, pointers are NULL
+  animVertices: [^]f32,    // Animated vertex positions (after bones transformations)
+  animNormals: [^]f32,     // Animated normals (after bones transformations)
 
 	// OpenGL identifiers
 	vaoId: u32,                   // OpenGL Vertex Array Object id
@@ -353,13 +355,23 @@ Transform :: struct {
 	scale:       Vector3,         // Scale
 }
 
+// Anim pose, an array of Transform
+ModelAnimPose :: [^]Transform
+
 // Bone information
 BoneInfo :: struct {
 	name:   [32]byte `fmt:"s,0"`, // Bone name
 	parent: c.int,                // Bone parent
 }
 
-// Model type
+// Skeleton, animation bones hierarchy
+ModelSkeleton :: struct {
+  boneCount: c.int,             // Number of bones
+  bones: [^]BoneInfo,           // Bones information (skeleton)
+  bindPose: ModelAnimPose,      // Bones base transformation ([^]Transform)
+}
+
+// Model, meshes, materials and animation data
 Model :: struct #align(align_of(uintptr)) {
 	transform: Matrix,            // Local transform matrix
 
@@ -369,19 +381,21 @@ Model :: struct #align(align_of(uintptr)) {
 	materials:    [^]Material,    // Materials array
 	meshMaterial: [^]c.int,       // Mesh material number
 
-	// Animation data
-	boneCount: c.int,             // Number of bones
-	bones:     [^]BoneInfo,       // Bones information (skeleton)
-	bindPose:  [^]Transform,      // Bones base transformation (pose)
+  // Animation data
+  skeleton: ModelSkeleton,      // Skeleton for animation
+
+	// Runtime animation data (CPU/GPU skinning)
+  currentPose: ModelAnimPose,   // Current animation pose ([^]Transform)
+  boneMatrices: [^]Matrix,      // Bones animated transformation matrices
 }
 
 // Model animation
 ModelAnimation :: struct {
-	boneCount:  c.int,            // Number of bones
-	frameCount: c.int,            // Number of animation frames
-	bones:      [^]BoneInfo,      // Bones information (skeleton)
-	framePoses: [^][^]Transform,  // Poses array by frame
 	name:       [32]byte `fmt:"s,0"`, // Animation name
+
+  boneCount: c.int,                 // Number of bones (per pose)
+  keyframeCount: c.int,             // Number of animation key frames
+  keyframePoses: [^]ModelAnimPose,  // Animation sequence keyframe poses [keyframe][pose]
 }
 
 // Ray type (useful for raycast)
