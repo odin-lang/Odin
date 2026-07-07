@@ -3625,7 +3625,9 @@ parse_binary_expr :: proc(p: ^Parser, lhs: bool, prec_in: int) -> ^ast.Expr {
 			case .If, .When:
 				if p.prev_tok.pos.line < op.pos.line {
 					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-					break loop
+					if p.expr_level <= 0 {
+						break loop
+					}
 				}
 			}
 

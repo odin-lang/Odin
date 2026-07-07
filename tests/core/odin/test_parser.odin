@@ -134,7 +134,7 @@ my_func :: proc (cond: bool, a: string, b: string) -> string {
 
 
 @test
-test_parse_multiline_ternary_with_comment :: proc(t: ^testing.T) {
+test_parse_multiline_ternary_infix_with_comment :: proc(t: ^testing.T) {
 	context.allocator = context.temp_allocator
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	file := ast.File{
@@ -147,6 +147,43 @@ test_parse_multiline_ternary_with_comment :: proc(t: ^testing.T) {
 							cond
 							? a // This is a comment!
 							: b
+					)
+					return out
+			}
+		`,
+	}
+
+	p := parser.default_parser()
+
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	p.warn = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.warnf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	ok := parser.parse_file(&p, &file)
+	testing.expect(t, ok, "bad parse")
+	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+}
+
+@test
+test_parse_ternary_if_statements_with_comment :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	file := ast.File{
+		fullpath = "test.odin",
+		src = `
+			package main
+
+			my_func :: proc (cond: bool, a: string, b: string) -> string {
+					out := (
+							cond
+							if a // This is a comment!
+							else b
 					)
 					return out
 			}

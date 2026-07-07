@@ -3585,7 +3585,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 		case Token_when:
 			if (prev.pos.line < op.pos.line) {
 				// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-				goto loop_end;
+				if (f->expr_level <= 0) {
+					goto loop_end;
+				}
 			}
 			break;
 		}
