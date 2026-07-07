@@ -1471,17 +1471,17 @@ foreign lib {
 
 	// Font loading/unloading functions
 
-	GetFontDefault     :: proc() -> Font ---                                                                                                                  		   // Get the default Font
-	LoadFont           :: proc(fileName: cstring) -> Font ---                                                                                                 		   // Load font from file into GPU memory (VRAM)
-	LoadFontEx         :: proc(fileName: cstring, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---                                             // Load font from file with extended parameters, use NULL for codepoints and 0 for codepointCount to load the default character set, font size is provided in pixels height
-	LoadFontFromImage  :: proc(image: Image, key: Color, firstChar: rune) -> Font ---                                                                         		   // Load font from Image (XNA style)
-	LoadFontFromMemory :: proc(fileType: cstring, fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---      	   // Load font from memory buffer, fileType refers to extension: i.e. '.ttf'
-	IsFontValid        :: proc(font: Font) -> bool ---                                                                                                        		   // Check if a font is valid (font data loaded, WARNING: GPU texture not checked)
-	LoadFontData       :: proc(fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int, type: FontType) -> [^]GlyphInfo --- 	   // Load font data for further use
-	GenImageFontAtlas  :: proc(glyphs: [^]GlyphInfo, glyphRecs: ^[^]Rectangle, codepointCount: c.int, fontSize: c.int, padding: c.int, packMethod: c.int) -> Image --- // Generate image font atlas using chars info
-	UnloadFontData     :: proc(glyphs: [^]GlyphInfo, glyphCount: c.int) ---                                                                                    		   // Unload font chars info data (RAM)
-	UnloadFont         :: proc(font: Font) ---                                                                                                                		   // Unload font from GPU memory (VRAM)
-	ExportFontAsCode   :: proc(font: Font, fileName: cstring) -> bool ---                                                                                     		   // Export font as code file, returns true on success
+	GetFontDefault     :: proc() -> Font ---                                                                                                                  		           // Get the default Font
+	LoadFont           :: proc(fileName: cstring) -> Font ---                                                                                                 		           // Load font from file into GPU memory (VRAM)
+	LoadFontEx         :: proc(fileName: cstring, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---                                                             // Load font from file with extended parameters, use NULL for codepoints and 0 for codepointCount to load the default character set, font size is provided in pixels height
+	LoadFontFromImage  :: proc(image: Image, key: Color, firstChar: rune) -> Font ---                                                                         		           // Load font from Image (XNA style)
+	LoadFontFromMemory :: proc(fileType: cstring, fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---      	                   // Load font from memory buffer, fileType refers to extension: i.e. '.ttf'
+	IsFontValid        :: proc(font: Font) -> bool ---                                                                                                        		           // Check if a font is valid (font data loaded, WARNING: GPU texture not checked)
+	LoadFontData       :: proc(fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int, type: FontType, glyphCount: ^c.int) -> [^]GlyphInfo --- // Load font data for further use
+	GenImageFontAtlas  :: proc(glyphs: [^]GlyphInfo, glyphRecs: ^[^]Rectangle, codepointCount: c.int, fontSize: c.int, padding: c.int, packMethod: c.int) -> Image ---                 // Generate image font atlas using chars info
+	UnloadFontData     :: proc(glyphs: [^]GlyphInfo, glyphCount: c.int) ---                                                                                    		           // Unload font chars info data (RAM)
+	UnloadFont         :: proc(font: Font) ---                                                                                                                		           // Unload font from GPU memory (VRAM)
+	ExportFontAsCode   :: proc(font: Font, fileName: cstring) -> bool ---                                                                                     		           // Export font as code file, returns true on success
 
 	// Text drawing functions
 
