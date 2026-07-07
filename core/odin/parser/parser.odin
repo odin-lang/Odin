@@ -381,6 +381,9 @@ advance_token :: proc(p: ^Parser) -> tokenizer.Token {
 		#partial switch p.curr_tok.kind {
 		case .Comment:
 			consume_comment_groups(p, prev)
+			if p.curr_tok.kind == .Semicolon && p.expr_level > 0 && p.curr_tok.text == "\n" {
+				advance_token(p)
+			}
 		case .Semicolon:
 			if p.expr_level > 0 && p.curr_tok.text == "\n" {
 				advance_token(p)
