@@ -507,6 +507,9 @@ ShapeType :: enum c.int {
 // Used to create a shape
 // @ingroup shape
 ShapeDef :: struct {
+	/// Optional shape name for debugging
+	name:                  cstring,
+
 	// Use this to store application specific shape data.
 	userData: rawptr,
 
