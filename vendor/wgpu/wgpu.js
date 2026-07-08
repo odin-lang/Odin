@@ -1812,7 +1812,7 @@ class WebGPUInterface {
 			 * @param {number} data
 			 * @param {number|BigInt} size
 			 */
-			wgpuComputePassEncoderSetImmediates: (computePassEncoderIdx, offset, data, size) {
+			wgpuComputePassEncoderSetImmediates: (computePassEncoderIdx, offset, data, size) => {
 				console.warn("wgpuComputePassEncoderSetImmediates: unimplemented in browsers at the time of writing");
 			},
 
