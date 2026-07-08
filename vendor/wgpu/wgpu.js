@@ -1812,7 +1812,7 @@ class WebGPUInterface {
 			 * @param {number} data
 			 * @param {number|BigInt} size
 			 */
-			wgpuComputePassEncoderSetImmediates: (computePassEncoderIdx, offset, data, size) {
+			wgpuComputePassEncoderSetImmediates: (computePassEncoderIdx, offset, data, size) => {
 				console.warn("wgpuComputePassEncoderSetImmediates: unimplemented in browsers at the time of writing");
 			},
 
@@ -2712,7 +2712,7 @@ class WebGPUInterface {
 			 * @param {number} data
 			 * @param {number|BigInt} size
 			 */
-			wgpuRenderBundleEncoderSetImmediates: (renderBundleEncoderIdx, offset, data, size) {
+			wgpuRenderBundleEncoderSetImmediates: (renderBundleEncoderIdx, offset, data, size) => {
 				console.warn("wgpuRenderBundleEncoderSetImmediates: unimplemented in browsers at the time of writing");
 			},
 
@@ -2919,7 +2919,7 @@ class WebGPUInterface {
 			 * @param {number} data
 			 * @param {number|BigInt} size
 			 */
-			wgpuRenderPassEncoderSetImmediates: (renderPassEncoderIdx, offset, data, size) {
+			wgpuRenderPassEncoderSetImmediates: (renderPassEncoderIdx, offset, data, size) => {
 				console.warn("wgpuRenderPassEncoderSetImmediates: unimplemented in browsers at the time of writing");
 			},
 
