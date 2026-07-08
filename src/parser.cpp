@@ -1529,6 +1529,9 @@ gb_internal Token advance_token(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
 			consume_comment_groups(f, prev);
+			if (f->curr_token.kind == Token_Semicolon && ignore_newlines(f) && f->curr_token.string == "\n") {
+				advance_token(f);
+			}
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -3582,7 +3585,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 		case Token_when:
 			if (prev.pos.line < op.pos.line) {
 				// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-				goto loop_end;
+				if (f->expr_level <= 0) {
+					goto loop_end;
+				}
 			}
 			break;
 		}
