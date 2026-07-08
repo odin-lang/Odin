@@ -417,6 +417,7 @@ Allocator_Error :: enum byte {
 	Invalid_Pointer      = 2,
 	Invalid_Argument     = 3,
 	Mode_Not_Implemented = 4,
+	Multiplication_Overflow_On_Requested_Size = 5,
 }
 
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,

@@ -543,7 +543,13 @@ make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocat
 @(require_results)
 _make_aligned_type_erased :: proc(slice: rawptr, elem_size: int, len: int, alignment: int, allocator: Allocator, loc := #caller_location) -> Allocator_Error {
 	make_slice_error_loc(loc, len)
-	data, err := mem_alloc_bytes(elem_size*len, alignment, allocator, loc)
+
+	byte_count, overflows := intrinsics.overflow_mul(elem_size, len)
+	if overflows {
+		return .Multiplication_Overflow_On_Requested_Size
+	}
+
+	data, err := mem_alloc_bytes(byte_count, alignment, allocator, loc)
 	if data == nil && elem_size != 0 {
 		return err
 	}
@@ -593,7 +599,13 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #a
 _make_dynamic_array_len_cap :: proc(array: ^Raw_Dynamic_Array, size_of_elem, align_of_elem: int, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
 	make_dynamic_array_error_loc(loc, len, cap)
 	array.allocator = allocator // initialize allocator before just in case it fails to allocate any memory
-	data := mem_alloc_bytes(size_of_elem*cap, align_of_elem, allocator, loc) or_return
+
+	byte_count, overflows := intrinsics.overflow_mul(size_of_elem, cap)
+	if overflows {
+		return .Multiplication_Overflow_On_Requested_Size
+	}
+
+	data := mem_alloc_bytes(byte_count, align_of_elem, allocator, loc) or_return
 	use_zero := data == nil && size_of_elem != 0
 	array.data = raw_data(data)
 	array.len = 0 if use_zero else len
@@ -636,7 +648,13 @@ when MAP_ENABLED {
 @(builtin, require_results)
 make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) #optional_allocator_error {
 	make_slice_error_loc(loc, len)
-	data := mem_alloc_bytes(size_of(E)*len, align_of(E), allocator, loc) or_return
+
+	byte_count, overflows := intrinsics.overflow_mul(size_of(E), len)
+	if overflows {
+		return .Multiplication_Overflow_On_Requested_Size
+	}
+
+	data := mem_alloc_bytes(byte_count, align_of(E), allocator, loc) or_return
 	if data == nil && size_of(E) != 0 {
 		return
 	}
@@ -1377,7 +1395,11 @@ _reserve_dynamic_array :: #force_no_inline proc(a: ^Raw_Dynamic_Array, size_of_e
 	}
 
 	old_size  := a.cap * size_of_elem
-	new_size  := capacity * size_of_elem
+	new_size, overflows := intrinsics.overflow_mul(capacity, size_of_elem)
+	if overflows {
+		return .Multiplication_Overflow_On_Requested_Size
+	}
+
 	allocator := a.allocator
 
 	new_data: []byte
@@ -1406,7 +1428,10 @@ _reserve_dynamic_array_unsafe :: #force_no_inline proc(a: ^Raw_Dynamic_Array, si
 	}
 
 	old_size  := a.cap * size_of_elem
-	new_size  := capacity * size_of_elem
+	new_size, overflows := intrinsics.overflow_mul(capacity, size_of_elem)
+	if overflows {
+		return .Multiplication_Overflow_On_Requested_Size
+	}
 	allocator := a.allocator
 
 	new_data: []byte
@@ -1466,7 +1491,11 @@ _resize_dynamic_array :: #force_no_inline proc(a: ^Raw_Dynamic_Array, size_of_el
 	}
 
 	old_size  := a.cap  * size_of_elem
-	new_size  := length * size_of_elem
+	new_size, overflows := intrinsics.overflow_mul(length, size_of_elem)
+	if overflows {
+		return .Multiplication_Overflow_On_Requested_Size
+	}
+
 	allocator := a.allocator
 
 	new_data : []byte
