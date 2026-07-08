@@ -192,8 +192,8 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 @(no_sanitize_address)
 tracking_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
-	size, alignment: int,
+	packed_info: Allocator_Packed_Info,
+	size: int,
 	old_memory: rawptr,
 	old_size: int,
 	loc := #caller_location,
@@ -216,6 +216,8 @@ tracking_allocator_proc :: proc(
 	}
 
 	data := (^Tracking_Allocator)(allocator_data)
+	mode := packed_info.mode
+	alignment := 1<<packed_info.log2_alignment
 
 	sync.mutex_guard(&data.mutex)
 
@@ -237,7 +239,7 @@ tracking_allocator_proc :: proc(
 			data.bad_free_callback(data, old_memory, loc)
 		}
 	} else {
-		result = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, loc) or_return
+		result = data.backing.procedure(data.backing.data, packed_info, size, old_memory, old_size, loc) or_return
 	}
 	result_ptr := raw_data(result)
 

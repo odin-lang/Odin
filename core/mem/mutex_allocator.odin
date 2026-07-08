@@ -38,15 +38,14 @@ mutex_allocator :: proc(m: ^Mutex_Allocator) -> Allocator {
 
 mutex_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
+	packed_info: Allocator_Packed_Info,
 	size: int,
-	alignment: int,
 	old_memory: rawptr,
 	old_size: int,
 	loc := #caller_location,
 ) -> (result: []byte, err: Allocator_Error) {
 	m := (^Mutex_Allocator)(allocator_data)
 	sync.mutex_guard(&m.mutex)
-	return m.backing.procedure(m.backing.data, mode, size, alignment, old_memory, old_size, loc)
+	return m.backing.procedure(m.backing.data, packed_info, size, old_memory, old_size, loc)
 }
 

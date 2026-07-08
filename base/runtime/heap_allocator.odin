@@ -10,8 +10,8 @@ heap_allocator :: proc() -> Allocator {
 	}
 }
 
-heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-                            size, alignment: int,
+heap_allocator_proc :: proc(allocator_data: rawptr, packed_info: Allocator_Packed_Info,
+                            size: int,
                             old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	//
 	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
@@ -19,6 +19,9 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	// padding. We also store the original pointer returned by heap_alloc right before
 	// the pointer we return to the user.
 	//
+
+	mode := packed_info.mode
+	alignment := int(1)<<packed_info.log2_alignment
 
 	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr, old_size: int, zero_memory := true) -> ([]byte, Allocator_Error) {
 		// Not(flysand): We need to reserve enough space for alignment, which

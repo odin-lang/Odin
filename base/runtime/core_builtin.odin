@@ -651,7 +651,8 @@ make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := con
 
 	byte_count, overflows := intrinsics.overflow_mul(size_of(E), len)
 	if overflows {
-		return .Multiplication_Overflow_On_Requested_Size
+		err = .Multiplication_Overflow_On_Requested_Size
+		return
 	}
 
 	data := mem_alloc_bytes(byte_count, align_of(E), allocator, loc) or_return

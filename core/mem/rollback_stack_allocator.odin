@@ -458,14 +458,15 @@ rollback_stack_allocator :: proc(stack: ^Rollback_Stack) -> Allocator {
 @(require_results, no_sanitize_address)
 rollback_stack_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
-	size, alignment: int,
+	packed_info: Allocator_Packed_Info,
+	size: int,
 	old_memory: rawptr,
 	old_size: int,
 	loc := #caller_location,
 ) -> (result: []byte, err: Allocator_Error) {
 	stack := cast(^Rollback_Stack)allocator_data
-	switch mode {
+	alignment := 1<<packed_info.log2_alignment
+	switch packed_info.mode {
 	case .Alloc:
 		return rb_alloc_bytes(stack, size, alignment, loc)
 	case .Alloc_Non_Zeroed:

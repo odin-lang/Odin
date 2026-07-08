@@ -59,18 +59,21 @@ log_allocator :: proc(la: ^Log_Allocator) -> runtime.Allocator {
 }
 
 // Backing procedure for allocator that logs all allocations.
-log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                           size, alignment: int,
-                           old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
+log_allocator_proc :: proc(allocator_data: rawptr,
+                           packed_info: runtime.Allocator_Packed_Info,
+                           size: int, old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
 	la := (^Log_Allocator)(allocator_data)
 
 	if context.logger.procedure == nil || la.level < context.logger.lowest_level {
-		return la.allocator.procedure(la.allocator.data, mode, size, alignment, old_memory, old_size, location)
+		return la.allocator.procedure(la.allocator.data, packed_info, size, old_memory, old_size, location)
 	}
 
 	padding := " " if la.prefix != "" else ""
 
 	buf: [256]byte = ---
+
+	mode := packed_info.mode
+	alignment := 1<<packed_info.log2_alignment
 
 	sync.lock(&la.lock)
 	switch mode {
@@ -138,7 +141,7 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 	}
 	sync.unlock(&la.lock)
 
-	data, err := la.allocator.procedure(la.allocator.data, mode, size, alignment, old_memory, old_size, location)
+	data, err := la.allocator.procedure(la.allocator.data, packed_info, size, old_memory, old_size, location)
 	if err != nil {
 		sync.lock(&la.lock)
 		str := fmt.bprintf(buf[:], "%s%sALLOCATOR ERROR=%v", la.prefix, padding, err)

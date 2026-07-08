@@ -493,12 +493,12 @@ free :: proc{free_rawptr, free_cstring}
 
 // Wrap CMark allocator as Odin allocator
 @(private)
-cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                             size, alignment: int,
+cmark_allocator_proc :: proc(allocator_data: rawptr, packed_info: runtime.Allocator_Packed_Info,
+                             size: int,
                              old_memory: rawptr, old_size: int, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) {
 
 	cmark_alloc := cast(^Allocator)allocator_data
-	switch mode {
+	switch packed_info.mode {
 	case .Alloc, .Alloc_Non_Zeroed:
 		ptr := cmark_alloc.calloc(1, c.size_t(size))
 		res = ([^]byte)(ptr)[:size]
@@ -515,8 +515,8 @@ cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 		return nil, .Mode_Not_Implemented
 
 	case .Resize, .Resize_Non_Zeroed:
-		new_ptr := cmark_alloc.realloc(old_memory, c.size_t(size))
-		res = transmute([]byte)runtime.Raw_Slice{new_ptr, size}
+		new_ptr := ([^]byte)(cmark_alloc.realloc(old_memory, c.size_t(size)))
+		res = new_ptr[:size]
 		if size > old_size {
 			runtime.mem_zero(raw_data(res[old_size:]), size - old_size)
 		}

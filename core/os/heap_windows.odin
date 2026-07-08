@@ -26,9 +26,8 @@ heap_free :: proc(ptr: rawptr) {
 	win32.HeapFree(win32.GetProcessHeap(), 0, ptr)
 }
 
-_heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
+_heap_allocator_proc :: proc(allocator_data: rawptr, packed_info: mem.Allocator_Packed_Info,
+                            size: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
 	//
 	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
 	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
@@ -74,6 +73,9 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 		return aligned_alloc(new_size, new_alignment, true, p)
 	}
+
+	mode := packed_info.mode
+	alignment := 1<<packed_info.log2_alignment
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:

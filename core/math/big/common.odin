@@ -119,6 +119,7 @@ Error :: enum byte {
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
 	Mode_Not_Implemented    = 4, // Allocation
+	Multiplication_Overflow_On_Requested_Size = 5,
 
 	Assignment_To_Immutable = 10,
 	Max_Iterations_Reached  = 11,
@@ -147,6 +148,7 @@ Error_String :: #sparse[Error]string{
 	.Invalid_Pointer         = "Invalid pointer",
 	.Invalid_Argument        = "Invalid argument",
 	.Mode_Not_Implemented    = "Allocation mode not implemented",
+	.Multiplication_Overflow_On_Requested_Size = "Multiplication overflow on requested allocation size",
 
 	.Assignment_To_Immutable = "Assignment to immutable",
 	.Max_Iterations_Reached  = "Max iterations reached",

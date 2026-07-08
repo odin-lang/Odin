@@ -1826,10 +1826,9 @@ MemAllocator :: proc "contextless" () -> mem.Allocator {
 	return mem.Allocator{MemAllocatorProc, nil}
 }
 
-MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                         size, alignment: int,
-                         old_memory: rawptr, old_size: int, location := #caller_location) -> (data: []byte, err: mem.Allocator_Error)  {
-	switch mode {
+MemAllocatorProc :: proc(allocator_data: rawptr, packed_info: mem.Allocator_Packed_Info,
+                         size: int, old_memory: rawptr, old_size: int, location := #caller_location) -> (data: []byte, err: mem.Allocator_Error)  {
+	switch packed_info.mode {
 	case .Alloc, .Alloc_Non_Zeroed:
 		ptr := MemAlloc(c.uint(size))
 		if ptr == nil {

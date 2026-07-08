@@ -326,13 +326,15 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 
 // The allocator procedure used by an `Allocator` produced by `arena_allocator`
 @(no_sanitize_address)
-arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                             size, alignment: int,
+arena_allocator_proc :: proc(allocator_data: rawptr, packed_info: mem.Allocator_Packed_Info,
+                             size: int,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Arena)(allocator_data)
 
-	size, alignment := uint(size), uint(alignment)
+	mode := packed_info.mode
+
+	size, alignment := uint(size), uint(1)<<packed_info.log2_alignment
 	old_size := uint(old_size)
 
 	switch mode {

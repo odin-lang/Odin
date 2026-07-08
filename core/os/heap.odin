@@ -15,8 +15,7 @@ heap_allocator :: proc() -> runtime.Allocator {
 
 
 @(require_results)
-heap_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
-	return _heap_allocator_proc(allocator_data, mode, size, alignment, old_memory, old_size, loc)
+heap_allocator_proc :: proc(allocator_data: rawptr, packed_info: runtime.Allocator_Packed_Info,
+                            size: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+	return _heap_allocator_proc(allocator_data, packed_info, size, old_memory, old_size, loc)
 }

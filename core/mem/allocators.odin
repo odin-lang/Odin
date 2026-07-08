@@ -71,8 +71,8 @@ nil_allocator :: proc() -> Allocator {
 
 nil_allocator_proc :: proc(
 	allocator_data:  rawptr,
-	mode:            Allocator_Mode,
-	size, alignment: int,
+	packed_info:     Allocator_Packed_Info,
+	size: int,
 	old_memory:      rawptr,
 	old_size:        int,
 	loc := #caller_location,
@@ -98,13 +98,13 @@ panic_allocator :: proc() -> Allocator {
 
 panic_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode: Allocator_Mode,
-	size, alignment: int,
+	packed_info: Allocator_Packed_Info,
+	size: int,
 	old_memory: rawptr,
 	old_size: int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
-	switch mode {
+	switch packed_info.mode {
 	case .Alloc:
 		if size > 0 {
 			panic("mem: panic allocator, .Alloc called", loc=loc)
@@ -291,14 +291,15 @@ arena_free_all :: proc(a: ^Arena) {
 
 arena_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode:           Allocator_Mode,
+	packed_info:    Allocator_Packed_Info,
 	size:           int,
-	alignment:      int,
 	old_memory:     rawptr,
 	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error)  {
 	arena := cast(^Arena)allocator_data
+	mode := packed_info.mode
+	alignment := 1<<packed_info.log2_alignment
 	switch mode {
 	case .Alloc:
 		return arena_alloc_bytes(arena, size, alignment, loc)
@@ -772,14 +773,16 @@ scratch_resize_bytes_non_zeroed :: proc(
 }
 
 scratch_allocator_proc :: proc(
-	allocator_data:  rawptr,
-	mode:            Allocator_Mode,
-	size, alignment: int,
-	old_memory:      rawptr,
-	old_size:        int,
+	allocator_data: rawptr,
+	packed_info:    Allocator_Packed_Info,
+	size:           int,
+	old_memory:     rawptr,
+	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := (^Scratch)(allocator_data)
+	mode := packed_info.mode
+	alignment := 1<<packed_info.log2_alignment
 	size := size
 	switch mode {
 	case .Alloc:
@@ -1190,9 +1193,8 @@ stack_resize_bytes_non_zeroed :: proc(
 
 stack_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode:           Allocator_Mode,
+	packed_info:    Allocator_Packed_Info,
 	size:           int,
-	alignment:      int,
 	old_memory:     rawptr,
 	old_size:       int,
 	loc := #caller_location,
@@ -1201,7 +1203,8 @@ stack_allocator_proc :: proc(
 	if s.data == nil {
 		return nil, .Invalid_Argument
 	}
-	switch mode {
+	alignment := 1<<packed_info.log2_alignment
+	switch packed_info.mode {
 	case .Alloc:
 		return stack_alloc_bytes(s, size, alignment, loc)
 	case .Alloc_Non_Zeroed:
@@ -1585,18 +1588,19 @@ small_stack_resize_bytes_non_zeroed :: proc(
 }
 
 small_stack_allocator_proc :: proc(
-	allocator_data:  rawptr,
-	mode:            Allocator_Mode,
-	size, alignment: int,
-	old_memory:      rawptr,
-	old_size:        int,
+	allocator_data: rawptr,
+	packed_info:    Allocator_Packed_Info,
+	size:           int,
+	old_memory:     rawptr,
+	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	s := cast(^Small_Stack)allocator_data
 	if s.data == nil {
 		return nil, .Invalid_Argument
 	}
-	switch mode {
+	alignment := 1<<packed_info.log2_alignment
+	switch packed_info.mode {
 	case .Alloc:
 		return small_stack_alloc_bytes(s, size, alignment, loc)
 	case .Alloc_Non_Zeroed:
@@ -1725,12 +1729,13 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, alignment: int, loc :=
 	if len(a.unused_blocks) > 0 {
 		new_block = pop(&a.unused_blocks)
 	} else {
+		log2_alignment := runtime._u8_log2(max(a.minimum_alignment, alignment))
+
 		data: []byte
 		data, err = a.block_allocator.procedure(
 			a.block_allocator.data,
-			Allocator_Mode.Alloc,
+			{.Alloc, log2_alignment},
 			a.block_size,
-			max(a.minimum_alignment, alignment),
 			nil,
 			0,
 		)
@@ -2001,15 +2006,15 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 
 dynamic_arena_allocator_proc :: proc(
 	allocator_data: rawptr,
-	mode:           Allocator_Mode,
+	packed_info:    Allocator_Packed_Info,
 	size:           int,
-	alignment:      int,
 	old_memory:     rawptr,
 	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	arena := (^Dynamic_Arena)(allocator_data)
-	switch mode {
+	alignment := 1<<packed_info.log2_alignment
+	switch packed_info.mode {
 	case .Alloc:
 		return dynamic_arena_alloc_bytes(arena, size, alignment, loc)
 	case .Alloc_Non_Zeroed:
@@ -2362,15 +2367,16 @@ buddy_allocator_free_all :: proc(b: ^Buddy_Allocator) {
 
 @(no_sanitize_address)
 buddy_allocator_proc :: proc(
-	allocator_data:  rawptr,
-	mode:            Allocator_Mode,
-	size, alignment: int,
-	old_memory:      rawptr,
-	old_size:        int,
+	allocator_data: rawptr,
+	packed_info:    Allocator_Packed_Info,
+	size:           int,
+	old_memory:     rawptr,
+	old_size:       int,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	b := (^Buddy_Allocator)(allocator_data)
-	switch mode {
+	alignment := 1<<packed_info.log2_alignment
+	switch packed_info.mode {
 	case .Alloc:
 		return buddy_allocator_alloc_bytes(b, uint(size))
 	case .Alloc_Non_Zeroed:
@@ -2431,9 +2437,8 @@ compat_allocator :: proc(rra: ^Compat_Allocator) -> Allocator {
 	}
 }
 
-compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
+compat_allocator_proc :: proc(allocator_data: rawptr, packed_info: Allocator_Packed_Info,
+                             size: int, old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	Header :: struct {
 		size:      int,
@@ -2448,6 +2453,9 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return header
 	}
 
+	mode := packed_info.mode
+	alignment := 1<<packed_info.log2_alignment
+
 	rra := (^Compat_Allocator)(allocator_data)
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
@@ -2455,7 +2463,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		req_size := size + a
 		assert(req_size >= 0, "overflow")
 
-		allocation := rra.parent.procedure(rra.parent.data, mode, req_size, alignment, old_memory, old_size, location) or_return
+		allocation := rra.parent.procedure(rra.parent.data, {mode, runtime._u8_log2(a)}, req_size, old_memory, old_size, location) or_return
 		#no_bounds_check data = allocation[a:]
 
 		([^]Header)(raw_data(data))[-1] = {
@@ -2472,7 +2480,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		orig_ptr  := rawptr(uintptr(old_memory)-uintptr(a))
 		orig_size := header.size + a
 
-		return rra.parent.procedure(rra.parent.data, mode, orig_size, header.alignment, orig_ptr, orig_size, location)
+		return rra.parent.procedure(rra.parent.data, {mode, runtime._u8_log2(header.alignment)}, orig_size, orig_ptr, orig_size, location)
 
 	case .Resize, .Resize_Non_Zeroed:
 		header    := get_unpoisoned_header(old_memory)
@@ -2486,7 +2494,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		req_size := size + a
 		assert(size >= 0, "overflow")
 
-		allocation := rra.parent.procedure(rra.parent.data, mode, req_size, new_alignment, orig_ptr, orig_size, location) or_return
+		allocation := rra.parent.procedure(rra.parent.data, {mode, runtime._u8_log2(new_alignment)}, req_size, orig_ptr, orig_size, location) or_return
 		#no_bounds_check data = allocation[a:]
 
 		([^]Header)(raw_data(data))[-1] = {
@@ -2498,7 +2506,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return
 
 	case .Free_All:
-		return rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+		return rra.parent.procedure(rra.parent.data, {mode, runtime._u8_log2(alignment)}, size, old_memory, old_size, location)
 
 	case .Query_Info:
 		info := (^Allocator_Query_Info)(old_memory)
@@ -2510,7 +2518,7 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return
 
 	case .Query_Features:
-		data, err = rra.parent.procedure(rra.parent.data, mode, size, alignment, old_memory, old_size, location)
+		data, err = rra.parent.procedure(rra.parent.data, {mode, runtime._u8_log2(alignment)}, size, old_memory, old_size, location)
 		if err != nil {
 			set := (^Allocator_Mode_Set)(old_memory)
 			set^ += {.Query_Info}

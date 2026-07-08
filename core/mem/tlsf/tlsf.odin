@@ -137,8 +137,8 @@ destroy :: proc(control: ^Allocator) {
 	}
 }
 
-allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                       size, alignment: int,
+allocator_proc :: proc(allocator_data: rawptr, packed_info: runtime.Allocator_Packed_Info,
+                       size: int,
                        old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
 
 	control := (^Allocator)(allocator_data)
@@ -146,11 +146,13 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		return nil, .Invalid_Argument
 	}
 
-	switch mode {
+	alignment := uint(1)<<packed_info.log2_alignment
+
+	switch packed_info.mode {
 	case .Alloc:
-		return alloc_bytes(control, uint(size), uint(alignment))
+		return alloc_bytes(control, uint(size), alignment)
 	case .Alloc_Non_Zeroed:
-		return alloc_bytes_non_zeroed(control, uint(size), uint(alignment))
+		return alloc_bytes_non_zeroed(control, uint(size), alignment)
 
 	case .Free:
 		free_with_size(control, old_memory, uint(old_size))
@@ -161,10 +163,10 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		return nil, nil
 
 	case .Resize:
-		return resize(control, old_memory, uint(old_size), uint(size), uint(alignment))
+		return resize(control, old_memory, uint(old_size), uint(size), alignment)
 
 	case .Resize_Non_Zeroed:
-		return resize_non_zeroed(control, old_memory, uint(old_size), uint(size), uint(alignment))
+		return resize_non_zeroed(control, old_memory, uint(old_size), uint(size), alignment)
 
 	case .Query_Features:
 		set := (^runtime.Allocator_Mode_Set)(old_memory)

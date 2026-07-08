@@ -41,12 +41,11 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 		}
 	}
 
-	default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-	                                    size, alignment: int,
-	                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	default_temp_allocator_proc :: proc(allocator_data: rawptr, packed_info: Allocator_Packed_Info,
+	                                    size: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 
 		s := (^Default_Temp_Allocator)(allocator_data)
-		return arena_allocator_proc(&s.arena, mode, size, alignment, old_memory, old_size, loc)
+		return arena_allocator_proc(&s.arena, packed_info, size, old_memory, old_size, loc)
 	}
 
 	@(require_results)

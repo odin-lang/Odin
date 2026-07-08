@@ -420,9 +420,17 @@ Allocator_Error :: enum byte {
 	Multiplication_Overflow_On_Requested_Size = 5,
 }
 
-Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
+Allocator_Packed_Info :: struct {
+	mode:           Allocator_Mode,
+	log2_alignment: u8,
+}
+
+// NOTE(bill): Allocator_Packed_Info could be packed even further to 8 bits (3:mode + 5:log2_alignment)
+// but this is not benefiting any ABI whatsoever to minimize it furthers
+#assert(size_of(Allocator_Packed_Info) == 2)
+
+Allocator_Proc :: #type proc(allocator_data: rawptr, packed_info: Allocator_Packed_Info,
+                             size: int, old_memory: rawptr, old_size: int,
                              location: Source_Code_Location = #caller_location) -> ([]byte, Allocator_Error)
 Allocator :: struct {
 	procedure: Allocator_Proc,

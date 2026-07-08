@@ -246,6 +246,9 @@ is defined as follows:
 */
 Allocator :: runtime.Allocator
 
+Allocator_Packed_Info :: runtime.Allocator_Packed_Info
+
+
 /*
 Default alignment.
 
@@ -709,7 +712,7 @@ Query allocator features.
 @(require_results)
 query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: Allocator_Mode_Set) {
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, .Query_Features, 0, 0, &set, 0, loc)
+		allocator.procedure(allocator.data, {.Query_Features, 0}, 0, &set, 0, loc)
 		return set
 	}
 	return nil
@@ -726,7 +729,7 @@ query_info :: proc(
 ) -> (props: Allocator_Query_Info) {
 	props.pointer = pointer
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, .Query_Info, 0, 0, &props, 0, loc)
+		allocator.procedure(allocator.data, {.Query_Info, 0}, 0, &props, 0, loc)
 	}
 	return
 }
