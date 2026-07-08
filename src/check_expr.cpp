@@ -5829,7 +5829,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup) && selector->kind == Ast_Ident) {
 			gbString sel_str = expr_to_string(selector);
-			error(node, "'%s' is not declared by by '%.*s'", sel_str, LIT(e->token.string));
+			error(node, "'%s' is not declared by '%.*s'", sel_str, LIT(e->token.string));
 			gb_string_free(sel_str);
 			operand->mode = Addressing_Invalid;
 			operand->expr = node;
