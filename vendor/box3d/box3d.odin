@@ -19,10 +19,20 @@ when ODIN_OS == .Windows {
 	foreign import lib {
 		"lib/linux-amd64/libbox3d.a",
 	}
-} else when ODIN_OS == .Darwin && (ODIN_ARCH == .arm64 || ODIN_ARCH == .amd64) && !BOX3D_SHARED {
+} else when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED {
 	@(export)
 	foreign import lib {
-		"lib/darwin/libbox3d.a",
+		"lib/linux-arm64/libbox3d.a",
+	}
+} else when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64) && !BOX3D_SHARED {
+	@(export)
+	foreign import lib {
+		"lib/darwin-amd64/libbox3d.a",
+	}
+} else when ODIN_OS == .Darwin && (ODIN_ARCH == .arm64) && !BOX3D_SHARED {
+	@(export)
+	foreign import lib {
+		"lib/darwin-arm64/libbox3d.a",
 	}
 } else {
 	@(export)
@@ -491,7 +501,7 @@ foreign lib {
 	// Sub-step one frame. This will sub-step and return immediately after body creation.
 	// The next call will execute the time step. This allows bodies to be rendered
 	// at the creation pose.
-	RecPlayer_SubStepFrame :: procplayer: ^RecPlayer) ---
+	RecPlayer_SubStepFrame :: proc(player: ^RecPlayer) ---
 
 
 	// Rewind to frame 0 (in-place restore so the world id stays stable).
@@ -514,7 +524,7 @@ foreign lib {
 	RecPlayer_IsAtEnd :: proc(#by_ptr player: RecPlayer) -> bool ---
 
 	// @return true when the op stream is paused between body creation and world step.
-	RecPlayer_IsAtPreStep :: proc(#by_ptr player: b3RecPlayer) -> bool ---
+	RecPlayer_IsAtPreStep :: proc(#by_ptr player: RecPlayer) -> bool ---
 
 	// @return true when any StateHash mismatch has been detected
 	RecPlayer_HasDiverged :: proc(#by_ptr player: RecPlayer) -> bool ---
