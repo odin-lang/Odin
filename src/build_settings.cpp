@@ -881,7 +881,7 @@ gb_global TargetMetrics target_freestanding_arm32 = {
 	TargetOs_freestanding,
 	TargetArch_arm32,
 	4, 4, 8, 16,
-	str_lit("arm-unknown-unknown-gnueabihf"),
+	str_lit("arm-none-eabihf"),
 };
 gb_global TargetMetrics target_freestanding_riscv64 = {
 	TargetOs_freestanding,
