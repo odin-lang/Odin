@@ -1764,7 +1764,10 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 		}
 	} else {
-		if (in_type) {
+		expr = unparen_expr(expr);
+		if (expr && expr->kind == Ast_Uninit) {
+			error(expr, "Default parameter cannot be ---");
+		} else if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
 		} else {
 			check_expr(ctx, &o, expr);
