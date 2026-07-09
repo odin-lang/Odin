@@ -643,7 +643,7 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 
 gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
 	thread_init(pool, t, idx);
-	isize stack_size = 0;
+	isize stack_size = 1 * 1024 * 1024; // 1 MiB (LLVM takes a lot of stack space)
 
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = CreateThread(NULL, stack_size, internal_thread_proc, t, 0, NULL);
