@@ -491,7 +491,7 @@ foreign lib {
 	// Sub-step one frame. This will sub-step and return immediately after body creation.
 	// The next call will execute the time step. This allows bodies to be rendered
 	// at the creation pose.
-	RecPlayer_SubStepFrame :: procplayer: ^b3RecPlayer) ---
+	RecPlayer_SubStepFrame :: procplayer: ^RecPlayer) ---
 
 
 	// Rewind to frame 0 (in-place restore so the world id stays stable).
