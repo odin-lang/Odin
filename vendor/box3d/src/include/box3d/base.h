@@ -102,7 +102,7 @@ typedef void b3LogFcn( const char* message );
 B3_API void b3SetAllocator( b3AllocFcn* allocFcn, b3FreeFcn* freeFcn );
 
 /// Total bytes allocated by Box3D
-B3_API int32_t b3GetByteCount( void );
+B3_API int b3GetByteCount( void );
 
 /// Override the default assert callback.
 ///	@param assertFcn a non-null assert callback
@@ -185,9 +185,5 @@ B3_API void b3Sleep( int milliseconds );
 // Simple djb2 hash function for determinism testing
 #define B3_HASH_INIT 5381
 B3_API uint32_t b3Hash( uint32_t hash, const uint8_t* data, int count );
-
-// Dump file support functions
-B3_API void b3WriteBinaryFile( void* data, int size, const char* fileName );
-B3_API void* b3ReadBinaryFile( const char* prefix, const char* fileName, int* memSize );
 
 //! @endcond
