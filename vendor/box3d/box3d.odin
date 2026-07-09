@@ -19,7 +19,12 @@ when ODIN_OS == .Windows {
 	foreign import lib {
 		"lib/linux-amd64/libbox3d.a",
 	}
-} else when ODIN_OS == .Darwin && (ODIN_ARCH == .arm64 || ODIN_ARCH == .amd64) && !BOX3D_SHARED {
+} else when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED {
+	@(export)
+	foreign import lib {
+		"lib/linux-arm64/libbox3d.a",
+	}
+} else when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED {
 	@(export)
 	foreign import lib {
 		"lib/darwin/libbox3d.a",
@@ -59,7 +64,7 @@ foreign lib {
 	SetAllocator :: proc(allocFcn: AllocFcn, freeFcn: FreeFcn) ---
 
 	// Total bytes allocated by Box3D
-	GetByteCount :: proc() -> i32 ---
+	GetByteCount :: proc() -> c.int ---
 
 	// Override the default assert callback.
 	//	@param assertFcn a non-null assert callback
@@ -113,9 +118,9 @@ foreign lib {
 	// Simple djb2 hash function for determinism testing
 	Hash :: proc(hash: u32, data: [^]u8, count: c.int) -> u32 ---
 
-	// Dump file support functions
-	WriteBinaryFile :: proc(data: rawptr, size: c.int, fileName: cstring) ---
-	ReadBinaryFile  :: proc(prefix: cstring, fileName: cstring, memSize: ^c.int) -> rawptr ---
+	// // Dump file support functions
+	// WriteBinaryFile :: proc(data: rawptr, size: c.int, fileName: cstring) ---
+	// ReadBinaryFile  :: proc(prefix: cstring, fileName: cstring, memSize: ^c.int) -> rawptr ---
 }
 
 
@@ -479,7 +484,7 @@ foreign lib {
 	// Replaying at a different count re-partitions the constraint graph, so the StateHash check
 	// becomes a cross-thread determinism test. Adjustable later with RecPlayer_SetWorkerCount.
 	// @return a new player, or NULL on bad header or deserialization failure
-	 RecPlayer_Create :: proc(data: rawptr, size: c.int, workerCount: c.int) -> RecPlayer ---
+	RecPlayer_Create :: proc(data: rawptr, size: c.int, workerCount: c.int) -> RecPlayer ---
 
 	// Destroy the player and free all memory. Restores the previous global length scale.
 	RecPlayer_Destroy :: proc(player: ^RecPlayer) ---
@@ -487,6 +492,12 @@ foreign lib {
 	// Advance one frame: dispatch ops until the next Step completes.
 	// @return true when a frame was stepped, false at end-of-recording
 	RecPlayer_StepFrame :: proc(player: ^RecPlayer) -> bool ---
+
+	// Sub-step one frame. This will sub-step and return immediately after body creation.
+	// The next call will execute the time step. This allows bodies to be rendered
+	// at the creation pose.
+	RecPlayer_SubStepFrame :: proc(player: ^RecPlayer) ---
+
 
 	// Rewind to frame 0 (in-place restore so the world id stays stable).
 	RecPlayer_Restart :: proc(player: ^RecPlayer) ---
@@ -506,6 +517,9 @@ foreign lib {
 
 	// @return true when the op stream is exhausted
 	RecPlayer_IsAtEnd :: proc(#by_ptr player: RecPlayer) -> bool ---
+
+	// @return true when the op stream is paused between body creation and world step.
+	RecPlayer_IsAtPreStep :: proc(#by_ptr player: RecPlayer) -> bool ---
 
 	// @return true when any StateHash mismatch has been detected
 	RecPlayer_HasDiverged :: proc(#by_ptr player: RecPlayer) -> bool ---
@@ -614,7 +628,7 @@ foreign lib {
 	// properties regardless of the automatic mass setting.
 	Body_SetType :: proc(bodyId: BodyId, type: BodyType) ---
 
-	// Set the body name. Up to B3_BODY_NAME_LENGTH characters including null termination.
+	// Set the body name.
 	Body_SetName :: proc(bodyId: BodyId, name: cstring) ---
 
 	// Get the body name.
@@ -742,10 +756,10 @@ foreign lib {
 	Body_GetWorldInverseRotationalInertia :: proc(bodyId: BodyId) -> Matrix3 ---
 
 	// Get the center of mass position of the body in local space
-	Body_GetLocalCenterOfMass :: proc(bodyId: BodyId) -> Vec3 ---
+	Body_GetLocalCenter :: proc(bodyId: BodyId) -> Vec3 ---
 
 	// Get the center of mass position of the body in world space
-	Body_GetWorldCenterOfMass :: proc(bodyId: BodyId) -> Pos ---
+	Body_GetWorldCenter :: proc(bodyId: BodyId) -> Pos ---
 
 	// Override the body's mass properties. Normally this is computed automatically using the
 	// shape geometry and density. This information is lost if a shape is added or removed or if the
@@ -835,7 +849,7 @@ foreign lib {
 
 	// Enable/disable hit events on all shapes
 	// @see ShapeDef::enableHitEvents
-	Body_EnableHitEvents :: proc(bodyId: BodyId, enableHitEvents: bool) ---
+	Body_EnableHitEvents :: proc(bodyId: BodyId, flag: bool) ---
 
 	// Get the world that owns this body
 	Body_GetWorld :: proc(bodyId: BodyId) -> WorldId ---
@@ -946,12 +960,18 @@ foreign lib {
 	// Returns true if the shape is a sensor
 	Shape_IsSensor :: proc(shapeId: ShapeId) -> bool ---
 
+	// Set the shape name.
+	Shape_SetName :: proc(shapeId: ShapeId, name: cstring) ---
+
+	// Get the shape name. Returns an empty string if the name isn't set.
+	Shape_GetName :: proc(shapeId: ShapeId) -> cstring ---
+
 	// Set the user data for a shape
 	Shape_SetUserData :: proc(shapeId: ShapeId, userData: rawptr) ---
 
 	// Get the user data for a shape. This is useful when you get a shape id
 	// from an event or query.
-	 Shape_GetUserData :: proc(shapeId: ShapeId) ---
+	Shape_GetUserData :: proc(shapeId: ShapeId) ---
 
 	// Set the mass density of a shape, usually in kg/m^3.
 	// This will optionally update the mass properties on the parent body.

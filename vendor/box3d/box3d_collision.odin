@@ -71,7 +71,7 @@ foreign lib {
 	DynamicTree_RayCast :: proc(#by_ptr tree: DynamicTree, #by_ptr input: RayCastInput, maskBits: u64, requireAllBits: bool, callback: TreeRayCastCallbackFcn, ctx: rawptr) -> TreeStats ---
 
 	// Sweep an AABB through the tree. The box is in the tree's world float frame and the callback
-	// re-differences each shape at full precision against the query origin. Used by the large world
+	// re-differences each shape at full precision aganist the query origin. Used by the large world
 	// spatial queries so the tree traversal stays float while the narrow phase stays precise.
 	DynamicTree_BoxCast :: proc(#by_ptr tree: DynamicTree, #by_ptr input: BoxCastInput, maskBits: u64, requireAllBits: bool, callback: TreeBoxCastCallbackFcn, ctx: rawptr) -> TreeStats ---
 
@@ -444,7 +444,8 @@ foreign lib {
 	CollideCapsuleAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr capsuleA: Capsule, #by_ptr triangleB: [3]Vec3, cache: ^SimplexCache) ---
 
 	// Collide a hull and a triangle.
-	CollideHullAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr hullA: HullData, v1, v2, v3: Vec3, triangleFlags: c.int, cache: ^SATCache) ---
+	CollideHullAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr hullA: HullData, v1, v2, v3: Vec3,
+	                               triangleFlags: c.int, cache: ^SATCache, enableSpeculative: bool) ---
 
 	// Collide a sphere and a triangle.
 	CollideSphereAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr sphereA: Sphere, #by_ptr triangleB: [3]Vec3) ---

@@ -118,15 +118,6 @@ AABB_MARGIN_FRACTION :: 0.125
 // The time that a body must be still before it will go to sleep. In seconds.
 TIME_TO_SLEEP :: 0.5
 
-// Maximum length of the body name. Can be 0 if you don't need names.
-// Note: this gates recording capability.
-BODY_NAME_LENGTH :: 18
-
-// Maximum length of the shape name. Can be 0 if you don't need names.
-// Note: this gates recording capability.
-// todo waiting on this because it breaks existing recordings
-SHAPE_NAME_LENGTH :: 18
-
 // The maximum number of contact points between two touching shapes.
 MAX_MANIFOLD_POINTS :: 4
 

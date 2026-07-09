@@ -89,10 +89,6 @@ SegmentDistanceResult :: struct {
 
 @(link_prefix="b3", default_calling_convention="c", require_results)
 foreign lib {
-	// @return is this float valid (finite and not NaN).
-	IsValidFloat :: proc(a: f32) -> bool ---
-
-
 	// Compute an approximate arctangent in the range [-pi, pi]
 	// This is hand coded for cross-platform determinism. The atan2f
 	// function in the standard library is not cross-platform deterministic.

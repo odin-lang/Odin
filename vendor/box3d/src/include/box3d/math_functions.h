@@ -155,9 +155,6 @@ B3_INLINE int b3ClampInt( int a, int lower, int upper )
 	return a < lower ? lower : ( upper < a ? upper : a );
 }
 
-/// @return is this float valid (finite and not NaN).
-B3_API bool b3IsValidFloat( float a );
-
 /// @return the absolute value of a float.
 B3_INLINE float b3AbsFloat( float a )
 {
