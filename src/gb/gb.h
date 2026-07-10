@@ -5613,7 +5613,7 @@ gb_inline b32 gb_path_is_absolute(char const *path) {
 	b32 result = false;
 	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
-	result == (gb_strlen(path) > 2) &&
+	result = (gb_strlen(path) > 2) &&
 	          gb_char_is_alpha(path[0]) &&
 	          (path[1] == ':' && path[2] == GB_PATH_SEPARATOR);
 #else
