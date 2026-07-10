@@ -3100,7 +3100,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-stack-protector:<string>")) {
 			print_usage_line(2, "Specifies the stack protector.");
 			print_usage_line(2, "Available options:");
-				print_usage_line(3, "-stack-protector:default");
 				print_usage_line(3, "-stack-protector:none");
 				print_usage_line(3, "-stack-protector:base");
 				print_usage_line(3, "-stack-protector:all");
