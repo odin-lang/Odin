@@ -84,12 +84,14 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 	arg := arg
 
 	if strings.has_prefix(arg, "-") {
-		// -flag
+		// -short or -flag
 		arg = arg[1:]
+		is_short := true
 
 		if strings.has_prefix(arg, "-") {
-			// Allow `--` to function as `-`.
+			// --flag
 			arg = arg[1:]
+			is_short = false
 
 			if len(arg) == 0 {
 				// `--`, and only `--`.
@@ -103,17 +105,18 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 		flag: string
 		find_assignment: for r, i in arg {
 			if r == '=' {
-				// --flag=option
+				// -short=option or --flag=option
 				flag = arg[:i]
 				arg = arg[1 + i:]
+				flag = resolve_unix_flag_name(model, flag, is_short)
 				error = set_option(model, parser, flag, arg)
 				return
 			}
 		}
 
-		// --flag option, potentially
-		future_args = set_unix_flag(model, parser, arg) or_return
-		current_flag = arg
+		// -short option or --flag option, potentially
+		current_flag = resolve_unix_flag_name(model, arg, is_short)
+		future_args = set_unix_flag(model, parser, current_flag) or_return
 
 	} else {
 		// positional
@@ -121,6 +124,19 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 	}
 
 	return
+}
+
+// Resolve a single-dash short name to the field's canonical long name. If the
+// short name is not declared, preserve the existing single-dash long-name
+// behavior and let the assignment proc perform its usual lookup and erroring.
+resolve_unix_flag_name :: proc(model: ^$T, name: string, is_short: bool) -> string {
+	if is_short {
+		if field, _, ok := get_field_by_short(model, name); ok {
+			return get_field_name(field)
+		}
+	}
+
+	return name
 }
 
 // Parse a number of requirements specifier.
