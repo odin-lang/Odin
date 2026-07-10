@@ -6129,12 +6129,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	do_warning = &syntax_warning;
 	if (use_check_errors) {
 		do_error = &error;
-		do_error = &warning;
+		do_warning = &warning;
 	}
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
 	String collection_name = {};
+	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
 
 	isize colon_pos = -1;
 	for (isize j = 0; j < original_string.len; j++) {
@@ -6144,8 +6145,18 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		}
 	}
 
+	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
 	if (file_mutex == nullptr) {
+		if (!is_import_decl_path &&
+		    colon_pos == 1 &&
+		    original_string.len > 2 &&
+		    gb_char_is_alpha(original_string[0]) &&
+		    (original_string[2] == '/' || original_string[2] == '\\')) {
+			colon_pos = -1;
+			has_windows_drive = true;
+		}
+
 		for (isize i = 0; i < original_string.len; i++) {
 			if (original_string.text[i] == '\\') {
 				original_string.text[i] = '/';
@@ -6167,7 +6178,18 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		file_str = original_string;
 	}
 
-	if (!is_import_path_valid(file_str)) {
+	if (is_import_decl_path && is_import_path_absolute(file_str)) {
+		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+		return false;
+	}
+
+	if (has_windows_drive) {
+		String sub_file_path = substring(file_str, 3, file_str.len);
+		if (!is_import_path_valid(sub_file_path)) {
+			do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+			return false;
+		}
+	} else if (!is_import_path_valid(file_str)) {
 		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
@@ -6229,8 +6251,12 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
 
-	String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
-	*path = fullpath;
+	if (has_windows_drive) {
+		*path = file_str;
+	} else {
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
+		*path = fullpath;
+	}
 	return true;
 }
 
