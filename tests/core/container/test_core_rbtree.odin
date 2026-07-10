@@ -143,8 +143,7 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	clear(&inserted_map)
 
 	for i := 0; i < NR_INSERTS * 4; i += 1 {
-		k := Key(rand.uint32()) & 0x7
-		min_key = min(min_key, k); max_key = max(max_key, k)
+		k := Key(i) & 0x7
 		v := Value(i)
 
 		existing_node, in_map := inserted_map[k]
