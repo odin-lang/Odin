@@ -9,7 +9,7 @@ test_multidim_array_cast :: proc(t: ^testing.T) {
 
 	a : [3][2]i32
 	b: Foo
-	b = cast(Foo)transmute([3][2]i32)a
+	b = cast(Foo)a
 
 	testing.expect_value(t, b, Foo{})
 }
