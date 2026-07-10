@@ -1571,7 +1571,10 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	for (Entity *e = {}; mpsc_dequeue(&gen->info->objc_class_implementations, &e); /**/) {
 		GB_ASSERT(e->kind == Entity_TypeName && e->TypeName.objc_is_implementation);
 		lb_handle_objc_find_or_register_class(p, e->TypeName.objc_class_name, e->type);
-		error(e->token, "Objective-C related things are not allowed with '-bedrock'");
+
+		if (build_context.bedrock) {
+			error(e->token, "Objective-C related things are not allowed with '-bedrock'");
+		}
 	}
 
 	// Ensure classes that have been implicitly referenced through
@@ -1684,7 +1687,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			Type *superclass = tn.objc_superclass;
 
 			if (superclass != nullptr) {
-				auto& superclass_global = string_map_must_get(&global_class_map, tn.objc_class_name);
+				auto &superclass_global = string_map_must_get(&global_class_map, superclass->Named.type_name->TypeName.objc_class_name);
 				superclass_value = superclass_global.class_value;
 			}
 
