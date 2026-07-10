@@ -6024,10 +6024,6 @@ gb_global Rune illegal_import_runes[] = {
 
 gb_internal bool is_import_path_valid(String const &path) {
 	if (path.len > 0) {
-		if (path[0] == '/') {
-			return false;
-		}
-
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
 		u8 *curr = start;
@@ -6053,6 +6049,19 @@ gb_internal bool is_import_path_valid(String const &path) {
 			curr += width;
 		}
 
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool is_import_path_absolute(String const &path) {
+	if (path.len > 0 && path[0] == '/') {
+		return true;
+	}
+	if (path.len > 2 &&
+	    gb_char_is_alpha(path[0]) &&
+	    path[1] == ':' &&
+	    (path[2] == '/' || path[2] == '\\')) {
 		return true;
 	}
 	return false;
@@ -6271,6 +6280,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			ast_node(id, ImportDecl, node);
 
 			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+			if (is_import_path_absolute(original_string)) {
+				syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
+
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
@@ -6297,6 +6312,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				GB_ASSERT(fp->kind == Ast_BasicLit);
 				Token fp_token = fp->BasicLit.token;
 				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				if (is_import_path_absolute(file_str)) {
+					syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+					decls[i] = ast_bad_decl(f, fp_token, fp_token);
+					goto end;
+				}
+
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
