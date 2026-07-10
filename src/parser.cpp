@@ -6024,6 +6024,10 @@ gb_global Rune illegal_import_runes[] = {
 
 gb_internal bool is_import_path_valid(String const &path) {
 	if (path.len > 0) {
+		if (path[0] == '/') {
+			return false;
+		}
+
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
 		u8 *curr = start;
@@ -6131,23 +6135,8 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		}
 	}
 
-	bool has_windows_drive = false;
-	bool is_absolute = false;
-	bool allow_absolute_path = file_mutex == nullptr || node->kind == Ast_ForeignImportDecl;
-
-	if (allow_absolute_path) {
-		if (colon_pos == 1 && original_string.len > 2 &&
-		    gb_char_is_alpha(original_string[0])) {
-			if (original_string[2] == '/' || original_string[2] == '\\') {
-				colon_pos = -1;
-				has_windows_drive = true;
-				is_absolute = true;
-			}
-		}
-	}
-
 #if defined(GB_SYSTEM_WINDOWS)
-	if (allow_absolute_path) {
+	if (file_mutex == nullptr) {
 		for (isize i = 0; i < original_string.len; i++) {
 			if (original_string.text[i] == '\\') {
 				original_string.text[i] = '/';
@@ -6169,20 +6158,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		file_str = original_string;
 	}
 
-#if !defined(GB_SYSTEM_WINDOWS)
-	if (allow_absolute_path && (file_str.len > 0 && file_str[0] == '/')) {
-		is_absolute = true;
-	}
-#endif
-
-
-	if (has_windows_drive) {
-		String sub_file_path = substring(file_str, 3, file_str.len);
-		if (!is_import_path_valid(sub_file_path)) {
-			do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
-			return false;
-		}
-	} else if (!is_import_path_valid(file_str)) {
+	if (!is_import_path_valid(file_str)) {
 		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
@@ -6244,13 +6220,8 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
 
-	if (is_absolute) {
-		*path = file_str;
-	} else {
-		bool ok = false;
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
-		*path = fullpath;
-	}
+	String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
+	*path = fullpath;
 	return true;
 }
 
