@@ -1277,7 +1277,7 @@ assign_at_elem_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[d
 		array[index] = arg
 		ok = true
 	} else {
-		resize(array, index+1, loc) or_return
+		resize(array, index+1) or_return
 		array[index] = arg
 		ok = true
 	}
@@ -1296,7 +1296,7 @@ assign_at_elems_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[
 		copy(array[index:], args)
 		ok = true
 	} else {
-		resize(array, new_size, loc) or_return
+		resize(array, new_size) or_return
 		copy(array[index:], args)
 		ok = true
 	}
@@ -1314,7 +1314,7 @@ assign_at_elem_string_fixed_capacity_dynamic_array :: proc "contextless" (array:
 		copy(array[index:], arg)
 		ok = true
 	} else {
-		resize(array, new_size, loc) or_return
+		resize(array, new_size) or_return
 		copy(array[index:], arg)
 		ok = true
 	}
