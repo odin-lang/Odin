@@ -22,6 +22,7 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 	// All flags get their tags parsed so they can be reasoned about later.
 	Flag :: struct {
 		name: string,
+		short: string,
 		usage: string,
 		type_description: string,
 		full_length: int,
@@ -106,6 +107,9 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		flag: Flag
 
 		if args_tag, ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS); ok {
+			if style == .Unix {
+				flag.short, _ = get_struct_subtag(args_tag, SUBTAG_SHORT)
+			}
 			if _, is_hidden := get_struct_subtag(args_tag, SUBTAG_HIDDEN); is_hidden {
 				// Hidden flags stay hidden.
 				continue
@@ -184,6 +188,10 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		} else {
 			flag.full_length = len(flag_prefix) + len(flag.name) + len(flag_assignment) + len(flag.type_description)
 		}
+		if style == .Unix && len(flag.short) > 0 && flag.name != INTERNAL_OVERFLOW_FLAG {
+			// `-s, ` before the canonical `--long-name`.
+			flag.full_length += 3 + len(flag.short)
+		}
 
 		longest_flag_length = max(longest_flag_length, flag.full_length)
 
@@ -255,6 +263,11 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		if flag.name == INTERNAL_OVERFLOW_FLAG {
 			strings.write_string(&builder, flag.type_description)
 		} else {
+			if style == .Unix && len(flag.short) > 0 {
+				strings.write_byte(&builder, '-')
+				strings.write_string(&builder, flag.short)
+				strings.write_string(&builder, ", ")
+			}
 			strings.write_string(&builder, flag_prefix)
 			strings.write_string(&builder, flag.name)
 			if !flag.is_boolean {
