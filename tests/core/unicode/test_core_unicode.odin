@@ -9,6 +9,11 @@ Test_Case :: struct {
 	expected_clusters: int,
 }
 
+Text_Test_Case :: struct {
+	str: string,
+	expected_output: []string
+}
+
 run_test_cases :: proc(t: ^testing.T, test_cases: []Test_Case, loc := #caller_location) {
 	failed := 0
 	for c, i in test_cases {
@@ -130,5 +135,34 @@ test_width :: proc(t: ^testing.T) {
 		graphemes, _, width := utf8.grapheme_count(str)
 		testing.expect_value(t, graphemes, 25)
 		testing.expect_value(t, width, 50)
+	}
+}
+
+@test
+test_grapheme_cluster_text :: proc(t: ^testing.T) {
+
+	cases :: []Text_Test_Case {
+		{"abc", {"a", "b", "c"}},
+		{"é", {"é"}},
+		{"中", {"中"}},
+		{"\U0001F1FA\U0001F1F8", {"\U0001F1FA\U0001F1F8"}},
+		{"\U0001F1FA\U0001F1F8\U0001F1EE\U0001F1EA", {"\U0001F1FA\U0001F1F8", "\U0001F1EE\U0001F1EA"}},
+		{"\U0001F468‍\U0001F469‍\U0001F467‍\U0001F466", {"\U0001F468‍\U0001F469‍\U0001F467‍\U0001F466"}},
+		{"\U0001F44D\U0001F3FD", {"\U0001F44D\U0001F3FD"}},
+		{"a\r\nb", {"a", "\r\n", "b"}},
+	}
+
+	for c in cases {
+		it := utf8.decode_grapheme_iterator_make(c.str)
+		i := 0
+		for text, grapheme in utf8.decode_grapheme_iterate(&it) {
+			if !testing.expectf(t, i < len(c.expected_output), "%q: expected %d clusters, got at least %d", c.str, len(c.expected_output), i + 1) {
+				break
+			}
+			testing.expectf(t, text == c.expected_output[i], "%q cluster %d: expected text %q, got %q", c.str, i, c.expected_output[i], text)
+			testing.expectf(t, text == c.str[grapheme.byte_index:][:len(text)], "%q cluster %d: text does not start at byte_index %d", c.str, i, grapheme.byte_index)
+			i += 1
+		}
+		testing.expectf(t, i == len(c.expected_output), "%q: expected %d clusters, got %d", c.str, len(c.expected_output), i)
 	}
 }
