@@ -130,7 +130,7 @@ find_value :: proc(t: $T/Tree($Key, $Value), key: Key) -> (value: Value, ok: boo
 
 // find_or_insert attempts to insert the key-value pair into the tree, and returns
 // the node, a boolean indicating if a new node was inserted, and the
-// node allocator error if relevant. If the key is already present, the existing node is updated and returned.
+// node allocator error if relevant. If the key is already present, the existing node is returned un-altered.
 find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n: ^Node(Key, Value), inserted: bool, err: runtime.Allocator_Error) {
 	n_ptr := &t._root
 	for n_ptr^ != nil {
@@ -141,7 +141,6 @@ find_or_insert :: proc(t: ^$T/Tree($Key, $Value), key: Key, value: Value) -> (n:
 		case .Greater:
 			n_ptr = &n._right
 		case .Equal:
-			n.value = value
 			return
 		}
 	}
