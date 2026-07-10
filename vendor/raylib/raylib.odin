@@ -377,7 +377,7 @@ Model :: struct #align(align_of(uintptr)) {
 	materialCount: c.int,         // Number of materials
 	meshes:        [^]Mesh,       // Meshes array
 	materials:     [^]Material,   // Materials array
-	meshMaterial:  ^c.int,        // Mesh material number
+	meshMaterial:  [^]c.int,      // Mesh material number
 
 	// Animation data
 	skeleton:      ModelSkeleton, // Skeleton for animation
