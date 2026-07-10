@@ -80,6 +80,7 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON
+$ODIN test ../test_issue_6983.odin $COMMON
 
 set +x
 

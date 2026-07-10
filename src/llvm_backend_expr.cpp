@@ -3088,6 +3088,46 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			return lb_addr_load(p, v);
 		}
 	}
+	if (is_type_array(dst) && is_type_array(src) && dst->Array.count == src->Array.count) {
+		Type *dst_immediate_elem = dst->Array.elem;
+		Type *src_immediate_elem = src->Array.elem;
+
+		if (are_types_identical(dst_immediate_elem, src_immediate_elem)) {
+			lbValue v = value;
+			v.type = t;
+			return v;
+		}
+
+		i64 count = dst->Array.count;
+
+		lbAddr v = lb_add_local_generated(p, t, true);
+		lbValue psrc = lb_address_from_load_or_generate_local(p, value);
+		lbValue pdst = v.addr;
+
+		if (count > MAX_SIMD_ARRAY_COUNT_FOR_INLINING) {
+			auto loop_data = lb_loop_start(p, count, t_int);
+
+			lbValue sp = lb_emit_array_ep(p, psrc, loop_data.idx);
+			lbValue dp = lb_emit_array_ep(p, pdst, loop_data.idx);
+
+			lbValue s = lb_emit_load(p, sp);
+			s = lb_emit_conv(p, s, dst_immediate_elem);
+			lb_emit_store(p, dp, s);
+
+			lb_loop_end(p, loop_data);
+		} else {
+			for (i64 i = 0; i < count; i++) {
+				lbValue sp = lb_emit_array_epi(p, psrc, i);
+				lbValue dp = lb_emit_array_epi(p, pdst, i);
+
+				lbValue s = lb_emit_load(p, sp);
+				s = lb_emit_conv(p, s, dst_immediate_elem);
+				lb_emit_store(p, dp, s);
+			}
+		}
+
+		return lb_addr_load(p, v);
+	}
 
 
 	if (is_type_array_like(dst)) {
