@@ -1025,6 +1025,51 @@ test_unix :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_unix_short :: proc(t: ^testing.T) {
+	S :: struct {
+		output:  string `args:"short=o"`,
+		verbose: bool   `args:"short=v"`,
+	}
+
+	{
+		s: S
+		args := [?]string { "-o", "short", "-v" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.output, "short")
+		testing.expect_value(t, s.verbose, true)
+	}
+
+	{
+		s: S
+		args := [?]string { "-o=equals" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.output, "equals")
+	}
+
+	{
+		s: S
+		args := [?]string { "--output", "long" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.output, "long")
+	}
+
+	{
+		s: S
+		args := [?]string { "-output", "single-dash-long" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.output, "single-dash-long")
+	}
+}
+
+@(test)
 test_unix_manifold :: proc(t: ^testing.T) {
 	S :: struct {
 		a: [dynamic]int `args:"manifold"`,
@@ -1514,9 +1559,9 @@ Flags:
 	--widgets <string>, at most 2           | <This flag has not been documented yet.>
 	                                        |
 	--array <rune>, multiple                | <This flag has not been documented yet.>
-	--count <u8>                            | <This flag has not been documented yet.>
+	-c, --count <u8>                        | <This flag has not been documented yet.>
 	--greek <Custom_Enum>                   | <This flag has not been documented yet.>
-	--verbose                               | <This flag has not been documented yet.>
+	-v, --verbose                           | <This flag has not been documented yet.>
 	<string, ...>                           | <This flag has not been documented yet.>
 `
 
@@ -1535,7 +1580,7 @@ very nicely.
 
 "`,
 
-		c: u8 `args:"name=count"`,
+		c: u8 `args:"name=count,short=c"`,
 		greek: Custom_Enum,
 
 		array: [dynamic]rune,
@@ -1548,7 +1593,7 @@ very nicely.
 		bots: [dynamic]string `args:"required"`,
 
 		debug: bool `args:"hidden" usage:"print debug info"`,
-		verbose: bool,
+		verbose: bool `args:"short=v"`,
 
 		overflow: [dynamic]string,
 	}
