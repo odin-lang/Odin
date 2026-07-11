@@ -1982,19 +1982,20 @@ handle_op:;
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(integral_type);
-
 			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-
 			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			if (is_unsigned) {
 				res.value = LLVMBuildLShr(p->builder, lhsval, bits, "");
+
+				LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
+				res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			} else {
+				LLVMValueRef bit_size_minus_one = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type)-1, false);
+				bits = LLVMBuildSelect(p->builder, width_test, bits, bit_size_minus_one, "");
+
 				res.value = LLVMBuildAShr(p->builder, lhsval, bits, "");
 			}
-
-			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
-			res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			return res;
 		}
 	case Token_AndNot:
