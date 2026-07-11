@@ -130,7 +130,7 @@ poly_frommsg :: proc "contextless" (r: ^Poly, msg: []byte) #no_bounds_check {
 
 	for i in 0..<N/8 {
 		for j in 0..<8 {
-			r.coeffs[8*i+j] = subtle.csel_i16(0, (Q+1)/2, int(msg[i] >> uint(j))&1)
+			r.coeffs[8*i+j] = subtle.csel_i16(0, (Q+1)/2, (msg[i] >> uint(j))&1)
 		}
 	}
 }

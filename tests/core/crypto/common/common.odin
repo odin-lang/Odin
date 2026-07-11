@@ -1,6 +1,7 @@
 package test_crypto_common
 
 import "core:bytes"
+import "core:encoding/base64"
 import "core:encoding/hex"
 
 // Common helpers for cryptography tests.
@@ -23,3 +24,13 @@ hexbytes_decode :: proc(x: Hex_Bytes, allocator := context.allocator) -> []byte 
 	return dst
 }
 
+Jwk_Bytes :: string
+
+jwkbytes_decode :: proc(s: Jwk_Bytes, allocator := context.allocator) -> []byte {
+	dst, err := base64.decode(s, base64.DEC_URL_TABLE, allocator = allocator)
+	if err != nil {
+		panic("Jwk_Bytes: invalid hex encoding")
+	}
+
+	return dst
+}

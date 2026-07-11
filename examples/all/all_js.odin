@@ -49,6 +49,7 @@ package all
 @(require) import "core:crypto/pbkdf2"
 @(require) import "core:crypto/poly1305"
 @(require) import "core:crypto/ristretto255"
+@(require) import "core:crypto/rsa"
 @(require) import "core:crypto/sha2"
 @(require) import "core:crypto/sha3"
 @(require) import "core:crypto/shake"

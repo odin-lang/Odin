@@ -2743,10 +2743,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (check) {
 		if (print_flag("-collection:<name>=<filepath>")) {
-			print_usage_line(2, "Defines a library collection used for imports.");
+			print_usage_line(2, "Defines a library collection used for imports and foreign imports.");
 			print_usage_line(2, "Example: -collection:shared=dir/to/shared");
 			print_usage_line(2, "Usage in Code:");
 				print_usage_line(3, "import \"shared:foo\"");
+				print_usage_line(3, "foreign import lib \"shared:libfoo.a\"");
 		}
 
 		if (print_flag("-custom-attribute:<string>")) {
@@ -3100,7 +3101,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-stack-protector:<string>")) {
 			print_usage_line(2, "Specifies the stack protector.");
 			print_usage_line(2, "Available options:");
-				print_usage_line(3, "-stack-protector:default");
 				print_usage_line(3, "-stack-protector:none");
 				print_usage_line(3, "-stack-protector:base");
 				print_usage_line(3, "-stack-protector:all");

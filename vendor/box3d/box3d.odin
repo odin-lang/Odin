@@ -389,7 +389,7 @@ foreign lib {
 	World_SetUserData :: proc(worldId: WorldId, userData: rawptr) ---
 
 	// Get the user data pointer.
-	 World_GetUserData :: proc(worldId: WorldId) ---
+	World_GetUserData :: proc(worldId: WorldId) -> rawptr ---
 
 	// Set the friction callback. Passing NULL resets to default.
 	World_SetFrictionCallback :: proc(worldId: WorldId, callback: FrictionCallback) ---
@@ -638,7 +638,7 @@ foreign lib {
 	Body_SetUserData :: proc(bodyId: BodyId, userData: rawptr) ---
 
 	// Get the user data stored in a body
-	 Body_GetUserData :: proc(bodyId: BodyId) ---
+	Body_GetUserData :: proc(bodyId: BodyId) -> rawptr ---
 
 	// Get the world position of a body. This is the location of the body origin.
 	Body_GetPosition :: proc(bodyId: BodyId) -> Pos ---
@@ -971,7 +971,7 @@ foreign lib {
 
 	// Get the user data for a shape. This is useful when you get a shape id
 	// from an event or query.
-	Shape_GetUserData :: proc(shapeId: ShapeId) ---
+	Shape_GetUserData :: proc(shapeId: ShapeId) -> rawptr ---
 
 	// Set the mass density of a shape, usually in kg/m^3.
 	// This will optionally update the mass properties on the parent body.
@@ -1178,7 +1178,7 @@ foreign lib {
 	Joint_SetUserData :: proc(jointId: JointId, userData: rawptr) ---
 
 	// Get the user data on a joint
-	 Joint_GetUserData :: proc(jointId: JointId) ---
+	Joint_GetUserData :: proc(jointId: JointId) -> rawptr ---
 
 	// Wake the bodies connect to this joint
 	Joint_WakeBodies :: proc(jointId: JointId) ---

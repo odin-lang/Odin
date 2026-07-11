@@ -60,7 +60,7 @@ fe_from_bytes :: proc "contextless" (
 		reduced[3], borrow = bits.sub_u64(tmp[3], ELL[3], borrow)
 		reduced[4], borrow = bits.sub_u64(tmp[4], ELL[4], borrow)
 		reduced[5], borrow = bits.sub_u64(tmp[5], ELL[5], borrow)
-		need_reduced := subtle.u64_is_zero(borrow)
+		need_reduced := subtle.eq0(borrow)
 
 		fe_cond_select(&tmp, &tmp, &reduced, int(need_reduced))
 		fe_to_montgomery(out1, &tmp)
