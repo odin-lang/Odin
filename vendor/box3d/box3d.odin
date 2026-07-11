@@ -389,7 +389,7 @@ foreign lib {
 	World_SetUserData :: proc(worldId: WorldId, userData: rawptr) ---
 
 	// Get the user data pointer.
-	 World_GetUserData :: proc(worldId: WorldId) ---
+	World_GetUserData :: proc(worldId: WorldId) -> rawptr ---
 
 	// Set the friction callback. Passing NULL resets to default.
 	World_SetFrictionCallback :: proc(worldId: WorldId, callback: FrictionCallback) ---
