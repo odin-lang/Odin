@@ -391,7 +391,12 @@ _build_to_anchor :: proc(
 		#partial switch verify_signature(cert, root) {
 		case .None:
 			append(acc, root)
-			return true
+			// Chain is complete: enforce every CA's name constraints over it.
+			// On violation, keep searching — a different anchor/path may satisfy them.
+			if _check_name_constraints(acc[:]) {
+				return true
+			}
+			pop(acc)
 		case .Unsupported_Algorithm:
 			saw_unsupported^ = true
 		case:
@@ -475,12 +480,8 @@ _issuer_usable :: proc(issuer: ^Certificate, now: time.Time, below: int) -> bool
 	if issuer.unhandled_critical {
 		return false
 	}
-	// Name constraints are NOT decoded. RFC 5280 section 6.1.4(g) requires a
-	// validator that processes them to enforce them regardless of criticality;
-	// until that is implemented, refuse any issuer that asserts them.
-	if _has_extension(issuer, _OID_EXT_NAME_CONSTRAINTS) {
-		return false
-	}
+	// Name constraints asserted by this issuer are enforced on the completed
+	// chain (see _check_name_constraints), so an NC-bearing CA is usable here.
 	if !issuer.basic_constraints_valid || !issuer.is_ca {
 		return false
 	}
@@ -499,15 +500,12 @@ _issuer_usable :: proc(issuer: ^Certificate, now: time.Time, below: int) -> bool
 // The anchor is trusted input, so unlike _issuer_usable its CA authorization
 // (basicConstraints / keyCertSign / pathLenConstraint) and self-signature are
 // NOT re-checked. Still required: valid at `now` (resilience to an expired
-// anchor comes from the search trying other anchors/intermediates), no
-// uninterpreted critical extension, and no name constraints (which we cannot
-// enforce, so refuse rather than ignore).
+// anchor comes from the search trying other anchors/intermediates) and no
+// uninterpreted critical extension. Any nameConstraints it asserts are
+// enforced on the completed chain (see _check_name_constraints).
 @(private)
 _anchor_usable :: proc(anchor: ^Certificate, now: time.Time) -> bool {
 	if anchor.unhandled_critical {
-		return false
-	}
-	if _has_extension(anchor, _OID_EXT_NAME_CONSTRAINTS) {
 		return false
 	}
 	if _check_validity(anchor, now) != .None {
@@ -529,16 +527,6 @@ _permits_eku :: proc(cert: ^Certificate, ask: EKU_Bit) -> bool {
 		return true
 	}
 	return ask in cert.ext_key_usage
-}
-
-@(private)
-_has_extension :: proc(cert: ^Certificate, oid: []byte) -> bool {
-	for ext in cert.extensions {
-		if bytes.equal(ext.oid, oid) {
-			return true
-		}
-	}
-	return false
 }
 
 @(private)

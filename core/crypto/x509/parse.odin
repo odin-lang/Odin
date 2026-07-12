@@ -675,6 +675,11 @@ _parse_known_extension :: proc(
 		// practice, and AKI is only a path-building hint (issuers are matched by DN + signature), so the other fields carry no
 		// validation weight here.
 
+	case bytes.equal(oid, _OID_EXT_NAME_CONSTRAINTS):
+		// Left raw in `extensions` and enforced during chain validation (see _check_name_constraints,
+		// dNSName/iPAddress with fail-closed on other forms). Recognized here so a critical 
+		// nameConstraints does not trip unhandled_critical.
+
 	case:
 		if critical {
 			cert.unhandled_critical = true

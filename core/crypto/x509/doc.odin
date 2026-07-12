@@ -35,13 +35,15 @@ LIMITATIONS:
     (SHA-1/256/384/512), ECDSA P-256/P-384, and Ed25519. These paths return
     .Unsupported_Algorithm: ECDSA P-521 (effectively dead in web PKI), and
     RSA-PSS naming a digest or MGF this package does not recognize.
-  - Name constraints are NOT decoded; verify_chain fails CLOSED on them.
-    Any CA (intermediate or trust anchor) asserting a nameConstraints
-    extension, critical or not, is refused as an issuer, so a chain through
-    a name-constrained CA is rejected rather than accepted unchecked. RFC
-    5280 section 6.1.4(g) requires a validator that processes name
-    constraints to enforce them regardless of criticality; until that is
-    implemented, refusing is the only safe option.
+  - Name constraints (RFC 5280 4.2.1.10) are enforced for the dNSName and
+    iPAddress forms: a CA's permitted/excluded subtrees are checked against
+    every subordinate certificate's SANs, regardless of the extension's
+    criticality. A NameConstraints that uses any other base form
+    (directoryName, rfc822Name, URI, otherName), a minimum/maximum, or that
+    is malformed cannot be fully evaluated, so the whole chain is rejected
+    (fail closed) rather than accepted unchecked. NOT enforced: the RFC 5280
+    rule that the extension be critical, and dNSName syntax validation (a
+    leading-period constraint is accepted, as OpenSSL does).
   - REVOCATION IS NOT CHECKED. verify_chain performs NO CRL or OCSP
     revocation checking. Callers that need revocation (e.g. TLS clients) 
     MUST supply it separately (OCSP stapling, CRLite, …). 
@@ -67,9 +69,9 @@ duplicate extension OIDs (Duplicate_Extension, RFC 5280 section 4.2).
     extension is still available via `extensions`.
   - Only the extensions path validation needs are decoded
     (BasicConstraints, KeyUsage, ExtKeyUsage, SubjectAltName,
-    Subject/Authority Key Identifier). All others (AIA, CRL
-    distribution points, certificate policies, name constraints, …)
-    are left raw in `extensions`.
+    Subject/Authority Key Identifier; NameConstraints is decoded at
+    verification time). All others (AIA, CRL distribution points,
+    certificate policies, …) are left raw in `extensions`.
   - Subject and issuer are exposed only as raw DER (`raw_subject` /
     `raw_issuer`); distinguished-name attribute decoding (CN, O, …) is
     not performed.

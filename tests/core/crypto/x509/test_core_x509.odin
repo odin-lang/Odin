@@ -67,6 +67,23 @@ NEG_EKU_INTER     := #load("testdata/neg_eku_inter.der")      // emailProtection
 NEG_EKU_LEAF      := #load("testdata/neg_eku_leaf.der")       // serverAuth leaf
 NEG_NC_INTER      := #load("testdata/neg_nc_inter.der")       // non-critical nameConstraints
 NEG_NC_LEAF       := #load("testdata/neg_nc_leaf.der")        // name within permitted subtree
+// Dedicated name-constraint chains (EC P-256), generated with openssl:
+//   root -> nc_inter (critical NC: permitted DNS:.example.com, IP:10.0.0.0/8)
+//     -> nc_leaf_ok  (SAN host.example.com + 10.1.2.3 — within → accept)
+//     -> nc_leaf_bad (SAN host.evil.com — outside → reject)
+//   root -> nc_dir_inter (critical NC on directoryName — a form we do not
+//     evaluate) -> nc_leaf_dir (must fail closed → reject)
+NC_ROOT      := #load("testdata/nc_root.der")
+NC_INTER     := #load("testdata/nc_inter.der")
+NC_DIR_INTER := #load("testdata/nc_dir_inter.der")
+NC_LEAF_OK   := #load("testdata/nc_leaf_ok.der")
+NC_LEAF_BAD  := #load("testdata/nc_leaf_bad.der")
+NC_LEAF_DIR  := #load("testdata/nc_leaf_dir.der")
+// CVE-2025-61727 shape: nc_excl_inter excludes DNS:bar.example.com; the leaf's
+// wildcard SAN *.example.com spans bar.example.com and must be rejected, not
+// treated as a literal string that slips past the exclusion.
+NC_EXCL_INTER := #load("testdata/nc_excl_inter.der")
+NC_LEAF_WILD  := #load("testdata/nc_leaf_wild.der")
 // EKU alternative path: two intermediates sharing a subject DN and key,
 // one emailProtection-only, one serverAuth; the leaf chains through either.
 EKU_ALT_BAD       := #load("testdata/eku_alt_bad.der")        // same key, emailProtection only
@@ -558,18 +575,58 @@ test_verify_chain_eku_alt_path :: proc(t: ^testing.T) {
 	}
 }
 
-// Name constraints are not decoded, so verify_chain fails CLOSED: a
-// chain through a name-constrained CA is rejected even when the leaf's
-// name is within the permitted subtree (here a NON-critical NC, so it is
-// the explicit NC refusal, not the unhandled-critical path).
+// Name constraints (RFC 5280 4.2.1.10) are enforced for dNSName and iPAddress:
+// a leaf whose SANs fall within a constraining CA's permitted subtrees is
+// accepted, one that falls outside is rejected, and a critical NameConstraints
+// must NOT be mistaken for an unhandled critical extension.
 @(test)
-test_verify_chain_name_constraints_fail_closed :: proc(t: ^testing.T) {
-	root, _  := x509.parse(NEG_ROOT);      defer x509.destroy(&root)
-	inter, _ := x509.parse(NEG_NC_INTER);  defer x509.destroy(&inter)
-	leaf, _  := x509.parse(NEG_NC_LEAF);   defer x509.destroy(&leaf)
-	// The NC is present but not critical, so it must not have tripped the
-	// unhandled-critical flag — the refusal is the explicit NC check.
-	testing.expect(t, !inter.unhandled_critical, "NC is non-critical")
+test_verify_chain_name_constraints_permitted :: proc(t: ^testing.T) {
+	root, _  := x509.parse(NC_ROOT);     defer x509.destroy(&root)
+	inter, _ := x509.parse(NC_INTER);    defer x509.destroy(&inter)
+	leaf, _  := x509.parse(NC_LEAF_OK);  defer x509.destroy(&leaf)
+	testing.expect(t, !inter.unhandled_critical, "critical NC is recognized, not unhandled")
+
+	opts := x509.Verify_Options{roots = {&root}, intermediates = {&inter}, current_time = time.unix(CHAIN_NOW, 0)}
+	c, err := x509.verify_chain(&leaf, opts); defer delete(c)
+	testing.expect_value(t, err, x509.Error.None) // host.example.com + 10.1.2.3 are permitted
+	testing.expect_value(t, len(c), 3)
+}
+
+// A SAN outside every permitted subtree (host.evil.com vs permitted
+// .example.com) must be rejected.
+@(test)
+test_verify_chain_name_constraints_violation :: proc(t: ^testing.T) {
+	root, _  := x509.parse(NC_ROOT);      defer x509.destroy(&root)
+	inter, _ := x509.parse(NC_INTER);     defer x509.destroy(&inter)
+	leaf, _  := x509.parse(NC_LEAF_BAD);  defer x509.destroy(&leaf)
+
+	opts := x509.Verify_Options{roots = {&root}, intermediates = {&inter}, current_time = time.unix(CHAIN_NOW, 0)}
+	c, err := x509.verify_chain(&leaf, opts); delete(c)
+	testing.expect_value(t, err, x509.Error.Unknown_Authority)
+}
+
+// CVE-2025-61727: a wildcard SAN must not slip past a dNSName exclusion. The
+// intermediate excludes bar.example.com; the leaf's *.example.com spans it, so
+// the chain must be rejected (matching a wildcard as a literal string would
+// wrongly accept it).
+@(test)
+test_verify_chain_name_constraints_wildcard_excluded :: proc(t: ^testing.T) {
+	root, _  := x509.parse(NC_ROOT);        defer x509.destroy(&root)
+	inter, _ := x509.parse(NC_EXCL_INTER);  defer x509.destroy(&inter)
+	leaf, _  := x509.parse(NC_LEAF_WILD);   defer x509.destroy(&leaf)
+
+	opts := x509.Verify_Options{roots = {&root}, intermediates = {&inter}, current_time = time.unix(CHAIN_NOW, 0)}
+	c, err := x509.verify_chain(&leaf, opts); delete(c)
+	testing.expect_value(t, err, x509.Error.Unknown_Authority)
+}
+
+// A constraint on a GeneralName form we do not evaluate (here directoryName)
+// must fail closed — reject rather than silently ignore the constraint.
+@(test)
+test_verify_chain_name_constraints_unevaluable_fail_closed :: proc(t: ^testing.T) {
+	root, _  := x509.parse(NC_ROOT);        defer x509.destroy(&root)
+	inter, _ := x509.parse(NC_DIR_INTER);   defer x509.destroy(&inter)
+	leaf, _  := x509.parse(NC_LEAF_DIR);    defer x509.destroy(&leaf)
 
 	opts := x509.Verify_Options{roots = {&root}, intermediates = {&inter}, current_time = time.unix(CHAIN_NOW, 0)}
 	c, err := x509.verify_chain(&leaf, opts); delete(c)
