@@ -2,6 +2,7 @@ package x509
 
 import "core:bytes"
 import "core:encoding/asn1"
+import "core:strings"
 
 // Name-constraint processing (RFC 5280 section 4.2.1.10 + the section 6.1.4
 // path-validation checks), scoped to the dNSName and iPAddress GeneralName
@@ -242,10 +243,10 @@ _nc_dns_match :: proc(nc: []byte, excluded: bool, name: string) -> bool {
 				if excluded {
 					// Fail closed: exclude the wildcard if its subtree overlaps
 					// the constraint at all (constraint covers b, or b covers it).
-					if _dns_in_constraint(c, b) || _dns_in_constraint(b, _strip_dot(c)) {
+					if _dns_in_constraint(c, b) || _dns_in_constraint(b, strings.trim_prefix(c, ".")) {
 						return true
 					}
-				} else if _dns_in_constraint(_strip_dot(c), b) {
+				} else if _dns_in_constraint(strings.trim_prefix(c, "."), b) {
 					// Permitted only if every child of b is inside the subtree.
 					return true
 				}
@@ -255,13 +256,6 @@ _nc_dns_match :: proc(nc: []byte, excluded: bool, name: string) -> bool {
 		}
 	}
 	return false
-}
-
-// _strip_dot drops a single leading '.', normalizing a subtree constraint to a
-// bare domain for the wildcard-overlap comparisons above.
-@(private)
-_strip_dot :: proc "contextless" (s: string) -> string {
-	return s[1:] if len(s) > 0 && s[0] == '.' else s
 }
 
 // _nc_ip_match reports whether `ip` (a 4- or 16-octet address) matches any
@@ -332,9 +326,13 @@ _dns_in_constraint :: proc "contextless" (constraint, name: string) -> bool {
 	return false
 }
 
+// _ascii_eq_fold / _ascii_suffix_fold are the package's DNS-name comparison
+// primitives, shared with verify_hostname. dNSNames are IA5String (ASCII) and 
+// IDNs are carried as punycode A-labels. Do not replace with strings.equal_fold.
 @(private)
 _ascii_lower :: proc "contextless" (b: byte) -> byte {
-	return b + 0x20 if b >= 'A' && b <= 'Z' else b
+	if b >= 'A' && b <= 'Z' { return b+0x20 }
+	else { return b }
 }
 
 @(private)

@@ -6,6 +6,7 @@ import "core:crypto/ed25519"
 import "core:crypto/hash"
 import "core:crypto/rsa"
 import "core:net"
+import "core:slice"
 import "core:strings"
 import "core:time"
 
@@ -80,8 +81,10 @@ _match_hostname :: proc(pattern, host: string) -> bool {
 		return false
 	}
 
+	// DNS comparisons are ASCII case-insensitive (RFC 4343): dNSNames are
+	// IA5String and IDNs travel as punycode A-labels, so `_ascii_eq_fold`is used.
 	if !strings.has_prefix(p, "*.") {
-		return strings.equal_fold(p, host)
+		return _ascii_eq_fold(p, host)
 	}
 
 	// Wildcard: "*." + base. The host's first label is consumed by the wildcard; the
@@ -100,7 +103,7 @@ _match_hostname :: proc(pattern, host: string) -> bool {
 	if strings.index_byte(base, '*') >= 0 {
 		return false
 	}
-	return strings.equal_fold(base, rest)
+	return _ascii_eq_fold(base, rest)
 }
 
 // ============================================================
@@ -406,7 +409,7 @@ _build_to_anchor :: proc(
 
 	// Otherwise extend through an untrusted intermediate and recurse.
 	for inter in opts.intermediates {
-		if inter == cert || _in_chain(acc, inter) {
+		if inter == cert || slice.contains(acc[:], inter) {
 			continue
 		}
 		if !_is_issuer_of(inter, cert) || !_issuer_usable(inter, opts.current_time, below) {
@@ -527,14 +530,4 @@ _permits_eku :: proc(cert: ^Certificate, ask: EKU_Bit) -> bool {
 		return true
 	}
 	return ask in cert.ext_key_usage
-}
-
-@(private)
-_in_chain :: proc(acc: ^[dynamic]^Certificate, cert: ^Certificate) -> bool {
-	for c in acc {
-		if c == cert {
-			return true
-		}
-	}
-	return false
 }
