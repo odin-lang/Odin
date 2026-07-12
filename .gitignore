@@ -277,7 +277,6 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
-*.a
 
 # WASM
 *.wasm

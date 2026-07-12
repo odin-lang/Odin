@@ -433,7 +433,7 @@ fill :: proc "contextless" (array: $T/[]$E, value: E) #no_bounds_check {
 }
 
 rotate_left :: proc "contextless" (array: $T/[]$E, mid: int) {
-	if len(a) == 0 {
+	if len(array) == 0 {
 		return
 	}
 	n := len(array)

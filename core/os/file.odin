@@ -536,7 +536,7 @@ is_directory :: proc(path: string) -> bool {
 }
 
 /*
-	`copy_file` copies a file from `src_path` to `dst_path` and returns an error if any was encountered.
+	`is_tty` returns `true` if `f` is a TTY, `false` if not.
 */
 @(require_results)
 is_tty :: proc "contextless" (f: ^File) -> bool {

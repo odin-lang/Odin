@@ -171,6 +171,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
+	Subtarget_Playdate,
 	
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
@@ -181,6 +182,7 @@ gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit("iphone"),
 	str_lit("iphonesimulator"),
 	str_lit("android"),
+	str_lit("playdate"),
 };
 
 
@@ -276,6 +278,13 @@ enum RelocMode : u8 {
 	RelocMode_Static,
 	RelocMode_PIC,
 	RelocMode_DynamicNoPIC,
+};
+
+enum StackProtector : u8 {
+	StackProtector_None,
+	StackProtector_Ssp,
+	StackProtector_SspReq,
+	StackProtector_SspStrong,
 };
 
 enum BuildPath : u8 {
@@ -539,6 +548,8 @@ struct BuildContext {
 	bool   disallow_do;
 	bool   show_import_graph;
 
+	bool   webkit_switch_workaround;
+
 	IntegerDivisionByZeroKind integer_division_by_zero_behaviour;
 
 	LinkerChoice linker_choice;
@@ -599,12 +610,18 @@ struct BuildContext {
 
 	bool   print_linker_flags;
 
-	RelocMode reloc_mode;
+	RelocMode      reloc_mode;
+	StackProtector stack_protector;
+
 	bool   disable_red_zone;
 	bool   disable_unwind;
 	bool   no_plt;
 
 	isize max_error_count;
+
+	bool bedrock;
+	bool disable_non_constant_globals;
+	bool disable_init_fini;
 
 
 	u32 cmd_doc_flags;
@@ -864,7 +881,7 @@ gb_global TargetMetrics target_freestanding_arm32 = {
 	TargetOs_freestanding,
 	TargetArch_arm32,
 	4, 4, 8, 16,
-	str_lit("arm-unknown-unknown-gnueabihf"),
+	str_lit("arm-none-eabihf"),
 };
 gb_global TargetMetrics target_freestanding_riscv64 = {
 	TargetOs_freestanding,
@@ -1841,8 +1858,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		bc->no_entry_point = true;
 	} else {
 		if (bc->no_rtti) {
-			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
-			gb_exit(1);
+			if (!bc->bedrock) {
+				gb_printf_err("-no-rtti is only allowed on freestanding targets or '-bedrock'\n");
+				gb_exit(1);
+			}
 		}
 	}
 
@@ -1899,16 +1918,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 				}
 				break;
 		}
-	} else if (metrics->os == TargetOs_linux) {
-		if (bc->reloc_mode == RelocMode_Default) {
-			bc->reloc_mode = RelocMode_PIC;
-		}
-		switch (metrics->arch) {
-		case TargetArch_arm64:
-		case TargetArch_amd64:
-			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
-			break;
-		}
 	} else if (metrics->os == TargetOs_openbsd) {
 		// Always use PIC for OpenBSD: it defaults to PIE
 		if (bc->reloc_mode == RelocMode_Default) {
@@ -1937,9 +1946,42 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->metrics.target_triplet = str_lit("i686-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
-		
 		default:
 			GB_PANIC("Unknown architecture for -subtarget:android");
+		}
+	} else if (metrics->os == TargetOs_linux) {
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_PIC;
+		}
+		switch (metrics->arch) {
+		case TargetArch_arm64:
+		case TargetArch_amd64:
+			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
+			break;
+		}
+	} else if (subtarget == Subtarget_Playdate) {
+		// Playdate uses the cortex-m7 as well and an FPU, requiring thumb instructions and hard floats.
+		bc->microarch = str_lit("cortex-m7");
+		bc->metrics.target_triplet = str_lit("thumbv7em-none-eabihf");
+		// Remove MOVW/MOVT instructions as playdate only handles R_ARM_ABS32 relocations.
+		if(bc->target_features_string.len > 0) {
+			bc->target_features_string = concatenate_strings(permanent_allocator(), bc->target_features_string, str_lit(",no-movt"));
+		} else {
+			bc->target_features_string = str_lit("no-movt");
+		}
+	}
+
+	if (metrics->os == TargetOs_windows ||
+	    metrics->os == TargetOs_darwin ||
+	    metrics->os == TargetOs_linux ||
+	    metrics->os == TargetOs_freebsd ||
+	    metrics->os == TargetOs_openbsd ||
+	    metrics->os == TargetOs_netbsd) {
+	    	// -stack-protector is supported
+	} else {
+		if (bc->stack_protector != StackProtector_None) {
+			gb_printf_err("-stack-protector is not supported on this target\n");
+			gb_exit(1);
 		}
 	}
 
@@ -2367,12 +2409,32 @@ gb_internal bool init_build_paths(String init_filename) {
 		GB_PANIC("Unhandled build mode/target combination.\n");
 	}
 
+	bool output_should_be_directory = false;
+
 	if (bc->out_filepath.len > 0) {
 		bc->build_paths[BuildPath_Output] = path_from_string(ha, bc->out_filepath);
-		if (build_context.metrics.os == TargetOs_windows) {
-			String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-			defer (gb_free(ha, output_file.text));
-			if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+		bool output_is_directory = path_is_directory(bc->build_paths[BuildPath_Output]);
+
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+
+		// NOTE(Jeroen): For LLVM-IR, we want `-out` to specify a directory.
+		//               For other outputs we expect it to be a file path.
+		if (build_context.build_mode == BuildMode_LLVM_IR) {
+			if (!output_is_directory) {
+				gb_printf_err("Output path %.*s should be a directory for LLVM-IR output.\n", LIT(output_file));
+				return false;
+			}
+			output_should_be_directory = true;
+
+		} else if (build_context.build_mode == BuildMode_Object) {
+			// Both directory or filename prefix allowed
+
+		} else if (build_context.build_mode == BuildMode_Assembly) {
+			// Both directory or filename prefix allowed
+
+		} else if (build_context.metrics.os == TargetOs_windows) {
+			if (output_is_directory) {
 				gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 				return false;
 			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
@@ -2483,7 +2545,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	// Do we have an extension? We might not if the output filename was supplied.
 	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
 		if (build_context.metrics.os == TargetOs_windows || is_arch_wasm() || build_context.build_mode != BuildMode_Executable) {
-			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+
+			// NOTE(Jeroen): If build mode is LLVM_IR and a custom output was set
+			if (!output_should_be_directory) {
+				bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+			}
 		}
 	}
 
@@ -2491,7 +2557,7 @@ gb_internal bool init_build_paths(String init_filename) {
 	defer (gb_free(ha, output_file.text));
 
 	// Check if output path is a directory.
-	if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+	if (!output_should_be_directory && path_is_directory(bc->build_paths[BuildPath_Output])) {
 		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 		return false;
 	}

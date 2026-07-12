@@ -51,6 +51,45 @@ import "core:testing"
 //   - pbkdf2_hmacsha256_test.json
 //   - pbkdf2_hmacsha384_test.json
 //   - pbkdf2_hmacsha512_test.json
+// - crypto/rsa
+//   - rsa_pkcs1_1024_sig_gen_test.json
+//   - rsa_pkcs1_1536_sig_gen_test.json
+//   - rsa_pkcs1_2048_sig_gen_test.json
+//   - rsa_pkcs1_3072_sig_gen_test.json
+//   - rsa_pkcs1_4096_sig_gen_test.json
+//   - rsa_pss_2048_sha1_mgf1_20_test.json
+//   - rsa_pss_2048_sha256_mgf1_0_test.json
+//   - rsa_pss_2048_sha256_mgf1_32_test.json
+//   - rsa_pss_2048_sha256_mgf1sha1_20_test.json
+//   - rsa_pss_2048_sha384_mgf1_48_test.json
+//   - rsa_pss_2048_sha512_256_mgf1_32_test.json
+//   - rsa_pss_3072_sha256_mgf1_32_test.json
+//   - rsa_pss_4096_sha256_mgf1_32_test.json
+//   - rsa_pss_4096_sha384_mgf1_48_test.json
+//   - rsa_pss_4096_sha512_mgf1_32_test.json
+//   - rsa_pss_4096_sha512_mgf1_64_test.json
+//   - rsa_pss_misc_test.json
+//   - rsa_oaep_2048_sha1_mgf1sha1_test.json
+//   - rsa_oaep_2048_sha224_mgf1sha1_test.json
+//   - rsa_oaep_2048_sha224_mgf1sha224_test.json
+//   - rsa_oaep_2048_sha256_mgf1sha1_test.json
+//   - rsa_oaep_2048_sha256_mgf1sha256_test.json
+//   - rsa_oaep_2048_sha384_mgf1sha1_test.json
+//   - rsa_oaep_2048_sha384_mgf1sha384_test.json
+//   - rsa_oaep_2048_sha512_224_mgf1sha1_test.json
+//   - rsa_oaep_2048_sha512_mgf1sha1_test.json
+//   - rsa_oaep_2048_sha512_mgf1sha512_test.json
+//   - rsa_oaep_3072_sha256_mgf1sha1_test.json
+//   - rsa_oaep_3072_sha256_mgf1sha256_test.json
+//   - rsa_oaep_3072_sha512_256_mgf1sha1_test.json
+//   - rsa_oaep_3072_sha512_256_mgf1sha512_256_test.json
+//   - rsa_oaep_3072_sha512_mgf1sha1_test.json
+//   - rsa_oaep_3072_sha512_mgf1sha512_test.json
+//   - rsa_oaep_4096_sha256_mgf1sha1_test.json
+//   - rsa_oaep_4096_sha256_mgf1sha256_test.json
+//   - rsa_oaep_4096_sha512_mgf1sha1_test.json
+//   - rsa_oaep_4096_sha512_mgf1sha512_test.json
+//   - rsa_oaep_misc_test.json
 // - crypto/siphash
 //   - siphash_1_3_test.json
 //   - siphash_2_4_test.json
@@ -73,7 +112,7 @@ import "core:testing"
 // - crypto/legacy/md5
 // - crypto/tuplehash
 
-ARENA_SIZE :: 4 * 1024 * 1024 // There is no kill like overkill.
+ARENA_SIZE :: 8 * 1024 * 1024 // There is no kill like overkill.
 
 BASE_PATH :: ODIN_ROOT + "tests/core/assets/Wycheproof"
 SUFFIX_TEST_JSON :: "_test.json"

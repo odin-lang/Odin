@@ -791,7 +791,10 @@ gb_internal void check_scope_usage_internal(Checker *c, Scope *scope, u64 vet_fl
 			array_add(&vetted_entities, ve_unused);
 		} else if (is_shadowed) {
 			array_add(&vetted_entities, ve_shadowed);
-		} else if (e->kind == Entity_Variable && (e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static|EntityFlag_Field)) == 0 && !e->Variable.is_global) {
+		} else if (e->kind == Entity_Variable &&
+		           ((e->flags & (EntityFlag_Param|EntityFlag_Using|EntityFlag_Static|EntityFlag_Field)) == 0 ||
+		            (e->flags & EntityFlag_Result) != 0) &&
+		          !e->Variable.is_global) {
 			i64 sz = type_size_of(e->type);
 			// TODO(bill): When is a good size warn?
 			// Is >256 KiB good enough?
@@ -1106,7 +1109,6 @@ gb_internal i64 odin_compile_timestamp(void) {
 	return ns_after_1970;
 }
 
-gb_internal bool lb_use_new_pass_system(void);
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -1118,6 +1120,14 @@ gb_internal void init_universal(void) {
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
 		String const &name = basic_types[i].Basic.name;
+		if (build_context.bedrock) {
+			if ((basic_types[i].Basic.flags & BasicFlag_Integer) != 0 &&
+			    basic_types[i].Basic.size == 16) {
+				// disallow 128-bit integers
+				continue;
+			}
+		}
+
 		add_global_type_entity(name, &basic_types[i]);
 	}
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
@@ -1143,6 +1153,8 @@ gb_internal void init_universal(void) {
 	add_global_string_constant("ODIN_VERSION",                  bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",                     bc->ODIN_ROOT);
 	add_global_string_constant("ODIN_BUILD_PROJECT_NAME",       bc->ODIN_BUILD_PROJECT_NAME);
+
+	add_global_bool_constant("ODIN_BEDROCK", bc->bedrock);
 
 	{
 		GlobalEnumValue values[Windows_Subsystem_COUNT] = {
@@ -1234,6 +1246,7 @@ gb_internal void init_universal(void) {
 			{"iPhone",          Subtarget_iPhone},
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
 			{"Android",         Subtarget_Android},
+			{"Playdate",        Subtarget_Playdate},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
@@ -1301,6 +1314,32 @@ gb_internal void init_universal(void) {
 	}
 
 	{
+		GlobalEnumValue values[ProcCC_MAX] = {
+			{"Invalid",       ProcCC_Invalid},
+			{"Odin",          ProcCC_Odin},
+			{"Contextless",   ProcCC_Contextless},
+			{"CDecl",         ProcCC_CDecl},
+			{"Std_Call",      ProcCC_StdCall},
+			{"Fast_Call",     ProcCC_FastCall},
+
+			{"None",          ProcCC_None},
+			{"Naked",         ProcCC_Naked},
+
+			{"_",             ProcCC_InlineAsm},
+
+			{"Win64",         ProcCC_Win64},
+			{"SysV",          ProcCC_SysV},
+
+			{"PreserveNone",  ProcCC_PreserveNone},
+			{"PreserveMost",  ProcCC_PreserveMost},
+			{"PreserveAll",   ProcCC_PreserveAll},
+		};
+
+		auto fields = add_global_enum_type(str_lit("Odin_Calling_Convention"), values, gb_count_of(values), &t_odin_calling_convention, t_u8);
+		add_global_enum_constant(fields, "ODIN_DEFAULT_CALLING_CONVENTION", default_calling_convention());
+	}
+
+	{
 		int minimum_os_version = 0;
 		if (build_context.minimum_os_version_string != "") {
 			int major, minor, revision = 0;
@@ -1343,7 +1382,8 @@ gb_internal void init_universal(void) {
 	}
 
 	{
-		bool f16_supported = lb_use_new_pass_system();
+		// Available since LLVM 17 / new pass system, which is the minimum now.
+		bool f16_supported = true;
 		if (is_arch_wasm()) {
 			f16_supported = false;
 		} else if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
@@ -2875,9 +2915,11 @@ gb_internal void collect_testing_procedures_of_package(Checker *c, AstPackage *p
 	InternedString interned = string_interner_insert(str_lit("Test_Signature"), 0, &hash);
 	Entity *test_signature = scope_lookup_current(testing_scope, interned, hash);
 
-	Scope *s = pkg->scope;
-	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;
+	for_array(i, c->info.entities) {
+		Entity *e = c->info.entities[i];
+		if (e->pkg != pkg) {
+			continue;
+		}
 		if (e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -6842,6 +6884,13 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
+		if (entity_has_deferred_procedure(dst)) {
+			error(src->token,
+			      "Deferred procedure '%.*s' cannot be used as the target of '%.*s' because it has a deferred procedure itself (deferred procedure chaining is not allowed)",
+			      LIT(dst->token.string), LIT(src->token.string));
+			continue;
+		}
+
 		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
 			error(src->token, "'%s' cannot be used with a polymorphic procedure", attribute);
 			continue;
@@ -6853,7 +6902,10 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
-		GB_ASSERT(is_type_proc(src->type));
+		if (!is_type_proc(src->type)) {
+			error(src->token, "Invalid procedure type found during deferred procedure checking");
+			continue;
+		}
 		GB_ASSERT(is_type_proc(dst->type));
 		Type *src_params = base_type(src->type)->Proc.params;
 		Type *src_results = base_type(src->type)->Proc.results;
@@ -7665,6 +7717,14 @@ gb_internal void check_parsed_files(Checker *c) {
 		Type *t = &basic_types[i];
 		if (t->Basic.size > 0 &&
 		    (t->Basic.flags & BasicFlag_LLVM) == 0) {
+		    	if (build_context.bedrock) {
+				if ((t->Basic.flags & BasicFlag_Integer) != 0 &&
+				    t->Basic.size == 16) {
+				    	// disallow 128-bit integers
+					continue;
+				}
+			}
+
 			add_type_info_type(&c->builtin_ctx, t);
 		}
 	}

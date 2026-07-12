@@ -12,9 +12,9 @@ un :: distinct (
 	u64
 )
 // sn :: distinct (
-// 	int when (size_of(uintptr) == size_of(int)) else
-// 	i32  when size_of(uintptr) == 4 else
-// 	i64
+//	int when (size_of(uintptr) == size_of(int)) else
+//	i32  when size_of(uintptr) == 4 else
+//	i64
 // )
 
 
@@ -781,6 +781,12 @@ break_state_flag :: enum u32 {
 	SAW_AL_AFTER_LR = 4,
 	LAST_WAS_BRACKET = 5,
 }
+// TODO: Was this supposed to be a bitset or regular enum?
+shape_context_flag :: enum u32 {
+	KBTS_SHAPE_CONTEXT_FLAG_NONE,
+	KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP,
+}
+shape_context_flags :: distinct bit_set[shape_context_flag; u32]
 
 
 
@@ -1750,18 +1756,20 @@ feature_tag :: enum u32 {
 	zero = 'z' | 'e'<<8 | 'r'<<16 | 'o'<<24, // Slashed Zero
 }
 
-_gdef             :: struct {}
-_cmap_14          :: struct {}
-_gsub_gpos        :: struct {}
-_maxp             :: struct {}
-_hea              :: struct {}
-shaper_properties :: struct {}
-_feature          :: struct {}
-_head             :: struct {}
-_langsys          :: struct {}
-shape_config      :: struct {}
-glyph_config      :: struct {}
-shape_context     :: struct {}
+_gdef                :: struct {}
+_cmap_14             :: struct {}
+_gsub_gpos           :: struct {}
+_maxp                :: struct {}
+_hea                 :: struct {}
+shaper_properties    :: struct {}
+_feature             :: struct {}
+_head                :: struct {}
+_langsys             :: struct {}
+shape_config         :: struct {}
+glyph_config         :: struct {}
+bucketed_glyph       :: struct {}
+shape_context        :: struct {}
+shape_scratchpad     :: struct {}
 
 allocator_op_allocate :: struct {
 	Pointer: rawptr,
@@ -1848,6 +1856,23 @@ font_info :: struct {
 	StyleFlags: font_style_flags,
 	Weight:     font_weight,
 	Width:      font_width,
+}
+font_info2 :: struct {
+	Size: u32,
+	using FontInfo: font_info,
+}
+font_info2_1 :: struct {
+	using FontInfo2: font_info2,
+	UnitsPerEm: u16,
+	XMin, YMin, XMax, YMax: i16,
+	Ascent, Descent, LineGap: i16,
+}
+font_info2_2 :: struct {
+	using FontInfo2_1: font_info2_1,
+
+	// For now, this is just OS2.sCapHeight.
+	// If/when this is zero, we might consider trying to communicate a useful height instead of simply passing the zero along.
+	CapitalHeight: i16,
 }
 
 feature_override :: struct {
@@ -2033,6 +2058,11 @@ glyph :: struct {
 
 	ParentInfo: u32,
 
+	Bucketed: ^bucketed_glyph,
+	SortKey: u32,
+	SortKeyInterval: u32,
+	BucketedBucketIndex: u16,
+
 	// This is set by GSUB and used by GPOS.
 	// A 0-index means that we should attach to the last component in the ligature.
 	//
@@ -2064,7 +2094,9 @@ glyph :: struct {
 
 shape_codepoint :: struct {
 	Font:   ^font, // Only set when (.GRAPHEME in BreakFlags)
-	Config: ^glyph_config,
+
+	FeatureOverrides: [^]feature_override `fmt:"v,FeatureOverrideCount"`,
+	FeatureOverrideCount: c.int,
 
 	Codepoint: rune,
 	UserId:    c.int,
@@ -2121,8 +2153,8 @@ glyph_storage :: struct {
 }
 
 glyph_parent :: struct {
-	Decomposition: u64,
-	Codepoint:     rune,
+	Codepoint:  rune,
+	Codepoint1: rune,
 }
 
 font_coverage_test :: struct {
@@ -2145,3 +2177,4 @@ run :: struct {
 
 	Glyphs: glyph_iterator,
 }
+

@@ -781,6 +781,9 @@ gb_global Type *t_c_va_list     = nullptr;
 gb_global Type *t_c_va_list_ptr = nullptr;
 
 
+gb_global Type *t_odin_calling_convention = nullptr;
+
+
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
 	OdinAtomicMemoryOrder_consume = 1, // monotonic
@@ -1468,6 +1471,10 @@ gb_internal bool is_type_constant_type(Type *t) {
 		return is_type_constant_type(t->Array.elem);
 	case Type_EnumeratedArray:
 		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_SimdVector:
+		return is_type_constant_type(t->SimdVector.elem);
+	case Type_Matrix:
+		return is_type_constant_type(t->Matrix.elem);
 	}
 	return false;
 }
@@ -1522,7 +1529,7 @@ gb_internal bool is_type_multi_pointer(Type *t) {
 	return t->kind == Type_MultiPointer;
 }
 gb_internal bool is_type_internally_pointer_like(Type *t) {
-	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_cstring16(t) || is_type_proc(t);
 }
 
 gb_internal bool is_type_tuple(Type *t) {
@@ -2696,8 +2703,6 @@ gb_internal bool is_type_union_constantable(Type *type) {
 
 	if (bt->Union.variants.count == 0) {
 		return true;
-	} else if (bt->Union.variants.count == 1) {
-		return is_type_constant_type(bt->Union.variants[0]);
 	}
 
 	for (Type *v : bt->Union.variants) {
@@ -3094,7 +3099,7 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 					return true;
 				}
 			}
-			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(f->type)) {
+			if ((f->flags & EntityFlags_IsSubtype) != 0 && is_type_struct(f->type)) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					array_add(&sel->index, cast(i32)i);
@@ -3829,8 +3834,22 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			}
 		} else if (type->kind == Type_BitSet) {
 			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel, allow_blank_ident);
-		}
+		} else if (type->kind == Type_BitField) {
+			for_array(i, type->BitField.fields) {
+				Entity *f = type->BitField.fields[i];
+				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+					continue;
+				}
+				auto str = entity_interned_name(f);
+				if (field_name == str) {
+					selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+					sel.entity = f;
+					sel.is_bit_field = true;
+					return sel;
+				}
+			}
 
+		}
 
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
@@ -3929,7 +3948,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 				return sel;
 			}
 		}
-
 	} else if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
@@ -3963,6 +3981,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f16, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f16, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f16, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -3979,6 +4000,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -3994,6 +4019,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f32, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f32, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f32, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -4010,6 +4038,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -4025,6 +4057,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f64, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f64, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f64, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -4041,6 +4076,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -5030,9 +5069,11 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
-		if (nested_level > 0) {
-			return nested_level;
+		if (f->flags & EntityFlags_IsSubtype) {
+			isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
+			if (nested_level > 0) {
+				return nested_level;
+			}
 		}
 	}
 

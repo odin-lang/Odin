@@ -1,5 +1,6 @@
 package test_core_xml
 
+import "core:encoding/entity"
 import "core:encoding/xml"
 import "core:testing"
 import "core:strings"
@@ -215,6 +216,29 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 		tree_string = tree_string[:min(2_048, len(tree_string))]
 		log.error(tree_string)
 	}
+}
+
+@(test)
+test_normalize_whitespace :: proc(t: ^testing.T) {
+	s := "A &amp; B"
+	normalized_entity_decode, _ := entity.decode_xml(s, {.Normalize_Whitespace})
+	defer delete(normalized_entity_decode)
+
+	testing.expect_value(t, normalized_entity_decode, "A & B")
+
+	s = `<hellope attr="A &amp; B">A &amp; B</hellope>`
+
+	opts := xml.Options{
+		flags = {.Ignore_Unsupported, .Decode_SGML_Entities},
+	}
+
+	doc, err := xml.parse_bytes(transmute([]byte)s, opts)
+	defer xml.destroy(doc)
+	assert(err == .None)
+
+	testing.expect_value(t, doc.elements[0].value[0], "A & B")
+	attr := doc.elements[0].attribs
+	testing.expect_value(t, attr[0].val, "A & B")
 }
 
 @(private)

@@ -516,10 +516,29 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 		return prev_hash;
 	}
 
+	// NOTE(tf2spi): Unwrap type aliases similar to are_types_identical*
+	Type *type_unaliased = type;
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type_unaliased = type->Named.base;
+		}
+	}
 	TypeWriter w = {};
 	type_writer_make_hasher(&w, &w.hash_ctx);
-	write_type_to_canonical_string(&w, type);
+	write_type_to_canonical_string(&w, type_unaliased);
 	u64 hash = typeid_hash_context_fini(&w.hash_ctx);
+	if (build_context.webkit_switch_workaround) {
+		// Clear the top bit so every `typeid` is in [1, 2^63). A `switch` over a
+		// typeid (e.g. a type switch over `any` in core:fmt) then has a case-value
+		// span < 2^63. WebKit's B3/OMG wasm JIT computes a switch's value range as
+		// a signed i64 (max - min); a span >= 2^63 overflows and makes it build a
+		// pathologically-sized jump table, OOM-crashing the tab.
+		// WebKit bug: https://bugs.webkit.org/show_bug.cgi?id=317022
+		// Odin issue/PR: https://github.com/odin-lang/Odin/issues/6810
+		hash &= 0x7fffffffffffffffull;
+		hash = hash ? hash : 1;
+	}
 
 	type->canonical_hash.store(hash, std::memory_order_relaxed);
 
@@ -960,6 +979,12 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		if (type->Proc.result_count > 0) {
 			type_writer_appendc(w, "->");
 			write_canonical_params(w, type->Proc.results);
+		}
+		if (type->Proc.diverging) {
+			type_writer_appendc(w, "!");
+		}
+		if (type->Proc.optional_ok) {
+			type_writer_appendc(w, "#optional_ok");
 		}
 		return;
 

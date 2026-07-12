@@ -29,6 +29,13 @@ Pool :: struct($T: typeid) {
 	num_outstanding: int,
 	num_ready:       int,
 	link_off:        uintptr,
+	// Guards free_list.  An untagged Treiber stack is vulnerable to ABA:
+	// between get's head load and its CAS, another thread can pop the head,
+	// reuse it, and push it back — the CAS then succeeds and installs a
+	// stale next pointer, handing an in-flight element to two owners.
+	// A tagged head would keep this lock-free but requires a double-width
+	// CAS, which is not portably available.
+	mu:              sync.Mutex,
 	free_list:       ^T,
 }
 
@@ -61,20 +68,20 @@ destroy :: proc(p: ^Pool($T)) {
 get :: proc(p: ^Pool($T)) -> (elem: ^T, err: runtime.Allocator_Error) #optional_allocator_error {
 	defer sync.atomic_add_explicit(&p.num_outstanding, 1, .Relaxed)
 
-	for {
-		elem = sync.atomic_load_explicit(&p.free_list, .Acquire)
-		if elem == nil {
-			// NOTE: pool arena has an internal lock.
-			return new(T, _pool_arena_allocator(&p.arena))
-		}
-
-		if _, ok := sync.atomic_compare_exchange_weak_explicit(&p.free_list, elem, _get_next(p, elem), .Acquire, .Relaxed); ok {
-			_set_next(p, elem, nil)
-			_unpoison_elem(p, elem)
-			sync.atomic_sub_explicit(&p.num_ready, 1, .Relaxed)
-			return
-		}
+	sync.mutex_lock(&p.mu)
+	elem = p.free_list
+	if elem == nil {
+		sync.mutex_unlock(&p.mu)
+		// NOTE: pool arena has an internal lock.
+		return new(T, _pool_arena_allocator(&p.arena))
 	}
+	p.free_list = _get_next(p, elem)
+	sync.mutex_unlock(&p.mu)
+
+	_set_next(p, elem, nil)
+	_unpoison_elem(p, elem)
+	sync.atomic_sub_explicit(&p.num_ready, 1, .Relaxed)
+	return
 }
 
 put :: proc(p: ^Pool($T), elem: ^T) {
@@ -84,13 +91,10 @@ put :: proc(p: ^Pool($T), elem: ^T) {
 	defer sync.atomic_sub_explicit(&p.num_outstanding, 1, .Relaxed)
 	defer sync.atomic_add_explicit(&p.num_ready, 1, .Relaxed)
 
-	for {
-		head := sync.atomic_load_explicit(&p.free_list, .Relaxed)
-		_set_next(p, elem, head)
-		if _, ok := sync.atomic_compare_exchange_weak_explicit(&p.free_list, head, elem, .Release, .Relaxed); ok {
-			return
-		}
-	}
+	sync.mutex_lock(&p.mu)
+	_set_next(p, elem, p.free_list)
+	p.free_list = elem
+	sync.mutex_unlock(&p.mu)
 }
 
 num_outstanding :: proc(p: ^Pool($T)) -> int {

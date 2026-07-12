@@ -60,6 +60,8 @@ gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_bool
 	is_type_raw_union,
 	is_type_fixed_capacity_dynamic_array,
 
+	is_type_internally_pointer_like,
+
 	is_type_polymorphic_record_specialized,
 	is_type_polymorphic_record_unspecialized,
 
@@ -763,8 +765,10 @@ gb_internal bool check_builtin_c_procedure(CheckerContext *c, Operand *operand, 
 			return false;
 		}
 
+		c->allow_c_vararg_param = true;
 		Operand args = {};
 		check_expr(c, &args, ce->args[1]);
+		c->allow_c_vararg_param = false;
 		if (list.mode == Addressing_Invalid) {
 			return false;
 		}
@@ -7060,6 +7064,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_type_is_simd_vector:
 	case BuiltinProc_type_is_matrix:
 	case BuiltinProc_type_is_raw_union:
+	case BuiltinProc_type_is_fixed_capacity_dynamic_array:
+	case BuiltinProc_type_is_internally_pointer_like:
 	case BuiltinProc_type_is_specialized_polymorphic_record:
 	case BuiltinProc_type_is_unspecialized_polymorphic_record:
 	case BuiltinProc_type_has_nil:
@@ -7789,6 +7795,28 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		break;
 
+	case BuiltinProc_type_proc_calling_convention:
+		if (operand->mode != Addressing_Type || !is_type_proc(operand->type)) {
+			error(operand->expr, "Expected a procedure type for '%.*s'", LIT(builtin_name));
+			return false;
+		} else {
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr, "Expected a non-polymorphic procedure type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			Type *pt = base_type(operand->type);
+			GB_ASSERT(pt->kind == Type_Proc);
+			ProcCallingConvention cc = pt->Proc.calling_convention;
+
+			operand->mode  = Addressing_Constant;
+			operand->type  = t_odin_calling_convention;
+			operand->value = exact_value_i64(cc);
+		}
+
+		break;
+
+
 	case BuiltinProc_type_polymorphic_record_parameter_count:
 		operand->value = exact_value_i64(0);
 		if (operand->mode != Addressing_Type) {
@@ -8249,7 +8277,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Ast *call_expr = unparen_expr(ce->args[0]);
 			Operand op = {};
 			check_expr_base(c, &op, ce->args[0], nullptr);
-			if (op.mode != Addressing_Value && !(call_expr && call_expr->kind == Ast_CallExpr)) {
+			if (op.mode != Addressing_Value || call_expr == nullptr || call_expr->kind != Ast_CallExpr) {
 				error(ce->args[0], "Expected a call expression for '%.*s'", LIT(builtin_name));
 				return false;
 			}

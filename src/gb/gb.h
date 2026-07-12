@@ -2493,7 +2493,13 @@ extern "C" {
 #pragma warning(disable:4127) // Conditional expression is constant
 #endif
 
+gb_internal void print_all_errors(void);
+gb_internal bool any_errors(void);
+gb_internal bool any_warnings(void);
 void gb_assert_handler(char const *prefix, char const *condition, char const *file, i32 line, char const *msg, ...) {
+	if (any_errors() || any_warnings()) {
+		print_all_errors();
+	}
 	gb_printf_err("%s(%d): %s: ", file, line, prefix);
 	if (condition)
 		gb_printf_err( "`%s` ", condition);
@@ -5607,7 +5613,7 @@ gb_inline b32 gb_path_is_absolute(char const *path) {
 	b32 result = false;
 	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
-	result == (gb_strlen(path) > 2) &&
+	result = (gb_strlen(path) > 2) &&
 	          gb_char_is_alpha(path[0]) &&
 	          (path[1] == ':' && path[2] == GB_PATH_SEPARATOR);
 #else

@@ -135,8 +135,29 @@ test_rbtree_integer :: proc(t: ^testing.T, $Key: typeid, $Value: typeid) {
 	testing.expect(t, rb.len(tree) == entry_count - 1, "iterator/remove: len should drop by 1")
 
 	rb.destroy(&tree)
-	testing.expect(t, rb.len(tree)    == 0, "destroy: len should be 0")
+	testing.expect(t,  rb.len(tree)    == 0, "destroy: len should be 0")
 	testing.expectf(t, callback_count == 0, "remove: on_remove should've been called %v times, it was %v", entry_count, callback_count)
+
+	// Test upsert
+	rb.init(&tree)
+	clear(&inserted_map)
+
+	for i := 0; i < NR_INSERTS * 4; i += 1 {
+		k := Key(i) & 0x7
+		v := Value(i)
+
+		existing_node, in_map := inserted_map[k]
+		n, inserted, _ := rb.upsert(&tree, k, v)
+		testing.expect(t, in_map != inserted, "upsert: inserted should match inverse of map lookup")
+		if inserted {
+			inserted_map[k] = n
+		} else {
+			testing.expect(t, existing_node == n, "upsert: expecting existing node")
+			testing.expect_value(t, v, n.value) // And updated value
+		}
+	}
+
+	rb.destroy(&tree)
 
 	// print_tree_node(tree._root)
 	delete(inserted_map)

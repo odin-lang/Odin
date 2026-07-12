@@ -2,15 +2,6 @@ gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue l
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr);
 gb_internal lbValue lb_expand_values(lbProcedure *p, lbValue val, Type *type);
 
-gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count) {
-	GB_ASSERT(bit_count <= 64);
-	if (bit_count == 0) {
-		return LLVMConstInt(type, 0, false);
-	}
-	u64 mask = bit_count == 64 ? ~0ull : (1ull<<bit_count)-1;
-	return LLVMConstInt(type, mask, false);
-}
-
 gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *final_type) {
 	lbModule *m = p->module;
 
@@ -1991,19 +1982,20 @@ handle_op:;
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(integral_type);
-
 			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-
 			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			if (is_unsigned) {
 				res.value = LLVMBuildLShr(p->builder, lhsval, bits, "");
+
+				LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
+				res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			} else {
+				LLVMValueRef bit_size_minus_one = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type)-1, false);
+				bits = LLVMBuildSelect(p->builder, width_test, bits, bit_size_minus_one, "");
+
 				res.value = LLVMBuildAShr(p->builder, lhsval, bits, "");
 			}
-
-			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
-			res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			return res;
 		}
 	case Token_AndNot:
@@ -3887,6 +3879,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			break;
 		}
 
+		GB_ASSERT(res.value != nullptr);
 		return res;
 
 	} else if (is_type_soa_pointer(a)) {
@@ -4420,7 +4413,6 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	Type *type = type_of_expr(expr);
 	GB_ASSERT_MSG(tv.mode != Addressing_Invalid, "invalid expression '%s' (tv.mode = %d, tv.type = %s) @ %s\n Current Proc: %.*s : %s", expr_to_string(expr), tv.mode, type_to_string(tv.type), token_pos_to_string(expr_pos), LIT(p->name), type_to_string(p->type));
-
 
 
 	if (tv.value.kind != ExactValue_Invalid) {
@@ -6581,11 +6573,12 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					} else {
 						item = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
 					}
+
+					// make sure it's ^T and not [^]T
+					item.type = alloc_type_multi_pointer_to_pointer(item.type);
 					if (sub_sel.index.count > 0) {
 						item = lb_emit_deep_field_gep(p, item, sub_sel);
 					}
-				// make sure it's ^T and not [^]T
-				item.type = alloc_type_multi_pointer_to_pointer(item.type);
 
 					return lb_addr(item);
 				} else if (addr.kind == lbAddr_Swizzle) {

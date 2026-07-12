@@ -1529,6 +1529,9 @@ gb_internal Token advance_token(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
 			consume_comment_groups(f, prev);
+			if (f->curr_token.kind == Token_Semicolon && ignore_newlines(f) && f->curr_token.string == "\n") {
+				advance_token(f);
+			}
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -2528,8 +2531,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
 
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
+				}
+
+				array_add(&args, elem);
 				if (!allow_field_separator(f)) {
 					break;
 				}
@@ -2894,10 +2903,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		f->expr_level = prev_level;
 
-		if (is_raw_union && is_packed) {
-			is_packed = false;
-			syntax_error(token, "'#raw_union' cannot also be '#packed'");
-		}
 		if (is_raw_union && is_all_or_none) {
 			is_all_or_none = false;
 			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
@@ -3580,7 +3585,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 		case Token_when:
 			if (prev.pos.line < op.pos.line) {
 				// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-				goto loop_end;
+				if (f->expr_level <= 0) {
+					goto loop_end;
+				}
 			}
 			break;
 		}
@@ -4218,18 +4225,33 @@ gb_internal FieldFlag is_token_field_prefix(AstFile *f) {
 		return FieldFlag_using;
 
 	case Token_Hash:
-		advance_token(f);
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-				auto const &mapping = parse_field_prefix_mappings[i];
-				if (mapping.token_kind == Token_Hash) {
-					if (f->curr_token.string == mapping.name) {
-						return mapping.flag;
-					}
+		{
+			// Check for types first before fields
+			Token tok = peek_token(f);
+			if (tok.kind == Token_Ident) {
+				if (tok.string == "simd" ||
+				    tok.string == "type" ||
+				    tok.string == "row_major" ||
+				    tok.string == "column_major" ||
+				    tok.string == "sparse" ||
+				    tok.string == "soa") {
+					return FieldFlag_Invalid;
 				}
 			}
-			break;
+
+			advance_token(f);
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+					auto const &mapping = parse_field_prefix_mappings[i];
+					if (mapping.token_kind == Token_Hash) {
+						if (f->curr_token.string == mapping.name) {
+							return mapping.flag;
+						}
+					}
+				}
+				break;
+			}
 		}
 		return FieldFlag_Unknown;
 	}
@@ -6032,6 +6054,19 @@ gb_internal bool is_import_path_valid(String const &path) {
 	return false;
 }
 
+gb_internal bool is_import_path_absolute(String const &path) {
+	if (path.len > 0 && path[0] == '/') {
+		return true;
+	}
+	if (path.len > 2 &&
+	    gb_char_is_alpha(path[0]) &&
+	    path[1] == ':' &&
+	    (path[2] == '/' || path[2] == '\\')) {
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool is_build_flag_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
@@ -6094,12 +6129,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	do_warning = &syntax_warning;
 	if (use_check_errors) {
 		do_error = &error;
-		do_error = &warning;
+		do_warning = &warning;
 	}
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
 	String collection_name = {};
+	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
 
 	isize colon_pos = -1;
 	for (isize j = 0; j < original_string.len; j++) {
@@ -6112,11 +6148,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
 	if (file_mutex == nullptr) {
-		if (colon_pos == 1 && original_string.len > 2) {
-			if (original_string[2] == '/' || original_string[2] == '\\') {
-				colon_pos = -1;
-				has_windows_drive = true;
-			}
+		if (!is_import_decl_path &&
+		    colon_pos == 1 &&
+		    original_string.len > 2 &&
+		    gb_char_is_alpha(original_string[0]) &&
+		    (original_string[2] == '/' || original_string[2] == '\\')) {
+			colon_pos = -1;
+			has_windows_drive = true;
 		}
 
 		for (isize i = 0; i < original_string.len; i++) {
@@ -6140,6 +6178,10 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		file_str = original_string;
 	}
 
+	if (is_import_decl_path && is_import_path_absolute(file_str)) {
+		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+		return false;
+	}
 
 	if (has_windows_drive) {
 		String sub_file_path = substring(file_str, 3, file_str.len);
@@ -6212,8 +6254,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		bool ok = false;
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
 		*path = fullpath;
 	}
 	return true;
@@ -6265,6 +6306,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			ast_node(id, ImportDecl, node);
 
 			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+			if (is_import_path_absolute(original_string)) {
+				syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
+
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
@@ -6291,6 +6338,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				GB_ASSERT(fp->kind == Ast_BasicLit);
 				Token fp_token = fp->BasicLit.token;
 				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				if (is_import_path_absolute(file_str)) {
+					syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+					decls[i] = ast_bad_decl(f, fp_token, fp_token);
+					goto end;
+				}
+
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
@@ -6390,6 +6443,11 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			}
 			if (p == "ignore") {
 				this_kind_correct = false;
+				continue;
+			}
+
+			if (p == "bedrock") {
+				this_kind_correct = build_context.bedrock == !is_notted;
 				continue;
 			}
 
@@ -7073,4 +7131,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	return ParseFile_None;
 }
-
