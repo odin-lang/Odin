@@ -1,6 +1,7 @@
 package x509
 
 import "core:bytes"
+import "core:crypto/hash"
 import "core:encoding/asn1"
 
 /*
@@ -121,12 +122,17 @@ parse :: proc(der: []byte, allocator := context.allocator) -> (cert: Certificate
 	cert.raw_tbs = outer.data[tbs_start:outer.pos]
 
 	// signatureAlgorithm + signatureValue.
-	sig_oid, _, serr := _read_algorithm_identifier(&outer)
+	sig_oid, sig_params, serr := _read_algorithm_identifier(&outer)
 	if serr != .None {
 		return {}, .Malformed
 	}
 	cert.signature_oid = sig_oid
 	cert.signature_algorithm = _signature_algorithm(sig_oid)
+	if cert.signature_algorithm == .RSA_PSS {
+		if perr := _parse_pss_params(&cert, sig_params); perr != .None {
+			return {}, perr
+		}
+	}
 
 	sig_bits, sberr := asn1.read_bit_string_octets(&outer)
 	if sberr != .None || asn1.done(&outer) != .None {
@@ -161,12 +167,16 @@ parse :: proc(der: []byte, allocator := context.allocator) -> (cert: Certificate
 	}
 	cert.serial = serial
 
-	// signature must match the outer signatureAlgorithm per RFC 5280 section 4.1.1.2.
-	tbs_sig_oid, _, tserr := _read_algorithm_identifier(&tbs)
+	// signature must match the outer signatureAlgorithm per RFC 5280 section 4.1.1.2,
+	// the OID always, and for RSA-PSS the parameters too (they carry the digest).
+	tbs_sig_oid, tbs_sig_params, tserr := _read_algorithm_identifier(&tbs)
 	if tserr != .None {
 		return {}, .Malformed
 	}
 	if !bytes.equal(tbs_sig_oid, sig_oid) {
+		return {}, .Malformed
+	}
+	if cert.signature_algorithm == .RSA_PSS && !bytes.equal(tbs_sig_params, sig_params) {
 		return {}, .Malformed
 	}
 
@@ -299,6 +309,108 @@ _signature_algorithm :: proc(oid: []byte) -> Signature_Algorithm {
 		return .RSA_SHA1
 	}
 	return .Unknown
+}
+
+// _hash_from_oid maps a bare hash-algorithm OID (as it appears in an
+// RSASSA-PSS AlgorithmIdentifier) to a hash.Algorithm, reporting ok=false for
+// digests this package does not verify (leaving the field .Invalid so the
+// verifier fails closed rather than the parser rejecting the certificate).
+@(private)
+_hash_from_oid :: proc(oid: []byte) -> (hash.Algorithm, bool) {
+	switch {
+	case bytes.equal(oid, _OID_HASH_SHA256):
+		return .SHA256, true
+	case bytes.equal(oid, _OID_HASH_SHA384):
+		return .SHA384, true
+	case bytes.equal(oid, _OID_HASH_SHA512):
+		return .SHA512, true
+	case bytes.equal(oid, _OID_HASH_SHA1):
+		return .Insecure_SHA1, true
+	}
+	return .Invalid, false
+}
+
+// _parse_pss_params decodes RSASSA-PSS-params (RFC 4055 section 3.1) from the
+// signatureAlgorithm parameters into cert.pss_*:
+//   SEQUENCE { hashAlgorithm [0], maskGenAlgorithm [1], saltLength [2] INTEGER,
+//              trailerField [3] INTEGER }, all EXPLICIT and all with defaults.
+// Omitted fields take their RFC 4055 defaults (SHA-1 / MGF1-SHA-1 / salt 20).
+// A structurally broken params element is .Malformed; an unrecognized digest is
+// NOT an error here, the hash is left .Invalid for verify_signature to reject.
+@(private)
+_parse_pss_params :: proc(cert: ^Certificate, params: []byte) -> Error {
+	// RFC 4055 defaults (applied when a field is absent).
+	cert.pss_hash = .Insecure_SHA1
+	cert.pss_mgf_hash = .Insecure_SHA1
+	cert.pss_salt_len = 20
+	if len(params) == 0 {
+		return .None // absent parameters: all defaults
+	}
+
+	cur: asn1.Cursor
+	asn1.cursor_init(&cur, params)
+	seq, e := asn1.read_sequence(&cur)
+	if e != .None || asn1.done(&cur) != .None {
+		return .Malformed
+	}
+
+	// hashAlgorithm [0] EXPLICIT AlgorithmIdentifier
+	if inner, present, ie := asn1.read_explicit(&seq, 0); ie != .None {
+		return .Malformed
+	} else if present {
+		oid, _, oe := _read_algorithm_identifier(&inner)
+		if oe != .None || asn1.done(&inner) != .None {
+			return .Malformed
+		}
+		cert.pss_hash, _ = _hash_from_oid(oid) // .Invalid when unrecognized
+	}
+
+	// maskGenAlgorithm [1] EXPLICIT AlgorithmIdentifier { id-mgf1, hashAlgorithm }
+	if inner, present, ie := asn1.read_explicit(&seq, 1); ie != .None {
+		return .Malformed
+	} else if present {
+		mgf_oid, mgf_params, me := _read_algorithm_identifier(&inner)
+		if me != .None || asn1.done(&inner) != .None {
+			return .Malformed
+		}
+		if !bytes.equal(mgf_oid, _OID_MGF1) {
+			cert.pss_mgf_hash = .Invalid // an MGF other than MGF1: unverifiable here
+		} else {
+			mp: asn1.Cursor
+			asn1.cursor_init(&mp, mgf_params)
+			hoid, _, he := _read_algorithm_identifier(&mp)
+			if he != .None || asn1.done(&mp) != .None {
+				return .Malformed
+			}
+			cert.pss_mgf_hash, _ = _hash_from_oid(hoid)
+		}
+	}
+
+	// saltLength [2] EXPLICIT INTEGER
+	if inner, present, ie := asn1.read_explicit(&seq, 2); ie != .None {
+		return .Malformed
+	} else if present {
+		sl, se := asn1.read_i64(&inner)
+		if se != .None || asn1.done(&inner) != .None || sl < 0 {
+			return .Malformed
+		}
+		cert.pss_salt_len = int(sl)
+	}
+
+	// trailerField [3] EXPLICIT INTEGER, only trailerFieldBC (1) is defined.
+	if inner, present, ie := asn1.read_explicit(&seq, 3); ie != .None {
+		return .Malformed
+	} else if present {
+		tf, te := asn1.read_i64(&inner)
+		if te != .None || asn1.done(&inner) != .None || tf != 1 {
+			return .Malformed
+		}
+	}
+
+	if asn1.done(&seq) != .None {
+		return .Malformed
+	}
+	return .None
 }
 
 @(private)

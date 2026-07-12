@@ -31,10 +31,17 @@ single-edge signature check on its own.
 
 LIMITATIONS:
 
-  - RSA & ECDSA P-521 signatures are not implemented in core, these paths 
-    return .Unsupported_Algorithm. 
-  - Name constraints are NOT enforced yet; verify_chain fails CLOSED on
-    them (a chain through a name-constrained CA is automatically rejected. 
+  - Signature verification covers RSA PKCS#1 v1.5 and RSA-PSS
+    (SHA-1/256/384/512), ECDSA P-256/P-384, and Ed25519. These paths return
+    .Unsupported_Algorithm: ECDSA P-521 (effectively dead in web PKI), and
+    RSA-PSS naming a digest or MGF this package does not recognize.
+  - Name constraints are NOT decoded; verify_chain fails CLOSED on them.
+    Any CA (intermediate or trust anchor) asserting a nameConstraints
+    extension, critical or not, is refused as an issuer, so a chain through
+    a name-constrained CA is rejected rather than accepted unchecked. RFC
+    5280 section 6.1.4(g) requires a validator that processes name
+    constraints to enforce them regardless of criticality; until that is
+    implemented, refusing is the only safe option.
   - REVOCATION IS NOT CHECKED. verify_chain performs NO CRL or OCSP
     revocation checking. Callers that need revocation (e.g. TLS clients) 
     MUST supply it separately (OCSP stapling, CRLite, …). 
@@ -49,30 +56,6 @@ LIMITATIONS:
     assert EKU must include the purpose, enforced across the leaf and
     every intermediate (EKU nesting). Leaf KeyUsage is not checked
     against the intended protocol use.
-
-Name constraints (Future PR):
-
-  verify_chain does not yet DECODE name constraints, and it fails CLOSED
-  on them: any CA, intermediate or trust anchor, that asserts a
-  nameConstraints extension, critical or not, is refused as an issuer,
-  so a chain through a name-constrained CA is rejected, never accepted
-  unchecked. RFC 5280 section 6.1.4(g) requires a validator that
-  processes name constraints to enforce them regardless of criticality;
-  until we do, refusing is the only safe stand-in.
-
-  Planned order:
-    1. Enforce dNSName and iPAddress constraints, the forms real
-       name-constrained CAs almost always use, still failing closed
-       when a constraint uses a form we do not evaluate (directoryName,
-       rfc822Name, URI, otherName). A name-form constraint restricts
-       only names of that form (RFC 5280 section 4.2.1.10), so dNSName
-       constraints can be checked against dNSName SANs with no
-       distinguished-name decoding; this recovers the large majority of
-       name-constrained chains.
-    2. Full section 4.2.1.10 enforcement: the remaining GeneralName
-       forms plus distinguished-name parsing and comparison, built and
-       validated test-first against the x509-limbo / BetterTLS
-       name-constraints corpus.
 
 Parsing is deliberately lenient wherever strictness is a validation
 concern rather than a structural one. Exception: Parser rejects

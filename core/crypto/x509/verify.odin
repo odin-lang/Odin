@@ -4,6 +4,7 @@ import "core:bytes"
 import "core:crypto/ecdsa"
 import "core:crypto/ed25519"
 import "core:crypto/hash"
+import "core:crypto/rsa"
 import "core:net"
 import "core:strings"
 import "core:time"
@@ -107,18 +108,51 @@ _match_hostname :: proc(pattern, host: string) -> bool {
 //
 // verify_signature checks that `cert`'s signature was produced by the
 // private key matching `issuer`'s public key, over cert.raw_tbs (the
-// signed TBSCertificate). It checks ONLY the cryptographic signature —
+// signed TBSCertificate). It checks ONLY the cryptographic signature,
 // not validity periods, names, basic constraints, or that `issuer` is
 // actually authorized to issue `cert`; verify_chain does all of that.
 //
 // Returns .None on a good signature, .Signature_Invalid on a bad one,
-// and .Unsupported_Algorithm when the signature algorithm (RSA, ECDSA
-// P-521) or the issuer key type is not implemented here.
+// and .Unsupported_Algorithm when the signature algorithm (ECDSA P-521, or
+// RSA-PSS with an unrecognized digest) or the issuer key type is not
+// implemented here.
 @(require_results)
 verify_signature :: proc(cert: ^Certificate, issuer: ^Certificate) -> Error {
 	#partial switch cert.signature_algorithm {
-	case .RSA_SHA1, .RSA_SHA256, .RSA_SHA384, .RSA_SHA512, .RSA_PSS:
-		return .Unsupported_Algorithm
+	case .RSA_SHA1, .RSA_SHA256, .RSA_SHA384, .RSA_SHA512:
+		if issuer.public_key_algorithm != .RSA {
+			// An RSA signature paired with a non-RSA issuer key can never verify.
+			return .Unsupported_Algorithm
+		}
+		pub: rsa.Public_Key
+		defer rsa.public_key_clear(&pub)
+		if !rsa.public_key_set_bytes(&pub, issuer.rsa_n, issuer.rsa_e) {
+			return .Signature_Invalid
+		}
+		h := _hash_for_rsa(cert.signature_algorithm)
+		if !rsa.verify_pkcs1(&pub, h, cert.raw_tbs, cert.signature) {
+			return .Signature_Invalid
+		}
+		return .None
+
+	case .RSA_PSS:
+		if issuer.public_key_algorithm != .RSA {
+			return .Unsupported_Algorithm
+		}
+		// The parser decodes the RSASSA-PSS-params into cert.pss_*, leaving a
+		// digest it cannot verify as .Invalid; refuse rather than guess.
+		if cert.pss_hash == .Invalid || cert.pss_mgf_hash == .Invalid {
+			return .Unsupported_Algorithm
+		}
+		pub: rsa.Public_Key
+		defer rsa.public_key_clear(&pub)
+		if !rsa.public_key_set_bytes(&pub, issuer.rsa_n, issuer.rsa_e) {
+			return .Signature_Invalid
+		}
+		if !rsa.verify_pss(&pub, cert.pss_hash, cert.pss_salt_len, cert.raw_tbs, cert.signature, mgf1_algo = cert.pss_mgf_hash) {
+			return .Signature_Invalid
+		}
+		return .None
 
 	case .ECDSA_SHA256, .ECDSA_SHA384, .ECDSA_SHA512:
 		curve: ecdsa.Curve
@@ -165,6 +199,21 @@ _hash_for_ecdsa :: proc "contextless" (s: Signature_Algorithm) -> hash.Algorithm
 	case .ECDSA_SHA384:
 		return .SHA384
 	case .ECDSA_SHA512:
+		return .SHA512
+	}
+	return .SHA256
+}
+
+// _hash_for_rsa maps an RSA PKCS#1 v1.5 signature algorithm to its message
+// digest. SHA-1 (obsolete, legacy verification only) maps to .Insecure_SHA1.
+@(private)
+_hash_for_rsa :: proc "contextless" (s: Signature_Algorithm) -> hash.Algorithm {
+	#partial switch s {
+	case .RSA_SHA1:
+		return .Insecure_SHA1
+	case .RSA_SHA384:
+		return .SHA384
+	case .RSA_SHA512:
 		return .SHA512
 	}
 	return .SHA256
@@ -221,11 +270,11 @@ _MAX_SIG_CHECKS :: 100
 // opts.required_eku is set the leaf AND every intermediate must permit
 // that purpose (e.g. an email-only sub-CA cannot issue a TLS server leaf).
 //
-// The trust anchor is treated as trusted input, as in Go and OpenSSL: it
-// must be valid at opts.current_time and is name-chained + signature-checked
-// as the issuer below it, but its CA authorization (basicConstraints /
-// keyCertSign / pathLenConstraint) and its own self-signature are NOT
-// re-checked. An expired anchor is still rejected; resilience to that comes
+// The trust anchor is treated as trusted input: it must be valid at 
+// opts.current_time and is name-chained + signature-checked as the issuer 
+// below it, but its CA authorization (basicConstraints / keyCertSign /
+// pathLenConstraint) and its own self-signature are NOT re-checked. 
+// An expired anchor is still rejected; resilience to that comes
 // from the search trying every other available anchor and intermediate.
 //
 @(require_results)
@@ -244,21 +293,18 @@ verify_chain :: proc(
 	if verr := _check_validity(leaf, opts.current_time); verr != .None {
 		return nil, verr
 	}
-	// RSA is identifiable from the leaf's signature algorithm OID, report correctly
-	if leaf.signature_algorithm == .RSA_SHA1 ||
-	   leaf.signature_algorithm == .RSA_SHA256 ||
-	   leaf.signature_algorithm == .RSA_SHA384 ||
-	   leaf.signature_algorithm == .RSA_SHA512 ||
-	   leaf.signature_algorithm == .RSA_PSS {
-		return nil, .Unsupported_Algorithm
-	}
+	// A leaf signed with an algorithm the verifier cannot check (RSA-PSS with
+	// an unrecognized digest, ECDSA P-521) surfaces via `saw_unsupported` from
+	// the per-edge verify_signature call, so an unbuildable path still returns
+	// .Unsupported_Algorithm.
 	if opts.dns_name != "" {
 		if herr := verify_hostname(leaf, opts.dns_name); herr != .None {
 			return nil, herr
 		}
 	}
 
-	// Reserve the whole path up front: with capacity in hand, the appends below should never reallocate, so single point of OOM risk
+	// Reserve the whole path up front: with capacity in hand, the appends below should never 
+	// reallocate, so single point of OOM risk
 	acc, aerr := make([dynamic]^Certificate, 0, _MAX_CHAIN_DEPTH + 1, allocator)
 	if aerr != nil {
 		return nil, .Allocation_Failed
@@ -333,8 +379,7 @@ _build_to_anchor :: proc(
 	// Prefer terminating at a trust anchor. The anchor must have issued `cert`
 	// (name chaining + signature) and be valid at `now`, but as TRUSTED INPUT
 	// its CA authorization (basicConstraints / keyCertSign / pathLenConstraint)
-	// and its own self-signature are NOT re-checked, matching how Go and
-	// OpenSSL treat roots. See _anchor_usable.
+	// and its own self-signature are NOT re-checked. See _anchor_usable.
 	for root in opts.roots {
 		if !_is_issuer_of(root, cert) || !_anchor_usable(root, opts.current_time) {
 			continue
@@ -430,9 +475,9 @@ _issuer_usable :: proc(issuer: ^Certificate, now: time.Time, below: int) -> bool
 	if issuer.unhandled_critical {
 		return false
 	}
-	// Name constraints are NOT decoded yet. RFC 5280 section 6.1.4(g)
-	// requires a validator that processes NC to enforce it regardless of
-	// criticality, so we fail to prevent escapements
+	// Name constraints are NOT decoded. RFC 5280 section 6.1.4(g) requires a
+	// validator that processes them to enforce them regardless of criticality;
+	// until that is implemented, refuse any issuer that asserts them.
 	if _has_extension(issuer, _OID_EXT_NAME_CONSTRAINTS) {
 		return false
 	}
@@ -451,12 +496,11 @@ _issuer_usable :: proc(issuer: ^Certificate, now: time.Time, below: int) -> bool
 	return true
 }
 
-// The anchor is trusted input, so unlike _issuer_usable its CA authorization 
-// (basicConstraints / keyCertSign / pathLenConstraint) and self-signature are 
-// NOT re-checked, matching Go and OpenSSL's treatment of roots. Still required: 
-// valid at `now` (Go and OpenSSL both enforce this; resilience to an expired 
-// anchor comes from the search trying other anchors/intermediates), no 
-// uninterpreted critical extension, and no name constraints (which we cannot 
+// The anchor is trusted input, so unlike _issuer_usable its CA authorization
+// (basicConstraints / keyCertSign / pathLenConstraint) and self-signature are
+// NOT re-checked. Still required: valid at `now` (resilience to an expired
+// anchor comes from the search trying other anchors/intermediates), no
+// uninterpreted critical extension, and no name constraints (which we cannot
 // enforce, so refuse rather than ignore).
 @(private)
 _anchor_usable :: proc(anchor: ^Certificate, now: time.Time) -> bool {

@@ -9,8 +9,7 @@ constructors below, then turn it into bytes with `encoded_len` + `encode`
 (no allocation, into a caller buffer) or `marshal` (one allocation, owned
 slice). A SEQUENCE/SET simply holds its children, so length is discovered
 by a measure pass rather than back-patched, and `set` can sort its
-children (DER SET OF ordering) without disturbing this surface, both are
-additive.
+children (DER SET OF ordering).
 
 Zero-copy, with a lifetime caveat: the constructors BORROW their byte and
 child inputs (no copies), so a Value tree is only valid while those inputs
@@ -23,7 +22,7 @@ its children with a slice/array that outlives the encode call:
 DER is canonical by construction: definite minimal-length headers, minimal
 INTEGER magnitudes with the sign octet inserted only when required. The
 writer emits low-tag-number identifiers only (tag number <= 30), which
-covers all of PKIX; high-tag-number form is a future addition.
+covers all of PKIX; high-tag-number form is not supported.
 
 See:
 - [[ https://www.itu.int/rec/T-REC-X.690 ]]
@@ -81,10 +80,8 @@ boolean :: proc "contextless" (v: bool) -> Value {
 
 // Builds an INTEGER from an unsigned big-endian magnitude: leading zero 
 // octets are dropped (minimal encoding) and a single 0x00 sign octet is 
-// inserted when the top bit would otherwise read as negative. An empty 
-// or all-zero magnitude encodes as 0. This is the shape RSA moduli / 
-// exponents and certificate serials are written in, and the inverse of 
-// read_unsigned_integer_bytes.
+// inserted when the top bit would otherwise read as negative. An empty
+// or all-zero magnitude encodes as 0. The inverse of read_unsigned_integer_bytes.
 integer_unsigned :: proc "contextless" (magnitude: []byte) -> Value {
 	return Value{tag = universal(.Integer), form = .Integer_Magnitude, content = magnitude}
 }
@@ -321,9 +318,7 @@ _content_len :: proc(v: Value) -> int {
 //
 // Emitting back-to-front means a constructed node's content length falls out
 // of where its children landed (no second measure pass): encoded_len does the
-// single O(n) sizing pass, this does the single O(n) write pass. DER wants to
-// be written this way — it is the tree generalization of the fixed-buffer
-// trick in crypto/ecdsa's hand-rolled encoder.
+// single O(n) sizing pass, this does the single O(n) write pass.
 @(private)
 _emit :: proc(v: Value, dst: []byte) -> int {
 	if v.form == .Raw {
@@ -372,7 +367,7 @@ _emit :: proc(v: Value, dst: []byte) -> int {
 			end -= _emit(v.children[i], dst[:end])
 		}
 	}
-	clen := len(dst) - end // content length, read off the cursor — never recomputed
+	clen := len(dst) - end // content length, read off the cursor, never recomputed
 
 	tmp: [9]byte // identifier byte + up to 8 length octets covers any int length
 	lw := _write_length(tmp[:], clen)

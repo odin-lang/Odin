@@ -1,5 +1,6 @@
 package x509
 
+import "core:crypto/hash"
 import "core:time"
 
 Error :: enum {
@@ -24,8 +25,8 @@ Error :: enum {
 }
 
 // Signature_Algorithm covers the PKIX signature algorithms a client
-// encounters in practice. RSA_PSS parameters are not interpreted; the
-// raw AlgorithmIdentifier is preserved on the Certificate.
+// encounters in practice. RSASSA-PSS parameters are decoded into the
+// Certificate's pss_* fields.
 Signature_Algorithm :: enum {
 	Unknown,
 	RSA_SHA1, // obsolete; parsed for identification only
@@ -103,7 +104,7 @@ Certificate :: struct {
 	version:                 int, // 1, 2, or 3
 	// Certificate serial number as the raw DER INTEGER content (minimal two's-complement). 
 	// It is an opaque identifier, compare and display by these bytes. A positive serial whose top
-	// bit is set carries a leading 0x00 sign octet (as openssl shows it); a serial of 0 is the single octet {0x00}. RFC 5280 requires
+	// bit is set carries a leading 0x00 sign octet; a serial of 0 is the single octet {0x00}. RFC 5280 requires
 	// serials to be positive and <= 20 octets, but non-conformant (negative, zero, or over-long) serials are preserved
 	serial:                  []byte,
 	signature_algorithm:     Signature_Algorithm,
@@ -121,6 +122,16 @@ Certificate :: struct {
 	rsa_e:                   []byte,
 	// ECDSA: the uncompressed point (0x04 || X || Y); Ed25519: the 32-byte key.
 	ec_point:                []byte,
+
+	// RSASSA-PSS parameters, decoded from the signatureAlgorithm's
+	// RSASSA-PSS-params (meaningful only when signature_algorithm ==
+	// .RSA_PSS; RFC 4055 defaults applied for omitted fields). pss_hash and
+	// pss_mgf_hash are hash.Algorithm.Invalid when the certificate names a
+	// digest this package cannot verify, which verify_signature reports as
+	// .Unsupported_Algorithm rather than a failure.
+	pss_hash:                hash.Algorithm,
+	pss_mgf_hash:            hash.Algorithm,
+	pss_salt_len:            int,
 
 	// BasicConstraints (basic_constraints_valid reports presence).
 	basic_constraints_valid: bool,
@@ -177,6 +188,21 @@ _OID_SIG_ECDSA_SHA384 := []byte{0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x03} 
 _OID_SIG_ECDSA_SHA512 := []byte{0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x04} // ecdsa-with-SHA512 (1.2.840.10045.4.3.4)
 @(rodata, private)
 _OID_ED25519 := []byte{0x2B, 0x65, 0x70} // id-Ed25519 (1.3.101.112), RFC 8410
+
+@(rodata, private)
+_OID_EXT_REQUEST := []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x09, 0x0E} // id-extensionRequest (1.2.840.113549.1.9.14), PKCS#9
+
+// Bare hash OIDs (content octets), for the RSASSA-PSS AlgorithmIdentifiers.
+@(rodata, private)
+_OID_HASH_SHA1 := []byte{0x2B, 0x0E, 0x03, 0x02, 0x1A} // id-sha1 (1.3.14.3.2.26)
+@(rodata, private)
+_OID_HASH_SHA256 := []byte{0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01} // id-sha256 (2.16.840.1.101.3.4.2.1)
+@(rodata, private)
+_OID_HASH_SHA384 := []byte{0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02} // id-sha384 (2.16.840.1.101.3.4.2.2)
+@(rodata, private)
+_OID_HASH_SHA512 := []byte{0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03} // id-sha512 (2.16.840.1.101.3.4.2.3)
+@(rodata, private)
+_OID_MGF1 := []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x08} // id-mgf1 (1.2.840.113549.1.1.8), RFC 4055
 
 @(rodata, private)
 _OID_KEY_RSA := []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01} // rsaEncryption (1.2.840.113549.1.1.1)

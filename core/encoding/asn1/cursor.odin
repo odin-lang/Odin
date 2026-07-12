@@ -165,9 +165,8 @@ read_i64 :: proc "contextless" (r: ^Cursor) -> (value: i64, err: Error) {
 	return value, .None
 }
 
-// Reads a non-negative INTEGER and returns its magnitude octets with any leading 0x00 
-// sign octet stripped, the shape RSA moduli, public exponents, and certificate serials 
-// are consumed in.
+// Reads a non-negative INTEGER and returns its magnitude octets with any leading 0x00 sign 
+// octet stripped.
 read_unsigned_integer_bytes :: proc "contextless" (r: ^Cursor) -> (magnitude: []byte, err: Error) {
 	content, ierr := read_integer_bytes(r)
 	if ierr != .None {
@@ -210,8 +209,7 @@ read_bit_string :: proc "contextless" (r: ^Cursor) -> (bits: []byte, unused: int
 	return bits, unused, .None
 }
 
-// Reads a BIT STRING that must be a whole number of octets (unused == 0),
-// the only form PKIX uses for SubjectPublicKeyInfo keys and signature values.
+// Reads a BIT STRING that must be a whole number of octets (unused == 0).
 read_bit_string_octets :: proc "contextless" (r: ^Cursor) -> (octets: []byte, err: Error) {
 	bits, unused, berr := read_bit_string(r)
 	if berr != .None {
@@ -402,9 +400,8 @@ oid_to_string :: proc(raw: []byte, allocator := context.allocator) -> (str: stri
 		strings.builder_destroy(&sb)
 	}
 
-	// Builder writes swallow allocator failures, so tally the written
-	// vs expected lengths and treat any shortfall as an allocation
-	// failure (the same defense pem.encode uses).
+	// Builder writes swallow allocator failures, so tally the written vs expected lengths
+	// and treat any shortfall as an allocation failure.
 	written, expected := 0, 0
 	acc: u64 = 0
 	first := true
@@ -569,11 +566,9 @@ _two_digits :: proc "contextless" (b: []byte) -> (value: int, ok: bool) {
 	return int(b[0] - '0') * 10 + int(b[1] - '0'), true
 }
 
-// Converts Unix seconds to a time.Time, saturating at time.Time's 
-// representable bounds. time.Time counts i64 nanoseconds, so it tops 
-// out near year 2262; a far-future X.509 date (notably RFC 5280's 
-// "99991231235959Z" no-expiration sentinel) saturates to that bound
-// rather than overflowing, and so reads as "effectively never".
+// Converts Unix seconds to a time.Time, saturating at time.Time's i64-nanosecond
+// bounds (near year 2262) rather than overflowing. See the note above
+// read_utc_time for why far-future dates are saturated instead of rejected.
 @(private)
 _time_from_unix :: proc "contextless" (secs: i64) -> dt.Time {
 	NS_PER_SEC :: i64(1_000_000_000)

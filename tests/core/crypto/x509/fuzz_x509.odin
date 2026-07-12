@@ -72,7 +72,7 @@ test_fuzz_bitflips :: proc(t: ^testing.T) {
 // Random multi-byte mutations across all three fixtures.
 @(test)
 test_fuzz_mutations :: proc(t: ^testing.T) {
-	fixtures := [?][]byte{RSA_DER, EC_DER, ED_DER}
+	fixtures := [?][]byte{RSA_DER, PSS_DER, EC_DER, ED_DER}
 
 	max_len := 0
 	for f in fixtures {
@@ -86,7 +86,7 @@ test_fuzz_mutations :: proc(t: ^testing.T) {
 		input := buf[:len(fixture)]
 		copy(input, fixture)
 
-		// Mutate 1-16 positions, occasionally truncating instead —
+		// Mutate 1-16 positions, occasionally truncating instead,
 		// length-field damage is where TLV parsers historically break.
 		if rand.int_max(8) == 0 {
 			input = input[:rand.int_max(len(input) + 1)]
