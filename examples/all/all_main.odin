@@ -182,6 +182,7 @@ package all
 @(require) import rexcode_rsp      "core:rexcode/isa/rsp"
 @(require) import rexcode_x86      "core:rexcode/isa/x86"
 @(require) import rexcode_ir       "core:rexcode/ir"
-@(require) import rexcode_wasm     "core:rexcode/wasm"
+@(require) import rexcode_spirv    "core:rexcode/ir/spirv"
+@(require) import rexcode_wasm     "core:rexcode/ir/wasm"
 
 main :: proc() {}
