@@ -276,14 +276,26 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	opts := DEFAULT_PRINT_OPTIONS
 	opts.indent = "    "
 	assert(len(f.blocks) <= 1)
+	level := 0
 	for blk in f.blocks {
 		for &op, i in blk.ops {
-			if i+1 == len(blk.ops) && Opcode(op.opcode) == .END {
-				// TODO(bill): Should this be rendered or NOT?
-				// break
+			opcode := Opcode(op.opcode)
+			#partial switch opcode {
+			case .END, .ELSE:
+				level -= 1
+			}
+			level = max(level, 0)
+
+			for _ in 0..<level {
+				strings.write_string(sb, "  ")
 			}
 			write_operation(sb, &op, &opts)
 			strings.write_string(sb, opts.separator)
+
+			#partial switch opcode {
+			case .BLOCK, .LOOP, .IF, .ELSE:
+				level += 1
+			}
 		}
 	}
 
