@@ -97,7 +97,7 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 	defer strings.write_string(sb, ")\n")
 
 	if name, ok := module_name(m); ok {
-		if wat_ident_ok(name) {
+		if ident_ok(name) {
 			strings.write_string(sb, " $")
 			strings.write_string(sb, name)
 		} else {
@@ -201,7 +201,7 @@ wat_write_imports :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Pars
 			if int(fi) < len(m.functions) {
 				name = m.functions[fi].name
 			}
-			wat_write_id_or_comment(sb, name, Id(fi))
+			write_id_or_comment(sb, name, Id(fi))
 			fmt.sbprintf(sb, " (type %d)", tidx)
 			fi += 1
 		case .TABLE:
@@ -240,7 +240,7 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	strings.write_string(sb, unit)
 	strings.write_string(sb, "(func")
 	defer strings.write_string(sb, ")\n")
-	wat_write_id_or_comment(sb, f.name, f.id)
+	write_id_or_comment(sb, f.name, f.id)
 	fmt.sbprintf(sb, " (type %d)", f.signature)
 
 	type := &m.func_types[f.signature]
@@ -273,11 +273,13 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	}
 	strings.write_byte(sb, '\n')
 
+	m := m
+
 	opts := DEFAULT_PRINT_OPTIONS
 	opts.indent = "    "
 	assert(len(f.blocks) <= 1)
-	level := 0
 	for blk in f.blocks {
+		level := 0
 		for &op, i in blk.ops {
 			opcode := Opcode(op.opcode)
 			#partial switch opcode {
@@ -286,10 +288,8 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 			}
 			level = max(level, 0)
 
-			for _ in 0..<level {
-				strings.write_string(sb, "  ")
-			}
-			write_operation(sb, &op, &opts)
+			indent_str(sb, "  ", level)
+			write_operation(sb, &op, &opts, &m)
 			strings.write_string(sb, opts.separator)
 
 			#partial switch opcode {
@@ -477,14 +477,6 @@ wat_write_const_expr :: proc(sb: ^strings.Builder, m: Module, relocs: []Relocati
 	// }
 }
 
-wat_write_id_or_comment :: proc(sb: ^strings.Builder, name: string, index: Id) {
-	if name != "" && wat_ident_ok(name) {
-		strings.write_string(sb, " $")
-		strings.write_string(sb, name)
-	} else {
-		fmt.sbprintf(sb, " (;%d;)", index)
-	}
-}
 
 @(private)
 indent_str :: proc(sb: ^strings.Builder, unit: string, level: int) {
@@ -493,26 +485,6 @@ indent_str :: proc(sb: ^strings.Builder, unit: string, level: int) {
 	}
 }
 
-@(require_results)
-wat_ident_ok :: proc(s: string) -> bool {
-	if len(s) == 0 {
-		return false
-	}
-	#no_bounds_check for i in 0..<len(s) {
-		c := s[i]
-		switch c {
-		case '0'..='9', 'A'..='Z', 'a'..='z':
-			// okay
-		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '/',
-		     ':', '<', '=', '>', '?', '@', '\\', '^', '_', '`', '|',
-		     '~':
-			// okay
-		case:
-			return false
-		}
-	}
-	return true
-}
 
 wat_write_quoted_string :: proc(sb: ^strings.Builder, bytes: []u8) {
 	@(rodata, static)

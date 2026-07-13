@@ -3,6 +3,7 @@
 
 package rexcode_wasm
 
+import "core:fmt"
 import "core:strings"
 import "core:strconv"
 
@@ -40,6 +41,7 @@ import "core:strconv"
 // print: disassemble `m` into the caller-owned builder `sb`. The canonical ir
 // print verb; `sbprint` / `tprint` below are thin convenience sinks over it.
 print :: proc(m: Module, sb: ^strings.Builder, options: ^Print_Options = nil) {
+	m := m
 	opts := DEFAULT_PRINT_OPTIONS
 	if options != nil { opts = options^ }
 
@@ -52,7 +54,7 @@ print :: proc(m: Module, sb: ^strings.Builder, options: ^Print_Options = nil) {
 		}
 		for blk in fn.blocks {
 			for &op in blk.ops {
-				write_operation(sb, &op, &opts)
+				write_operation(sb, &op, &opts, &m)
 				strings.write_string(sb, opts.separator)
 			}
 		}
@@ -66,7 +68,7 @@ sbprint :: proc(sb: ^strings.Builder, ops: []Operation, options: ^Print_Options 
 	opts := DEFAULT_PRINT_OPTIONS
 	if options != nil { opts = options^ }
 	for &op in ops {
-		write_operation(sb, &op, &opts)
+		write_operation(sb, &op, &opts, nil)
 		strings.write_string(sb, opts.separator)
 	}
 }
@@ -98,7 +100,7 @@ mnemonic_to_string :: proc(op: Opcode, uppercase := false, allocator := context.
 // Per-operation writer
 // =============================================================================
 
-write_operation :: proc(sb: ^strings.Builder, op: ^Operation, opts: ^Print_Options) {
+write_operation :: proc(sb: ^strings.Builder, op: ^Operation, opts: ^Print_Options, module: Maybe(^Module)) {
 	strings.write_string(sb, opts.indent)
 
 	opcode := Opcode(op.opcode)
@@ -138,10 +140,64 @@ write_operation :: proc(sb: ^strings.Builder, op: ^Operation, opts: ^Print_Optio
 			}
 		}
 
+	case .CALL:
+		if m, ok := module.?; ok {
+			assert(len(op.operands) == 1)
+			o := op.operands[0]
+			if o.kind == .REF {
+				if o.imm < i64(len(m.functions)) {
+					name := m.functions[o.imm].name
+					write_name_or_id(sb, name, Id(o.imm))
+					break
+				}
+
+			}
+		}
+		fallthrough
 	case:
 		for &o in op.operands {
 			write_operand(sb, &o, opcode, opts)
 		}
+	}
+}
+
+@(private, require_results)
+ident_ok :: proc(s: string) -> bool {
+	if len(s) == 0 {
+		return false
+	}
+	#no_bounds_check for i in 0..<len(s) {
+		c := s[i]
+		switch c {
+		case '0'..='9', 'A'..='Z', 'a'..='z':
+			// okay
+		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '/',
+		     ':', '<', '=', '>', '?', '@', '\\', '^', '_', '`', '|',
+		     '~':
+			// okay
+		case:
+			return false
+		}
+	}
+	return true
+}
+
+write_name_or_id :: proc(sb: ^strings.Builder, name: string, index: Id) {
+	if name != "" && ident_ok(name) {
+		strings.write_string(sb, " $")
+		strings.write_string(sb, name)
+	} else {
+		fmt.sbprintf(sb, " %d", index)
+	}
+}
+
+
+write_id_or_comment :: proc(sb: ^strings.Builder, name: string, index: Id) {
+	if name != "" && ident_ok(name) {
+		strings.write_string(sb, " $")
+		strings.write_string(sb, name)
+	} else {
+		fmt.sbprintf(sb, " (;%d;)", index)
 	}
 }
 
