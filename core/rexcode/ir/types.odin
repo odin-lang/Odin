@@ -53,10 +53,10 @@ Type :: struct {
 	_:       [3]u8,
 }
 
-@(require_results) type_void  :: #force_inline proc "contextless" ()           -> Type { return Type{kind = .VOID} }
-@(require_results) type_bool  :: #force_inline proc "contextless" ()           -> Type { return Type{kind = .BOOL} }
-@(require_results) type_int   :: #force_inline proc "contextless" (bits: u16)   -> Type { return Type{kind = .INT,   bits = bits} }
-@(require_results) type_float :: #force_inline proc "contextless" (bits: u16)   -> Type { return Type{kind = .FLOAT, bits = bits} }
+@(require_results) type_void  :: #force_inline proc "contextless" ()          -> Type { return Type{kind = .VOID} }
+@(require_results) type_bool  :: #force_inline proc "contextless" ()          -> Type { return Type{kind = .BOOL} }
+@(require_results) type_int   :: #force_inline proc "contextless" (bits: u16) -> Type { return Type{kind = .INT,   bits = bits} }
+@(require_results) type_float :: #force_inline proc "contextless" (bits: u16) -> Type { return Type{kind = .FLOAT, bits = bits} }
 
 @(require_results)
 type_array :: #force_inline proc "contextless" (elem: Type_Ref, len_ref: Id) -> Type {
