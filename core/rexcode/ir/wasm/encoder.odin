@@ -44,6 +44,7 @@ encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int 
 // the total byte count written. (A Module built as one function / one block
 // reproduces the old flat `encode([]Instruction)` behavior exactly.)
 encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (byte_count: u32, ok: bool) {
+	// TODO(bill): This just writes the functions and nothing to do with the module section stuff
 	errors_start := u32(len(errors))
 	op_index := u16(0)
 	for fn in m.functions {
