@@ -130,6 +130,7 @@ Function :: struct {
 	blocks:    []Block,
 	name:      string,
 	signature: Type_Ref,   // a FUNCTION type in Module.types
+	id:        Id, // not used by all formats
 }
 
 // A module-level mutable/immutable value.

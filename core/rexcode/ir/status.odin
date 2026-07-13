@@ -37,6 +37,6 @@ Error_Code :: enum u8 {
 Error :: struct #packed {
 	location: u32,
 	code:     Error_Code,
-	_:        [3]u8,
+	_:        [3]u8 `fmt:"-"`,
 }
 #assert(size_of(Error) == 8)

@@ -69,7 +69,7 @@ decode :: proc(
 	return
 }
 
-@(private="file", require_results)
+@(private, require_results)
 parse_error_code :: proc "contextless" (err: Reader_Error) -> Error_Code {
 	#partial switch e in err {
 	case Parse_Error:
@@ -168,12 +168,12 @@ Reader :: struct {
 	off:  u32,
 }
 
-@(private="file", require_results)
+@(private, require_results)
 reader :: proc "contextless" (data: []u8, off: u32) -> Reader {
 	return Reader{data = data, off = off}
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_byte :: proc "contextless" (r: ^Reader) -> (u8, Parse_Error) {
 	if r.off >= u32(len(r.data)) { return 0, .TRUNCATED }
 	b := r.data[r.off]
@@ -181,7 +181,7 @@ rd_byte :: proc "contextless" (r: ^Reader) -> (u8, Parse_Error) {
 	return b, .NONE
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_u32le_block :: proc "contextless" (r: ^Reader) -> (u32, Parse_Error) {
 	if r.off + 4 > u32(len(r.data)) { return 0, .TRUNCATED }
 	v := u32(r.data[r.off])       |
@@ -192,7 +192,7 @@ rd_u32le_block :: proc "contextless" (r: ^Reader) -> (u32, Parse_Error) {
 	return v, .NONE
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_uleb :: proc "contextless" (r: ^Reader) -> (u64, Parse_Error) {
 	shift: uint = 0
 	value: u64 = 0
@@ -207,7 +207,7 @@ rd_uleb :: proc "contextless" (r: ^Reader) -> (u64, Parse_Error) {
 	return 0, .BAD_ULEB
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_sleb :: proc "contextless" (r: ^Reader) -> (i64, Parse_Error) {
 	shift: uint = 0
 	value: i64 = 0
@@ -226,13 +226,13 @@ rd_sleb :: proc "contextless" (r: ^Reader) -> (i64, Parse_Error) {
 	return value, .NONE
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_u32 :: proc "contextless" (r: ^Reader) -> (u32, Parse_Error) {
 	v, err := rd_uleb(r)
 	return u32(v), err
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_name :: proc "contextless" (r: ^Reader) -> (val: string, err: Parse_Error) {
 	n := rd_u32(r) or_return
 	if r.off + n > u32(len(r.data)) { err = .TRUNCATED; return }
@@ -241,7 +241,7 @@ rd_name :: proc "contextless" (r: ^Reader) -> (val: string, err: Parse_Error) {
 	return
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_valtype_vec :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Value_Type, err: Reader_Error) {
 	n := rd_u32(r) or_return
 	out = make([]Value_Type, int(n), allocator) or_return
@@ -251,7 +251,7 @@ rd_valtype_vec :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Valu
 	return
 }
 
-@(private="file", require_results)
+@(private, require_results)
 rd_limits :: proc "contextless" (r: ^Reader) -> (min: u64, max: Maybe(u64), err: Parse_Error) {
 	flags := rd_byte(r) or_return
 	min    = rd_uleb(r) or_return
@@ -265,7 +265,7 @@ rd_limits :: proc "contextless" (r: ^Reader) -> (min: u64, max: Maybe(u64), err:
 // Structured section parsers
 // =============================================================================
 
-@(private="file", require_results)
+@(private, require_results)
 parse_types :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Func_Type, err: Reader_Error) {
 	n := rd_u32(r) or_return
 	out = make([]Func_Type, int(n), allocator) or_return
@@ -278,7 +278,7 @@ parse_types :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Func_Ty
 	return
 }
 
-@(private="file", require_results)
+@(private, require_results)
 parse_imports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Import, err: Reader_Error) {
 	n := rd_u32(r) or_return
 	out = make([]Import, int(n), allocator) or_return
@@ -302,7 +302,7 @@ parse_imports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Impor
 	return
 }
 
-@(private="file", require_results)
+@(private, require_results)
 parse_function_section :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []u32, err: Reader_Error) {
 	n := rd_u32(r) or_return
 	out = make([]u32, int(n), allocator) or_return
@@ -312,7 +312,7 @@ parse_function_section :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out
 	return
 }
 
-@(private="file", require_results)
+@(private, require_results)
 parse_exports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Export, err: Reader_Error) {
 	n := rd_u32(r) or_return
 	out = make([]Export, int(n), allocator) or_return
@@ -326,20 +326,20 @@ parse_exports :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Expor
 
 // One code entry's locals (still compressed as `count x type` groups) and the
 // file span of its body `expr`.
-@(private="file")
+@(private)
 Code_Body :: struct {
 	locals:      []Local_Group,
 	body_offset: u32,   // file offset of the instruction stream
 	body_size:   u32,   // instruction-stream length in bytes
 }
 
-@(private="file")
+@(private)
 Local_Group :: struct {
 	count: u32,
 	type:  Value_Type,
 }
 
-@(private="file", require_results)
+@(private, require_results)
 parse_code :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Code_Body, err: Reader_Error) {
 	n := rd_u32(r) or_return
 	out = make([]Code_Body, int(n), allocator) or_return
@@ -364,7 +364,7 @@ parse_code :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Code_Bod
 }
 
 
-@(private="file", require_results)
+@(private, require_results)
 parse_custom_sections :: proc(m: ^Module, allocator: runtime.Allocator) -> Reader_Error {
 	custom_count := 0
 	for &sec in m.sections {
@@ -465,7 +465,7 @@ parse_custom_sections :: proc(m: ^Module, allocator: runtime.Allocator) -> Reade
 // Function index space  (imports ++ defined) with eagerly-decoded bodies
 // =============================================================================
 
-@(private="file", require_results)
+@(private, require_results)
 build_functions :: proc(
 	m:            ^Module,
 	func_typeidx: []u32,
@@ -530,6 +530,7 @@ build_functions :: proc(
 			blocks := make([]Block, 1, allocator) or_return
 			blocks[0] = Block{id = ID_NONE, ops = ops}
 			f.blocks = blocks
+			f.id = Id(fi)
 		}
 		funcs[fi] = f
 	}
@@ -550,7 +551,7 @@ build_functions :: proc(
 // be relative to the body start (so `decode_ops` -- whose pc starts at 0 --
 // matches them). Returns nil when there are none (the common, linked-module
 // case), so no allocation happens.
-@(private="file", require_results)
+@(private, require_results)
 relocs_for_body :: proc(all: []Relocation, body_off_in_sec, size: u32, allocator: runtime.Allocator) -> []Relocation {
 	if len(all) == 0 { return nil }
 	lo := body_off_in_sec
@@ -571,7 +572,7 @@ relocs_for_body :: proc(all: []Relocation, body_off_in_sec, size: u32, allocator
 // Relocations  (object-file `reloc.*` custom sections)
 // =============================================================================
 
-@(private="file", require_results)
+@(private, require_results)
 parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_out: []Reloc_Group, err: Reader_Error) {
 	groups: [dynamic]Reloc_Group
 	groups.allocator = allocator
@@ -611,7 +612,7 @@ parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_ou
 
 // Override function names with the "name" custom section's function-name
 // subsection (id 1) when present -- these are the authoritative debug names.
-@(private="file")
+@(private)
 apply_name_section :: proc(m: ^Module) {
 	for sec in m.sections {
 		if sec.id != .CUSTOM || sec.name != "name" { continue }

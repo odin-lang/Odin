@@ -54,7 +54,9 @@ Reloc_Group :: struct {
 @(require_results)
 relocations_for_section :: proc "contextless" (groups: []Reloc_Group, id: Section_Id) -> []Relocation {
 	for g in groups {
-		if g.target_section == id { return g.relocs }
+		if g.target_section == id {
+			return g.relocs
+		}
 	}
 	return nil
 }
@@ -86,7 +88,8 @@ reloc_type_from_wire :: proc "contextless" (code: u8) -> (Relocation_Type, bool)
 @(require_results)
 reloc_has_addend :: proc "contextless" (code: u8) -> bool {
 	switch code {
-	case 3, 4, 5, 8, 9: return true
+	case 3, 4, 5, 8, 9:
+		return true
 	}
 	return false
 }

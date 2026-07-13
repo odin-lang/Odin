@@ -98,7 +98,6 @@ Module :: struct {
 	using base: ir.Module,   // functions, globals, symbols, dataflow (= .STACK), target
 
 	version: u32,            // WASM_VERSION if 0 on encode
-	name:    string,         // Module's name
 
 	// --- container sections (the WASM-specific data the ir core has no slot for) ---
 	func_types: []Func_Type, // the type section; ir.Function.signature indexes here
@@ -202,3 +201,28 @@ section_name :: #force_inline proc "contextless" (id: Section_Id) -> string {
 	return "unknown"
 }
 
+
+@(require_results)
+count_import_kind :: proc "contextless" (m: Module, k: External_Kind) -> u32 {
+	n: u32 = 0
+	for imp in m.imports {
+		if imp.kind == k {
+			n += 1
+		}
+	}
+	return n
+}
+
+
+@(require_results)
+module_name :: proc "contextless" (m: Module) -> (string, bool) {
+	for c in m.customs {
+		#partial switch v in c.variant {
+		case Custom_Section_Name:
+			if v.module_name != "" {
+				return v.module_name, true
+			}
+		}
+	}
+	return "", false
+}
