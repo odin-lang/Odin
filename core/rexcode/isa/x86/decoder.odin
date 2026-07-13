@@ -317,13 +317,24 @@ entries_fit_modrm :: proc "contextless" (idx: Decode_Index, state: ^Decoder_Stat
 	if state.position >= len(state.data) { return true } // can't peek; don't override
 	modrm := state.data[state.position]
 	mod3  := (modrm >> 6) == 3
-	for i in 0 ..< int(idx.count) {
+	for i in 0..<int(idx.count) {
 		e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
 		mrt := Operand_Type.NONE
-		for k in 0 ..< 4 { if e.enc[k] == .MR { mrt = e.ops[k]; break } }
-		if mrt == .NONE { return true }
-		if op_is_reg_only(mrt) && !mod3 { continue }
-		if op_is_mem_only(mrt) &&  mod3 { continue }
+		for k in 0..<4 {
+			if e.enc[k] == .MR {
+				mrt = e.ops[k]
+				break
+			}
+		}
+		if mrt == .NONE {
+			return true
+		}
+		if op_is_reg_only(mrt) && !mod3 {
+			continue
+		}
+		if op_is_mem_only(mrt) &&  mod3 {
+			continue
+		}
 		return true
 	}
 	return false
@@ -483,7 +494,7 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 	first_entry := &LEGACY_DECODE_ENTRIES[idx.start]
 	uses_op_r := false
 	if opcode < 0xD8 || opcode > 0xDF {
-		for i in 0 ..< int(idx.count) {
+		for i in 0..<int(idx.count) {
 			if entry_has_opr(&LEGACY_DECODE_ENTRIES[int(idx.start) + i]) {
 				uses_op_r = true
 				break
@@ -512,18 +523,25 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 				e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
 				sized := Operand_Type.NONE
 				for t in e.ops {
-					#partial switch t { case .R16, .R32, .R64: sized = t }
-					if sized != .NONE { break }
+					#partial switch t {
+					case .R16, .R32, .R64:
+						sized = t
+					}
+					if sized != .NONE {
+						break
+					}
 				}
 
 				if state.prefix_66 {
 					if sized == .R16 { return e, nil, .NONE }
 				} else {
 					is_64 := state.mode == ._64 && (e.flags.default_64 || (state.rex & 0x08 != 0))
-					if is_64 && sized == .R64 { return e, nil, .NONE }
+					if  is_64 && sized == .R64 { return e, nil, .NONE }
 					if !is_64 && sized == .R32 { return e, nil, .NONE }
 					// i386: default_64 entries are the "default operand size" form (32-bit).
-					if state.mode == ._32 && sized == .R64 && e.flags.default_64 { return e, nil, .NONE }
+					if state.mode == ._32 && sized == .R64 && e.flags.default_64 {
+						return e, nil, .NONE
+					}
 				}
 			}
 		}
@@ -541,7 +559,7 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		// string ops, PUSHF/POPF, IRET*, ...) -- select by operand-size state and
 		// mode default, without (wrongly) consuming the next byte as a ModR/M.
 		has_modrm_byte := false
-		for i in 0 ..< int(idx.count) {
+		for i in 0..<int(idx.count) {
 			e := &LEGACY_DECODE_ENTRIES[base + i]
 			if e.flags.needs_modrm || e.ext != 0xFF { has_modrm_byte = true; break }
 		}
@@ -553,9 +571,11 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			// accumulator's type (AX_IMPL/EAX_IMPL/RAX_IMPL -> 16/32/64, e.g.
 			// ADD AX/EAX/RAX, imm at 0x05). Match either signal.
 			rexw := state.rex & 0x08 != 0
-			for i in 0 ..< int(idx.count) {
+			for i in 0..<int(idx.count) {
 				e := &LEGACY_DECODE_ENTRIES[base + i]
-				if entry_has_opr(e) { continue }   // +r forms (XCHG eAX,r / NOP) handled above
+				if entry_has_opr(e) {
+					continue // +r forms (XCHG eAX,r / NOP) handled above
+				}
 				match: bool
 				if rexw {
 					match = e.flags.force_rex_w || opsize_class_of(e.ops[0]) == .RM64
@@ -572,9 +592,11 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			}
 			// Fallback: the plain 32-bit no-flag form (e.g. CWDE at 0x98, whose
 			// default_64 doesn't match 64-bit mode but is still the right pick).
-			for i in 0 ..< int(idx.count) {
+			for i in 0..<int(idx.count) {
 				e := &LEGACY_DECODE_ENTRIES[base + i]
-				if entry_has_opr(e) { continue }
+				if entry_has_opr(e) {
+					continue
+				}
 				sz := opsize_class_of(e.ops[0])
 				if !e.flags.force_rex_w && !e.flags.opsize_16 && sz != .RM16 && sz != .RM64 {
 					return e, nil, .NONE
@@ -598,7 +620,7 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			// ENDBR64=F3 0F 1E FA, FADDP=DE C1, ... (ext 0xFF is the "no ModR/M
 			// constraint" sentinel, NOT a fixed byte -- exclude it, else a normal
 			// register-operand instruction whose ModR/M is 0xFF would false-match).
-			for i in 0 ..< int(idx.count) {
+			for i in 0..<int(idx.count) {
 				e := &LEGACY_DECODE_ENTRIES[base + i]
 				// A fixed form carries no ModR/M operand (needs_modrm=false); this
 				// distinguishes a real fixed byte 0xFF (FCOS = D9 FF) from the 0xFF
@@ -611,7 +633,7 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			}
 			// x87 ST(i) range: ext is the C0-aligned base; low 3 bits pick ST(i),
 			// delivered to the OP_R operand via state.opcode_reg.
-			for i in 0 ..< int(idx.count) {
+			for i in 0..<int(idx.count) {
 				e := &LEGACY_DECODE_ENTRIES[base + i]
 				if e.ext != 0xFF && e.ext >= 0xC0 && entry_has_opr(e) && (modrm & 0xF8) == e.ext {
 					state.opcode_reg = modrm & 0x07
@@ -641,32 +663,44 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		mod3 := (modrm >> 6) == 3
 		best: ^Decode_Entry
 		best_score := 0
-		for i in 0 ..< int(idx.count) {
+		for i in 0..<int(idx.count) {
 			e := &LEGACY_DECODE_ENTRIES[base + i]
 			// Only forms that actually consume this ModR/M byte as reg/mem (a /digit
 			// or plain ModR/M) belong here; fixed-ModR/M forms (FCOS etc., matched
 			// above when mod==11) have needs_modrm=false and must not be considered
 			// for a memory ModR/M, else they'd win the tie and drop the ModR/M byte.
-			if !e.flags.needs_modrm { continue }
-			if !(e.ext == 0xFF || e.ext == modrm_reg) { continue }
+			if !e.flags.needs_modrm {
+				continue
+			}
+			if !(e.ext == 0xFF || e.ext == modrm_reg) {
+				continue
+			}
 			// Reg-vs-memory: forms sharing an opcode/digit but differing by whether
 			// the r/m is a register or memory (RDRAND vs VMPTRLD, MOVLHPS vs MOVHPS,
 			// MOVHLPS vs MOVLPS) are selected by ModR/M.mod.
 			mrt := Operand_Type.NONE
-			for k in 0 ..< 4 { if e.enc[k] == .MR { mrt = e.ops[k]; break } }
+			for k in 0..<4 {
+				if e.enc[k] == .MR {
+					mrt = e.ops[k]
+					break
+				}
+			}
 			if op_is_reg_only(mrt) && !mod3 { continue }
 			if op_is_mem_only(mrt) &&  mod3 { continue }
 			sz := 0
 			for op in e.ops {
-				if op == .NONE { break }
+				if op == .NONE {
+					break
+				}
 				if opsize_class_of(op) == target_size { sz += 1 }
 			}
 			fb := 0
-			if rexw {
+			switch {
+			case rexw:
 				fb = e.flags.force_rex_w ? 1 : 0
-			} else if state.prefix_66 {
+			case state.prefix_66:
 				fb = e.flags.opsize_16 ? 1 : 0
-			} else {
+			case:
 				fb = (!e.flags.force_rex_w && !e.flags.opsize_16) ? 1 : 0
 			}
 			score := sz * 4 + fb
@@ -682,12 +716,21 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		// No size signal: first ModR/M-consuming entry with matching extension and
 		// a reg/mem kind consistent with ModR/M.mod (so a memory ModR/M doesn't fall
 		// back to a register-only form, e.g. PINSRW xmm,m16 vs xmm,r32).
-		for i in 0 ..< int(idx.count) {
+		for i in 0..<int(idx.count) {
 			e := &LEGACY_DECODE_ENTRIES[base + i]
-			if !e.flags.needs_modrm { continue }
-			if !(e.ext == 0xFF || e.ext == modrm_reg) { continue }
+			if !e.flags.needs_modrm {
+				continue
+			}
+			if !(e.ext == 0xFF || e.ext == modrm_reg) {
+				continue
+			}
 			mrt := Operand_Type.NONE
-			for k in 0 ..< 4 { if e.enc[k] == .MR { mrt = e.ops[k]; break } }
+			for k in 0..<4 {
+				if e.enc[k] == .MR {
+					mrt = e.ops[k]
+					break
+				}
+			}
 			if op_is_reg_only(mrt) && !mod3 { continue }
 			if op_is_mem_only(mrt) &&  mod3 { continue }
 			return e, nil, .NONE
@@ -748,14 +791,18 @@ decode_opcode_vex :: #force_inline proc(state: ^Decoder_State) -> (entry: ^Decod
 		w_match := e.vex_w == .WIG ||
 		           (e.vex_w == .W0 && !state.vex_w) ||
 		           (e.vex_w == .W1 && state.vex_w)
-		if !w_match { continue }
+		if !w_match {
+			continue
+		}
 
 		// Check VEX.L constraint
 		l_match := e.vex_l == .LIG ||
 		           (e.vex_l == .L0 && state.vex_l == 0) ||
 		           (e.vex_l == .L1 && state.vex_l == 1) ||
 		           (e.vex_l == .L2 && state.vex_l == 2)
-		if !l_match { continue }
+		if !l_match {
+			continue
+		}
 
 		return nil, e, .NONE
 	}
@@ -814,7 +861,9 @@ decode_operands :: proc(state: ^Decoder_State, entry: ^Decode_Entry) -> (inst: I
 	op_count := entry.flags.op_count
 	out_idx: u8 = 0
 	for i in 0..<op_count {
-		if is_accumulator_impl(entry.ops[i]) { continue }
+		if is_accumulator_impl(entry.ops[i]) {
+			continue
+		}
 		op_enc := entry.enc[i]
 
 		// PUSH/POP FS/GS: the segment operand is implicit in the opcode
@@ -1096,10 +1145,10 @@ decode_memory_operand :: proc(state: ^Decoder_State, modrm_info: ModRM_Info,
 			err = .BUFFER_TOO_SHORT
 			return
 		}
-		disp = i32(u32(state.data[state.position]) |
-				   u32(state.data[state.position+1]) << 8 |
-				   u32(state.data[state.position+2]) << 16 |
-				   u32(state.data[state.position+3]) << 24)
+		disp = i32(u32(state.data[state.position])         |
+		           u32(state.data[state.position+1]) << 8  |
+		           u32(state.data[state.position+2]) << 16 |
+		           u32(state.data[state.position+3]) << 24)
 		state.position += 4
 	}
 
