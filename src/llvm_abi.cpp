@@ -1148,7 +1148,7 @@ namespace lbAbiArm64 {
 		case LLVMPointerTypeKind:
 			return true;
 		case LLVMVectorTypeKind:{
-				i32 sz = lb_sizeof(type);
+				i64 sz = lb_sizeof(type);
 				return sz == 8 || sz == 16;
 			}
 		}
