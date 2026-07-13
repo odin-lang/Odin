@@ -55,6 +55,17 @@ External_Kind :: enum u8 {
 	GLOBAL = 3,
 }
 
+// A parsed binary section header: where its *contents* live in the file and how
+// many entries it declares. Kept so sections the ir core does not model
+// structurally (table/memory/global/element/data) stay re-readable from `data`.
+Section :: struct {
+	id:     Section_Id,
+	offset: u32,      // file offset of the section contents
+	size:   u32,      // contents length in bytes
+	count:  u32,      // declared element count (0 for CUSTOM / START)
+	name:   string,   // custom-section name (borrowed from `data`)
+}
+
 // A WASM function signature: value-typed params and results.
 Func_Type :: struct {
 	params:  []Value_Type,
@@ -76,10 +87,18 @@ Export :: struct {
 
 // The WASM module -- the unit the verbs operate on. Embeds the ir core; adds the
 // container metadata parsed from / emitted to the binary sections.
+//
+// After `decode`, `base.functions` spans the whole WASM function index space:
+// imported functions occupy the low indices (their `blocks` are empty -- an
+// import has no body) followed by the module-defined functions (each a single
+// `ir.Block` whose ops are the decoded body). `ir.Function.signature` is the
+// function's typeidx (an index into `func_types`, by convention), and its
+// `name` is resolved from the export and "name" custom sections.
 Module :: struct {
 	using base: ir.Module,   // functions, globals, symbols, dataflow (= .STACK), target
 
 	version: u32,            // WASM_VERSION if 0 on encode
+	name:    string,         // Module's name
 
 	// --- container sections (the WASM-specific data the ir core has no slot for) ---
 	func_types: []Func_Type, // the type section; ir.Function.signature indexes here
@@ -91,6 +110,11 @@ Module :: struct {
 	// A WASM function's declared locals (the code section's local groups), kept
 	// parallel to base.functions since ir.Function has no locals slot.
 	function_locals: [][]Value_Type,
+
+	// --- preserved binary framing (so nothing decoded is lost / is re-readable) ---
+	sections:    []Section,     // every section header, in file order
+	relocations: []Reloc_Group, // object-file relocations, grouped by target section
+	data:        []u8,          // borrowed whole-file bytes (table/memory/... re-readable)
 }
 
 // A freshly-made WASM module declares STACK dataflow so the shared verbs and the

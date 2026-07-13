@@ -20,9 +20,11 @@ import "base:runtime"
 // relocations *are* re-attached: when an input relocation lands on a decoded
 // index field, that operand is marked symbolic and carries the label id.
 
-// decode: parse a WASM `expr` byte stream into a single-function, single-block
-// Module (dataflow = .STACK). The reusable stream decoder is `decode_ops`.
-decode :: proc(
+// decode_expr: parse a bare WASM `expr` byte stream (one instruction stream,
+// no container) into a single-function, single-block Module (dataflow = .STACK).
+// The full-container module verb is `decode` (parse.odin); the reusable
+// stream-level decoder both share is `decode_ops`.
+decode_expr :: proc(
 	data:      []u8,
 	m:         ^Module,
 	errors:    ^[dynamic]Error,
@@ -109,7 +111,6 @@ decode_one :: proc(
 
 	form := encoding_form(m)
 	operands := make([dynamic]Operand, allocator)
-	defer if !ok { delete(operands) }
 
 	for k, ki in form.imm {
 		switch k {
@@ -166,15 +167,15 @@ decode_one :: proc(
 
 		case .BR_TABLE:
 			count := int(read_uleb(data, &off) or_return)
-			reserve(&operands, len(operands)+count+1)
-			operands_default_index := len(operands)
-			for _ in 0..<count {
+			default_index := len(operands)
+			reserve(&operands, count+1)
+			append(&operands, Operand{}) // dummy for default
+			for i in 0 ..< int(count) {
 				t := read_uleb(data, &off) or_return
 				append(&operands, op_labelidx(u32(t)))
 			}
 			def := read_uleb(data, &off) or_return
-			// default first
-			inject_at(&operands, operands_default_index, op_labelidx(u32(def)))
+			operands[default_index] = op_labelidx(u32(def)) // default first
 
 		case .ZERO_BYTE:
 			if off >= u32(len(data)) {
