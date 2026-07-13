@@ -133,6 +133,8 @@ parse_container :: proc(data: []u8, m: ^Module, errors: ^[dynamic]Error, allocat
 		}
 	}
 
+	parse_custom_sections(m, allocator) or_return
+
 	// Relocations must be parsed before the bodies: the CODE group is threaded
 	// into body decode so relocatable index fields become symbolic refs.
 	m.relocations = parse_relocations(m^, allocator) or_return
@@ -194,7 +196,7 @@ rd_u32le_block :: proc "contextless" (r: ^Reader) -> (u32, Parse_Error) {
 rd_uleb :: proc "contextless" (r: ^Reader) -> (u64, Parse_Error) {
 	shift: uint = 0
 	value: u64 = 0
-	for _ in 0 ..< 10 {
+	for _ in 0..<10 {
 		if r.off >= u32(len(r.data)) { return 0, .TRUNCATED }
 		b := r.data[r.off]
 		r.off += 1
@@ -210,7 +212,7 @@ rd_sleb :: proc "contextless" (r: ^Reader) -> (i64, Parse_Error) {
 	shift: uint = 0
 	value: i64 = 0
 	b: u8 = 0
-	for _ in 0 ..< 10 {
+	for _ in 0..<10 {
 		if r.off >= u32(len(r.data)) { return 0, .TRUNCATED }
 		b = r.data[r.off]
 		r.off += 1
@@ -361,6 +363,104 @@ parse_code :: proc(r: ^Reader, allocator: runtime.Allocator) -> (out: []Code_Bod
 	return
 }
 
+
+@(private="file", require_results)
+parse_custom_sections :: proc(m: ^Module, allocator: runtime.Allocator) -> Reader_Error {
+	custom_count := 0
+	for &sec in m.sections {
+		if sec.id == .CUSTOM {
+			custom_count += 1
+		}
+	}
+	m.customs = make([]Custom_Section, custom_count, allocator) or_return
+	custom_index := 0
+	for &sec in m.sections {
+		if sec.id != .CUSTOM {
+			continue
+		}
+
+		custom := &m.customs[custom_index]
+		custom_index += 1
+
+		custom.section = sec
+
+		custom.payload = m.data[sec.offset:][:sec.size]
+
+		r := reader(custom.payload, 0)
+		sec_name := rd_name(&r) or_continue
+		assert(sec_name == sec.name)
+
+		if strings.has_prefix(sec.name, ".debug_") {
+			// DWARF debug stuff
+		} else if strings.has_prefix(sec.name, "reloc.") {
+			// other relocation stuff
+		}
+
+		custom_block: switch sec.name {
+		case "linking":
+			// not yet handled
+		case "producers":
+			// not yet handled
+		case "dynlink.0":
+			// not yet handled
+		case "external_debug_info", "sourceMappingURL":
+			// not yet handled, but debugging related
+		case "metadata.code.branch_hint":
+			// not yet handled
+		case "name":
+			cname: Custom_Section_Name
+			defer custom.variant = cname
+
+			for r.off < u32(len(r.data)) {
+				id   := rd_byte(&r) or_return
+				size := rd_u32(&r)  or_return
+				end_off := r.off+size
+				defer r.off = end_off
+
+				switch id {
+				case 0: // module
+					cname.module_name = rd_name(&r) or_return
+				case 1: // functions
+					count := rd_u32(&r) or_return
+					cname.functions = make([]Custom_Section_Name_Function, count, allocator) or_return
+					for &func in cname.functions {
+						func.id   = rd_u32(&r)  or_return
+						func.name = rd_name(&r) or_return
+					}
+				case 2: // locals
+					count := rd_u32(&r) or_return
+
+					cname.locals = make([]Custom_Section_Name_Function_Locals, count, allocator) or_return
+
+					for &local_func in cname.locals {
+						local_func.func_idx = rd_u32(&r) or_return
+						local_count := rd_u32(&r) or_return
+						local_func.locals = make([]Custom_Section_Name_Local, local_count, allocator) or_return
+						for &local in local_func.locals {
+							local.idx  = rd_u32(&r)  or_return
+							local.name = rd_name(&r) or_return
+						}
+					}
+				}
+			}
+
+		case "target_features":
+			target_features: Custom_Section_Target_Features
+			defer custom.variant = target_features
+
+			count := rd_u32(&r) or_return
+			target_features.features = make([]Custom_Section_Target_Feature, count, allocator) or_return
+
+			for &feature in target_features.features {
+				feature.prefix  = Custom_Section_Target_Feature_Prefix(rd_byte(&r) or_return)
+				feature.feature = rd_name(&r) or_return
+			}
+		}
+	}
+
+	return nil
+}
+
 // =============================================================================
 // Function index space  (imports ++ defined) with eagerly-decoded bodies
 // =============================================================================
@@ -415,7 +515,9 @@ build_functions :: proc(
 			flat := make([]Value_Type, nlocals, allocator) or_return
 			w := 0
 			for g in cb.locals {
-				for _ in 0 ..< int(g.count) { flat[w] = g.type; w += 1 }
+				for _ in 0..<int(g.count) {
+					flat[w] = g.type; w += 1
+				}
 			}
 			locals[fi] = flat
 
@@ -483,7 +585,7 @@ parse_relocations :: proc(m: Module, allocator: runtime.Allocator) -> (groups_ou
 
 		out := make([]Relocation, int(count), allocator) or_return
 		w := 0
-		for _ in 0 ..< count {
+		for _ in 0..<count {
 			code   := rd_byte(&r) or_return
 			offset := rd_u32(&r)  or_return          // field offset within target section
 			index  := rd_u32(&r)  or_return          // symbol / target index
@@ -524,7 +626,7 @@ apply_name_section :: proc(m: ^Module) {
 			payload_end := r.off + sub_size
 			if sub_id == 1 {   // function names
 				count := rd_u32(&r) or_break
-				for _ in 0 ..< count {
+				for _ in 0..<count {
 					fidx := rd_u32(&r)  or_break
 					name := rd_name(&r) or_break
 					if int(fidx) < len(m.base.functions) {

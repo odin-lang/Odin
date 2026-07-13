@@ -106,6 +106,8 @@ Module :: struct {
 	exports:    []Export,
 	start:      i64,         // -1 if absent, else the start funcidx
 
+	customs:    []Custom_Section,
+
 	// --- side tables parallel to the ir core arrays ---
 	// A WASM function's declared locals (the code section's local groups), kept
 	// parallel to base.functions since ir.Function has no locals slot.
@@ -127,3 +129,76 @@ make_module :: proc "contextless" () -> Module {
 	m.start         = -1
 	return m
 }
+
+
+// -----------------------------------------------------------------------------
+// Custom Section Layout
+// -----------------------------------------------------------------------------
+
+Custom_Section :: struct {
+	section: Section,
+	payload: []byte, // borrowed, m.data[section.offset:][:section.size]
+	variant: union {
+		Custom_Section_Name,
+		Custom_Section_Target_Features,
+	},
+}
+
+Custom_Section_Name_Function :: struct {
+	id:   u32,
+	name: string, // borrowed
+}
+
+Custom_Section_Name_Local :: struct {
+	idx:  u32,
+	name: string, // borrowed
+}
+
+Custom_Section_Name_Function_Locals :: struct {
+	func_idx: u32,
+	locals: []Custom_Section_Name_Local,
+}
+
+Custom_Section_Name :: struct {
+	module_name: string,
+	functions:   []Custom_Section_Name_Function,
+	locals:      []Custom_Section_Name_Function_Locals,
+}
+
+Custom_Section_Target_Feature_Prefix :: enum u8 {
+	Used       = '+',
+	Disallowed = '-',
+	Required   = '=',
+}
+
+Custom_Section_Target_Feature :: struct {
+	prefix:  Custom_Section_Target_Feature_Prefix,
+	feature: string, // borrowed
+}
+
+
+Custom_Section_Target_Features :: struct {
+	features: []Custom_Section_Target_Feature,
+}
+
+
+@(require_results)
+section_name :: #force_inline proc "contextless" (id: Section_Id) -> string {
+	switch id {
+	case .CUSTOM:     return "custom"
+	case .TYPE:       return "type"
+	case .IMPORT:     return "import"
+	case .FUNCTION:   return "function"
+	case .TABLE:      return "table"
+	case .MEMORY:     return "memory"
+	case .GLOBAL:     return "global"
+	case .EXPORT:     return "export"
+	case .START:      return "start"
+	case .ELEMENT:    return "element"
+	case .CODE:       return "code"
+	case .DATA:       return "data"
+	case .DATA_COUNT: return "data.count"
+	}
+	return "unknown"
+}
+
