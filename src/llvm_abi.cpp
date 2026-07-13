@@ -1147,6 +1147,10 @@ namespace lbAbiArm64 {
 		case LLVMDoubleTypeKind:
 		case LLVMPointerTypeKind:
 			return true;
+		case LLVMVectorTypeKind:{
+				i64 sz = lb_sizeof(type);
+				return sz == 8 || sz == 16;
+			}
 		}
 		return false;
 	}
@@ -1228,6 +1232,15 @@ namespace lbAbiArm64 {
 			if (base_type_) *base_type_ = type;
 			if (member_count_) *member_count_ = 1;
 			return true;
+		case LLVMVectorTypeKind:{
+			i64 sz = lb_sizeof(type);
+			if (sz == 8 || sz == 16){
+				if (base_type_) *base_type_ = type;
+				if (member_count_) *member_count_ = 1;
+				return true;
+			}
+			return false;
+		}
 		case LLVMArrayTypeKind:
 			return is_homogenous_array(c, type, base_type_, member_count_);
 		case LLVMStructTypeKind:
