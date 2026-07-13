@@ -39,7 +39,10 @@ package rexcode_ir
 // shared *vocabulary*, not an implementation.
 
 // Per-IR dataflow discipline. WASM = STACK; SPIR-V / LLVM / AIR / DXIL = SSA.
-Dataflow :: enum u8 { STACK, SSA }
+Dataflow :: enum u8 {
+	STACK, // WASM
+	SSA,   // SPIR-V / LLVM / AIR / DXIL
+}
 
 // -----------------------------------------------------------------------------
 // Operand  (generalizes isa.Operand)
