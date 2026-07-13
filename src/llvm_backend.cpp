@@ -1571,7 +1571,10 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	for (Entity *e = {}; mpsc_dequeue(&gen->info->objc_class_implementations, &e); /**/) {
 		GB_ASSERT(e->kind == Entity_TypeName && e->TypeName.objc_is_implementation);
 		lb_handle_objc_find_or_register_class(p, e->TypeName.objc_class_name, e->type);
-		error(e->token, "Objective-C related things are not allowed with '-bedrock'");
+
+		if (build_context.bedrock) {
+			error(e->token, "Objective-C related things are not allowed with '-bedrock'");
+		}
 	}
 
 	// Ensure classes that have been implicitly referenced through
@@ -1684,7 +1687,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 			Type *superclass = tn.objc_superclass;
 
 			if (superclass != nullptr) {
-				auto& superclass_global = string_map_must_get(&global_class_map, tn.objc_class_name);
+				auto &superclass_global = string_map_must_get(&global_class_map, superclass->Named.type_name->TypeName.objc_class_name);
 				superclass_value = superclass_global.class_value;
 			}
 
@@ -2408,10 +2411,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			LLVMInitializeFunctionPassManager(m->function_pass_managers[i]);
 		}
 
-		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
-		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
-		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],      -1);
-
 		for (i32 i = 0; i < lbFunctionPassManager_COUNT; i++) {
 			LLVMFinalizeFunctionPassManager(m->function_pass_managers[i]);
 		}
@@ -2480,11 +2479,8 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	auto wd = cast(lbLLVMModulePassWorkerData *)data;
 
 	LLVMPassManagerRef module_pass_manager = LLVMCreatePassManager();
-	lb_populate_module_pass_manager(wd->target_machine, module_pass_manager, build_context.optimization_level);
 	LLVMRunPassManager(module_pass_manager, wd->m->mod);
 
-
-#if LB_USE_NEW_PASS_SYSTEM
 	auto passes = array_make<char const *>(heap_allocator(), 0, 64);
 	defer (array_free(&passes));
 
@@ -2560,7 +2556,6 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		exit_with_errors();
 		return 1;
 	}
-#endif
 
 	if (LLVM_IGNORE_VERIFICATION) {
 		return 0;
@@ -2713,9 +2708,12 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s.len  -= prefix.len;
 	}
 
-	path = concatenate_strings(permanent_allocator(), path, s);
-	path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
-
+	if (build_context.out_filepath.len > 0) {
+		path = concatenate_strings(permanent_allocator(), path, s);
+		path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
+	} else {
+		path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
+	}
 	return path;
 }
 
@@ -2735,6 +2733,8 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
 	path = gb_string_appendc(path, "/");
+
+	bool output_is_directory = path_is_directory(make_string_c(path));
 
 	if (USE_SEPARATE_MODULES) {
 		GB_ASSERT(m->module_name != nullptr);
@@ -2760,10 +2760,14 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	if (build_context.lto_kind != LTO_None) {
 		ext = STR_LIT("bc");
 	} else if (build_context.build_mode == BuildMode_Assembly) {
-		ext = STR_LIT("S");
+		// Allow a user override for the asm extension.
+		// If that's a directory, we force the `.S` extension
+		ext = output_is_directory ? STR_LIT("S") : build_context.build_paths[BuildPath_Output].ext;
 	} else if (build_context.build_mode == BuildMode_Object) {
 		// Allow a user override for the object extension.
-		ext = build_context.build_paths[BuildPath_Output].ext;
+		// If that's a directory, we force the `.obj` extension
+		ext = output_is_directory ? STR_LIT("obj") : build_context.build_paths[BuildPath_Output].ext;
+
 	} else {
 		ext = infer_object_extension_from_build_context();
 	}
@@ -2855,7 +2859,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime, lbProcedure *cleanup_runtime) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
 
 	Type *params  = alloc_type_tuple();
@@ -3164,9 +3167,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
 	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;
-	if (!LB_USE_NEW_PASS_SYSTEM) {
-		build_context.optimization_level = gb_clamp(build_context.optimization_level, -1, 2);
-	}
 	switch (build_context.optimization_level) {
 	default:/*fallthrough*/
 	case 0: code_gen_level = LLVMCodeGenLevelNone;       break;

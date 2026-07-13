@@ -171,6 +171,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhone,
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
+	Subtarget_Playdate,
 	
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
@@ -181,6 +182,7 @@ gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit("iphone"),
 	str_lit("iphonesimulator"),
 	str_lit("android"),
+	str_lit("playdate"),
 };
 
 
@@ -879,7 +881,7 @@ gb_global TargetMetrics target_freestanding_arm32 = {
 	TargetOs_freestanding,
 	TargetArch_arm32,
 	4, 4, 8, 16,
-	str_lit("arm-unknown-unknown-gnueabihf"),
+	str_lit("arm-none-eabihf"),
 };
 gb_global TargetMetrics target_freestanding_riscv64 = {
 	TargetOs_freestanding,
@@ -1957,6 +1959,16 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->no_plt = LLVM_VERSION_MAJOR >= 19;
 			break;
 		}
+	} else if (subtarget == Subtarget_Playdate) {
+		// Playdate uses the cortex-m7 as well and an FPU, requiring thumb instructions and hard floats.
+		bc->microarch = str_lit("cortex-m7");
+		bc->metrics.target_triplet = str_lit("thumbv7em-none-eabihf");
+		// Remove MOVW/MOVT instructions as playdate only handles R_ARM_ABS32 relocations.
+		if(bc->target_features_string.len > 0) {
+			bc->target_features_string = concatenate_strings(permanent_allocator(), bc->target_features_string, str_lit(",no-movt"));
+		} else {
+			bc->target_features_string = str_lit("no-movt");
+		}
 	}
 
 	if (metrics->os == TargetOs_windows ||
@@ -2397,12 +2409,32 @@ gb_internal bool init_build_paths(String init_filename) {
 		GB_PANIC("Unhandled build mode/target combination.\n");
 	}
 
+	bool output_should_be_directory = false;
+
 	if (bc->out_filepath.len > 0) {
 		bc->build_paths[BuildPath_Output] = path_from_string(ha, bc->out_filepath);
-		if (build_context.metrics.os == TargetOs_windows) {
-			String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-			defer (gb_free(ha, output_file.text));
-			if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+		bool output_is_directory = path_is_directory(bc->build_paths[BuildPath_Output]);
+
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+
+		// NOTE(Jeroen): For LLVM-IR, we want `-out` to specify a directory.
+		//               For other outputs we expect it to be a file path.
+		if (build_context.build_mode == BuildMode_LLVM_IR) {
+			if (!output_is_directory) {
+				gb_printf_err("Output path %.*s should be a directory for LLVM-IR output.\n", LIT(output_file));
+				return false;
+			}
+			output_should_be_directory = true;
+
+		} else if (build_context.build_mode == BuildMode_Object) {
+			// Both directory or filename prefix allowed
+
+		} else if (build_context.build_mode == BuildMode_Assembly) {
+			// Both directory or filename prefix allowed
+
+		} else if (build_context.metrics.os == TargetOs_windows) {
+			if (output_is_directory) {
 				gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 				return false;
 			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
@@ -2513,7 +2545,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	// Do we have an extension? We might not if the output filename was supplied.
 	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
 		if (build_context.metrics.os == TargetOs_windows || is_arch_wasm() || build_context.build_mode != BuildMode_Executable) {
-			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+
+			// NOTE(Jeroen): If build mode is LLVM_IR and a custom output was set
+			if (!output_should_be_directory) {
+				bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+			}
 		}
 	}
 
@@ -2521,7 +2557,7 @@ gb_internal bool init_build_paths(String init_filename) {
 	defer (gb_free(ha, output_file.text));
 
 	// Check if output path is a directory.
-	if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+	if (!output_should_be_directory && path_is_directory(bc->build_paths[BuildPath_Output])) {
 		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 		return false;
 	}

@@ -1764,7 +1764,10 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 		}
 	} else {
-		if (in_type) {
+		expr = unparen_expr(expr);
+		if (expr && expr->kind == Ast_Uninit) {
+			error(expr, "Default parameter cannot be ---");
+		} else if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
 		} else {
 			check_expr(ctx, &o, expr);
@@ -2174,6 +2177,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {
 								poly_const = op.value;
+								if (poly_const.kind == ExactValue_Integer && is_type_float(type)) {
+									poly_const.kind = ExactValue_Float;
+									poly_const.value_float = big_int_to_f64(&poly_const.value_integer);
+								}
 							} else {
 								if (!ctx->in_proc_group) {
 									error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
@@ -2221,8 +2228,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					if (!is_type_pointer(type) && !is_type_multi_pointer(type)) {
-						error(name, "'#no_alias' can only be applied pointer or multi-pointer typed parameters");
+					bool ok = is_type_internally_pointer_like(type);
+					if (!ok) {
+						error(name, "'#no_alias' can only be applied pointer-like type parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}

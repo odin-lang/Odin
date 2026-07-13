@@ -1109,7 +1109,6 @@ gb_internal i64 odin_compile_timestamp(void) {
 	return ns_after_1970;
 }
 
-gb_internal bool lb_use_new_pass_system(void);
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -1247,6 +1246,7 @@ gb_internal void init_universal(void) {
 			{"iPhone",          Subtarget_iPhone},
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
 			{"Android",         Subtarget_Android},
+			{"Playdate",        Subtarget_Playdate},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));
@@ -1382,7 +1382,8 @@ gb_internal void init_universal(void) {
 	}
 
 	{
-		bool f16_supported = lb_use_new_pass_system();
+		// Available since LLVM 17 / new pass system, which is the minimum now.
+		bool f16_supported = true;
 		if (is_arch_wasm()) {
 			f16_supported = false;
 		} else if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
@@ -6883,6 +6884,13 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
+		if (entity_has_deferred_procedure(dst)) {
+			error(src->token,
+			      "Deferred procedure '%.*s' cannot be used as the target of '%.*s' because it has a deferred procedure itself (deferred procedure chaining is not allowed)",
+			      LIT(dst->token.string), LIT(src->token.string));
+			continue;
+		}
+
 		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
 			error(src->token, "'%s' cannot be used with a polymorphic procedure", attribute);
 			continue;
@@ -6894,7 +6902,10 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
-		GB_ASSERT(is_type_proc(src->type));
+		if (!is_type_proc(src->type)) {
+			error(src->token, "Invalid procedure type found during deferred procedure checking");
+			continue;
+		}
 		GB_ASSERT(is_type_proc(dst->type));
 		Type *src_params = base_type(src->type)->Proc.params;
 		Type *src_results = base_type(src->type)->Proc.results;

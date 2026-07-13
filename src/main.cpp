@@ -875,7 +875,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							} else if (value.value_string == "speed") {
 								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 2;
-							} else if (value.value_string == "aggressive" && LB_USE_NEW_PASS_SYSTEM) {
+							} else if (value.value_string == "aggressive") {
 								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 3;
 							} else {
@@ -884,9 +884,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\tminimal\n");
 								gb_printf_err("\tsize\n");
 								gb_printf_err("\tspeed\n");
-								if (LB_USE_NEW_PASS_SYSTEM) {
-									gb_printf_err("\taggressive\n");
-								}
+								gb_printf_err("\taggressive\n");
 								gb_printf_err("\tnone (useful for -debug builds)\n");
 								bad_flags = true;
 							}
@@ -1199,8 +1197,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bool found = false;
 
 								if (selected_target_metrics->metrics->os != TargetOs_darwin &&
-								    selected_target_metrics->metrics->os != TargetOs_linux ) {
-									gb_printf_err("-subtarget can only be used with darwin and linux based targets at the moment\n");
+										selected_target_metrics->metrics->os != TargetOs_linux &&
+									 (selected_target_metrics->metrics->os != TargetOs_freestanding ||
+										selected_target_metrics->metrics->arch != TargetArch_arm32)) {
+									gb_printf_err("-subtarget can only be used with darwin, linux or freestanding_arm32 based targets at the moment\n");
 									bad_flags = true;
 									break;
 								}
@@ -2743,10 +2743,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (check) {
 		if (print_flag("-collection:<name>=<filepath>")) {
-			print_usage_line(2, "Defines a library collection used for imports.");
+			print_usage_line(2, "Defines a library collection used for imports and foreign imports.");
 			print_usage_line(2, "Example: -collection:shared=dir/to/shared");
 			print_usage_line(2, "Usage in Code:");
 				print_usage_line(3, "import \"shared:foo\"");
+				print_usage_line(3, "foreign import lib \"shared:libfoo.a\"");
 		}
 
 		if (print_flag("-custom-attribute:<string>")) {
@@ -3041,9 +3042,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-o:minimal");
 				print_usage_line(3, "-o:size");
 				print_usage_line(3, "-o:speed");
-			if (LB_USE_NEW_PASS_SYSTEM) {
 				print_usage_line(3, "-o:aggressive (use this with caution)");
-			}
 			print_usage_line(2, "The default is -o:minimal. If -debug is set, the default is -o:none.");
 		}
 
@@ -3102,7 +3101,6 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-stack-protector:<string>")) {
 			print_usage_line(2, "Specifies the stack protector.");
 			print_usage_line(2, "Available options:");
-				print_usage_line(3, "-stack-protector:default");
 				print_usage_line(3, "-stack-protector:none");
 				print_usage_line(3, "-stack-protector:base");
 				print_usage_line(3, "-stack-protector:all");
@@ -3202,7 +3200,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (build) {
 		if (print_flag("-subtarget:<subtarget>")) {
-			print_usage_line(2, "[Darwin and Linux only]");
+			print_usage_line(2, "[Darwin, Linux and Freestanding ARM32 only]");
 			print_usage_line(2, "Available subtargets:");
 			String prefix = str_lit("-subtarget:");
 			for (u32 i = 1; i < Subtarget_COUNT; i++) {
@@ -4217,12 +4215,6 @@ int main(int arg_count, char const **arg_ptr) {
 		String disabled;
 		if (!check_target_feature_is_enabled(str_lit("64bit,f,d,m"), &disabled)) { // 64bit, floats, doubles, integer multiplication.
 			gb_printf_err("missing required target feature: \"%.*s\", enable it by setting a different -microarch or explicitly adding it through -target-features\n", LIT(disabled));
-			gb_exit(1);
-		}
-
-		// NOTE(laytan): some weird errors on LLVM 14 that LLVM 17 fixes.
-		if (LLVM_VERSION_MAJOR < 17) {
-			gb_printf_err("Invalid LLVM version %s, RISC-V targets require at least LLVM 17\n", LLVM_VERSION_STRING);
 			gb_exit(1);
 		}
 	}

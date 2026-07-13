@@ -353,9 +353,15 @@ gb_internal void big_int_shl(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 gb_internal void big_int_shr(BigInt *dst, BigInt const *x, BigInt const *y) {
 	u32 yy = mp_get_u32(y);
-	BigInt d = {};
-	mp_div_2d(x, yy, dst, &d);
-	big_int_dealloc(&d);
+
+	BigInt rem = {};
+	defer (mp_clear(&rem));
+
+	mp_div_2d(x, yy, dst, &rem);
+
+	if (mp_isneg(x) && !mp_iszero(&rem)) {
+		mp_sub_d(dst, 1, dst);
+	}
 }
 
 gb_internal void big_int_mul_u64(BigInt *dst, BigInt const *x, u64 y) {

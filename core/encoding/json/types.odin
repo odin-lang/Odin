@@ -112,6 +112,7 @@ destroy_value :: proc(value: Value, allocator := context.allocator, loc := #call
 	}
 }
 
+@(require_results)
 clone_value :: proc(value: Value, allocator := context.allocator) -> Value {
 	value := value
 	context.allocator = allocator

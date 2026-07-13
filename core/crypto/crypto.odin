@@ -49,7 +49,7 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 
 	// After the loop, v == 0 if and only if (⟺) a == b.  The subtraction will underflow
 	// if and only if (⟺) v == 0, setting the sign-bit, which gets returned.
-	return subtle.eq(0, v)
+	return int(subtle.eq(0, v))
 }
 
 // is_zero_constant_time returns 1 if and only if (⟺) b is all 0s, 0 otherwise.
@@ -59,7 +59,7 @@ is_zero_constant_time :: proc "contextless" (b: []byte) -> int {
 		v |= b_
 	}
 
-	return subtle.byte_eq(0, v)
+	return int(subtle.byte_eq(0, v))
 }
 
 /*

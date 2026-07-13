@@ -20,7 +20,9 @@ import "core:c"
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
 	SizeOfShapeContext       :: proc() -> c.int ---
+	PlaceShapeContext2       :: proc(Allocator: allocator_function, AllocatorData: rawptr, Memory: rawptr, Flags: shape_context_flags) -> ^shape_context ---
 	PlaceShapeContext        :: proc(Allocator: allocator_function, AllocatorData: rawptr, Memory: rawptr) -> ^shape_context ---
+	CreateShapeContext2      :: proc(Allocator: allocator_function, AllocatorData: rawptr, Flags: shape_context_flags) -> ^shape_context ---
 	CreateShapeContext       :: proc(Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_context ---
 	DestroyShapeContext      :: proc(Context: ^shape_context) ---
 	ShapePushFont            :: proc(Context: ^shape_context, Font: ^font) -> ^font ---
@@ -38,6 +40,14 @@ foreign lib {
 	ShapeManualBreak         :: proc(Context: ^shape_context) ---
 }
 
+@(require_results)
+PlaceShapeContextFixedMemory2 :: proc "c" (Memory: []byte, Flags: shape_context_flags) -> ^shape_context {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_PlaceShapeContextFixedMemory2 :: proc(Memory: rawptr, Size: c.int, Flags: shape_context_flags) -> ^shape_context ---
+	}
+	return kbts_PlaceShapeContextFixedMemory2(raw_data(Memory), c.int(len(Memory)), Flags)
+}
 @(require_results)
 PlaceShapeContextFixedMemory :: proc "c" (Memory: []byte) -> ^shape_context {
 	@(default_calling_convention="c", require_results)
@@ -120,10 +130,11 @@ ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator)
 //
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
 foreign lib {
-	FreeFont    :: proc(Font: ^font) ---
-	FontIsValid :: proc(Font: ^font) -> b32 ---
-	PlaceBlob   :: proc(Font: ^font, State: ^load_font_state, ScratchMemory: rawptr, OutputMemory: rawptr) -> load_font_error ---
-	GetFontInfo :: proc(Font: ^font, Info: ^font_info) ---
+	FreeFont     :: proc(Font: ^font) ---
+	FontIsValid  :: proc(Font: ^font) -> b32 ---
+	PlaceBlob    :: proc(Font: ^font, State: ^load_font_state, ScratchMemory: rawptr, OutputMemory: rawptr) -> load_font_error ---
+	GetFontInfo  :: proc(Font: ^font, Info: ^font_info) ---
+	GetFontInfo2 :: proc(Font: ^font, Info: ^font_info2) ---
 
 	// A shape_config is a bag of pre-computed data for a specific shaping setup.
 	SizeOfShapeConfig  :: proc(Font: ^font, Script: script, Language: language) -> b32 ---
@@ -145,6 +156,14 @@ foreign lib {
 	// A single glyph_config can be shared by multiple glyphs.
 
 	DestroyGlyphConfig :: proc(Config: ^glyph_config) ---
+
+	// A shape_scratchpad holds all transient runtime shaping data.
+	// While the shape_config is immutable and can be trivially shared among threads, a shape_scratchpad is mutable and needs to be per-thread.
+	SizeOfShapeScratchpad           :: proc(Config: ^shape_config) -> un ---
+	PlaceShapeScratchpad            :: proc(Config: ^shape_config, Memory: rawptr, Allocator: allocator_function, AllocatorData: rawptr) -> shape_scratchpad ---
+	PlaceShapeScratchpadFixedMemory :: proc(Config: ^shape_config, Memory: rawptr, Size: c.int) -> shape_scratchpad ---
+	CreateShapeScratchpad           :: proc(Config: ^shape_config, Allocator: allocator_function, AllocatorData: rawptr) -> shape_scratchpad ---
+	DestroyShapeScratchpad          :: proc(Scratchpad: ^shape_scratchpad) ---
 }
 
 @(require_results)
@@ -177,51 +196,41 @@ FontFromMemory :: proc "c" (FileData: []byte, FontIndex: c.int, Allocator: alloc
 
 
 @(require_results)
-ShapeDirect :: proc "contextless" (Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Allocator: allocator_function, AllocatorData: rawptr) -> (Output: glyph_iterator, Err: shape_error) {
+ShapeDirect :: proc "contextless" (Scratchpad: ^shape_scratchpad, Storage: ^glyph_storage, RunDirection: direction) -> (Output: glyph_iterator, Err: shape_error) {
 	@(default_calling_convention="c", require_results)
 	foreign lib {
-		kbts_ShapeDirect :: proc(Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Allocator: allocator_function, AllocatorData: rawptr, Output: ^glyph_iterator) -> shape_error ---
+		kbts_ShapeDirect :: proc(Scratchpad: ^shape_scratchpad, Storage: ^glyph_storage, RunDirection: direction, Output: ^glyph_iterator) -> shape_error ---
 	}
-	Err = kbts_ShapeDirect(Config, Storage, RunDirection, Allocator, AllocatorData, &Output)
-	return
-}
-
-@(require_results)
-ShapeDirectFixedMemory :: proc "contextless" (Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Memory: rawptr, MemorySize: c.int) -> (Output: glyph_iterator, Err: shape_error) {
-	@(default_calling_convention="c", require_results)
-	foreign lib {
-		kbts_ShapeDirectFixedMemory :: proc(Config: ^shape_config, Storage: ^glyph_storage, RunDirection: direction, Memory: rawptr, MemorySize: c.int, Output: ^glyph_iterator) -> shape_error ---
-	}
-	Err = kbts_ShapeDirectFixedMemory(Config, Storage, RunDirection, Memory, MemorySize, &Output)
+	Err = kbts_ShapeDirect(Scratchpad, Storage, RunDirection, &Output)
 	return
 }
 
 
 @(require_results)
-SizeOfGlyphConfig :: proc "c" (Overrides: []feature_override) -> c.int {
+SizeOfGlyphConfig :: proc "c" (ShapeConfig: ^shape_config, Overrides: []feature_override) -> c.int {
 	@(default_calling_convention="c", require_results)
 	foreign lib {
-		kbts_SizeOfGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int) -> c.int ---
+		kbts_SizeOfGlyphConfig :: proc(ShapeConfig: ^shape_config, Overrides: [^]feature_override, OverrideCount: c.int) -> c.int ---
 	}
-	return kbts_SizeOfGlyphConfig(raw_data(Overrides), c.int(len(Overrides)))
+	return kbts_SizeOfGlyphConfig(ShapeConfig, raw_data(Overrides), c.int(len(Overrides)))
 }
 
 @(require_results)
-PlaceGlyphConfig :: proc "c" (Overrides: []feature_override, Memory: rawptr) -> ^glyph_config {
+PlaceGlyphConfig :: proc "c" (ShapeConfig: ^shape_config, Overrides: []feature_override, Memory: rawptr) -> ^glyph_config {
 	@(default_calling_convention="c", require_results)
 	foreign lib {
-		kbts_PlaceGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int, Memory: rawptr) -> ^glyph_config ---
+		kbts_PlaceGlyphConfig :: proc(ShapeConfig: ^shape_config, Overrides: [^]feature_override, OverrideCount: c.int, Memory: rawptr) -> ^glyph_config ---
 	}
-	return kbts_PlaceGlyphConfig(raw_data(Overrides), c.int(len(Overrides)), Memory)
+	return kbts_PlaceGlyphConfig(ShapeConfig, raw_data(Overrides), c.int(len(Overrides)), Memory)
 }
 
 @(require_results)
-CreateGlyphConfig :: proc(Overrides: []feature_override, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config {
+CreateGlyphConfig :: proc(ShapeConfig: ^shape_config, Overrides: []feature_override, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config {
 	@(default_calling_convention="c", require_results)
 	foreign lib {
-		kbts_CreateGlyphConfig :: proc(Overrides: [^]feature_override, OverrideCount: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config ---
+		kbts_CreateGlyphConfig :: proc(ShapeConfig: ^shape_config, Overrides: [^]feature_override, OverrideCount: c.int, Allocator: allocator_function, AllocatorData: rawptr) -> ^glyph_config ---
 	}
-	return kbts_CreateGlyphConfig(raw_data(Overrides), c.int(len(Overrides)), Allocator, AllocatorData)
+	return kbts_CreateGlyphConfig(ShapeConfig, raw_data(Overrides), c.int(len(Overrides)), Allocator, AllocatorData)
 }
 
 @(default_calling_convention="c", link_prefix="kbts_", require_results)
@@ -265,12 +274,13 @@ BreakEntireString :: proc "c" (Direction: direction, JapaneseLineBreakStyle: jap
                                Input: []byte, InputFormat: text_format,
                                Breaks: []break_type, BreakCount: ^c.int,
                                BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_BreakEntireString :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-		                               Input: rawptr, InputSizeInBytes: c.int, InputFormat: text_format,
-		                               Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
-		                               BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
+			Input: rawptr, InputSizeInBytes: c.int, InputFormat: text_format,
+			Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
+			BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
 	}
 	kbts_BreakEntireString(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Input), c.int(len(Input)), InputFormat, raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
 }
@@ -279,12 +289,13 @@ BreakEntireStringUtf32 :: proc "c" (Direction: direction, JapaneseLineBreakStyle
                                     Utf32: []rune,
                                     Breaks: []break_type, BreakCount: ^c.int,
                                     BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_BreakEntireStringUtf32 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-		                                    Utf32: [^]rune, Utf32Count: c.int,
-		                                    Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
-		                                    BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
+			Utf32: [^]rune, Utf32Count: c.int,
+			Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
+			BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
 	}
 	kbts_BreakEntireStringUtf32(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Utf32), c.int(len(Utf32)), raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
 }
@@ -293,12 +304,13 @@ BreakEntireStringUtf8 :: proc "c" (Direction: direction, JapaneseLineBreakStyle:
                                    Utf8: string,
                                    Breaks: []break_type, BreakCount: ^c.int,
                                    BreakFlags: []break_flags, BreakFlagCount: ^c.int) {
+
 	@(default_calling_convention="c", require_results)
 	foreign lib {
 		kbts_BreakEntireStringUtf8 :: proc(Direction: direction, JapaneseLineBreakStyle: japanese_line_break_style, ConfigFlags: break_config_flags,
-		                                   Utf8: [^]byte, Utf8Length: c.int,
-		                                   Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
-		                                   BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
+			Utf8: [^]byte, Utf8Length: c.int,
+			Breaks: [^]break_type, BreakCapacity: c.int, BreakCount: ^c.int,
+			BreakFlags: [^]break_flags, BreakFlagCapacity: c.int, BreakFlagCount: ^c.int) ---
 	}
 	kbts_BreakEntireStringUtf8(Direction, JapaneseLineBreakStyle, ConfigFlags, raw_data(Utf8), c.int(len(Utf8)), raw_data(Breaks), c.int(len(Breaks)), BreakCount, raw_data(BreakFlags), c.int(len(BreakFlags)), BreakFlagCount)
 }
@@ -390,7 +402,7 @@ AllocatorFromOdinAllocator :: proc "contextless" (allocator: ^runtime.Allocator)
 		case .ALLOCATE:
 			res, _ := runtime.mem_alloc(int(Op.Allocate.Size), runtime.DEFAULT_ALIGNMENT)
 			Op.Allocate.Pointer = raw_data(res)
-			Op.Allocate.Size    = u32(len(res))
+			Op.Allocate.Size	= u32(len(res))
 		case .FREE:
 			_ = runtime.mem_free(Op.Free.Pointer)
 		}

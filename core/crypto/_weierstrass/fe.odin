@@ -196,10 +196,10 @@ fe_gen_y_p384r1 :: proc "contextless" (fe: ^Field_Element_p384r1) {
 
 @(require_results)
 fe_is_zero_p256r1 :: proc "contextless" (fe: ^Field_Element_p256r1) -> int {
-	return int(subtle.u64_is_zero(p256r1.fe_non_zero(fe)))
+	return int(subtle.eq0(p256r1.fe_non_zero(fe)))
 }
 
 @(require_results)
 fe_is_zero_p384r1 :: proc "contextless" (fe: ^Field_Element_p384r1) -> int {
-	return int(subtle.u64_is_zero(p384r1.fe_non_zero(fe)))
+	return int(subtle.eq0(p384r1.fe_non_zero(fe)))
 }

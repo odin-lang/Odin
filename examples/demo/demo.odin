@@ -670,7 +670,7 @@ union_type :: proc() {
 	{
 		// NOTE(bill): A union can be used to achieve something similar. Instead
 		// of embedding the base data into the derived types, the derived data
-		// in embedded into the base type. Below is the same example of the
+		// is embedded into the base type. Below is the same example of the
 		// basic game Entity but using an union.
 
 		Entity :: struct {
@@ -757,7 +757,7 @@ using_statement :: proc() {
 	// `using` as a struct field modifier remains available always
 
 	fmt.println("\n# using statement")
-	// using can used to bring entities declared in a scope/namespace
+	// using can be used to bring entities declared in a scope/namespace
 	// into the current scope. This can be applied to import names, struct
 	// fields, procedure fields, and struct values.
 
@@ -768,7 +768,7 @@ using_statement :: proc() {
 			orientation: quaternion128,
 		}
 
-		// It can used like this:
+		// It can be used like this:
 		foo0 :: proc(entity: ^Entity) {
 			fmt.println(entity.position.x, entity.position.y, entity.position.z)
 		}

@@ -1471,6 +1471,10 @@ gb_internal bool is_type_constant_type(Type *t) {
 		return is_type_constant_type(t->Array.elem);
 	case Type_EnumeratedArray:
 		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_SimdVector:
+		return is_type_constant_type(t->SimdVector.elem);
+	case Type_Matrix:
+		return is_type_constant_type(t->Matrix.elem);
 	}
 	return false;
 }
@@ -1525,7 +1529,7 @@ gb_internal bool is_type_multi_pointer(Type *t) {
 	return t->kind == Type_MultiPointer;
 }
 gb_internal bool is_type_internally_pointer_like(Type *t) {
-	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_cstring16(t) || is_type_proc(t);
 }
 
 gb_internal bool is_type_tuple(Type *t) {
@@ -3977,6 +3981,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f16, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f16, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f16, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -3993,6 +4000,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -4008,6 +4019,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f32, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f32, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f32, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -4024,6 +4038,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -4039,6 +4057,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f64, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f64, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f64, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -4055,6 +4076,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;

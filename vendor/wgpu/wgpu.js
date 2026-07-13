@@ -26,7 +26,7 @@ const ENUMS = {
 	CompareFunction: [undefined, "never", "less", "equal", "less-equal", "greater", "not-equal", "greater-equal", "always", ],
 	TextureDimension: [undefined, "1d", "2d", "3d", ],
 	ErrorType: [undefined, "no-error", "validation", "out-of-memory", "internal", "unknown", ],
-	WGSLLanguageFeatureName: [undefined, "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", "uniform_buffer_standard_layout", "subgroup_id", "texture_and_sampler_let", "subgroup_uniformity", "texture_formats_tier1" ],
+	WGSLLanguageFeatureName: [undefined, "readonly_and_readwrite_storage_textures", "packed_4x8_integer_dot_product", "unrestricted_pointer_parameters", "pointer_composite_access", "uniform_buffer_standard_layout", "subgroup_id", "texture_and_sampler_let", "subgroup_uniformity", "texture_formats_tier1", "linear_indexing" ],
 	PowerPreference: [undefined, "low-power", "high-performance", ],
 	CompositeAlphaMode: ["auto", "opaque", "premultiplied", "unpremultiplied", "inherit", ],
 	StencilOperation: [undefined, "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap", ],
@@ -1808,6 +1808,16 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} computePassEncoderIdx
+			 * @param {number} offset
+			 * @param {number} data
+			 * @param {number|BigInt} size
+			 */
+			wgpuComputePassEncoderSetImmediates: (computePassEncoderIdx, offset, data, size) => {
+				console.warn("wgpuComputePassEncoderSetImmediates: unimplemented in browsers at the time of writing");
+			},
+
+			/**
+			 * @param {number} computePassEncoderIdx
 			 * @param {number} pipelineIdx
 			 */
 			wgpuComputePassEncoderSetPipeline: (computePassEncoderIdx, pipelineIdx) => {
@@ -2698,6 +2708,16 @@ class WebGPUInterface {
 
 			/**
 			 * @param {number} renderBundleEncoderIdx
+			 * @param {number} offset
+			 * @param {number} data
+			 * @param {number|BigInt} size
+			 */
+			wgpuRenderBundleEncoderSetImmediates: (renderBundleEncoderIdx, offset, data, size) => {
+				console.warn("wgpuRenderBundleEncoderSetImmediates: unimplemented in browsers at the time of writing");
+			},
+
+			/**
+			 * @param {number} renderBundleEncoderIdx
 			 * @param {number} bufferIdx
 			 * @param {number} formatInt
 			 * @param {BigInt} offset
@@ -2891,6 +2911,16 @@ class WebGPUInterface {
 				);	
 
 				renderPassEncoder.setBindGroup(groupIndex, group, dynamicOffsets);
+			},
+
+			/**
+			 * @param {number} renderPassEncoderIdx
+			 * @param {number} offset
+			 * @param {number} data
+			 * @param {number|BigInt} size
+			 */
+			wgpuRenderPassEncoderSetImmediates: (renderPassEncoderIdx, offset, data, size) => {
+				console.warn("wgpuRenderPassEncoderSetImmediates: unimplemented in browsers at the time of writing");
 			},
 
 			/**

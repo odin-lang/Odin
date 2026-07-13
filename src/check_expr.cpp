@@ -1142,7 +1142,7 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 	if (operand->mode == Addressing_Type && is_type_typeid(type)) {
 		add_type_info_type(c, operand->type);
-		add_type_and_value(c, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
+		add_type_and_value(c, operand->expr, Addressing_Constant, type, exact_value_typeid(operand->type));
 		return;
 	}
 
@@ -1968,6 +1968,14 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_Variable:
+		if ((e->flags & EntityFlag_CVarArg) && !c->allow_c_vararg_param) {
+			ERROR_BLOCK();
+			error(o->expr, "'#c_vararg' parameter '%.*s' cannot be used directly", LIT(name));
+			error_line("\tSuggestion: use c_va_start to convert C varargs to c_va_list\n");
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			return e;
+		}
 		e->flags |= EntityFlag_Used;
 		if (type == t_invalid) {
 			o->type = t_invalid;
@@ -3926,6 +3934,11 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		}
 	}
 
+	// In this case, the cast involves array programming
+	// so the operand needs to be a computed value
+	if (!is_type_array_like(x->type) && is_type_array_like(type)) {
+		x->mode = Addressing_Value;
+	}
 	x->type = type;
 }
 
@@ -5161,16 +5174,12 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 			if (valid_count == 1) {
 				Type *new_type = t->Union.variants[first_success_index];
-				target_type = new_type;
-				if (is_type_union(new_type)) {
-					convert_to_typed(c, operand, new_type);
-					break;
-				}
-				operand->type = new_type;
 				if (operand->mode != Addressing_Constant ||
-				    !elem_type_can_be_constant(operand->type)) {
+				    !elem_type_can_be_constant(new_type)) {
 					operand->mode = Addressing_Value;
 				}
+				convert_to_typed(c, operand, new_type);
+				target_type = new_type;
 				break;
 			} else if (valid_count > 1) {
 				ERROR_BLOCK();
@@ -5204,7 +5213,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type, true);
 				if (count > 0) {
-					error_line("'%s' is a union which only excepts the following types:\n", type_str);
+					error_line("'%s' is a union which only accepts the following types:\n", type_str);
 
 					error_line("\t");
 					for (i32 i = 0; i < count; i++) {
@@ -5363,7 +5372,8 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 					TEMPORARY_ALLOCATOR_GUARD();
 					String idx_str = big_int_to_string(temporary_allocator(), &i);
 					gbString expr_str = expr_to_string(operand.expr, temporary_allocator());
-					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld, got %.*s", expr_str, max_count, LIT(idx_str));
+					char range_type = open_range ? '=' : '<';
+					error(operand.expr, "Index '%s' is out of bounds range 0..%c%lld, got %.*s", expr_str, range_type, max_count, LIT(idx_str));
 					return false;
 				}
 
@@ -5819,7 +5829,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup) && selector->kind == Ast_Ident) {
 			gbString sel_str = expr_to_string(selector);
-			error(node, "'%s' is not declared by by '%.*s'", sel_str, LIT(e->token.string));
+			error(node, "'%s' is not declared by '%.*s'", sel_str, LIT(e->token.string));
 			gb_string_free(sel_str);
 			operand->mode = Addressing_Invalid;
 			operand->expr = node;
@@ -6774,7 +6784,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic, allow_array_programming)) {
 			bool ok = false;
 			if (e && (e->flags & EntityFlag_AnyInt)) {
-				if (is_type_integer(param_type) && (is_type_integer(o->type) || is_type_enum(o->type))) {
+				if (o->mode != Addressing_Type && is_type_integer(param_type) && (is_type_integer(o->type) || is_type_enum(o->type))) {
 					ok = check_is_castable_to(c, o, param_type);
 				}
 			}
@@ -9898,6 +9908,7 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 				if (is_diverging_expr(y.expr)) {
 					// Allow
 					y.mode = Addressing_Value;
+					y.type = x.type;
 					y_is_diverging = true;
 				} else {
 					error_operand_no_value(&y);
@@ -10217,7 +10228,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 		Ast *ident = fv->field;
 		if (ident->kind == Ast_ImplicitSelectorExpr) {
 			gbString expr_str = expr_to_string(ident);
-			error(ident, "Field names do not start with a '.', remove the '.' in %.*s", expr_str, LIT(assignment_str));
+			error(ident, "Field names do not start with a '.', remove the '.' from '%s' in %.*s", expr_str, LIT(assignment_str));
 			gb_string_free(expr_str);
 
 			ident = ident->ImplicitSelectorExpr.selector;
@@ -12832,6 +12843,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		} else {
 			str = gb_string_appendc(str, " ---");
 		}
+		// NOTE(tf2spi):
+		// Two proc literals with the same signature output the same expr above
+		// which poses challenges for name canonicalization. Include the below
+		// discriminator with the file ID and offset to help with this.
+		TokenPos pos = ast_token(node).pos;
+		str = gb_string_append_fmt(str, " /* %d!%d */", pos.file_id, pos.offset);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);

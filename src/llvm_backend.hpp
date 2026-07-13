@@ -4,6 +4,10 @@
 #include <llvm/Config/llvm-config.h>
 #endif
 
+#if LLVM_VERSION_MAJOR < 17
+#error "LLVM Version 17 is the minimum required"
+#endif
+
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
@@ -11,45 +15,13 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
-#if LLVM_VERSION_MAJOR >= 17
 #include <llvm-c/Transforms/PassBuilder.h>
-#else
-#include <llvm-c/Transforms/AggressiveInstCombine.h>
-#include <llvm-c/Transforms/InstCombine.h>
-#include <llvm-c/Transforms/IPO.h>
-#include <llvm-c/Transforms/PassManagerBuilder.h>
-#include <llvm-c/Transforms/Scalar.h>
-#include <llvm-c/Transforms/Utils.h>
-#include <llvm-c/Transforms/Vectorize.h>
-#endif
 
-#if LLVM_VERSION_MAJOR < 14
-#error "LLVM Version 14 is the minimum required"
-#endif
 
-#if LLVM_VERSION_MAJOR > 14 || (LLVM_VERSION_MAJOR == 14 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
-#define ODIN_LLVM_MINIMUM_VERSION_14 1
-#else
-#define ODIN_LLVM_MINIMUM_VERSION_14 0
-#endif
-
-#if LLVM_VERSION_MAJOR == 15 || LLVM_VERSION_MAJOR == 16
-#error "LLVM versions 15 and 16 are not supported"
-#endif
-
-#if LLVM_VERSION_MAJOR >= 17
-#define LB_USE_NEW_PASS_SYSTEM 1
-#else
-#define LB_USE_NEW_PASS_SYSTEM 0
-#endif
 
 #if LLVM_VERSION_MAJOR >= 19
 #define LLVMDIBuilderInsertDeclareAtEnd(...) LLVMDIBuilderInsertDeclareRecordAtEnd(__VA_ARGS__)
 #endif
-
-gb_internal bool lb_use_new_pass_system(void) {
-	return LB_USE_NEW_PASS_SYSTEM;
-}
 
 struct lbProcedure;
 
@@ -408,13 +380,6 @@ struct lbProcedure {
 #define ABI_PKG_NAME_SEPARATOR "."
 #endif
 
-
-#if !ODIN_LLVM_MINIMUM_VERSION_14
-#define LLVMConstGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstGEP(ConstantVal__, ConstantIndices__, NumIndices__)
-#define LLVMConstInBoundsGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstInBoundsGEP(ConstantVal__, ConstantIndices__, NumIndices__)
-#define LLVMBuildPtrDiff2(Builder__, Ty__, LHS__, RHS__, Name__) LLVMBuildPtrDiff(Builder__, LHS__, RHS__, Name__)
-#endif
-
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c);
 
 gb_internal String lb_mangle_name(Entity *e);
@@ -595,7 +560,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *false_block);
 
 gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_);
-gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_);
+gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeRef t, LLVMValueRef *values, isize value_count_, bool force_non_named=false);
 gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name);
 
 gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);
@@ -641,11 +606,7 @@ gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, S
 gb_internal LLVMMetadataRef lb_debug_location_from_token_pos(lbProcedure *p, TokenPos pos);
 
 gb_internal LLVMTypeRef llvm_array_type(LLVMTypeRef ElementType, uint64_t ElementCount) {
-#if LB_USE_NEW_PASS_SYSTEM
 	return LLVMArrayType2(ElementType, ElementCount);
-#else
-	return LLVMArrayType(ElementType, cast(unsigned)ElementCount);
-#endif
 }
 
 gb_internal lbValue lb_emit_struct_iv(lbProcedure *p, lbValue agg, lbValue field, i32 index);

@@ -277,7 +277,6 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
-*.a
 
 # core:rexcode commits its generated encode/decode tables: each arch's tablegen
 # emits human-readable Odin, serialized to tables/*.bin, which the library
