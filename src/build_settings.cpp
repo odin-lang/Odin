@@ -1964,7 +1964,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 		// single precision float fpu as well as issues with function lowering
 		// when using the thumbv7em triplet.
 		bc->metrics.target_triplet = str_lit("arm-unknown-unknown-gnueabihf");
-		//no-movt required as playdate doesn't support it
+		//no-movt required as playdate only handles R_ARM_ABS32 relocations
 		String const playdate_features = str_lit("no-movt,armv7e-m,thumb2,m7,fpregs");
 
 		if(bc->target_features_string.len > 0) {
