@@ -109,7 +109,6 @@ emit_passthrough :: proc(m: Module, out: ^[dynamic]u8, relocs: ^[dynamic]Relocat
 // From-scratch module: synthesize the modeled sections in canonical order.
 @(private)
 emit_synth :: proc(m: Module, out: ^[dynamic]u8, relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) {
-	// id byte ++ uleb(len contents) ++ contents
 	emit_section :: proc(out: ^[dynamic]u8, id: Section_Id, contents: []u8) {
 		append(out, u8(id))
 		append_uleb(out, u64(len(contents)))
@@ -124,7 +123,7 @@ emit_synth :: proc(m: Module, out: ^[dynamic]u8, relocs: ^[dynamic]Relocation, e
 		c: [dynamic]u8; c.allocator = tmp
 		append_uleb(&c, u64(len(m.func_types)))
 		for ft in m.func_types {
-			append(&c, 0x60)   // functype form
+			append(&c, 0x60) // functype form
 
 			#assert(size_of(ft.params[0]) == 1)
 			#assert(size_of(ft.results[0]) == 1)
@@ -285,7 +284,7 @@ emit_code_section :: proc(m: Module, out: ^[dynamic]u8, relocs: ^[dynamic]Reloca
 @(private)
 emit_locals :: proc(body: ^[dynamic]u8, locals: []Value_Type) {
 	group_count := u32(0)
-	for i := 0; i < len(locals); /**/ {
+	#no_bounds_check for i := 0; i < len(locals); /**/ {
 		j := i+1
 		for j < len(locals) && locals[j] == locals[i] {
 			j += 1
@@ -294,7 +293,7 @@ emit_locals :: proc(body: ^[dynamic]u8, locals: []Value_Type) {
 		i = j
 	}
 	append_uleb(body, u64(group_count))
-	for i := 0; i < len(locals); /**/ {
+	#no_bounds_check for i := 0; i < len(locals); /**/ {
 		j := i+1
 		for j < len(locals) && locals[j] == locals[i] {
 			j += 1

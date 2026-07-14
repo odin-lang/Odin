@@ -170,7 +170,7 @@ decode_one :: proc(
 			default_index := len(operands)
 			reserve(&operands, count+1)
 			append(&operands, Operand{}) // dummy for default
-			for i in 0 ..< int(count) {
+			for _ in 0..<int(count) {
 				t := read_uleb(data, &off) or_return
 				append(&operands, op_labelidx(u32(t)))
 			}

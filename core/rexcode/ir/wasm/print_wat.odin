@@ -280,7 +280,7 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	assert(len(f.blocks) <= 1)
 	for blk in f.blocks {
 		level := 0
-		for &op, i in blk.ops {
+		for &op in blk.ops {
 			opcode := Opcode(op.opcode)
 			#partial switch opcode {
 			case .END, .ELSE:
