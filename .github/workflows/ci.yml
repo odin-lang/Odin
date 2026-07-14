@@ -27,9 +27,9 @@ jobs:
           gmake release
           ./odin version
           ./odin report
-          gmake -C vendor/stb/src
-          gmake -C vendor/cgltf/src
-          gmake -C vendor/miniaudio/src
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/miniaudio/src/build_miniaudio.sh
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
@@ -60,9 +60,9 @@ jobs:
           gmake release
           ./odin version
           ./odin report
-          gmake -C vendor/stb/src
-          gmake -C vendor/cgltf/src
-          gmake -C vendor/miniaudio/src
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/miniaudio/src/build_miniaudio.sh
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
