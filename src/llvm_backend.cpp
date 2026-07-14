@@ -2734,7 +2734,7 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
 	path = gb_string_appendc(path, "/");
 
-	bool output_is_directory = path_is_directory(make_string_c(path));
+	bool output_is_directory = path_is_directory(build_context.build_paths[BuildPath_Output]);
 
 	if (USE_SEPARATE_MODULES) {
 		GB_ASSERT(m->module_name != nullptr);
