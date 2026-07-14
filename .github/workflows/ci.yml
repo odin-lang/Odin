@@ -27,9 +27,9 @@ jobs:
           gmake release
           ./odin version
           ./odin report
-          (cd ./vendor/stb/src/; ./vendor/stb/src/build_stb.sh)
-          (cd ./vendor/cgltf/src/; ./vendor/cgltf/src/build_cgltf.sh)
-          (cd ./vendor/miniaudio/src/; ./vendor/miniaudio/src/build_miniaudio.sh)
+          (cd ./vendor/stb/src/; build_stb.sh)
+          (cd ./vendor/cgltf/src/; build_cgltf.sh)
+          (cd ./vendor/miniaudio/src/; build_miniaudio.sh)
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
@@ -37,8 +37,7 @@ jobs:
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          (cd tests/issues; ./run.sh)
-          ./odin check tests/benchmark -vet -strict-style -no-entry-point
+          (cd tests/issues; ./run.ests/benchmark -vet -strict-style -no-entry-point
 
   build_freebsd:
     name: FreeBSD Build, Check, and Test
@@ -60,16 +59,15 @@ jobs:
           gmake release
           ./odin version
           ./odin report
-          (cd ./vendor/stb/src/; ./vendor/stb/src/build_stb.sh)
-          (cd ./vendor/cgltf/src/; ./vendor/cgltf/src/build_cgltf.sh)
-          (cd ./vendor/miniaudio/src/; ./vendor/miniaudio/src/build_miniaudio.sh)
+          (cd ./vendor/stb/src/; build_stb.sh)
+          (cd ./vendor/cgltf/src/; build_cgltf.sh)
+          (cd ./vendor/miniaudio/src/; build_miniaudio.sh)
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/core/speed.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
-          (cd tests/issues; ./run.sh)
-          ./odin check tests/benchmark -vet -strict-style -no-entry-point
+          (cd tests/issues; ./run.ests/benchmark -vet -strict-style -no-entry-point
   ci:
     strategy:
       fail-fast: false
@@ -122,9 +120,9 @@ jobs:
           brew install curl mbedtls
       - name: Compile needed Vendor
         run: |
-          (cd ./vendor/stb/src/; ./vendor/stb/src/build_stb.sh)
-          (cd ./vendor/cgltf/src/; ./vendor/cgltf/src/build_cgltf.sh)
-          (cd ./vendor/miniaudio/src/; ./vendor/miniaudio/src/build_miniaudio.sh)
+          (cd ./vendor/stb/src/; build_stb.sh)
+          (cd ./vendor/cgltf/src/; build_cgltf.sh)
+          (cd ./vendor/miniaudio/src/; build_miniaudio.sh)
       - name: Odin check
         run: ./odin check examples/demo -vet
       - name: Odin run
@@ -313,9 +311,9 @@ jobs:
 
       - name: Compile needed Vendor
         run: |
-          (cd ./vendor/stb/src/; ./vendor/stb/src/build_stb.sh)
-          (cd ./vendor/cgltf/src/; ./vendor/cgltf/src/build_cgltf.sh)
-          (cd ./vendor/miniaudio/src/; ./vendor/miniaudio/src/build_miniaudio.sh)
+          (cd ./vendor/stb/src/; build_stb.sh)
+          (cd ./vendor/cgltf/src/; build_cgltf.sh)
+          (cd ./vendor/miniaudio/src/; build_miniaudio.sh)
 
       - name: Odin check examples/all
         run: ./odin check examples/all -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
