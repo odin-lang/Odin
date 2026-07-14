@@ -166,7 +166,8 @@ run_case :: proc(tc: ^Testcase) -> Bucket {
 		opts.required_eku = .Server_Auth
 	}
 
-	chain, verr := x509.verify_chain(leaf, opts, context.temp_allocator)
+	// The chain is temp-allocated; the caller's per-case free_all reclaims it.
+	_, verr := x509.verify_chain(leaf, opts, context.temp_allocator)
 	return _verdict(verr == .None, expect_ok)
 }
 

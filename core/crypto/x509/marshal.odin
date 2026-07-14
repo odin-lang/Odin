@@ -3,7 +3,9 @@ package x509
 import "core:encoding/asn1"
 import "core:time"
 
-// Distinguished-name attribute types the DN builder knows by name.
+// Distinguished-name attribute types the DN builder knows by name. `Other`
+// carries any attribute outside this set via DN_Attribute.oid (used by
+// parse_dn for attributes it does not recognize by name).
 DN_Attribute_Type :: enum {
 	Common_Name,         // CN, 2.5.4.3
 	Country,             // C,  2.5.4.6
@@ -12,14 +14,17 @@ DN_Attribute_Type :: enum {
 	Organization,        // O,  2.5.4.10
 	Organizational_Unit, // OU, 2.5.4.11
 	Serial_Number,       // 2.5.4.5
+	Other,               // any other attribute; its type OID is in `oid`
 }
 
-// DN_Attribute is one relative distinguished name: a type and its value.
+// DN_Attribute is one relative distinguished name: a type and its value. When
+// `type` is `Other`, `oid` holds the raw attribute-type OID content octets.
 // Values are emitted as UTF8String, except Country and Serial_Number which
 // are PrintableString (X.520), the policy RFC 5280 section 4.1.2.4 advises.
 DN_Attribute :: struct {
 	type:  DN_Attribute_Type,
 	value: string,
+	oid:   []byte, // meaningful only when type == Other
 }
 
 @(rodata, private)
@@ -63,7 +68,7 @@ marshal_dn :: proc(attrs: []DN_Attribute, allocator := context.allocator) -> (de
 	defer delete(pairs, allocator)
 
 	for a, i in attrs {
-		pairs[2 * i] = asn1.object_identifier(_dn_oid(a.type))
+		pairs[2 * i] = asn1.object_identifier(_dn_oid(a))
 		pairs[2 * i + 1] = asn1.primitive(_dn_string_tag(a.type), transmute([]byte)a.value)
 		atvs[i] = asn1.sequence(pairs[2 * i:2 * i + 2])
 		rdns[i] = asn1.set(atvs[i:i + 1])
@@ -77,8 +82,8 @@ marshal_dn :: proc(attrs: []DN_Attribute, allocator := context.allocator) -> (de
 }
 
 @(private)
-_dn_oid :: proc(type: DN_Attribute_Type) -> []byte {
-	switch type {
+_dn_oid :: proc(a: DN_Attribute) -> []byte {
+	switch a.type {
 	case .Common_Name:
 		return _OID_AT_CN
 	case .Country:
@@ -93,6 +98,8 @@ _dn_oid :: proc(type: DN_Attribute_Type) -> []byte {
 		return _OID_AT_OU
 	case .Serial_Number:
 		return _OID_AT_SERIAL
+	case .Other:
+		return a.oid
 	}
 	return nil
 }

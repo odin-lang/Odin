@@ -32,9 +32,10 @@ single-edge signature check on its own.
 LIMITATIONS:
 
   - Signature verification covers RSA PKCS#1 v1.5 and RSA-PSS
-    (SHA-1/256/384/512), ECDSA P-256/P-384, and Ed25519. These paths return
-    .Unsupported_Algorithm: ECDSA P-521 (effectively dead in web PKI), and
-    RSA-PSS naming a digest or MGF this package does not recognize.
+    (SHA-256/384/512), ECDSA P-256/P-384, and Ed25519. These paths return
+    .Unsupported_Algorithm: SHA-1 (deprecated and rejected, RFC 9155), ECDSA
+    P-521 (effectively dead in web PKI), and RSA-PSS naming a digest or MGF
+    this package does not recognize.
   - Name constraints (RFC 5280 4.2.1.10) are enforced for the dNSName and
     iPAddress forms: a CA's permitted/excluded subtrees are checked against
     every subordinate certificate's SANs, regardless of the extension's
@@ -72,9 +73,11 @@ duplicate extension OIDs (Duplicate_Extension, RFC 5280 section 4.2).
     Subject/Authority Key Identifier; NameConstraints is decoded at
     verification time). All others (AIA, CRL distribution points,
     certificate policies, …) are left raw in `extensions`.
-  - Subject and issuer are exposed only as raw DER (`raw_subject` /
-    `raw_issuer`); distinguished-name attribute decoding (CN, O, …) is
-    not performed.
+  - Subject and issuer are kept as raw DER (`raw_subject` / `raw_issuer`),
+    which is what name chaining compares (the RFC 5280 binary rule). The
+    attributes (CN, O, …) are decoded on demand by `parse_dn`, not at parse
+    time; `dn_get` / `dn_string` read them out and `serial_string` formats
+    the serial.
   - Unsupported public-key curves yield Public_Key_Algorithm.Unknown.
   - Non-conformant-but-extractable values are preserved: negative or 
     over-long serials, and validity dates far in the future. Validity 

@@ -115,20 +115,24 @@ _match_hostname :: proc(pattern, host: string) -> bool {
 // not validity periods, names, basic constraints, or that `issuer` is
 // actually authorized to issue `cert`; verify_chain does all of that.
 //
-// Returns .None on a good signature, .Signature_Invalid on a bad one,
-// and .Unsupported_Algorithm when the signature algorithm (ECDSA P-521, or
-// RSA-PSS with an unrecognized digest) or the issuer key type is not
-// implemented here.
+// Returns .None on a good signature, .Signature_Invalid on a bad one, and
+// .Unsupported_Algorithm when the signature algorithm (SHA-1, which is rejected
+// per RFC 9155; ECDSA P-521; or RSA-PSS with an unrecognized digest) or the
+// issuer key type is not implemented here.
 @(require_results)
 verify_signature :: proc(cert: ^Certificate, issuer: ^Certificate) -> Error {
 	#partial switch cert.signature_algorithm {
-	case .RSA_SHA1, .RSA_SHA256, .RSA_SHA384, .RSA_SHA512:
+	case .RSA_SHA1:
+		// SHA-1 signatures are deprecated and rejected (RFC 9155); the
+		// algorithm is recognized at parse time for identification only.
+		return .Unsupported_Algorithm
+
+	case .RSA_SHA256, .RSA_SHA384, .RSA_SHA512:
 		if issuer.public_key_algorithm != .RSA {
 			// An RSA signature paired with a non-RSA issuer key can never verify.
 			return .Unsupported_Algorithm
 		}
 		pub: rsa.Public_Key
-		defer rsa.public_key_clear(&pub)
 		if !rsa.public_key_set_bytes(&pub, issuer.rsa_n, issuer.rsa_e) {
 			return .Signature_Invalid
 		}
@@ -143,12 +147,15 @@ verify_signature :: proc(cert: ^Certificate, issuer: ^Certificate) -> Error {
 			return .Unsupported_Algorithm
 		}
 		// The parser decodes the RSASSA-PSS-params into cert.pss_*, leaving a
-		// digest it cannot verify as .Invalid; refuse rather than guess.
+		// digest it cannot verify as .Invalid; SHA-1 is likewise rejected 
+		// (RFC 9155), for the message digest or the MGF.
 		if cert.pss_hash == .Invalid || cert.pss_mgf_hash == .Invalid {
 			return .Unsupported_Algorithm
 		}
+		if cert.pss_hash == .Insecure_SHA1 || cert.pss_mgf_hash == .Insecure_SHA1 {
+			return .Unsupported_Algorithm
+		}
 		pub: rsa.Public_Key
-		defer rsa.public_key_clear(&pub)
 		if !rsa.public_key_set_bytes(&pub, issuer.rsa_n, issuer.rsa_e) {
 			return .Signature_Invalid
 		}
@@ -170,7 +177,6 @@ verify_signature :: proc(cert: ^Certificate, issuer: ^Certificate) -> Error {
 		}
 		h := _hash_for_ecdsa(cert.signature_algorithm)
 		pub: ecdsa.Public_Key
-		defer ecdsa.public_key_clear(&pub)
 		if !ecdsa.public_key_set_bytes(&pub, curve, issuer.ec_point) {
 			return .Signature_Invalid
 		}
@@ -184,7 +190,6 @@ verify_signature :: proc(cert: ^Certificate, issuer: ^Certificate) -> Error {
 			return .Unsupported_Algorithm
 		}
 		pub: ed25519.Public_Key
-		defer ed25519.public_key_clear(&pub)
 		if !ed25519.public_key_set_bytes(&pub, issuer.ec_point) {
 			return .Signature_Invalid
 		}
@@ -208,12 +213,10 @@ _hash_for_ecdsa :: proc "contextless" (s: Signature_Algorithm) -> hash.Algorithm
 }
 
 // _hash_for_rsa maps an RSA PKCS#1 v1.5 signature algorithm to its message
-// digest. SHA-1 (obsolete, legacy verification only) maps to .Insecure_SHA1.
+// digest. RSA_SHA1 is rejected before reaching here (see verify_signature).
 @(private)
 _hash_for_rsa :: proc "contextless" (s: Signature_Algorithm) -> hash.Algorithm {
 	#partial switch s {
-	case .RSA_SHA1:
-		return .Insecure_SHA1
 	case .RSA_SHA384:
 		return .SHA384
 	case .RSA_SHA512:
