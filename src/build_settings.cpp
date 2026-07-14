@@ -1960,14 +1960,17 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		}
 	} else if (subtarget == Subtarget_Playdate) {
-		// Playdate uses the cortex-m7 as well and an FPU, requiring thumb instructions and hard floats.
-		bc->microarch = str_lit("cortex-m7");
-		bc->metrics.target_triplet = str_lit("thumbv7em-none-eabihf");
-		// Remove MOVW/MOVT instructions as playdate only handles R_ARM_ABS32 relocations.
+		// Uses generic triplet and arch to avoid issues with the playdates
+		// single precision float fpu as well as issues with function lowering
+		// when using the thumbv7em triplet.
+		bc->metrics.target_triplet = str_lit("arm-unknown-unknown-gnueabihf");
+		//no-movt required as playdate only handles R_ARM_ABS32 relocations
+		String const playdate_features = str_lit("no-movt,armv7e-m,thumb2,m7,fpregs");
+
 		if(bc->target_features_string.len > 0) {
-			bc->target_features_string = concatenate_strings(permanent_allocator(), bc->target_features_string, str_lit(",no-movt"));
+			bc->target_features_string = concatenate3_strings(permanent_allocator(), playdate_features, str_lit(","), bc->target_features_string);
 		} else {
-			bc->target_features_string = str_lit("no-movt");
+			bc->target_features_string = playdate_features;
 		}
 	}
 
