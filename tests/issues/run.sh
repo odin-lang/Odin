@@ -85,6 +85,9 @@ $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o
 $ODIN test ../test_issue_7010.odin $COMMON
 
+clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
+$ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
+
 set +x
 
 popd
