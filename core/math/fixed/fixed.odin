@@ -35,7 +35,7 @@ init_from_f64 :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), va
 	x.i &= 1<<Fraction_Width - 1
 	x.i |= Backing(i) << Fraction_Width
 	if val < 0 {
-		x.i *= -1
+		x.i = -x.i 
 	}
 }
 
@@ -46,11 +46,7 @@ init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), 
 }
 
 to_f64 :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
-	sign := -1.0 if x.i < 0 else 1.0
-	num := math.abs(x.i)
-	res := f64(num >> Fraction_Width)
-	res += f64(num & (1<<Fraction_Width-1)) / f64(1<<Fraction_Width)
-	return res * sign
+	return f64(x.i) / f64(1 << Fraction_Width)
 }
 
 
@@ -88,11 +84,7 @@ div_sat :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z:
 
 @(require_results)
 floor :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	if x.i >= 0 {
-		return x.i >> Fraction_Width
-	} else {
-		return (x.i - (1 << (Fraction_Width - 1)) + (1 << (Fraction_Width - 2))) >> Fraction_Width
-	}
+	return x.i >> Fraction_Width
 }
 @(require_results)
 ceil :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
