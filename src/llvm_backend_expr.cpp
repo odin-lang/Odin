@@ -3408,8 +3408,11 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		i64 ls = type_size_of(lt);
 		i64 rs = type_size_of(rt);
 
-		// NOTE(bill): Quick heuristic, larger types are usually the target type
-		if (ls < rs) {
+		if (check_is_assignable_to_using_subtype(lt, rt)) {
+			left = lb_emit_conv(p, left, rt);
+		} else if (check_is_assignable_to_using_subtype(rt, lt)) {
+			right = lb_emit_conv(p, right, lt);
+		} else if (ls < rs) { // NOTE(bill): Quick heuristic, larger types are usually the target type
 			left = lb_emit_conv(p, left, rt);
 		} else if (ls > rs) {
 			right = lb_emit_conv(p, right, lt);
@@ -4077,7 +4080,7 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 					return res;
 				}
 			}
-		} else if (is_type_struct(t) && type_has_nil(t)) {
+		} else if (is_type_struct(t)) {
 			auto args = array_make<lbValue>(permanent_allocator(), 2);
 			lbValue lhs = lb_address_from_load_or_generate_local(p, x);
 			args[0] = lb_emit_conv(p, lhs, t_rawptr);
