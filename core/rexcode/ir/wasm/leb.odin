@@ -160,3 +160,26 @@ read_u64_block :: #force_inline proc "contextless" (data: []u8, offset: ^u32) ->
 	offset^ += 8
 	return v, true
 }
+
+
+// Unsigned LEB128, appended to a [dynamic]u8
+append_uleb :: proc(b: ^[dynamic]u8, value: u64) {
+	v := value
+	for {
+		bb := u8(v & 0x7F)
+		v >>= 7
+		if v != 0 {
+			bb |= 0x80
+		}
+		append(b, bb)
+		if v == 0 {
+			break
+		}
+	}
+}
+
+
+append_uleb_name :: proc(b: ^[dynamic]u8, s: string) {
+	append_uleb(b, u64(len(s)))
+	append(b, s)
+}

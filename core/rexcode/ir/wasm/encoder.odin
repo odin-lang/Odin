@@ -21,10 +21,9 @@ import "core:math/bits"
 // 5-byte LEB placeholders so the patched value always fits.
 //
 // The reusable core is `encode_ops` (an operation stream = a WASM `expr`). The
-// Module verb `encode` drives it over each function's body blocks. Byte-level
-// container framing (the type/function/code section wrappers) is a separate,
-// symmetric concern -- the sibling container reader lives in the WASM `module`
-// parsing path -- and is not part of this instruction-stream codec.
+// container `encode` verb (write.odin) wraps those bodies in the CODE-section
+// framing and emits the surrounding sections, producing a whole `.wasm` file;
+// this file owns only the instruction-stream level.
 
 MAX_OPCODE_SIZE :: 3   // prefix byte + two-byte unsigned-LEB sub-opcode (SIMD reaches 0x113)
 
@@ -38,26 +37,6 @@ encode_max_code_size :: #force_inline proc "contextless" (n: int) -> int {
 @(require_results)
 encode_max_relocation_count :: #force_inline proc "contextless" (n: int) -> int {
 	return n
-}
-
-// encode: serialize the module's function bodies into `code`, in order. Returns
-// the total byte count written. (A Module built as one function / one block
-// reproduces the old flat `encode([]Instruction)` behavior exactly.)
-encode :: proc(m: Module, code: []u8, relocs: ^[dynamic]Relocation, errors: ^[dynamic]Error) -> (byte_count: u32, ok: bool) {
-	// TODO(bill): This just writes the functions and nothing to do with the module section stuff
-	errors_start := u32(len(errors))
-	op_index := u16(0)
-	for fn in m.functions {
-		for blk in fn.blocks {
-			for &op in blk.ops {
-				n := encode_operation(&op, byte_count, op_index, code, relocs, errors) or_return
-				byte_count += n
-				op_index += 1
-			}
-		}
-	}
-	ok = u32(len(errors)) == errors_start
-	return
 }
 
 // encode_ops: the reusable instruction-stream encoder (a WASM `expr`).
