@@ -80,6 +80,7 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON
+$ODIN build ../test_issue_7037.odin $COMMON -o:none
 
 
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o

@@ -2004,11 +2004,11 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 		if (o->type != nullptr && o->type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
 			Type *bt = base_type(o->type);
-			if (bt != nullptr) {
+			// Keep struct aliases named so recursive fields retain their alias edge.
+			if (bt != nullptr && bt->kind != Type_Struct) {
 				o->type = bt;
 			}
 		}
-
 		break;
 
 	case Entity_ImportName:
