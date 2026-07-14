@@ -88,6 +88,9 @@ $ODIN test ../test_issue_7010.odin $COMMON
 clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 $ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
 
+clang -c ../test_issue_5640.c -o test_issue_5640_c.o
+$ODIN test ../test_issue_5640.odin -o:none --sanitize:address $COMMON
+
 set +x
 
 popd
