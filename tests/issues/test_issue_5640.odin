@@ -1,3 +1,5 @@
+// Tests issue: https://github.com/odin-lang/Odin/issues/5640
+
 package test_issues
 
 import "core:testing"
