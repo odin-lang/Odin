@@ -114,15 +114,15 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	return &pmblock.block, nil
 }
 
-@(require_results, no_sanitize_address)
-_memory_block_resize :: proc(block: ^Memory_Block, new_size: uint, default_commit_size: uint) -> (err: Allocator_Error) {
-	if block.committed < new_size {
+@(private="file", require_results, no_sanitize_address)
+memory_block_ensure_capacity :: proc(block: ^Memory_Block, capacity: uint, default_commit_size: uint) -> (err: Allocator_Error) {
+	if block.committed < capacity {
 		pmblock := (^Platform_Memory_Block)(block)
 		base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
 
 		// NOTE(bill): [Heuristic] grow the commit size larger than needed
 		// TODO(bill): determine a better heuristic for this behaviour
-		new_committed := max(new_size, block.committed<<1)
+		new_committed := max(capacity, block.committed<<1)
 		platform_total_commit := base_offset + new_committed
 		platform_total_commit = align_formula(platform_total_commit, uint(mem.PAGE_SIZE))
 		platform_total_commit = min(max(platform_total_commit, default_commit_size), pmblock.reserved)
@@ -144,8 +144,9 @@ memory_block_resize :: proc(block: ^Memory_Block, new_size: uint, default_commit
 	if block == nil || new_size > block.reserved {
 		return .Out_Of_Memory
     }
-	_memory_block_resize(block, new_size, default_commit_size) or_return
+	memory_block_ensure_capacity(block, new_size, default_commit_size) or_return
     block.used = new_size
+    return
 }
 
 @(require_results, no_sanitize_address)
@@ -179,7 +180,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 	}
 
 	new_size := block.used + size
-	_memory_block_resize(block, new_size, default_commit_size) or_return
+	memory_block_ensure_capacity(block, new_size, default_commit_size) or_return
 
 	data = block.base[block.used+alignment_offset:][:min_size]
 	block.used = new_size
