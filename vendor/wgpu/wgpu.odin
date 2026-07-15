@@ -13,7 +13,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.0.0, make sure to read the docs at '" + #directory + "doc.odin'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.1.1, make sure to read the docs at '" + #directory + "doc.odin'")
 	}
 
 	@(export)
@@ -39,7 +39,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.0.0, make sure to read the docs at '" + #directory + "doc.odin'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.1.1, make sure to read the docs at '" + #directory + "doc.odin'")
 	}
 
 	@(export)
@@ -56,7 +56,7 @@ when ODIN_OS == .Windows {
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
 
 	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.0.0, make sure to read the docs at '" + #directory + "doc.odin'")
+		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.1.1, make sure to read the docs at '" + #directory + "doc.odin'")
 	}
 
 	@(export)
@@ -123,6 +123,10 @@ AddressMode :: enum i32 {
 	ClampToEdge = 0x00000001,
 	Repeat = 0x00000002,
 	MirrorRepeat = 0x00000003,
+
+	// Native.
+
+	ClampToBorder = 0x00000004,
 }
 
 BackendType :: enum i32 {
@@ -309,16 +313,14 @@ FeatureName :: enum i32 {
 	TextureCompressionAstcHdr,
 	MappablePrimaryBuffers = 0x0003000E,
 	BufferBindingArray,
-	UniformBufferAndStorageTextureArrayNonUniformIndexing,
-	// TODO: requires wgpu.h api change
-	// AddressModeClampToZero,
-	// AddressModeClampToBorder,
+	StorageTextureArrayNonUniformIndexing = 0x00030010,
+	AdressModeClampToZero = 0x00030011,
+	AdressModeClampToBorder = 0x00030012,
 	PolygonModeLine = 0x00030013,
 	PolygonModePoint,
 	ConservativeRasterization,
-	// ClearTexture,
-	SpirvShaderPassthrough = 0x00030017,
-	// MultiView,
+	ClearTexture,
+	MultiView = 0x00030018,
 	VertexAttribute64bit = 0x00030019,
 	TextureFormatNv12,
 	RayQuery = 0x0003001C,
@@ -331,6 +333,37 @@ FeatureName :: enum i32 {
 	TimestampQueryInsideEncoders,
 	TimestampQueryInsidePasses,
 	ShaderInt64,
+	ShaderFloat32Atomic,
+	TextureAtomic,
+	TextureFormatP010,
+	// TODO: requires wgpu.h api change
+	// ExternalTexture,
+	PipelineCache = 0x0003002B,
+	ShaderInt64AtomicMinMax,
+	ShaderInt64AtomicAllOps,
+	// TODO: requires wgpu.h api change
+	// VulkanGoogleDisplayTiming,
+	// VulkanExternalMemoryWin32,
+	TextureInt64Atomic = 0x00030030,
+	// TODO: not implemented yet, see https://github.com/gfx-rs/wgpu/issues/7149
+	UniformBufferBindingArrays,
+	// TODO: requires wgpu.h api change
+	// MeshShader,
+	// RayHitVertexReturn,
+	// MeshShaderMultiview,
+	// ExtendedAccelerationStructureVertexFormat,
+	// PassThroughShaders,
+	ShaderBarycentrics = 0x00030037,
+	SelectiveMultiview,
+	// TODO: requires wgpu.h api change
+	// MeshShaderPoints,
+	MultisampleArray = 0x0003003A,
+	CooperativeMatrix,
+	ShaderPerVertex,
+	ShaderDrawIndex,
+	AccelerationStructureBindingArray,
+	MemoryDecorationCoherent,
+	MemoryDecorationVolative,
 }
 
 FilterMode :: enum i32 {
@@ -505,9 +538,7 @@ SType :: enum i32 {
 	// Native.
 	DeviceExtras = 0x00030001,
 	NativeLimits,
-	PipelineLayoutExtras,
 	ShaderSourceGLSL,
-	SupportedLimitsExtras,
 	InstanceExtras,
 	BindGroupEntryExtras,
 	BindGroupLayoutEntryExtras,
@@ -515,6 +546,7 @@ SType :: enum i32 {
 	SurfaceConfigurationExtras,
 	SurfaceSourceSwapChainPanel,
 	PrimitiveStateExtras,
+	SamplerDescriptorExtras,
 
 	// Odin.
 	SurfaceSourceCanvasHTMLSelector = 0x00040001,
@@ -652,13 +684,6 @@ TextureFormat :: enum i32 {
 
 	// Native.
 
-	// From FeatureName.TextureFormat16bitNorm
-	NativeR16Unorm = 0x00030001,
-	NativeR16Snorm,
-	Rg16Unorm,
-	Rg16Snorm,
-	Rgba16Unorm,
-	Rgba16Snorm,
 	NV12,
 	P010,
 }
@@ -754,6 +779,7 @@ WGSLLanguageFeatureName :: enum i32 {
 	TextureAndSamplerLet = 0x00000007,
 	SubgroupUniformity = 0x00000008,
 	TextureFormatsTier1 = 0x00000009,
+	LinearIndexing = 0x0000000A,
 }
 
 BufferUsage :: enum i32 {
@@ -1635,6 +1661,7 @@ foreign libwgpu {
 	ComputePassEncoderPushDebugGroup :: proc(computePassEncoder: ComputePassEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuComputePassEncoderSetBindGroup")
 	RawComputePassEncoderSetBindGroup :: proc(computePassEncoder: ComputePassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
+	ComputePassEncoderSetImmediates :: proc(computePassEncoder: ComputePassEncoder, offset: u32, data: rawptr, size: uint) ---
 	ComputePassEncoderSetLabel :: proc(computePassEncoder: ComputePassEncoder, label: StringView) ---
 	ComputePassEncoderSetPipeline :: proc(computePassEncoder: ComputePassEncoder, pipeline: ComputePipeline) ---
 	ComputePassEncoderAddRef :: proc(computePassEncoder: ComputePassEncoder) ---
@@ -1731,6 +1758,7 @@ foreign libwgpu {
 	RenderBundleEncoderPushDebugGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuRenderBundleEncoderSetBindGroup")
 	RawRenderBundleEncoderSetBindGroup :: proc(renderBundleEncoder: RenderBundleEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
+	RenderBundleEncoderSetImmediates :: proc(renderBundleEncoder: RenderBundleEncoder, offset: u32, data: rawptr, size: uint) ---
 	RenderBundleEncoderSetIndexBuffer :: proc(renderBundleEncoder: RenderBundleEncoder, buffer: Buffer, format: IndexFormat, offset: u64, size: u64) ---
 	RenderBundleEncoderSetLabel :: proc(renderBundleEncoder: RenderBundleEncoder, label: StringView) ---
 	RenderBundleEncoderSetPipeline :: proc(renderBundleEncoder: RenderBundleEncoder, pipeline: RenderPipeline) ---
@@ -1753,6 +1781,7 @@ foreign libwgpu {
 	RenderPassEncoderPushDebugGroup :: proc(renderPassEncoder: RenderPassEncoder, groupLabel: StringView) ---
 	@(link_name="wgpuRenderPassEncoderSetBindGroup")
 	RawRenderPassEncoderSetBindGroup :: proc(renderPassEncoder: RenderPassEncoder, groupIndex: u32, /* NULLABLE */ group: BindGroup, dynamicOffsetCount: uint, dynamicOffsets: /* const */ [^]u32) ---
+	RenderPassEncoderSetImmediates :: proc(renderPassEncoder: RenderPassEncoder, offset: u32, data: rawptr, size: uint) ---
 	RenderPassEncoderSetBlendConstant :: proc(renderPassEncoder: RenderPassEncoder, color: /* const */ ^Color) ---
 	RenderPassEncoderSetIndexBuffer :: proc(renderPassEncoder: RenderPassEncoder, buffer: Buffer, format: IndexFormat, offset: u64, size: u64) ---
 	RenderPassEncoderSetLabel :: proc(renderPassEncoder: RenderPassEncoder, label: StringView) ---

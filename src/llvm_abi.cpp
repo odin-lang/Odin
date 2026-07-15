@@ -1124,7 +1124,7 @@ namespace lbAbiAmd64SysV {
 
 
 namespace lbAbiArm64 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type* original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 	gb_internal bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
 
@@ -1132,7 +1132,7 @@ namespace lbAbiArm64 {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
@@ -1147,15 +1147,31 @@ namespace lbAbiArm64 {
 		case LLVMDoubleTypeKind:
 		case LLVMPointerTypeKind:
 			return true;
+		case LLVMVectorTypeKind:{
+				i64 sz = lb_sizeof(type);
+				return sz == 8 || sz == 16;
+			}
 		}
 		return false;
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type) {
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, Type* original_type) {
 		LLVMAttributeRef attr = nullptr;
 		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
+		// https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms#Pass-arguments-to-functions-correctly
+		// Darwin expects caller to take responsibility of zero/sign extending any arguments < 32bits.
+		if (build_context.metrics.os == TargetOs_darwin && original_type != nullptr) {
+			if ((is_type_integer_like(original_type) || is_type_enum(original_type)) && lb_sizeof(type) < 4) {
+				if (is_type_unsigned(original_type) || is_type_boolean(original_type)) {
+					attr = lb_create_enum_attribute(c, "zeroext");
+				} else {
+					attr = lb_create_enum_attribute(c, "signext");
+				}
+			}
+		} else {
+			if (type == i1) {
+				attr = lb_create_enum_attribute(c, "zeroext");
+			}
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
@@ -1228,6 +1244,15 @@ namespace lbAbiArm64 {
 			if (base_type_) *base_type_ = type;
 			if (member_count_) *member_count_ = 1;
 			return true;
+		case LLVMVectorTypeKind:{
+			i64 sz = lb_sizeof(type);
+			if (sz == 8 || sz == 16){
+				if (base_type_) *base_type_ = type;
+				if (member_count_) *member_count_ = 1;
+				return true;
+			}
+			return false;
+		}
 		case LLVMArrayTypeKind:
 			return is_homogenous_array(c, type, base_type_, member_count_);
 		case LLVMStructTypeKind:
@@ -1247,7 +1272,7 @@ namespace lbAbiArm64 {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (is_register(return_type)) {
-			return non_struct(c, return_type);
+			return non_struct(c, return_type, nullptr);
 		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count)) {
 			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
 				return lb_arg_type_direct(return_type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
@@ -1284,17 +1309,24 @@ namespace lbAbiArm64 {
 		}
 	}
     
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type* original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
-		for (unsigned i = 0; i < arg_count; i++) {
+		GB_ASSERT(original_type->kind == Type_Proc);
+		auto const &params = original_type->Proc.params->Tuple.variables;
+
+		for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
+			while (params[j]->kind != Entity_Variable) {
+				j++;
+			}
+			Type *ptype = params[j]->type;
 			LLVMTypeRef type = arg_types[i];
 
 			LLVMTypeRef homo_base_type = {};
 			unsigned homo_member_count = 0;
 
 			if (is_register(type)) {
-				args[i] = non_struct(c, type);
+				args[i] = non_struct(c, type, ptype);
 			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
 				if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
 					args[i] = lb_arg_type_direct(type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
@@ -1310,22 +1342,8 @@ namespace lbAbiArm64 {
 					} else if (size <= 8) {
 						cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
 					} else {
-						unsigned count = cast(unsigned)((size+7)/8);
-
 						LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
-						LLVMTypeRef *types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, count);
-
-						i64 size_copy = size;
-						for (unsigned i = 0; i < count; i++) {
-							if (size_copy >= 8) {
-								types[i] = llvm_i64;
-							} else {
-								types[i] = LLVMIntTypeInContext(c, 8*cast(unsigned)size_copy);
-							}
-							size_copy -= 8;
-						}
-						GB_ASSERT(size_copy <= 0);
-						cast_type = LLVMStructTypeInContext(c, types, count, true);
+						cast_type = llvm_array_type(llvm_i64, 2);
 					}
 					args[i] = lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 				} else {

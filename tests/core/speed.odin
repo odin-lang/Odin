@@ -2,6 +2,7 @@
 package tests_core
 
 @(require) import "crypto"
+@(require) import "crypto/bigint"
 @(require) import "hash"
 @(require) import "image"
 @(require) import "math/big"

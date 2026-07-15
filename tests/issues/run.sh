@@ -79,6 +79,21 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN check ../test_issue_6979.odin -no-entry-point $COMMON
+
+
+clang -c ../test_issue_7010.c -o test_issue_7010_c.o
+$ODIN test ../test_issue_7010.odin $COMMON
+
+clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
+$ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
+
+clang -c ../test_issue_5640.c -o test_issue_5640_c.o
+if [[ "$(uname)" != "NetBSD" ]]; then
+	$ODIN test ../test_issue_5640.odin -o:none --sanitize:address $COMMON
+else
+	$ODIN test ../test_issue_5640.odin -o:none $COMMON
+fi
 
 set +x
 

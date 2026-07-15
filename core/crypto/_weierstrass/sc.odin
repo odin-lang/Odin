@@ -133,10 +133,10 @@ sc_is_zero :: proc {
 
 @(require_results)
 sc_is_zero_p256r1 :: proc "contextless" (fe: ^Scalar_p256r1) -> int {
-	return int(subtle.u64_is_zero(p256r1.fe_non_zero(fe)))
+	return int(subtle.eq0(p256r1.fe_non_zero(fe)))
 }
 
 @(require_results)
 sc_is_zero_p384r1 :: proc "contextless" (fe: ^Scalar_p384r1) -> int {
-	return int(subtle.u64_is_zero(p384r1.fe_non_zero(fe)))
+	return int(subtle.eq0(p384r1.fe_non_zero(fe)))
 }

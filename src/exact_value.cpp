@@ -1132,12 +1132,13 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 		gb_free(heap_allocator(), s.text);
 		return str;
 	}
+	// NOTE(tf2spi): %.17g is specific enough to canonically serialize f64
 	case ExactValue_Float:
-		return gb_string_append_fmt(str, "%f", v.value_float);
+		return gb_string_append_fmt(str, "%.17g", v.value_float);
 	case ExactValue_Complex:
-		return gb_string_append_fmt(str, "%f+%fi", v.value_complex->real, v.value_complex->imag);
+		return gb_string_append_fmt(str, "%.17g+%.17gi", v.value_complex->real, v.value_complex->imag);
 	case ExactValue_Quaternion:
-		return gb_string_append_fmt(str, "%f+%fi+%fj+%fk", v.value_quaternion->real, v.value_quaternion->imag, v.value_quaternion->jmag, v.value_quaternion->kmag);
+		return gb_string_append_fmt(str, "%.17g+%.17gi+%.17gj+%.17gk", v.value_quaternion->real, v.value_quaternion->imag, v.value_quaternion->jmag, v.value_quaternion->kmag);
 
 	case ExactValue_Pointer:
 		return str;

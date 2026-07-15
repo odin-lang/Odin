@@ -97,19 +97,6 @@ B3_API float b3GetStallThreshold( void );
 /// The time that a body must be still before it will go to sleep. In seconds.
 #define B3_TIME_TO_SLEEP 0.5f
 
-/// Maximum length of the body name. Can be 0 if you don't need names.
-/// Note: this gates recording capability.
-#ifndef B3_BODY_NAME_LENGTH
-#define B3_BODY_NAME_LENGTH 18
-#endif
-
-/// Maximum length of the shape name. Can be 0 if you don't need names.
-/// Note: this gates recording capability.
-/// todo waiting on this because it breaks existing recordings
-#ifndef B3_SHAPE_NAME_LENGTH
-#define B3_SHAPE_NAME_LENGTH 18
-#endif
-
 /// The maximum number of contact points between two touching shapes.
 #define B3_MAX_MANIFOLD_POINTS 4
 

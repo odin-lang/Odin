@@ -302,7 +302,7 @@ typedef struct b3BodyDef
 	/// Sleep speed threshold, default is 0.05 meters per second
 	float sleepThreshold;
 
-	/// Optional body name for debugging. Up to B3_BODY_NAME_LENGTH characters (including null termination)
+	/// Optional body name for debugging.
 	const char* name;
 
 	/// Use this to store application specific body data.
@@ -432,7 +432,7 @@ typedef enum b3ShapeType
 	/// A capsule is an extruded sphere
 	b3_capsuleShape,
 
-	/// A compound shape composed of up to 64K spheres, capsules, hulls, and meshes
+	/// A baked compound shape composed of spheres, capsules, hulls, and meshes
 	b3_compoundShape,
 
 	/// A height field useful for terrain
@@ -455,6 +455,9 @@ typedef enum b3ShapeType
 /// @ingroup shape
 typedef struct b3ShapeDef
 {
+	/// Optional shape name for debugging
+	const char* name;
+
 	/// Use this to store application specific shape data.
 	void* userData;
 
@@ -505,7 +508,13 @@ typedef struct b3ShapeDef
 	bool invokeContactCreation;
 
 	/// Should the body update the mass properties when this shape is created. Default is true.
+	/// Warning: if this is false, you MUST call b3Body_ApplyMassFromShapes or b3Body_SetMassData before simulating the world.
 	bool updateBodyMass;
+
+	/// Enable speculative collision. Leave this true unless you care about reducing ghost collision
+	/// more than continuous collision under rotation.
+	/// Experimental: this can only disable speculative contact between hulls and triangles (meshes and height fields).
+	bool enableSpeculativeContact;
 
 	/// Used internally to detect a valid definition. DO NOT SET.
 	int internalValue;
@@ -2405,11 +2414,13 @@ typedef struct b3CompoundDef
 /// a mesh with many materials, you can use it outside of the compound.
 #define B3_MAX_COMPOUND_MESH_MATERIALS 4
 
-/// The runtime data for a compound shape. This is a potentially large yet highly optimized
+/// The runtime data for a baked compound shape. This is a potentially large yet highly optimized
 /// data structure. It can contain thousands of child shapes, yet at runtime it populates
 /// into the world as a single shape in the runtime broad-phase.
 /// This data structure has data living off the end and must be accessed using offsets.
 /// Accessors are provided for user relevant data.
+/// Note: you don't need to use this to create runtime compounds. For runtime compounds you can
+/// add multiple shapes to a body using the regular shape creation functions.
 typedef struct b3CompoundData
 {
 	/// The compound version is always first.
@@ -2996,6 +3007,9 @@ typedef struct b3DebugDraw
 
 	/// Option to draw the mass and center of mass of dynamic bodies
 	bool drawMass;
+
+	/// Option to draw the sleep information for dynamic and kinematic bodies
+	bool drawSleep;
 
 	/// Option to draw body names
 	bool drawBodyNames;

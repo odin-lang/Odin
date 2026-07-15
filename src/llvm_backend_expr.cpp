@@ -1982,19 +1982,20 @@ handle_op:;
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(integral_type);
-
 			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-
 			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			if (is_unsigned) {
 				res.value = LLVMBuildLShr(p->builder, lhsval, bits, "");
+
+				LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
+				res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			} else {
+				LLVMValueRef bit_size_minus_one = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type)-1, false);
+				bits = LLVMBuildSelect(p->builder, width_test, bits, bit_size_minus_one, "");
+
 				res.value = LLVMBuildAShr(p->builder, lhsval, bits, "");
 			}
-
-			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
-			res.value = LLVMBuildSelect(p->builder, width_test, res.value, zero, "");
 			return res;
 		}
 	case Token_AndNot:
@@ -3408,8 +3409,11 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		i64 ls = type_size_of(lt);
 		i64 rs = type_size_of(rt);
 
-		// NOTE(bill): Quick heuristic, larger types are usually the target type
-		if (ls < rs) {
+		if (check_is_assignable_to_using_subtype(lt, rt)) {
+			left = lb_emit_conv(p, left, rt);
+		} else if (check_is_assignable_to_using_subtype(rt, lt)) {
+			right = lb_emit_conv(p, right, lt);
+		} else if (ls < rs) { // NOTE(bill): Quick heuristic, larger types are usually the target type
 			left = lb_emit_conv(p, left, rt);
 		} else if (ls > rs) {
 			right = lb_emit_conv(p, right, lt);
@@ -4077,7 +4081,7 @@ gb_internal lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, 
 					return res;
 				}
 			}
-		} else if (is_type_struct(t) && type_has_nil(t)) {
+		} else if (is_type_struct(t)) {
 			auto args = array_make<lbValue>(permanent_allocator(), 2);
 			lbValue lhs = lb_address_from_load_or_generate_local(p, x);
 			args[0] = lb_emit_conv(p, lhs, t_rawptr);

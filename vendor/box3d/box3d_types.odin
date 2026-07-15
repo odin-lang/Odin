@@ -370,7 +370,7 @@ BodyDef :: struct{
 	// Sleep speed threshold, default is 0.05 meters per second
 	sleepThreshold: f32,
 
-	// Optional body name for debugging. Up to B3_BODY_NAME_LENGTH characters (including null termination)
+	// Optional body name for debugging.
 	name: cstring,
 
 	// Use this to store application specific body data.
@@ -488,7 +488,7 @@ ShapeType :: enum c.int {
 	// A capsule is an extruded sphere
 	capsuleShape,
 
-	// A compound shape composed of up to 64K spheres, capsules, hulls, and meshes
+	// A baked compound shape composed of spheres, capsules, hulls, and meshes
 	compoundShape,
 
 	// A height field useful for terrain
@@ -507,6 +507,9 @@ ShapeType :: enum c.int {
 // Used to create a shape
 // @ingroup shape
 ShapeDef :: struct {
+	// Optional shape name for debugging
+	name: cstring,
+
 	// Use this to store application specific shape data.
 	userData: rawptr,
 
@@ -557,7 +560,13 @@ ShapeDef :: struct {
 	invokeContactCreation: bool,
 
 	// Should the body update the mass properties when this shape is created. Default is true.
+	// Warning: if this is false, you MUST call b3Body_ApplyMassFromShapes or b3Body_SetMassData before simulating the world.
 	updateBodyMass: bool,
+
+	// Enable speculative collision. Leave this true unless you care about reducing ghost collision
+	// more than continuous collision under rotation.
+	// Experimental: this can only disable speculative contact between hulls and triangles (meshes and height fields).
+	enableSpeculativeContact: bool,
 
 	// Used internally to detect a valid definition. DO NOT SET.
 	internalValue: c.int,
@@ -1958,13 +1967,13 @@ HullData :: struct {
 // Efficient box hull
 BoxHull :: struct {
 	// The embedded hull. So the offsets index into the arrays that follow.
-	base:        HullData,
-	boxVertices:  [8]HullVertex,   //< Box vertices.
-	boxPoints:    [8]Vec3,         //< Box points.
-	boxEdges:    [24]HullHalfEdge, //< Box half-edges.
-	boxFaces:     [6]HullFace,     //< Box faces.
-	padding:      [2]u8,           //< Explicit padding, see b3HullData::padding.
-	boxPlanes:    [6]Plane,        //< Box face planes.
+	base:         HullData,
+	boxVertices:  [8]HullVertex,    //< Box vertices.
+	boxPoints:    [8]Vec3,          //< Box points.
+	boxEdges:     [24]HullHalfEdge, //< Box half-edges.
+	boxFaces:     [6]HullFace,      //< Box faces.
+	padding:      [2]u8,            //< Explicit padding, see b3HullData::padding.
+	boxPlanes:    [6]Plane,         //< Box face planes.
 }
 
 /**@}*/ // hull
@@ -2330,11 +2339,13 @@ COMPOUND_VERSION ::  0x830778DB07086EB4 ~ DYNAMIC_TREE_VERSION ~ MESH_VERSION ~ 
 // a mesh with many materials, you can use it outside of the compound.
 MAX_COMPOUND_MESH_MATERIALS :: 4
 
-// The runtime data for a compound shape. This is a potentially large yet highly optimized
+// The runtime data for a baked compound shape. This is a potentially large yet highly optimized
 // data structure. It can contain thousands of child shapes, yet at runtime it populates
 // into the world as a single shape in the runtime broad-phase.
 // This data structure has data living off the end and must be accessed using offsets.
 // Accessors are provided for user relevant data.
+// Note: you don't need to use this to create runtime compounds. For runtime compounds you can
+// add multiple shapes to a body using the regular shape creation functions.
 CompoundData :: struct {
 	// The compound version is always first.
 	version: u64,
@@ -2890,6 +2901,9 @@ DebugDraw :: struct {
 
 	// Option to draw the mass and center of mass of dynamic bodies
 	drawMass: bool,
+
+	// Option to draw the sleep information for dynamic and kinematic bodies
+	drawSleep: bool,
 
 	// Option to draw body names
 	drawBodyNames: bool,
