@@ -1496,6 +1496,7 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 		case 0: result_type = alloc_type_array(t->FixedCapacityDynamicArray.elem, t->FixedCapacityDynamicArray.capacity); break;
 		case 1: result_type = t_int; break;
 		}
+		break;
 
 	case Type_Map:
 		{
