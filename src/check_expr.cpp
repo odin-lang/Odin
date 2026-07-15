@@ -80,7 +80,7 @@ gb_internal Type *   make_optional_ok_type          (Type *value, bool typed=tru
 gb_internal Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 gb_internal Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
 gb_internal void     check_not_tuple                (CheckerContext *c, Operand *operand);
-gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
+gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type, bool no_final_update=false);
 gb_internal gbString expr_to_string                 (Ast *expression);
 gb_internal gbString expr_to_string                 (Ast *expression, gbAllocator allocator);
 gb_internal void     update_untyped_expr_type       (CheckerContext *c, Ast *e, Type *type, bool final);
@@ -4989,7 +4989,7 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 	return v;
 }
 
-gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
+gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type, bool no_final_update) {
 	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
@@ -5075,7 +5075,11 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Array: {
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
+			while (is_type_array(elem)) {
+				elem = base_array_type(elem);
+			}
 			operand->mode = Addressing_Value;
+			convert_to_typed(c, operand, elem, /*no_final_update*/true);
 		} else {
 			if (operand->value.kind == ExactValue_String) {
 				String s = operand->value.value_string;
@@ -5115,6 +5119,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
 			operand->mode = Addressing_Value;
+			convert_to_typed(c, operand, elem, /*no_final_update*/true);
 		} else {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
@@ -5136,6 +5141,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				return;
 			} else {
 				operand->mode = Addressing_Value;
+				convert_to_typed(c, operand, elem, /*no_final_update*/true);
 			}
 		} else {
 			operand->mode = Addressing_Invalid;
@@ -5211,7 +5217,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				    !elem_type_can_be_constant(new_type)) {
 					operand->mode = Addressing_Value;
 				}
-				convert_to_typed(c, operand, new_type);
+				convert_to_typed(c, operand, new_type, /*no_final_update*/true);
 				target_type = new_type;
 				break;
 			} else if (valid_count > 1) {
@@ -5292,7 +5298,9 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		}
 	}
 
-	update_untyped_expr_type(c, operand->expr, target_type, true);
+	if (!no_final_update) {
+		update_untyped_expr_type(c, operand->expr, target_type, true);
+	}
 	operand->type = target_type;
 }
 
