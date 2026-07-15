@@ -8393,6 +8393,11 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
+			if (check_cycle(c, found_entity, true)) {
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return CallArgumentError_WrongTypes;
+			}
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
 			return err;
