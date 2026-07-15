@@ -151,8 +151,8 @@ test_fixed_4_4_signed_roundtrip_exhaustive :: proc(t: ^testing.T) {
 
 // same for unsigned backing 
 @test
-test_fixed_8_8_unsigned_roundtrip_exhaustive :: proc(t: ^testing.T) {
-	Fixed :: fixed.Fixed(u8, 8)
+test_fixed_4_4_unsigned_roundtrip_exhaustive :: proc(t: ^testing.T) {
+	Fixed :: fixed.Fixed(u8, 4)
 
 	for c in 0..<256 {
 		raw := u8(c)
