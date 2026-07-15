@@ -115,6 +115,40 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 }
 
 @(require_results, no_sanitize_address)
+_memory_block_resize :: proc(block: ^Memory_Block, new_size: uint, default_commit_size: uint) -> (err: Allocator_Error) {
+	if block.committed < new_size {
+		pmblock := (^Platform_Memory_Block)(block)
+		base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
+
+		// NOTE(bill): [Heuristic] grow the commit size larger than needed
+		// TODO(bill): determine a better heuristic for this behaviour
+		new_committed := max(new_size, block.committed<<1)
+		platform_total_commit := base_offset + new_committed
+		platform_total_commit = align_formula(platform_total_commit, uint(mem.PAGE_SIZE))
+		platform_total_commit = min(max(platform_total_commit, default_commit_size), pmblock.reserved)
+
+		assert(pmblock.committed <= pmblock.reserved)
+		assert(pmblock.committed < platform_total_commit)
+
+		platform_memory_commit(pmblock, platform_total_commit) or_return
+
+		pmblock.committed = platform_total_commit
+		block.committed = pmblock.committed - base_offset
+		assert(block.committed <= block.reserved)
+	}
+	return
+}
+
+@(require_results, no_sanitize_address)
+memory_block_resize :: proc(block: ^Memory_Block, new_size: uint, default_commit_size: uint = 0) -> (err: Allocator_Error) {
+	if block == nil || new_size > block.reserved {
+		return .Out_Of_Memory
+    }
+	_memory_block_resize(block, new_size, default_commit_size) or_return
+    block.used = new_size
+}
+
+@(require_results, no_sanitize_address)
 alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint, default_commit_size: uint = 0) -> (data: []byte, err: Allocator_Error) {
 	@(no_sanitize_address)
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
@@ -126,30 +160,6 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 		}
 		return alignment_offset
 		
-	}
-	@(no_sanitize_address)
-	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint, default_commit_size: uint) -> (err: Allocator_Error) {
-		if block.committed - block.used < size {
-			pmblock := (^Platform_Memory_Block)(block)
-			base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
-
-			// NOTE(bill): [Heuristic] grow the commit size larger than needed
-			// TODO(bill): determine a better heuristic for this behaviour
-			extra_size := max(size, block.committed>>1)
-			platform_total_commit := base_offset + block.used + extra_size
-			platform_total_commit = align_formula(platform_total_commit, uint(mem.PAGE_SIZE))
-			platform_total_commit = min(max(platform_total_commit, default_commit_size), pmblock.reserved)
-
-			assert(pmblock.committed <= pmblock.reserved)
-			assert(pmblock.committed < platform_total_commit)
-
-			platform_memory_commit(pmblock, platform_total_commit) or_return
-
-			pmblock.committed = platform_total_commit
-			block.committed = pmblock.committed - base_offset
-			assert(block.committed <= block.reserved)
-		}
-		return
 	}
 
 	if block == nil {
@@ -168,10 +178,11 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 		return
 	}
 
-	do_commit_if_necessary(block, size, default_commit_size) or_return
+	new_size := block.used + size
+	_memory_block_resize(block, new_size, default_commit_size) or_return
 
 	data = block.base[block.used+alignment_offset:][:min_size]
-	block.used += size
+	block.used = new_size
 	// sanitizer.address_unpoison(data)
 	return
 }
