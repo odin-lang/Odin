@@ -463,7 +463,7 @@ gb_internal LLVMValueRef llvm_const_insert_value_with_rebuild(lbModule *m, LLVMV
 	GB_ASSERT(count > 0);
 
 	unsigned value_count = LLVMCountStructElementTypes(LLVMTypeOf(agg));
-	LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, count);
+	LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, value_count);
 	defer (gb_free(heap_allocator(), values));
 
 	for (unsigned i = 0; i < value_count; i++) {
