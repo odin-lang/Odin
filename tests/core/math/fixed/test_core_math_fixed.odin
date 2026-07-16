@@ -2,6 +2,7 @@ package test_core_math_fixed
 
 import "core:math"
 import "core:math/fixed"
+import "core:strconv"
 import "core:testing"
 
 @test
@@ -162,4 +163,36 @@ test_fixed_4_4_unsigned_roundtrip_exhaustive :: proc(t: ^testing.T) {
 		fixed.init_from_f64(&back, fixed.to_f64(fv))
 		testing.expectf(t, back.i == raw, "Expected raw %v to roundtrip through %v, got %v", raw, fixed.to_f64(fv), back.i)
 	}
+}
+
+// same for Fixed0_8 unsigned backing
+@test
+test_fixed_0_8_unsigned_roundtrip_exhaustive :: proc(t: ^testing.T) {
+	Fixed :: fixed.Fixed(u8, 8)
+
+	for c in 0..<256 {
+		raw := u8(c)
+		fv  := transmute(Fixed)raw
+
+		back: Fixed
+		fixed.init_from_f64(&back, fixed.to_f64(fv))
+		testing.expectf(t, back.i == raw, "Expected raw %v to roundtrip through %v, got %v", raw, fixed.to_f64(fv), back.i)
+	}
+}
+
+// write() and to_string() with a large Fraction_Width
+@test
+test_fixed_write_large_fraction_width :: proc(t: ^testing.T) {
+	x : fixed.Fixed(u64, 62)
+	fixed.init_from_parts(&x, 0, 1)  // 2^-62
+	buf, buf2: [100]byte
+	fs := strconv.write_float(buf2[:], fixed.to_f64(x), 'f', 65, 64) // string has leading sign and trailing zeroes
+	
+	s := fixed.write(buf[:], x)		
+	testing.expectf(t, len(s) == 64, "Expected string length 64 of write(Fixed(u64, 62)(2^-62)), got %v", len(s))
+	testing.expectf(t, s == fs[1:][:64], "Expected write(Fixed(u64, 62)(2^-62)) = %q, got %q",  fs[1:][:64], s)
+
+	s = fixed.to_string(x, context.temp_allocator)
+	testing.expectf(t, s == fs[1:][:64], "Expected to_string(Fixed(u64, 62)(2^-62)) = %q, got %q",  fs[1:][:64], s)
+	
 }
