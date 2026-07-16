@@ -3177,16 +3177,36 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		add_type_info_type(c, y->type);
 		add_type_and_value(c, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
 
-		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
+		if (y->mode == Addressing_Constant) {
+			bool comp = are_types_identical(x->type, y->value.value_typeid);
+			if (op == Token_NotEq) {
+				comp = !comp;
+			}
+			x->mode = Addressing_Constant;
+			x->type = t_untyped_bool;
+			x->value = exact_value_bool(comp);
+		} else {
+			x->mode = Addressing_Value;
+			x->type = t_untyped_bool;
+		}
 		return;
 	} else if (is_type_typeid(x->type) && y->mode == Addressing_Type) {
 		add_type_info_type(c, x->type);
 		add_type_info_type(c, y->type);
 		add_type_and_value(c, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
 
-		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
+		if (x->mode == Addressing_Constant) {
+			bool comp = are_types_identical(y->type, x->value.value_typeid);
+			if (op == Token_NotEq) {
+				comp = !comp;
+			}
+			x->mode = Addressing_Constant;
+			x->type = t_untyped_bool;
+			x->value = exact_value_bool(comp);
+		} else {
+			x->mode = Addressing_Value;
+			x->type = t_untyped_bool;
+		}
 		return;
 	}
 
@@ -5570,7 +5590,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
-			} else if (is_type_proc(tav.type)) {
+			} else if (tav.mode == Addressing_Type) {
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = false;
+				return exact_value_typeid(tav.type);
+			} else if (is_type_proc(tav.type) || is_type_typeid(tav.type)) {
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
