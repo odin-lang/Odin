@@ -145,8 +145,8 @@ memory_block_resize :: proc(block: ^Memory_Block, new_size: uint, default_commit
 		return .Out_Of_Memory
     }
 	memory_block_ensure_capacity(block, new_size, default_commit_size) or_return
-    block.used = new_size
-    return
+	block.used = new_size
+	return
 }
 
 @(require_results, no_sanitize_address)
