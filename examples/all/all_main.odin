@@ -168,4 +168,21 @@ package all
 @(require) import "core:unicode/utf8/utf8string"
 @(require) import "core:unicode/utf16"
 
+
+@(require) import "core:rexcode"
+@(require) import rexcode_isa      "core:rexcode/isa"
+@(require) import rexcode_arm32    "core:rexcode/isa/arm32"
+@(require) import rexcode_arm64    "core:rexcode/isa/arm64"
+@(require) import rexcode_mips     "core:rexcode/isa/mips"
+@(require) import rexcode_mos6502  "core:rexcode/isa/mos6502"
+@(require) import rexcode_mos65816 "core:rexcode/isa/mos65816"
+@(require) import rexcode_ppc      "core:rexcode/isa/ppc"
+@(require) import rexcode_ppc_vle  "core:rexcode/isa/ppc_vle"
+@(require) import rexcode_riscv    "core:rexcode/isa/riscv"
+@(require) import rexcode_rsp      "core:rexcode/isa/rsp"
+@(require) import rexcode_x86      "core:rexcode/isa/x86"
+@(require) import rexcode_ir       "core:rexcode/ir"
+@(require) import rexcode_spirv    "core:rexcode/ir/spirv"
+@(require) import rexcode_wasm     "core:rexcode/ir/wasm"
+
 main :: proc() {}
