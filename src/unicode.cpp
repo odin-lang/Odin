@@ -66,6 +66,7 @@ gb_internal bool rune_is_whitespace(Rune r) {
 	case '\t':
 	case '\n':
 	case '\r':
+	case '\f':
 		return true;
 	}
 	return false;
