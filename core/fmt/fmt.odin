@@ -1456,9 +1456,11 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		prev_fi := fi^
 		defer fi^ = prev_fi
 		fi.hash = false
-		fi.width = bit_size
 		fi.zero = true
 		fi.plus = false
+		// force the width to always be bit_size/4 to accurately represent the number
+		fi.width = bit_size/4
+		fi.width_set = true
 
 		u: u64
 		switch bit_size {
@@ -3132,12 +3134,14 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 
 				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, verb)
-				if hash {
-					io.write_string(fi.writer, " = ", &fi.n)
-				} else {
-					io.write_string(fi.writer, "=", &fi.n)
+				if info.value.size > 0 {
+					if hash {
+						io.write_string(fi.writer, " = ", &fi.n)
+					} else {
+						io.write_string(fi.writer, "=", &fi.n)
+					}
+					fmt_arg(fi, any{rawptr(value), info.value.id}, verb)
 				}
-				fmt_arg(fi, any{rawptr(value), info.value.id}, verb)
 
 				if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 			}

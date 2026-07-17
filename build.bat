@@ -21,7 +21,7 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 
 where /Q git.exe || goto skip_git_hash
 if not exist .git\ goto skip_git_hash
-for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m-%%d" --no-patch --no-notes HEAD') do (
+for /f "tokens=1,2" %%i IN ('git -c "log.showSignature=false" show "--pretty=%%cd %%h" "--date=format:%%Y-%%m-%%d" --no-patch --no-notes HEAD') do (
 	set CURR_DATE_TIME=%%i
 	set GIT_SHA=%%j
 )
@@ -106,16 +106,6 @@ set libs= ^
 	bin\llvm\windows\LLVM-C.lib
 set odin_res=misc\odin.res
 set odin_rc=misc\odin.rc
-
-rem DO NOT TOUCH!
-rem THIS TILDE STUFF IS FOR DEVELOPMENT ONLY!
-set tilde_backend=0
-if %tilde_backend% EQU 1 (
-	set libs=%libs% src\tilde\tb.lib
-	set compiler_defines=%compiler_defines% -DODIN_TILDE_BACKEND
-)
-rem DO NOT TOUCH!
-
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console -MANIFEST:EMBED
 

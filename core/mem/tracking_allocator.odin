@@ -130,11 +130,11 @@ the tracking allocator to the old behavior, where the bad_free_array was used.
 */
 @(no_sanitize_address)
 tracking_allocator_bad_free_callback_panic :: proc(t: ^Tracking_Allocator, memory: rawptr, location: runtime.Source_Code_Location) {
-	runtime.print_caller_location(location)
-	runtime.print_string(" Tracking allocator error: Bad free of pointer ")
-	runtime.print_uintptr(uintptr(memory))
-	runtime.print_string("\n")
-	runtime.trap()
+	buf: [256]byte
+	offset := 0
+	_ = runtime.write_string(&offset, buf[:], "Tracking allocator error: Bad free of pointer ")
+	_ = runtime.write_u64(&offset, buf[:], u64(uintptr(memory)))
+	panic(string(buf[:offset]), loc = location)
 }
 
 /*

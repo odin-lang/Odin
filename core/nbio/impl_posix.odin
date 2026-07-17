@@ -120,6 +120,7 @@ _init :: proc(l: ^Event_Loop, allocator: mem.Allocator) -> (rerr: General_Error)
 		filter = .User,
 		flags  = {.Add, .Enable, .Clear},
 	})
+	__tick(l, 0) // Tick to enqueue wake up, allowing wake ups before the user's first tick.
 
 	return nil
 }
@@ -740,6 +741,11 @@ poll_exec :: proc(op: ^Operation) -> Op_Result {
 	}
 
 	if op.poll.result != .Ready {
+		return .Done
+	}
+
+	if .EOF in op._impl.flags {
+		op.poll.result = .Ready
 		return .Done
 	}
 

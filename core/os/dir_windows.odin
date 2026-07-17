@@ -126,7 +126,7 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	}
 
 	err: Error
-	it.impl.path, err = _cleanpath_from_buf(wpath, file_allocator())
+	it.impl.path, err = get_absolute_path(impl.name, file_allocator())
 	if err != nil {
 		read_directory_iterator_set_error(it, impl.name, err)
 	}

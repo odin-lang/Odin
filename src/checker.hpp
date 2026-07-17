@@ -163,6 +163,8 @@ struct AttributeContext {
 	String require_target_feature; // required by the target micro-architecture
 	String enable_target_feature;  // will be enabled for the procedure only
 
+	u64 fast_math_flags;
+
 	bool   raddbg_type_view;
 	String raddbg_type_view_string;
 };
@@ -832,6 +834,7 @@ struct CheckerContext {
 	bool       hide_polymorphic_errors;
 	bool       in_polymorphic_specialization;
 	bool       allow_arrow_right_selector_expr;
+	bool       allow_c_vararg_param;
 	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 

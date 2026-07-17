@@ -236,16 +236,6 @@ back_ptr :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
 }
 
 
-@(deprecated="Use `front_ptr` instead")
-peek_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
-	return front_ptr(q, loc)
-}
-
-@(deprecated="Use `back_ptr` instead")
-peek_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
-	return back_ptr(q, loc)
-}
-
 /*
 Push an element to the back of the queue.
 
@@ -416,7 +406,7 @@ push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T, loc := #caller_location) -
 }
 
 /*
-Consume `n` elements from the back of the queue.
+Consume `n` elements from the front of the queue.
 
 This will raise a bounds checking error if the queue does not have enough elements.
 */

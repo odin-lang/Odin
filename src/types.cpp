@@ -400,7 +400,7 @@ enum TypeInfoFlag : u32 {
 
 enum : int {
 	MATRIX_ELEMENT_COUNT_MIN = 1,
-	MATRIX_ELEMENT_COUNT_MAX = 16,
+	MATRIX_ELEMENT_COUNT_MAX = 64,
 	MATRIX_ELEMENT_MAX_SIZE = MATRIX_ELEMENT_COUNT_MAX * (2 * 8), // complex128
 
 	SIMD_ELEMENT_COUNT_MIN = 1,
@@ -776,6 +776,14 @@ gb_global Type *t_objc_Class = nullptr;
 gb_global Type *t_objc_Ivar  = nullptr;
 gb_global Type *t_objc_instancetype = nullptr; // Special distinct variant of t_objc_id used mimic auto-typing of instancetype* in Objective-C
 
+
+gb_global Type *t_c_va_list     = nullptr;
+gb_global Type *t_c_va_list_ptr = nullptr;
+
+
+gb_global Type *t_odin_calling_convention = nullptr;
+
+
 enum OdinAtomicMemoryOrder : i32 {
 	OdinAtomicMemoryOrder_relaxed = 0, // unordered
 	OdinAtomicMemoryOrder_consume = 1, // monotonic
@@ -796,6 +804,34 @@ char const *OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_COUNT] = {
 };
 
 gb_global Type *t_atomic_memory_order = nullptr;
+
+
+
+
+enum OdinFastMathFlag : u8 {
+	OdinFastMath_Allow_Reassoc    = 0,
+	OdinFastMath_No_NaNs          = 1,
+	OdinFastMath_No_Infs          = 2,
+	OdinFastMath_No_Signed_Zeros  = 3,
+	OdinFastMath_Allow_Reciprocal = 4,
+	OdinFastMath_Allow_Contract   = 5,
+	OdinFastMath_Approx_Func      = 6,
+
+	OdinFastMath_COUNT,
+};
+
+char const *OdinFastMathFlag_strings[OdinFastMath_COUNT] = {
+	"Allow_Reassoc",
+	"No_NaNs",
+	"No_Infs",
+	"No_Signed_Zeros",
+	"Allow_Reciprocal",
+	"Allow_Contract",
+	"Approx_Func",
+};
+
+gb_global Type *t_fast_math_flag  = nullptr; // named enum
+gb_global Type *t_fast_math_flags = nullptr; // named bit_set
 
 
 
@@ -1332,6 +1368,8 @@ gb_internal bool is_type_integer_or_float(Type *t) {
 	return false;
 }
 
+
+
 gb_internal bool is_type_numeric(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
@@ -1433,6 +1471,10 @@ gb_internal bool is_type_constant_type(Type *t) {
 		return is_type_constant_type(t->Array.elem);
 	case Type_EnumeratedArray:
 		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_SimdVector:
+		return is_type_constant_type(t->SimdVector.elem);
+	case Type_Matrix:
+		return is_type_constant_type(t->Matrix.elem);
 	}
 	return false;
 }
@@ -1487,7 +1529,7 @@ gb_internal bool is_type_multi_pointer(Type *t) {
 	return t->kind == Type_MultiPointer;
 }
 gb_internal bool is_type_internally_pointer_like(Type *t) {
-	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_proc(t);
+	return is_type_pointer(t) || is_type_multi_pointer(t) || is_type_cstring(t) || is_type_cstring16(t) || is_type_proc(t);
 }
 
 gb_internal bool is_type_tuple(Type *t) {
@@ -1707,6 +1749,51 @@ gb_internal bool is_type_simd_vector(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
 	return t->kind == Type_SimdVector;
+}
+
+
+gb_internal Type *type_unsigned_equivalent(Type *t) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (is_type_simd_vector(t)) {
+		if (is_type_unsigned(t->SimdVector.elem)) {
+			return original_type;
+		}
+		return alloc_type_simd_vector(t->SimdVector.count, type_unsigned_equivalent(t->SimdVector.elem));
+	}
+
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1:  return t_u8;
+	case 2:  return t_u16;
+	case 4:  return t_u32;
+	case 8:  return t_u64;
+	case 16: return t_u128;
+	}
+	GB_PANIC("No known equivalent unsigned integer sized for %s", type_to_string(t));
+	return nullptr;
+}
+
+gb_internal Type *type_signed_equivalent(Type *t) {
+	Type *original_type = t;
+	t = base_type(t);
+	if (is_type_simd_vector(t)) {
+		if (!is_type_unsigned(t->SimdVector.elem)) {
+			return original_type;
+		}
+		return alloc_type_simd_vector(t->SimdVector.count, type_signed_equivalent(t->SimdVector.elem));
+	}
+	;
+	i64 sz = type_size_of(t);
+	switch (sz) {
+	case 1:  return t_i8;
+	case 2:  return t_i16;
+	case 4:  return t_i32;
+	case 8:  return t_i64;
+	case 16: return t_i128;
+	}
+	GB_PANIC("No known equivalent signed integer sized for %s", type_to_string(t));
+	return nullptr;
 }
 
 gb_internal Type *base_array_type(Type *t) {
@@ -2576,18 +2663,50 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+gb_internal bool is_type_union_constantable(Type *type);
+
+gb_internal bool is_type_constant_type_for_unions(Type *t) {
+	t = core_type(t);
+	if (t == nullptr) { return false; }
+	switch (t->kind) {
+	case Type_Basic:
+		if (t->Basic.kind == Basic_typeid) {
+			return true;
+		}
+		return (t->Basic.flags & BasicFlag_ConstantType) != 0;
+	case Type_BitSet:
+		return true;
+	case Type_Proc:
+		return true;
+	case Type_Array:
+		return is_type_constant_type(t->Array.elem);
+	case Type_EnumeratedArray:
+		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_Struct:
+		{
+			for (Entity *field : t->Struct.fields) {
+				if (!is_type_constant_type_for_unions(field->type)) {
+					return false;
+				}
+			}
+			return true;
+		}
+	case Type_Union:
+		return is_type_union_constantable(t);
+	}
+	return false;
+}
+
 gb_internal bool is_type_union_constantable(Type *type) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
 	if (bt->Union.variants.count == 0) {
 		return true;
-	} else if (bt->Union.variants.count == 1) {
-		return is_type_constant_type(bt->Union.variants[0]);
 	}
 
 	for (Type *v : bt->Union.variants) {
-		if (!is_type_constant_type(v)) {
+		if (!is_type_constant_type_for_unions(v)) {
 			return false;
 		}
 	}
@@ -2600,7 +2719,7 @@ gb_internal bool is_type_raw_union_constantable(Type *type) {
 	GB_ASSERT(bt->Struct.is_raw_union);
 
 	for (Entity *f : bt->Struct.fields) {
-		if (!is_type_constant_type(f->type)) {
+		if (!is_type_constant_type_for_unions(f->type)) {
 			return false;
 		}
 	}
@@ -2980,7 +3099,7 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 					return true;
 				}
 			}
-			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(f->type)) {
+			if ((f->flags & EntityFlags_IsSubtype) != 0 && is_type_struct(f->type)) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					array_add(&sel->index, cast(i32)i);
@@ -3058,6 +3177,13 @@ gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
 	return are_types_identical_internal(x, y, true);
 }
 
+gb_internal bool are_proc_properties_identical(Type *x, Type *y) {
+	return x->Proc.calling_convention == y->Proc.calling_convention &&
+	       x->Proc.c_vararg    == y->Proc.c_vararg    &&
+	       x->Proc.variadic    == y->Proc.variadic    &&
+	       x->Proc.diverging   == y->Proc.diverging   &&
+	       x->Proc.optional_ok == y->Proc.optional_ok;
+}
 
 gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
@@ -3262,11 +3388,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		break;
 
 	case Type_Proc:
-		return x->Proc.calling_convention == y->Proc.calling_convention &&
-		       x->Proc.c_vararg    == y->Proc.c_vararg    &&
-		       x->Proc.variadic    == y->Proc.variadic    &&
-		       x->Proc.diverging   == y->Proc.diverging   &&
-		       x->Proc.optional_ok == y->Proc.optional_ok &&
+		return are_proc_properties_identical(x, y) &&
 		       are_types_identical_internal(x->Proc.params, y->Proc.params, check_tuple_names) &&
 		       are_types_identical_internal(x->Proc.results, y->Proc.results, check_tuple_names);
 
@@ -3712,8 +3834,22 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			}
 		} else if (type->kind == Type_BitSet) {
 			return lookup_field_with_selection(type->BitSet.elem, field_name, true, sel, allow_blank_ident);
-		}
+		} else if (type->kind == Type_BitField) {
+			for_array(i, type->BitField.fields) {
+				Entity *f = type->BitField.fields[i];
+				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
+					continue;
+				}
+				auto str = entity_interned_name(f);
+				if (field_name == str) {
+					selection_add_index(&sel, i);  // HACK(bill): Leaky memory
+					sel.entity = f;
+					sel.is_bit_field = true;
+					return sel;
+				}
+			}
 
+		}
 
 		if (type->kind == Type_Generic && type->Generic.specialized != nullptr) {
 			Type *specialized = type->Generic.specialized;
@@ -3812,7 +3948,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 				return sel;
 			}
 		}
-
 	} else if (type->kind == Type_Basic) {
 		switch (type->Basic.kind) {
 		case Basic_any: {
@@ -3846,6 +3981,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f16, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f16, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f16, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -3862,6 +4000,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -3877,6 +4019,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f32, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f32, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f32, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -3893,6 +4038,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -3908,6 +4057,9 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			gb_local_persist Entity *entity__y = alloc_entity_field(nullptr, make_token_ident(y), t_f64, false, 1);
 			gb_local_persist Entity *entity__z = alloc_entity_field(nullptr, make_token_ident(z), t_f64, false, 2);
 
+			gb_local_persist String xyz = str_lit("xyz");
+			gb_local_persist Entity *entity__xyz = alloc_entity_field(nullptr, make_token_ident(xyz), alloc_type_array(t_f64, 3), false, -1);
+
 			String n = field_name.string();
 			if (n == w) {
 				selection_add_index(&sel, 3);
@@ -3924,6 +4076,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			} else if (n == z) {
 				selection_add_index(&sel, 2);
 				sel.entity = entity__z;
+				return sel;
+			} else if (n == xyz) {
+				selection_add_index(&sel, -1);
+				sel.entity = entity__xyz;
 				return sel;
 			}
 		} break;
@@ -4913,13 +5069,51 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 				return level+1;
 			}
 		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
-		if (nested_level > 0) {
-			return nested_level;
+		if (f->flags & EntityFlags_IsSubtype) {
+			isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr, allow_polymorphic);
+			if (nested_level > 0) {
+				return nested_level;
+			}
 		}
 	}
 
 	return 0;
+}
+
+gb_internal bool check_is_assignable_to_using_offset_zero_subtype(Type *src, Type *dst) {
+
+	Type *src_struct = base_type(src);
+	if (!is_type_struct(src_struct)) {
+		return false;
+	}
+
+	// We check multiple fields in case of #raw_union,
+	// but exit on the first field that is not at offset 0.
+	for_array(i, src_struct->Struct.fields) {
+		Entity *f = src_struct->Struct.fields[i];
+		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
+			continue;
+		}
+
+		Type *field_type = nullptr;
+		i64 offset = type_offset_of(src_struct, i, &field_type);
+
+		// Only allowed if the subtype field shared the same address as its container
+		if (offset != 0) {
+			return false;
+		}
+
+		if (are_types_identical(field_type, dst)) {
+			return true;
+		}
+
+		// Check parent if the field type is a struct
+		if (check_is_assignable_to_using_offset_zero_subtype(field_type, dst)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 gb_internal bool is_type_subtype_of(Type *src, Type *dst) {

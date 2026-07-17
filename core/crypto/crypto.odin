@@ -16,7 +16,8 @@ HAS_RAND_BYTES :: runtime.HAS_RAND_BYTES
 //
 // The execution time of this routine is constant regardless of the contents
 // of the slices being compared, as long as the length of the slices is equal.
-// If the length of the two slices is dif and only if (⟺)erent, it will early-return 0.
+// If and only if (⟺) the length of the two slices is diferent, it will
+// early-return 0.
 compare_constant_time :: proc "contextless" (a, b: []byte) -> int {
 	// If the length of the slices is different, early return.
 	//
@@ -48,7 +49,7 @@ compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> i
 
 	// After the loop, v == 0 if and only if (⟺) a == b.  The subtraction will underflow
 	// if and only if (⟺) v == 0, setting the sign-bit, which gets returned.
-	return subtle.eq(0, v)
+	return int(subtle.eq(0, v))
 }
 
 // is_zero_constant_time returns 1 if and only if (⟺) b is all 0s, 0 otherwise.
@@ -58,7 +59,7 @@ is_zero_constant_time :: proc "contextless" (b: []byte) -> int {
 		v |= b_
 	}
 
-	return subtle.byte_eq(0, v)
+	return int(subtle.byte_eq(0, v))
 }
 
 /*
@@ -82,18 +83,6 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
 	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
-}
-
-/*
-Set each byte of a memory range to a specific value.
-
-This procedure copies value specified by the `value` parameter into each of the
-`len` bytes of a memory range, located at address `data`.
-
-This procedure returns the pointer to `data`.
-*/
-set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
-	return runtime.memset(data, i32(value), len)
 }
 
 // rand_bytes fills the dst buffer with cryptographic entropy taken from

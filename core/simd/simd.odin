@@ -2441,40 +2441,55 @@ Graphically, the operation looks as follows. The `t` and `f` represent the
 select :: intrinsics.simd_select
 
 /*
-Runtime Equivalent to Shuffle.
+Hardware-level dynamic swizzle / table lookup.
 
-Performs element-wise table lookups using runtime indices.
-Each element in the indices vector selects an element from the table vector.
-The indices are automatically masked to prevent out-of-bounds access.
-
-This operation is hardware-accelerated on most platforms when using 8-bit
-integer vectors. For other element types or unsupported vector sizes, it
-falls back to software emulation.
+For each output lane `i`, picks an element from `table` using `indices[i]`
+as the source position. Maps directly onto hardware table-lookup instructions
+where available (`tbl` on ARM, `pshufb` on x86, `swizzle` on WASM). This is
+the runtime counterpart of `simd.shuffle`.
 
 Inputs:
-- `table`: The lookup table vector (should be power-of-2 size for correct masking).
-- `indices`: The indices vector (automatically masked to valid range).
+- `table`:   a `#simd[N]T` lookup table, where `T` is an integer type and
+            `N` is a power of two (enforced by `#simd`).
+- `indices`: a `#simd[N]T` of source positions. Must have the exact same
+            type as `table`.
 
 Returns:
-- A vector where `result[i] = table[indices[i] & (table_size-1)]`.
+- A `#simd[N]T`. For `indices[i]` in `[0, N-1]`, `result[i] = table[indices[i]]`
+  on ARM, on WebAssembly (16-byte), and on the scalar emulation fallback.
+  On x86 vectors larger than 16 bytes, the operation is lane-local; see Notes.
 
-Operation:
+Operation (in-range indices, non-lane-local platforms):
 
-	for i in 0 ..< len(indices) {
-		masked_index := indices[i] & (len(table) - 1)
-		result[i] = table[masked_index]
+	for i in 0 ..< N {
+		result[i] = table[indices[i]]   // indices[i] assumed to be in [0, N-1]
 	}
-	return result
+
+Notes:
+- **Out-of-range indices** (`indices[i] >= N`) are platform-defined:
+  most hardware paths return 0; the scalar fallback wraps via
+  `indices[i] & (N-1)`. Mask explicitly if you need portable behavior.
+- **x86 wide vectors are lane-local.** `vpshufb` treats a 256-bit AVX2
+  register as two independent 128-bit lanes; `pshufb.b.512` treats a
+  512-bit AVX-512 register as four. An index in lane `k` can only address
+  table entries in that same lane. AVX2 Example: Lane 0 is [0..15], Lane 1
+  is [16..31]. Accessing `indices[20] = 5` yields `table[21]`, not `table[5]`.
+  ARM `tbl` and the emulation fallback are cross-lane across the full table.
+- **Hardware acceleration is conditional.** It requires 8-bit integer
+  elements, a vector size supported by the target, and the relevant
+  target features enabled (`ssse3` / `avx2` / `avx512f`+`avx512bw` on x86,
+  `neon` on ARM). Otherwise this falls back to scalar emulation. Non-byte
+  element types always use the scalar fallback.
 
 Implementation:
 
-	| Platform    | Lane Size                                 | Implementation      |
-	|-------------|-------------------------------------------|---------------------|
-	| x86-64      | pshufb (16B), vpshufb (32B), AVX512 (64B) | Single vector       |
-	| ARM64       | tbl1 (16B), tbl2 (32B), tbl4 (64B)        | Automatic splitting |
-	| ARM32       | vtbl1 (8B), vtbl2 (16B), vtbl4 (32B)      | Automatic splitting |
-	| WebAssembly | i8x16.swizzle (16B), Emulation (>16B)     | Mixed               |
-	| Other       | Emulation                                 | Software            |
+	| Platform    | Hardware path (8-bit elements)                  | Notes                         |
+	|-------------|-------------------------------------------------|-------------------------------|
+	| x86-64      | pshufb (16B), vpshufb (32B), pshufb.b.512 (64B) | 32 / 64 B are lane-local      |
+	| ARM64       | tbl1 (16B), tbl2 (32B), tbl4 (64B)              | >16 B: split into 16-B chunks |
+	| ARM32       | vtbl1 (8B), vtbl2 (16B), vtbl4 (32B)            | >8 B: split into 8-B chunks   |
+	| WebAssembly | i8x16.swizzle (16B)                             | Other sizes: emulated         |
+	| Other       | Scalar emulation                                |                               |
 
 Example:
 
@@ -2482,12 +2497,11 @@ Example:
 	import "core:fmt"
 
 	runtime_swizzle_example :: proc() {
-		table := simd.u8x16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+		table   := simd.u8x16{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 		indices := simd.u8x16{15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
-		result := simd.runtime_swizzle(table, indices)
-		fmt.println(result) // Expected: {15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+		result  := simd.runtime_swizzle(table, indices)
+		fmt.println(result) // {15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
 	}
-
 */
 runtime_swizzle :: intrinsics.simd_runtime_swizzle
 
@@ -2517,9 +2531,15 @@ Compute the nearest integer of each lane in a SIMD vector.
 nearest :: intrinsics.simd_nearest
 
 /*
-Transmute a SIMD vector into an integer vector.
+Transmute a SIMD vector into an unsigned integer vector.
 */
 to_bits :: intrinsics.simd_to_bits
+
+/*
+Transmute a SIMD vector into a signed integer vector.
+*/
+to_bits_signed :: intrinsics.simd_to_bits_signed
+
 
 /*
 Reverse the lanes of a SIMD vector.
@@ -2580,6 +2600,33 @@ Reverse the bit pattern of a SIMD vector.
 reverse_bits :: intrinsics.reverse_bits
 
 /*
+Swap the bytes of the elements of a SIMD vector.
+*/
+byte_swap :: intrinsics.byte_swap
+
+
+/*
+**Operation**
+
+	#assert(len(a) == len(b))
+	res := 0
+	N :: len(a)
+	for i in 0 ..< N/2 {
+		res[i] = a[2*i + 1]
+	}
+	for i in 0 ..< N/2 {
+		res[i + N/2] = b[2*i]
+	}
+	return res
+*/
+odd_even :: intrinsics.simd_odd_even
+
+@(require_results)
+add_sub :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return odd_even(add(a, b), sub(a, b))
+}
+
+/*
 Perform a FMA (Fused multiply-add) operation on each lane of SIMD vectors.
 
 A fused multiply-add is a ternary operation that for three operands, `a`, `b`
@@ -2605,6 +2652,41 @@ Returns:
 	return res
 */
 fused_mul_add :: intrinsics.fused_mul_add
+
+
+@(require_results)
+fused_neg_mul_add :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(neg(a), b, c)
+}
+
+@(require_results)
+fused_mul_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(a, b, neg(c))
+}
+
+@(require_results)
+fused_neg_mul_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	return fused_mul_add(neg(a), b, neg(c))
+}
+
+@(require_results)
+fused_mul_add_sub :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	odd  := fused_mul_add(a, b, c)
+	even := fused_mul_sub(a, b, c)
+	return odd_even(odd, even)
+}
+
+@(require_results)
+fused_mul_sub_add :: #force_inline proc "contextless" (a, b, c: $T/#simd[$LANES]$E) -> T {
+	odd  := fused_mul_sub(a, b, c)
+	even := fused_mul_add(a, b, c)
+	return odd_even(odd, even)
+}
+
+
+
+
+
 
 /*
 Perform a FMA (Fused multiply-add) operation on each lane of SIMD vectors.
@@ -2723,6 +2805,15 @@ signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where in
 	return select(is_nan, v, copysign(T(1), v))
 }
 
+@(require_results)
+sign_bit :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> (res: type_of(intrinsics.simd_to_bits(T{}))) {
+	BITS :: 8*size_of(E)
+	val  := to_bits(v)
+	mask := type_of(val)(1<<(BITS-1))
+	masked := bit_and(val, mask)
+	return to_bits(shr_masked(to_bits_signed(masked), BITS-1))
+}
+
 /*
 Calculate reciprocals of SIMD lanes.
 
@@ -2758,6 +2849,10 @@ recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where int
 }
 
 
+approx_recip      :: intrinsics.simd_approx_recip
+approx_recip_sqrt :: intrinsics.simd_approx_recip_sqrt
+
+
 /*
 Create a vector where each lane contains the index of that lane.
 Inputs:
@@ -2770,3 +2865,41 @@ Operation:
 	}
 */
 indices :: intrinsics.simd_indices
+
+/*
+Create a vector where each lane contains the index of that lane.
+Inputs:
+- `V`: The type of the vector to create.
+Result:
+- A vector of the given type, where each lane contains the index of that lane.
+Operation:
+	for i in 0 ..< N {
+		res[i] = i
+	}
+*/
+iota :: intrinsics.simd_indices
+
+
+sums_of_n :: intrinsics.simd_sums_of_n
+
+
+@(require_results)
+saturating_neg :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return saturating_sub(T(0), v)
+}
+
+@(require_results)
+saturating_abs :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return max(v, saturating_sub(T(0), v))
+}
+
+@(require_results)
+abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	return abs(sub(a, b))
+}
+
+pairwise_add :: intrinsics.simd_pairwise_add
+pairwise_sub :: intrinsics.simd_pairwise_add
+
+interleave   :: intrinsics.simd_interleave
+deinterleave :: intrinsics.simd_deinterleave

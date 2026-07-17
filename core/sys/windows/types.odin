@@ -132,6 +132,7 @@ LPSTARTUPINFOW        :: ^STARTUPINFOW
 LPTRACKMOUSEEVENT     :: ^TRACKMOUSEEVENT
 VOID                  :: rawptr
 PVOID                 :: rawptr
+PVOID64               :: rawptr
 LPVOID                :: rawptr
 PINT                  :: ^INT
 LPINT                 :: ^INT
@@ -3410,8 +3411,20 @@ CONSOLE_READCONSOLE_CONTROL :: struct {
 	dwCtrlWakeupMask:  ULONG,
 	dwControlKeyState: ULONG,
 }
-
 PCONSOLE_READCONSOLE_CONTROL :: ^CONSOLE_READCONSOLE_CONTROL
+
+CONSOLE_SCREEN_BUFFER_INFOEX :: struct {
+	cbSize:               ULONG,
+	dwSize:               COORD,
+	dwCursorPosition:     COORD,
+	wAttributes:          WORD,
+	srWindow:             SMALL_RECT,
+	dwMaximumWindowSize:  COORD,
+	wPopupAttributes:     WORD,
+	bFullscreenSupported: BOOL,
+	ColorTable:           [16]COLORREF,
+}
+PCONSOLE_SCREEN_BUFFER_INFOEX :: ^CONSOLE_SCREEN_BUFFER_INFOEX
 
 BY_HANDLE_FILE_INFORMATION :: struct {
 	dwFileAttributes:     DWORD,
@@ -3425,7 +3438,6 @@ BY_HANDLE_FILE_INFORMATION :: struct {
 	nFileIndexHigh:       DWORD,
 	nFileIndexLow:        DWORD,
 }
-
 LPBY_HANDLE_FILE_INFORMATION :: ^BY_HANDLE_FILE_INFORMATION
 
 FILE_STANDARD_INFO :: struct {
@@ -4196,6 +4208,34 @@ COMDLG_FILTERSPEC :: struct {
 	pszName, pszSpec: LPCWSTR,
 }
 
+PERCEIVED :: enum c_int {
+	FIRST       = -3,
+	CUSTOM      = -3,
+	UNSPECIFIED = -2,
+	FOLDER      = -1,
+	UNKNOWN     = 0,
+	TEXT        = 1,
+	IMAGE       = 2,
+	AUDIO       = 3,
+	VIDEO       = 4,
+	COMPRESSED  = 5,
+	DOCUMENT    = 6,
+	SYSTEM      = 7,
+	APPLICATION = 8,
+	GAMEMEDIA   = 9,
+	CONTACTS    = 10,
+	LAST        = 10,
+}
+
+PERCEIVEDFLAG :: DWORD
+PERCEIVEDFLAG_UNDEFINED     :: 0x0000
+PERCEIVEDFLAG_SOFTCODED     :: 0x0001
+PERCEIVEDFLAG_HARDCODED     :: 0x0002
+PERCEIVEDFLAG_NATIVESUPPORT :: 0x0004
+PERCEIVEDFLAG_GDIPLUS       :: 0x0010
+PERCEIVEDFLAG_WMSDK         :: 0x0020
+PERCEIVEDFLAG_ZIPFOLDER     :: 0x0040
+
 DECIMAL :: struct {
 	wReserved: USHORT,
 	using _: struct #raw_union {
@@ -4277,17 +4317,19 @@ SHACF_AUTOAPPEND_FORCE_OFF  :: 0x80000000  // Ignore the registry default and fo
 
 LWSTDAPI :: HRESULT
 
-CLSID_FileOpenDialog := &GUID{0xDC1C5A9C, 0xE88A, 0x4DDE, {0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7}}
-CLSID_FileSaveDialog := &GUID{0xC0B4E2F3, 0xBA21, 0x4773, {0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B}}
-CLSID_TaskbarList    := &GUID{0x56FDF344, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
+CLSID_FileOpenDialog    := &GUID{0xDC1C5A9C, 0xE88A, 0x4DDE, {0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7}}
+CLSID_FileSaveDialog    := &GUID{0xC0B4E2F3, 0xBA21, 0x4773, {0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B}}
+CLSID_TaskbarList       := &GUID{0x56FDF344, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
+CLSID_QueryAssociations :=  GUID{0xa07034fd, 0x6caa, 0x4954, {0xac, 0x3f, 0x97, 0xa2, 0x72, 0x16, 0xf9, 0x8a}}
 
-IID_IShellItem       := &GUID{0x43826d1e, 0xe718, 0x42ee, {0xbc, 0x55, 0xa1, 0xe2, 0x61, 0xc3, 0x7b, 0xfe}}
-IID_IFileDialog      := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
-IID_IFileSaveDialog  := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
-IID_IFileOpenDialog  := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
-IID_ITaskbarList     := &GUID{0x56FDF342, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
-IID_ITaskbarList2    := &GUID{0x602D4995, 0xB13A, 0x429b, {0xA6, 0x6E, 0x19, 0x35, 0xE4, 0x4F, 0x43, 0x17}}
-IID_ITaskbarList3    := &GUID{0xea1afb91, 0x9e28, 0x4b86, {0x90, 0xe9, 0x9e, 0x9f, 0x8a, 0x5e, 0xef, 0xaf}}
+IID_IShellItem         := &GUID{0x43826d1e, 0xe718, 0x42ee, {0xbc, 0x55, 0xa1, 0xe2, 0x61, 0xc3, 0x7b, 0xfe}}
+IID_IFileDialog        := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
+IID_IFileSaveDialog    := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
+IID_IFileOpenDialog    := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
+IID_ITaskbarList       := &GUID{0x56FDF342, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
+IID_ITaskbarList2      := &GUID{0x602D4995, 0xB13A, 0x429b, {0xA6, 0x6E, 0x19, 0x35, 0xE4, 0x4F, 0x43, 0x17}}
+IID_ITaskbarList3      := &GUID{0xea1afb91, 0x9e28, 0x4b86, {0x90, 0xe9, 0x9e, 0x9f, 0x8a, 0x5e, 0xef, 0xaf}}
+IID_IQueryAssociations := &GUID{0xc46ca590, 0x3c3f, 0x11d2, {0xbe, 0xe6, 0x00, 0x00, 0xf8, 0x05, 0xca, 0x57}}
 
 IModalWindow :: struct #raw_union {
 	#subtype IUnknown: IUnknown,
@@ -4670,13 +4712,98 @@ ITaskbarList3Vtbl :: struct {
 	SetThumbnailClip: proc "system" (this: ^ITaskbarList3, hwnd: HWND, prcClip: ^RECT) -> HRESULT,
 }
 
+ASSOCF_Bits :: enum c_int {
+	INIT_NOREMAPCLSID    = 0,
+	INIT_BYEXENAME       = 1,
+	OPEN_BYEXENAME       = 1,
+	INIT_DEFAULTTOSTAR   = 2,
+	INIT_DEFAULTTOFOLDER = 3,
+	NOUSERSETTINGS       = 4,
+	NOTRUNCATE           = 5,
+	VERIFY               = 6,
+	REMAPRUNDLL          = 7,
+	NOFIXUPS             = 8,
+	IGNOREBASECLASS      = 9,
+	INIT_IGNOREUNKNOWN   = 10,
+	INIT_FIXED_PROGID    = 11,
+	IS_PROTOCOL          = 12,
+	INIT_FOR_FILE        = 13,
+	IS_FULL_URI          = 14,
+	PER_MACHINE_ONLY     = 15,
+	APP_TO_APP           = 16,
+}
+ASSOCF :: bit_set[ASSOCF_Bits; c_int]
+
+ASSOCSTR :: enum c_int {
+	COMMAND = 1,
+	EXECUTABLE,
+	FRIENDLYDOCNAME,
+	FRIENDLYAPPNAME,
+	NOOPEN,
+	SHELLNEWVALUE,
+	DDECOMMAND,
+	DDEIFEXEC,
+	DDEAPPLICATION,
+	DDETOPIC,
+	INFOTIP,
+	QUICKTIP,
+	TILEINFO,
+	CONTENTTYPE,
+	DEFAULTICON,
+	SHELLEXTENSION,
+	DROPTARGET,
+	DELEGATEEXECUTE,
+	SUPPORTED_URI_PROTOCOLS,
+	PROGID,
+	APPID,
+	APPPUBLISHER,
+	APPICONREFERENCE,
+	MAX,
+}
+
+ASSOCKEY :: enum c_int {
+	SHELLEXECCLASS = 1,
+	APP,
+	CLASS,
+	BASECLASS,
+	MAX,
+}
+
+ASSOCDATA :: enum c_int {
+	MSIDESCRIPTOR = 1,
+	NOACTIVATEHANDLER,
+	UNUSED1,
+	HASPERUSERASSOC,
+	EDITFLAGS,
+	VALUE,
+	MAX,
+}
+
+ASSOCENUM :: enum c_int {
+	NONE,
+}
+
+IQueryAssociations :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IQueryAssociationsVtbl,
+}
+
+IQueryAssociationsVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Init:      proc "system" (this: ^IQueryAssociations, flags: ASSOCF, pszAssoc: LPCWSTR, hkProgid: HKEY, hwnd: HWND) -> HRESULT,
+	GetString: proc "system" (this: ^IQueryAssociations, flags: ASSOCF, str: ASSOCSTR, pszExtra: LPCWSTR, pszOut: LPWSTR, pcchOut: ^DWORD) -> HRESULT,
+	GetKey:    proc "system" (this: ^IQueryAssociations, flags: ASSOCF, key: ASSOCKEY, pszExtra: LPCWSTR, phkeyOut: ^HKEY) -> HRESULT,
+	GetData:   proc "system" (this: ^IQueryAssociations, flags: ASSOCF, data: ASSOCDATA, pszExtra: LPCWSTR, pvOut: rawptr, pcbOut: ^DWORD) -> HRESULT,
+	GetEnum:   proc "system" (this: ^IQueryAssociations, flags: ASSOCF, assocenum: ASSOCENUM, pszExtra: LPCWSTR, riid: REFIID, ppvOut: ^rawptr) -> HRESULT,
+}
+
 MEMORYSTATUSEX :: struct {
 	dwLength:                DWORD,
 	dwMemoryLoad:            DWORD,
 	ullTotalPhys:            DWORDLONG,
 	ullAvailPhys:            DWORDLONG,
-	ullTotalPageFil:         DWORDLONG,
-	ullAvailPageFil:         DWORDLONG,
+	ullTotalPageFile:        DWORDLONG,
+	ullAvailPageFile:        DWORDLONG,
 	ullTotalVirtual:         DWORDLONG,
 	ullAvailVirtual:         DWORDLONG,
 	ullAvailExtendedVirtual: DWORDLONG,
@@ -5254,3 +5381,133 @@ Com_Error_Bits :: enum DWORD {
 }
 Com_Error :: distinct bit_set[Com_Error_Bits; DWORD]
 
+FILETYPEATTRIBUTEFLAG :: enum DWORD {
+	Exclude               = 0,
+	Show                  = 1,
+	HasExtension          = 2,
+	NoEdit                = 3,
+	NoRemove              = 4,
+	NoNewVerb             = 5,
+	NoEditVerb            = 6,
+	NoRemoveVerb          = 7,
+	NoEditDesc            = 8,
+	NoEditIcon            = 9,
+	NoEditDflt            = 10,
+	NoEditVerbCmd         = 11,
+	NoEditVerbExe         = 12,
+	NoDDE                 = 13,
+	NoEditMIME            = 15,
+	OpenIsSafe            = 16,
+	AlwaysUnsafe          = 17,
+	NoRecentDocs          = 20,
+	SafeForElevation      = 21,
+	AlwaysUseDirectInvoke = 22,
+}
+FILETYPEATTRIBUTEFLAGS :: bit_set[FILETYPEATTRIBUTEFLAG; DWORD]
+
+ASSOCCLASS :: enum c_int {
+	SHELL_KEY = 0,
+	PROGID_KEY,
+	PROGID_STR,
+	CLSID_KEY,
+	CLSID_STR,
+	APP_KEY,
+	APP_STR,
+	SYSTEM_STR,
+	FOLDER,
+	STAR,
+	FIXED_PROGID_STR,
+	PROTOCOL_STR,
+}
+
+ASSOCIATIONELEMENT :: struct {
+	ac:       ASSOCCLASS,
+	hkClass:  HKEY,
+	pszClass: PCWSTR,
+}
+
+
+
+HCERTSTORE :: distinct rawptr
+
+// This type is used where the HCRYPTPROV parameter is no longer used.
+// The caller should always pass in `nil`.
+HCRYPTPROV_LEGACY :: rawptr
+
+CERT_CLOSE_STORE_FORCE_FLAG :: 0x00000001
+CERT_CLOSE_STORE_CHECK_FLAG :: 0x00000002
+
+CERT_CONTEXT :: struct {
+	dwCertEncodingType: DWORD,
+	pbCertEncoded:      [^]byte,
+	cbCertEncoded:      DWORD,
+	pCertInfo:          ^CERT_INFO,
+	hCertStore:         HCERTSTORE,
+}
+
+CERT_INFO :: struct {
+	dwVersion:            DWORD,
+	SerialNumber:         CRYPT_INTEGER_BLOB,
+	SignatureAlgorithm:   CRYPT_ALGORITHM_IDENTIFIER,
+	Issuer:               CERT_NAME_BLOB,
+	NotBefore:            FILETIME,
+	NotAfter:             FILETIME,
+	Subject:              CERT_NAME_BLOB,
+	SubjectPublicKeyInfo: CERT_PUBLIC_KEY_INFO,
+	IssuerUniqueId:       CRYPT_BIT_BLOB,
+	SubjectUniqueId:      CRYPT_BIT_BLOB,
+	cExtension:           DWORD,
+	rgExtension:          ^CERT_EXTENSION,
+}
+
+CRYPTOAPI_BLOB :: struct {
+	cbData: DWORD,
+	pbData: [^]byte `fmt:s,cbData`,
+}
+
+CRYPT_INTEGER_BLOB  :: distinct CRYPTOAPI_BLOB
+CRYPT_UINT_BLOB     :: distinct CRYPTOAPI_BLOB
+CRYPT_OBJID_BLOB    :: distinct CRYPTOAPI_BLOB
+CERT_NAME_BLOB      :: distinct CRYPTOAPI_BLOB
+CERT_RDN_VALUE_BLOB :: distinct CRYPTOAPI_BLOB
+CERT_BLOB           :: distinct CRYPTOAPI_BLOB
+CRL_BLOB            :: distinct CRYPTOAPI_BLOB
+DATA_BLOB           :: distinct CRYPTOAPI_BLOB
+CRYPT_DATA_BLOB     :: distinct CRYPTOAPI_BLOB
+CRYPT_HASH_BLOB     :: distinct CRYPTOAPI_BLOB
+CRYPT_DIGEST_BLOB   :: distinct CRYPTOAPI_BLOB
+CRYPT_DER_BLOB      :: distinct CRYPTOAPI_BLOB
+CRYPT_ATTR_BLOB     :: distinct CRYPTOAPI_BLOB
+
+//+-------------------------------------------------------------------------
+//  In a CRYPT_BIT_BLOB the last byte may contain 0-7 unused bits. Therefore, the
+//  overall bit length is cbData * 8 - cUnusedBits.
+//--------------------------------------------------------------------------
+// certenrolls_begin -- CERT_CONTEXT
+CRYPT_BIT_BLOB :: struct {
+	cbData:      DWORD,
+	pbData:      [^]byte,
+	cUnusedBits: DWORD,
+}
+
+//+-------------------------------------------------------------------------
+//  Type used for any algorithm
+//
+//  Where the Parameters CRYPT_OBJID_BLOB is in its encoded representation. For most
+//  algorithm types, the Parameters CRYPT_OBJID_BLOB is NULL (Parameters.cbData = 0).
+//--------------------------------------------------------------------------
+CRYPT_ALGORITHM_IDENTIFIER :: struct {
+	pszObjId:   LPSTR,
+	Parameters: CRYPT_OBJID_BLOB,
+}
+
+CERT_PUBLIC_KEY_INFO :: struct {
+	Algorithm: CRYPT_ALGORITHM_IDENTIFIER,
+	PublicKey: CRYPT_BIT_BLOB,
+}
+
+CERT_EXTENSION :: struct {
+	pszObjId:  LPSTR,
+	fCritical: BOOL,
+	Value:     CRYPT_OBJID_BLOB,
+}

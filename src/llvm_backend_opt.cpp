@@ -32,11 +32,6 @@
 **************************************************************************/
 
 
-gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level);
-gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level);
-gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level);
-gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level);
-
 // gb_internal LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data) {
 // 	lbModule *m = cast(lbModule *)user_data;
 // 	if (m == nullptr) {
@@ -48,227 +43,61 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 // 	return LLVMIsAAllocaInst(value) != nullptr;
 // }
 
-gb_internal bool lb_opt_ignore(i32 optimization_level) {
-	return optimization_level < 0;
-}
-
-gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
-	if (lb_opt_ignore(optimization_level)) {
-		return;
-	}
-
-#if !LB_USE_NEW_PASS_SYSTEM
-	if (false && optimization_level <= 0 && build_context.ODIN_DEBUG) {
-		LLVMAddMergedLoadStoreMotionPass(fpm);
-	} else {
-		LLVMAddPromoteMemoryToRegisterPass(fpm);
-		LLVMAddMergedLoadStoreMotionPass(fpm);
-		if (!build_context.ODIN_DEBUG) {
-			LLVMAddEarlyCSEPass(fpm);
-		}
-	}
-#endif
-}
-
-gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
-	if (lb_opt_ignore(optimization_level)) {
-		return;
-	}
-
-#if !LB_USE_NEW_PASS_SYSTEM
-	if (ignore_memcpy_pass) {
-		lb_basic_populate_function_pass_manager(fpm, optimization_level);
-		return;
-	} else if (optimization_level <= 0) {
-		LLVMAddMemCpyOptPass(fpm);
-		lb_basic_populate_function_pass_manager(fpm, optimization_level);
-		return;
-	}
-
-#if 0
-	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
-	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
-#else
-	LLVMAddMemCpyOptPass(fpm);
-	lb_basic_populate_function_pass_manager(fpm, optimization_level);
-
-	LLVMAddSCCPPass(fpm);
-
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddUnifyFunctionExitNodesPass(fpm);
-
-	LLVMAddCFGSimplificationPass(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-	LLVMAddLowerExpectIntrinsicPass(fpm);
-#endif
-#endif
-}
-
-gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
-	if (lb_opt_ignore(optimization_level)) {
-		return;
-	}
-
-#if !LB_USE_NEW_PASS_SYSTEM
-	if (optimization_level <= 0) {
-		LLVMAddMemCpyOptPass(fpm);
-		lb_basic_populate_function_pass_manager(fpm, optimization_level);
-		return;
-	}
-
-#if 1
-	LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
-	LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderSetSizeLevel(pmb, optimization_level);
-	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
-#else
-	LLVMAddMemCpyOptPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddCFGSimplificationPass(fpm);
-
-	LLVMAddSCCPPass(fpm);
-
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddUnifyFunctionExitNodesPass(fpm);
-
-	LLVMAddCFGSimplificationPass(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-	LLVMAddLowerExpectIntrinsicPass(fpm);
-#endif
-#endif
-}
-
-gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
-#if !LB_USE_NEW_PASS_SYSTEM
-	LLVMAddCFGSimplificationPass(mpm);
-
-	LLVMAddJumpThreadingPass(mpm);
-
-	LLVMAddSimplifyLibCallsPass(mpm);
-
-	LLVMAddTailCallEliminationPass(mpm);
-	LLVMAddCFGSimplificationPass(mpm);
-	LLVMAddReassociatePass(mpm);
-
-	LLVMAddLoopRotatePass(mpm);
-	LLVMAddLICMPass(mpm);
-	LLVMAddLoopUnswitchPass(mpm);
-
-	LLVMAddCFGSimplificationPass(mpm);
-	LLVMAddLoopIdiomPass(mpm);
-	LLVMAddLoopDeletionPass(mpm);
-
-	LLVMAddMergedLoadStoreMotionPass(mpm);
-
-	LLVMAddMemCpyOptPass(mpm);
-	LLVMAddSCCPPass(mpm);
-
-	LLVMAddBitTrackingDCEPass(mpm);
-
-	LLVMAddJumpThreadingPass(mpm);
-	LLVMAddLICMPass(mpm);
-
-	LLVMAddLoopRerollPass(mpm);
-	LLVMAddAggressiveDCEPass(mpm);
-	LLVMAddCFGSimplificationPass(mpm);
-#endif
-}
-
-
-gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level) {
-
-	// NOTE(bill): Treat -opt:3 as if it was -opt:2
-	// TODO(bill): Determine which opt definitions should exist in the first place
-	if (optimization_level <= 0 && build_context.ODIN_DEBUG) {
-		return;
-	}
-#if !LB_USE_NEW_PASS_SYSTEM
-	LLVMAddAlwaysInlinerPass(mpm);
-	LLVMAddStripDeadPrototypesPass(mpm);
-	LLVMAddAnalysisPasses(target_machine, mpm);
-	LLVMAddPruneEHPass(mpm);
-	if (optimization_level <= 0) {
-		return;
-	}
-
-	LLVMAddGlobalDCEPass(mpm);
-
-	if (optimization_level >= 2) {
-		// NOTE(bill, 2021-03-29: use this causes invalid code generation)
-		// LLVMPassManagerBuilderRef pmb = LLVMPassManagerBuilderCreate();
-		// LLVMPassManagerBuilderSetOptLevel(pmb, optimization_level);
-		// LLVMPassManagerBuilderPopulateModulePassManager(pmb, mpm);
-		// LLVMPassManagerBuilderPopulateLTOPassManager(pmb, mpm, false, true);
-		// return;
-	}
-	
-
-	LLVMAddIPSCCPPass(mpm);
-	LLVMAddCalledValuePropagationPass(mpm);
-
-	LLVMAddGlobalOptimizerPass(mpm);
-	LLVMAddDeadArgEliminationPass(mpm);
-
-	LLVMAddCFGSimplificationPass(mpm);
-
-	LLVMAddPruneEHPass(mpm);
-	if (optimization_level < 2) {
-		return;
-	}
-
-	LLVMAddFunctionInliningPass(mpm);
-	
-	
-	lb_add_function_simplifcation_passes(mpm, optimization_level);
-		
-	LLVMAddGlobalDCEPass(mpm);
-	LLVMAddGlobalOptimizerPass(mpm);
-	
-
-	LLVMAddLoopRotatePass(mpm);
-
-	LLVMAddLoopVectorizePass(mpm);
-	
-	if (optimization_level >= 2) {
-		LLVMAddEarlyCSEPass(mpm);
-		LLVMAddLICMPass(mpm);
-		LLVMAddLoopUnswitchPass(mpm);
-		LLVMAddCFGSimplificationPass(mpm);
-	}
-
-	LLVMAddCFGSimplificationPass(mpm);
-
-	LLVMAddSLPVectorizePass(mpm);
-	LLVMAddLICMPass(mpm);
-
-	LLVMAddAlignmentFromAssumptionsPass(mpm);
-
-	LLVMAddStripDeadPrototypesPass(mpm);
-
-	if (optimization_level >= 2) {
-		LLVMAddGlobalDCEPass(mpm);
-		LLVMAddConstantMergePass(mpm);
-	}
-
-	LLVMAddCFGSimplificationPass(mpm);
-#endif
-}
-
-
-
 /**************************************************************************
 	IMPORTANT NOTE(bill, 2021-11-06): Custom Passes
 	
 	The procedures below are custom written passes to aid in the 
 	optimization of Odin programs	
 **************************************************************************/
+
+gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
+	Entity *e = p->entity;
+	if (e == nullptr) {
+		return;
+	}
+	GB_ASSERT(e->kind == Entity_Procedure);
+
+
+	u64 fast_math_flags = e->Procedure.fast_math_flags;
+	LLVMFastMathFlags llvm_flags = 0;
+	if (fast_math_flags & OdinFastMath_Allow_Reassoc)    llvm_flags |= LLVMFastMathAllowReassoc;
+	if (fast_math_flags & OdinFastMath_No_NaNs)          llvm_flags |= LLVMFastMathNoNaNs;
+	if (fast_math_flags & OdinFastMath_No_Infs)          llvm_flags |= LLVMFastMathNoInfs;
+	if (fast_math_flags & OdinFastMath_No_Signed_Zeros)  llvm_flags |= LLVMFastMathNoSignedZeros;
+	if (fast_math_flags & OdinFastMath_Allow_Reciprocal) llvm_flags |= LLVMFastMathAllowReciprocal;
+	if (fast_math_flags & OdinFastMath_Allow_Contract)   llvm_flags |= LLVMFastMathAllowContract;
+	if (fast_math_flags & OdinFastMath_Approx_Func)      llvm_flags |= LLVMFastMathApproxFunc;
+
+	if (llvm_flags == 0) {
+		return;
+	}
+
+	for (LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(p->value);
+	     block != nullptr;
+	     block = LLVMGetNextBasicBlock(block)) {
+		for (LLVMValueRef instr = LLVMGetFirstInstruction(block);
+		     instr != nullptr;
+		     instr = LLVMGetNextInstruction(instr))  {
+			switch (LLVMGetInstructionOpcode(instr)) {
+			case LLVMFNeg:
+			case LLVMFAdd:
+			case LLVMFSub:
+			case LLVMFMul:
+			case LLVMFDiv:
+			case LLVMFRem:
+			case LLVMFPToUI:
+			case LLVMFPToSI:
+			case LLVMUIToFP:
+			case LLVMSIToFP:
+			case LLVMFPTrunc:
+			case LLVMFPExt:
+			case LLVMFCmp:
+				LLVMSetFastMathFlags(instr, llvm_flags);
+				break;
+			}
+		}
+	}
+}
 
 gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	unsigned debug_declare_id = LLVMLookupIntrinsicID("llvm.dbg.declare", 16);
@@ -475,6 +304,9 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 	if (p == nullptr) {
 		return;
 	}
+
+	lb_run_fast_float_math_pass(p);
+
 	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
 	// which means we cannot rely upon it
 	// This is also useful for read the .ll for debug purposes because a lot of instructions

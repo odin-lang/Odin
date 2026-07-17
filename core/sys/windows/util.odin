@@ -465,7 +465,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 		return "", {}, false
 	}
 
-	cname_w := make([]u16, min(computer_name_size, 1), context.temp_allocator)
+	cname_w := make([]u16, computer_name_size, context.temp_allocator)
 
 	res = LookupAccountNameW(
 		nil,
@@ -507,7 +507,7 @@ get_sid :: proc(username: string, sid: ^SID) -> (ok: bool) {
 		return false
 	}
 
-	cname_w := make([]u16, min(computer_name_size, 1), context.temp_allocator)
+	cname_w := make([]u16, computer_name_size, context.temp_allocator)
 
 	res = LookupAccountNameW(
 		nil,
@@ -707,7 +707,6 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 	}
 	si := STARTUPINFOW{}
 	si.cb = size_of(STARTUPINFOW)
-	pi := pi
 
 	ok = bool(CreateProcessAsUserW(
 		user_token,
@@ -738,7 +737,7 @@ ensure_winsock_initialized :: proc "contextless" () {
 	@static gate := false
 	@static initted := false
 
-	if initted {
+	if intrinsics.atomic_load(&initted) {
 		return
 	}
 
@@ -752,5 +751,5 @@ ensure_winsock_initialized :: proc "contextless" () {
 	res := WSAStartup(version_requested, &unused_info)
 	assert_contextless(res == 0, "unable to initialized Winsock2")
 
-	initted = true
+	intrinsics.atomic_store(&initted, true)
 }

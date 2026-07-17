@@ -493,10 +493,10 @@ CallbackToken :: distinct u64
 CURRENT_CALLBACK_TOKEN_VALUE :: CallbackToken(0xFFFFFFFFFFFFFFFF)
 INVALID_CALLBACK_TOKEN_VALUE :: CallbackToken(0x0000000000000000)
 
-ReadingCallback        :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, reading: ^IGameInputReading, hasOverrunOccured: bool)
-DeviceCallback         :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentStatus: DeviceStatus, previousStatus: DeviceStatus)
-SystemButtonCallback   :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentButtons: SystemButtons, previousButtons: SystemButtons)
-KeyboardLayoutCallback :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IGameInputDevice, timestamp: u64, currentLayout: u32, previousLayout: u32)
+ReadingCallback        :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, reading: ^IReading, hasOverrunOccured: bool)
+DeviceCallback         :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IDevice, timestamp: u64, currentStatus: DeviceStatus, previousStatus: DeviceStatus)
+SystemButtonCallback   :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IDevice, timestamp: u64, currentButtons: SystemButtons, previousButtons: SystemButtons)
+KeyboardLayoutCallback :: #type proc "stdcall" (callbackToken: CallbackToken, ctx: rawptr, device: ^IDevice, timestamp: u64, currentLayout: u32, previousLayout: u32)
 
 KeyState :: struct {
 	scanCode:   u32,
@@ -988,134 +988,134 @@ IGameInput :: struct #raw_union {
 IGameInput_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
 	GetCurrentTimestamp:            proc "system" (this: ^IGameInput) -> u64,
-	GetCurrentReading:              proc "system" (this: ^IGameInput, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	GetNextReading:                 proc "system" (this: ^IGameInput, referenceReading: ^IGameInputReading, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	GetPreviousReading:             proc "system" (this: ^IGameInput, referenceReading: ^IGameInputReading, inputKind: Kind, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	GetTemporalReading:             proc "system" (this: ^IGameInput, timestamp: u64, device: ^IGameInputDevice, reading: ^^IGameInputReading) -> HRESULT,
-	RegisterReadingCallback:        proc "system" (this: ^IGameInput, device: ^IGameInputDevice, inputKind: Kind, analogThreshold: f32, ctx: rawptr, callbackFunc: ReadingCallback, callbackToken: ^CallbackToken) -> HRESULT,
-	RegisterDeviceCallback:         proc "system" (this: ^IGameInput, device: ^IGameInputDevice, inputKind: Kind, statusFilter: DeviceStatus, enumerationKind: EnumerationKind, ctx: rawptr, callbackFunc: DeviceCallback, callbackToken: ^CallbackToken) -> HRESULT,
-	RegisterSystemButtonCallback:   proc "system" (this: ^IGameInput, device: ^IGameInputDevice, buttonFilter: SystemButtons, ctx: rawptr, callbackFunc: SystemButtonCallback, callbackToken: ^CallbackToken) -> HRESULT,
-	RegisterKeyboardLayoutCallback: proc "system" (this: ^IGameInput, device: ^IGameInputDevice, ctx: rawptr, callbackFunc: KeyboardLayoutCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	GetCurrentReading:              proc "system" (this: ^IGameInput, inputKind: Kind, device: ^IDevice, reading: ^^IReading) -> HRESULT,
+	GetNextReading:                 proc "system" (this: ^IGameInput, referenceReading: ^IReading, inputKind: Kind, device: ^IDevice, reading: ^^IReading) -> HRESULT,
+	GetPreviousReading:             proc "system" (this: ^IGameInput, referenceReading: ^IReading, inputKind: Kind, device: ^IDevice, reading: ^^IReading) -> HRESULT,
+	GetTemporalReading:             proc "system" (this: ^IGameInput, timestamp: u64, device: ^IDevice, reading: ^^IReading) -> HRESULT,
+	RegisterReadingCallback:        proc "system" (this: ^IGameInput, device: ^IDevice, inputKind: Kind, analogThreshold: f32, ctx: rawptr, callbackFunc: ReadingCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	RegisterDeviceCallback:         proc "system" (this: ^IGameInput, device: ^IDevice, inputKind: Kind, statusFilter: DeviceStatus, enumerationKind: EnumerationKind, ctx: rawptr, callbackFunc: DeviceCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	RegisterSystemButtonCallback:   proc "system" (this: ^IGameInput, device: ^IDevice, buttonFilter: SystemButtons, ctx: rawptr, callbackFunc: SystemButtonCallback, callbackToken: ^CallbackToken) -> HRESULT,
+	RegisterKeyboardLayoutCallback: proc "system" (this: ^IGameInput, device: ^IDevice, ctx: rawptr, callbackFunc: KeyboardLayoutCallback, callbackToken: ^CallbackToken) -> HRESULT,
 	StopCallback:                   proc "system" (this: ^IGameInput, callbackToken: CallbackToken),
 	UnregisterCallback:             proc "system" (this: ^IGameInput, callbackToken: CallbackToken, timeoutInMicroseconds: u64) -> bool,
-	CreateDispatcher:               proc "system" (this: ^IGameInput, dispatcher: ^^IGameInputDispatcher) -> HRESULT,
-	CreateAggregateDevice:          proc "system" (this: ^IGameInput, kind: Kind, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromId:               proc "system" (this: ^IGameInput, value: ^APP_LOCAL_DEVICE_ID, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromObject:           proc "system" (this: ^IGameInput, value: ^IUnknown, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromPlatformHandle:   proc "system" (this: ^IGameInput, value: HANDLE, device: ^^IGameInputDevice) -> HRESULT,
-	FindDeviceFromPlatformString:   proc "system" (this: ^IGameInput, value: win.LPCWSTR, device: ^^IGameInputDevice) -> HRESULT,
+	CreateDispatcher:               proc "system" (this: ^IGameInput, dispatcher: ^^IDispatcher) -> HRESULT,
+	CreateAggregateDevice:          proc "system" (this: ^IGameInput, kind: Kind, device: ^^IDevice) -> HRESULT,
+	FindDeviceFromId:               proc "system" (this: ^IGameInput, value: ^APP_LOCAL_DEVICE_ID, device: ^^IDevice) -> HRESULT,
+	FindDeviceFromObject:           proc "system" (this: ^IGameInput, value: ^IUnknown, device: ^^IDevice) -> HRESULT,
+	FindDeviceFromPlatformHandle:   proc "system" (this: ^IGameInput, value: HANDLE, device: ^^IDevice) -> HRESULT,
+	FindDeviceFromPlatformString:   proc "system" (this: ^IGameInput, value: win.LPCWSTR, device: ^^IDevice) -> HRESULT,
 	EnableOemDeviceSupport:         proc "system" (this: ^IGameInput, vendorId: u16, productId: u16, interfaceNumber: u8, collectionNumber: u8) -> HRESULT,
 	SetFocusPolicy:                 proc "system" (this: ^IGameInput, policy: FocusPolicy),
 }
 
-IGameInputReading_UUID_STRING :: "2156947A-E1FA-4DE0-A30B-D812931DBD8D"
-IGameInputReading_UUID := &IID{0x2156947A, 0xE1FA, 0x4DE0, {0xA3, 0x0B, 0xD8, 0x12, 0x93, 0x1D, 0x0BD, 0x8D}}
-IGameInputReading :: struct #raw_union {
+IReading_UUID_STRING :: "2156947A-E1FA-4DE0-A30B-D812931DBD8D"
+IReading_UUID := &IID{0x2156947A, 0xE1FA, 0x4DE0, {0xA3, 0x0B, 0xD8, 0x12, 0x93, 0x1D, 0x0BD, 0x8D}}
+IReading :: struct #raw_union {
 	#subtype iunknown: IUnknown,
-	using igameinputreading_vtable: ^IGameInputReading_VTable,
+	using igameinputreading_vtable: ^IReading_VTable,
 }
-IGameInputReading_VTable :: struct {
+IReading_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetInputKind:             proc "system" (this: ^IGameInputReading) -> Kind,
-	GetSequenceNumber:        proc "system" (this: ^IGameInputReading, inputKind: Kind) -> u64,
-	GetTimestamp:             proc "system" (this: ^IGameInputReading) -> u64,
-	GetDevice:                proc "system" (this: ^IGameInputReading, device: ^^IGameInputDevice),
-	GetRawReport:             proc "system" (this: ^IGameInputReading, report: ^^IGameInputRawDeviceReport) -> bool,
-	GetControllerAxisCount:   proc "system" (this: ^IGameInputReading) -> u32,
-	GetControllerAxisState:   proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]f32) -> u32,
-	GetControllerButtonCount: proc "system" (this: ^IGameInputReading) -> u32,
-	GetControllerButtonState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]bool) -> u32,
-	GetControllerSwitchCount: proc "system" (this: ^IGameInputReading) -> u32,
-	GetControllerSwitchState: proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]SwitchPosition) -> u32,
-	GetKeyCount:              proc "system" (this: ^IGameInputReading) -> u32,
-	GetKeyState:              proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]KeyState) -> u32,
-	GetMouseState:            proc "system" (this: ^IGameInputReading, state: ^MouseState) -> bool,
-	GetTouchCount:            proc "system" (this: ^IGameInputReading) -> u32,
-	GetTouchState:            proc "system" (this: ^IGameInputReading, stateArrayCount: u32, stateArray: [^]TouchState) -> u32,
-	GetMotionState:           proc "system" (this: ^IGameInputReading, state: ^MotionState) -> bool,
-	GetArcadeStickState:      proc "system" (this: ^IGameInputReading, state: ^ArcadeStickState) -> bool,
-	GetFlightStickState:      proc "system" (this: ^IGameInputReading, state: ^FlightStickState) -> bool,
-	GetGamepadState:          proc "system" (this: ^IGameInputReading, state: ^GamepadState) -> bool,
-	GetRacingWheelState:      proc "system" (this: ^IGameInputReading, state: ^RacingWheelState) -> bool,
-	GetUiNavigationState:     proc "system" (this: ^IGameInputReading, state: ^UiNavigationState) -> bool,
+	GetInputKind:             proc "system" (this: ^IReading) -> Kind,
+	GetSequenceNumber:        proc "system" (this: ^IReading, inputKind: Kind) -> u64,
+	GetTimestamp:             proc "system" (this: ^IReading) -> u64,
+	GetDevice:                proc "system" (this: ^IReading, device: ^^IDevice),
+	GetRawReport:             proc "system" (this: ^IReading, report: ^^IRawDeviceReport) -> bool,
+	GetControllerAxisCount:   proc "system" (this: ^IReading) -> u32,
+	GetControllerAxisState:   proc "system" (this: ^IReading, stateArrayCount: u32, stateArray: [^]f32) -> u32,
+	GetControllerButtonCount: proc "system" (this: ^IReading) -> u32,
+	GetControllerButtonState: proc "system" (this: ^IReading, stateArrayCount: u32, stateArray: [^]bool) -> u32,
+	GetControllerSwitchCount: proc "system" (this: ^IReading) -> u32,
+	GetControllerSwitchState: proc "system" (this: ^IReading, stateArrayCount: u32, stateArray: [^]SwitchPosition) -> u32,
+	GetKeyCount:              proc "system" (this: ^IReading) -> u32,
+	GetKeyState:              proc "system" (this: ^IReading, stateArrayCount: u32, stateArray: [^]KeyState) -> u32,
+	GetMouseState:            proc "system" (this: ^IReading, state: ^MouseState) -> bool,
+	GetTouchCount:            proc "system" (this: ^IReading) -> u32,
+	GetTouchState:            proc "system" (this: ^IReading, stateArrayCount: u32, stateArray: [^]TouchState) -> u32,
+	GetMotionState:           proc "system" (this: ^IReading, state: ^MotionState) -> bool,
+	GetArcadeStickState:      proc "system" (this: ^IReading, state: ^ArcadeStickState) -> bool,
+	GetFlightStickState:      proc "system" (this: ^IReading, state: ^FlightStickState) -> bool,
+	GetGamepadState:          proc "system" (this: ^IReading, state: ^GamepadState) -> bool,
+	GetRacingWheelState:      proc "system" (this: ^IReading, state: ^RacingWheelState) -> bool,
+	GetUiNavigationState:     proc "system" (this: ^IReading, state: ^UiNavigationState) -> bool,
 }
 
-IGameInputDevice_UUID_STRING :: "31DD86FB-4C1B-408A-868F-439B3CD47125"
-IGameInputDevice_UUID := &IID{0x31DD86FB, 0x4C1B, 0x408A, {0x86, 0x8F, 0x43, 0x9B, 0x3C, 0xD4, 0x71, 0x25}}
-IGameInputDevice :: struct #raw_union {
+IDevice_UUID_STRING :: "31DD86FB-4C1B-408A-868F-439B3CD47125"
+IDevice_UUID := &IID{0x31DD86FB, 0x4C1B, 0x408A, {0x86, 0x8F, 0x43, 0x9B, 0x3C, 0xD4, 0x71, 0x25}}
+IDevice :: struct #raw_union {
 	#subtype iunknown: IUnknown,
-	using igameinputdevice_vtable: ^IGameInputDevice_Vtable,
+	using igameinputdevice_vtable: ^IDevice_Vtable,
 }
-IGameInputDevice_Vtable :: struct {
+IDevice_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDeviceInfo:                   proc "system" (this: ^IGameInputDevice) -> ^DeviceInfo,
-	GetDeviceStatus:                 proc "system" (this: ^IGameInputDevice) -> DeviceStatus,
-	GetBatteryState:                 proc "system" (this: ^IGameInputDevice, state: ^BatteryState),
-	CreateForceFeedbackEffect:       proc "system" (this: ^IGameInputDevice, motorIndex: u32, params: ^ForceFeedbackParams, effect: ^^IGameInputForceFeedbackEffect) -> HRESULT,
-	IsForceFeedbackMotorPoweredOn:   proc "system" (this: ^IGameInputDevice, motorIndex: u32) -> bool,
-	SetForceFeedbackMotorGain:       proc "system" (this: ^IGameInputDevice, motorIndex: u32, masterGain: f32),
-	SetHapticMotorState:             proc "system" (this: ^IGameInputDevice, motorIndex: u32, params: ^HapticFeedbackParams) -> HRESULT,
-	SetRumbleState:                  proc "system" (this: ^IGameInputDevice, params: ^RumbleParams),
-	SetInputSynchronizationState:    proc "system" (this: ^IGameInputDevice, enabled: bool),
-	SendInputSynchronizationHint:    proc "system" (this: ^IGameInputDevice),
-	PowerOff:                        proc "system" (this: ^IGameInputDevice),
-	CreateRawDeviceReport:           proc "system" (this: ^IGameInputDevice, reportId: u32, reportKind: RawDeviceReportKind, report: ^^IGameInputRawDeviceReport) -> HRESULT,
-	GetRawDeviceFeature:             proc "system" (this: ^IGameInputDevice, reportId: u32, report: ^^IGameInputRawDeviceReport) -> HRESULT,
-	SetRawDeviceFeature:             proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
-	SendRawDeviceOutput:             proc "system" (this: ^IGameInputDevice, report: ^IGameInputRawDeviceReport) -> HRESULT,
-	SendRawDeviceOutputWithResponse: proc "system" (this: ^IGameInputDevice, requestReport: ^IGameInputRawDeviceReport, responseReport: ^^IGameInputRawDeviceReport) -> HRESULT,
-	ExecuteRawDeviceIoControl:       proc "system" (this: ^IGameInputDevice, controlCode: u32, inputBufferSize: win.SIZE_T, inputBuffer: rawptr, outputBufferSize: win.SIZE_T, outputBuffer: rawptr, outputSize: ^win.SIZE_T) -> HRESULT,
-	AcquireExclusiveRawDeviceAccess: proc "system" (this: ^IGameInputDevice, timeoutInMicroseconds: u64) -> bool,
-	ReleaseExclusiveRawDeviceAccess: proc "system" (this: ^IGameInputDevice),
+	GetDeviceInfo:                   proc "system" (this: ^IDevice) -> ^DeviceInfo,
+	GetDeviceStatus:                 proc "system" (this: ^IDevice) -> DeviceStatus,
+	GetBatteryState:                 proc "system" (this: ^IDevice, state: ^BatteryState),
+	CreateForceFeedbackEffect:       proc "system" (this: ^IDevice, motorIndex: u32, params: ^ForceFeedbackParams, effect: ^^IForceFeedbackEffect) -> HRESULT,
+	IsForceFeedbackMotorPoweredOn:   proc "system" (this: ^IDevice, motorIndex: u32) -> bool,
+	SetForceFeedbackMotorGain:       proc "system" (this: ^IDevice, motorIndex: u32, masterGain: f32),
+	SetHapticMotorState:             proc "system" (this: ^IDevice, motorIndex: u32, params: ^HapticFeedbackParams) -> HRESULT,
+	SetRumbleState:                  proc "system" (this: ^IDevice, params: ^RumbleParams),
+	SetInputSynchronizationState:    proc "system" (this: ^IDevice, enabled: bool),
+	SendInputSynchronizationHint:    proc "system" (this: ^IDevice),
+	PowerOff:                        proc "system" (this: ^IDevice),
+	CreateRawDeviceReport:           proc "system" (this: ^IDevice, reportId: u32, reportKind: RawDeviceReportKind, report: ^^IRawDeviceReport) -> HRESULT,
+	GetRawDeviceFeature:             proc "system" (this: ^IDevice, reportId: u32, report: ^^IRawDeviceReport) -> HRESULT,
+	SetRawDeviceFeature:             proc "system" (this: ^IDevice, report: ^IRawDeviceReport) -> HRESULT,
+	SendRawDeviceOutput:             proc "system" (this: ^IDevice, report: ^IRawDeviceReport) -> HRESULT,
+	SendRawDeviceOutputWithResponse: proc "system" (this: ^IDevice, requestReport: ^IRawDeviceReport, responseReport: ^^IRawDeviceReport) -> HRESULT,
+	ExecuteRawDeviceIoControl:       proc "system" (this: ^IDevice, controlCode: u32, inputBufferSize: win.SIZE_T, inputBuffer: rawptr, outputBufferSize: win.SIZE_T, outputBuffer: rawptr, outputSize: ^win.SIZE_T) -> HRESULT,
+	AcquireExclusiveRawDeviceAccess: proc "system" (this: ^IDevice, timeoutInMicroseconds: u64) -> bool,
+	ReleaseExclusiveRawDeviceAccess: proc "system" (this: ^IDevice),
 }
 
-IGameInputDispatcher_UUID_STRING :: "415EED2E-98CB-42C2-8F28-B94601074E31"
-IGameInputDispatcher_UUID := &IID{0x415EED2E, 0x98CB, 0x42C2, {0x8F, 0x28, 0xB9, 0x46, 0x01, 0x07, 0x4E, 0x31}}
-IGameInputDispatcher :: struct #raw_union {
+IDispatcher_UUID_STRING :: "415EED2E-98CB-42C2-8F28-B94601074E31"
+IDispatcher_UUID := &IID{0x415EED2E, 0x98CB, 0x42C2, {0x8F, 0x28, 0xB9, 0x46, 0x01, 0x07, 0x4E, 0x31}}
+IDispatcher :: struct #raw_union {
 	#subtype iunknown: IUnknown,
-	using igameinputdispatcher_vtable: ^IGameInputDispatcher_Vtable,
+	using igameinputdispatcher_vtable: ^IDispatcher_Vtable,
 }
-IGameInputDispatcher_Vtable :: struct {
+IDispatcher_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	Dispatch:       proc "system" (this: ^IGameInputDispatcher, quotaInMicroseconds: u64) -> bool,
-	OpenWaitHandle: proc "system" (this: ^IGameInputDispatcher, waitHandle: ^HANDLE) -> HRESULT,
+	Dispatch:       proc "system" (this: ^IDispatcher, quotaInMicroseconds: u64) -> bool,
+	OpenWaitHandle: proc "system" (this: ^IDispatcher, waitHandle: ^HANDLE) -> HRESULT,
 }
 
-IGameInputForceFeedbackEffect_UUID_STRING :: "51BDA05E-F742-45D9-B085-9444AE48381D"
-IGameInputForceFeedbackEffect_UUID := &IID{0x51BDA05E, 0xF742, 0x45D9, {0xB0, 0x85, 0x94, 0x44, 0xAE, 0x48, 0x38, 0x1D}}
-IGameInputForceFeedbackEffect :: struct #raw_union {
+IForceFeedbackEffect_UUID_STRING :: "51BDA05E-F742-45D9-B085-9444AE48381D"
+IForceFeedbackEffect_UUID := &IID{0x51BDA05E, 0xF742, 0x45D9, {0xB0, 0x85, 0x94, 0x44, 0xAE, 0x48, 0x38, 0x1D}}
+IForceFeedbackEffect :: struct #raw_union {
 	#subtype iunknown: IUnknown,
-	using igameinputforcefeedbackeffect_vtable: ^IGameInputForceFeedbackEffect_Vtable,
+	using igameinputforcefeedbackeffect_vtable: ^IForceFeedbackEffect_Vtable,
 }
-IGameInputForceFeedbackEffect_Vtable :: struct {
+IForceFeedbackEffect_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDevice:     proc "system" (this: ^IGameInputForceFeedbackEffect, device: ^^IGameInputDevice),
-	GetMotorIndex: proc "system" (this: ^IGameInputForceFeedbackEffect) -> u32,
-	GetGain:       proc "system" (this: ^IGameInputForceFeedbackEffect) -> f32,
-	SetGain:       proc "system" (this: ^IGameInputForceFeedbackEffect, gain: f32),
-	GetParams:     proc "system" (this: ^IGameInputForceFeedbackEffect, params: ^ForceFeedbackParams),
-	SetParams:     proc "system" (this: ^IGameInputForceFeedbackEffect, params: ^ForceFeedbackParams) -> bool,
-	GetState:      proc "system" (this: ^IGameInputForceFeedbackEffect) -> FeedbackEffectState,
-	SetState:      proc "system" (this: ^IGameInputForceFeedbackEffect, state: FeedbackEffectState),
+	GetDevice:     proc "system" (this: ^IForceFeedbackEffect, device: ^^IDevice),
+	GetMotorIndex: proc "system" (this: ^IForceFeedbackEffect) -> u32,
+	GetGain:       proc "system" (this: ^IForceFeedbackEffect) -> f32,
+	SetGain:       proc "system" (this: ^IForceFeedbackEffect, gain: f32),
+	GetParams:     proc "system" (this: ^IForceFeedbackEffect, params: ^ForceFeedbackParams),
+	SetParams:     proc "system" (this: ^IForceFeedbackEffect, params: ^ForceFeedbackParams) -> bool,
+	GetState:      proc "system" (this: ^IForceFeedbackEffect) -> FeedbackEffectState,
+	SetState:      proc "system" (this: ^IForceFeedbackEffect, state: FeedbackEffectState),
 }
 
-IGameInputRawDeviceReport_UUID_STRING :: "61F08CF1-1FFC-40CA-A2B8-E1AB8BC5B6DC"
-IGameInputRawDeviceReport_UUID := &IID{0x61F08CF1, 0x1FFC, 0x40CA, {0xA2, 0xB8, 0xE1, 0xAB, 0x8B, 0xC5, 0xB6, 0xDC}}
-IGameInputRawDeviceReport :: struct #raw_union {
+IRawDeviceReport_UUID_STRING :: "61F08CF1-1FFC-40CA-A2B8-E1AB8BC5B6DC"
+IRawDeviceReport_UUID := &IID{0x61F08CF1, 0x1FFC, 0x40CA, {0xA2, 0xB8, 0xE1, 0xAB, 0x8B, 0xC5, 0xB6, 0xDC}}
+IRawDeviceReport :: struct #raw_union {
 	#subtype iunknown: IUnknown,
-	using igameinputrawdevicereport_vtable: ^IGameInputRawDeviceReport_Vtable,
+	using igameinputrawdevicereport_vtable: ^IRawDeviceReport_Vtable,
 }
-IGameInputRawDeviceReport_Vtable :: struct {
+IRawDeviceReport_Vtable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetDevice:      proc "system" (this: ^IGameInputRawDeviceReport, device: ^^IGameInputDevice),
-	GetReportInfo:  proc "system" (this: ^IGameInputRawDeviceReport) -> ^RawDeviceReportInfo,
-	GetRawDataSize: proc "system" (this: ^IGameInputRawDeviceReport) -> win.SIZE_T,
-	GetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: win.SIZE_T, buffer: rawptr) -> win.SIZE_T,
-	SetRawData:     proc "system" (this: ^IGameInputRawDeviceReport, bufferSize: win.SIZE_T, buffer: rawptr) -> bool,
-	GetItemValue:   proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: ^u64) -> bool,
-	SetItemValue:   proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32, value: u64) -> bool,
-	ResetItemValue: proc "system" (this: ^IGameInputRawDeviceReport, itemIndex: u32) -> bool,
-	ResetAllItems:  proc "system" (this: ^IGameInputRawDeviceReport) -> bool,
+	GetDevice:      proc "system" (this: ^IRawDeviceReport, device: ^^IDevice),
+	GetReportInfo:  proc "system" (this: ^IRawDeviceReport) -> ^RawDeviceReportInfo,
+	GetRawDataSize: proc "system" (this: ^IRawDeviceReport) -> win.SIZE_T,
+	GetRawData:     proc "system" (this: ^IRawDeviceReport, bufferSize: win.SIZE_T, buffer: rawptr) -> win.SIZE_T,
+	SetRawData:     proc "system" (this: ^IRawDeviceReport, bufferSize: win.SIZE_T, buffer: rawptr) -> bool,
+	GetItemValue:   proc "system" (this: ^IRawDeviceReport, itemIndex: u32, value: ^u64) -> bool,
+	SetItemValue:   proc "system" (this: ^IRawDeviceReport, itemIndex: u32, value: u64) -> bool,
+	ResetItemValue: proc "system" (this: ^IRawDeviceReport, itemIndex: u32) -> bool,
+	ResetAllItems:  proc "system" (this: ^IRawDeviceReport) -> bool,
 }
 
 @(default_calling_convention="system", link_prefix="GameInput")

@@ -34,6 +34,7 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 builder_make_none :: proc(allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, allocator, loc) or_return }, nil
 }
@@ -50,6 +51,7 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 builder_make_len :: proc(len: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, len, allocator, loc) or_return }, nil
 }
@@ -67,6 +69,7 @@ Returns:
 - res: The new Builder
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator, loc := #caller_location) -> (res: Builder, err: runtime.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, len, cap, allocator, loc) or_return }, nil
 }
@@ -193,6 +196,7 @@ Inputs:
 Returns:
 - res: the io.Stream
 */
+@(require_results)
 to_stream :: proc(b: ^Builder) -> (res: io.Stream) {
 	return io.Stream{procedure=_builder_stream_proc, data=b}
 }
@@ -205,6 +209,7 @@ Inputs:
 Returns:
 - res: The io.Writer
 */
+@(require_results)
 to_writer :: proc(b: ^Builder) -> (res: io.Writer) {
 	return io.to_writer(to_stream(b))
 }
@@ -267,6 +272,7 @@ Output:
 	ab
 
 */
+@(require_results)
 builder_from_bytes :: proc(backing: []byte) -> (res: Builder) {
 	return Builder{
 		buf = transmute([dynamic]byte)runtime.Raw_Dynamic_Array{
@@ -292,6 +298,7 @@ Inputs:
 Returns:
 - res: The contents of the Builder's buffer, as a string
 */
+@(require_results)
 to_string :: proc(b: Builder) -> (res: string) {
 	return string(b.buf[:])
 }
@@ -306,6 +313,7 @@ Inputs:
 Returns:
 - res: A cstring of the Builder's buffer
 */
+@(require_results)
 unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
 	append(&b.buf, 0, loc)
 	pop(&b.buf)
@@ -321,6 +329,7 @@ Returns:
 - res: A cstring of the Builder's buffer upon success
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := append(&b.buf, 0, loc) or_return
 	if n != 1 {
@@ -341,6 +350,7 @@ Inputs:
 Returns:
 - res: The length of the Builder's buffer
 */
+@(require_results)
 builder_len :: proc(b: Builder) -> (res: int) {
 	return len(b.buf)
 }
@@ -353,6 +363,7 @@ Inputs:
 Returns:
 - res: The capacity of the Builder's buffer
 */
+@(require_results)
 builder_cap :: proc(b: Builder) -> (res: int) {
 	return cap(b.buf)
 }
@@ -365,6 +376,7 @@ Inputs:
 Returns:
 - res: The available space left in the Builder's buffer
 */
+@(require_results)
 builder_space :: proc(b: Builder) -> (res: int) {
 	return cap(b.buf) - len(b.buf)
 }

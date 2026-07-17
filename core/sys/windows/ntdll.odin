@@ -50,6 +50,22 @@ foreign ntdll_lib {
 		EaBuffer: PVOID,
 		EaLength: ULONG,
 	) -> NTSTATUS ---
+
+
+	NtAssociateWaitCompletionPacket :: proc(
+		WaitCompletionPacketHandle: HANDLE,
+		IoCompletionHandle:         HANDLE,
+		TargetObjectHandle:         HANDLE,
+		KeyContext:                 PVOID,
+		ApcContext:                 PVOID,
+		IoStatus:                   NTSTATUS,
+		IoStatusInformation:        ULONG_PTR,
+		AlreadySignaled:            ^BOOLEAN,
+	) -> NTSTATUS ---
+
+	NtDelayExecution :: proc(Alertable: BOOL, DelayInterval: PLARGE_INTEGER) -> NTSTATUS ---
+
+	ZwSetTimerResolution :: proc(RequestedResolution: ULONG, Set: BOOLEAN, ActualResolution: PULONG) -> NTSTATUS ---
 }
 
 

@@ -13,7 +13,7 @@ LIB :: (
 when LIB != "" {
 	when !#exists(LIB) {
 		// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
-		#panic("Could not find the compiled cgltf library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/cgltf/src\"`")
+		// #panic("Could not find the compiled cgltf library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/cgltf/src\"`")
 	}
 }
 

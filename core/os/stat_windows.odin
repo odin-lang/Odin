@@ -377,17 +377,25 @@ _volume_name_len :: proc(path: string) -> (length: int) {
 
 	// UNC path, minimum version of the volume is `\\h\s` for host, share.
 	// Can also contain an IP address in the host position.
+	// (path might be purely path separators)
 	slash_count := 0
+	found_host: bool
 	for i in prefix..<len(path) {
 		// Host needs to be at least 1 character
-		if _is_path_separator(path[i]) && i > 0 {
+		if _is_path_separator(path[i]) {
 			slash_count += 1
 
-			if slash_count == 2 {
+			if slash_count == 2 && found_host {
 				return i
+			}
+		} else {
+			found_host = true
+			// Found a host but no trailing slash `\\h\s`
+			if slash_count == 1 && i == len(path)-1 {
+				return len(path)
 			}
 		}
 	}
 
-	return len(path)
+	return 0
 }

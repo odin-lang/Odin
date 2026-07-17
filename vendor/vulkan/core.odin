@@ -7,8 +7,36 @@ API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
 API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 API_VERSION_1_4 :: (1<<22) | (4<<12) | (0)
 
+MAKE_API_VERSION :: proc "contextless" (variant, major, minor, patch: u32) -> u32 {
+	return (variant<<29) | (major<<22) | (minor<<12) | (patch)
+}
+
 MAKE_VERSION :: proc "contextless" (major, minor, patch: u32) -> u32 {
 	return (major<<22) | (minor<<12) | (patch)
+}
+
+API_VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+	return (version>>22) & 0x7F
+}
+
+VERSION_MAJOR :: proc "contextless" (version: u32) -> u32 {
+	return (version>>22)
+}
+
+API_VERSION_MINOR :: proc "contextless" (version: u32) -> u32 {
+	return (version>>12) & 0x3FF
+}
+
+VERSION_MINOR :: API_VERSION_MINOR
+
+API_VERSION_PATCH :: proc "contextless" (version: u32) -> u32 {
+	return (version & 0xFFF)
+}
+
+VERSION_PATCH :: API_VERSION_PATCH
+
+API_VERSION_VARIANT :: proc "contextless" (version: u32) -> u32 {
+	return (version>>29)
 }
 
 // Base types
@@ -67,7 +95,7 @@ VULKAN_VIDEO_CODEC_H265_ENCODE_SPEC_VERSION :: VULKAN_VIDEO_CODEC_H265_ENCODE_AP
 MAKE_VIDEO_STD_VERSION :: MAKE_VERSION
 
 // General Constants
-HEADER_VERSION       :: 309
+HEADER_VERSION       :: 354
 MAX_DRIVER_NAME_SIZE :: 256
 MAX_DRIVER_INFO_SIZE :: 256
 
@@ -126,6 +154,14 @@ VIDEO_H265_MAX_LONG_TERM_PICS                       :: 16
 VIDEO_H265_MAX_DELTA_POC                            :: 48
 VIDEO_H265_NO_REFERENCE_PICTURE                     :: 0xFF
 VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE             :: 8
+VIDEO_VP9_NUM_REF_FRAMES                            :: 8
+VIDEO_VP9_REFS_PER_FRAME                            :: 3
+VIDEO_VP9_MAX_REF_FRAMES                            :: 4
+VIDEO_VP9_LOOP_FILTER_ADJUSTMENTS                   :: 2
+VIDEO_VP9_MAX_SEGMENTS                              :: 8
+VIDEO_VP9_SEG_LVL_MAX                               :: 4
+VIDEO_VP9_MAX_SEGMENTATION_TREE_PROBS               :: 7
+VIDEO_VP9_MAX_SEGMENTATION_PRED_PROB                :: 3
 
 // Vulkan Video Codec Constants
 VULKAN_VIDEO_CODEC_AV1_DECODE_EXTENSION_NAME  :: "VK_STD_vulkan_video_codec_av1_decode"
@@ -134,6 +170,7 @@ VULKAN_VIDEO_CODEC_H264_DECODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h264
 VULKAN_VIDEO_CODEC_H264_ENCODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h264_encode"
 VULKAN_VIDEO_CODEC_H265_DECODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h265_decode"
 VULKAN_VIDEO_CODEC_H265_ENCODE_EXTENSION_NAME :: "VK_STD_vulkan_video_codec_h265_encode"
+VULKAN_VIDEO_CODEC_VP9_DECODE_EXTENSION_NAME  :: "VK_STD_vulkan_video_codec_vp9_decode"
 
 // Vendor Constants
 KHR_surface                                                  :: 1
@@ -266,6 +303,9 @@ KHR_DEDICATED_ALLOCATION_EXTENSION_NAME                      :: "VK_KHR_dedicate
 KHR_storage_buffer_storage_class                             :: 1
 KHR_STORAGE_BUFFER_STORAGE_CLASS_SPEC_VERSION                :: 1
 KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME              :: "VK_KHR_storage_buffer_storage_class"
+KHR_shader_bfloat16                                          :: 1
+KHR_SHADER_BFLOAT16_SPEC_VERSION                             :: 1
+KHR_SHADER_BFLOAT16_EXTENSION_NAME                           :: "VK_KHR_shader_bfloat16"
 KHR_relaxed_block_layout                                     :: 1
 KHR_RELAXED_BLOCK_LAYOUT_SPEC_VERSION                        :: 1
 KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME                      :: "VK_KHR_relaxed_block_layout"
@@ -334,9 +374,15 @@ KHR_SHADER_TERMINATE_INVOCATION_EXTENSION_NAME               :: "VK_KHR_shader_t
 KHR_fragment_shading_rate                                    :: 1
 KHR_FRAGMENT_SHADING_RATE_SPEC_VERSION                       :: 2
 KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME                     :: "VK_KHR_fragment_shading_rate"
+KHR_shader_constant_data                                     :: 1
+KHR_SHADER_CONSTANT_DATA_SPEC_VERSION                        :: 1
+KHR_SHADER_CONSTANT_DATA_EXTENSION_NAME                      :: "VK_KHR_shader_constant_data"
 KHR_dynamic_rendering_local_read                             :: 1
 KHR_DYNAMIC_RENDERING_LOCAL_READ_SPEC_VERSION                :: 1
 KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME              :: "VK_KHR_dynamic_rendering_local_read"
+KHR_shader_abort                                             :: 1
+KHR_SHADER_ABORT_SPEC_VERSION                                :: 1
+KHR_SHADER_ABORT_EXTENSION_NAME                              :: "VK_KHR_shader_abort"
 KHR_shader_quad_control                                      :: 1
 KHR_SHADER_QUAD_CONTROL_SPEC_VERSION                         :: 1
 KHR_SHADER_QUAD_CONTROL_EXTENSION_NAME                       :: "VK_KHR_shader_quad_control"
@@ -385,6 +431,9 @@ KHR_VIDEO_ENCODE_QUEUE_EXTENSION_NAME                        :: "VK_KHR_video_en
 KHR_synchronization2                                         :: 1
 KHR_SYNCHRONIZATION_2_SPEC_VERSION                           :: 1
 KHR_SYNCHRONIZATION_2_EXTENSION_NAME                         :: "VK_KHR_synchronization2"
+KHR_device_address_commands                                  :: 1
+KHR_DEVICE_ADDRESS_COMMANDS_SPEC_VERSION                     :: 1
+KHR_DEVICE_ADDRESS_COMMANDS_EXTENSION_NAME                   :: "VK_KHR_device_address_commands"
 KHR_fragment_shader_barycentric                              :: 1
 KHR_FRAGMENT_SHADER_BARYCENTRIC_SPEC_VERSION                 :: 1
 KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME               :: "VK_KHR_fragment_shader_barycentric"
@@ -406,6 +455,9 @@ KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME                    :: "VK_KHR_format_f
 KHR_ray_tracing_maintenance1                                 :: 1
 KHR_RAY_TRACING_MAINTENANCE_1_SPEC_VERSION                   :: 1
 KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME                 :: "VK_KHR_ray_tracing_maintenance1"
+KHR_shader_untyped_pointers                                  :: 1
+KHR_SHADER_UNTYPED_POINTERS_SPEC_VERSION                     :: 1
+KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME                   :: "VK_KHR_shader_untyped_pointers"
 KHR_portability_enumeration                                  :: 1
 KHR_PORTABILITY_ENUMERATION_SPEC_VERSION                     :: 1
 KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME                   :: "VK_KHR_portability_enumeration"
@@ -421,6 +473,12 @@ KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME              :: "VK_KHR_shader_m
 KHR_maintenance5                                             :: 1
 KHR_MAINTENANCE_5_SPEC_VERSION                               :: 1
 KHR_MAINTENANCE_5_EXTENSION_NAME                             :: "VK_KHR_maintenance5"
+KHR_present_id2                                              :: 1
+KHR_PRESENT_ID_2_SPEC_VERSION                                :: 1
+KHR_PRESENT_ID_2_EXTENSION_NAME                              :: "VK_KHR_present_id2"
+KHR_present_wait2                                            :: 1
+KHR_PRESENT_WAIT_2_SPEC_VERSION                              :: 1
+KHR_PRESENT_WAIT_2_EXTENSION_NAME                            :: "VK_KHR_present_wait2"
 KHR_ray_tracing_position_fetch                               :: 1
 KHR_RAY_TRACING_POSITION_FETCH_SPEC_VERSION                  :: 1
 KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME                :: "VK_KHR_ray_tracing_position_fetch"
@@ -428,6 +486,15 @@ KHR_pipeline_binary                                          :: 1
 MAX_PIPELINE_BINARY_KEY_SIZE_KHR                             :: 32
 KHR_PIPELINE_BINARY_SPEC_VERSION                             :: 1
 KHR_PIPELINE_BINARY_EXTENSION_NAME                           :: "VK_KHR_pipeline_binary"
+KHR_surface_maintenance1                                     :: 1
+KHR_SURFACE_MAINTENANCE_1_SPEC_VERSION                       :: 1
+KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME                     :: "VK_KHR_surface_maintenance1"
+KHR_swapchain_maintenance1                                   :: 1
+KHR_SWAPCHAIN_MAINTENANCE_1_SPEC_VERSION                     :: 1
+KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME                   :: "VK_KHR_swapchain_maintenance1"
+KHR_internally_synchronized_queues                           :: 1
+KHR_INTERNALLY_SYNCHRONIZED_QUEUES_SPEC_VERSION              :: 1
+KHR_INTERNALLY_SYNCHRONIZED_QUEUES_EXTENSION_NAME            :: "VK_KHR_internally_synchronized_queues"
 KHR_cooperative_matrix                                       :: 1
 KHR_COOPERATIVE_MATRIX_SPEC_VERSION                          :: 2
 KHR_COOPERATIVE_MATRIX_EXTENSION_NAME                        :: "VK_KHR_cooperative_matrix"
@@ -441,6 +508,10 @@ KHR_VIDEO_DECODE_AV1_EXTENSION_NAME                          :: "VK_KHR_video_de
 KHR_video_encode_av1                                         :: 1
 KHR_VIDEO_ENCODE_AV1_SPEC_VERSION                            :: 1
 KHR_VIDEO_ENCODE_AV1_EXTENSION_NAME                          :: "VK_KHR_video_encode_av1"
+KHR_video_decode_vp9                                         :: 1
+MAX_VIDEO_VP9_REFERENCES_PER_FRAME_KHR                       :: 3
+KHR_VIDEO_DECODE_VP9_SPEC_VERSION                            :: 1
+KHR_VIDEO_DECODE_VP9_EXTENSION_NAME                          :: "VK_KHR_video_decode_vp9"
 KHR_video_maintenance1                                       :: 1
 KHR_VIDEO_MAINTENANCE_1_SPEC_VERSION                         :: 1
 KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME                       :: "VK_KHR_video_maintenance1"
@@ -450,6 +521,9 @@ KHR_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME                  :: "VK_KHR_vertex_a
 KHR_load_store_op_none                                       :: 1
 KHR_LOAD_STORE_OP_NONE_SPEC_VERSION                          :: 1
 KHR_LOAD_STORE_OP_NONE_EXTENSION_NAME                        :: "VK_KHR_load_store_op_none"
+KHR_unified_image_layouts                                    :: 1
+KHR_UNIFIED_IMAGE_LAYOUTS_SPEC_VERSION                       :: 1
+KHR_UNIFIED_IMAGE_LAYOUTS_EXTENSION_NAME                     :: "VK_KHR_unified_image_layouts"
 KHR_shader_float_controls2                                   :: 1
 KHR_SHADER_FLOAT_CONTROLS_2_SPEC_VERSION                     :: 1
 KHR_SHADER_FLOAT_CONTROLS_2_EXTENSION_NAME                   :: "VK_KHR_shader_float_controls2"
@@ -468,6 +542,12 @@ KHR_SHADER_EXPECT_ASSUME_EXTENSION_NAME                      :: "VK_KHR_shader_e
 KHR_maintenance6                                             :: 1
 KHR_MAINTENANCE_6_SPEC_VERSION                               :: 1
 KHR_MAINTENANCE_6_EXTENSION_NAME                             :: "VK_KHR_maintenance6"
+KHR_copy_memory_indirect                                     :: 1
+KHR_COPY_MEMORY_INDIRECT_SPEC_VERSION                        :: 1
+KHR_COPY_MEMORY_INDIRECT_EXTENSION_NAME                      :: "VK_KHR_copy_memory_indirect"
+KHR_video_encode_intra_refresh                               :: 1
+KHR_VIDEO_ENCODE_INTRA_REFRESH_SPEC_VERSION                  :: 1
+KHR_VIDEO_ENCODE_INTRA_REFRESH_EXTENSION_NAME                :: "VK_KHR_video_encode_intra_refresh"
 KHR_video_encode_quantization_map                            :: 1
 KHR_VIDEO_ENCODE_QUANTIZATION_MAP_SPEC_VERSION               :: 2
 KHR_VIDEO_ENCODE_QUANTIZATION_MAP_EXTENSION_NAME             :: "VK_KHR_video_encode_quantization_map"
@@ -477,15 +557,45 @@ KHR_SHADER_RELAXED_EXTENDED_INSTRUCTION_EXTENSION_NAME       :: "VK_KHR_shader_r
 KHR_maintenance7                                             :: 1
 KHR_MAINTENANCE_7_SPEC_VERSION                               :: 1
 KHR_MAINTENANCE_7_EXTENSION_NAME                             :: "VK_KHR_maintenance7"
+KHR_device_fault                                             :: 1
+KHR_DEVICE_FAULT_SPEC_VERSION                                :: 1
+KHR_DEVICE_FAULT_EXTENSION_NAME                              :: "VK_KHR_device_fault"
 KHR_maintenance8                                             :: 1
 KHR_MAINTENANCE_8_SPEC_VERSION                               :: 1
 KHR_MAINTENANCE_8_EXTENSION_NAME                             :: "VK_KHR_maintenance8"
+KHR_shader_fma                                               :: 1
+KHR_SHADER_FMA_SPEC_VERSION                                  :: 1
+KHR_SHADER_FMA_EXTENSION_NAME                                :: "VK_KHR_shader_fma"
+KHR_maintenance9                                             :: 1
+KHR_MAINTENANCE_9_SPEC_VERSION                               :: 1
+KHR_MAINTENANCE_9_EXTENSION_NAME                             :: "VK_KHR_maintenance9"
 KHR_video_maintenance2                                       :: 1
 KHR_VIDEO_MAINTENANCE_2_SPEC_VERSION                         :: 1
 KHR_VIDEO_MAINTENANCE_2_EXTENSION_NAME                       :: "VK_KHR_video_maintenance2"
+KHR_video_encode_feedback2                                   :: 1
+KHR_VIDEO_ENCODE_FEEDBACK_2_SPEC_VERSION                     :: 1
+KHR_VIDEO_ENCODE_FEEDBACK_2_EXTENSION_NAME                   :: "VK_KHR_video_encode_feedback2"
 KHR_depth_clamp_zero_one                                     :: 1
 KHR_DEPTH_CLAMP_ZERO_ONE_SPEC_VERSION                        :: 1
 KHR_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME                      :: "VK_KHR_depth_clamp_zero_one"
+KHR_robustness2                                              :: 1
+KHR_ROBUSTNESS_2_SPEC_VERSION                                :: 1
+KHR_ROBUSTNESS_2_EXTENSION_NAME                              :: "VK_KHR_robustness2"
+KHR_present_mode_fifo_latest_ready                           :: 1
+KHR_PRESENT_MODE_FIFO_LATEST_READY_SPEC_VERSION              :: 1
+KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME            :: "VK_KHR_present_mode_fifo_latest_ready"
+KHR_opacity_micromap                                         :: 1
+KHR_OPACITY_MICROMAP_SPEC_VERSION                            :: 1
+KHR_OPACITY_MICROMAP_EXTENSION_NAME                          :: "VK_KHR_opacity_micromap"
+KHR_maintenance10                                            :: 1
+KHR_MAINTENANCE_10_SPEC_VERSION                              :: 1
+KHR_MAINTENANCE_10_EXTENSION_NAME                            :: "VK_KHR_maintenance10"
+KHR_maintenance11                                            :: 1
+KHR_MAINTENANCE_11_SPEC_VERSION                              :: 1
+KHR_MAINTENANCE_11_EXTENSION_NAME                            :: "VK_KHR_maintenance11"
+KHR_extended_flags                                           :: 1
+KHR_EXTENDED_FLAGS_SPEC_VERSION                              :: 1
+KHR_EXTENDED_FLAGS_EXTENSION_NAME                            :: "VK_KHR_extended_flags"
 EXT_debug_report                                             :: 1
 EXT_DEBUG_REPORT_SPEC_VERSION                                :: 10
 EXT_DEBUG_REPORT_EXTENSION_NAME                              :: "VK_EXT_debug_report"
@@ -520,7 +630,7 @@ NVX_binary_import                                            :: 1
 NVX_BINARY_IMPORT_SPEC_VERSION                               :: 2
 NVX_BINARY_IMPORT_EXTENSION_NAME                             :: "VK_NVX_binary_import"
 NVX_image_view_handle                                        :: 1
-NVX_IMAGE_VIEW_HANDLE_SPEC_VERSION                           :: 3
+NVX_IMAGE_VIEW_HANDLE_SPEC_VERSION                           :: 4
 NVX_IMAGE_VIEW_HANDLE_EXTENSION_NAME                         :: "VK_NVX_image_view_handle"
 AMD_draw_indirect_count                                      :: 1
 AMD_DRAW_INDIRECT_COUNT_SPEC_VERSION                         :: 2
@@ -636,6 +746,12 @@ EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME                     :: "VK_EXT_sampler_
 AMD_gpu_shader_int16                                         :: 1
 AMD_GPU_SHADER_INT16_SPEC_VERSION                            :: 2
 AMD_GPU_SHADER_INT16_EXTENSION_NAME                          :: "VK_AMD_gpu_shader_int16"
+AMD_gpa_interface                                            :: 1
+AMD_GPA_INTERFACE_SPEC_VERSION                               :: 1
+AMD_GPA_INTERFACE_EXTENSION_NAME                             :: "VK_AMD_gpa_interface"
+EXT_descriptor_heap                                          :: 1
+EXT_DESCRIPTOR_HEAP_SPEC_VERSION                             :: 1
+EXT_DESCRIPTOR_HEAP_EXTENSION_NAME                           :: "VK_EXT_descriptor_heap"
 AMD_mixed_attachment_samples                                 :: 1
 AMD_MIXED_ATTACHMENT_SAMPLES_SPEC_VERSION                    :: 1
 AMD_MIXED_ATTACHMENT_SAMPLES_EXTENSION_NAME                  :: "VK_AMD_mixed_attachment_samples"
@@ -695,6 +811,15 @@ NV_REPRESENTATIVE_FRAGMENT_TEST_EXTENSION_NAME               :: "VK_NV_represent
 EXT_filter_cubic                                             :: 1
 EXT_FILTER_CUBIC_SPEC_VERSION                                :: 3
 EXT_FILTER_CUBIC_EXTENSION_NAME                              :: "VK_EXT_filter_cubic"
+QCOM_render_pass_shader_resolve                              :: 1
+QCOM_RENDER_PASS_SHADER_RESOLVE_SPEC_VERSION                 :: 4
+QCOM_RENDER_PASS_SHADER_RESOLVE_EXTENSION_NAME               :: "VK_QCOM_render_pass_shader_resolve"
+QCOM_cooperative_matrix_conversion                           :: 1
+QCOM_COOPERATIVE_MATRIX_CONVERSION_SPEC_VERSION              :: 1
+QCOM_COOPERATIVE_MATRIX_CONVERSION_EXTENSION_NAME            :: "VK_QCOM_cooperative_matrix_conversion"
+QCOM_elapsed_timer_query                                     :: 1
+QCOM_ELAPSED_TIMER_QUERY_SPEC_VERSION                        :: 1
+QCOM_ELAPSED_TIMER_QUERY_EXTENSION_NAME                      :: "VK_QCOM_elapsed_timer_query"
 EXT_global_priority                                          :: 1
 EXT_GLOBAL_PRIORITY_SPEC_VERSION                             :: 2
 EXT_GLOBAL_PRIORITY_EXTENSION_NAME                           :: "VK_EXT_global_priority"
@@ -743,6 +868,9 @@ NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME                          :: "VK_NV_scissor_e
 NV_device_diagnostic_checkpoints                             :: 1
 NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_SPEC_VERSION                :: 2
 NV_DEVICE_DIAGNOSTIC_CHECKPOINTS_EXTENSION_NAME              :: "VK_NV_device_diagnostic_checkpoints"
+EXT_present_timing                                           :: 1
+EXT_PRESENT_TIMING_SPEC_VERSION                              :: 3
+EXT_PRESENT_TIMING_EXTENSION_NAME                            :: "VK_EXT_present_timing"
 EXT_pci_bus_info                                             :: 1
 EXT_PCI_BUS_INFO_SPEC_VERSION                                :: 2
 EXT_PCI_BUS_INFO_EXTENSION_NAME                              :: "VK_EXT_pci_bus_info"
@@ -750,7 +878,7 @@ AMD_display_native_hdr                                       :: 1
 AMD_DISPLAY_NATIVE_HDR_SPEC_VERSION                          :: 1
 AMD_DISPLAY_NATIVE_HDR_EXTENSION_NAME                        :: "VK_AMD_display_native_hdr"
 EXT_fragment_density_map                                     :: 1
-EXT_FRAGMENT_DENSITY_MAP_SPEC_VERSION                        :: 2
+EXT_FRAGMENT_DENSITY_MAP_SPEC_VERSION                        :: 3
 EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME                      :: "VK_EXT_fragment_density_map"
 EXT_scalar_block_layout                                      :: 1
 EXT_SCALAR_BLOCK_LAYOUT_SPEC_VERSION                         :: 1
@@ -856,6 +984,9 @@ NV_INHERITED_VIEWPORT_SCISSOR_EXTENSION_NAME                 :: "VK_NV_inherited
 EXT_texel_buffer_alignment                                   :: 1
 EXT_TEXEL_BUFFER_ALIGNMENT_SPEC_VERSION                      :: 1
 EXT_TEXEL_BUFFER_ALIGNMENT_EXTENSION_NAME                    :: "VK_EXT_texel_buffer_alignment"
+QCOM_render_pass_transform                                   :: 1
+QCOM_RENDER_PASS_TRANSFORM_SPEC_VERSION                      :: 5
+QCOM_RENDER_PASS_TRANSFORM_EXTENSION_NAME                    :: "VK_QCOM_render_pass_transform"
 EXT_depth_bias_control                                       :: 1
 EXT_DEPTH_BIAS_CONTROL_SPEC_VERSION                          :: 1
 EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME                        :: "VK_EXT_depth_bias_control"
@@ -871,6 +1002,9 @@ EXT_ROBUSTNESS_2_EXTENSION_NAME                              :: "VK_EXT_robustne
 EXT_custom_border_color                                      :: 1
 EXT_CUSTOM_BORDER_COLOR_SPEC_VERSION                         :: 12
 EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME                       :: "VK_EXT_custom_border_color"
+EXT_texture_compression_astc_3d                              :: 1
+EXT_TEXTURE_COMPRESSION_ASTC_3D_SPEC_VERSION                 :: 1
+EXT_TEXTURE_COMPRESSION_ASTC_3D_EXTENSION_NAME               :: "VK_EXT_texture_compression_astc_3d"
 GOOGLE_user_type                                             :: 1
 GOOGLE_USER_TYPE_SPEC_VERSION                                :: 1
 GOOGLE_USER_TYPE_EXTENSION_NAME                              :: "VK_GOOGLE_user_type"
@@ -886,9 +1020,24 @@ EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME           :: "VK_EXT_pipeline
 NV_device_diagnostics_config                                 :: 1
 NV_DEVICE_DIAGNOSTICS_CONFIG_SPEC_VERSION                    :: 2
 NV_DEVICE_DIAGNOSTICS_CONFIG_EXTENSION_NAME                  :: "VK_NV_device_diagnostics_config"
-NV_cuda_kernel_launch                                        :: 1
-NV_CUDA_KERNEL_LAUNCH_SPEC_VERSION                           :: 2
-NV_CUDA_KERNEL_LAUNCH_EXTENSION_NAME                         :: "VK_NV_cuda_kernel_launch"
+QCOM_render_pass_store_ops                                   :: 1
+QCOM_RENDER_PASS_STORE_OPS_SPEC_VERSION                      :: 2
+QCOM_RENDER_PASS_STORE_OPS_EXTENSION_NAME                    :: "VK_QCOM_render_pass_store_ops"
+QCOM_queue_perf_hint                                         :: 1
+QCOM_QUEUE_PERF_HINT_SPEC_VERSION                            :: 1
+QCOM_QUEUE_PERF_HINT_EXTENSION_NAME                          :: "VK_QCOM_queue_perf_hint"
+QCOM_image_processing3                                       :: 1
+QCOM_IMAGE_PROCESSING_3_SPEC_VERSION                         :: 1
+QCOM_IMAGE_PROCESSING_3_EXTENSION_NAME                       :: "VK_QCOM_image_processing3"
+QCOM_shader_multiple_wait_queues                             :: 1
+QCOM_SHADER_MULTIPLE_WAIT_QUEUES_SPEC_VERSION                :: 1
+QCOM_SHADER_MULTIPLE_WAIT_QUEUES_EXTENSION_NAME              :: "VK_QCOM_shader_multiple_wait_queues"
+EXT_shader_split_barrier                                     :: 1
+EXT_SHADER_SPLIT_BARRIER_SPEC_VERSION                        :: 1
+EXT_SHADER_SPLIT_BARRIER_EXTENSION_NAME                      :: "VK_EXT_shader_split_barrier"
+QCOM_tile_shading                                            :: 1
+QCOM_TILE_SHADING_SPEC_VERSION                               :: 2
+QCOM_TILE_SHADING_EXTENSION_NAME                             :: "VK_QCOM_tile_shading"
 NV_low_latency                                               :: 1
 NV_LOW_LATENCY_SPEC_VERSION                                  :: 1
 NV_LOW_LATENCY_EXTENSION_NAME                                :: "VK_NV_low_latency"
@@ -913,6 +1062,9 @@ EXT_YCBCR_2PLANE_444_FORMATS_EXTENSION_NAME                  :: "VK_EXT_ycbcr_2p
 EXT_fragment_density_map2                                    :: 1
 EXT_FRAGMENT_DENSITY_MAP_2_SPEC_VERSION                      :: 1
 EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME                    :: "VK_EXT_fragment_density_map2"
+QCOM_rotated_copy_commands                                   :: 1
+QCOM_ROTATED_COPY_COMMANDS_SPEC_VERSION                      :: 2
+QCOM_ROTATED_COPY_COMMANDS_EXTENSION_NAME                    :: "VK_QCOM_rotated_copy_commands"
 EXT_image_robustness                                         :: 1
 EXT_IMAGE_ROBUSTNESS_SPEC_VERSION                            :: 1
 EXT_IMAGE_ROBUSTNESS_EXTENSION_NAME                          :: "VK_EXT_image_robustness"
@@ -928,6 +1080,9 @@ EXT_4444_FORMATS_EXTENSION_NAME                              :: "VK_EXT_4444_for
 EXT_device_fault                                             :: 1
 EXT_DEVICE_FAULT_SPEC_VERSION                                :: 2
 EXT_DEVICE_FAULT_EXTENSION_NAME                              :: "VK_EXT_device_fault"
+ARM_rasterization_order_attachment_access                    :: 1
+ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_SPEC_VERSION       :: 1
+ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME     :: "VK_ARM_rasterization_order_attachment_access"
 EXT_rgba10x6_formats                                         :: 1
 EXT_RGBA10X6_FORMATS_SPEC_VERSION                            :: 1
 EXT_RGBA10X6_FORMATS_EXTENSION_NAME                          :: "VK_EXT_rgba10x6_formats"
@@ -998,6 +1153,12 @@ EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME                      :: "VK_EXT_border_c
 EXT_pageable_device_local_memory                             :: 1
 EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_SPEC_VERSION                :: 1
 EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME              :: "VK_EXT_pageable_device_local_memory"
+ARM_shader_core_properties                                   :: 1
+ARM_SHADER_CORE_PROPERTIES_SPEC_VERSION                      :: 1
+ARM_SHADER_CORE_PROPERTIES_EXTENSION_NAME                    :: "VK_ARM_shader_core_properties"
+ARM_scheduling_controls                                      :: 1
+ARM_SCHEDULING_CONTROLS_SPEC_VERSION                         :: 2
+ARM_SCHEDULING_CONTROLS_EXTENSION_NAME                       :: "VK_ARM_scheduling_controls"
 EXT_image_sliced_view_of_3d                                  :: 1
 EXT_IMAGE_SLICED_VIEW_OF_3D_SPEC_VERSION                     :: 1
 EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME                   :: "VK_EXT_image_sliced_view_of_3d"
@@ -1008,6 +1169,12 @@ EXT_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME                      :: "VK_EXT_depth_cl
 EXT_non_seamless_cube_map                                    :: 1
 EXT_NON_SEAMLESS_CUBE_MAP_SPEC_VERSION                       :: 1
 EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME                     :: "VK_EXT_non_seamless_cube_map"
+ARM_render_pass_striped                                      :: 1
+ARM_RENDER_PASS_STRIPED_SPEC_VERSION                         :: 1
+ARM_RENDER_PASS_STRIPED_EXTENSION_NAME                       :: "VK_ARM_render_pass_striped"
+QCOM_fragment_density_map_offset                             :: 1
+QCOM_FRAGMENT_DENSITY_MAP_OFFSET_SPEC_VERSION                :: 3
+QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME              :: "VK_QCOM_fragment_density_map_offset"
 NV_copy_memory_indirect                                      :: 1
 NV_COPY_MEMORY_INDIRECT_SPEC_VERSION                         :: 1
 NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME                       :: "VK_NV_copy_memory_indirect"
@@ -1029,6 +1196,9 @@ GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME                      :: "VK_GOOGLE_surfa
 EXT_image_compression_control_swapchain                      :: 1
 EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_SPEC_VERSION         :: 1
 EXT_IMAGE_COMPRESSION_CONTROL_SWAPCHAIN_EXTENSION_NAME       :: "VK_EXT_image_compression_control_swapchain"
+QCOM_image_processing                                        :: 1
+QCOM_IMAGE_PROCESSING_SPEC_VERSION                           :: 1
+QCOM_IMAGE_PROCESSING_EXTENSION_NAME                         :: "VK_QCOM_image_processing"
 EXT_nested_command_buffer                                    :: 1
 EXT_NESTED_COMMAND_BUFFER_SPEC_VERSION                       :: 1
 EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME                     :: "VK_EXT_nested_command_buffer"
@@ -1041,6 +1211,9 @@ EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME                  :: "VK_EXT_extended
 EXT_subpass_merge_feedback                                   :: 1
 EXT_SUBPASS_MERGE_FEEDBACK_SPEC_VERSION                      :: 2
 EXT_SUBPASS_MERGE_FEEDBACK_EXTENSION_NAME                    :: "VK_EXT_subpass_merge_feedback"
+ARM_tensors                                                  :: 1
+ARM_TENSORS_SPEC_VERSION                                     :: 2
+ARM_TENSORS_EXTENSION_NAME                                   :: "VK_ARM_tensors"
 EXT_shader_module_identifier                                 :: 1
 MAX_SHADER_MODULE_IDENTIFIER_SIZE_EXT                        :: 32
 EXT_SHADER_MODULE_IDENTIFIER_SPEC_VERSION                    :: 1
@@ -1063,6 +1236,12 @@ AMD_ANTI_LAG_EXTENSION_NAME                                  :: "VK_AMD_anti_lag
 EXT_shader_object                                            :: 1
 EXT_SHADER_OBJECT_SPEC_VERSION                               :: 1
 EXT_SHADER_OBJECT_EXTENSION_NAME                             :: "VK_EXT_shader_object"
+QCOM_tile_properties                                         :: 1
+QCOM_TILE_PROPERTIES_SPEC_VERSION                            :: 1
+QCOM_TILE_PROPERTIES_EXTENSION_NAME                          :: "VK_QCOM_tile_properties"
+QCOM_multiview_per_view_viewports                            :: 1
+QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_SPEC_VERSION               :: 1
+QCOM_MULTIVIEW_PER_VIEW_VIEWPORTS_EXTENSION_NAME             :: "VK_QCOM_multiview_per_view_viewports"
 NV_ray_tracing_invocation_reorder                            :: 1
 NV_RAY_TRACING_INVOCATION_REORDER_SPEC_VERSION               :: 1
 NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME             :: "VK_NV_ray_tracing_invocation_reorder"
@@ -1081,6 +1260,9 @@ EXT_LEGACY_VERTEX_ATTRIBUTES_EXTENSION_NAME                  :: "VK_EXT_legacy_v
 EXT_layer_settings                                           :: 1
 EXT_LAYER_SETTINGS_SPEC_VERSION                              :: 2
 EXT_LAYER_SETTINGS_EXTENSION_NAME                            :: "VK_EXT_layer_settings"
+ARM_shader_core_builtins                                     :: 1
+ARM_SHADER_CORE_BUILTINS_SPEC_VERSION                        :: 2
+ARM_SHADER_CORE_BUILTINS_EXTENSION_NAME                      :: "VK_ARM_shader_core_builtins"
 EXT_pipeline_library_group_handles                           :: 1
 EXT_PIPELINE_LIBRARY_GROUP_HANDLES_SPEC_VERSION              :: 1
 EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME            :: "VK_EXT_pipeline_library_group_handles"
@@ -1090,21 +1272,53 @@ EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME      :: "VK_EXT_dynamic_
 NV_low_latency2                                              :: 1
 NV_LOW_LATENCY_2_SPEC_VERSION                                :: 2
 NV_LOW_LATENCY_2_EXTENSION_NAME                              :: "VK_NV_low_latency2"
+ARM_data_graph                                               :: 1
+MAX_PHYSICAL_DEVICE_DATA_GRAPH_OPERATION_SET_NAME_SIZE_ARM   :: 128
+ARM_DATA_GRAPH_SPEC_VERSION                                  :: 1
+ARM_DATA_GRAPH_EXTENSION_NAME                                :: "VK_ARM_data_graph"
+ARM_data_graph_instruction_set_tosa                          :: 1
+MAX_DATA_GRAPH_TOSA_NAME_SIZE_ARM                            :: 128
+ARM_DATA_GRAPH_INSTRUCTION_SET_TOSA_SPEC_VERSION             :: 1
+ARM_DATA_GRAPH_INSTRUCTION_SET_TOSA_EXTENSION_NAME           :: "VK_ARM_data_graph_instruction_set_tosa"
+QCOM_multiview_per_view_render_areas                         :: 1
+QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_SPEC_VERSION            :: 1
+QCOM_MULTIVIEW_PER_VIEW_RENDER_AREAS_EXTENSION_NAME          :: "VK_QCOM_multiview_per_view_render_areas"
 NV_per_stage_descriptor_set                                  :: 1
 NV_PER_STAGE_DESCRIPTOR_SET_SPEC_VERSION                     :: 1
 NV_PER_STAGE_DESCRIPTOR_SET_EXTENSION_NAME                   :: "VK_NV_per_stage_descriptor_set"
+QCOM_image_processing2                                       :: 1
+QCOM_IMAGE_PROCESSING_2_SPEC_VERSION                         :: 1
+QCOM_IMAGE_PROCESSING_2_EXTENSION_NAME                       :: "VK_QCOM_image_processing2"
+QCOM_filter_cubic_weights                                    :: 1
+QCOM_FILTER_CUBIC_WEIGHTS_SPEC_VERSION                       :: 1
+QCOM_FILTER_CUBIC_WEIGHTS_EXTENSION_NAME                     :: "VK_QCOM_filter_cubic_weights"
+QCOM_ycbcr_degamma                                           :: 1
+QCOM_YCBCR_DEGAMMA_SPEC_VERSION                              :: 1
+QCOM_YCBCR_DEGAMMA_EXTENSION_NAME                            :: "VK_QCOM_ycbcr_degamma"
+QCOM_filter_cubic_clamp                                      :: 1
+QCOM_FILTER_CUBIC_CLAMP_SPEC_VERSION                         :: 1
+QCOM_FILTER_CUBIC_CLAMP_EXTENSION_NAME                       :: "VK_QCOM_filter_cubic_clamp"
 EXT_attachment_feedback_loop_dynamic_state                   :: 1
 EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_SPEC_VERSION      :: 1
 EXT_ATTACHMENT_FEEDBACK_LOOP_DYNAMIC_STATE_EXTENSION_NAME    :: "VK_EXT_attachment_feedback_loop_dynamic_state"
 NV_descriptor_pool_overallocation                            :: 1
 NV_DESCRIPTOR_POOL_OVERALLOCATION_SPEC_VERSION               :: 1
 NV_DESCRIPTOR_POOL_OVERALLOCATION_EXTENSION_NAME             :: "VK_NV_descriptor_pool_overallocation"
+QCOM_tile_memory_heap                                        :: 1
+QCOM_TILE_MEMORY_HEAP_SPEC_VERSION                           :: 1
+QCOM_TILE_MEMORY_HEAP_EXTENSION_NAME                         :: "VK_QCOM_tile_memory_heap"
+EXT_memory_decompression                                     :: 1
+EXT_MEMORY_DECOMPRESSION_SPEC_VERSION                        :: 1
+EXT_MEMORY_DECOMPRESSION_EXTENSION_NAME                      :: "VK_EXT_memory_decompression"
 NV_display_stereo                                            :: 1
 NV_DISPLAY_STEREO_SPEC_VERSION                               :: 1
 NV_DISPLAY_STEREO_EXTENSION_NAME                             :: "VK_NV_display_stereo"
 NV_raw_access_chains                                         :: 1
 NV_RAW_ACCESS_CHAINS_SPEC_VERSION                            :: 1
 NV_RAW_ACCESS_CHAINS_EXTENSION_NAME                          :: "VK_NV_raw_access_chains"
+NV_external_compute_queue                                    :: 1
+NV_EXTERNAL_COMPUTE_QUEUE_SPEC_VERSION                       :: 1
+NV_EXTERNAL_COMPUTE_QUEUE_EXTENSION_NAME                     :: "VK_NV_external_compute_queue"
 NV_command_buffer_inheritance                                :: 1
 NV_COMMAND_BUFFER_INHERITANCE_SPEC_VERSION                   :: 1
 NV_COMMAND_BUFFER_INHERITANCE_EXTENSION_NAME                 :: "VK_NV_command_buffer_inheritance"
@@ -1114,11 +1328,14 @@ NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME               :: "VK_NV_shader_at
 EXT_shader_replicated_composites                             :: 1
 EXT_SHADER_REPLICATED_COMPOSITES_SPEC_VERSION                :: 1
 EXT_SHADER_REPLICATED_COMPOSITES_EXTENSION_NAME              :: "VK_EXT_shader_replicated_composites"
+EXT_shader_float8                                            :: 1
+EXT_SHADER_FLOAT8_SPEC_VERSION                               :: 1
+EXT_SHADER_FLOAT8_EXTENSION_NAME                             :: "VK_EXT_shader_float8"
 NV_ray_tracing_validation                                    :: 1
 NV_RAY_TRACING_VALIDATION_SPEC_VERSION                       :: 1
 NV_RAY_TRACING_VALIDATION_EXTENSION_NAME                     :: "VK_NV_ray_tracing_validation"
 NV_cluster_acceleration_structure                            :: 1
-NV_CLUSTER_ACCELERATION_STRUCTURE_SPEC_VERSION               :: 2
+NV_CLUSTER_ACCELERATION_STRUCTURE_SPEC_VERSION               :: 4
 NV_CLUSTER_ACCELERATION_STRUCTURE_EXTENSION_NAME             :: "VK_NV_cluster_acceleration_structure"
 NV_partitioned_acceleration_structure                        :: 1
 NV_PARTITIONED_ACCELERATION_STRUCTURE_SPEC_VERSION           :: 1
@@ -1127,18 +1344,82 @@ PARTITIONED_ACCELERATION_STRUCTURE_PARTITION_INDEX_GLOBAL_NV :: ~u32(0)
 EXT_device_generated_commands                                :: 1
 EXT_DEVICE_GENERATED_COMMANDS_SPEC_VERSION                   :: 1
 EXT_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME                 :: "VK_EXT_device_generated_commands"
+NV_push_constant_bank                                        :: 1
+NV_PUSH_CONSTANT_BANK_SPEC_VERSION                           :: 1
+NV_PUSH_CONSTANT_BANK_EXTENSION_NAME                         :: "VK_NV_push_constant_bank"
+EXT_ray_tracing_invocation_reorder                           :: 1
+EXT_RAY_TRACING_INVOCATION_REORDER_SPEC_VERSION              :: 2
+EXT_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME            :: "VK_EXT_ray_tracing_invocation_reorder"
 EXT_depth_clamp_control                                      :: 1
 EXT_DEPTH_CLAMP_CONTROL_SPEC_VERSION                         :: 1
 EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME                       :: "VK_EXT_depth_clamp_control"
 NV_cooperative_matrix2                                       :: 1
 NV_COOPERATIVE_MATRIX_2_SPEC_VERSION                         :: 1
 NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME                       :: "VK_NV_cooperative_matrix2"
+ARM_pipeline_opacity_micromap                                :: 1
+ARM_PIPELINE_OPACITY_MICROMAP_SPEC_VERSION                   :: 1
+ARM_PIPELINE_OPACITY_MICROMAP_EXTENSION_NAME                 :: "VK_ARM_pipeline_opacity_micromap"
+ARM_performance_counters_by_region                           :: 1
+ARM_PERFORMANCE_COUNTERS_BY_REGION_SPEC_VERSION              :: 1
+ARM_PERFORMANCE_COUNTERS_BY_REGION_EXTENSION_NAME            :: "VK_ARM_performance_counters_by_region"
+ARM_shader_instrumentation                                   :: 1
+ARM_SHADER_INSTRUMENTATION_SPEC_VERSION                      :: 1
+ARM_SHADER_INSTRUMENTATION_EXTENSION_NAME                    :: "VK_ARM_shader_instrumentation"
 EXT_vertex_attribute_robustness                              :: 1
 EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_SPEC_VERSION                 :: 1
 EXT_VERTEX_ATTRIBUTE_ROBUSTNESS_EXTENSION_NAME               :: "VK_EXT_vertex_attribute_robustness"
+ARM_format_pack                                              :: 1
+ARM_FORMAT_PACK_SPEC_VERSION                                 :: 1
+ARM_FORMAT_PACK_EXTENSION_NAME                               :: "VK_ARM_format_pack"
 NV_present_metering                                          :: 1
 NV_PRESENT_METERING_SPEC_VERSION                             :: 1
 NV_PRESENT_METERING_EXTENSION_NAME                           :: "VK_NV_present_metering"
+EXT_multisampled_render_to_swapchain                         :: 1
+EXT_MULTISAMPLED_RENDER_TO_SWAPCHAIN_SPEC_VERSION            :: 1
+EXT_MULTISAMPLED_RENDER_TO_SWAPCHAIN_EXTENSION_NAME          :: "VK_EXT_multisampled_render_to_swapchain"
+EXT_fragment_density_map_offset                              :: 1
+EXT_FRAGMENT_DENSITY_MAP_OFFSET_SPEC_VERSION                 :: 1
+EXT_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME               :: "VK_EXT_fragment_density_map_offset"
+EXT_zero_initialize_device_memory                            :: 1
+EXT_ZERO_INITIALIZE_DEVICE_MEMORY_SPEC_VERSION               :: 1
+EXT_ZERO_INITIALIZE_DEVICE_MEMORY_EXTENSION_NAME             :: "VK_EXT_zero_initialize_device_memory"
+EXT_shader_64bit_indexing                                    :: 1
+EXT_SHADER_64BIT_INDEXING_SPEC_VERSION                       :: 1
+EXT_SHADER_64BIT_INDEXING_EXTENSION_NAME                     :: "VK_EXT_shader_64bit_indexing"
+EXT_custom_resolve                                           :: 1
+EXT_CUSTOM_RESOLVE_SPEC_VERSION                              :: 1
+EXT_CUSTOM_RESOLVE_EXTENSION_NAME                            :: "VK_EXT_custom_resolve"
+QCOM_data_graph_model                                        :: 1
+DATA_GRAPH_MODEL_TOOLCHAIN_VERSION_LENGTH_QCOM               :: 3
+QCOM_DATA_GRAPH_MODEL_SPEC_VERSION                           :: 1
+QCOM_DATA_GRAPH_MODEL_EXTENSION_NAME                         :: "VK_QCOM_data_graph_model"
+ARM_data_graph_optical_flow                                  :: 1
+ARM_DATA_GRAPH_OPTICAL_FLOW_SPEC_VERSION                     :: 1
+ARM_DATA_GRAPH_OPTICAL_FLOW_EXTENSION_NAME                   :: "VK_ARM_data_graph_optical_flow"
+EXT_shader_long_vector                                       :: 1
+EXT_SHADER_LONG_VECTOR_SPEC_VERSION                          :: 1
+EXT_SHADER_LONG_VECTOR_EXTENSION_NAME                        :: "VK_EXT_shader_long_vector"
+EXT_shader_uniform_buffer_unsized_array                      :: 1
+EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_SPEC_VERSION         :: 1
+EXT_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_EXTENSION_NAME       :: "VK_EXT_shader_uniform_buffer_unsized_array"
+NV_compute_occupancy_priority                                :: 1
+NV_COMPUTE_OCCUPANCY_PRIORITY_SPEC_VERSION                   :: 1
+NV_COMPUTE_OCCUPANCY_PRIORITY_EXTENSION_NAME                 :: "VK_NV_compute_occupancy_priority"
+COMPUTE_OCCUPANCY_PRIORITY_LOW_NV                            :: 25
+COMPUTE_OCCUPANCY_PRIORITY_NORMAL_NV                         :: 50
+COMPUTE_OCCUPANCY_PRIORITY_HIGH_NV                           :: 75
+EXT_shader_subgroup_partitioned                              :: 1
+EXT_SHADER_SUBGROUP_PARTITIONED_SPEC_VERSION                 :: 1
+EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME               :: "VK_EXT_shader_subgroup_partitioned"
+ARM_data_graph_neural_accelerator_statistics                 :: 1
+ARM_DATA_GRAPH_NEURAL_ACCELERATOR_STATISTICS_SPEC_VERSION    :: 1
+ARM_DATA_GRAPH_NEURAL_ACCELERATOR_STATISTICS_EXTENSION_NAME  :: "VK_ARM_data_graph_neural_accelerator_statistics"
+EXT_primitive_restart_index                                  :: 1
+EXT_PRIMITIVE_RESTART_INDEX_SPEC_VERSION                     :: 1
+EXT_PRIMITIVE_RESTART_INDEX_EXTENSION_NAME                   :: "VK_EXT_primitive_restart_index"
+NV_cooperative_matrix_decode_vector                          :: 1
+NV_COOPERATIVE_MATRIX_DECODE_VECTOR_SPEC_VERSION             :: 1
+NV_COOPERATIVE_MATRIX_DECODE_VECTOR_EXTENSION_NAME           :: "VK_NV_cooperative_matrix_decode_vector"
 KHR_acceleration_structure                                   :: 1
 KHR_ACCELERATION_STRUCTURE_SPEC_VERSION                      :: 13
 KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME                    :: "VK_KHR_acceleration_structure"
@@ -1202,38 +1483,45 @@ KHR_PORTABILITY_SUBSET_EXTENSION_NAME                        :: "VK_KHR_portabil
 AMDX_shader_enqueue                                          :: 1
 AMDX_SHADER_ENQUEUE_SPEC_VERSION                             :: 2
 AMDX_SHADER_ENQUEUE_EXTENSION_NAME                           :: "VK_AMDX_shader_enqueue"
+NV_cuda_kernel_launch                                        :: 1
+NV_CUDA_KERNEL_LAUNCH_SPEC_VERSION                           :: 2
+NV_CUDA_KERNEL_LAUNCH_EXTENSION_NAME                         :: "VK_NV_cuda_kernel_launch"
 NV_displacement_micromap                                     :: 1
 NV_DISPLACEMENT_MICROMAP_SPEC_VERSION                        :: 2
 NV_DISPLACEMENT_MICROMAP_EXTENSION_NAME                      :: "VK_NV_displacement_micromap"
+AMDX_dense_geometry_format                                   :: 1
+AMDX_DENSE_GEOMETRY_FORMAT_SPEC_VERSION                      :: 1
+AMDX_DENSE_GEOMETRY_FORMAT_EXTENSION_NAME                    :: "VK_AMDX_dense_geometry_format"
 
 // Handles types
-Instance       :: distinct Handle
-PhysicalDevice :: distinct Handle
-Device         :: distinct Handle
-Queue          :: distinct Handle
-CommandBuffer  :: distinct Handle
-Buffer                        :: distinct NonDispatchableHandle
-Image                         :: distinct NonDispatchableHandle
+Instance               :: distinct Handle
+PhysicalDevice         :: distinct Handle
+Device                 :: distinct Handle
+Queue                  :: distinct Handle
+CommandBuffer          :: distinct Handle
+ExternalComputeQueueNV :: distinct Handle
 Semaphore                     :: distinct NonDispatchableHandle
 Fence                         :: distinct NonDispatchableHandle
 DeviceMemory                  :: distinct NonDispatchableHandle
-Event                         :: distinct NonDispatchableHandle
+Buffer                        :: distinct NonDispatchableHandle
+Image                         :: distinct NonDispatchableHandle
 QueryPool                     :: distinct NonDispatchableHandle
-BufferView                    :: distinct NonDispatchableHandle
 ImageView                     :: distinct NonDispatchableHandle
+CommandPool                   :: distinct NonDispatchableHandle
+RenderPass                    :: distinct NonDispatchableHandle
+Framebuffer                   :: distinct NonDispatchableHandle
+Event                         :: distinct NonDispatchableHandle
+BufferView                    :: distinct NonDispatchableHandle
 ShaderModule                  :: distinct NonDispatchableHandle
 PipelineCache                 :: distinct NonDispatchableHandle
-PipelineLayout                :: distinct NonDispatchableHandle
 Pipeline                      :: distinct NonDispatchableHandle
-RenderPass                    :: distinct NonDispatchableHandle
+PipelineLayout                :: distinct NonDispatchableHandle
 DescriptorSetLayout           :: distinct NonDispatchableHandle
 Sampler                       :: distinct NonDispatchableHandle
 DescriptorSet                 :: distinct NonDispatchableHandle
 DescriptorPool                :: distinct NonDispatchableHandle
-Framebuffer                   :: distinct NonDispatchableHandle
-CommandPool                   :: distinct NonDispatchableHandle
-SamplerYcbcrConversion        :: distinct NonDispatchableHandle
 DescriptorUpdateTemplate      :: distinct NonDispatchableHandle
+SamplerYcbcrConversion        :: distinct NonDispatchableHandle
 PrivateDataSlot               :: distinct NonDispatchableHandle
 SurfaceKHR                    :: distinct NonDispatchableHandle
 SwapchainKHR                  :: distinct NonDispatchableHandle
@@ -1242,22 +1530,27 @@ DisplayModeKHR                :: distinct NonDispatchableHandle
 VideoSessionKHR               :: distinct NonDispatchableHandle
 VideoSessionParametersKHR     :: distinct NonDispatchableHandle
 DeferredOperationKHR          :: distinct NonDispatchableHandle
+AccelerationStructureKHR      :: distinct NonDispatchableHandle
 PipelineBinaryKHR             :: distinct NonDispatchableHandle
 DebugReportCallbackEXT        :: distinct NonDispatchableHandle
 CuModuleNVX                   :: distinct NonDispatchableHandle
 CuFunctionNVX                 :: distinct NonDispatchableHandle
 DebugUtilsMessengerEXT        :: distinct NonDispatchableHandle
+GpaSessionAMD                 :: distinct NonDispatchableHandle
+TensorARM                     :: distinct NonDispatchableHandle
 ValidationCacheEXT            :: distinct NonDispatchableHandle
 AccelerationStructureNV       :: distinct NonDispatchableHandle
 PerformanceConfigurationINTEL :: distinct NonDispatchableHandle
 IndirectCommandsLayoutNV      :: distinct NonDispatchableHandle
-CudaModuleNV                  :: distinct NonDispatchableHandle
-CudaFunctionNV                :: distinct NonDispatchableHandle
-AccelerationStructureKHR      :: distinct NonDispatchableHandle
 MicromapEXT                   :: distinct NonDispatchableHandle
+TensorViewARM                 :: distinct NonDispatchableHandle
 OpticalFlowSessionNV          :: distinct NonDispatchableHandle
 ShaderEXT                     :: distinct NonDispatchableHandle
+DataGraphPipelineSessionARM   :: distinct NonDispatchableHandle
 IndirectExecutionSetEXT       :: distinct NonDispatchableHandle
 IndirectCommandsLayoutEXT     :: distinct NonDispatchableHandle
+ShaderInstrumentationARM      :: distinct NonDispatchableHandle
+CudaModuleNV                  :: distinct NonDispatchableHandle
+CudaFunctionNV                :: distinct NonDispatchableHandle
 
 

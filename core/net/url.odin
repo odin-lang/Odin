@@ -154,7 +154,7 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		strings.write_string(&b, s[:i])
 		s = s[i:]
 
-		if len(s) == 0 {
+		if len(s) <= 1 {
 			return // percent without anything after it
 		}
 		s = s[1:]

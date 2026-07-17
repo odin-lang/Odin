@@ -87,8 +87,8 @@ foreign Kernel32 {
 }
 
 @(no_sanitize_address)
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	result := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
+	result := VirtualAlloc(rawptr(address_hint), size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
 		err = .Out_Of_Memory
 		return
@@ -145,18 +145,6 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	ok := VirtualProtect(data, size, pflags, &old_protect)
 	return bool(ok)
 }
-
-
-@(no_sanitize_address)
-_platform_memory_init :: proc "contextless" () {
-	sys_info: SYSTEM_INFO
-	GetSystemInfo(&sys_info)
-	DEFAULT_PAGE_SIZE = max(DEFAULT_PAGE_SIZE, uint(sys_info.dwPageSize))
-	
-	// is power of two
-	assert_contextless(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
-}
-
 
 @(no_sanitize_address)
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {

@@ -2,6 +2,25 @@
 #include <malloc.h>
 #endif
 
+#ifdef __ANDROID__
+
+// Bionic may not provide aligned_alloc.
+// Provide a fallback using posix_memalign and ensure the alignment
+// satisfies its requirement (multiple of pointer size).
+static void* android_aligned_alloc(size_t align, size_t size) {
+	void* allocated;
+
+	const size_t ptr_size = sizeof(void*);
+	align = (align + (ptr_size - 1)) / ptr_size * ptr_size;
+
+	if (posix_memalign(&allocated, align, size) != 0)
+		return NULL;
+	return allocated;
+}
+#define aligned_alloc android_aligned_alloc
+
+#endif
+
 template <typename U, typename V>
 gb_internal gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
@@ -265,11 +284,11 @@ gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize comm
 
 	gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit) {
 		void *mem = mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-		if (mem == nullptr) {
+		if (mem == MAP_FAILED) {
 			gb_printf_err("Out of Virtual memory, oh no...\n");
 			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
 			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
-			GB_ASSERT_MSG(mem != nullptr, "Out of Virtual Memory, oh no...");
+			GB_ASSERT_MSG(mem != MAP_FAILED, "Out of Virtual Memory, oh no...");
 		}
 		return mem;
 	}
@@ -501,6 +520,10 @@ gb_internal Arena *get_arena(ThreadArenaKind kind) {
 	return nullptr;
 }
 
+template <typename T>
+gb_internal T *arena_alloc_array(Arena *arena, isize count) {
+	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+}
 
 template <typename T>
 gb_internal T *permanent_alloc_item() {
@@ -511,13 +534,13 @@ gb_internal T *permanent_alloc_item() {
 template <typename T>
 gb_internal T *permanent_alloc_array(isize count) {
 	Arena *arena = get_arena(ThreadArena_Permanent);
-	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return arena_alloc_array<T>(arena, count);
 }
 
 template <typename T>
 gb_internal Slice<T> permanent_slice_make(isize count) {
 	Arena *arena = get_arena(ThreadArena_Permanent);
-	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	T *data = arena_alloc_array<T>(arena, count);
 	return {data, count};
 }
 
@@ -530,13 +553,13 @@ gb_internal T *temporary_alloc_item() {
 template <typename T>
 gb_internal T *temporary_alloc_array(isize count) {
 	Arena *arena = get_arena(ThreadArena_Temporary);
-	return cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	return arena_alloc_array<T>(arena, count);
 }
 
 template <typename T>
 gb_internal Slice<T> temporary_slice_make(isize count) {
 	Arena *arena = get_arena(ThreadArena_Temporary);
-	T *data = cast(T *)arena_alloc(arena, gb_size_of(T)*count, gb_align_of(T));
+	T *data = arena_alloc_array<T>(arena, count);
 	return {data, count};
 }
 

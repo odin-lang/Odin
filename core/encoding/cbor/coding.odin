@@ -411,12 +411,13 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 		io.copy_n(buf_stream, d.reader, i64(n)) or_return
 	}
 
-	v = buf.buf[:]
-
 	// Write zero byte so this can be converted to cstring.
 	strings.write_byte(&buf, 0)
 
 	if .Shrink_Excess in d.flags { shrink(&buf.buf) }
+
+	v = buf.buf[:len(buf.buf)-1]
+
 	return
 }
 

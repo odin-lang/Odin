@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+	<Type Name="b3Vector2">
+		<DisplayString>[ {x}, {y} ]</DisplayString>
+	</Type>
+
+	<Type Name="b3Vec3">
+		<DisplayString>[ {x}, {y}, {z} ]</DisplayString>
+	</Type>
+
+	<Type Name="b3Quat">
+		<DisplayString>[ {v}, {s} ]</DisplayString>
+	</Type>
+
+	<!-- Distinct types only in BOX3D_DOUBLE_PRECISION builds; otherwise they alias b3Vec3 / b3Transform -->
+	<Type Name="b3Pos">
+		<DisplayString>[ {x}, {y}, {z} ]</DisplayString>
+	</Type>
+
+	<Type Name="b3WorldTransform">
+		<DisplayString>[ {p}, {q} ]</DisplayString>
+	</Type>
+
+	<Type Name="b3WorldId">
+		<DisplayString>index: {index1}</DisplayString>
+		<Expand>
+			<ExpandedItem>b3_worlds[ index1 - 1 ]</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="b3BodyId">
+		<DisplayString>
+			{b3_worlds[world0].bodies.data[index1-1].name,na},
+			{b3_worlds[world0].bodies.data[index1-1].type}
+		</DisplayString>
+		<Expand>
+			<ExpandedItem>b3_worlds[ world0 ].bodies.data[index1-1]</ExpandedItem>
+		</Expand>
+	</Type>
+	
+	<Type Name="b3ShapeId">
+		<DisplayString>
+			{b3_worlds[world0].shapes.data[index1-1].type}
+		</DisplayString>
+	</Type>
+
+	<Type Name="b3ManifoldPoint">
+		<DisplayString>
+			{point}, sep = {separation}
+		</DisplayString>
+	</Type>
+	
+	<Type Name="b3FeaturePair">
+		<DisplayString>
+			{int(owner1)}:{int(index1)}, {int(owner2)}:{int(index2)}
+		</DisplayString>
+	</Type>
+
+	<Type Name="b3TempManifold">
+		<DisplayString>count: { pointCount }, triangle: { triangleIndex }, cluster: {clusterIndex}</DisplayString>
+		<Expand>
+			<Item Name="normal">normal</Item>
+			<Item Name="feature">feature</Item>
+			<Item Name="flags">triangleFlags</Item>
+			<ArrayItems>
+				<Size>pointCount</Size>
+				<ValuePointer>points</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	
+	<Type Name="b3ShapeProxy">
+		<DisplayString>{{{count} : {radius}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">count</Item>
+			<Item Name="[radius]">radius</Item>
+			<ArrayItems Condition="count > 0">
+				<Size>count</Size>
+				<ValuePointer>points</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="b3SeparationFunction">
+		<DisplayString>type: {type}</DisplayString>
+		<Expand>
+			<Item Name="[witnessA]">witnessA</Item>
+			<Item Name="[witnessB]">witnessB</Item>
+			<Item Name="[sweepA]">sweepA</Item>
+			<Item Name="[sweepB]">sweepB</Item>
+			<Item Name="[proxyA]">proxyA</Item>
+			<Item Name="[proxyB]">proxyB</Item>
+		</Expand>
+	</Type>
+
+	<Type Name="b3DynamicArray_*">
+		<DisplayString>{{{count} / {capacity}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">count</Item>
+			<Item Name="[capacity]">capacity</Item>
+			<ArrayItems Condition="count > 0">
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<!-- natvis does not handle wildcards in struct names -->
+	<Type Name="b3DynamicArray_int">
+		<DisplayString>{{{count} / {capacity}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">count</Item>
+			<Item Name="[capacity]">capacity</Item>
+			<ArrayItems Condition="count > 0">
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="b3DynamicArray_Foo">
+		<DisplayString>{{{count} / {capacity}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">count</Item>
+			<Item Name="[capacity]">capacity</Item>
+			<ArrayItems Condition="count > 0">
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+	<Type Name="b3DynamicArray_b3Contact">
+		<DisplayString>{{{count} / {capacity}}}</DisplayString>
+		<Expand>
+			<Item Name="[count]">count</Item>
+			<Item Name="[capacity]">capacity</Item>
+			<ArrayItems Condition="count > 0">
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+</AutoVisualizer>

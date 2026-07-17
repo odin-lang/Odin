@@ -9,7 +9,7 @@ foreign version {
 	GetFileVersionInfoW       :: proc(lptstrFilename: LPCWSTR, dwHandle: DWORD, dwLen: DWORD, lpData: LPVOID) -> BOOL ---
 
 	GetFileVersionInfoSizeExW :: proc(dwFlags: FILE_VER_GET_FLAGS, lpwstrFilename: LPCWSTR, lpdwHandle: LPDWORD) -> DWORD ---
-	GetFileVersionInfoExW     :: proc(dwFlags: FILE_VER_GET_FLAGS, lpwstrFilename: LPCWSTR, dwHandle, dwLen: DWORD, lpData: LPVOID) -> DWORD ---
+	GetFileVersionInfoExW     :: proc(dwFlags: FILE_VER_GET_FLAGS, lpwstrFilename: LPCWSTR, dwHandle, dwLen: DWORD, lpData: LPVOID) -> BOOL ---
 
 	VerLanguageNameW          :: proc(wLang: DWORD, szLang: LPWSTR, cchLang: DWORD) -> DWORD ---
 	VerQueryValueW            :: proc(pBlock: LPCVOID, lpSubBlock: LPCWSTR, lplpBuffer: ^LPVOID, puLen: PUINT) -> BOOL ---

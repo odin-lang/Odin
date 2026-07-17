@@ -1,6 +1,7 @@
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
 gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
+gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level);
 
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
@@ -33,6 +34,30 @@ gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstF
 	}
 }
 
+gb_internal void populate_using_entity_scope_field(CheckerContext *ctx, Ast *node, AstField *parent_field, Type *original_type, isize level, Entity* field_entity) {
+	GB_ASSERT(field_entity->kind == Entity_Variable);
+	String name = field_entity->token.string;
+	InternedString interned = entity_interned_name(field_entity);
+	Entity *e = scope_lookup_current(ctx->scope, interned);
+	if (e != nullptr && name != "_") {
+		gbString ot = type_to_string(original_type);
+		// TODO(bill): Better type error
+		if (node != nullptr) {
+			gbString str = expr_to_string(node);
+			error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
+			gb_string_free(str);
+		} else {
+			error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
+		}
+		gb_string_free(ot);
+	} else {
+		add_entity(ctx, ctx->scope, nullptr, field_entity);
+		if (field_entity->flags & EntityFlag_Using) {
+			populate_using_entity_scope(ctx, node, parent_field, field_entity->type, level+1);
+		}
+	}
+}
+
 gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level) {
 	if (t == nullptr) {
 		return;
@@ -42,27 +67,11 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 
 	if (t->kind == Type_Struct) {
 		for (Entity *f : t->Struct.fields) {
-			GB_ASSERT(f->kind == Entity_Variable);
-			String name = f->token.string;
-			InternedString interned = entity_interned_name(f);
-			Entity *e = scope_lookup_current(ctx->scope, interned);
-			if (e != nullptr && name != "_") {
-				gbString ot = type_to_string(original_type);
-				// TODO(bill): Better type error
-				if (node != nullptr) {
-					gbString str = expr_to_string(node);
-					error(e->token, "'%.*s' is already declared in '%s', through 'using' from '%s'", LIT(name), str, ot);
-					gb_string_free(str);
-				} else {
-					error(e->token, "'%.*s' is already declared, through 'using' from '%s'", LIT(name), ot);
-				}
-				gb_string_free(ot);
-			} else {
-				add_entity(ctx, ctx->scope, nullptr, f);
-				if (f->flags & EntityFlag_Using) {
-					populate_using_entity_scope(ctx, node, field, f->type, level+1);
-				}
-			}
+			populate_using_entity_scope_field(ctx, node, field, original_type, level, f);
+		}
+	} else if (t->kind == Type_BitField) {
+		for (Entity *f : t->BitField.fields) {
+			populate_using_entity_scope_field(ctx, node, field, original_type, level, f);
 		}
 	} else if (t->kind == Type_Array && t->Array.count <= 4) {
 		switch (t->Array.count) {
@@ -127,6 +136,8 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 	i32 field_src_index = 0;
 	i32 field_group_index = -1;
 	for_array(i, params) {
+		*fields = slice_from_array(fields_array);
+		*tags = tags_array.data;
 		Ast *param = params[i];
 		if (param->kind != Ast_Field) {
 			continue;
@@ -796,11 +807,19 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
-			if (is_type_untyped(t) || is_type_empty_union(t)) {
+			if (is_type_untyped(t)) {
 				ok = false;
 				gbString str = type_to_string(t);
 				error(node, "Invalid variant type in union '%s'", str);
 				gb_string_free(str);
+			} else if (is_type_empty_union(t)) {
+				Type *base = base_type(t);
+				if (base == nullptr || base->kind != Type_Union || base->Union.node == nullptr) {
+					ok = false;
+					gbString str = type_to_string(t);
+					error(node, "Invalid variant type in union '%s'", str);
+					gb_string_free(str);
+				}
 			} else {
 				for_array(j, variants) {
 					if (union_variant_index_types_equal(t, variants[j])) {
@@ -1481,6 +1500,68 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 }
 
 
+// If `specialization` is a polymorphic-record specialization that has been published into
+// its originating record's `gen_types` cache, return that cache's `GenTypesData`. Its
+// `RecursiveMutex` guards concurrent `find_polymorphic_record_entity` reads, so the
+// in-place finalization below must hold it. Returns nullptr otherwise.
+gb_internal GenTypesData *gen_types_data_of_specialization(Type *specialization) {
+	if (specialization != nullptr &&
+	    specialization->kind == Type_Named &&
+	    specialization->Named.type_name != nullptr) {
+		Type *orig = specialization->Named.type_name->TypeName.original_type_for_parapoly;
+		if (orig != nullptr && orig->kind == Type_Named) {
+			return orig->Named.gen_types_data;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal bool check_type_specialization_to_internal(CheckerContext *ctx, Type *specialization, Type *type, TypeTuple *s_tuple, TypeTuple *t_tuple, bool modify_type) {
+	GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
+	for_array(i, s_tuple->variables) {
+		Entity *s_e = s_tuple->variables[i];
+		Entity *t_e = t_tuple->variables[i];
+		Type *st = s_e->type;
+		Type *tt = t_e->type;
+
+		// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
+		if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
+			Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
+			GB_ASSERT(e != nullptr);
+			if (modify_type) {
+				e->kind = Entity_Constant;
+				e->Constant.value = t_e->Constant.value;
+				e->type = t_e->type;
+			}
+		} else {
+			if (st->kind == Type_Basic && tt->kind == Type_Basic &&
+				s_e->kind == Entity_Constant && t_e->kind == Entity_Constant) {
+				if (!compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value))
+					return false;
+			} else {
+				bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
+				if (!ok) {
+					// TODO(bill, 2021-08-19): is this logic correct?
+					return false;
+				}
+			}
+		}
+	}
+
+	if (modify_type) {
+		// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
+		// `specialization` may already be published in a polymorphic record's gen_types cache;
+		// finalize it under that record's (recursive) gen_types mutex so a concurrent
+		// find_polymorphic_record_entity on another thread cannot observe a torn Type.
+		GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
+		if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
+		gb_memmove(specialization, type, gb_size_of(Type));
+		if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
+	}
+
+	return true;
+}
+
 gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type) {
 	if (type == nullptr ||
 	    type == t_invalid) {
@@ -1517,43 +1598,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 			TypeTuple *s_tuple = get_record_polymorphic_params(s);
 			TypeTuple *t_tuple = get_record_polymorphic_params(t);
-			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
-			for_array(i, s_tuple->variables) {
-				Entity *s_e = s_tuple->variables[i];
-				Entity *t_e = t_tuple->variables[i];
-				Type *st = s_e->type;
-				Type *tt = t_e->type;
-
-				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
-				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
-					GB_ASSERT(e != nullptr);
-					if (modify_type) {
-						e->kind = Entity_Constant;
-						e->Constant.value = t_e->Constant.value;
-						e->type = t_e->type;
-					}
-				} else {
-					if (st->kind == Type_Basic && tt->kind == Type_Basic &&
-						s_e->kind == Entity_Constant && t_e->kind == Entity_Constant) {
-						if (!compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value))
-							return false;
-					} else {
-						bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
-						if (!ok) {
-							// TODO(bill, 2021-08-19): is this logic correct?
-							return false;
-						}
-					}
-				}
-			}
-
-			if (modify_type) {
-				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
-				gb_memmove(specialization, type, gb_size_of(Type));
-			}
-
-			return true;
+			return check_type_specialization_to_internal(ctx, specialization, type, s_tuple, t_tuple, modify_type);
 		}
 	} else if (t->kind == Type_Union) {
 		if (t->Union.polymorphic_parent == nullptr &&
@@ -1570,37 +1615,7 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 
 			TypeTuple *s_tuple = get_record_polymorphic_params(s);
 			TypeTuple *t_tuple = get_record_polymorphic_params(t);
-			GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
-			for_array(i, s_tuple->variables) {
-				Entity *s_e = s_tuple->variables[i];
-				Entity *t_e = t_tuple->variables[i];
-				Type *st = s_e->type;
-				Type *tt = t_e->type;
-
-				// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
-				if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-					Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
-					GB_ASSERT(e != nullptr);
-					if (modify_type) {
-						e->kind = Entity_Constant;
-						e->Constant.value = t_e->Constant.value;
-						e->type = t_e->type;
-					}
-				} else {
-					bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
-					if (!ok) {
-						// TODO(bill, 2021-08-19): is this logic correct?
-						return false;
-					}
-				}
-			}
-
-			if (modify_type) {
-				// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it
-				gb_memmove(specialization, type, gb_size_of(Type));
-			}
-
-			return true;
+			return check_type_specialization_to_internal(ctx, specialization, type, s_tuple, t_tuple, modify_type);
 		}
 	}
 
@@ -1621,11 +1636,18 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (show_error) {
+			ERROR_BLOCK();
+
 			gbString pts = type_to_string(poly_type);
 			gbString ots = type_to_string(operand.type, true);
 			defer (gb_string_free(pts));
 			defer (gb_string_free(ots));
 			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+
+			if (operand.mode == Addressing_Type) {
+				error_line("\tSuggestion: Are you trying to pass a type to a value parameter?\n");
+			}
+
 		}
 		return t_invalid;
 	}
@@ -1742,7 +1764,10 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
 		}
 	} else {
-		if (in_type) {
+		expr = unparen_expr(expr);
+		if (expr && expr->kind == Ast_Uninit) {
+			error(expr, "Default parameter cannot be ---");
+		} else if (in_type) {
 			check_expr_with_type_hint(ctx, &o, expr, in_type);
 		} else {
 			check_expr(ctx, &o, expr);
@@ -2152,6 +2177,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {
 								poly_const = op.value;
+								if (poly_const.kind == ExactValue_Integer && is_type_float(type)) {
+									poly_const.kind = ExactValue_Float;
+									poly_const.value_float = big_int_to_f64(&poly_const.value_integer);
+								}
 							} else {
 								if (!ctx->in_proc_group) {
 									error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
@@ -2199,8 +2228,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					if (!is_type_pointer(type) && !is_type_multi_pointer(type)) {
-						error(name, "'#no_alias' can only be applied pointer or multi-pointer typed parameters");
+					bool ok = is_type_internally_pointer_like(type);
+					if (!ok) {
+						error(name, "'#no_alias' can only be applied pointer-like type parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
@@ -2459,7 +2489,9 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false);
 		} else {
 			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
-				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(str_lit("$deferred_return")), nullptr);
+				gbString name = expr_to_string(field->type);
+				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(make_string_c(name)), nullptr);
+				gb_string_free(name);
 			} else {
 				type = check_type(ctx, field->type);
 			}
@@ -2823,6 +2855,12 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 			error(e, "Array count too large, %.*s", LIT(str));
 			gb_free(a, str.text);
 			return 0;
+		} else if (o->value.kind == ExactValue_Float) {
+			u64 u = cast(u64)o->value.value_float;
+			f64 f = cast(f64)u;
+			if (f == o->value.value_float) {
+				return u;
+			}
 		}
 	}
 
@@ -3038,6 +3076,10 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
+
+	if (build_context.bedrock) {
+		error(node, "'map' is not a valid type when using '-bedrock'");
+	}
 }
 
 gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
@@ -3777,6 +3819,7 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			*type = alloc_type_dynamic_array(elem);
 		}
 		set_base_type(named_type, *type);
+
 		return true;
 	case_end;
 

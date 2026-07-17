@@ -1529,6 +1529,9 @@ gb_internal Token advance_token(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
 			consume_comment_groups(f, prev);
+			if (f->curr_token.kind == Token_Semicolon && ignore_newlines(f) && f->curr_token.string == "\n") {
+				advance_token(f);
+			}
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -2039,9 +2042,6 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 }
 
 gb_internal Ast *parse_value(AstFile *f) {
-	if (f->curr_token.kind == Token_OpenBrace) {
-		return parse_literal_value(f, nullptr);
-	}
 	Ast *value;
 	bool prev_allow_range = f->allow_range;
 	f->allow_range = true;
@@ -2058,54 +2058,6 @@ gb_internal void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTa
 		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
-}
-
-gb_internal bool is_foreign_name_valid(String const &name) {
-	if (name.len == 0) {
-		return false;
-	}
-	isize offset = 0;
-	while (offset < name.len) {
-		Rune rune;
-		isize remaining = name.len - offset;
-		isize width = utf8_decode(name.text+offset, remaining, &rune);
-		if (rune == GB_RUNE_INVALID && width == 1) {
-			return false;
-		} else if (rune == GB_RUNE_BOM && remaining > 0) {
-			return false;
-		}
-
-		if (offset == 0) {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alpha(cast(char)rune))
-					return false;
-				break;
-			}
-		} else {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alphanumeric(cast(char)rune)) {
-					return false;
-				}
-				break;
-			}
-		}
-
-		offset += width;
-	}
-
-	return true;
 }
 
 gb_internal void parse_proc_tags(AstFile *f, u64 *tags) {
@@ -2579,8 +2531,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
 
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
+				}
+
+				array_add(&args, elem);
 				if (!allow_field_separator(f)) {
 					break;
 				}
@@ -2945,10 +2903,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		f->expr_level = prev_level;
 
-		if (is_raw_union && is_packed) {
-			is_packed = false;
-			syntax_error(token, "'#raw_union' cannot also be '#packed'");
-		}
 		if (is_raw_union && is_all_or_none) {
 			is_all_or_none = false;
 			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
@@ -3525,6 +3479,7 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Xor:
 	case Token_And:
 	case Token_Not:
+	case Token_MulMul: // 'expand_values' operator
 	case Token_Mul: // Used for error handling when people do C-like things
 	{
 		Token token = advance_token(f);
@@ -3630,7 +3585,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 		case Token_when:
 			if (prev.pos.line < op.pos.line) {
 				// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-				goto loop_end;
+				if (f->expr_level <= 0) {
+					goto loop_end;
+				}
 			}
 			break;
 		}
@@ -4106,6 +4063,71 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	return ProcCC_Invalid;
 }
 
+gb_internal bool is_ast_generic(Ast *a) {
+	bool is_generic = false;
+	if (a != nullptr) {
+		switch (a->kind) {
+		case Ast_TypeidType:
+			is_generic = a->TypeidType.specialization != nullptr;
+			break;
+		case Ast_PolyType:
+			is_generic = true;
+			break;
+		case Ast_ProcType:
+			is_generic = a->ProcType.generic;
+			break;
+		case Ast_PointerType:
+			is_generic = is_ast_generic(a->PointerType.type);
+			break;
+		case Ast_MultiPointerType:
+			is_generic = is_ast_generic(a->MultiPointerType.type);
+			break;
+		case Ast_ArrayType:
+			is_generic = is_ast_generic(a->ArrayType.elem) || is_ast_generic(a->ArrayType.count);
+			break;
+		case Ast_DynamicArrayType:
+			is_generic = is_ast_generic(a->DynamicArrayType.elem);
+			break;
+		case Ast_FixedCapacityDynamicArrayType:
+			is_generic = is_ast_generic(a->FixedCapacityDynamicArrayType.elem) || is_ast_generic(a->FixedCapacityDynamicArrayType.capacity);
+			break;
+		case Ast_BitSetType:
+			is_generic = is_ast_generic(a->BitSetType.elem);
+			break;
+		case Ast_MapType:
+			is_generic = is_ast_generic(a->MapType.key) || is_ast_generic(a->MapType.value);
+			break;
+		case Ast_MatrixType:
+			is_generic = is_ast_generic(a->MatrixType.row_count) || is_ast_generic(a->MatrixType.column_count) || is_ast_generic(a->MatrixType.elem);
+			break;
+		}
+	}
+	return is_generic;
+}
+
+gb_internal bool is_field_list_generic(AstFieldList *field_list, bool check_names) {
+	bool is_generic = false;
+
+	for (Ast *param : field_list->list) {
+		ast_node(field, Field, param);
+		if (is_ast_generic(field->type)) {
+			is_generic = true;
+			goto end;
+		}
+		if (!check_names || field->type == nullptr) {
+			continue;
+		}
+		for (Ast *name : field->names) {
+			if (name->kind == Ast_PolyType) {
+				is_generic = true;
+				goto end;
+			}
+		}
+	}
+end:
+	return is_generic;
+}
+
 gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	Ast *params = nullptr;
 	Ast *results = nullptr;
@@ -4141,24 +4163,11 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	results = parse_results(f, &diverging);
 
 	u64 tags = 0;
-	bool is_generic = false;
-
-	for (Ast *param : params->FieldList.list) {
-		ast_node(field, Field, param);
-		if (field->type != nullptr) {
-		    if (field->type->kind == Ast_PolyType) {
-				is_generic = true;
-				goto end;
-			}
-			for (Ast *name : field->names) {
-				if (name->kind == Ast_PolyType) {
-					is_generic = true;
-					goto end;
-				}
-			}
-		}
+	bool is_generic = is_field_list_generic(&params->FieldList, true);
+	if (!is_generic && (results != nullptr)) {
+		is_generic = is_field_list_generic(&results->FieldList, false);
 	}
-end:
+
 	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic, diverging);
 }
 
@@ -4216,18 +4225,33 @@ gb_internal FieldFlag is_token_field_prefix(AstFile *f) {
 		return FieldFlag_using;
 
 	case Token_Hash:
-		advance_token(f);
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-				auto const &mapping = parse_field_prefix_mappings[i];
-				if (mapping.token_kind == Token_Hash) {
-					if (f->curr_token.string == mapping.name) {
-						return mapping.flag;
-					}
+		{
+			// Check for types first before fields
+			Token tok = peek_token(f);
+			if (tok.kind == Token_Ident) {
+				if (tok.string == "simd" ||
+				    tok.string == "type" ||
+				    tok.string == "row_major" ||
+				    tok.string == "column_major" ||
+				    tok.string == "sparse" ||
+				    tok.string == "soa") {
+					return FieldFlag_Invalid;
 				}
 			}
-			break;
+
+			advance_token(f);
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+					auto const &mapping = parse_field_prefix_mappings[i];
+					if (mapping.token_kind == Token_Hash) {
+						if (f->curr_token.string == mapping.name) {
+							return mapping.flag;
+						}
+					}
+				}
+				break;
+			}
 		}
 		return FieldFlag_Unknown;
 	}
@@ -4951,8 +4975,9 @@ gb_internal Ast *parse_for_stmt(AstFile *f) {
 						Token next_token = peek_token(f);
 						if (next_token.kind == Token_in || next_token.kind == Token_Comma) {
 							cond = parse_simple_stmt(f, StmtAllowFlag_In);
-							GB_ASSERT(cond->kind == Ast_AssignStmt && cond->AssignStmt.op.kind == Token_in);
-							is_range = true;
+							if (cond->kind == Ast_AssignStmt && cond->AssignStmt.op.kind == Token_in) {
+								is_range = true;
+							}
 							goto range_skip;
 						}
 					}
@@ -5392,7 +5417,10 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-	case Token_Mul: // Used for error handling when people do C-like things
+	// Used for error handling when people do C-like things
+	case Token_Mul:
+	case Token_Increment:
+	case Token_Decrement:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f);
 		return s;
@@ -6026,6 +6054,19 @@ gb_internal bool is_import_path_valid(String const &path) {
 	return false;
 }
 
+gb_internal bool is_import_path_absolute(String const &path) {
+	if (path.len > 0 && path[0] == '/') {
+		return true;
+	}
+	if (path.len > 2 &&
+	    gb_char_is_alpha(path[0]) &&
+	    path[1] == ':' &&
+	    (path[2] == '/' || path[2] == '\\')) {
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool is_build_flag_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
@@ -6088,12 +6129,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	do_warning = &syntax_warning;
 	if (use_check_errors) {
 		do_error = &error;
-		do_error = &warning;
+		do_warning = &warning;
 	}
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
 	String collection_name = {};
+	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
 
 	isize colon_pos = -1;
 	for (isize j = 0; j < original_string.len; j++) {
@@ -6106,11 +6148,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
 	if (file_mutex == nullptr) {
-		if (colon_pos == 1 && original_string.len > 2) {
-			if (original_string[2] == '/' || original_string[2] == '\\') {
-				colon_pos = -1;
-				has_windows_drive = true;
-			}
+		if (!is_import_decl_path &&
+		    colon_pos == 1 &&
+		    original_string.len > 2 &&
+		    gb_char_is_alpha(original_string[0]) &&
+		    (original_string[2] == '/' || original_string[2] == '\\')) {
+			colon_pos = -1;
+			has_windows_drive = true;
 		}
 
 		for (isize i = 0; i < original_string.len; i++) {
@@ -6134,6 +6178,10 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		file_str = original_string;
 	}
 
+	if (is_import_decl_path && is_import_path_absolute(file_str)) {
+		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+		return false;
+	}
 
 	if (has_windows_drive) {
 		String sub_file_path = substring(file_str, 3, file_str.len);
@@ -6206,8 +6254,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		bool ok = false;
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
 		*path = fullpath;
 	}
 	return true;
@@ -6259,6 +6306,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			ast_node(id, ImportDecl, node);
 
 			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+			if (is_import_path_absolute(original_string)) {
+				syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
+
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
@@ -6285,6 +6338,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				GB_ASSERT(fp->kind == Ast_BasicLit);
 				Token fp_token = fp->BasicLit.token;
 				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				if (is_import_path_absolute(file_str)) {
+					syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+					decls[i] = ast_bad_decl(f, fp_token, fp_token);
+					goto end;
+				}
+
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
@@ -6384,6 +6443,11 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			}
 			if (p == "ignore") {
 				this_kind_correct = false;
+				continue;
+			}
+
+			if (p == "bedrock") {
+				this_kind_correct = build_context.bedrock == !is_notted;
 				continue;
 			}
 
@@ -7067,4 +7131,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	return ParseFile_None;
 }
-

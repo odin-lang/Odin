@@ -1,19 +1,19 @@
 /*
-Bindings for [[ raylib v5.5 ; https://www.raylib.com ]].
+Bindings for [[ raylib v6.0 ; https://www.raylib.com ]].
 
-	*********************************************************************************************
+	**********************************************************************************************
 	*
-	*   raylib v5.5 - A simple and easy-to-use library to enjoy videogames programming (www.raylib.com)
+	*   raylib v6.0 - A simple and easy-to-use library to enjoy videogames programming (www.raylib.com)
 	*
 	*   FEATURES:
 	*       - NO external dependencies, all required libraries included with raylib
-	*       - Multiplatform: Windows, Linux, FreeBSD, OpenBSD, NetBSD, DragonFly,
-	*                        MacOS, Haiku, Android, Raspberry Pi, DRM native, HTML5.
+	*       - Multiplatform: Windows, Linux, macOS, FreeBSD, Web, Android, Raspberry Pi, DRM native...
 	*       - Written in plain C code (C99) in PascalCase/camelCase notation
 	*       - Hardware accelerated with OpenGL (1.1, 2.1, 3.3, 4.3, ES2, ES3 - choose at compile)
-	*       - Unique OpenGL abstraction layer (usable as standalone module): [rlgl]
+	*       - Software renderer optional, for systems with no GPU: [rlsw]
+	*       - Custom OpenGL abstraction layer (usable as standalone module): [rlgl]
 	*       - Multiple Fonts formats supported (TTF, OTF, FNT, BDF, Sprite fonts)
-	*       - Outstanding texture formats support, including compressed formats (DXT, ETC, ASTC)
+	*       - Many texture formats supported, including compressed formats (DXT, ETC, ASTC)
 	*       - Full 3d support for 3d Shapes, Models, Billboards, Heightmaps and more!
 	*       - Flexible Materials system, supporting classic maps and PBR maps
 	*       - Animated 3D models supported (skeletal bones animation) (IQM, M3D, GLTF)
@@ -29,24 +29,23 @@ Bindings for [[ raylib v5.5 ; https://www.raylib.com ]].
 	*       - One default Shader is loaded on rlglInit()->rlLoadShaderDefault() [rlgl] (OpenGL 3.3 or ES2)
 	*       - One default RenderBatch is loaded on rlglInit()->rlLoadRenderBatch() [rlgl] (OpenGL 3.3 or ES2)
 	*
-	*   DEPENDENCIES (included):
-	*       [rcore][GLFW] rglfw (Camilla Löwy - github.com/glfw/glfw) for window/context management and input
-	*       [rcore][RGFW] rgfw (ColleagueRiley - github.com/ColleagueRiley/RGFW) for window/context management and input
-	*       [rlgl] glad/glad_gles2 (David Herberth - github.com/Dav1dde/glad) for OpenGL 3.3 extensions loading
+	*   DEPENDENCIES:
+	*       [rcore] Depends on the selected platform backend, check rcore.c header for details
+	*       [rlgl] glad/glad_gles2 (David Herberth - github.com/Dav1dde/glad) for OpenGL extensions loading
 	*       [raudio] miniaudio (David Reid - github.com/mackron/miniaudio) for audio device/context management
 	*
 	*   OPTIONAL DEPENDENCIES (included):
-	*       [rcore] msf_gif (Miles Fogle) for GIF recording
 	*       [rcore] sinfl (Micha Mettke) for DEFLATE decompression algorithm
 	*       [rcore] sdefl (Micha Mettke) for DEFLATE compression algorithm
-	*       [rcore] rprand (Ramon Snatamaria) for pseudo-random numbers generation
-	*       [rtextures] qoi (Dominic Szablewski - https://phoboslab.org) for QOI image manage
-	*       [rtextures] stb_image (Sean Barret) for images loading (BMP, TGA, PNG, JPEG, HDR...)
-	*       [rtextures] stb_image_write (Sean Barret) for image writing (BMP, TGA, PNG, JPG)
-	*       [rtextures] stb_image_resize2 (Sean Barret) for image resizing algorithms
-	*       [rtextures] stb_perlin (Sean Barret) for Perlin Noise image generation
-	*       [rtext] stb_truetype (Sean Barret) for ttf fonts loading
-	*       [rtext] stb_rect_pack (Sean Barret) for rectangles packing
+	*       [rcore] rprand (Ramon Santamaria) for pseudo-random numbers generation
+	*       [rtextures] qoi (Dominic Szablewski - https://phoboslab.org) for QOI image management
+	*       [rtextures] stb_image (Sean Barrett) for images loading (BMP, TGA, PNG, JPEG, HDR...)
+	*       [rtextures] stb_image_write (Sean Barrett) for image writing (BMP, TGA, PNG, JPG)
+	*       [rtextures] stb_image_resize2 (Sean Barrett) for image resizing algorithms
+	*       [rtextures] stb_perlin (Sean Barrett) for Perlin Noise image generation
+	*       [rtextures] rltexgpu (Ramon Santamaria) for GPU-compressed texture formats
+	*       [rtext] stb_truetype (Sean Barrett) for ttf fonts loading
+	*       [rtext] stb_rect_pack (Sean Barrett) for rectangles packing
 	*       [rmodels] par_shapes (Philip Rideout) for parametric 3d shapes generation
 	*       [rmodels] tinyobj_loader_c (Syoyo Fujita) for models loading (OBJ, MTL)
 	*       [rmodels] cgltf (Johannes Kuhlmann) for models loading (glTF)
@@ -55,10 +54,10 @@ Bindings for [[ raylib v5.5 ; https://www.raylib.com ]].
 	*       [raudio] dr_wav (David Reid) for WAV audio file loading
 	*       [raudio] dr_flac (David Reid) for FLAC audio file loading
 	*       [raudio] dr_mp3 (David Reid) for MP3 audio file loading
-	*       [raudio] stb_vorbis (Sean Barret) for OGG audio loading
+	*       [raudio] stb_vorbis (Sean Barrett) for OGG audio loading
 	*       [raudio] jar_xm (Joshua Reisenauer) for XM audio module loading
 	*       [raudio] jar_mod (Joshua Reisenauer) for MOD audio module loading
-	*       [raudio] qoa (Dominic Szablewski - https://phoboslab.org) for QOA audio manage
+	*       [raudio] qoa (Dominic Szablewski - https://phoboslab.org) for QOA audio management
 	*
 	*
 	*   LICENSE: zlib/libpng
@@ -66,7 +65,7 @@ Bindings for [[ raylib v5.5 ; https://www.raylib.com ]].
 	*   raylib is licensed under an unmodified zlib/libpng license, which is an OSI-certified,
 	*   BSD-like license that allows static linking with closed source software:
 	*
-	*   Copyright (c) 2013-2024 Ramon Santamaria (@raysan5)
+	*   Copyright (c) 2013-2026 Ramon Santamaria (@raysan5)
 	*
 	*   This software is provided "as-is", without any express or implied warranty. In no event
 	*   will the authors be held liable for any damages arising from the use of this software.
@@ -83,7 +82,7 @@ Bindings for [[ raylib v5.5 ; https://www.raylib.com ]].
 	*
 	*     3. This notice may not be removed or altered from any source distribution.
 	*
-	*********************************************************************************************
+	**********************************************************************************************
 */
 package raylib
 
@@ -98,7 +97,7 @@ MAX_MATERIAL_MAPS      :: #config(RAYLIB_MAX_MATERIAL_MAPS, 12)
 #assert(size_of(rune) == size_of(c.int))
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
-RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.a")
+RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.web.a")
 
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
@@ -110,18 +109,32 @@ when ODIN_OS == .Windows {
 		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	foreign import lib {
-		// Note(bumbread): I'm not sure why in `linux/` folder there are
-		// multiple copies of raylib.so, but since these bindings are for
-		// particular version of the library, I better specify it. Ideally,
-		// though, it's best specified in terms of major (.so.4)
-		"linux/libraylib.so.550" when RAYLIB_SHARED else "linux/libraylib.a",
-		"system:dl",
-		"system:pthread",
+	when ODIN_ARCH == .arm64 {
+		foreign import lib {
+			// Note(bumbread): I'm not sure why in `linux/` folder there are
+			// multiple copies of raylib.so, but since these bindings are for
+			// particular version of the library, I better specify it. Ideally,
+			// though, it's best specified in terms of major (.so.4)
+			"linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "linux-arm64/libraylib.a",
+			"system:dl",
+			"system:pthread",
+			"system:X11",
+		}
+	} else {
+		foreign import lib {
+			// Note(bumbread): I'm not sure why in `linux/` folder there are
+			// multiple copies of raylib.so, but since these bindings are for
+			// particular version of the library, I better specify it. Ideally,
+			// though, it's best specified in terms of major (.so.4)
+			"linux/libraylib.so.600" when RAYLIB_SHARED else "linux/libraylib.a",
+			"system:dl",
+			"system:pthread",
+			"system:X11",
+		}
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"macos/libraylib.550.dylib" when RAYLIB_SHARED else "macos/libraylib.a",
+		"macos/libraylib.600.dylib" when RAYLIB_SHARED else "macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
@@ -134,10 +147,10 @@ when ODIN_OS == .Windows {
 	foreign import lib "system:raylib"
 }
 
-VERSION_MAJOR :: 5
-VERSION_MINOR :: 5
+VERSION_MAJOR :: 6
+VERSION_MINOR :: 0
 VERSION_PATCH :: 0
-VERSION :: "5.5"
+VERSION :: "6.0"
 
 PI :: 3.14159265358979323846
 DEG2RAD :: PI/180.0
@@ -193,7 +206,7 @@ Matrix :: #row_major matrix[4, 4]f32
 // Note: In Raylib this is a struct. But here we use a fixed array, so that .rgba swizzling etc work.
 Color :: distinct [4]u8
 
-// Rectangle type
+// Rectangle, 4 components
 Rectangle :: struct {
 	x:      f32,                  // Rectangle top-left corner position x
 	y:      f32,                  // Rectangle top-left corner position y
@@ -201,8 +214,7 @@ Rectangle :: struct {
 	height: f32,                  // Rectangle height
 }
 
-// Image type, bpp always RGBA (32bit)
-// NOTE: Data stored in CPU memory (RAM)
+// Image, pixel data stored in CPU memory (RAM)
 Image :: struct {
 	data:    rawptr,              // Image raw data
 	width:   c.int,               // Image base width
@@ -211,8 +223,7 @@ Image :: struct {
 	format:  PixelFormat,         // Data format (PixelFormat type)
 }
 
-// Texture type
-// NOTE: Data stored in GPU memory
+// Texture, tex data stored in GPU memory (VRAM)
 Texture :: struct {
 	id:      c.uint,              // OpenGL texture id
 	width:   c.int,               // Texture base width
@@ -221,13 +232,13 @@ Texture :: struct {
 	format:  PixelFormat,         // Data format (PixelFormat type)
 }
 
-// Texture2D type, same as Texture
+// Texture2D, same as Texture
 Texture2D :: Texture
 
-// TextureCubemap type, actually, same as Texture
+// TextureCubemap, same as Texture
 TextureCubemap :: Texture
 
-// RenderTexture type, for texture rendering
+// RenderTexture, fbo for texture rendering
 RenderTexture :: struct {
 	id:       c.uint,             // OpenGL framebuffer object id
 	texture: Texture,             // Color buffer attachment texture
@@ -237,7 +248,7 @@ RenderTexture :: struct {
 // RenderTexture2D type, same as RenderTexture
 RenderTexture2D :: RenderTexture
 
-// N-Patch layout info
+// NPatchInfo, n-patch layout info
 NPatchInfo :: struct {
 	source: Rectangle,            // Texture source rectangle
 	left:   c.int,                // Left border offset
@@ -247,7 +258,7 @@ NPatchInfo :: struct {
 	layout: NPatchLayout,         // Layout of the n-patch: 3x3, 1x3 or 3x1
 }
 
-// Font character info
+// GlyphInfo, font characters glyphs info
 GlyphInfo :: struct {
 	value:    rune,               // Character value (Unicode)
 	offsetX:  c.int,              // Character offset X when drawing
@@ -256,28 +267,28 @@ GlyphInfo :: struct {
 	image:    Image,              // Character image data
 }
 
-// Font type, includes texture and charSet array data
+// Font, font texture and GlyphInfo array data
 Font :: struct {
 	baseSize:     c.int,          // Base size (default chars height)
 	glyphCount:   c.int,          // Number of characters
 	glyphPadding: c.int,          // Padding around the chars
 	texture:      Texture2D,      // Characters texture atlas
 	recs:         [^]Rectangle,   // Characters rectangles in texture
-	glyphs:       [^]GlyphInfo,    // Characters info data
+	glyphs:       [^]GlyphInfo,   // Characters info data
 }
 
-// Camera type, defines a camera position/orientation in 3d space
+// Camera, defines position/orientation in 3d space
 Camera3D :: struct {
-	position: Vector3,            // Camera position
-	target:   Vector3,            // Camera target it looks-at
-	up:       Vector3,            // Camera up vector (rotation over its axis)
-	fovy:     f32,                // Camera field-of-view apperture in Y (degrees) in perspective, used as near plane width in orthographic
+	position:   Vector3,          // Camera position
+	target:     Vector3,          // Camera target it looks-at
+	up:         Vector3,          // Camera up vector (rotation over its axis)
+	fovy:       f32,              // Camera field-of-view aperture in Y (degrees) in perspective, used as near plane height in world units in orthographic
 	projection: CameraProjection, // Camera projection: `.PERSPECTIVE` or `.ORTHOGRAPHIC`
 }
 
 Camera :: Camera3D                    // Camera type fallback, defaults to Camera3D
 
-// Camera2D type, defines a 2d camera
+// Camera2D, defines position/orientation in 2d space
 Camera2D :: struct {
 	offset:   Vector2,            // Camera offset (displacement from target)
 	target:   Vector2,            // Camera target (rotation and zoom origin)
@@ -285,93 +296,107 @@ Camera2D :: struct {
 	zoom:     f32,                // Camera zoom (scaling), should be 1.0f by default
 }
 
-// Vertex data defining a mesh
+// Mesh, vertex data and vao/vbo
 // NOTE: Data stored in CPU memory (and GPU)
 Mesh :: struct {
 	vertexCount:   c.int,         // Number of vertices stored in arrays
 	triangleCount: c.int,         // Number of triangles stored (indexed or not)
 
 	// Default vertex data
-	vertices:   [^]f32,           // Vertex position (XYZ - 3 components per vertex) (shader-location = 0)
-	texcoords:  [^]f32,           // Vertex texture coordinates (UV - 2 components per vertex) (shader-location = 1)
-	texcoords2: [^]f32,           // Vertex second texture coordinates (useful for lightmaps) (shader-location = 5)
-	normals:    [^]f32,           // Vertex normals (XYZ - 3 components per vertex) (shader-location = 2)
-	tangents:   [^]f32,           // Vertex tangents (XYZW - 4 components per vertex) (shader-location = 4)
-	colors:     [^]u8,            // Vertex colors (RGBA - 4 components per vertex) (shader-location = 3)
-	indices:    [^]u16,           // Vertex indices (in case vertex data comes indexed)
+	vertices:     [^]f32,         // Vertex position (XYZ - 3 components per vertex) (shader-location = 0)
+	texcoords:    [^]f32,         // Vertex texture coordinates (UV - 2 components per vertex) (shader-location = 1)
+	texcoords2:   [^]f32,         // Vertex second texture coordinates (useful for lightmaps) (shader-location = 5)
+	normals:      [^]f32,         // Vertex normals (XYZ - 3 components per vertex) (shader-location = 2)
+	tangents:     [^]f32,         // Vertex tangents (XYZW - 4 components per vertex) (shader-location = 4)
+	colors:       [^]u8,          // Vertex colors (RGBA - 4 components per vertex) (shader-location = 3)
+	indices:      [^]u16,         // Vertex indices (in case vertex data comes indexed)
 
-	// Animation vertex data
+	// Skin data for animation
+	boneCount:    c.int,          // Number of bones (MAX: 256 bones)
+	boneIndices:  [^]u8,          // Vertex bone indices, up to 4 bones influence by vertex (skinning) (shader-location = 6)
+	boneWeights:  [^]f32,         // Vertex bone weight, up to 4 bones influence by vertex (skinning) (shader-location = 7)
+
+	// Runtime animation vertex data (CPU skinning)
+	// NOTE: In case of GPU skinning, not used, pointers are NULL
 	animVertices: [^]f32,         // Animated vertex positions (after bones transformations)
 	animNormals:  [^]f32,         // Animated normals (after bones transformations)
-	boneIds:      [^]u8,          // Vertex bone ids, up to 4 bones influence by vertex (skinning)
-	boneWeights:  [^]f32,         // Vertex bone weight, up to 4 bones influence by vertex (skinning)
-	boneMatrices: [^]Matrix,      // Bones animated transformation matrices
-	boneCount:    c.int,          // Number of bones
 
 	// OpenGL identifiers
-	vaoId: u32,                   // OpenGL Vertex Array Object id
-	vboId: [^]u32,                // OpenGL Vertex Buffer Objects id (default vertex data)
+	vaoId:        u32,            // OpenGL Vertex Array Object id
+	vboId:        [^]u32,         // OpenGL Vertex Buffer Objects id (default vertex data)
 }
 
-// Shader type (generic)
+// Shader
 Shader :: struct {
 	id:   c.uint,                 // Shader program id
 	locs: [^]c.int,               // Shader locations array (MAX_SHADER_LOCATIONS)
 }
 
-// Material texture map
+// MaterialMap
 MaterialMap :: struct {
 	texture: Texture2D,           // Material map texture
 	color:   Color,               // Material map color
 	value:   f32,                 // Material map value
 }
 
-// Material type (generic)
+// Material, includes shader and maps
 Material :: struct {
 	shader: Shader,               // Material shader
 	maps:   [^]MaterialMap,       // Material maps array (MAX_MATERIAL_MAPS)
 	params: [4]f32,               // Material generic parameters (if required)
 }
 
-// Transformation properties
+// Transform, vertex transformation data
 Transform :: struct {
 	translation: Vector3,         // Translation
 	rotation:    Quaternion,      // Rotation
 	scale:       Vector3,         // Scale
 }
 
-// Bone information
+// Anim pose, an array of Transform[]
+ModelAnimPose :: [^]Transform
+
+// Bone, skeletal animation bone
 BoneInfo :: struct {
 	name:   [32]byte `fmt:"s,0"`, // Bone name
 	parent: c.int,                // Bone parent
 }
 
-// Model type
+// Skeleton, animation bones hierarchy
+ModelSkeleton :: struct {
+	boneCount: c.int,             // Number of bones
+	bones:     [^]BoneInfo,       // Bones information (skeleton)
+	bindPose:  ModelAnimPose,     // Bones base transformation (Transform[])
+}
+
+// Model, meshes, materials and animation data
 Model :: struct #align(align_of(uintptr)) {
 	transform: Matrix,            // Local transform matrix
 
-	meshCount: c.int,             // Number of meshes
+	meshCount:     c.int,         // Number of meshes
 	materialCount: c.int,         // Number of materials
-	meshes:       [^]Mesh,        // Meshes array
-	materials:    [^]Material,    // Materials array
-	meshMaterial: [^]c.int,       // Mesh material number
+	meshes:        [^]Mesh,       // Meshes array
+	materials:     [^]Material,   // Materials array
+	meshMaterial:  [^]c.int,      // Mesh material number
 
 	// Animation data
-	boneCount: c.int,             // Number of bones
-	bones:     [^]BoneInfo,       // Bones information (skeleton)
-	bindPose:  [^]Transform,      // Bones base transformation (pose)
+	skeleton:      ModelSkeleton, // Skeleton for animation
+
+	// Runtime animation data (CPU/GPU skinning)
+	currentPose:   ModelAnimPose, // Current animation pose (Transform[])
+	boneMatrices:  [^]Matrix,     // Bones animated transformation matrices
 }
 
-// Model animation
+// ModelAnimation, contains a full animation sequence
 ModelAnimation :: struct {
-	boneCount:  c.int,            // Number of bones
-	frameCount: c.int,            // Number of animation frames
-	bones:      [^]BoneInfo,      // Bones information (skeleton)
-	framePoses: [^][^]Transform,  // Poses array by frame
-	name:       [32]byte `fmt:"s,0"`, // Animation name
+	name:          [32]byte `fmt:"s,0"`, // Animation name
+
+	boneCount:     c.int,                // Number of bones (per pose)
+	keyframeCount: c.int,                // Number of animation key frames
+	keyframePoses: [^][^]Transform,      // Animation sequence keyframe poses [keyframe][pose]
 }
 
-// Ray type (useful for raycast)
+// Ray, ray for raycasting
 Ray :: struct {
 	position:  Vector3,           // Ray position (origin)
 	direction: Vector3,           // Ray direction (normalized)
@@ -381,7 +406,7 @@ Ray :: struct {
 RayCollision :: struct {
 	hit:      bool,               // Did the ray hit something?
 	distance: f32,                // Distance to nearest hit
-	point:    Vector3,            // Point of nearest hit
+	point:    Vector3,            // Point of the nearest hit
 	normal:   Vector3,            // Surface normal of hit
 }
 
@@ -391,27 +416,27 @@ BoundingBox :: struct {
 	max: Vector3,                 // Maximum vertex box-corner
 }
 
-// Wave type, defines audio wave data
+// Wave, audio wave data
 Wave :: struct {
 	frameCount:  c.uint,          // Total number of frames (considering channels)
 	sampleRate:  c.uint,          // Frequency (samples per second)
 	sampleSize:  c.uint,          // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
-	channels:    c.uint,          // Number of channels (1-mono, 2-stereo)
+	channels:    c.uint,          // Number of channels (1-mono, 2-stereo, ...)
 	data:        rawptr,          // Buffer data pointer
 }
 
 // Audio stream type
 // NOTE: Actual structs are defined internally in raudio module
 AudioStream :: struct {
-	buffer:    rawptr,            // Pointer to internal data used by the audio system
-	processor: rawptr,            // Pointer to internal data processor, useful for audio effects
+	buffer:     rawptr,           // Pointer to internal data used by the audio system
+	processor:  rawptr,           // Pointer to internal data processor, useful for audio effects
 
 	sampleRate: c.uint,           // Frequency (samples per second)
 	sampleSize: c.uint,           // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
-	channels:   c.uint,           // Number of channels (1-mono, 2-stereo)
+	channels:   c.uint,           // Number of channels (1-mono, 2-stereo, ...)
 }
 
-// Sound source type
+// Sound
 Sound :: struct {
 	using stream: AudioStream,    // Audio stream
 	frameCount:   c.uint,         // Total number of frames (considering channels)
@@ -428,7 +453,7 @@ Music :: struct {
 	ctxData: rawptr,              // Audio context data, depends on type
 }
 
-// Head-Mounted-Display device parameters
+// VrDeviceInfo, Head-Mounted-Display device parameters
 VrDeviceInfo :: struct {
 	hResolution:            c.int,    // Horizontal resolution in pixels
 	vResolution:            c.int,    // Vertical resolution in pixels
@@ -441,7 +466,7 @@ VrDeviceInfo :: struct {
 	chromaAbCorrection:     [4]f32,   // Chromatic aberration correction parameters
 }
 
-// VR Stereo rendering configuration for simulator
+// VrStereoConfig, VR stereo rendering configuration for simulator
 VrStereoConfig :: struct #align(4) {
 	projection:        [2]Matrix,     // VR projection matrices (per eye)
 	viewOffset:        [2]Matrix,     // VR view offset matrices (per eye)
@@ -455,16 +480,15 @@ VrStereoConfig :: struct #align(4) {
 
 // File path list
 FilePathList :: struct {
-	capacity: c.uint,                     // Filepaths max entries
-	count:    c.uint,                     // Filepaths entries count
-	paths:    [^]cstring,                 // Filepaths entries
+	count:    c.uint,                 // Filepaths entries count
+	paths:    [^]cstring,             // Filepaths entries
 }
 
 // Automation event
 AutomationEvent :: struct {
 	frame:      c.uint,               // Event frame
 	type:       c.uint,               // Event type (AutomationEventType)
-	params:     [4]c.int,             // Event parameters (if required) ---
+	params:     [4]c.int,             // Event parameters (if required)
 }
 
 // Automation event list
@@ -500,8 +524,8 @@ ConfigFlag :: enum c.int {
 }
 ConfigFlags :: distinct bit_set[ConfigFlag; c.int]
 
-
 // Trace log level
+// NOTE: Organized by priority level
 TraceLogLevel :: enum c.int {
 	ALL = 0,                          // Display all logs
 	TRACE,                            // Trace logging, intended for internal use only
@@ -514,8 +538,7 @@ TraceLogLevel :: enum c.int {
 }
 
 // Keyboard keys (US keyboard layout)
-// NOTE: Use GetKeyPressed() to allow redefining
-// required keys for alternative layouts
+// NOTE: Use GetKeyPressed() to allow redefining required keys for alternative layouts
 KeyboardKey :: enum c.int {
 	KEY_NULL         = 0,             // Key: NULL, used for no key pressed
 	// Alphanumeric keys
@@ -681,7 +704,7 @@ GamepadButton :: enum c.int {
 	RIGHT_THUMB,                      // Gamepad joystick pressed button right
 }
 
-// Gamepad axis
+// Gamepad axes
 GamepadAxis :: enum c.int {
 	LEFT_X        = 0,                // Gamepad left stick X axis
 	LEFT_Y        = 1,                // Gamepad left stick Y axis
@@ -706,8 +729,9 @@ MaterialMapIndex :: enum c.int {
 	BRDF,                             // Brdf material
 }
 
-
 // Shader location index
+// NOTE: Some locations are tried to be set automatically on shader loading,
+// but only if default attributes/uniforms names are found, check config.h for names
 ShaderLocationIndex :: enum c.int {
 	VERTEX_POSITION = 0,              // Shader location: vertex attribute: position
 	VERTEX_TEXCOORD01,                // Shader location: vertex attribute: texcoord01
@@ -730,16 +754,16 @@ ShaderLocationIndex :: enum c.int {
 	MAP_ROUGHNESS,                    // Shader location: sampler2d texture: roughness
 	MAP_OCCLUSION,                    // Shader location: sampler2d texture: occlusion
 	MAP_EMISSION,                     // Shader location: sampler2d texture: emission
-	MAP_HEIGHT,                       // Shader location: sampler2d texture: height
+	MAP_HEIGHT,                       // Shader location: sampler2d texture: heightmap
 	MAP_CUBEMAP,                      // Shader location: samplerCube texture: cubemap
 	MAP_IRRADIANCE,                   // Shader location: samplerCube texture: irradiance
 	MAP_PREFILTER,                    // Shader location: samplerCube texture: prefilter
 	MAP_BRDF,                         // Shader location: sampler2d texture: brdf
-	VERTEX_BONEIDS,                   // Shader location: vertex attribute: boneIds
-	VERTEX_BONEWEIGHTS,               // Shader location: vertex attribute: boneWeights
-	BONE_MATRICES,                    // Shader location: array of matrices uniform: boneMatrices
+	VERTEX_BONEIDS,                   // Shader location: vertex attribute: bone indices
+	VERTEX_BONEWEIGHTS,               // Shader location: vertex attribute: bone weights
+	MATRIX_BONETRANSFORMS,            // Shader location: matrix attribute: bone transforms (animation)
+	VERTEX_INSTANCETRANSFORM,         // Shader location: vertex attribute: instance transforms
 }
-
 
 // Shader uniform data type
 ShaderUniformDataType :: enum c.int {
@@ -751,7 +775,19 @@ ShaderUniformDataType :: enum c.int {
 	IVEC2,                            // Shader uniform type: ivec2 (2 int)
 	IVEC3,                            // Shader uniform type: ivec3 (3 int)
 	IVEC4,                            // Shader uniform type: ivec4 (4 int)
+	UINT,                             // Shader uniform type: unsigned int
+	UIVEC2,                           // Shader uniform type: uivec2 (2 unsigned int)
+	UIVEC3,                           // Shader uniform type: uivec3 (3 unsigned int)
+	UIVEC4,                           // Shader uniform type: uivec4 (4 unsigned int)
 	SAMPLER2D,                        // Shader uniform type: sampler2d
+}
+
+// Shader attribute data types
+ShaderAttributeDataType :: enum c.int {
+	FLOAT = 0,                        // Shader attribute type: float
+	VEC2,                             // Shader attribute type: vec2 (2 float)
+	VEC3,                             // Shader attribute type: vec3 (3 float)
+	VEC4,                             // Shader attribute type: vec4 (4 float)
 }
 
 // Pixel formats
@@ -883,6 +919,7 @@ NPatchLayout :: enum c.int {
 
 // Callbacks to hook some internal functions
 // WARNING: This callbacks are intended for advanced users
+
 TraceLogCallback     :: #type proc "c" (logLevel: TraceLogLevel, text: cstring, args: ^c.va_list)       // Logging: Redirect trace log messages
 LoadFileDataCallback :: #type proc "c"(fileName: cstring, dataSize: ^c.int) -> [^]u8                    // FileIO: Load binary data
 SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, dataSize: c.int) -> bool       // FileIO: Save binary data
@@ -906,8 +943,8 @@ foreign lib {
 	// Window-related functions
 
 	InitWindow               :: proc(width, height: c.int, title: cstring) ---  // Initialize window and OpenGL context
-	WindowShouldClose        :: proc() -> bool  ---                             // Check if application should close (KEY_ESCAPE pressed or windows close icon clicked)
 	CloseWindow              :: proc() ---                                      // Close window and unload OpenGL context
+	WindowShouldClose        :: proc() -> bool  ---                             // Check if application should close (KEY_ESCAPE pressed or windows close icon clicked)
 	IsWindowReady            :: proc() -> bool  ---                             // Check if window has been initialized successfully
 	IsWindowFullscreen       :: proc() -> bool  ---                             // Check if window is currently fullscreen
 	IsWindowHidden           :: proc() -> bool  ---                             // Check if window is currently hidden
@@ -955,17 +992,6 @@ foreign lib {
 	EnableEventWaiting       :: proc() ---                                      // Enable waiting for events on EndDrawing(), no automatic event polling
 	DisableEventWaiting      :: proc() ---                                      // Disable waiting for events on EndDrawing(), automatic events polling
 
-
-	// Custom frame control functions
-	// NOTE: Those functions are intended for advance users that want full control over the frame processing
-	// By default EndDrawing() does this job: draws everything + SwapScreenBuffer() + manage frame timing + PollInputEvents()
-	// To avoid that behaviour and control frame processes manually, enable in config.h: SUPPORT_CUSTOM_FRAME_CONTROL
-
-	SwapScreenBuffer :: proc() ---             // Swap back buffer with front buffer (screen drawing)
-	PollInputEvents  :: proc() ---             // Register all input events
-	WaitTime         :: proc(seconds: f64) --- // Wait for some time (halt program execution)
-
-
 	// Cursor-related functions
 
 	ShowCursor       :: proc() ---                                              // Shows cursor
@@ -1010,6 +1036,7 @@ foreign lib {
 	GetShaderLocationAttrib :: proc(shader: Shader, attribName: cstring)  -> c.int ---                                                    // Get shader attribute location
 
 	// We use #any_int here so we can pass ShaderLocationIndex
+
 	SetShaderValue          :: proc(shader: Shader, #any_int locIndex: c.int, value: rawptr, uniformType: ShaderUniformDataType) ---               // Set shader uniform value
 	SetShaderValueV         :: proc(shader: Shader, #any_int locIndex: c.int, value: rawptr, uniformType: ShaderUniformDataType, count: c.int) --- // Set shader uniform value vector
 	SetShaderValueMatrix    :: proc(shader: Shader, #any_int locIndex: c.int, mat: Matrix) ---                                                     // Set shader uniform value (matrix 4x4)
@@ -1019,7 +1046,7 @@ foreign lib {
 	// Screen-space-related functions
 
 	GetScreenToWorldRay   :: proc(position: Vector2, camera: Camera) -> Ray ---                                  // Get a ray trace from screen position (i.e mouse)
-	GetScreenToWorldRayEx :: proc(position: Vector2, camera: Camera, width: c.int, height: c.int) ->Ray ---      // Get a ray trace from screen position (i.e mouse) in a viewport
+	GetScreenToWorldRayEx :: proc(position: Vector2, camera: Camera, width: c.int, height: c.int) -> Ray ---      // Get a ray trace from screen position (i.e mouse) in a viewport
 	GetWorldToScreen      :: proc(position: Vector3, camera: Camera) -> Vector2 ---                              // Get the screen space position for a 3d world space position
 	GetWorldToScreenEx    :: proc(position: Vector3, camera: Camera, width: c.int, height: c.int) -> Vector2 --- // Get size position for a 3d world space position
 	GetWorldToScreen2D    :: proc(position: Vector2, camera: Camera2D) -> Vector2 ---                            // Get the screen space position for a 2d camera world space position
@@ -1030,9 +1057,18 @@ foreign lib {
 	// Timing-related functions
 
 	SetTargetFPS :: proc(fps: c.int) --- // Set target FPS (maximum)
-	GetFPS       :: proc() -> c.int ---  // Returns current FPS
 	GetFrameTime :: proc() -> f32 ---    // Returns time in seconds for last frame drawn (delta time)
 	GetTime      :: proc() -> f64 ---    // Returns elapsed time in seconds since InitWindow()
+	GetFPS       :: proc() -> c.int ---  // Returns current FPS
+
+	// Custom frame control functions
+	// NOTE: Those functions are intended for advance users that want full control over the frame processing
+	// By default EndDrawing() does this job: draws everything + SwapScreenBuffer() + manage frame timing + PollInputEvents()
+	// To avoid that behaviour and control frame processes manually, enable in config.h: SUPPORT_CUSTOM_FRAME_CONTROL
+
+	SwapScreenBuffer :: proc() ---             // Swap back buffer with front buffer (screen drawing)
+	PollInputEvents  :: proc() ---             // Register all input events
+	WaitTime         :: proc(seconds: f64) --- // Wait for some time (halt program execution)
 
 	// Random value generation functions
 
@@ -1042,25 +1078,22 @@ foreign lib {
 	UnloadRandomSequence :: proc(sequence: [^]c.int) ---                         // Unload random values sequence
 
 	// Misc. functions
+
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
 	SetConfigFlags :: proc(flags: ConfigFlags) ---       // Setup init configuration flags (view FLAGS). NOTE: This function is expected to be called before window creation
 	OpenURL        :: proc(url: cstring) ---             // Open URL with default system browser (if available)
 
 	// NOTE: Following functions implemented in module [utils]
 	//------------------------------------------------------------------
+
 	TraceLog         :: proc(logLevel: TraceLogLevel, text: cstring, #c_vararg args: ..any) --- // Show trace log messages (LOG_DEBUG, LOG_INFO, LOG_WARNING, LOG_ERROR)
 	SetTraceLogLevel :: proc(logLevel: TraceLogLevel) ---                                       // Set the current threshold (minimum) log level
+	SetTraceLogCallback     :: proc(callback: TraceLogCallback) ---     // Set custom trace log
+
+	// Memory management, using internal allocators
+
 	MemAlloc         :: proc(size: c.uint) -> rawptr ---                                        // Internal memory allocator
 	MemRealloc       :: proc(ptr: rawptr, size: c.uint) -> rawptr ---                           // Internal memory reallocator
-
-	// Set custom callbacks
-	// WARNING: Callbacks setup is intended for advanced users
-
-	SetTraceLogCallback     :: proc(callback: TraceLogCallback) ---     // Set custom trace log
-	SetLoadFileDataCallback :: proc(callback: LoadFileDataCallback) --- // Set custom file binary data loader
-	SetSaveFileDataCallback :: proc(callback: SaveFileDataCallback) --- // Set custom file binary data saver
-	SetLoadFileTextCallback :: proc(callback: LoadFileTextCallback) --- // Set custom file text data loader
-	SetSaveFileTextCallback :: proc(callback: SaveFileTextCallback) --- // Set custom file text data saver
 
 	// Files management functions
 
@@ -1072,12 +1105,27 @@ foreign lib {
 	UnloadFileText          :: proc(text: [^]byte) ---                                                    // Unload file text data allocated by LoadFileText()
 	SaveFileText            :: proc(fileName: cstring, text: [^]byte) -> bool ---                         // Save text data to file (write), string must be '\0' terminated, returns true on success
 
+	// File access custom callbacks
+	// WARNING: Callbacks setup is intended for advanced users
+
+	SetLoadFileDataCallback :: proc(callback: LoadFileDataCallback) --- // Set custom file binary data loader
+	SetSaveFileDataCallback :: proc(callback: SaveFileDataCallback) --- // Set custom file binary data saver
+	SetLoadFileTextCallback :: proc(callback: LoadFileTextCallback) --- // Set custom file text data loader
+	SetSaveFileTextCallback :: proc(callback: SaveFileTextCallback) --- // Set custom file text data saver
+
 	// File system functions
 
+	FileRename              :: proc(fileName: cstring, fileRename: cstring) -> c.int ---                       // Rename file (if exists)
+	FileRemove              :: proc(fileName: cstring) -> c.int ---                                            // Remove file (if exists)
+	FileCopy                :: proc(srcPath: cstring, dstPath: cstring) -> c.int ---                           // Copy file from one path to another, dstPath created if it doesn't exist
+	FileMove                :: proc(srcPath: cstring, dstPath: cstring) -> c.int ---                           // Move file from one directory to another, dstPath created if it doesn't exist
+	FileTextReplace         :: proc(fileName: cstring, search: cstring, replacement: cstring) -> c.int ---     // Replace text in an existing file
+	FileTextFindIndex       :: proc(fileName: cstring, search: cstring) -> c.int ---                           // Find text in existing file
 	FileExists              :: proc(fileName: cstring) -> bool ---                                             // Check if file exists
 	DirectoryExists         :: proc(dirPath: cstring) -> bool ---                                              // Check if a directory path exists
 	IsFileExtension         :: proc(fileName, ext: cstring) -> bool ---                                        // Check file extension (including point: .png, .wav)
 	GetFileLength           :: proc(fileName: cstring) -> c.int ---                                            // Get file length in bytes (NOTE: GetFileSize() conflicts with windows.h)
+	GetFileModTime          :: proc(fileName: cstring) -> c.long ---                                           // Get file modification time (last write time)
 	GetFileExtension        :: proc(fileName: cstring) -> cstring ---                                          // Get pointer to extension for a filename string (includes dot: '.png')
 	GetFileName             :: proc(filePath: cstring) -> cstring ---                                          // Get pointer to filename for a path string
 	GetFileNameWithoutExt   :: proc(filePath: cstring) -> cstring ---                                          // Get filename string without extension (uses static string)
@@ -1088,25 +1136,26 @@ foreign lib {
 	MakeDirectory           :: proc(dirPath: cstring) -> c.int ---                                             // Create directories (including full path requested), returns 0 on success
 	ChangeDirectory         :: proc(dir: cstring) -> bool ---                                                  // Change working directory, return true on success
 	IsPathFile              :: proc(path: cstring) -> bool ---                                                 // Check if a given path is a file or a directory
-	IsFileNameValid         :: proc (fileName: cstring) -> bool ---                                            // Check if fileName is valid for the platform/OS
+	IsFileNameValid         :: proc(fileName: cstring) -> bool ---                                             // Check if fileName is valid for the platform/OS
 	LoadDirectoryFiles      :: proc(dirPath: cstring) -> FilePathList ---                                      // Load directory filepaths
 	LoadDirectoryFilesEx    :: proc(basePath: cstring, filter: cstring, scanSubdirs: bool) -> FilePathList --- // Load directory filepaths with extension filtering and recursive directory scan. Use 'DIR' in the filter string to include directories in the result
 	UnloadDirectoryFiles    :: proc(files: FilePathList) ---                                                   // Unload filepaths
 	IsFileDropped           :: proc() -> bool ---                                                              // Check if a file has been dropped into window
 	LoadDroppedFiles        :: proc() -> FilePathList ---                                                      // Load dropped filepaths
 	UnloadDroppedFiles      :: proc(files: FilePathList) ---                                                   // Unload dropped filepaths
-	GetFileModTime          :: proc(fileName: cstring) -> c.long ---                                           // Get file modification time (last write time)
+	GetDirectoryFileCount   :: proc(dirPath: cstring) -> c.uint ---                                            // Get the file count in a directory
+	GetDirectoryFileCountEx :: proc(basePath: cstring, filter: cstring, scanSubdirs: bool) -> c.uint ---       // Get the file count in a directory with extension filtering and recursive directory scan. Use 'DIR' in the filter string to include directories in the result
 
 	// Compression/Encoding functionality
 
 	CompressData     :: proc(data: rawptr,     dataSize: c.int,     compDataSize: ^c.int) -> [^]byte ---       // Compress data (DEFLATE algorithm), memory must be MemFree()
 	DecompressData   :: proc(compData: rawptr, compDataSize: c.int, dataSize:     ^c.int) -> [^]byte ---       // Decompress data (DEFLATE algorithm), memory must be MemFree()
-	EncodeDataBase64 :: proc(data: rawptr,     dataSize: c.int,     outputSize:   ^c.int) -> [^]byte ---       // Encode data to Base64 string, memory must be MemFree()
-	DecodeDataBase64 :: proc(data: rawptr,     outputSize: ^c.int) -> [^]byte ---                              // Decode Base64 string data, memory must be MemFree()
+	EncodeDataBase64 :: proc(data: rawptr,     dataSize: c.int,     outputSize:   ^c.int) -> cstring ---       // Encode data to Base64 string (includes NULL terminator), memory must be MemFree()
+	DecodeDataBase64 :: proc(data: rawptr,     outputSize: ^c.int) -> cstring ---                              // Decode Base64 string (expected NULL terminated), memory must be MemFree()
 	ComputeCRC32     :: proc(data: rawptr,     dataSize: c.int) -> c.uint ---                                  // Compute CRC32 hash code
-	ComputeMD5       :: proc (data: rawptr,    dataSize: c.int) -> [^]c.uint ---                               // Compute MD5 hash code, returns static int[4] (16 bytes)
+	ComputeMD5       :: proc(data: rawptr,     dataSize: c.int) -> [^]c.uint ---                               // Compute MD5 hash code, returns static int[4] (16 bytes)
 	ComputeSHA1      :: proc(data: rawptr,     dataSize: c.int) -> [^]c.uint ---                               // Compute SHA1 hash code, returns static int[5] (20 bytes)
-
+	ComputeSHA256    :: proc(data: rawptr,     dataSize: c.int) -> [^]c.uint ---                               // Compute SHA256 hash code, returns static int[8] (32 bytes)
 
 	// Automation events functionality
 
@@ -1132,6 +1181,7 @@ foreign lib {
 	IsKeyUp        	   :: proc(key: KeyboardKey) -> bool --- // Detect if a key is NOT being pressed
 	GetKeyPressed  	   :: proc() -> KeyboardKey ---          // Get key pressed (keycode), call it multiple times for keys queued
 	GetCharPressed 	   :: proc() -> rune ---                 // Get char pressed (unicode), call it multiple times for chars queued
+	GetKeyName         :: proc(key: KeyboardKey) -> cstring ---    // Get name of a QWERTY key on the current keyboard layout (eg returns string 'q' for KEY_A on an AZERTY keyboard)
 	SetExitKey     	   :: proc(key: KeyboardKey) ---         // Set a custom key to exit program (default is ESC)
 
 	// Input-related functions: gamepads
@@ -1148,45 +1198,43 @@ foreign lib {
 	SetGamepadMappings       :: proc(mappings: cstring) -> c.int ---                                     // Set internal gamepad mappings (SDL_GameControllerDB)
 	SetGamepadVibration      :: proc(gamepad: c.int, leftMotor: f32, rightMotor: f32, duration: f32) --- // Set gamepad vibration for both motors (duration in seconds)
 
-
 	// Input-related functions: mouse
 
-	IsMouseButtonPressed  :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been pressed once
-	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is being pressed
-	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
-	IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---
+	IsMouseButtonPressed  :: proc(button: MouseButton) -> bool ---    // Check if a mouse button has been pressed once
+	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Check if a mouse button is being pressed
+	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Check if a mouse button has been released once
+	IsMouseButtonUp       :: proc(button: MouseButton) -> bool ---    // Check if a mouse button is NOT being pressed
 
-	GetMouseX             :: proc() -> c.int ---                      // Returns mouse position X
-	GetMouseY             :: proc() -> c.int ---                      // Returns mouse position Y
-	GetMousePosition      :: proc() -> Vector2 ---                    // Returns mouse position XY
-	GetMouseDelta         :: proc() -> Vector2 ---                    // Returns mouse delta XY
+	GetMouseX             :: proc() -> c.int ---                      // Get mouse position X
+	GetMouseY             :: proc() -> c.int ---                      // Get mouse position Y
+	GetMousePosition      :: proc() -> Vector2 ---                    // Get mouse position XY
+	GetMouseDelta         :: proc() -> Vector2 ---                    // Get mouse delta between frames
 	SetMousePosition      :: proc(x, y: c.int) ---                    // Set mouse position XY
 	SetMouseOffset        :: proc(offsetX, offsetY: c.int) ---        // Set mouse offset
 	SetMouseScale         :: proc(scaleX, scaleY: f32) ---            // Set mouse scaling
-	GetMouseWheelMove     :: proc() -> f32 ---                        // Returns mouse wheel movement Y
+	GetMouseWheelMove     :: proc() -> f32 ---                        // Get mouse wheel movement for X or Y, whichever is larger
 	GetMouseWheelMoveV    :: proc() -> Vector2 ---                    // Get mouse wheel movement for both X and Y
 	SetMouseCursor        :: proc(cursor: MouseCursor) ---            // Set mouse cursor
 
 	// Input-related functions: touch
 
-	GetTouchX          :: proc() -> c.int ---               // Returns touch position X for touch point 0 (relative to screen size)
-	GetTouchY          :: proc() -> c.int ---               // Returns touch position Y for touch point 0 (relative to screen size)
-	GetTouchPosition   :: proc(index: c.int) -> Vector2 --- // Returns touch position XY for a touch point index (relative to screen size)
-	GetTouchPointId    :: proc(index: c.int) -> c.int ---   // Get touch point identifier for given index
-	GetTouchPointCount :: proc() -> c.int ---               // Get number of touch points
+	GetTouchX          :: proc() -> c.int ---                         // Get touch position X for touch point 0 (relative to screen size)
+	GetTouchY          :: proc() -> c.int ---                         // Get touch position Y for touch point 0 (relative to screen size)
+	GetTouchPosition   :: proc(index: c.int) -> Vector2 ---           // Get touch position XY for a touch point index (relative to screen size)
+	GetTouchPointId    :: proc(index: c.int) -> c.int ---             // Get touch point identifier for given index
+	GetTouchPointCount :: proc() -> c.int ---                         // Get number of touch points
 
 	//------------------------------------------------------------------------------------
 	// Gestures and Touch Handling Functions (Module: rgestures)
 	//------------------------------------------------------------------------------------
 
-	SetGesturesEnabled     :: proc(flags: Gestures) ---          // Enable a set of gestures using flags
-
-	GetGestureDetected     :: proc() -> Gestures ---             // Get latest detected gesture
-	GetGestureHoldDuration :: proc() -> f32 ---                  // Get gesture hold time in seconds
-	GetGestureDragVector   :: proc() -> Vector2 ---              // Get gesture drag vector
-	GetGestureDragAngle    :: proc() -> f32 ---                  // Get gesture drag angle
-	GetGesturePinchVector  :: proc() -> Vector2 ---              // Get gesture pinch delta
-	GetGesturePinchAngle   :: proc() -> f32 ---                  // Get gesture pinch angle
+	SetGesturesEnabled :: proc(flags: Gestures) ---            // Enable a set of gestures using flags
+	// IsGestureDetected is declared near the bottom
+	GetGestureHoldDuration :: proc() -> f32 ---                // Get gesture hold time in seconds
+	GetGestureDragVector   :: proc() -> Vector2 ---            // Get gesture drag vector
+	GetGestureDragAngle    :: proc() -> f32 ---                // Get gesture drag angle
+	GetGesturePinchVector  :: proc() -> Vector2 ---            // Get gesture pinch delta
+	GetGesturePinchAngle   :: proc() -> f32 ---                // Get gesture pinch angle
 
 	//------------------------------------------------------------------------------------
 	// Camera System Functions (Module: camera)
@@ -1223,7 +1271,6 @@ foreign lib {
 	GetShapesTexture :: proc() -> Texture2D ---                             // Get texture that is used for shapes drawing
 	GetShapesTextureRectangle :: proc() -> Rectangle ---                    // Get texture source rectangle that is used for shapes drawing
 
-
 	// Basic shapes drawing functions
 
 	DrawPixel                   :: proc(posX, posY: c.int, color: Color) ---                                                                          // Draw a pixel using geometry [Can be slow, use with care]
@@ -1233,15 +1280,18 @@ foreign lib {
 	DrawLineEx                  :: proc(startPos, endPos: Vector2, thick: f32, color: Color) ---                                                      // Draw a line (using triangles/quads)
 	DrawLineStrip               :: proc(points: [^]Vector2, pointCount: c.int, color: Color) ---                                                      // Draw lines sequence (using gl lines)
 	DrawLineBezier              :: proc(startPos, endPos: Vector2, thick: f32, color: Color) ---                                                      // Draw line segment cubic-bezier in-out interpolation
+	DrawLineDashed              :: proc(startPos, endPos: Vector2, dashSize: c.int, spaceSize: c.int, color: Color) ---                               // Draw a dashed line
 	DrawCircle                  :: proc(centerX, centerY: c.int, radius: f32, color: Color) ---                                                       // Draw a color-filled circle
+	DrawCircleV                 :: proc(center: Vector2, radius: f32, color: Color) ---                                                               // Draw a color-filled circle (Vector version)
+	DrawCircleGradient          :: proc(center: Vector2, radius: f32, inner, outer: Color) ---                                                        // Draw a gradient-filled circle
 	DrawCircleSector            :: proc(center: Vector2, radius: f32, startAngle, endAngle: f32, segments: c.int, color: Color) ---                   // Draw a piece of a circle
 	DrawCircleSectorLines       :: proc(center: Vector2, radius: f32, startAngle, endAngle: f32, segments: c.int, color: Color) ---                   // Draw circle sector outline
-	DrawCircleGradient          :: proc(centerX, centerY: c.int, radius: f32, inner, outer: Color) ---                                                // Draw a gradient-filled circle
-	DrawCircleV                 :: proc(center: Vector2, radius: f32, color: Color) ---                                                               // Draw a color-filled circle (Vector version)
 	DrawCircleLines             :: proc(centerX, centerY: c.int, radius: f32, color: Color) ---                                                       // Draw circle outline
 	DrawCircleLinesV            :: proc(center: Vector2, radius: f32, color: Color) ---                                                               // Draw circle outline (Vector version)
 	DrawEllipse                 :: proc(centerX, centerY: c.int, radiusH, radiusV: f32, color: Color) ---                                             // Draw ellipse
+	DrawEllipseV                :: proc(center: Vector2, radiusH, radiusV: f32, color: Color) ---                                                     // Draw ellipse (Vector version)
 	DrawEllipseLines            :: proc(centerX, centerY: c.int, radiusH, radiusV: f32, color: Color) ---                                             // Draw ellipse outline
+	DrawEllipseLinesV           :: proc(center: Vector2, radiusH, radiusV: f32, color: Color) ---                                                     // Draw ellipse outline (Vector version)
 	DrawRing                    :: proc(center: Vector2, innerRadius, outerRadius: f32, startAngle, endAngle: f32, segments: c.int, color: Color) --- // Draw ring
 	DrawRingLines               :: proc(center: Vector2, innerRadius, outerRadius: f32, startAngle, endAngle: f32, segments: c.int, color: Color) --- // Draw ring outline
 	DrawRectangle               :: proc(posX, posY: c.int, width, height: c.int, color: Color) ---                                                    // Draw a color-filled rectangle
@@ -1250,7 +1300,7 @@ foreign lib {
 	DrawRectanglePro            :: proc(rec: Rectangle, origin: Vector2, rotation: f32, color: Color) ---                                             // Draw a color-filled rectangle with pro parameters
 	DrawRectangleGradientV      :: proc(posX, posY: c.int, width, height: c.int, top, bottom: Color) ---                                              // Draw a vertical-gradient-filled rectangle
 	DrawRectangleGradientH      :: proc(posX, posY: c.int, width, height: c.int, left, right: Color) ---                                              // Draw a horizontal-gradient-filled rectangle
-	DrawRectangleGradientEx     :: proc(rec: Rectangle, topLeft, bottomLeft, topRight, bottomRight: Color) ---                                        // Draw a gradient-filled rectangle with custom vertex colors
+	DrawRectangleGradientEx     :: proc(rec: Rectangle, topLeft, bottomLeft, bottomRight, topRight: Color) ---                                        // Draw a gradient-filled rectangle with custom vertex colors
 	DrawRectangleLines          :: proc(posX, posY: c.int, width, height: c.int, color: Color) ---                                                    // Draw rectangle outline
 	DrawRectangleLinesEx        :: proc(rec: Rectangle, lineThick: f32, color: Color) ---                                                             // Draw rectangle outline with extended parameters
 	DrawRectangleRounded        :: proc(rec: Rectangle, roundness: f32, segments: c.int, color: Color) ---                                            // Draw rectangle with rounded edges
@@ -1265,6 +1315,7 @@ foreign lib {
 	DrawPolyLinesEx             :: proc(center: Vector2, sides: c.int, radius: f32, rotation: f32, lineThick: f32, color: Color) ---                  // Draw a polygon outline of n sides with extended parameters
 
 	// Splines drawing functions
+
 	DrawSplineLinear                 :: proc(points: [^]Vector2, pointCount: c.int, thick: f32, color: Color) --- // Draw spline: Linear, minimum 2 points
 	DrawSplineBasis                  :: proc(points: [^]Vector2, pointCount: c.int, thick: f32, color: Color) --- // Draw spline: B-Spline, minimum 4 points
 	DrawSplineCatmullRom             :: proc(points: [^]Vector2, pointCount: c.int, thick: f32, color: Color) --- // Draw spline: Catmull-Rom, minimum 4 points
@@ -1277,12 +1328,15 @@ foreign lib {
 	DrawSplineSegmentBezierCubic 	 :: proc(p1, c2, c3, p4: Vector2, thick: f32, color: Color) ---               // Draw spline segment: Cubic Bezier, 2 points, 2 control points
 
 	// Spline segment point evaluation functions, for a given t [0.0f .. 1.0f]
+
 	GetSplinePointLinear  	  :: proc(startPos, endPos: Vector2, t: f32) -> Vector2 ---    // Get (evaluate) spline point: Linear
 	GetSplinePointBasis 	  :: proc(p1, p2, p3, p4: Vector2, t: f32) -> Vector2 ---      // Get (evaluate) spline point: B-Spline
 	GetSplinePointCatmullRom  :: proc(p1, p2, p3, p4: Vector2, t: f32) -> Vector2 ---      // Get (evaluate) spline point: Catmull-Rom
 	GetSplinePointBezierQuad  :: proc(p1, c2, p3: Vector2, t: f32) -> Vector2 ---          // Get (evaluate) spline point: Quadratic Bezier
 	GetSplinePointBezierCubic :: proc(p1, c2, c3, p4: Vector2, t: f32) -> Vector2 ---      // Get (evaluate) spline point: Cubic Bezier
-                                                                                                                                                        // Basic shapes collision detection functions
+
+	// Basic shapes collision detection functions
+
 	CheckCollisionRecs          :: proc(rec1, rec2: Rectangle) -> bool ---                                                                          // Check collision between two rectangles
 	CheckCollisionCircles       :: proc(center1: Vector2, radius1: f32, center2: Vector2, radius2: f32) -> bool ---                                 // Check collision between two circles
 	CheckCollisionCircleRec     :: proc(center: Vector2, radius: f32, rec: Rectangle) -> bool ---                                                   // Check collision between circle and rectangle
@@ -1295,7 +1349,9 @@ foreign lib {
 	CheckCollisionLines         :: proc(startPos1, endPos1, startPos2, endPos2: Vector2, collisionPoint: [^]Vector2) -> bool ---                    // Check the collision between two lines defined by two points each, returns collision point by reference
 	GetCollisionRec             :: proc(rec1, rec2: Rectangle) -> Rectangle ---                                                                     // Get collision rectangle for two rectangles collision
 
-
+	//------------------------------------------------------------------------------------
+	// Texture Loading and Drawing Functions (Module: textures)
+	//------------------------------------------------------------------------------------
 
 	// Image loading functions
 	// NOTE: These functions do not require GPU access
@@ -1410,7 +1466,8 @@ foreign lib {
 	SetTextureFilter  :: proc(texture: Texture2D, filter: TextureFilter) ---                                                                // Set texture scaling filter mode
 	SetTextureWrap    :: proc(texture: Texture2D, wrap: TextureWrap) ---                                                                    // Set texture wrapping mode
 
-                                                                                                                                                // Texture drawing functions
+	// Texture drawing functions
+
 	DrawTexture       :: proc(texture: Texture2D, posX, posY: c.int, tint: Color) ---                                                       // Draw a Texture2D
 	DrawTextureV      :: proc(texture: Texture2D, position: Vector2, tint: Color) ---                                                       // Draw a Texture2D with position defined as Vector2
 	DrawTextureEx     :: proc(texture: Texture2D, position: Vector2, rotation: f32, scale: f32, tint: Color) ---                            // Draw a Texture2D with extended parameters
@@ -1439,26 +1496,23 @@ foreign lib {
 	SetPixelColor       :: proc(dstPtr: rawptr, color: Color, format: PixelFormat) ---  // Set color formatted into destination pixel pointer
 	GetPixelDataSize    :: proc(width, height: c.int, format: PixelFormat) -> c.int --- // Get pixel data size in bytes for certain format
 
-
-
-
 	//------------------------------------------------------------------------------------
 	// Font Loading and Text Drawing Functions (Module: text)
 	//------------------------------------------------------------------------------------
 
 	// Font loading/unloading functions
 
-	GetFontDefault     :: proc() -> Font ---                                                                                                                  		   // Get the default Font
-	LoadFont           :: proc(fileName: cstring) -> Font ---                                                                                                 		   // Load font from file into GPU memory (VRAM)
-	LoadFontEx         :: proc(fileName: cstring, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---                                             // Load font from file with extended parameters, use NULL for codepoints and 0 for codepointCount to load the default character set, font size is provided in pixels height
-	LoadFontFromImage  :: proc(image: Image, key: Color, firstChar: rune) -> Font ---                                                                         		   // Load font from Image (XNA style)
-	LoadFontFromMemory :: proc(fileType: cstring, fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---      	   // Load font from memory buffer, fileType refers to extension: i.e. '.ttf'
-	IsFontValid        :: proc(font: Font) -> bool ---                                                                                                        		   // Check if a font is valid (font data loaded, WARNING: GPU texture not checked)
-	LoadFontData       :: proc(fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int, type: FontType) -> [^]GlyphInfo --- 	   // Load font data for further use
-	GenImageFontAtlas  :: proc(glyphs: [^]GlyphInfo, glyphRecs: ^[^]Rectangle, codepointCount: c.int, fontSize: c.int, padding: c.int, packMethod: c.int) -> Image --- // Generate image font atlas using chars info
-	UnloadFontData     :: proc(glyphs: [^]GlyphInfo, glyphCount: c.int) ---                                                                                    		   // Unload font chars info data (RAM)
-	UnloadFont         :: proc(font: Font) ---                                                                                                                		   // Unload font from GPU memory (VRAM)
-	ExportFontAsCode   :: proc(font: Font, fileName: cstring) -> bool ---                                                                                     		   // Export font as code file, returns true on success
+	GetFontDefault     :: proc() -> Font ---                                                                                                                  		           // Get the default Font
+	LoadFont           :: proc(fileName: cstring) -> Font ---                                                                                                 		           // Load font from file into GPU memory (VRAM)
+	LoadFontEx         :: proc(fileName: cstring, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---                                                             // Load font from file with extended parameters, use NULL for codepoints and 0 for codepointCount to load the default character set, font size is provided in pixels height
+	LoadFontFromImage  :: proc(image: Image, key: Color, firstChar: rune) -> Font ---                                                                         		           // Load font from Image (XNA style)
+	LoadFontFromMemory :: proc(fileType: cstring, fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int) -> Font ---      	                   // Load font from memory buffer, fileType refers to extension: i.e. '.ttf'
+	IsFontValid        :: proc(font: Font) -> bool ---                                                                                                        		           // Check if a font is valid (font data loaded, WARNING: GPU texture not checked)
+	LoadFontData       :: proc(fileData: rawptr, dataSize: c.int, fontSize: c.int, codepoints: [^]rune, codepointCount: c.int, type: FontType, glyphCount: ^c.int) -> [^]GlyphInfo --- // Load font data for further use
+	GenImageFontAtlas  :: proc(glyphs: [^]GlyphInfo, glyphRecs: ^[^]Rectangle, codepointCount: c.int, fontSize: c.int, padding: c.int, packMethod: c.int) -> Image ---                 // Generate image font atlas using chars info
+	UnloadFontData     :: proc(glyphs: [^]GlyphInfo, glyphCount: c.int) ---                                                                                    		           // Unload font chars info data (RAM)
+	UnloadFont         :: proc(font: Font) ---                                                                                                                		           // Unload font from GPU memory (VRAM)
+	ExportFontAsCode   :: proc(font: Font, fileName: cstring) -> bool ---                                                                                     		           // Export font as code file, returns true on success
 
 	// Text drawing functions
 
@@ -1467,16 +1521,17 @@ foreign lib {
 	DrawTextEx         :: proc(font: Font, text: cstring, position: Vector2, fontSize: f32, spacing: f32, tint: Color) ---                        		// Draw text using font and additional parameters
 	DrawTextPro        :: proc(font: Font, text: cstring, position, origin: Vector2, rotation: f32, fontSize: f32, spacing: f32, tint: Color) --- 		// Draw text using Font and pro parameters (rotation)
 	DrawTextCodepoint  :: proc(font: Font, codepoint: rune, position: Vector2, fontSize: f32, tint: Color) ---                                    		// Draw one character (codepoint)
-	DrawTextCodepoints :: proc(font: Font, codepoints: [^]rune, codepointCount: c.int, position: Vector2, fontSize: f32, spacing: f32, tint: Color) ---     // Draw multiple character (codepoint)
+	DrawTextCodepoints :: proc(font: Font, codepoints: [^]rune, codepointCount: c.int, position: Vector2, fontSize: f32, spacing: f32, tint: Color) --- // Draw multiple character (codepoint)
 
 	// Text font info functions
 
-	SetTextLineSpacing :: proc(spacing: c.int) ---                                                      // Set vertical line spacing when drawing with line-breaks
-	MeasureText        :: proc(text: cstring, fontSize: c.int) -> c.int ---                             // Measure string width for default font
-	MeasureTextEx      :: proc(font: Font, text: cstring, fontSize: f32, spacing: f32) -> Vector2 ---   // Measure string size for Font
-	GetGlyphIndex      :: proc(font: Font, codepoint: rune) -> c.int ---                                // Get glyph index position in font for a codepoint (unicode character), fallback to '?' if not found
-	GetGlyphInfo       :: proc(font: Font, codepoint: rune) -> GlyphInfo ---                            // Get glyph font info data for a codepoint (unicode character), fallback to '?' if not found
-	GetGlyphAtlasRec   :: proc(font: Font, codepoint: rune) -> Rectangle ---                            // Get glyph rectangle in font atlas for a codepoint (unicode character), fallback to '?' if not found
+	SetTextLineSpacing :: proc(spacing: c.int) ---                                                             // Set vertical line spacing when drawing with line-breaks
+	MeasureText        :: proc(text: cstring, fontSize: c.int) -> c.int ---                                    // Measure string width for default font
+	MeasureTextEx      :: proc(font: Font, text: cstring, fontSize: f32, spacing: f32) -> Vector2 ---          // Measure string size for Font
+	MeasureTextCodepoints :: proc(font: Font, codepoints: [^]c.int, length: c.int, fontSize, spacing: f32) -> Vector2 --- // Measure string size for an existing array of codepoints for Font
+	GetGlyphIndex      :: proc(font: Font, codepoint: rune) -> c.int ---                                       // Get glyph index position in font for a codepoint (unicode character), fallback to '?' if not found
+	GetGlyphInfo       :: proc(font: Font, codepoint: rune) -> GlyphInfo ---                                   // Get glyph font info data for a codepoint (unicode character), fallback to '?' if not found
+	GetGlyphAtlasRec   :: proc(font: Font, codepoint: rune) -> Rectangle ---                                   // Get glyph rectangle in font atlas for a codepoint (unicode character), fallback to '?' if not found
 
 	// Text codepoints management functions (unicode characters)
 
@@ -1491,29 +1546,37 @@ foreign lib {
 	CodepointToUTF8      :: proc(codepoint: rune, utf8Size: ^c.int) -> cstring ---  // Encode one codepoint into UTF-8 byte array (array length returned as parameter)
 
 	// Text strings management functions (no UTF-8 strings, only byte chars)
-	// NOTE: Some strings allocate memory internally for returned strings, just be careful!
+	// WARNING 1: Most of these functions use internal static buffers[], it's recommended to store returned data on user-side for re-use
+	// WARNING 2: Some functions allocate memory internally for the returned strings, those strings must be freed by user using MemFree()
 
-	TextCopy      :: proc(dst: [^]byte, src: cstring) -> c.int ---                               // Copy one string to another, returns bytes copied
-	TextIsEqual   :: proc(text1, text2: cstring) -> bool ---                                     // Check if two text string are equal
-	TextLength    :: proc(text: cstring) -> c.uint ---                                           // Get text length, checks for '\0' ending
+	LoadTextLines   :: proc(text: cstring, count: ^c.int) -> [^]cstring ---                        // Load text as separate lines ('\n')
+	UnloadTextLines :: proc(text: [^]cstring, lineCount: c.int) ---                                // Unload text lines
+	TextCopy        :: proc(dst: [^]byte, src: cstring) -> c.int ---                               // Copy one string to another, returns bytes copied
+	TextIsEqual     :: proc(text1, text2: cstring) -> bool ---                                     // Check if two text string are equal
+	TextLength      :: proc(text: cstring) -> c.uint ---                                           // Get text length, checks for '\0' ending
 
 	// TextFormat is defined at the bottom of this file
 
-	TextSubtext   :: proc(text: cstring, position: c.int, length: c.int) -> cstring ---          // Get a piece of a text string
-	TextReplace   :: proc(text: [^]byte, replace, by: cstring) -> [^]byte ---                    // Replace text string (WARNING: memory must be freed!)
-	TextInsert    :: proc(text, insert: cstring, position: c.int) -> [^]byte ---                 // Insert text in a position (WARNING: memory must be freed!)
-	TextJoin      :: proc(textList: [^]cstring, count: c.int, delimiter: cstring) -> cstring --- // Join text strings with delimiter
-	TextSplit     :: proc(text: cstring, delimiter: byte, count: ^c.int) -> [^]cstring ---       // Split text into multiple strings
-	TextAppend    :: proc(text: [^]byte, append: cstring, position: ^c.int) ---                  // Append text at specific position and move cursor!
-	TextFindIndex :: proc(text, find: cstring) -> c.int ---                                      // Find first text occurrence within a string
-	TextToUpper   :: proc(text: cstring) -> cstring ---                                          // Get upper case version of provided string
-	TextToLower   :: proc(text: cstring) -> cstring ---                                          // Get lower case version of provided string
-	TextToPascal  :: proc(text: cstring) -> cstring ---                                          // Get Pascal case notation version of provided string
-	TextToSnake   :: proc(text: cstring) -> cstring ---                                          // Get Snake case notation version of provided string
-	TextToCamel   :: proc(text: cstring) -> cstring ---                                          // Get Camel case notation version of provided string
-
-	TextToInteger :: proc(text: cstring) -> c.int ---                                            // Get integer value from text (negative values not supported)
-	TextToFloat   :: proc(text: cstring) -> f32 ---                                              // Get float value from text (negative values not supported)
+	TextSubtext             :: proc(text: cstring, position: c.int, length: c.int) -> cstring ---          // Get a piece of a text string
+	TextRemoveSpaces        :: proc(text: cstring) -> cstring ---                                          // Remove text spaces, concat words
+	GetTextBetween          :: proc(text, begin, end: cstring) -> [^]byte ---                              // Get text between two strings
+	TextReplace             :: proc(text, search, replacement: cstring) -> [^]byte ---                     // Replace text string with new string
+	TextReplaceAlloc        :: proc(text, search, replacement: cstring) -> [^]byte ---                     // Replace text string with new string, memory must be MemFree()
+	TextReplaceBetween      :: proc(text, begin, end, replacement: cstring) -> [^]byte ---                 // Replace text between two specific strings
+	TextReplaceBetweenAlloc :: proc(text, begin, end, replacement: cstring) -> [^]byte ---                 // Replace text between two specific strings, memory must be MemFree()
+	TextInsert              :: proc(text, insert: cstring, position: c.int) -> [^]byte ---                 // Insert text in a position (WARNING: memory must be freed!)
+	TextInsertAlloc         :: proc(text: cstring, insert: cstring, position: c.int) -> [^]byte ---        // Insert text in a defined byte position, memory must be MemFree()
+	TextJoin                :: proc(textList: [^]cstring, count: c.int, delimiter: cstring) -> cstring --- // Join text strings with delimiter
+	TextSplit               :: proc(text: cstring, delimiter: byte, count: ^c.int) -> [^]cstring ---       // Split text into multiple strings
+	TextAppend              :: proc(text: [^]byte, append: cstring, position: ^c.int) ---                  // Append text at specific position and move cursor!
+	TextFindIndex           :: proc(text, find: cstring) -> c.int ---                                      // Find first text occurrence within a string
+	TextToUpper             :: proc(text: cstring) -> cstring ---                                          // Get upper case version of provided string
+	TextToLower             :: proc(text: cstring) -> cstring ---                                          // Get lower case version of provided string
+	TextToPascal            :: proc(text: cstring) -> cstring ---                                          // Get Pascal case notation version of provided string
+	TextToSnake             :: proc(text: cstring) -> cstring ---                                          // Get Snake case notation version of provided string
+	TextToCamel             :: proc(text: cstring) -> cstring ---                                          // Get Camel case notation version of provided string
+	TextToInteger           :: proc(text: cstring) -> c.int ---                                            // Get integer value from text (negative values not supported)
+	TextToFloat             :: proc(text: cstring) -> f32 ---                                              // Get float value from text (negative values not supported)
 
 
 	//------------------------------------------------------------------------------------
@@ -1562,8 +1625,6 @@ foreign lib {
 	DrawModelEx       :: proc(model: Model, position: Vector3, rotationAxis: Vector3, rotationAngle: f32, scale: Vector3, tint: Color) ---                                           // Draw a model with extended parameters
 	DrawModelWires    :: proc(model: Model, position: Vector3, scale: f32, tint: Color) ---                                                                                          // Draw a model wires (with texture if set)
 	DrawModelWiresEx  :: proc(model: Model, position: Vector3, rotationAxis: Vector3, rotationAngle: f32, scale: Vector3, tint: Color) ---                                           // Draw a model wires (with texture if set) with extended parameters
-	DrawModelPoints   :: proc(model: Model, position: Vector3, scale: f32, tint: Color) ---                                                                                          // Draw a model as points
-	DrawModelPointsEx :: proc(model: Model, position: Vector3, rotationAxis: Vector3, rotationAngle: f32, scale: Vector3, tint: Color) ---                                           // Draw a model as points with extended parameters
 	DrawBoundingBox   :: proc(box: BoundingBox, color: Color) ---                                                                                                                    // Draw bounding box (wires)
 	DrawBillboard     :: proc(camera: Camera, texture: Texture2D, position: Vector3, scale: f32, tint: Color) ---                                                                    // Draw a billboard texture
 	DrawBillboardRec  :: proc(camera: Camera, texture: Texture2D, source: Rectangle, position: Vector3, size: Vector2, tint: Color) ---                                              // Draw a billboard texture defined by source
@@ -1606,12 +1667,11 @@ foreign lib {
 
 	// Model animations loading/unloading functions
 
-	LoadModelAnimations       :: proc(fileName: cstring, animCount: ^c.int) -> [^]ModelAnimation ---  // Load model animations from file
-	UpdateModelAnimation      :: proc(model: Model, anim: ModelAnimation, frame: c.int) ---           // Update model animation pose (CPU)
-	UpdateModelAnimationBones :: proc(model: Model, anim: ModelAnimation, frame: c.int) ---           // Update model animation mesh bone matrices (GPU skinning)
-	UnloadModelAnimation      :: proc(anim: ModelAnimation) ---                                       // Unload animation data
-	UnloadModelAnimations     :: proc(animations: [^]ModelAnimation, animCount: c.int) ---            // Unload animation array data
-	IsModelAnimationValid     :: proc(model: Model, anim: ModelAnimation) -> bool ---                 // Check model animation skeleton match
+	LoadModelAnimations       :: proc(fileName: cstring, animCount: ^c.int) -> [^]ModelAnimation ---                                        // Load model animations from file
+	UpdateModelAnimation      :: proc(model: Model, anim: ModelAnimation, frame: f32) ---                                                   // Update model animation pose (vertex buffers and bone matrices)
+	UpdateModelAnimationEx    :: proc(model: Model, animA: ModelAnimation, frameA: f32, animB: ModelAnimation, frameB: f32, blend: f32) --- // Update model animation pose, blending two animations
+	UnloadModelAnimations     :: proc(animations: [^]ModelAnimation, animCount: c.int) ---                                                  // Unload animation array data
+	IsModelAnimationValid     :: proc(model: Model, anim: ModelAnimation) -> bool ---                                                       // Check model animation skeleton match
 
 	// Collision detection functions
 
@@ -1640,7 +1700,7 @@ foreign lib {
 
 	LoadWave           :: proc(fileName: cstring) -> Wave ---                                    // Load wave data from file
 	LoadWaveFromMemory :: proc(fileType: cstring, fileData: rawptr, dataSize: c.int) -> Wave --- // Load wave from memory buffer, fileType refers to extension: i.e. '.wav'
-	IsWaveValid        :: proc(wave: Wave) -> bool ---                                           // Checks if wave data is // Checks if wave data is valid (data loaded and parameters)
+	IsWaveValid        :: proc(wave: Wave) -> bool ---                                           // Checks if wave data is valid (data loaded and parameters)
 	LoadSound          :: proc(fileName: cstring) -> Sound ---                                   // Load sound from file
 	LoadSoundFromWave  :: proc(wave: Wave) -> Sound ---                                          // Load sound from wave data
 	LoadSoundAlias	   :: proc(source: Sound) -> Sound ---                                       // Create a new sound that shares the same sample data as the source sound, does not own the sound data
@@ -1661,7 +1721,7 @@ foreign lib {
 	IsSoundPlaying    :: proc(sound: Sound) -> bool ---                                        // Check if a sound is currently playing
 	SetSoundVolume    :: proc(sound: Sound, volume: f32) ---                                   // Set volume for a sound (1.0 is max level)
 	SetSoundPitch     :: proc(sound: Sound, pitch: f32) ---                                    // Set pitch for a sound (1.0 is base level)
-	SetSoundPan       :: proc(sound: Sound, pan: f32) ---                                      // Set pan for a sound (0.5 is center)
+	SetSoundPan       :: proc(sound: Sound, pan: f32) ---                                      // Set pan for a sound (-1.0 left, 0.0 center, 1.0 right)
 	WaveCopy          :: proc(wave: Wave) -> Wave ---                                          // Copy a wave to a new wave
 	WaveCrop          :: proc(wave: ^Wave, initFrame, finalFrame: c.int) ---                   // Crop a wave to defined samples range
 	WaveFormat        :: proc(wave: ^Wave, sampleRate, sampleSize: c.int, channels: c.int) --- // Convert wave data to desired format
@@ -1684,7 +1744,7 @@ foreign lib {
 	SeekMusicStream           :: proc(music: Music, position: f32) ---                               // Seek music to a position (in seconds)
 	SetMusicVolume            :: proc(music: Music, volume: f32) ---                                 // Set volume for music (1.0 is max level)
 	SetMusicPitch             :: proc(music: Music, pitch: f32) ---                                  // Set pitch for a music (1.0 is base level)
-	SetMusicPan               :: proc(music: Music, pan: f32) ---                                    // Set pan for a music (0.5 is center)
+	SetMusicPan               :: proc(music: Music, pan: f32) ---                                    // Set pan for a music (-1.0 left, 0.0 center, 1.0 right)
 	GetMusicTimeLength        :: proc(music: Music) -> f32 ---                                       // Get music time length (in seconds)
 	GetMusicTimePlayed        :: proc(music: Music) -> f32 ---                                       // Get current music time played (in seconds)
 
@@ -1721,7 +1781,6 @@ IsGestureDetected :: proc "c" (gesture: Gesture) -> bool {
 	}
 	return IsGestureDetected({gesture})
 }
-
 
 // Text formatting with variables (sprintf style)
 TextFormat :: proc(text: cstring, args: ..any) -> cstring {

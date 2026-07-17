@@ -384,6 +384,24 @@ base :: proc(path: string) -> string {
 }
 
 /*
+Gets the parent directory path from a path.
+
+e.g.
+	'/home/foo/bar.tar.gz' -> '/home/foo'
+	'path/to/name.tar.gz'  -> 'path/to'
+
+Returns "." if the path is an empty string.
+*/
+dir :: proc(path: string) -> string {
+	if path == "" {
+		return "."
+	}
+
+	d, _ := split_path(path)
+	return d
+}
+
+/*
 Gets the name of a file from a path.
 
 The stem of a file is such that `stem(path)` + `ext(path)` = `base(path)`.
@@ -395,10 +413,15 @@ e.g.
 	'name.tar.gz' -> 'name.tar'
 	'name.txt'    -> 'name'
 
+Returns an empty string if the path is empty
 Returns an empty string if there is no stem. e.g: '.gitignore'.
 Returns an empty string if there's a trailing path separator.
 */
 stem :: proc(path: string) -> string {
+	if path == "" {
+		return ""
+	}
+
 	// If the last character is a path separator, there is no file.
 	if is_path_separator(path[len(path) - 1]) {
 		return ""

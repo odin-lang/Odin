@@ -50,3 +50,9 @@ test_expected_signal :: proc(t: ^testing.T) {
 	testing.expect_signal(t, libc.SIGILL)
 	libc.raise(libc.SIGILL)
 }
+
+@test
+test_array_bounds_trap_signal :: proc(t: ^testing.T) {
+	testing.expect_signal(t, libc.SIGILL)
+	_ = make([]u8, -1)
+}

@@ -171,7 +171,7 @@ foreign advapi32 {
 		hKey: HKEY,
 		dwIndex: DWORD,
 		lpName: LPWSTR,
-		lpcchName: LPDWORD,
+		cchName: DWORD,
 	  ) -> LSTATUS ---
 
 	RegEnumKeyExW :: proc(

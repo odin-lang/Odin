@@ -184,14 +184,8 @@ struct Entity {
 
 	Entity *    aliased_of;
 
-	union {
-		std::atomic<struct lbModule *> code_gen_module;
-		struct cgModule *cg_module;
-	};
-	union {
-		std::atomic<struct lbProcedure *> code_gen_procedure;
-		struct cgProcedure *cg_procedure;
-	};
+	std::atomic<struct lbModule *> code_gen_module;
+	std::atomic<struct lbProcedure *> code_gen_procedure;
 
 	u64         order_in_src;
 	String      deprecated_message;
@@ -255,6 +249,7 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			String  link_suffix;
+			String  link_section;
 			String  objc_selector_name;
 			Entity *objc_class;
 			DeferredProcedure deferred_procedure;
@@ -262,6 +257,9 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+
+			u64     fast_math_flags;
+
 			bool    is_foreign                 : 1;
 			bool    is_export                  : 1;
 			bool    generated_from_polymorphic : 1;

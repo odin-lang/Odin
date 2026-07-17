@@ -38,7 +38,11 @@ delete_args :: proc "contextless" () {
 }
 
 /*
-Exit the current process.
+Tells the OS to exit the current process directly.
+
+IMPORTANT: `@(fini)` blocks won't be executed.
+
+If you want `@(fini)` cleanup to happen, call `runtime._cleanup_runtime` first.
 */
 exit :: proc "contextless" (code: int) -> ! {
 	runtime.exit(code)

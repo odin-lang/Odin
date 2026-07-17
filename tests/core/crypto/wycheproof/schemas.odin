@@ -1,28 +1,10 @@
 package test_wycheproof
 
-import "core:bytes"
-import "core:encoding/hex"
 @(require) import "core:encoding/json"
 @(require) import "core:log"
 @(require) import "core:os"
 
-Hex_Bytes :: string
-
-hexbytes_compare :: proc(x: Hex_Bytes, b: []byte, allocator := context.allocator) -> bool {
-	dst := hexbytes_decode(x)
-	defer delete(dst)
-
-	return bytes.equal(dst, b)
-}
-
-hexbytes_decode :: proc(x: Hex_Bytes, allocator := context.allocator) -> []byte {
-	dst, ok := hex.decode(transmute([]byte)(x), allocator)
-	if !ok {
-		panic("wycheproof/common/Hex_Bytes: invalid hex encoding")
-	}
-
-	return dst
-}
+import "../common"
 
 Result :: string
 
@@ -46,10 +28,6 @@ result_is_valid :: proc(r: Result) -> bool {
 result_is_invalid :: proc(r: Result) -> bool {
 	return r == "invalid"
 }
-
-
-// The type namings are not following Odin convention, to better match
-// the schema, though the fields do.
 
 load :: proc(tvs: ^$T/Test_Vectors, fn: string) -> bool {
 	raw_json, err := os.read_entire_file_from_path(fn, context.allocator)
@@ -82,6 +60,11 @@ Test_Vectors_Note :: struct {
 	links:       []string `json:"links"`,
 }
 
+Test_Group_Source :: struct {
+	name:    string `json:"name"`,
+	version: string `json:"version"`,
+}
+
 Aead_Test_Group :: struct {
 	iv_size:  int                `json:"ivSize"`,
 	key_size: int                `json:"keySize"`,
@@ -90,16 +73,16 @@ Aead_Test_Group :: struct {
 }
 
 Aead_Test_Vector :: struct {
-	tc_id:   int       `json:"tcId"`,
-	comment: string    `json:"comment"`,
-	key:     Hex_Bytes `json:"key"`,
-	iv:      Hex_Bytes `json:"iv"`,
-	aad:     Hex_Bytes `json:"aad"`,
-	msg:     Hex_Bytes `json:"msg"`,
-	ct:      Hex_Bytes `json:"ct"`,
-	tag:     Hex_Bytes `json:"tag"`,
-	result:  Result    `json:"result"`,
-	flags:   []string  `json:"flags"`,
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	key:     common.Hex_Bytes `json:"key"`,
+	iv:      common.Hex_Bytes `json:"iv"`,
+	aad:     common.Hex_Bytes `json:"aad"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	ct:      common.Hex_Bytes `json:"ct"`,
+	tag:     common.Hex_Bytes `json:"tag"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
 }
 
 Hkdf_Test_Group :: struct {
@@ -108,15 +91,15 @@ Hkdf_Test_Group :: struct {
 }
 
 Hkdf_Test_Vector :: struct {
-	tc_id:   int       `json:"tcId"`,
-	comment: string    `json:"comment"`,
-	ikm:     Hex_Bytes `json:"ikm"`,
-	salt:    Hex_Bytes `json:"salt"`,
-	info:    Hex_Bytes `json:"info"`,
-	size:    int       `json:"size"`,
-	okm:     Hex_Bytes `json:"okm"`,
-	result:  Result    `json:"result"`,
-	flags:   []string  `json:"flags"`,
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	ikm:     common.Hex_Bytes `json:"ikm"`,
+	salt:    common.Hex_Bytes `json:"salt"`,
+	info:    common.Hex_Bytes `json:"info"`,
+	size:    int              `json:"size"`,
+	okm:     common.Hex_Bytes `json:"okm"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
 }
 
 Mac_Test_Group :: struct {
@@ -126,13 +109,13 @@ Mac_Test_Group :: struct {
 }
 
 Mac_Test_Vector :: struct {
-	tc_id:   int       `json:"tcId"`,
-	comment: string    `json:"comment"`,
-	key:     Hex_Bytes `json:"key"`,
-	msg:     Hex_Bytes `json:"msg"`,
-	tag:     Hex_Bytes `json:"tag"`,
-	result:  Result    `json:"result"`,
-	flags:   []string `json:"flags"`,
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	key:     common.Hex_Bytes `json:"key"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	tag:     common.Hex_Bytes `json:"tag"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
 }
 
 Ecdh_Test_Group :: struct {
@@ -141,18 +124,18 @@ Ecdh_Test_Group :: struct {
 }
 
 Ecdh_Test_Vector :: struct {
-	tc_id:   int       `json:"tcId"`,
-	comment: string    `json:"comment"`,
-	public:  Hex_Bytes `json:"public"`,
-	private: Hex_Bytes `json:"private"`,
-	shared:  Hex_Bytes `json:"shared"`,
-	result:  Result    `json:"result"`,
-	flags:   []string  `json:"flags"`,
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	public:  common.Hex_Bytes `json:"public"`,
+	private: common.Hex_Bytes `json:"private"`,
+	shared:  common.Hex_Bytes `json:"shared"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
 }
 
 Eddsa_Test_Group :: struct {
 	public_key:     Eddsa_Key         `json:"publicKey"`,
-	public_key_der: Hex_Bytes         `json:"publicKeyDer"`,
+	public_key_der: common.Hex_Bytes  `json:"publicKeyDer"`,
 	public_key_pem: string            `json:"publicKeyPem"`,
 	public_key_jwk: Eddsa_Jwk         `json:"publicKeyJwk"`,
 	type:           string            `json:"type"`,
@@ -160,31 +143,31 @@ Eddsa_Test_Group :: struct {
 }
 
 Eddsa_Key :: struct {
-	type:     string    `json:"type"`,
-	curve:    string    `json:"curve"`,
-	key_size: int       `json:"keySize"`,
-	pk:       Hex_Bytes `json:"pk"`,
+	type:     string           `json:"type"`,
+	curve:    string           `json:"curve"`,
+	key_size: int              `json:"keySize"`,
+	pk:       common.Hex_Bytes `json:"pk"`,
 }
 
 Eddsa_Jwk :: struct {
-	kid: string `json:"kid"`,
-	crv: string `json:"crv"`,
-	kty: string `json:"kty"`,
-	x:   string `json:"x"`,
+	kid: string           `json:"kid"`,
+	crv: string           `json:"crv"`,
+	kty: string           `json:"kty"`,
+	x:   common.Jwk_Bytes `json:"x"`,
 }
 
 Ecdsa_Key :: struct {
-	type:         string    `json:"type"`,
-	curve:        string    `json:"curve"`,
-	key_size:     int       `json:"keySize"`,
-	uncompressed: Hex_Bytes `json:"uncompressed"`,
-	wx:           Hex_Bytes `json:"wx"`,
-	wy:           Hex_Bytes `json:"wy"`,
+	type:         string           `json:"type"`,
+	curve:        string           `json:"curve"`,
+	key_size:     int              `json:"keySize"`,
+	uncompressed: common.Hex_Bytes `json:"uncompressed"`,
+	wx:           common.Hex_Bytes `json:"wx"`,
+	wy:           common.Hex_Bytes `json:"wy"`,
 }
 
 Ecdsa_Test_Group :: struct {
 	public_key:     Ecdsa_Key         `json:"publicKey"`,
-	public_key_der: Hex_Bytes         `json:"publicKeyDer"`,
+	public_key_der: common.Hex_Bytes  `json:"publicKeyDer"`,
 	public_key_pem: string            `json:"publicKeyPem"`,
 	type:           string            `json:"type"`,
 	sha:            string            `json:"sha"`,
@@ -192,12 +175,12 @@ Ecdsa_Test_Group :: struct {
 }
 
 Dsa_Test_Vector :: struct {
-	tc_id:   int       `json:"tcId"`,
-	comment: string    `json:"comment"`,
-	msg:     Hex_Bytes `json:"msg"`,
-	sig:     Hex_Bytes `json:"sig"`,
-	result:  Result    `json:"result"`,
-	flags:   []string  `json:"flags"`,
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	sig:     common.Hex_Bytes `json:"sig"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
 }
 
 Pbkdf_Test_Group :: struct {
@@ -206,13 +189,148 @@ Pbkdf_Test_Group :: struct {
 }
 
 Pbkdf_Test_Vector :: struct {
-	tc_id:           int       `json:"tcId"`,
-	comment:         string    `json:"comment"`,
-	password:        Hex_Bytes `json:"password"`,
-	salt:            Hex_Bytes `json:"salt"`,
-	iteration_count: u32       `json:"iterationCount"`,
-	dk_len:          int       `json:"dkLen"`,
-	dk:              Hex_Bytes `json:"dk"`,
-	result:          Result    `json:"result"`,
-	flags:           []string  `json:"flags"`,
+	tc_id:           int              `json:"tcId"`,
+	comment:         string           `json:"comment"`,
+	password:        common.Hex_Bytes `json:"password"`,
+	salt:            common.Hex_Bytes `json:"salt"`,
+	iteration_count: u32              `json:"iterationCount"`,
+	dk_len:          int              `json:"dkLen"`,
+	dk:              common.Hex_Bytes `json:"dk"`,
+	result:          Result           `json:"result"`,
+	flags:           []string         `json:"flags"`,
+}
+
+Kem_Test_Group :: struct {
+	type:          string            `json:"type"`,
+	source:        Test_Group_Source `json:"source"`,
+	parameter_set: string            `json:"parameterSet"`,
+	tests:         []Kem_Test_Vector `json:"tests"`,
+}
+
+Kem_Test_Vector :: struct {
+	tc_id:           int              `json:"tcId"`,
+	flags:           []string         `json:"flags"`,
+	comment:         string           `json:"comment"`,
+	seed:            common.Hex_Bytes `json:"seed"`,
+	m:               common.Hex_Bytes `json:"m"`,
+	ek:              common.Hex_Bytes `json:"ek"`,
+	dk:              common.Hex_Bytes `json:"dk"`,
+	c:               common.Hex_Bytes `json:"c"`,
+	k:               common.Hex_Bytes `json:"K"`,
+	result:          Result           `json:"result"`,
+}
+
+Mldsa_Test_Group :: struct {
+	type:              string              `json:"type"`,
+	private_seed:      common.Hex_Bytes    `json:"privateSeed"`,
+	private_key_pkcs8: common.Hex_Bytes    `json:"privateKeyPkcs8"`,
+	public_key:        common.Hex_Bytes    `json:"publicKey"`,
+	public_key_der:    common.Hex_Bytes    `json:"publicKeyDer"`,
+	source:            Test_Group_Source   `json:"source"`,
+	tests:             []Mldsa_Test_Vector `json:"tests"`,
+}
+
+Mldsa_Test_Vector :: struct {
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	rnd:     common.Hex_Bytes `json:"rnd"`,
+	ctx:     common.Hex_Bytes `json:"ctx"`,
+	mu:      common.Hex_Bytes `json:"mu"`,
+	sig:     common.Hex_Bytes `json:"sig"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
+}
+
+Rsa_Pkcs1_Sig_Test_Group :: struct {
+	private_key:       Rsa_Private_Key       `json:"privateKey"`,
+	key_asn:           common.Hex_Bytes      `json:"keyAsn"`,
+	key_der:           common.Hex_Bytes      `json:"keyDer"`,
+	key_pem:           string                `json:"keyPem"`,
+	key_size:          int                   `json:"keySize"`,
+	private_key_jwk:   Rsa_Jwk_Private_Key   `json:"privateKeyJwk"`,
+	private_key_pem:   string                `json:"privateKeyPem"`,
+	private_key_pkcs8: common.Hex_Bytes      `json:"privateKeyPkcs8"`,
+	sha:               string                `json:"sha"`,
+	type:              string                `json:"type"`,
+	source:            Test_Group_Source     `json:"source"`,
+	tests:             []Rsa_Sig_Test_Vector `json:"tests"`,
+}
+
+Rsa_Sig_Test_Vector :: struct {
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	sig:     common.Hex_Bytes `json:"sig"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
+}
+
+Rsa_Pss_Sig_Test_Group :: struct {
+	public_key:        Rsa_Public_Key        `json:"publicKey"`,
+	public_key_asn:    common.Hex_Bytes      `json:"publicKeyAsn"`,
+	public_key_der:    common.Hex_Bytes      `json:"publicKeyDer"`,
+	public_key_pem:    string                `json:"publicKeyPem"`,
+	key_size:          int                   `json:"keySize"`,
+	sha:               string                `json:"sha"`,
+	mgf:               string                `json:"mgf"`,
+	mfg_sha:           string                `json:"mgfSha"`,
+	s_len:             int                   `json:"sLen"`,
+	type:              string                `json:"type"`,
+	source:            Test_Group_Source     `json:"source"`,
+	tests:             []Rsa_Sig_Test_Vector `json:"tests"`,
+}
+
+Rsa_Oaep_Dec_Test_Group :: struct {
+	key_size:          int                    `json:"keySize"`,
+	private_key:       Rsa_Private_Key        `json:"privateKey"`,
+	private_key_jwk:   Rsa_Jwk_Private_Key    `json:"privateKeyJwk"`,
+	private_key_pem:   string                 `json:"privateKeyPem"`,
+	private_key_pkcs8: common.Hex_Bytes       `json:"privateKeyPkcs8"`,
+	sha:               string                 `json:"sha"`,
+	mgf:               string                 `json:"mgf"`,
+	mfg_sha:           string                 `json:"mgfSha"`,
+	type:              string                 `json:"type"`,
+	source:            Test_Group_Source      `json:"source"`,
+	tests:             []Rsa_Oaep_Test_Vector `json:"tests"`,
+}
+
+Rsa_Oaep_Test_Vector :: struct {
+	tc_id:   int              `json:"tcId"`,
+	comment: string           `json:"comment"`,
+	msg:     common.Hex_Bytes `json:"msg"`,
+	ct:      common.Hex_Bytes `json:"ct"`,
+	label:   common.Hex_Bytes `json:"label"`,
+	result:  Result           `json:"result"`,
+	flags:   []string         `json:"flags"`,
+}
+
+Rsa_Public_Key :: struct {
+	modulus:          common.Hex_Bytes `json:"modulus"`,
+	public_exponent:  common.Hex_Bytes `json:"publicExponent"`,
+}
+
+Rsa_Private_Key :: struct {
+	modulus:          common.Hex_Bytes `json:"modulus"`,
+	private_exponent: common.Hex_Bytes `json:"privateExponent"`,
+	public_exponent:  common.Hex_Bytes `json:"publicExponent"`,
+	prime1:           common.Hex_Bytes `json:"prime1"`,
+	prime2:           common.Hex_Bytes `json:"prime2"`,
+	exponent1:        common.Hex_Bytes `json:"exponent1"`,
+	exponent2:        common.Hex_Bytes `json:"exponent2"`,
+	coefficient:      common.Hex_Bytes `json:"coefficient"`,
+}
+
+Rsa_Jwk_Private_Key :: struct {
+	akg: string           `json:"alg"`,
+	kid: string           `json:"kid"`,
+	kty: string           `json:"kty"`,
+	d:   common.Jwk_Bytes `json:"d"`,
+	dp:  common.Jwk_Bytes `json:"dp"`,
+	dq:  common.Jwk_Bytes `json:"dq"`,
+	e:   common.Jwk_Bytes `json:"e"`,
+	n:   common.Jwk_Bytes `json:"n"`,
+	p:   common.Jwk_Bytes `json:"p"`,
+	q:   common.Jwk_Bytes `json:"q"`,
+	qi:  common.Jwk_Bytes `json:"qi"`,
 }

@@ -4,8 +4,8 @@ package mem_virtual
 
 import "core:sys/linux"
 
-_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	addr, errno := linux.mmap(0, size, {}, {.PRIVATE, .ANONYMOUS})
+_reserve :: proc "contextless" (size: uint, address_hint: uintptr) -> (data: []byte, err: Allocator_Error) {
+	addr, errno := linux.mmap(address_hint, size, {}, {.PRIVATE, .ANONYMOUS})
 	if errno == .ENOMEM {
 		return nil, .Out_Of_Memory
 	} else if errno == .EINVAL {
@@ -41,12 +41,6 @@ _protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) 
 	if .Execute in flags { pflags += {.EXEC}  }
 	errno := linux.mprotect(data, size, pflags)
 	return errno == .NONE
-}
-
-_platform_memory_init :: proc "contextless" () {
-	DEFAULT_PAGE_SIZE = 4096
-	// is power of two
-	assert_contextless(DEFAULT_PAGE_SIZE != 0 && (DEFAULT_PAGE_SIZE & (DEFAULT_PAGE_SIZE-1)) == 0)
 }
 
 _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) -> (data: []byte, error: Map_File_Error) {

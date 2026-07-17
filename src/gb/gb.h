@@ -87,10 +87,6 @@ extern "C" {
 		#ifndef GB_SYSTEM_NETBSD
 		#define GB_SYSTEM_NETBSD 1
 		#endif
-	#elif defined(__HAIKU__) || defined(__haiku__)
-		#ifndef GB_SYSTEM_HAIKU
-		#define GB_SYSTEM_HAIKU 1
-		#endif
 	#else
 		#error This UNIX operating system is not supported
 	#endif
@@ -219,7 +215,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__HAIKU__)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -267,13 +263,6 @@ extern "C" {
 	#define lseek64 lseek
 #endif
 
-#if defined(GB_SYSTEM_HAIKU)
-	#include <stdio.h>
-	#include <pthread.h>
-	#include <kernel/OS.h>
-	#define lseek64 lseek
-#endif
-    
 #if defined(GB_SYSTEM_UNIX)
 	#include <semaphore.h>
 #endif
@@ -843,13 +832,6 @@ typedef struct gbAffinity {
 #elif defined(GB_SYSTEM_NETBSD)
 typedef struct gbAffinity {
 	b32 is_accurate;
-	isize core_count;
-	isize thread_count;
-	isize threads_per_core;
-} gbAffinity;
-#elif defined(GB_SYSTEM_HAIKU)
-typedef struct gbAffinity {
-	b32   is_accurate;
 	isize core_count;
 	isize thread_count;
 	isize threads_per_core;
@@ -2511,7 +2493,13 @@ extern "C" {
 #pragma warning(disable:4127) // Conditional expression is constant
 #endif
 
+gb_internal void print_all_errors(void);
+gb_internal bool any_errors(void);
+gb_internal bool any_warnings(void);
 void gb_assert_handler(char const *prefix, char const *condition, char const *file, i32 line, char const *msg, ...) {
+	if (any_errors() || any_warnings()) {
+		print_all_errors();
+	}
 	gb_printf_err("%s(%d): %s: ", file, line, prefix);
 	if (condition)
 		gb_printf_err( "`%s` ", condition);
@@ -3042,8 +3030,6 @@ gb_inline u32 gb_thread_current_id(void) {
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
 #elif defined(GB_SYSTEM_LINUX)
 	thread_id = gettid();
-#elif defined(GB_SYSTEM_HAIKU)
-	thread_id = find_thread(NULL);
 #elif defined(GB_SYSTEM_FREEBSD)
 	thread_id = pthread_getthreadid_np();
 #elif defined(GB_SYSTEM_NETBSD)
@@ -3256,9 +3242,6 @@ b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
 	//info.affinity_tag = cast(integer_t)index;
 	//result = thread_policy_set(thread, THREAD_AFFINITY_POLICY, cast(thread_policy_t)&info, THREAD_AFFINITY_POLICY_COUNT);
 
-#if !defined(GB_SYSTEM_HAIKU)
-	result = pthread_setaffinity_np(thread, sizeof(cpuset_t), &mn);
-#endif
 	return result == 0;
 }
 
@@ -3339,29 +3322,6 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 	return a->threads_per_core;
 }
 
-#elif defined(GB_SYSTEM_HAIKU)
-#include <unistd.h>
-
-void gb_affinity_init(gbAffinity *a) {
-	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
-	a->threads_per_core = 1;
-	a->is_accurate      = a->core_count > 0;
-	a->core_count       = a->is_accurate ? a->core_count : 1;
-	a->thread_count     = a->core_count;
-}
-
-void gb_affinity_destroy(gbAffinity *a) {
-	gb_unused(a);
-}
-
-b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
-	return true;
-}
-
-isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
-	GB_ASSERT(0 <= core && core < a->core_count);
-	return a->threads_per_core;
-}
 #else
 #error TODO(bill): Unknown system
 #endif
@@ -5653,7 +5613,7 @@ gb_inline b32 gb_path_is_absolute(char const *path) {
 	b32 result = false;
 	GB_ASSERT(path != NULL);
 #if defined(GB_SYSTEM_WINDOWS)
-	result == (gb_strlen(path) > 2) &&
+	result = (gb_strlen(path) > 2) &&
 	          gb_char_is_alpha(path[0]) &&
 	          (path[1] == ':' && path[2] == GB_PATH_SEPARATOR);
 #else
