@@ -60,8 +60,8 @@ Socket :: distinct SOCKET
 SOCKET_NULL :: Socket(~uintptr(0))
 
 Buffer :: struct {
-	data:       rawptr,
 	dataLength: uint,
+	data:       rawptr,
 }
 
 SocketSet :: distinct fd_set
