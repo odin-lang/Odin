@@ -191,11 +191,6 @@ _yield :: proc() {
 }
 
 _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.Source_Code_Location) -> (name: string, err: runtime.Allocator_Error) {
-	// Haiku doesn't have pthread_getname yet
-	when ODIN_OS == .Haiku {
-		unimplemented("core:thread get_name for haiku is not yet supported")
-	}
-
 	tid: posix.pthread_t
 	if thread == nil {
 		tid = posix.pthread_self()
@@ -205,10 +200,10 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 	
 	buf : [_MAX_PTHREAD_NAME_LENGTH]u8
 
-	when ODIN_OS == .Darwin || ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
-		pthread_getname_np(tid, raw_data(buf[:]), len(buf))
-	} else when ODIN_OS == .OpenBSD {
+	when ODIN_OS == .OpenBSD {
 		pthread_get_name_np(tid, raw_data(buf[:]), len(buf))
+	} else {
+		pthread_getname_np(tid, raw_data(buf[:]), len(buf))
 	}
 
 	name, err = strings.clone_from_cstring(cstring(raw_data(buf[:])), allocator, loc)
@@ -216,10 +211,6 @@ _get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.So
 }
 
 _set_name :: proc(thread: ^Thread) {
-	when ODIN_OS == .Haiku {
-		return
-	}
-
 	name, ok := thread.name.?
 	if !ok {
 		return
