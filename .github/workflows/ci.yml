@@ -81,6 +81,8 @@ jobs:
     steps:
 
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Download LLVM (MacOS Intel)
         if: matrix.os == 'macos-15-intel'
@@ -198,6 +200,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - name: build Odin
         shell: cmd
         run: |
