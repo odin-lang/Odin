@@ -214,7 +214,7 @@ template <> bool operator != (String const &a, char const (&b)[1]) { return a.le
 gb_internal gb_inline bool str_eq(String16 const &a, String16 const &b) {
 	if (a.len != b.len) return false;
 	if (a.len == 0) return true;
-	return memcmp(a.text, b.text, a.len) == 0;
+	return memcmp(a.text, b.text, a.len * gb_size_of(u16)) == 0;
 }
 gb_internal gb_inline bool str_ne(String16 const &a, String16 const &b) { return !str_eq(a, b);                }
 gb_internal gb_inline bool str_lt(String16 const &a, String16 const &b) { return string16_compare(a, b) < 0;     }
