@@ -96,7 +96,7 @@ Runs Kahn's algorithm to produce a topological ordering of the keys.
 Returns:
 - `sorted`: keys in topological order; for every edge `key -> dependency`
 - `cycled`: keys that are part of (or downstream of) a dependency cycle
-- `err`:    an `Allocator_Error` if the backing slices could not be allocated
+- `err`:    an `Allocator_Error` if the backing buffer could not be allocated
 
 The caller owns the returned slices and must free them with the same `allocator`.
 
@@ -106,33 +106,37 @@ Note: The returned slices are always valid topological orderings,
 sort :: proc(sorter: ^$S/Sorter($K), allocator := context.allocator) -> (sorted, cycled: []K, err: runtime.Allocator_Error) {
 	relations := &sorter.relations
 
-	sorted_da := make([dynamic]K, 0, len(relations), allocator) or_return
-	defer shrink(&sorted_da)
+	buf := make([]K, len(relations), allocator) or_return
 
-	cycled_da := make([dynamic]K, 0, len(relations), allocator) or_return
-	defer shrink(&cycled_da)
+	sorted_end, cycled_start := 0, len(relations)
 
 	for k, v in relations {
 		if v.dependencies == 0 {
-			append(&sorted_da, k)
+			buf[sorted_end] = k
+			sorted_end += 1
 		}
 	}
 
-	for root in sorted_da {
+	for i in 0..<sorted_end {
+		root := buf[i]
 		for k, _ in relations[root].dependents {
 			relation := &relations[k]
 			relation.dependencies -= 1
 			if relation.dependencies == 0 {
-				append(&sorted_da, k)
+				buf[sorted_end] = k
+				sorted_end += 1
 			}
 		}
 	}
 
 	for k, v in relations {
 		if v.dependencies != 0 {
-			append(&cycled_da, k)
+			cycled_start -= 1
+			buf[cycled_start] = k
 		}
 	}
 
-	return sorted_da[:], cycled_da[:], err
+	sorted = buf[:sorted_end]
+	cycled = buf[cycled_start:]
+	return
 }
