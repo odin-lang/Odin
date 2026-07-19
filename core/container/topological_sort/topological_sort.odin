@@ -103,6 +103,7 @@ The caller owns the returned slices and must free them with the same `allocator`
 Note: The returned slices are always valid topological orderings,
       but their specific ordering is not guaranteed.
 */
+@require_results
 sort :: proc(sorter: ^$S/Sorter($K), allocator := context.allocator) -> (sorted, cycled: []K, err: runtime.Allocator_Error) {
 	relations := &sorter.relations
 
