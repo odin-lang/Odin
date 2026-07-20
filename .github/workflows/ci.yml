@@ -6,7 +6,7 @@ jobs:
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
     env:
-      PKGSRC_BRANCH: 2025Q4
+      PKGSRC_BRANCH: 2026Q1
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
@@ -18,8 +18,8 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
-          pkgin -y in gmake git bash python311 llvm clang
+          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)${PKGSRC_BRANCH:+_${PKGSRC_BRANCH}}/All" /usr/sbin/pkg_add pkgin
+          pkgin -y in gmake git bash python311 llvm clang || cat /var/db/pkgin/pkg_install-err.log
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
         run: |
           set -e -x

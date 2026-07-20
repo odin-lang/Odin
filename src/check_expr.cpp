@@ -80,7 +80,7 @@ gb_internal Type *   make_optional_ok_type          (Type *value, bool typed=tru
 gb_internal Entity * check_selector                 (CheckerContext *c, Operand *operand, Ast *node, Type *type_hint);
 gb_internal Entity * check_ident                    (CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name);
 gb_internal void     check_not_tuple                (CheckerContext *c, Operand *operand);
-gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
+gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type, bool no_final_update=false);
 gb_internal gbString expr_to_string                 (Ast *expression);
 gb_internal gbString expr_to_string                 (Ast *expression, gbAllocator allocator);
 gb_internal void     update_untyped_expr_type       (CheckerContext *c, Ast *e, Type *type, bool final);
@@ -1386,22 +1386,22 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 	}
 }
 
-gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source_count) {
+gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source_count, bool modify_type) {
 	Type *gt = *gt_;
-	
 	GB_ASSERT(gt->kind == Type_Generic);
 	Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name, 0);
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_TypeName) {
-		*gt_ = nullptr;
 		*dst_count = source_count;
 
-		e->kind = Entity_Constant;
-		e->Constant.value = exact_value_i64(source_count);
-		e->type = t_untyped_integer;
+		if (modify_type) {
+			*gt_ = nullptr;
+			e->kind = Entity_Constant;
+			e->Constant.value = exact_value_i64(source_count);
+			e->type = t_untyped_integer;
+		}
 		return true;
 	} else if (e->kind == Entity_Constant) {
-		*gt_ = nullptr;
 		if (e->Constant.value.kind != ExactValue_Integer) {
 			return false;
 		}
@@ -1410,6 +1410,9 @@ gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source
 			return false;
 		}
 		*dst_count = source_count;
+		if (modify_type) {
+			*gt_ = nullptr;
+		}
 		return true;
 	}
 	return false;
@@ -1490,12 +1493,18 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 
 	case Type_Array:
 		if (source->kind == Type_Array) {
-			if (poly->Array.generic_count != nullptr) {
-				if (!polymorphic_assign_index(&poly->Array.generic_count, &poly->Array.count, source->Array.count)) {
+			Type *generic_count = poly->Array.generic_count;
+			i64 count = poly->Array.count;
+			if (generic_count != nullptr) {
+				if (!polymorphic_assign_index(&generic_count, &count, source->Array.count, modify_type)) {
 					return false;
 				}
+				if (modify_type) {
+					poly->Array.generic_count = generic_count;
+					poly->Array.count = count;
+				}
 			}
-			if (poly->Array.count == source->Array.count) {
+			if (count == source->Array.count) {
 				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
 			}
 		} else if (source->kind == Type_EnumeratedArray) {
@@ -1509,6 +1518,9 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 					Type *it = base_type(index);
 					if (it->kind != Type_Enum) {
 						return false;
+					}
+					if (!modify_type) {
+						return is_polymorphic_type_assignable(c, poly->Array.elem, source->EnumeratedArray.elem, true, false);
 					}
 
 					poly->kind = Type_EnumeratedArray;
@@ -1565,14 +1577,18 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 
 	case Type_FixedCapacityDynamicArray:
 		if (source->kind == Type_FixedCapacityDynamicArray) {
-			if (poly->FixedCapacityDynamicArray.generic_capacity != nullptr) {
-				if (!polymorphic_assign_index(&poly->FixedCapacityDynamicArray.generic_capacity,
-				                              &poly->FixedCapacityDynamicArray.capacity,
-				                              source->FixedCapacityDynamicArray.capacity)) {
+			Type *generic_capacity = poly->FixedCapacityDynamicArray.generic_capacity;
+			i64 capacity = poly->FixedCapacityDynamicArray.capacity;
+			if (generic_capacity != nullptr) {
+				if (!polymorphic_assign_index(&generic_capacity, &capacity, source->FixedCapacityDynamicArray.capacity, modify_type)) {
 					return false;
 				}
+				if (modify_type) {
+					poly->FixedCapacityDynamicArray.generic_capacity = generic_capacity;
+					poly->FixedCapacityDynamicArray.capacity = capacity;
+				}
 			}
-			if (poly->FixedCapacityDynamicArray.capacity == source->FixedCapacityDynamicArray.capacity) {
+			if (capacity == source->FixedCapacityDynamicArray.capacity) {
 				return is_polymorphic_type_assignable(c, poly->FixedCapacityDynamicArray.elem, source->FixedCapacityDynamicArray.elem, true, modify_type);
 			}
 		}
@@ -1723,8 +1739,10 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
 			if (key || value) {
-				poly->Map.lookup_result_type = nullptr;
-				init_map_internal_types(poly);
+				if (modify_type) {
+					poly->Map.lookup_result_type = nullptr;
+					init_map_internal_types(poly);
+				}
 				return true;
 			}
 		}
@@ -1732,20 +1750,29 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 		
 	case Type_Matrix:
 		if (source->kind == Type_Matrix) {
-			if (poly->Matrix.generic_row_count != nullptr) {
-				poly->Matrix.stride_in_bytes = 0;
-				if (!polymorphic_assign_index(&poly->Matrix.generic_row_count, &poly->Matrix.row_count, source->Matrix.row_count)) {
+			Type *generic_row_count = poly->Matrix.generic_row_count;
+			Type *generic_column_count = poly->Matrix.generic_column_count;
+			i64 row_count = poly->Matrix.row_count;
+			i64 column_count = poly->Matrix.column_count;
+			if (generic_row_count != nullptr) {
+				if (!polymorphic_assign_index(&generic_row_count, &row_count, source->Matrix.row_count, modify_type)) {
 					return false;
 				}
 			}
-			if (poly->Matrix.generic_column_count != nullptr) {
-				poly->Matrix.stride_in_bytes = 0;
-				if (!polymorphic_assign_index(&poly->Matrix.generic_column_count, &poly->Matrix.column_count, source->Matrix.column_count)) {
+			if (generic_column_count != nullptr) {
+				if (!polymorphic_assign_index(&generic_column_count, &column_count, source->Matrix.column_count, modify_type)) {
 					return false;
 				}
 			}
-			if (poly->Matrix.row_count == source->Matrix.row_count &&
-			    poly->Matrix.column_count == source->Matrix.column_count) {
+			if (modify_type && (poly->Matrix.generic_row_count != nullptr || poly->Matrix.generic_column_count != nullptr)) {
+				poly->Matrix.generic_row_count = generic_row_count;
+				poly->Matrix.generic_column_count = generic_column_count;
+				poly->Matrix.row_count = row_count;
+				poly->Matrix.column_count = column_count;
+				poly->Matrix.stride_in_bytes = 0;
+			}
+			if (row_count == source->Matrix.row_count &&
+			    column_count == source->Matrix.column_count) {
 				return is_polymorphic_type_assignable(c, poly->Matrix.elem, source->Matrix.elem, true, modify_type);
 			}
 		} 
@@ -1753,12 +1780,18 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 
 	case Type_SimdVector:
 		if (source->kind == Type_SimdVector) {
-			if (poly->SimdVector.generic_count != nullptr) {
-				if (!polymorphic_assign_index(&poly->SimdVector.generic_count, &poly->SimdVector.count, source->SimdVector.count)) {
+			Type *generic_count = poly->SimdVector.generic_count;
+			i64 count = poly->SimdVector.count;
+			if (generic_count != nullptr) {
+				if (!polymorphic_assign_index(&generic_count, &count, source->SimdVector.count, modify_type)) {
 					return false;
 				}
+				if (modify_type) {
+					poly->SimdVector.generic_count = generic_count;
+					poly->SimdVector.count = count;
+				}
 			}
-			if (poly->SimdVector.count == source->SimdVector.count) {
+			if (count == source->SimdVector.count) {
 				return is_polymorphic_type_assignable(c, poly->SimdVector.elem, source->SimdVector.elem, true, modify_type);
 			}
 		}
@@ -2004,11 +2037,11 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 		if (o->type != nullptr && o->type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
 			Type *bt = base_type(o->type);
-			if (bt != nullptr) {
+			// Keep struct aliases named so recursive fields retain their alias edge.
+			if (bt != nullptr && bt->kind != Type_Struct) {
 				o->type = bt;
 			}
 		}
-
 		break;
 
 	case Entity_ImportName:
@@ -3144,16 +3177,36 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		add_type_info_type(c, y->type);
 		add_type_and_value(c, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
 
-		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
+		if (y->mode == Addressing_Constant) {
+			bool comp = are_types_identical(x->type, y->value.value_typeid);
+			if (op == Token_NotEq) {
+				comp = !comp;
+			}
+			x->mode = Addressing_Constant;
+			x->type = t_untyped_bool;
+			x->value = exact_value_bool(comp);
+		} else {
+			x->mode = Addressing_Value;
+			x->type = t_untyped_bool;
+		}
 		return;
 	} else if (is_type_typeid(x->type) && y->mode == Addressing_Type) {
 		add_type_info_type(c, x->type);
 		add_type_info_type(c, y->type);
 		add_type_and_value(c, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
 
-		x->mode = Addressing_Value;
-		x->type = t_untyped_bool;
+		if (x->mode == Addressing_Constant) {
+			bool comp = are_types_identical(y->type, x->value.value_typeid);
+			if (op == Token_NotEq) {
+				comp = !comp;
+			}
+			x->mode = Addressing_Constant;
+			x->type = t_untyped_bool;
+			x->value = exact_value_bool(comp);
+		} else {
+			x->mode = Addressing_Value;
+			x->type = t_untyped_bool;
+		}
 		return;
 	}
 
@@ -4956,7 +5009,7 @@ gb_internal ExactValue convert_exact_value_for_type(ExactValue v, Type *type) {
 	return v;
 }
 
-gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type) {
+gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *target_type, bool no_final_update) {
 	if (target_type == nullptr || operand->mode == Addressing_Invalid ||
 	    operand->mode == Addressing_Type ||
 	    is_type_typed(operand->type) ||
@@ -5042,7 +5095,11 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Array: {
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
+			while (is_type_array(elem)) {
+				elem = base_array_type(elem);
+			}
 			operand->mode = Addressing_Value;
+			convert_to_typed(c, operand, elem, /*no_final_update*/true);
 		} else {
 			if (operand->value.kind == ExactValue_String) {
 				String s = operand->value.value_string;
@@ -5082,6 +5139,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
 			operand->mode = Addressing_Value;
+			convert_to_typed(c, operand, elem, /*no_final_update*/true);
 		} else {
 			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
@@ -5103,6 +5161,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				return;
 			} else {
 				operand->mode = Addressing_Value;
+				convert_to_typed(c, operand, elem, /*no_final_update*/true);
 			}
 		} else {
 			operand->mode = Addressing_Invalid;
@@ -5178,7 +5237,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				    !elem_type_can_be_constant(new_type)) {
 					operand->mode = Addressing_Value;
 				}
-				convert_to_typed(c, operand, new_type);
+				convert_to_typed(c, operand, new_type, /*no_final_update*/true);
 				target_type = new_type;
 				break;
 			} else if (valid_count > 1) {
@@ -5259,7 +5318,9 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		}
 	}
 
-	update_untyped_expr_type(c, operand->expr, target_type, true);
+	if (!no_final_update) {
+		update_untyped_expr_type(c, operand->expr, target_type, true);
+	}
 	operand->type = target_type;
 }
 
@@ -5529,7 +5590,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;
-			} else if (is_type_proc(tav.type)) {
+			} else if (tav.mode == Addressing_Type) {
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = false;
+				return exact_value_typeid(tav.type);
+			} else if (is_type_proc(tav.type) || is_type_typeid(tav.type)) {
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
 				return tav.value;

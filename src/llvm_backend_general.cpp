@@ -463,7 +463,7 @@ gb_internal LLVMValueRef llvm_const_insert_value_with_rebuild(lbModule *m, LLVMV
 	GB_ASSERT(count > 0);
 
 	unsigned value_count = LLVMCountStructElementTypes(LLVMTypeOf(agg));
-	LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, count);
+	LLVMValueRef *values = gb_alloc_array(heap_allocator(), LLVMValueRef, value_count);
 	defer (gb_free(heap_allocator(), values));
 
 	for (unsigned i = 0; i < value_count; i++) {
@@ -1781,12 +1781,14 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	GB_ASSERT(type->kind == Type_Proc);
 
 	mutex_lock(&m->func_raw_types_mutex);
-	defer (mutex_unlock(&m->func_raw_types_mutex));
 
 	LLVMTypeRef *found = map_get(&m->func_raw_types, type);
 	if (found) {
+		mutex_unlock(&m->func_raw_types_mutex);
 		return *found;
 	}
+
+	mutex_unlock(&m->func_raw_types_mutex);
 
 	unsigned param_count = 0;
 
@@ -1896,7 +1898,9 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	              "\n\tFuncTypeCtx: %p\n\tCurrentCtx:  %p\n\tGlobalCtx:   %p",
 	              LLVMGetTypeContext(new_abi_fn_type), m->ctx);
 
+	mutex_lock(&m->func_raw_types_mutex);
 	map_set(&m->func_raw_types, type, new_abi_fn_type);
+	mutex_unlock(&m->func_raw_types_mutex);
 
 	return new_abi_fn_type;
 }
