@@ -130,16 +130,17 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (h
 			if .Non_Blocking in flags {
 				nix_attrs |= win32.FILE_FLAG_OVERLAPPED
 			}
-			h := win32.CreateFileW(path, access, share_mode, &sa, win32.TRUNCATE_EXISTING, nix_attrs, nil)
-			if h == win32.INVALID_HANDLE {
-				switch e := win32.GetLastError(); e {
-				case win32.ERROR_FILE_NOT_FOUND, _ERROR_BAD_NETPATH, win32.ERROR_PATH_NOT_FOUND:
-					// file does not exist, create the file
-				case 0:
-					return uintptr(h), nil
-				case:
-					return 0, _get_platform_error()
-				}
+
+			h := win32.CreateFileW(path, access | win32.GENERIC_WRITE, share_mode, &sa, win32.TRUNCATE_EXISTING, nix_attrs, nil)
+			if h != win32.INVALID_HANDLE {
+				// File exists and is now truncated, preserving attributes.
+				return uintptr(h), nil
+			}
+			switch e := win32.GetLastError(); e {
+			case win32.ERROR_FILE_NOT_FOUND, _ERROR_BAD_NETPATH, win32.ERROR_PATH_NOT_FOUND:
+				// File does not exist, fall through and create it.
+			case:
+				return 0, _get_platform_error()
 			}
 		}
 	}
