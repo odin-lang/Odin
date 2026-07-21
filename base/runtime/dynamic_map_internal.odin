@@ -297,7 +297,8 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 		return {}, .Out_Of_Memory
 	}
 
-	capacity := uintptr(1) << max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
+	new_log2_capacity := max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
+	capacity := uintptr(1) << new_log2_capacity
 
 	CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
 
@@ -312,7 +313,7 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 	if intrinsics.expect(data_ptr & CACHE_MASK != 0, false) {
 		panic("allocation not aligned to a cache line", loc)
 	} else {
-		result.data = data_ptr | log2_capacity // Tagged pointer representation for capacity.
+		result.data = data_ptr | new_log2_capacity // Tagged pointer representation for capacity.
 		result.len = 0
 
 		map_clear_dynamic(&result, info)
@@ -591,10 +592,14 @@ map_shrink_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_a
 		m.allocator = context.allocator
 	}
 
+	log2_capacity := map_log2_cap(m^)
+	// Don't shrink below the minimum.
+	if log2_capacity <= MAP_MIN_LOG2_CAPACITY {
+		return false, nil
+	}
 	// Cannot shrink the capacity if the number of items in the map would exceed
 	// one minus the current log2 capacity's resize threshold. That is the shrunk
 	// map needs to be within the max load factor.
-	log2_capacity := map_log2_cap(m^)
 	if uintptr(m.len) >= map_load_factor(log2_capacity - 1) {
 		return false, nil
 	}
