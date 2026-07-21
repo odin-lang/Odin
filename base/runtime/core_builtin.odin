@@ -215,6 +215,7 @@ remove_range_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #a
 unordered_remove :: proc{
 	unordered_remove_dynamic_array,
 	unordered_remove_fixed_capacity_dynamic_array,
+	unordered_remove_soa,
 }
 
 
@@ -222,6 +223,7 @@ unordered_remove :: proc{
 ordered_remove :: proc{
 	ordered_remove_dynamic_array,
 	ordered_remove_fixed_capacity_dynamic_array,
+	ordered_remove_soa,
 }
 
 @builtin
