@@ -2385,7 +2385,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			if (e->Variable.is_rodata) {
 				cc.is_rodata = true;
 			}
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, nullptr, cc);
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, cc);
 		}
 
 		String mangled_name = {};

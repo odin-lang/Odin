@@ -671,7 +671,7 @@ gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *
 
 #define MAXIMUM_TYPE_DISTANCE 10
 
-gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type, bool allow_array_programming) {
+gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type, bool allow_array_programming, bool allow_unions=true) {
 	if (c == nullptr) {
 		GB_ASSERT(operand->mode == Addressing_Value);
 		GB_ASSERT(is_type_typed(operand->type));
@@ -873,7 +873,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_union(dst)) {
+	if (is_type_union(dst) && allow_unions) {
 		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, s)) {
 				return 1;
@@ -887,7 +887,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 
 		if (dst->Union.variants.count == 1) {
 			Type *vt = dst->Union.variants[0];
-			i64 score = check_distance_between_types(c, operand, vt, allow_array_programming);
+			i64 score = check_distance_between_types(c, operand, vt, allow_array_programming, /*allow_unions*/false);
 			if (score >= 0) {
 				return score+2;
 			}
@@ -895,7 +895,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
 			for (Type *vt : dst->Union.variants) {
-				i64 score = check_distance_between_types(c, operand, vt, allow_array_programming);
+				i64 score = check_distance_between_types(c, operand, vt, allow_array_programming, /*allow_unions*/false);
 				if (score >= 0) {
 					if (lowest_score < 0) {
 						lowest_score = score;
@@ -1013,7 +1013,7 @@ gb_internal i64 assign_score_function(i64 distance, bool is_variadic=false) {
 }
 
 
-gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_, bool is_variadic=false, bool allow_array_programming=true) {
+gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type *type, i64 *score_, bool is_variadic=false, bool allow_array_programming=true, bool allow_unions=true) {
 	if (c == nullptr) {
 		GB_ASSERT(operand->mode == Addressing_Value);
 		GB_ASSERT(is_type_typed(operand->type));
@@ -1034,7 +1034,7 @@ gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *o
 		}
 	}
 
-	i64 score = check_distance_between_types(c, operand, type, allow_array_programming);
+	i64 score = check_distance_between_types(c, operand, type, allow_array_programming, allow_unions);
 	if (score >= 0) {
 		if (score_) *score_ = assign_score_function(score, is_variadic);
 		return true;
@@ -1148,7 +1148,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
-		if (type == nullptr || is_type_any(type)) {
+		Type *elem_type = core_broadcastable_elem_type(type);
+		if (is_type_union(elem_type)) {
+			target_type = elem_type;
+		}
+		if (type == nullptr || is_type_any(elem_type)) {
 			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
 				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
 
@@ -1233,6 +1237,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 	}
 
 	if (check_is_assignable_to(c, operand, type)) {
+		if (operand->mode == Addressing_Constant && type_conversion_is_variant(operand->type, type)) {
+			Operand o = {};
+			check_expr_with_type_hint(c, &o, operand->expr, type);
+			operand->value = exact_value_variant(operand->expr);
+		}
 		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
 		 	add_type_info_type(c, operand->type);
 			add_type_and_value(c, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
@@ -3856,6 +3865,7 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 			x->mode = Addressing_Value;
 		} else if (is_type_union(type)) {
 			if (is_type_union_constantable(type)) {
+				x->value = exact_value_variant(x->expr);
 				return true;
 			}
 			x->mode = Addressing_Value;
@@ -3922,8 +3932,9 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 	if (is_type_untyped(x->type)) {
 		Type *final_type = type;
 		if (is_const_expr && !is_type_constant_type(type)) {
-			if (is_type_union(type)) {
-				convert_to_typed(c, x, type);
+			Type *elem_type = core_broadcastable_elem_type(type);
+			if (is_type_union(elem_type)) {
+				convert_to_typed(c, x, elem_type);
 			}
 			final_type = default_type(x->type);
 		}
@@ -5095,11 +5106,12 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Array: {
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
-			while (is_type_array(elem)) {
-				elem = base_array_type(elem);
-			}
+			elem = core_broadcastable_elem_type(elem);
 			operand->mode = Addressing_Value;
 			convert_to_typed(c, operand, elem, /*no_final_update*/true);
+			if (is_type_union(elem)) {
+				target_type = operand->type;
+			}
 		} else {
 			if (operand->value.kind == ExactValue_String) {
 				String s = operand->value.value_string;
@@ -5204,7 +5216,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			for_array(i, t->Union.variants) {
 				Type *vt = t->Union.variants[i];
 				i64 score = 0;
-				if (check_is_assignable_to_with_score(c, operand, vt, &score)) {
+				if (check_is_assignable_to_with_score(c, operand, vt, &score, /*is_variadic*/false, /*allow_array_programming*/true, /*allow_unions*/false)) {
 					valids[valid_count].index = i;
 					valids[valid_count].score = score;
 					valid_count += 1;
@@ -12667,8 +12679,21 @@ gb_internal ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, T
 		}
 		gb_string_free(xs);
 	}
-	if (o->type != nullptr && is_type_untyped(o->type)) {
-		add_untyped(c, node, o->mode, o->type, o->value);
+	if (o->type != nullptr) {
+		if (type_hint != nullptr) {
+			Type *elem_type = core_broadcastable_elem_type(type_hint);
+			if (is_type_untyped(o->type)) {
+				if (is_type_union(elem_type)) {
+					convert_to_typed(c, o, elem_type);
+				}
+			}
+			if (type_conversion_is_variant(o->type, elem_type)) {
+				o->value.variant_type = o->type;
+			}
+		}
+		if (is_type_untyped(o->type)) {
+			add_untyped(c, node, o->mode, o->type, o->value);
+		}
 	}
 	check_rtti_type_disallowed(node, o->type, "An expression is using a type, %s, which has been disallowed");
 
@@ -12802,6 +12827,14 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 		return v.value_procedure == nullptr;
 	case ExactValue_Typeid:
 		return v.value_typeid == nullptr;
+	case ExactValue_Variant:
+		if (v.value_variant == nullptr) {
+			return true;
+		}
+		if (v.value_variant->tav.mode != Addressing_Constant) {
+			return false;
+		}
+		return is_exact_value_zero(v.value_variant->tav.value);
 	}
 	return true;
 
@@ -12829,8 +12862,26 @@ gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, E
 	return test;
 }
 
+gb_internal bool compare_exact_values_variant(TokenKind op, ExactValue x, ExactValue y) {
+	Ast *lhs = x.value_variant;
+	Ast *rhs = y.value_variant;
 
+	return compare_exact_values(op, lhs->tav.value, rhs->tav.value);
+}
 
+gb_internal void match_exact_values_variant(ExactValue *x, ExactValue *y) {
+	GB_ASSERT(x->kind == ExactValue_Variant);
+	while (x->value_variant != nullptr &&
+	    x->value_variant->tav.mode == Addressing_Constant) {
+		*x = x->value_variant->tav.value;
+	}
+	while (y->kind == ExactValue_Variant &&
+	    y->value_variant != nullptr &&
+	    y->value_variant->tav.mode == Addressing_Constant) {
+		*y = y->value_variant->tav.value;
+	}
+	match_exact_values(x, y);
+}
 
 gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
