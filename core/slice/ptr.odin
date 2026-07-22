@@ -68,13 +68,13 @@ ptr_swap_overlapping :: proc "contextless" (x, y: rawptr, len: int) {
 }
 
 
-ptr_rotate :: proc  "contextless"  (left: int, mid: ^$T, right: int) {
+ptr_rotate :: proc "contextless" (left: int, mid: ^$T, right: int) {
 	when size_of(T) != 0 {
 		left, mid, right := left, mid, right
 
 		SWAP :: 256
 
-		for left * size_of(T) > SWAP && right * size_of(T)  > SWAP {
+		for left * size_of(T) > SWAP && right * size_of(T) > SWAP {
 			if left >= right {
 				for {
 					ptr_swap_non_overlapping(ptr_sub(mid, right), mid, right * size_of(T))
