@@ -2682,6 +2682,8 @@ gb_internal bool is_type_constant_type_for_unions(Type *t) {
 		return is_type_constant_type(t->Array.elem);
 	case Type_EnumeratedArray:
 		return is_type_constant_type(t->EnumeratedArray.elem);
+	case Type_FixedCapacityDynamicArray:
+		return is_type_constant_type_for_unions(t->FixedCapacityDynamicArray.elem);
 	case Type_Struct:
 		{
 			for (Entity *field : t->Struct.fields) {

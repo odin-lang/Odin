@@ -9,31 +9,27 @@ ENABLE_VALIDATION :: false
 
 BOX3D_SHARED :: #config(BOX3D_SHARED, false)
 
+@(private)
+LIB_PATH :: (
+	     "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
+	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
+	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
+	else ""
+)
+
 when ODIN_OS == .Windows {
 	@(export)
-	foreign import lib {
-		"lib/box3d.lib",
+	foreign import lib "lib/box3d.lib"
+} else when LIB_PATH != "" {
+	when !#exists(LIB_PATH) {
+		#panic("Could not find the compiled Box3D library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/box3d/src/build.sh\"`")
 	}
-} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED {
+
 	@(export)
-	foreign import lib {
-		"lib/linux-amd64/libbox3d.a",
-	}
-} else when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED {
-	@(export)
-	foreign import lib {
-		"lib/linux-arm64/libbox3d.a",
-	}
-} else when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED {
-	@(export)
-	foreign import lib {
-		"lib/darwin/libbox3d.a",
-	}
+	foreign import lib { LIB_PATH }
 } else {
 	@(export)
-	foreign import lib {
-		"system:box3d",
-	}
+	foreign import lib "system:box3d"
 }
 
 // This is used to indicate null for interfaces that work with indices instead of pointers
