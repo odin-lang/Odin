@@ -68,51 +68,52 @@ ptr_swap_overlapping :: proc "contextless" (x, y: rawptr, len: int) {
 }
 
 
+
+
 ptr_rotate :: proc  "contextless"  (left: int, mid: ^$T, right: int) {
 	when size_of(T) != 0 {
 		left, mid, right := left, mid, right
 
 		SWAP :: 256
-		if left <= right && left * size_of(T) <= SWAP {
-			swap : [SWAP]byte = ---
+
+		for left * size_of(T) > SWAP && right * size_of(T)  > SWAP {
+			if left >= right {
+				for {
+					slice.ptr_swap_non_overlapping(slice.ptr_sub(mid, right), mid, right * size_of(T))
+					mid = slice.ptr_sub(mid, right)
+
+					left -= right
+					if left < right {
+						break
+					}
+				}
+			} else {
+				for {
+					slice.ptr_swap_non_overlapping(slice.ptr_sub(mid, left), mid, left * size_of(T))
+					mid = slice.ptr_add(mid, left)
+
+					right -= left
+					if right < left {
+						break
+					}
+				}
+			}
+		}
+		swap : [SWAP]byte = ---
+		if left <= right {
 			start := slice.ptr_sub(mid, left)
 			end := slice.ptr_add(start, right)
 
 			runtime.mem_copy(&swap, start, left * size_of(T))
 			runtime.mem_copy(start, mid, right * size_of(T))
 			runtime.mem_copy(end, &swap, left * size_of(T))
-		} else if right < left && right * size_of(T) <= SWAP {
-			swap : [SWAP]byte = ---
+		} else {
 			start := slice.ptr_sub(mid, left)
 			end := slice.ptr_add(start, right)
 
 			runtime.mem_copy(&swap, mid, right * size_of(T))
 			runtime.mem_copy(end, start, left * size_of(T))
 			runtime.mem_copy(start, &swap, right * size_of(T))
-		} else {
-			for left > 0 && right > 0 {
-				if left >= right {
-					for {
-						ptr_swap_non_overlapping(ptr_sub(mid, right), mid, right * size_of(T))
-						mid = ptr_sub(mid, right)
-
-						left -= right
-						if left < right {
-							break
-						}
-					}
-				} else {
-					for {
-						ptr_swap_non_overlapping(ptr_sub(mid, left), mid, left * size_of(T))
-						mid = ptr_add(mid, left)
-
-						right -= left
-						if right < left {
-							break
-						}
-					}
-				}
-			}
 		}
 	}
 }
