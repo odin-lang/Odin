@@ -3168,6 +3168,41 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 }
 
 
+gb_internal Operand make_operand_from_node(Ast *node);
+
+gb_internal bool is_comparison_constant(Operand *x, Operand *y) {
+	if (!is_type_constant_type(x->type) || !is_type_constant_type(y->type)) {
+		return false;
+	}
+	if (x->value.kind == ExactValue_Compound) {
+		if (y->value.kind != ExactValue_Compound) {
+			return false;
+		}
+		ast_node(x_cl, CompoundLit, x->value.value_compound);
+		ast_node(y_cl, CompoundLit, y->value.value_compound);
+
+		if (x_cl->elems.count != y_cl->elems.count) {
+			return false;
+		}
+		if (x_cl->elems.count > 0 &&
+			(x_cl->elems[0]->kind == Ast_FieldValue ||
+			 y_cl->elems[0]->kind == Ast_FieldValue)) {
+			return false;
+		}
+
+		for (isize i = 0; i < x_cl->elems.count; i++) {
+			Operand lhs = make_operand_from_node(x_cl->elems[i]);
+			Operand rhs = make_operand_from_node(y_cl->elems[i]);
+			if (!is_comparison_constant(&lhs, &rhs)) {
+				return false;
+			}
+		}
+	} else if (y->value.kind == ExactValue_Compound) {
+		return false;
+	}
+	return true;
+}
+
 gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
 		bool comp = are_types_identical(x->type, y->type);
@@ -3298,7 +3333,7 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 	} else {
 		if (x->mode == Addressing_Constant &&
 		    y->mode == Addressing_Constant) {
-			if (is_type_constant_type(x->type)) {
+			if (is_comparison_constant(x, y)) {
 				if (is_type_bit_set(x->type)) {
 					switch (op) {
 					case Token_CmpEq:
