@@ -9,31 +9,27 @@ ENABLE_VALIDATION :: false
 
 BOX3D_SHARED :: #config(BOX3D_SHARED, false)
 
+@(private)
+LIB_PATH :: (
+	     "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
+	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
+	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
+	else ""
+)
+
 when ODIN_OS == .Windows {
 	@(export)
-	foreign import lib {
-		"lib/box3d.lib",
+	foreign import lib "lib/box3d.lib"
+} else when LIB_PATH != "" {
+	when !#exists(LIB_PATH) {
+		#panic("Could not find the compiled Box3D library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/box3d/src/build.sh\"`")
 	}
-} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED {
+
 	@(export)
-	foreign import lib {
-		"lib/linux-amd64/libbox3d.a",
-	}
-} else when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED {
-	@(export)
-	foreign import lib {
-		"lib/linux-arm64/libbox3d.a",
-	}
-} else when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED {
-	@(export)
-	foreign import lib {
-		"lib/darwin/libbox3d.a",
-	}
+	foreign import lib { LIB_PATH }
 } else {
 	@(export)
-	foreign import lib {
-		"system:box3d",
-	}
+	foreign import lib "system:box3d"
 }
 
 // This is used to indicate null for interfaces that work with indices instead of pointers
@@ -389,7 +385,7 @@ foreign lib {
 	World_SetUserData :: proc(worldId: WorldId, userData: rawptr) ---
 
 	// Get the user data pointer.
-	 World_GetUserData :: proc(worldId: WorldId) ---
+	World_GetUserData :: proc(worldId: WorldId) -> rawptr ---
 
 	// Set the friction callback. Passing NULL resets to default.
 	World_SetFrictionCallback :: proc(worldId: WorldId, callback: FrictionCallback) ---
@@ -638,7 +634,7 @@ foreign lib {
 	Body_SetUserData :: proc(bodyId: BodyId, userData: rawptr) ---
 
 	// Get the user data stored in a body
-	 Body_GetUserData :: proc(bodyId: BodyId) ---
+	Body_GetUserData :: proc(bodyId: BodyId) -> rawptr ---
 
 	// Get the world position of a body. This is the location of the body origin.
 	Body_GetPosition :: proc(bodyId: BodyId) -> Pos ---
@@ -971,7 +967,7 @@ foreign lib {
 
 	// Get the user data for a shape. This is useful when you get a shape id
 	// from an event or query.
-	Shape_GetUserData :: proc(shapeId: ShapeId) ---
+	Shape_GetUserData :: proc(shapeId: ShapeId) -> rawptr ---
 
 	// Set the mass density of a shape, usually in kg/m^3.
 	// This will optionally update the mass properties on the parent body.
@@ -1178,7 +1174,7 @@ foreign lib {
 	Joint_SetUserData :: proc(jointId: JointId, userData: rawptr) ---
 
 	// Get the user data on a joint
-	 Joint_GetUserData :: proc(jointId: JointId) ---
+	Joint_GetUserData :: proc(jointId: JointId) -> rawptr ---
 
 	// Wake the bodies connect to this joint
 	Joint_WakeBodies :: proc(jointId: JointId) ---

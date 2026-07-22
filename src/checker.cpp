@@ -6884,6 +6884,13 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
+		if (entity_has_deferred_procedure(dst)) {
+			error(src->token,
+			      "Deferred procedure '%.*s' cannot be used as the target of '%.*s' because it has a deferred procedure itself (deferred procedure chaining is not allowed)",
+			      LIT(dst->token.string), LIT(src->token.string));
+			continue;
+		}
+
 		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
 			error(src->token, "'%s' cannot be used with a polymorphic procedure", attribute);
 			continue;

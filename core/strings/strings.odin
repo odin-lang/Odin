@@ -22,6 +22,7 @@ Returns:
 - res: The cloned string
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	c := make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
@@ -42,6 +43,7 @@ Returns:
 - res: A cloned cstring with an appended null-byte
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
 	c := make([]byte, len(s)+1, allocator, loc) or_return
 	copy(c, s)
@@ -61,6 +63,7 @@ NOTE: The created string is only valid as long as the pointer and length are val
 Returns:
 - res: A string created from the byte pointer and length
 */
+@(require_results)
 string_from_ptr :: proc(ptr: ^byte, len: int) -> (res: string) {
 	return transmute(string)runtime.Raw_String{ptr, len}
 }
@@ -78,6 +81,7 @@ Inputs:
 Returns:
 - res: A string created from the null-terminated byte pointer and length
 */
+@(require_results)
 string_from_null_terminated_ptr :: proc "contextless" (ptr: [^]byte, len: int) -> (res: string) {
 	s := string(ptr[:len])
 	s = truncate_to_byte(s, 0)
@@ -95,6 +99,7 @@ WARNING: This is unsafe because the original string may not contain a null-byte.
 Returns:
 - res: The converted cstring
 */
+@(require_results)
 unsafe_string_to_cstring :: proc(str: string) -> (res: cstring) {
 	d := transmute(runtime.Raw_String)str
 	return cstring(d.data)
@@ -112,6 +117,7 @@ NOTE: Failure to find the byte results in returning the entire string.
 Returns:
 - res: The truncated string
 */
+@(require_results)
 truncate_to_byte :: proc "contextless" (str: string, b: byte) -> (res: string) #no_bounds_check {
 	n := index_byte(str, b)
 	if n < 0 {
@@ -130,6 +136,7 @@ Inputs:
 Returns:
 - res: The truncated string
 */
+@(require_results)
 truncate_to_rune :: proc(str: string, r: rune) -> (res: string) #no_bounds_check {
 	n := index_rune(str, r)
 	if n < 0 {
@@ -152,6 +159,7 @@ Returns:
 - res: The cloned string from the byte array with a null-byte
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	c := make([]byte, len(s)+1, allocator, loc) or_return
 	copy(c, s)
@@ -173,6 +181,7 @@ Returns:
 - res: The cloned string from the cstring
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return clone(string(s), allocator, loc)
 }
@@ -194,6 +203,7 @@ Returns:
 - res: The cloned string from the byte pointer and length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 clone_from_ptr :: proc(ptr: ^byte, len: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := string_from_ptr(ptr, len)
 	return clone(s, allocator, loc)
@@ -224,6 +234,7 @@ Returns:
 - res: The cloned string from the null-terminated cstring and byte length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	s := string_from_ptr((^u8)(ptr), len)
 	s = truncate_to_byte(s, 0)
@@ -253,6 +264,7 @@ Inputs:
 Returns:
 - result: `true` if the rune `r` in the string `s`, `false` otherwise
 */
+@(require_results)
 contains_rune :: proc(s: string, r: rune) -> (result: bool) {
 	for c in s {
 		if c == r {
@@ -290,6 +302,7 @@ Output:
 	false
 
 */
+@(require_results)
 contains :: proc(s, substr: string) -> (res: bool) {
 	return index(s, substr) >= 0
 }
@@ -324,11 +337,13 @@ Output:
 	false
 
 */
+@(require_results)
 contains_any :: proc(s, chars: string) -> (res: bool) {
 	return index_any(s, chars) >= 0
 }
 
 
+@(require_results)
 contains_space :: proc(s: string) -> (res: bool) {
 	for c in s {
 		if is_space(c) {
@@ -363,6 +378,7 @@ Output:
 	5
 
 */
+@(require_results)
 rune_count :: proc(s: string) -> (res: int) {
 	return utf8.rune_count_in_string(s)
 }
@@ -398,6 +414,7 @@ Output:
 	false
 
 */
+@(require_results)
 equal_fold :: proc(u, v: string) -> (res: bool) #no_bounds_check {
 	s, t := u, v
 	loop: for s != "" && t != "" {
@@ -476,6 +493,7 @@ Output:
 	0
 
 */
+@(require_results)
 prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
 	RUNE_ERROR :: '\ufffd'
 	RUNE_SELF  :: 0x80
@@ -524,6 +542,7 @@ Output:
 
 
 */
+@(require_results)
 common_prefix :: proc(a, b: string) -> string {
 	return a[:prefix_length(a, b)]
 }
@@ -558,6 +577,7 @@ Output:
 	false
 
 */
+@(require_results)
 has_prefix :: proc(s, prefix: string) -> (result: bool) {
 	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
 }
@@ -592,6 +612,7 @@ Output:
 	true
 
 */
+@(require_results)
 has_suffix :: proc(s, suffix: string) -> (result: bool) #no_bounds_check {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
@@ -631,6 +652,7 @@ Output:
 	a...b...c
 
 */
+@(require_results)
 join :: proc(a: []string, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if len(a) == 0 {
 		return "", nil
@@ -678,6 +700,7 @@ Output:
 	abc
 
 */
+@(require_results)
 concatenate :: proc(a: []string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if len(a) == 0 {
 		return "", nil
@@ -724,6 +747,7 @@ Output:
 	example
 
 */
+@(require_results)
 cut :: proc(s: string, rune_offset := int(0), rune_length := int(0)) -> (res: string) {
 	s := s; rune_length := rune_length
 
@@ -785,6 +809,7 @@ Output:
 	example
 
 */
+@(require_results)
 cut_clone :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	res = cut(s, rune_offset, rune_length)
 	return clone(res, allocator, loc)
@@ -811,7 +836,7 @@ Returns:
 - res: The slice of substrings
 - err: An optional allocator error if one occured, `nil` otherwise
 */
-@private
+@(private, require_results)
 _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #no_bounds_check {
 	s, n := s_, n_
 
@@ -892,6 +917,7 @@ Output:
 	["aaa", "bbb", "ccc", "ddd", "eee"]
 
 */
+@(require_results)
 split :: proc(s, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, 0, -1, allocator, loc)
 }
@@ -930,6 +956,7 @@ Output:
 	["aaa", "bbb", "ccc.ddd.eee"]
 
 */
+@(require_results)
 split_n :: proc(s, sep: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, 0, n, allocator, loc)
 }
@@ -967,6 +994,7 @@ Output:
 	["aaa.", "bbb.", "ccc.", "ddd.", "eee"]
 
 */
+@(require_results)
 split_after :: proc(s, sep: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, len(sep), -1, allocator, loc)
 }
@@ -1005,6 +1033,7 @@ Output:
 	["aaa.", "bbb.", "ccc.ddd.eee"]
 
 */
+@(require_results)
 split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	return _split(s, sep, len(sep), n, allocator, loc)
 }
@@ -1024,7 +1053,7 @@ Returns:
 - res: The resulting substring
 - ok: `true` if an iteration result was returned, `false` if the iterator has reached the end
 */
-@private
+@(private, require_results)
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
 	m: int
 	if sep == "" {
@@ -1082,6 +1111,7 @@ Output:
 	e
 
 */
+@(require_results)
 split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 	m := index_byte(s^, sep)
 	#no_bounds_check if m < 0 {
@@ -1129,6 +1159,7 @@ Output:
 	e
 
 */
+@(require_results)
 split_iterator :: proc(s: ^string, sep: string) -> (res: string, ok: bool) {
 	return _split_iterator(s, sep, 0)
 }
@@ -1165,6 +1196,7 @@ Output:
 	e
 
 */
+@(require_results)
 split_after_iterator :: proc(s: ^string, sep: string) -> (res: string, ok: bool) {
 	return _split_iterator(s, sep, len(sep))
 }
@@ -1180,7 +1212,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original.
 */
-@(private)
+@(private, require_results)
 _trim_cr :: proc(s: string) -> (res: string) #no_bounds_check {
 	n := len(s)
 	if n > 0 {
@@ -1221,6 +1253,7 @@ Output:
 	["a", "b", "c", "d", "e"]
 
 */
+@(require_results)
 split_lines :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, 0, -1, allocator, loc) or_return
@@ -1263,6 +1296,7 @@ Output:
 	["a", "b", "c\nd\ne"]
 
 */
+@(require_results)
 split_lines_n :: proc(s: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, 0, n, allocator, loc) or_return
@@ -1304,6 +1338,7 @@ Output:
 	["a\n", "b\n", "c\n", "d\n", "e"]
 
 */
+@(require_results)
 split_lines_after :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, len(sep), -1, allocator, loc) or_return
@@ -1347,6 +1382,7 @@ Output:
 	["a\n", "b\n", "c\nd\ne"]
 
 */
+@(require_results)
 split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, len(sep), n, allocator, loc) or_return
@@ -1385,6 +1421,7 @@ Output:
 	abcde
 
 */
+@(require_results)
 split_lines_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
 	line = _split_iterator(s, sep, 0) or_return
@@ -1423,6 +1460,7 @@ Output:
 	e
 
 */
+@(require_results)
 split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
 	line = _split_iterator(s, sep, len(sep)) or_return
@@ -1460,6 +1498,7 @@ Output:
 	-1
 
 */
+@(require_results)
 index_byte :: proc "contextless" (s: string, c: byte) -> (res: int) {
 	return #force_inline bytes.index_byte(transmute([]u8)s, c)
 }
@@ -1496,6 +1535,7 @@ Output:
 	-1
 
 */
+@(require_results)
 last_index_byte :: proc "contextless" (s: string, c: byte) -> (res: int) {
 	return #force_inline bytes.last_index_byte(transmute([]u8)s, c)
 }
@@ -1539,6 +1579,7 @@ Output:
 	7
 
 */
+@(require_results)
 index_rune :: proc(s: string, r: rune) -> (res: int) {
 	switch {
 	case u32(r) < utf8.RUNE_SELF:
@@ -1591,6 +1632,7 @@ Output:
 	-1
 
 */
+@(require_results)
 index :: proc "contextless" (s, substr: string) -> (res: int) #no_bounds_check {
 	hash_str_rabin_karp :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) #no_bounds_check {
 		for i := 0; i < len(s); i += 1 {
@@ -1671,6 +1713,7 @@ Output:
 	-1
 
 */
+@(require_results)
 last_index :: proc(s, substr: string) -> (res: int) #no_bounds_check {
 	hash_str_rabin_karp_reverse :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) #no_bounds_check {
 		for i := len(s) - 1; i >= 0; i -= 1 {
@@ -1751,6 +1794,7 @@ Output:
 	-1
 
 */
+@(require_results)
 index_any :: proc(s, chars: string) -> (res: int) #no_bounds_check {
 	if chars == "" {
 		return -1
@@ -1815,6 +1859,7 @@ Output:
 	-1
 
 */
+@(require_results)
 last_index_any :: proc(s, chars: string) -> (res: int) #no_bounds_check {
 	if chars == "" {
 		return -1
@@ -1876,6 +1921,7 @@ Returns:
 - idx: the index of the first matching substring
 - width: the length of the found substring
 */
+@(require_results)
 index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) #no_bounds_check {
 	idx = -1
 	if s == "" || len(substrs) <= 0 {
@@ -1939,6 +1985,7 @@ Output:
 	0
 
 */
+@(require_results)
 count :: proc(s, substr: string) -> (res: int) #no_bounds_check {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
@@ -2005,6 +2052,7 @@ Output:
 	abcabc
 
 */
+@(require_results)
 repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	if count < 0 {
 		panic("strings: negative repeat count")
@@ -2056,6 +2104,7 @@ Output:
 
 */
 
+@(require_results)
 replace_all :: proc(s, old, new: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
 	return replace(s, old, new, -1, allocator, loc)
 }
@@ -2097,6 +2146,7 @@ Output:
 	zzzz true
 
 */
+@(require_results)
 replace :: proc(s, old, new: string, n: int, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
 	if old == new || n == 0 {
 		was_allocation = false
@@ -2176,6 +2226,7 @@ Output:
 	abcabc false
 
 */
+@(require_results)
 remove :: proc(s, key: string, n: int, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
 	return replace(s, key, "", n, allocator, loc)
 }
@@ -2213,6 +2264,7 @@ Output:
 	abcabc false
 
 */
+@(require_results)
 remove_all :: proc(s, key: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool) {
 	return remove(s, key, -1, allocator, loc)
 }
@@ -2229,6 +2281,7 @@ Inputs:
 Returns:
 -res: `true` if `r` is a whitespace character, `false` if otherwise
 */
+@(require_results)
 is_ascii_space :: proc(r: rune) -> (res: bool) {
 	if r < utf8.RUNE_SELF {
 		return _ascii_space[u8(r)]
@@ -2245,6 +2298,7 @@ Inputs:
 Returns:
 -res: `true` if `r` is a whitespace character, `false` if otherwise
 */
+@(require_results)
 is_space :: proc(r: rune) -> (res: bool) {
 	if r < 0x2000 {
 		switch r {
@@ -2272,6 +2326,7 @@ Inputs:
 Returns:
 -res: `true` if `r` is `0x0`, `false` if otherwise
 */
+@(require_results)
 is_null :: proc(r: rune) -> (res: bool) {
 	return r == 0x0000
 }
@@ -2312,6 +2367,7 @@ Output:
 	-1
 
 */
+@(require_results)
 index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res: int) {
 	for r, i in s {
 		if p(r) == truth {
@@ -2322,6 +2378,7 @@ index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res: int
 }
 
 // Same as `index_proc`, but the procedure p takes a raw pointer for state
+@(require_results)
 index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> (res: int) {
 	for r, i in s {
 		if p(state, r) == truth {
@@ -2332,6 +2389,7 @@ index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: r
 }
 
 // Finds the index of the *last* rune in the string s for which the procedure p returns the same value as truth
+@(require_results)
 last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res: int) {
 	// TODO(bill): Probably use Rabin-Karp Search
 	for i := len(s); i > 0; {
@@ -2345,6 +2403,7 @@ last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> (res
 }
 
 // Same as `index_proc_with_state`, runs through the string in reverse
+@(require_results)
 last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> (res: int) {
 	// TODO(bill): Probably use Rabin-Karp Search
 	for i := len(s); i > 0; {
@@ -2384,6 +2443,7 @@ Output:
 	testing
 
 */
+@(require_results)
 trim_left_proc :: proc(s: string, p: proc(rune) -> bool) -> (res: string) {
 	i := index_proc(s, p, false)
 	if i == -1 {
@@ -2403,6 +2463,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_left_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> (res: string) {
 	i := index_proc_with_state(s, p, state, false)
 	if i == -1 {
@@ -2438,6 +2499,7 @@ Output:
 	test
 
 */
+@(require_results)
 trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> (res: string) #no_bounds_check {
 	i := last_index_proc(s, p, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
@@ -2460,6 +2522,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original, empty when no match
 */
+@(require_results)
 trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> (res: string) #no_bounds_check {
 	i := last_index_proc_with_state(s, p, state, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
@@ -2472,6 +2535,7 @@ trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 }
 
 // Procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
+@(require_results)
 is_in_cutset :: proc(state: rawptr, r: rune) -> (res: bool) {
 	cutset := (^string)(state)^
 	for c in cutset {
@@ -2492,6 +2556,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_left :: proc(s: string, cutset: string) -> (res: string) {
 	if s == "" || cutset == "" {
 		return s
@@ -2510,6 +2575,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_right :: proc(s: string, cutset: string) -> (res: string) {
 	if s == "" || cutset == "" {
 		return s
@@ -2528,6 +2594,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim :: proc(s: string, cutset: string) -> (res: string) {
 	return trim_right(trim_left(s, cutset), cutset)
 }
@@ -2541,6 +2608,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_left_space :: proc(s: string) -> (res: string) {
 	return trim_left_proc(s, is_space)
 }
@@ -2554,6 +2622,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_right_space :: proc(s: string) -> (res: string) {
 	return trim_right_proc(s, is_space)
 }
@@ -2567,6 +2636,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_space :: proc(s: string) -> (res: string) {
 	return trim_right_space(trim_left_space(s))
 }
@@ -2580,6 +2650,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_left_null :: proc(s: string) -> (res: string) {
 	return trim_left_proc(s, is_null)
 }
@@ -2593,6 +2664,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_right_null :: proc(s: string) -> (res: string) {
 	return trim_right_proc(s, is_null)
 }
@@ -2605,6 +2677,7 @@ Inputs:
 Returns:
 - res: The trimmed string as a slice of the original
 */
+@(require_results)
 trim_null :: proc(s: string) -> (res: string) {
 	return trim_right_null(trim_left_null(s))
 }
@@ -2635,6 +2708,7 @@ Output:
 	testing
 
 */
+@(require_results)
 trim_prefix :: proc(s, prefix: string) -> (res: string) #no_bounds_check {
 	if has_prefix(s, prefix) {
 		return s[len(prefix):]
@@ -2668,6 +2742,7 @@ Output:
 	todo.doc
 
 */
+@(require_results)
 trim_suffix :: proc(s, suffix: string) -> (res: string) #no_bounds_check {
 	if has_suffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
@@ -2708,6 +2783,7 @@ Output:
 	["testing", "this", "out", "nice", "done", "last"]
 
 */
+@(require_results)
 split_multi :: proc(s: string, substrs: []string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	if s == "" || len(substrs) <= 0 {
 		return nil, nil
@@ -2783,6 +2859,7 @@ Output:
 	last
 
 */
+@(require_results)
 split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
 	if len(it) == 0 || len(substrs) <= 0 {
 		return
@@ -2839,6 +2916,7 @@ Output:
 	Hello?
 
 */
+@(require_results)
 scrub :: proc(s: string, replacement: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	str := s
 	b: Builder
@@ -2901,6 +2979,7 @@ Output:
 	abcxyz zyxcba
 
 */
+@(require_results)
 reverse :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	str := s
 	n := len(str)
@@ -2948,6 +3027,7 @@ Output:
 	abc1    abc2    abc3
 
 */
+@(require_results)
 expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	if tab_size <= 0 {
 		panic("tab size must be positive")
@@ -3028,6 +3108,7 @@ Output:
 	true
 
 */
+@(require_results)
 partition :: proc(str, sep: string) -> (head, match, tail: string) #no_bounds_check {
 	i := index(str, sep)
 	if i == -1 {
@@ -3060,6 +3141,7 @@ Returns:
 - res: A new string centered within a field of the specified length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
 	if n >= length || pad == "" {
@@ -3097,6 +3179,7 @@ Returns:
 - res: A new string left-justified within a field of the specified length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
 	if n >= length || pad == "" {
@@ -3133,6 +3216,7 @@ Returns:
 - res: A new string right-justified within a field of the specified length
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
 	if n >= length || pad == "" {
@@ -3194,6 +3278,7 @@ Returns:
 - res: A slice of substrings of the input string, or an empty slice if the input string only contains white space
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 fields :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	n := 0
 	was_space := 1
@@ -3260,6 +3345,7 @@ Returns:
 - res: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
 - err: An optional allocator error if one occured, `nil` otherwise
 */
+@(require_results)
 fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
 	substrings := make([dynamic]string, 0, 32, allocator, loc) or_return
 
@@ -3297,6 +3383,7 @@ Returns:
 - field: The first non-space substring found
 - ok: A boolean indicating if a non-space substring was found
 */
+@(require_results)
 fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) #no_bounds_check {
 	start, end := -1, -1
 	for r, offset in s {
@@ -3344,6 +3431,7 @@ Returns:
 
 NOTE: This implementation is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
 */
+@(require_results)
 levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc := #caller_location) -> (res: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	LEVENSHTEIN_DEFAULT_COSTS: []int : {
 		0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
@@ -3403,7 +3491,7 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc :
 	return costs[n], nil
 }
 
-@(private)
+@(private, require_results)
 internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) #no_bounds_check {
 	sub = s
 	ok  = true
@@ -3458,6 +3546,7 @@ Returns:
 - sub: the substring
 - ok: whether the rune indexes where in bounds of the original string
 */
+@(require_results)
 substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) {
 	if rune_start < 0 || rune_end < 0 || rune_end < rune_start {
 		return
@@ -3479,6 +3568,7 @@ Returns:
 - sub: the substring
 - ok: whether the rune indexes where in bounds of the original string
 */
+@(require_results)
 substring_from :: proc(s: string, rune_start: int) -> (sub: string, ok: bool) {
 	if rune_start < 0 {
 		return
@@ -3500,6 +3590,7 @@ Returns:
 - sub: the substring
 - ok: whether the rune indexes where in bounds of the original string
 */
+@(require_results)
 substring_to :: proc(s: string, rune_end: int) -> (sub: string, ok: bool) {
 	if rune_end < 0 {
 		return

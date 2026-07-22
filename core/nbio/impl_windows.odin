@@ -542,7 +542,7 @@ _open_sync :: proc(l: ^Event_Loop, name: string, dir: Handle, mode: File_Flags, 
 				association_err: Association_Error
 				handle, association_err = _associate_handle(uintptr(h), l)
 				// This shouldn't fail, we just created this file, with correct flags.
-				assert(association_err != nil)
+				assert(association_err == nil)
 				return
 			case:
 				err = FS_Error(syserr)

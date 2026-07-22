@@ -49,7 +49,7 @@ Example:
 			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, err)
 			return
 		}
-		csv.reader_init(&r, handle.stream)
+		csv.reader_init(&r, os.to_stream(handle))
 
 		for r, i in csv.iterator_next(&r) {
 			for f, j in r {
@@ -67,7 +67,7 @@ Example:
 
 		csv_data, csv_err := os.read_entire_file(filename, context.allocator)
 		defer delete(csv_data, context.allocator)
-		if err != nil {
+		if csv_err != nil {
 			fmt.eprintfln("Unable to open file: %v. Error: %v", filename, csv_err)
 			return
 		}

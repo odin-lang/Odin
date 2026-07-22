@@ -6,7 +6,7 @@ jobs:
     name: NetBSD Build, Check, and Test
     runs-on: ubuntu-latest
     env:
-      PKGSRC_BRANCH: 2025Q4
+      PKGSRC_BRANCH: 2026Q1
     steps:
     - uses: actions/checkout@v4
     - name: Build, Check, and Test
@@ -18,18 +18,20 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
-          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)_${PKGSRC_BRANCH}/All" /usr/sbin/pkg_add pkgin
-          pkgin -y in gmake git bash python311 llvm clang
+          PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)${PKGSRC_BRANCH:+_${PKGSRC_BRANCH}}/All" /usr/sbin/pkg_add pkgin
+          pkgin -y in gmake git bash python311 llvm clang || cat /var/db/pkgin/pkg_install-err.log
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
         run: |
           set -e -x
           git config --global --add safe.directory $(pwd)
           gmake release
+          export ODIN_ROOT="$(pwd)"
           ./odin version
           ./odin report
-          gmake -C vendor/stb/src
-          gmake -C vendor/cgltf/src
-          gmake -C vendor/miniaudio/src
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/miniaudio/src/build_miniaudio.sh
+          ./vendor/kb_text_shape/src/build_unix.sh
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
@@ -60,9 +62,11 @@ jobs:
           gmake release
           ./odin version
           ./odin report
-          gmake -C vendor/stb/src
-          gmake -C vendor/cgltf/src
-          gmake -C vendor/miniaudio/src
+          export ODIN_ROOT="$(pwd)"
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/miniaudio/src/build_miniaudio.sh
+          ./vendor/kb_text_shape/src/build_unix.sh
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
@@ -122,9 +126,14 @@ jobs:
           brew install curl mbedtls
       - name: Compile needed Vendor
         run: |
-          make -C vendor/stb/src
-          make -C vendor/cgltf/src
-          make -C vendor/miniaudio/src
+          export ODIN_ROOT="$(pwd)"
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/miniaudio/src/build_miniaudio.sh
+          ./vendor/kb_text_shape/src/build_unix.sh
+      - name: Compile Box3D (Ubuntu ARM)
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: ./vendor/box3d/src/build.sh
       - name: Odin check
         run: ./odin check examples/demo -vet
       - name: Odin run
@@ -143,6 +152,8 @@ jobs:
         run: ./odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed
       - name: Noise Protocol Framework tests
         run: ./odin test tests/core/crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed
+      - name: X.509 limbo tests
+        run: ./odin test tests/core/crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed
       - name: Vendor library tests
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
         if: matrix.os != 'macos-15-intel' && matrix.os != 'macos-latest'
@@ -250,6 +261,11 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed -microarch:native
+      - name: X.509 limbo tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          odin test tests/core/crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed -microarch:native
       - name: Vendor library tests
         shell: cmd
         run: |
@@ -313,9 +329,11 @@ jobs:
 
       - name: Compile needed Vendor
         run: |
-          make -C vendor/stb/src
-          make -C vendor/cgltf/src
-          make -C vendor/miniaudio/src
+          export ODIN_ROOT="$(pwd)"
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/miniaudio/src/build_miniaudio.sh
+          ./vendor/kb_text_shape/src/build_unix.sh
 
       - name: Odin check examples/all
         run: ./odin check examples/all -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
