@@ -3268,7 +3268,7 @@ gb_internal void parse_check_or_return(Ast *operand, char const *msg) {
 	}
 }
 
-gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
+gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand) {
 	if (operand == nullptr) {
 		if (f->allow_type) return nullptr;
 		Token begin = f->curr_token;
@@ -3427,7 +3427,7 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			break;
 
 		case Token_OpenBrace:
-			if (!lhs && is_literal_type(operand) && f->expr_level >= 0) {
+			if (is_literal_type(operand) && f->expr_level >= 0) {
 				operand = parse_literal_value(f, operand);
 			} else {
 				loop = false;
@@ -3436,11 +3436,9 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 
 		case Token_Increment:
 		case Token_Decrement:
-			if (!lhs) {
+			{
 				Token token = advance_token(f);
 				syntax_error(token, "Postfix '%.*s' operator is not supported", LIT(token.string));
-			} else {
-				loop = false;
 			}
 			break;
 
@@ -3448,8 +3446,6 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			loop = false;
 			break;
 		}
-
-		lhs = false; // NOTE(bill): 'tis not lhs anymore
 	}
 
 	return operand;
@@ -3506,7 +3502,7 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	}
 	}
 
-	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
+	return parse_atom_expr(f, parse_operand(f, lhs));
 }
 
 gb_internal bool is_ast_range(Ast *expr) {
@@ -4679,7 +4675,7 @@ gb_internal Ast *parse_type_or_ident(AstFile *f) {
 
 	bool lhs = true;
 	Ast *operand = parse_operand(f, lhs);
-	Ast *type = parse_atom_expr(f, operand, lhs);
+	Ast *type = parse_atom_expr(f, operand);
 	return type;
 }
 
