@@ -51,6 +51,8 @@
 **************************************************************************/
 
 gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
+#if LLVM_VERSION_MAJOR >= 18
+
 	Entity *e = p->entity;
 	if (e == nullptr) {
 		return;
@@ -60,13 +62,13 @@ gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
 
 	u64 fast_math_flags = e->Procedure.fast_math_flags;
 	LLVMFastMathFlags llvm_flags = 0;
-	if (fast_math_flags & OdinFastMath_Allow_Reassoc)    llvm_flags |= LLVMFastMathAllowReassoc;
-	if (fast_math_flags & OdinFastMath_No_NaNs)          llvm_flags |= LLVMFastMathNoNaNs;
-	if (fast_math_flags & OdinFastMath_No_Infs)          llvm_flags |= LLVMFastMathNoInfs;
-	if (fast_math_flags & OdinFastMath_No_Signed_Zeros)  llvm_flags |= LLVMFastMathNoSignedZeros;
-	if (fast_math_flags & OdinFastMath_Allow_Reciprocal) llvm_flags |= LLVMFastMathAllowReciprocal;
-	if (fast_math_flags & OdinFastMath_Allow_Contract)   llvm_flags |= LLVMFastMathAllowContract;
-	if (fast_math_flags & OdinFastMath_Approx_Func)      llvm_flags |= LLVMFastMathApproxFunc;
+	if (fast_math_flags & (1 << OdinFastMath_Allow_Reassoc))    llvm_flags |= LLVMFastMathAllowReassoc;
+	if (fast_math_flags & (1 << OdinFastMath_No_NaNs))          llvm_flags |= LLVMFastMathNoNaNs;
+	if (fast_math_flags & (1 << OdinFastMath_No_Infs))          llvm_flags |= LLVMFastMathNoInfs;
+	if (fast_math_flags & (1 << OdinFastMath_No_Signed_Zeros))  llvm_flags |= LLVMFastMathNoSignedZeros;
+	if (fast_math_flags & (1 << OdinFastMath_Allow_Reciprocal)) llvm_flags |= LLVMFastMathAllowReciprocal;
+	if (fast_math_flags & (1 << OdinFastMath_Allow_Contract))   llvm_flags |= LLVMFastMathAllowContract;
+	if (fast_math_flags & (1 << OdinFastMath_Approx_Func))      llvm_flags |= LLVMFastMathApproxFunc;
 
 	if (llvm_flags == 0) {
 		return;
@@ -77,26 +79,17 @@ gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
 	     block = LLVMGetNextBasicBlock(block)) {
 		for (LLVMValueRef instr = LLVMGetFirstInstruction(block);
 		     instr != nullptr;
-		     instr = LLVMGetNextInstruction(instr))  {
-			switch (LLVMGetInstructionOpcode(instr)) {
-			case LLVMFNeg:
-			case LLVMFAdd:
-			case LLVMFSub:
-			case LLVMFMul:
-			case LLVMFDiv:
-			case LLVMFRem:
-			case LLVMFPToUI:
-			case LLVMFPToSI:
-			case LLVMUIToFP:
-			case LLVMSIToFP:
-			case LLVMFPTrunc:
-			case LLVMFPExt:
-			case LLVMFCmp:
+		     instr = LLVMGetNextInstruction(instr))  {			
+			if (LLVMCanValueUseFastMathFlags(instr)) {
 				LLVMSetFastMathFlags(instr, llvm_flags);
-				break;
 			}
 		}
 	}
+#else
+	// LLVMSetFastMathFlags doesn't seem to exist in LLVM 17,
+	// so @(fast_math) becomes no op on older LLVM
+	gb_unused(p);
+#endif
 }
 
 gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
