@@ -900,6 +900,23 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					         expr_to_string(value.value_compound),
 					         temp_canonical_string(value_type), temp_canonical_string(original_type));
 
+				} else if (value.kind == ExactValue_TypeCast) {
+					Ast *expr = value.value_typecast;
+					if (expr->kind == Ast_CallExpr && expr->CallExpr.proc->tav.mode == Addressing_Type) {
+						expr = expr->CallExpr.args[0];
+					} else if (expr->kind == Ast_TypeCast) {
+						expr = expr->TypeCast.expr;
+					}
+					Type *variant = type_of_expr(expr);
+					if (union_is_variant_of(value_type, variant)) {
+						value_type = variant;
+						if (is_type_union(variant)) {
+							value.value_typecast = expr;
+						} else {
+							value = expr->tav.value;
+						}
+						break;
+					}
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
 				}

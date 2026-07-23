@@ -8644,6 +8644,9 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 				update_untyped_expr_type(c, arg, t, false);
 				check_representable_as_constant(c, operand->value, t, &operand->value);
 			}
+			if (operand->mode == Addressing_Constant && is_type_union(t)) {
+				operand->value = exact_value_typecast(operand->expr);
+			}
 			break;
 		}
 		}
@@ -12452,6 +12455,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 				break;
 			}
 		}
+		if (o->mode == Addressing_Constant && is_type_union(type)) {
+			o->value = exact_value_typecast(tc->expr);
+		}
 		return Expr_Expr;
 	case_end;
 
@@ -12808,28 +12814,29 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 }
 
 
-
 gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y) {
 	ast_node(x_cl, CompoundLit, x.value_compound);
 	ast_node(y_cl, CompoundLit, y.value_compound);
 
-	if (x_cl->elems.count != y_cl->elems.count) {
-		return false;
-	}
-
 	bool test = op == Token_CmpEq;
+	if (x_cl->elems.count != y_cl->elems.count) {
+		return !test;
+	}
 
 	for (isize i = 0; i < x_cl->elems.count; i++) {
 		Ast *lhs = x_cl->elems[i];
 		Ast *rhs = y_cl->elems[i];
-		if (compare_exact_values(op, lhs->tav.value, rhs->tav.value) != test) {
+		if (compare_exact_values(Token_NotEq, lhs->tav.value, rhs->tav.value)) {
 			return !test;
 		}
 	}
 	return test;
 }
 
-
+gb_internal bool compare_exact_values_typecast(TokenKind op, ExactValue x, ExactValue y) {
+	// TODO(tf2spi): Probably not the proper way to compare typecasts...
+	return compare_exact_values(op, x.value_typecast->tav.value, y.value_typecast->tav.value);
+}
 
 
 gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
