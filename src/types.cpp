@@ -1948,6 +1948,13 @@ gb_internal Type *core_array_type(Type *t) {
 	}
 }
 
+gb_internal Type *core_broadcastable_elem_type(Type *t) {
+	while (is_type_array(t)) {
+		t = base_array_type(t);
+	}
+	return t;
+}
+
 gb_internal i32 type_math_rank(Type *t) {
 	i32 rank = 0;
 	for (;;) {
@@ -3589,6 +3596,17 @@ gb_internal Type *union_tag_type(Type *u) {
 	}
 	GB_PANIC("Invalid union_tag_size");
 	return t_uint;
+}
+
+gb_internal bool type_conversion_is_variant(Type *src, Type *dst) {
+	dst = base_type(core_broadcastable_elem_type(dst));
+	if (dst == nullptr) { return false; }
+
+	switch (dst->kind) {
+	case Type_Union:
+		return union_is_variant_of(dst, src);
+	}
+	return false;
 }
 
 gb_internal int matched_target_features(TypeProc *t) {
