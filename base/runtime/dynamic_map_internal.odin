@@ -523,7 +523,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 
 @(require_results)
-map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
+map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> (err: Allocator_Error) {
 	@(require_results)
 	ceil_log2 :: #force_inline proc "contextless" (x: uintptr) -> uintptr {
 		z := intrinsics.count_leading_zeros(x)
@@ -537,15 +537,27 @@ map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_
 		m.allocator = context.allocator
 	}
 
-	new_capacity := new_capacity
+	// The map will resize itself at MAP_LOAD_FACTOR capacity.
+	// <64 bit systems can have maps close to uintptr size.
+	when size_of(uintptr) < 8 {
+		MAX_CEIL_SYSTEM  :: uintptr(1) << (size_of(uintptr) * 8 - 1)
+		MAX_NEW_CAPACITY :: uintptr(u64(MAX_CEIL_SYSTEM) * 75 / 100)
+	} else {
+		MAX_NEW_CAPACITY :: max(uintptr) / 100
+	}
+
+	if new_capacity > MAX_NEW_CAPACITY {
+		return Allocator_Error.Out_Of_Memory
+	}
+	new_capacity_with_resize := new_capacity * 100 / MAP_LOAD_FACTOR
 	old_capacity := uintptr(map_cap(m^))
 
-	if old_capacity >= new_capacity {
+	if old_capacity >= new_capacity_with_resize {
 		return nil
 	}
 
 	// ceiling nearest power of two
-	log2_new_capacity := ceil_log2(new_capacity)
+	log2_new_capacity := ceil_log2(new_capacity_with_resize)
 
 	log2_min_cap := max(MAP_MIN_LOG2_CAPACITY, log2_new_capacity)
 
