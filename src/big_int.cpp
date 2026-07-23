@@ -208,45 +208,93 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 		len -= 2;
 	}
 
+	// NOTE(bill): Try a fast path for small integers rather than relying on
+	// big integer arithmetic straightaway
+	isize max_len = 0;
+	switch (base) {
+	case 2:  max_len = 63; break;
+	case 8:  max_len = 21; break;
+	case 10: max_len = 18; break;
+	case 12: max_len = 17; break;
+	case 16: max_len = 15; break;
+	}
+
 	BigInt b = {};
-	big_int_from_u64(&b, base);
-	defer (big_int_dealloc(&b));
-
-	mp_zero(dst);
-
-	BigInt digit = {};
-	defer (big_int_dealloc(&digit));
+	defer (if (b.dp) big_int_dealloc(&b));
 
 	isize i = 0;
-	for (; i < len; i++) {
-		Rune r = cast(Rune)text[i];
+	if (len < max_len) {
+		u64 value = 0;
 
-		if (r == '-') {
-			if (is_negative) {
-				// NOTE(Jeroen): Can't have a doubly negative number.
-				*success = false;
-				return;
+		for (; i < len; i++) {
+			Rune r = cast(Rune)text[i];
+
+			if (r == '-') {
+				if (is_negative) {
+					// NOTE(Jeroen): Can't have a doubly negative number.
+					*success = false;
+					return;
+				}
+				is_negative = true;
+				continue;
 			}
-			is_negative = true;
-			continue;
-		}
 
-		if (r == '_') {
-			continue;
-		}
-		u64 v = u64_digit_value(r);
-		if (v >= base) {
-			// NOTE(Jeroen): Can still be a valid integer if the next character is an `e` or `E`.
-			if (r != 'e' && r != 'E') {
-				*success = false;
+			if (r == '_') {
+				continue;
 			}
-			break;
+			u64 v = u64_digit_value(r);
+			if (v >= base) {
+				// NOTE(Jeroen): Can still be a valid integer if the next character is an `e` or `E`.
+				if (r != 'e' && r != 'E') {
+					*success = false;
+				}
+				break;
+			}
+
+			value *= base;
+			value += v;
 		}
 
-		big_int_from_u64(&digit, v);
-		big_int_mul_eq(dst, &b);
-		big_int_add_eq(dst, &digit);
+		big_int_from_u64(dst, value);
+	} else {
+		big_int_from_u64(&b, base);
+
+		mp_zero(dst);
+
+		BigInt digit = {};
+		defer (big_int_dealloc(&digit));
+
+		for (; i < len; i++) {
+			Rune r = cast(Rune)text[i];
+
+			if (r == '-') {
+				if (is_negative) {
+					// NOTE(Jeroen): Can't have a doubly negative number.
+					*success = false;
+					return;
+				}
+				is_negative = true;
+				continue;
+			}
+
+			if (r == '_') {
+				continue;
+			}
+			u64 v = u64_digit_value(r);
+			if (v >= base) {
+				// NOTE(Jeroen): Can still be a valid integer if the next character is an `e` or `E`.
+				if (r != 'e' && r != 'E') {
+					*success = false;
+				}
+				break;
+			}
+
+			big_int_from_u64(&digit, v);
+			big_int_mul_eq(dst, &b);
+			big_int_add_eq(dst, &digit);
+		}
 	}
+
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
 		GB_ASSERT(base == 10);
@@ -284,6 +332,9 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 		BigInt tmp = {};
 		mp_init(&tmp);
 		defer (big_int_dealloc(&tmp));
+		if (b.dp == nullptr) {
+			big_int_from_u64(&b, base);
+		}
 		big_int_exp_u64(&tmp, &b, exp, success);
 		big_int_mul_eq(dst, &tmp);
 	}

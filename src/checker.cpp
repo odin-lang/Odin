@@ -7785,8 +7785,8 @@ gb_internal void check_parsed_files(Checker *c) {
 			token.pos.column  = 1;
 			if (s->pkg->files.count > 0) {
 				AstFile *f = s->pkg->files[0];
-				if (f->tokens.count > 0) {
-					token = f->tokens[0];
+				if (f->first_token.kind != Token_Invalid) {
+					token = f->first_token;
 				}
 			}
 
