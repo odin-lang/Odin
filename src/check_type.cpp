@@ -2228,9 +2228,13 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				if (p->flags&FieldFlag_no_alias) {
-					bool ok = is_type_internally_pointer_like(type);
-					if (!ok) {
-						error(name, "'#no_alias' can only be applied pointer-like type parameters");
+					// If type == t_invalid, we either already errored (and erroring again here is just log
+					// noise) or we are rejecting a polymorphic proc group overload candidate.
+					// If no_polymorphic_errors is set, we are speculatively checking a candidate and
+					// erroring+stripping is premature: the chosen candidate will be re-checked with errors enabled,
+					// so a true error isn't lost.
+					if (type != t_invalid && !is_type_internally_pointer_like(type) && !ctx->no_polymorphic_errors) {
+						error(name, "'#no_alias' can only be applied to pointer-like type parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
