@@ -13,6 +13,7 @@ Sort_Kind :: enum {
 	Cmp,
 }
 
+
 _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (ORD(E) && KIND == .Ordered) || (KIND != .Ordered) #no_bounds_check {
 	less :: #force_inline proc(a, b: E, call: P) -> bool {
 		when KIND == .Ordered {
@@ -25,14 +26,103 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 			#panic("unhandled Sort_Kind")
 		}
 	}
-	
-	// insertion sort
-	// TODO(bill): use a different algorithm as insertion sort is O(n^2)
-	n := len(data)
-	for i in 1..<n {
-		for j := i; j > 0 && less(data[j], data[j-1], call); j -= 1 {
-			swap(data, j, j-1)
+	if len(data) < 1000 {
+		insertion_sort(data, call)
+		return
+	}
+	rotate_merge(data, call)
+	// O(nlog²n)
+	rotate_merge :: proc(arr: $T/[]$E, call: $P){
+        if len(arr) < 32 {
+            insertion_sort(arr, call)
+            return
+        }
+		mid := len(arr) >> 1
+
+		rotate_merge(arr[:mid], call)
+		rotate_merge(arr[mid:], call)
+
+		stable_merge(arr, mid, len(arr) - mid, call)
+	}
+
+	insertion_sort :: #force_inline proc(arr: $A/[]$T, call: $P) #no_bounds_check {
+		for i in 1..<len(arr) {
+			x := arr[i]
+			j := i
+			for ; j > 0 && less(x, arr[j - 1], call); j -= 1 {
+				arr[j] = arr[j - 1]
+			}
+			arr[j] = x
 		}
+	}
+
+	bin_search_left :: #force_inline proc(arr: $A/[]$T, value: T,  call: $P) -> int #no_bounds_check {
+		from := 0
+		len := len(arr)
+
+		for len > 0 {
+			half := len / 2
+			mid := from + half
+
+			if less(arr[mid], value, call){
+				from = mid + 1
+				len -= half + 1
+			} else {
+				len = half
+			}
+		}
+		return from
+	}
+
+	bin_search_right :: #force_inline proc(arr: $A/[]$T, value: T,  call: $P) -> int #no_bounds_check {
+		from := 0
+		len := len(arr)
+
+		for len > 0 {
+			half := len / 2
+			mid := from + half
+
+			if less(value, arr[mid], call){
+				len = half
+			} else {
+				from = mid + 1
+				len -= half + 1
+			}
+		}
+		return from
+	}
+
+	stable_merge :: proc(arr: $T/[]$E, left, right: int, call: $P) #no_bounds_check {
+		if left == 0 || right == 0 {
+			return
+		}
+		if left + right == 2 {
+			if less(arr[1],arr[0],call) {
+				swap(arr,0,1)
+			}
+			return
+		} 
+		first_cut, second_cut : int
+		left2, right2 : int
+		if left > right {
+			left2 = left >> 1
+			first_cut = left2
+
+			second_cut = left + bin_search_left(arr[left:], arr[first_cut], call)
+			right2 = second_cut - left
+		} else {
+			right2 = right >> 1
+			second_cut = left + right2
+
+			first_cut = bin_search_right(arr[:left], arr[second_cut],call)
+			left2 = first_cut
+		}
+		
+		rotate_left(arr[first_cut:second_cut], left - first_cut)
+		new_mid := first_cut + right2
+
+		stable_merge(arr[:new_mid], left2, 		right2,		  call)
+		stable_merge(arr[new_mid:], left-left2, right-right2, call)
 	}
 }
 
