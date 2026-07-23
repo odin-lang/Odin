@@ -42,6 +42,14 @@ if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
 	done
 fi
 
+# Macports supports many concurrent llvm installations.
+# Pin an active one with `sudo port select llvm`.
+if [ -z "$LLVM_CONFIG" ] && [ "$OS_NAME" = "Darwin" ] && [ -n "$(command -v port)" ]; then
+    if command -v llvm-config >/dev/null 2>&1; then
+        LLVM_CONFIG="$(command -v llvm-config)"
+    fi
+fi
+
 if [ -z "$LLVM_CONFIG" ]; then
 	DEFAULT_VERSION=""
 
@@ -61,6 +69,10 @@ if [ -z "$LLVM_CONFIG" ]; then
 		elif [ -n "$(command -v "llvm-config$V")" ]; then
 			LLVM_CONFIG="llvm-config$V"
 			break
+		# macports
+    elif [ -n "$(command -v "llvm-config-mp-$V")" ]; then
+    	LLVM_CONFIG="llvm-config-mp-$V"
+    	break
 		fi
 	done
 
@@ -104,9 +116,9 @@ fi
 case "$OS_NAME" in
 Darwin)
 	darwin_sysroot=
-	if [ $(which xcrun) ]; then
+	if [ -n "$(command -v xcrun)" ]; then
 		darwin_sysroot="--sysroot $(xcrun --sdk macosx --show-sdk-path)"
-	elif [[ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]]; then
+	elif [ -e "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk" ]; then
 		darwin_sysroot="--sysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
 	else
 		echo "Warning: MacOSX.sdk not found."
@@ -114,6 +126,11 @@ Darwin)
 
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags) ${darwin_sysroot}"
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System -lLLVM"
+
+	if [ -n "$(command -v port)" ]; then
+		LLVM_LIBDIR="$($LLVM_CONFIG --libdir)"
+		LDFLAGS="$LDFLAGS -Wl,-rpath,$LLVM_LIBDIR"
+	fi
 	;;
 FreeBSD)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
