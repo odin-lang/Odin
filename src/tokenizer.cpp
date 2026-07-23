@@ -662,6 +662,7 @@ gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newli
 			case ' ':
 			case '\t':
 			case '\r':
+			case '\f':
 				advance_to_next_rune(t);
 				continue;
 			}
@@ -674,6 +675,7 @@ gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newli
 			case ' ':
 			case '\t':
 			case '\r':
+			case '\f':
 				advance_to_next_rune(t);
 				continue;
 			}
