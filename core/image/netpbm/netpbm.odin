@@ -10,6 +10,7 @@ import "core:unicode"
 import "base:runtime"
 
 Image        :: image.Image
+Options      :: image.Options
 Format       :: image.Netpbm_Format
 Header       :: image.Netpbm_Header
 Info         :: image.Netpbm_Info
@@ -26,7 +27,7 @@ PFM     :: Formats{.Pf, .PF}
 ASCII   :: Formats{.P1, .P2, .P3}
 BINARY  :: Formats{.P4, .P5, .P6} + PAM + PFM
 
-load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
 	img = new(Image)
@@ -46,6 +47,9 @@ load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^
 	}
 	img.metadata = info
 
+	if .vertical_flip in options {
+		image.vertical_flip(img)
+	}
 	return img, nil
 }
 
@@ -720,7 +724,7 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 @(init, private)
 _register :: proc "contextless" () {
 	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
-		return load_from_bytes(data, allocator)
+		return load_from_bytes(data, options, allocator)
 	}
 	destroyer :: proc(img: ^Image) {
 		_ = destroy(img)
