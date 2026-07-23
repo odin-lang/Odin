@@ -5086,6 +5086,7 @@ WSAEPROVIDERFAILEDINIT :: 10106 // Service provider failed to initialize
 
 // Address families
 AF_UNSPEC : c_int : 0  // Unspecified
+AF_UNIX   : c_int : 1  // Unix Domain Sockets; supported on Windows 10 Build 17026 and greater.
 AF_INET   : c_int : 2  // IPv4
 AF_INET6  : c_int : 23 // IPv6
 AF_IRDA   : c_int : 26 // Infrared
@@ -5205,6 +5206,12 @@ sockaddr_in6 :: struct {
 	sin6_flowinfo: c_ulong,
 	sin6_addr:     in6_addr,
 	sin6_scope_id: c_ulong,
+}
+
+UNIX_PATH_MAX :: 108
+sockaddr_un :: struct {
+	sun_family: u16,
+	sun_path: [UNIX_PATH_MAX]byte,
 }
 
 in_addr :: struct {
