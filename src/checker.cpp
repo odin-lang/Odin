@@ -5356,6 +5356,37 @@ gb_internal bool is_string_an_identifier(String s) {
 	return offset == s.len;
 }
 
+gb_internal String resolve_import_name(String name, String relpath) {
+	if (name.len != 0) {
+		return name;
+	}
+
+	isize slash = -1;
+	isize colon = -1;
+
+	for (isize i = relpath.len-1; i >= 0; i--) {
+		u8 c = relpath[i];
+		if (c == '/') {
+			slash = i;
+			break;
+		}
+		if (c == ':') {
+			colon = i;
+			break;
+		}
+	}
+	String entity_name;
+	if (slash > -1) {
+		entity_name = substring(relpath, slash + 1, relpath.len);
+	} else if (colon > -1) {
+		entity_name = substring(relpath, colon + 1, relpath.len);
+	} else {
+		entity_name = relpath;
+	}
+
+	return entity_name;
+}
+
 gb_internal String path_to_entity_name(String name, String fullpath, bool strip_extension=true) {
 	if (name.len != 0) {
 		return name;
@@ -5628,7 +5659,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	// 	// error(token, "Multiple import of the same file within this scope");
 	// }
 
-	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
+	String import_name = resolve_import_name(id->import_name.string, string_value_from_token(ctx->file, id->relpath));
 	if (is_blank_ident(import_name)) {
 		force_use = true;
 	}
