@@ -8,6 +8,7 @@ package testing
 	List of contributors:
 		Ginger Bill: Initial implementation.
 		Feoramund:   Total rewrite.
+		John Bakhmat: Fancy-mode stdout capture.
 */
 
 import            "base:intrinsics"
@@ -493,6 +494,36 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.assertf(alloc_error == nil, "Error allocating memory for log message queue: %v", alloc_error)
 	defer delete(log_messages)
 
+	stdout_pending: [dynamic]Stdout_Message = ---
+	stdout_pending, alloc_error = make([dynamic]Stdout_Message, 0, RESERVED_LOG_MESSAGES)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for stdout pending queue: %v", alloc_error)
+	defer free_stdout_messages(&stdout_pending)
+
+	test_stdout_ctx: Test_Stdout_Ctx
+	stdout_channel: Stdout_Channel = ---
+	saved_real_stdout := os.stdout
+
+	if should_show_animations {
+		stdout_buffer_size := BUFFERED_EVENTS_PER_CHANNEL * max(1, thread_count)
+		stdout_channel, alloc_error = chan.create_buffered(Stdout_Channel, stdout_buffer_size, context.allocator)
+		fmt.assertf(alloc_error == nil, "Error allocating memory for stdout channel: %v", alloc_error)
+
+		init_test_stdout_ctx(
+			&test_stdout_ctx,
+			saved_real_stdout,
+			chan.as_send(stdout_channel),
+			context.allocator,
+		)
+
+		os.stdout = &test_stdout_ctx.file
+	}
+	defer if should_show_animations {
+		if os.stdout == &test_stdout_ctx.file {
+			os.stdout = saved_real_stdout
+		}
+		chan.destroy(&stdout_channel)
+	}
+
 	sorted_failed_test_reasons: [dynamic]int = ---
 	sorted_failed_test_reasons, alloc_error = make([dynamic]int, 0, RESERVED_TEST_FAILURES)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for sorted failed test reasons: %v", alloc_error)
@@ -621,6 +652,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				}
 			}
 
+			if !events_pending && should_show_animations {
+				if chan.len(stdout_channel) > 0 {
+					events_pending = true
+				}
+			}
+
 			if !events_pending {
 				// Keep the main thread from pegging a core at 100% usage.
 				time.sleep(1 * time.Microsecond)
@@ -730,6 +767,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					}
 				}
 			}
+		}
+
+		if should_show_animations {
+			alloc_error = drain_stdout_channel(stdout_channel, &stdout_pending)
+			fmt.assertf(alloc_error == nil, "Error draining stdout channel: %v", alloc_error)
 		}
 
 		check_timeouts: for i := len(task_timeouts) - 1; i >= 0; i -= 1 {
@@ -855,12 +897,18 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		// -- Redraw.
 
 		if should_show_animations {
-			if len(log_messages) == 0 && !needs_to_redraw(report) {
+			if len(log_messages) == 0 && len(stdout_pending) == 0 && !needs_to_redraw(report) {
 				continue main_loop
 			}
 
 			if !bypass_progress_overwrite {
 				fmt.wprintf(stdout, ansi_redraw_string, total_done_count, total_test_count)
+			}
+
+			if len(stdout_pending) > 0 {
+				if !emit_stdout_messages(stdout, &stdout_pending) {
+					fmt.wprintln(stdout)
+				}
 			}
 		} else {
 			if total_done_count != last_done_count {
@@ -909,6 +957,27 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// At the time of writing, the thread library is undergoing a rewrite that
 	// should solve this problem; it is not an issue with the test runner itself.
 	thread.pool_join(&pool)
+
+	if should_show_animations {
+		alloc_error = drain_stdout_channel(stdout_channel, &stdout_pending)
+		fmt.assertf(alloc_error == nil, "Error draining stdout channel after join: %v", alloc_error)
+
+		if len(stdout_pending) > 0 {
+			// The pool may become empty before the main loop observes the last
+			// stdout writes. Clear the progress block before emitting them,
+			// then restore the final progress frame below the output.
+			fmt.wprintf(stdout, ansi_redraw_string, total_done_count, total_test_count)
+
+			if !emit_stdout_messages(stdout, &stdout_pending) {
+				fmt.wprintln(stdout)
+			}
+
+			redraw_report(batch_writer, report)
+			draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
+			fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+			bytes.buffer_reset(&batch_buffer)
+		}
+	}
 
 	finished_in := time.since(start_time)
 
