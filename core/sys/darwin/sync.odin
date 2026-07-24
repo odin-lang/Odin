@@ -1,3 +1,4 @@
+#+build darwin
 package darwin
 
 // #define OS_WAIT_ON_ADDR_AVAILABILITY \
