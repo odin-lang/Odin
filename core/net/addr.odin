@@ -623,7 +623,7 @@ address_to_string_builder :: proc(addr: Address, b: ^strings.Builder) -> string 
 				*/
 
 				buf: [32]byte
-				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val), strconv.digits, {})
+				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val))
 				strings.write_string(b, str)
 
 				if i < best.start - 1 {
@@ -636,7 +636,7 @@ address_to_string_builder :: proc(addr: Address, b: ^strings.Builder) -> string 
 				*/
 
 				buf: [32]byte
-				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val), strconv.digits, {})
+				str := strconv.write_bits(buf[:], u64(val), 16, false, size_of(val))
 				strings.write_string(b, str)
 
 				if i != 7 {

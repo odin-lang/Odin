@@ -26,8 +26,8 @@ write :: proc(w: io.Writer, id: Identifier) -> (error: io.Error) #no_bounds_chec
 		high_nibble := octet >> 4
 		low_nibble := octet & 0xF
 
-		io.write_byte(w, strconv.digits[high_nibble]) or_return
-		io.write_byte(w, strconv.digits[low_nibble]) or_return
+		io.write_byte(w, strconv.DIGITS[high_nibble]) or_return
+		io.write_byte(w, strconv.DIGITS[low_nibble]) or_return
 		return nil
 	}
 
@@ -58,8 +58,8 @@ unsafe_write :: proc(w: io.Writer, id: Identifier) #no_bounds_check {
 		high_nibble := octet >> 4
 		low_nibble := octet & 0xF
 
-		io.write_byte(w, strconv.digits[high_nibble])
-		io.write_byte(w, strconv.digits[low_nibble])
+		io.write_byte(w, strconv.DIGITS[high_nibble])
+		io.write_byte(w, strconv.DIGITS[low_nibble])
 	}
 
 	for index in 0 ..< 4 {write_octet(w, id[index])}
