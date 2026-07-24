@@ -253,8 +253,8 @@ foreign lib {
 	GetRenderVSync                   :: proc(renderer: ^Renderer, vsync: ^c.int) -> bool ---
 	RenderDebugText                  :: proc(renderer: ^Renderer, x, y: f32, str: cstring) -> bool ---
 	RenderDebugTextFormat            :: proc(renderer: ^Renderer, x, y: f32, fmt: cstring, #c_vararg args: ..any) -> bool ---
-	SetDefaultTextureAddressMode     :: proc(renderer: ^Renderer, scale_mode: ScaleMode) -> bool ---
-	GetDefaultTextureAddressMode     :: proc(renderer: ^Renderer, scale_mode: ^ScaleMode) -> bool ---
+	SetDefaultTextureScaleMode       :: proc(renderer: ^Renderer, scale_mode: ScaleMode) -> bool ---
+	GetDefaultTextureScaleMode       :: proc(renderer: ^Renderer, scale_mode: ^ScaleMode) -> bool ---
 }
 
 
