@@ -510,6 +510,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Token_Kind, str
 			case 'z': int_base(t, &kind, 12, "illegal dozenal integer")
 			case 'x': int_base(t, &kind, 16, "illegal hexadecimal integer")
 			case 'h':
+				kind = .Float
 				prev := t.offset
 				advance_rune(t)
 				scan_mantissa(t, 16)
