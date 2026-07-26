@@ -39,9 +39,11 @@ _locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) 
 
 @(private="package")
 _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
-	mem_err: runtime.Allocator_Error
-	out, mem_err = make([]Location, len(bt), allocator)
-	if mem_err != nil { return nil, .Allocator_Error }
+	{
+		mem_err: runtime.Allocator_Error
+		out, mem_err = make([]Location, len(bt), allocator)
+		if mem_err != nil { return nil, .Allocator_Error }
+	}
 
 	defer if err != nil { _locations_destroy(out, allocator) }
 
