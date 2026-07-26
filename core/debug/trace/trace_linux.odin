@@ -157,17 +157,17 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		defer delete(stdout, temp_allocator)
 		defer delete(stderr, temp_allocator)
 
+		count := len(command)-COMMAND_START_LEN
+
 		// `SYMBOLIZER_PROGRAM` does not exist, lets fall back to unresolved info.
 		if perr == .Not_Exist {
 			fill_unresolved(locations, msgs, allocator)
-			return
+			return count, nil
 		}
 
 		if perr != nil || !state.success {
 			return 0, .Resolve_Aborted
 		}
-
-		count := len(command)-COMMAND_START_LEN
 
 		sstdout := string(stdout)
 		for i in 0..<count {
