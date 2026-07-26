@@ -1,6 +1,12 @@
 /*
 Captures and resolves stack traces for debugging purpose.
 
+Debug info based support is implemented for Windows, MacOS, and Linux.
+
+Other targets can use the instrumentation based mode, which uses Odin's instrumentation
+features to trace, with some runtime overhead.
+Opt in with `-define:ODIN_TRACE_INSTRUMENTATION_MODE=true`.
+
 Example:
 	package main
 
