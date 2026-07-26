@@ -474,7 +474,7 @@ space_ranges := [?]i32{
 	0x1680,  0x1680, // Ogham space mark
 	0x2000,  0x200b, // en dash .. zero-width space
 	0x200e,  0x200f, // LTR mark .. RTL mark (pattern whitespace)
-	0x2028,  0x2029,     0x3000,  0x3000,
+	0x2028,  0x2029, // paragraph and line seperators
 	0x202f,  0x202f, // narrow no-break space
 	0x205f,  0x205f, // medium mathematical space
 	0x3000,  0x3000, // ideographic space
@@ -492,7 +492,7 @@ unicode_spaces := [?]i32{
 	0x1680, // Ogham space mark
 	0x2000, // en dash .. zero-width space
 	0x200e, 0x200f, // LTR mark .. RTL mark (pattern whitespace)
-	0x2028, 0x2029,  0x3000,  0x3000,
+	0x2028, 0x2029, // paragraph and line seperators
 	0x202f, // narrow no-break space
 	0x205f, // medium mathematical space
 	0x3000, // ideographic space
