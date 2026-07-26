@@ -47,7 +47,7 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 
 	// Debug info is needed, if we call with out-of-date debug symbols it will return out-of-date info, so better to short-circuit right away.
 	when !ODIN_DEBUG {
-		for &location, i in locations {
+		for &location, i in out {
 			location.file_path = "??"
 
 			builder := strings.builder_make(allocator)
