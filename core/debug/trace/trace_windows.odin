@@ -29,7 +29,9 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 @(private="package")
 _locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
 	for line in locations {
-		delete(line.file_path, allocator)
+		if line.file_path != "??" && line.file_path != OOM_MARKER {
+			delete(line.file_path, allocator)
+		}
 		if line.procedure != "??" && line.procedure != OOM_MARKER {
 			delete(line.procedure, allocator)
 		}
@@ -98,7 +100,14 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		lineInfo.SizeOfStruct = size_of(lineInfo)
 		if win.SymGetLineFromAddrW64(process, win.DWORD64(bt[i]), &{}, &lineInfo) {
 			file_name, mem_err := win.wstring_to_utf8(lineInfo.FileName, len(lineInfo.FileName), allocator)
-			line.file_path = mem_err == nil ? file_name : OOM_MARKER
+			if mem_err != nil {
+				line.file_path = OOM_MARKER
+			} else if file_name == "??" {
+				delete(file_name, allocator)
+				line.file_path = "??"
+			} else {
+				line.file_path = file_name
+			}
 			line.line = i32(lineInfo.LineNumber)
 		} else {
 			location := strings.builder_make(allocator)

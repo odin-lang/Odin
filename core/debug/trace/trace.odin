@@ -160,6 +160,8 @@ print :: proc(locations: []Location, padding := "\t") {
 				fmt.eprintf("(%v", location.line)
 				if location.column > 0 {
 					fmt.eprintf(":%v)", location.column)
+				} else {
+					fmt.eprint(")")
 				}
 			} else when ODIN_ERROR_POS_STYLE == .Unix {
 				fmt.eprintf(":%v", location.line)

@@ -207,7 +207,7 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 	ALLOCATOR_MAX_BACKTRACES :: 16
 
 	for _, leak in t.allocation_map {
-		fmt.eprintfln("\x1b[31m%v leaked %m\x1b[0m", leak.location, leak.size)
+		fmt.eprintfln("%v leaked %m", leak.location, leak.size)
 
 		defer i += 1
 		if i > ALLOCATOR_MAX_BACKTRACES {
@@ -230,7 +230,7 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 
 	for bad_free, _ in t.bad_free_array {
 		fmt.eprintfln(
-			"\x1b[31m%v allocation %p was freed badly\x1b[0m",
+			"%v allocation %p was freed badly",
 			bad_free.location,
 			bad_free.memory,
 		)
