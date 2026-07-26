@@ -1,77 +1,198 @@
+#+vet explicit-allocators
 package debug_trace
 
-import "base:intrinsics"
 import "base:runtime"
 
-Frame :: distinct uintptr
+import "core:io"
+import "core:os"
+import "core:sync"
 
-Frame_Location :: struct {
-	using loc: runtime.Source_Code_Location,
-	allocator: runtime.Allocator,
+// Size of a constant backtrace, as used by the tracking allocator for example.
+BACKTRACE_SIZE :: #config(ODIN_TRACE_SIZE, 16)
+
+/*
+Use the instrumentation based trace mode, instead of debug info based.
+This mode has a little bit of runtime performance impact, but is supported on all targets.
+*/
+INSTRUMENTATION_MODE :: #config(ODIN_TRACE_INSTRUMENTATION_MODE, false)
+
+/*
+When using the instrumentation mode, but you also want to use Odin's instrumentation features
+for something else. You can define this, and call this package's instrumentation procedures:
+`instrumentation_enter`, and `instrumentation_exit`, in your own instrumentation enter/exit procedures.
+*/
+CUSTOM_INSTRUMENTATION :: #config(ODIN_TRACE_CUSTOM_INSTRUMENTATION, false)
+
+/*
+The path/command to invoke for symbolization.
+Linux only.
+*/
+SYMBOLIZER_PROGRAM :: #config(ODIN_TRACE_SYMBOLIZER_PROGRAM, "addr2line")
+
+// The string that is used when allocation failed for a symbol/file path.
+OOM_MARKER :: "??OOM"
+
+Capture :: []Capture_Entry
+
+Capture_Const :: struct {
+	trace: [BACKTRACE_SIZE]Capture_Entry,
+	len:   int,
 }
 
-delete_frame_location :: proc(fl: Frame_Location) -> runtime.Allocator_Error {
-	allocator := fl.allocator
-	delete(fl.loc.procedure, allocator) or_return
-	delete(fl.loc.file_path, allocator) or_return
-	return nil
+// Platform specific.
+Capture_Entry :: distinct _Capture_Entry
+
+/*
+Capture a constantly sized trace (defined by `-define:ODIN_TRACE_SIZE`).
+
+The trace starts at the stack frame that called this procedure,
+you can start higher up the stack using the `skip` argument.
+*/
+capture :: #force_no_inline proc(skip := 0) -> (bt: Capture_Const) {
+	bt.len = _capture(bt.trace[:], skip)
+	return
 }
 
-Context :: struct {
-	in_resolve: bool, // atomic
-	impl: _Context,
+/*
+Capture must be deleted by the caller.
+*/
+
+/*
+Capture a trace of the given size.
+
+The trace starts at the stack frame that called this procedure,
+you can start higher up the stack using the `skip` argument.
+
+The capture must be deleted by the caller.
+*/
+capture_n :: #force_no_inline proc(max_len: i32, skip := 0, allocator := context.allocator) -> Capture {
+	bt := make([]Capture_Entry, max_len, allocator)
+	n  := _capture(bt[:], skip)
+	return bt[:n]
 }
 
-init :: proc(ctx: ^Context) -> bool {
-	return _init(ctx)
+/*
+Capture a trace into the given preallocated capture buffer (owned by the caller).
+
+The trace starts at the stack frame that called this procedure,
+you can start higher up the stack using the `skip` argument.
+*/
+capture_fill :: #force_no_inline proc(buf: Capture, skip := 0) -> int {
+	return _capture(buf, skip)
 }
 
-destroy :: proc(ctx: ^Context) -> bool {
-	return _destroy(ctx)
+Resolve_Error :: enum {
+	None,
+	Allocator_Error,
+	Parse_Address_Failed,
+	Resolve_Aborted,
+	Resolve_Failed,
 }
 
-@(require_results)
-frames :: proc(ctx: ^Context, skip: uint, frames_buffer: []Frame) -> []Frame {
-	return _frames(ctx, skip, frames_buffer)
+Location :: runtime.Source_Code_Location
+
+/*
+Resolve the back trace into source code locations, if possible.
+
+Compile with `-debug` (or use `-define:ODIN_TRACE_INSTRUMENTATION_MODE`) for the most useful information.
+
+The result must be destroyed using `locations_destroy`.
+*/
+resolve :: proc {
+	resolve_n,
+	resolve_const,
 }
 
-@(require_results)
-resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> (result: Frame_Location) {
-	return _resolve(ctx, frame, allocator)
+/*
+See the procedure group `resolve`.
+*/
+resolve_n :: proc(bt: Capture, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
+	return _resolve(bt, allocator, temp_allocator)
 }
 
-
-@(require_results)
-in_resolve :: proc "contextless" (ctx: ^Context) -> bool {
-	return intrinsics.atomic_load(&ctx.in_resolve)
+/*
+See the procedure group `resolve`.
+*/
+resolve_const :: proc(bt: Capture_Const, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
+	bt := bt
+	return _resolve(bt.trace[:bt.len], allocator, temp_allocator)
 }
 
-_format_hex :: proc(buf: []byte, val: uintptr, allocator: runtime.Allocator) -> int {
-	_digits := "0123456789abcdef"
+locations_destroy :: proc(locations: []Location, allocator := context.allocator) {
+	_locations_destroy(locations, allocator)
+}
 
-	shift := (size_of(uintptr) * 8) - 4
-	offs := 0
+/*
+An assertion failure procedure that prints a back trace.
 
-	for shift >= 0 {
-		d := (val >> uint(shift)) & 0xf
-		buf[offs] = _digits[d]
-		shift -= 4
-		offs += 1
+Example:
+	context.assertion_failure_proc = trace.assertion_failure_proc
+	assert(false)
+*/
+assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
+	{
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+		lines, err := resolve(capture(skip=1), context.temp_allocator, context.temp_allocator)
+		if err != nil {
+			os.write_string(os.stderr, "could not get backtrace for assertion failure\n")
+		} else {
+			os.write_string(os.stderr, "[back trace]\n")
+			print(lines)
+			locations_destroy(lines, context.temp_allocator)
+		}
 	}
 
-	return offs
+	runtime.default_assertion_failure_proc(prefix, message, loc)
 }
 
-_format_missing_proc :: proc(addr: uintptr, allocator: runtime.Allocator) -> string {
-	PREFIX :: "proc:0x"
-	buf, buf_err := make([]byte, len(PREFIX) + 16, allocator)
-	copy(buf, PREFIX)
+/*
+Print/writes locations.
 
-	if buf_err != nil {
-		return "OUT_OF_MEMORY"
+Inputs:
+- locations: the result of a `resolve` call.
+- padding:   padding to print before each line, defaults to a tab.
+- w:         the writer to print to, defaults to stderr.
+*/
+print :: proc(locations: []Location, padding := "\t", w: Maybe(io.Writer) = nil) {
+	w := w.? or_else os.to_writer(os.stderr)
+
+	for location, i in locations {
+		io.write_string(w, padding)
+		io.write_byte(w, '#')
+		io.write_int(w, i)
+		io.write_string(w, " ")
+		io.write_string(w, location.procedure)
+		io.write_string(w, " at ")
+		io.write_string(w, location.file_path)
+
+		if location.line > 0 {
+			when ODIN_ERROR_POS_STYLE == .Default {
+				io.write_byte(w, '(')
+				io.write_int(w, int(location.line))
+				if location.column > 0 {
+					io.write_byte(w, ':')
+					io.write_int(w, int(location.column))
+				}
+				io.write_byte(w, ')')
+			} else when ODIN_ERROR_POS_STYLE == .Unix {
+				io.write_byte(w, ':')
+				io.write_int(w, int(location.line))
+				if location.column > 0 {
+					io.write_byte(w, ':')
+					io.write_int(w, int(location.column))
+				}
+			} else {
+				#panic("unhandled ODIN_ERROR_POS_STYLE")
+			}
+		}
+
+		io.write_byte(w, '\n')
 	}
-
-	offs := len(PREFIX)
-	offs += _format_hex(buf[offs:], uintptr(addr), allocator)
-	return string(buf[:offs])
 }
+
+/*
+The dbghelp library of win32 is not thread safe, this library uses this mutex to get exclusive access.
+It is provided in case you want to use the dbghelp library, and want to coordinate access with this package.
+*/
+_win32_dbghelp_mutex: sync.Mutex

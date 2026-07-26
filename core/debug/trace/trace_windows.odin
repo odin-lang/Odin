@@ -1,69 +1,114 @@
-#+private
-#+build windows
+#+vet explicit-allocators
+#+private file
 package debug_trace
 
-import "base:intrinsics"
-import "base:runtime"
+@require import     "base:runtime"
 
-import win32 "core:sys/windows"
+@require import     "core:strings"
+@require import     "core:sync"
+@require import win "core:sys/windows"
 
-_Context :: struct {
-	hProcess: win32.HANDLE,
-	lock:     win32.SRWLOCK,
-}
+when !INSTRUMENTATION_MODE {
 
-_init :: proc "contextless" (ctx: ^Context) -> (ok: bool) {
-	defer if !ok { _destroy(ctx) }
-	ctx.impl.hProcess = win32.GetCurrentProcess()
-	win32.SymInitialize(ctx.impl.hProcess, nil, true) or_return
-	win32.SymSetOptions(win32.SYMOPT_LOAD_LINES)
-	return true
-}
+@(private="package")
+_Capture_Entry :: uintptr
 
-_destroy :: proc "contextless" (ctx: ^Context) -> bool {
-	if ctx != nil {
-		win32.SymCleanup(ctx.impl.hProcess)
-	}
-	return true
-}
+@(private="package")
+_capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
+	frame_count := win.RtlCaptureStackBackTrace(u32(skip)+2, u32(len(buf)), ([^]rawptr)(raw_data(buf)), nil)
 
-_frames :: proc "contextless" (ctx: ^Context, skip: uint, frames_buffer: []Frame) -> []Frame {
-	frame_count := win32.RtlCaptureStackBackTrace(u32(skip) + 2, u32(len(frames_buffer)), ([^]rawptr)(&frames_buffer[0]), nil)
-	for i in 0..<frame_count {
+	for &frame in buf[:frame_count] {
 		// NOTE: Return address is one after the call instruction so subtract a byte to
 		// end up back inside the call instruction which is needed for SymFromAddr.
-		frames_buffer[i] -= 1
+		frame -= 1
 	}
-	return frames_buffer[:frame_count]
+
+	return int(frame_count)
 }
 
+@(private="package")
+_locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
+	for line in locations {
+		delete(line.file_path, allocator)
+		if line.procedure != "??" && line.procedure != OOM_MARKER {
+			delete(line.procedure, allocator)
+		}
+	}
+	delete(locations, allocator)
+}
 
-_resolve :: proc(ctx: ^Context, frame: Frame, allocator: runtime.Allocator) -> (fl: Frame_Location) {
-	intrinsics.atomic_store(&ctx.in_resolve, true)
-	defer intrinsics.atomic_store(&ctx.in_resolve, false)
+@(private="package")
+_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
+	mem_err: runtime.Allocator_Error
+	out, mem_err = make([]Location, len(bt), allocator)
+	if mem_err != nil { return nil, .Allocator_Error }
 
-	// NOTE(bill): Dbghelp is not thread-safe
-	win32.AcquireSRWLockExclusive(&ctx.impl.lock)
-	defer win32.ReleaseSRWLockExclusive(&ctx.impl.lock)
+	defer if err != nil { _locations_destroy(out, allocator) }
 
-	data: [size_of(win32.SYMBOL_INFOW) + size_of([256]win32.WCHAR)]byte
-	symbol := (^win32.SYMBOL_INFOW)(&data[0])
+	// Debug info is needed, if we call with out-of-date debug symbols it will return out-of-date info, so better to short-circuit right away.
+	when !ODIN_DEBUG {
+		for &location, i in locations {
+			location.file_path = "??"
+
+			builder := strings.builder_make(allocator)
+			strings.write_string(&builder, "0x")
+			strings.write_i64   (&builder, i64(bt[i]), 16)
+			location.procedure = strings.to_string(builder)
+		}
+		return
+	}
+
+	process := win.GetCurrentProcess()
+
+	sync.guard(&_win32_dbghelp_mutex)
+
+	if !win.SymInitialize(process, nil, true) {
+		err = .Resolve_Aborted
+		return
+	}
+	defer win.SymCleanup(process)
+
+	win.SymSetOptions(win.SYMOPT_LOAD_LINES|win.SYMOPT_DEFERRED_LOADS)
+
+	data: [size_of(win.SYMBOL_INFOW) + size_of([256]win.WCHAR)]byte
+	symbol := (^win.SYMBOL_INFOW)(&data[0])
 	// The value of SizeOfStruct must be the size of the whole struct,
 	// not just the size of the pointer
 	symbol.SizeOfStruct = size_of(symbol^)
 	symbol.MaxNameLen = 255
-	if win32.SymFromAddrW(ctx.impl.hProcess, win32.DWORD64(frame), &{}, symbol) {
-		fl.procedure, _ = win32.wstring_to_utf8(cstring16(&symbol.Name[0]), -1, allocator)
-	} else {
-		fl.procedure = _format_missing_proc(uintptr(frame), allocator)
-	}
 
-	line: win32.IMAGEHLP_LINE64
-	line.SizeOfStruct = size_of(line)
-	if win32.SymGetLineFromAddrW64(ctx.impl.hProcess, win32.DWORD64(frame), &{}, &line) {
-		fl.file_path, _ = win32.wstring_to_utf8(line.FileName, -1, allocator)
-		fl.line = i32(line.LineNumber)
+	for &line, i in out {
+		if win.SymFromAddrW(process, win.DWORD64(bt[i]), nil, symbol) {
+			symbol, mem_err := win.wstring_to_utf8(cstring16(&symbol.Name[0]), int(symbol.NameLen), allocator)
+			if mem_err != nil {
+				line.procedure = OOM_MARKER 
+			} else if symbol == "??" {
+				delete(symbol, allocator)
+				line.procedure = "??"
+			} else {
+				line.procedure = symbol
+			}
+		} else {
+			line.procedure = "??"
+		}
+
+		lineInfo: win.IMAGEHLP_LINE64
+		lineInfo.SizeOfStruct = size_of(lineInfo)
+		if win.SymGetLineFromAddrW64(process, win.DWORD64(bt[i]), &{}, &lineInfo) {
+			line.file_path, mem_err = win.wstring_to_utf8(lineInfo.FileName, len(lineInfo.FileName), allocator)
+			if mem_err != nil {
+				line.file_path = OOM_MARKER
+			}
+			line.line = i32(lineInfo.LineNumber)
+		} else {
+			location := strings.builder_make(allocator)
+			strings.write_string(&location, "0x")
+			strings.write_i64   (&location, i64(bt[i]), 16)
+			line.file_path = strings.to_string(location)
+		}
 	}
 
 	return
 }
+
+} // INSTRUMENTATION_MODE

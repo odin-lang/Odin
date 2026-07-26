@@ -1,51 +1,40 @@
 /*
-Stack trace library. Only works when debug symbols are enabled using `-debug`.
+Captures and resolves stack traces for debugging purpose.
 
 Example:
-	import "base:runtime"
-	import "core:debug/trace"
+	package main
 
+	import "core:debug/trace"
 	import "core:fmt"
 
-	global_trace_ctx: trace.Context
-
-	debug_trace_assertion_failure_proc :: proc(prefix, message: string, loc := #caller_location) -> ! {
-		runtime.print_caller_location(loc)
-		runtime.print_string(" ")
-		runtime.print_string(prefix)
-		if len(message) > 0 {
-			runtime.print_string(": ")
-			runtime.print_string(message)
-		}
-		runtime.print_byte('\n')
-
-		ctx := &global_trace_ctx
-		if !trace.in_resolve(ctx) {
-			buf: [64]trace.Frame
-			runtime.print_string("Debug Trace:\n")
-			frames := trace.frames(ctx, 1, buf[:])
-			for f, i in frames {
-				fl := trace.resolve(ctx, f, context.temp_allocator)
-				if fl.loc.file_path == "" && fl.loc.line == 0 {
-					continue
-				}
-				runtime.print_caller_location(fl.loc)
-				runtime.print_string(" - frame ")
-				runtime.print_int(i)
-				runtime.print_byte('\n')
-			}
-		}
-		runtime.trap()
-	}
-
 	main :: proc() {
-		trace.init(&global_trace_ctx)
-		defer trace.destroy(&global_trace_ctx)
+		track: trace.Tracking_Allocator
+		trace.tracking_allocator_init(&track, context.allocator)
+		defer trace.tracking_allocator_destroy(&track)
 
-		context.assertion_failure_proc = debug_trace_assertion_failure_proc
+		context.allocator = trace.tracking_allocator(&track)
+		defer trace.tracking_allocator_print_results(&track)
 
-		...
+		context.assertion_failure_proc = trace.assertion_failure_proc
+
+		_main()
 	}
 
+	_main :: proc() {
+		// Uncomment to try tracking allocator.
+		// for _ in 0..<5 {
+		// 	_ = new(int)
+		// 	free(rawptr(uintptr(100)))
+		// }
+
+		// Uncomment to try assertion failure handling.
+		// assert(false)
+
+		capture := trace.capture()
+		locations, err := trace.resolve(capture)
+		if err != nil { fmt.eprintfln("trace error: %v", err) }
+		defer trace.locations_destroy(locations)
+		trace.print(locations)
+	}
 */
 package debug_trace
