@@ -6586,6 +6586,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags)
 			error_line("\tusing-stmt\n");
 			error_line("\tusing-param\n");
 			error_line("\tstyle\n");
+			error_line("\textra\n");
 			error_line("\tsemicolon\n");
 			error_line("\tdeprecated\n");
 			error_line("\tcast\n");
