@@ -38,7 +38,10 @@ Example:
 
 		capture := trace.capture()
 		locations, err := trace.resolve(capture)
-		if err != nil { fmt.eprintfln("trace error: %v", err) }
+		if err != nil {
+			fmt.eprintfln("trace error: %v", err)
+			return
+		}
 		defer trace.locations_destroy(locations)
 		trace.print(locations)
 	}

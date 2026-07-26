@@ -85,7 +85,6 @@ Resolve_Error :: enum {
 	Allocator_Error,
 	Parse_Address_Failed,
 	Resolve_Aborted,
-	Resolve_Failed,
 }
 
 Location :: runtime.Source_Code_Location

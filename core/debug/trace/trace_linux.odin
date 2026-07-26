@@ -73,7 +73,8 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 
 	// Debug info is needed.
 	when !ODIN_DEBUG {
-		return fallback_to_unresolved(locations, msgs, allocator)
+		fill_unresolved(locations, msgs, allocator)
+		return
 	}
 
 	i := 0
@@ -82,7 +83,8 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	defer delete(command)
 
 	if _, err := append(&command, SYMBOLIZER_PROGRAM, "--functions", "--exe", ""); err != nil {
-		return fallback_to_unresolved(locations, msgs, allocator)
+		fill_unresolved(locations, msgs, allocator)
+		return
 	}
 
 	COMMAND_EXE_POS   :: 3
@@ -100,7 +102,8 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		}
 
 		if _, err := append(&command, addr); err != nil {
-			return fallback_to_unresolved(locations, msgs, allocator)
+			fill_unresolved(locations, msgs, allocator)
+			return
 		}
 	}
 
@@ -119,7 +122,7 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		return clone
 	}
 
-	fallback_to_unresolved :: proc(locations: []Location, msgs: []cstring, allocator: runtime.Allocator) -> ([]Location, Resolve_Error) {
+	fill_unresolved :: proc(locations: []Location, msgs: []cstring, allocator: runtime.Allocator) {
 		for msg, i in msgs {
 			exe, address, parse_err := parse_address(msg)
 			if parse_err != nil {
@@ -134,8 +137,6 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 				procedure = clone_or_oom_marker(address, allocator),
 			}
 		}
-
-		return locations, nil
 	}
 
 	// Parses the exe and address out of a backtrace line.
@@ -156,7 +157,15 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		defer delete(stdout, temp_allocator)
 		defer delete(stderr, temp_allocator)
 
-		if perr != nil || !state.success { return 0, .Resolve_Failed }
+		// `SYMBOLIZER_PROGRAM` does not exist, lets fall back to unresolved info.
+		if perr == .Not_Exist {
+			fill_unresolved(locations, msgs, allocator)
+			return
+		}
+
+		if perr != nil || !state.success {
+			return 0, .Resolve_Aborted
+		}
 
 		count := len(command)-COMMAND_START_LEN
 
@@ -202,8 +211,7 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	}
 
 	process_line :: proc(line: string, ok: bool) -> (string, Resolve_Error) {
-		if !ok        { return "", .Resolve_Aborted }
-		if line == "" { return "", .Resolve_Failed  }
+		if !ok || line == "" { return "", .Resolve_Aborted }
 		return strings.trim_right_space(line), nil
 	}
 }
