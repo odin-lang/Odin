@@ -3,8 +3,7 @@ package debug_trace
 
 import "base:runtime"
 
-import "core:io"
-import "core:os"
+import "core:fmt"
 import "core:sync"
 
 // Size of a constant backtrace, as used by the tracking allocator for example.
@@ -135,9 +134,9 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 
 		lines, err := resolve(capture(skip=1), context.temp_allocator, context.temp_allocator)
 		if err != nil {
-			os.write_string(os.stderr, "could not get backtrace for assertion failure\n")
+			fmt.eprintfln("could not get backtrace for assertion failure: %v", err)
 		} else {
-			os.write_string(os.stderr, "[back trace]\n")
+			fmt.eprintfln("[back trace]")
 			print(lines)
 			locations_destroy(lines, context.temp_allocator)
 		}
@@ -147,47 +146,32 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 }
 
 /*
-Print/writes locations.
+Print locations to stderr.
 
 Inputs:
 - locations: the result of a `resolve` call.
 - padding:   padding to print before each line, defaults to a tab.
-- w:         the writer to print to, defaults to stderr.
 */
-print :: proc(locations: []Location, padding := "\t", w: Maybe(io.Writer) = nil) {
-	w := w.? or_else os.to_writer(os.stderr)
-
+print :: proc(locations: []Location, padding := "\t") {
 	for location, i in locations {
-		io.write_string(w, padding)
-		io.write_byte(w, '#')
-		io.write_int(w, i)
-		io.write_string(w, " ")
-		io.write_string(w, location.procedure)
-		io.write_string(w, " at ")
-		io.write_string(w, location.file_path)
-
+		fmt.eprintf("%s#%v %v at %v", padding, i, location.procedure, location.file_path)
 		if location.line > 0 {
 			when ODIN_ERROR_POS_STYLE == .Default {
-				io.write_byte(w, '(')
-				io.write_int(w, int(location.line))
+				fmt.eprintf("(%v", location.line)
 				if location.column > 0 {
-					io.write_byte(w, ':')
-					io.write_int(w, int(location.column))
+					fmt.eprintf(":%v)", location.column)
 				}
-				io.write_byte(w, ')')
 			} else when ODIN_ERROR_POS_STYLE == .Unix {
-				io.write_byte(w, ':')
-				io.write_int(w, int(location.line))
+				fmt.eprintf(":%v", location.line)
 				if location.column > 0 {
-					io.write_byte(w, ':')
-					io.write_int(w, int(location.column))
+					fmt.eprintf(":%v", location.column)
 				}
 			} else {
 				#panic("unhandled ODIN_ERROR_POS_STYLE")
 			}
 		}
 
-		io.write_byte(w, '\n')
+		fmt.eprintln()
 	}
 }
 
