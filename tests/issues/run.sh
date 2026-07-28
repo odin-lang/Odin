@@ -65,6 +65,7 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN test ../test_issue_6419.odin $COMMON
 $ODIN test ../test_pr_6470.odin $COMMON
 if [[ $($ODIN test ../test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
 	echo "SUCCESSFUL 1/1"
