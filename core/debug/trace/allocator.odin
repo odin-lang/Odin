@@ -7,8 +7,6 @@ import "core:fmt"
 import "core:mem"
 import "core:sync"
 
-// TODO: should this just be added to `core:mem.Tracking_Allocator`?
-
 /*
 The backtrace tracking allocator is a similar allocator as the `core:mem` tracking allocator but keeps
 backtraces for each allocation.
