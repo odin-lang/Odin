@@ -1,7 +1,7 @@
 package test_internal
 
 import "core:log"
-import "base:intrinsics"
+import "base:runtime"
 import "core:math/rand"
 import "core:testing"
 
@@ -198,6 +198,41 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 			}
 		}
 		seed_incr += 1
+	}
+}
+
+@test
+map_shrink :: proc(t: ^testing.T) {
+	m: map[int]int
+	defer delete(m)
+
+	{
+		reserve(&m, 8)
+		did_shrink, err := shrink(&m)
+		testing.expect_value(t, did_shrink, false)
+		testing.expect_value(t, err, runtime.Allocator_Error.None)
+		testing.expect_value(t, cap(m), 8)
+	}
+
+	{
+		reserve(&m, 64)
+		did_shrink, err := shrink(&m)
+		testing.expect_value(t, did_shrink, true)
+		testing.expect_value(t, err, runtime.Allocator_Error.None)
+		testing.expect_value(t, cap(m), 8)
+	}
+
+	{
+		reserve(&m, 128)
+
+		for i in 0 ..< 50 {
+			m[i] = i
+		}
+
+		did_shrink, err := shrink(&m)
+		testing.expect_value(t, did_shrink, false)
+		testing.expect_value(t, err, runtime.Allocator_Error.None)
+		testing.expect_value(t, cap(m), 128)
 	}
 }
 
