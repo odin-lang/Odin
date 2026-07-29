@@ -6735,8 +6735,11 @@ gb_internal bool consume_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap 
 		// This is prevent any possible race conditions in evaluation when multithreaded
 		// NOTE(bill): In single threaded mode, this should never happen
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-			check_procedure_later(c, pi);
-			return false;
+			Type *pt = base_type(parent->type);
+			if (!pt->Proc.is_polymorphic || pt->Proc.is_poly_specialized) {
+				check_procedure_later(c, pi);
+				return false;
+			}
 		}
 	}
 	if (untyped) {
@@ -6770,8 +6773,11 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 		// This is prevent any possible race conditions in evaluation when multithreaded
 		// NOTE(bill): In single threaded mode, this should never happen
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-			thread_pool_add_task(check_proc_info_worker_proc, pi);
-			return 1;
+			Type *pt = base_type(parent->type);
+			if (!pt->Proc.is_polymorphic || pt->Proc.is_poly_specialized) {
+				thread_pool_add_task(check_proc_info_worker_proc, pi);
+				return 1;
+			}
 		}
 	}
 	map_clear(untyped);
