@@ -12291,6 +12291,14 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 	case_ast_node(i, Ident, node);
 		check_ident(c, o, node, nullptr, type_hint, false);
+		{
+			Entity *entity = node->Ident.entity;
+			if (entity != nullptr && entity->kind == Entity_Label) {
+				String name = entity->token.string;
+				error(node, "'%.*s' is a label and cannot be used as an expression", LIT(name));
+				o->mode = Addressing_Invalid;
+			}
+		}
 	case_end;
 
 	case_ast_node(u, Uninit, node);

@@ -393,7 +393,7 @@ _append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_broa
 		return 0, nil
 	}
 
-	if cap(array) <= len(array) + 1 {
+	if cap(array) < len(array) + 1 {
 		// Same behavior as append_soa_elems but there's only one arg, so we always just add DEFAULT_DYNAMIC_ARRAY_CAPACITY.
 		cap := 2 * cap(array) + DEFAULT_DYNAMIC_ARRAY_CAPACITY
 		err = _reserve_soa(array, cap, zero_memory, loc) // do not 'or_return' here as it could be a partial success
@@ -456,7 +456,7 @@ _append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, zero_memory: bool, #no_bro
 		return
 	}
 
-	if cap(array) <= len(array)+arg_len {
+	if cap(array) < len(array)+arg_len {
 		cap := 2 * cap(array) + max(DEFAULT_DYNAMIC_ARRAY_CAPACITY, arg_len)
 		err = _reserve_soa(array, cap, zero_memory, loc) // do not 'or_return' here as it could be a partial success
 	}
