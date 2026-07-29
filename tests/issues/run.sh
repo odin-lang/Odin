@@ -90,6 +90,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN build ../test_issue_7073-1.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o
 $ODIN test ../test_issue_7010.odin $COMMON
 

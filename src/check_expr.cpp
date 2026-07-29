@@ -2996,6 +2996,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 		if (!o->type) {
 			return;
 		}
+		if (o->mode == Addressing_Type) {
+			gbString type_str = type_to_string(o->type);
+			error(node, "Cannot apply '**' to a type '%s', the operand must be a value of struct or array type", type_str);
+			gb_string_free(type_str);
+		}
 
 		Type *type = base_type(o->type);
 		if (!is_type_struct(type) && !is_type_array(type)) {
