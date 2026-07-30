@@ -640,7 +640,7 @@ gb_internal gb_inline f64 gb_sqrt(f64 x) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 
-gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, wchar_t **_after_double_dash_raw) {
+gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, isize *_double_dash_pos, wchar_t **_after_double_dash_raw) {
 	u32 i, j;
 
 	u32 len = cast(u32)string16_len(cast(u16 *)cmd_line);
@@ -650,6 +650,7 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, wchar
 	wchar_t *_argv = cast(wchar_t *)((cast(u8 *)argv)+i);
 
 	wchar_t *after_double_dash_raw = nullptr;
+	isize double_dash_pos = -1;
 
 	u32 argc = 0;
 	argv[argc] = _argv;
@@ -660,12 +661,13 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, wchar
 	j = 0;
 
 	auto const check_double_dash = [&]() {
-		if (!after_double_dash_raw &&
+		if (double_dash_pos == -1 &&
 			argc >= 1 &&
 			argv[argc - 1][0] == '-' &&
 			argv[argc - 1][1] == '-' &&
 			argv[argc - 1][2] == '\0') {
 
+			double_dash_pos = argc - 1;
 			after_double_dash_raw = cmd_line + i;
 		}
 	};
@@ -718,6 +720,7 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, wchar
 	check_double_dash();
 
 	if (_argc) *_argc = argc;
+	if (_double_dash_pos) *_double_dash_pos = double_dash_pos;
 	if (_after_double_dash_raw) *_after_double_dash_raw = after_double_dash_raw;
 	return argv;
 }

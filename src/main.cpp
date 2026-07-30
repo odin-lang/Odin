@@ -296,12 +296,12 @@ gb_internal bool system_exec_command_line_app_output(char const *command, gbStri
 	return true;
 }
 
-gb_internal Array<String> setup_args(int argc, char const **argv, wchar_t **after_double_dash_raw) {
+gb_internal Array<String> setup_args(int argc, char const **argv, isize *double_dash_pos, wchar_t **after_double_dash_raw) {
 	gbAllocator a = heap_allocator();
 
 #if defined(GB_SYSTEM_WINDOWS)
 	int wargc = 0;
-	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc, after_double_dash_raw);
+	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc, double_dash_pos, after_double_dash_raw);
 	auto args = array_make<String>(a, 0, wargc);
 	for (isize i = 0; i < wargc; i++) {
 		u16 *warg = cast(u16 *)wargv[i];
@@ -310,6 +310,8 @@ gb_internal Array<String> setup_args(int argc, char const **argv, wchar_t **afte
 		String arg = string16_to_string(a, wstr);
 		if (arg.len > 0) {
 			array_add(&args, arg);
+		} else if (double_dash_pos && *double_dash_pos > 0 && args.count < *double_dash_pos) {
+			*double_dash_pos -= 1;
 		}
 	}
 	return args;
@@ -3803,8 +3805,9 @@ int main(int arg_count, char const **arg_ptr) {
 	
 	init_build_context_error_pos_style();
 
+	isize double_dash_pos = -1;
 	wchar_t *after_double_dash_raw = nullptr;
-	Array<String> args = setup_args(arg_count, arg_ptr, &after_double_dash_raw);
+	Array<String> args = setup_args(arg_count, arg_ptr, &double_dash_pos, &after_double_dash_raw);
 #if !defined(GB_SYSTEM_WINDOWS)
 	Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 	defer (array_free(&run_args));
@@ -3814,9 +3817,11 @@ int main(int arg_count, char const **arg_ptr) {
 	String init_filename = {};
 	isize  last_non_run_arg = args.count;
 
-	isize double_dash_pos = -1;
 	for_array(i, args) {
 		if (args[i] == "--") {
+#if defined(GB_SYSTEM_WINDOWS)
+			GB_ASSERT(double_dash_pos == i);
+#endif
 			double_dash_pos = i;
 			break;
 		}
