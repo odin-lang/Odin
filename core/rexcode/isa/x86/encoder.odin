@@ -740,7 +740,7 @@ encode :: proc(
 			case .IW:
 				if user_op.kind == .IMMEDIATE {
 					v := u16(user_op.immediate)
-					out[pos=0] = u8(v)
+					out[pos+0] = u8(v)
 					out[pos+1] = u8(v >> 8)
 					pos += 2
 				}
