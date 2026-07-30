@@ -3805,8 +3805,10 @@ int main(int arg_count, char const **arg_ptr) {
 
 	wchar_t *after_double_dash_raw = nullptr;
 	Array<String> args = setup_args(arg_count, arg_ptr, &after_double_dash_raw);
+#if !defined(GB_SYSTEM_WINDOWS)
 	Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 	defer (array_free(&run_args));
+#endif
 
 	String command = args[1];
 	String init_filename = {};
@@ -3867,9 +3869,11 @@ int main(int arg_count, char const **arg_ptr) {
 				return 1;
 			}
 
+#if !defined(GB_SYSTEM_WINDOWS)
 			for(isize i = double_dash_pos+1; i < args.count; ++i) {
 				array_add(&run_args, args[i]);
 			}
+#endif
 		}
 		args = array_slice(args, 0, last_non_run_arg);
 
