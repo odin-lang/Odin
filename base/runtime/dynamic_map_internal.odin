@@ -524,15 +524,6 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 @(require_results)
 map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
-	@(require_results)
-	ceil_log2 :: #force_inline proc "contextless" (x: uintptr) -> uintptr {
-		z := intrinsics.count_leading_zeros(x)
-		if z > 0 && x & (x-1) != 0 {
-			z -= 1
-		}
-		return size_of(uintptr)*8 - 1 - z
-	}
-
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
 	}
@@ -545,7 +536,7 @@ map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_
 	}
 
 	// ceiling nearest power of two
-	log2_new_capacity := ceil_log2(new_capacity)
+	log2_new_capacity := __ceil_log2(new_capacity)
 
 	log2_min_cap := max(MAP_MIN_LOG2_CAPACITY, log2_new_capacity)
 
@@ -592,19 +583,23 @@ map_shrink_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_a
 		m.allocator = context.allocator
 	}
 
-	log2_capacity := map_log2_cap(m^)
 	// Don't shrink below the minimum.
+	log2_capacity := map_log2_cap(m^)
 	if log2_capacity <= MAP_MIN_LOG2_CAPACITY {
 		return false, nil
 	}
+
 	// Cannot shrink the capacity if the number of items in the map would exceed
 	// one minus the current log2 capacity's resize threshold. That is the shrunk
 	// map needs to be within the max load factor.
-	if uintptr(m.len) >= map_load_factor(log2_capacity - 1) {
+	load_factor := map_load_factor(log2_capacity - 1)
+	if m.len >= load_factor {
 		return false, nil
 	}
 
-	shrunk := map_alloc_dynamic(info, log2_capacity - 1, m.allocator) or_return
+	log2_capacity = max(__ceil_log2(m.len), MAP_MIN_LOG2_CAPACITY)
+
+	shrunk := map_alloc_dynamic(info, log2_capacity, m.allocator) or_return
 
 	capacity := uintptr(1) << log2_capacity
 
@@ -914,7 +909,6 @@ __dynamic_map_entry :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 	return
 }
 
-
 // IMPORTANT: USED WITHIN THE COMPILER
 @(private)
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) -> Allocator_Error {
@@ -924,7 +918,20 @@ __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Ma
 	return map_reserve_dynamic(m, info, uintptr(new_capacity), loc)
 }
 
+@(require_results, private)
+__ceil_log2 :: #force_inline proc "contextless" (x: uintptr) -> uintptr {
+	// NOTE(barney): log2(0) is undefined, but 0 is a reasonable return value.
+	// Alternatively, 8 could be considered as well.
+	if x == 0 {
+		return 0
+	}
 
+	z := intrinsics.count_leading_zeros(x)
+	if z > 0 && x & (x-1) != 0 {
+		z -= 1
+	}
+	return size_of(uintptr)*8 - 1 - z
+}
 
 // NOTE: the default hashing algorithm derives from fnv64a, with some minor modifications to work for `map` type:
 //
