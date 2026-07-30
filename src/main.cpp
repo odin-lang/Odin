@@ -537,6 +537,27 @@ gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, Str
 	array_add(build_flags, flag);
 }
 
+// A value such as `1e-5` is a float, not an integer. Base prefixed literals are excluded because
+// `e` is a valid digit in bases 16 and above, e.g. `0x1e`.
+gb_internal bool build_param_looks_like_float(String const &param) {
+	if (string_contains_char(param, '.')) {
+		return true;
+	}
+	isize i = 0;
+	if (param.len > 0 && (param[0] == '-' || param[0] == '+')) {
+		i = 1;
+	}
+	if (param.len > i+1 && param[i] == '0' && !gb_char_is_digit(cast(char)param[i+1])) {
+		return false;
+	}
+	for (; i < param.len; i++) {
+		if (param[i] == 'e' || param[i] == 'E') {
+			return true;
+		}
+	}
+	return false;
+}
+
 gb_internal ExactValue build_param_to_exact_value(String name, String param) {
 	ExactValue value = {};
 
@@ -562,7 +583,7 @@ gb_internal ExactValue build_param_to_exact_value(String name, String param) {
 		Try to parse as an integer or float
 	*/
 	if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
-		if (string_contains_char(param, '.')) {
+		if (build_param_looks_like_float(param)) {
 			value = exact_value_float_from_string(param);
 		} else {
 			value = exact_value_integer_from_string(param);
