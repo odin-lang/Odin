@@ -72,9 +72,9 @@ get_environment_color :: proc() -> Color_Depth {
 
 @(init)
 init_terminal :: proc "contextless" () {
-	_init_terminal()
-
 	context = runtime.default_context()
+
+	_init_terminal()
 
 	// We respect `NO_COLOR` specifically as a color-disabler but not as a
 	// blanket ban on any terminal manipulation codes, hence why this comes

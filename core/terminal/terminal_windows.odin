@@ -18,6 +18,8 @@ old_modes: [2]struct{
 }
 
 _init_terminal :: proc "contextless" () {
+	context = runtime.default_context()
+
 	vtp_enabled: bool
 
 	for &v in old_modes {
@@ -41,8 +43,6 @@ _init_terminal :: proc "contextless" () {
 		// This color depth is available on Windows 10 since build 10586.
 		color_depth = .Four_Bit
 	} else {
-		context = runtime.default_context()
-
 		// The user may be on a non-default terminal emulator.
 		color_depth = get_environment_color()
 	}
