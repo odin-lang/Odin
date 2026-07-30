@@ -932,6 +932,17 @@ test_builtin_help_flag :: proc(t: ^testing.T) {
 	result = flags.parse(&s, args_normal[:])
 	_, ok = result.(flags.Help_Request)
 	testing.expectf(t, ok, "unexpected result: %v", result)
+
+	args_unix_short  := [?]string { "-h" }
+	args_unix_normal := [?]string { "--help" }
+
+	result = flags.parse(&s, args_unix_short[:], .Unix)
+	_, ok = result.(flags.Help_Request)
+	testing.expectf(t, ok, "unexpected result: %v", result)
+
+	result = flags.parse(&s, args_unix_normal[:], .Unix)
+	_, ok = result.(flags.Help_Request)
+	testing.expectf(t, ok, "unexpected result: %v", result)
 }
 
 // This test makes sure that if a positional argument is specified, it won't be
@@ -997,9 +1008,9 @@ test_unix :: proc(t: ^testing.T) {
 	S :: struct {
 		a: string,
 	}
-	s: S
 
 	{
+		s: S
 		args := [?]string { "--a", "hellope" }
 
 		result := flags.parse(&s, args[:], .Unix)
@@ -1008,19 +1019,45 @@ test_unix :: proc(t: ^testing.T) {
 	}
 
 	{
-		args := [?]string { "-a", "hellope", "--a", "world" }
+		s: S
+		args := [?]string { "--a=world" }
 
 		result := flags.parse(&s, args[:], .Unix)
 		testing.expect_value(t, result, nil)
 		testing.expect_value(t, s.a, "world")
 	}
+}
+
+@(test)
+test_unix_rejects_undeclared_short :: proc(t: ^testing.T) {
+	S :: struct {
+		a: string,
+	}
 
 	{
+		s: S
+		args := [?]string { "-a", "hellope" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		err, ok := result.(flags.Parse_Error)
+		testing.expectf(t, ok, "unexpected result: %v", result)
+		if ok {
+			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Missing_Flag)
+		}
+		testing.expect_value(t, s.a, "")
+	}
+
+	{
+		s: S
 		args := [?]string { "-a=hellope" }
 
 		result := flags.parse(&s, args[:], .Unix)
-		testing.expect_value(t, result, nil)
-		testing.expect_value(t, s.a, "hellope")
+		err, ok := result.(flags.Parse_Error)
+		testing.expectf(t, ok, "unexpected result: %v", result)
+		if ok {
+			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Missing_Flag)
+		}
+		testing.expect_value(t, s.a, "")
 	}
 }
 
@@ -1064,8 +1101,12 @@ test_unix_short :: proc(t: ^testing.T) {
 		args := [?]string { "-output", "single-dash-long" }
 
 		result := flags.parse(&s, args[:], .Unix)
-		testing.expect_value(t, result, nil)
-		testing.expect_value(t, s.output, "single-dash-long")
+		err, ok := result.(flags.Parse_Error)
+		testing.expectf(t, ok, "unexpected result: %v", result)
+		if ok {
+			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Missing_Flag)
+		}
+		testing.expect_value(t, s.output, "")
 	}
 }
 
@@ -1100,7 +1141,7 @@ test_unix_manifold_limited :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "-a", "11", "101", "-b", "3" }
+	args := [?]string { "--a", "11", "101", "--b", "3" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer delete(s.a)
@@ -1125,7 +1166,7 @@ test_unix_two_manifold_limited :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+	args := [?]string { "--a", "11", "101", "--b", "3", "7", "--c", "9" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
@@ -1158,7 +1199,7 @@ test_unix_two_manifold_string :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+	args := [?]string { "--a", "11", "101", "--b", "3", "7", "--c", "9" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
@@ -1176,10 +1217,10 @@ test_unix_two_manifold_string :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, s.a[0], "11")
 	testing.expect_value(t, s.a[1], "101")
-	testing.expect_value(t, s.a[2], "-b")
+	testing.expect_value(t, s.a[2], "--b")
 	testing.expect_value(t, s.a[3], "3")
 	testing.expect_value(t, s.a[4], "7")
-	testing.expect_value(t, s.a[5], "-c")
+	testing.expect_value(t, s.a[5], "--c")
 	testing.expect_value(t, s.a[6], "9")
 }
 
@@ -1194,7 +1235,7 @@ test_unix_two_manifold_int :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "-a", "11", "101", "-b", "3", "7", "-c", "9" }
+	args := [?]string { "--a", "11", "101", "--b", "3", "7", "--c", "9" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
@@ -1228,7 +1269,7 @@ test_unix_positional :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "-b", "17", "11" }
+	args := [?]string { "--b", "17", "11" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	testing.expect_value(t, result, nil)
@@ -1244,7 +1285,7 @@ test_unix_positional_with_manifold :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "35", "-v", "17", "11" }
+	args := [?]string { "35", "--v", "17", "11" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
@@ -1264,7 +1305,7 @@ test_unix_double_dash_varargs :: proc(t: ^testing.T) {
 	}
 	s: S
 
-	args := [?]string { "-i", "3", "--", "hellope", "-i", "5" }
+	args := [?]string { "--i", "3", "--", "hellope", "-i", "5" }
 
 	result := flags.parse(&s, args[:], .Unix)
 	defer {
