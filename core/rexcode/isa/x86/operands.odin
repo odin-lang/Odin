@@ -37,6 +37,11 @@ Memory :: bit_field u64 {
 	addr_size_override: bool | 1,
 	base_class:         u8   | 5,
 	index_class:        u8   | 5,
+	// When set, `disp` holds a label id (not a literal displacement): the
+	// encoder emits a REL32 relocation at the disp32's byte offset instead of
+	// the literal, so a RIP-relative operand can reference a label. Uses one of
+	// Memory's 4 spare bits -- no growth, and one bit-test on the hot path.
+	disp_is_label:      bool | 1,
 }
 
 @(require_results)
@@ -76,6 +81,10 @@ mem_make :: proc "contextless" (base: Register, index: Register, scale: u8, disp
 	}
 
 	mem.disp = disp
+	// Must be explicitly cleared: `mem` starts uninitialized (`= ---`) and the
+	// encoder reads this on the hot path -- garbage here would spuriously turn a
+	// literal displacement into a label reference. mem_rip_label sets it after.
+	mem.disp_is_label = false
 
 	return mem
 }
@@ -150,6 +159,20 @@ mem_rip_disp :: #force_inline proc "contextless" (disp: i32) -> Memory {
 	return mem_make(RIP, NONE, 1, disp, NONE)
 }
 
+// RIP-relative memory operand whose displacement references a label rather than
+// a literal. The encoder writes a placeholder disp32 and emits a REL32
+// relocation for `label_id` at that field's byte offset -- the native way to
+// express `lea reg, [rip + <label>]` (position-independent data addressing).
+// The relocation carries addend 0; any within-section offset is supplied by the
+// downstream object/JIT layer when it resolves the label.
+@(require_results)
+mem_rip_label :: #force_inline proc "contextless" (label_id: u32) -> Memory {
+	m := mem_make(RIP, NONE, 1, 0, NONE)
+	m.disp = i32(label_id)
+	m.disp_is_label = true
+	return m
+}
+
 // -----------------------------------------------------------------------------
 // SECTION: 2.5 Operand struct and Flags
 // -----------------------------------------------------------------------------
@@ -184,6 +207,10 @@ Operand_Flags :: bit_field u16 {
 	zeroing:   bool      | 1,      // merge (0) vs zero (1) masking
 	broadcast: Broadcast | 3, // broadcast mode (see Broadcast enum)
 	er_sae:    u8        | 2,         // embedded rounding / SAE (0=none, 1=RN-SAE, 2=RD-SAE, 3=RU-SAE/RZ-SAE)
+	// When set on a movabs (IQ) immediate operand, `Operand.immediate` holds a
+	// label id: the encoder writes a placeholder imm64 and emits an ABS64
+	// relocation at its byte offset. Uses one of Operand_Flags' spare bits.
+	imm_is_label: bool   | 1,
 }
 
 // -----------------------------------------------------------------------------
@@ -253,6 +280,16 @@ op_rel32 :: #force_inline proc "contextless" (offset: i32) -> Operand {
 @(require_results)
 op_label :: #force_inline proc "contextless" (label_id: u32, size: u8 = 4) -> Operand {
 	return Operand{relative = i64(label_id), kind = .RELATIVE, size = size}
+}
+
+// A movabs imm64 that references a label: the immediate stays kind .IMMEDIATE
+// (so form matching is unchanged) but is flagged as a label, so the encoder
+// emits an ABS64 relocation for it instead of a literal. Use for
+// `movabs reg, <label>` (absolute addressing; the target address is filled in
+// at relocation time).
+@(require_results)
+op_imm_label :: #force_inline proc "contextless" (label_id: u32) -> Operand {
+	return Operand{immediate = i64(label_id), kind = .IMMEDIATE, size = 8, flags = {imm_is_label = true}}
 }
 
 // -----------------------------------------------------------------------------
