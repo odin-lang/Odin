@@ -3370,6 +3370,153 @@ run_i386_tests :: proc() {
 }
 
 // =============================================================================
+// SECTION 11: LABEL ADDRESSING (RIP-relative disp + movabs imm)
+// =============================================================================
+//
+// Native label references for a memory displacement (REL32) and a movabs imm64
+// (ABS64) -- the encoder emits the same relocations it already does for
+// jump/call targets, so a RIP-relative `lea reg, [rip + <label>]` and an
+// absolute `movabs reg, <label>` can be expressed directly.
+
+read_i32_le :: proc(b: []u8, off: int) -> i32 {
+	return i32(u32(b[off]) | (u32(b[off+1]) << 8) | (u32(b[off+2]) << 16) | (u32(b[off+3]) << 24))
+}
+
+run_label_addressing_tests :: proc() {
+	before := g_stats.failed
+
+	// -- lea rax, [rip + L], L DEFINED: disp32 must resolve to L - end_of_lea ----
+	{
+		// insts: 0=lea rax,[rip+L]  1=ret  2=ret   L (id 0) at inst index 2.
+		insts := []x86.Instruction{
+			{mnemonic = .LEA, operand_count = 2, ops = {x86.op_reg(x86.RAX), x86.op_mem(x86.mem_rip_label(0), 8), {}, {}}},
+			x86.inst_none(.RET),
+			x86.inst_none(.RET),
+		}
+		labels := [1]x86.Label_Definition{x86.Label_Definition(2)} // L -> inst index 2
+		code: [64]u8
+		relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+		defer delete(relocs); defer delete(errs)
+
+		n, ok := x86.encode(insts, labels[:], code[:], &relocs, &errs, true, 0)
+		// lea rax,[rip+disp32] = 48 8D 05 dd dd dd dd (7 bytes); disp32 at offset 3.
+		disp := read_i32_le(code[:], 3)
+		target := i32(labels[0])          // now a byte offset
+		want := target - 7                 // next_pc = end of the 7-byte lea
+		prefix_ok := code[0] == 0x48 && code[1] == 0x8D && code[2] == 0x05
+		if ok && len(relocs) == 0 && prefix_ok && disp == want && n == 9 {
+			fmt.printf("%s[PASS]%s lea [rip+L] resolved: disp32=%d (L@%d)\n", GREEN, RESET, disp, target)
+			g_stats.passed += 1
+		} else {
+			fmt.printf("%s[FAIL]%s lea [rip+L] resolved: ok=%v relocs=%d prefix_ok=%v disp=%d want=%d n=%d\n",
+				RED, RESET, ok, len(relocs), prefix_ok, disp, want, n)
+			g_stats.failed += 1
+		}
+	}
+
+	// -- lea rax, [rip + L], L UNDEFINED: a REL32 reloc at the disp32 offset ------
+	{
+		insts := []x86.Instruction{
+			{mnemonic = .LEA, operand_count = 2, ops = {x86.op_reg(x86.RAX), x86.op_mem(x86.mem_rip_label(0), 8), {}, {}}},
+		}
+		labels := [1]x86.Label_Definition{x86.LABEL_UNDEFINED}
+		code: [64]u8
+		relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+		defer delete(relocs); defer delete(errs)
+
+		_, ok := x86.encode(insts, labels[:], code[:], &relocs, &errs, true, 0)
+		r := len(relocs) == 1 ? relocs[0] : x86.Relocation{}
+		good := ok && len(relocs) == 1 &&
+			r.type == .REL32 && r.size == 4 && r.offset == 3 && r.label_id == 0 && r.addend == 0
+		// placeholder disp must be zero until relocation
+		good &&= read_i32_le(code[:], 3) == 0
+		if good {
+			fmt.printf("%s[PASS]%s lea [rip+L] unresolved: REL32 @off=%d size=%d label=%d\n",
+				GREEN, RESET, r.offset, r.size, r.label_id)
+			g_stats.passed += 1
+		} else {
+			fmt.printf("%s[FAIL]%s lea [rip+L] unresolved: ok=%v relocs=%d %v\n", RED, RESET, ok, len(relocs), r)
+			g_stats.failed += 1
+		}
+	}
+
+	// -- movabs rax, L: an ABS64 reloc at the imm64 offset -----------------------
+	{
+		insts := []x86.Instruction{
+			{mnemonic = .MOV, operand_count = 2, ops = {x86.op_reg(x86.RAX), x86.op_imm_label(0), {}, {}}},
+		}
+		labels := [1]x86.Label_Definition{x86.LABEL_UNDEFINED}
+		code: [64]u8
+		relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+		defer delete(relocs); defer delete(errs)
+
+		n, ok := x86.encode(insts, labels[:], code[:], &relocs, &errs, true, 0)
+		r := len(relocs) == 1 ? relocs[0] : x86.Relocation{}
+		// movabs rax, imm64 = 48 B8 <imm64> (10 bytes); imm64 at offset 2.
+		prefix_ok := n == 10 && code[0] == 0x48 && code[1] == 0xB8
+		good := ok && len(relocs) == 1 &&
+			r.type == .ABS64 && r.size == 8 && r.offset == 2 && r.label_id == 0 && prefix_ok
+		if good {
+			fmt.printf("%s[PASS]%s movabs rax, L: ABS64 @off=%d size=%d (48 B8 ...)\n",
+				GREEN, RESET, r.offset, r.size)
+			g_stats.passed += 1
+		} else {
+			fmt.printf("%s[FAIL]%s movabs rax, L: ok=%v n=%d relocs=%d prefix_ok=%v %v\n",
+				RED, RESET, ok, n, len(relocs), prefix_ok, r)
+			g_stats.failed += 1
+		}
+	}
+
+	// -- lea [rip+L] with a nonzero-distance L, executed end-to-end --------------
+	// Prove the resolved displacement actually points at the datum: lay a known
+	// dword right after a `lea rax,[rip+L]; mov eax,[rax]; ret`, and check the
+	// loaded value comes back. The disp is derived from the real layout, not baked.
+	{
+		DATUM :: i32(0x5A17C0DE)
+		insts := []x86.Instruction{
+			// 0: lea rax, [rip + L]
+			{mnemonic = .LEA, operand_count = 2, ops = {x86.op_reg(x86.RAX), x86.op_mem(x86.mem_rip_label(0), 8), {}, {}}},
+			// 1: mov eax, [rax]   (load the datum L points at)
+			{mnemonic = .MOV, operand_count = 2, ops = {x86.op_reg(x86.EAX), x86.op_mem(x86.mem_base_only(x86.RAX), 4), {}, {}}},
+			// 2: ret
+			x86.inst_none(.RET),
+			// 3: filler that reserves >=4 bytes for the datum; its first 4 bytes are
+			//    overwritten below. Never executed (the ret at inst 2 returns first).
+			x86.inst_r_i(.MOV, x86.EAX, 0x1111_1111, 4),
+		}
+		labels := [1]x86.Label_Definition{x86.Label_Definition(3)} // L at inst index 3
+		code: [64]u8
+		relocs: [dynamic]x86.Relocation; errs: [dynamic]x86.Error
+		defer delete(relocs); defer delete(errs)
+
+		n, ok := x86.encode(insts, labels[:], code[:], &relocs, &errs, true, 0)
+		// L's byte offset is where inst 3 starts; the lea's disp resolved to it.
+		// Overwrite those 4 bytes with the datum the load should return.
+		datum_off := int(labels[0])
+		v := u32(DATUM)
+		code[datum_off] = u8(v); code[datum_off+1] = u8(v >> 8); code[datum_off+2] = u8(v >> 16); code[datum_off+3] = u8(v >> 24)
+
+		exec := alloc_exec(4096)
+		defer free_exec(exec)
+		copy(exec, code[:n])
+		fn := transmute(proc "c" () -> i64)raw_data(exec)
+		got := i32(fn())
+		if ok && len(relocs) == 0 && got == DATUM {
+			fmt.printf("%s[PASS]%s lea [rip+L] loads datum: got 0x%08X\n", GREEN, RESET, u32(got))
+			g_stats.passed += 1
+		} else {
+			fmt.printf("%s[FAIL]%s lea [rip+L] loads datum: ok=%v relocs=%d got 0x%08X want 0x%08X\n",
+				RED, RESET, ok, len(relocs), u32(got), u32(DATUM))
+			g_stats.failed += 1
+		}
+	}
+
+	if g_stats.failed == before {
+		fmt.printf("%s[PASS]%s label addressing (REL32 disp + ABS64 movabs)\n", GREEN, RESET)
+	}
+}
+
+// =============================================================================
 // MAIN
 // =============================================================================
 
@@ -3413,6 +3560,9 @@ main :: proc() {
 
 		log_header("LARGE FUNCTION TESTS")
 		run_large_tests()
+
+		log_header("LABEL ADDRESSING TESTS")
+		run_label_addressing_tests()
 	}
 
 	log_header("DECODE-ONLY TESTS")
