@@ -178,17 +178,63 @@ gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, 
 	return exit_code;
 }
 
-#if defined(GB_SYSTEM_WINDOWS)
-#include <process.h>
-#else
+#if !defined(GB_SYSTEM_WINDOWS)
 #include <spawn.h>
 extern char **environ;
 #endif
 
-int run_subprocess(const char *name, const char **args) {
 #if defined(GB_SYSTEM_WINDOWS)
-	return (int)_spawnv(_P_WAIT, name, args);
+int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
+	gbAllocator a = heap_allocator();
+
+	String16 wexe_name = string_to_string16(a, exe_name);
+	defer (gb_free(a, wexe_name.text));
+
+	isize args_len = 0;
+	if (after_double_dash_raw) {
+		args_len = string16_len(cast(u16 *)after_double_dash_raw);
+	}
+
+	isize cmd_len = wexe_name.len + 2;
+	if (args_len > 0) cmd_len += args_len + 1;
+
+	wchar_t *cmd_line = gb_alloc_array(a, wchar_t, cmd_len + 1);
+	defer (gb_free(a, cmd_line));
+
+	isize n = 0;
+	cmd_line[n++] = '"';
+	gb_memmove(cmd_line + n, wexe_name.text, wexe_name.len * gb_size_of(wchar_t));
+	n += wexe_name.len;
+	cmd_line[n++] = '"';
+	if (args_len > 0) {
+		cmd_line[n++] = ' ';
+		gb_memmove(cmd_line + n, after_double_dash_raw, args_len * gb_size_of(wchar_t));
+		n += args_len;
+	}
+	cmd_line[n] = '\0';
+
+	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
+	PROCESS_INFORMATION pi = {0};
+	int exit_code = 0;
+
+	if (CreateProcessW(nullptr, cmd_line,
+	                   nullptr, nullptr, true, 0, nullptr, nullptr,
+	                   &start_info, &pi)) {
+		WaitForSingleObject(pi.hProcess, INFINITE);
+		GetExitCodeProcess(pi.hProcess, cast(DWORD *)&exit_code);
+
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	} else {
+		String cmd_line_utf8 = string16_to_string(a, make_string16(cast(u16 *)cmd_line, n));
+		gb_printf_err("Failed to execute command:\n\t%.*s\n", LIT(cmd_line_utf8));
+		gb_free(a, cmd_line_utf8.text);
+		exit_code = -1;
+	}
+	return exit_code;
+}
 #else
+int run_subprocess(const char *name, const char **args) {
 	pid_t pid;
 	int status;
 	status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
@@ -215,8 +261,8 @@ int run_subprocess(const char *name, const char **args) {
 		}
 	}
 	GB_PANIC("Subprocess failure");
-#endif
 }
+#endif
 
 #if defined(GB_SYSTEM_WINDOWS)
 #define popen _popen
@@ -250,12 +296,12 @@ gb_internal bool system_exec_command_line_app_output(char const *command, gbStri
 	return true;
 }
 
-gb_internal Array<String> setup_args(int argc, char const **argv) {
+gb_internal Array<String> setup_args(int argc, char const **argv, wchar_t **after_double_dash_raw) {
 	gbAllocator a = heap_allocator();
 
 #if defined(GB_SYSTEM_WINDOWS)
 	int wargc = 0;
-	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc);
+	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc, after_double_dash_raw);
 	auto args = array_make<String>(a, 0, wargc);
 	for (isize i = 0; i < wargc; i++) {
 		u16 *warg = cast(u16 *)wargv[i];
@@ -3757,7 +3803,8 @@ int main(int arg_count, char const **arg_ptr) {
 	
 	init_build_context_error_pos_style();
 
-	Array<String> args = setup_args(arg_count, arg_ptr);
+	wchar_t *after_double_dash_raw = nullptr;
+	Array<String> args = setup_args(arg_count, arg_ptr, &after_double_dash_raw);
 	Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 	defer (array_free(&run_args));
 
@@ -4415,6 +4462,9 @@ end_of_code_gen:;
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
+#if defined(GB_SYSTEM_WINDOWS)
+		int subprocess_res = run_subprocess(exe_name, after_double_dash_raw);
+#else
 		const char* exe_name_cstring = alloc_cstring(heap_allocator(), exe_name);
 		Array<const char *> run_args_cstring = array_make<const char *>(heap_allocator(), 0, run_args.count);
 		defer({
@@ -4429,6 +4479,7 @@ end_of_code_gen:;
 		array_add(&run_args_cstring, NULL);
 
 		int subprocess_res = run_subprocess(exe_name_cstring, run_args_cstring.data);
+#endif
 		if (subprocess_res) {
 			gb_exit(subprocess_res);
 		}
