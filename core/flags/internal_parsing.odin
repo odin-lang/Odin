@@ -2,6 +2,7 @@
 package flags
 
 import "core:container/bit_array"
+@require import "core:fmt"
 import "core:strconv"
 import "core:strings"
 
@@ -84,7 +85,7 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 	arg := arg
 
 	if strings.has_prefix(arg, "-") {
-		// -short or -flag
+		// -short or --flag
 		arg = arg[1:]
 		is_short := true
 
@@ -108,14 +109,14 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 				// -short=option or --flag=option
 				flag = arg[:i]
 				arg = arg[1 + i:]
-				flag = resolve_unix_flag_name(model, flag, is_short)
+				flag = resolve_unix_flag_name(model, flag, is_short) or_return
 				error = set_option(model, parser, flag, arg)
 				return
 			}
 		}
 
 		// -short option or --flag option, potentially
-		current_flag = resolve_unix_flag_name(model, arg, is_short)
+		current_flag = resolve_unix_flag_name(model, arg, is_short) or_return
 		future_args = set_unix_flag(model, parser, current_flag) or_return
 
 	} else {
@@ -126,17 +127,21 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 	return
 }
 
-// Resolve a single-dash short name to the field's canonical long name. If the
-// short name is not declared, preserve the existing single-dash long-name
-// behavior and let the assignment proc perform its usual lookup and erroring.
-resolve_unix_flag_name :: proc(model: ^$T, name: string, is_short: bool) -> string {
-	if is_short {
-		if field, _, ok := get_field_by_short(model, name); ok {
-			return get_field_name(field)
-		}
+// Resolve a declared single-dash short name to the field's canonical long name.
+// Double-dash names are already canonical and pass through unchanged.
+resolve_unix_flag_name :: proc(model: ^$T, name: string, is_short: bool) -> (resolved_name: string, error: Error) {
+	if !is_short || name == RESERVED_HELP_FLAG_SHORT {
+		return name, nil
 	}
 
-	return name
+	if field, _, ok := get_field_by_short(model, name); ok {
+		return get_field_name(field), nil
+	}
+
+	return "", Parse_Error {
+		.Missing_Flag,
+		fmt.tprintf("Unable to find any short flag named `%s`.", name),
+	}
 }
 
 // Parse a number of requirements specifier.
