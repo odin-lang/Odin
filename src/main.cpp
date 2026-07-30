@@ -3811,23 +3811,16 @@ int main(int arg_count, char const **arg_ptr) {
 			build_context.command_kind = Command_test;
 		}
 
-		isize run_args_start_idx = -1;
-		for_array(i, args) {
-			if (args[i] == "--") {
-				run_args_start_idx = i;
-				break;
-			}
-		}
-		if (run_args_start_idx != -1) {
-			last_non_run_arg = run_args_start_idx;
+		if (double_dash_pos != -1) {
+			last_non_run_arg = double_dash_pos;
 
-			if (run_args_start_idx == 2) {
+			if (double_dash_pos == 2) {
 				// missing src path on argv[2], invocation: odin [run|test] --
 				usage(args[0]);
 				return 1;
 			}
 
-			for(isize i = run_args_start_idx+1; i < args.count; ++i) {
+			for(isize i = double_dash_pos+1; i < args.count; ++i) {
 				array_add(&run_args, args[i]);
 			}
 		}
