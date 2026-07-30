@@ -377,8 +377,13 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 		ch, ds = digits(s, ch, base, &invalid)
 		digsep |= ds
 		if ch == '.' && .Scan_Floats in s.flags {
+			prev_s := s^
 			ch = advance(s)
-			seen_dot = true
+			if ch == '.' {
+				s^ = prev_s
+			} else {
+				seen_dot = true
+			}
 		}
 	}
 
