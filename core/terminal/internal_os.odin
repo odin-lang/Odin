@@ -21,6 +21,15 @@ get_no_color :: proc() -> bool {
 	return false
 }
 
+get_is_dumb :: proc() -> bool {
+	buf: [128]u8
+	if term, err := os.lookup_env(buf[:], "TERM"); err == nil {
+		// "dumb" terminal overrides all other color and ansi capabilities logic
+		return term == "dumb"
+	}
+	return false
+}
+
 get_environment_color :: proc() -> Color_Depth {
 	buf: [128]u8
 	// `COLORTERM` is non-standard but widespread and unambiguous.

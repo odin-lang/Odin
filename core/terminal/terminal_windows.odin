@@ -46,6 +46,8 @@ _init_terminal :: proc "contextless" () {
 		// The user may be on a non-default terminal emulator.
 		color_depth = get_environment_color()
 	}
+
+	is_dumb = get_is_dumb()
 }
 
 _fini_terminal :: proc "contextless" () {

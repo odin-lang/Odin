@@ -278,18 +278,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// The animations are only ever shown through STDOUT;
 	// STDERR is used exclusively for logging regardless of error level.
-	global_log_colors_disabled = !terminal.color_enabled || !terminal.is_terminal(os.stderr)
-	global_ansi_disabled       = !terminal.is_terminal(os.stdout)
-
-	buf: [128]u8
-	if term, err := os.lookup_env(buf[:], "TERM"); err == nil {
-		// "dumb" terminal overrides all other color and ansi capabilities logic
-		if term == "dumb" {
-			global_ansi_disabled = true
-			global_log_colors_disabled = true
-		}
-	}
-
+	global_log_colors_disabled = terminal.is_dumb || !terminal.color_enabled || !terminal.is_terminal(os.stderr)
+	global_ansi_disabled       = terminal.is_dumb || !terminal.is_terminal(os.stdout)
 	should_show_animations := FANCY_OUTPUT && terminal.color_enabled && !global_ansi_disabled
 
 	// -- Parse CLI options
