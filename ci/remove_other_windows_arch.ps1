@@ -55,6 +55,8 @@ $llvm_arch = if ($Architecture -eq "amd64") { "x64" } else { "arm64" }
 $llvm_path = Join-Path $root_path "bin\llvm\windows\$llvm_arch"
 Remove-FileInsideRoot (Join-Path $llvm_path "LLVM-C.dll")
 Remove-FileInsideRoot (Join-Path $llvm_path "LLVM-C.lib")
+Remove-FileInsideRoot (Join-Path $llvm_path "lld-link.exe")
+Remove-FileInsideRoot (Join-Path $llvm_path "wasm-ld.exe")
 
 if ($Architecture -eq "arm64") {
 	Remove-FileInsideRoot (Join-Path $root_path "bin\radlink.exe")
