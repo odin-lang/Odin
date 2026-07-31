@@ -37,6 +37,7 @@ jobs:
           cp -r vendor dist
           cp -r bin dist
           cp -r examples dist
+          powershell -NoProfile -ExecutionPolicy Bypass -File ci/remove_other_windows_arch.ps1 -Architecture amd64 -Root dist
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -74,6 +75,7 @@ jobs:
           cp -r vendor dist
           cp -r bin dist
           cp -r examples dist
+          powershell -NoProfile -ExecutionPolicy Bypass -File ci/remove_other_windows_arch.ps1 -Architecture arm64 -Root dist
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
