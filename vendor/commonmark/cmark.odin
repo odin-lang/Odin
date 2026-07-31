@@ -12,7 +12,7 @@ when COMMONMARK_SHARED {
 
 when ODIN_OS == .Windows {
 	foreign import lib {
-		"cmark_static.lib",
+		"amd64/cmark_static.lib" when ODIN_ARCH == .amd64 else "arm64/cmark_static.lib",
 	}
 } else when ODIN_OS == .Linux {
 	foreign import lib "system:cmark"

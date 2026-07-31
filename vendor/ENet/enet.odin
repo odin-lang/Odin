@@ -2,18 +2,10 @@
 package ENet
 
 when ODIN_OS == .Windows {
-	when ODIN_ARCH == .amd64 {
-		foreign import ENet {
-			"lib/enet64.lib",
-			"system:Ws2_32.lib",
-			"system:Winmm.lib",
-		}
-	} else {
-		foreign import ENet {
-			"lib/enet.lib",
-			"system:Ws2_32.lib",
-			"system:Winmm.lib",
-		}
+	foreign import ENet {
+		"lib/amd64/enet64.lib" when ODIN_ARCH == .amd64 else "lib/arm64/enet.lib" when ODIN_ARCH == .arm64 else "lib/i386/enet.lib",
+		"system:Ws2_32.lib",
+		"system:Winmm.lib",
 	}
 } else {
 	foreign import ENet "system:enet"

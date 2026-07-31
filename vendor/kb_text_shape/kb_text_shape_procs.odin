@@ -1,7 +1,11 @@
 package vendor_kb_text_shape
 
 when ODIN_OS == .Windows {
-	foreign import lib "lib/kb_text_shape.lib"
+	when ODIN_ARCH == .amd64 {
+		foreign import lib "lib/amd64/kb_text_shape.lib"
+	} else when ODIN_ARCH == .arm64 {
+		foreign import lib "lib/arm64/kb_text_shape.lib"
+	}
 } else {
 	@(private)
 	LIB_PATH :: "lib/kb_text_shape.a"

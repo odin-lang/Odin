@@ -5,7 +5,7 @@ import c "core:c/libc"
 when ODIN_OS == .Windows {
 	@(export, extra_linker_flags="/NODEFAULTLIB:msvcrt")
 	foreign import lib {
-		"lib/libcurl.lib",
+		"lib/amd64/libcurl.lib" when ODIN_ARCH == .amd64 else "lib/arm64/libcurl.lib",
 		"system:Advapi32.lib",
 		"system:Crypt32.lib",
 		"system:Normaliz.lib",

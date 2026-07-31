@@ -5,7 +5,11 @@ import "core:c"
 import SDL ".."
 
 when ODIN_OS == .Windows {
-	foreign import lib "SDL2_mixer.lib"
+	when ODIN_ARCH == .amd64 {
+		foreign import lib "amd64/SDL2_mixer.lib"
+	} else when ODIN_ARCH == .arm64 {
+		foreign import lib "arm64/SDL2_mixer.lib"
+	}
 } else {
 	foreign import lib "system:SDL2_mixer"
 }
@@ -219,4 +223,3 @@ foreign lib {
 	GetChunk              :: proc(channel: c.int) -> ^Chunk ---
 	CloseAudio            :: proc() ---
 }
-

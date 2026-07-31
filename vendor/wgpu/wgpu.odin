@@ -8,7 +8,7 @@ WGPU_DEBUG  :: #config(WGPU_DEBUG,  false)
 @(private) TYPE :: "debug" when WGPU_DEBUG else "release"
 
 when ODIN_OS == .Windows {
-	@(private) ARCH :: "x86_64"   when ODIN_ARCH == .amd64 else "x86_64" when ODIN_ARCH == .i386 else #panic("unsupported WGPU Native architecture")
+	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
 	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
 

@@ -5,7 +5,8 @@ import c "core:c"
 
 @(private)
 LIB :: (
-	     "../lib/stb_vorbis.lib"      when ODIN_OS == .Windows
+	     "../lib/amd64/stb_vorbis.lib" when ODIN_OS == .Windows && ODIN_ARCH == .amd64
+	else "../lib/arm64/stb_vorbis.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
 	else "../lib/stb_vorbis.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_vorbis.a" when ODIN_OS == .Darwin
 	else "../lib/stb_vorbis_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32

@@ -3,17 +3,26 @@
 # These files must always have *nix line-endings
 Makefile text eol=lf
 *.sh text eol=lf
-vendor/box2d/lib/box2d_windows_amd64_avx2.lib filter=lfs diff=lfs merge=lfs -text
-vendor/box2d/lib/box2d_windows_amd64_sse2.lib filter=lfs diff=lfs merge=lfs -text
-vendor/miniaudio/lib/miniaudio.lib filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/SDL3.dll filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/SDL3.lib filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/mixer/*.dll filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/mixer/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/amd64/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/arm64/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/miniaudio/lib/amd64/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/miniaudio/lib/arm64/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/amd64/SDL3.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/amd64/SDL3.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/arm64/SDL3.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/arm64/SDL3.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/mixer/amd64/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/mixer/amd64/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/mixer/arm64/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/mixer/arm64/*.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.pdb filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-aarch64-msvc-release/lib/wgpu_native.dll filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-aarch64-msvc-release/lib/wgpu_native.dll.lib filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-aarch64-msvc-release/lib/wgpu_native.lib filter=lfs diff=lfs merge=lfs -text
+vendor/wgpu/lib/wgpu-windows-aarch64-msvc-release/lib/wgpu_native.pdb filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/linux/libraygui.so filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/linux/libraygui.a filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/linux/libraylib.a filter=lfs diff=lfs merge=lfs -text
@@ -25,11 +34,7 @@ vendor/raylib/macos/libraygui.dylib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/macos/libraylib.a filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/macos/libraylib.600.dylib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/wasm/libraylib.web.a filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/windows/raylib.dll filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/windows/raylib.lib filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/windows/raylibdll.lib filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/windows/raygui.dll filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/windows/raygui.lib filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/windows/rayguidll.lib filter=lfs diff=lfs merge=lfs -text
+vendor/raylib/windows/amd64/* filter=lfs diff=lfs merge=lfs -text
+vendor/raylib/windows/arm64/* filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/linux-amd64/libbox3d.a filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/darwin/libbox3d.a filter=lfs diff=lfs merge=lfs -text

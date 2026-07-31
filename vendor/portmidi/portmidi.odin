@@ -10,7 +10,7 @@ when ODIN_OS == .Windows {
 		#panic("Shared linking not supported for portmidi on windows yet")
 	} else {
 		foreign import lib {
-			"portmidi_s.lib",
+			"amd64/portmidi_s.lib" when ODIN_ARCH == .amd64 else "arm64/portmidi_s.lib",
 			"system:Winmm.lib",
 			"system:Advapi32.lib",
 		}

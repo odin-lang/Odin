@@ -11,16 +11,15 @@ BOX3D_SHARED :: #config(BOX3D_SHARED, false)
 
 @(private)
 LIB_PATH :: (
-	     "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
+	     "lib/amd64/box3d.lib"        when ODIN_OS == .Windows && ODIN_ARCH == .amd64 && !BOX3D_SHARED
+	else "lib/arm64/box3d.lib"        when ODIN_OS == .Windows && ODIN_ARCH == .arm64 && !BOX3D_SHARED
+	else "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
 	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
 	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
 	else ""
 )
 
-when ODIN_OS == .Windows {
-	@(export)
-	foreign import lib "lib/box3d.lib"
-} else when LIB_PATH != "" {
+when LIB_PATH != "" {
 	when !#exists(LIB_PATH) {
 		#panic("Could not find the compiled Box3D library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/box3d/src/build.sh\"`")
 	}

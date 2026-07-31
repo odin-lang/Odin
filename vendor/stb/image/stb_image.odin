@@ -5,7 +5,8 @@ import "core:c"
 
 @(private)
 LIB :: (
-	     "../lib/stb_image.lib"      when ODIN_OS == .Windows
+	     "../lib/amd64/stb_image.lib" when ODIN_OS == .Windows && ODIN_ARCH == .amd64
+	else "../lib/arm64/stb_image.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
 	else "../lib/stb_image.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_image.a" when ODIN_OS == .Darwin
 	else "../lib/stb_image_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32

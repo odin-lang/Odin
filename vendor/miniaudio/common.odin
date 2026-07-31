@@ -9,7 +9,12 @@ when MINIAUDIO_SHARED {
 }
 
 @(private)
-LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio.a"
+LIB :: (
+	     "lib/amd64/miniaudio.lib" when ODIN_OS == .Windows && ODIN_ARCH == .amd64
+	else "lib/arm64/miniaudio.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
+	else "lib/miniaudio.a"         when ODIN_OS != .Windows
+	else ""
+)
 
 when !#exists(LIB) {
 	// Windows library is shipped with the compiler, so a Windows specific message should not be needed.

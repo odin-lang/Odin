@@ -102,7 +102,10 @@ RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.web.a")
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {
-		"windows/raylibdll.lib" when RAYLIB_SHARED else "windows/raylib.lib" ,
+		"windows/amd64/raylibdll.lib" when ODIN_ARCH == .amd64 && RAYLIB_SHARED else
+		"windows/amd64/raylib.lib"    when ODIN_ARCH == .amd64 else
+		"windows/arm64/raylibdll.lib" when RAYLIB_SHARED else
+		"windows/arm64/raylib.lib",
 		"system:Winmm.lib",
 		"system:Gdi32.lib",
 		"system:User32.lib",

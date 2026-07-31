@@ -8,7 +8,7 @@ package portmidi
 import "core:c"
 
 when ODIN_OS == .Windows {
-	foreign import lib "portmidi_s.lib"
+	foreign import lib { "amd64/portmidi_s.lib" when ODIN_ARCH == .amd64 else "arm64/portmidi_s.lib" }
 } else {
 	foreign import lib "system:portmidi"
 }

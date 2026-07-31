@@ -6,7 +6,8 @@ import stbrp "vendor:stb/rect_pack"
 
 @(private)
 LIB :: (
-	     "../lib/stb_truetype.lib"      when ODIN_OS == .Windows
+	     "../lib/amd64/stb_truetype.lib" when ODIN_OS == .Windows && ODIN_ARCH == .amd64
+	else "../lib/arm64/stb_truetype.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
 	else "../lib/stb_truetype.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_truetype.a" when ODIN_OS == .Darwin
 	else "../lib/stb_truetype_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32

@@ -4,7 +4,7 @@ import "core:c"
 
 when ODIN_OS == .Windows {
 	@(ignore_duplicates)
-	foreign import lib "SDL2.lib"
+	foreign import lib { "amd64/SDL2.lib" when ODIN_ARCH == .amd64 else "arm64/SDL2.lib" }
 } else {
 	@(ignore_duplicates)
 	foreign import lib "system:SDL2"

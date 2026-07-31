@@ -8,14 +8,14 @@ GLFW_SHARED :: #config(GLFW_SHARED, ODIN_OS != .Windows && ODIN_OS != .Darwin)
 when ODIN_OS == .Windows {
 	when GLFW_SHARED {
 		foreign import glfw {
-			"../lib/glfw3dll.lib",
+			"../lib/amd64/glfw3dll.lib" when ODIN_ARCH == .amd64 else "../lib/arm64/glfw3dll.lib",
 			"system:user32.lib", 
 			"system:gdi32.lib", 
 			"system:shell32.lib",
 		}
 	} else {
 		foreign import glfw {
-			"../lib/glfw3_mt.lib",
+			"../lib/amd64/glfw3_mt.lib" when ODIN_ARCH == .amd64 else "../lib/arm64/glfw3_mt.lib",
 			"system:user32.lib",
 			"system:gdi32.lib",
 			"system:shell32.lib",
@@ -217,4 +217,3 @@ foreign glfw {
 	@(linkage="strong" when ODIN_OS == .Windows else "weak")
 	PlatformSupported :: proc(platform: c.int) -> b32 ---
 }
-

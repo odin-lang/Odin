@@ -5,7 +5,11 @@ import "core:c"
 import SDL "vendor:sdl3"
 
 when ODIN_OS == .Windows {
-	foreign import lib "SDL3_mixer.lib"
+	when ODIN_ARCH == .amd64 {
+		foreign import lib "amd64/SDL3_mixer.lib"
+	} else when ODIN_ARCH == .arm64 {
+		foreign import lib "arm64/SDL3_mixer.lib"
+	}
 } else {
 	foreign import lib "system:SDL3_mixer"
 }

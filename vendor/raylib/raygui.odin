@@ -7,7 +7,10 @@ RAYGUI_WASM_LIB :: #config(RAYGUI_WASM_LIB, "wasm/libraygui.a")
 
 when ODIN_OS == .Windows {
 	foreign import lib {
-		"windows/rayguidll.lib" when RAYGUI_SHARED else "windows/raygui.lib",
+		"windows/amd64/rayguidll.lib" when ODIN_ARCH == .amd64 && RAYGUI_SHARED else
+		"windows/amd64/raygui.lib"    when ODIN_ARCH == .amd64 else
+		"windows/arm64/rayguidll.lib" when RAYGUI_SHARED else
+		"windows/arm64/raygui.lib",
 	}
 } else when ODIN_OS == .Linux  {
 	foreign import lib {

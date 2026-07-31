@@ -4,7 +4,11 @@ package vendor_zlib
 import "core:c"
 
 when ODIN_OS == .Windows {
-	foreign import zlib "libz.lib"
+	when ODIN_ARCH == .amd64 {
+		foreign import zlib "amd64/libz.lib"
+	} else when ODIN_ARCH == .arm64 {
+		foreign import zlib "arm64/libz.lib"
+	}
 } else when ODIN_OS == .Linux {
 	foreign import zlib "system:z"
 } else {

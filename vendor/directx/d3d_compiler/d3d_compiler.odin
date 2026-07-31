@@ -1,7 +1,11 @@
 // Bindings for [[ Direct3D Shader Compiler ; https://learn.microsoft.com/en-us/windows/win32/api/d3dcompiler/ ]].
 package directx_d3d_compiler
 
-foreign import d3dcompiler "d3dcompiler_47.lib"
+when ODIN_ARCH == .amd64 {
+	foreign import d3dcompiler "amd64/d3dcompiler_47.lib"
+} else when ODIN_ARCH == .arm64 {
+	foreign import d3dcompiler "arm64/d3dcompiler_47.lib"
+}
 import win32 "core:sys/windows"
 
 D3DCOMPILER_DLL_A :: "d3dcompiler_47.dll"

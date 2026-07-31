@@ -4,7 +4,8 @@ import "core:c"
 
 @(private)
 RESIZE_LIB :: (
-	     "../lib/stb_image_resize.lib"      when ODIN_OS == .Windows
+	     "../lib/amd64/stb_image_resize.lib" when ODIN_OS == .Windows && ODIN_ARCH == .amd64
+	else "../lib/arm64/stb_image_resize.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
 	else "../lib/stb_image_resize.a"        when ODIN_OS == .Linux
 	else "../lib/darwin/stb_image_resize.a" when ODIN_OS == .Darwin
 	else "../lib/stb_image_resize_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
