@@ -8,7 +8,7 @@ on:
 jobs:
   build_windows:
     name: Windows Build
-    if: github.repository == 'odin-lang/Odin'
+    if: github.repository == 'odin-lang/Odin' || github.event_name == 'workflow_dispatch'
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
           path: dist
   build_windows_arm64:
     name: Windows ARM64 Build
-    if: github.repository == 'odin-lang/Odin'
+    if: github.repository == 'odin-lang/Odin' || github.event_name == 'workflow_dispatch'
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +88,7 @@ jobs:
       ARCH: ${{ matrix.arch }}
       DOCKER_IMAGE: ${{ matrix.arch == 'amd64' && 'alpine:3.24' || 'arm64v8/alpine:3.24' }}
     name: Linux Build ${{ matrix.arch }}
-    if: github.repository == 'odin-lang/Odin'
+    if: github.repository == 'odin-lang/Odin' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.arch == 'amd64' && 'ubuntu-latest' || 'ubuntu-24.04-arm' }}
     steps:
       - uses: actions/checkout@v4
@@ -136,7 +136,7 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
     name: Macos Build ${{ matrix.arch }}
-    if: github.repository == 'odin-lang/Odin'
+    if: github.repository == 'odin-lang/Odin' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.arch == 'amd64' && 'macos-15-intel' || 'macos-latest' }}
     steps:
       - uses: actions/checkout@v4
@@ -179,6 +179,7 @@ jobs:
   upload_b2:
     runs-on: [ubuntu-latest]
     needs: [build_windows, build_windows_arm64, build_macos, build_linux]
+    if: github.repository == 'odin-lang/Odin'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
