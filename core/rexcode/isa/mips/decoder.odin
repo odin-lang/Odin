@@ -57,6 +57,7 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	endianness:   Endianness = .BIG,
+	features:     Feature_Set = FEATURES_ALL,
 ) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data))
 	if n_bytes & 3 != 0 {
@@ -73,7 +74,7 @@ decode :: proc(
 
 		inst: Instruction
 		info: Instruction_Info
-		entry_idx := decode_one_inline(word, byte_count, &inst, &info)
+		entry_idx := decode_one_inline(word, byte_count, &inst, &info, features)
 
 		if entry_idx < 0 {
 			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
@@ -114,7 +115,7 @@ decode :: proc(
 
 @(private="file")
 decode_one_inline :: #force_inline proc "contextless" (
-	word: u32, pc: u32, inst: ^Instruction, info: ^Instruction_Info,
+	word: u32, pc: u32, inst: ^Instruction, info: ^Instruction_Info, features: Feature_Set,
 ) -> int {
 	primary := (word >> 26) & 0x3F
 
@@ -135,6 +136,10 @@ decode_one_inline :: #force_inline proc "contextless" (
 	matched_idx := -1
 	for i in 0..<cnt {
 		e := &DECODE_ENTRIES[base + i]
+		// Skip an entry belonging to a disabled ISA variant, so a shared opcode resolves to the
+		// enabled instruction (e.g. opcode 0x37 -> `LD` when VFPU_PSP is not in `features`). Entries
+		// keep their most-specific-mask-first order, so the first ENABLED match is still the right one.
+		if e.feature not_in features { continue }
 		if (word & e.mask) == e.bits {
 			matched_idx = base + i
 			break

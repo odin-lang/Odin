@@ -77,6 +77,20 @@ Feature :: enum u8 {
 	VFPU_PSP,        // PSP Allegrex Vector FPU
 }
 
+// A set of enabled ISA features, used to disambiguate the several MIPS variants that share the same
+// encoding tables. Different targets reuse the same primary opcodes for different instructions — most
+// notably opcode 0x37 is `LD` on 64-bit MIPS but the PSP Allegrex `vfim.s` (VFPU) — so a decoder that
+// wants only one variant passes the matching set and the others are skipped. `decode` defaults to
+// `FEATURES_ALL`, preserving the universal-table behavior for callers that don't care.
+Feature_Set :: distinct bit_set[Feature; u32]
+
+FEATURES_ALL :: ~Feature_Set{}
+
+// The NEC VR4300 (Nintendo 64) and other classic 64-bit MIPS III cores: the MIPS I/II/III integer ISA
+// plus COP0 (system control) and the COP1 FPU. Excludes MIPS IV+/R6 and every console-specific COP2
+// extension (PS1 GTE, PS2 MMI/VU, PSP VFPU), so e.g. opcode 0x37 decodes as `LD`, not `vfim.s`.
+FEATURES_MIPS_III :: Feature_Set{.MIPS_I, .MIPS_II, .MIPS_III, .COP0, .FPU}
+
 Encoding_Flags :: bit_field u8 {
 	delay_slot:  bool | 1,   // branch with a one-instruction delay slot
 	likely:      bool | 1,   // *L variants: nullify delay slot if not taken
