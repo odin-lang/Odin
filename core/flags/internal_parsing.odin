@@ -103,10 +103,14 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 			}
 		}
 
+		if is_short {
+			return parse_unix_short_arg(model, parser, arg)
+		}
+
 		flag: string
 		find_assignment: for r, i in arg {
 			if r == '=' {
-				// -short=option or --flag=option
+				// --flag=option
 				flag = arg[:i]
 				arg = arg[1 + i:]
 				flag = resolve_unix_flag_name(model, flag, is_short) or_return
@@ -115,13 +119,51 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 			}
 		}
 
-		// -short option or --flag option, potentially
+		// --flag option, potentially
 		current_flag = resolve_unix_flag_name(model, arg, is_short) or_return
-		future_args = set_unix_flag(model, parser, current_flag) or_return
+		future_args = set_unix_flag(model, parser, current_flag, false) or_return
 
 	} else {
 		// positional
 		error = push_positional(model, parser, arg)
+	}
+
+	return
+}
+
+// Parse one or more declared single-dash short options. Every option before
+// the last must be boolean; the final option may consume a value.
+parse_unix_short_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
+	future_args: int,
+	current_flag: string,
+	error: Error,
+) {
+	shorts := arg
+	option: string
+	has_option: bool
+
+	if equals := strings.index_byte(arg, '='); equals >= 0 {
+		shorts = arg[:equals]
+		option = arg[equals + 1:]
+		has_option = true
+	}
+
+	if len(shorts) == 0 {
+		current_flag = resolve_unix_flag_name(model, shorts, true) or_return
+		return
+	}
+
+	for i in 0 ..< len(shorts) {
+		#no_bounds_check short := shorts[i:i + 1]
+		is_last := i == len(shorts) - 1
+		current_flag = resolve_unix_flag_name(model, short, true) or_return
+
+		if is_last && has_option {
+			error = set_option(model, parser, current_flag, option)
+			return
+		}
+
+		future_args = set_unix_flag(model, parser, current_flag, !is_last) or_return
 	}
 
 	return
