@@ -2643,6 +2643,12 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	TargetArchKind arch = build_context.metrics.arch;
 	switch (cc) {
 	case ProcCC_StdCall:
+		if (arch != TargetArch_i386 && arch != TargetArch_amd64 &&
+		    !(arch == TargetArch_arm64 && build_context.metrics.os == TargetOs_windows)) {
+			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected either i386, amd64, or Windows arm64, got %.*s",
+			      proc_calling_convention_strings[cc], LIT(target_arch_names[arch]));
+		}
+		break;
 	case ProcCC_FastCall:
 		if (arch != TargetArch_i386 && arch != TargetArch_amd64) {
 			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected either i386 or amd64, got %.*s",

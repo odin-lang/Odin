@@ -411,24 +411,18 @@ gb_internal void big_int_mul(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 gb_internal u64 leading_zeros_u64(u64 x) {
 #if defined(GB_COMPILER_MSVC)
-	#if defined(GB_ARCH_64_BIT)
+	#if defined(GB_CPU_X86) && defined(GB_ARCH_64_BIT)
 		return __lzcnt64(x);
 	#else
-		u64 y, n;
-
-		n = 0;
-		y = x;
-	L:
-		if (x < 0) {
-			return n;
+		u64 n = 0;
+		if (x == 0) {
+			return 64;
 		}
-		if (y == 0) {
-			return 64-n;
+		while ((x & (1ull << 63)) == 0) {
+			n += 1;
+			x <<= 1;
 		}
-		n++;
-		x <<= 1;
-		y >>= 1;
-		goto L;
+		return n;
 	#endif
 #else
 	return cast(u64)__builtin_clzll(cast(unsigned long long)x);

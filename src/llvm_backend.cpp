@@ -3768,7 +3768,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		switch (build_context.metrics.os) {
 		case TargetOs_windows: {
 			auto paths = array_make<String>(heap_allocator(), 0, 1);
-			String path = concatenate_strings(permanent_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\llvm\\windows\\clang_rt.asan-x86_64.lib"));
+			String runtime_name = build_context.metrics.arch == TargetArch_arm64
+				? str_lit("\\bin\\llvm\\windows\\arm64\\clang_rt.asan-aarch64.lib")
+				: str_lit("\\bin\\llvm\\windows\\x64\\clang_rt.asan-x86_64.lib");
+			String path = concatenate_strings(permanent_allocator(), build_context.ODIN_ROOT, runtime_name);
 			array_add(&paths, path);
 			Entity *lib = alloc_entity_library_name(nullptr, make_token_ident("asan_lib"), nullptr, slice_from_array(paths), str_lit("asan_lib"));
 			array_add(&gen->foreign_libraries, lib);

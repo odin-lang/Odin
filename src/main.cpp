@@ -3296,6 +3296,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Examples:");
 				print_usage_line(3, "-target:linux_amd64");
 				print_usage_line(3, "-target:windows_amd64");
+				print_usage_line(3, "-target:windows_arm64");
 				print_usage_line(3, "-target:\"?\" for a list");
 		}
 

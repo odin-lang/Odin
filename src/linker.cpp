@@ -245,22 +245,36 @@ try_cross_linking:;
 								obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
 							}
 
-							String obj_format = str_lit("win64");
-						#if defined(GB_ARCH_32_BIT)
-							obj_format = str_lit("win32");
-						#endif
+							if (build_context.metrics.arch == TargetArch_arm64) {
+								String assembler_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_VS_EXE]);
+								defer (gb_free(heap_allocator(), assembler_path.text));
+								result = system_exec_command_line_app("armasm64",
+									"\"%.*sarmasm64.exe\" -nologo "
+									"-o \"%.*s\" "
+									"%.*s "
+									"\"%.*s\"",
+									LIT(assembler_path),
+									LIT(obj_file),
+									LIT(build_context.extra_assembler_flags),
+									LIT(asm_file)
+								);
+							} else {
+								String obj_format = build_context.metrics.arch == TargetArch_i386
+									? str_lit("win32")
+									: str_lit("win64");
 
-							result = system_exec_command_line_app("nasm",
-								"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
-								"-f \"%.*s\" "
-								"-o \"%.*s\" "
-								"%.*s "
-								"",
-								LIT(build_context.ODIN_ROOT), LIT(asm_file),
-								LIT(obj_format),
-								LIT(obj_file),
-								LIT(build_context.extra_assembler_flags)
-							);
+								result = system_exec_command_line_app("nasm",
+									"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
+									"-f \"%.*s\" "
+									"-o \"%.*s\" "
+									"%.*s "
+									"",
+									LIT(build_context.ODIN_ROOT), LIT(asm_file),
+									LIT(obj_format),
+									LIT(obj_file),
+									LIT(build_context.extra_assembler_flags)
+								);
+							}
 
 							if (result) {
 								return result;

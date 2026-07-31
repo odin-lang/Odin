@@ -211,7 +211,7 @@ pss_sig_unpad :: proc(
 	salt := x[xlen - hash_len - salt_len - 1:]
 	tmp: [hash.MAX_DIGEST_SIZE]byte
 	h := tmp[:hash_len]
-	ctx: hash.Context = ---
+	ctx: hash.Context
 	hash.init(&ctx, data_algo)
 	hash.update(&ctx, tmp[:8])
 	hash.update(&ctx, digest)
@@ -265,7 +265,7 @@ pss_sig_pad :: proc(
 	// Compute the seed for MGF1.
 	seed := x[xlen - hash_len - 1:]
 	seed = seed[:hash_len]
-	ctx: hash.Context = ---
+	ctx: hash.Context
 	hash.init(&ctx, data_algo)
 	intrinsics.mem_zero(raw_data(seed), 8)
 	hash.update(&ctx, seed[:8])

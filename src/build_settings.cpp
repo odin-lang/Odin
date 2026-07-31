@@ -703,6 +703,12 @@ gb_global TargetMetrics target_windows_amd64 = {
 	8, 8, AMD64_MAX_ALIGNMENT, 32,
 	str_lit("x86_64-pc-windows-msvc"),
 };
+gb_global TargetMetrics target_windows_arm64 = {
+	TargetOs_windows,
+	TargetArch_arm64,
+	8, 8, 16, 32,
+	str_lit("aarch64-pc-windows-msvc"),
+};
 
 gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
@@ -908,6 +914,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 
 	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
+	{ str_lit("windows_arm64"),       &target_windows_arm64  },
 
 	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
@@ -1764,7 +1771,11 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	#if defined(GB_ARCH_64_BIT)
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = &target_windows_amd64;
+			#if defined(GB_CPU_ARM)
+				metrics = &target_windows_arm64;
+			#else
+				metrics = &target_windows_amd64;
+			#endif
 		#elif defined(GB_SYSTEM_OSX)
 			#if defined(GB_CPU_ARM)
 				metrics = &target_darwin_arm64;
@@ -1995,6 +2006,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		case TargetArch_i386:
 			bc->link_flags = str_lit("/machine:x86 ");
+			break;
+		case TargetArch_arm64:
+			bc->link_flags = str_lit("/machine:arm64 ");
 			break;
 		}
 	} else if (bc->metrics.os == TargetOs_darwin) {

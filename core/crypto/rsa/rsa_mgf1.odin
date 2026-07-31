@@ -28,7 +28,7 @@ import "core:encoding/endian"
 @(private)
 mgf1_xor :: proc(data: []byte, hash_algo: hash.Algorithm, seed: []byte) {
 	tmp: [hash.MAX_DIGEST_SIZE]byte = ---
-	ctx: hash.Context = ---
+	ctx: hash.Context
 
 	buf, blen := data, len(data)
 	hlen := hash.DIGEST_SIZES[hash_algo]

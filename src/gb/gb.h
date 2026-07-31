@@ -2543,12 +2543,12 @@ gb_inline void gb_zero_size(void *ptr, isize size) {
 }
 
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && defined(GB_CPU_X86) && !defined(__clang__)
 #pragma intrinsic(__movsb)
 #endif
 
 gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && defined(GB_CPU_X86) && !defined(__clang__)
 	if (dest == NULL) {
 		return NULL;
 	}
@@ -6233,8 +6233,10 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 //
 //
 
-#if defined(GB_COMPILER_MSVC) && !defined(__clang__)
+#if defined(GB_COMPILER_MSVC) && defined(GB_CPU_X86) && !defined(__clang__)
 	gb_inline u64 gb_rdtsc(void) { return __rdtsc(); }
+#elif defined(GB_COMPILER_MSVC) && defined(GB_CPU_ARM)
+	gb_inline u64 gb_rdtsc(void) { return 0; }
 #elif defined(__i386__)
 	gb_inline u64 gb_rdtsc(void) {
 		u64 x;

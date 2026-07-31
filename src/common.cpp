@@ -329,7 +329,7 @@ gb_internal bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
 }
 
 gb_internal void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
-#if defined(GB_COMPILER_MSVC) && defined(GB_ARCH_64_BIT)
+#if defined(GB_COMPILER_MSVC) && defined(GB_CPU_X86) && defined(GB_ARCH_64_BIT)
 	*lo = _umul128(x, y, hi);
 #else
 	// URL(bill): https://stackoverflow.com/questions/25095741/how-can-i-multiply-64-bit-operands-and-get-128-bit-result-portably#25096197

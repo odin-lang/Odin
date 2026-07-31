@@ -455,7 +455,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	if (selected_subtarget == Subtarget_Playdate) {
 		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
 	} else if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
+		cc_kind = lb_calling_convention(pt->Proc.calling_convention);
 	}
 	LLVMSetFunctionCallConv(p->value, cc_kind);
 	lbValue proc_value = {p->value, p->type};
@@ -995,7 +995,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
-		auto llvm_cc = lb_calling_convention_map[proc_type->Proc.calling_convention];
+		auto llvm_cc = lb_calling_convention(proc_type->Proc.calling_convention);
 		if (selected_subtarget == Subtarget_Playdate) {
 			llvm_cc = lbCallingConvention_ARM_AAPCS_VFP;
 		}

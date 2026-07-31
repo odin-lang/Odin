@@ -17,6 +17,11 @@
 *.pdb
 *.sh
 
+# Windows DLL ABI test driver and generated MSVC/Odin outputs.
+!/abi/windows_dll/run.bat
+/abi/windows_dll/abi_fixture.obj
+/abi/windows_dll/bin/
+
 # Ignore documentation-related files.
 /documentation/verify/
 /documentation/all.odin-doc

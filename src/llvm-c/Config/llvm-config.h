@@ -19,7 +19,11 @@
 
 /* Target triple LLVM will generate code for by default */
 /* Doesn't use `cmakedefine` because it is allowed to be empty. */
+#if defined(_M_ARM64)
+#define LLVM_DEFAULT_TARGET_TRIPLE "aarch64-pc-windows-msvc"
+#else
 #define LLVM_DEFAULT_TARGET_TRIPLE "x86_64-pc-windows-msvc"
+#endif
 
 /* Define if threads enabled */
 #define LLVM_ENABLE_THREADS 1
@@ -28,28 +32,60 @@
 #define LLVM_HAS_ATOMICS 1
 
 /* Host triple LLVM will be executed on */
+#if defined(_M_ARM64)
+#define LLVM_HOST_TRIPLE "aarch64-pc-windows-msvc"
+#else
 #define LLVM_HOST_TRIPLE "x86_64-pc-windows-msvc"
+#endif
 
 /* LLVM architecture name for the native architecture, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_ARCH AArch64
+#else
 #define LLVM_NATIVE_ARCH X86
+#endif
 
 /* LLVM name for the native AsmParser init function, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_ASMPARSER LLVMInitializeAArch64AsmParser
+#else
 #define LLVM_NATIVE_ASMPARSER LLVMInitializeX86AsmParser
+#endif
 
 /* LLVM name for the native AsmPrinter init function, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_ASMPRINTER LLVMInitializeAArch64AsmPrinter
+#else
 #define LLVM_NATIVE_ASMPRINTER LLVMInitializeX86AsmPrinter
+#endif
 
 /* LLVM name for the native Disassembler init function, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_DISASSEMBLER LLVMInitializeAArch64Disassembler
+#else
 #define LLVM_NATIVE_DISASSEMBLER LLVMInitializeX86Disassembler
+#endif
 
 /* LLVM name for the native Target init function, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_TARGET LLVMInitializeAArch64Target
+#else
 #define LLVM_NATIVE_TARGET LLVMInitializeX86Target
+#endif
 
 /* LLVM name for the native TargetInfo init function, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_TARGETINFO LLVMInitializeAArch64TargetInfo
+#else
 #define LLVM_NATIVE_TARGETINFO LLVMInitializeX86TargetInfo
+#endif
 
 /* LLVM name for the native target MC init function, if available */
+#if defined(_M_ARM64)
+#define LLVM_NATIVE_TARGETMC LLVMInitializeAArch64TargetMC
+#else
 #define LLVM_NATIVE_TARGETMC LLVMInitializeX86TargetMC
+#endif
 
 /* LLVM name for the native target MCA init function, if available */
 /* #undef LLVM_NATIVE_TARGETMCA */

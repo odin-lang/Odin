@@ -189,7 +189,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	if (selected_subtarget == Subtarget_Playdate) {
 		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
 	} else if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[calling_convention];
+		cc_kind = lb_calling_convention(calling_convention);
 	}
 	// if (build_context.metrics.arch == TargetArch_amd64) {
 	// 	if (build_context.metrics.os == TargetOs_windows) {

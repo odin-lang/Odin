@@ -2,19 +2,48 @@
 
 setlocal EnableDelayedExpansion
 
+if /I "%ODIN_BUILD_ARCH%" == "arm64" (
+	set odin_arch=arm64
+	set manifest_arch=arm64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.ARM64
+) else if /I "%ODIN_BUILD_ARCH%" == "x64" (
+	set odin_arch=x64
+	set manifest_arch=amd64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+) else if not "%ODIN_BUILD_ARCH%" == "" (
+	echo ERROR: ODIN_BUILD_ARCH must be either x64 or arm64.
+	exit /b 1
+) else if /I "%VSCMD_ARG_TGT_ARCH%" == "arm64" (
+	set odin_arch=arm64
+	set manifest_arch=arm64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.ARM64
+) else if /I "%VSCMD_ARG_TGT_ARCH%" == "x64" (
+	set odin_arch=x64
+	set manifest_arch=amd64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+) else if /I "%PROCESSOR_ARCHITECTURE%" == "ARM64" (
+	set odin_arch=arm64
+	set manifest_arch=arm64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.ARM64
+) else (
+	set odin_arch=x64
+	set manifest_arch=amd64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+)
+
 where /Q cl.exe || (
 	set __VSCMD_ARG_NO_LOGO=1
-	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set VS=%%i
+	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires !vs_component! -property installationPath') do set VS=%%i
 	if "!VS!" equ "" (
 		echo ERROR: MSVC installation not found
 		exit /b 1
 	)
-	call "!VS!\Common7\Tools\vsdevcmd.bat" -arch=x64 -host_arch=x64 || exit /b 1
+	call "!VS!\Common7\Tools\vsdevcmd.bat" -arch=!odin_arch! -host_arch=!odin_arch! || exit /b 1
 )
 
-if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
+if /I "%VSCMD_ARG_TGT_ARCH%" neq "%odin_arch%" (
 	if "%ODIN_IGNORE_MSVC_CHECK%" == "" (
-		echo ERROR: please run this from MSVC x64 native tools command prompt, 32-bit target is not supported!
+		echo ERROR: please run this from the MSVC %odin_arch% native tools command prompt.
 		exit /b 1
 	)
 )
@@ -100,10 +129,25 @@ set compiler_warnings= ^
 
 set compiler_includes= ^
 	/Isrc\
+if "%ODIN_LLVM_DIR%" == "" set ODIN_LLVM_DIR=bin\llvm\windows\%odin_arch%
+if "%ODIN_LLVM_LIB%" == "" set ODIN_LLVM_LIB=%ODIN_LLVM_DIR%\LLVM-C.lib
+if "%ODIN_LLVM_DLL%" == "" set ODIN_LLVM_DLL=%ODIN_LLVM_DIR%\LLVM-C.dll
+if "%ODIN_LLD_LINK%" == "" set ODIN_LLD_LINK=%ODIN_LLVM_DIR%\lld-link.exe
+if "%ODIN_WASM_LD%" == "" set ODIN_WASM_LD=%ODIN_LLVM_DIR%\wasm-ld.exe
+if not exist "%ODIN_LLVM_LIB%" (
+	echo ERROR: LLVM import library not found at "%ODIN_LLVM_LIB%".
+	echo Set ODIN_LLVM_LIB to an LLVM-C import library built for %odin_arch%.
+	exit /b 1
+)
+if not exist "%ODIN_LLVM_DLL%" (
+	echo ERROR: LLVM runtime library not found at "%ODIN_LLVM_DLL%".
+	echo Set ODIN_LLVM_DLL to an LLVM-C DLL built for %odin_arch%.
+	exit /b 1
+)
 set libs= ^
 	kernel32.lib ^
 	Synchronization.lib ^
-	bin\llvm\windows\LLVM-C.lib
+	"%ODIN_LLVM_LIB%"
 set odin_res=misc\odin.res
 set odin_rc=misc\odin.rc
 
@@ -124,7 +168,19 @@ del *.ilk > NUL 2> NUL
 rc %rc_flags% %odin_rc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
-mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
+copy /Y "%ODIN_LLVM_DLL%" LLVM-C.dll > NUL
+if %errorlevel% neq 0 goto end_of_build
+if exist "%ODIN_LLD_LINK%" (
+	copy /Y "%ODIN_LLD_LINK%" bin\lld-link.exe > NUL
+) else (
+	echo WARNING: native lld-link not found at "%ODIN_LLD_LINK%".
+)
+if exist "%ODIN_WASM_LD%" (
+	copy /Y "%ODIN_WASM_LD%" bin\wasm-ld.exe > NUL
+) else (
+	echo WARNING: native wasm-ld not found at "%ODIN_WASM_LD%".
+)
+mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=%manifest_arch%, version=%odin_version_full%, type=win32"
 if %errorlevel% neq 0 goto end_of_build
 
 call build_vendor.bat

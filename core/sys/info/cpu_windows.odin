@@ -3,6 +3,13 @@ package sysinfo
 import sys "core:sys/windows"
 import "base:intrinsics"
 
+when ODIN_ARCH == .arm32 || ODIN_ARCH == .arm64 {
+	@(private)
+	_cpu_features :: proc "contextless" () -> (features: CPU_Features) {
+		return {}
+	}
+}
+
 @(private)
 _cpu_core_count :: proc "contextless" () -> (physical: int, logical: int, ok: bool) {
 	// Reportedly, Windows Server supports a maximum of 256 logical cores.
