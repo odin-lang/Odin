@@ -6,7 +6,7 @@ package flags
 Parsing_Style :: enum {
 	// Odin-style: `-flag`, `-flag:option`, `-map:key=value`
 	Odin,
-	// UNIX-style: `-f` (declared short), `--flag`, `--flag=argument`, `--flag argument (manifold-argument)`
+	// UNIX-style: `-f`, bundled shorts (`-abc`), `--flag`, `--flag=argument`, `--flag argument`
 	Unix,
 }
 

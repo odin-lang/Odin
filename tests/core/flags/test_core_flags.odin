@@ -1032,6 +1032,7 @@ test_unix :: proc(t: ^testing.T) {
 test_unix_rejects_undeclared_short :: proc(t: ^testing.T) {
 	S :: struct {
 		a: string,
+		output: string,
 	}
 
 	{
@@ -1058,6 +1059,19 @@ test_unix_rejects_undeclared_short :: proc(t: ^testing.T) {
 			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Missing_Flag)
 		}
 		testing.expect_value(t, s.a, "")
+	}
+
+	{
+		s: S
+		args := [?]string { "-output", "hellope" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		err, ok := result.(flags.Parse_Error)
+		testing.expectf(t, ok, "unexpected result: %v", result)
+		if ok {
+			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Missing_Flag)
+		}
+		testing.expect_value(t, s.output, "")
 	}
 }
 
@@ -1104,8 +1118,66 @@ test_unix_short :: proc(t: ^testing.T) {
 		err, ok := result.(flags.Parse_Error)
 		testing.expectf(t, ok, "unexpected result: %v", result)
 		if ok {
-			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.Missing_Flag)
+			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.No_Value)
 		}
+		testing.expect_value(t, s.output, "")
+	}
+}
+
+@(test)
+test_unix_short_bundle :: proc(t: ^testing.T) {
+	S :: struct {
+		alpha: bool `args:"short=a"`,
+		beta: bool `args:"short=b"`,
+		charlie: bool `args:"short=c"`,
+		output: string `args:"short=o"`,
+	}
+
+	{
+		s: S
+		args := [?]string { "-abc" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.alpha, true)
+		testing.expect_value(t, s.beta, true)
+		testing.expect_value(t, s.charlie, true)
+	}
+
+	{
+		s: S
+		args := [?]string { "-abo", "file.txt" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.alpha, true)
+		testing.expect_value(t, s.beta, true)
+		testing.expect_value(t, s.output, "file.txt")
+	}
+
+	{
+		s: S
+		args := [?]string { "-abo=attached.txt" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		testing.expect_value(t, result, nil)
+		testing.expect_value(t, s.alpha, true)
+		testing.expect_value(t, s.beta, true)
+		testing.expect_value(t, s.output, "attached.txt")
+	}
+
+	{
+		s: S
+		args := [?]string { "-aob", "file.txt" }
+
+		result := flags.parse(&s, args[:], .Unix)
+		err, ok := result.(flags.Parse_Error)
+		testing.expectf(t, ok, "unexpected result: %v", result)
+		if ok {
+			testing.expect_value(t, err.reason, flags.Parse_Error_Reason.No_Value)
+		}
+		testing.expect_value(t, s.alpha, true)
+		testing.expect_value(t, s.beta, false)
 		testing.expect_value(t, s.output, "")
 	}
 }
