@@ -11,6 +11,8 @@ when ODIN_OS == .Windows {
 			foreign import lib_ "amd64/OpenEXRCore-3_3.lib"
 		} else when ODIN_ARCH == .arm64 {
 			foreign import lib_ "arm64/OpenEXRCore-3_3.lib"
+		} else {
+			foreign import lib_ "i386/OpenEXRCore-3_3.lib"
 		}
 	}
 } else {

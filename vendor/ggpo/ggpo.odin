@@ -19,7 +19,11 @@ when ODIN_OS == .Windows {
 		foreign import lib "amd64/GGPO.lib"
 	} else when ODIN_ARCH == .arm64 {
 		foreign import lib "arm64/GGPO.lib"
+	} else {
+		foreign import lib "i386/GGPO.lib"
 	}
+} else {
+	foreign import lib "GGPO.lib"
 }
 
 import c "core:c/libc"

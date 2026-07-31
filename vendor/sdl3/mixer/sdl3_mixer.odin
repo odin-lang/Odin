@@ -9,6 +9,8 @@ when ODIN_OS == .Windows {
 		foreign import lib "amd64/SDL3_mixer.lib"
 	} else when ODIN_ARCH == .arm64 {
 		foreign import lib "arm64/SDL3_mixer.lib"
+	} else {
+		foreign import lib "i386/SDL3_mixer.lib"
 	}
 } else {
 	foreign import lib "system:SDL3_mixer"

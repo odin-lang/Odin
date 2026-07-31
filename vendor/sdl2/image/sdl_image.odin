@@ -9,6 +9,8 @@ when ODIN_OS == .Windows {
 		foreign import lib "amd64/SDL2_image.lib"
 	} else when ODIN_ARCH == .arm64 {
 		foreign import lib "arm64/SDL2_image.lib"
+	} else {
+		foreign import lib "i386/SDL2_image.lib"
 	}
 } else {
 	foreign import lib "system:SDL2_image"

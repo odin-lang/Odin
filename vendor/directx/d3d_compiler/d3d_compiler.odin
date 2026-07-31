@@ -5,6 +5,8 @@ when ODIN_ARCH == .amd64 {
 	foreign import d3dcompiler "amd64/d3dcompiler_47.lib"
 } else when ODIN_ARCH == .arm64 {
 	foreign import d3dcompiler "arm64/d3dcompiler_47.lib"
+} else {
+	foreign import d3dcompiler "i386/d3dcompiler_47.lib"
 }
 import win32 "core:sys/windows"
 

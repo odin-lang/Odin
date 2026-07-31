@@ -8,6 +8,8 @@ when ODIN_OS == .Windows {
 		foreign import zlib "amd64/libz.lib"
 	} else when ODIN_ARCH == .arm64 {
 		foreign import zlib "arm64/libz.lib"
+	} else {
+		foreign import zlib "i386/libz.lib"
 	}
 } else when ODIN_OS == .Linux {
 	foreign import zlib "system:z"

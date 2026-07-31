@@ -8,13 +8,9 @@ WGPU_DEBUG  :: #config(WGPU_DEBUG,  false)
 @(private) TYPE :: "debug" when WGPU_DEBUG else "release"
 
 when ODIN_OS == .Windows {
-	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
+	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else "unsupported"
 	@(private) EXT  :: ".dll.lib" when WGPU_SHARED else ".lib"
 	@(private) LIB  :: "lib/wgpu-windows-" + ARCH + "-msvc-" + TYPE + "/lib/wgpu_native" + EXT
-
-	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.1.1, make sure to read the docs at '" + #directory + "doc.odin'")
-	}
 
 	@(export)
 	foreign import libwgpu {
@@ -34,13 +30,9 @@ when ODIN_OS == .Windows {
 		"system:runtimeobject.lib",
 	}
 } else when ODIN_OS == .Darwin {
-	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
+	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else "unsupported"
 	@(private) EXT  :: ".dylib" when WGPU_SHARED else ".a"
 	@(private) LIB  :: "lib/wgpu-macos-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
-
-	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.1.1, make sure to read the docs at '" + #directory + "doc.odin'")
-	}
 
 	@(export)
 	foreign import libwgpu {
@@ -51,13 +43,9 @@ when ODIN_OS == .Windows {
 		"system:Metal.framework",
 	}
 } else when ODIN_OS == .Linux {
-	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else #panic("unsupported WGPU Native architecture")
+	@(private) ARCH :: "x86_64" when ODIN_ARCH == .amd64 else "aarch64" when ODIN_ARCH == .arm64 else "unsupported"
 	@(private) EXT  :: ".so"    when WGPU_SHARED else ".a"
 	@(private) LIB  :: "lib/wgpu-linux-" + ARCH + "-" + TYPE + "/lib/libwgpu_native" + EXT
-
-	when !#exists(LIB) {
-		#panic("Could not find the compiled WGPU Native library at '" + #directory + LIB + "', these can be downloaded from https://github.com/gfx-rs/wgpu-native/releases/tag/v29.0.1.1, make sure to read the docs at '" + #directory + "doc.odin'")
-	}
 
 	@(export)
 	foreign import libwgpu {

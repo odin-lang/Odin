@@ -167,7 +167,7 @@ MP_STATIC_ASSERT(prec_geq_min_prec, MP_DEFAULT_DIGIT_COUNT >= MP_MIN_DIGIT_COUNT
 #if defined(__STDC_IEC_559__) || defined(__GCC_IEC_559) \
    || defined(__x86_64__) || defined(_M_X64) || defined(_M_AMD64) \
    || defined(__i386__) || defined(_M_X86) || defined(_M_IX86) \
-   || defined(__aarch64__) || defined(__arm__)
+   || defined(__aarch64__) || defined(_M_ARM64) || defined(__arm__)
 #define MP_HAS_SET_DOUBLE
 #endif
 

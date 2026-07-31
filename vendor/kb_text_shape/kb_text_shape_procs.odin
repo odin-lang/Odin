@@ -5,6 +5,8 @@ when ODIN_OS == .Windows {
 		foreign import lib "lib/amd64/kb_text_shape.lib"
 	} else when ODIN_ARCH == .arm64 {
 		foreign import lib "lib/arm64/kb_text_shape.lib"
+	} else {
+		foreign import lib "lib/i386/kb_text_shape.lib"
 	}
 } else {
 	@(private)
