@@ -25,6 +25,21 @@ function Remove-DirectoryInsideRoot {
 	Remove-Item -LiteralPath $full_path -Recurse -Force
 }
 
+function Remove-FileInsideRoot {
+	param([string]$Path)
+
+	if (!(Test-Path -LiteralPath $Path)) {
+		return
+	}
+
+	$full_path = [IO.Path]::GetFullPath($Path)
+	if (!$full_path.StartsWith($root_prefix, [StringComparison]::OrdinalIgnoreCase)) {
+		throw "Refusing to remove file outside artifact root: $full_path"
+	}
+
+	Remove-Item -LiteralPath $full_path -Force
+}
+
 $other_arch = if ($Architecture -eq "amd64") { "arm64" } else { "amd64" }
 $vendor_path = Join-Path $root_path "vendor"
 
@@ -35,6 +50,16 @@ Get-ChildItem -LiteralPath $vendor_path -Directory -Recurse |
 
 $other_llvm_arch = if ($Architecture -eq "amd64") { "arm64" } else { "x64" }
 Remove-DirectoryInsideRoot (Join-Path $root_path "bin\llvm\windows\$other_llvm_arch")
+
+$llvm_arch = if ($Architecture -eq "amd64") { "x64" } else { "arm64" }
+$llvm_path = Join-Path $root_path "bin\llvm\windows\$llvm_arch"
+Remove-FileInsideRoot (Join-Path $llvm_path "LLVM-C.dll")
+Remove-FileInsideRoot (Join-Path $llvm_path "LLVM-C.lib")
+
+if ($Architecture -eq "arm64") {
+	Remove-FileInsideRoot (Join-Path $root_path "bin\radlink.exe")
+	Remove-FileInsideRoot (Join-Path $root_path "bin\RAD-LICENSE")
+}
 
 $other_wgpu_arch = if ($Architecture -eq "amd64") { "aarch64" } else { "x86_64" }
 Remove-DirectoryInsideRoot (Join-Path $vendor_path "wgpu\lib\wgpu-windows-$other_wgpu_arch-msvc-release")
