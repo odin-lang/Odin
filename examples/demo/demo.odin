@@ -275,9 +275,18 @@ control_flow :: proc() {
 
 		// Odin’s `switch` is like one in C or C++, except that Odin only runs the selected case.
 		// This means that a `break` statement is not needed at the end of each case.
-		// Another important difference is that the case values need not be integers nor constants.
+		// Fallthrough statement can be used to explicitly fall through into the next case block.
 
-		// To achieve a C-like fall through into the next case block, the keyword `fallthrough` can be used.
+		switch i := 0; i {
+		case 0:
+			fmt.println("one_step")
+			fallthrough
+		case 1:
+			fmt.println("beyond")
+		}
+
+		// Another important difference is that the case values need do not have to be integers or constants.
+
 		one_angry_dwarf :: proc() -> int {
 			fmt.println("one_angry_dwarf was called")
 			return 1
@@ -397,8 +406,6 @@ control_flow :: proc() {
 
 	{ // Branch statements
 		cond, cond1, cond2 := false, false, false
-		one_step :: proc() { fmt.println("one_step") }
-		beyond :: proc() { fmt.println("beyond") }
 
 		// Break statement
 		for cond {
@@ -424,23 +431,6 @@ control_flow :: proc() {
 				continue
 			}
 			fmt.println("Hellope")
-		}
-
-		// Fallthrough statement
-
-		// Odin’s switch is like one in C or C++, except that Odin only runs the selected
-		// case. This means that a break statement is not needed at the end of each case.
-		// Another important difference is that the case values need not be integers nor
-		// constants.
-
-		// fallthrough can be used to explicitly fall through into the next case block:
-
-		switch i := 0; i {
-		case 0:
-			one_step()
-			fallthrough
-		case 1:
-			beyond()
 		}
 	}
 }
