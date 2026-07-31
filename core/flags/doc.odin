@@ -187,7 +187,9 @@ at parse time.
 	-f argument
 
 Single-dash flags must be declared with the `short=C` struct subtag. Long
-flags always require two dashes.
+flags always require two dashes. Boolean short flags may be bundled. A short
+flag that takes a value must be last in the bundle. (for e.g. -a -b -c can be
+set via -abc)
 
 Do note that map flags are not currently supported in this parsing style.
 
