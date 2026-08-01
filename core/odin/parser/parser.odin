@@ -2651,7 +2651,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		specialization: ^ast.Expr
 		if allow_token(p, .Quo) {
 			specialization = parse_type(p)
-			end = specialization.pos
+			end = specialization.end
 		}
 		if is_blank_ident(type) {
 			error(p, type.pos, "invalid polymorphic type definition with a blank identifier")
