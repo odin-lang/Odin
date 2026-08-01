@@ -584,24 +584,30 @@ map_shrink_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_a
 	}
 
 	// Don't shrink below the minimum.
-	log2_capacity := map_log2_cap(m^)
-	if log2_capacity <= MAP_MIN_LOG2_CAPACITY {
+	log2_capacity_current := map_log2_cap(m^)
+	if log2_capacity_current <= MAP_MIN_LOG2_CAPACITY {
 		return false, nil
 	}
 
 	// Cannot shrink the capacity if the number of items in the map would exceed
 	// one minus the current log2 capacity's resize threshold. That is the shrunk
 	// map needs to be within the max load factor.
-	load_factor := map_load_factor(log2_capacity - 1)
-	if m.len >= load_factor {
+	load_factor_new_max := map_load_factor(log2_capacity_current - 1)
+	if m.len >= load_factor_new_max {
 		return false, nil
 	}
 
-	log2_capacity = max(__ceil_log2(m.len), MAP_MIN_LOG2_CAPACITY)
+	log2_capacity_new := max(__ceil_log2(m.len), MAP_MIN_LOG2_CAPACITY)
+	load_factor_new := map_load_factor(log2_capacity_new)
 
-	shrunk := map_alloc_dynamic(info, log2_capacity, m.allocator) or_return
+	// The new log2 capacity's load factor needs to contain the current map as well.
+	if m.len > load_factor_new {
+		log2_capacity_new += 1
+	}
 
-	capacity := uintptr(1) << log2_capacity
+	shrunk := map_alloc_dynamic(info, log2_capacity_new, m.allocator) or_return
+
+	capacity := uintptr(1) << log2_capacity_new
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
