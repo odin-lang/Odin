@@ -234,6 +234,19 @@ map_shrink :: proc(t: ^testing.T) {
 		testing.expect_value(t, err, runtime.Allocator_Error.None)
 		testing.expect_value(t, cap(m), 128)
 	}
+
+	{
+		reserve(&m, 256)
+
+		for i in 0 ..< 50 {
+			m[i] = i
+		}
+
+		did_shrink, err := shrink(&m)
+		testing.expect_value(t, did_shrink, true)
+		testing.expect_value(t, err, runtime.Allocator_Error.None)
+		testing.expect_value(t, cap(m), 128)
+	}
 }
 
 @test
