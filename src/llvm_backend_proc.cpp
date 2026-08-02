@@ -3418,6 +3418,18 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntvct_el0"), str_lit("=r"), has_side_effects);
 				GB_ASSERT(the_asm != nullptr);
 				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			#if LLVM_VERSION_MAJOR > 19 || (LLVM_VERSION_MAJOR == 19 && LLVM_VERSION_MINOR >= 1)
+			} else if (build_context.metrics.arch == TargetArch_riscv64 && build_context.metrics.os == TargetOs_linux) {
+				// Linux in it's infinite wisdom decided that `rdcycle` should not be
+				// available to userland past Linux 6.6.  Some inline assembly with
+				// `rdtime` would also work, but LLVM issue #117701 suggests just
+				// using this intrinsic.
+				//
+				// Support for this was introduced in commit `b8ed69e`, and is present
+				// in LLVM tags 19.1.0-rc1.
+				char const *name = "llvm.readsteadycounter";
+				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
+			#endif
 			} else {
 				char const *name = "llvm.readcyclecounter";
 				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
