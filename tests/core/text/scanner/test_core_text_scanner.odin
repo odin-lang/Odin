@@ -1,7 +1,6 @@
 package test_core_text_scanner
 
 import "base:runtime"
-import "core:log"
 import "core:fmt"
 import "core:testing"
 import "core:text/scanner"
