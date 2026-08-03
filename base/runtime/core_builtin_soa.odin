@@ -480,24 +480,14 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 
 	footer := raw_soa_footer(array)
 	if size_of(E) > 0 && arg_len > 0 {
-		// For the common case where E has no more than 16 fields:
-		// At ODIN_OPTIMIZATION_MODE >= .Speed do per-field copy passes that bind
-		// the SOA struct's multipointers and each incoming element's fields by
-		// position via expand_values with compile-time known types.
-		// At ODIN_OPTIMIZATION_MODE <= .Size the compiler's lowering is
-		// used, because it is the most compact at these field counts.
-		// When E has >16 fields:
-		// Type erased per-field loop using RTTI, with one mem_copy per element per field (codegen size is field count invariant).
-		// (Note that offset and the multipointers must be read after _reserve_soa, because any growth moves them.)
 		offset := footer.len
 		FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-
+		// Advance len before the copy, soa_copy_from_slice needs the final len to be set
 		footer.len += arg_len
 		when FIELD_COUNT == 0 {
 			// do nothing
 		} else when FIELD_COUNT <= 16 && ODIN_OPTIMIZATION_MODE <= .Size {
-			// Use the compiler's #soa element store lowering.
-			// Note that #no_bounds_check is not optional
+			// Use the compiler's #soa element store lowering, more compact at these field counts.
 			#no_bounds_check for j in 0..<arg_len {
 				array[offset + j] = args[j]
 			}
