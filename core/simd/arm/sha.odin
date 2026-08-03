@@ -2,6 +2,7 @@
 package simd_arm
 
 import "core:simd"
+_ :: simd
 
 // SHA1 hash update accelerator, choose.
 //
