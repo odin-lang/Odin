@@ -410,6 +410,15 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
+		// NOTE: polymorphic procedure check not idempotent without this
+		if (src->Proc.is_poly_specialized && base_entity->Procedure.generated_from_polymorphic) {
+	    	if (are_types_identical(src, dst)) {
+				if (poly_proc_data) {
+					poly_proc_data->gen_entity = base_entity;
+				}
+				return true;
+			}
+		}
 		return false;
 	}
 
