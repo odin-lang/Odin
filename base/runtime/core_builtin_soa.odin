@@ -497,11 +497,9 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 			// do nothing
 		} else when FIELD_COUNT <= 16 && ODIN_OPTIMIZATION_MODE <= .Size {
 			// Use the compiler's #soa element store lowering.
-			// Note that #no_bounds_check is not optional, we write at index == len.
-			#no_bounds_check {
-				for j in 0..<arg_len {
-					array[offset + j] = args[j]
-				}
+			// Note that #no_bounds_check is not optional
+			#no_bounds_check for j in 0..<arg_len {
+				array[offset + j] = args[j]
 			}
 		} else {
 			intrinsics.soa_copy_from_slice(array, offset, args[:arg_len])
