@@ -219,13 +219,13 @@ when ODIN_ARCH == .arm64 {
 @(private, default_calling_convention = "none")
 foreign _ {
 	@(link_name = "llvm.aarch64.crypto.sha1c" when ODIN_ARCH == .arm64 else "llvm.arm.neon.sha1c")
-	_vsha1cq_u32 :: proc(hash_abcd: uint32x4_t, e: uint32_t, wk: uint32x4_t) -> uint32x4_t ---
+	_vsha1cq_u32 :: proc(hash_abcd: uint32x4_t, hash_e: uint32_t, wk: uint32x4_t) -> uint32x4_t ---
 	@(link_name = "llvm.aarch64.crypto.sha1p" when ODIN_ARCH == .arm64 else "llvm.arm.neon.sha1p")
-	_vsha1pq_u32 :: proc(hash_abcd: uint32x4_t, e: uint32_t, wk: uint32x4_t) -> uint32x4_t ---
+	_vsha1pq_u32 :: proc(hash_abcd: uint32x4_t, hash_e: uint32_t, wk: uint32x4_t) -> uint32x4_t ---
 	@(link_name = "llvm.aarch64.crypto.sha1m" when ODIN_ARCH == .arm64 else "llvm.arm.neon.sha1m")
-	_vsha1mq_u32 :: proc(hash_abcd: uint32x4_t, e: uint32_t, wk: uint32x4_t) -> uint32x4_t ---
+	_vsha1mq_u32 :: proc(hash_abcd: uint32x4_t, hash_e: uint32_t, wk: uint32x4_t) -> uint32x4_t ---
 	@(link_name = "llvm.aarch64.crypto.sha1h" when ODIN_ARCH == .arm64 else "llvm.arm.neon.sha1h")
-	_vsha1h_u32 :: proc(e: uint32_t) -> uint32_t ---
+	_vsha1h_u32 :: proc(hash_e: uint32_t) -> uint32_t ---
 	@(link_name = "llvm.aarch64.crypto.sha1su0" when ODIN_ARCH == .arm64 else "llvm.arm.neon.sha1su0")
 	_vsha1su0q_u32 :: proc(w0_3, w4_7, w8_11: uint32x4_t) -> uint32x4_t ---
 	@(link_name = "llvm.aarch64.crypto.sha1su1" when ODIN_ARCH == .arm64 else "llvm.arm.neon.sha1su1")
