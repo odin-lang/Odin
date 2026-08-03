@@ -466,9 +466,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
-	if (nctx.polymorphic_scope == nullptr) {
-		nctx.polymorphic_scope = scope;
-	}
+	nctx.polymorphic_scope = scope;
 
 
 	auto *pt = &src->Proc;
