@@ -1,6 +1,6 @@
 #+build orca
 #+private
-package runtime
+package tests_heap_allocator_libc
 
 foreign {
 	@(link_name="malloc")   _orca_malloc   :: proc "c" (size: int) -> rawptr ---
