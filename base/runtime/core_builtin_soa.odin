@@ -480,7 +480,6 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 
 	footer := raw_soa_footer(array)
 	if size_of(E) > 0 && arg_len > 0 {
-		// Note that offset must be read after _reserve_soa, because any growth moves the field pointers.
 		offset := footer.len
 		FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
 		// Advance len before the copy, soa_copy_from_slice needs the final len to be set
