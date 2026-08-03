@@ -5282,6 +5282,62 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 	}
 
+	case BuiltinProc_soa_copy_from_slice: {
+		Operand array_ptr = {};
+		Operand offset    = {};
+		Operand args      = {};
+		check_expr(c, &array_ptr, ce->args[0]);
+		if (array_ptr.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_type_pointer(array_ptr.type)) {
+			gbString s = type_to_string(array_ptr.type);
+			error(array_ptr.expr, "Expected a pointer to a #soa dynamic array, got %s", s);
+			gb_string_free(s);
+			return false;
+		}
+		Type *array_type = type_deref(array_ptr.type);
+		if (!is_type_soa_dynamic_array(array_type)) {
+			gbString s = type_to_string(array_ptr.type);
+			error(array_ptr.expr, "Expected a pointer to a #soa dynamic array, got %s", s);
+			gb_string_free(s);
+			return false;
+		}
+		Type *at = base_type(array_type);
+		GB_ASSERT(at->kind == Type_Struct);
+		Type *elem = at->Struct.soa_elem;
+
+		check_expr_with_type_hint(c, &offset, ce->args[1], t_int);
+		if (offset.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_type_integer(offset.type)) {
+			gbString s = type_to_string(array_ptr.type);
+			error(array_ptr.expr, "Expected an integer as the offset for '%.*s', got %s", s, LIT(builtin_name));
+			gb_string_free(s);
+			return false;
+		}
+
+		Type *slice_hint = alloc_type_slice(elem);
+
+		check_expr_with_type_hint(c, &args, ce->args[2], slice_hint);
+		if (args.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(base_type(args.type), slice_hint)) {
+			gbString s = type_to_string(slice_hint);
+			gbString t = type_to_string(args.type);
+			error(array_ptr.expr, "Expected a %s to use as the slice '%.*s', got %s", s, LIT(builtin_name), t);
+			gb_string_free(t);
+			gb_string_free(s);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
+		operand->type = nullptr;
+		break;
+	}
+
 	case BuiltinProc_concatenate: {
 		Operand lhs = {};
 

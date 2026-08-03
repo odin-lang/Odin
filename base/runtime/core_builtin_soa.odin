@@ -491,256 +491,26 @@ _append_soa_elems :: proc(#no_alias array: ^$T/#soa[dynamic]$E, zero_memory: boo
 		// (Note that offset and the multipointers must be read after _reserve_soa, because any growth moves them.)
 		offset := footer.len
 		FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-		when FIELD_COUNT <= 16 {
-			when ODIN_OPTIMIZATION_MODE <= .Size {
-				// Use the compiler's #soa element store lowering.
-				// Note that #no_bounds_check is not optional, we write at index == len.
-				#no_bounds_check {
-					for j in 0..<arg_len {
-						array[offset + j] = args[j]
-					}
-				}
-			} else when FIELD_COUNT >= 1 { // nothing to do if field count is 0
-				_append_soa_elems_per_field_expanded(array, offset, args[:arg_len])
-			}
-		} else { // FIELD_COUNT > 16
-			ti := type_info_base(type_info_of(typeid_of(T)))
-			si := &ti.variant.(Type_Info_Struct)
-			// si describes the SOA struct (fields are multipointers), so E's
-			// field offsets are not available in it; read them from E's own RTTI (si.soa_base_type).
-			// Note that basing on default struct layout here instead
-			// would misplace the fields of #packed elements.
-			// (> 16 fields is struct-only: array element types are capped at length 4.)
-			se := &type_info_base(si.soa_base_type).variant.(Type_Info_Struct)
 
-			src_base := uintptr(raw_data(args))
-			for i in 0..<uintptr(FIELD_COUNT) {
-				type := si.types[i].variant.(Type_Info_Multi_Pointer).elem
-
-				dst := uintptr(([^]rawptr)(array)[i]) + uintptr(type.size*offset)
-				src := src_base + se.offsets[i]
+		footer.len += arg_len
+		when FIELD_COUNT == 0 {
+			// do nothing
+		} else when FIELD_COUNT <= 16 && ODIN_OPTIMIZATION_MODE <= .Size {
+			// Use the compiler's #soa element store lowering.
+			// Note that #no_bounds_check is not optional, we write at index == len.
+			#no_bounds_check {
 				for j in 0..<arg_len {
-					mem_copy(rawptr(dst + uintptr(j*type.size)), rawptr(src + uintptr(j*size_of(E))), type.size)
+					array[offset + j] = args[j]
 				}
 			}
-		}
-	}
-	footer.len += arg_len
-	return arg_len, err
-}
-
-// 1..16-field expnaded copy arms for _append_soa_elems.
-// this only exists to keep _append_soa_elems more readable.
-// args MUST already be clamped to capacity by the caller.
-_append_soa_elems_per_field_expanded :: #force_inline proc(#no_alias array: ^$T/#soa[dynamic]$E, offset: int, #no_broadcast args: []E) {
-	arg_len := len(args)
-	FIELD_COUNT :: len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-	when FIELD_COUNT == 1 {
-		// here and below the ignored last 3 values comprise the footer
-		p0, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v := expand_values(args[j]); p0[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 2 {
-		p0, p1, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v := expand_values(args[j]); p1[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 3 {
-		p0, p1, p2, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v := expand_values(args[j]); p2[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 4 {
-		p0, p1, p2, p3, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v := expand_values(args[j]); p3[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 5 {
-		p0, p1, p2, p3, p4, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v := expand_values(args[j]); p4[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 6 {
-		p0, p1, p2, p3, p4, p5, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v := expand_values(args[j]); p5[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 7 {
-		p0, p1, p2, p3, p4, p5, p6, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v := expand_values(args[j]); p6[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 8 {
-		p0, p1, p2, p3, p4, p5, p6, p7, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v := expand_values(args[j]); p7[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 9 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v := expand_values(args[j]); p8[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 10 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p9[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 11 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p9[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p10[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 12 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p9[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p10[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p11[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 13 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p9[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p10[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p11[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p12[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 14 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p9[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p10[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p11[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p12[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p13[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 15 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p9[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p10[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p11[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p12[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p13[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p14[offset+j] = v }
-		}
-	} else when FIELD_COUNT == 16 {
-		p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, _, _, _ := expand_values(array^)
-		#no_bounds_check {
-			for j in 0..<arg_len { v, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p0[offset+j] = v }
-			for j in 0..<arg_len { _, v, _, _, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p1[offset+j] = v }
-			for j in 0..<arg_len { _, _, v, _, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p2[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, v, _, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p3[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, v, _, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p4[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, v, _, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p5[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, v, _, _, _, _, _, _, _, _, _ := expand_values(args[j]); p6[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, v, _, _, _, _, _, _, _, _ := expand_values(args[j]); p7[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, v, _, _, _, _, _, _, _ := expand_values(args[j]); p8[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, v, _, _, _, _, _, _ := expand_values(args[j]); p9[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, v, _, _, _, _, _ := expand_values(args[j]); p10[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, v, _, _, _, _ := expand_values(args[j]); p11[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, v, _, _, _ := expand_values(args[j]); p12[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, _, v, _, _ := expand_values(args[j]); p13[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, _, _, v, _ := expand_values(args[j]); p14[offset+j] = v }
-			for j in 0..<arg_len { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, v := expand_values(args[j]); p15[offset+j] = v }
+		} else {
+			intrinsics.soa_copy_from_slice(array, offset, args[:arg_len])
 		}
 	} else {
-		#panic("_append_soa_elems_per_field_expanded instantiated with an unsupported field count")
+		footer.len += arg_len
 	}
+	return arg_len, err
 }
-
 
 // The append_soa built-in procedure appends elements to the end of an #soa dynamic array
 @builtin

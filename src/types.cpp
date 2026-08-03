@@ -2001,6 +2001,11 @@ gb_internal bool is_type_soa_struct(Type *t) {
 	if (t == nullptr) { return false; }
 	return t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None;
 }
+gb_internal bool is_type_soa_dynamic_array(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) { return false; }
+	return t->kind == Type_Struct && t->Struct.soa_kind == StructSoa_Dynamic;
+}
 
 gb_internal bool is_type_raw_union(Type *t) {
 	t = base_type(t);
