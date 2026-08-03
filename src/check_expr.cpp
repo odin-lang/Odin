@@ -1023,17 +1023,6 @@ gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *o
 		return false;
 	}
 
-	// Handle polymorphic procedure used as default parameter
-	if (operand->mode == Addressing_Value && is_type_proc(type) && is_type_proc(operand->type)) {
-		Entity *e = entity_from_expr(operand->expr);
-		if (e != nullptr && e->kind == Entity_Procedure && is_type_polymorphic(e->type) && !is_type_polymorphic(type)) {
-			// Special case: Allow a polymorphic procedure to be used as default value for concrete proc type
-			// during the initial check. It will be properly instantiated when actually used.
-			if (score_) *score_ = assign_score_function(1);
-			return true;
-		}
-	}
-
 	i64 score = check_distance_between_types(c, operand, type, allow_array_programming);
 	if (score >= 0) {
 		if (score_) *score_ = assign_score_function(score, is_variadic);
