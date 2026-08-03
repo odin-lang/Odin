@@ -12,16 +12,12 @@ foo :: proc(x: int, poly: proc(int) -> int = identity) -> int {
 @test
 test_issue_6753 :: proc(t: ^testing.T) {
     p: proc(int) -> int = identity
-
-	testing.expect(t, p != nil)
-
-    if p != nil {
-		testing.expect(t, p(123) == 123)
-    }
+	testing.expect(t, p != nil, "polymorphic procedure was not instantiated")
+	testing.expect_value(t, p(123), 123)
 }
 
 // failing as returns before specialized
 @test
 test_issue_default_poly_parameter_6753 :: proc(t: ^testing.T) {
-	testing.expect(t, foo(123) == 123)
+	testing.expect_value(t, foo(123), 123)
 }

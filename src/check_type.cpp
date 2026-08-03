@@ -2143,8 +2143,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						// This is just to add the error message to determine_type_from_polymorphic which
 						// depends on valid position information
 						op.expr = _params;
-						op.mode = Addressing_Invalid;
-						op.type = t_invalid;
+
+						// NOTE(taylbr): Can still have valid type with null expr. Needed for resolving
+						if (op.mode == Addressing_Invalid || op.type == nullptr) {
+							op.mode = Addressing_Invalid;
+							op.type = t_invalid;
+						}
 					}
 					if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);
