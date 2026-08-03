@@ -4669,6 +4669,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TypeProc *procedure_type, Ast* call_expression) {
 	switch (param_value.kind) {
 	case ParameterValue_Constant:
+		if (param_value.proc_entity != nullptr && is_type_proc(parameter_type)) {
+			lbValue v = lb_find_procedure_value_from_entity(p->module, param_value.proc_entity);
+			if (v.value != nullptr) {
+				return lb_emit_conv(p, v, parameter_type);
+			}
+		}
 		if (is_type_constant_type(parameter_type)) {
 			auto res = lb_const_value(p->module, parameter_type, param_value.value);
 			return res;

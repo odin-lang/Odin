@@ -32,6 +32,12 @@ $ODIN build ../test_issue_5043.odin $COMMON
 $ODIN build ../test_issue_5097.odin $COMMON
 $ODIN build ../test_issue_5097-2.odin $COMMON
 $ODIN build ../test_issue_5265.odin $COMMON
+if [[ $($ODIN build ../test_issue_5573.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN test ../test_issue_5699.odin $COMMON
 $ODIN test ../test_issue_6068.odin $COMMON
 $ODIN test ../test_issue_6101.odin $COMMON
@@ -74,7 +80,7 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_6484.odin -no-entry-point $COMMON
-$ODIN test ../test_issue_6753.odin -no-entry-point $COMMON
+$ODIN test ../test_issue_6753.odin $COMMON
 if [[ $($ODIN check ../test_issue_6874.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
 	echo "SUCCESSFUL 1/1"
 else

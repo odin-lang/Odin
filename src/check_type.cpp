@@ -1791,6 +1791,7 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 					if (e->kind == Entity_Procedure) {
 						param_value.kind = ParameterValue_Constant;
 						param_value.value = exact_value_procedure(e->identifier);
+						param_value.proc_entity = e;
 						add_entity_use(ctx, e->identifier, e);
 					} else {
 						if (e->flags & EntityFlag_Param) {
