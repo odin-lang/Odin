@@ -3,6 +3,78 @@ package simd_arm
 
 import "core:simd"
 
+// Bitwise Select.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbsl_p8)
+@(require_results, enable_target_feature = "neon")
+vbsl_p8 :: #force_inline proc "c" (a: uint8x8_t, b: poly8x8_t, c: poly8x8_t) -> poly8x8_t {
+	not := int8x8_t(-1)
+	return simd.bit_or(
+		simd.bit_and(a, b),
+		simd.bit_and(simd.bit_xor(a, transmute(uint8x8_t)not), c),
+	)
+}
+
+// Bitwise Select.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbsl_p16)
+@(require_results, enable_target_feature = "neon")
+vbsl_p16 :: #force_inline proc "c" (a: uint16x4_t, b: poly16x4_t, c: poly16x4_t) -> poly16x4_t {
+	not := int16x4_t(-1)
+	return simd.bit_or(
+		simd.bit_and(a, b),
+		simd.bit_and(simd.bit_xor(a, transmute(uint16x4_t)not), c),
+	)
+}
+
+// Bitwise Select.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbsl_p64)
+@(require_results, enable_target_feature = "neon")
+vbsl_p64 :: #force_inline proc "c" (a: poly64x1_t, b: poly64x1_t, c: poly64x1_t) -> poly64x1_t {
+	not := int64x1_t(-1)
+	return simd.bit_or(
+		simd.bit_and(a, b),
+		simd.bit_and(simd.bit_xor(a, transmute(poly64x1_t)not), c),
+	)
+}
+
+// Bitwise Select.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbslq_p8)
+@(require_results, enable_target_feature = "neon")
+vbslq_p8 :: #force_inline proc "c" (a: uint8x16_t, b: poly8x16_t, c: poly8x16_t) -> poly8x16_t {
+	not := int8x16_t(-1)
+	return simd.bit_or(
+		simd.bit_and(a, b),
+		simd.bit_and(simd.bit_xor(a, transmute(poly8x16_t)not), c),
+	)
+}
+
+// Bitwise Select.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbslq_p16)
+@(require_results, enable_target_feature = "neon")
+vbslq_p16 :: #force_inline proc "c" (a: uint16x8_t, b: poly16x8_t, c: poly16x8_t) -> poly16x8_t {
+	not := int16x8_t(-1)
+	return simd.bit_or(
+		simd.bit_and(a, b),
+		simd.bit_and(simd.bit_xor(a, transmute(poly16x8_t)not), c),
+	)
+}
+
+// Bitwise Select.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vbslq_p64)
+@(require_results, enable_target_feature = "neon")
+vbslq_p64 :: #force_inline proc "c" (a: poly64x2_t, b: poly64x2_t, c: poly64x2_t) -> poly64x2_t {
+	not := int64x2_t(-1)
+	return simd.bit_or(
+		simd.bit_and(a, b),
+		simd.bit_and(simd.bit_xor(a, transmute(poly64x2_t)not), c),
+	)
+}
+
 // Join two smaller vectors into a single larger vector
 //
 // [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcombine_p8)
