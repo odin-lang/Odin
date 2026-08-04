@@ -2447,7 +2447,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			} else {
 				Operand o = {};
 				Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
-				if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+				if (e == nullptr || (e->kind != Entity_Procedure && (e->flags & EntityFlag_Param) == 0)) {
 					error(arg, "'#caller_expression' expected a valid earlier parameter name");
 				}
 				arg->Ident.entity = e;
