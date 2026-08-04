@@ -5026,8 +5026,6 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 					variadic_args = lb_build_expr(p, variadic[0]);
 					variadic_args = lb_emit_conv(p, variadic_args, slice_type);
 				} else {
-					Type *elem_type = slice_type->Slice.elem;
-
 					auto var_args = array_make<lbValue>(heap_allocator(), 0, variadic.count);
 					defer (array_free(&var_args));
 					for (Ast *var_arg : variadic) {
