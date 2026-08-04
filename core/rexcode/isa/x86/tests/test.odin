@@ -3010,10 +3010,11 @@ run_label_map_tests :: proc() {
 
 	x86.decode(code_buf[:byte_count], nil, &decoded_insts, &decoded_info, &decoded_labels, &decode_errors)
 
-	// Print with named labels (printer wants id→name; Label_Map stores name→id).
-	id_to_name := make(map[u32]string, len(lm.names), context.temp_allocator)
-	for name, id in lm.names { id_to_name[id] = name }
-	output := x86.tprint(decoded_insts[:], decoded_info[:], lm.labels[:], label_names=&id_to_name)
+	// Print with named labels (printer wants BYTE OFFSET → name; Label_Map stores name → id, and
+	// after encode each id's Label_Definition holds its byte offset).
+	names := make(x86.Label_Names, len(lm.names), context.temp_allocator)
+	for name, id in lm.names { names[x86.Label_Offset(u32(lm.labels[id]))] = name }
+	output := x86.tprint(decoded_insts[:], decoded_info[:], lm.labels[:], label_names=&names)
 
 	// Verify output contains named labels
 	// Note: JNZ and JNE are the same instruction, decoder may output either

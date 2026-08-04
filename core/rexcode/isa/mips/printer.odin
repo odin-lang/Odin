@@ -74,7 +74,7 @@ sbprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	opts := options
 	if opts == nil {
@@ -83,14 +83,11 @@ sbprint :: proc(
 		opts = &defaults
 	}
 
-	// Offset -> label_id index (single linear pass over label_defs).
-	offset_to_label: map[u32]u32
-	defer delete(offset_to_label)
-	for ld, id in label_defs {
-		if ld != LABEL_UNDEFINED {
-			offset_to_label[u32(ld)] = u32(id)
-		}
-	}
+	// Display-side label naming: numbers in ADDRESS order (independent of the internal ids'
+	// allocation order), caller names keyed by byte offset (isa.Label_Display).
+	display: isa.Label_Display
+	isa.label_display_init(&display, label_defs, label_names)
+	defer isa.label_display_destroy(&display)
 
 	for i in 0..<len(instructions) {
 		inst := &instructions[i]
@@ -99,9 +96,9 @@ sbprint :: proc(
 			offset = inst_info[i].offset
 		}
 
-		// Label at this offset?
-		if label_id, has := offset_to_label[offset]; has {
-			write_label(sb, label_id, label_names, opts)
+		// A displayable label at this offset — a definition, or a caller-named offset?
+		if isa.label_display_at(&display, offset) {
+			isa.label_display_write(&display, sb, offset, opts.label_prefix)
 			strings.write_byte(sb, ':')
 			strings.write_string(sb, opts.separator)
 		}
@@ -123,7 +120,7 @@ sbprint :: proc(
 						strings.write_byte(sb, ' ')
 					}
 				}
-				write_operand(sb, &inst.ops[slot], offset_to_label, label_names, opts)
+				write_operand(sb, &inst.ops[slot], &display, opts)
 			}
 		}
 		strings.write_string(sb, opts.separator)
@@ -137,7 +134,7 @@ sbprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sbprint(sb, instructions, inst_info, label_defs, tokens, options, label_names)
 	strings.write_byte(sb, '\n')
@@ -153,7 +150,7 @@ print :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -166,7 +163,7 @@ println :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -179,7 +176,7 @@ aprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 	allocator := context.allocator,
 ) -> string {
 	sb := strings.builder_make(allocator)
@@ -193,7 +190,7 @@ aprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 	allocator := context.allocator,
 ) -> string {
 	sb := strings.builder_make(allocator)
@@ -207,7 +204,7 @@ tprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -220,7 +217,7 @@ tprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -234,7 +231,7 @@ bprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_from_bytes(buf)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -248,7 +245,7 @@ bprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_from_bytes(buf)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -262,7 +259,7 @@ fprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -276,7 +273,7 @@ fprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -290,7 +287,7 @@ wprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -304,7 +301,7 @@ wprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -404,11 +401,10 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 
 @(private="file")
 write_operand :: proc(
-	sb:              ^strings.Builder,
-	op:              ^Operand,
-	offset_to_label: map[u32]u32,
-	label_names:     ^map[u32]string,
-	opts:            ^Print_Options,
+	sb:      ^strings.Builder,
+	op:      ^Operand,
+	display: ^isa.Label_Display,
+	opts:    ^Print_Options,
 ) {
 	switch op.kind {
 	case .NONE:
@@ -428,30 +424,13 @@ write_operand :: proc(
 
 	case .RELATIVE:
 		target := u32(op.relative)
-		if id, has := offset_to_label[target]; has {
-			write_label(sb, id, label_names, opts)
+		if isa.label_display_at(display, target) {
+			isa.label_display_write(display, sb, target, opts.label_prefix)
 		} else {
 			// No label discovered at this target -- fall back to absolute hex.
 			isa.print_hex(sb, u64(target), opts)
 		}
 	}
-}
-
-@(private="file")
-write_label :: proc(
-	sb:          ^strings.Builder,
-	label_id:    u32,
-	label_names: ^map[u32]string,
-	opts:        ^Print_Options,
-) {
-	if label_names != nil {
-		if name, has := label_names^[label_id]; has {
-			strings.write_string(sb, name)
-			return
-		}
-	}
-	strings.write_string(sb, opts.label_prefix)
-	write_decimal_u32(sb, label_id)
 }
 
 @(private="file")
