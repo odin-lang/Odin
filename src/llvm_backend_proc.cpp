@@ -3355,6 +3355,95 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 	// "Intrinsics"
 
+	case BuiltinProc_soa_copy_from_slice:
+		{
+			lbValue ptr    = lb_build_expr(p, ce->args[0]);
+			lbValue offset = lb_build_expr(p, ce->args[1]);
+			lbValue args   = lb_build_expr(p, ce->args[2]);
+
+			Type *ptr_type = base_type(ptr.type);
+			Type *array_type = base_type(type_deref(ptr_type));
+			GB_ASSERT(is_type_soa_dynamic_array(array_type));
+
+			Type *elem = array_type->Struct.soa_elem;
+
+			i32 field_count = 0;
+			if (is_type_array(elem)) {
+				field_count = cast(i32)get_array_type_count(elem);
+			} else {
+				Type *bt = base_type(elem);
+				GB_ASSERT(bt->kind == Type_Struct);
+				field_count = cast(i32)bt->Struct.fields.count;
+			}
+			if (field_count == 0) {
+				return {};
+			}
+			GB_ASSERT(field_count >= 1);
+
+			Type *slice_type = base_type(args.type);
+			GB_ASSERT(slice_type->kind == Type_Slice);
+			GB_ASSERT(are_types_identical(slice_type->Slice.elem, elem));
+
+			lbValue arg_ptr = lb_slice_elem(p, args);
+			lbValue arg_len = lb_slice_len(p, args);
+
+			lbValue soa_array_len = lb_soa_struct_len(p, ptr);
+
+			offset = lb_emit_conv(p, offset, t_int);
+			lbValue max_soa_len = lb_emit_arith(p, Token_Sub, soa_array_len, offset, t_int);
+			lbValue max_len = lb_emit_min(p, t_int, arg_len, max_soa_len);
+
+			if (field_count <= 16) {
+				lbValue *ps = gb_alloc_array(temporary_allocator(), lbValue, field_count);
+				for (i32 field_index = 0; field_index < field_count; field_index++) {
+					ps[field_index] = lb_emit_load(p, lb_emit_struct_ep(p, ptr, field_index));
+				}
+
+				for (i32 field_index = 0; field_index < field_count; field_index++) {
+					auto loop_data = lb_loop_start_runtime(p, max_len);
+
+					lbValue j = loop_data.idx;
+					lbValue index = lb_emit_arith(p, Token_Add, j, offset, t_int);
+
+					lbValue dst = lb_emit_ptr_offset(p, ps[field_index], index);
+					// make sure it's ^T and not [^]T
+					dst.type = alloc_type_multi_pointer_to_pointer(dst.type);
+
+					lbValue src_ptr = lb_emit_ptr_offset(p, arg_ptr, j);
+					src_ptr = lb_emit_struct_ep(p, src_ptr, field_index);
+
+					lbValue src = lb_emit_load(p, src_ptr);
+					lb_emit_store(p, dst, src);
+
+					lb_loop_end(p, loop_data);
+				}
+			} else {
+				for (i32 field_index = 0; field_index < field_count; field_index++) {
+					Type *type = array_type->Struct.fields[field_index]->type;
+					GB_ASSERT(type->kind == Type_MultiPointer);
+					type = type->MultiPointer.elem;
+
+					lbValue dst = lb_emit_load(p, lb_emit_struct_ep(p, ptr, field_index));
+					dst = lb_emit_ptr_offset(p, dst, offset);
+					dst.type = alloc_type_multi_pointer_to_pointer(dst.type);
+
+					auto loop_data = lb_loop_start_runtime(p, max_len);
+
+					lbValue src = lb_emit_ptr_offset(p, arg_ptr, loop_data.idx);
+
+					lbValue d = lb_emit_ptr_offset(p, dst, loop_data.idx);
+					lbValue s = lb_emit_struct_ep(p, src, field_index);
+
+					GB_ASSERT(are_types_identical(d.type, s.type));
+
+					lb_mem_copy_non_overlapping(p, d, s, lb_const_int(p->module, t_int, type_size_of(type)), false);
+
+					lb_loop_end(p, loop_data);
+				}
+			}
+			return {};
+		}
+
 	case BuiltinProc_alloca:
 		{
 			lbValue sz = lb_build_expr(p, ce->args[0]);
@@ -3418,6 +3507,18 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs $0, cntvct_el0"), str_lit("=r"), has_side_effects);
 				GB_ASSERT(the_asm != nullptr);
 				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			#if LLVM_VERSION_MAJOR > 19 || (LLVM_VERSION_MAJOR == 19 && LLVM_VERSION_MINOR >= 1)
+			} else if (build_context.metrics.arch == TargetArch_riscv64 && build_context.metrics.os == TargetOs_linux) {
+				// Linux in it's infinite wisdom decided that `rdcycle` should not be
+				// available to userland past Linux 6.6.  Some inline assembly with
+				// `rdtime` would also work, but LLVM issue #117701 suggests just
+				// using this intrinsic.
+				//
+				// Support for this was introduced in commit `b8ed69e`, and is present
+				// in LLVM tags 19.1.0-rc1.
+				char const *name = "llvm.readsteadycounter";
+				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
+			#endif
 			} else {
 				char const *name = "llvm.readcyclecounter";
 				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);

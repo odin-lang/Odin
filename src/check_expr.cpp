@@ -1307,8 +1307,12 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				if (context_name == "procedure argument") {
 					if (is_type_slice(src) && are_types_identical(src->Slice.elem, dst)) {
 						gbString a = expr_to_string(operand->expr);
-						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n\n", a);
+						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n", a);
 						gb_string_free(a);
+					}
+				} else if (context_name == "bit_set 'in'") {
+					if (is_type_bit_set(operand->type)) {
+						error_line("\tSuggestion: Prefer <= if you want a superset\n");
 					}
 				}
 				if (src->kind == dst->kind && src->kind == Type_Proc) {
@@ -4421,7 +4425,12 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 
 		if (is_type_bit_set(rhs_type)) {
 			Type *elem = base_type(rhs_type)->BitSet.elem;
-			check_expr_with_type_hint(c, x, be->left, elem);
+			Type *type_hint = elem;
+			Ast *left = unparen_expr(be->left);
+			if (left != nullptr && left->kind == Ast_CompoundLit) {
+				type_hint = rhs_type;
+			}
+			check_expr_with_type_hint(c, x, left, type_hint);
 		} else if (is_type_map(rhs_type)) {
 			Type *key = base_type(rhs_type)->Map.key;
 			check_expr_with_type_hint(c, x, be->left, key);

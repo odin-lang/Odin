@@ -253,8 +253,6 @@ b3BodyId b3CreateBody( b3WorldId worldId, const b3BodyDef* def )
 		bodyState->angularVelocity = def->angularVelocity;
 		bodyState->deltaRotation = b3Quat_identity;
 		bodyState->flags = bodySim->flags;
-
-		bodySim->maxAngularVelocity = b3Length( def->angularVelocity ) + 5.0f;
 	}
 
 	if ( bodyId == world->bodies.count )
@@ -2303,6 +2301,37 @@ bool b3Body_IsBullet( b3BodyId bodyId )
 	b3World* world = b3GetWorld( bodyId.world0 );
 	b3Body* body = b3GetBodyFullId( world, bodyId );
 	return ( body->flags & b3_isBullet ) != 0;
+}
+
+void b3Body_AllowFastRotation(b3BodyId bodyId, bool flag)
+{
+	b3World* world = b3GetUnlockedWorld( bodyId.world0 );
+	if ( world == NULL )
+	{
+		return;
+	}
+
+	B3_REC( world, BodyAllowFastRotation, bodyId, flag );
+
+	uint32_t newFlag = flag ? b3_allowFastRotation : 0;
+
+	b3Body* body = b3GetBodyFullId( world, bodyId );
+	if ( ( body->flags & b3_allowFastRotation ) == newFlag )
+	{
+		return;
+	}
+
+	body->flags &= ~b3_allowFastRotation;
+	body->flags |= newFlag;
+
+	b3SyncBodyFlags( world, body );
+}
+
+bool b3Body_IsFastRotationAllowed(b3BodyId bodyId)
+{
+	b3World* world = b3GetWorld( bodyId.world0 );
+	b3Body* body = b3GetBodyFullId( world, bodyId );
+	return ( body->flags & b3_allowFastRotation ) != 0;
 }
 
 void b3Body_EnableContactRecycling( b3BodyId bodyId, bool flag )

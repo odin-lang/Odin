@@ -833,6 +833,14 @@ foreign lib {
 	// Is this body a bullet?
 	Body_IsBullet :: proc(bodyId: BodyId) -> bool ---
 
+	// Allow this body to rotate fast. Useful for axially symmetric bodies, such as vehicle wheels.
+	// Normally rotation speed is clamped to improve CCD. However, this clamping is unnecessary for
+	// bodies that only rotate fast around an axis of symmetry.
+	Body_AllowFastRotation :: proc(bodyId: BodyId, flag: bool) ---
+
+	// Is this body allowed to rotate fast?
+	Body_IsFastRotationAllowed :: proc(bodyId: BodyId) -> bool ---
+
 	// Enable or disable contact recycling for this body. Contact recycling is a performance optimization
 	// that reuses contact manifolds when bodies move slightly. Disabling it can avoid ghost collisions
 	// on characters at the cost of higher per-step work. Existing contacts retain their prior setting;
@@ -895,6 +903,10 @@ foreign lib {
 	 * @defgroup shape Shape
 	 * Functions to create, destroy, and access.
 	 * Shapes bind raw geometry to bodies and hold material properties including friction and restitution.
+	 * You may add multiple shapes to a single body. There are no hard limits on shape count per body.
+	 *
+	 * When you create a shape on a body the center of mass moves. This can lead to the body linear velocity
+	 * changing if the angular velocity is non-zero.
 	 * @{
 	 */
 
@@ -933,8 +945,10 @@ foreign lib {
 	// @return the shape id for accessing the shape
 	CreateHeightFieldShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, heightField: ^HeightFieldData) -> ShapeId ---
 
-	// Compound shapes are only allowed on static bodies.
-	CreateCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
+	// Baked compound shapes are only allowed on static bodies.
+	// Note: runtime compounds are achieved by adding multiple shapes to a body.
+	// Runtime compounds can be dynamic and/or kinematic.
+	CreateBakedCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
 
 	// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
 	//	body are destroyed at once.
