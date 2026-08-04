@@ -1614,6 +1614,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->fini_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
+	array_init(&i->foreign_library_names, a, 0, 0);
 	array_init(&i->defineables, a);
 
 	map_init(&i->objc_msgSend_types);
@@ -1653,6 +1654,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
+	array_free(&i->foreign_library_names);
 	array_free(&i->defineables);
 
 	array_free(&i->all_procedures);
@@ -5786,6 +5788,7 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 		add_untyped_expressions(ctx.info, &untyped);
 
 		e->LibraryName.paths = fl->fullpaths;
+		array_add(&c->info.foreign_library_names, e); // for -cached mtime checking
 	}
 
 	for (Entity *e = nullptr; mpsc_dequeue(&c->info.foreign_decls_to_check, &e); /**/) {
