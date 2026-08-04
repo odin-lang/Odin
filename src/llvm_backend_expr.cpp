@@ -4393,6 +4393,19 @@ gb_internal lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	return res;
 }
 
+gb_internal Type *lb_build_expr_original_const_type(Ast *expr) {
+	expr = unparen_expr(expr);
+	Type *type = type_of_expr(expr);
+	if (is_type_union(type)) {
+		if (expr->kind == Ast_CallExpr) {
+			if (expr->CallExpr.proc->tav.mode == Addressing_Type) {
+				return lb_build_expr_original_const_type(expr->CallExpr.args[0]);
+			}
+		}
+	}
+	return type;
+}
+
 gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
