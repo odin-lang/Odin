@@ -20,18 +20,18 @@ foo_poly :: proc(x: $T, g: proc(T) -> T = f_poly) -> T {
 }
 
 @test
-test_issue_6753_ambiguous_poly_argumentment :: proc (t: ^testing.T) {
-    testing.expect_value(t, foo_group(1, f_poly), 1) // should be no ambiguity whether foo_concrete or foo_impossible
+test_issue_6753_ambiguous_poly_argument :: proc (t: ^testing.T) {
+	testing.expect_value(t, foo_group(1, f_poly), 1) // should be no ambiguity whether foo_concrete or foo_impossible
 }
 
 @test
 test_issue_6753_default_poly_proc :: proc (t: ^testing.T) {
-    testing.expect_value(t, foo_poly(1), 1)
+	testing.expect_value(t, foo_poly(1), 1)
 }
 
 @test
 test_issue_6753_parapoly_proc_variable :: proc(t: ^testing.T) {
-    p: proc(int) -> int = f_poly
+	p: proc(int) -> int = f_poly
 	testing.expect(t, p != nil, "polymorphic procedure was not instantiated")
 	testing.expect_value(t, p(123), 123)
 }
@@ -58,7 +58,7 @@ bar_group :: proc { bar_poly, bar_bytes }
 
 @test
 test_issue_6753_parapoly_default_in_group :: proc(t: ^testing.T) {
-      testing.expect_value(t, bar_group(123, describe), "#123")
-      testing.expect_value(t, bar_group("hi"), "#hi")
-      testing.expect_value(t, bar_group([]byte{1, 2}, describe_bytes), "bytes")
+	testing.expect_value(t, bar_group(123, describe), "#123")
+	testing.expect_value(t, bar_group("hi"), "#hi")
+	testing.expect_value(t, bar_group([]byte{1, 2}, describe_bytes), "bytes")
 }
