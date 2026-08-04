@@ -278,13 +278,17 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	// NOTE(bill): offset==0 is the return value
 	isize offset = 1;
-	if (pt->Proc.return_by_pointer) {
+	lbFunctionType *ft = p->abi_function_type;
+	GB_ASSERT(ft != nullptr);
+	if (ft->ret.kind == lbArg_Indirect) {
+		// return by pointer prepends an sret param
 		offset = 2;
 	}
 
-	isize parameter_index = 0;
 	if (pt->Proc.param_count) {
 		TypeTuple *params = &pt->Proc.params->Tuple;
+		isize parameter_index = 0;   // 0-based position among the Odin proc params in the LLVM function signature
+		isize ft_args_index = 0;     // index into ft->args
 		for (isize i = 0; i < pt->Proc.param_count; i++) {
 			Entity *e = params->variables[i];
 			if (e->kind != Entity_Variable) {
@@ -292,6 +296,13 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			}
 
 			if (i+1 == params->variables.count && pt->Proc.c_vararg) {
+				continue;
+			}
+
+			GB_ASSERT(ft_args_index < ft->args.count);
+			lbArgType *arg = &ft->args[ft_args_index++];
+			if (arg->kind == lbArg_Ignore) {
+				// these are not present in the LLVM function signature, don't advance parameter_index
 				continue;
 			}
 
