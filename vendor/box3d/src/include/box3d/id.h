@@ -96,13 +96,14 @@ static const b3JointId b3_nullJointId = B3_NULL_ID;
 static const b3ContactId b3_nullContactId = B3_NULL_ID;
 
 /// Macro to determine if any id is null.
-#define B3_IS_NULL( id ) ( id.index1 == 0 )
+#define B3_IS_NULL( id ) ( ( id ).index1 == 0 )
 
 /// Macro to determine if any id is non-null.
-#define B3_IS_NON_NULL( id ) ( id.index1 != 0 )
+#define B3_IS_NON_NULL( id ) ( ( id ).index1 != 0 )
 
 /// Compare two ids for equality. Doesn't work for b3WorldId. Don't mix types.
-#define B3_ID_EQUALS( id1, id2 ) ( id1.index1 == id2.index1 && id1.world0 == id2.world0 && id1.generation == id2.generation )
+#define B3_ID_EQUALS( id1, id2 )                                                                                                 \
+	( ( id1 ).index1 == ( id2 ).index1 && ( id1 ).world0 == ( id2 ).world0 && ( id1 ).generation == ( id2 ).generation )
 
 /// Store a world id into a uint32_t.
 B3_ID_INLINE uint32_t b3StoreWorldId( b3WorldId id )

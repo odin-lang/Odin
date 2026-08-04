@@ -77,7 +77,8 @@ void b3ParallelFor( b3World* world, b3ParallelForCallback* callback, int itemCou
 	// Target multiple blocks per worker to reduce thread stalls.
 	// block size grows once items exceed maxBlockCount * minRange
 	// so the block count stays bounded and per-block sync overhead stays low.
-	int blocksPerWorker = 4;
+	// Benchmarking shows 32 is optimal for the convex pile benchmark and others.
+	int blocksPerWorker = 32;
 	int maxBlockCount = blocksPerWorker * workerCount;
 
 	int blockSize;

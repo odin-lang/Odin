@@ -5,6 +5,10 @@ Makefile text eol=lf
 *.sh text eol=lf
 vendor/box2d/lib/box2d_windows_amd64_avx2.lib filter=lfs diff=lfs merge=lfs -text
 vendor/box2d/lib/box2d_windows_amd64_sse2.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box3d/lib/linux-amd64/libbox3d.a filter=lfs diff=lfs merge=lfs -text
+vendor/box3d/lib/linux-arm64/libbox3d.a filter=lfs diff=lfs merge=lfs -text
+vendor/box3d/lib/darwin/libbox3d.a filter=lfs diff=lfs merge=lfs -text
+vendor/box3d/lib/box3d.lib filter=lfs diff=lfs merge=lfs -text
 vendor/miniaudio/lib/miniaudio.lib filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/SDL3.dll filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/SDL3.lib filter=lfs diff=lfs merge=lfs -text
@@ -31,5 +35,3 @@ vendor/raylib/windows/raylibdll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raygui.dll filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raygui.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/rayguidll.lib filter=lfs diff=lfs merge=lfs -text
-vendor/box3d/lib/linux-amd64/libbox3d.a filter=lfs diff=lfs merge=lfs -text
-vendor/box3d/lib/darwin/libbox3d.a filter=lfs diff=lfs merge=lfs -text
