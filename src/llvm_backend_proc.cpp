@@ -653,7 +653,8 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 			bool is_odin_cc = is_calling_convention_odin(ft->calling_convention);
 
-			unsigned param_index = 0;
+			unsigned param_index = 0;      // index into ft->args and the source param position used for debug info
+			unsigned llvm_param_index = 0; // 0-based position among the Odin proc params in the LLVM function signature
 			for_array(i, params->variables) {
 				Entity *e = params->variables[i];
 				if (e->kind != Entity_Variable) {
@@ -667,6 +668,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 				lbArgType *arg_type = &ft->args[param_index];
 				defer (param_index += 1);
+				// lbArg_Ignore params are not present in the LLVM function signature, 
+				// so they don't advance the LLVM signature position
+				defer (if (arg_type->kind != lbArg_Ignore) { llvm_param_index += 1; });
 
 				if (arg_type->kind == lbArg_Ignore) {
 					// Even though it is an ignored argument, it might still be referenced in the
@@ -676,7 +680,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 				} else if (arg_type->kind == lbArg_Direct) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						LLVMTypeRef param_type = lb_type(p->module, e->type);
-						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
+						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
 						LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
 
 						lbValue param = {};
@@ -703,7 +707,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						}
 
 						lbValue ptr = {};
-						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
+						ptr.value = LLVMGetParam(p->value, param_offset+llvm_param_index);
 						ptr.type = alloc_type_pointer(e->type);
 
 						if (do_callee_copy) {
