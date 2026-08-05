@@ -7135,7 +7135,9 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 							Entity *e = entry.value;
 							switch (e->kind) {
 							case Entity_TypeName: {
-								// if (print_count == 0) error_line("\n\tWith the following definitions:\n");
+								// NOTE: the leading "  " is required; a genuinely empty line
+								// terminates the error message when it is printed.
+								if (print_count == 0) error_line("  \n\tWith the following definitions:\n");
 
 								gbString str = type_to_string(e->type);
 								error_line("\t\t%.*s :: %s;\n", LIT(e->token.string), str);
@@ -7144,7 +7146,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 								break;
 							}
 							case Entity_Constant: {
-								if (print_count == 0) error_line("\n\tWith the following definitions:\n");
+								if (print_count == 0) error_line("  \n\tWith the following definitions:\n");
 
 								gbString str = exact_value_to_string(e->Constant.value);
 								if (is_type_untyped(e->type)) {
