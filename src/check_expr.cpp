@@ -410,6 +410,15 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
+		// NOTE: polymorphic procedure check not idempotent without this
+		if (src->Proc.is_poly_specialized && base_entity->Procedure.generated_from_polymorphic) {
+			if (are_types_identical(src, dst)) {
+				if (poly_proc_data) {
+					poly_proc_data->gen_entity = base_entity;
+				}
+				return true;
+			}
+		}
 		return false;
 	}
 
@@ -457,9 +466,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
-	if (nctx.polymorphic_scope == nullptr) {
-		nctx.polymorphic_scope = scope;
-	}
+	nctx.polymorphic_scope = scope;
 
 
 	auto *pt = &src->Proc;
@@ -1021,17 +1028,6 @@ gb_internal bool check_is_assignable_to_with_score(CheckerContext *c, Operand *o
 	if (operand->mode == Addressing_Invalid || type == t_invalid) {
 		if (score_) *score_ = 0;
 		return false;
-	}
-
-	// Handle polymorphic procedure used as default parameter
-	if (operand->mode == Addressing_Value && is_type_proc(type) && is_type_proc(operand->type)) {
-		Entity *e = entity_from_expr(operand->expr);
-		if (e != nullptr && e->kind == Entity_Procedure && is_type_polymorphic(e->type) && !is_type_polymorphic(type)) {
-			// Special case: Allow a polymorphic procedure to be used as default value for concrete proc type
-			// during the initial check. It will be properly instantiated when actually used.
-			if (score_) *score_ = assign_score_function(1);
-			return true;
-		}
 	}
 
 	i64 score = check_distance_between_types(c, operand, type, allow_array_programming);

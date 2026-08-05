@@ -1791,6 +1791,7 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 					if (e->kind == Entity_Procedure) {
 						param_value.kind = ParameterValue_Constant;
 						param_value.value = exact_value_procedure(e->identifier);
+						param_value.proc_entity = e;
 						add_entity_use(ctx, e->identifier, e);
 					} else {
 						if (e->flags & EntityFlag_Param) {
@@ -2143,8 +2144,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						// This is just to add the error message to determine_type_from_polymorphic which
 						// depends on valid position information
 						op.expr = _params;
-						op.mode = Addressing_Invalid;
-						op.type = t_invalid;
+
+						// NOTE(taylbr): Can still have valid type with null expr. Needed for resolving
+						if (op.mode == Addressing_Invalid || op.type == nullptr) {
+							op.mode = Addressing_Invalid;
+							op.type = t_invalid;
+						}
 					}
 					if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);

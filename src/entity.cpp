@@ -111,6 +111,7 @@ enum ParameterValueKind {
 struct ParameterValue {
 	ParameterValueKind kind;
 	Ast *original_ast_expr;
+	Entity *proc_entity;
 	union {
 		ExactValue value;
 		Ast *ast_value;
