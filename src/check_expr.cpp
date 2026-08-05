@@ -7650,13 +7650,13 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	auto print_argument_types = [&]() {
 		error_line("\tGiven argument types:\n");
-		isize i = 0;
 		for (Operand const &o : positional_operands) {
 			gbString type = type_to_string(o.type);
 			defer (gb_string_free(type));
 			error_line("\t • %s\n", type);
 		}
-		for (Operand const &o : named_operands) {
+		for_array(i, named_operands) {
+			Operand const &o = named_operands[i];
 			gbString type = type_to_string(o.type);
 			defer (gb_string_free(type));
 
@@ -7830,14 +7830,15 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					}
 					error_line("%s", expr);
 				}
-				for (Operand const &o : named_operands) {
+				for_array(named_idx, named_operands) {
+					Operand const &o = named_operands[named_idx];
 					if (i++ > 0) error_line(", ");
 
 					gbString expr = expr_to_string(o.expr);
 					defer (gb_string_free(expr));
 
-					if (i < ce->split_args->named.count) {
-						Ast *named_field = ce->split_args->named[i];
+					if (named_idx < ce->split_args->named.count) {
+						Ast *named_field = ce->split_args->named[named_idx];
 						ast_node(fv, FieldValue, named_field);
 
 						gbString field = expr_to_string(fv->field);
