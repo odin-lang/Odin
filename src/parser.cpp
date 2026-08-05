@@ -4317,7 +4317,7 @@ gb_internal u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_f
 				if (m.token_kind == Token_Hash) {
 					prefix = "#";
 				}
-				syntax_error(f->curr_token, "'%s%.*s' in not allowed within this field list", prefix, LIT(m.name));
+				syntax_error(f->curr_token, "'%s%.*s' is not allowed within this field list", prefix, LIT(m.name));
 			}
 		}
 

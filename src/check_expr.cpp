@@ -2739,7 +2739,7 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (is_type_integer(o->type) && is_type_pointer(type)) {
 		if (is_type_uintptr(o->type)) {
-			error_line("\tSuggestion: %a may be directly casted to %s\n", a, b);
+			error_line("\tSuggestion: %s may be directly casted to %s\n", a, b);
 		} else {
 			error_line("\tSuggestion: for an integer to be casted to a pointer, it must be converted to 'uintptr' first\n");
 		}
