@@ -2391,14 +2391,18 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_i32be:
 		case Basic_i64be:
 			if (c->bit_field_bit_size == 0) {
-				// return imin <= i && i <= imax;
+				// NOTE: the check below is a magnitude test (mp_count_bits() <= 64), 
+				// big_int_to_i64 would wrap u64 max to -1 and pass for any signed type.
+				// Compare magnitudes instead
 				if (!big_int_can_be_represented_in_64_bits(&i)) {
 					return false;
 				}
 
-				i64 val64 = big_int_to_i64(&i);
-
-				return imin_64 <= val64 && val64 <= imax_64;
+				u64 mag = mp_get_mag_u64(&i);
+				if (big_int_is_neg(&i)) {
+					return mag <= cast(u64)-(imin_64+1) + 1; // |imin_64|, without overflowing i64
+				}
+				return mag <= cast(u64)imax_64;
 			}
 			/*fallthrough*/
 		case Basic_i128le:
