@@ -70,12 +70,19 @@ Darwin)
 	;;
 Linux)
 	LIB_DIR="../lib/linux-$ARCH"
-	mkdir -p "$LIB_DIR"
-	$cc -c -O2 -std=c17 -fPIC -Iinclude src/*.c
-	$ar rcs "$LIB_DIR/$LIB_NAME" ./*.o
-	rm ./*.o
+	mkdir -p "$LIB_DIR" build
+	for src in src/*.c; do
+		obj="build/$(basename "${src%.c}.o")"
+		$cc -c -O2 -std=c17 -fPIC -Iinclude "$src" -o "$obj"
+	done
+	# Clean up old library in case `ar` is tempted to preserve old symbols
+	rm -f "$LIB_DIR/$LIB_NAME"
+	$ar rcs "$LIB_DIR/$LIB_NAME" build/*.o
+	$ranlib "$LIB_DIR/$LIB_NAME"
+	rm -rf build
 	;;
 *)
+
 	echo "Error: Unsupported operating system: $(uname -s)"
 	exit 1
 	;;
