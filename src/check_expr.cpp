@@ -7607,7 +7607,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	if (max_matched_features > 0) {
 		for_array(i, valids) {
-			Entity *p = procs[valids[i].index];
+			// NOTE: A polymorphic candidate appends its instantiated entity to proc_entities above,
+			// so valids[i].index can be >= procs.count.
+			Entity *p = proc_entities[valids[i].index];
 			Type *t = base_type(p->type);
 			GB_ASSERT(t->kind == Type_Proc);
 
