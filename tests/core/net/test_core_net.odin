@@ -304,7 +304,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 		r.length, r.err = net.recv_tcp(client, r.data[:])
 		return
 	}
-	
+
 	thread_data := [2]Thread_Data{}
 
 	wg: sync.Wait_Group
@@ -313,7 +313,7 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	thread_data[0].t = t
 	thread_data[0].wg = &wg
 	thread_data[0].tid = thread.create_and_start_with_data(&thread_data[0], tcp_server, context)
-	
+
 	sync.wait_group_wait(&wg)
 	sync.wait_group_add(&wg, 2)
 
@@ -522,6 +522,31 @@ join_url_test :: proc(t: ^testing.T) {
 			pass |= url == test_url
 		}
 		testing.expectf(t, pass, "Expected `net.join_url` to return one of %s, got %s", test.url, url)
+	}
+}
+
+@test
+percent_encode_test :: proc(t: ^testing.T) {
+	test_cases := []struct{input, expected: string} {
+		// Bytes < 0x10 must be zero-padded to two hex digits
+		{"\n",   "%0A"},
+		{"\t",   "%09"},
+		{"\r",   "%0D"},
+		{"a\nb", "a%0Ab"},
+		{"\x00", "%00"},
+
+		// Bytes >= 0x10
+		{" ",    "%20"},
+		{"😃",   "%F0%9F%98%83"},
+
+		// Unreserved characters pass through unescaped
+		{"AZaz09-_.~", "AZaz09-_.~"},
+	}
+
+	for test in test_cases {
+		encoded := net.percent_encode(test.input)
+		defer delete(encoded)
+		testing.expectf(t, encoded == test.expected, "Expected `net.percent_encode(%q)` to return %q, got %q", test.input, test.expected, encoded)
 	}
 }
 
