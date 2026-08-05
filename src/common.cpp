@@ -885,8 +885,13 @@ gb_internal isize levenstein_distance_case_insensitive(String const &a, String c
 					minimum = substitute;
 				}
 				// Damerau-Levenshtein (transposition extension)
+				// NOTE: this is the "optimal string alignment" variant, which is what this
+				// matrix supports; the transposition discount only applies when the two
+				// characters are actually swapped.
 				#if USE_DAMERAU_LEVENSHTEIN
-				if (i > 1 && j > 1) {
+				if (i > 1 && j > 1 &&
+				    a_c == gb_char_to_lower(cast(char)b.text[j-2]) &&
+				    b_c == gb_char_to_lower(cast(char)a.text[i-2])) {
 					isize transpose = matrix[(i-2)*w + j-2] + 1;
 					if (transpose < minimum) {
 						minimum = transpose;
