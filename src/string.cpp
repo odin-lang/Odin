@@ -959,9 +959,10 @@ gb_internal String quote_to_ascii(gbAllocator a, String16 str, u8 quote='"') {
 		}
 		if (width == 1 && r == GB_RUNE_INVALID) {
 			array_add(&buf, cast(u8)'\\');
-			array_add(&buf, cast(u8)'x');
-			array_add(&buf, cast(u8)lower_hex[s[0]>>4]);
-			array_add(&buf, cast(u8)lower_hex[s[0]&0xf]);
+			array_add(&buf, cast(u8)'u');
+			for (isize i = 12; i >= 0; i -= 4) {
+				array_add(&buf, cast(u8)lower_hex[(s[0]>>i)&0xf]);
+			}
 			continue;
 		}
 
