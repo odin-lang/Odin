@@ -19,7 +19,6 @@ package net
 */
 
 import "core:strings"
-import "core:strconv"
 import "core:unicode/utf8"
 import "core:encoding/hex"
 
