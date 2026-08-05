@@ -3121,7 +3121,7 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 			error(node, "Invalid matrix column count, got nothing");
 		} else {
 			gbString s = expr_to_string(column.expr);
-			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			error(column.expr, "Invalid matrix column count, expected %d+ columns, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 			gb_string_free(s);
 		}
 	}
