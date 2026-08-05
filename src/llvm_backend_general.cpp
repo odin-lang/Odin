@@ -330,6 +330,29 @@ gb_internal lbLoopData lb_loop_start(lbProcedure *p, isize count, Type *index_ty
 	return data;
 }
 
+gb_internal lbLoopData lb_loop_start_runtime(lbProcedure *p, lbValue count) {
+	lbLoopData data = {};
+
+	lbValue max = count;
+
+	data.idx_addr = lb_add_local_generated(p, count.type, true);
+
+	data.body = lb_create_block(p, "loop.body");
+	data.done = lb_create_block(p, "loop.done");
+	data.loop = lb_create_block(p, "loop.loop");
+
+	lb_emit_jump(p, data.loop);
+	lb_start_block(p, data.loop);
+
+	data.idx = lb_addr_load(p, data.idx_addr);
+
+	lbValue cond = lb_emit_comp(p, Token_Lt, data.idx, max);
+	lb_emit_if(p, cond, data.body, data.done);
+	lb_start_block(p, data.body);
+
+	return data;
+}
+
 gb_internal void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 	if (data.idx_addr.addr.value != nullptr) {
 		lb_emit_increment(p, data.idx_addr.addr);

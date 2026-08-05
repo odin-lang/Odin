@@ -69,7 +69,7 @@ chacha8rand_refill_simd128 :: proc(r: ^Default_Random_State) {
 		s8_ := intrinsics.byte_swap(k[4])
 		s9_ := intrinsics.byte_swap(k[5])
 		s10_ := intrinsics.byte_swap(k[6])
-		s11_ := intrinicss.byte_swap(k[7])
+		s11_ := intrinsics.byte_swap(k[7])
 	}
 
 	// 4-lane ChaCha8.

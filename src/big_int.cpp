@@ -249,13 +249,28 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
-		GB_ASSERT(base == 10);
-		GB_ASSERT(text[i] != '-');
+		if (base != 10) {
+			// An exponent is only meaningful for a base 10 literal.
+			*success = false;
+			return;
+		}
+		if (i >= len) {
+			// Nothing follows the exponent marker.
+			*success = false;
+			return;
+		}
+		if (text[i] == '-') {
+			// A negative exponent is never an integer.
+			// The caller is expected to parse the value as a float instead.
+			*success = false;
+			return;
+		}
 		if (text[i] == '+') {
 			i += 1;
 		}
 
 		u64 exp = 0;
+		isize exp_digits = 0;
 		for (; i < len; i++) {
 			char r = cast(char)text[i];
 			if (r == '_') {
@@ -270,6 +285,11 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			}
 			exp *= 10;
 			exp += v;
+			exp_digits += 1;
+		}
+		if (exp_digits == 0) {
+			*success = false;
+			return;
 		}
 
 		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).

@@ -2201,7 +2201,9 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	LLVMValueRef switch_instr = nullptr;
 	if (type_size_of(parent_base_type) == 0) {
 		GB_ASSERT(tag.value == nullptr);
-		switch_instr = LLVMBuildSwitch(p->builder, lb_const_bool(p->module, t_llvm_bool, false).value, else_block->block, cast(unsigned)num_cases);
+		GB_ASSERT(switch_kind == TypeSwitch_Union); // zero size only possible for union{}
+		Type *ut = type_deref(parent.type);
+		switch_instr = LLVMBuildSwitch(p->builder, lb_const_int(m, union_tag_type(ut), 0).value, else_block->block, cast(unsigned)num_cases);
 	} else {
 		GB_ASSERT(tag.value != nullptr);
 		switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);

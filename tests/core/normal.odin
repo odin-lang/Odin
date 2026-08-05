@@ -53,6 +53,7 @@ download_assets :: proc "contextless" () {
 @(require) import "text/i18n"
 @(require) import "text/match"
 @(require) import "text/regex"
+@(require) import "text/scanner"
 @(require) import "thread"
 @(require) import "time"
 @(require) import "unicode"
