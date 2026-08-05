@@ -178,8 +178,14 @@ encode :: proc(
 		if form_index >= 0 && form_index < len(ENCODE_RECIPES) {
 			recipe := &ENCODE_RECIPES[form_index]
 			if recipe.flags.eligible && transmute(u8)inst.flags == 0 {
-				imm_lit := recipe.imm_op < 0 || inst.ops[recipe.imm_op].kind == .IMMEDIATE
-				if imm_lit {
+				// The recipe emitter is contextless and cannot append relocations,
+				// so a labeled immediate or a labeled memory displacement must fall
+				// back to the interpreter (which emits the relocation).
+				imm_lit := recipe.imm_op < 0 ||
+					(inst.ops[recipe.imm_op].kind == .IMMEDIATE && !inst.ops[recipe.imm_op].flags.imm_is_label)
+				rm_lit := recipe.rm_op < 0 ||
+					inst.ops[recipe.rm_op].kind != .MEMORY || !inst.ops[recipe.rm_op].mem.disp_is_label
+				if imm_lit && rm_lit {
 					byte_count += emit_recipe(recipe, &inst, code[byte_count:])
 					continue
 				}
@@ -545,6 +551,8 @@ encode :: proc(
 			sib:               u8  = 0
 			disp:              i32 = 0
 			displacement_size: u8  = 0
+			disp_is_label          := false // disp32 references a label -> emit REL32
+			disp_label_id:     u32 = 0
 
 			// Reg field
 			if enc.flags.modrm_reg_ext {
@@ -572,6 +580,11 @@ encode :: proc(
 							rm = 0b101
 							disp = m.disp
 							displacement_size = 4
+							// A RIP-relative disp can carry a label id instead of a
+							// literal: emit a REL32 relocation at the disp32 offset
+							// (mirrors the .RELATIVE -> REL32 jump/call path).
+							disp_is_label = m.disp_is_label
+							disp_label_id = u32(m.disp)
 						} else if !mem_has_base(m) && !mem_has_index(m) {
 							mod = 0b00
 							rm = 0b100
@@ -633,13 +646,21 @@ encode :: proc(
 				pos += 1
 			}
 
-			// Displacement: bounded little-endian emit. Kept as a counted loop
-			// (0/1/4 trips, highly predictable per code pattern) so no buffer
-			// tail-slack is needed and no bytes are written past the real size.
-			for _ in 0..<displacement_size {
-				out[pos] = u8(disp & 0xFF)
-				disp >>= 8
-				pos += 1
+			// Displacement. A labeled disp emits a placeholder disp32 and records a
+			// REL32 relocation at its byte offset (addend 0). Otherwise a bounded
+			// little-endian emit -- kept as a counted loop (0/1/4 trips, highly
+			// predictable per code pattern) so no buffer tail-slack is needed and no
+			// bytes are written past the real size.
+			if disp_is_label {
+				append(&pending_relocations, Relocation{byte_count + pos, disp_label_id, 0, .REL32, 4, u16(instruction_index)})
+				out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+				pos += 4
+			} else {
+				for _ in 0..<displacement_size {
+					out[pos] = u8(disp & 0xFF)
+					disp >>= 8
+					pos += 1
+				}
 			}
 		}
 
@@ -693,10 +714,19 @@ encode :: proc(
 				}
 			case .IQ:
 				if user_op.kind == .IMMEDIATE {
-					v := u64(user_op.immediate)
-					out[pos]   = u8(v);       out[pos+1] = u8(v >> 8);  out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
-					out[pos+4] = u8(v >> 32); out[pos+5] = u8(v >> 40); out[pos+6] = u8(v >> 48); out[pos+7] = u8(v >> 56)
-					pos += 8
+					if user_op.flags.imm_is_label {
+						// movabs reg, <label>: placeholder imm64 + ABS64 relocation.
+						label_id := u32(user_op.immediate)
+						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .ABS64, 8, u16(instruction_index)})
+						out[pos]   = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+						out[pos+4] = 0; out[pos+5] = 0; out[pos+6] = 0; out[pos+7] = 0
+						pos += 8
+					} else {
+						v := u64(user_op.immediate)
+						out[pos]   = u8(v);       out[pos+1] = u8(v >> 8);  out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
+						out[pos+4] = u8(v >> 32); out[pos+5] = u8(v >> 40); out[pos+6] = u8(v >> 48); out[pos+7] = u8(v >> 56)
+						pos += 8
+					}
 				}
 			}
 		}
@@ -946,6 +976,12 @@ mem_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: O
 }
 
 imm_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_type: Operand_Type) -> bool {
+	// A labeled immediate is an address placeholder (movabs): it must select the
+	// full imm64 form regardless of the label id's numeric value, so a small id
+	// doesn't collapse to a shorter `mov r64, imm32` and lose the ABS64 slot.
+	if op.flags.imm_is_label {
+		return op_type == .IMM64
+	}
 	// Match based on whether the VALUE fits in the encoding's immediate size.
 	// x64 immediates are interpreted as both signed and unsigned depending on context:
 	// - ADD r32, imm8sx: sign-extended, so -1 becomes 0xFFFFFFFF

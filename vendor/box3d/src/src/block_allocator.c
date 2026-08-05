@@ -9,6 +9,10 @@ b3BlockAllocator b3CreateBlockAllocator( int elementSize, int initialCount )
 {
 	B3_ASSERT( elementSize >= (int)sizeof( void* ) );
 
+	// The free list stores a pointer inside each element, so the stride must keep every element aligned.
+	// Blocks come from b3Alloc, so a stride that is a multiple of B3_ALIGNMENT aligns all elements.
+	elementSize = ( ( elementSize - 1 ) | ( B3_ALIGNMENT - 1 ) ) + 1;
+
 	b3BlockAllocator allocator = { 0 };
 
 	b3Array_Create( allocator.blocks );
@@ -81,6 +85,7 @@ void b3FreeElement( b3BlockAllocator* allocator, void* element )
 	B3_ASSERT( allocator != NULL );
 	B3_ASSERT( element != NULL );
 	B3_ASSERT( allocator->allocationCount > 0 );
+	B3_ASSERT( ( (uintptr_t)element & ( B3_ALIGNMENT - 1 ) ) == 0 );
 
 	allocator->allocationCount -= 1;
 

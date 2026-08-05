@@ -3121,14 +3121,14 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 			error(node, "Invalid matrix column count, got nothing");
 		} else {
 			gbString s = expr_to_string(column.expr);
-			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			error(column.expr, "Invalid matrix column count, expected %d+ columns, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 			gb_string_free(s);
 		}
 	}
 	
 	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
 		i64 element_count = row_count*column_count;
-		error(column.expr, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
+		error(node, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
 	}
 
 

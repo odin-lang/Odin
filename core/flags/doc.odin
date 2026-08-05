@@ -53,8 +53,8 @@ Under the `args` tag, there are the following subtags:
 - `hidden`: hide this flag from the usage documentation.
 - `required`: cause verification to fail if this argument is not set.
 - `manifold=N`: take several arguments at once, UNIX-style only.
-- `file`: for `os.Handle` types, file open mode.
-- `perms`: for `os.Handle` types, file open permissions.
+- `file`: for `^os.File` types, file open mode.
+- `perms`: for `^os.File` types, file open permissions.
 - `indistinct`: allow the setting of distinct types by their base type.
 
 `required` may be given a range specifier in the following formats:
@@ -72,7 +72,7 @@ arguments it consumes at once. If this number is not specified, it will take as
 many arguments as can be converted to the underlying element type.
 
 
-`file` determines the file open mode for an `os.Handle`.
+`file` determines the file open mode for an `^os.File`.
 It accepts a string of flags that can be mixed together:
 - r: read
 - w: write
@@ -81,7 +81,7 @@ It accepts a string of flags that can be mixed together:
 - t: truncate, erase the file on open
 
 
-`perms` determines the file open permissions for an `os.Handle`.
+`perms` determines the file open permissions for an `^os.File`.
 
 The permissions are represented by three numbers in octal format. The first
 number is the owner, the second is the group, and the third is other. Read is
@@ -120,7 +120,7 @@ Supported Flag Data Types:
 - all bit_sets
 - `string` and `cstring`
 - `rune`
-- `os.Handle`
+- `^os.File`
 - `time.Time`
 - `datetime.DateTime`
 - `net.Host_Or_Endpoint`,

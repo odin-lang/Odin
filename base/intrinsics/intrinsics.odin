@@ -379,6 +379,7 @@ simd_pairwise_sub :: proc(a, b: #simd[LANES]T) -> #simd[LANES]T where LANES % 2 
 simd_interleave   :: proc(a, ..#simd[LANES/N]T)       -> #simd[LANES]T where N >= 1 ---
 simd_deinterleave :: proc(a: #simd[LANES]T, $N: uint) -> (..#simd[LANES/N]T) where N >= 1, LANES % N == 0 --- // returns N multiple vectors
 
+soa_copy_from_slice :: proc(ptr: ^$A/#soa[dynamic]$E, offset: int, args: []$E) ---
 
 // Checks if the current target supports the given target features.
 //

@@ -3538,7 +3538,7 @@ LoadLibraryEx_Flag :: enum DWORD {
 	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
 	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
 }
-LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag; DWORD]
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW

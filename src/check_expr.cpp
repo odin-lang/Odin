@@ -1311,8 +1311,12 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				if (context_name == "procedure argument") {
 					if (is_type_slice(src) && are_types_identical(src->Slice.elem, dst)) {
 						gbString a = expr_to_string(operand->expr);
-						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n\n", a);
+						error_line("\tSuggestion: Did you mean to pass the slice into the variadic parameter with ..%s?\n", a);
 						gb_string_free(a);
+					}
+				} else if (context_name == "bit_set 'in'") {
+					if (is_type_bit_set(operand->type)) {
+						error_line("\tSuggestion: Prefer <= if you want a superset\n");
 					}
 				}
 				if (src->kind == dst->kind && src->kind == Type_Proc) {
@@ -2387,14 +2391,18 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		case Basic_i32be:
 		case Basic_i64be:
 			if (c->bit_field_bit_size == 0) {
-				// return imin <= i && i <= imax;
+				// NOTE: the check below is a magnitude test (mp_count_bits() <= 64), 
+				// big_int_to_i64 would wrap u64 max to -1 and pass for any signed type.
+				// Compare magnitudes instead
 				if (!big_int_can_be_represented_in_64_bits(&i)) {
 					return false;
 				}
 
-				i64 val64 = big_int_to_i64(&i);
-
-				return imin_64 <= val64 && val64 <= imax_64;
+				u64 mag = mp_get_mag_u64(&i);
+				if (big_int_is_neg(&i)) {
+					return mag <= cast(u64)-(imin_64+1) + 1; // |imin_64|, without overflowing i64
+				}
+				return mag <= cast(u64)imax_64;
 			}
 			/*fallthrough*/
 		case Basic_i128le:
@@ -2731,7 +2739,7 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (is_type_integer(o->type) && is_type_pointer(type)) {
 		if (is_type_uintptr(o->type)) {
-			error_line("\tSuggestion: %a may be directly casted to %s\n", a, b);
+			error_line("\tSuggestion: %s may be directly casted to %s\n", a, b);
 		} else {
 			error_line("\tSuggestion: for an integer to be casted to a pointer, it must be converted to 'uintptr' first\n");
 		}
@@ -2995,6 +3003,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 	case Token_MulMul: { // 'expand_values' operator
 		if (!o->type) {
 			return;
+		}
+		if (o->mode == Addressing_Type) {
+			gbString type_str = type_to_string(o->type);
+			error(node, "Cannot apply '**' to a type '%s', the operand must be a value of struct or array type", type_str);
+			gb_string_free(type_str);
 		}
 
 		Type *type = base_type(o->type);
@@ -4420,7 +4433,12 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 
 		if (is_type_bit_set(rhs_type)) {
 			Type *elem = base_type(rhs_type)->BitSet.elem;
-			check_expr_with_type_hint(c, x, be->left, elem);
+			Type *type_hint = elem;
+			Ast *left = unparen_expr(be->left);
+			if (left != nullptr && left->kind == Ast_CompoundLit) {
+				type_hint = rhs_type;
+			}
+			check_expr_with_type_hint(c, x, left, type_hint);
 		} else if (is_type_map(rhs_type)) {
 			Type *key = base_type(rhs_type)->Map.key;
 			check_expr_with_type_hint(c, x, be->left, key);
@@ -7117,7 +7135,9 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 							Entity *e = entry.value;
 							switch (e->kind) {
 							case Entity_TypeName: {
-								// if (print_count == 0) error_line("\n\tWith the following definitions:\n");
+								// NOTE: the leading "  " is required; a genuinely empty line
+								// terminates the error message when it is printed.
+								if (print_count == 0) error_line("  \n\tWith the following definitions:\n");
 
 								gbString str = type_to_string(e->type);
 								error_line("\t\t%.*s :: %s;\n", LIT(e->token.string), str);
@@ -7126,7 +7146,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 								break;
 							}
 							case Entity_Constant: {
-								if (print_count == 0) error_line("\n\tWith the following definitions:\n");
+								if (print_count == 0) error_line("  \n\tWith the following definitions:\n");
 
 								gbString str = exact_value_to_string(e->Constant.value);
 								if (is_type_untyped(e->type)) {
@@ -7587,7 +7607,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	if (max_matched_features > 0) {
 		for_array(i, valids) {
-			Entity *p = procs[valids[i].index];
+			// NOTE: A polymorphic candidate appends its instantiated entity to proc_entities above,
+			// so valids[i].index can be >= procs.count.
+			Entity *p = proc_entities[valids[i].index];
 			Type *t = base_type(p->type);
 			GB_ASSERT(t->kind == Type_Proc);
 
@@ -7645,13 +7667,13 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 	auto print_argument_types = [&]() {
 		error_line("\tGiven argument types:\n");
-		isize i = 0;
 		for (Operand const &o : positional_operands) {
 			gbString type = type_to_string(o.type);
 			defer (gb_string_free(type));
 			error_line("\t • %s\n", type);
 		}
-		for (Operand const &o : named_operands) {
+		for_array(i, named_operands) {
+			Operand const &o = named_operands[i];
 			gbString type = type_to_string(o.type);
 			defer (gb_string_free(type));
 
@@ -7825,14 +7847,15 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					}
 					error_line("%s", expr);
 				}
-				for (Operand const &o : named_operands) {
+				for_array(named_idx, named_operands) {
+					Operand const &o = named_operands[named_idx];
 					if (i++ > 0) error_line(", ");
 
 					gbString expr = expr_to_string(o.expr);
 					defer (gb_string_free(expr));
 
-					if (i < ce->split_args->named.count) {
-						Ast *named_field = ce->split_args->named[i];
+					if (named_idx < ce->split_args->named.count) {
+						Ast *named_field = ce->split_args->named[named_idx];
 						ast_node(fv, FieldValue, named_field);
 
 						gbString field = expr_to_string(fv->field);
