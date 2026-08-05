@@ -225,7 +225,8 @@ UNIQUE_TEST_VECTORS :: [][2][]int{
 	{{1,2,4,4,5},         {1,2,4,5}},
 }
 
-@test
+// Disable on NetBSD due to Illegal Instruction on CI, even with `microarch:native`
+@(test, disabled=ODIN_OS == .NetBSD)
 test_unique :: proc(t: ^testing.T) {
 	for v in UNIQUE_TEST_VECTORS {
 		assorted := v[0]

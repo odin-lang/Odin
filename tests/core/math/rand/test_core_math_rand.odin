@@ -10,7 +10,8 @@ Generator :: struct {
 	biased: bool,
 }
 
-@(test)
+// Disable on NetBSD due to Illegal Instruction on CI, even with `microarch:native`
+@(test, disabled=ODIN_OS == .NetBSD)
 test_prngs :: proc(t: ^testing.T) {
 	gens := []Generator {
 		{
@@ -48,7 +49,8 @@ rand_determinism :: proc(t: ^testing.T, rng: Generator) {
 	testing.expectf(t, first_value == second_value, "rng '%s' is non-deterministic.", rng.name)
 }
 
-@(test)
+// Disable on NetBSD due to Illegal Instruction on CI, even with `microarch:native`
+@(test, disabled=ODIN_OS == .NetBSD)
 test_default_rand_determinism_user_set :: proc(t: ^testing.T) {
 	rng_state_1 := rand.create(13)
 	rng_state_2 := rand.create(13)
