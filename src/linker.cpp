@@ -155,7 +155,7 @@ try_cross_linking:;
 		String section_name = str_lit("msvc-link");
 		bool is_windows = build_context.metrics.os == TargetOs_windows;
 	#else
-		String section_name = str_lit("lld-link");
+		String section_name = str_lit("ld-link");
 		bool is_windows = false;
 	#endif
 
