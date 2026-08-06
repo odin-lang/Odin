@@ -1024,10 +1024,16 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		}
 
 		for_array(i, ft->args) {
+			// lbArg_Ignore args are not present in the call arguments, so they must not
+			// advance param_offset (mirrors lb_add_function_type_attributes)
+			if (ft->args[i].kind == lbArg_Ignore) {
+				continue;
+			}
 			LLVMAttributeRef attribute = ft->args[i].attribute;
 			if (attribute != nullptr) {
-				LLVMAddCallSiteAttribute(ret, param_offset + cast(LLVMAttributeIndex)i, attribute);
+				LLVMAddCallSiteAttribute(ret, param_offset, attribute);
 			}
+			param_offset += 1;
 		}
 
 		switch (inlining) {
