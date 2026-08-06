@@ -43,6 +43,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
 ..\..\..\odin build ..\test_issue_7073-1.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+..\..\..\odin check ..\test_recursive_type_field_query.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 
 @echo off
 

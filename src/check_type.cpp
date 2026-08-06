@@ -603,6 +603,9 @@ gb_internal bool check_record_poly_operand_specialization(CheckerContext *ctx, T
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands) {
 	for (Entity *e : found_gen_types->types) {
 		Type *t = base_type(e->type);
+		if (t == t_invalid) {
+			continue;
+		}
 		TypeTuple *tuple = get_record_polymorphic_params(t);
 		GB_ASSERT_MSG(tuple != nullptr, "%s :: %s", type_to_string(e->type), type_to_string(t));
 		GB_ASSERT(param_count == tuple->variables.count);
@@ -661,6 +664,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	ast_node(st, StructType, node);
 
 	String context = str_lit("struct");
+	Entity *specialization_entity = nullptr;
 
 	isize min_field_count = 0;
 	for_array(field_index, st->fields) {
@@ -697,7 +701,14 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+		specialization_entity = named_type->Named.type_name;
+		specialization_entity->state = EntityState_InProgress;
+		check_type_path_push(ctx, specialization_entity);
 	}
+	defer (if (specialization_entity != nullptr) {
+		check_type_path_pop(ctx);
+		specialization_entity->state = EntityState_Resolved;
+	});
 
 	if (!struct_type->Struct.is_polymorphic) {
 		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
@@ -773,6 +784,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 
 	union_type->Union.node  = node;
 	union_type->Union.scope = ctx->scope;
+	Entity *specialization_entity = nullptr;
 	union_type->Union.polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
 		&union_type->Union.is_polymorphic,
@@ -784,7 +796,14 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+		specialization_entity = named_type->Named.type_name;
+		specialization_entity->state = EntityState_InProgress;
+		check_type_path_push(ctx, specialization_entity);
 	}
+	defer (if (specialization_entity != nullptr) {
+		check_type_path_pop(ctx);
+		specialization_entity->state = EntityState_Resolved;
+	});
 
 	if (!union_type->Union.is_polymorphic) {
 		if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
