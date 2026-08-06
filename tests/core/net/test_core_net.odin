@@ -547,6 +547,11 @@ percent_encode_test :: proc(t: ^testing.T) {
 		encoded := net.percent_encode(test.input)
 		defer delete(encoded)
 		testing.expectf(t, encoded == test.expected, "Expected `net.percent_encode(%q)` to return %q, got %q", test.input, test.expected, encoded)
+
+		decoded, ok := net.percent_decode(encoded)
+		defer delete(decoded)
+		testing.expectf(t, ok, "Expected `net.percent_decode(%q)` to succeed", encoded)
+		testing.expectf(t, decoded == test.input, "Expected percent-encoding roundtrip for %q, got %q", test.input, decoded)
 	}
 }
 
