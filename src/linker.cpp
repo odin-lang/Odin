@@ -810,6 +810,7 @@ try_cross_linking:;
 				}
 			} else if (build_context.build_mode != BuildMode_DynamicLibrary) {
 				if (build_context.metrics.os != TargetOs_openbsd
+					&& build_context.metrics.os != TargetOs_darwin
 					&& build_context.metrics.arch != TargetArch_riscv64
 					&& !is_android
 				) {
@@ -961,7 +962,7 @@ try_cross_linking:;
 					if (is_android) {
 						// ignore
 					} else {
-						link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,\\$ORIGIN ");
+						link_settings = gb_string_appendc(link_settings, "-Wl,-rpath,$ORIGIN ");
 					}
 				}
 			}

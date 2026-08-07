@@ -83,6 +83,10 @@ gb_global Timings global_timings = {0};
 
 #include "bug_report.cpp"
 
+#if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+int run_subprocess(const char *name, const char **args, bool honor_path = false);
+#endif
+
 // NOTE(bill): 'name' is used in debugging and profiling modes
 gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char const *name, char const *fmt, va_list va) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
@@ -154,7 +158,11 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
 		gb_printf_err("%s\n\n", cmd_line);
 	}
-	exit_code = system(cmd_line);
+
+	int argc;
+	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
+
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true);
 	if (exit_on_err && WIFSIGNALED(exit_code)) {
 		struct rlimit limit = { 0, 0, };
 		setrlimit(RLIMIT_CORE, &limit);
@@ -236,10 +244,19 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	return exit_code;
 }
 #else
-int run_subprocess(const char *name, const char **args) {
+int run_subprocess(const char *name, const char **args, bool honor_path) {
 	pid_t pid;
 	int status;
-	status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+
+	String exec_name = make_string_c(args[0]);
+	exec_name = last_path_element(exec_name);
+	args[0] = alloc_cstring(gb_heap_allocator(), exec_name);
+
+	if (!honor_path) {
+		status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+	} else {
+		status = posix_spawnp(&pid, name, NULL, NULL, (char *const *)args, environ);
+	}
 	if (status != 0) {
 		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
 		return -1;
