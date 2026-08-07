@@ -2050,26 +2050,26 @@ gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
-		// NOTE: the insertion order is a race between the files of a package, so anchor on the
-		// lower position to keep the diagnostic stable
-		TokenPos lo = prev->token.pos;
-		TokenPos hi = pos;
-		if (hi < lo) {
-			lo = pos;
-			hi = prev->token.pos;
+		// NOTE: the insertion order is a race between the files of a package, so order the pair by
+		// position; the later declaration stays the anchor, as it is the one being reported
+		TokenPos first = prev->token.pos;
+		TokenPos second = pos;
+		if (second < first) {
+			first = pos;
+			second = prev->token.pos;
 		}
 		if (found->flags & EntityFlag_Result) {
-			error(lo,
+			error(second,
 			      "Direct shadowing of the named return value '%.*s' in this scope\n"
 			      "\tat %s",
 			      LIT(name),
-			      token_pos_to_string(hi));
+			      token_pos_to_string(first));
 		} else {
-			error(lo,
+			error(second,
 			      "Redeclaration of '%.*s' in this scope\n"
 			      "\tat %s",
 			      LIT(name),
-			      token_pos_to_string(hi));
+			      token_pos_to_string(first));
 		}
 	}
 	return false;
