@@ -34,16 +34,177 @@ test_type_inference_on_literals_with_default_args :: proc(t: ^testing.T) {
 		testing.expect_value(t, group({.A}),        Bit_Set{.A})
 	}
 	{
+		// NOTE: the overloads differ in arity so that only one is ever viable, i.e. this
+		// checks what was inferred rather than which overload won. See
+		// test_proc_group_default_arg_precedence for the latter.
 		Bit_Set :: bit_set[enum{A, B, C}]
-		proc_1 :: proc(a: Bit_Set={.A})                  -> int { return 1 }
-		proc_2 :: proc(a: Bit_Set={.B}, b: Bit_Set={.C}) -> int { return 2 }
+		proc_1 :: proc(a: Bit_Set={.A}) -> Bit_Set { return a }
+		proc_2 :: proc(a, b: Bit_Set)   -> Bit_Set { return b }
 		group :: proc{proc_1, proc_2}
 
-		testing.expect_value(t, group(),            2)
-		testing.expect_value(t, group(Bit_Set{.A}), 2)
-		testing.expect_value(t, group({.A}),        2)
-		testing.expect_value(t, group({.B}, {.C}),  2)
+		testing.expect_value(t, group(),               Bit_Set{.A})
+		testing.expect_value(t, group(Bit_Set{.B}),    Bit_Set{.B})
+		testing.expect_value(t, group({.B}),           Bit_Set{.B})
+		testing.expect_value(t, group({.B}, {.C}),     Bit_Set{.C})
 	}
+}
+
+@test
+test_proc_group_default_arg_precedence :: proc(t: ^testing.T) {
+	// An overload that needs fewer default arguments synthesised is the closer match, so
+	// proc_1 wins whenever both are viable.
+	Bit_Set :: bit_set[enum{A, B, C}]
+	proc_1 :: proc(a: Bit_Set={.A})                  -> int { return 1 }
+	proc_2 :: proc(a: Bit_Set={.B}, b: Bit_Set={.C}) -> int { return 2 }
+	group :: proc{proc_1, proc_2}
+
+	testing.expect_value(t, group(),            1) // proc_1 synthesises 1, proc_2 synthesises 2
+	testing.expect_value(t, group(Bit_Set{.A}), 1) // proc_1 synthesises 0, proc_2 synthesises 1
+	testing.expect_value(t, group({.A}),        1)
+	testing.expect_value(t, group({.B}, {.C}),  2) // only proc_2 takes two arguments
+}
+
+@test
+test_proc_group_arity_precedence :: proc(t: ^testing.T) {
+	{
+		// a non-variadic overload is the closer match when the variadic part is empty
+		proc_exact    :: proc(x: int)           -> int { return 1 }
+		proc_variadic :: proc(x: int, r: ..int) -> int { return 2 }
+		group :: proc{proc_exact, proc_variadic}
+
+		testing.expect_value(t, group(1),       1)
+		testing.expect_value(t, group(1, 2, 3), 2)
+	}
+	{
+		// adding a defaulted sibling must not steal an exact match from an existing member
+		proc_int    :: proc(x: int)            -> int { return 1 }
+		proc_string :: proc(x: string)         -> int { return 2 }
+		proc_f32    :: proc(x: f32)            -> int { return 3 }
+		proc_f32_d  :: proc(x: f32, y: int=0)  -> int { return 4 }
+		proc_rune   :: proc(x: rune)           -> int { return 5 }
+		group :: proc{proc_int, proc_string, proc_f32, proc_f32_d, proc_rune}
+
+		v: f32
+		testing.expect_value(t, group(v), 3)
+	}
+}
+
+@test
+test_proc_group_untyped_constant_default_type :: proc(t: ^testing.T) {
+	// An untyped constant prefers its default type over other members of the same family,
+	// and any same-family type over a cross-family one.
+	{
+		proc_int :: proc(int) -> int { return 1 }
+		proc_i64 :: proc(i64) -> int { return 2 }
+		group :: proc{proc_int, proc_i64}
+		testing.expect_value(t, group(1), 1)
+	}
+	{
+		// neither is the default type, but the integer family still beats the float one
+		proc_i64 :: proc(i64) -> int { return 1 }
+		proc_f64 :: proc(f64) -> int { return 2 }
+		group :: proc{proc_i64, proc_f64}
+		testing.expect_value(t, group(1), 1)
+	}
+	{
+		proc_f32 :: proc(f32) -> int { return 1 }
+		proc_f64 :: proc(f64) -> int { return 2 }
+		group :: proc{proc_f32, proc_f64}
+		testing.expect_value(t, group(1.5), 2)
+	}
+	{
+		proc_rune :: proc(rune) -> int { return 1 }
+		proc_int  :: proc(int)  -> int { return 2 }
+		group :: proc{proc_rune, proc_int}
+		testing.expect_value(t, group('x'), 1)
+	}
+	{
+		proc_string  :: proc(string)  -> int { return 1 }
+		proc_cstring :: proc(cstring) -> int { return 2 }
+		group :: proc{proc_string, proc_cstring}
+		testing.expect_value(t, group("hi"), 1)
+	}
+	{
+		proc_bool :: proc(bool) -> int { return 1 }
+		proc_b32  :: proc(b32)  -> int { return 2 }
+		group :: proc{proc_bool, proc_b32}
+		testing.expect_value(t, group(true), 1)
+	}
+	{
+		// a value that does not fit the default type selects the overload that can hold it
+		proc_u8  :: proc(u8)  -> int { return 1 }
+		proc_i64 :: proc(i64) -> int { return 2 }
+		group :: proc{proc_u8, proc_i64}
+		testing.expect_value(t, group(100000), 2)
+	}
+}
+
+@test
+test_proc_group_polymorphic_precedence :: proc(t: ^testing.T) {
+	// Candidates are ordered value-polymorphic > concrete > type-polymorphic: `proc($S: T)`
+	// specializes on a compile-time value and is the most specific, `proc(x: $T)`
+	// specializes on a type and is a fallback.
+	{
+		proc_concrete :: proc(x: int) -> int { return 1 }
+		proc_generic  :: proc(x: $T)  -> int { return 2 }
+		group :: proc{proc_concrete, proc_generic}
+
+		testing.expect_value(t, group(1), 1)
+		v: int = 1
+		testing.expect_value(t, group(v), 1)
+	}
+	{
+		// the generic is the only viable overload
+		proc_concrete :: proc(x: string) -> int { return 1 }
+		proc_generic  :: proc(x: $T)     -> int { return 2 }
+		group :: proc{proc_concrete, proc_generic}
+		testing.expect_value(t, group(1), 2)
+	}
+	{
+		proc_static  :: proc($S: string) -> int { return 1 }
+		proc_dynamic :: proc(s: string)  -> int { return 2 }
+		group :: proc{proc_static, proc_dynamic}
+
+		testing.expect_value(t, group("literal"), 1)
+		s := "runtime"
+		testing.expect_value(t, group(s), 2) // not a constant, only proc_dynamic is viable
+	}
+	{
+		// all three tiers present, and the result must not depend on declaration order
+		proc_generic  :: proc(x: $T)      -> int { return 3 }
+		proc_concrete :: proc(s: string)  -> int { return 2 }
+		proc_static   :: proc($S: string) -> int { return 1 }
+		group :: proc{proc_generic, proc_concrete, proc_static}
+
+		testing.expect_value(t, group("literal"), 1)
+	}
+
+	// NOTE: the two cases below are still reported as ambiguous. Both are in the
+	// polymorphic instantiation machinery rather than in candidate scoring, and are
+	// expected to be resolved by https://github.com/odin-lang/Odin/pull/7208
+	//
+	// A more specialised generic should beat a less specialised one:
+	//
+	// {
+	// 	proc_slice   :: proc(x: $T/[]$E) -> int { return 1 }
+	// 	proc_generic :: proc(x: $T)      -> int { return 2 }
+	// 	group :: proc{proc_slice, proc_generic}
+	//
+	// 	s := []int{1}
+	// 	testing.expect_value(t, group(s), 1)
+	// }
+	//
+	// Passing a polymorphic procedure to a group whose members take procedure-typed
+	// parameters: only foo_concrete can accept f_poly once instantiated.
+	//
+	// {
+	// 	f_poly :: proc(x: $T) -> T { return x }
+	// 	foo_concrete   :: proc(x: int, g: proc(int) -> int) -> int { return 1 }
+	// 	foo_impossible :: proc(x: int, g: proc(int, int) -> string) -> int { return 2 }
+	// 	group :: proc{foo_concrete, foo_impossible}
+	//
+	// 	testing.expect_value(t, group(1, f_poly), 1)
+	// }
 }
 
 @test
