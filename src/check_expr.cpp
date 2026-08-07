@@ -4082,7 +4082,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 				big_int_shl_eq(&umax, &sz_in_bits);
 
 				if (is_type_unsigned(src_t) && !is_type_unsigned(dst_t)) {
-					if (big_int_cmp(&v, &smax) >= 0) {
+					if (big_int_cmp(&v, &smax) > 0) {
 						big_int_sub_eq(&v, &umax);
 					}
 				} else if (!is_type_unsigned(src_t) && is_type_unsigned(dst_t)) {
