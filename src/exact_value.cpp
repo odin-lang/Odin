@@ -419,6 +419,12 @@ gb_internal ExactValue exact_value_to_integer(ExactValue v) {
 	case ExactValue_Integer:
 		return v;
 	case ExactValue_Float: {
+		f64 const min = cast(f64)I64_MIN; // -2^63
+		f64 const max = -min;             // 2^63, one past I64_MAX
+		// NOTE: the conversion below is undefined outside of this range, NaN included
+		if (!(v.value_float >= min && v.value_float < max)) {
+			break;
+		}
 		i64 i = cast(i64)v.value_float;
 		f64 f = cast(f64)i;
 		if (f == v.value_float) {

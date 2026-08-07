@@ -2846,9 +2846,14 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	}
 	Type *type = core_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
-		if (o->value.kind == ExactValue_Integer) {
-			BigInt count = o->value.value_integer;
-			if (big_int_is_neg(&o->value.value_integer)) {
+		ExactValue value = o->value;
+		if (value.kind == ExactValue_Float) {
+			// NOTE: an integral float is a valid count, but it must be range checked as an integer
+			value = exact_value_to_integer(value);
+		}
+		if (value.kind == ExactValue_Integer) {
+			BigInt count = value.value_integer;
+			if (big_int_is_neg(&count)) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &count);
 				error(e, "Invalid negative array count, %.*s", LIT(str));
@@ -2864,12 +2869,6 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 			error(e, "Array count too large, %.*s", LIT(str));
 			gb_free(a, str.text);
 			return 0;
-		} else if (o->value.kind == ExactValue_Float) {
-			u64 u = cast(u64)o->value.value_float;
-			f64 f = cast(f64)u;
-			if (f == o->value.value_float) {
-				return u;
-			}
 		}
 	}
 
