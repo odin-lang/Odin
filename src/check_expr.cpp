@@ -7607,10 +7607,24 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				array_add(&proc_entities, data.gen_entity);
 				index = proc_entities.count-1;
 
-				// Prefer non-polymorphic procedures over polymorphic. This must be a
-				// small tie-break: assign_score_function(1) is ~a full perfect-match
-				// unit, so adding it made a generic beat an exact concrete overload.
-				item.score -= 1;
+				// Order candidates: value-polymorphic > concrete > type-polymorphic
+				//
+				// `proc($S: string)` specialises on a compile-time *value*
+				// `proc(x: $T)` specialises on a *type* and is a fallback, so it should
+				// lose to an exact concrete overload
+				//
+				// Both are small tie-breaks on purpose: assign_score_function(1) is
+				// ~a full perfect-match unit and would swamp argument match quality.
+				bool has_polymorphic_constant = false;
+				if (pt->Proc.params != nullptr) {
+					for (Entity *param : pt->Proc.params->Tuple.variables) {
+						if (param != nullptr && param->kind == Entity_Constant) {
+							has_polymorphic_constant = true;
+							break;
+						}
+					}
+				}
+				item.score += has_polymorphic_constant ? +1 : -1;
 			}
 
 			max_matched_features = gb_max(max_matched_features, matched_target_features(&pt->Proc));
