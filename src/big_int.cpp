@@ -694,7 +694,9 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 		big_int_dealloc(&r);
 		big_int_dealloc(&b);
 
-		for (isize i = first_word_idx; i < buf.count/2; i++) {
+		// NOTE: only the digits are reversed, not the leading '-'. 
+		isize digit_count = buf.count - first_word_idx;
+		for (isize i = first_word_idx; i < first_word_idx + digit_count/2; i++) {
 			isize j = buf.count + first_word_idx - i - 1;
 			char tmp = buf[i];
 			buf[i] = buf[j];
