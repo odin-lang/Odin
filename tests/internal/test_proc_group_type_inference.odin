@@ -179,32 +179,26 @@ test_proc_group_polymorphic_precedence :: proc(t: ^testing.T) {
 		testing.expect_value(t, group("literal"), 1)
 	}
 
-	// NOTE: the two cases below are still reported as ambiguous. Both are in the
-	// polymorphic instantiation machinery rather than in candidate scoring, and are
-	// expected to be resolved by https://github.com/odin-lang/Odin/pull/7208
-	//
-	// A more specialised generic should beat a less specialised one:
-	//
-	// {
-	// 	proc_slice   :: proc(x: $T/[]$E) -> int { return 1 }
-	// 	proc_generic :: proc(x: $T)      -> int { return 2 }
-	// 	group :: proc{proc_slice, proc_generic}
-	//
-	// 	s := []int{1}
-	// 	testing.expect_value(t, group(s), 1)
-	// }
-	//
-	// Passing a polymorphic procedure to a group whose members take procedure-typed
-	// parameters: only foo_concrete can accept f_poly once instantiated.
-	//
-	// {
-	// 	f_poly :: proc(x: $T) -> T { return x }
-	// 	foo_concrete   :: proc(x: int, g: proc(int) -> int) -> int { return 1 }
-	// 	foo_impossible :: proc(x: int, g: proc(int, int) -> string) -> int { return 2 }
-	// 	group :: proc{foo_concrete, foo_impossible}
-	//
-	// 	testing.expect_value(t, group(1, f_poly), 1)
-	// }
+	// a specialised generic beats an unconstrained one
+	{
+		proc_slice   :: proc(x: $T/[]$E) -> int { return 1 }
+		proc_generic :: proc(x: $T)      -> int { return 2 }
+		group :: proc{proc_slice, proc_generic}
+
+		s := []int{1}
+		testing.expect_value(t, group(s), 1)
+	}
+
+	// passing a polymorphic procedure to a group whose members take procedure-typed
+	// parameters: only foo_concrete can accept f_poly once instantiated
+	{
+		f_poly :: proc(x: $T) -> T { return x }
+		foo_concrete   :: proc(x: int, g: proc(int) -> int) -> int { return 1 }
+		foo_impossible :: proc(x: int, g: proc(int, int) -> string) -> int { return 2 }
+		group :: proc{foo_concrete, foo_impossible}
+
+		testing.expect_value(t, group(1, f_poly), 1)
+	}
 }
 
 @test

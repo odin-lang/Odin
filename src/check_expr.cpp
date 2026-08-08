@@ -7603,24 +7603,37 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				array_add(&proc_entities, data.gen_entity);
 				index = proc_entities.count-1;
 
-				// Order candidates: value-polymorphic > concrete > type-polymorphic
+				// Order candidates:
+				//   value-polymorphic > concrete > specialized generic > unconstrained generic
 				//
 				// `proc($S: string)` specialises on a compile-time *value*
-				// `proc(x: $T)` specialises on a *type* and is a fallback, so it should
-				// lose to an exact concrete overload
+				// `proc(x: $T)` specialises on a *type* and is a fallback, so it should lose
+				//  to an exact concrete overload
+				// `proc(x: $T/[]$E)` constrains that type, so it is the closer of the two
 				//
-				// Both are small tie-breaks on purpose: assign_score_function(1) is
+				// These are small tie-breaks on purpose: assign_score_function(1) is
 				// ~a full perfect-match unit and would swamp argument match quality.
 				bool has_polymorphic_constant = false;
+				bool has_specialized_generic = false;
 				if (pt->Proc.params != nullptr) {
 					for (Entity *param : pt->Proc.params->Tuple.variables) {
-						if (param != nullptr && param->kind == Entity_Constant) {
+						if (param == nullptr) {
+							continue;
+						}
+						if (param->kind == Entity_Constant) {
 							has_polymorphic_constant = true;
-							break;
+						}
+						Type *bt = base_type(param->type);
+						if (bt != nullptr && bt->kind == Type_Generic && bt->Generic.specialized != nullptr) {
+							has_specialized_generic = true;
 						}
 					}
 				}
-				item.score += has_polymorphic_constant ? +1 : -1;
+				if (has_polymorphic_constant) {
+					item.score += 2;
+				} else {
+					item.score += has_specialized_generic ? -1 : -2;
+				}
 			}
 
 			max_matched_features = gb_max(max_matched_features, matched_target_features(&pt->Proc));
