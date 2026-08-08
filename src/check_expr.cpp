@@ -735,35 +735,38 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			if (operand->mode == Addressing_Constant) {
 				if (check_representable_as_constant(c, operand->value, dst, nullptr)) {
 					if (is_type_typed(dst) && src->kind == Type_Basic) {
+						// NOTE: prefer the untyped constant's default type (int, f64, string, bool,
+						// rune) over other members of the same family, so a call like g(1) picks
+						// `int` over `i64` instead of scoring them identically and going ambiguous.
 						switch (src->Basic.kind) {
 						case Basic_UntypedBool:
 							if (is_type_boolean(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							break;
 						case Basic_UntypedRune:
 							if (is_type_integer(dst) || is_type_rune(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							break;
 						case Basic_UntypedInteger:
 							if (is_type_integer(dst) || is_type_rune(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							break;
 						case Basic_UntypedString:
 							if (is_type_string(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							break;
 						case Basic_UntypedFloat:
 							if (is_type_float(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							break;
 						case Basic_UntypedComplex:
 							if (is_type_complex(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							if (is_type_quaternion(dst)) {
 								return 2;
@@ -771,12 +774,13 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 							break;
 						case Basic_UntypedQuaternion:
 							if (is_type_quaternion(dst)) {
-								return 1;
+								return are_types_identical(dst, default_type(src)) ? 1 : 2;
 							}
 							break;
 						}
 					}
-					return 2;
+					// A cross-family constant conversion ranks below a same-family one.
+					return 3;
 				}
 				return -1;
 			}
@@ -7008,6 +7012,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						error(o->expr, "'..' in a variadic procedure can only have one variadic argument at the end");
 					}
 					if (data) {
+						// A synthesised default argument is not evidence of a better match: it
+						// contributes assign_score_function(1) as a dummy bonus and is then scored
+						// again as a perfect-match argument. Discount both, plus 1 to break the
+						// resulting tie, so an exact-arity overload wins.
+						score -= dummy_argument_count * (assign_score_function(0) + assign_score_function(1) + 1);
 						data->score = score;
 						data->result_type = final_proc_type->Proc.results;
 						data->gen_entity = gen_entity;
@@ -7037,6 +7046,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	}
 
 	if (data) {
+		// A synthesised default argument is not evidence of a better match: it
+		// contributes assign_score_function(1) as a dummy bonus and is then scored
+		// again as a perfect-match argument. Discount both, plus 1 to break the
+		// resulting tie, so an exact-arity overload wins.
+		score -= dummy_argument_count * (assign_score_function(0) + assign_score_function(1) + 1);
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
@@ -7589,8 +7603,37 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				array_add(&proc_entities, data.gen_entity);
 				index = proc_entities.count-1;
 
-				// prefer non-polymorphic procedures over polymorphic
-				item.score += assign_score_function(1);
+				// Order candidates:
+				//   value-polymorphic > concrete > specialized generic > unconstrained generic
+				//
+				// `proc($S: string)` specialises on a compile-time *value*
+				// `proc(x: $T)` specialises on a *type* and is a fallback, so it should lose
+				//  to an exact concrete overload
+				// `proc(x: $T/[]$E)` constrains that type, so it is the closer of the two
+				//
+				// These are small tie-breaks on purpose: assign_score_function(1) is
+				// ~a full perfect-match unit and would swamp argument match quality.
+				bool has_polymorphic_constant = false;
+				bool has_specialized_generic = false;
+				if (pt->Proc.params != nullptr) {
+					for (Entity *param : pt->Proc.params->Tuple.variables) {
+						if (param == nullptr) {
+							continue;
+						}
+						if (param->kind == Entity_Constant) {
+							has_polymorphic_constant = true;
+						}
+						Type *bt = base_type(param->type);
+						if (bt != nullptr && bt->kind == Type_Generic && bt->Generic.specialized != nullptr) {
+							has_specialized_generic = true;
+						}
+					}
+				}
+				if (has_polymorphic_constant) {
+					item.score += 2;
+				} else {
+					item.score += has_specialized_generic ? -1 : -2;
+				}
 			}
 
 			max_matched_features = gb_max(max_matched_features, matched_target_features(&pt->Proc));
