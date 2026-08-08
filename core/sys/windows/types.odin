@@ -1623,6 +1623,23 @@ WIN32_FIND_DATAW :: struct {
 	cAlternateFileName: [14]WCHAR,
 }
 
+FINDEX_INFO_LEVELS :: enum c_int {
+	FindExInfoStandard = 0,
+	FindExInfoBasic    = 1,
+	FindExInfoMaxInfoLevel,
+}
+
+FINDEX_SEARCH_OPS :: enum c_int {
+	FindExSearchNameMatch          = 0,
+	FindExSearchLimitToDirectories = 1,
+	FindExSearchLimitToDevices     = 2,
+	FindExSearchMaxSearchOp,
+}
+
+FIND_FIRST_EX_CASE_SENSITIVE       : DWORD : 0x00000001
+FIND_FIRST_EX_LARGE_FETCH          : DWORD : 0x00000002
+FIND_FIRST_EX_ON_DISK_ENTRIES_ONLY : DWORD : 0x00000004
+
 FILE_ID_128 :: struct {
 	Identifier: [16]BYTE,
 }
