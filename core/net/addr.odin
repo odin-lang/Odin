@@ -128,6 +128,9 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family, allow_decim
 	case .IP6:
 		return parse_ip6_address(address_and_maybe_port)
 
+	case .UNIX:
+		panic("net.aton(): no such thing as a UNIX domain address; they use filesystem paths instead.")
+
 	case:
 		return nil, false
 	}

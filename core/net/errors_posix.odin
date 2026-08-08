@@ -150,6 +150,27 @@ _tcp_recv_error :: proc() -> TCP_Recv_Error {
 	}
 }
 
+_unix_recv_error :: proc() -> Unix_Recv_Error {
+	#partial switch posix.errno() {
+	case .EBADF, .EFAULT, .EINVAL, .ENOTSOCK, .EOPNOTSUPP:
+		return .Invalid_Argument
+	case .ENOBUFS:
+		return .Insufficient_Resources
+	case .ENOTCONN:
+		return .Not_Connected
+	case .ECONNRESET:
+		return .Connection_Closed
+	case .ETIMEDOUT:
+		return .Timeout
+	case .EAGAIN:
+		return .Would_Block
+	case .EINTR:
+		return .Interrupted
+	case:
+		return .Unknown
+	}
+}
+
 _udp_recv_error :: proc() -> UDP_Recv_Error {
 	#partial switch posix.errno() {
 	case .EBADF, .EFAULT, .EINVAL, .ENOTSOCK, .EOPNOTSUPP, .EMSGSIZE:
@@ -170,6 +191,31 @@ _udp_recv_error :: proc() -> UDP_Recv_Error {
 }
 
 _tcp_send_error :: proc() -> TCP_Send_Error {
+	#partial switch posix.errno() {
+	case .EACCES, .EBADF, .EFAULT, .EMSGSIZE, .ENOTSOCK, .EOPNOTSUPP:
+		return .Invalid_Argument
+	case .ENOBUFS:
+		return .Insufficient_Resources
+	case .ECONNRESET, .EPIPE:
+		return .Connection_Closed
+	case .ENOTCONN:
+		return .Not_Connected
+	case .EHOSTUNREACH:
+		return .Host_Unreachable
+	case .ENETDOWN, .ENETUNREACH:
+		return .Network_Unreachable
+	case .ETIMEDOUT:
+		return .Timeout
+	case .EAGAIN:
+		return .Would_Block
+	case .EINTR:
+		return .Interrupted
+	case:
+		return .Unknown
+	}
+}
+
+_unix_send_error :: proc() -> Unix_Send_Error {
 	#partial switch posix.errno() {
 	case .EACCES, .EBADF, .EFAULT, .EMSGSIZE, .ENOTSOCK, .EOPNOTSUPP:
 		return .Invalid_Argument

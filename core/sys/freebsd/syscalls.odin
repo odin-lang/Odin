@@ -165,7 +165,7 @@ recv :: proc "contextless" (s: Fd, buf: []u8, flags: Recv_Flags) -> (int, Errno)
 // The accept() system call appeared in 4.2BSD.
 accept_T :: proc "contextless" (s: Fd, sockaddr: ^$T) -> (Fd, Errno)
 where
-	intrinsics.type_is_subtype_of(T, Socket_Address_Header)
+	intrinsics.type_is_subtype_of(T, Socket_Address_Header) || T == Socket_Address_Unix
 {
 	// sockaddr must contain a valid pointer, or this will segfault because
 	// we're telling the syscall that there's memory available to write to.
@@ -408,7 +408,7 @@ socket :: proc "contextless" (domain: Protocol_Family, type: Socket_Type, protoc
 // The connect() system call appeared in 4.2BSD.
 connect :: proc "contextless" (fd: Fd, sockaddr: ^$T, addrlen: socklen_t) -> Errno
 where
-	intrinsics.type_is_subtype_of(T, Socket_Address_Header)
+	intrinsics.type_is_subtype_of(T, Socket_Address_Header) || T == Socket_Address_Unix
 {
 	result, _ := intrinsics.syscall_bsd(SYS_connect,
 		cast(uintptr)fd,
@@ -424,7 +424,7 @@ where
 // The bind() system call appeared in 4.2BSD.
 bind :: proc "contextless" (s: Fd, sockaddr: ^$T, addrlen: socklen_t) -> Errno
 where
-	intrinsics.type_is_subtype_of(T, Socket_Address_Header)
+	intrinsics.type_is_subtype_of(T, Socket_Address_Header) || T == Socket_Address_Unix
 {
 	result, _ := intrinsics.syscall_bsd(SYS_bind,
 		cast(uintptr)s,

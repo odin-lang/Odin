@@ -57,13 +57,15 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	sys_socket_type: freebsd.Socket_Type     = ---
 
 	switch family {
-	case .IP4: sys_family = .INET
-	case .IP6: sys_family = .INET6
+	case .IP4:  sys_family = .INET
+	case .IP6:  sys_family = .INET6
+	case .UNIX: sys_family = .UNIX
 	}
 
 	switch protocol {
-	case .TCP: sys_protocol = .TCP; sys_socket_type = .STREAM
-	case .UDP: sys_protocol = .UDP; sys_socket_type = .DGRAM
+	case .TCP:  sys_protocol = .TCP; sys_socket_type = .STREAM
+	case .UDP:  sys_protocol = .UDP; sys_socket_type = .DGRAM
+	case .UNIX: sys_protocol = .IP;  sys_socket_type = .STREAM
 	}
 
 	new_socket, errno := freebsd.socket(sys_family, sys_socket_type, sys_protocol)
@@ -73,8 +75,9 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	}
 
 	switch protocol {
-	case .TCP: return cast(TCP_Socket)new_socket, nil
-	case .UDP: return cast(UDP_Socket)new_socket, nil
+	case .TCP:  return cast(TCP_Socket)new_socket,  nil
+	case .UDP:  return cast(UDP_Socket)new_socket,  nil
+	case .UNIX: return cast(Unix_Socket)new_socket, nil
 	}
 
 	return
@@ -101,6 +104,28 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 }
 
 @(private)
+_dial_unix :: proc(path: string, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(len(path) < freebsd.SUNPATHLEN, "net.dial_unix_from_path(): path too long", loc = loc)
+
+	sock := _create_socket(.UNIX, .UNIX) or_return
+	socket = sock.(Unix_Socket)
+
+	sockaddr := freebsd.Socket_Address_Unix {
+		family = .UNIX,
+	}
+	n := copy(sockaddr.path[:], path)
+	sockaddr.path[n] = 0
+
+	res := freebsd.connect(freebsd.Fd(socket), &sockaddr, size_of(sockaddr))
+	if res != nil {
+		err = _dial_error(res)
+		return
+	}
+
+	return
+}
+
+@(private)
 _bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	real_socket := any_socket_to_socket(socket)
@@ -111,8 +136,10 @@ _bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	return
 }
 
+DEFAULT_LISTEN_BACKLOG :: 1000
+
 @(private)
-_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := DEFAULT_LISTEN_BACKLOG) -> (socket: TCP_Socket, err: Network_Error) {
 	family := family_from_endpoint(interface_endpoint)
 	new_socket := create_socket(family, .TCP) or_return
 	socket = new_socket.(TCP_Socket)
@@ -123,6 +150,34 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: T
 	errno := freebsd.listen(cast(Fd)socket, backlog)
 	if errno != nil {
 		err = _listen_error(errno)
+		return
+	}
+
+	return
+}
+
+@(private)
+_listen_unix :: proc(path: string, backlog := DEFAULT_LISTEN_BACKLOG, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(len(path) < freebsd.SUNPATHLEN, "net.listen_unix(): path too long", loc = loc)
+
+	sock := _create_socket(.UNIX, .UNIX) or_return
+	socket = sock.(Unix_Socket)
+
+	sockaddr := freebsd.Socket_Address_Unix {
+		family = .UNIX,
+	}
+	n := copy(sockaddr.path[:], path)
+	sockaddr.path[n] = 0
+
+	res := freebsd.bind(freebsd.Fd(socket), &sockaddr, size_of(sockaddr))
+	if res != nil {
+		err = _bind_error(res)
+		return
+	}
+
+	res = freebsd.listen(freebsd.Fd(socket), int(backlog))
+	if res != nil {
+		err = _listen_error(res)
 		return
 	}
 
@@ -173,6 +228,15 @@ _accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client
 }
 
 @(private)
+_accept_unix :: proc(listening_socket: Unix_Socket) -> (client: Unix_Socket, err: Accept_Error) {
+	client_sock, errno := freebsd.accept(freebsd.Fd(listening_socket), (^freebsd.Socket_Address_Unix)(nil))
+	if errno != .NONE {
+		return {}, _accept_error(errno)
+	}
+	return Unix_Socket(client_sock), nil
+}
+
+@(private)
 _close :: proc(socket: Any_Socket) {
 	real_socket := cast(Fd)any_socket_to_socket(socket)
 	// TODO: This returns an error number, but the `core:net` interface does not handle it.
@@ -190,6 +254,18 @@ _recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: TCP
 		return
 	}
 	return result, nil
+}
+
+@(private)
+_recv_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_read: int, err: Unix_Recv_Error) {
+	if len(buf) <= 0 {
+		return 0, nil
+	}
+	num_read, errno := freebsd.recv(freebsd.Fd(socket), buf, {})
+	if errno != .NONE {
+		return 0, _unix_recv_error(errno)
+	}
+	return int(num_read), nil
 }
 
 @(private)
@@ -221,6 +297,21 @@ _send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: 
 		bytes_written += result
 	}
 	return
+}
+
+@(private)
+_send_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_written: int, err: Unix_Send_Error) {
+	total_written := 0
+	for total_written < len(buf) {
+		limit := min(int(max(i32)), len(buf) - total_written)
+		remaining := buf[total_written:][:limit]
+		res, errno := freebsd.send(freebsd.Fd(socket), remaining, .NOSIGNAL)
+		if errno != nil {
+			return total_written, _unix_send_error(errno)
+		}
+		total_written += int(res)
+	}
+	return total_written, nil
 }
 
 @(private)
