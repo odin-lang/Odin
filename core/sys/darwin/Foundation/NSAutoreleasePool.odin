@@ -17,15 +17,16 @@ AutoreleasePool_init :: proc "c" (self: ^AutoreleasePool) -> ^AutoreleasePool {
 AutoreleasePool_drain :: proc "c" (self: ^AutoreleasePool) {
 	msgSend(nil, self, "drain")
 }
+
 @(objc_type=AutoreleasePool, objc_name="addObject")
 AutoreleasePool_addObject :: proc "c" (self: ^AutoreleasePool, obj: ^Object) {
 	msgSend(nil, self, "addObject:", obj)
 }
-@(objc_type=AutoreleasePool, objc_name="showPools")
-AutoreleasePool_showPools :: proc "c" (self: ^AutoreleasePool, obj: ^Object) {
-	msgSend(nil, self, "showPools")
-}
 
+@(objc_type=AutoreleasePool, objc_name="showPools", objc_is_class_method=true)
+AutoreleasePool_showPools :: proc "c" () {
+	msgSend(nil, AutoreleasePool, "showPools")
+}
 
 @(deferred_out=AutoreleasePool_drain)
 scoped_autoreleasepool :: proc "c" () -> ^AutoreleasePool {
