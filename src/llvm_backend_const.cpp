@@ -206,7 +206,7 @@ gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeR
 	GB_ASSERT_MSG(value_count == elem_count, "%s %u %u", LLVMPrintTypeToString(t), value_count, elem_count);
 
 	if (force_non_named) {
-		return LLVMConstStructInContext(m->ctx, values, value_count, true);
+		return LLVMConstStructInContext(m->ctx, values, value_count, LLVMIsPackedStruct(t));
 	}
 
 	bool failure = false;
@@ -216,7 +216,7 @@ gb_internal LLVMValueRef llvm_const_named_struct_internal(lbModule *m, LLVMTypeR
 	}
 
 	if (failure) {
-		return LLVMConstStructInContext(m->ctx, values, value_count, true);
+		return LLVMConstStructInContext(m->ctx, values, value_count, LLVMIsPackedStruct(t));
 	}
 	return LLVMConstNamedStruct(t, values, value_count);
 }
