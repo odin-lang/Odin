@@ -1916,6 +1916,12 @@ POLLRDHUP      :: 0x2000
 POLLFREE       :: 0x4000
 POLL_BUSY_LOOP :: 0x8000
 
+// fcntl commands
+F_GETFD :: 1
+
+// errno values
+EBADF :: 9
+
 // perf event data
 Perf_Sample :: struct #raw_union {
 	period:    u64,
@@ -2327,6 +2333,18 @@ sys_dup2 :: proc "contextless" (oldfd: int, newfd: int) -> int {
 	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
 		return int(intrinsics.syscall(SYS_dup2, uintptr(oldfd), uintptr(newfd)))
 	} else {
+		// Differences between dup2 and dup3 are:
+		//   - dup3 takes a flags argument
+		//   - dup2 does not return EINVAL
+		//   - if old == new dup3 returns EINVAL, dup2 returns new if it is a valid file descriptor
+		if oldfd == newfd {
+			ret := sys_fcntl(newfd, F_GETFD, 0)
+			if ret >= 0 {
+				return newfd
+			} else {
+				return -EBADF
+			}
+		}
 		return int(intrinsics.syscall(SYS_dup3, uintptr(oldfd), uintptr(newfd), 0))
 	}
 }
