@@ -4,84 +4,56 @@ gb_internal GB_COMPARE_PROC(string_cmp) {
 	return string_compare(x, y);
 }
 
-gb_internal bool recursively_delete_directory(wchar_t *wpath_c) {
-#if defined(GB_SYSTEM_WINDOWS)
-	auto const is_dots_w = [](wchar_t const *str) -> bool {
-		if (!str) {
-			return false;
-		}
-		return wcscmp(str, L".") == 0 || wcscmp(str, L"..") == 0;
-	};
+// odin_cache_root is where cached build artifacts live:
+//   $ODIN_CACHE_DIR, else $XDG_CACHE_HOME/odin, else ~/.cache/odin.
+gb_internal String odin_cache_root(void) {
+	gbAllocator a = permanent_allocator();
 
-	TEMPORARY_ALLOCATOR_GUARD();
-
-	wchar_t dir_path[MAX_PATH] = {};
-	wchar_t filename[MAX_PATH] = {};
-	wcscpy_s(dir_path, wpath_c);
-	wcscat_s(dir_path, L"\\*");
-
-	wcscpy_s(filename, wpath_c);
-	wcscat_s(filename, L"\\");
-
-
-	WIN32_FIND_DATAW find_file_data = {};
-	HANDLE hfind = FindFirstFileW(dir_path, &find_file_data);
-	if (hfind == INVALID_HANDLE_VALUE) {
-		return false;
+	char const *dir = gb_get_env("ODIN_CACHE_DIR", a);
+	if (dir && *dir) {
+		return make_string_c(dir);
 	}
-	defer (FindClose(hfind));
-
-	wcscpy_s(dir_path, filename);
-
-	for (;;) {
-		if (FindNextFileW(hfind, &find_file_data)) {
-			if (is_dots_w(find_file_data.cFileName)) {
-				continue;
-			}
-			wcscat_s(filename, find_file_data.cFileName);
-
-			if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-				if (!recursively_delete_directory(filename)) {
-					return false;
-				}
-				RemoveDirectoryW(filename);
-				wcscpy_s(filename, dir_path);
-			} else {
-				if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) {
-					_wchmod(filename, _S_IWRITE);
-				}
-				if (!DeleteFileW(filename)) {
-					return false;
-				}
-				wcscpy_s(filename, dir_path);
-			}
-		} else {
-			if (GetLastError() == ERROR_NO_MORE_FILES) {
-				break;
-			}
-			return false;
-		}
+	char const *xdg = gb_get_env("XDG_CACHE_HOME", a);
+	if (xdg && *xdg) {
+		return concatenate_strings(a, make_string_c(xdg), str_lit("/odin"));
 	}
-
-
-	return RemoveDirectoryW(wpath_c);
-#else
-	return false;
-#endif
+	char const *home = gb_get_env("HOME", a);
+	if (!home || !*home) {
+		gb_printf_err("Cannot determine a cache directory; set $ODIN_CACHE_DIR.\n");
+		gb_exit(1);
+	}
+	return concatenate_strings(a, make_string_c(home), str_lit("/.cache/odin"));
 }
 
+// recursively_delete_directory removes `path` and everything beneath it. A missing path counts as success.
 gb_internal bool recursively_delete_directory(String const &path) {
+	Array<FileInfo> files = {};
+	ReadDirectoryError err = read_directory(path, &files);
+	if (err == ReadDirectory_NotExists) {
+		return true;
+	}
+	if (err != ReadDirectory_None && err != ReadDirectory_Empty) {
+		return false;
+	}
+	for (FileInfo const &fi : files) {
+		if (fi.is_dir) {
+			if (!recursively_delete_directory(fi.fullpath)) {
+				return false;
+			}
+		} else {
+			gb_file_remove(alloc_cstring(temporary_allocator(), fi.fullpath));
+		}
+	}
 #if defined(GB_SYSTEM_WINDOWS)
-	String16 wpath = string_to_string16(permanent_allocator(), path);
-	wchar_t *wpath_c = alloc_wstring(permanent_allocator(), wpath);
-	return recursively_delete_directory(wpath_c);
+	String16 wpath = string_to_string16(temporary_allocator(), path);
+	return RemoveDirectoryW(cast(wchar_t *)wpath.text);
 #else
-	return false;
+	return rmdir(alloc_cstring(temporary_allocator(), path)) == 0;
 #endif
 }
 
 gb_internal bool try_clear_cache(void) {
-	return recursively_delete_directory(str_lit(".odin-cache"));
+	return recursively_delete_directory(odin_cache_root());
 }
 
 
@@ -120,6 +92,15 @@ gb_internal bool check_if_exists_directory_otherwise_create(String const &str) {
 	}
 	return false;
 #endif
+}
+
+// make_directory_recursive creates `path` and any missing parent directories.
+gb_internal void make_directory_recursive(String const &path) {
+	for (isize i = 1; i <= path.len; i++) {
+		if (i == path.len || path[i] == '/' || path[i] == '\\') {
+			(void)check_if_exists_directory_otherwise_create(substring(path, 0, i));
+		}
+	}
 }
 gb_internal bool try_copy_executable_cache_internal(bool to_cache) {
 	String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
@@ -187,6 +168,17 @@ gb_internal bool try_copy_executable_from_cache(void) {
 extern char **environ;
 #endif
 
+// foreign libs baked into the final binary: static libs, object files, asm.
+// dynamic libs (.so/.dylib/.framework) load at runtime, so we skip those.
+gb_internal bool foreign_lib_is_statically_linked(String const &path) {
+	if (has_asm_extension(path)) {
+		return true;
+	}
+	String ext = path_extension(path, false);
+	return str_eq_ignore_case(ext, "a") || str_eq_ignore_case(ext, "lib") ||
+	       str_eq_ignore_case(ext, "o") || str_eq_ignore_case(ext, "obj");
+}
+
 Array<String> cache_gather_files(Checker *c) {
 	Parser *p = c->parser;
 
@@ -215,6 +207,30 @@ Array<String> cache_gather_files(Checker *c) {
 			continue;
 		}
 		array_add(&files, cache->path);
+	}
+
+	// static foreign libs get baked in too, so track their mtimes
+	for (Entity *e : c->info.foreign_library_names) {
+		if (e->LibraryName.decl == nullptr) {
+			continue;
+		}
+		ast_node(imp, ForeignImportDecl, e->LibraryName.decl);
+		for (isize i = 0; i < e->LibraryName.paths.count; i++) {
+			String lib = string_trim_whitespace(e->LibraryName.paths[i]);
+			if (lib.len == 0 || !foreign_lib_is_statically_linked(lib)) {
+				continue;
+			}
+			// system: imports are names, not real files
+			if (i < imp->filepaths.count) {
+				Ast *fp = imp->filepaths[i];
+				if (fp->tav.mode == Addressing_Constant &&
+				    fp->tav.value.kind == ExactValue_String &&
+				    string_starts_with(fp->tav.value.value_string, str_lit("system:"))) {
+					continue;
+				}
+			}
+			array_add(&files, lib);
+		}
 	}
 
 	array_sort(files, string_cmp);
@@ -270,9 +286,8 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		crc = crc64_with_seed(path.text, path.len, crc);
 	}
 
-	String base_cache_dir = build_context.build_paths[BuildPath_Output].basename;
-	base_cache_dir = concatenate_strings(permanent_allocator(), base_cache_dir, str_lit("/.odin-cache"));
-	(void)check_if_exists_directory_otherwise_create(base_cache_dir);
+	String base_cache_dir = odin_cache_root();
+	make_directory_recursive(base_cache_dir);
 
 	gbString crc_str = gb_string_make_reserve(permanent_allocator(), 16);
 	crc_str = gb_string_append_fmt(crc_str, "%016llx", crc);
@@ -290,17 +305,17 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 		return false;
 	}
 
-	if (check_if_exists_file_otherwise_create(files_path)) {
+	if (build_context.cache_check_mtime && check_if_exists_file_otherwise_create(files_path)) {
 		return false;
 	}
-	if (check_if_exists_file_otherwise_create(args_path)) {
+	if (build_context.cache_check_args && check_if_exists_file_otherwise_create(args_path)) {
 		return false;
 	}
-	if (check_if_exists_file_otherwise_create(env_path)) {
+	if (build_context.cache_check_env && check_if_exists_file_otherwise_create(env_path)) {
 		return false;
 	}
 
-	{
+	if (build_context.cache_check_mtime) {
 		// exists already
 		LoadedFile loaded_file = {};
 
@@ -352,7 +367,7 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 			return false;
 		}
 	}
-	{
+	if (build_context.cache_check_args) {
 		LoadedFile loaded_file = {};
 
 		LoadedFileError file_err = load_file_32(
@@ -383,8 +398,11 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 				return false;
 			}
 		}
+		if (args_count != args.count) {
+			return false;
+		}
 	}
-	{
+	if (build_context.cache_check_env) {
 		LoadedFile loaded_file = {};
 
 		LoadedFileError file_err = load_file_32(
@@ -415,6 +433,9 @@ gb_internal bool try_cached_build(Checker *c, Array<String> const &args) {
 				return false;
 			}
 		}
+		if (env_count != envs.count) {
+			return false;
+		}
 	}
 
 	return try_copy_executable_from_cache();
@@ -426,7 +447,7 @@ void write_cached_build(Checker *c, Array<String> const &args) {
 	auto envs = cache_gather_envs();
 	defer (array_free(&envs));
 
-	{
+	if (build_context.cache_check_mtime) {
 		char const *path_c = alloc_cstring(temporary_allocator(), build_context.build_cache_data.files_path);
 		gb_file_remove(path_c);
 
@@ -441,7 +462,7 @@ void write_cached_build(Checker *c, Array<String> const &args) {
 			gb_fprintf(&f, "%llu %.*s\n", cast(unsigned long long)ft, LIT(path));
 		}
 	}
-	{
+	if (build_context.cache_check_args) {
 		char const *path_c = alloc_cstring(temporary_allocator(), build_context.build_cache_data.args_path);
 		gb_file_remove(path_c);
 
@@ -456,7 +477,7 @@ void write_cached_build(Checker *c, Array<String> const &args) {
 			gb_fprintf(&f, "%.*s\n", LIT(targ));
 		}
 	}
-	{
+	if (build_context.cache_check_env) {
 		char const *path_c = alloc_cstring(temporary_allocator(), build_context.build_cache_data.env_path);
 		gb_file_remove(path_c);
 

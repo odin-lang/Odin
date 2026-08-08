@@ -120,6 +120,31 @@ else
 	$ODIN test ../test_issue_5640.odin -o:none $COMMON
 fi
 
+# -cached: changing a static foreign lib should trigger a rebuild.
+# skipped on freebsd: the emulated ci vm sigills (core dumps) on the odin -cached build, though it
+# passes on every native target plus netbsd. guarded with a uname check like the netbsd asan skip above.
+if [[ "$(uname)" != "FreeBSD" ]]; then
+	clang -c ../test_cached_foreign_libs.c -o cached_foreign_libs_c.o
+	ar rcs libcached_foreign_libs.a cached_foreign_libs_c.o
+	CACHED_HOME="$PWD/cached_test_home"
+	rm -rf "$CACHED_HOME"
+	cached_build() { ODIN_CACHE_DIR="$CACHED_HOME" $ODIN build ../test_cached_foreign_libs.odin -file -cached -show-debug-messages -out:cached_foreign_libs_app 2>&1; }
+	cached_build >/dev/null # cold build, fills the cache
+	if cached_build | grep -q "try_copy_executable_from_cache"; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached didn't reuse the cache when nothing changed)"
+		exit 1
+	fi
+	touch -t 203012312359 libcached_foreign_libs.a
+	if cached_build | grep -q "try_copy_executable_to_cache"; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached didn't rebuild after the static lib changed)"
+		exit 1
+	fi
+fi
+
 set +x
 
 popd

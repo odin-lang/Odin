@@ -580,6 +580,9 @@ struct BuildContext {
 	LTOKind lto_kind;
 	bool   module_per_file;
 	bool   cached;
+	bool   cache_check_mtime; // source file modification times
+	bool   cache_check_args;  // build flags
+	bool   cache_check_env;   // environment variables
 	BuildCacheData build_cache_data;
 
 	bool internal_no_inline;
