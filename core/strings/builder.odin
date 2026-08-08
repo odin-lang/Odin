@@ -804,7 +804,7 @@ Returns:
 */
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
-	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], i, base, false, 64)
 	return write_string(b, s)
 }
 /*
@@ -822,7 +822,7 @@ Returns:
 */
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 	buf: [32]byte
-	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], u64(i), base, true, 64)
 	return write_string(b, s)
 }
 /*
