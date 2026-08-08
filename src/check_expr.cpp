@@ -8278,6 +8278,11 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	}
 
 	TypeTuple *tuple = get_record_polymorphic_params(original_type);
+	if (tuple == nullptr) {
+		error(call, "No params are expected!");
+		err = CallArgumentError_TooManyArguments;
+		return err;
+	}
 	isize param_count = tuple->variables.count;
 	isize minimum_param_count = param_count;
 	for (; minimum_param_count > 0; minimum_param_count--) {
