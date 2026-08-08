@@ -2296,6 +2296,59 @@ matrix4_perspective :: proc{
 
 
 @(require_results)
+matrix4_perspective_zero_to_one_f16 :: proc "contextless" (fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
+	tan_half_fovy := math.tan(0.5 * fovy)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = far / (far - near)
+	m[3, 2] = +1
+	m[2, 3] = -(far*near) / (far - near)
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+@(require_results)
+matrix4_perspective_zero_to_one_f32 :: proc "contextless" (fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
+	tan_half_fovy := math.tan(0.5 * fovy)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = far / (far - near)
+	m[3, 2] = +1
+	m[2, 3] = -(far*near) / (far - near)
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+@(require_results)
+matrix4_perspective_zero_to_one_f64 :: proc "contextless" (fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
+	tan_half_fovy := math.tan(0.5 * fovy)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = far / (far - near)
+	m[3, 2] = +1
+	m[2, 3] = -(far*near) / (far - near)
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+matrix4_perspective_zero_to_one :: proc{
+	matrix4_perspective_zero_to_one_f16,
+	matrix4_perspective_zero_to_one_f32,
+	matrix4_perspective_zero_to_one_f64,
+}
+
+
+
+@(require_results)
 matrix_ortho3d_f16 :: proc "contextless" (left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
@@ -2352,6 +2405,62 @@ matrix_ortho3d :: proc{
 
 
 @(require_results)
+matrix_ortho3d_zero_to_one_f16 :: proc "contextless" (left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
+	m[0, 0] = +2 / (right - left)
+	m[1, 1] = +2 / (top - bottom)
+	m[2, 2] = +1 / (far - near)
+	m[0, 3] = -(right + left)   / (right - left)
+	m[1, 3] = -(top   + bottom) / (top - bottom)
+	m[2, 3] = -near / (far- near)
+	m[3, 3] = 1
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+@(require_results)
+matrix_ortho3d_zero_to_one_f32 :: proc "contextless" (left, right, bottom, top, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
+	m[0, 0] = +2 / (right - left)
+	m[1, 1] = +2 / (top - bottom)
+	m[2, 2] = +1 / (far - near)
+	m[0, 3] = -(right + left)   / (right - left)
+	m[1, 3] = -(top   + bottom) / (top - bottom)
+	m[2, 3] = -near / (far- near)
+	m[3, 3] = 1
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+@(require_results)
+matrix_ortho3d_zero_to_one_f64 :: proc "contextless" (left, right, bottom, top, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
+	m[0, 0] = +2 / (right - left)
+	m[1, 1] = +2 / (top - bottom)
+	m[2, 2] = +1 / (far - near)
+	m[0, 3] = -(right + left)   / (right - left)
+	m[1, 3] = -(top   + bottom) / (top - bottom)
+	m[2, 3] = -near / (far- near)
+	m[3, 3] = 1
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+matrix_ortho3d_zero_to_one :: proc{
+	matrix_ortho3d_zero_to_one_f16,
+	matrix_ortho3d_zero_to_one_f32,
+	matrix_ortho3d_zero_to_one_f64,
+}
+
+
+
+@(require_results)
 matrix4_infinite_perspective_f16 :: proc "contextless" (fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
@@ -2400,6 +2509,58 @@ matrix4_infinite_perspective :: proc{
 	matrix4_infinite_perspective_f16,
 	matrix4_infinite_perspective_f32,
 	matrix4_infinite_perspective_f64,
+}
+
+
+@(require_results)
+matrix4_infinite_perspective_zero_to_one_f16 :: proc "contextless" (fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
+	tan_half_fovy := math.tan(0.5 * fovy)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +1
+	m[3, 2] = +1
+	m[2, 3] = -near
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+@(require_results)
+matrix4_infinite_perspective_zero_to_one_f32 :: proc "contextless" (fovy, aspect, near: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
+	tan_half_fovy := math.tan(0.5 * fovy)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +1
+	m[3, 2] = +1
+	m[2, 3] = -near
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+@(require_results)
+matrix4_infinite_perspective_zero_to_one_f64 :: proc "contextless" (fovy, aspect, near: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
+	tan_half_fovy := math.tan(0.5 * fovy)
+	m[0, 0] = 1 / (aspect*tan_half_fovy)
+	m[1, 1] = 1 / (tan_half_fovy)
+	m[2, 2] = +1
+	m[3, 2] = +1
+	m[2, 3] = -near
+
+	if flip_z_axis {
+		m[2] = -m[2]
+	}
+
+	return
+}
+matrix4_infinite_perspective_zero_to_one :: proc{
+	matrix4_infinite_perspective_zero_to_one_f16,
+	matrix4_infinite_perspective_zero_to_one_f32,
+	matrix4_infinite_perspective_zero_to_one_f64,
 }
 
 
