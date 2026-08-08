@@ -1,18 +1,26 @@
 // Fixed-point rational numbers and conversion to/from `f64`.
 package math_fixed
 
-import "core:math"
 import "core:strconv"
 import "base:intrinsics"
-_, _, _ :: intrinsics, strconv, math
+_, _ :: intrinsics, strconv
 
 Fixed :: struct($Backing: typeid, $Fraction_Width: uint)
 	where
 		intrinsics.type_is_integer(Backing),
-		0 <= Fraction_Width,
-		Fraction_Width <= 8*size_of(Backing) {
+		0 < Fraction_Width,
+		Fraction_Width <= 8*size_of(Backing),
+		// see NOTE below
+		intrinsics.type_is_unsigned(Backing) || Fraction_Width < 8*size_of(Backing) {
 	i: Backing,
 }
+
+// NOTE:
+// signed Backings can't have all the bits allocated to fraction:
+// such types (e.g. Fixed(i8, 8)) would be well defined, but in the current implementation
+// they result in compile errors for some procedures (init_from_parts) 
+// and incorrect results from others (ceil, round, floor)
+
 
 Fixed4_4  :: distinct Fixed(i8, 4)
 Fixed5_3  :: distinct Fixed(i8, 3)
@@ -29,14 +37,9 @@ Fixed32_32 :: distinct Fixed(i64, 32)
 Fixed52_12 :: distinct Fixed(i64, 12)
 
 
+// val must be in range; other values produce garbage/poison
 init_from_f64 :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
-	i, f := math.modf(math.abs(val))
-	x.i  = Backing(f * (1<<Fraction_Width))
-	x.i &= 1<<Fraction_Width - 1
-	x.i |= Backing(i) << Fraction_Width
-	if val < 0 {
-		x.i *= -1
-	}
+	x.i = Backing(val * (1 << Fraction_Width))
 }
 
 init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
@@ -46,11 +49,7 @@ init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), 
 }
 
 to_f64 :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
-	sign := -1.0 if x.i < 0 else 1.0
-	num := math.abs(x.i)
-	res := f64(num >> Fraction_Width)
-	res += f64(num & (1<<Fraction_Width-1)) / f64(1<<Fraction_Width)
-	return res * sign
+	return f64(x.i) / f64(1 << Fraction_Width)
 }
 
 
@@ -88,11 +87,7 @@ div_sat :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z:
 
 @(require_results)
 floor :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
-	if x.i >= 0 {
-		return x.i >> Fraction_Width
-	} else {
-		return (x.i - (1 << (Fraction_Width - 1)) + (1 << (Fraction_Width - 2))) >> Fraction_Width
-	}
+	return x.i >> Fraction_Width
 }
 @(require_results)
 ceil :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
@@ -103,12 +98,15 @@ round :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing 
 	return (x.i + (1 << (Fraction_Width - 1))) >> Fraction_Width
 }
 
+@(private="file")
+WRITE_BUF_SIZE :: 135  // accommodates up to 128-bit backing types
+
 @(require_results)
 write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	Integer_Width :: 8*size_of(Backing) - Fraction_Width
 
 	x := x
-	buf: [48]byte
+	buf: [WRITE_BUF_SIZE]byte
 	i := 0
 
 	if !intrinsics.type_is_unsigned(Backing) && x.i == min(Backing) {
@@ -123,7 +121,7 @@ write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 			x.i = -x.i
 		}
 
-		when size_of(Backing) < 16 {
+		when size_of(Backing) < 8 {
 			T :: u64
 			write_uint :: strconv.write_uint
 		} else {
@@ -149,13 +147,13 @@ write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	}
 
 	n := copy(dst, buf[:i])
-	return string(dst[:i])
+	return string(dst[:n])
 }
 
 
 @(require_results)
 to_string :: proc(x: $T/Fixed($Backing, $Fraction_Width), allocator := context.allocator) -> string {
-	buf: [48]byte
+	buf: [WRITE_BUF_SIZE]byte
 	s := write(buf[:], x)
 	str := make([]byte, len(s), allocator)
 	copy(str, s)
