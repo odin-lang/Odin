@@ -42,6 +42,13 @@ poly16x8_t :: #simd[8]poly16_t
 poly64x1_t :: #simd[1]poly64_t
 poly64x2_t :: #simd[2]poly64_t
 
+int8x8x2_t  :: [2]int8x8_t
+int8x16x2_t :: [2]int8x16_t
+int8x8x3_t  :: [3]int8x8_t
+int8x16x3_t :: [3]int8x16_t
+int8x8x4_t  :: [4]int8x8_t
+int8x16x4_t :: [4]int8x16_t
+
 uint8x8x2_t  :: [2]uint8x8_t
 uint8x16x2_t :: [2]uint8x16_t
 uint8x8x3_t  :: [3]uint8x8_t
