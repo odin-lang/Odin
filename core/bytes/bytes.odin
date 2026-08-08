@@ -709,13 +709,20 @@ index_any :: proc(s, chars: []byte) -> int {
 	if chars == nil {
 		return -1
 	}
+	if len(chars) == 1 {
+		return index_byte(s, chars[0])
+	}
 
-	// TODO(bill): Optimize
+	// NOTE: Same technique as strings.Ascii_Set, duplicated here since
+	// core:strings imports core:bytes and not the other way around.
+	set: [8]u32
+	for c in chars {
+		set[c >> 5] |= 1 << (u32(c) & 31)
+	}
+
 	for r, i in s {
-		for c in chars {
-			if r == c {
-				return i
-			}
+		if set[r >> 5] & (1 << (u32(r) & 31)) != 0 {
+			return i
 		}
 	}
 	return -1
