@@ -1,3 +1,5 @@
+#define MP_USE_MEMOPS
+
 #include "libtommath/mp_2expt.c"
 #include "libtommath/mp_abs.c"
 #include "libtommath/mp_add.c"

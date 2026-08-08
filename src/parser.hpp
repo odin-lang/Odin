@@ -118,9 +118,15 @@ struct AstFile {
 	String       directory;
 
 	Tokenizer    tokenizer;
-	Array<Token> tokens;
+
+	i32          total_token_count;
+
+	bool         use_cached_tokens;
+	Array<Token> cached_tokens;
+
 	isize        curr_token_index;
 	isize        prev_token_index;
+	Token        first_token;
 	Token        curr_token;
 	Token        prev_token; // previous non-comment
 	Token        package_token;
