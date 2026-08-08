@@ -187,6 +187,9 @@ pool_join :: proc(pool: ^Pool) {
 //
 // Each task also needs an allocator which it either owns, or which is thread
 // safe.
+//
+// Completed tasks remain in the pool until removed with `pool_pop_done`.
+// When reusing the pool, call it once for every task added.
 pool_add_task :: proc(pool: ^Pool, allocator: mem.Allocator, procedure: Task_Proc, data: rawptr, user_index: int = 0) {
 	sync.guard(&pool.mutex)
 
@@ -344,7 +347,10 @@ pool_pop_waiting :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 	return
 }
 
-// Use this to take out finished tasks.
+// Remove and return the next completed task, if one is available.
+//
+// The caller is responsible for processing the result and releasing any
+// resources associated with the task.
 pool_pop_done :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 	sync.guard(&pool.mutex)
 
@@ -374,6 +380,9 @@ pool_do_work :: proc(pool: ^Pool, task: Task) {
 
 // Process the rest of the tasks, also use this thread for processing, then join
 // all the pool threads.
+//
+// Completed tasks are not removed. Retrieve each one with `pool_pop_done`.
+// The pool cannot be restarted after this procedure returns.
 pool_finish :: proc(pool: ^Pool) {
 	for task in pool_pop_waiting(pool) {
 		pool_do_work(pool, task)

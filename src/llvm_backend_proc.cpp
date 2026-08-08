@@ -1024,10 +1024,16 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		}
 
 		for_array(i, ft->args) {
+			// lbArg_Ignore args are not present in the call arguments, so they must not
+			// advance param_offset (mirrors lb_add_function_type_attributes)
+			if (ft->args[i].kind == lbArg_Ignore) {
+				continue;
+			}
 			LLVMAttributeRef attribute = ft->args[i].attribute;
 			if (attribute != nullptr) {
-				LLVMAddCallSiteAttribute(ret, param_offset + cast(LLVMAttributeIndex)i, attribute);
+				LLVMAddCallSiteAttribute(ret, param_offset, attribute);
 			}
+			param_offset += 1;
 		}
 
 		switch (inlining) {
@@ -4785,6 +4791,12 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TypeProc *procedure_type, Ast* call_expression) {
 	switch (param_value.kind) {
 	case ParameterValue_Constant:
+		if (param_value.proc_entity != nullptr && is_type_proc(parameter_type)) {
+			lbValue v = lb_find_procedure_value_from_entity(p->module, param_value.proc_entity);
+			if (v.value != nullptr) {
+				return lb_emit_conv(p, v, parameter_type);
+			}
+		}
 		if (is_type_constant_type(parameter_type)) {
 			auto res = lb_const_value(p->module, parameter_type, param_value.value);
 			return res;
@@ -4904,6 +4916,79 @@ gb_internal void lb_add_values_to_array(lbProcedure *p, Array<lbValue> *args, lb
 	}
 }
 
+gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Slice<lbValue> var_args) {
+	GB_ASSERT(is_type_slice(slice_type));
+	if (var_args.count == 0) {
+		return lb_const_nil(p->module, slice_type);
+	}
+
+	Type *elem_type = slice_type->Slice.elem;
+	lbAddr slice = {};
+
+	for (auto const &vr : p->variadic_reuses) {
+		if (are_types_identical(vr.slice_type, slice_type)) {
+			slice = vr.slice_addr;
+			break;
+		}
+	}
+
+	DeclInfo *d = decl_info_of_entity(p->entity);
+	if (d != nullptr && slice.addr.value == nullptr) {
+		for (auto const &vr : d->variadic_reuses) {
+			if (are_types_identical(vr.slice_type, slice_type)) {
+				#if LLVM_VERSION_MAJOR >= 13
+					// NOTE(bill): No point wasting even more memory, just reuse this stack variable too
+					if (p->variadic_reuses.count > 0) {
+						slice = p->variadic_reuses[0].slice_addr;
+					} else {
+						slice = lb_add_local_generated(p, slice_type, true);
+					}
+					// NOTE(bill): Change the underlying type to match the specific type
+					slice.addr.type = alloc_type_pointer(slice_type);
+				#else
+					slice = lb_add_local_generated(p, slice_type, true);
+				#endif
+				array_add(&p->variadic_reuses, lbVariadicReuseSlices{slice_type, slice});
+				break;
+			}
+		}
+	}
+
+	lbValue base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
+	if (base_array_ptr.value == nullptr) {
+		if (d != nullptr) {
+			i64 max_bytes = d->variadic_reuse_max_bytes;
+			i64 max_align = gb_max(d->variadic_reuse_max_align, 16);
+			p->variadic_reuse_base_array_ptr = lb_add_local_generated(p, alloc_type_array(t_u8, max_bytes), true);
+			lb_try_update_alignment(p->variadic_reuse_base_array_ptr.addr, cast(unsigned)max_align);
+			base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
+		} else {
+			base_array_ptr = lb_add_local_generated(p, alloc_type_array(elem_type, var_args.count), true).addr;
+		}
+	}
+
+	if (slice.addr.value == nullptr) {
+		slice = lb_add_local_generated(p, slice_type, true);
+	}
+
+	GB_ASSERT(base_array_ptr.value != nullptr);
+	GB_ASSERT(slice.addr.value != nullptr);
+
+	base_array_ptr = lb_emit_conv(p, base_array_ptr, alloc_type_pointer(alloc_type_array(elem_type, var_args.count)));
+
+	for_array(i, var_args) {
+		lbValue addr = lb_emit_array_epi(p, base_array_ptr, cast(i32)i);
+		lbValue var_arg = lb_emit_conv(p, var_args[i], elem_type);
+		lb_emit_store(p, addr, var_arg);
+	}
+
+	lbValue base_elem = lb_emit_array_epi(p, base_array_ptr, 0);
+	lbValue len = lb_const_int(p->module, t_int, var_args.count);
+	lb_fill_slice(p, slice, base_elem, len);
+
+	return lb_addr_load(p, slice);
+}
+
 gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbValue *sret_dst) {
 	lbModule *m = p->module;
 
@@ -4989,8 +5074,45 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	bool is_c_vararg = pt->c_vararg;
+	bool has_tuple_positional_arg = false;
+	if (pt->variadic && !is_c_vararg && !vari_expand) {
+		for (Ast *arg : ce->split_args->positional) {
+			TypeAndValue tav = type_and_value_of_expr(arg);
+			if (is_type_tuple(tav.type)) {
+				has_tuple_positional_arg = true;
+				break;
+			}
+		}
+	}
 
-	for_array(i, ce->split_args->positional) {
+	if (has_tuple_positional_arg) {
+		auto flat_args = array_make<lbValue>(heap_allocator());
+		defer (array_free(&flat_args));
+
+		for_array(i, ce->split_args->positional) {
+			Entity *e = pt->params->Tuple.variables[gb_min(i, cast(isize)pt->variadic_index)];
+			if (e->kind == Entity_TypeName) {
+				array_add(&flat_args, lb_const_nil(p->module, e->type));
+			} else if (e->kind == Entity_Constant) {
+				array_add(&flat_args, lb_const_value(p->module, e->type, e->Constant.value));
+			} else {
+				GB_ASSERT(e->kind == Entity_Variable);
+				lbValue arg = lb_build_expr(p, ce->split_args->positional[i]);
+				lb_add_values_to_array(p, &flat_args, arg);
+			}
+		}
+
+		isize fixed_count = pt->variadic_index;
+		isize supplied_fixed_count = gb_min(fixed_count, flat_args.count);
+		for (isize i = 0; i < supplied_fixed_count; i++) {
+			array_add(&args, flat_args[i]);
+		}
+		array_resize(&args, fixed_count);
+
+		Type *slice_type = pt->params->Tuple.variables[pt->variadic_index]->type;
+		auto var_args = slice(slice_from_array(flat_args), supplied_fixed_count, flat_args.count);
+		array_add(&args, lb_build_variadic_slice(p, slice_type, var_args));
+	} else for_array(i, ce->split_args->positional) {
 		Entity *e = pt->params->Tuple.variables[i];
 		if (e->kind == Entity_TypeName) {
 			array_add(&args, lb_const_nil(p->module, e->type));
@@ -5032,82 +5154,13 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 					variadic_args = lb_build_expr(p, variadic[0]);
 					variadic_args = lb_emit_conv(p, variadic_args, slice_type);
 				} else {
-					Type *elem_type = slice_type->Slice.elem;
-
 					auto var_args = array_make<lbValue>(heap_allocator(), 0, variadic.count);
 					defer (array_free(&var_args));
 					for (Ast *var_arg : variadic) {
 						lbValue v = lb_build_expr(p, var_arg);
 						lb_add_values_to_array(p, &var_args, v);
 					}
-					isize slice_len = var_args.count;
-					if (slice_len > 0) {
-						lbAddr slice = {};
-
-						for (auto const &vr : p->variadic_reuses) {
-							if (are_types_identical(vr.slice_type, slice_type)) {
-								slice = vr.slice_addr;
-								break;
-							}
-						}
-
-						DeclInfo *d = decl_info_of_entity(p->entity);
-						if (d != nullptr && slice.addr.value == nullptr) {
-							for (auto const &vr : d->variadic_reuses) {
-								if (are_types_identical(vr.slice_type, slice_type)) {
-								#if LLVM_VERSION_MAJOR >= 13
-									// NOTE(bill): No point wasting even more memory, just reuse this stack variable too
-									if (p->variadic_reuses.count > 0) {
-										slice = p->variadic_reuses[0].slice_addr;
-									} else {
-										slice = lb_add_local_generated(p, slice_type, true);
-									}
-									// NOTE(bill): Change the underlying type to match the specific type
-									slice.addr.type = alloc_type_pointer(slice_type);
-								#else
-									slice = lb_add_local_generated(p, slice_type, true);
-								#endif
-									array_add(&p->variadic_reuses, lbVariadicReuseSlices{slice_type, slice});
-									break;
-								}
-							}
-						}
-
-						lbValue base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
-						if (base_array_ptr.value == nullptr) {
-							if (d != nullptr) {
-								i64 max_bytes = d->variadic_reuse_max_bytes;
-								i64 max_align = gb_max(d->variadic_reuse_max_align, 16);
-								p->variadic_reuse_base_array_ptr = lb_add_local_generated(p, alloc_type_array(t_u8, max_bytes), true);
-								lb_try_update_alignment(p->variadic_reuse_base_array_ptr.addr, cast(unsigned)max_align);
-								base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
-							} else {
-								base_array_ptr = lb_add_local_generated(p, alloc_type_array(elem_type, slice_len), true).addr;
-							}
-						}
-
-						if (slice.addr.value == nullptr) {
-							slice = lb_add_local_generated(p, slice_type, true);
-						}
-
-						GB_ASSERT(base_array_ptr.value != nullptr);
-						GB_ASSERT(slice.addr.value != nullptr);
-
-						base_array_ptr = lb_emit_conv(p, base_array_ptr, alloc_type_pointer(alloc_type_array(elem_type, slice_len)));
-
-						for (isize i = 0; i < var_args.count; i++) {
-							lbValue addr = lb_emit_array_epi(p, base_array_ptr, cast(i32)i);
-							lbValue var_arg = var_args[i];
-							var_arg = lb_emit_conv(p, var_arg, elem_type);
-							lb_emit_store(p, addr, var_arg);
-						}
-
-						lbValue base_elem = lb_emit_array_epi(p, base_array_ptr, 0);
-						lbValue len = lb_const_int(p->module, t_int, slice_len);
-						lb_fill_slice(p, slice, base_elem, len);
-
-						variadic_args = lb_addr_load(p, slice);
-					}
+					variadic_args = lb_build_variadic_slice(p, slice_type, slice_from_array(var_args));
 				}
 			}
 			array_add(&args, variadic_args);

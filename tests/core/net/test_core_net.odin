@@ -526,6 +526,36 @@ join_url_test :: proc(t: ^testing.T) {
 }
 
 @test
+percent_encode_test :: proc(t: ^testing.T) {
+	test_cases := []struct{input, expected: string} {
+		// Bytes < 0x10 must be zero-padded to two hex digits
+		{"\n",   "%0A"},
+		{"\t",   "%09"},
+		{"\r",   "%0D"},
+		{"a\nb", "a%0Ab"},
+		{"\x00", "%00"},
+
+		// Bytes >= 0x10
+		{" ",    "%20"},
+		{"😃",   "%F0%9F%98%83"},
+
+		// Unreserved characters pass through unescaped
+		{"AZaz09-_.~", "AZaz09-_.~"},
+	}
+
+	for test in test_cases {
+		encoded := net.percent_encode(test.input)
+		defer delete(encoded)
+		testing.expectf(t, encoded == test.expected, "Expected `net.percent_encode(%q)` to return %q, got %q", test.input, test.expected, encoded)
+
+		decoded, ok := net.percent_decode(encoded)
+		defer delete(decoded)
+		testing.expectf(t, ok, "Expected `net.percent_decode(%q)` to succeed", encoded)
+		testing.expectf(t, decoded == test.input, "Expected percent-encoding roundtrip for %q, got %q", test.input, decoded)
+	}
+}
+
+@test
 test_udp_echo :: proc(t: ^testing.T) {
 	endpoint := net.Endpoint{address=net.IP4_Address{127, 0, 0, 1}, port=0}
 
