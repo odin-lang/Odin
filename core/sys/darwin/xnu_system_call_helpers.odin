@@ -1,3 +1,4 @@
+#+build darwin
 package darwin
 
 import "core:c"
