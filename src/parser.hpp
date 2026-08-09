@@ -468,6 +468,47 @@ struct AstSplitArgs {
 		i64 max_count; \
 		Ast *tag; \
 	}) \
+	AST_KIND(AsmTemplate, "asm template", struct { \
+		Token        token;            \
+		bool         has_side_effects; \
+		bool         is_align_stack;   \
+		Ast *        signature;        \
+		Slice<Ast *> specs;            \
+		Slice<Ast *> clobbers;         \
+		Slice<Ast *> instructions;     \
+		Token        end;              \
+	}) \
+	AST_KIND(AsmRegister, "asm register", struct { \
+		Token token; \
+		Token name;  \
+	}) \
+	AST_KIND(AsmSpec, "asm specification", struct { \
+		Ast *name;              \
+		Ast *tied_name;         \
+		Ast *type;              \
+		Ast *value;             \
+		bool is_temporary_decl; \
+	}) \
+	AST_KIND(AsmClobber, "asm clobber", struct { \
+		Token token; \
+		Ast * value; \
+	}) \
+	AST_KIND(AsmLabelDecl, "asm label declaration", struct { \
+		Token token; \
+		Ast * name;  \
+	}) \
+	AST_KIND(AsmInstruction, "asm instruction", struct { \
+		Token        name;     \
+		Slice<Ast *> operands; \
+	}) \
+	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
+		Token open;  \
+		Ast * base;  \
+		Ast * index; \
+		Ast * scale; \
+		Ast * disp;  \
+		Token close; \
+	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_KIND(TagExpr,      "tag expression",         struct { Token token, name; Ast *expr; }) \

@@ -13,6 +13,21 @@ gb_internal Token ast_token(Ast *node) {
 		}
 		return node->CompoundLit.open;
 
+	case Ast_AsmTemplate:
+		return node->AsmTemplate.token;
+	case Ast_AsmRegister:
+		return node->AsmRegister.token;
+	case Ast_AsmSpec:
+		return ast_token(node->AsmSpec.name);
+	case Ast_AsmClobber:
+		return node->AsmClobber.token;
+	case Ast_AsmLabelDecl:
+		return node->AsmLabelDecl.token;
+	case Ast_AsmInstruction:
+		return node->AsmInstruction.name;
+	case Ast_AsmMemoryOperand:
+		return node->AsmMemoryOperand.open;
+
 	case Ast_TagExpr:       return node->TagExpr.token;
 	case Ast_BadExpr:       return node->BadExpr.begin;
 	case Ast_UnaryExpr:     return node->UnaryExpr.op;
@@ -155,6 +170,33 @@ Token ast_end_token(Ast *node) {
 		return ast_end_token(node->ProcLit.type);
 	case Ast_CompoundLit:
 		return node->CompoundLit.close;
+
+	case Ast_AsmTemplate:
+		return node->AsmTemplate.end;
+	case Ast_AsmRegister:
+		return node->AsmRegister.name;
+	case Ast_AsmSpec:
+		if (node->AsmSpec.value) {
+			return ast_end_token(node->AsmSpec.value);
+		}
+		if (node->AsmSpec.type) {
+			return ast_end_token(node->AsmSpec.type);
+		}
+		if (node->AsmSpec.tied_name) {
+			return ast_end_token(node->AsmSpec.tied_name);
+		}
+		return ast_end_token(node->AsmSpec.name);
+	case Ast_AsmClobber:
+		return ast_end_token(node->AsmClobber.value);
+	case Ast_AsmLabelDecl:
+		return ast_end_token(node->AsmLabelDecl.name);
+	case Ast_AsmInstruction:
+		if (node->AsmInstruction.operands.count > 0) {
+			return ast_end_token(node->AsmInstruction.operands[node->AsmInstruction.operands.count-1]);
+		}
+		return node->AsmInstruction.name;
+	case Ast_AsmMemoryOperand:
+		return node->AsmMemoryOperand.close;
 
 	case Ast_BadExpr:       return node->BadExpr.end;
 	case Ast_TagExpr:

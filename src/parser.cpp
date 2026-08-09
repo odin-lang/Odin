@@ -520,8 +520,37 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->MatrixType.column_count = clone_ast(n->MatrixType.column_count, f);
 		n->MatrixType.elem         = clone_ast(n->MatrixType.elem, f);
 		break;
-	}
 
+	case Ast_AsmTemplate:
+		n->AsmTemplate.signature    = clone_ast(n->AsmTemplate.signature, f);
+		n->AsmTemplate.specs        = clone_ast_array(n->AsmTemplate.specs, f);
+		n->AsmTemplate.clobbers     = clone_ast_array(n->AsmTemplate.clobbers, f);
+		n->AsmTemplate.instructions = clone_ast_array(n->AsmTemplate.instructions, f);
+		break;
+	case Ast_AsmRegister:
+		break;
+	case Ast_AsmSpec:
+		n->AsmSpec.name      = clone_ast(n->AsmSpec.name,      f);
+		n->AsmSpec.tied_name = clone_ast(n->AsmSpec.tied_name, f);
+		n->AsmSpec.type      = clone_ast(n->AsmSpec.type,      f);
+		n->AsmSpec.value     = clone_ast(n->AsmSpec.value,     f);
+		break;
+	case Ast_AsmClobber:
+		n->AsmClobber.value = clone_ast(n->AsmClobber.value, f);
+		break;
+	case Ast_AsmLabelDecl:
+		n->AsmLabelDecl.name = clone_ast(n->AsmLabelDecl.name, f);
+		break;
+	case Ast_AsmInstruction:
+		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
+		break;
+	case Ast_AsmMemoryOperand:
+		n->AsmMemoryOperand.base  = clone_ast(n->AsmMemoryOperand.base,  f);
+		n->AsmMemoryOperand.index = clone_ast(n->AsmMemoryOperand.index, f);
+		n->AsmMemoryOperand.scale = clone_ast(n->AsmMemoryOperand.scale, f);
+		n->AsmMemoryOperand.disp  = clone_ast(n->AsmMemoryOperand.disp,  f);
+		break;
+	}
 	return n;
 }
 
@@ -1727,7 +1756,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		syntax_error(prev, "'..' for ranges are not allowed, did you mean '..<' or '..='?");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
-	
+
 	advance_token(f);
 	return prev;
 }
@@ -2376,6 +2405,268 @@ gb_internal void parser_check_polymorphic_record_parameters(AstFile *f, Ast *pol
 			}
 		}
 	}
+}
+
+
+gb_internal Ast *parse_asm_register(AstFile *f) {
+	Token token = expect_token(f, Token_Mod);
+	Token name  = expect_token(f, Token_Ident);
+	Ast *reg = alloc_ast_node(f, Ast_AsmRegister);
+	reg->AsmRegister.token = token;
+	reg->AsmRegister.name  = name;
+	return reg;
+}
+gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
+	switch (f->curr_token.kind) {
+	case Token_Period:
+		{
+			Token token = expect_token(f, Token_Period);
+			Ast *name   = parse_ident(f);
+			Ast *label_decl = alloc_ast_node(f, Ast_AsmLabelDecl);
+			label_decl->AsmLabelDecl.token = token;
+			label_decl->AsmLabelDecl.name  = name;
+			return label_decl;
+		}
+	case Token_Ident:
+		return parse_ident(f);
+	case Token_Mod:
+		return parse_asm_register(f);
+	case Token_Integer:
+	case Token_Float:
+	case Token_Rune:
+		return ast_basic_lit(f, advance_token(f));
+	case Token_OpenBracket:
+		if (allow_memory_operand) {
+			Token open  = expect_token(f, Token_OpenBracket);
+			Ast *base  = nullptr;
+			Ast *index = nullptr;
+			Ast *scale = nullptr;
+			Ast *disp  = nullptr;
+
+			base = parse_asm_operand(f, false);
+
+			if (allow_token(f, Token_Add)) {
+				Ast *possible_index = parse_asm_operand(f, false);
+				if (allow_token(f, Token_Mul)) {
+					index = possible_index;
+					scale = parse_asm_operand(f, false);
+					if (allow_token(f, Token_Add)) {
+						disp = parse_asm_operand(f, false);
+					}
+				} else {
+					disp = possible_index;
+				}
+			}
+
+			Token close = expect_token(f, Token_CloseBracket);
+
+			Ast *mem = alloc_ast_node(f, Ast_AsmMemoryOperand);
+			mem->AsmMemoryOperand.open  = open;
+			mem->AsmMemoryOperand.base  = base;
+			mem->AsmMemoryOperand.index = index;
+			mem->AsmMemoryOperand.scale = scale;
+			mem->AsmMemoryOperand.disp  = disp;
+			mem->AsmMemoryOperand.close = close;
+
+			return mem;
+		}
+		break;
+	}
+
+	syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
+	advance_token(f);
+	return nullptr;
+}
+
+gb_internal Slice<Ast *> parse_asm_operands(AstFile *f) {
+	Array<Ast *> operands = {};
+	operands.allocator = heap_allocator();
+
+	while (f->curr_token.kind != Token_Semicolon &&
+	       f->curr_token.kind != Token_EOF) {
+		Ast *operand = parse_asm_operand(f, true);
+		if (operand != nullptr) {
+			array_add(&operands, operand);
+		}
+	       	if (!allow_token(f, Token_Comma)) {
+	       		break;
+	       	}
+	}
+
+	if (allow_token(f, Token_Semicolon)) {
+		// okay
+	}
+
+	return slice_from_array(operands);
+}
+
+gb_internal Ast *parse_asm_instruction(AstFile *f) {
+	if (allow_token(f, Token_Semicolon)) {
+		return nullptr;
+	}
+	switch (f->curr_token.kind) {
+	default:
+		if (!token_is_keyword(f->curr_token.kind)) {
+			break;
+		}
+		/*fallthrough*/
+	case Token_Ident:
+		{
+			Token name = advance_token(f);
+			auto operands = parse_asm_operands(f);
+			Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
+			instruction->AsmInstruction.name = name;
+			instruction->AsmInstruction.operands = operands;
+			return instruction;
+		}
+	case Token_Period:
+		{
+			Token token = expect_token(f, Token_Period);
+			Ast *name   = parse_ident(f);
+			expect_token(f, Token_Colon);
+			Ast *label_decl = alloc_ast_node(f, Ast_AsmLabelDecl);
+			label_decl->AsmLabelDecl.token = token;
+			label_decl->AsmLabelDecl.name  = name;
+			return label_decl;
+		}
+	}
+	syntax_error(f->curr_token, "Expected an asm instruction, got '%.*s'", LIT(f->curr_token.string));
+	advance_token(f);
+	return nullptr;
+}
+
+
+gb_internal Ast *parse_asm_template(AstFile *f) {
+	Token token = expect_token(f, Token_asm);
+
+	bool has_side_effects = false;
+	bool is_align_stack   = false;
+
+	while (f->curr_token.kind == Token_Hash) {
+		advance_token(f);
+		if (f->curr_token.kind == Token_Ident) {
+			Token token = advance_token(f);
+			String name = token.string;
+			if (name == "side_effects") {
+				if (has_side_effects) {
+					syntax_error(token, "Duplicate directive on inline asm expression: '#side_effects'");
+				}
+				has_side_effects = true;
+			} else if (name == "align_stack") {
+				if (is_align_stack) {
+					syntax_error(token, "Duplicate directive on inline asm expression: '#align_stack'");
+				}
+				is_align_stack = true;
+			} else {
+				syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
+			}
+		} else {
+			syntax_error(f->curr_token, "Expected an identifier after hash");
+		}
+	}
+
+
+	Ast *signature = parse_proc_type(f, token);
+
+	Slice<Ast *> asm_specs = {};
+	Slice<Ast *> asm_clobbers  = {};
+
+	if (f->curr_token.kind == Token_OpenBracket) {
+		Array<Ast *> specs = {};
+		specs.allocator = heap_allocator();
+
+		Array<Ast *> clobbers = {};
+		clobbers.allocator = heap_allocator();
+
+		Token open = expect_token(f, Token_OpenBracket);
+		while (f->curr_token.kind != Token_CloseBracket &&
+		       f->curr_token.kind != Token_EOF) {
+			Ast *spec = nullptr;
+			if (f->curr_token.kind == Token_Ident) {
+				Ast *name      = parse_ident(f);
+				Ast *tied_name = nullptr;
+				Ast *type      = nullptr;
+				Ast *value     = nullptr;
+				if (allow_token(f, Token_ArrowRight)) {
+					tied_name = parse_ident(f);
+				}
+				if (allow_token(f, Token_Colon)) {
+					type = parse_type(f);
+				}
+				if (allow_token(f, Token_Eq)) {
+					value = parse_asm_register(f);
+				}
+
+				if (type == nullptr && value == nullptr) {
+					syntax_error(f->curr_token, "An asm specification must specify at least either a type or a value");
+				}
+
+				spec = alloc_ast_node(f, Ast_AsmSpec);
+				spec->AsmSpec.name      = name;
+				spec->AsmSpec.tied_name = tied_name;
+				spec->AsmSpec.type      = type;
+				spec->AsmSpec.value     = value;
+			} else if (f->curr_token.kind == Token_Hash) {
+				Token hash = expect_token(f, Token_Hash);
+				Token clobber_token = expect_token(f, Token_Ident);
+				if (clobber_token.string != "clobber") {
+					syntax_error(clobber_token, "Expected #clobber, got '%.*s'", LIT(clobber_token.string));
+				} else {
+					Ast *value = parse_asm_operand(f, false);
+					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
+					clobber->AsmClobber.token = hash;
+					clobber->AsmClobber.value = value;
+					array_add(&clobbers, clobber);
+				}
+			} else {
+				syntax_error(f->curr_token, "Expected am asm specification which begins with a identifier, got '%.*s'", LIT(f->curr_token.string));
+				advance_token(f);
+			}
+			if (spec != nullptr) {
+				array_add(&specs, spec);
+			}
+			if (!allow_token(f, Token_Comma)) {
+				break;
+			}
+		}
+		Token close = expect_token(f, Token_CloseBracket);
+
+		asm_specs    = slice_from_array(specs);
+		asm_clobbers = slice_from_array(clobbers);
+	}
+
+	Slice<Ast *> asm_instructions = {};
+
+	if (!allow_token(f, Token_OpenBrace)) {
+		syntax_error(f->curr_token, "Expected a body for an asm template");
+		advance_token(f);
+	} else {
+		Array<Ast *> instructions = {};
+		instructions.allocator = heap_allocator();
+
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			Ast *instruction = parse_asm_instruction(f);
+			if (instruction != nullptr) {
+				array_add(&instructions, instruction);
+			}
+		}
+
+		Token close = expect_token(f, Token_CloseBrace);
+
+		asm_instructions = slice_from_array(instructions);
+	}
+
+	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);
+	asm_template->AsmTemplate.token            = token;
+	asm_template->AsmTemplate.has_side_effects = has_side_effects;
+	asm_template->AsmTemplate.is_align_stack   = is_align_stack;
+	asm_template->AsmTemplate.signature        = signature;
+	asm_template->AsmTemplate.specs            = asm_specs;
+	asm_template->AsmTemplate.clobbers         = asm_clobbers;
+	asm_template->AsmTemplate.instructions     = asm_instructions;
+	asm_template->AsmTemplate.end              = f->prev_token;
+	return asm_template;
 }
 
 
@@ -3105,83 +3396,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		return ast_bit_set_type(f, token, elem, underlying);
 	}
 
-	case Token_asm: {
-		Token token = expect_token(f, Token_asm);
-
-		Array<Ast *> param_types = {};
-		Ast *return_type = nullptr;
-		if (allow_token(f, Token_OpenParen)) {
-			param_types = array_make<Ast *>(ast_allocator(f));
-			while (f->curr_token.kind != Token_CloseParen && f->curr_token.kind != Token_EOF) {
-				Ast *t = parse_type(f);
-				array_add(&param_types, t);
-				if (f->curr_token.kind != Token_Comma ||
-				    f->curr_token.kind == Token_EOF) {
-				    break;
-				}
-				advance_token(f);
-			}
-			expect_token(f, Token_CloseParen);
-
-			if (allow_token(f, Token_ArrowRight)) {
-				return_type = parse_type(f);
-			}
-		}
-
-		bool has_side_effects = false;
-		bool is_align_stack = false;
-		InlineAsmDialectKind dialect = InlineAsmDialect_Default;
-
-		while (f->curr_token.kind == Token_Hash) {
-			advance_token(f);
-			if (f->curr_token.kind == Token_Ident) {
-				Token token = advance_token(f);
-				String name = token.string;
-				if (name == "side_effects") {
-					if (has_side_effects) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#side_effects'");
-					}
-					has_side_effects = true;
-				} else if (name == "align_stack") {
-					if (is_align_stack) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#align_stack'");
-					}
-					is_align_stack = true;
-				} else if (name == "att") {
-					if (dialect == InlineAsmDialect_ATT) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#att'");
-					} else if (dialect != InlineAsmDialect_Default) {
-						syntax_error(token, "Conflicting asm dialects");
-					} else {
-						dialect = InlineAsmDialect_ATT;
-					}
-				} else if (name == "intel") {
-					if (dialect == InlineAsmDialect_Intel) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#intel'");
-					} else if (dialect != InlineAsmDialect_Default) {
-						syntax_error(token, "Conflicting asm dialects");
-					} else {
-						dialect = InlineAsmDialect_Intel;
-					}
-				} else {
-					syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
-				}
-			} else {
-				syntax_error(f->curr_token, "Expected an identifier after hash");
-			}
-		}
-
-		skip_possible_newline_for_literal(f);
-		Token open = expect_token(f, Token_OpenBrace);
-		Ast *asm_string = parse_expr(f, false);
-		expect_token(f, Token_Comma);
-		Ast *constraints_string = parse_expr(f, false);
-		allow_token(f, Token_Comma);
-		Token close = expect_closing_brace_of_field_list(f);
-
-		return ast_inline_asm_expr(f, token, open, close, param_types, return_type, asm_string, constraints_string, has_side_effects, is_align_stack, dialect);
-	}
-
+	case Token_asm:
+		return parse_asm_template(f);
 	}
 
 	return nullptr;
