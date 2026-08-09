@@ -2547,7 +2547,7 @@ gb_internal Ast *parse_asm_signature(AstFile *f, Token asm_token) {
 
 	expect_token(f, Token_OpenParen);
 	f->expr_level += 1;
-	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, false, false);
+	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, false, true);
 	if (file_allow_newline(f)) {
 		skip_possible_newline(f);
 	}

@@ -5023,6 +5023,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	// NOTE(bill): Regular call
 	lbValue value = {};
+	Entity *asm_template = nullptr;
 
 	if (proc_entity != nullptr) {
 		if (proc_entity->flags & EntityFlag_Disabled) {
@@ -5056,15 +5057,25 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 			}
 		}
 	}
+	Type *proc_value_type = nullptr;
 
 	if (is_objc_call) {
 		value.type = proc_tv.type;
+		proc_value_type = value.type;
 	} else if (value.value == nullptr) {
-		value = lb_build_expr(p, proc_expr);
+		Entity *found = entity_of_node(proc_expr);
+		if (found && found->kind == Entity_AsmTemplate) {
+			asm_template = found;
+			proc_value_type = asm_template->type;
+		} else {
+			value = lb_build_expr(p, proc_expr);
+			proc_value_type = value.type;
+		}
 	}
 
-	GB_ASSERT(value.value != nullptr || is_objc_call);
-	Type *proc_type_ = base_type(value.type);
+
+	GB_ASSERT(value.value != nullptr || is_objc_call || asm_template != nullptr);
+	Type *proc_type_ = base_type(proc_value_type);
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
 
@@ -5283,6 +5294,11 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 	}
 
-	return lb_emit_call(p, value, call_args, inlining, tailing, sret_dst);
+	if (asm_template != nullptr) {
+		GB_ASSERT(value.value == nullptr);
+		return lb_emit_asm_template_call(p, asm_template, call_args);
+	} else {
+		return lb_emit_call(p, value, call_args, inlining, tailing, sret_dst);
+	}
 }
 
