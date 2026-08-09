@@ -7370,7 +7370,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
-			operand->value = exact_value_bool(check_type_specialization_to(c, s, t, false, false));
+			bool is_specialization = false;
+			if (!are_types_identical(s, t)) {
+				is_specialization = check_type_specialization_to(c, s, t, false, false);
+			}
+			operand->value = exact_value_bool(is_specialization);
 
 		}
 		break;
