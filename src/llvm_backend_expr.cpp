@@ -5068,6 +5068,47 @@ gb_internal void lb_build_addr_compound_lit_assign_array(lbProcedure *p, Array<l
 	}
 }
 
+// address of one component of an #soa container's array element, for soa[i][j] and for the
+// same element reached through a for-in looping variable, v[j]
+gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAddr const &soa_addr, Type *elem_type) {
+	ast_node(ie, IndexExpr, expr);
+	GB_ASSERT(soa_addr.kind == lbAddr_SoaVariable);
+	GB_ASSERT_MSG(elem_type->kind == Type_Array, "%s", type_to_string(elem_type));
+
+	// this is a no-op when the index is in range by construction, like in a for-in loop
+	lb_emit_soa_index_bounds_check(p, soa_addr.addr, soa_addr.soa.index, soa_addr.soa.index_expr);
+
+	i64 const component_count = elem_type->Array.count;
+
+	auto const index_tv = type_and_value_of_expr(ie->index);
+	if (index_tv.mode == Addressing_Constant && index_tv.value.kind == ExactValue_Integer) {
+		i64 component = big_int_to_i64(&index_tv.value.value_integer);
+		GB_ASSERT_MSG(0 <= component && component < component_count, "%s", expr_to_string(expr));
+		return lb_addr_soa_field_elem(lb_soa_field_elem_ptr(p, soa_addr.addr, cast(i32)component, soa_addr.soa.index));
+	}
+
+	// for non-constant index do chain select between the component pointers;
+	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless), 
+	// and should be folded if j turns out constant after inlining;
+	// TODO: more efficient codegen can be done, most definitely for fixed kind, possibly for slice/dynamic,
+	// (but this works for both kinds)
+	//
+	// Note: a temp holding the whole element would be simpler but would not be an lvalue,
+	// and writes go through here
+	lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
+	lb_emit_bounds_check(p, ast_token(ie->index), index, lb_const_int(p->module, t_int, component_count));
+
+	lbValue ptr = lb_soa_field_elem_ptr(p, soa_addr.addr, 0, soa_addr.soa.index);
+	// lb_emit_select evaluates both arms, so every candidate address is formed;
+	// only the selected one is loaded or stored through
+	for (i64 component = 1; component < component_count; component++) {
+		lbValue candidate = lb_soa_field_elem_ptr(p, soa_addr.addr, cast(i32)component, soa_addr.soa.index);
+		lbValue is_component = lb_emit_comp(p, Token_CmpEq, index, lb_const_int(p->module, t_int, component));
+		ptr = lb_emit_select(p, is_component, candidate, ptr);
+	}
+	return lb_addr_soa_field_elem(ptr);
+}
+
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	ast_node(ie, IndexExpr, expr);
 
@@ -5086,10 +5127,10 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr_soa_variable(val, index, ie->index);
 	}
 
-	if (ie->expr->tav.mode == Addressing_SoaVariable) {
-		// SOA Structures for slices/dynamic arrays
-		GB_ASSERT_MSG(is_type_multi_pointer(type_of_expr(ie->expr)), "%s", type_to_string(type_of_expr(ie->expr)));
-
+	if (ie->expr->tav.mode == Addressing_SoaVariable && is_type_multi_pointer(type_of_expr(ie->expr))) {
+		// soa.x[i], indexing one field's multipointer;
+		// the soa element of array type, soa[i][j] carries Addressing_SoaVariable too but has
+		// no multipointer to index; it is handled in the Type_Array case below
 		lbValue field = lb_build_expr(p, ie->expr);
 		lbValue index = lb_build_expr(p, ie->index);
 
@@ -5145,8 +5186,15 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	switch (t->kind) {
 	case Type_Array: {
-		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		lbAddr array_addr = lb_build_addr(p, ie->expr);
+		// soa[i][j], or v[j] in a for-in loop, with v being the looping var over soa container
+		//
+		// keyed on the lowered lbAddr kind rather than the addressing mode,
+		// because, unlike soa[i], v is seen by the checker as Addressing_Variable
+		if (array_addr.kind == lbAddr_SoaVariable) {
+			return lb_build_addr_soa_elem_index(p, expr, array_addr, t);
+		}
+		lbValue array = lb_addr_get_ptr(p, array_addr);
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}

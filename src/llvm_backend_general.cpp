@@ -617,6 +617,12 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 }
 
 // pointer to the index element of the field_index component
+//
+// the returned pointer type depends on the soa kind (because the field types do):
+// ^T for StructSoa_Fixed (field is [N]T array), but [^]T for the slice and dynamic
+// kinds (field is the [^]T this offsets);
+// loads and stores work with either, but an lbAddr must not hold the multipointer,
+// so use lb_addr_soa_field_elem to build an lbAddr from this
 gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 field_index, lbValue index) {
 	Type *t = base_type(type_deref(soa_ptr.type));
 	GB_ASSERT_MSG(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None, "%s", type_to_string(t));
@@ -626,6 +632,14 @@ gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 f
 		return lb_emit_array_ep(p, field, index);
 	}
 	return lb_emit_ptr_offset(p, lb_emit_load(p, field), index);
+}
+
+// lbAddr over an lb_soa_field_elem_ptr pointer, retyped ^T when it came as [^]T
+gb_internal lbAddr lb_addr_soa_field_elem(lbValue ptr) {
+	if (is_type_multi_pointer(ptr.type)) {
+		ptr.type = alloc_type_multi_pointer_to_pointer(ptr.type);
+	}
+	return lb_addr(ptr);
 }
 
 // bounds check for an #soa element index
