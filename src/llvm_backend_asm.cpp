@@ -6,7 +6,7 @@ gb_internal AsmTemplateEntityDecl *lb_asm_entity_decl(Array<AsmTemplateEntityDec
 	}
 	GB_PANIC("Could not find asm entity %s", LIT(e->token.string));
 	return nullptr;
-};
+}
 
 gb_internal gbString lb_asm_write_label_name(gbString asm_string, AstIdent *label_ident) {
 	String name = label_ident->token.string;
@@ -66,7 +66,6 @@ gb_internal gbString lb_asm_write_operand(gbString asm_string, Array<i32> op_num
 	case_end;
 
 	case_ast_node(label, AsmLabelDecl, op);
-		String name = label->name->Ident.token.string;
 		asm_string = lb_asm_write_label_name(asm_string, &label->name->Ident);
 	case_end;
 	default:
@@ -95,7 +94,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 	auto call_args   = array_make<LLVMValueRef>(temporary_allocator(), 0, ops.count);
 	auto ret_types   = array_make<LLVMTypeRef>(temporary_allocator(),  0, ops.count);
 
-	// Per-operand bookkeeping, indexed the same as `ops`.
+	// Per-operand bookkeeping, indexed the same as `ops` (via total_index).
 	auto op_number = array_make<i32>(temporary_allocator(), ops.count, ops.count); // $N, or -1 for clobbers
 	auto ret_slot  = array_make<i32>(temporary_allocator(), ops.count, ops.count); // return-struct index, or -1
 	for_array(i, ops) {
@@ -120,7 +119,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 	auto raw = [&](char const *s) {
 		constraints = gb_string_appendc(constraints, s);
 	};
-	auto put = [&](String s)      {
+	auto put = [&](String s) {
 		constraints = gb_string_append_length(constraints, s.text, s.len);
 	};
 
@@ -148,6 +147,9 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		return pos;
 	};
 
+	// ---- Pass 1: outputs -----------------------------------------------------
+	// Real outputs plus *unpinned* register scratch (modeled as discarded
+	// early-clobber outputs, since a clobber can only name a fixed register).
 	for_array(i, ops) {
 		AsmTemplateEntityDecl const &e = ops[i];
 
@@ -161,7 +163,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 
 		sep();
 
-		if (e.kind == AsmTemplateEntityDecl_Memory) {
+		if (false && e.kind == AsmTemplateEntityDecl_Memory) {
 			// Indirect memory output: writes through a pointer, so it takes an arg
 			// and contributes nothing to the return type.
 			raw("=*m");
@@ -176,8 +178,10 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 			if (e.pin.len != 0) { raw("{"); put(e.pin); raw("}"); }
 			else                raw(class_letter(e.reg_class));
 
+			// Use the entity's real declared type so the return-struct slot matches
+			// the constraint's width/class (e.g. <4 x float> for a #simd[4]f32 scratch).
 			LLVMTypeRef ty = is_alloc_scratch
-				? lb_type(m, t_uintptr)   // TODO: pick a register-width type per reg_class
+				? lb_type(m, e.entity->type)
 				: output_llvm_type(e);
 
 			ret_slot[i] = cast(i32)ret_types.count;
@@ -204,16 +208,17 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		} else {
 			switch (e.kind) {
 			case AsmTemplateEntityDecl_Register:
+			case AsmTemplateEntityDecl_Memory:
 				if (e.pin.len != 0) { raw("{"); put(e.pin); raw("}"); }
 				else                raw(class_letter(e.reg_class));
 				add_arg(v.value);
 				break;
-			case AsmTemplateEntityDecl_Memory: {
-				raw("*m"); // indirect
-				unsigned pos = add_arg(v.value);
-				array_add(&elem_attrs, ElemAttr{pos, lb_type(m, type_deref(v.type))});
-				break;
-			}
+			// case AsmTemplateEntityDecl_Memory: {
+			// 	raw("*m"); // indirect
+			// 	unsigned pos = add_arg(v.value);
+			// 	array_add(&elem_attrs, ElemAttr{pos, lb_type(m, type_deref(v.type))});
+			// 	break;
+			// }
 			case AsmTemplateEntityDecl_Immediate:
 				raw("i"); // TODO: "n" if a known-constant integer is required
 				add_arg(v.value);
@@ -225,7 +230,8 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		op_number[i] = next_op++;
 	}
 
-	GB_ASSERT(tmpl.node->kind = Ast_AsmTemplate);
+	// ---- Build the template text ---------------------------------------------
+	GB_ASSERT(tmpl.node->kind == Ast_AsmTemplate);
 	auto *node = &tmpl.node->AsmTemplate;
 	for_array(i, node->instructions) {
 		if (i > 0) {
@@ -238,6 +244,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 			String name = instr->name->Ident.token.string;
 			asm_string = gb_string_append_length(asm_string, name.text, name.len);
 			asm_string = gb_string_appendc(asm_string, " ");
+			// Intel-source operand order reversed to AT&T (src, ..., dst).
 			for (isize j = instr->operands.count-1; j >= 0; j -= 1) {
 				Ast *op = instr->operands[j];
 				if (j < instr->operands.count-1) {
@@ -245,8 +252,6 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 				}
 				asm_string = lb_asm_write_operand(asm_string, op_number, &ops, op);
 			}
-
-
 		case_end;
 		case_ast_node(label, AsmLabelDecl, instr_);
 			asm_string = lb_asm_write_label_name(asm_string, &label->name->Ident);
@@ -257,8 +262,6 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 			break;
 		}
 	}
-
-	gb_printf_err("%s\n", asm_string);
 
 	// ---- Pass 3: clobbers ----------------------------------------------------
 	// Only the Scratch group. Unpinned register scratch was already emitted as an
@@ -286,6 +289,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		}
 	}
 
+	// ---- Build the callee type -----------------------------------------------
 	LLVMTypeRef ret_ty = nullptr;
 	if (ret_types.count == 0) {
 		ret_ty = LLVMVoidTypeInContext(ctx);
@@ -308,7 +312,12 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 
 	LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-	gb_printf_err("%s\n", LLVMPrintValueToString(call));
+	{
+		gb_printf_err("%s\n", asm_string);
+		char *ir = LLVMPrintValueToString(call);
+		gb_printf_err("%s\n", ir);
+		LLVMDisposeMessage(ir);
+	}
 
 	// Attach elementtype() to every indirect operand's pointer arg (opaque-pointer requirement).
 	unsigned et_kind = LLVMGetEnumAttributeKindForName("elementtype", 11);
@@ -324,7 +333,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		return lbValue{}; // void asm (memory outputs already wrote through their pointers)
 	}
 
-	// The LLVM return struct is ordered by operand, and includes scratch slots;
+	// The LLVM return struct is ordered by operand and includes scratch slots;
 	// pull out only the real register outputs and index them by result_index.
 	auto result_vals = array_make<LLVMValueRef>(temporary_allocator(), result_count, result_count);
 	for (isize i = 0; i < result_count; i++) result_vals[i] = nullptr;
@@ -353,7 +362,6 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		GB_ASSERT(result_vals[i] != nullptr);
 		agg = LLVMBuildInsertValue(p->builder, agg, result_vals[i], cast(unsigned)i, "");
 	}
-
 
 	return lbValue{agg, results_type};
 }
