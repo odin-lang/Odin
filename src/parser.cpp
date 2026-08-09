@@ -542,6 +542,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmLabelDecl.name = clone_ast(n->AsmLabelDecl.name, f);
 		break;
 	case Ast_AsmInstruction:
+		n->AsmInstruction.name     = clone_ast(n->AsmInstruction.name, f);
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
 		break;
 	case Ast_AsmMemoryOperand:
@@ -2512,7 +2513,7 @@ gb_internal Ast *parse_asm_instruction(AstFile *f) {
 		/*fallthrough*/
 	case Token_Ident:
 		{
-			Token name = advance_token(f);
+			Ast *name = parse_ident(f);
 			auto operands = parse_asm_operands(f);
 			Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
 			instruction->AsmInstruction.name = name;
@@ -2535,12 +2536,41 @@ gb_internal Ast *parse_asm_instruction(AstFile *f) {
 	return nullptr;
 }
 
+gb_internal Ast *parse_results(AstFile *f, bool *diverging);
+gb_internal bool is_field_list_generic(AstFieldList *field_list, bool check_names);
+gb_internal Ast *parse_asm_signature(AstFile *f, Token asm_token) {
+	Ast *params = nullptr;
+	Ast *results = nullptr;
+	bool diverging = false;
+
+	ProcCallingConvention cc = ProcCC_InlineAsm;
+
+	expect_token(f, Token_OpenParen);
+	f->expr_level += 1;
+	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, false, false);
+	if (file_allow_newline(f)) {
+		skip_possible_newline(f);
+	}
+	f->expr_level -= 1;
+	expect_token_after(f, Token_CloseParen, "asm template parameter list");
+	results = parse_results(f, &diverging);
+
+	u64 tags = 0;
+	bool is_generic = is_field_list_generic(&params->FieldList, true);
+	if (!is_generic && (results != nullptr)) {
+		is_generic = is_field_list_generic(&results->FieldList, false);
+	}
+
+	return ast_proc_type(f, asm_token, params, results, tags, cc, is_generic, diverging);
+}
 
 gb_internal Ast *parse_asm_template(AstFile *f) {
 	Token token = expect_token(f, Token_asm);
 
 	bool has_side_effects = false;
 	bool is_align_stack   = false;
+
+	Ast *signature = parse_asm_signature(f, token);
 
 	while (f->curr_token.kind == Token_Hash) {
 		advance_token(f);
@@ -2565,11 +2595,12 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 		}
 	}
 
-
-	Ast *signature = parse_proc_type(f, token);
-
 	Slice<Ast *> asm_specs = {};
 	Slice<Ast *> asm_clobbers  = {};
+
+	if (file_allow_newline(f)) {
+		skip_possible_newline(f);
+	}
 
 	if (f->curr_token.kind == Token_OpenBracket) {
 		Array<Ast *> specs = {};
@@ -2630,6 +2661,9 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 			}
 		}
 		Token close = expect_token(f, Token_CloseBracket);
+		if (file_allow_newline(f)) {
+			skip_possible_newline(f);
+		}
 
 		asm_specs    = slice_from_array(specs);
 		asm_clobbers = slice_from_array(clobbers);

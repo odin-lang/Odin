@@ -15,7 +15,8 @@ struct DeclInfo;
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
-	ENTITY_KIND(Label)
+	ENTITY_KIND(Label) \
+	ENTITY_KIND(AsmTemplate)
 
 enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
@@ -159,6 +160,32 @@ gb_internal TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
 	return md;
 }
 
+enum AsmTemplateEntityDeclKind : u8 {
+	AsmTemplateEntityDecl_Invalid,
+	AsmTemplateEntityDecl_Register,
+	AsmTemplateEntityDecl_Memory,
+	AsmTemplateEntityDecl_Immediate,
+
+	AsmTemplateEntityDecl_COUNT
+};
+
+enum AsmTemplateEntityDeclParamGroup : u8 {
+	AsmTemplateEntityDeclParamGroup_Unknown,
+	AsmTemplateEntityDeclParamGroup_Input,
+	AsmTemplateEntityDeclParamGroup_Output,
+	AsmTemplateEntityDeclParamGroup_Scratch,
+
+	AsmTemplateEntityDeclParamGroup_COUNT
+};
+
+struct AsmTemplateEntityDecl {
+	Entity *                        entity;
+	Entity *                        tied_entity;
+	AsmTemplateEntityDeclKind       kind;
+	AsmTemplateEntityDeclParamGroup param_group;
+	u16                             register_map;
+};
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
@@ -300,6 +327,15 @@ struct Entity {
 			Ast *node;
 			Ast *parent;
 		} Label;
+		struct {
+			Ast *node;
+			bool has_side_effects;
+			bool is_align_stack;
+			Scope *param_scope;
+			Scope *label_scope;
+
+			Array<AsmTemplateEntityDecl> decls;
+		} AsmTemplate;
 	};
 };
 
@@ -477,8 +513,14 @@ gb_internal Entity *alloc_entity_library_name(Scope *scope, Token token, Type *t
 }
 
 
-
-
+gb_internal Entity *alloc_entity_asm_template(Scope *scope, Token token, Type *type, Ast *node) {
+	GB_ASSERT(node->kind == Ast_AsmTemplate);
+	Entity *entity = alloc_entity(Entity_AsmTemplate, scope, token, type);
+	entity->AsmTemplate.node = node;
+	entity->AsmTemplate.has_side_effects = node->AsmTemplate.has_side_effects;
+	entity->AsmTemplate.is_align_stack = node->AsmTemplate.is_align_stack;
+	return entity;
+}
 
 gb_internal Entity *alloc_entity_nil(String name, Type *type) {
 	Entity *entity = alloc_entity(Entity_Nil, nullptr, make_token_ident(name), type);

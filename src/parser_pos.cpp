@@ -24,7 +24,7 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_AsmLabelDecl:
 		return node->AsmLabelDecl.token;
 	case Ast_AsmInstruction:
-		return node->AsmInstruction.name;
+		return ast_token(node->AsmInstruction.name);
 	case Ast_AsmMemoryOperand:
 		return node->AsmMemoryOperand.open;
 
@@ -194,7 +194,7 @@ Token ast_end_token(Ast *node) {
 		if (node->AsmInstruction.operands.count > 0) {
 			return ast_end_token(node->AsmInstruction.operands[node->AsmInstruction.operands.count-1]);
 		}
-		return node->AsmInstruction.name;
+		return ast_end_token(node->AsmInstruction.name);
 	case Ast_AsmMemoryOperand:
 		return node->AsmMemoryOperand.close;
 

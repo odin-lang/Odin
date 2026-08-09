@@ -361,6 +361,7 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 		case Entity_Constant:
 		case Entity_TypeName:
 		case Entity_Procedure:
+		case Entity_AsmTemplate:
 			break;
 		default:
 			continue;
@@ -2064,6 +2065,10 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_Nil:
+		o->mode = Addressing_Value;
+		break;
+
+	case Entity_AsmTemplate:
 		o->mode = Addressing_Value;
 		break;
 
@@ -12340,6 +12345,11 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
+	case_ast_node(asm_template, AsmTemplate, node);
+		error(node, "Illegal use of an asm template outside of a named constant value declaration");
+		o->mode = Addressing_Invalid;
+	case_end;
+
 	case_ast_node(i, Implicit, node);
 		switch (i->kind) {
 		case Token_context:
@@ -13584,6 +13594,133 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			str = write_expr_to_string(str, ia->constraints_string, shorthand);
 		}
 		str = gb_string_appendc(str, "}");
+	case_end;
+
+	case_ast_node(at, AsmTemplate, node);
+		str = gb_string_appendc(str, "asm");
+		{
+			ast_node(pt, ProcType, at->signature);
+
+			str = gb_string_appendc(str, "(");
+			str = write_expr_to_string(str, pt->params, shorthand);
+			str = gb_string_appendc(str, ")");
+			if (pt->results != nullptr) {
+				str = gb_string_appendc(str, " -> ");
+
+				bool parens_needed = false;
+				if (pt->results && pt->results->kind == Ast_FieldList) {
+					for (Ast *field : pt->results->FieldList.list) {
+						ast_node(f, Field, field);
+						if (f->names.count != 0) {
+							parens_needed = true;
+							break;
+						}
+					}
+				}
+
+				if (parens_needed) {
+					str = gb_string_append_rune(str, '(');
+				}
+				str = write_expr_to_string(str, pt->results, shorthand);
+				if (parens_needed) {
+					str = gb_string_append_rune(str, ')');
+				}
+			}
+		}
+
+		if (at->has_side_effects) {
+			str = gb_string_appendc(str, " #side_effects");
+		}
+		if (at->is_align_stack) {
+			str = gb_string_appendc(str, " #align_stack");
+		}
+		if (at->specs.count) {
+			str = gb_string_append_rune(str, '[');
+			for_array(j, at->specs) {
+				if (j > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				Ast *spec = at->specs[j];
+				str = write_expr_to_string(str, spec, shorthand);
+			}
+			str = gb_string_append_rune(str, ']');
+		}
+		str = gb_string_append_rune(str, '{');
+		for_array(j, at->instructions) {
+			if (j > 0) {
+				str = gb_string_appendc(str, "; ");
+			}
+			Ast *instr = at->instructions[j];
+			str = write_expr_to_string(str, instr, shorthand);
+			if (instr->kind == Ast_AsmLabelDecl) {
+				str = gb_string_appendc(str, ":");
+			}
+		}
+		str = gb_string_append_rune(str, '}');
+	case_end;
+
+	case_ast_node(ar, AsmRegister, node);
+		str = gb_string_appendc(str, "%");
+		str = gb_string_append_length(str, ar->name.string.text, ar->name.string.len);
+	case_end;
+
+	case_ast_node(spec, AsmSpec, node);
+		if (spec->name) {
+			str = write_expr_to_string(str, spec->name, shorthand);
+			if (spec->tied_name) {
+				str = gb_string_appendc(str, " -> ");
+				str = write_expr_to_string(str, spec->tied_name, shorthand);
+			}
+		}
+		if (spec->type) {
+			str = gb_string_appendc(str, ": ");
+			str = write_expr_to_string(str, spec->type, shorthand);
+		}
+		if (spec->value) {
+			str = gb_string_appendc(str, " = ");
+			str = write_expr_to_string(str, spec->value, shorthand);
+		}
+	case_end;
+
+	case_ast_node(clobber, AsmClobber, node);
+		str = gb_string_appendc(str, "#clobber ");
+		str = write_expr_to_string(str, clobber->value, shorthand);
+	case_end;
+
+	case_ast_node(label, AsmLabelDecl, node);
+		str = gb_string_appendc(str, ".");
+		str = write_expr_to_string(str, label->name, shorthand);
+	case_end;
+
+	case_ast_node(instr, AsmInstruction, node);
+		str = write_expr_to_string(str, instr->name, shorthand);
+		for_array(j, instr->operands) {
+			if (j == 0) {
+				str = gb_string_appendc(str, " ");
+			} else {
+				str = gb_string_appendc(str, ", ");
+			}
+			Ast *operand = instr->operands[j];
+			str = write_expr_to_string(str, operand, shorthand);
+		}
+	case_end;
+
+	case_ast_node(op, AsmMemoryOperand, node);
+		str = gb_string_appendc(str, "[");
+		str = write_expr_to_string(str, op->base, shorthand);
+		if (op->index) {
+			str = gb_string_appendc(str, " + ");
+			str = write_expr_to_string(str, op->index, shorthand);
+			if (op->scale) {
+				str = gb_string_appendc(str, "*");
+				str = write_expr_to_string(str, op->scale, shorthand);
+			}
+		}
+		if (op->disp) {
+			str = gb_string_appendc(str, " + ");
+			str = write_expr_to_string(str, op->disp, shorthand);
+		}
+		str = gb_string_appendc(str, "]");
 	case_end;
 	}
 

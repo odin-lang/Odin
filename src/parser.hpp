@@ -483,11 +483,10 @@ struct AstSplitArgs {
 		Token name;  \
 	}) \
 	AST_KIND(AsmSpec, "asm specification", struct { \
-		Ast *name;              \
-		Ast *tied_name;         \
-		Ast *type;              \
-		Ast *value;             \
-		bool is_temporary_decl; \
+		Ast *name;      \
+		Ast *tied_name; \
+		Ast *type;      \
+		Ast *value;     \
 	}) \
 	AST_KIND(AsmClobber, "asm clobber", struct { \
 		Token token; \
@@ -498,7 +497,7 @@ struct AstSplitArgs {
 		Ast * name;  \
 	}) \
 	AST_KIND(AsmInstruction, "asm instruction", struct { \
-		Token        name;     \
+		Ast *        name;     \
 		Slice<Ast *> operands; \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \

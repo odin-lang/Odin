@@ -15,19 +15,20 @@ struct Quaternion256 {
 };
 
 enum ExactValueKind {
-	ExactValue_Invalid    = 0,
+	ExactValue_Invalid     = 0,
 
-	ExactValue_Bool       = 1,
-	ExactValue_String     = 2,
-	ExactValue_Integer    = 3,
-	ExactValue_Float      = 4,
-	ExactValue_Complex    = 5,
-	ExactValue_Quaternion = 6,
-	ExactValue_Pointer    = 7,
-	ExactValue_Compound   = 8,
-	ExactValue_Procedure  = 9,
-	ExactValue_Typeid     = 10,
-	ExactValue_String16   = 11,
+	ExactValue_Bool        = 1,
+	ExactValue_String      = 2,
+	ExactValue_Integer     = 3,
+	ExactValue_Float       = 4,
+	ExactValue_Complex     = 5,
+	ExactValue_Quaternion  = 6,
+	ExactValue_Pointer     = 7,
+	ExactValue_Compound    = 8,
+	ExactValue_Procedure   = 9,
+	ExactValue_Typeid      = 10,
+	ExactValue_String16    = 11,
+	ExactValue_AsmTemplate = 12,
 
 	ExactValue_Count,
 };
@@ -62,6 +63,7 @@ struct ExactValue {
 		Ast *          value_procedure;
 		Type *         value_typeid;
 		String16       value_string16;
+		Ast *          value_asm_template;
 	};
 };
 
@@ -106,6 +108,9 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 		break;
 	case ExactValue_Procedure:
 		res = ptr_map_hash_key(v.value_procedure);
+		break;
+	case ExactValue_AsmTemplate:
+		res = ptr_map_hash_key(v.value_asm_template);
 		break;
 	case ExactValue_Typeid:
 		res = ptr_map_hash_key(v.value_typeid);
