@@ -2004,6 +2004,25 @@ gb_internal bool is_valid_asm_parameter_type(Type *type) {
 	return false;
 }
 
+gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type) {
+	if (is_type_integer(type)) {
+		return AsmRegClass_Integer;
+	}
+	if (is_type_float(type)) {
+		return AsmRegClass_Float;
+	}
+	if (is_type_boolean(type)) {
+		return AsmRegClass_Integer;
+	}
+	if (is_type_pointer(type) || is_type_multi_pointer(type)) {
+		return AsmRegClass_Integer;
+	}
+	if (is_type_simd_vector(type)) {
+		return AsmRegClass_Vector;
+	}
+	return AsmRegClass_Unknown;
+}
+
 gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool input_parameters, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
 	Type *tuple = alloc_type_tuple();
 	if (_params == nullptr) {
@@ -2015,6 +2034,7 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 	Array<Entity *> variables = {};
 	variables.allocator = heap_allocator();
 
+	i32 param_index = 0;
 	for (Ast *param : params) {
 		ast_node(field, Field, param);
 
@@ -2068,21 +2088,21 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 			if (found == nullptr) {
 				array_add(&variables, entity);
 
-				AsmTemplateEntityDecl ed = {};
-				ed.entity = entity;
-				ed.kind = AsmTemplateEntityDecl_Register;
-				if (is_type_internally_pointer_like(type)) {
-					ed.kind = AsmTemplateEntityDecl_Memory;
-				}
+				AsmTemplateEntityDecl ed = asm_template_entity_decl_default(entity);
 				if (is_poly_name) {
 					ed.kind = AsmTemplateEntityDecl_Immediate;
 				}
 				if (input_parameters) {
 					ed.param_group = AsmTemplateEntityDeclParamGroup_Input;
+					ed.param_index = param_index++;
+					ed.result_index = -1;
 				} else {
 					ed.param_group = AsmTemplateEntityDeclParamGroup_Output;
+					ed.param_index  = -1;
+					ed.result_index = param_index++;
 				}
 
+				ed.total_index = cast(i32)asm_template_entity_decls->count;
 				array_add(asm_template_entity_decls, ed);
 			} else {
 				TokenPos pos = found->token.pos;
@@ -2100,12 +2120,15 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 	return tuple;
 }
 
-gb_internal AsmTemplateEntityDeclParamGroup check_asm_find_group(Entity *entity, Array<AsmTemplateEntityDecl> const &asm_template_entity_decls) {
-	for (auto const &ed : asm_template_entity_decls) {
+gb_internal AsmTemplateEntityDeclParamGroup check_asm_find_group(Entity *entity, Array<AsmTemplateEntityDecl> const &asm_template_entity_decls, i32 *index_) {
+	for_array(i, asm_template_entity_decls) {
+		auto const &ed = asm_template_entity_decls[i];
 		if (ed.entity == entity) {
+			if (index_) *index_ = cast(i32)i;
 			return ed.param_group;
 		}
 	}
+	if (index_) *index_ = -1;
 	return AsmTemplateEntityDeclParamGroup_Unknown;
 };
 
@@ -2120,7 +2143,6 @@ gb_internal AsmTemplateEntityDeclKind check_asm_find_kind(Entity *entity, Array<
 
 
 gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
-
 	for (Ast *spec_ : specs) {
 		if (spec_->kind != Ast_AsmSpec) {
 			continue;
@@ -2150,14 +2172,9 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 
 				Entity *found = scope_insert(scope, entity);
 				if (found == nullptr) {
-					AsmTemplateEntityDecl ed = {};
-					ed.entity = entity;
-					ed.kind = AsmTemplateEntityDecl_Register;
-					if (is_type_internally_pointer_like(type)) {
-						ed.kind = AsmTemplateEntityDecl_Memory;
-					}
+					AsmTemplateEntityDecl ed = asm_template_entity_decl_default(entity);
 					ed.param_group = AsmTemplateEntityDeclParamGroup_Scratch;
-
+					ed.total_index = cast(i32)asm_template_entity_decls->count;
 					array_add(asm_template_entity_decls, ed);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -2190,8 +2207,11 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 				continue;
 			}
 
-			auto input_group  = check_asm_find_group(input, *asm_template_entity_decls);
-			auto output_group = check_asm_find_group(output, *asm_template_entity_decls);
+			i32 input_index  = -1;
+			i32 output_index = -1;
+
+			auto input_group  = check_asm_find_group(input,  *asm_template_entity_decls, &input_index);
+			auto output_group = check_asm_find_group(output, *asm_template_entity_decls, &output_index);
 			if (input_group != AsmTemplateEntityDeclParamGroup_Input) {
 				error(input->token, "Parameter tied with '%.*s' must be an input parameter", LIT(output->token.string));
 				continue;
@@ -2200,6 +2220,15 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 				error(output->token, "Parameter tied with '%.*s' must be an output parameter", LIT(input->token.string));
 				continue;
 			}
+
+			GB_ASSERT(input_index >= 0);
+			GB_ASSERT(output_index >= 0);
+
+			auto *i = &(*asm_template_entity_decls)[input_index];
+			auto *o = &(*asm_template_entity_decls)[output_index];
+
+			i->tie = output_index;
+			o->tie = input_index;
 
 			must_check_value = true;
 		}

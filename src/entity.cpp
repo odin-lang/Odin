@@ -169,6 +169,14 @@ enum AsmTemplateEntityDeclKind : u8 {
 	AsmTemplateEntityDecl_COUNT
 };
 
+enum AsmRegClass : u8 {
+	AsmRegClass_Unknown,
+	AsmRegClass_Integer,
+	AsmRegClass_Float,
+	AsmRegClass_Vector,
+	AsmRegClass_Mask,
+};
+
 enum AsmTemplateEntityDeclParamGroup : u8 {
 	AsmTemplateEntityDeclParamGroup_Unknown,
 	AsmTemplateEntityDeclParamGroup_Input,
@@ -183,7 +191,15 @@ struct AsmTemplateEntityDecl {
 	Entity *                        tied_entity;
 	AsmTemplateEntityDeclKind       kind;
 	AsmTemplateEntityDeclParamGroup param_group;
-	u16                             register_map;
+	AsmRegClass                     reg_class;
+
+	String                          pin;
+
+	i32 total_index;
+
+	i32 param_index;  // index into the Proc signature's params (inputs), else -1
+	i32 result_index; // index into results (outputs), else -1
+	i32 tie; // InOut: index into operands[] of the tied output; else -1
 };
 
 // An Entity is a named "thing" in the language
@@ -333,11 +349,15 @@ struct Entity {
 			bool is_align_stack;
 			Scope *param_scope;
 			Scope *label_scope;
-
 			Array<AsmTemplateEntityDecl> decls;
+
 		} AsmTemplate;
 	};
 };
+
+
+gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type);
+gb_internal bool is_type_internally_pointer_like(Type *t);
 
 gb_internal InternedString entity_interned_name(Entity *entity) {
 	auto name = entity->interned_name.load();
@@ -348,6 +368,24 @@ gb_internal InternedString entity_interned_name(Entity *entity) {
 	}
 	return name;
 }
+
+
+gb_internal AsmTemplateEntityDecl asm_template_entity_decl_default(Entity *entity) {
+	AsmTemplateEntityDecl ed = {};
+	ed.kind = AsmTemplateEntityDecl_Register;
+	if (is_type_internally_pointer_like(entity->type)) {
+		ed.kind = AsmTemplateEntityDecl_Memory;
+	}
+	ed.reg_class = check_asm_reg_class_from_type(entity->type);
+	ed.entity = entity;
+	ed.total_index  = -1;
+	ed.param_index  = -1;
+	ed.result_index = -1;
+	ed.tie          = -1;
+
+	return ed;
+}
+
 
 gb_internal bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	switch (kind) {
