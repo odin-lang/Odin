@@ -5,6 +5,8 @@ cc=${CC:-cc}
 ar=${AR:-ar}
 ranlib=${RANLIB:-ranlib}
 lipo=${LIPO:-lipo}
+wasm_cc=${WASM_CC:-clang}
+wasm_ld=${WASM_LD:-wasm-ld}
 ODIN_ROOT=${ODIN_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}
 
 cd "$ODIN_ROOT/vendor/box3d/src" || exit 1
@@ -87,3 +89,25 @@ Linux)
 	exit 1
 	;;
 esac
+
+echo "Building Box3D for wasm32"
+mkdir -p build/wasm
+for src in src/*.c; do
+	obj="build/wasm/$(basename "${src%.c}.o")"
+	"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
+		--sysroot="$ODIN_ROOT/vendor/libc-shim" \
+		-Iinclude \
+		-include wasm_compat.h \
+		-DBOX3D_DISABLE_SIMD \
+		-DNDEBUG \
+		"$src" -o "$obj"
+done
+"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
+	--sysroot="$ODIN_ROOT/vendor/libc-shim" \
+	-Iinclude \
+	-include wasm_compat.h \
+	-DBOX3D_DISABLE_SIMD \
+	-DNDEBUG \
+	wasm_compat.c -o build/wasm/wasm_compat.o
+"$wasm_ld" -r -o ../lib/box3d_wasm.o build/wasm/*.o
+rm -rf build/wasm

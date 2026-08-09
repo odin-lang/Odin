@@ -319,3 +319,5 @@ build/
 cmake-build*/
 CMakeLists.txt
 sandbox/
+
+vendor/box3d/lib/box3d_wasm.o
