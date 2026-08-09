@@ -2419,6 +2419,8 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 	Type *type = alloc_type_proc(ate->param_scope, params, params->Tuple.variables.count, results, results->Tuple.variables.count, false, pt->calling_convention);
 	type->Proc.diverging = pt->diverging;
 
+	entity->type = type;
+
 	check_asm_specs(ctx, ate->param_scope, at->specs, &ate->decls);
 	{ // check clobbers
 		for (Ast *clobber_ : at->clobbers) {

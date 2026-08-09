@@ -5933,7 +5933,8 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
-		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup) && selector->kind == Ast_Ident) {
+		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup || e->kind == Entity_AsmTemplate) &&
+		    selector->kind == Ast_Ident) {
 			gbString sel_str = expr_to_string(selector);
 			error(node, "'%s' is not declared by '%.*s'", sel_str, LIT(e->token.string));
 			gb_string_free(sel_str);
@@ -6302,6 +6303,10 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
 	case Entity_Nil:
+		operand->mode = Addressing_Value;
+		break;
+
+	case Entity_AsmTemplate:
 		operand->mode = Addressing_Value;
 		break;
 	}
