@@ -5,6 +5,8 @@ cc=${CC:-cc}
 ar=${AR:-ar}
 ranlib=${RANLIB:-ranlib}
 lipo=${LIPO:-lipo}
+wasm_cc=${WASM_CC:-clang}
+wasm_ld=${WASM_LD:-wasm-ld}
 ODIN_ROOT=${ODIN_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}
 
 cd "$ODIN_ROOT/vendor/box3d/src" || exit 1
@@ -87,3 +89,8 @@ Linux)
 	exit 1
 	;;
 esac
+
+echo "Building Box3D for wasm32"
+make -f wasm.Makefile clean
+make -f wasm.Makefile CC="$wasm_cc" LD="$wasm_ld" ODIN_ROOT="$ODIN_ROOT"
+make -f wasm.Makefile clean
