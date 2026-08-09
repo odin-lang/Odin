@@ -153,7 +153,6 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_sub,
 	BuiltinProc_simd_mul,
 	BuiltinProc_simd_div,
-	BuiltinProc_simd_rem,
 	BuiltinProc_simd_shl,        // Odin logic
 	BuiltinProc_simd_shr,        // Odin logic
 	BuiltinProc_simd_shl_masked, // C logic
@@ -564,7 +563,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_div"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_rem"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shl"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shr"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

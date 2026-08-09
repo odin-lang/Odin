@@ -1610,7 +1610,6 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 	case BuiltinProc_simd_sub:
 	case BuiltinProc_simd_mul:
 	case BuiltinProc_simd_div:
-	case BuiltinProc_simd_rem:
 		if (is_float) {
 			switch (builtin_id) {
 			case BuiltinProc_simd_add: op_code = LLVMFAdd; break;
@@ -1628,13 +1627,6 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 					op_code = LLVMSDiv;
 				} else {
 					op_code = LLVMUDiv;
-				}
-				break;
-			case BuiltinProc_simd_rem:
-				if (is_signed) {
-					op_code = LLVMSRem;
-				} else {
-					op_code = LLVMURem;
 				}
 				break;
 			}
