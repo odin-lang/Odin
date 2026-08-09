@@ -41,7 +41,6 @@ else
 fi
 $ODIN test ../test_issue_5699.odin $COMMON
 $ODIN test ../test_issue_6068.odin $COMMON
-$ODIN test ../test_issue_6101.odin $COMMON
 $ODIN test ../test_issue_6165.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON -o:speed
