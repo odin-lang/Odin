@@ -2306,7 +2306,15 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (in_value.kind == ExactValue_String16) {
 			return is_type_string16(type) || is_type_cstring16(type);
 		}
-		return in_value.kind == ExactValue_String;
+		if (in_value.kind != ExactValue_String) {
+			return false;
+		}
+		// NOTE: a UTF-8 constant has to be re-expressed in UTF-16, otherwise its length and
+		// indices stay those of the UTF-8 encoding
+		if (is_type_string16(type) || is_type_cstring16(type)) {
+			if (out_value) *out_value = exact_value_string16(string_to_string16(permanent_allocator(), in_value.value_string));
+		}
+		return true;
 	} else if (is_type_integer(type) || is_type_rune(type)) {
 		ExactValue v = exact_value_to_integer(in_value);
 		if (v.kind != ExactValue_Integer) {
@@ -4005,14 +4013,15 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		Type *dst = core_type(type);
 
 		if (is_type_string(src) && is_type_string(dst)) {
-			bool src_utf16 = is_type_string16(src) || is_type_cstring16(src);
 			bool dst_utf16 = is_type_string16(dst) || is_type_cstring16(dst);
 
-			if (!src_utf16 && dst_utf16) {
+			// NOTE: keyed off the value's encoding rather than the source type; it may have been re-expressed 
+			// when it was checked against the target type
+			if (dst_utf16 && x->value.kind == ExactValue_String) {
 				x->value = exact_value_string16(string_to_string16(permanent_allocator(), x->value.value_string));
 			}
 
-			if (src_utf16 && !dst_utf16) {
+			if (!dst_utf16 && x->value.kind == ExactValue_String16) {
 				x->value = exact_value_string(string16_to_string(permanent_allocator(), x->value.value_string16));
 			}
 		}
@@ -12218,12 +12227,14 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		indices[i] = index;
 	}
 
+	bool invalid_indices = false;
 	for (isize i = 0; i < gb_count_of(indices); i++) {
 		i64 a = indices[i];
 		for (isize j = i+1; j < gb_count_of(indices); j++) {
 			i64 b = indices[j];
 			if (a > b && b >= 0) {
 				error(se->close, "Invalid slice indices: [%td > %td]", a, b);
+				invalid_indices = true;
 			}
 		}
 	}
@@ -12249,7 +12260,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 	o->mode = Addressing_Value;
 
-	if (is_type_string(t) && max_count >= 0) {
+	if (is_type_string(t) && max_count >= 0 && !invalid_indices) {
 		bool all_constant = true;
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			if (nodes[i] != nullptr) {
