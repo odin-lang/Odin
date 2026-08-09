@@ -2973,10 +2973,28 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			return;
 		}
 
-		if (o->mode == Addressing_SoaVariable) {
+		Type *soa_for_in_type = nullptr;
+		if (node->kind == Ast_UnaryExpr) {
 			ast_node(ue, UnaryExpr, node);
-			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
-				ast_node(ie, IndexExpr, ue->expr);
+			Entity *e = entity_of_node(ue->expr);
+			if (e != nullptr && e->kind == Entity_Variable &&
+			    (e->flags & EntityFlag_SoaPtrField) != 0 &&
+			    e->Variable.for_loop_parent_type != nullptr) {
+				Type *soa_type = type_deref(e->Variable.for_loop_parent_type);
+				if (is_type_soa_struct(soa_type)) {
+					soa_for_in_type = soa_type;
+				}
+			}
+		}
+
+		if (soa_for_in_type != nullptr) {
+			// &v in for-in loop over #soa container
+			o->type = alloc_type_soa_pointer(soa_for_in_type);
+		} else if (o->mode == Addressing_SoaVariable) {
+			ast_node(ue, UnaryExpr, node);
+			Ast *index_expr = unparen_expr(ue->expr);
+			if (ast_node_expect(index_expr, Ast_IndexExpr)) {
+				ast_node(ie, IndexExpr, index_expr);
 				Type *soa_type = type_deref(type_of_expr(ie->expr));
 				GB_ASSERT(is_type_soa_struct(soa_type));
 				o->type = alloc_type_soa_pointer(soa_type);

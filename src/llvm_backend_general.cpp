@@ -616,6 +616,38 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 	return v;
 }
 
+// pointer to the index element of the field_index component
+gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 field_index, lbValue index) {
+	Type *t = base_type(type_deref(soa_ptr.type));
+	GB_ASSERT_MSG(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None, "%s", type_to_string(t));
+
+	lbValue field = lb_emit_struct_ep(p, soa_ptr, field_index);
+	if (t->Struct.soa_kind == StructSoa_Fixed) {
+		return lb_emit_array_ep(p, field, index);
+	}
+	return lb_emit_ptr_offset(p, lb_emit_load(p, field), index);
+}
+
+// bounds check for an #soa element index
+gb_internal void lb_emit_soa_index_bounds_check(lbProcedure *p, lbValue soa_ptr, lbValue index, Ast *index_expr) {
+	if (index_expr == nullptr) {
+		return;
+	}
+	Type *t = base_type(type_deref(soa_ptr.type));
+	GB_ASSERT(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None);
+	if (lb_is_const(index) && t->Struct.soa_kind == StructSoa_Fixed) {
+		return;
+	}
+
+	lbValue len = {};
+	if (t->Struct.soa_kind == StructSoa_Fixed) {
+		len = lb_const_int(p->module, t_int, t->Struct.soa_count);
+	} else {
+		len = lb_soa_struct_len(p, soa_ptr);
+	}
+	lb_emit_bounds_check(p, ast_token(index_expr), index, len);
+}
+
 gb_internal lbAddr lb_addr_swizzle(lbValue addr, Type *array_type, u8 swizzle_count, u8 swizzle_indices[4]) {
 	GB_ASSERT(is_type_array(array_type) || is_type_simd_vector(array_type));
 	GB_ASSERT(1 < swizzle_count && swizzle_count <= 4);
@@ -631,6 +663,16 @@ gb_internal lbAddr lb_addr_swizzle_large(lbValue addr, Type *array_type, Slice<i
 	lbAddr v = {lbAddr_SwizzleLarge, addr};
 	v.swizzle_large.type = array_type;
 	v.swizzle_large.indices = swizzle_indices;
+	return v;
+}
+
+gb_internal lbAddr lb_addr_swizzle_soa(lbValue addr, lbValue index, Ast *index_expr, Type *type, Slice<i32> const &swizzle_indices) {
+	GB_ASSERT(swizzle_indices.count > 0);
+	lbAddr v = {lbAddr_SwizzleSoa, addr};
+	v.swizzle_soa.index = index;
+	v.swizzle_soa.index_expr = index_expr;
+	v.swizzle_soa.type = type;
+	v.swizzle_soa.indices = swizzle_indices;
 	return v;
 }
 
@@ -662,6 +704,13 @@ gb_internal Type *lb_addr_type(lbAddr const &addr) {
 		return addr.swizzle.type;
 	case lbAddr_SwizzleLarge:
 		return addr.swizzle_large.type;
+	case lbAddr_SwizzleSoa:
+		return addr.swizzle_soa.type;
+	case lbAddr_SoaVariable:
+		// deliberately the container type (#soa[N]T), not the element type the addr denotes;
+		// lb_soa_variable_make_pointer and lb_build_assign_stmt depend on this,
+		// if this gets changed to Struct.soa_elem, these must be fixed with it.
+		return type_deref(addr.addr.type);
 	case lbAddr_Context:
 		if (addr.ctx.sel.index.count > 0) {
 			Type *t = t_context;
@@ -686,6 +735,17 @@ gb_internal lbValue lb_make_soa_pointer(lbProcedure *p, Type *type, lbValue cons
 	return lb_addr_load(p, v);
 }
 
+// the soa pointer denoting an lbAddr_SoaVariable element is the only pointer the
+// soa element can have; the generic lb_addr_get_ptr deliberately panics for this kind
+gb_internal lbValue lb_soa_variable_make_pointer(lbProcedure *p, lbAddr const &addr) {
+	GB_ASSERT(addr.kind == lbAddr_SoaVariable);
+	// lb_addr_type on an SoaVariable returns the container type
+	// (see the SoaVariable case in lb_addr_type),
+	// which is what the soa pointer is parameterized by
+	Type *soa_ptr_type = alloc_type_soa_pointer(lb_addr_type(addr));
+	return lb_make_soa_pointer(p, soa_ptr_type, addr.addr, addr.soa.index);
+}
+
 gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		GB_PANIC("Illegal addr -> nullptr");
@@ -697,12 +757,10 @@ gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 		return lb_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
 
 	case lbAddr_SoaVariable:
-		{
-			Type *soa_ptr_type = alloc_type_soa_pointer(lb_addr_type(addr));
-			return lb_address_from_load_or_generate_local(p, lb_make_soa_pointer(p, soa_ptr_type, addr.addr, addr.soa.index));
-			// TODO(bill): FIX THIS HACK
-			// return lb_address_from_load(p, lb_addr_load(p, addr));
-		}
+		// use lb_addr_load/lb_addr_store or lb_soa_field_elem_ptr for a single component;
+		// callers that need the soa pointer get it via lb_soa_variable_make_pointer
+		GB_PANIC("lbAddr_SoaVariable should be handled elsewhere");
+		break;
 
 	case lbAddr_Context:
 		GB_PANIC("lbAddr_Context should be handled elsewhere");
@@ -714,6 +772,10 @@ gb_internal lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 
 	case lbAddr_SwizzleLarge:
 		GB_PANIC("lbAddr_SwizzleLarge should be handled elsewhere");
+		break;
+
+	case lbAddr_SwizzleSoa:
+		GB_PANIC("lbAddr_SwizzleSoa should be handled elsewhere");
 		break;
 	}
 
@@ -1264,6 +1326,28 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			}
 		}
 		return;
+	} else if (addr.kind == lbAddr_SwizzleSoa) {
+		GB_ASSERT(value.value != nullptr);
+		value = lb_emit_conv(p, value, lb_addr_type(addr));
+
+		lb_emit_soa_index_bounds_check(p, addr.addr, addr.swizzle_soa.index, addr.swizzle_soa.index_expr);
+
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		isize n = addr.swizzle_soa.indices.count;
+		lbValue src = lb_address_from_load_or_generate_local(p, value);
+		auto src_loads = slice_make<lbValue>(temporary_allocator(), n);
+		auto dst_ptrs  = slice_make<lbValue>(temporary_allocator(), n);
+		for (isize i = 0; i < n; i++) {
+			src_loads[i] = lb_emit_load(p, lb_emit_array_epi(p, src, i));
+		}
+		for (isize i = 0; i < n; i++) {
+			dst_ptrs[i] = lb_soa_field_elem_ptr(p, addr.addr, addr.swizzle_soa.indices[i], addr.swizzle_soa.index);
+		}
+		for (isize i = 0; i < n; i++) {
+			lb_emit_store(p, dst_ptrs[i], src_loads[i]);
+		}
+		return;
 	} else if (addr.kind == lbAddr_SwizzleLarge) {
 		GB_ASSERT(value.value != nullptr);
 		value = lb_emit_conv(p, value, lb_addr_type(addr));
@@ -1314,7 +1398,9 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 	Type *a = type_deref(ptr.type, true);
 	if (LLVMIsNull(value.value)) {
-		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
+		// used to be llvm_addr_type: for a multi-pointer typed ptr the latter is `ptr`,
+		// and ConstNull of it would store 8 bytes over an element of any size
+		LLVMTypeRef src_t = lb_type(p->module, a);
 		if (is_type_proc(a)) {
 			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
 			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
@@ -1638,6 +1724,17 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 				lbValue src = lb_emit_array_epi(p, addr.addr, index);
 				lb_emit_store(p, dst, lb_emit_load(p, src));
 			}
+		}
+		return lb_addr_load(p, res);
+	} else if (addr.kind == lbAddr_SwizzleSoa) {
+		lb_emit_soa_index_bounds_check(p, addr.addr, addr.swizzle_soa.index, addr.swizzle_soa.index_expr);
+
+		// gather one component per field, no vector path like for lbAddr_Swizzle;
+		lbAddr res = lb_add_local_generated(p, addr.swizzle_soa.type, false);
+		for (isize i = 0; i < addr.swizzle_soa.indices.count; i++) {
+			lbValue src = lb_soa_field_elem_ptr(p, addr.addr, addr.swizzle_soa.indices[i], addr.swizzle_soa.index);
+			lbValue dst = lb_emit_array_epi(p, res.addr, i);
+			lb_emit_store(p, dst, lb_emit_load(p, src));
 		}
 		return lb_addr_load(p, res);
 	}  else if (addr.kind == lbAddr_SwizzleLarge) {

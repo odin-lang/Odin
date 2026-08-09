@@ -1,4 +1,5 @@
 #+feature dynamic-literals
+#+feature using-stmt
 package test_core_runtime
 
 import "base:intrinsics"
@@ -227,6 +228,226 @@ test_soa_make_len :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, array[0], [2]int{1, 2})
 	testing.expect_value(t, array[1], [2]int{3, 4})
+}
+
+// storing an all-zero constant into a slice/dynamic #soa element
+@(test)
+test_soa_zero_elem_store :: proc(t: ^testing.T) {
+
+	V :: struct {a: u8, b: u16, c: u32, d: u64, e: u128}
+	one := V{1, 2, 3, 4, 5}
+
+	array := make(#soa[dynamic]V, 0, 8)
+	defer delete(array)
+	for _ in 0 ..< 8 {
+		append(&array, one)
+	}
+
+	array[2] = {}
+	array[5] = V{0, 0, 0, 0, 0}
+
+	s: #soa[]V = array[:]
+	s[7] = V{}
+
+	for i in 0 ..< 8 {
+		expected := one if i != 2 && i != 5 && i != 7 else V{}
+		testing.expect_value(t, array[i], expected)
+	}
+}
+
+
+V_Padded :: struct {a: i32, b: f64, c: f32}
+soa_padded_global := #soa[3]V_Padded{
+	{a = 1, b = 1.0, c = 1.0},
+	{a = 2, b = 2.0, c = 1.0},
+	{a = 3, b = 3.0, c = 1.0},
+}
+
+// fixed #soa compound literals with a padded element struct
+@(test)
+test_soa_fixed_compound_literal :: proc(t: ^testing.T) {
+	for i in 0 ..< 3 {
+		testing.expect_value(t, soa_padded_global[i], V_Padded{i32(i + 1), f64(i + 1), 1.0})
+	}
+
+	local := #soa[3]V_Padded{
+		{a = 1, b = 1.0, c = 1.0},
+		{a = 2, b = 2.0, c = 1.0},
+		{a = 3, b = 3.0, c = 1.0},
+	}
+	for i in 0 ..< 3 {
+		testing.expect_value(t, local[i], V_Padded{i32(i + 1), f64(i + 1), 1.0})
+	}
+
+	sparse := #soa[4]V_Padded{
+		0 ..= 1 = {a = 7, b = 7.0, c = 7.0},
+		3 = {a = 9, b = 9.0, c = 9.0},
+	}
+	testing.expect_value(t, sparse[0], V_Padded{7, 7.0, 7.0})
+	testing.expect_value(t, sparse[1], V_Padded{7, 7.0, 7.0})
+	testing.expect_value(t, sparse[2], V_Padded{})
+	testing.expect_value(t, sparse[3], V_Padded{9, 9.0, 9.0})
+}
+
+// swizzling an element of an #soa container with an array element type
+@(test)
+test_soa_array_elem_swizzle :: proc(t: ^testing.T) {
+
+	ref := [4]u16{1, 2, 3, 4} // reference
+
+	fixed: #soa[3][4]u16
+	fixed.x[0], fixed.y[0], fixed.z[0], fixed.w[0] = 90, 91, 92, 93
+	fixed.x[1], fixed.y[1], fixed.z[1], fixed.w[1] = 1, 2, 3, 4
+
+	testing.expect_value(t, fixed[1].x, ref.x)
+	testing.expect_value(t, fixed[1].xy, ref.xy)
+	testing.expect_value(t, fixed[1].xyz, ref.xyz)
+	testing.expect_value(t, fixed[1].xyzw, ref.xyzw)
+	testing.expect_value(t, fixed[1].yx, ref.yx)   // permuted
+	testing.expect_value(t, fixed[1].xx, ref.xx)   // repeated
+	testing.expect_value(t, fixed[1].wzyx, ref.wzyx)
+
+	// swizzle may repeat components and count can go > the array len
+	testing.expect_value(t, swizzle(fixed[1], 0, 1), swizzle(ref, 0, 1))
+	testing.expect_value(t, swizzle(fixed[1], 3, 0, 1), swizzle(ref, 3, 0, 1))
+	testing.expect_value(t, swizzle(fixed[1], 0, 1, 0, 1, 0), swizzle(ref, 0, 1, 0, 1, 0))
+	testing.expect_value(t, swizzle(fixed[1], 3, 3, 3, 3, 3, 3), swizzle(ref, 3, 3, 3, 3, 3, 3))
+
+	// runtime element index
+	i := 1
+	testing.expect_value(t, fixed[i].xy, ref.xy)
+
+	// scatter writes
+	fixed[1].xy = [2]u16{10, 11}
+	testing.expect_value(t, fixed.x[1], 10)
+	testing.expect_value(t, fixed.y[1], 11)
+	testing.expect_value(t, fixed.z[1], 3)
+	// scatter writes permuted
+	fixed[1].yx = [2]u16{20, 21}
+	testing.expect_value(t, fixed.y[1], 20)
+	testing.expect_value(t, fixed.x[1], 21)
+	testing.expect_value(t, fixed.x[0], 90)
+	testing.expect_value(t, fixed.w[0], 93)
+
+	// dynamic and slice kinds
+	dyn := make(#soa[dynamic][4]u16, 2)
+	defer delete(dyn)
+	dyn[0] = [4]u16{1, 2, 3, 4}
+	dyn[1] = [4]u16{5, 6, 7, 8}
+
+	testing.expect_value(t, dyn[0].xy, ref.xy)
+	testing.expect_value(t, dyn[0].zx, ref.zx)
+	dyn[1].xy = [2]u16{40, 41}
+	testing.expect_value(t, dyn.x[1], 40)
+	testing.expect_value(t, dyn.y[1], 41)
+	testing.expect_value(t, dyn.x[0], 1)
+
+	s := dyn[:]
+	testing.expect_value(t, s[0].zw, ref.zw)
+	s[0].zw = [2]u16{50, 51}
+	testing.expect_value(t, dyn.z[0], 50)
+	testing.expect_value(t, dyn.w[0], 51)
+
+	// through #soa pointer
+	p := &dyn[0]
+	testing.expect_value(t, p^.x, u16(1))
+	testing.expect_value(t, p^.xy, [2]u16{1, 2})
+	
+	// auto-deref through the #soa pointer
+	testing.expect_value(t, p.x, u16(1))
+	testing.expect_value(t, p.xy, [2]u16{1, 2})
+	testing.expect_value(t, p.yx, [2]u16{2, 1})
+	p.zw = [2]u16{60, 61}
+	testing.expect_value(t, dyn.z[0], 60)
+	testing.expect_value(t, dyn.w[0], 61)
+	p.xy += [2]u16{1, 1}
+	testing.expect_value(t, dyn.x[0], 2)
+	testing.expect_value(t, dyn.y[0], 3)
+
+	// read-modify-write
+	fixed[1].xy += [2]u16{9, 10}
+	testing.expect_value(t, fixed.x[1], 30)
+	testing.expect_value(t, fixed.y[1], 30)
+	fixed[1].xx += [2]u16{5, 100}
+	testing.expect_value(t, fixed.x[1], 35)
+
+	// range over an element swizzle
+	sum: u16
+	for c in fixed[1].wz {
+		sum += c
+	}
+	testing.expect_value(t, sum, u16(7))
+
+	// shuffle
+	fixed[1].xy = [2]u16{9, 10}
+	fixed[1].xy = fixed[1].yx
+	testing.expect_value(t, fixed[1].xy, [2]u16{10, 9})
+}
+
+// "using" on an #soa for-in looping variable
+@(test)
+test_soa_for_in_using :: proc(t: ^testing.T) {
+	S :: struct {
+		a: int,
+		b: int,
+		c: int,
+	}
+	s: #soa[2]S = {{a = 1, b = 2, c = 3}, {a = 4, b = 5, c = 6}}
+
+	sum := 0
+	for v in s {
+		using v
+		sum += a + c
+	}
+	testing.expect_value(t, sum, 14)
+
+	for &v in s {
+		using v
+		b += 10
+	}
+	testing.expect_value(t, s.b[0], 12)
+	testing.expect_value(t, s.b[1], 15)
+}
+
+// &v in for-in over soa container
+@(test)
+test_soa_for_in_addr :: proc(t: ^testing.T) {
+	S :: struct {
+		a: int,
+		b: int,
+	}
+	s: #soa[2]S = {{a = 1, b = 2}, {a = 3, b = 4}}
+
+	for &v, i in s {
+		p := &v
+		testing.expect_value(t, p.a, s.a[i])
+		p.b += 10 * (i + 1)
+	}
+	testing.expect_value(t, s.b[0], 12)
+	testing.expect_value(t, s.b[1], 24)
+
+	// &v is the same type as &s[i]
+	q := &s[0]
+	for &v in s {
+		q = &v
+	}
+
+	// still valid
+	testing.expect_value(t, q.a, 3)
+	q.a = 30
+	testing.expect_value(t, s.a[1], 30)
+
+	// array element type
+	arr: #soa[2][4]u16
+	arr[1] = [4]u16{1, 2, 3, 4}
+	for &v, i in arr {
+		pv := &v
+		if i == 1 {
+			testing.expect_value(t, pv.x, u16(1))
+			pv.y = 20
+		}
+	}
+	testing.expect_value(t, arr.y[1], 20)
 }
 
 @(test)
