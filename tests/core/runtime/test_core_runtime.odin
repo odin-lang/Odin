@@ -384,6 +384,214 @@ test_soa_array_elem_swizzle :: proc(t: ^testing.T) {
 	testing.expect_value(t, fixed[1].xy, [2]u16{10, 9})
 }
 
+// chained indexing of #soa container when element type is an array -> soa[i][j]
+@(test)
+test_soa_array_elem_chained_indexing :: proc(t: ^testing.T) {
+
+	fixed: #soa[3][4]u16
+	for i in 0 ..< 3 {
+		fixed.x[i] = u16(i*10 + 0)
+		fixed.y[i] = u16(i*10 + 1)
+		fixed.z[i] = u16(i*10 + 2)
+		fixed.w[i] = u16(i*10 + 3)
+	}
+
+	// const inner index
+	testing.expect_value(t, fixed[1][0], 10)
+	testing.expect_value(t, fixed[2][3], 23)
+
+	// var inner index
+	for i in 0 ..< 3 {
+		tmp := fixed[i]
+		for j in 0 ..< 4 {
+			testing.expect_value(t, fixed[i][j], tmp[j])
+			testing.expect_value(t, fixed[i][j], u16(i*10 + j))
+		}
+	}
+
+	// index and the .x/y/z/w name must agree
+	for i in 0 ..< 3 {
+		testing.expect_value(t, fixed[i][0], fixed[i].x)
+		testing.expect_value(t, fixed[i][3], fixed[i].w)
+	}
+
+	// dynamic + slice
+	dyn := make(#soa[dynamic][4]u16, 2)
+	defer delete(dyn)
+	dyn[0] = [4]u16{10, 11, 12, 13}
+	dyn[1] = [4]u16{20, 21, 22, 23}
+
+	testing.expect_value(t, dyn[0][3], 13)
+	testing.expect_value(t, dyn[1][0], 20)
+
+	slice := dyn[:]
+	testing.expect_value(t, slice[0][3], 13)
+	testing.expect_value(t, slice[1][2], 22)
+
+	for i in 0 ..< 2 {
+		dyn_tmp := dyn[i]
+		slice_tmp := slice[i]
+		for j in 0 ..< 4 {
+			testing.expect_value(t, dyn[i][j], dyn_tmp[j])
+			testing.expect_value(t, slice[i][j], dyn_tmp[j])
+			testing.expect_value(t, dyn[i][j], slice_tmp[j])
+			testing.expect_value(t, slice[i][j], slice_tmp[j])
+		}
+	}
+
+	// soa[i][j] must equal v[j] where v is the for-in looping variable
+	// test fixed, dynamic and sliec
+	for v, i in fixed {
+		testing.expect_value(t, v[3], u16(i*10 + 3))
+		for j in 0 ..< 4 {
+			testing.expect_value(t, v[j], fixed[i][j])
+		}
+	}
+	for &v, i in fixed {
+		testing.expect_value(t, v[1], u16(i*10 + 1))
+		j := 2
+		testing.expect_value(t, v[j], u16(i*10 + j))
+	}
+	for v, i in dyn {
+		for j in 0 ..< 4 {
+			testing.expect_value(t, v[j], u16((i + 1)*10 + j))
+		}
+	}
+	for &v, i in dyn {
+		testing.expect_value(t, v[1], u16((i + 1)*10 + 1))
+		j := 3
+		testing.expect_value(t, v[j], u16((i + 1)*10 + j))
+	}	
+	for v, i in slice {
+		testing.expect_value(t, v[2], slice[i][2])
+	}
+	for &v, i in slice {
+		testing.expect_value(t, v[2], slice[i][2])
+		j := 0
+		testing.expect_value(t, v[j], u16((i + 1)*10 + j))
+	}		
+
+	// write access must work through the looping var
+	fixed_scatter: #soa[2][4]u16
+	for &v, i in fixed_scatter {
+		v[0] = u16(i)
+		for j in 1 ..< 4 {
+			v[j] = u16(i*10 + j)
+		}
+		v[3] += 5
+	}
+	for i in 0 ..< 2 {
+		testing.expect_value(t, fixed_scatter.x[i], u16(i))
+		testing.expect_value(t, fixed_scatter.y[i], u16(i*10 + 1))
+		testing.expect_value(t, fixed_scatter.z[i], u16(i*10 + 2))
+		testing.expect_value(t, fixed_scatter.w[i], u16(i*10 + 3 + 5))
+	}
+	// for fixed soa you can get fancy and select a whole .x/y/z/w lane
+	testing.expect_value(t, fixed_scatter.x, [2]u16{0, 1})
+	testing.expect_value(t, fixed_scatter.y, [2]u16{1, 11})
+	testing.expect_value(t, fixed_scatter.z, [2]u16{2, 12})
+	testing.expect_value(t, fixed_scatter.w, [2]u16{3 + 5, 13 + 5})
+
+	dyn_scatter := make(#soa[dynamic][4]u16, 2)
+	defer delete(dyn_scatter)
+	for &v, i in dyn_scatter {
+		v[0] = u16(i + 1)
+		for j in 1 ..< 4 {
+			v[j] = u16((i + 1)*10 + j)
+		}
+		v[3] += 5
+	}
+	for i in 0 ..< 2 {
+		testing.expect_value(t, dyn_scatter.x[i], u16(i + 1))
+		testing.expect_value(t, dyn_scatter.y[i], u16((i + 1)*10 + 1))
+		testing.expect_value(t, dyn_scatter.z[i], u16((i + 1)*10 + 2))
+		testing.expect_value(t, dyn_scatter.w[i], u16((i + 1)*10 + 3 + 5))
+	}
+
+	slice_scatter := dyn_scatter[:]
+	for &v in slice_scatter {
+		v[1] += 100
+	}
+	testing.expect_value(t, dyn_scatter.y[0], 111)
+	testing.expect_value(t, dyn_scatter.y[1], 121)
+	testing.expect_value(t, dyn_scatter.x[0], 1)
+
+	// soa[i][j] writes
+	fixed_write: #soa[3][4]u16
+	fixed_write[1][0] = 5
+	k := 2
+	fixed_write[1][k] = 6
+	fixed_write[1][1] += 7
+	fixed_write[1][0], fixed_write[1][3] = fixed_write[1][3], fixed_write[1][0]
+	testing.expect_value(t, fixed_write.x, [3]u16{0, 0, 0})
+	testing.expect_value(t, fixed_write.y, [3]u16{0, 7, 0})
+	testing.expect_value(t, fixed_write.z, [3]u16{0, 6, 0})
+	testing.expect_value(t, fixed_write.w, [3]u16{0, 5, 0})
+
+	dyn_write := make(#soa[dynamic][4]u16, 2)
+	defer delete(dyn_write)
+	dyn_write[0][3] = 41
+	dyn_write[1][k] = 42
+	slice_write := dyn_write[:]
+	slice_write[0][1] = 43
+	slice_write[0][k] = 44
+	testing.expect_value(t, dyn_write.w[0], 41)
+	testing.expect_value(t, dyn_write.z[1], 42)
+	testing.expect_value(t, dyn_write.y[0], 43)
+	testing.expect_value(t, dyn_write.z[0], 44)
+	testing.expect_value(t, dyn_write.x[0], 0)
+
+	// a single component has a real address
+	testing.expect_value(t, &fixed_write[1][2], &fixed_write.z[1])
+	pw := &fixed_write[1][2]
+	pw^ = 60
+	testing.expect_value(t, fixed_write.z[1], 60)
+	for j in 0 ..< 4 {
+		p := &fixed_write[1][j]
+		p^ = u16(70 + j)
+	}
+	testing.expect_value(t, fixed_write.x, [3]u16{0, 70, 0})
+	testing.expect_value(t, fixed_write.y, [3]u16{0, 71, 0})
+	testing.expect_value(t, fixed_write.z, [3]u16{0, 72, 0})
+	testing.expect_value(t, fixed_write.w, [3]u16{0, 73, 0})
+
+	for j in 0 ..< 4 {
+		p := &dyn_write[0][j]
+		p^ = u16(80 + j)
+	}
+	testing.expect_value(t, dyn_write.x[0], 80)
+	testing.expect_value(t, dyn_write.w[0], 83)
+	for j in 0 ..< 4 {
+		p := &slice_write[1][j]
+		p^ = u16(90 + j)
+	}
+	testing.expect_value(t, dyn_write.x[1], 90)
+	testing.expect_value(t, dyn_write.w[1], 93)
+
+	// multi dim array element type, only the outer index is scattered
+	nested: #soa[2][3][2]u16
+	nested[1].x = {1, 3}
+	nested[1].z = {7, 11}
+	testing.expect_value(t, nested[1][0][1], 3)
+	testing.expect_value(t, nested[1][2][0], 7)	
+
+	nested[1][0][1] = 8
+	nested[1][2][0] = 9
+	testing.expect_value(t, nested[1][0], [2]u16{1, 8})
+	testing.expect_value(t, nested[1][2], [2]u16{9, 11})
+
+	for j in 0 ..< 3 {
+		nested[1][j][0] = u16(50 + j)
+	}
+	for j in 0 ..< 3 {
+		testing.expect_value(t, nested[1][j][0], u16(50 + j))
+	}
+	testing.expect_value(t, nested.x[1][0], 50)
+	testing.expect_value(t, nested.y[1][0], 51)
+	testing.expect_value(t, nested.z[1][0], 52)
+	testing.expect_value(t, nested[0][0], [2]u16{0, 0})
+}
+
 // "using" on an #soa for-in looping variable
 @(test)
 test_soa_for_in_using :: proc(t: ^testing.T) {
