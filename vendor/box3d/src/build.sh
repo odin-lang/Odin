@@ -91,6 +91,23 @@ Linux)
 esac
 
 echo "Building Box3D for wasm32"
-make -f wasm.Makefile clean
-make -f wasm.Makefile CC="$wasm_cc" LD="$wasm_ld" ODIN_ROOT="$ODIN_ROOT"
-make -f wasm.Makefile clean
+mkdir -p build/wasm
+for src in src/*.c; do
+	obj="build/wasm/$(basename "${src%.c}.o")"
+	"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
+		--sysroot="$ODIN_ROOT/vendor/libc-shim" \
+		-Iinclude \
+		-include wasm_compat.h \
+		-DBOX3D_DISABLE_SIMD \
+		-DNDEBUG \
+		"$src" -o "$obj"
+done
+"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
+	--sysroot="$ODIN_ROOT/vendor/libc-shim" \
+	-Iinclude \
+	-include wasm_compat.h \
+	-DBOX3D_DISABLE_SIMD \
+	-DNDEBUG \
+	wasm_compat.c -o build/wasm/wasm_compat.o
+"$wasm_ld" -r -o ../lib/box3d_wasm.o build/wasm/*.o
+rm -rf build/wasm

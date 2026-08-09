@@ -131,8 +131,8 @@ jobs:
           ./vendor/cgltf/src/build_cgltf.sh
           ./vendor/miniaudio/src/build_miniaudio.sh
           ./vendor/kb_text_shape/src/build_unix.sh
-      - name: Compile Box3D (Ubuntu ARM)
-        if: matrix.os == 'ubuntu-24.04-arm'
+      - name: Compile Box3D (Ubuntu)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
         run: ./vendor/box3d/src/build.sh
       - name: Odin check
         run: ./odin check examples/demo -vet
