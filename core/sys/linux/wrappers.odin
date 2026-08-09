@@ -51,7 +51,68 @@ WCOREDUMP :: #force_inline proc "contextless" (s: u32) -> bool {
 	return (cast(uint)sig - 1) / (8*size_of(uint))
 }
 
-// TODO: sigaddset etc
+/// Clear all signals from `set`.
+sigemptyset :: #force_inline proc "contextless" (set: ^Sig_Set) {
+	set^ = {}
+}
+
+/// Add every signal to `set`.
+sigfillset :: #force_inline proc "contextless" (set: ^Sig_Set) {
+	for &word in set {
+		word = max(uint)
+	}
+}
+
+/// Add `sig` to `set`.
+sigaddset :: #force_inline proc "contextless" (set: ^Sig_Set, sig: Signal) {
+	set[_sigword(sig)] |= _sigmask(sig)
+}
+
+/// Remove `sig` from `set`.
+sigdelset :: #force_inline proc "contextless" (set: ^Sig_Set, sig: Signal) {
+	set[_sigword(sig)] &~= _sigmask(sig)
+}
+
+/// Check whether `sig` is a member of `set`.
+sigismember :: #force_inline proc "contextless" (set: Sig_Set, sig: Signal) -> bool {
+	return set[_sigword(sig)] & _sigmask(sig) != 0
+}
+
+/// Store the union of `left` and `right` into `dest`.
+sigorset :: #force_inline proc "contextless" (dest: ^Sig_Set, left, right: Sig_Set) {
+	for i in 0 ..< _SIGSET_NWORDS {
+		dest[i] = left[i] | right[i]
+	}
+}
+
+/// Store the intersection of `left` and `right` into `dest`.
+sigandset :: #force_inline proc "contextless" (dest: ^Sig_Set, left, right: Sig_Set) {
+	for i in 0 ..< _SIGSET_NWORDS {
+		dest[i] = left[i] & right[i]
+	}
+}
+
+/// Extract the major device number from `dev`.
+major :: #force_inline proc "contextless" (dev: Dev) -> u32 {
+	d := u64(dev)
+	return u32((d & 0x00000000000fff00) >> 8) | u32((d & 0xfffff00000000000) >> 32)
+}
+
+/// Extract the minor device number from `dev`.
+minor :: #force_inline proc "contextless" (dev: Dev) -> u32 {
+	d := u64(dev)
+	return u32((d & 0x00000000000000ff) >> 0) | u32((d & 0x00000ffffff00000) >> 12)
+}
+
+/// Construct a `Dev` from a major and minor device number.
+makedev :: #force_inline proc "contextless" (maj: u32, min: u32) -> Dev {
+	d: u64
+	d |= u64(maj & 0x00000fff) << 8
+	d |= u64(maj & 0xfffff000) << 32
+	d |= u64(min & 0x000000ff) << 0
+	d |= u64(min & 0xffffff00) << 12
+	return Dev(d)
+}
 
 
 /*
