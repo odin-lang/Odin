@@ -2403,7 +2403,12 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 				// Okay for now
 			} else {
 				Entity *param_entity = entity_of_node(disp.expr);
-				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
+				if (disp.mode == Addressing_Constant) {
+					if (is_type_integer(disp.type)) {
+						break;
+					}
+				}
+				if (param_entity == nullptr) {
 					gbString s = expr_to_string(disp.expr);
 					error(disp.expr, "An displacement value must an integer, got %s", s);
 					gb_string_free(s);
@@ -2413,12 +2418,16 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 				switch (kind) {
 				case AsmTemplateEntityDecl_Register:
 				case AsmTemplateEntityDecl_Immediate:
-					// okay:
-					break;
+					if (is_type_integer(disp.type)) {
+						break;
+					}
+					/*fallthrough*/
 				default:
 					{
 						gbString s = expr_to_string(disp.expr);
-						error(disp.expr, "An displacement must be an integer value, got %s", s);
+						gbString t = type_to_string(disp.type);
+						error(disp.expr, "An displacement must be an integer value, got %s of type %s", s, t);
+						gb_string_free(t);
 						gb_string_free(s);
 					}
 					break;
