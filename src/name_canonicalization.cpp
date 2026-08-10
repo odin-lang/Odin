@@ -573,7 +573,8 @@ gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity 
 
 gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 	GB_ASSERT(e != nullptr);
-	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName || e->kind == Entity_Variable) {
+	if (e->kind == Entity_Procedure || e->kind == Entity_AsmTemplate ||
+	    e->kind == Entity_TypeName  || e->kind == Entity_Variable) {
 		if (e->kind == Entity_Procedure && (e->Procedure.is_export || e->Procedure.is_foreign)) {
 			// no prefix
 			return;
@@ -740,6 +741,7 @@ write_base_name:
 		// For debug symbols only
 		/*fallthrough*/
 	case Entity_Procedure:
+	case Entity_AsmTemplate:
 	case Entity_Variable:
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 		if (is_type_polymorphic(e->type)) {

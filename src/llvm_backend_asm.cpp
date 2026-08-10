@@ -8,9 +8,11 @@ gb_internal AsmTemplateEntityDecl *lb_asm_entity_decl(Array<AsmTemplateEntityDec
 	return nullptr;
 }
 
-gb_internal gbString lb_asm_write_label_name(gbString asm_string, AstIdent *label_ident) {
+gb_internal gbString lb_asm_write_label_name(gbString asm_string, Entity *tmpl_entity, AstIdent *label_ident) {
 	String name = label_ident->token.string;
-	asm_string = gb_string_appendc(asm_string, ".L");
+	asm_string = gb_string_appendc(asm_string, ".L_");
+	asm_string = gb_string_append_length(asm_string, tmpl_entity->token.string.text, tmpl_entity->token.string.len);
+	asm_string = gb_string_appendc(asm_string, "_");
 	asm_string = gb_string_append_length(asm_string, name.text, name.len);
 	// ${:uid} expands to a per-instantiation unique integer, so repeated
 	// inlining of the same template can't collide on the label symbol.
@@ -18,7 +20,7 @@ gb_internal gbString lb_asm_write_label_name(gbString asm_string, AstIdent *labe
 	return asm_string;
 }
 
-gb_internal gbString lb_asm_write_operand(gbString asm_string, Array<i32> op_number, Array<AsmTemplateEntityDecl> *decls, Ast *op, bool print_prefixes=true) {
+gb_internal gbString lb_asm_write_operand(gbString asm_string, Entity *tmpl_entity, Array<i32> op_number, Array<AsmTemplateEntityDecl> *decls, Ast *op, bool print_prefixes=true) {
 	switch (op->kind) {
 	case_ast_node(i, Ident, op);
 		Entity *e = entity_of_node(op);
@@ -30,17 +32,17 @@ gb_internal gbString lb_asm_write_operand(gbString asm_string, Array<i32> op_num
 	case_end;
 	case_ast_node(mem_op, AsmMemoryOperand, op);
 		if (mem_op->disp) {
-			asm_string = lb_asm_write_operand(asm_string, op_number, decls, mem_op->disp, /*print_prefixes*/false);
+			asm_string = lb_asm_write_operand(asm_string, tmpl_entity, op_number, decls, mem_op->disp, /*print_prefixes*/false);
 		}
 		asm_string = gb_string_appendc(asm_string, "(");
 		GB_ASSERT(mem_op->base != nullptr);
-		asm_string = lb_asm_write_operand(asm_string, op_number, decls, mem_op->base);
+		asm_string = lb_asm_write_operand(asm_string, tmpl_entity, op_number, decls, mem_op->base);
 		if (mem_op->index) {
 			asm_string = gb_string_appendc(asm_string, ",");
-			asm_string = lb_asm_write_operand(asm_string, op_number, decls, mem_op->index);
+			asm_string = lb_asm_write_operand(asm_string, tmpl_entity, op_number, decls, mem_op->index);
 			if (mem_op->scale) {
 				asm_string = gb_string_appendc(asm_string, ",");
-				asm_string = lb_asm_write_operand(asm_string, op_number, decls, mem_op->scale, /*print_prefixes*/false);
+				asm_string = lb_asm_write_operand(asm_string, tmpl_entity, op_number, decls, mem_op->scale, /*print_prefixes*/false);
 			}
 		}
 		asm_string = gb_string_appendc(asm_string, ")");
@@ -66,7 +68,7 @@ gb_internal gbString lb_asm_write_operand(gbString asm_string, Array<i32> op_num
 	case_end;
 
 	case_ast_node(label, AsmLabelDecl, op);
-		asm_string = lb_asm_write_label_name(asm_string, &label->name->Ident);
+		asm_string = lb_asm_write_label_name(asm_string, tmpl_entity, &label->name->Ident);
 	case_end;
 	default:
 		GB_PANIC("TODO %s", expr_to_string(op));
@@ -248,11 +250,11 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 				if (j < instr->operands.count-1) {
 					asm_string = gb_string_appendc(asm_string, ", ");
 				}
-				asm_string = lb_asm_write_operand(asm_string, op_number, &ops, op);
+				asm_string = lb_asm_write_operand(asm_string, entity, op_number, &ops, op);
 			}
 		case_end;
 		case_ast_node(label, AsmLabelDecl, instr_);
-			asm_string = lb_asm_write_label_name(asm_string, &label->name->Ident);
+			asm_string = lb_asm_write_label_name(asm_string, entity, &label->name->Ident);
 			asm_string = gb_string_appendc(asm_string, ":");
 		case_end;
 		default:
