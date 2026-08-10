@@ -571,14 +571,14 @@ when ODIN_ARCH == .arm64 {
 				idx,
 			)
 		} else {
-			v := int8x16x2_t {
+			t := poly8x16x2_t {
 				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 			}
 			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x8_t)_vqtbl2(
-				transmute(int8x16_t)v.x,
-				transmute(int8x16_t)v.y,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
 				idx,
 			)
 			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
@@ -597,14 +597,14 @@ when ODIN_ARCH == .arm64 {
 				idx,
 			)
 		} else {
-			v := int8x16x2_t {
+			t := poly8x16x2_t {
 				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 			}
 			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x16_t)_vqtbl2q(
-				transmute(int8x16_t)v.x,
-				transmute(int8x16_t)v.y,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
 				idx,
 			)
 			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
@@ -624,16 +624,16 @@ when ODIN_ARCH == .arm64 {
 				idx,
 			)
 		} else {
-			v := int8x16x3_t {
+			t := poly8x16x3_t {
 				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 			}
 			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x8_t)_vqtbl3(
-				transmute(int8x16_t)v.x,
-				transmute(int8x16_t)v.y,
-				transmute(int8x16_t)v.z,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
 				idx,
 			)
 			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
@@ -653,16 +653,16 @@ when ODIN_ARCH == .arm64 {
 				idx,
 			)
 		} else {
-			v := int8x16x3_t {
+			t := poly8x16x3_t {
 				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 			}
 			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x16_t)_vqtbl3q(
-				transmute(int8x16_t)v.x,
-				transmute(int8x16_t)v.y,
-				transmute(int8x16_t)v.z,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
 				idx,
 			)
 			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
@@ -683,7 +683,7 @@ when ODIN_ARCH == .arm64 {
 				idx,
 			)
 		} else {
-			v := int8x16x4_t {
+			t := poly8x16x4_t {
 				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
@@ -691,10 +691,10 @@ when ODIN_ARCH == .arm64 {
 			}
 			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x8_t)_vqtbl4(
-				transmute(int8x16_t)v.x,
-				transmute(int8x16_t)v.y,
-				transmute(int8x16_t)v.z,
-				transmute(int8x16_t)v.w,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				transmute(int8x16_t)t.w,
 				idx,
 			)
 			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
@@ -715,7 +715,7 @@ when ODIN_ARCH == .arm64 {
 				idx,
 			)
 		} else {
-			v := int8x16x4_t {
+			t := poly8x16x4_t {
 				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
 				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
@@ -723,10 +723,10 @@ when ODIN_ARCH == .arm64 {
 			}
 			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x16_t)_vqtbl4q(
-				transmute(int8x16_t)v.x,
-				transmute(int8x16_t)v.y,
-				transmute(int8x16_t)v.z,
-				transmute(int8x16_t)v.w,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				transmute(int8x16_t)t.w,
 				idx,
 			)
 			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
