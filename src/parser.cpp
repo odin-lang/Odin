@@ -542,6 +542,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmLabelDecl.name = clone_ast(n->AsmLabelDecl.name, f);
 		break;
 	case Ast_AsmInstruction:
+		n->AsmInstruction.prefix   = clone_ast(n->AsmInstruction.prefix, f);
 		n->AsmInstruction.name     = clone_ast(n->AsmInstruction.name, f);
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
 		break;
@@ -2628,8 +2629,12 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					value = parse_asm_register(f);
 				}
 
-				if (type == nullptr && value == nullptr) {
-					syntax_error(f->curr_token, "An asm specification must specify at least either a type or a value");
+				if (tied_name != nullptr) {
+					if (type != nullptr) {
+						syntax_error(f->curr_token, "An asm specification for tied values cannot declare a type");
+					}
+				} else if (type == nullptr && value == nullptr) {
+					syntax_error(f->curr_token, "An asm specification must specify at least either a type or a value if the value is not tied");
 				}
 
 				spec = alloc_ast_node(f, Ast_AsmSpec);

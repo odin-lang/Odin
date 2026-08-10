@@ -2155,6 +2155,22 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 
 		bool must_check_value = false;
 
+		String pin = {};
+		if (spec->value != nullptr) {
+			if (spec->value->kind != Ast_AsmRegister) {
+				gbString s = expr_to_string(spec->value);
+				error(spec->value, "Expected an asm register, got %s", s);
+				gb_string_free(s);
+				continue;
+			}
+
+			ast_node(reg, AsmRegister, spec->value);
+			pin = reg->name.string;
+			if (pin == "any") {
+				pin = {};
+			}
+		}
+
 		if (spec->tied_name == nullptr) {
 			if (spec->type != nullptr) {
 				Type *type = check_type(ctx, spec->type);
@@ -2175,6 +2191,7 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 					AsmTemplateEntityDecl ed = asm_template_entity_decl_default(entity);
 					ed.param_group = AsmTemplateEntityDeclParamGroup_Scratch;
 					ed.total_index = cast(i32)asm_template_entity_decls->count;
+					ed.pin = pin;
 					array_add(asm_template_entity_decls, ed);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -2188,6 +2205,17 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 			} else if (input == nullptr) {
 				error(spec->name, "Undefined parameter declaration '%.*s'", LIT(spec->name->Ident.token.string));
 				continue;
+			} else {
+				i32 index = -1;
+				auto group = check_asm_find_group(input, *asm_template_entity_decls, &index);
+				gb_unused(group);
+				GB_ASSERT(index >= 0);
+				auto *i = &(*asm_template_entity_decls)[index];
+				if (i->pin.len == 0) {
+					i->pin = pin;
+				} else {
+					error(spec_, "Asm register has already been pinned");
+				}
 			}
 
 		} else {
@@ -2230,13 +2258,12 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 			i->tie = output_index;
 			o->tie = input_index;
 
+			i->pin = pin;
+			o->pin = pin;
+
+
 			must_check_value = true;
 		}
-
-		if (spec->value != nullptr) {
-			// TODO(bill): check registers
-		}
-
 	}
 }
 

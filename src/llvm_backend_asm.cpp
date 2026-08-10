@@ -147,7 +147,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		return pos;
 	};
 
-	// ---- Pass 1: outputs -----------------------------------------------------
+	// Pass 1: outputs
 	// Real outputs plus *unpinned* register scratch (modeled as discarded
 	// early-clobber outputs, since a clobber can only name a fixed register).
 	for_array(i, ops) {
@@ -163,37 +163,32 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 
 		sep();
 
-		if (false && e.kind == AsmTemplateEntityDecl_Memory) {
-			// Indirect memory output: writes through a pointer, so it takes an arg
-			// and contributes nothing to the return type.
-			raw("=*m");
-			lbValue ptr = args[e.param_index];
-			unsigned pos = add_arg(ptr.value);
-			array_add(&elem_attrs, ElemAttr{pos, lb_type(m, type_deref(ptr.type))});
-			op_number[i] = next_op++;
-		} else {
-			// Register output: '=' ['&'] ( '{pin}' | class-letter )
-			raw("=");
-			if (is_alloc_scratch) raw("&"); // early-clobber: keep scratch off any input reg
-			if (e.pin.len != 0) { raw("{"); put(e.pin); raw("}"); }
-			else                raw(class_letter(e.reg_class));
-
-			// Use the entity's real declared type so the return-struct slot matches
-			// the constraint's width/class (e.g. <4 x float> for a #simd[4]f32 scratch).
-			LLVMTypeRef ty = is_alloc_scratch
-				? lb_type(m, e.entity->type)
-				: output_llvm_type(e);
-
-			ret_slot[i] = cast(i32)ret_types.count;
-			array_add(&ret_types, ty);
-			op_number[i] = next_op++;
+		// Register output: '=' ['&'] ( '{pin}' | class-letter )
+		raw("=");
+		if (is_alloc_scratch) { // early-clobber: keep scratch off any input reg
+			raw("&");
 		}
+		if (e.pin.len != 0) {
+			raw("{"); put(e.pin); raw("}");
+		} else {
+			raw(class_letter(e.reg_class));
+		}
+
+		// Use the entity's real declared type so the return-struct slot matches
+		// the constraint's width/class (e.g. <4 x float> for a #simd[4]f32 scratch).
+		LLVMTypeRef ty = is_alloc_scratch ? lb_type(m, e.entity->type) : output_llvm_type(e);
+
+		ret_slot[i] = cast(i32)ret_types.count;
+		array_add(&ret_types, ty);
+		op_number[i] = next_op++;
 	}
 
-	// ---- Pass 2: inputs ------------------------------------------------------
+	// Pass 2: inputs
 	for (isize i = 0; i < ops.count; i++) {
 		AsmTemplateEntityDecl const &e = ops[i];
-		if (e.param_group != AsmTemplateEntityDeclParamGroup_Input) continue;
+		if (e.param_group != AsmTemplateEntityDeclParamGroup_Input) {
+			continue;
+		}
 
 		sep();
 		lbValue v = args[e.param_index];
@@ -209,8 +204,11 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 			switch (e.kind) {
 			case AsmTemplateEntityDecl_Register:
 			case AsmTemplateEntityDecl_Memory:
-				if (e.pin.len != 0) { raw("{"); put(e.pin); raw("}"); }
-				else                raw(class_letter(e.reg_class));
+				if (e.pin.len != 0) {
+					raw("{"); put(e.pin); raw("}");
+				} else {
+					raw(class_letter(e.reg_class));
+				}
 				add_arg(v.value);
 				break;
 			// case AsmTemplateEntityDecl_Memory: {
@@ -230,7 +228,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		op_number[i] = next_op++;
 	}
 
-	// ---- Build the template text ---------------------------------------------
+	// Build the template text
 	GB_ASSERT(tmpl.node->kind == Ast_AsmTemplate);
 	auto *node = &tmpl.node->AsmTemplate;
 	for_array(i, node->instructions) {
@@ -263,7 +261,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		}
 	}
 
-	// ---- Pass 3: clobbers ----------------------------------------------------
+	// Pass 3: clobbers
 	// Only the Scratch group. Unpinned register scratch was already emitted as an
 	// output in Pass 1, so it is skipped here.
 	for (isize i = 0; i < ops.count; i++) {
@@ -289,7 +287,10 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		}
 	}
 
-	// ---- Build the callee type -----------------------------------------------
+	// Build the callee type
+	// NOTE(bill): Even though the user has given a signature, this might not actually match what
+	// LLVM requires it to be due to the scratch parameters and more, so many of the results might
+	// need to be completely ignored to match the user's given signature.
 	LLVMTypeRef ret_ty = nullptr;
 	if (ret_types.count == 0) {
 		ret_ty = LLVMVoidTypeInContext(ctx);
@@ -301,21 +302,27 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 
 	LLVMTypeRef fn_ty = LLVMFunctionType(ret_ty, param_types.data, cast(unsigned)param_types.count, /*vararg*/false);
 
+	// TODO(bill): determine all the cases when side-effects happen
+	bool has_side_effects = tmpl.has_side_effects;
+
 	LLVMValueRef ia = LLVMGetInlineAsm(
 		fn_ty,
 		asm_string,  cast(size_t)gb_string_length(asm_string),
 		constraints, cast(size_t)gb_string_length(constraints),
-		/*HasSideEffects*/ tmpl.has_side_effects,
+		/*HasSideEffects*/ has_side_effects,
 		/*IsAlignStack*/   tmpl.is_align_stack,
 		LLVMInlineAsmDialectATT,
 		/*CanThrow*/       false);
 
 	LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-	{
+	{	// DEBUG PRINT!!!
+		// DEBUG PRINT!!!
+		// DEBUG PRINT!!!
+		// DEBUG PRINT!!!
 		gb_printf_err("%s\n", asm_string);
 		char *ir = LLVMPrintValueToString(call);
-		gb_printf_err("%s\n", ir);
+		gb_printf_err("%s\n\n", ir);
 		LLVMDisposeMessage(ir);
 	}
 
@@ -326,7 +333,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		LLVMAddCallSiteAttribute(call, cast(LLVMAttributeIndex)(elem_attrs[k].arg_pos + 1), attr);
 	}
 
-	// ---- Repackage results in Odin result order ------------------------------
+	// Repackage results in Odin result order
 	Type *pt = base_type(entity->type);
 	isize result_count = (pt->Proc.results != nullptr) ? pt->Proc.results->Tuple.variables.count : 0;
 	if (result_count == 0) {
@@ -340,8 +347,12 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 
 	for (isize i = 0; i < ops.count; i++) {
 		AsmTemplateEntityDecl const &e = ops[i];
-		if (e.param_group != AsmTemplateEntityDeclParamGroup_Output) continue;
-		if (e.result_index < 0) continue; // memory output: not a returned value
+		if (e.param_group != AsmTemplateEntityDeclParamGroup_Output) {
+			continue;
+		}
+		if (e.result_index < 0) {
+			continue; // memory output: not a returned value
+		}
 		GB_ASSERT(ret_slot[i] >= 0);
 
 		LLVMValueRef v = (ret_types.count == 1)

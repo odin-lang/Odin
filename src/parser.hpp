@@ -497,6 +497,7 @@ struct AstSplitArgs {
 		Ast * name;  \
 	}) \
 	AST_KIND(AsmInstruction, "asm instruction", struct { \
+		Ast *        prefix; /*optional*/ \
 		Ast *        name;     \
 		Slice<Ast *> operands; \
 	}) \
