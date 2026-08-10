@@ -2143,6 +2143,10 @@ gb_internal AsmTemplateEntityDeclKind check_asm_find_kind(Entity *entity, Array<
 
 
 gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
+	StringSet pin_set = {};
+	string_set_init(&pin_set, specs.count);
+	defer (string_set_destroy(&pin_set));
+
 	for (Ast *spec_ : specs) {
 		if (spec_->kind != Ast_AsmSpec) {
 			continue;
@@ -2168,6 +2172,11 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 			pin = reg->name.string;
 			if (pin == "any") {
 				pin = {};
+			}
+			if (pin.len != 0) {
+				if (string_set_update(&pin_set, pin)) {
+					error(spec->value, "Pinned register %%%.*s has already be assigned", LIT(pin));
+				}
 			}
 		}
 
@@ -2488,19 +2497,38 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 
 	check_asm_specs(ctx, ate->param_scope, at->specs, &ate->decls);
 	{ // check clobbers
+		StringSet reg_set = {};
+		string_set_init(&reg_set, 16);
+		defer (string_set_destroy(&reg_set));
+
+		bool clobber_cc     = false;
+		bool clobber_memory = false;
+
 		for (Ast *clobber_ : at->clobbers) {
 			ast_node(clobber, AsmClobber, clobber_);
 			switch (clobber->value->kind) {
 			case Ast_AsmRegister:
-				// TODO(bill): register check
+				{
+					String reg = clobber->value->AsmRegister.name.string;
+					if (string_set_update(&reg_set, reg)) {
+						error(clobber->value, "#clobber %%%.*s has already been defined", LIT(reg));
+					}
+					// TODO(bill): register check for validity
+				}
 				break;
 			case Ast_Ident:
 				{
 					String str = clobber->value->Ident.token.string;
 					if (str == "cc") {
-						// okay
+						if (clobber_cc) {
+							error(clobber->value, "#clobber cc has already been defined");
+						}
+						clobber_cc = true;
 					} else if (str == "memory") {
-						// okay
+						if (clobber_memory) {
+							error(clobber->value, "#clobber memory has already been defined");
+						}
+						clobber_memory = true;
 					} else {
 						error(clobber->value, "Expected either a register, 'cc', or 'memory' for a '#clobber' specification, got '%.*s'", LIT(str));
 					}
