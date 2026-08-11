@@ -140,7 +140,7 @@ main :: proc() {
 	{
 		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
 		defer strings.write_string(&sb, "\t};\n")
-		for op in type_of(gen.Encoding{}.enc[0]) {
+		for op in Operand_Encoding {
 			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
 		}
 
@@ -279,7 +279,41 @@ main :: proc() {
 		strings.write_string(&sb, "\t\treturn 0;\n")
 		strings.write_string(&sb, "\t}\n")
 	}
-
+	{
+		strings.write_string(&sb, "\tAsmOperandKind kind_from_operand_type(OperandType type) {\n")
+		strings.write_string(&sb, "\t\tswitch (type) {\n")
+		strings.write_string(&sb, "\t\tcase OP_R8:  case OP_R16: case OP_R32: case OP_R64:\n")
+		strings.write_string(&sb, "\t\tcase OP_SREG: case OP_CR: case OP_DR:\n")
+		strings.write_string(&sb, "\t\tcase OP_XMM: case OP_YMM: case OP_ZMM:\n")
+		strings.write_string(&sb, "\t\tcase OP_MM:  case OP_K:   case OP_STI:\n")
+		strings.write_string(&sb, "\t\tcase OP_AL_IMPL:  case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:\n")
+		strings.write_string(&sb, "\t\tcase OP_CL_IMPL:  case OP_DX_IMPL:\n")
+		strings.write_string(&sb, "\t\tcase OP_ST0_IMPL: case OP_XMM0_IMPL:\n")
+		strings.write_string(&sb, "\t\t\treturn AsmOperand_Register;\n")
+		strings.write_string(&sb, "\t\tcase OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:\n")
+		strings.write_string(&sb, "\t\tcase OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:\n")
+		strings.write_string(&sb, "\t\tcase OP_YMM_M256: case OP_ZMM_M512:\n")
+		strings.write_string(&sb, "\t\tcase OP_MM_M64:\n")
+		strings.write_string(&sb, "\t\tcase OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:\n")
+		strings.write_string(&sb, "\t\t\treturn AsmOperand_Register_Or_Memory;\n")
+		strings.write_string(&sb, "\t\tcase OP_M:   case OP_M8:  case OP_M16: case OP_M32: case OP_M64:\n")
+		strings.write_string(&sb, "\t\tcase OP_M80: case OP_M128: case OP_M256: case OP_M512:\n")
+		strings.write_string(&sb, "\t\tcase OP_MOFFS8: case OP_MOFFS16: case OP_MOFFS32: case OP_MOFFS64:\n")
+		strings.write_string(&sb, "\t\tcase OP_M16_16: case OP_M16_32: case OP_M16_64:\n")
+		strings.write_string(&sb, "\t\t\treturn AsmOperand_Memory;\n")
+		strings.write_string(&sb, "\t\tcase OP_IMM8: case OP_IMM16: case OP_IMM32: case OP_IMM64:\n")
+		strings.write_string(&sb, "\t\tcase OP_IMM8SX:\n")
+		strings.write_string(&sb, "\t\tcase OP_ONE_IMPL:\n")
+		strings.write_string(&sb, "\t\tcase OP_PTR16_16: case OP_PTR16_32: case OP_PTR16_64:\n")
+		strings.write_string(&sb, "\t\t\treturn AsmOperand_Immediate;\n")
+		strings.write_string(&sb, "\t\tcase OP_REL8: case OP_REL32:\n")
+		strings.write_string(&sb, "\t\t\treturn AsmOperand_Label;\n")
+		strings.write_string(&sb, "\t\tcase OP_NONE:\n")
+		strings.write_string(&sb, "\t\tdefault:\n")
+		strings.write_string(&sb, "\t\t\treturn AsmOperand_Invalid;\n")
+		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t}\n")
+	}
 
 
 	strings.write_string(&sb, "};\n")
@@ -446,6 +480,35 @@ main :: proc() {
 		os.exit(1)
 	}
 }
+
+Operand_Encoding :: type_of(gen.Encoding{}.enc[0])
+
+Asm_Operand_Kind :: enum u8 {
+	Invalid,
+	Register,
+	Memory,
+	Register_Or_Memory,
+	Immediate,
+	Label,
+}
+
+
+@(rodata)
+operand_encoding_to_kind := [Operand_Encoding]Asm_Operand_Kind{
+	.NONE  = .Invalid,
+	.MR    = .Register_Or_Memory,
+	.REG   = .Register,
+	.VVVV  = .Register,
+	.OP_R  = .Register,
+	.IS4   = .Register,
+	.AAA   = .Register,
+	.IMPL  = .Register,
+	.IB    = .Immediate,
+	.IW    = .Immediate,
+	.ID    = .Immediate,
+	.IQ    = .Immediate,
+}
+
 
 Prefix :: enum u8 {
 	INVALID,

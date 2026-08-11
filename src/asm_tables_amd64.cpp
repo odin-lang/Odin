@@ -304,6 +304,39 @@ struct Asm_amd64 {
 		}
 		return 0;
 	}
+	AsmOperandKind kind_from_operand_type(OperandType type) {
+		switch (type) {
+		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
+		case OP_SREG: case OP_CR: case OP_DR:
+		case OP_XMM: case OP_YMM: case OP_ZMM:
+		case OP_MM:  case OP_K:   case OP_STI:
+		case OP_AL_IMPL:  case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:
+		case OP_CL_IMPL:  case OP_DX_IMPL:
+		case OP_ST0_IMPL: case OP_XMM0_IMPL:
+			return AsmOperand_Register;
+		case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
+		case OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:
+		case OP_YMM_M256: case OP_ZMM_M512:
+		case OP_MM_M64:
+		case OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:
+			return AsmOperand_Register_Or_Memory;
+		case OP_M:   case OP_M8:  case OP_M16: case OP_M32: case OP_M64:
+		case OP_M80: case OP_M128: case OP_M256: case OP_M512:
+		case OP_MOFFS8: case OP_MOFFS16: case OP_MOFFS32: case OP_MOFFS64:
+		case OP_M16_16: case OP_M16_32: case OP_M16_64:
+			return AsmOperand_Memory;
+		case OP_IMM8: case OP_IMM16: case OP_IMM32: case OP_IMM64:
+		case OP_IMM8SX:
+		case OP_ONE_IMPL:
+		case OP_PTR16_16: case OP_PTR16_32: case OP_PTR16_64:
+			return AsmOperand_Immediate;
+		case OP_REL8: case OP_REL32:
+			return AsmOperand_Label;
+		case OP_NONE:
+		default:
+			return AsmOperand_Invalid;
+		}
+	}
 };
 
 

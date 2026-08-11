@@ -68,7 +68,7 @@ gb_global Timings global_timings = {0};
 #include "parser.hpp"
 #include "checker.hpp"
 
-#include "asm_tables_amd64.cpp"
+#include "asm_tables.cpp"
 
 #include "parser.cpp"
 #include "checker.cpp"

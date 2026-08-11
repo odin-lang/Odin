@@ -315,6 +315,7 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u1
 	}
 	auto p = g_asm_amd64.prefix_lookup(name);
 	if (p) {
+		if (mnemonic_) *mnemonic_ = cast(u16)p;
 		return CheckMnemomic_Prefix;
 	}
 
@@ -326,7 +327,38 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u1
 	return CheckMnemomic_Invalid;
 }
 
-gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands) {
+gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
+	if (operand->mode == Addressing_Constant) {
+		return AsmOperand_Immediate;
+	}
+	Ast *expr = operand->expr;
+	switch (expr->kind) {
+	case_ast_node(label, AsmLabelDecl, expr);
+		return AsmOperand_Label;
+	case_end;
+	case_ast_node(reg, AsmRegister, expr);
+		return AsmOperand_Register;
+	case_end;
+	case_ast_node(reg, AsmMemoryOperand, expr);
+		return AsmOperand_Memory;
+	case_end;
+	case_ast_node(ident, Ident, expr);
+		// TODO(bill): Is this correct?
+		if (expr->tav.mode == Addressing_Constant) {
+			return AsmOperand_Immediate;
+		}
+		Entity *e = entity_of_node(expr);
+		if (e != nullptr && e->kind == Entity_Variable && (e->flags & EntityFlag_PolyConst) != 0) {
+			return AsmOperand_Immediate;
+		}
+		return AsmOperand_Register;
+	case_end;
+	}
+	return AsmOperand_Invalid;
+}
+
+
+gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands, u8 previous_prefix) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = g_asm_amd64.encoding_forms(mnemonic);
 	String name = g_asm_amd64.mnemonic_strings[mnemonic];
@@ -334,8 +366,20 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 	int min_count = I32_MAX;
 	int max_count = -1;
 
-	bool ok = false;
+	for (auto form : forms) {
+		int explicit_count = cast(int)form.explicit_count();
+		min_count = gb_min(min_count, explicit_count);
+		max_count = gb_max(min_count, explicit_count);
+	}
+	min_count = gb_max(min_count, 0);
+	max_count = gb_max(max_count, 0);
 
+	isize valid_form_index = -1;
+
+	auto valid_spots = slice_make<bool>(heap_allocator(), max_count);
+	defer (slice_free(&valid_spots, heap_allocator()));
+
+	bool ok = true;
 	for (auto form : forms) {
 		int explicit_count = cast(int)form.explicit_count();
 		min_count = gb_min(min_count, explicit_count);
@@ -343,7 +387,29 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 		if (operands.count != explicit_count) {
 			continue;
 		}
-		ok = true; // pretend for the time being
+
+		ok = true;
+		for_array(i, operands) {
+			auto type = form.ops[i];
+			Operand const *operand = &operands[i];
+			AsmOperandKind dst_kind = g_asm_amd64.kind_from_operand_type(type);
+			AsmOperandKind src_kind = determine_asm_operand_kind(operand);
+			if (dst_kind == src_kind) {
+				valid_spots[i] = true;
+				continue;
+			}
+			if (dst_kind == AsmOperand_Register_Or_Memory &&
+			    (src_kind == AsmOperand_Register || src_kind == AsmOperand_Memory)) {
+				valid_spots[i] = true;
+				continue;
+			}
+			ok = false;
+			break;
+		}
+		if (ok) {
+			// the result has been found to be correct
+			break;
+		}
 	}
 
 	if (operands.count < min_count || operands.count > max_count) {
@@ -355,10 +421,21 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 		return;
 	}
 	if (ok) {
+		if (valid_form_index >= 0 && previous_prefix > 0) {
+			// TODO(bill): validate the prefix for the selected form
+		}
+
 		return;
 	}
 
-	error(instr->name, "The operands to '%.*s' matched non of the expected encoding forms", LIT(name));
+	{
+		error(instr->name, "The operands to '%.*s' matched non of the expected encoding forms", LIT(name));
+		for_array(i, valid_spots) {
+			if (!valid_spots[i] && i < operands.count) {
+				error(operands[i].expr, "Invalid operand kind for the asm instruction '%.*s'", LIT(name));
+			}
+		}
+	}
 }
 
 
@@ -657,6 +734,8 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 	defer (array_free(&operands));
 
 	for (Ast *instruction_ : at->instructions) {
+		u8 previous_prefix = 0;
+
 		switch (instruction_->kind) {
 		case_ast_node(instr, AsmInstruction, instruction_);
 			GB_ASSERT(instr->name->kind == Ast_Ident);
@@ -676,8 +755,9 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 				if (instr->operands.count != 0) {
 					error(instr->name, "A prefix must not have any operands, and be separate from the instruction it is prefixing");
 				}
+				previous_prefix = cast(u8)mnemonic;
 			} else if (res == CheckMnemomic_Mnemonic) {
-				check_mnemonic(ctx, instr, mnemonic, slice_from_array(operands));
+				check_mnemonic(ctx, instr, mnemonic, slice_from_array(operands), previous_prefix);
 			}
 
 		case_end;
