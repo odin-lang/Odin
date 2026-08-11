@@ -568,6 +568,27 @@ test_soa_array_elem_chained_indexing :: proc(t: ^testing.T) {
 	testing.expect_value(t, dyn_write.x[1], 90)
 	testing.expect_value(t, dyn_write.w[1], 93)
 
+	// through a pointer to the element
+	ep := &fixed_write[1]
+	k = 2
+	testing.expect_value(t, ep[k], 72)
+	testing.expect_value(t, ep[1], ep^[1])
+	ep[0] = 100
+	testing.expect_value(t, fixed_write.x[1], 100)
+	ep[k] = 102
+	testing.expect_value(t, fixed_write.z[1], 102)
+	pe := &ep[3]
+	pe^ = 103
+	testing.expect_value(t, fixed_write.w[1], 103)
+
+	eps := &slice_write[0]
+	eps[1] = 143
+	testing.expect_value(t, dyn_write.y[0], 143)
+	epd := &dyn_write[1]
+	testing.expect_value(t, epd[k], 92)
+	epd[0] = 190
+	testing.expect_value(t, dyn_write.x[1], 190)
+
 	// multi dim array element type, only the outer index is scattered
 	nested: #soa[2][3][2]u16
 	nested[1].x = {1, 3}
@@ -590,6 +611,211 @@ test_soa_array_elem_chained_indexing :: proc(t: ^testing.T) {
 	testing.expect_value(t, nested.y[1][0], 51)
 	testing.expect_value(t, nested.z[1][0], 52)
 	testing.expect_value(t, nested[0][0], [2]u16{0, 0})
+
+	pn := &nested[1]
+	testing.expect_value(t, pn[0][0], 50)
+	pn[0][1] = 60
+	testing.expect_value(t, nested.x[1][1], 60)
+}
+
+// ranging over an element of array-element typed #soa,
+// for v in soa[i], or for &v in soa[i]
+@(test)
+test_soa_array_elem_range :: proc(t: ^testing.T) {
+	fixed: #soa[3][4]u16
+	fixed[0] = [4]u16{90, 91, 92, 93}
+	fixed[1] = [4]u16{10, 11, 12, 13}
+
+	for v, j in fixed[1] {
+		testing.expect_value(t, v, fixed[1][j])
+	}
+
+	#reverse for v, j in fixed[0] {
+		testing.expect_value(t, v, fixed[0][j])
+	}
+
+	got: [4]u16
+	i := 0
+	for v in fixed[1] {
+		got[i] = v
+		i += 1
+	}
+	testing.expect_value(t, got, [4]u16{10, 11, 12, 13})
+
+	// double loop
+	sum : u16 = 0
+	for e in fixed {
+		for v in e {
+			sum += v
+		}
+	}
+	testing.expect_value(t, sum, 90 + 91 + 92 + 93 + 10 + 11 + 12 + 13)
+
+	// through pointer to the container
+	got = {}
+	i = 0
+	p := &fixed
+	k := 1
+	for v in p[k] {
+		got[i] = v
+		i += 1
+	}
+	testing.expect_value(t, got, [4]u16{10, 11, 12, 13})
+
+	// slice
+	slice := fixed[:]
+	got = {}
+	i = 0
+	for v in slice[1] {
+		got[i] = v
+		i += 1
+	}
+	testing.expect_value(t, got, [4]u16{10, 11, 12, 13})
+
+	// dynamic
+	dyn: #soa[dynamic][4]u16
+	defer delete(dyn)
+	append_soa(&dyn, [4]u16{20, 21, 22, 23})
+	append_soa(&dyn, [4]u16{30, 31, 32, 33})
+	got = {}
+	i = 0
+	for v in dyn[1] {
+		got[i] = v
+		i += 1
+	}
+	testing.expect_value(t, got, [4]u16{30, 31, 32, 33})
+
+	// multi dim array type
+	nested: #soa[2][3][2]u16
+	nested[1] = [3][2]u16{{1, 2}, {3, 4}, {5, 6}}
+	flat: [6]u16
+	n := 0
+	for row in nested[1] {
+		for v in row {
+			flat[n] = v
+			n += 1
+		}
+	}
+	testing.expect_value(t, flat, [6]u16{1, 2, 3, 4, 5, 6})
+
+	// a write during the loop is visible to later iterations
+	// (same as normal arrays)
+	live: #soa[2][4]u16
+	live[0] = [4]u16{1, 2, 3, 4}
+	seen: [4]u16
+	for v, j in live[0] {
+		if j == 0 {
+			live.z[0] = 99
+		}
+		seen[j] = v
+	}
+	testing.expect_value(t, seen, [4]u16{1, 2, 99, 4})
+
+	//////////////////////////
+	// for &v in soa[i]
+	//////////////////////////
+
+	// fixed: #soa[3][4]u16
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	for &v in fixed[1] {
+		v *= 10
+	}
+	testing.expect_value(t, fixed[1], [4]u16{10, 20, 30, 40})
+	testing.expect_value(t, fixed.x[1], 10)
+	testing.expect_value(t, fixed.w[1], 40)
+
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	for &v, j in fixed[1] {
+		v += u16(j)
+	}
+	testing.expect_value(t, fixed[1], [4]u16{1, 3, 5, 7})
+
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	#reverse for &v in fixed[1] {
+		v *= 2
+	}
+	testing.expect_value(t, fixed[1], [4]u16{2, 4, 6, 8})
+
+	// through pointer to the container
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	k = 1
+	p = &fixed
+	for &v in p[k] {
+		v += 100
+	}
+	testing.expect_value(t, fixed[1], [4]u16{101, 102, 103, 104})
+
+	// slice
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	slice = fixed[:]
+	for &v in slice[1] {
+		v *= 3
+	}
+	testing.expect_value(t, fixed[1], [4]u16{3, 6, 9, 12})
+
+	// dynamic
+	dyn[0] = [4]u16{1, 2, 3, 4}
+	for &v in dyn[0] {
+		v += 5
+	}
+	testing.expect_value(t, dyn[0], [4]u16{6, 7, 8, 9})
+
+	// multi dim array type
+	nested[0] = [2]u16{1, 2}
+	nested[1] = [2]u16{5, 6}
+	for &e in nested {
+		for &v in e {
+			v += 1
+		}
+	}
+	testing.expect_value(t, nested[0], [2]u16{2, 3})
+	testing.expect_value(t, nested[1], [2]u16{6, 7})
+
+	//////////////////////////
+	// through a pointer to the element
+	// for v in ep^, or for v in ep
+	//////////////////////////
+
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	ep := &fixed[1]
+
+	got = {}
+	i = 0
+	for v in ep^ {
+		got[i] = v
+		i += 1
+	}
+	testing.expect_value(t, got, [4]u16{1, 2, 3, 4})
+
+	for &v, j in ep^ {
+		v += u16(10 * (j + 1))
+	}
+	testing.expect_value(t, fixed[1], [4]u16{11, 22, 33, 44})
+
+	// auto-deref
+	fixed[1] = [4]u16{1, 2, 3, 4}
+	got = {}
+	i = 0
+	for v in ep {
+		got[i] = v
+		i += 1
+	}
+	testing.expect_value(t, got, [4]u16{1, 2, 3, 4})
+
+	for &v in ep {
+		v *= 2
+	}
+	testing.expect_value(t, fixed[1], [4]u16{2, 4, 6, 8})
+
+	// a [0]T element has no components; the loop must not run
+	// (and the compiler must not crash :)
+	c0: #soa[2][0]u16
+	n = 0
+	for v in c0[0] {
+		_ = v
+		n += 1
+	}
+	testing.expect_value(t, n, 0)
 }
 
 // "using" on an #soa for-in looping variable

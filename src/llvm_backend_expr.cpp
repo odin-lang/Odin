@@ -5087,26 +5087,11 @@ gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAdd
 		return lb_addr_soa_field_elem(lb_soa_field_elem_ptr(p, soa_addr.addr, cast(i32)component, soa_addr.soa.index));
 	}
 
-	// for non-constant index do chain select between the component pointers;
-	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless), 
-	// and should be folded if j turns out constant after inlining;
-	// TODO: more efficient codegen can be done, most definitely for fixed kind, possibly for slice/dynamic,
-	// (but this works for both kinds)
-	//
 	// Note: a temp holding the whole element would be simpler but would not be an lvalue,
 	// and writes go through here
 	lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 	lb_emit_bounds_check(p, ast_token(ie->index), index, lb_const_int(p->module, t_int, component_count));
-
-	lbValue ptr = lb_soa_field_elem_ptr(p, soa_addr.addr, 0, soa_addr.soa.index);
-	// lb_emit_select evaluates both arms, so every candidate address is formed;
-	// only the selected one is loaded or stored through
-	for (i64 component = 1; component < component_count; component++) {
-		lbValue candidate = lb_soa_field_elem_ptr(p, soa_addr.addr, cast(i32)component, soa_addr.soa.index);
-		lbValue is_component = lb_emit_comp(p, Token_CmpEq, index, lb_const_int(p->module, t_int, component));
-		ptr = lb_emit_select(p, is_component, candidate, ptr);
-	}
-	return lb_addr_soa_field_elem(ptr);
+	return lb_addr_soa_field_elem(lb_soa_array_component_elem_ptr(p, soa_addr.addr, index, soa_addr.soa.index, component_count));
 }
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
@@ -5193,6 +5178,13 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		// because, unlike soa[i], v is seen by the checker as Addressing_Variable
 		if (array_addr.kind == lbAddr_SoaVariable) {
 			return lb_build_addr_soa_elem_index(p, expr, array_addr, t);
+		}
+		// p[j], where p is an #soa element pointer (e.g. p := &soa[i])
+		if (is_type_soa_pointer(type_of_expr(ie->expr))) {
+			// build a soa variable from the soa ptr to get the address of the component
+			lbValue soa_ptr = lb_addr_load(p, array_addr);
+			lbAddr soa_addr = lb_addr_soa_variable_from_soa_ptr(p, soa_ptr);
+			return lb_build_addr_soa_elem_index(p, expr, soa_addr, t);
 		}
 		lbValue array = lb_addr_get_ptr(p, array_addr);
 		if (deref) {
@@ -6578,10 +6570,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 						// base p doesn't lower to an lbAddr_SoaVariable on its own
 						// (it is a local holding the soa pointer), so build the element
 						// addr here the same way an explicit p^ does
-						lbValue value = lb_build_expr(p, se->expr);
-						lbValue ptr = lb_emit_struct_ev(p, value, 0);
-						lbValue idx = lb_emit_struct_ev(p, value, 1);
-						addr = lb_addr_soa_variable(ptr, idx, nullptr);
+						addr = lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, se->expr));
 					} else {
 						addr = lb_build_addr(p, se->expr);
 					}
@@ -6803,10 +6792,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(de, DerefExpr, expr);
 		Type *t = type_of_expr(de->expr);
 		if (is_type_soa_pointer(t)) {
-			lbValue value = lb_build_expr(p, de->expr);
-			lbValue ptr = lb_emit_struct_ev(p, value, 0);
-			lbValue idx = lb_emit_struct_ev(p, value, 1);
-			return lb_addr_soa_variable(ptr, idx, nullptr);
+			return lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, de->expr));
 		}
 		lbValue addr = lb_build_expr(p, de->expr);
 		return lb_addr(addr);

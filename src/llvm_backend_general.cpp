@@ -616,6 +616,16 @@ gb_internal lbAddr lb_addr_soa_variable(lbValue addr, lbValue index, Ast *index_
 	return v;
 }
 
+// lbAddr_SoaVariable for the element pointed by an #soa pointer,
+// unpacked from the ptr's {^container, index} pair
+//
+// the nullptr index_expr is deliberate, there is no source index expression,
+// the index was already bounds checked when the pointer was formed (e.g. p := &soa[i])
+gb_internal lbAddr lb_addr_soa_variable_from_soa_ptr(lbProcedure *p, lbValue soa_ptr) {
+	GB_ASSERT_MSG(is_type_soa_pointer(soa_ptr.type), "%s", type_to_string(soa_ptr.type));
+	return lb_addr_soa_variable(lb_emit_struct_ev(p, soa_ptr, 0), lb_emit_struct_ev(p, soa_ptr, 1), nullptr);
+}
+
 // pointer to the index element of the field_index component
 //
 // the returned pointer type depends on the soa kind (because the field types do):
@@ -632,6 +642,41 @@ gb_internal lbValue lb_soa_field_elem_ptr(lbProcedure *p, lbValue soa_ptr, i32 f
 		return lb_emit_array_ep(p, field, index);
 	}
 	return lb_emit_ptr_offset(p, lb_emit_load(p, field), index);
+}
+
+// the same address as lb_soa_field_elem_ptr, for a component index only known at runtime,
+// this is array-element #soa only, unlike lb_soa_field_elem_ptr which serves any soa kind
+//
+// Note: the caller bounds checks component_index if needed
+gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbValue soa_ptr, lbValue component_index, lbValue elem_index, i64 component_count) {
+	Type *t = base_type(type_deref(soa_ptr.type));
+	GB_ASSERT_MSG(t->kind == Type_Struct && t->Struct.soa_kind != StructSoa_None, "%s", type_to_string(t));
+	GB_ASSERT_MSG(base_type(t->Struct.soa_elem)->kind == Type_Array,
+	              "indexing a component at runtime needs uniformly typed fields, got element %s",
+	              type_to_string(t->Struct.soa_elem));
+	if (component_count == 0) {
+		// a [0]T element has no components, nor does its soa struct have a field to get a ptr to;
+		// emit a typed nil so that code is well formed;
+		// callers either check bounds (driect indexing) or skip the code (e.g. range loop over array element),
+		// so this is never dereferenced when bounds checks are on;
+		// with bounds checks off the access is out of bounds by definition
+		return lb_const_nil(p->module, alloc_type_pointer(base_type(t->Struct.soa_elem)->Array.elem));
+	}
+	// do chain select between the component pointers;
+	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless), 
+	// and it is folded if j is resolved to constant after inlining/unrolling;
+	// TODO: more efficient codegen can be done, most definitely for fixed kind, possibly for slice/dynamic,
+	// (but this works for both kinds)
+	//
+	// lb_emit_select evaluates both arms, so every candidate address is
+	// formed; only the selected one is dereferenced	
+	lbValue ptr = lb_soa_field_elem_ptr(p, soa_ptr, 0, elem_index);
+	for (i64 component = 1; component < component_count; component++) {
+		lbValue candidate = lb_soa_field_elem_ptr(p, soa_ptr, cast(i32)component, elem_index);
+		lbValue is_component = lb_emit_comp(p, Token_CmpEq, component_index, lb_const_int(p->module, t_int, component));
+		ptr = lb_emit_select(p, is_component, candidate, ptr);
+	}
+	return ptr;
 }
 
 // lbAddr over an lb_soa_field_elem_ptr pointer, retyped ^T when it came as [^]T
@@ -1502,10 +1547,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
 		return lbValue{v, t};
 	} else if (is_type_soa_pointer(value.type)) {
-		lbValue ptr = lb_emit_struct_ev(p, value, 0);
-		lbValue idx = lb_emit_struct_ev(p, value, 1);
-		lbAddr addr = lb_addr_soa_variable(ptr, idx, nullptr);
-		return lb_addr_load(p, addr);
+		return lb_addr_load(p, lb_addr_soa_variable_from_soa_ptr(p, value));
 	}
 
 	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));

@@ -377,11 +377,22 @@ gb_internal void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
 
 gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValue count_ptr,
                                         lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_,
-                                        bool is_reverse, i64 unroll_count=0) {
+                                        bool is_reverse, i64 unroll_count=0, lbAddr const *soa_elem=nullptr) {
 	lbModule *m = p->module;
 
+	// when ranging over an #soa element rather than an array, expr is unused, there being no array
+	// to point at, so expr_type (the [N]T being ranged over) comes from the container's soa_elem
+	bool const is_soa_elem = soa_elem != nullptr && soa_elem->kind == lbAddr_SoaVariable;
+
 	lbValue count = {};
-	Type *expr_type = base_type(type_deref(expr.type));
+	Type *expr_type = nullptr;
+	if (is_soa_elem) {
+		Type *soa = base_type(type_deref(soa_elem->addr.type));
+		GB_ASSERT(soa->kind == Type_Struct && soa->Struct.soa_kind != StructSoa_None);
+		expr_type = base_type(soa->Struct.soa_elem);
+	} else {
+		expr_type = base_type(type_deref(expr.type));
+	}
 	switch (expr_type->kind) {
 	case Type_Array:
 		count = lb_const_int(m, t_int, expr_type->Array.count);
@@ -472,7 +483,13 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	switch (expr_type->kind) {
 	case Type_Array: {
 		if (val_type != nullptr) {
-			val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
+			if (is_soa_elem) {
+				lbValue ptr = lb_soa_array_component_elem_ptr(p, soa_elem->addr, idx, soa_elem->soa.index, expr_type->Array.count);
+				lbAddr component = lb_addr_soa_field_elem(ptr);
+				val = lb_emit_load(p, component.addr);
+			} else {
+				val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
+			}
 		}
 		break;
 	}
@@ -1343,7 +1360,8 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_Array: {
-			lbValue array;
+			lbValue array = {};
+			lbAddr const *soa_elem = nullptr;
 			lbAddr addr = lb_build_addr(p, expr);
 			switch (addr.kind) {
 			case lbAddr_Swizzle:
@@ -1352,9 +1370,28 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 				// NOTE(laytan): apply the swizzle.
 				array = lb_address_from_load(p, lb_addr_load(p, addr));
 				break;
+			case lbAddr_SoaVariable:
+				// for v in soa[i] (and other direct forms);
+				// there is no array here to range over, the element is scattered across the field
+				// arrays and has no address of its own, only a container pointer and the element
+				// index, which is what this lbAddr carries. lb_build_range_indexed uses those
+				// with the loop counter as the component index to address each component directly
+				//
+				// the element index bounds check is hoisted here,
+				// the component index is in range by construction and needs none
+				lb_emit_soa_index_bounds_check(p, addr.addr, addr.soa.index, addr.soa.index_expr);
+				soa_elem = &addr;
+				break;
 			default:
 				array = lb_addr_get_ptr(p, addr);
-				if (is_type_pointer(type_deref(array.type))) {
+				if (is_type_soa_pointer(type_deref(array.type))) {
+					// for v in p, where p is an #soa element ptr (e.g. p := &soa[i]);
+					// we need to build the soa variable from the soa ptr
+					// and then produce the soa_elem as in the lbAddr_SoaVariable case above;
+					lbValue soa_ptr = lb_emit_load(p, array);
+					addr = lb_addr_soa_variable_from_soa_ptr(p, soa_ptr);
+					soa_elem = &addr;
+				} else if (is_type_pointer(type_deref(array.type))) {
 					array = lb_emit_load(p, array);
 				}
 				break;
@@ -1362,7 +1399,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->Array.count));
-			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
+			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse, 0, soa_elem);
 			break;
 		}
 		case Type_EnumeratedArray: {
