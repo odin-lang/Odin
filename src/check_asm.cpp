@@ -110,9 +110,29 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	}
 
 	// Width check (only when the slot pins a width and we could size the type).
-	if (want_w != 0 && got_w != 0 && want_w != got_w) {
-		if (mismatch_) *mismatch_ = AsmMismatch_Size;
-		return false;
+	if (want_w != 0 && got_w != 0) {
+		if (want_class == AsmRegClass_Vector) {
+			// XMM/YMM/ZMM slot. A scalar float (f32/f64) uses only the low lane, so
+			// it is valid in any vector-register slot as long as it fits. A #simd
+			// vector, by contrast, must match the register width exactly (a 128-bit
+			// vector is not a ymm, a 256-bit vector is not an xmm).
+			bool width_ok = false;
+			if (got_class == AsmRegClass_Float) {
+				width_ok = (got_w <= want_w);   // scalar in low lane
+			} else {
+				width_ok = (got_w == want_w);   // #simd must be exact
+			}
+			if (!width_ok) {
+				if (mismatch_) *mismatch_ = AsmMismatch_Size;
+				return false;
+			}
+		} else {
+			// GPR / mask / memory-sized slot: exact width.
+			if (want_w != got_w) {
+				if (mismatch_) *mismatch_ = AsmMismatch_Size;
+				return false;
+			}
+		}
 	}
 	return true;
 }
