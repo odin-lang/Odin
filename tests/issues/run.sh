@@ -110,6 +110,9 @@ fi
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o
 $ODIN test ../test_issue_7010.odin $COMMON
 
+clang -c ../test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
+$ODIN test ../test_issue_sysv_abi.odin $COMMON
+
 clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 $ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
 
