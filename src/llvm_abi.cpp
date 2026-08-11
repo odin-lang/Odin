@@ -1766,10 +1766,12 @@ namespace lbAbiRiscv64 {
 		// compatibility for struct declarations.
 		// The flattened form is for the floating-point rules, which are about the MEMBERS; the
 		// integer fallback below is about the OBJECT, so `size` stays the size of the original.
+		// The rules are stated over the members alone, so the aggregate's size does not gate
+		// them: over-alignment grows a struct without changing any member type.
 		LLVMTypeRef  fp_type = type;
 		LLVMTypeKind fp_kind = kind;
 		i64          fp_size = size;
-		if (kind == LLVMStructTypeKind && size <= gb_max(2*xlen, 2*flen)) {
+		if (kind == LLVMStructTypeKind) {
 			Array<LLVMTypeRef> fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, LLVMCountStructElementTypes(type));
 			flatten(m, &fields, type, false);
 
@@ -1785,6 +1787,11 @@ namespace lbAbiRiscv64 {
 
 		if (is_float(fp_type) && fp_size <= flen && *fprs_left >= 1) {
 			*fprs_left -= 1;
+			if (fp_type != orig_type) {
+				// A struct that flattened to a single float has to be coerced to that float;
+				// handing back the original sends an over-aligned one to integer registers.
+				return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
+			}
 			return non_struct(c, orig_type);
 		}
 
