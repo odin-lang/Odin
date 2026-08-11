@@ -1,3 +1,12 @@
+enum AsmRegClass : u8 {
+	AsmRegClass_Unknown,
+	AsmRegClass_Integer,
+	AsmRegClass_Float,
+	AsmRegClass_Vector,
+	AsmRegClass_Mask,
+};
+
+
 enum AsmOperandKind : u8 {
 	AsmOperand_Invalid,
 	AsmOperand_Register,

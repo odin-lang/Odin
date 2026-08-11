@@ -169,14 +169,6 @@ enum AsmTemplateEntityDeclKind : u8 {
 	AsmTemplateEntityDecl_COUNT
 };
 
-enum AsmRegClass : u8 {
-	AsmRegClass_Unknown,
-	AsmRegClass_Integer,
-	AsmRegClass_Float,
-	AsmRegClass_Vector,
-	AsmRegClass_Mask,
-};
-
 enum AsmTemplateEntityDeclParamGroup : u8 {
 	AsmTemplateEntityDeclParamGroup_Unknown,
 	AsmTemplateEntityDeclParamGroup_Input,

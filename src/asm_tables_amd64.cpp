@@ -285,7 +285,7 @@ struct Asm_amd64 {
 	}
 	// size in bits for register
 	u16 reg_size(Register r) const {
-		switch (reg_class(r)) {
+		switch (reg_class(register_codes[r])) {
 		case REG_CLASS_GPR64: return 64;
 		case REG_CLASS_GPR32: return 32;
 		case REG_CLASS_GPR16: return 16;
@@ -304,6 +304,7 @@ struct Asm_amd64 {
 		}
 		return 0;
 	}
+
 	AsmOperandKind kind_from_operand_type(OperandType type) {
 		switch (type) {
 		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
@@ -336,6 +337,50 @@ struct Asm_amd64 {
 		default:
 			return AsmOperand_Invalid;
 		}
+	}
+
+	bool operand_type_is_implicit(OperandType t) {
+		switch (t) {
+		case OP_AL_IMPL:  case OP_AX_IMPL:
+		case OP_EAX_IMPL: case OP_RAX_IMPL:
+		case OP_CL_IMPL:  case OP_DX_IMPL:
+		case OP_ONE_IMPL:
+		case OP_ST0_IMPL: case OP_XMM0_IMPL:
+			return true;
+		}
+		return false;
+	}
+
+	AsmRegClass operand_type_reg_class(OperandType t) {
+		switch (t) {
+		case OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:
+		case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
+		case OP_AL_IMPL: case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:
+		case OP_CL_IMPL: case OP_DX_IMPL:
+			return AsmRegClass_Integer;
+		case OP_XMM: case OP_YMM: case OP_ZMM:
+		case OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:
+		case OP_YMM_M256: case OP_ZMM_M512:
+		case OP_XMM0_IMPL:
+			return AsmRegClass_Vector; // xmm/ymm/zmm; float scalars also land here (see note)
+		case OP_K:
+		case OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:
+			return AsmRegClass_Mask;
+		}
+		return AsmRegClass_Unknown; // OP_M*, OP_IMM*, OP_REL*, OP_SREG/CR/DR/MM/STi, moffs, ptr, m16_16... : no GPR/XMM class constraint here
+	}
+
+	u16 operand_type_bit_width(OperandType t) {
+		switch (t) {
+		case OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;
+		case OP_R16: case OP_RM16: case OP_M16: case OP_AX_IMPL:  case OP_DX_IMPL: case OP_K_M16: return 16;
+		case OP_R32: case OP_RM32: case OP_M32: case OP_EAX_IMPL: case OP_XMM_M32: case OP_K_M32: return 32;
+		case OP_R64: case OP_RM64: case OP_M64: case OP_RAX_IMPL: case OP_XMM_M64: case OP_K_M64: case OP_MM: case OP_MM_M64: return 64;
+		case OP_M128: case OP_XMM: case OP_XMM_M128: case OP_XMM0_IMPL: return 128;
+		case OP_M256: case OP_YMM: case OP_YMM_M256: return 256;
+		case OP_M512: case OP_ZMM: case OP_ZMM_M512: return 512;
+		}
+		return 0; // OP_M (sizeless), OP_IMM*, OP_REL*, OP_K (opmask width is data-dependent), etc.
 	}
 };
 
