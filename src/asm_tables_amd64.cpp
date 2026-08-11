@@ -97,6 +97,9 @@ struct Asm_amd64 {
 	static String const mnemonic_strings[MNEMONIC_COUNT];
 	static String const prefix_strings[PREFIX_COUNT];
 
+	enum PrefixKind : u8 { PrefixKind_None, PrefixKind_Lock, PrefixKind_Rep, PrefixKind_Repne, PrefixKind_Other };
+
+
 	// Register classes (upper byte)
 	static const u16 REG_CLASS_NONE  = 0x000;
 	static const u16 REG_CLASS_GPR64 = 0x100;
@@ -232,6 +235,8 @@ struct Asm_amd64 {
 		bool has_implicit  () const { return ((flags>>21u)&1) != 0; }
 		u8   explicit_count() const { return cast(u8)((flags>>18u)&((1u<<3)-1)); }
 		u8   op_count      () const { return cast(u8)((flags>>22u)&((1u<<3)-1)); }
+		bool   lock_ok     () const { return ((flags>>14u)&1) != 0; }
+		bool   rep_ok      () const { return ((flags>>15u)&1) != 0; }
 	};
 	#pragma pack(pop)
 	GB_STATIC_ASSERT(gb_size_of(Encoding) == 16);
@@ -407,6 +412,43 @@ struct Asm_amd64 {
 			seen += 1;
 		}
 		return -1;
+	}
+
+	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) {
+		PrefixKind kind = PrefixKind_None;
+		if (prefix != 0) {
+			switch (prefix) {
+			case PREFIX_LOCK:  kind = PrefixKind_Lock;  break;
+			case PREFIX_REP:   kind = PrefixKind_Rep;   break;
+			case PREFIX_REPNE: kind = PrefixKind_Repne; break;
+			default:           kind = PrefixKind_Other; break;
+			}
+		}
+		switch (kind) {
+		case PrefixKind_Lock:
+			if (!form.lock_ok()) {
+				return false;
+			} else {
+				if (requires_memory_dest_) *requires_memory_dest_ = true;
+				return true;
+			}
+		case PrefixKind_Rep:
+			if (!form.rep_ok()) {
+				return false;
+			} else {
+				return true;
+			}
+		case PrefixKind_Repne:
+			if (!form.rep_ok()) {
+				return false;
+			} else {
+				return true;
+			}
+		case PrefixKind_Other:
+		case PrefixKind_None:
+			return true;
+		}
+		return true;
 	}
 };
 

@@ -84,6 +84,12 @@ main :: proc() {
 
 	{
 		strings.write_string(&sb, "\n");
+		strings.write_string(&sb, "\tenum PrefixKind : u8 { PrefixKind_None, PrefixKind_Lock, PrefixKind_Rep, PrefixKind_Repne, PrefixKind_Other };\n");
+		strings.write_string(&sb, "\n");
+	}
+
+	{
+		strings.write_string(&sb, "\n");
 		strings.write_string(&sb, "\t// Register classes (upper byte)\n")
 		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_NONE  = 0x000;\n")
 		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_GPR64 = 0x100;\n")
@@ -184,6 +190,18 @@ main :: proc() {
 			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
 			strings.write_string(&sb, "\t\tu8   op_count      () const { ")
 			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
+			strings.write_string(&sb, "\t\tbool   lock_ok     () const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "rep_ok")
+			strings.write_string(&sb, "\t\tbool   rep_ok      () const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
 			strings.write_string(&sb, " }\n")
 		}
 	}
@@ -392,6 +410,45 @@ main :: proc() {
 		strings.write_string(&sb, "\t\treturn -1;\n")
 		strings.write_string(&sb, "\t}\n")
 
+	}
+	strings.write_string(&sb, "\n")
+	{
+		strings.write_string(&sb, "\tbool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) {\n")
+		strings.write_string(&sb, "\t\tPrefixKind kind = PrefixKind_None;\n")
+		strings.write_string(&sb, "\t\tif (prefix != 0) {\n")
+		strings.write_string(&sb, "\t\t\tswitch (prefix) {\n")
+		strings.write_string(&sb, "\t\t\tcase PREFIX_LOCK:  kind = PrefixKind_Lock;  break;\n")
+		strings.write_string(&sb, "\t\t\tcase PREFIX_REP:   kind = PrefixKind_Rep;   break;\n")
+		strings.write_string(&sb, "\t\t\tcase PREFIX_REPNE: kind = PrefixKind_Repne; break;\n")
+		strings.write_string(&sb, "\t\t\tdefault:           kind = PrefixKind_Other; break;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t\tswitch (kind) {\n")
+		strings.write_string(&sb, "\t\tcase PrefixKind_Lock:\n")
+		strings.write_string(&sb, "\t\t\tif (!form.lock_ok()) {\n")
+		strings.write_string(&sb, "\t\t\t\treturn false;\n")
+		strings.write_string(&sb, "\t\t\t} else {\n")
+		strings.write_string(&sb, "\t\t\t\tif (requires_memory_dest_) *requires_memory_dest_ = true;\n")
+		strings.write_string(&sb, "\t\t\t\treturn true;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\tcase PrefixKind_Rep:\n")
+		strings.write_string(&sb, "\t\t\tif (!form.rep_ok()) {\n")
+		strings.write_string(&sb, "\t\t\t\treturn false;\n")
+		strings.write_string(&sb, "\t\t\t} else {\n")
+		strings.write_string(&sb, "\t\t\t\treturn true;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\tcase PrefixKind_Repne:\n")
+		strings.write_string(&sb, "\t\t\tif (!form.rep_ok()) {\n")
+		strings.write_string(&sb, "\t\t\t\treturn false;\n")
+		strings.write_string(&sb, "\t\t\t} else {\n")
+		strings.write_string(&sb, "\t\t\t\treturn true;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\tcase PrefixKind_Other:\n")
+		strings.write_string(&sb, "\t\tcase PrefixKind_None:\n")
+		strings.write_string(&sb, "\t\t\treturn true;\n")
+		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t\treturn true;\n")
+		strings.write_string(&sb, "\t}\n")
 	}
 
 

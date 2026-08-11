@@ -627,7 +627,7 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 
 
 template <typename AsmCtx>
-gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands, u8 previous_prefix) {
+gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands, u8 previous_prefix, Ast *previous_prefix_instr) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = asm_ctx->encoding_forms(mnemonic);
 	String name = asm_ctx->mnemonic_strings[mnemonic];
@@ -738,9 +738,19 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 	}
 	if (matched) {
 		if (valid_form_index >= 0 && previous_prefix > 0) {
-			// TODO(bill): validate the prefix for the selected form
-		}
+			auto &form = forms[valid_form_index];
 
+			bool requires_memory_dest = false;
+			bool ok = asm_ctx->prefix_kind_okay(previous_prefix, form, &requires_memory_dest);
+			if (ok) {
+				if (operands.count != 0 && determine_asm_operand_kind(&operands[0]) != AsmOperand_Memory) {
+					error(previous_prefix_instr ? previous_prefix_instr : instr->name,
+					      "Asm prefix requires '%.*s' to have a memory destination operand", LIT(name));
+				}
+			} else {
+				error(instr->name, "Asm prefix cannot be applied to '%.*s'", LIT(name));
+			}
+		}
 		return;
 	}
 
@@ -1182,9 +1192,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	array_reserve(&operands, 16);
 	defer (array_free(&operands));
 
-	for (Ast *instruction_ : at->instructions) {
-		u8 previous_prefix = 0;
+	u8 previous_prefix = 0;
+	Ast *previous_prefix_instr = nullptr; // for a good error location
 
+	for (Ast *instruction_ : at->instructions) {
 		switch (instruction_->kind) {
 		case_ast_node(instr, AsmInstruction, instruction_);
 			GB_ASSERT(instr->name->kind == Ast_Ident);
@@ -1192,30 +1203,47 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			u16 mnemonic = 0;
 			CheckMnemomicResult res = check_mnemonic_name(asm_ctx, instr, &mnemonic);
 
-
 			array_clear(&operands);
-
 			for (Ast *expr : instr->operands) {
 				Operand operand = {};
 				check_asm_instruction_operand(asm_ctx, ctx, entity, &operand, expr, /*allow_memory_operands*/true);
 				array_add(&operands, operand);
 			}
+
 			if (res == CheckMnemomic_Prefix) {
 				if (instr->operands.count != 0) {
 					error(instr->name, "A prefix must not have any operands, and be separate from the instruction it is prefixing");
 				}
+				if (previous_prefix != 0) {
+					error(instr->name, "A prefix cannot immediately follow another prefix");
+				}
 				previous_prefix = cast(u8)mnemonic;
+				previous_prefix_instr = instruction_;
 			} else if (res == CheckMnemomic_Mnemonic) {
-				check_mnemonic(asm_ctx, ctx, instr, mnemonic, slice_from_array(operands), previous_prefix);
+				check_mnemonic(asm_ctx, ctx, instr, mnemonic, slice_from_array(operands), previous_prefix, previous_prefix_instr);
+				previous_prefix = 0;
+				previous_prefix_instr = nullptr;
+			} else {
+				// invalid mnemonic already reported; a pending prefix now has no target
+				previous_prefix = 0;
+				previous_prefix_instr = nullptr;
 			}
+		case_end;
 
-		case_end;
 		case_ast_node(label, AsmLabelDecl, instruction_);
-			// already done
+			if (previous_prefix != 0) {
+				error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but a label declaration was found");
+				previous_prefix = 0;
+				previous_prefix_instr = nullptr;
+			}
 		case_end;
+
 		default:
 			error(instruction_, "Unexpected instruction in asm template");
 			break;
 		}
+	}
+	if (previous_prefix != 0) {
+		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 }
