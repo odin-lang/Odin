@@ -322,7 +322,15 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u1
 	if (instr->operands.count == 0) {
 		error(instr->name, "Unknown mnemonic/prefix for this target platform: %%%.*s", LIT(name));
 	} else {
+		ERROR_BLOCK();
 		error(instr->name, "Unknown mnemonic for this target platform: %%%.*s", LIT(name));
+		auto dym = did_you_mean_make(heap_allocator(), g_asm_amd64.MNEMONIC_COUNT, name);
+		defer (did_you_mean_destroy(&dym));
+		for (String const &str : g_asm_amd64.mnemonic_strings) {
+			did_you_mean_append(&dym, str);
+		}
+		check_did_you_mean_print(&dym);
+
 	}
 	return CheckMnemomic_Invalid;
 }
@@ -369,12 +377,11 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 	for (auto form : forms) {
 		int explicit_count = cast(int)form.explicit_count();
 		min_count = gb_min(min_count, explicit_count);
-		max_count = gb_max(min_count, explicit_count);
+		max_count = gb_max(max_count, explicit_count);
 	}
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
 
-	isize valid_form_index = -1;
 
 	auto valid_spots = slice_make<bool>(heap_allocator(), max_count);
 	defer (slice_free(&valid_spots, heap_allocator()));
@@ -382,16 +389,18 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 	auto possible_kinds = slice_make<AsmOperandKind>(heap_allocator(), max_count);
 	defer (slice_free(&possible_kinds, heap_allocator()));
 
-	bool ok = true;
-	for (auto form : forms) {
-		int explicit_count = cast(int)form.explicit_count();
-		min_count = gb_min(min_count, explicit_count);
-		max_count = gb_max(min_count, explicit_count);
-		if (operands.count != explicit_count) {
+	bool matched = false;
+	isize valid_form_index = -1;
+	isize best_form = -1;
+	int   best_score = -1;
+
+	for_array(form_index, forms) {
+		auto &form = forms[form_index];
+		if (operands.count != cast(int)form.explicit_count()) {
 			continue;
 		}
 
-		ok = true;
+		int score = 0;
 		for_array(i, operands) {
 			auto type = form.ops[i];
 			Operand const *operand = &operands[i];
@@ -402,32 +411,36 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 			// for partially correct forms of the instruction?
 			possible_kinds[i] = dst_kind;
 
-			if (dst_kind == src_kind) {
+			bool spot_ok = (dst_kind == src_kind) ||
+			               (dst_kind == AsmOperand_Register_Or_Memory &&
+			                (src_kind == AsmOperand_Register || src_kind == AsmOperand_Memory));
+
+			if (spot_ok) {
+				score += 1;
 				valid_spots[i] = true;
-				continue;
 			}
-			if (dst_kind == AsmOperand_Register_Or_Memory &&
-			    (src_kind == AsmOperand_Register || src_kind == AsmOperand_Memory)) {
-				valid_spots[i] = true;
-				continue;
-			}
-			ok = false;
 		}
-		if (ok) {
+		if (score == operands.count) {
 			// the result has been found to be correct
+			matched = true;
+			valid_form_index = form_index;
 			break;
+		}
+		if (score > best_score) {
+			best_score = score;
+			best_form = form_index;
 		}
 	}
 
 	if (operands.count < min_count || operands.count > max_count) {
 		if (min_count == max_count) {
-			error(instr->name, "The asm instruction '%.*s' expects %d operands, got %d", LIT(name), max_count, operands.count);
+			error(instr->name, "The asm instruction '%.*s' expects %d operands, got %td", LIT(name), max_count, operands.count);
 		} else {
-			error(instr->name, "The asm instruction '%.*s' expects %d..=%d operands, got %d", LIT(name), min_count, max_count, operands.count);
+			error(instr->name, "The asm instruction '%.*s' expects %d..=%d operands, got %td", LIT(name), min_count, max_count, operands.count);
 		}
 		return;
 	}
-	if (ok) {
+	if (matched) {
 		if (valid_form_index >= 0 && previous_prefix > 0) {
 			// TODO(bill): validate the prefix for the selected form
 		}
