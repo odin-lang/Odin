@@ -174,14 +174,14 @@ main :: proc() {
 		}
 		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
-			bit_size   := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
+			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
 			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
 			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
 			strings.write_string(&sb, " }\n")
 		}
 		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
-			bit_size   := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
+			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
 			strings.write_string(&sb, "\t\tu8   op_count      () const { ")
 			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
 			strings.write_string(&sb, " }\n")
@@ -203,8 +203,6 @@ main :: proc() {
 	strings.write_string(&sb, "\tStringMap<Mnemonic> mnemonic_map;\n")
 	strings.write_string(&sb, "\tStringMap<Prefix>   prefix_map;\n")
 	strings.write_string(&sb, "\tStringMap<Register> register_map;\n")
-	strings.write_string(&sb, "\tSlice<EncodeRun> ENCODE_RUNS;\n")
-	strings.write_string(&sb, "\tSlice<Encoding>  ENCODE_FORMS;\n")
 
 	{
 		strings.write_string(&sb, "\tbool init() {\n")
@@ -246,15 +244,16 @@ main :: proc() {
 		strings.write_string(&sb, "\t\treturn found ? *found : REG_INVALID;\n")
 	}
 	{
-		strings.write_string(&sb, "\tSlice<Encoding> encoding_forms(Mnemonic m) const {\n")
+		strings.write_string(&sb, "\tSlice<Encoding> encoding_forms(/*Mnemonic*/ u16 m) const {\n")
 		defer strings.write_string(&sb, "\t}\n")
 
-		strings.write_string(&sb, "\t\tEncodeRun r = ENCODE_RUNS[m];\n")
-		strings.write_string(&sb, "\t\treturn slice_lower_and_count(ENCODE_FORMS, r.start, r.count);\n")
+		strings.write_string(&sb, "\t\tEncodeRun r = raw_encode_runs[m];\n")
+		strings.write_string(&sb, "\t\tEncoding *ENCODE_FORMS = cast(Encoding *)raw_encode_forms;\n")
+		strings.write_string(&sb, "\t\treturn Slice<Encoding>{ENCODE_FORMS+r.start, r.count};\n")
 	}
 	{
-		strings.write_string(&sb, "\tu16 reg_class(Register r) const {\n")
-		strings.write_string(&sb, "\t\treturn 0xFF00 & cast(u16)r;\n")
+		strings.write_string(&sb, "\tu16 reg_class(/*Register*/ u16 r) const {\n")
+		strings.write_string(&sb, "\t\treturn 0xFF00 & r;\n")
 		strings.write_string(&sb, "\t}\n")
 	}
 	{

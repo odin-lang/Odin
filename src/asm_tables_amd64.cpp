@@ -229,8 +229,8 @@ struct Asm_amd64 {
 		EncodingFlags   flags;
 
 		bool has_implicit  () const { return ((flags>>21u)&1) != 0; }
-		u8   explicit_count() const { return cast(u8)((flags>>18u)&((1u<<18)-1)); }
-		u8   op_count      () const { return cast(u8)((flags>>22u)&((1u<<22)-1)); }
+		u8   explicit_count() const { return cast(u8)((flags>>18u)&((1u<<3)-1)); }
+		u8   op_count      () const { return cast(u8)((flags>>22u)&((1u<<3)-1)); }
 	};
 	#pragma pack(pop)
 	GB_STATIC_ASSERT(gb_size_of(Encoding) == 16);
@@ -248,8 +248,6 @@ struct Asm_amd64 {
 	StringMap<Mnemonic> mnemonic_map;
 	StringMap<Prefix>   prefix_map;
 	StringMap<Register> register_map;
-	Slice<EncodeRun> ENCODE_RUNS;
-	Slice<Encoding>  ENCODE_FORMS;
 	bool init() {
 		string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 		for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
@@ -277,12 +275,13 @@ struct Asm_amd64 {
 		Register *found = string_map_get(&register_map, name);
 		return found ? *found : REG_INVALID;
 	}
-	Slice<Encoding> encoding_forms(Mnemonic m) const {
-		EncodeRun r = ENCODE_RUNS[m];
-		return slice_lower_and_count(ENCODE_FORMS, r.start, r.count);
+	Slice<Encoding> encoding_forms(/*Mnemonic*/ u16 m) const {
+		EncodeRun r = raw_encode_runs[m];
+		Encoding *ENCODE_FORMS = cast(Encoding *)raw_encode_forms;
+		return Slice<Encoding>{ENCODE_FORMS+r.start, r.count};
 	}
-	u16 reg_class(Register r) const {
-		return 0xFF00 & cast(u16)r;
+	u16 reg_class(/*Register*/ u16 r) const {
+		return 0xFF00 & r;
 	}
 	// size in bits for register
 	u16 reg_size(Register r) const {
