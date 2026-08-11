@@ -59,7 +59,7 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 
 		if (!is_valid_asm_parameter_type(type)) {
 			gbString s = type_to_string(type);
-			error(field->type, "Invalid type for an asm template. It must be an integer, float, boolean, pointer, multi-pointer, or #simd vector, got '%s'", type);
+			error(field->type, "Invalid type for an asm template. It must be an integer, float, boolean, pointer, multi-pointer, or #simd vector, got '%s'", s);
 			gb_string_free(s);
 			continue;
 		}
@@ -171,8 +171,6 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 
 		Entity *input = scope_lookup(scope, spec->name->Ident.interned, spec->name->Ident.hash);
 
-		bool must_check_value = false;
-
 		String pin = {};
 		if (spec->value != nullptr) {
 			if (spec->value->kind != Ast_AsmRegister) {
@@ -189,7 +187,7 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 			}
 			if (pin.len != 0) {
 				if (string_set_update(&pin_set, pin)) {
-					error(spec->value, "Pinned register %%%.*s has already be assigned", LIT(pin));
+					error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
 				}
 			}
 		}
@@ -283,9 +281,6 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 
 			i->pin = pin;
 			o->pin = pin;
-
-
-			must_check_value = true;
 		}
 	}
 }
@@ -321,9 +316,9 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u1
 
 	ERROR_BLOCK();
 	if (instr->operands.count == 0) {
-		error(instr->name, "Unknown mnemonic/prefix for this target platform: %%%.*s", LIT(name));
+		error(instr->name, "Unknown mnemonic/prefix for this target platform: %.*s", LIT(name));
 	} else {
-		error(instr->name, "Unknown mnemonic for this target platform: %%%.*s", LIT(name));
+		error(instr->name, "Unknown mnemonic for this target platform: %.*s", LIT(name));
 
 	}
 	auto dym = did_you_mean_make(heap_allocator(), g_asm_amd64.MNEMONIC_COUNT, name);
@@ -411,16 +406,11 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 		for_array(i, operands) {
 			auto type = form.ops[i];
 			Operand const *operand = &operands[i];
-			AsmOperandKind dst_kind = g_asm_amd64.kind_from_operand_type(type);
-			AsmOperandKind src_kind = determine_asm_operand_kind(operand);
+			AsmOperandKind dst = g_asm_amd64.kind_from_operand_type(type);
+			AsmOperandKind src = determine_asm_operand_kind(operand);
 
-			// TODO(bill): Is this even correct logic for determine the best error message for the possible operand kinds?
-			// for partially correct forms of the instruction?
-			possible_kinds[i] = dst_kind;
-
-			bool spot_ok = (dst_kind == src_kind) ||
-			               (dst_kind == AsmOperand_Register_Or_Memory &&
-			                (src_kind == AsmOperand_Register || src_kind == AsmOperand_Memory));
+			bool spot_ok = (dst == src) ||
+			               (dst == AsmOperand_Register_Or_Memory && (src == AsmOperand_Register || src == AsmOperand_Memory));
 
 			if (spot_ok) {
 				score += 1;
@@ -455,8 +445,20 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 		return;
 	}
 
+	// failure path
+	if (best_form >= 0) {
+		auto &form = forms[best_form];
+		for_array(i, operands) {
+			AsmOperandKind dst = g_asm_amd64.kind_from_operand_type(form.ops[i]);
+			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
+			possible_kinds[i] = dst;
+			valid_spots[i] = (dst == src) ||
+			                 (dst == AsmOperand_Register_Or_Memory && (src == AsmOperand_Register || src == AsmOperand_Memory));
+		}
+	}
+
 	{
-		error(instr->name, "The operands to '%.*s' matched non of the expected encoding forms", LIT(name));
+		error(instr->name, "The operands to '%.*s' matched none of the expected encoding forms", LIT(name));
 		for_array(i, valid_spots) {
 			if (!valid_spots[i] && i < operands.count) {
 				auto kind = possible_kinds[i];
@@ -529,14 +531,14 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 				Entity *param_entity = entity_of_node(base.expr);
 				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
 					gbString s = expr_to_string(base.expr);
-					error(base.expr, "A base value must a memory parameter, got %s", s);
+					error(base.expr, "A base value must be a memory parameter, got %s", s);
 					gb_string_free(s);
 					break;
 				}
 				auto kind = check_asm_find_kind(param_entity, ate->decls);
 				if (kind != AsmTemplateEntityDecl_Memory) {
 					gbString s = expr_to_string(base.expr);
-					error(base.expr, "A scale must be a memory parameter, got %s", s);
+					error(base.expr, "A base value must be a memory parameter, got %s", s);
 					gb_string_free(s);
 					break;
 				}
