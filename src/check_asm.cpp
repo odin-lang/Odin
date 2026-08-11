@@ -755,10 +755,19 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 			AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
 
 			if (m == AsmMismatch_ImmRange) {
-				gbString vs = exact_value_to_string(operands[i].value);
-				error(operands[i].expr,
-				      "Operand %td of '%.*s' is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
-				      i, LIT(name), vs, cast(int)want_bits[i]);
+				ExactValue ev = operands[i].value;
+				gbString vs = exact_value_to_string(ev);
+				i32 bits_required = 0;
+				check_asm_immediate_value_fits(ev, want_bits[i], &bits_required, nullptr);
+				if (bits_required > 0) {
+					error(operands[i].expr,
+					      "Operand %td of '%.*s' is a %d-bit immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
+					      i, LIT(name), bits_required, vs, cast(int)want_bits[i]);
+				} else {
+					error(operands[i].expr,
+					      "Operand %td of '%.*s' is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
+					      i, LIT(name), vs, cast(int)want_bits[i]);
+				}
 				gb_string_free(vs);
 			} else if (m == AsmMismatch_ImmType) {
 				error(operands[i].expr,
