@@ -320,7 +320,7 @@ main :: proc() {
 
 	strings.write_string(&sb, "\n\n\n")
 
-	fmt.sbprintf(&sb, "gb_internal Asm_{0:s} g_asm_{0:s};\n", ISA_NAME)
+	fmt.sbprintf(&sb, "gb_global Asm_{0:s} g_asm_{0:s};\n", ISA_NAME)
 
 	strings.write_string(&sb, "\n\n\n")
 

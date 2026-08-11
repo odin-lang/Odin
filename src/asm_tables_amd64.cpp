@@ -341,7 +341,7 @@ struct Asm_amd64 {
 
 
 
-gb_internal Asm_amd64 g_asm_amd64;
+gb_global Asm_amd64 g_asm_amd64;
 
 
 

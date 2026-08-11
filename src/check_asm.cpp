@@ -379,6 +379,9 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 	auto valid_spots = slice_make<bool>(heap_allocator(), max_count);
 	defer (slice_free(&valid_spots, heap_allocator()));
 
+	auto possible_kinds = slice_make<AsmOperandKind>(heap_allocator(), max_count);
+	defer (slice_free(&possible_kinds, heap_allocator()));
+
 	bool ok = true;
 	for (auto form : forms) {
 		int explicit_count = cast(int)form.explicit_count();
@@ -394,6 +397,11 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 			Operand const *operand = &operands[i];
 			AsmOperandKind dst_kind = g_asm_amd64.kind_from_operand_type(type);
 			AsmOperandKind src_kind = determine_asm_operand_kind(operand);
+
+			// TODO(bill): Is this even correct logic for determine the best error message for the possible operand kinds?
+			// for partially correct forms of the instruction?
+			possible_kinds[i] = dst_kind;
+
 			if (dst_kind == src_kind) {
 				valid_spots[i] = true;
 				continue;
@@ -404,7 +412,6 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 				continue;
 			}
 			ok = false;
-			break;
 		}
 		if (ok) {
 			// the result has been found to be correct
@@ -432,7 +439,12 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 		error(instr->name, "The operands to '%.*s' matched non of the expected encoding forms", LIT(name));
 		for_array(i, valid_spots) {
 			if (!valid_spots[i] && i < operands.count) {
-				error(operands[i].expr, "Invalid operand kind for the asm instruction '%.*s'", LIT(name));
+				auto kind = possible_kinds[i];
+				if (kind) {
+					error(operands[i].expr, "Invalid operand kind for the asm instruction '%.*s', expected %.*s operand", LIT(name), LIT(asm_operand_kind_expected_strings[kind]));
+				} else {
+					error(operands[i].expr, "Invalid operand kind for the asm instruction '%.*s'", LIT(name));
+				}
 			}
 		}
 	}
