@@ -321,3 +321,4 @@ CMakeLists.txt
 sandbox/
 
 vendor/box3d/lib/box3d_wasm.o
+vendor/box3d/lib/box3d_wasm_threads.o

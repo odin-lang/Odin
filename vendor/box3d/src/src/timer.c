@@ -607,13 +607,21 @@ void b3Sleep( int milliseconds )
 
 typedef struct b3Mutex
 {
+#if defined( __wasm_atomics__ )
+	int state;
+#else
 	int dummy;
+#endif
 } b3Mutex;
 
 b3Mutex* b3CreateMutex( void )
 {
 	b3Mutex* m = b3Alloc( sizeof( b3Mutex ) );
+#if defined( __wasm_atomics__ )
+	__atomic_store_n( &m->state, 0, __ATOMIC_RELAXED );
+#else
 	m->dummy = 42;
+#endif
 	return m;
 }
 
@@ -625,12 +633,22 @@ void b3DestroyMutex( b3Mutex* m )
 
 void b3LockMutex( b3Mutex* m )
 {
+#if defined( __wasm_atomics__ )
+	while ( __atomic_exchange_n( &m->state, 1, __ATOMIC_ACQUIRE ) != 0 )
+	{
+	}
+#else
 	(void)m;
+#endif
 }
 
 void b3UnlockMutex( b3Mutex* m )
 {
+#if defined( __wasm_atomics__ )
+	__atomic_store_n( &m->state, 0, __ATOMIC_RELEASE );
+#else
 	(void)m;
+#endif
 }
 
 typedef struct b3Semaphore
