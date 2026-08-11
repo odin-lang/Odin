@@ -1764,49 +1764,53 @@ namespace lbAbiRiscv64 {
 		// Flatten down the type so it is easier to check all the ABI conditions.
 		// Note that we also need to remove all implicit padding fields Odin adds so we keep ABI
 		// compatibility for struct declarations.
+		// The flattened form is for the floating-point rules, which are about the MEMBERS; the
+		// integer fallback below is about the OBJECT, so `size` stays the size of the original.
+		LLVMTypeRef  fp_type = type;
+		LLVMTypeKind fp_kind = kind;
+		i64          fp_size = size;
 		if (kind == LLVMStructTypeKind && size <= gb_max(2*xlen, 2*flen)) {
 			Array<LLVMTypeRef> fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, LLVMCountStructElementTypes(type));
 			flatten(m, &fields, type, false);
 
 			if (fields.count == 1) {
-				type = fields[0];
+				fp_type = fields[0];
 			} else {
-				type = LLVMStructTypeInContext(c, fields.data, cast(unsigned)fields.count, false);
+				fp_type = LLVMStructTypeInContext(c, fields.data, cast(unsigned)fields.count, false);
 			}
 
-			kind = LLVMGetTypeKind(type);
-			size = lb_sizeof(type);
-			GB_ASSERT_MSG(size == lb_sizeof(orig_type), "flattened: %s of size %d, original: %s of size %d", LLVMPrintTypeToString(type), size, LLVMPrintTypeToString(orig_type), lb_sizeof(orig_type));
+			fp_kind = LLVMGetTypeKind(fp_type);
+			fp_size = lb_sizeof(fp_type);
 		}
 
-		if (is_float(type) && size <= flen && *fprs_left >= 1) {
+		if (is_float(fp_type) && fp_size <= flen && *fprs_left >= 1) {
 			*fprs_left -= 1;
 			return non_struct(c, orig_type);
 		}
 
-		if (kind == LLVMStructTypeKind && size <= 2*flen) {
-			unsigned elem_count = LLVMCountStructElementTypes(type);
+		if (fp_kind == LLVMStructTypeKind && fp_size <= 2*flen) {
+			unsigned elem_count = LLVMCountStructElementTypes(fp_type);
 			if (elem_count == 2) {
-				LLVMTypeRef ty1 = LLVMStructGetTypeAtIndex(type, 0);
+				LLVMTypeRef ty1 = LLVMStructGetTypeAtIndex(fp_type, 0);
 				i64 ty1s = lb_sizeof(ty1);
-				LLVMTypeRef ty2 = LLVMStructGetTypeAtIndex(type, 1);
+				LLVMTypeRef ty2 = LLVMStructGetTypeAtIndex(fp_type, 1);
 				i64 ty2s = lb_sizeof(ty2);
 
 				if (is_float(ty1) && is_float(ty2) && ty1s <= flen && ty2s <= flen && *fprs_left >= 2) {
 					*fprs_left -= 2;
-					return lb_arg_type_direct(orig_type, type, nullptr, nullptr);
+					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
 
 				if (is_float(ty1) && is_register(ty2) && ty1s <= flen && ty2s <= xlen && *fprs_left >= 1 && *gprs_left >= 1) {
 					*fprs_left -= 1;
 					*gprs_left -= 1;
-					return lb_arg_type_direct(orig_type, type, nullptr, nullptr);
+					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
 
 				if (is_register(ty1) && is_float(ty2) && ty1s <= xlen && ty2s <= flen && *gprs_left >= 1 && *fprs_left >= 1) {
 					*fprs_left -= 1;
 					*gprs_left -= 1;
-					return lb_arg_type_direct(orig_type, type, nullptr, nullptr);
+					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
 			}
 		}
