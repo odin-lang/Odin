@@ -2694,10 +2694,9 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
-	String path = concatenate3_strings(permanent_allocator(),
+	String path = concatenate_strings(permanent_allocator(),
 		build_context.build_paths[BuildPath_Output].basename,
-		STR_LIT("/"),
-		build_context.build_paths[BuildPath_Output].name
+		STR_LIT("/")
 	);
 
 	GB_ASSERT(m->module_name != nullptr);
