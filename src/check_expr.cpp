@@ -8217,7 +8217,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	TypeTuple *tuple = get_record_polymorphic_params(original_type);
 	if (tuple == nullptr) {
-		error(call, "No params are expected!");
+		error(call, "Type '%s' does not expect any polymorphic parameters",type_to_string(operand->type));
 		err = CallArgumentError_TooManyArguments;
 		return err;
 	}
