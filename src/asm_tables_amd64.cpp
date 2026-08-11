@@ -386,6 +386,7 @@ struct Asm_amd64 {
 		case OP_IMM64: return 64;
 		case OP_REL8:  return 8;
 		case OP_REL32: return 32;
+		case OP_IMM8SX: return 8;
 		}
 		return 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.
 	}

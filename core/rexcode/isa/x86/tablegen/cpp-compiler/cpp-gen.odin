@@ -367,6 +367,7 @@ main :: proc() {
 		strings.write_string(&sb, "\t\tcase OP_IMM64: return 64;\n")
 		strings.write_string(&sb, "\t\tcase OP_REL8:  return 8;\n")
 		strings.write_string(&sb, "\t\tcase OP_REL32: return 32;\n")
+		strings.write_string(&sb, "\t\tcase OP_IMM8SX: return 8;\n")
 		strings.write_string(&sb, "\t\t}\n")
 		strings.write_string(&sb, "\t\treturn 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.\n")
 		strings.write_string(&sb, "\t}\n")

@@ -133,6 +133,9 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	AsmOperandKind slot_kind = asm_ctx->kind_from_operand_type(slot);
 	if (slot_kind == AsmOperand_Immediate) {
 		i32 want_w = asm_ctx->operand_type_bit_width(slot);   // 32 for OP_IMM32
+		if (want_w == 0) {
+			GB_PANIC("HERE: %d", slot);
+		}
 		if (want_bits_) *want_bits_ = want_w;
 		if (operand->mode != Addressing_Constant) {
 			return true;   // $-immediate, bound per instantiation; defer
@@ -609,10 +612,13 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 	auto possible_kinds = slice_make<AsmOperandKind>(heap_allocator(), max_count);
 	defer (slice_free(&possible_kinds, heap_allocator()));
 
-	bool matched = false;
+	bool  matched          = false;
 	isize valid_form_index = -1;
-	isize best_form = -1;
+
+	isize best_form  = -1;
 	int   best_score = -1;
+	int   best_dist  = I32_MAX; // secondary: prefer smaller width distance
+	int   best_pref  = -1;      // tertiary: prefer wider slots (r64 over r32)
 
 	for_array(form_index, forms) {
 		auto &form = forms[form_index];
@@ -620,7 +626,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 			continue;
 		}
 
-		int score = 0;
+		int score      = 0;
+		int width_dist = 0;
+		int width_pref = 0;
+
 		for_array(i, operands) {
 			int slot = asm_ctx->form_explicit_slot(form, cast(int)i);
 			auto type = (slot >= 0) ? form.ops[slot] : asm_ctx->OP_NONE;
@@ -631,31 +640,53 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 			bool kind_ok = (dst == src) ||
 			               (dst == AsmOperand_Register_Or_Memory && (src == AsmOperand_Register || src == AsmOperand_Memory));
 
+			// Tertiary key: bias toward wider register slots so an r64 form outranks
+			// an otherwise-equal r32 form.
+			width_pref += cast(int)asm_ctx->operand_type_bit_width(type);
+
 			bool spot_ok = false;
 			if (kind_ok) {
 				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory) {
-					spot_ok = true; // memory form accepts memory; skip size check
+					spot_ok = true; // memory form accepts memory; no size check
 				} else {
-					spot_ok = check_asm_operand_size_class(asm_ctx, type, operand, nullptr, nullptr, nullptr);
+					AsmMismatch m = AsmMismatch_None;
+					i32 wb_ = 0, gb_ = 0;
+					spot_ok = check_asm_operand_size_class(asm_ctx, type, operand, &m, &wb_, &gb_);
+					if (!spot_ok && (m == AsmMismatch_Size || m == AsmMismatch_ImmRange) && wb_ > 0 && gb_ > 0) {
+						int d = cast(int)wb_ - cast(int)gb_;
+						width_dist += (d < 0) ? -d : d;
+					}
 				}
 			}
 
 			if (spot_ok) {
-				score += 2;          // full match
+				score += 2;
 				valid_spots[i] = true;
 			} else if (kind_ok) {
-				score += 1;          // kind matched, only value/size/class failed -> better near-miss
+				score += 1; // kind matched, only value/size/class failed
 			}
 		}
-		if (score == operands.count*2) {
-			// the result has been found to be correct
+
+		if (score == operands.count * 2) {
 			matched = true;
 			valid_form_index = form_index;
 			break;
 		}
-		if (score > best_score) {
+
+		// Lexicographic rank: score desc, then width_dist asc, then width_pref desc.
+		bool better;
+		if (score != best_score) {
+			better = score > best_score;
+		} else if (width_dist != best_dist) {
+			better = width_dist < best_dist;
+		} else {
+			better = width_pref > best_pref;
+		}
+		if (better) {
 			best_score = score;
-			best_form = form_index;
+			best_dist  = width_dist;
+			best_pref  = width_pref;
+			best_form  = form_index;
 		}
 	}
 
