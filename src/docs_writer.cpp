@@ -890,6 +890,9 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		}
 		break;
 	case Entity_Constant:
+		if (init_expr == nullptr) {
+			init_expr = e->Constant.init_expr;
+		}
 		field_group_index = e->Constant.field_group_index;
 		break;
 	case Entity_Procedure:

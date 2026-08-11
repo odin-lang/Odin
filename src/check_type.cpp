@@ -1009,6 +1009,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		e->Constant.flags |= entity_flags;
 		e->Constant.docs = docs;
 		e->Constant.comment = comment;
+		e->Constant.init_expr = init;
 
 		auto interned = entity_interned_name(e);
 
