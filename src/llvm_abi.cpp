@@ -1738,6 +1738,13 @@ namespace lbAbiRiscv64 {
 		}
 	}
 
+	// The psABI's rule is "one floating-point real and one integer (or bitfield)", and a pointer
+	// is not an integer. `is_register` admits pointers and keeps that meaning for its other
+	// callers, so the floating-point arms need their own predicate.
+	gb_internal bool is_int_member(LLVMTypeRef type) {
+		return LLVMGetTypeKind(type) == LLVMIntegerTypeKind && lb_sizeof(type) > 0;
+	}
+
 	gb_internal lbArgType compute_arg_type(lbModule *m, LLVMTypeRef type, int *gprs_left, int *fprs_left, Type *odin_type) {
 		LLVMContextRef c = m->ctx;
 
@@ -1808,13 +1815,13 @@ namespace lbAbiRiscv64 {
 					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
 
-				if (is_float(ty1) && is_register(ty2) && ty1s <= flen && ty2s <= xlen && *fprs_left >= 1 && *gprs_left >= 1) {
+				if (is_float(ty1) && is_int_member(ty2) && ty1s <= flen && ty2s <= xlen && *fprs_left >= 1 && *gprs_left >= 1) {
 					*fprs_left -= 1;
 					*gprs_left -= 1;
 					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
 
-				if (is_register(ty1) && is_float(ty2) && ty1s <= xlen && ty2s <= flen && *gprs_left >= 1 && *fprs_left >= 1) {
+				if (is_int_member(ty1) && is_float(ty2) && ty1s <= xlen && ty2s <= flen && *gprs_left >= 1 && *fprs_left >= 1) {
 					*fprs_left -= 1;
 					*gprs_left -= 1;
 					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
