@@ -37,3 +37,7 @@ gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
 };
 
 #include "asm_tables_amd64.cpp"
+
+void init_asm_tables() {
+	g_asm_amd64.init();
+}

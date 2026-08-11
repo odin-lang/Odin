@@ -365,6 +365,27 @@ main :: proc() {
 		strings.write_string(&sb, "\t\treturn 0; // OP_M (sizeless), OP_IMM*, OP_REL*, OP_K (opmask width is data-dependent), etc.\n")
 		strings.write_string(&sb, "\t}\n")
 	}
+	strings.write_string(&sb, "\n")
+	{
+		strings.write_string(&sb, "\tint form_explicit_slot(Encoding const &form, int explicit_index) {\n")
+		strings.write_string(&sb, "\t\tint seen = 0;\n")
+		strings.write_string(&sb, "\t\tfor (int j = 0; j < gb_count_of(form.ops); j++) {\n")
+		strings.write_string(&sb, "\t\t\tauto t = form.ops[j];\n")
+		strings.write_string(&sb, "\t\t\tif (!t) {\n")
+		strings.write_string(&sb, "\t\t\t\tbreak;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\t\tif (operand_type_is_implicit(t)) {\n")
+		strings.write_string(&sb, "\t\t\t\tcontinue;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\t\tif (seen == explicit_index) {\n")
+		strings.write_string(&sb, "\t\t\t\treturn j;\n")
+		strings.write_string(&sb, "\t\t\t}\n")
+		strings.write_string(&sb, "\t\t\tseen += 1;\n")
+		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t\treturn -1;\n")
+		strings.write_string(&sb, "\t}\n")
+
+	}
 
 
 	strings.write_string(&sb, "};\n")

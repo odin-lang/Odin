@@ -382,6 +382,24 @@ struct Asm_amd64 {
 		}
 		return 0; // OP_M (sizeless), OP_IMM*, OP_REL*, OP_K (opmask width is data-dependent), etc.
 	}
+
+	int form_explicit_slot(Encoding const &form, int explicit_index) {
+		int seen = 0;
+		for (int j = 0; j < gb_count_of(form.ops); j++) {
+			auto t = form.ops[j];
+			if (!t) {
+				break;
+			}
+			if (operand_type_is_implicit(t)) {
+				continue;
+			}
+			if (seen == explicit_index) {
+				return j;
+			}
+			seen += 1;
+		}
+		return -1;
+	}
 };
 
 

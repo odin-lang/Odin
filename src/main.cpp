@@ -4314,9 +4314,7 @@ int main(int arg_count, char const **arg_ptr) {
 	bool failed_to_cache_parsing = false;
 
 	TIME_SECTION("init asm tables");
-	{
-		g_asm_amd64.init();
-	}
+	init_asm_tables();
 
 	MAIN_TIME_SECTION("parse files");
 

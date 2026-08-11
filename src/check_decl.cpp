@@ -2065,7 +2065,11 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 			break;
 
 		case Entity_AsmTemplate:
-			check_asm_template(&c, e, d);
+			if (build_context.metrics.arch == TargetArch_amd64) {
+				check_asm_template(&g_asm_amd64, &c, e, d);
+			} else {
+				error(e->token, "asm templates are not currently supported for this target");
+			}
 			break;
 		}
 

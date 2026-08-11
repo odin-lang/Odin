@@ -14,26 +14,6 @@ gb_internal i32 check_asm_operand_bit_width(Type *type) {
 	return cast(i32)(sz * 8);
 }
 
-// Map the user's explicit operand index -> index into form.ops[], skipping implicit slots.
-// Returns -1 if there is no such explicit slot (shouldn't happen once explicit_count matches).
-gb_internal int asm_form_explicit_slot(Asm_amd64::Encoding const &form, int explicit_index) {
-	int seen = 0;
-	for (int j = 0; j < gb_count_of(form.ops); j++) {
-		auto t = form.ops[j];
-		if (!t) {
-			break;
-		}
-		if (g_asm_amd64.operand_type_is_implicit(t)) {
-			continue;
-		}
-		if (seen == explicit_index) {
-			return j;
-		}
-		seen += 1;
-	}
-	return -1;
-}
-
 gb_internal bool is_valid_asm_parameter_type(Type *type) {
 	if (is_type_integer(type)) {
 		return true;
@@ -73,13 +53,19 @@ gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type) {
 }
 
 
+enum AsmMismatch : u8 {
+	AsmMismatch_None,
+	AsmMismatch_Size,
+	AsmMismatch_Class,
+};
+
 // Returns true if the operand's Odin type is size/class-compatible with the form's slot.
-// On mismatch, fills *reason (static string) for a precise diagnostic. `type` here is the
+// On mismatch, fills *mismatch_ for a precise diagnostic. `slot` here is the
 // resolved OperandType at the correct (implicit-skipped) slot.
-template <typename T>
-gb_internal bool check_asm_operand_size_class(T *asm_ctx, typename T::OperandType slot, Operand const *operand,
-                                              String *reason_, i32 *want_bits_, i32 *got_bits_) {
-	if (reason_) *reason_ = {};
+template <typename AsmCtx>
+gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot, Operand const *operand,
+                                              AsmMismatch *mismatch_, i32 *want_bits_, i32 *got_bits_) {
+	if (mismatch_) *mismatch_ = AsmMismatch_None;
 	// Only register/memory-sized slots constrain width & class. Immediates/labels/sizeless-mem: skip here.
 	AsmRegClass want_class = asm_ctx->operand_type_reg_class(slot);
 	i32         want_w     = asm_ctx->operand_type_bit_width(slot);
@@ -89,13 +75,8 @@ gb_internal bool check_asm_operand_size_class(T *asm_ctx, typename T::OperandTyp
 		return true;
 	}
 
-	AsmRegClass got_class = AsmRegClass_Unknown;
-	i32         got_w = 0;
-	if (operand->expr->kind == Ast_AsmRegister) {
-
-	}
-	got_class = check_asm_reg_class_from_type(operand->type);
-	got_w     = check_asm_operand_bit_width(operand->type);
+	AsmRegClass got_class = check_asm_reg_class_from_type(operand->type);
+	i32         got_w     = check_asm_operand_bit_width(operand->type);
 	if (got_w < 0) {
 		// TODO(bill): determine the correct width from the untyped constant value
 		got_w = want_w;
@@ -123,14 +104,14 @@ gb_internal bool check_asm_operand_size_class(T *asm_ctx, typename T::OperandTyp
 		}
 
 		if (!class_ok) {
-			if (reason_) *reason_ = str_lit("register class");
+			if (mismatch_) *mismatch_ = AsmMismatch_Class;
 			return false;
 		}
 	}
 
 	// Width check (only when the slot pins a width and we could size the type).
 	if (want_w != 0 && got_w != 0 && want_w != got_w) {
-		if (reason_) *reason_ = str_lit("size");
+		if (mismatch_) *mismatch_ = AsmMismatch_Size;
 		return false;
 	}
 	return true;
@@ -385,12 +366,21 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 	}
 }
 
-gb_internal bool check_register(Operand *operand, AstAsmRegister *asm_reg) {
+template <typename AsmCtx>
+gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegister *asm_reg) {
 	String name = asm_reg->name.string;
-	auto r = g_asm_amd64.register_lookup(name);
+	auto r = asm_ctx->register_lookup(name);
 	if (r) {
 		operand->mode = Addressing_Value;
-		u16 width_in_bits = g_asm_amd64.reg_size(r);
+
+		u16 reg_class = asm_ctx->reg_class(r);
+		if (reg_class == asm_ctx->REG_CLASS_K) {
+			// Opmask register: classify as a mask, not a 64-bit integer.
+			// operand->type = t_asm_mask; // see note if this type does not yet exist
+			// return true;
+		}
+
+		u16 width_in_bits = asm_ctx->reg_size(r);
 		switch (width_in_bits) {
 		case 8:
 			operand->type = t_u8;
@@ -433,14 +423,15 @@ enum CheckMnemomicResult {
 	CheckMnemomic_Prefix,
 };
 
-gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u16 *mnemonic_) {
+template <typename AsmCtx>
+gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_) {
 	String name = instr->name->Ident.token.string;
-	auto m = g_asm_amd64.mnemonic_lookup(name);
+	auto m = asm_ctx->mnemonic_lookup(name);
 	if (m) {
 		if (mnemonic_) *mnemonic_ = cast(u16)m;
 		return CheckMnemomic_Mnemonic;
 	}
-	auto p = g_asm_amd64.prefix_lookup(name);
+	auto p = asm_ctx->prefix_lookup(name);
 	if (p) {
 		if (mnemonic_) *mnemonic_ = cast(u16)p;
 		return CheckMnemomic_Prefix;
@@ -453,15 +444,15 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u1
 		error(instr->name, "Unknown mnemonic for this target platform: %.*s", LIT(name));
 
 	}
-	auto dym = did_you_mean_make(heap_allocator(), g_asm_amd64.MNEMONIC_COUNT, name);
+	auto dym = did_you_mean_make(heap_allocator(), asm_ctx->MNEMONIC_COUNT, name);
 	defer (did_you_mean_destroy(&dym));
-	for (u16 i = g_asm_amd64.M_INVALID+1; i < g_asm_amd64.MNEMONIC_COUNT; i++) {
-		String str = g_asm_amd64.mnemonic_strings[i];
+	for (u16 i = asm_ctx->M_INVALID+1; i < asm_ctx->MNEMONIC_COUNT; i++) {
+		String str = asm_ctx->mnemonic_strings[i];
 		did_you_mean_append(&dym, str);
 	}
 	if (instr->operands.count == 0) {
-		for (u16 i = g_asm_amd64.PREFIX_INVALID+1; i < g_asm_amd64.PREFIX_COUNT; i++) {
-			String str = g_asm_amd64.prefix_strings[i];
+		for (u16 i = asm_ctx->PREFIX_INVALID+1; i < asm_ctx->PREFIX_COUNT; i++) {
+			String str = asm_ctx->prefix_strings[i];
 			did_you_mean_append(&dym, str);
 		}
 	}
@@ -500,10 +491,11 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 }
 
 
-gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands, u8 previous_prefix) {
+template <typename AsmCtx>
+gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands, u8 previous_prefix) {
 	GB_ASSERT(mnemonic > 0);
-	auto forms = g_asm_amd64.encoding_forms(mnemonic);
-	String name = g_asm_amd64.mnemonic_strings[mnemonic];
+	auto forms = asm_ctx->encoding_forms(mnemonic);
+	String name = asm_ctx->mnemonic_strings[mnemonic];
 
 	int min_count = I32_MAX;
 	int max_count = -1;
@@ -536,9 +528,10 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 
 		int score = 0;
 		for_array(i, operands) {
-			auto type = form.ops[i];
+			int slot = asm_ctx->form_explicit_slot(form, cast(int)i);
+			auto type = (slot >= 0) ? form.ops[slot] : asm_ctx->OP_NONE;
 			Operand const *operand = &operands[i];
-			AsmOperandKind dst = g_asm_amd64.kind_from_operand_type(type);
+			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(operand);
 
 			bool kind_ok = (dst == src) ||
@@ -550,7 +543,7 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory) {
 					// No need to do an extra size class check, it accepts memory
 				} else {
-					spot_ok = check_asm_operand_size_class(&g_asm_amd64, type, operand, nullptr, nullptr, nullptr);
+					spot_ok = check_asm_operand_size_class(asm_ctx, type, operand, nullptr, nullptr, nullptr);
 				}
 			}
 
@@ -589,15 +582,15 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 
 	// failure path
 	enum { MAX_VARIANT_COUNT = 32 };
-	String mismatch_reason[MAX_VARIANT_COUNT] = {}; // parallels valid_spots for the best form
-	i32    want_bits[MAX_VARIANT_COUNT] = {};
-	i32    got_bits[MAX_VARIANT_COUNT]  = {};
+	AsmMismatch mismatch[MAX_VARIANT_COUNT] = {}; // parallels valid_spots for the best form
+	i32         want_bits[MAX_VARIANT_COUNT] = {};
+	i32         got_bits[MAX_VARIANT_COUNT]  = {};
 	if (best_form >= 0) {
 		auto &form = forms[best_form];
 		for_array(i, operands) {
-			int slot = asm_form_explicit_slot(form, cast(int)i);
-			Asm_amd64::OperandType type = (slot >= 0) ? form.ops[slot] : Asm_amd64::OP_NONE;
-			AsmOperandKind dst = g_asm_amd64.kind_from_operand_type(type);
+			int slot = asm_ctx->form_explicit_slot(form, cast(int)i);
+			auto type = (slot >= 0) ? form.ops[slot] : asm_ctx->OP_NONE;
+			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
 			possible_kinds[i] = dst;
 
@@ -606,13 +599,13 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 			if (!kind_ok) {
 				valid_spots[i] = false;
 			} else {
-				String reason = {};
+				AsmMismatch m = AsmMismatch_None;
 				i32 wb_ = 0;
 				i32 gb_ = 0;
-				bool ok = check_asm_operand_size_class(&g_asm_amd64, type, &operands[i], &reason, &wb_, &gb_);
+				bool ok = check_asm_operand_size_class(asm_ctx, type, &operands[i], &m, &wb_, &gb_);
 				valid_spots[i] = ok;
 				if (!ok && i < MAX_VARIANT_COUNT) {
-					mismatch_reason[i] = reason;
+					mismatch[i]  = m;
 					want_bits[i] = wb_;
 					got_bits[i]  = gb_;
 				}
@@ -629,17 +622,14 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 			auto dst = possible_kinds[i];
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
 
-			String reason = {};
-			if (i < MAX_VARIANT_COUNT) {
-				reason = mismatch_reason[i];
-			}
+			AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
 
-			if (reason == "size" && want_bits[i] && got_bits[i]) {
+			if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
 				// dst kind was right, width was wrong
 				error(operands[i].expr,
 				      "Operand %td of '%.*s' has the wrong size: expected a %u-bit operand, got %u-bit",
 				      i, LIT(name), cast(unsigned)want_bits[i], cast(unsigned)got_bits[i]);
-			} else if (reason == "register class") {
+			} else if (m == AsmMismatch_Class) {
 				error(operands[i].expr,
 				      "Operand %td of '%.*s' is in the wrong register class, expected %.*s operand, got %.*s",
 				      i, LIT(name), LIT(asm_operand_kind_expected_strings[dst]), LIT(asm_operand_kind_expected_strings[src]));
@@ -655,8 +645,8 @@ gb_internal void check_mnemonic(CheckerContext *ctx, AstAsmInstruction *instr, u
 }
 
 
-
-gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *entity, Operand *operand, Ast *expr, bool allow_memory_operands) {
+template <typename AsmCtx>
+gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, Operand *operand, Ast *expr, bool allow_memory_operands) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -690,7 +680,7 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 		return;
 	case_end;
 	case_ast_node(asm_reg, AsmRegister, expr);
-		check_register(operand, asm_reg);
+		check_register(asm_ctx, operand, asm_reg);
 		return;
 	case_end;
 	case_ast_node(mem_op, AsmMemoryOperand, expr);
@@ -705,14 +695,14 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 		Operand index = {};
 		Operand scale = {};
 		Operand disp  = {};
-		check_asm_instruction_operand(ctx, entity, &base,  mem_op->base,  false);
-		check_asm_instruction_operand(ctx, entity, &index, mem_op->index, false);
-		check_asm_instruction_operand(ctx, entity, &scale, mem_op->scale, false);
-		check_asm_instruction_operand(ctx, entity, &disp,  mem_op->disp,  false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &base,  mem_op->base,  false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &index, mem_op->index, false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &scale, mem_op->scale, false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &disp,  mem_op->disp,  false);
 
 		for (int i = 0; base.expr && i == 0; i++) {
 			if (base.expr->kind == Ast_AsmRegister) {
-				check_register(&base, &base.expr->AsmRegister);
+				check_register(asm_ctx, &base, &base.expr->AsmRegister);
 			} else {
 				Entity *param_entity = entity_of_node(base.expr);
 				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
@@ -733,7 +723,7 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 
 		for (int i = 0; index.expr && i == 0; i++) {
 			if (index.expr->kind == Ast_AsmRegister) {
-				check_register(&index, &index.expr->AsmRegister);
+				check_register(asm_ctx, &index, &index.expr->AsmRegister);
 			} else {
 				Entity *param_entity = entity_of_node(index.expr);
 				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
@@ -793,7 +783,7 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 
 		for (int i = 0; disp.expr && i == 0; i++) {
 			if (disp.expr->kind == Ast_AsmRegister) {
-				check_register(&disp, &disp.expr->AsmRegister);
+				check_register(asm_ctx, &disp, &disp.expr->AsmRegister);
 			} else {
 				Entity *param_entity = entity_of_node(disp.expr);
 				if (disp.mode == Addressing_Constant) {
@@ -850,7 +840,8 @@ gb_internal void check_asm_instruction_operand(CheckerContext *ctx, Entity *enti
 }
 
 
-gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInfo *d) {
+template <typename AsmCtx>
+gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, DeclInfo *d) {
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
 	auto *ate = &entity->AsmTemplate;
 
@@ -894,7 +885,7 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 			case_ast_node(asm_reg, AsmRegister, clobber->value)
 				String reg = asm_reg->name.string;
 				Operand operand = {};
-				if (check_register(&operand, asm_reg)) {
+				if (check_register(asm_ctx, &operand, asm_reg)) {
 					if (string_set_update(&reg_set, reg)) {
 						error(clobber->value, "#clobber %%%.*s has already been defined", LIT(reg));
 					}
@@ -962,14 +953,14 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 			GB_ASSERT(instr->name->kind == Ast_Ident);
 
 			u16 mnemonic = 0;
-			CheckMnemomicResult res = check_mnemonic_name(instr, &mnemonic);
+			CheckMnemomicResult res = check_mnemonic_name(asm_ctx, instr, &mnemonic);
 
 
 			array_clear(&operands);
 
 			for (Ast *expr : instr->operands) {
 				Operand operand = {};
-				check_asm_instruction_operand(ctx, entity, &operand, expr, /*allow_memory_operands*/true);
+				check_asm_instruction_operand(asm_ctx, ctx, entity, &operand, expr, /*allow_memory_operands*/true);
 				array_add(&operands, operand);
 			}
 			if (res == CheckMnemomic_Prefix) {
@@ -978,7 +969,7 @@ gb_internal void check_asm_template(CheckerContext *ctx, Entity *entity, DeclInf
 				}
 				previous_prefix = cast(u8)mnemonic;
 			} else if (res == CheckMnemomic_Mnemonic) {
-				check_mnemonic(ctx, instr, mnemonic, slice_from_array(operands), previous_prefix);
+				check_mnemonic(asm_ctx, ctx, instr, mnemonic, slice_from_array(operands), previous_prefix);
 			}
 
 		case_end;
