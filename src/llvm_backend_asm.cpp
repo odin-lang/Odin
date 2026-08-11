@@ -49,6 +49,7 @@ struct lbAsmGenerate {
 		case_end;
 
 		case_ast_node(bl, BasicLit, op);
+			op->tav.value = exact_value_to_integer(op->tav.value);
 			ExactValue ev = op->tav.value;
 			GB_ASSERT(ev.kind != ExactValue_Invalid);
 			switch (ev.kind) {
@@ -61,6 +62,9 @@ struct lbAsmGenerate {
 				gb_free(heap_allocator(), s.text);
 				break;
 			}
+			case ExactValue_Float:
+				error(op, "Floating-point literals that cannot be represented as an integer are not supported within asm operands");
+				break;
 			default:
 				GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
 				break;

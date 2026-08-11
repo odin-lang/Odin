@@ -55,9 +55,72 @@ gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type) {
 
 enum AsmMismatch : u8 {
 	AsmMismatch_None,
-	AsmMismatch_Size,
-	AsmMismatch_Class,
+	AsmMismatch_Size,      // register / vector width mismatch
+	AsmMismatch_Class,     // register class mismatch
+	AsmMismatch_ImmRange,  // constant immediate does not fit the slot width
+	AsmMismatch_ImmType,   // non-integer constant where an integer immediate is required
 };
+
+// Does a constant immediate value fit a slot of `bits` width (0 == unconstrained)?
+// Accepts either a signed or an unsigned interpretation of the bit pattern, which
+// matches how the assembler treats imm fields (e.g. both 200 and -56 fit imm8).
+gb_internal bool check_asm_immediate_value_fits(ExactValue ev, i32 bits, i32 *needed_, AsmMismatch *mismatch_) {
+	if (ev.kind == ExactValue_Float) {
+		// Try to convert it if possible to an integer
+		ev = exact_value_to_integer(ev);
+	}
+
+	switch (ev.kind) {
+	case ExactValue_Bool:
+		// Encodes as 0 or 1; fits any immediate slot with a non-zero width.
+		if (needed_) *needed_ = 1;
+		return true;
+
+	case ExactValue_Integer: {
+		mp_int const *v = &ev.value_integer;
+		i32 mag_bits = cast(i32)mp_count_bits(v);
+		if (needed_) *needed_ = mag_bits;
+
+		if (bits == 0) {
+			// TODO(bill): is this a decent width?!
+			bits = 64; // slot does not pin a width, just set a decent default
+		}
+		if (mp_iszero(v)) {
+			return true;
+		}
+		if (!mp_isneg(v)) {
+			// Non-negative: fits if the unsigned bit pattern is <= `bits` wide.
+			if (mag_bits <= bits) {
+				return true;
+			}
+		} else {
+			// Negative: fits signed in `bits` iff mp_count_bits(-v - 1) <= bits-1.
+			// (-v-1 ranges 0 .. 2^(bits-1)-1 for the representable negatives.)
+			mp_int tmp = {};
+			mp_init(&tmp);
+			defer (mp_clear(&tmp));
+			mp_neg(v, &tmp);         // tmp = -v  (positive magnitude)
+			mp_sub_d(&tmp, 1, &tmp); // tmp = -v - 1
+			i32 nb = cast(i32)mp_count_bits(&tmp);
+			if (needed_) *needed_ = nb + 1; // signed bit-width, for the diagnostic
+			if (nb <= bits-1) {
+				return true;
+			}
+		}
+		if (mismatch_) *mismatch_ = AsmMismatch_ImmRange;
+		return false;
+	}
+
+	case ExactValue_Float:
+		// TODO(bill): does any architecture support floating-point immediates?
+		// amd64 has no floating-point instruction immediates.
+		if (needed_) *needed_ = 0;
+		if (mismatch_) *mismatch_ = AsmMismatch_ImmType;
+		return false;
+	}
+	if (mismatch_) *mismatch_ = AsmMismatch_ImmType;
+	return false;
+}
 
 // Returns true if the operand's Odin type is size/class-compatible with the form's slot.
 // On mismatch, fills *mismatch_ for a precise diagnostic. `slot` here is the
@@ -66,11 +129,26 @@ template <typename AsmCtx>
 gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot, Operand const *operand,
                                               AsmMismatch *mismatch_, i32 *want_bits_, i32 *got_bits_) {
 	if (mismatch_) *mismatch_ = AsmMismatch_None;
-	// Only register/memory-sized slots constrain width & class. Immediates/labels/sizeless-mem: skip here.
+
+	AsmOperandKind slot_kind = asm_ctx->kind_from_operand_type(slot);
+	if (slot_kind == AsmOperand_Immediate) {
+		i32 want_w = asm_ctx->operand_type_bit_width(slot);   // 32 for OP_IMM32
+		if (want_bits_) *want_bits_ = want_w;
+		if (operand->mode != Addressing_Constant) {
+			return true;   // $-immediate, bound per instantiation; defer
+		}
+		i32 needed = 0;
+		ExactValue ev = operand->value;
+		bool ok = check_asm_immediate_value_fits(ev, want_w, &needed, mismatch_);
+		if (got_bits_) *got_bits_ = needed;
+		return ok;
+	}
+
+	// Register / memory-sized slots
 	AsmRegClass want_class = asm_ctx->operand_type_reg_class(slot);
 	i32         want_w     = asm_ctx->operand_type_bit_width(slot);
 
-	// A pure-immediate or label slot imposes no reg width/class; value-range is checked elsewhere.
+	// A pure-label / sizeless slot imposes no reg width/class.
 	if (want_class == AsmRegClass_Unknown && want_w == 0) {
 		return true;
 	}
@@ -78,8 +156,15 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	AsmRegClass got_class = check_asm_reg_class_from_type(operand->type);
 	i32         got_w     = check_asm_operand_bit_width(operand->type);
 	if (got_w < 0) {
-		// TODO(bill): determine the correct width from the untyped constant value
-		got_w = want_w;
+		// Untyped constant: width is a property of the value, not the type.
+		if (operand->mode == Addressing_Constant && operand->value.kind == ExactValue_Integer) {
+			got_w = cast(i32)mp_count_bits(&operand->value.value_integer);
+			if (got_w == 0) {
+				got_w = 1; // zero still occupies a slot
+			}
+		} else {
+			got_w = 0; // unknown; skip the width comparison rather than fake a pass
+		}
 	}
 	if (want_bits_) *want_bits_ = want_w;
 	if (got_bits_)  *got_bits_  = got_w;
@@ -92,7 +177,6 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 			class_ok = (got_class == AsmRegClass_Integer);
 			break;
 		case AsmRegClass_Vector:
-			// XMM/YMM/ZMM slots accept both scalar float and #simd vector operands.
 			class_ok = (got_class == AsmRegClass_Vector || got_class == AsmRegClass_Float);
 			break;
 		case AsmRegClass_Mask:
@@ -102,32 +186,23 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 			class_ok = true;
 			break;
 		}
-
 		if (!class_ok) {
 			if (mismatch_) *mismatch_ = AsmMismatch_Class;
 			return false;
 		}
 	}
 
-	// Width check (only when the slot pins a width and we could size the type).
+	// Width check.
 	if (want_w != 0 && got_w != 0) {
 		if (want_class == AsmRegClass_Vector) {
-			// XMM/YMM/ZMM slot. A scalar float (f32/f64) uses only the low lane, so
-			// it is valid in any vector-register slot as long as it fits. A #simd
-			// vector, by contrast, must match the register width exactly (a 128-bit
-			// vector is not a ymm, a 256-bit vector is not an xmm).
-			bool width_ok = false;
-			if (got_class == AsmRegClass_Float) {
-				width_ok = (got_w <= want_w);   // scalar in low lane
-			} else {
-				width_ok = (got_w == want_w);   // #simd must be exact
-			}
+			// A scalar float uses only the low lane, so it is valid in any vector
+			// register slot as long as it fits; a #simd vector must match exactly.
+			bool width_ok = (got_class == AsmRegClass_Float) ? (got_w <= want_w) : (got_w == want_w);
 			if (!width_ok) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
 			}
 		} else {
-			// GPR / mask / memory-sized slot: exact width.
 			if (want_w != got_w) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
@@ -136,7 +211,6 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	}
 	return true;
 }
-
 
 gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool input_parameters, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
 	Type *tuple = alloc_type_tuple();
@@ -644,8 +718,17 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 
 			AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
 
-			if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
-				// dst kind was right, width was wrong
+			if (m == AsmMismatch_ImmRange) {
+				gbString vs = exact_value_to_string(operands[i].value);
+				error(operands[i].expr,
+				      "Operand %td of '%.*s': immediate value %s does not fit in a %d-bit immediate",
+				      i, LIT(name), vs, cast(int)want_bits[i]);
+				gb_string_free(vs);
+			} else if (m == AsmMismatch_ImmType) {
+				error(operands[i].expr,
+				      "Operand %td of '%.*s': a floating-point constant cannot be used as an immediate",
+				      i, LIT(name));
+			} else if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
 				error(operands[i].expr,
 				      "Operand %td of '%.*s' has the wrong size: expected a %u-bit operand, got %u-bit",
 				      i, LIT(name), cast(unsigned)want_bits[i], cast(unsigned)got_bits[i]);

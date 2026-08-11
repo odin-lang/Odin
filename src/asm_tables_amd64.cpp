@@ -380,8 +380,14 @@ struct Asm_amd64 {
 		case OP_M128: case OP_XMM: case OP_XMM_M128: case OP_XMM0_IMPL: return 128;
 		case OP_M256: case OP_YMM: case OP_YMM_M256: return 256;
 		case OP_M512: case OP_ZMM: case OP_ZMM_M512: return 512;
+		case OP_IMM8:  return 8;
+		case OP_IMM16: return 16;
+		case OP_IMM32: return 32;
+		case OP_IMM64: return 64;
+		case OP_REL8:  return 8;
+		case OP_REL32: return 32;
 		}
-		return 0; // OP_M (sizeless), OP_IMM*, OP_REL*, OP_K (opmask width is data-dependent), etc.
+		return 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.
 	}
 
 	int form_explicit_slot(Encoding const &form, int explicit_index) {
