@@ -12124,6 +12124,16 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 	case Type_Array:
 		valid = true;
 		max_count = t->Array.count;
+		if (is_type_soa_pointer(o->type)) {
+			// #soa element pointer; the pointed element is scattered like soa[i] itself,
+			// so it can't be sliced through the ptr (nor directly -> soa[i][:] is also rejected below)
+			gbString str = expr_to_string(node);
+			error(node, "Cannot slice '%s' through an #soa pointer, element is not contiguous in memory", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
 		if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
 			gbString str = expr_to_string(node);
 			error(node, "Cannot slice array '%s', value is not addressable", str);
