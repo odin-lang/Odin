@@ -122,10 +122,6 @@ gb_internal bool check_asm_operand_size_class(T *asm_ctx, typename T::OperandTyp
 			break;
 		}
 
-		if (operand->expr->kind == Ast_AsmRegister) {
-			gb_printf_err("HERE: %s: %s %d %d\n", expr_to_string(operand->expr), type_to_string(operand->type), want_class, got_class);
-		}
-
 		if (!class_ok) {
 			if (reason_) *reason_ = str_lit("register class");
 			return false;
