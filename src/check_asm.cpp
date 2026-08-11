@@ -633,20 +633,21 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 
 			bool spot_ok = false;
 			if (kind_ok) {
-				spot_ok = true;
 				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory) {
-					// No need to do an extra size class check, it accepts memory
+					spot_ok = true; // memory form accepts memory; skip size check
 				} else {
 					spot_ok = check_asm_operand_size_class(asm_ctx, type, operand, nullptr, nullptr, nullptr);
 				}
 			}
 
 			if (spot_ok) {
-				score += 1;
+				score += 2;          // full match
 				valid_spots[i] = true;
+			} else if (kind_ok) {
+				score += 1;          // kind matched, only value/size/class failed -> better near-miss
 			}
 		}
-		if (score == operands.count) {
+		if (score == operands.count*2) {
 			// the result has been found to be correct
 			matched = true;
 			valid_form_index = form_index;
@@ -708,7 +709,11 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 	}
 
 	{
-		error(instr->name, "The operands to '%.*s' matched none of the expected encoding forms", LIT(name));
+		if (best_score == operands.count*2 - 1) {
+			error(instr->name, "Asm operands to '%.*s' nearly matched the expected encoding forms", LIT(name));
+		} else {
+			error(instr->name, "Asm operands to '%.*s' matched none of the expected encoding forms", LIT(name));
+		}
 		for_array(i, valid_spots) {
 			if (valid_spots[i] || i >= operands.count) {
 				continue;
@@ -721,7 +726,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 			if (m == AsmMismatch_ImmRange) {
 				gbString vs = exact_value_to_string(operands[i].value);
 				error(operands[i].expr,
-				      "Operand %td of '%.*s': immediate value %s does not fit in a %d-bit immediate",
+				      "Operand %td of '%.*s' is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
 				      i, LIT(name), vs, cast(int)want_bits[i]);
 				gb_string_free(vs);
 			} else if (m == AsmMismatch_ImmType) {
