@@ -133,9 +133,6 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	AsmOperandKind slot_kind = asm_ctx->kind_from_operand_type(slot);
 	if (slot_kind == AsmOperand_Immediate) {
 		i32 want_w = asm_ctx->operand_type_bit_width(slot);   // 32 for OP_IMM32
-		if (want_w == 0) {
-			GB_PANIC("HERE: %d", slot);
-		}
 		if (want_bits_) *want_bits_ = want_w;
 		if (operand->mode != Addressing_Constant) {
 			return true;   // $-immediate, bound per instantiation; defer
@@ -214,6 +211,47 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	}
 	return true;
 }
+
+
+enum AsmAddrRole {
+	AsmAddr_Base,
+	AsmAddr_Index,
+};
+
+// Validate that a resolved base/index operand is a 32- or 64-bit integer register.
+// `reg_name` is the literal register string when the operand was an AstAsmRegister
+// (so rsp/esp-as-index can be caught), else the empty string.
+gb_internal bool check_asm_addr_register(Operand const *operand, AsmAddrRole role, String reg_name, i32 *width_) {
+	char const *role_name = (role == AsmAddr_Base) ? "base" : "index";
+
+	AsmRegClass cls = check_asm_reg_class_from_type(operand->type);
+	i32         w   = check_asm_operand_bit_width(operand->type);
+	if (width_) *width_ = w;
+
+	if (cls != AsmRegClass_Integer) {
+		char const *got = "non-integer";
+		if (cls == AsmRegClass_Vector) {
+			got = "vector";
+		} else if (cls == AsmRegClass_Mask) {
+			got = "mask";
+		}
+		error(operand->expr, "A memory operand's %s must be an integer register, got a %s value", role_name, got);
+		return false;
+	}
+	if (w != 32 && w != 64) {
+		error(operand->expr, "A memory operand's %s must be a 32-bit or 64-bit register, got a %d-bit register", role_name, cast(int)w);
+		return false;
+	}
+	if (role == AsmAddr_Index && reg_name.len != 0) {
+		// rsp/esp cannot be encoded as an index register.
+		if (reg_name == "rsp" || reg_name == "esp") {
+			error(operand->expr, "%%%.*s cannot be used as an index register", LIT(reg_name));
+			return false;
+		}
+	}
+	return true;
+}
+
 
 gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool input_parameters, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
 	Type *tuple = alloc_type_tuple();
@@ -375,7 +413,7 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 				Type *type = check_type(ctx, spec->type);
 				if (!is_valid_asm_parameter_type(type)) {
 					gbString s = type_to_string(type);
-					error(spec->type, "Invalid type for an asm template. It must be an integer, float, boolean, pointer, multi-pointer, or #simd vector, got '%s'", type);
+					error(spec->type, "Invalid type for an asm template. It must be an integer, float, boolean, pointer, multi-pointer, or #simd vector, got '%s'", s);
 					gb_string_free(s);
 					continue;
 				}
@@ -768,7 +806,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 				}
 				gb_string_free(vs);
 			} else if (m == AsmMismatch_ImmType) {
-				error(operands[i].expr, "'%.*s'' operand-%td a floating-point constant cannot be used as an immediate",
+				error(operands[i].expr, "'%.*s' operand-%td: a floating-point constant cannot be used as an immediate",
 				      LIT(name), i);
 			} else if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
 				error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit operand, got %u-bit",
@@ -842,55 +880,92 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &scale, mem_op->scale, false);
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &disp,  mem_op->disp,  false);
 
-		for (int i = 0; base.expr && i == 0; i++) {
+		i32  base_w     = 0;
+		i32  index_w    = 0;
+		bool have_base  = false;
+		bool have_index = false;
+
+		// base: must resolve to a 32/64-bit integer register
+		if (base.expr) {
+			String reg_name = {};
+			bool ok_kind = true;
 			if (base.expr->kind == Ast_AsmRegister) {
-				check_register(asm_ctx, &base, &base.expr->AsmRegister);
+				reg_name = base.expr->AsmRegister.name.string;
+				ok_kind = check_register(asm_ctx, &base, &base.expr->AsmRegister);
 			} else {
 				Entity *param_entity = entity_of_node(base.expr);
 				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
 					gbString s = expr_to_string(base.expr);
-					error(base.expr, "A base value must be a memory parameter, got %s", s);
+					error(base.expr, "A base value must be a register parameter, got %s", s);
 					gb_string_free(s);
-					break;
+					ok_kind = false;
+				} else {
+					auto kind = check_asm_find_kind(param_entity, ate->decls);
+					// A pointer/integer parameter used as an address base lowers to a
+					// register operand, so accept both Register and Memory kinds here.
+					if (kind != AsmTemplateEntityDecl_Register && kind != AsmTemplateEntityDecl_Memory) {
+						gbString s = expr_to_string(base.expr);
+						error(base.expr, "A base value must be a register parameter, got %s", s);
+						gb_string_free(s);
+						ok_kind = false;
+					}
 				}
-				auto kind = check_asm_find_kind(param_entity, ate->decls);
-				if (kind != AsmTemplateEntityDecl_Memory) {
-					gbString s = expr_to_string(base.expr);
-					error(base.expr, "A base value must be a memory parameter, got %s", s);
-					gb_string_free(s);
-					break;
-				}
+			}
+			if (ok_kind) {
+				have_base = check_asm_addr_register(&base, AsmAddr_Base, reg_name, &base_w);
 			}
 		}
 
-		for (int i = 0; index.expr && i == 0; i++) {
+		// index: must resolve to a 32/64-bit integer register, and not rsp/esp
+		if (index.expr) {
+			String reg_name = {};
+			bool ok_kind = true;
 			if (index.expr->kind == Ast_AsmRegister) {
-				check_register(asm_ctx, &index, &index.expr->AsmRegister);
+				reg_name = index.expr->AsmRegister.name.string;
+				ok_kind = check_register(asm_ctx, &index, &index.expr->AsmRegister);
 			} else {
 				Entity *param_entity = entity_of_node(index.expr);
 				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
 					gbString s = expr_to_string(index.expr);
-					error(index.expr, "An index value must an integer, got %s", s);
+					error(index.expr, "An index value must be an integer register, got %s", s);
 					gb_string_free(s);
-					break;
-				}
-				auto kind = check_asm_find_kind(param_entity, ate->decls);
-				switch (kind) {
-				case AsmTemplateEntityDecl_Register:
-				case AsmTemplateEntityDecl_Immediate:
-					// okay:
-					break;
-				default:
-					{
-						gbString s = expr_to_string(index.expr);
-						error(index.expr, "An index must be an integer value, got %s", s);
-						gb_string_free(s);
+					ok_kind = false;
+				} else {
+					auto kind = check_asm_find_kind(param_entity, ate->decls);
+					switch (kind) {
+					case AsmTemplateEntityDecl_Register:
+					case AsmTemplateEntityDecl_Immediate:
+						// okay
+						break;
+					default:
+						{
+							gbString s = expr_to_string(index.expr);
+							error(index.expr, "An index must be an integer register, got %s", s);
+							gb_string_free(s);
+							ok_kind = false;
+						}
+						break;
 					}
-					break;
 				}
+			}
+			if (ok_kind) {
+				have_index = check_asm_addr_register(&index, AsmAddr_Index, reg_name, &index_w);
 			}
 		}
 
+		// base and index must be the same width
+		if (have_base && have_index && base_w != index_w) {
+			Ast *at = mem_op->base ? mem_op->base : expr;
+			error(at, "A memory operand's base and index registers must be the same width, got a %d-bit base and a %d-bit index",
+			      cast(int)base_w, cast(int)index_w);
+		}
+
+		// a scale factor is meaningless without an index
+		if (scale.expr && !index.expr) {
+			error(scale.expr, "A scale factor requires an index register");
+		}
+
+		// scale: constant 1/2/4/8, or an immediate parameter
 		for (int i = 0; scale.expr && i == 0; i++) {
 			if (!is_type_integer(scale.type)) {
 				gbString s = expr_to_string(scale.expr);
@@ -933,40 +1008,50 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			}
 		}
 
+		// displacement: an integer that fits a signed 32-bit value
 		for (int i = 0; disp.expr && i == 0; i++) {
 			if (disp.expr->kind == Ast_AsmRegister) {
-				check_register(asm_ctx, &disp, &disp.expr->AsmRegister);
-			} else {
-				Entity *param_entity = entity_of_node(disp.expr);
-				if (disp.mode == Addressing_Constant) {
-					if (is_type_integer(disp.type)) {
-						break;
+				error(disp.expr, "A displacement must be an integer value, got a register");
+				break;
+			}
+
+			Entity *param_entity = entity_of_node(disp.expr);
+			if (disp.mode == Addressing_Constant) {
+				if (disp.value.kind == ExactValue_Integer) {
+					AsmMismatch m = AsmMismatch_None;
+					i32 needed = 0;
+					if (!check_asm_immediate_value_fits(disp.value, 32, &needed, &m)) {
+						gbString vs = exact_value_to_string(disp.value);
+						error(disp.expr, "A memory displacement must fit in a signed 32-bit value, got %s (needs %d bits)", vs, cast(int)needed);
+						gb_string_free(vs);
 					}
+					break;
 				}
-				if (param_entity == nullptr) {
+			}
+
+			if (param_entity == nullptr) {
+				gbString s = expr_to_string(disp.expr);
+				error(disp.expr, "A displacement value must be an integer, got %s", s);
+				gb_string_free(s);
+				break;
+			}
+			auto kind = check_asm_find_kind(param_entity, ate->decls);
+			switch (kind) {
+			case AsmTemplateEntityDecl_Register:
+			case AsmTemplateEntityDecl_Immediate:
+				if (is_type_integer(disp.type)) {
+					break;
+				}
+				/*fallthrough*/
+			default:
+				{
 					gbString s = expr_to_string(disp.expr);
-					error(disp.expr, "An displacement value must an integer, got %s", s);
+					gbString t = type_to_string(disp.type);
+					error(disp.expr, "A displacement must be an integer value, got %s of type %s", s, t);
+					gb_string_free(t);
 					gb_string_free(s);
-					break;
 				}
-				auto kind = check_asm_find_kind(param_entity, ate->decls);
-				switch (kind) {
-				case AsmTemplateEntityDecl_Register:
-				case AsmTemplateEntityDecl_Immediate:
-					if (is_type_integer(disp.type)) {
-						break;
-					}
-					/*fallthrough*/
-				default:
-					{
-						gbString s = expr_to_string(disp.expr);
-						gbString t = type_to_string(disp.type);
-						error(disp.expr, "An displacement must be an integer value, got %s of type %s", s, t);
-						gb_string_free(t);
-						gb_string_free(s);
-					}
-					break;
-				}
+				break;
 			}
 		}
 
