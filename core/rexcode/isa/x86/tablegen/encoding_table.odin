@@ -2396,6 +2396,84 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.VMOVNTDQA,  {.XMM,      .M128,     .NONE,     .NONE}, {.REG, .MR,   .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}},
 		{.VMOVNTDQA,  {.YMM,      .M256,     .NONE,     .NONE}, {.REG, .MR,   .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1}},
 	},
+	.VADDSUBPS = {
+		{.VADDSUBPS, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0xD0, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L0}},
+		{.VADDSUBPS, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0xD0, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VADDSUBPD = {
+		{.VADDSUBPD, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0xD0, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}},
+		{.VADDSUBPD, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0xD0, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VHADDPS = {   // <-- the instruction you named
+		{.VHADDPS, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7C, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L0}},
+		{.VHADDPS, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7C, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VHADDPD = {
+		{.VHADDPD, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7C, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}},
+		{.VHADDPD, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7C, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VHSUBPS = {
+		{.VHSUBPS, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7D, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L0}},
+		{.VHSUBPS, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7D, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VHSUBPD = {
+		{.VHSUBPD, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7D, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}},
+		{.VHSUBPD, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x7D, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VLDDQU = {    // 2-operand (load only)
+		{.VLDDQU, {.XMM, .M128, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0xF0, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L0}},
+		{.VLDDQU, {.YMM, .M256, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0xF0, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VMOVDDUP = {
+		{.VMOVDDUP, {.XMM, .XMM_M64,  .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L0}},
+		{.VMOVDDUP, {.YMM, .YMM_M256, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VMOVSLDUP = {
+		{.VMOVSLDUP, {.XMM, .XMM_M128, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=PREFIX_F3, vex_type=.VEX, vex_l=.L0}},
+		{.VMOVSLDUP, {.YMM, .YMM_M256, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=PREFIX_F3, vex_type=.VEX, vex_l=.L1}},
+	},
+	.VMOVSHDUP = {
+		{.VMOVSHDUP, {.XMM, .XMM_M128, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x16, 0, {esc=._0F, prefix=PREFIX_F3, vex_type=.VEX, vex_l=.L0}},
+		{.VMOVSHDUP, {.YMM, .YMM_M256, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x16, 0, {esc=._0F, prefix=PREFIX_F3, vex_type=.VEX, vex_l=.L1}},
+	},
+	// VEX.128.66.0F3A. — ESTR* also have a W1 (RAX/RDX) variant; W0 shown to match the SSE entries.
+	.VPCMPESTRI = {
+		{.VPCMPESTRI, {.XMM, .XMM_M128, .IMM8, .NONE}, {.REG, .MR, .IB, .NONE}, 0x61, 0, {esc=._0F3A, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+	},
+	.VPCMPESTRM = {
+		{.VPCMPESTRM, {.XMM, .XMM_M128, .IMM8, .NONE}, {.REG, .MR, .IB, .NONE}, 0x60, 0, {esc=._0F3A, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+	},
+	.VPCMPISTRI = {
+		{.VPCMPISTRI, {.XMM, .XMM_M128, .IMM8, .NONE}, {.REG, .MR, .IB, .NONE}, 0x63, 0, {esc=._0F3A, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}},
+	},
+	.VPCMPISTRM = {
+		{.VPCMPISTRM, {.XMM, .XMM_M128, .IMM8, .NONE}, {.REG, .MR, .IB, .NONE}, 0x62, 0, {esc=._0F3A, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}},
+	},
+	// VEX.128/256.66.0F38.W0 element broadcasts (AVX2). reg-source + memory-source forms, mirroring .VBROADCASTSS
+	.VPBROADCASTB = {
+		{.VPBROADCASTB, {.XMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTB, {.YMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+		{.VPBROADCASTB, {.XMM, .M8,  .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTB, {.YMM, .M8,  .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+	},
+	.VPBROADCASTW = {
+		{.VPBROADCASTW, {.XMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTW, {.YMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+		{.VPBROADCASTW, {.XMM, .M16, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTW, {.YMM, .M16, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+	},
+	.VPBROADCASTD = {
+		{.VPBROADCASTD, {.XMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTD, {.YMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+		{.VPBROADCASTD, {.XMM, .M32, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTD, {.YMM, .M32, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+	},
+	.VPBROADCASTQ = {
+		{.VPBROADCASTQ, {.XMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTQ, {.YMM, .XMM, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+		{.VPBROADCASTQ, {.XMM, .M64, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0, vex_w=.W0}},
+		{.VPBROADCASTQ, {.YMM, .M64, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1, vex_w=.W0}},
+	},
 	.VCVTPS2PD = {
 		{.VCVTPS2PD,  {.XMM,      .XMM_M64,  .NONE,     .NONE}, {.REG, .MR,   .NONE, .NONE}, 0x5A, 0, {esc=._0F, vex_type=.VEX, vex_l=.L0}},
 		{.VCVTPS2PD,  {.YMM,      .XMM_M128, .NONE,     .NONE}, {.REG, .MR,   .NONE, .NONE}, 0x5A, 0, {esc=._0F, vex_type=.VEX, vex_l=.L1}},
