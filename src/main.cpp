@@ -4313,6 +4313,11 @@ int main(int arg_count, char const **arg_ptr) {
 	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
 
+	TIME_SECTION("init asm tables");
+	{
+		g_asm_amd64.init();
+	}
+
 	MAIN_TIME_SECTION("parse files");
 
 	if (!init_parser(parser)) {

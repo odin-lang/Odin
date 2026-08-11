@@ -57,7 +57,30 @@ main :: proc() {
 		strings.write_string(&sb, "\t\tMNEMONIC_COUNT\n");
 	}
 
+	{
+		strings.write_string(&sb, "\tenum Prefix : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n");
+
+		count := uint(0)
+		ROW_COUNT :: 16
+		for prefix in Prefix {
+			if count == 0 {
+				strings.write_string(&sb, "\t\t")
+			}
+			fmt.sbprintf(&sb, "PREFIX_%s, ", prefix)
+
+			if count == ROW_COUNT-1 {
+				strings.write_string(&sb, "\n")
+			}
+
+			count = (count + 1) % ROW_COUNT
+		}
+		strings.write_string(&sb, "\n\n");
+		strings.write_string(&sb, "\t\tPREFIX_COUNT\n");
+	}
+
 	strings.write_string(&sb, "\tstatic String const mnemonic_strings[MNEMONIC_COUNT];\n")
+	strings.write_string(&sb, "\tstatic String const prefix_strings[PREFIX_COUNT];\n")
 
 	{
 		strings.write_string(&sb, "\n");
@@ -102,7 +125,7 @@ main :: proc() {
 
 
 	strings.write_string(&sb, "\tstatic u16 const register_codes[REG_COUNT];\n")
-	strings.write_string(&sb, "\tstatic String const register_names[REG_COUNT];\n")
+	strings.write_string(&sb, "\tstatic String const register_strings[REG_COUNT];\n")
 
 	strings.write_string(&sb, "\n\n")
 	{
@@ -178,6 +201,7 @@ main :: proc() {
 	fmt.sbprintf(&sb, "\tstatic u8 const raw_encode_forms[%d];\n", len(raw_encode_forms))
 
 	strings.write_string(&sb, "\tStringMap<Mnemonic> mnemonic_map;\n")
+	strings.write_string(&sb, "\tStringMap<Prefix>   prefix_map;\n")
 	strings.write_string(&sb, "\tStringMap<Register> register_map;\n")
 	strings.write_string(&sb, "\tSlice<EncodeRun> ENCODE_RUNS;\n")
 	strings.write_string(&sb, "\tSlice<Encoding>  ENCODE_FORMS;\n")
@@ -187,21 +211,39 @@ main :: proc() {
 		defer strings.write_string(&sb, "\t}\n")
 
 		strings.write_string(&sb, "\t\tstring_map_init(&mnemonic_map, MNEMONIC_COUNT*2);\n")
-		strings.write_string(&sb, "\t\tfor (u16 m = M_INVALID; m < MNEMONIC_COUNT; m++) {\n")
+		strings.write_string(&sb, "\t\tfor (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {\n")
 		strings.write_string(&sb, "\t\t\tstring_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);\n")
 		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t\tstring_map_init(&prefix_map, PREFIX_COUNT*2);\n")
+		strings.write_string(&sb, "\t\tfor (u8 r = PREFIX_INVALID+1; r < PREFIX_COUNT; r++) {\n")
+		strings.write_string(&sb, "\t\t\tstring_map_set(&prefix_map, prefix_strings[r], cast(Prefix)r);\n")
+		strings.write_string(&sb, "\t\t}\n")
 		strings.write_string(&sb, "\t\tstring_map_init(&register_map, REG_COUNT*2);\n")
-		strings.write_string(&sb, "\t\tfor (u16 r = REG_INVALID; r < REG_COUNT; r++) {\n")
-		strings.write_string(&sb, "\t\t\tstring_map_set(&register_map, register_names[r], cast(Register)r);\n")
+		strings.write_string(&sb, "\t\tfor (u16 r = REG_INVALID+1; r < REG_COUNT; r++) {\n")
+		strings.write_string(&sb, "\t\t\tstring_map_set(&register_map, register_strings[r], cast(Register)r);\n")
 		strings.write_string(&sb, "\t\t}\n")
 		strings.write_string(&sb, "\t\treturn true;\n")
 	}
 	{
-		strings.write_string(&sb, "\tMnemonic lookup(String const &name) {\n")
+		strings.write_string(&sb, "\tMnemonic mnemonic_lookup(String const &name) {\n")
 		defer strings.write_string(&sb, "\t}\n")
 
 		strings.write_string(&sb, "\t\tMnemonic *found = string_map_get(&mnemonic_map, name);\n")
 		strings.write_string(&sb, "\t\treturn found ? *found : M_INVALID;\n")
+	}
+	{
+		strings.write_string(&sb, "\tPrefix prefix_lookup(String const &name) {\n")
+		defer strings.write_string(&sb, "\t}\n")
+
+		strings.write_string(&sb, "\t\tPrefix *found = string_map_get(&prefix_map, name);\n")
+		strings.write_string(&sb, "\t\treturn found ? *found : PREFIX_INVALID;\n")
+	}
+	{
+		strings.write_string(&sb, "\tRegister register_lookup(String const &name) {\n")
+		defer strings.write_string(&sb, "\t}\n")
+
+		strings.write_string(&sb, "\t\tRegister *found = string_map_get(&register_map, name);\n")
+		strings.write_string(&sb, "\t\treturn found ? *found : REG_INVALID;\n")
 	}
 	{
 		strings.write_string(&sb, "\tSlice<Encoding> encoding_forms(Mnemonic m) const {\n")
@@ -244,11 +286,14 @@ main :: proc() {
 	strings.write_string(&sb, "};\n")
 
 	strings.write_string(&sb, "\n\n\n")
+
+	fmt.sbprintf(&sb, "gb_internal Asm_{0:s} g_asm_{0:s};\n", ISA_NAME)
+
+	strings.write_string(&sb, "\n\n\n")
+
 	{
 		fmt.sbprintf(&sb, "String const Asm_{0:s}::mnemonic_strings[Asm_{0:s}::MNEMONIC_COUNT] {{\n", ISA_NAME)
 		defer strings.write_string(&sb, "};\n");
-
-		iota := 0
 
 		count := uint(0)
 		ROW_COUNT :: 16
@@ -271,7 +316,33 @@ main :: proc() {
 				strings.write_string(&sb, "\n")
 			}
 
-			iota += 1
+			count = (count + 1) % ROW_COUNT
+		}
+		strings.write_string(&sb, "\n");
+	}
+	{
+		fmt.sbprintf(&sb, "String const Asm_{0:s}::prefix_strings[Asm_{0:s}::PREFIX_COUNT] {{\n", ISA_NAME)
+		defer strings.write_string(&sb, "};\n");
+
+		count := uint(0)
+		ROW_COUNT :: 16
+		for prefix in Prefix {
+			if count == 0 {
+				strings.write_string(&sb, "\t")
+			}
+
+			if prefix == .INVALID {
+				strings.write_string(&sb, "str_lit(\"\"), ")
+			} else {
+				str := strings.to_lower(reflect.enum_string(prefix))
+				fmt.sbprintf(&sb, "str_lit(%q), ", str)
+				delete(str)
+			}
+
+			if count == ROW_COUNT-1 {
+				strings.write_string(&sb, "\n")
+			}
+
 			count = (count + 1) % ROW_COUNT
 		}
 		strings.write_string(&sb, "\n");
@@ -300,7 +371,7 @@ main :: proc() {
 	}
 
 	{
-		fmt.sbprintf(&sb, "String const Asm_{0:s}::register_names[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)
+		fmt.sbprintf(&sb, "String const Asm_{0:s}::register_strings[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)
 		defer strings.write_string(&sb, "};\n");
 
 		count := uint(0)
@@ -377,7 +448,21 @@ main :: proc() {
 	}
 }
 
-
+Prefix :: enum u8 {
+	INVALID,
+	ES,
+	CS,
+	SS,
+	DS,
+	REX,
+	EVEX,
+	FS,
+	GS,
+	VEX,
+	LOCK,
+	REPNE,
+	REP,
+}
 
 
 

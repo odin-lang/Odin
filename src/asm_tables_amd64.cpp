@@ -88,7 +88,13 @@ struct Asm_amd64 {
 
 		MNEMONIC_COUNT
 	};
+	enum Prefix : u8 {
+		PREFIX_INVALID, PREFIX_ES, PREFIX_CS, PREFIX_SS, PREFIX_DS, PREFIX_REX, PREFIX_EVEX, PREFIX_FS, PREFIX_GS, PREFIX_VEX, PREFIX_LOCK, PREFIX_REPNE, PREFIX_REP, 
+
+		PREFIX_COUNT
+	};
 	static String const mnemonic_strings[MNEMONIC_COUNT];
+	static String const prefix_strings[PREFIX_COUNT];
 
 	// Register classes (upper byte)
 	static const u16 REG_CLASS_NONE  = 0x000;
@@ -126,7 +132,7 @@ struct Asm_amd64 {
 		REG_COUNT
 	};
 	static u16 const register_codes[REG_COUNT];
-	static String const register_names[REG_COUNT];
+	static String const register_strings[REG_COUNT];
 
 
 	enum OperandType : u8 {
@@ -240,23 +246,36 @@ struct Asm_amd64 {
 	static EncodeRun const raw_encode_runs[1176];
 	static u8 const raw_encode_forms[37680];
 	StringMap<Mnemonic> mnemonic_map;
+	StringMap<Prefix>   prefix_map;
 	StringMap<Register> register_map;
 	Slice<EncodeRun> ENCODE_RUNS;
 	Slice<Encoding>  ENCODE_FORMS;
 	bool init() {
 		string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
-		for (u16 m = M_INVALID; m < MNEMONIC_COUNT; m++) {
+		for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
 			string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
 		}
+		string_map_init(&prefix_map, PREFIX_COUNT*2);
+		for (u8 r = PREFIX_INVALID+1; r < PREFIX_COUNT; r++) {
+			string_map_set(&prefix_map, prefix_strings[r], cast(Prefix)r);
+		}
 		string_map_init(&register_map, REG_COUNT*2);
-		for (u16 r = REG_INVALID; r < REG_COUNT; r++) {
-			string_map_set(&register_map, register_names[r], cast(Register)r);
+		for (u16 r = REG_INVALID+1; r < REG_COUNT; r++) {
+			string_map_set(&register_map, register_strings[r], cast(Register)r);
 		}
 		return true;
 	}
-	Mnemonic lookup(String const &name) {
+	Mnemonic mnemonic_lookup(String const &name) {
 		Mnemonic *found = string_map_get(&mnemonic_map, name);
 		return found ? *found : M_INVALID;
+	}
+	Prefix prefix_lookup(String const &name) {
+		Prefix *found = string_map_get(&prefix_map, name);
+		return found ? *found : PREFIX_INVALID;
+	}
+	Register register_lookup(String const &name) {
+		Register *found = string_map_get(&register_map, name);
+		return found ? *found : REG_INVALID;
 	}
 	Slice<Encoding> encoding_forms(Mnemonic m) const {
 		EncodeRun r = ENCODE_RUNS[m];
@@ -287,6 +306,10 @@ struct Asm_amd64 {
 		return 0;
 	}
 };
+
+
+
+gb_internal Asm_amd64 g_asm_amd64;
 
 
 
@@ -366,6 +389,9 @@ String const Asm_amd64::mnemonic_strings[Asm_amd64::MNEMONIC_COUNT] {
 	str_lit("xsaves64"), str_lit("xrstors"), str_lit("xrstors64"), str_lit("prefetcht0"), str_lit("prefetcht1"), str_lit("prefetcht2"), str_lit("prefetchnta"), str_lit("prefetchw"), str_lit("clflushopt"), str_lit("clwb"), str_lit("cldemote"), str_lit("bswap"), str_lit("cmpxchg"), str_lit("cmpxchg8b"), str_lit("cmpxchg16b"), str_lit("xadd"), 
 	str_lit("bound"), str_lit("enter"), str_lit("leave"), str_lit("xlat"), str_lit("xlatb"), str_lit("movbe"), str_lit("rdrand"), str_lit("rdseed"), 
 };
+String const Asm_amd64::prefix_strings[Asm_amd64::PREFIX_COUNT] {
+	str_lit(""), str_lit("es"), str_lit("cs"), str_lit("ss"), str_lit("ds"), str_lit("rex"), str_lit("evex"), str_lit("fs"), str_lit("gs"), str_lit("vex"), str_lit("lock"), str_lit("repne"), str_lit("rep"), 
+};
 u16 const Asm_amd64::register_codes[Asm_amd64::REG_COUNT] {
 	0, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 
 	271, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 
@@ -382,7 +408,7 @@ u16 const Asm_amd64::register_codes[Asm_amd64::REG_COUNT] {
 	3330, 3331, 3584, 3585, 3586, 3587, 3588, 3589, 3590, 3591, 3840, 3841, 3842, 3843, 3844, 3845, 
 	3846, 3847, 65534, 
 };
-String const Asm_amd64::register_names[Asm_amd64::REG_COUNT] {
+String const Asm_amd64::register_strings[Asm_amd64::REG_COUNT] {
 	str_lit(""), str_lit("rax"), str_lit("rcx"), str_lit("rdx"), str_lit("rbx"), str_lit("rsp"), str_lit("rbp"), str_lit("rsi"), str_lit("rdi"), str_lit("r8"), str_lit("r9"), str_lit("r10"), str_lit("r11"), str_lit("r12"), str_lit("r13"), str_lit("r14"), 
 	str_lit("r15"), str_lit("eax"), str_lit("ecx"), str_lit("edx"), str_lit("ebx"), str_lit("esp"), str_lit("ebp"), str_lit("esi"), str_lit("edi"), str_lit("r8d"), str_lit("r9d"), str_lit("r10d"), str_lit("r11d"), str_lit("r12d"), str_lit("r13d"), str_lit("r14d"), 
 	str_lit("r15d"), str_lit("ax"), str_lit("cx"), str_lit("dx"), str_lit("bx"), str_lit("sp"), str_lit("bp"), str_lit("si"), str_lit("di"), str_lit("r8w"), str_lit("r9w"), str_lit("r10w"), str_lit("r11w"), str_lit("r12w"), str_lit("r13w"), str_lit("r14w"), 
