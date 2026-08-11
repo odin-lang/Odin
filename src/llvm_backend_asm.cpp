@@ -3,6 +3,14 @@ struct lbAsmGenerate {
 	AstAsmTemplate *              tmpl_node;
 	Array<AsmTemplateEntityDecl> *ops;
 
+	enum WriteOperandFlags : u32 {
+		WriteOperandFlag_PrintPrefixes = 1<<0,
+		WriteOperandFlag_IsScale       = 1<<1,
+
+		WriteOperandFlag_NONE = 0,
+		WriteOperandFlag_DEFAULT = WriteOperandFlag_PrintPrefixes,
+	};
+
 	void init(Entity *entity) {
 		this->tmpl_entity = entity;
 		GB_ASSERT(this->tmpl_entity != nullptr);
@@ -34,7 +42,7 @@ struct lbAsmGenerate {
 		return nullptr;
 	}
 
-	gbString write_operand(gbString asm_string, Array<i32> op_number, Ast *op, bool print_prefixes=true) {
+	gbString write_operand(gbString asm_string, Array<i32> op_number, Ast *op, u32 flags) {
 		switch (op->kind) {
 		case_ast_node(i, Ident, op);
 			Entity *e = entity_of_node(op);
@@ -45,7 +53,7 @@ struct lbAsmGenerate {
 			asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
 		case_end;
 		case_ast_node(mem_op, AsmMemoryOperand, op);
-			asm_string = this->write_memory_operand(asm_string, op_number, mem_op, false);
+			asm_string = this->write_memory_operand(asm_string, op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
 		case_end;
 
 		case_ast_node(bl, BasicLit, op);
@@ -55,11 +63,23 @@ struct lbAsmGenerate {
 			switch (ev.kind) {
 			case ExactValue_Integer: {
 				String s = big_int_to_string(heap_allocator(), &ev.value_integer, 10);
-				if (print_prefixes) {
+				if (flags & WriteOperandFlag_PrintPrefixes) {
 					asm_string = gb_string_appendc(asm_string, "$$");
 				}
 				asm_string = gb_string_append_length(asm_string, s.text, s.len);
 				gb_free(heap_allocator(), s.text);
+
+				if (flags & WriteOperandFlag_IsScale) {
+					i64 val = exact_value_to_i64(ev);
+					switch (val) {
+					case 1: case 2: case 4: case 8:
+						// okay
+						break;
+					default:
+						error(op, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %.*s", LIT(s));
+						break;
+					}
+				}
 				break;
 			}
 			case ExactValue_Float:
@@ -100,24 +120,24 @@ struct lbAsmGenerate {
 	};
 
 
-	virtual gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, bool print_prefixes=true) = 0;
+	virtual gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
 	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
 };
 
 struct lbAsmGenerate_amd64 : lbAsmGenerate {
-	gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, bool print_prefixes=true) override {
+	gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		if (mem_op->disp) {
-			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, /*print_prefixes*/false);
+			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, flags&~WriteOperandFlag_PrintPrefixes);
 		}
 		asm_string = gb_string_appendc(asm_string, "(");
 		GB_ASSERT(mem_op->base != nullptr);
-		asm_string = this->write_operand(asm_string, op_number, mem_op->base);
+		asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags);
 		if (mem_op->index) {
 			asm_string = gb_string_appendc(asm_string, ",");
-			asm_string = this->write_operand(asm_string, op_number, mem_op->index);
+			asm_string = this->write_operand(asm_string, op_number, mem_op->index, flags);
 			if (mem_op->scale) {
 				asm_string = gb_string_appendc(asm_string, ",");
-				asm_string = this->write_operand(asm_string, op_number, mem_op->scale, /*print_prefixes*/false);
+				asm_string = this->write_operand(asm_string, op_number, mem_op->scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
 			}
 		}
 		asm_string = gb_string_appendc(asm_string, ")");
@@ -273,7 +293,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 					if (j < instr->operands.count-1) {
 						asm_string = gb_string_appendc(asm_string, ", ");
 					}
-					asm_string = this->write_operand(asm_string, op_number, op);
+					asm_string = this->write_operand(asm_string, op_number, op, WriteOperandFlag_DEFAULT);
 				}
 			case_end;
 			case_ast_node(label, AsmLabelDecl, instr_);

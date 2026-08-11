@@ -740,10 +740,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 	}
 
 	{
-		if (best_score == operands.count*2 - 1) {
-			error(instr->name, "Asm operands to '%.*s' nearly matched the expected encoding forms", LIT(name));
+		if (best_score >= gb_max(operands.count*2 - 2, 0)) {
+			error(instr->name, "'%.*s' operands nearly matched the expected encoding forms", LIT(name));
 		} else {
-			error(instr->name, "Asm operands to '%.*s' matched none of the expected encoding forms", LIT(name));
+			error(instr->name, "'%.*s' operands matched none of the expected encoding forms", LIT(name));
 		}
 		for_array(i, valid_spots) {
 			if (valid_spots[i] || i >= operands.count) {
@@ -760,33 +760,27 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 				i32 bits_required = 0;
 				check_asm_immediate_value_fits(ev, want_bits[i], &bits_required, nullptr);
 				if (bits_required > 0) {
-					error(operands[i].expr,
-					      "Operand %td of '%.*s' is a %d-bit immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
-					      i, LIT(name), bits_required, vs, cast(int)want_bits[i]);
+					error(operands[i].expr, "'%.*s' operand-%td is a %d-bit immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
+					      LIT(name), i, bits_required, vs, cast(int)want_bits[i]);
 				} else {
-					error(operands[i].expr,
-					      "Operand %td of '%.*s' is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
-					      i, LIT(name), vs, cast(int)want_bits[i]);
+					error(operands[i].expr, "'%.*s' operand-%td is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
+					      LIT(name), i, vs, cast(int)want_bits[i]);
 				}
 				gb_string_free(vs);
 			} else if (m == AsmMismatch_ImmType) {
-				error(operands[i].expr,
-				      "Operand %td of '%.*s': a floating-point constant cannot be used as an immediate",
-				      i, LIT(name));
+				error(operands[i].expr, "'%.*s'' operand-%td a floating-point constant cannot be used as an immediate",
+				      LIT(name), i);
 			} else if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
-				error(operands[i].expr,
-				      "Operand %td of '%.*s' has the wrong size: expected a %u-bit operand, got %u-bit",
-				      i, LIT(name), cast(unsigned)want_bits[i], cast(unsigned)got_bits[i]);
+				error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit operand, got %u-bit",
+				      LIT(name), i, cast(unsigned)want_bits[i], cast(unsigned)got_bits[i]);
 			} else if (m == AsmMismatch_Class) {
-				error(operands[i].expr,
-				      "Operand %td of '%.*s' is in the wrong register class, expected %.*s operand, got %.*s",
-				      i, LIT(name), LIT(asm_operand_kind_expected_strings[dst]), LIT(asm_operand_kind_expected_strings[src]));
+				error(operands[i].expr, "'%.*s' operand-%td is in the wrong register class, expected %.*s operand, got %.*s",
+				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]), LIT(asm_operand_kind_expected_strings[src]));
 			} else if (dst) {
-				error(operands[i].expr,
-				      "Operand %td of '%.*s' has an invalid kind, expected %.*s operand",
-				      i, LIT(name), LIT(asm_operand_kind_expected_strings[dst]));
+				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind, expected %.*s operand",
+				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]));
 			} else {
-				error(operands[i].expr, "Operand %td of '%.*s' has an invalid kind", i, LIT(name));
+				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind", LIT(name), i);
 			}
 		}
 	}
@@ -905,11 +899,21 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 				break;
 			}
 			if (scale.mode == Addressing_Constant) {
+				gbString s = exact_value_to_string(scale.value);
+				defer (gb_string_free(s));
 				if (scale.value.kind != ExactValue_Integer) {
-					gbString s = exact_value_to_string(scale.value);
 					error(scale.expr, "A scale must be a constant integer or an immediate, got %s", s);
-					gb_string_free(s);
 					break;
+				} else {
+					i64 v = exact_value_to_i64(scale.value);
+					switch (v) {
+					case 1: case 2: case 4: case 8:
+						// okay
+						break;
+					default:
+						error(scale.expr, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %s", s);
+						break;
+					}
 				}
 			} else {
 				Entity *param_entity = entity_of_node(scale.expr);
