@@ -319,19 +319,26 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AstAsmInstruction *instr, u1
 		return CheckMnemomic_Prefix;
 	}
 
+	ERROR_BLOCK();
 	if (instr->operands.count == 0) {
 		error(instr->name, "Unknown mnemonic/prefix for this target platform: %%%.*s", LIT(name));
 	} else {
-		ERROR_BLOCK();
 		error(instr->name, "Unknown mnemonic for this target platform: %%%.*s", LIT(name));
-		auto dym = did_you_mean_make(heap_allocator(), g_asm_amd64.MNEMONIC_COUNT, name);
-		defer (did_you_mean_destroy(&dym));
-		for (String const &str : g_asm_amd64.mnemonic_strings) {
-			did_you_mean_append(&dym, str);
-		}
-		check_did_you_mean_print(&dym);
 
 	}
+	auto dym = did_you_mean_make(heap_allocator(), g_asm_amd64.MNEMONIC_COUNT, name);
+	defer (did_you_mean_destroy(&dym));
+	for (u16 i = g_asm_amd64.M_INVALID+1; i < g_asm_amd64.MNEMONIC_COUNT; i++) {
+		String str = g_asm_amd64.mnemonic_strings[i];
+		did_you_mean_append(&dym, str);
+	}
+	if (instr->operands.count == 0) {
+		for (u16 i = g_asm_amd64.PREFIX_INVALID+1; i < g_asm_amd64.PREFIX_COUNT; i++) {
+			String str = g_asm_amd64.prefix_strings[i];
+			did_you_mean_append(&dym, str);
+		}
+	}
+	check_did_you_mean_print(&dym);
 	return CheckMnemomic_Invalid;
 }
 
