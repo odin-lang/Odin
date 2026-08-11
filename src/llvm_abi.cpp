@@ -437,7 +437,9 @@ namespace lbAbi386 {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
-					args[i] = lb_arg_type_indirect(t, nullptr);
+					// Aggregates are pushed onto the stack by value, not passed as a pointer
+					// to a caller-owned copy. This is the rule for both i386 targets.
+					args[i] = lb_arg_type_indirect_byval(c, t);
 				}
 			} else {
 				args[i] = non_struct(c, t, false);
