@@ -192,6 +192,9 @@ struct AsmTemplateEntityDecl {
 	i32 param_index;  // index into the Proc signature's params (inputs), else -1
 	i32 result_index; // index into results (outputs), else -1
 	i32 tie; // InOut: index into operands[] of the tied output; else -1
+
+	i32 view_of; // total_index of the source operand this is a width-view of, else -1
+	i32 view_bits; // the view width in bits, otherwise 0
 };
 
 // An Entity is a named "thing" in the language
@@ -374,6 +377,8 @@ gb_internal AsmTemplateEntityDecl asm_template_entity_decl_default(Entity *entit
 	ed.param_index  = -1;
 	ed.result_index = -1;
 	ed.tie          = -1;
+	ed.view_of      = -1;
+	ed.view_bits    =  0;
 
 	return ed;
 }

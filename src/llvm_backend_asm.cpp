@@ -49,9 +49,26 @@ struct lbAsmGenerate {
 			Entity *e = entity_of_node(op);
 			auto *ed = entity_op(e);
 
-			i32 idx = op_number[ed->total_index];
-			GB_ASSERT(idx >= 0);
-			asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+			if (ed->view_of >= 0) {
+				// Width-view of another operand (e.g. `p0b: u8 = p0`): emit the SOURCE
+				// operand's number with an LLVM width modifier, so both names share the
+				// one register the allocator chose, viewed at the requested width.
+				i32 idx = op_number[ed->view_of];
+				GB_ASSERT(idx >= 0);
+				char mod = 0;
+				switch (ed->view_bits) {
+				case 8:  mod = 'b'; break; // low 8-bit  (al/r11b/...)
+				case 16: mod = 'w'; break; // 16-bit     (ax/r11w/...)
+				case 32: mod = 'k'; break; // 32-bit     (eax/r11d/...)
+				case 64: mod = 'q'; break; // 64-bit     (rax/r11/...)
+				default: GB_PANIC("asm: invalid width-view size %d", ed->view_bits); break;
+				}
+				asm_string = gb_string_append_fmt(asm_string, "${%d:%c}", idx, mod);
+			} else {
+				i32 idx = op_number[ed->total_index];
+				GB_ASSERT(idx >= 0);
+				asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+			}
 		case_end;
 		case_ast_node(mem_op, AsmMemoryOperand, op);
 			asm_string = this->write_memory_operand(asm_string, op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
@@ -218,7 +235,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		auto ret_types   = array_make<LLVMTypeRef>(temporary_allocator(),  0, ops->count);
 
 		// Per-operand bookkeeping, indexed the same as `ops` (via total_index).
-		auto op_number = array_make<i32>(temporary_allocator(), ops->count, ops->count); // $N, or -1 for clobbers
+		auto op_number = array_make<i32>(temporary_allocator(), ops->count, ops->count); // $N, or -1 for clobbers/views
 		auto ret_slot  = array_make<i32>(temporary_allocator(), ops->count, ops->count); // return-struct index, or -1
 		for_array(i, *ops) {
 			op_number[i] = -1;
@@ -259,6 +276,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		for_array(i, *ops) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
 
+			if (e.view_of >= 0) {
+				continue; // width-view: resolved to its source's operand, owns no slot
+			}
+
 			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
 			bool is_alloc_scratch = e.param_group == AsmTemplateEntityDeclParamGroup_Scratch
 			                     && e.kind == AsmTemplateEntityDecl_Register
@@ -292,6 +313,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		// Pass 2: inputs
 		for (isize i = 0; i < ops->count; i++) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
+
+			if (e.view_of >= 0) {
+				continue; // width-view: not its own input
+			}
 			if (e.param_group != AsmTemplateEntityDeclParamGroup_Input) {
 				continue;
 			}
@@ -383,6 +408,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		// output in Pass 1, so it is skipped here.
 		for (isize i = 0; i < ops->count; i++) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
+
+			if (e.view_of >= 0) {
+				continue; // width-view carries no clobber; its source owns the register
+			}
 			if (e.param_group != AsmTemplateEntityDeclParamGroup_Scratch) {
 				continue;
 			}
@@ -466,6 +495,9 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		for (isize i = 0; i < ops->count; i++) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
+			if (e.view_of >= 0) {
+				continue; // width-view: never a returned value
+			}
 			if (e.param_group != AsmTemplateEntityDeclParamGroup_Output) {
 				continue;
 			}

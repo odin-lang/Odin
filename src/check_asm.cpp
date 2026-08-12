@@ -469,16 +469,65 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 					ed.pin = pin;
 
 					if (other_scratch != nullptr) {
-						// TODO(bill): subsetting parameters
-						// p0:  u64 = %rax,
-						// p0b: u8  = p0,
-						//
-						// or
-						//
-						// p0:  u64, // implied = %any
-						// p0b: u8 = p0, // the 8-bit subsection of the same register, if possible
+						// Width-view of another operand: `p0b: u8 = p0`.
+						// p0b shares p0's register, viewed at p0b's declared width.
 						GB_ASSERT(spec->value != nullptr);
-						error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration");
+
+						i32 src_index = -1;
+						auto src_group = check_asm_find_group(other_scratch, *asm_template_entity_decls, &src_index);
+
+						// 1. The source must already exist and be a register-class operand
+						//    (you cannot take a width-view of an immediate or memory operand).
+						if (src_index < 0) {
+							error(spec->value, "'%.*s' must refer to a previously declared parameter", LIT(other_scratch->token.string));
+						} else {
+							auto &src = (*asm_template_entity_decls)[src_index];
+
+							bool src_is_reg = src_group == AsmTemplateEntityDeclParamGroup_Input  ||
+							                  src_group == AsmTemplateEntityDeclParamGroup_Output ||
+							                  src_group == AsmTemplateEntityDeclParamGroup_Scratch;
+							if (src.kind == AsmTemplateEntityDecl_Immediate || src.kind == AsmTemplateEntityDecl_Memory) {
+								src_is_reg = false;
+							}
+							if (!src_is_reg) {
+								error(spec->value, "A width-view can only be taken of a register operand, not '%.*s'", LIT(other_scratch->token.string));
+							}
+
+							// 2. The view width must be a legal sub-register width and no wider
+							//    than the source (only narrowing views exist).
+							i32 view_w = check_asm_operand_bit_width(type);          // this decl's type (u8 -> 8)
+							i32 src_w  = check_asm_operand_bit_width(src.entity->type);
+							AsmRegClass view_class = check_asm_reg_class_from_type(type);
+							AsmRegClass src_class  = check_asm_reg_class_from_type(src.entity->type);
+
+							if (view_class != AsmRegClass_Integer || src_class != AsmRegClass_Integer) {
+								error(spec->type, "Width-views are only supported for integer registers");
+							} else {
+								switch (view_w) {
+								case 8: case 16: case 32: case 64:
+									if (view_w > src_w) {
+										error(spec->type, "A width-view (%d-bit) cannot be wider than its source '%.*s' (%d-bit)",
+										      cast(int)view_w, LIT(other_scratch->token.string), cast(int)src_w);
+									}
+									break;
+								default:
+									error(spec->type, "A width-view must be an 8, 16, 32, or 64-bit integer type, got a %d-bit type", cast(int)view_w);
+									break;
+								}
+							}
+
+							// 3. A view does not carry its own pin; it inherits the source's register.
+							if (pin.len != 0) {
+								error(spec->value, "A width-view cannot also be pinned to a register; it inherits the source operand's register");
+							}
+
+							ed.kind       = AsmTemplateEntityDecl_Register;
+							ed.view_of    = src_index;
+							ed.view_bits  = view_w;
+							// A view is not itself an input/output/scratch slot for allocation:
+							// mark it so the lowering passes skip it. Reuse the Scratch group but
+							// with view_of >= 0 as the discriminator (see lowering note).
+						}
 					}
 
 					array_add(asm_template_entity_decls, ed);
