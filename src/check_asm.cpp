@@ -411,24 +411,37 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 		GB_ASSERT(spec->name->kind == Ast_Ident);
 
 		Entity *input = scope_lookup(scope, spec->name->Ident.interned, spec->name->Ident.hash);
+		Entity *other_scratch = nullptr;
 
 		String pin = {};
 		if (spec->value != nullptr) {
-			if (spec->value->kind != Ast_AsmRegister) {
-				gbString s = expr_to_string(spec->value);
-				error(spec->value, "Expected an asm register, got %s", s);
-				gb_string_free(s);
-				continue;
-			}
+			if (spec->value->kind == Ast_Ident) {
+				other_scratch = scope_lookup(scope, spec->value->Ident.interned, spec->value->Ident.hash);
+				if (other_scratch) {
+					auto group = check_asm_find_group(other_scratch, *asm_template_entity_decls, nullptr);
+					if (!group) {
+						error(spec->value, "This must be another parameter, got %.*s", LIT(other_scratch->token.string));
+					}
+				} else {
+					error(spec->value, "Undefined parameter declaration '%.*s'", LIT(spec->value->Ident.token.string));
+				}
+			} else {
+				if (spec->value->kind != Ast_AsmRegister) {
+					gbString s = expr_to_string(spec->value);
+					error(spec->value, "Expected an asm register or scratch parameter, got %s", s);
+					gb_string_free(s);
+					continue;
+				}
 
-			ast_node(reg, AsmRegister, spec->value);
-			pin = reg->name.string;
-			if (pin == "any") {
-				pin = {};
-			}
-			if (pin.len != 0) {
-				if (string_set_update(&pin_set, pin)) {
-					error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
+				ast_node(reg, AsmRegister, spec->value);
+				pin = reg->name.string;
+				if (pin == "any") {
+					pin = {};
+				}
+				if (pin.len != 0) {
+					if (string_set_update(&pin_set, pin)) {
+						error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
+					}
 				}
 			}
 		}
@@ -454,6 +467,20 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 					ed.param_group = AsmTemplateEntityDeclParamGroup_Scratch;
 					ed.total_index = cast(i32)asm_template_entity_decls->count;
 					ed.pin = pin;
+
+					if (other_scratch != nullptr) {
+						// TODO(bill): subsetting parameters
+						// p0:  u64 = %rax,
+						// p0b: u8  = p0,
+						//
+						// or
+						//
+						// p0:  u64, // implied = %any
+						// p0b: u8 = p0, // the 8-bit subsection of the same register, if possible
+						GB_ASSERT(spec->value != nullptr);
+						error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration");
+					}
+
 					array_add(asm_template_entity_decls, ed);
 				} else {
 					TokenPos pos = found->token.pos;
@@ -478,8 +505,12 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 				} else {
 					error(spec_, "Asm register has already been pinned");
 				}
-			}
 
+				if (other_scratch != nullptr) {
+					GB_ASSERT(spec->value != nullptr);
+					error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration");
+				}
+			}
 		} else {
 			GB_ASSERT(spec->tied_name->kind == Ast_Ident);
 
@@ -522,6 +553,11 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 
 			i->pin = pin;
 			o->pin = pin;
+
+			if (other_scratch != nullptr) {
+				GB_ASSERT(spec->value != nullptr);
+				error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration, not a tie");
+			}
 		}
 	}
 }

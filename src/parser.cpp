@@ -2642,7 +2642,15 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					type = parse_type(f);
 				}
 				if (allow_token(f, Token_Eq)) {
-					value = parse_asm_register(f);
+					if (f->curr_token.kind == Token_Ident) {
+						value = parse_ident(f);
+					} else if (f->curr_token.kind == Token_Mod) {
+						value = parse_asm_register(f);
+					} else {
+						error(f->curr_token, "Expected a register or scratch parameter");
+						Ast *dummy = parse_expr(f, true);
+						gb_unused(dummy);
+					}
 				}
 
 				if (tied_name != nullptr) {
