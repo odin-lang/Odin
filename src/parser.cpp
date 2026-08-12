@@ -2451,16 +2451,18 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 
 			base = parse_asm_operand(f, false);
 
+			// [base]
+			// [base + index]
+			// [base + index + disp]
+			// [base + index*scale] // *, <<, >>
+			// [base + index*scale + disp]
 			if (allow_token(f, Token_Add)) {
-				Ast *possible_index = parse_asm_operand(f, false);
+				index = parse_asm_operand(f, false);
 				if (allow_token(f, Token_Mul) ||
 				    allow_token(f, Token_Shl) ||
 				    allow_token(f, Token_Shr)) {
 				    	scale_op = f->prev_token;
-					index = possible_index;
 					scale = parse_asm_operand(f, false);
-				} else {
-					index = possible_index;
 				}
 				if (allow_token(f, Token_Add)) {
 					disp = parse_asm_operand(f, false);
@@ -2469,6 +2471,7 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 
 			Token close = expect_token(f, Token_CloseBracket);
 
+			// [...]:type
 			if (allow_token(f, Token_Colon)) {
 				type = parse_type(f);
 			}
