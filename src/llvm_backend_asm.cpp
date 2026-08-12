@@ -407,6 +407,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		// Pass 3: clobbers
 		// Only the Scratch group. Unpinned register scratch was already emitted as an
 		// output in Pass 1, so it is skipped here.
+		StringSet emitted_reg_clobbers = {};
+		string_set_init(&emitted_reg_clobbers);
+		defer (string_set_destroy(&emitted_reg_clobbers));
+
 		for (isize i = 0; i < ops->count; i++) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
 
@@ -425,6 +429,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			case AsmTemplateEntityDecl_Register: // pinned -> real clobber
 				GB_ASSERT(e.pin.len != 0);
 				raw("~{"); put(e.pin); raw("}");
+				string_set_update(&emitted_reg_clobbers, e.pin);
 				break;
 			case AsmTemplateEntityDecl_Memory:   // general memory clobber
 				raw("~{memory}");
@@ -433,6 +438,17 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			default:
 				GB_PANIC("asm: invalid scratch operand kind");
 			}
+		}
+
+		// Explicit register clobbers from #clobber <reg>, deduped against the pinned
+		// scratch clobbers already emitted above.
+		for (String const &reg : tmpl_entity->AsmTemplate.clobber_registers_set) {
+			if (string_set_exists(&emitted_reg_clobbers, reg)) {
+				continue; // already clobbered as a pinned scratch; don't double-emit
+			}
+			sep();
+			raw("~{"); put(reg); raw("}");
+			string_set_update(&emitted_reg_clobbers, reg);
 		}
 
 		// Template-level clobbers derived from #clobber cc / #clobber memory.
@@ -444,7 +460,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				raw("~{cc}");    // AArch64 uses ~{cc}
 			}
 		}
-		if (tmpl_entity->AsmTemplate.clobber_memory && memory_clobbered_already) {
+		if (tmpl_entity->AsmTemplate.clobber_memory && !memory_clobbered_already) {
 			sep();
 			raw("~{memory}");
 		}
