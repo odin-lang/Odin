@@ -834,6 +834,25 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 					}
 				}
 			} else {
+				if (t->curr_rune == '`' && peek_byte(t, 0) == '`') {
+					advance_to_next_rune(t); // consume the second opening ```
+					advance_to_next_rune(t); // consume the third opening ```
+					for (;;) {
+						Rune r = t->curr_rune;
+						if (r < 0) {
+							tokenizer_err(t, "Triple-quote multi-line string literal not terminated");
+							break;
+						}
+						advance_to_next_rune(t);
+						if (r == quote && t->curr_rune == '`' && peek_byte(t, 0) == '`') {
+							advance_to_next_rune(t); // consume the second closing ```
+							advance_to_next_rune(t); // consume the third closing ```
+							break;
+						}
+					}
+					token->string.len = t->curr - token->string.text;
+					goto semicolon_check;
+				}
 				for (;;) {
 					Rune r = t->curr_rune;
 					if (r < 0) {

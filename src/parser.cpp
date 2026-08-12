@@ -854,7 +854,9 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 		}
 		break;
 	case Token_String:
-		if (s.len >= 3 && s.text[0] == '"' && s.text[1] == '"' && s.text[2] == '"') {
+		if (s.len >= 6 &&
+		    ((s.text[0] == '"' && s.text[1] == '"' && s.text[2] == '"') ||
+		     (s.text[0] == '`' && s.text[1] == '`' && s.text[2] == '`'))) {
 			if (!unquote_string_triple(ast_allocator(f), &s, string_contains_char(s, '\r'))) {
 				syntax_error(token, "Invalid multi-line string literal");
 			}

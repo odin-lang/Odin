@@ -1233,7 +1233,6 @@ gb_internal i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_c
 	return 2;
 }
 
-
 // Escape-process the already-delimiter-stripped body of a triple-quoted
 // string. `force_new` is true when `s` already points at a freshly allocated
 // buffer, so the "no escapes" fast path still reports a new allocation.
@@ -1282,40 +1281,8 @@ gb_internal i32 unquote_string_triple_content(gbAllocator a, String *s_, String 
 	return 2;
 }
 
-// Java-style triple-quoted string literal `"""..."""` with indentation stripping for the multi-line form.
-//
-// If the literal spans multiple lines, the whitespace preceding the closing
-// `"""` on its own line determines the indentation removed from every content
-// line, and the line breaks immediately after the opening `"""` and before the
-// closing `"""` are excluded from the value. A single-line `"""..."""` keeps
-// its content verbatim (aside from escape processing). Escapes are processed in
-// both forms.
-//
-// 0 == failure
-// 1 == original memory
-// 2 == new allocation
-gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carriage_return=false) {
-	String s = *s_;
-	isize n = s.len;
-	// Smallest valid literal is `""""""` (an empty string): 6 bytes.
-	if (n < 6) {
-		return 0;
-	}
-	if (!(s[0]   == '"' && s[1]   == '"' && s[2]   == '"') ||
-	    !(s[n-1] == '"' && s[n-2] == '"' && s[n-3] == '"')) {
-		return 0;
-	}
-
-	String body = make_string(s.text+3, s.len-6);
-
-	// Single-line form: no newline, so no indentation handling.
-	if (!string_contains_char(body, '\n')) {
-		return unquote_string_triple_content(a, s_, body, has_carriage_return, false);
-	}
-
-
-	// The opening delimiter's line (everything up to the first newline) must
-	// contain only whitespace; content is not allowed on that line.
+gb_internal bool triple_string_deindent(gbAllocator a, String body, String *out) {
+	// Opening delimiter's line (up to the first newline) must be blank.
 	isize first_nl = 0;
 	while (body.text[first_nl] != '\n') {
 		first_nl += 1;
@@ -1323,12 +1290,12 @@ gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carria
 	for (isize i = 0; i < first_nl; i++) {
 		u8 c = body.text[i];
 		if (c != ' ' && c != '\t' && c != '\r') {
-			return 0;
+			return false;
 		}
 	}
 
-	// The closing delimiter must sit on its own line; the whitespace between
-	// the final newline and the closing `"""` is the indentation to strip.
+	// Closing delimiter's line: whitespace after the final newline is the
+	// indentation prefix removed from each content line.
 	isize last_nl = body.len - 1;
 	while (body.text[last_nl] != '\n') {
 		last_nl -= 1;
@@ -1337,14 +1304,12 @@ gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carria
 	for (isize i = 0; i < indent.len; i++) {
 		u8 c = indent.text[i];
 		if (c != ' ' && c != '\t') {
-			return 0;
+			return false;
 		}
 	}
 
-	// The value is everything strictly between those two newlines.
 	String content = make_string(body.text+first_nl+1, last_nl-(first_nl+1));
 
-	// De-indent line by line into a fresh buffer (never larger than `content`).
 	u8 *dbuf = gb_alloc_array(a, u8, content.len+1);
 	isize dlen = 0;
 	isize li = 0;
@@ -1371,12 +1336,12 @@ gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carria
 		} else {
 			if (len < indent.len) {
 				gb_free(a, dbuf);
-				return 0; // content line is less indented than the closing """
+				return false; // content line is less indented than the closing delimiter
 			}
 			for (isize k = 0; k < indent.len; k++) {
 				if (content.text[li+k] != indent.text[k]) {
 					gb_free(a, dbuf);
-					return 0; // indentation whitespace does not match
+					return false; // indentation whitespace does not match
 				}
 			}
 			for (isize k = indent.len; k < len; k++) {
@@ -1391,12 +1356,63 @@ gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carria
 		li = le + 1;
 	}
 
-	// Process escapes on the de-indented content (already a fresh buffer).
-	return unquote_string_triple_content(a, s_, make_string(dbuf, dlen), false, true);
+	*out = make_string(dbuf, dlen);
+	return true;
 }
 
+// Triple-quoted string literal, dispatching on the delimiter:
+//   `"`  -> escapes processed; multi-line form is Java-style de-indented
+//   `\`` -> raw (no escapes); multi-line form is ALSO Java-style de-indented
+//           (carriage returns normalized), embedded single/double backticks
+//           are literal
+//
+// 0 == failure
+// 1 == original memory
+// 2 == new allocation
+gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carriage_return=false) {
+	String s = *s_;
+	isize n = s.len;
+	if (n < 6) {
+		return 0;
+	}
+	u8 quote = s[0];
+	if (quote != '"' && quote != '`') {
+		return 0;
+	}
+	if (!(s[0]   == quote && s[1]   == quote && s[2]   == quote) ||
+	    !(s[n-1] == quote && s[n-2] == quote && s[n-3] == quote)) {
+		return 0;
+	}
 
+	String body = make_string(s.text+3, s.len-6);
+	bool raw = (quote == '`');
 
+	// Single-line form: no indentation handling.
+	if (!string_contains_char(body, '\n')) {
+		if (raw) {
+			if (has_carriage_return) {
+				*s_ = strip_carriage_return(a, body);
+				return 2;
+			}
+			*s_ = body;
+			return 1;
+		}
+		return unquote_string_triple_content(a, s_, body, has_carriage_return, false);
+	}
+
+	// Multi-line form: Java-style de-indentation for both delimiters.
+	String di = {};
+	if (!triple_string_deindent(a, body, &di)) {
+		return 0;
+	}
+	if (raw) {
+		// Raw: the de-indented content is used verbatim (no escape processing).
+		*s_ = di;
+		return 2;
+	}
+	// Processed: run escape sequences on the de-indented content.
+	return unquote_string_triple_content(a, s_, di, false, true);
+}
 gb_internal bool string_is_valid_identifier(String str) {
 	if (str.len <= 0) return false;
 
