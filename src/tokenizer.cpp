@@ -793,6 +793,32 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			Rune quote = curr_rune;
 			token->kind = Token_String;
 			if (curr_rune == '"') {
+				// NOTE(bill): Python-style triple-quoted string literal `"""..."""`.
+				if (t->curr_rune == '"' && peek_byte(t, 0) == '"') {
+					advance_to_next_rune(t); // consume the second opening `"`
+					advance_to_next_rune(t); // consume the third opening `"`
+					for (;;) {
+						Rune r = t->curr_rune;
+						if (r < 0) {
+							tokenizer_err(t, "Triple-quote multi-line string literal not terminated");
+							break;
+						}
+						advance_to_next_rune(t);
+						// A closing `"""` is three consecutive quotes: `r` plus the
+						// next two runes. `t->curr_rune` is now the second quote and
+						// `peek_byte(t, 0)` is the third.
+						if (r == quote && t->curr_rune == '"' && peek_byte(t, 0) == '"') {
+							advance_to_next_rune(t); // consume the second closing `"`
+							advance_to_next_rune(t); // consume the third closing `"`
+							break;
+						}
+						if (r == '\\') {
+							scan_escape(t);
+						}
+					}
+					token->string.len = t->curr - token->string.text;
+					goto semicolon_check;
+				}
 				for (;;) {
 					Rune r = t->curr_rune;
 					if (r == '\n' || r < 0) {

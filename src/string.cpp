@@ -1234,6 +1234,168 @@ gb_internal i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_c
 }
 
 
+// Escape-process the already-delimiter-stripped body of a triple-quoted
+// string. `force_new` is true when `s` already points at a freshly allocated
+// buffer, so the "no escapes" fast path still reports a new allocation.
+//
+// 0 == failure
+// 1 == original memory
+// 2 == new allocation
+gb_internal i32 unquote_string_triple_content(gbAllocator a, String *s_, String s, bool has_carriage_return, bool force_new) {
+	if (!string_contains_char(s, '\\')) {
+		if (has_carriage_return) {
+			*s_ = strip_carriage_return(a, s);
+			return 2;
+		}
+		*s_ = s;
+		return force_new ? 2 : 1;
+	}
+	if (has_carriage_return) {
+		s = strip_carriage_return(a, s);
+	}
+	u8 rune_temp[4] = {};
+	isize buf_len = 3*s.len / 2 + 1;
+	u8 *buf = gb_alloc_array(a, u8, buf_len);
+	isize offset = 0;
+	while (s.len > 0) {
+		String tail_string = {};
+		Rune r = 0;
+		bool multiple_bytes = false;
+		// NOTE: quote==0 makes unquote_char treat `"` as an ordinary byte
+		// (it only rejects a bare quote when quote is '"' or '\''), while
+		// `\\` escapes — including `\"` — are still handled.
+		bool success = unquote_char(s, 0, &r, &multiple_bytes, &tail_string);
+		if (!success) {
+			gb_free(a, buf);
+			return 0;
+		}
+		s = tail_string;
+		if (r < 0x80 || !multiple_bytes) {
+			buf[offset++] = cast(u8)r;
+		} else {
+			isize size = gb_utf8_encode_rune(rune_temp, r);
+			gb_memmove(buf+offset, rune_temp, size);
+			offset += size;
+		}
+	}
+	*s_ = make_string(buf, offset);
+	return 2;
+}
+
+// Java-style triple-quoted string literal `"""..."""` with indentation stripping for the multi-line form.
+//
+// If the literal spans multiple lines, the whitespace preceding the closing
+// `"""` on its own line determines the indentation removed from every content
+// line, and the line breaks immediately after the opening `"""` and before the
+// closing `"""` are excluded from the value. A single-line `"""..."""` keeps
+// its content verbatim (aside from escape processing). Escapes are processed in
+// both forms.
+//
+// 0 == failure
+// 1 == original memory
+// 2 == new allocation
+gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carriage_return=false) {
+	String s = *s_;
+	isize n = s.len;
+	// Smallest valid literal is `""""""` (an empty string): 6 bytes.
+	if (n < 6) {
+		return 0;
+	}
+	if (!(s[0]   == '"' && s[1]   == '"' && s[2]   == '"') ||
+	    !(s[n-1] == '"' && s[n-2] == '"' && s[n-3] == '"')) {
+		return 0;
+	}
+
+	String body = make_string(s.text+3, s.len-6);
+
+	// Single-line form: no newline, so no indentation handling.
+	if (!string_contains_char(body, '\n')) {
+		return unquote_string_triple_content(a, s_, body, has_carriage_return, false);
+	}
+
+
+	// The opening delimiter's line (everything up to the first newline) must
+	// contain only whitespace; content is not allowed on that line.
+	isize first_nl = 0;
+	while (body.text[first_nl] != '\n') {
+		first_nl += 1;
+	}
+	for (isize i = 0; i < first_nl; i++) {
+		u8 c = body.text[i];
+		if (c != ' ' && c != '\t' && c != '\r') {
+			return 0;
+		}
+	}
+
+	// The closing delimiter must sit on its own line; the whitespace between
+	// the final newline and the closing `"""` is the indentation to strip.
+	isize last_nl = body.len - 1;
+	while (body.text[last_nl] != '\n') {
+		last_nl -= 1;
+	}
+	String indent = make_string(body.text+last_nl+1, body.len-(last_nl+1));
+	for (isize i = 0; i < indent.len; i++) {
+		u8 c = indent.text[i];
+		if (c != ' ' && c != '\t') {
+			return 0;
+		}
+	}
+
+	// The value is everything strictly between those two newlines.
+	String content = make_string(body.text+first_nl+1, last_nl-(first_nl+1));
+
+	// De-indent line by line into a fresh buffer (never larger than `content`).
+	u8 *dbuf = gb_alloc_array(a, u8, content.len+1);
+	isize dlen = 0;
+	isize li = 0;
+	for (;;) {
+		isize le = li;
+		while (le < content.len && content.text[le] != '\n') {
+			le += 1;
+		}
+		isize len = le - li;
+		if (len > 0 && content.text[li+len-1] == '\r') {
+			len -= 1; // normalize CRLF line endings
+		}
+
+		bool blank = true;
+		for (isize k = 0; k < len; k++) {
+			u8 c = content.text[li+k];
+			if (c != ' ' && c != '\t') {
+				blank = false;
+				break;
+			}
+		}
+		if (blank) {
+			// A whitespace-only line contributes an empty line.
+		} else {
+			if (len < indent.len) {
+				gb_free(a, dbuf);
+				return 0; // content line is less indented than the closing """
+			}
+			for (isize k = 0; k < indent.len; k++) {
+				if (content.text[li+k] != indent.text[k]) {
+					gb_free(a, dbuf);
+					return 0; // indentation whitespace does not match
+				}
+			}
+			for (isize k = indent.len; k < len; k++) {
+				dbuf[dlen++] = content.text[li+k];
+			}
+		}
+
+		if (le >= content.len) {
+			break;
+		}
+		dbuf[dlen++] = '\n';
+		li = le + 1;
+	}
+
+	// Process escapes on the de-indented content (already a fresh buffer).
+	return unquote_string_triple_content(a, s_, make_string(dbuf, dlen), false, true);
+}
+
+
 
 gb_internal bool string_is_valid_identifier(String str) {
 	if (str.len <= 0) return false;
