@@ -921,7 +921,7 @@ non_zero_append_elem_string :: proc(#no_alias array: ^$T/[dynamic]$E/u8, arg: $A
 // Note: Prefer using the procedure group `non_zero_append`.
 @builtin
 non_zero_append_elem_fixed_capacity_string :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, arg: $A/string) -> (num_appended: int) {
-	return append_fixed_capacity_elem(array, transmute([]byte)arg)
+	return append_fixed_capacity_elems(array, ..transmute([]E)arg)
 }
 
 
