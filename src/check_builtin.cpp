@@ -5815,7 +5815,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(ct->kind == Type_Basic);
 				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5866,7 +5866,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(ct->kind == Type_Basic);
 				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5903,7 +5903,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(elem->kind == Type_Basic);
 				if (elem->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected a float which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected a float type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5952,7 +5952,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(elem->kind == Type_Basic);
 				if (elem->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected a float which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected a float type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
