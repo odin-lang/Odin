@@ -1081,11 +1081,9 @@ test_memory_compare_zero :: proc(t: ^testing.T) {
 	}
 }
 
-// Runs identical append/inject/remove sequences for a #soa[dynamic] array
+// Runs identical append/inject/remove/pop sequences for a #soa[dynamic] array
 // and an AoS [dynamic] reference, comparing all elements after each
-// stage. Covers appends, injections (interior, at the end, and past the
-// end where the gap must read as zero elements), unordered and ordered
-// removes.
+// stage. Covers appends, injections, pops, unordered and ordered removes.
 @(test)
 test_soa_array_append_inject_remove :: proc(t: ^testing.T) {
 	check :: proc(t: ^testing.T, $E: typeid, mk: proc(i: int) -> E) {
@@ -1241,6 +1239,74 @@ test_soa_array_append_inject_remove :: proc(t: ^testing.T) {
 		testing.expect_value(t, n, 1)
 		testing.expect_value(t, err, nil)
 		non_zero_append(&ref, mk(42))
+		expect_same(t, soa, ref)
+
+		// interleave pops from both ends
+		n, err = append(&soa, ..buf[:])
+		testing.expect_value(t, n, 32)
+		testing.expect_value(t, err, nil)
+		append(&ref, ..buf[:])
+		for _ in 0..<8 {
+			testing.expect_value(t, pop_soa(&soa), pop(&ref))
+			testing.expect_value(t, pop_front_soa(&soa), pop_front(&ref))
+		}
+		expect_same(t, soa, ref)
+
+		// safe pops from both ends, down to empty
+		popped: E
+		for len(ref) > 0 {
+			popped, ok = pop_safe_soa(&soa)
+			testing.expect(t, ok)
+			testing.expect_value(t, popped, pop(&ref))
+			if len(ref) == 0 {
+				break
+			}
+			popped, ok = pop_front_safe_soa(&soa)
+			testing.expect(t, ok)
+			testing.expect_value(t, popped, pop_front(&ref))
+		}
+		expect_same(t, soa, ref)
+		testing.expect_value(t, len(soa), 0)
+
+		// safe pops must report failure on an empty array
+		_, ok = pop_safe_soa(&soa)
+		testing.expect(t, !ok)
+		_, ok = pop_front_safe_soa(&soa)
+		testing.expect(t, !ok)
+
+		// test procedure groups resolution for the builtin names
+		for i in 0..<10 {
+			append(&soa, mk(700 + i))
+			append(&ref, mk(700 + i))
+		}
+		ok, err = inject_at(&soa, 3, mk(800))
+		testing.expect(t, ok)
+		testing.expect_value(t, err, nil)
+		inject_at(&ref, 3, mk(800))
+		expect_same(t, soa, ref)
+
+		ok, err = inject_at(&soa, 2, ..buf[:BATCH_LEN])
+		testing.expect(t, ok)
+		testing.expect_value(t, err, nil)
+		inject_at(&ref, 2, ..buf[:BATCH_LEN])
+		expect_same(t, soa, ref)
+
+		ordered_remove(&soa, 4)
+		ordered_remove(&ref, 4)
+		unordered_remove(&soa, 1)
+		unordered_remove(&ref, 1)
+		expect_same(t, soa, ref)
+
+		testing.expect_value(t, pop(&soa), pop(&ref))
+		testing.expect_value(t, pop_front(&soa), pop_front(&ref))
+		expect_same(t, soa, ref)
+
+		popped, ok = pop_safe(&soa)
+		testing.expect(t, ok)
+		testing.expect_value(t, popped, pop(&ref))
+		popped, ok = pop_front_safe(&soa)
+		testing.expect(t, ok)
+		testing.expect_value(t, popped, pop_front(&ref))
 		expect_same(t, soa, ref)
 	}
 
