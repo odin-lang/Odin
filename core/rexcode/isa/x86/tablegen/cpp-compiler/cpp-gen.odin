@@ -134,93 +134,91 @@ main :: proc() {
 		}
 	}
 	strings.write_string(&sb, "\n");
-	{
-		strings.write_string(&sb, """
-			enum ClobberFlags : u16 {
-				ClobberFlag_CF = 1<<0,
-				ClobberFlag_PF = 1<<1,
-				ClobberFlag_AF = 1<<2,
-				ClobberFlag_ZF = 1<<3,
-				ClobberFlag_SF = 1<<4,
-				ClobberFlag_OF = 1<<5,
-				ClobberFlag_DF = 1<<6,
-				ClobberFlag_IF = 1<<7,
-				ClobberFlag_TF = 1<<8,
-			};
-			enum SideEffectFlags : u16 {
-				SideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)
-				SideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)
-				SideEffectFlag_HINT        = 1<<2, // microarchitectural hint, architecturally inert (PAUSE/PREFETCH*/ENDBR)
-				SideEffectFlag_CACHE       = 1<<3, // cache-line maintenance with coherence effects (CLFLUSH/CLWB)
-				SideEffectFlag_TRAP        = 1<<4, // may deliberately raise a fault (#UD/#BR): UD0-2, BOUND
-				SideEffectFlag_INTERRUPT   = 1<<5, // software interrupt / syscall gate
-				SideEffectFlag_HALT        = 1<<6, // stops execution until an external event
-				SideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state
-				SideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns
-				SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
-			};
-			enum ClobberRegs : u16 {
-				ClobberReg_RAX    = 1<<0,
-				ClobberReg_RBX    = 1<<1,
-				ClobberReg_RCX    = 1<<2,
-				ClobberReg_RDX    = 1<<3,
-				ClobberReg_RSI    = 1<<4,
-				ClobberReg_RDI    = 1<<5,
-				ClobberReg_RSP    = 1<<6,
-				ClobberReg_RBP    = 1<<7,
-				ClobberReg_R11    = 1<<8,
-				ClobberReg_XMM0   = 1<<9,
-				ClobberReg_VECTOR = 1<<10,
-				ClobberReg_MXCSR  = 1<<11,
-				ClobberReg_FPU_ST = 1<<12,
-				ClobberReg_FPU_SW = 1<<13,
-			};
-			enum OperandSet : u8 {
-				OperandSet_OP0 = 1<<0,
-				OperandSet_OP1 = 1<<1,
-				OperandSet_OP2 = 1<<2,
-				OperandSet_OP3 = 1<<3,
-			};
-			struct Clobber {
-				OperandSet      written;
-				OperandSet      read;
-				ClobberRegs     implicit_wr;
-				ClobberRegs     implicit_rd;
-				ClobberFlags    flags_wr;
-				ClobberFlags    flags_undef;
-				ClobberFlags    flags_rd;
-				bool            writes_mem;
-				bool            reads_mem;
-				SideEffectFlags side_effects;
+	strings.write_string(&sb, """
+		enum ClobberFlags : u16 {
+			ClobberFlag_CF = 1<<0,
+			ClobberFlag_PF = 1<<1,
+			ClobberFlag_AF = 1<<2,
+			ClobberFlag_ZF = 1<<3,
+			ClobberFlag_SF = 1<<4,
+			ClobberFlag_OF = 1<<5,
+			ClobberFlag_DF = 1<<6,
+			ClobberFlag_IF = 1<<7,
+			ClobberFlag_TF = 1<<8,
+		};
+		enum SideEffectFlags : u16 {
+			SideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)
+			SideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)
+			SideEffectFlag_HINT        = 1<<2, // microarchitectural hint, architecturally inert (PAUSE/PREFETCH*/ENDBR)
+			SideEffectFlag_CACHE       = 1<<3, // cache-line maintenance with coherence effects (CLFLUSH/CLWB)
+			SideEffectFlag_TRAP        = 1<<4, // may deliberately raise a fault (#UD/#BR): UD0-2, BOUND
+			SideEffectFlag_INTERRUPT   = 1<<5, // software interrupt / syscall gate
+			SideEffectFlag_HALT        = 1<<6, // stops execution until an external event
+			SideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state
+			SideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns
+			SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
+		};
+		enum ClobberRegs : u16 {
+			ClobberReg_RAX    = 1<<0,
+			ClobberReg_RBX    = 1<<1,
+			ClobberReg_RCX    = 1<<2,
+			ClobberReg_RDX    = 1<<3,
+			ClobberReg_RSI    = 1<<4,
+			ClobberReg_RDI    = 1<<5,
+			ClobberReg_RSP    = 1<<6,
+			ClobberReg_RBP    = 1<<7,
+			ClobberReg_R11    = 1<<8,
+			ClobberReg_XMM0   = 1<<9,
+			ClobberReg_VECTOR = 1<<10,
+			ClobberReg_MXCSR  = 1<<11,
+			ClobberReg_FPU_ST = 1<<12,
+			ClobberReg_FPU_SW = 1<<13,
+		};
+		enum OperandSet : u8 {
+			OperandSet_OP0 = 1<<0,
+			OperandSet_OP1 = 1<<1,
+			OperandSet_OP2 = 1<<2,
+			OperandSet_OP3 = 1<<3,
+		};
+		struct Clobber {
+			OperandSet      written;
+			OperandSet      read;
+			ClobberRegs     implicit_wr;
+			ClobberRegs     implicit_rd;
+			ClobberFlags    flags_wr;
+			ClobberFlags    flags_undef;
+			ClobberFlags    flags_rd;
+			bool            writes_mem;
+			bool            reads_mem;
+			SideEffectFlags side_effects;
 
-				bool implies_clobber_cc() {
-					u16 const CC_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
-					                    ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
-					return ((flags_wr | flags_undef) & CC_MASK) != 0;
-				}
-				bool implies_clobber_memory() {
-					return writes_mem || reads_mem ||
-						(side_effects & (SideEffectFlag_FENCE |
-						                 SideEffectFlag_CACHE |
-						                 SideEffectFlag_SERIALIZING)) != 0;
-				}
-				bool implies_side_effects() {
-					u16 const VOLATILE_SE =
-						SideEffectFlag_FENCE       |
-						SideEffectFlag_SERIALIZING |
-						SideEffectFlag_CACHE       |
-						SideEffectFlag_TRAP        |
-						SideEffectFlag_INTERRUPT   |
-						SideEffectFlag_HALT        |
-						SideEffectFlag_PRIVILEGED  |
-						SideEffectFlag_CONTROL     |
-						SideEffectFlag_CET;
-						// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
-					return ((side_effects & VOLATILE_SE) != 0);
-				}
-			};
-		""")
-	}
+			bool implies_clobber_cc() {
+				u16 const CC_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
+				                    ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
+				return ((flags_wr | flags_undef) & CC_MASK) != 0;
+			}
+			bool implies_clobber_memory() {
+				return writes_mem || reads_mem ||
+					(side_effects & (SideEffectFlag_FENCE |
+					                 SideEffectFlag_CACHE |
+					                 SideEffectFlag_SERIALIZING)) != 0;
+			}
+			bool implies_side_effects() {
+				u16 const VOLATILE_SE =
+					SideEffectFlag_FENCE       |
+					SideEffectFlag_SERIALIZING |
+					SideEffectFlag_CACHE       |
+					SideEffectFlag_TRAP        |
+					SideEffectFlag_INTERRUPT   |
+					SideEffectFlag_HALT        |
+					SideEffectFlag_PRIVILEGED  |
+					SideEffectFlag_CONTROL     |
+					SideEffectFlag_CET;
+					// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
+				return ((side_effects & VOLATILE_SE) != 0);
+			}
+		};
+	""")
 	strings.write_string(&sb, "\n");
 
 
