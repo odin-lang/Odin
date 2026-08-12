@@ -538,6 +538,14 @@ test_ticket_mutex :: proc(t: ^testing.T) {
 
 @test
 test_benaphore :: proc(t: ^testing.T) {
+	// NOTE(Jeroen): Regularly times out on the simulated RISC-V CI runners,
+	//               so we're skipping the test there.
+
+	when ODIN_ARCH == .riscv64 {
+		log.infof("Skipped on riscv64")
+		return
+	}
+
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	Data :: struct {
