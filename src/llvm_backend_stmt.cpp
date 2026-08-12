@@ -496,11 +496,12 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	case Type_EnumeratedArray: {
 		if (val_type != nullptr) {
 			val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
-			// NOTE(bill): Override the idx value for the enumeration
-			Type *index_type = expr_type->EnumeratedArray.index;
-			if (compare_exact_values(Token_NotEq, *expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
-				idx = lb_emit_arith(p, Token_Add, idx, lb_const_value(m, index_type, *expr_type->EnumeratedArray.min_value), index_type);
-			}
+		}
+		// NOTE(bill): Override the idx value for the enumeration
+		// this does not depend on the value operand, which may be blank
+		Type *index_type = expr_type->EnumeratedArray.index;
+		if (compare_exact_values(Token_NotEq, *expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+			idx = lb_emit_arith(p, Token_Add, idx, lb_const_value(m, index_type, *expr_type->EnumeratedArray.min_value), index_type);
 		}
 		break;
 	}
