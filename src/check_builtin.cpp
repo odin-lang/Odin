@@ -1691,6 +1691,11 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 					return false;
 				}
 
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, &y, t_int);
+				if (y.mode == Addressing_Invalid) {
+					return false;
+				}
 				n = exact_value_to_u64(y.value);
 			}
 
@@ -1936,6 +1941,11 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector", LIT(builtin_name));
 				return false;
 			}
+			// convert constant from BigInt to a type before `exact_value_to_i64`; here it also sets the return arity
+			convert_to_typed(c, &n, t_int);
+			if (n.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 divisor = exact_value_to_i64(n.value);
 			if (divisor < 1 || divisor > max_count || (max_count % divisor != 0)) {
 				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector , got %lld, which must have been divisible by %lld", LIT(builtin_name), cast(long long)divisor, cast(long long)max_count);
@@ -1970,6 +1980,11 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 					gbString xs = type_to_string(x[i].type);
 					error(x[i].expr, "'%.*s' expected a constant integer, got '%s'", LIT(builtin_name), xs);
 					gb_string_free(xs);
+					return false;
+				}
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, x+i, t_int);
+				if (x[i].mode == Addressing_Invalid) {
 					return false;
 				}
 				i64 val = exact_value_to_i64(x[i].value);
@@ -6024,6 +6039,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &len, t_int);
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
 			if (len.mode == Addressing_Constant) {
 				i64 n = exact_value_to_i64(len.value);
 				if (n < 0) {
@@ -6063,6 +6084,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gbString str = type_to_string(len.type);
 				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
+				return false;
+			}
+
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &len, t_int);
+			if (len.mode == Addressing_Invalid) {
 				return false;
 			}
 
@@ -6594,6 +6621,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(z.expr, "Expected a constant integer for the scale in '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &z, t_int);
+			if (z.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 n = exact_value_to_i64(z.value);
 			if (n <= 0) {
 				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), n);
@@ -6719,6 +6751,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 			if (y.mode != Addressing_Constant && is_type_integer(y.type)) {
 				error(y.expr, "Second argument to '%.*s' representing the locality must be an integer in the range 0..=3", LIT(builtin_name));
+				return false;
+			}
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &y, t_int);
+			if (y.mode == Addressing_Invalid) {
 				return false;
 			}
 			i64 locality = exact_value_to_i64(y.value);
@@ -7772,6 +7809,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &op, t_int);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
 				error(op.expr, "Expected a non-negative integer for the index of procedure parameter value, got %lld", cast(long long)index);
@@ -7831,6 +7873,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &op, t_int);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
 				error(op.expr, "Expected a non-negative integer for the index of procedure parameter value, got %lld", cast(long long)index);
@@ -7925,6 +7972,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &op, t_int);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
 				error(op.expr, "Expected a non-negative integer for the index of record parameter value, got %lld", cast(long long)index);
