@@ -403,6 +403,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			}
 		}
 
+		bool memory_clobbered_already = false;
 		// Pass 3: clobbers
 		// Only the Scratch group. Unpinned register scratch was already emitted as an
 		// output in Pass 1, so it is skipped here.
@@ -427,10 +428,25 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				break;
 			case AsmTemplateEntityDecl_Memory:   // general memory clobber
 				raw("~{memory}");
+				memory_clobbered_already = true;
 				break;
 			default:
 				GB_PANIC("asm: invalid scratch operand kind");
 			}
+		}
+
+		// Template-level clobbers derived from #clobber cc / #clobber memory.
+		if (tmpl_entity->AsmTemplate.clobber_cc) {
+			sep();
+			if (build_context.metrics.arch == TargetArch_amd64) {
+				raw("~{flags}"); // x86 EFLAGS condition codes
+			} else {
+				raw("~{cc}");    // AArch64 uses ~{cc}
+			}
+		}
+		if (tmpl_entity->AsmTemplate.clobber_memory && memory_clobbered_already) {
+			sep();
+			raw("~{memory}");
 		}
 
 		// Build the callee type

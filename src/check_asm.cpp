@@ -734,7 +734,9 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 
 
 template <typename AsmCtx>
-gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInstruction *instr, u16 mnemonic, Slice<Operand> const &operands, u8 previous_prefix, Ast *previous_prefix_instr) {
+gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
+                                u16 mnemonic, Slice<Operand> const &operands,
+                                u8 previous_prefix, Ast *previous_prefix_instr) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = asm_ctx->encoding_forms(mnemonic);
 	String name = asm_ctx->mnemonic_strings[mnemonic];
@@ -860,6 +862,15 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 				error(instr->name, "Asm prefix cannot be applied to '%.*s'", LIT(name));
 			}
 		}
+
+		GB_ASSERT(tmpl_entity->kind == Entity_AsmTemplate);
+
+		// Handle clobbering from mnemonic
+		auto clobber = asm_ctx->clobber(mnemonic);
+
+		tmpl_entity->AsmTemplate.clobber_cc       |= clobber.implies_clobber_cc();
+		tmpl_entity->AsmTemplate.clobber_memory   |= clobber.implies_clobber_memory();
+		tmpl_entity->AsmTemplate.has_side_effects |= clobber.side_effects != 0;
 		return;
 	}
 
@@ -1260,12 +1271,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	entity->type = type;
 
+	auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
+
 	check_asm_specs(ctx, ate->param_scope, at->specs, &ate->decls);
 	{ // check clobbers
-		StringSet reg_set = {};
-		string_set_init(&reg_set, 16);
-		defer (string_set_destroy(&reg_set));
-
 		bool clobber_cc     = false;
 		bool clobber_memory = false;
 
@@ -1276,7 +1285,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				String reg = asm_reg->name.string;
 				Operand operand = {};
 				if (check_register(asm_ctx, &operand, asm_reg)) {
-					if (string_set_update(&reg_set, reg)) {
+					if (string_set_update(clobber_registers_set, reg)) {
 						error(clobber->value, "#clobber %%%.*s has already been defined", LIT(reg));
 					}
 				}
@@ -1302,6 +1311,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				break;
 			}
 		}
+
+		entity->AsmTemplate.clobber_cc     = clobber_cc;
+		entity->AsmTemplate.clobber_memory = clobber_memory;
 	}
 
 	// collect label decls
@@ -1363,7 +1375,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix = cast(u8)mnemonic;
 				previous_prefix_instr = instruction_;
 			} else if (res == CheckMnemomic_Mnemonic) {
-				check_mnemonic(asm_ctx, ctx, instr, mnemonic, slice_from_array(operands), previous_prefix, previous_prefix_instr);
+				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, slice_from_array(operands), previous_prefix, previous_prefix_instr);
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
 			} else {

@@ -345,7 +345,7 @@ struct Entity {
 
 			bool clobber_cc;
 			bool clobber_memory;
-			Array<String> clobber_registers;
+			StringSet clobber_registers_set;
 
 			Scope *param_scope;
 			Scope *label_scope;

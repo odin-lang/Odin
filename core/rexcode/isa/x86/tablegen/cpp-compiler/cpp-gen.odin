@@ -187,6 +187,18 @@ main :: proc() {
 		strings.write_string(&sb, "\t\tbool            writes_mem;\n")
 		strings.write_string(&sb, "\t\tbool            reads_mem;\n")
 		strings.write_string(&sb, "\t\tSideEffectFlags side_effects;\n")
+		strings.write_string(&sb, "\n")
+		strings.write_string(&sb, "\t\tbool implies_clobber_cc() {\n")
+		strings.write_string(&sb, "\t\t\tu16 const CC_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|\n")
+		strings.write_string(&sb, "\t\t\t                    ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;\n")
+		strings.write_string(&sb, "\t\t\treturn ((flags_wr | flags_undef) & CC_MASK) != 0;\n")
+		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t\tbool implies_clobber_memory() {\n")
+		strings.write_string(&sb, "\t\t\treturn writes_mem || reads_mem ||\n")
+		strings.write_string(&sb, "\t\t\t\t(side_effects & (SideEffectFlag_FENCE |\n")
+		strings.write_string(&sb, "\t\t\t\t                 SideEffectFlag_CACHE |\n")
+		strings.write_string(&sb, "\t\t\t\t                 SideEffectFlag_SERIALIZING)) != 0;\n")
+		strings.write_string(&sb, "\t\t}\n")
 		strings.write_string(&sb, "\t};\n")
 	}
 	strings.write_string(&sb, "\n");
