@@ -7313,6 +7313,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			i64 bit_offset = 0;
 			i64 bit_size = 0;
+			bool found = false;
 			for_array(i, type->BitField.fields) {
 				Entity *f = type->BitField.fields[i];
 				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
@@ -7322,8 +7323,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				if (field_name == str) {
 					bit_offset = type->BitField.bit_offsets[i];
 					bit_size = type->BitField.bit_sizes[i];
+					found = true;
 					break;
 				}
+			}
+			// A missing field would otherwise return 0, which is also the correct offset of the
+			// first declared field, so the caller has nothing to test for.
+			if (!found) {
+				gbString t = type_to_string(type);
+				error(ce->args[1], "'%s' is not a field of type %s", field_name.cstring(), t);
+				gb_string_free(t);
+				return false;
 			}
 
 			i64 value = 0;
