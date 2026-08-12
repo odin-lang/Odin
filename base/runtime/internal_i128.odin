@@ -92,9 +92,11 @@ floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 
 
 // f64 -> unsigned integer conversion (truncating toward zero)
-// port of clang/compiler-rt's fp_fixuint_impl.inc;
 // decompose the f64 into significand and exponent, shift the significand into place,
 // saturate out of range values
+//
+// Uses parts of compiler-rt's [fp_fixuint_impl.inc](https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/builtins/fp_fixuint_impl.inc), licensed under the [Apache License v2.0 with LLVM Exceptions](https://github.com/llvm/llvm-project/blob/main/compiler-rt/LICENSE.TXT).
+// For a copy of the license, see `LICENSE-compiler-rt.txt`.
 @(private="file")
 fixuint :: proc "contextless" ($U: typeid, a: f64) -> U where intrinsics.type_is_unsigned(U) {
 	BITS             :: 8 * size_of(U)
@@ -129,9 +131,11 @@ fixuint :: proc "contextless" ($U: typeid, a: f64) -> U where intrinsics.type_is
 }
 
 // f64 -> signed integer conversion (truncating toward zero)
-// port of clang/compiler-rt's fp_fixint_impl.inc;
 // decompose the f64 into significand and exponent, shift the significand into place,
 // saturate out of range values
+//
+// Uses parts of compiler-rt's [fp_fixuint_impl.inc](https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/builtins/fp_fixuint_impl.inc), licensed under the [Apache License v2.0 with LLVM Exceptions](https://github.com/llvm/llvm-project/blob/main/compiler-rt/LICENSE.TXT).
+// For a copy of the license, see `LICENSE-compiler-rt.txt`.
 @(private="file")
 fixint :: proc "contextless" ($T: typeid, a: f64) -> T where intrinsics.type_is_integer(T), !intrinsics.type_is_unsigned(T) {
 	BITS             :: 8 * size_of(T)
@@ -257,4 +261,3 @@ divti3 :: proc "c" (a, b: i128) -> i128 {
 
 	return i128((udivmodti4(u128(an), u128(bn), nil) ~ u_s_a) - u_s_a) // negate if negative
 }
-
