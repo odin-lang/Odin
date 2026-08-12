@@ -2824,6 +2824,10 @@ gb_internal bool is_type_comparable(Type *t) {
 		if (t->Struct.soa_kind != StructSoa_None) {
 			return false;
 		}
+		// an unspecialized polymorphic record has no values to compare
+		if (is_type_polymorphic_record_unspecialized(t)) {
+			return false;
+		}
 		if (t->Struct.is_raw_union) {
 			return is_type_simple_compare(t);
 		}
