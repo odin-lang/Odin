@@ -2459,11 +2459,11 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 				    	scale_op = f->prev_token;
 					index = possible_index;
 					scale = parse_asm_operand(f, false);
-					if (allow_token(f, Token_Add)) {
-						disp = parse_asm_operand(f, false);
-					}
 				} else {
 					index = possible_index;
+				}
+				if (allow_token(f, Token_Add)) {
+					disp = parse_asm_operand(f, false);
 				}
 			}
 

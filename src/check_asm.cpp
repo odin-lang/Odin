@@ -977,7 +977,9 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 					default:
 						{
 							gbString s = expr_to_string(index.expr);
-							error(index.expr, "An index must be an integer register, got %s", s);
+							gbString t = type_to_string(index.type);
+							error(index.expr, "An index must be an integer register, got %s of type %s", s, t);
+							gb_string_free(t);
 							gb_string_free(s);
 							ok_kind = false;
 						}
