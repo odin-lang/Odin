@@ -5770,6 +5770,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 			}
+			// An untyped constant is integer-like, so it reaches the size check below, and
+			// `type_size_of` asserts on a type that has no size. 
+			// no-op on typed types
+			convert_to_typed(c, &x, default_type(x.type));
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+
 			i64 sz = type_size_of(x.type);
 			if (sz < 2) {
 				gbString xts = type_to_string(x.type);
