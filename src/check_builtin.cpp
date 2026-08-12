@@ -1441,6 +1441,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 
 			i64 num_elems = get_array_type_count(x.type);
+			// the range is taken from the lane count; it has to meet the same limit a written bit_set does
+			if (num_elems > 128) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' would produce a bit_set of %lld bits, exceeding the maximum of 128, got '%s'", LIT(builtin_name), cast(long long)num_elems, xs);
+				gb_string_free(xs);
+				return false;
+			}
 
 			Type *result_type = alloc_type_bit_set();
 			result_type->BitSet.elem = t_int;
