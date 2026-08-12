@@ -480,21 +480,18 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		LLVMTypeRef fn_ty = LLVMFunctionType(ret_ty, param_types.data, cast(unsigned)param_types.count, /*vararg*/false);
 
-		// TODO(bill): determine all the cases when side-effects happen
-		bool has_side_effects = tmpl_node->has_side_effects;
-
 		LLVMValueRef ia = LLVMGetInlineAsm(
 			fn_ty,
 			asm_string,  cast(size_t)gb_string_length(asm_string),
 			constraints, cast(size_t)gb_string_length(constraints),
-			/*HasSideEffects*/ has_side_effects,
-			/*IsAlignStack*/   tmpl_node->is_align_stack,
+			/*HasSideEffects*/ tmpl_entity->AsmTemplate.has_side_effects,
+			/*IsAlignStack*/   tmpl_entity->AsmTemplate.is_align_stack,
 			LLVMInlineAsmDialectATT,
 			/*CanThrow*/       false);
 
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-		if (false) {
+		if (true) {
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!

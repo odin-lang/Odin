@@ -205,7 +205,18 @@ struct Asm_amd64 {
 				                 SideEffectFlag_SERIALIZING)) != 0;
 		}
 		bool implies_side_effects() {
-			return side_effects;
+			u16 const VOLATILE_SE =
+				SideEffectFlag_FENCE       |
+				SideEffectFlag_SERIALIZING |
+				SideEffectFlag_CACHE       |
+				SideEffectFlag_TRAP        |
+				SideEffectFlag_INTERRUPT   |
+				SideEffectFlag_HALT        |
+				SideEffectFlag_PRIVILEGED  |
+				SideEffectFlag_CONTROL     |
+				SideEffectFlag_CET;
+				// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
+			return ((side_effects & VOLATILE_SE) != 0);
 		}
 	};
 
