@@ -100,7 +100,6 @@ struct Asm_amd64 {
 	enum PrefixKind : u8 { PrefixKind_None, PrefixKind_Lock, PrefixKind_Rep, PrefixKind_Repne, PrefixKind_Other };
 
 
-	// Register classes (upper byte)
 	static const u16 REG_CLASS_NONE  = 0x000;
 	static const u16 REG_CLASS_GPR64 = 0x100;
 	static const u16 REG_CLASS_GPR32 = 0x200;
@@ -117,7 +116,7 @@ struct Asm_amd64 {
 	static const u16 REG_CLASS_BND   = 0xD00;  // bound
 	static const u16 REG_CLASS_MM    = 0xE00;  // MMX
 	static const u16 REG_CLASS_ST    = 0xF00;  // x87 FPU
-
+	
 	enum Register : u16 {
 		REG_INVALID, REG_RAX, REG_RCX, REG_RDX, REG_RBX, REG_RSP, REG_RBP, REG_RSI, REG_RDI, REG_R8, REG_R9, REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, 
 		REG_R15, REG_EAX, REG_ECX, REG_EDX, REG_EBX, REG_ESP, REG_EBP, REG_ESI, REG_EDI, REG_R8D, REG_R9D, REG_R10D, REG_R11D, REG_R12D, REG_R13D, REG_R14D, 
@@ -160,25 +159,25 @@ struct Asm_amd64 {
 		SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
 	};
 	enum ClobberRegs : u16 {
-		ClobberReg_RAX    = 1<<0, 
-		ClobberReg_RBX    = 1<<1, 
-		ClobberReg_RCX    = 1<<2, 
-		ClobberReg_RDX    = 1<<3, 
-		ClobberReg_RSI    = 1<<4, 
-		ClobberReg_RDI    = 1<<5, 
-		ClobberReg_RSP    = 1<<6, 
-		ClobberReg_RBP    = 1<<7, 
+		ClobberReg_RAX    = 1<<0,
+		ClobberReg_RBX    = 1<<1,
+		ClobberReg_RCX    = 1<<2,
+		ClobberReg_RDX    = 1<<3,
+		ClobberReg_RSI    = 1<<4,
+		ClobberReg_RDI    = 1<<5,
+		ClobberReg_RSP    = 1<<6,
+		ClobberReg_RBP    = 1<<7,
 		ClobberReg_R11    = 1<<8,
-		ClobberReg_XMM0   = 1<<9, 
-		ClobberReg_VECTOR = 1<<10, 
-		ClobberReg_MXCSR  = 1<<11, 
-		ClobberReg_FPU_ST = 1<<12, 
+		ClobberReg_XMM0   = 1<<9,
+		ClobberReg_VECTOR = 1<<10,
+		ClobberReg_MXCSR  = 1<<11,
+		ClobberReg_FPU_ST = 1<<12,
 		ClobberReg_FPU_SW = 1<<13,
 	};
-	enum OperandSet : u8 { 
-		OperandSet_OP0 = 1<<0, 
-		OperandSet_OP1 = 1<<1, 
-		OperandSet_OP2 = 1<<2, 
+	enum OperandSet : u8 {
+		OperandSet_OP0 = 1<<0,
+		OperandSet_OP1 = 1<<1,
+		OperandSet_OP2 = 1<<2,
 		OperandSet_OP3 = 1<<3,
 	};
 	struct Clobber {
@@ -219,7 +218,6 @@ struct Asm_amd64 {
 			return ((side_effects & VOLATILE_SE) != 0);
 		}
 	};
-
 	static u16 const register_codes[REG_COUNT];
 	static String const register_strings[REG_COUNT];
 
@@ -340,6 +338,7 @@ struct Asm_amd64 {
 	StringMap<Mnemonic> mnemonic_map;
 	StringMap<Prefix>   prefix_map;
 	StringMap<Register> register_map;
+
 	bool init() {
 		string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 		for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
@@ -355,6 +354,7 @@ struct Asm_amd64 {
 		}
 		return true;
 	}
+
 	Mnemonic mnemonic_lookup(String const &name) {
 		Mnemonic *found = string_map_get(&mnemonic_map, name);
 		return found ? *found : M_INVALID;
@@ -518,22 +518,13 @@ struct Asm_amd64 {
 		case PrefixKind_Lock:
 			if (!form.lock_ok()) {
 				return false;
-			} else {
-				if (requires_memory_dest_) *requires_memory_dest_ = true;
-				return true;
 			}
+			if (requires_memory_dest_) *requires_memory_dest_ = true;
+			return true;
 		case PrefixKind_Rep:
-			if (!form.rep_ok()) {
-				return false;
-			} else {
-				return true;
-			}
+			return form.rep_ok();
 		case PrefixKind_Repne:
-			if (!form.rep_ok()) {
-				return false;
-			} else {
-				return true;
-			}
+			return form.rep_ok();
 		case PrefixKind_Other:
 		case PrefixKind_None:
 			return true;

@@ -19,15 +19,18 @@ main :: proc() {
 
 	sb := strings.builder_make()
 
-	strings.write_string(&sb, "// =============================================================================\n")
-	strings.write_string(&sb, "// GENERATED FILE - DO NOT EDIT\n")
-	strings.write_string(&sb, "// =============================================================================\n")
-	strings.write_string(&sb, "//\n")
-	strings.write_string(&sb, "// Produces a C++ equivalent of the encoding table from core:rexcode written in Odin\n")
-	strings.write_string(&sb, "//   odin run tablegen              # Stage A: ENCODING_TABLE -> generated/ + this file\n")
-	strings.write_string(&sb, "//   odin run tablegen/generated    # Stage B: typed Odin literals -> tables/*.bin\n")
-	strings.write_string(&sb, "//   odin run tablegen/cpp-compiler # Stage C: typed Odin literals -> C++ literals\n")
-	strings.write_string(&sb, "//\n\n\n")
+	strings.write_string(&sb, """
+	// =============================================================================
+	// GENERATED FILE - DO NOT EDIT
+	// =============================================================================
+	//
+	// Produces a C++ equivalent of the encoding table from core:rexcode written in Odin
+	//   odin run tablegen              # Stage A: ENCODING_TABLE -> generated/ + this file
+	//   odin run tablegen/generated    # Stage B: typed Odin literals -> tables/*.bin
+	//   odin run tablegen/cpp-compiler # Stage C: typed Odin literals -> C++ literals
+	//
+	\n\n
+	""")
 
 
 	// strings.write_string(&sb, "struct Asm_a
@@ -91,24 +94,25 @@ main :: proc() {
 
 	{
 		strings.write_string(&sb, "\n");
-		strings.write_string(&sb, "\t// Register classes (upper byte)\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_NONE  = 0x000;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_GPR64 = 0x100;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_GPR32 = 0x200;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_GPR16 = 0x300;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_GPR8  = 0x400;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_GPR8H = 0x500;  // AH, CH, DH, BH - legacy high byte regs\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_XMM   = 0x600;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_YMM   = 0x700;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_ZMM   = 0x800;\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_K     = 0x900;  // opmask\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_SEG   = 0xA00;  // segment\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_CR    = 0xB00;  // control\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_DR    = 0xC00;  // debug\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_BND   = 0xD00;  // bound\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_MM    = 0xE00;  // MMX\n")
-		strings.write_string(&sb, "\tstatic const u16 REG_CLASS_ST    = 0xF00;  // x87 FPU\n")
-		strings.write_string(&sb, "\n");
+		strings.write_string(&sb, """
+			static const u16 REG_CLASS_NONE  = 0x000;
+			static const u16 REG_CLASS_GPR64 = 0x100;
+			static const u16 REG_CLASS_GPR32 = 0x200;
+			static const u16 REG_CLASS_GPR16 = 0x300;
+			static const u16 REG_CLASS_GPR8  = 0x400;
+			static const u16 REG_CLASS_GPR8H = 0x500;  // AH, CH, DH, BH - legacy high byte regs
+			static const u16 REG_CLASS_XMM   = 0x600;
+			static const u16 REG_CLASS_YMM   = 0x700;
+			static const u16 REG_CLASS_ZMM   = 0x800;
+			static const u16 REG_CLASS_K     = 0x900;  // opmask
+			static const u16 REG_CLASS_SEG   = 0xA00;  // segment
+			static const u16 REG_CLASS_CR    = 0xB00;  // control
+			static const u16 REG_CLASS_DR    = 0xC00;  // debug
+			static const u16 REG_CLASS_BND   = 0xD00;  // bound
+			static const u16 REG_CLASS_MM    = 0xE00;  // MMX
+			static const u16 REG_CLASS_ST    = 0xF00;  // x87 FPU
+			\n
+		""")
 		{
 			count := uint(0)
 			ROW_COUNT :: 16
@@ -131,89 +135,91 @@ main :: proc() {
 	}
 	strings.write_string(&sb, "\n");
 	{
-		strings.write_string(&sb, "\tenum ClobberFlags : u16 {\n")
-		strings.write_string(&sb, "\t\tClobberFlag_CF = 1<<0,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_PF = 1<<1,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_AF = 1<<2,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_ZF = 1<<3,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_SF = 1<<4,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_OF = 1<<5,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_DF = 1<<6,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_IF = 1<<7,\n")
-		strings.write_string(&sb, "\t\tClobberFlag_TF = 1<<8,\n")
-		strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, "\tenum SideEffectFlags : u16 {\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_HINT        = 1<<2, // microarchitectural hint, architecturally inert (PAUSE/PREFETCH*/ENDBR)\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_CACHE       = 1<<3, // cache-line maintenance with coherence effects (CLFLUSH/CLWB)\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_TRAP        = 1<<4, // may deliberately raise a fault (#UD/#BR): UD0-2, BOUND\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_INTERRUPT   = 1<<5, // software interrupt / syscall gate\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_HALT        = 1<<6, // stops execution until an external event\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns\n")
-		strings.write_string(&sb, "\t\tSideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops\n")
-		strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, "\tenum ClobberRegs : u16 {\n")
-		strings.write_string(&sb, "\t\tClobberReg_RAX    = 1<<0, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RBX    = 1<<1, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RCX    = 1<<2, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RDX    = 1<<3, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RSI    = 1<<4, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RDI    = 1<<5, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RSP    = 1<<6, \n")
-		strings.write_string(&sb, "\t\tClobberReg_RBP    = 1<<7, \n")
-		strings.write_string(&sb, "\t\tClobberReg_R11    = 1<<8,\n")
-		strings.write_string(&sb, "\t\tClobberReg_XMM0   = 1<<9, \n")
-		strings.write_string(&sb, "\t\tClobberReg_VECTOR = 1<<10, \n")
-		strings.write_string(&sb, "\t\tClobberReg_MXCSR  = 1<<11, \n")
-		strings.write_string(&sb, "\t\tClobberReg_FPU_ST = 1<<12, \n")
-		strings.write_string(&sb, "\t\tClobberReg_FPU_SW = 1<<13,\n")
-		strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, "\tenum OperandSet : u8 { \n")
-		strings.write_string(&sb, "\t\tOperandSet_OP0 = 1<<0, \n")
-		strings.write_string(&sb, "\t\tOperandSet_OP1 = 1<<1, \n")
-		strings.write_string(&sb, "\t\tOperandSet_OP2 = 1<<2, \n")
-		strings.write_string(&sb, "\t\tOperandSet_OP3 = 1<<3,\n")
-		strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, "\tstruct Clobber {\n")
-		strings.write_string(&sb, "\t\tOperandSet      written;\n")
-		strings.write_string(&sb, "\t\tOperandSet      read;\n")
-		strings.write_string(&sb, "\t\tClobberRegs     implicit_wr;\n")
-		strings.write_string(&sb, "\t\tClobberRegs     implicit_rd;\n")
-		strings.write_string(&sb, "\t\tClobberFlags    flags_wr;\n")
-		strings.write_string(&sb, "\t\tClobberFlags    flags_undef;\n")
-		strings.write_string(&sb, "\t\tClobberFlags    flags_rd;\n")
-		strings.write_string(&sb, "\t\tbool            writes_mem;\n")
-		strings.write_string(&sb, "\t\tbool            reads_mem;\n")
-		strings.write_string(&sb, "\t\tSideEffectFlags side_effects;\n")
-		strings.write_string(&sb, "\n")
-		strings.write_string(&sb, "\t\tbool implies_clobber_cc() {\n")
-		strings.write_string(&sb, "\t\t\tu16 const CC_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|\n")
-		strings.write_string(&sb, "\t\t\t                    ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;\n")
-		strings.write_string(&sb, "\t\t\treturn ((flags_wr | flags_undef) & CC_MASK) != 0;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\tbool implies_clobber_memory() {\n")
-		strings.write_string(&sb, "\t\t\treturn writes_mem || reads_mem ||\n")
-		strings.write_string(&sb, "\t\t\t\t(side_effects & (SideEffectFlag_FENCE |\n")
-		strings.write_string(&sb, "\t\t\t\t                 SideEffectFlag_CACHE |\n")
-		strings.write_string(&sb, "\t\t\t\t                 SideEffectFlag_SERIALIZING)) != 0;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\tbool implies_side_effects() {\n")
-		strings.write_string(&sb, "\t\t\tu16 const VOLATILE_SE =\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_FENCE       |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_SERIALIZING |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_CACHE       |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_TRAP        |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_INTERRUPT   |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_HALT        |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_PRIVILEGED  |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_CONTROL     |\n")
-		strings.write_string(&sb, "\t\t\t\tSideEffectFlag_CET;\n")
-		strings.write_string(&sb, "\t\t\t\t// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.\n")
-		strings.write_string(&sb, "\t\t\treturn ((side_effects & VOLATILE_SE) != 0);\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, """
+			enum ClobberFlags : u16 {
+				ClobberFlag_CF = 1<<0,
+				ClobberFlag_PF = 1<<1,
+				ClobberFlag_AF = 1<<2,
+				ClobberFlag_ZF = 1<<3,
+				ClobberFlag_SF = 1<<4,
+				ClobberFlag_OF = 1<<5,
+				ClobberFlag_DF = 1<<6,
+				ClobberFlag_IF = 1<<7,
+				ClobberFlag_TF = 1<<8,
+			};
+			enum SideEffectFlags : u16 {
+				SideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)
+				SideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)
+				SideEffectFlag_HINT        = 1<<2, // microarchitectural hint, architecturally inert (PAUSE/PREFETCH*/ENDBR)
+				SideEffectFlag_CACHE       = 1<<3, // cache-line maintenance with coherence effects (CLFLUSH/CLWB)
+				SideEffectFlag_TRAP        = 1<<4, // may deliberately raise a fault (#UD/#BR): UD0-2, BOUND
+				SideEffectFlag_INTERRUPT   = 1<<5, // software interrupt / syscall gate
+				SideEffectFlag_HALT        = 1<<6, // stops execution until an external event
+				SideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state
+				SideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns
+				SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
+			};
+			enum ClobberRegs : u16 {
+				ClobberReg_RAX    = 1<<0,
+				ClobberReg_RBX    = 1<<1,
+				ClobberReg_RCX    = 1<<2,
+				ClobberReg_RDX    = 1<<3,
+				ClobberReg_RSI    = 1<<4,
+				ClobberReg_RDI    = 1<<5,
+				ClobberReg_RSP    = 1<<6,
+				ClobberReg_RBP    = 1<<7,
+				ClobberReg_R11    = 1<<8,
+				ClobberReg_XMM0   = 1<<9,
+				ClobberReg_VECTOR = 1<<10,
+				ClobberReg_MXCSR  = 1<<11,
+				ClobberReg_FPU_ST = 1<<12,
+				ClobberReg_FPU_SW = 1<<13,
+			};
+			enum OperandSet : u8 {
+				OperandSet_OP0 = 1<<0,
+				OperandSet_OP1 = 1<<1,
+				OperandSet_OP2 = 1<<2,
+				OperandSet_OP3 = 1<<3,
+			};
+			struct Clobber {
+				OperandSet      written;
+				OperandSet      read;
+				ClobberRegs     implicit_wr;
+				ClobberRegs     implicit_rd;
+				ClobberFlags    flags_wr;
+				ClobberFlags    flags_undef;
+				ClobberFlags    flags_rd;
+				bool            writes_mem;
+				bool            reads_mem;
+				SideEffectFlags side_effects;
+
+				bool implies_clobber_cc() {
+					u16 const CC_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
+					                    ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
+					return ((flags_wr | flags_undef) & CC_MASK) != 0;
+				}
+				bool implies_clobber_memory() {
+					return writes_mem || reads_mem ||
+						(side_effects & (SideEffectFlag_FENCE |
+						                 SideEffectFlag_CACHE |
+						                 SideEffectFlag_SERIALIZING)) != 0;
+				}
+				bool implies_side_effects() {
+					u16 const VOLATILE_SE =
+						SideEffectFlag_FENCE       |
+						SideEffectFlag_SERIALIZING |
+						SideEffectFlag_CACHE       |
+						SideEffectFlag_TRAP        |
+						SideEffectFlag_INTERRUPT   |
+						SideEffectFlag_HALT        |
+						SideEffectFlag_PRIVILEGED  |
+						SideEffectFlag_CONTROL     |
+						SideEffectFlag_CET;
+						// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
+					return ((side_effects & VOLATILE_SE) != 0);
+				}
+			};
+		""")
 	}
 	strings.write_string(&sb, "\n");
 
@@ -249,15 +255,15 @@ main :: proc() {
 		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
 		strings.write_string(&sb, "\tstruct Encoding {\n")
 		defer strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, "\t\tMnemonic        mnemonic;\n")
-		strings.write_string(&sb, "\t\tOperandType     ops[4];\n")
-		strings.write_string(&sb, "\t\tOperandEncoding enc[4];\n")
-		strings.write_string(&sb, "\t\tu8              opcode;\n")
-		strings.write_string(&sb, "\t\tu8              ext;\n")
-		strings.write_string(&sb, "\t\tEncodingFlags   flags;\n")
-
-
-		strings.write_string(&sb, "\n")
+		strings.write_string(&sb, """
+				Mnemonic        mnemonic;
+				OperandType     ops[4];
+				OperandEncoding enc[4];
+				u8              opcode;
+				u8              ext;
+				EncodingFlags   flags;
+		\n
+		""")
 		Encoding_Flags :: type_of(gen.Encoding{}.flags)
 
 		{
@@ -311,244 +317,226 @@ main :: proc() {
 	strings.write_string(&sb, "\tStringMap<Prefix>   prefix_map;\n")
 	strings.write_string(&sb, "\tStringMap<Register> register_map;\n")
 
-	{
-		strings.write_string(&sb, "\tbool init() {\n")
-		defer strings.write_string(&sb, "\t}\n")
+	strings.write_string(&sb, """
 
-		strings.write_string(&sb, "\t\tstring_map_init(&mnemonic_map, MNEMONIC_COUNT*2);\n")
-		strings.write_string(&sb, "\t\tfor (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {\n")
-		strings.write_string(&sb, "\t\t\tstring_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\tstring_map_init(&prefix_map, PREFIX_COUNT*2);\n")
-		strings.write_string(&sb, "\t\tfor (u8 r = PREFIX_INVALID+1; r < PREFIX_COUNT; r++) {\n")
-		strings.write_string(&sb, "\t\t\tstring_map_set(&prefix_map, prefix_strings[r], cast(Prefix)r);\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\tstring_map_init(&register_map, REG_COUNT*2);\n")
-		strings.write_string(&sb, "\t\tfor (u16 r = REG_INVALID+1; r < REG_COUNT; r++) {\n")
-		strings.write_string(&sb, "\t\t\tstring_map_set(&register_map, register_strings[r], cast(Register)r);\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn true;\n")
-	}
-	{
-		strings.write_string(&sb, "\tMnemonic mnemonic_lookup(String const &name) {\n")
-		defer strings.write_string(&sb, "\t}\n")
+		bool init() {
+			string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
+			for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
+				string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
+			}
+			string_map_init(&prefix_map, PREFIX_COUNT*2);
+			for (u8 r = PREFIX_INVALID+1; r < PREFIX_COUNT; r++) {
+				string_map_set(&prefix_map, prefix_strings[r], cast(Prefix)r);
+			}
+			string_map_init(&register_map, REG_COUNT*2);
+			for (u16 r = REG_INVALID+1; r < REG_COUNT; r++) {
+				string_map_set(&register_map, register_strings[r], cast(Register)r);
+			}
+			return true;
+		}
 
-		strings.write_string(&sb, "\t\tMnemonic *found = string_map_get(&mnemonic_map, name);\n")
-		strings.write_string(&sb, "\t\treturn found ? *found : M_INVALID;\n")
-	}
-	{
-		strings.write_string(&sb, "\tPrefix prefix_lookup(String const &name) {\n")
-		defer strings.write_string(&sb, "\t}\n")
+		Mnemonic mnemonic_lookup(String const &name) {
+			Mnemonic *found = string_map_get(&mnemonic_map, name);
+			return found ? *found : M_INVALID;
+		}
+		Prefix prefix_lookup(String const &name) {
+			Prefix *found = string_map_get(&prefix_map, name);
+			return found ? *found : PREFIX_INVALID;
+		}
+		Register register_lookup(String const &name) {
+			Register *found = string_map_get(&register_map, name);
+			return found ? *found : REG_INVALID;
+		}
+		Slice<Encoding> encoding_forms(/*Mnemonic*/ u16 m) const {
+			EncodeRun r = raw_encode_runs[m];
+			Encoding *ENCODE_FORMS = cast(Encoding *)raw_encode_forms;
+			return Slice<Encoding>{ENCODE_FORMS+r.start, r.count};
+		}
+		Clobber clobber(/*Mnemonic*/ u16 m) const {
+			Clobber *c = cast(Clobber *)raw_clobber_table;
+			return c[m];
+		}
+		u16 reg_class(/*Register*/ u16 r) const {
+			return 0xFF00 & r;
+		}
+		// size in bits for register
+		u16 reg_size(Register r) const {
+			switch (reg_class(register_codes[r])) {
+			case REG_CLASS_GPR64: return 64;
+			case REG_CLASS_GPR32: return 32;
+			case REG_CLASS_GPR16: return 16;
+			case REG_CLASS_GPR8:  return 8;
+			case REG_CLASS_GPR8H: return 8;
+			case REG_CLASS_XMM:   return 128;
+			case REG_CLASS_YMM:   return 256;
+			case REG_CLASS_ZMM:   return 512;
+			case REG_CLASS_K:     return 64;
+			case REG_CLASS_MM:    return 64;
+			case REG_CLASS_ST:    return 80;
+			case REG_CLASS_SEG:   return 16;
+			case REG_CLASS_CR:    return 64;
+			case REG_CLASS_DR:    return 64;
+			case REG_CLASS_BND:   return 128;
+			}
+			return 0;
+		}
+	""")
+	strings.write_string(&sb, "\n\n")
 
-		strings.write_string(&sb, "\t\tPrefix *found = string_map_get(&prefix_map, name);\n")
-		strings.write_string(&sb, "\t\treturn found ? *found : PREFIX_INVALID;\n")
-	}
-	{
-		strings.write_string(&sb, "\tRegister register_lookup(String const &name) {\n")
-		defer strings.write_string(&sb, "\t}\n")
+	strings.write_string(&sb, """
+		AsmOperandKind kind_from_operand_type(OperandType type) {
+			switch (type) {
+			case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
+			case OP_SREG: case OP_CR: case OP_DR:
+			case OP_XMM: case OP_YMM: case OP_ZMM:
+			case OP_MM:  case OP_K:   case OP_STI:
+			case OP_AL_IMPL:  case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:
+			case OP_CL_IMPL:  case OP_DX_IMPL:
+			case OP_ST0_IMPL: case OP_XMM0_IMPL:
+				return AsmOperand_Register;
+			case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
+			case OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:
+			case OP_YMM_M256: case OP_ZMM_M512:
+			case OP_MM_M64:
+			case OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:
+				return AsmOperand_Register_Or_Memory;
+			case OP_M:   case OP_M8:  case OP_M16: case OP_M32: case OP_M64:
+			case OP_M80: case OP_M128: case OP_M256: case OP_M512:
+			case OP_MOFFS8: case OP_MOFFS16: case OP_MOFFS32: case OP_MOFFS64:
+			case OP_M16_16: case OP_M16_32: case OP_M16_64:
+				return AsmOperand_Memory;
+			case OP_IMM8: case OP_IMM16: case OP_IMM32: case OP_IMM64:
+			case OP_IMM8SX:
+			case OP_ONE_IMPL:
+			case OP_PTR16_16: case OP_PTR16_32: case OP_PTR16_64:
+				return AsmOperand_Immediate;
+			case OP_REL8: case OP_REL32:
+				return AsmOperand_Label;
+			case OP_NONE:
+			default:
+				return AsmOperand_Invalid;
+			}
+		}
+	""")
+	strings.write_string(&sb, "\n\n")
 
-		strings.write_string(&sb, "\t\tRegister *found = string_map_get(&register_map, name);\n")
-		strings.write_string(&sb, "\t\treturn found ? *found : REG_INVALID;\n")
-	}
-	{
-		strings.write_string(&sb, "\tSlice<Encoding> encoding_forms(/*Mnemonic*/ u16 m) const {\n")
-		defer strings.write_string(&sb, "\t}\n")
+	strings.write_string(&sb, """
+		bool operand_type_is_implicit(OperandType t) {
+			switch (t) {
+			case OP_AL_IMPL:  case OP_AX_IMPL:
+			case OP_EAX_IMPL: case OP_RAX_IMPL:
+			case OP_CL_IMPL:  case OP_DX_IMPL:
+			case OP_ONE_IMPL:
+			case OP_ST0_IMPL: case OP_XMM0_IMPL:
+				return true;
+			}
+			return false;
+		}
+	""")
 
-		strings.write_string(&sb, "\t\tEncodeRun r = raw_encode_runs[m];\n")
-		strings.write_string(&sb, "\t\tEncoding *ENCODE_FORMS = cast(Encoding *)raw_encode_forms;\n")
-		strings.write_string(&sb, "\t\treturn Slice<Encoding>{ENCODE_FORMS+r.start, r.count};\n")
-	}
-	{
-		strings.write_string(&sb, "\tClobber clobber(/*Mnemonic*/ u16 m) const {\n")
-		defer strings.write_string(&sb, "\t}\n")
+	strings.write_string(&sb, "\n\n")
 
-		strings.write_string(&sb, "\t\tClobber *c = cast(Clobber *)raw_clobber_table;\n")
-		strings.write_string(&sb, "\t\treturn c[m];\n")
-	}
-	{
-		strings.write_string(&sb, "\tu16 reg_class(/*Register*/ u16 r) const {\n")
-		strings.write_string(&sb, "\t\treturn 0xFF00 & r;\n")
-		strings.write_string(&sb, "\t}\n")
-	}
-	{
-		strings.write_string(&sb, "\t// size in bits for register\n")
-		strings.write_string(&sb, "\tu16 reg_size(Register r) const {\n")
-		strings.write_string(&sb, "\t\tswitch (reg_class(register_codes[r])) {\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_GPR64: return 64;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_GPR32: return 32;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_GPR16: return 16;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_GPR8:  return 8;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_GPR8H: return 8;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_XMM:   return 128;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_YMM:   return 256;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_ZMM:   return 512;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_K:     return 64;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_MM:    return 64;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_ST:    return 80;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_SEG:   return 16;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_CR:    return 64;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_DR:    return 64;\n")
-		strings.write_string(&sb, "\t\tcase REG_CLASS_BND:   return 128;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn 0;\n")
-		strings.write_string(&sb, "\t}\n")
-	}
-	strings.write_string(&sb, "\n")
-	{
-		strings.write_string(&sb, "\tAsmOperandKind kind_from_operand_type(OperandType type) {\n")
-		strings.write_string(&sb, "\t\tswitch (type) {\n")
-		strings.write_string(&sb, "\t\tcase OP_R8:  case OP_R16: case OP_R32: case OP_R64:\n")
-		strings.write_string(&sb, "\t\tcase OP_SREG: case OP_CR: case OP_DR:\n")
-		strings.write_string(&sb, "\t\tcase OP_XMM: case OP_YMM: case OP_ZMM:\n")
-		strings.write_string(&sb, "\t\tcase OP_MM:  case OP_K:   case OP_STI:\n")
-		strings.write_string(&sb, "\t\tcase OP_AL_IMPL:  case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_CL_IMPL:  case OP_DX_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_ST0_IMPL: case OP_XMM0_IMPL:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmOperand_Register;\n")
-		strings.write_string(&sb, "\t\tcase OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:\n")
-		strings.write_string(&sb, "\t\tcase OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:\n")
-		strings.write_string(&sb, "\t\tcase OP_YMM_M256: case OP_ZMM_M512:\n")
-		strings.write_string(&sb, "\t\tcase OP_MM_M64:\n")
-		strings.write_string(&sb, "\t\tcase OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmOperand_Register_Or_Memory;\n")
-		strings.write_string(&sb, "\t\tcase OP_M:   case OP_M8:  case OP_M16: case OP_M32: case OP_M64:\n")
-		strings.write_string(&sb, "\t\tcase OP_M80: case OP_M128: case OP_M256: case OP_M512:\n")
-		strings.write_string(&sb, "\t\tcase OP_MOFFS8: case OP_MOFFS16: case OP_MOFFS32: case OP_MOFFS64:\n")
-		strings.write_string(&sb, "\t\tcase OP_M16_16: case OP_M16_32: case OP_M16_64:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmOperand_Memory;\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM8: case OP_IMM16: case OP_IMM32: case OP_IMM64:\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM8SX:\n")
-		strings.write_string(&sb, "\t\tcase OP_ONE_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_PTR16_16: case OP_PTR16_32: case OP_PTR16_64:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmOperand_Immediate;\n")
-		strings.write_string(&sb, "\t\tcase OP_REL8: case OP_REL32:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmOperand_Label;\n")
-		strings.write_string(&sb, "\t\tcase OP_NONE:\n")
-		strings.write_string(&sb, "\t\tdefault:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmOperand_Invalid;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t}\n")
-	}
-	strings.write_string(&sb, "\n")
-	{
-		strings.write_string(&sb, "\tbool operand_type_is_implicit(OperandType t) {\n")
-		strings.write_string(&sb, "\t\tswitch (t) {\n")
-		strings.write_string(&sb, "\t\tcase OP_AL_IMPL:  case OP_AX_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_EAX_IMPL: case OP_RAX_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_CL_IMPL:  case OP_DX_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_ONE_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_ST0_IMPL: case OP_XMM0_IMPL:\n")
-		strings.write_string(&sb, "\t\t\treturn true;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn false;\n")
-		strings.write_string(&sb, "\t}\n")
-	}
-	strings.write_string(&sb, "\n")
-	{
-		strings.write_string(&sb, "\tAsmRegClass operand_type_reg_class(OperandType t) {\n")
-		strings.write_string(&sb, "\t\tswitch (t) {\n")
-		strings.write_string(&sb, "\t\tcase OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:\n")
-		strings.write_string(&sb, "\t\tcase OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:\n")
-		strings.write_string(&sb, "\t\tcase OP_AL_IMPL: case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:\n")
-		strings.write_string(&sb, "\t\tcase OP_CL_IMPL: case OP_DX_IMPL:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmRegClass_Integer;\n")
-		strings.write_string(&sb, "\t\tcase OP_XMM: case OP_YMM: case OP_ZMM:\n")
-		strings.write_string(&sb, "\t\tcase OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:\n")
-		strings.write_string(&sb, "\t\tcase OP_YMM_M256: case OP_ZMM_M512:\n")
-		strings.write_string(&sb, "\t\tcase OP_XMM0_IMPL:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmRegClass_Vector; // xmm/ymm/zmm; float scalars also land here (see note)\n")
-		strings.write_string(&sb, "\t\tcase OP_K:\n")
-		strings.write_string(&sb, "\t\tcase OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:\n")
-		strings.write_string(&sb, "\t\t\treturn AsmRegClass_Mask;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn AsmRegClass_Unknown; // OP_M*, OP_IMM*, OP_REL*, OP_SREG/CR/DR/MM/STi, moffs, ptr, m16_16... : no GPR/XMM class constraint here\n")
-		strings.write_string(&sb, "\t}\n")
-	}
-	strings.write_string(&sb, "\n")
-	{
-		strings.write_string(&sb, "\tu16 operand_type_bit_width(OperandType t) {\n")
-		strings.write_string(&sb, "\t\tswitch (t) {\n")
-		strings.write_string(&sb, "\t\tcase OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;\n")
-		strings.write_string(&sb, "\t\tcase OP_R16: case OP_RM16: case OP_M16: case OP_AX_IMPL:  case OP_DX_IMPL: case OP_K_M16: return 16;\n")
-		strings.write_string(&sb, "\t\tcase OP_R32: case OP_RM32: case OP_M32: case OP_EAX_IMPL: case OP_XMM_M32: case OP_K_M32: return 32;\n")
-		strings.write_string(&sb, "\t\tcase OP_R64: case OP_RM64: case OP_M64: case OP_RAX_IMPL: case OP_XMM_M64: case OP_K_M64: case OP_MM: case OP_MM_M64: return 64;\n")
-		strings.write_string(&sb, "\t\tcase OP_M128: case OP_XMM: case OP_XMM_M128: case OP_XMM0_IMPL: return 128;\n")
-		strings.write_string(&sb, "\t\tcase OP_M256: case OP_YMM: case OP_YMM_M256: return 256;\n")
-		strings.write_string(&sb, "\t\tcase OP_M512: case OP_ZMM: case OP_ZMM_M512: return 512;\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM8:  return 8;\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM16: return 16;\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM32: return 32;\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM64: return 64;\n")
-		strings.write_string(&sb, "\t\tcase OP_REL8:  return 8;\n")
-		strings.write_string(&sb, "\t\tcase OP_REL32: return 32;\n")
-		strings.write_string(&sb, "\t\tcase OP_IMM8SX: return 8;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.\n")
-		strings.write_string(&sb, "\t}\n")
-	}
-	strings.write_string(&sb, "\n")
-	{
-		strings.write_string(&sb, "\tint form_explicit_slot(Encoding const &form, int explicit_index) {\n")
-		strings.write_string(&sb, "\t\tint seen = 0;\n")
-		strings.write_string(&sb, "\t\tfor (int j = 0; j < gb_count_of(form.ops); j++) {\n")
-		strings.write_string(&sb, "\t\t\tauto t = form.ops[j];\n")
-		strings.write_string(&sb, "\t\t\tif (!t) {\n")
-		strings.write_string(&sb, "\t\t\t\tbreak;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\t\tif (operand_type_is_implicit(t)) {\n")
-		strings.write_string(&sb, "\t\t\t\tcontinue;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\t\tif (seen == explicit_index) {\n")
-		strings.write_string(&sb, "\t\t\t\treturn j;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\t\tseen += 1;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn -1;\n")
-		strings.write_string(&sb, "\t}\n")
-
-	}
-	strings.write_string(&sb, "\n")
-	{
-		strings.write_string(&sb, "\tbool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) {\n")
-		strings.write_string(&sb, "\t\tPrefixKind kind = PrefixKind_None;\n")
-		strings.write_string(&sb, "\t\tif (prefix != 0) {\n")
-		strings.write_string(&sb, "\t\t\tswitch (prefix) {\n")
-		strings.write_string(&sb, "\t\t\tcase PREFIX_LOCK:  kind = PrefixKind_Lock;  break;\n")
-		strings.write_string(&sb, "\t\t\tcase PREFIX_REP:   kind = PrefixKind_Rep;   break;\n")
-		strings.write_string(&sb, "\t\t\tcase PREFIX_REPNE: kind = PrefixKind_Repne; break;\n")
-		strings.write_string(&sb, "\t\t\tdefault:           kind = PrefixKind_Other; break;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\tswitch (kind) {\n")
-		strings.write_string(&sb, "\t\tcase PrefixKind_Lock:\n")
-		strings.write_string(&sb, "\t\t\tif (!form.lock_ok()) {\n")
-		strings.write_string(&sb, "\t\t\t\treturn false;\n")
-		strings.write_string(&sb, "\t\t\t} else {\n")
-		strings.write_string(&sb, "\t\t\t\tif (requires_memory_dest_) *requires_memory_dest_ = true;\n")
-		strings.write_string(&sb, "\t\t\t\treturn true;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\tcase PrefixKind_Rep:\n")
-		strings.write_string(&sb, "\t\t\tif (!form.rep_ok()) {\n")
-		strings.write_string(&sb, "\t\t\t\treturn false;\n")
-		strings.write_string(&sb, "\t\t\t} else {\n")
-		strings.write_string(&sb, "\t\t\t\treturn true;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\tcase PrefixKind_Repne:\n")
-		strings.write_string(&sb, "\t\t\tif (!form.rep_ok()) {\n")
-		strings.write_string(&sb, "\t\t\t\treturn false;\n")
-		strings.write_string(&sb, "\t\t\t} else {\n")
-		strings.write_string(&sb, "\t\t\t\treturn true;\n")
-		strings.write_string(&sb, "\t\t\t}\n")
-		strings.write_string(&sb, "\t\tcase PrefixKind_Other:\n")
-		strings.write_string(&sb, "\t\tcase PrefixKind_None:\n")
-		strings.write_string(&sb, "\t\t\treturn true;\n")
-		strings.write_string(&sb, "\t\t}\n")
-		strings.write_string(&sb, "\t\treturn true;\n")
-		strings.write_string(&sb, "\t}\n")
-	}
+	strings.write_string(&sb, """
+		AsmRegClass operand_type_reg_class(OperandType t) {
+			switch (t) {
+			case OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:
+			case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
+			case OP_AL_IMPL: case OP_AX_IMPL: case OP_EAX_IMPL: case OP_RAX_IMPL:
+			case OP_CL_IMPL: case OP_DX_IMPL:
+				return AsmRegClass_Integer;
+			case OP_XMM: case OP_YMM: case OP_ZMM:
+			case OP_XMM_M32: case OP_XMM_M64: case OP_XMM_M128:
+			case OP_YMM_M256: case OP_ZMM_M512:
+			case OP_XMM0_IMPL:
+				return AsmRegClass_Vector; // xmm/ymm/zmm; float scalars also land here (see note)
+			case OP_K:
+			case OP_K_M8: case OP_K_M16: case OP_K_M32: case OP_K_M64:
+				return AsmRegClass_Mask;
+			}
+			return AsmRegClass_Unknown; // OP_M*, OP_IMM*, OP_REL*, OP_SREG/CR/DR/MM/STi, moffs, ptr, m16_16... : no GPR/XMM class constraint here
+		}
+	""")
 
 
-	strings.write_string(&sb, "};\n")
+	strings.write_string(&sb, "\n\n")
+
+	strings.write_string(&sb, """
+		u16 operand_type_bit_width(OperandType t) {
+			switch (t) {
+			case OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;
+			case OP_R16: case OP_RM16: case OP_M16: case OP_AX_IMPL:  case OP_DX_IMPL: case OP_K_M16: return 16;
+			case OP_R32: case OP_RM32: case OP_M32: case OP_EAX_IMPL: case OP_XMM_M32: case OP_K_M32: return 32;
+			case OP_R64: case OP_RM64: case OP_M64: case OP_RAX_IMPL: case OP_XMM_M64: case OP_K_M64: case OP_MM: case OP_MM_M64: return 64;
+			case OP_M128: case OP_XMM: case OP_XMM_M128: case OP_XMM0_IMPL: return 128;
+			case OP_M256: case OP_YMM: case OP_YMM_M256: return 256;
+			case OP_M512: case OP_ZMM: case OP_ZMM_M512: return 512;
+			case OP_IMM8:  return 8;
+			case OP_IMM16: return 16;
+			case OP_IMM32: return 32;
+			case OP_IMM64: return 64;
+			case OP_REL8:  return 8;
+			case OP_REL32: return 32;
+			case OP_IMM8SX: return 8;
+			}
+			return 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.
+		}
+	""")
+
+	strings.write_string(&sb, "\n\n")
+
+	strings.write_string(&sb, """
+		int form_explicit_slot(Encoding const &form, int explicit_index) {
+			int seen = 0;
+			for (int j = 0; j < gb_count_of(form.ops); j++) {
+				auto t = form.ops[j];
+				if (!t) {
+					break;
+				}
+				if (operand_type_is_implicit(t)) {
+					continue;
+				}
+				if (seen == explicit_index) {
+					return j;
+				}
+				seen += 1;
+			}
+			return -1;
+		}
+	""")
+
+	strings.write_string(&sb, "\n\n")
+
+	strings.write_string(&sb, """
+		bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) {
+			PrefixKind kind = PrefixKind_None;
+			if (prefix != 0) {
+				switch (prefix) {
+				case PREFIX_LOCK:  kind = PrefixKind_Lock;  break;
+				case PREFIX_REP:   kind = PrefixKind_Rep;   break;
+				case PREFIX_REPNE: kind = PrefixKind_Repne; break;
+				default:           kind = PrefixKind_Other; break;
+				}
+			}
+			switch (kind) {
+			case PrefixKind_Lock:
+				if (!form.lock_ok()) {
+					return false;
+				}
+				if (requires_memory_dest_) *requires_memory_dest_ = true;
+				return true;
+			case PrefixKind_Rep:
+				return form.rep_ok();
+			case PrefixKind_Repne:
+				return form.rep_ok();
+			case PrefixKind_Other:
+			case PrefixKind_None:
+				return true;
+			}
+			return true;
+		}
+	""")
+
+	strings.write_string(&sb, "\n};\n")
 
 	strings.write_string(&sb, "\n\n\n")
 
