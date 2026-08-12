@@ -5116,7 +5116,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Operand o = {};
 		check_expr(c, &o, ce->args[0]);
 
-		if (!is_type_integer(o.type) && (o.mode != Addressing_Constant)) {
+		if (!is_type_integer(o.type) || o.mode != Addressing_Constant) {
 			error(ce->args[0], "Expected a constant integer for '%.*s'", LIT(builtin_name));
 			return false;
 		}
@@ -5137,7 +5137,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Operand o = {};
 		check_expr(c, &o, ce->args[0]);
 
-		if (!is_type_integer_or_float(o.type) && (o.mode != Addressing_Constant)) {
+		if (!is_type_integer_or_float(o.type) || o.mode != Addressing_Constant) {
 			error(ce->args[0], "Expected a constant number for '%.*s'", LIT(builtin_name));
 			return false;
 		}
