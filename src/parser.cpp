@@ -845,6 +845,25 @@ gb_internal Ast *ast_uninit(AstFile *f, Token token) {
 }
 
 gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
+	auto token_pos_at_offset = [](Token const &token, isize offset) -> TokenPos {
+		TokenPos pos = token.pos;
+		if (offset <= 0) {
+			return pos;
+		}
+		String s = token.string;
+		isize n = gb_min(offset, s.len);
+		for (isize i = 0; i < n; i++) {
+			if (s.text[i] == '\n') {
+				pos.line += 1;
+				pos.column = 1;
+			} else {
+				pos.column += 1;
+			}
+			pos.offset += 1;
+		}
+		return pos;
+	};
+
 	String s = token.string;
 	string_interner_insert(s);
 	switch (token.kind) {
@@ -857,8 +876,30 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 		if (s.len >= 6 &&
 		    ((s.text[0] == '"' && s.text[1] == '"' && s.text[2] == '"') ||
 		     (s.text[0] == '`' && s.text[1] == '`' && s.text[2] == '`'))) {
-			if (!unquote_string_triple(ast_allocator(f), &s, string_contains_char(s, '\r'))) {
-				syntax_error(token, "Invalid multi-line string literal");
+			TripleStringErrorKind terr = TripleStringError_None;
+			isize terr_off = -1;
+			if (!unquote_string_triple(ast_allocator(f), &s, string_contains_char(s, '\r'), &terr, &terr_off)) {
+				TokenPos pos = token_pos_at_offset(token, terr_off);
+				switch (terr) {
+				case TripleStringError_ContentOnOpeningLine:
+					syntax_error(pos, "A multi-line string literal must begin on the line after the opening delimiter");
+					break;
+				case TripleStringError_ClosingNotOnOwnLine:
+					syntax_error(pos, "The closing delimiter of a multi-line string literal must be on its own line");
+					break;
+				case TripleStringError_UnderIndented:
+					syntax_error(pos, "This line is indented less than the closing delimiter of the multi-line string literal");
+					break;
+				case TripleStringError_IndentationMismatch:
+					syntax_error(pos, "The indentation of this line does not match the closing delimiter of the multi-line string literal");
+					break;
+				case TripleStringError_InvalidEscape:
+					syntax_error(pos, "Invalid escape sequence in string literal");
+					break;
+				default:
+					syntax_error(pos, "Invalid multi-line string literal");
+					break;
+				}
 			}
 		} else if (!unquote_string(ast_allocator(f), &s, 0, s.text[0] == '`')) {
 			syntax_error(token, "Invalid string literal");

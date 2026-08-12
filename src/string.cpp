@@ -1360,34 +1360,54 @@ gb_internal bool triple_string_deindent(gbAllocator a, String body, String *out)
 	return true;
 }
 
-// Triple-quoted string literal, dispatching on the delimiter:
-//   `"`  -> escapes processed; multi-line form is Java-style de-indented
-//   `\`` -> raw (no escapes); multi-line form is ALSO Java-style de-indented
-//           (carriage returns normalized), embedded single/double backticks
-//           are literal
+
+enum TripleStringErrorKind {
+	TripleStringError_None = 0,
+	TripleStringError_InvalidLiteral,        // malformed delimiters (shouldn't occur for a real token)
+	TripleStringError_ContentOnOpeningLine,  // text after the opening delimiter on its own line
+	TripleStringError_ClosingNotOnOwnLine,   // closing delimiter is not alone on its line
+	TripleStringError_UnderIndented,         // a content line is indented less than the closing delimiter
+	TripleStringError_IndentationMismatch,   // a line's indentation whitespace differs from the closing delimiter
+	TripleStringError_InvalidEscape,         // bad escape sequence (only reachable for `"""` strings)
+};
+
+// `out_err` receives the failure reason and `out_err_offset` a byte offset into
+// the *token string* (i.e. into *s_ on entry) pointing at the offending
+// character, or -1 when no precise location is available. Both are only
+// meaningful when the function returns 0.
 //
 // 0 == failure
 // 1 == original memory
 // 2 == new allocation
-gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carriage_return=false) {
+gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carriage_return=false,
+                                      TripleStringErrorKind *out_err=nullptr, isize *out_err_offset=nullptr) {
+	if (out_err)        *out_err = TripleStringError_None;
+	if (out_err_offset) *out_err_offset = -1;
+
+	#define TRIPLE_FAIL(kind, off) do {                  \
+		if (out_err)        *out_err = (kind);       \
+		if (out_err_offset) *out_err_offset = (off); \
+		return 0;                                    \
+	} while (0)
+
 	String s = *s_;
 	isize n = s.len;
 	if (n < 6) {
-		return 0;
+		TRIPLE_FAIL(TripleStringError_InvalidLiteral, 0);
 	}
 	u8 quote = s[0];
 	if (quote != '"' && quote != '`') {
-		return 0;
+		TRIPLE_FAIL(TripleStringError_InvalidLiteral, 0);
 	}
 	if (!(s[0]   == quote && s[1]   == quote && s[2]   == quote) ||
 	    !(s[n-1] == quote && s[n-2] == quote && s[n-3] == quote)) {
-		return 0;
+		TRIPLE_FAIL(TripleStringError_InvalidLiteral, 0);
 	}
 
-	String body = make_string(s.text+3, s.len-6);
 	bool raw = (quote == '`');
+	String body = make_string(s.text+3, s.len-6); // body begins at token offset 3
 
-	// Single-line form: no indentation handling.
+	// Single-line form: no indentation handling
 	if (!string_contains_char(body, '\n')) {
 		if (raw) {
 			if (has_carriage_return) {
@@ -1397,22 +1417,109 @@ gb_internal i32 unquote_string_triple(gbAllocator a, String *s_, bool has_carria
 			*s_ = body;
 			return 1;
 		}
-		return unquote_string_triple_content(a, s_, body, has_carriage_return, false);
+		i32 r = unquote_string_triple_content(a, s_, body, has_carriage_return, false);
+		if (r == 0) {
+			TRIPLE_FAIL(TripleStringError_InvalidEscape, -1);
+		}
+		return r;
 	}
 
-	// Multi-line form: Java-style de-indentation for both delimiters.
-	String di = {};
-	if (!triple_string_deindent(a, body, &di)) {
-		return 0;
+	// Opening delimiter's line must be whitespace only.
+	isize first_nl = 0;
+	while (body.text[first_nl] != '\n') {
+		first_nl += 1;
 	}
+	for (isize i = 0; i < first_nl; i++) {
+		u8 c = body.text[i];
+		if (c != ' ' && c != '\t' && c != '\r') {
+			TRIPLE_FAIL(TripleStringError_ContentOnOpeningLine, 3 + i);
+		}
+	}
+
+	// Closing delimiter's line: whitespace after the final newline is the indent prefix.
+	isize last_nl = body.len - 1;
+	while (body.text[last_nl] != '\n') {
+		last_nl -= 1;
+	}
+	String indent = make_string(body.text+last_nl+1, body.len-(last_nl+1));
+	for (isize i = 0; i < indent.len; i++) {
+		u8 c = indent.text[i];
+		if (c != ' ' && c != '\t') {
+			TRIPLE_FAIL(TripleStringError_ClosingNotOnOwnLine, 3 + (last_nl+1) + i);
+		}
+	}
+
+	String content = make_string(body.text+first_nl+1, last_nl-(first_nl+1));
+	isize content_base = 3 + (first_nl+1); // token offset of the content start
+
+	u8 *dbuf = gb_alloc_array(a, u8, content.len+1);
+	isize dlen = 0;
+	isize li = 0;
+	for (;;) {
+		isize le = li;
+		while (le < content.len && content.text[le] != '\n') {
+			le += 1;
+		}
+		isize len = le - li;
+		if (len > 0 && content.text[li+len-1] == '\r') {
+			len -= 1; // normalize CRLF
+		}
+
+		bool blank = true;
+		for (isize k = 0; k < len; k++) {
+			u8 c = content.text[li+k];
+			if (c != ' ' && c != '\t') {
+				blank = false;
+				break;
+			}
+		}
+		if (!blank) {
+			isize ws = 0;
+			while (ws < len && (content.text[li+ws] == ' ' || content.text[li+ws] == '\t')) {
+				ws += 1;
+			}
+			isize ws_end_off = content_base + li + ws;
+
+			for (isize k = 0; k < indent.len; k++) {
+				if (k >= len || content.text[li+k] != indent.text[k]) {
+					u8 lc = 0;
+					if (k < len) {
+						lc = content.text[li+k];
+					}
+					gb_free(a, dbuf);
+
+					if (k < len && (lc == ' ' || lc == '\t')) {
+						TRIPLE_FAIL(TripleStringError_IndentationMismatch, ws_end_off);
+					}
+					TRIPLE_FAIL(TripleStringError_UnderIndented, ws_end_off);
+				}
+			}
+			for (isize k = indent.len; k < len; k++) {
+				dbuf[dlen++] = content.text[li+k];
+			}
+		}
+		if (le >= content.len) {
+			break;
+		}
+		dbuf[dlen++] = '\n';
+		li = le + 1;
+	}
+
+	String di = make_string(dbuf, dlen);
 	if (raw) {
-		// Raw: the de-indented content is used verbatim (no escape processing).
 		*s_ = di;
 		return 2;
 	}
-	// Processed: run escape sequences on the de-indented content.
-	return unquote_string_triple_content(a, s_, di, false, true);
+	i32 r = unquote_string_triple_content(a, s_, di, false, true);
+	if (r == 0) {
+		TRIPLE_FAIL(TripleStringError_InvalidEscape, -1);
+	}
+	return r;
+
+	#undef TRIPLE_FAIL
 }
+
+
 gb_internal bool string_is_valid_identifier(String str) {
 	if (str.len <= 0) return false;
 
