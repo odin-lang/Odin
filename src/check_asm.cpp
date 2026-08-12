@@ -426,7 +426,8 @@ gb_internal AsmTemplateEntityDeclKind check_asm_find_kind(Entity *entity, Array<
 };
 
 
-gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
+template <typename AsmCtx>
+gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
 	StringSet pin_set = {};
 	string_set_init(&pin_set, specs.count);
 	defer (string_set_destroy(&pin_set));
@@ -465,6 +466,8 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 				ast_node(reg, AsmRegister, spec->value);
 				pin = reg->name.string;
 				if (pin.len != 0) {
+					Operand op = {};
+					check_register(asm_ctx, &op, reg);
 					if (string_set_update(&pin_set, pin)) {
 						error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
 					}
@@ -1280,15 +1283,36 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	entity->type = type;
 
+
+	bool has_side_effects = false;
+	bool is_align_stack   = false;
 	auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
 
-	check_asm_specs(ctx, ate->param_scope, at->specs, &ate->decls);
+	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 	{ // check clobbers
 		bool clobber_cc     = false;
 		bool clobber_memory = false;
 
 		for (Ast *clobber_ : at->clobbers) {
 			ast_node(clobber, AsmClobber, clobber_);
+
+			if (clobber->value == nullptr) {
+				if (clobber->name.string == "side_effects") {
+					if (has_side_effects) {
+						error(clobber->name, "#side_effects has already been defined as an asm specification");
+					}
+					has_side_effects = true;
+				} else if (clobber->name.string == "align_stack") {
+					if (is_align_stack) {
+						error(clobber->name, "#align_stack has already been defined as an asm specification");
+					}
+					is_align_stack = true;
+				} else {
+					error(clobber->name, "Unknown clobber directive '#%.*s'", LIT(clobber->name.string));
+				}
+				continue;
+			}
+
 			switch (clobber->value->kind) {
 			case_ast_node(asm_reg, AsmRegister, clobber->value)
 				String reg = asm_reg->name.string;
@@ -1321,8 +1345,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			}
 		}
 
-		entity->AsmTemplate.clobber_cc     = clobber_cc;
-		entity->AsmTemplate.clobber_memory = clobber_memory;
+		entity->AsmTemplate.clobber_cc       = clobber_cc;
+		entity->AsmTemplate.clobber_memory   = clobber_memory;
+		entity->AsmTemplate.has_side_effects = has_side_effects;
+		entity->AsmTemplate.is_align_stack   = is_align_stack;
 	}
 
 	// collect label decls

@@ -2590,33 +2590,7 @@ gb_internal Ast *parse_asm_signature(AstFile *f, Token asm_token) {
 gb_internal Ast *parse_asm_template(AstFile *f) {
 	Token token = expect_token(f, Token_asm);
 
-	bool has_side_effects = false;
-	bool is_align_stack   = false;
-
 	Ast *signature = parse_asm_signature(f, token);
-
-	while (f->curr_token.kind == Token_Hash) {
-		advance_token(f);
-		if (f->curr_token.kind == Token_Ident) {
-			Token token = advance_token(f);
-			String name = token.string;
-			if (name == "side_effects") {
-				if (has_side_effects) {
-					syntax_error(token, "Duplicate directive on inline asm expression: '#side_effects'");
-				}
-				has_side_effects = true;
-			} else if (name == "align_stack") {
-				if (is_align_stack) {
-					syntax_error(token, "Duplicate directive on inline asm expression: '#align_stack'");
-				}
-				is_align_stack = true;
-			} else {
-				syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
-			}
-		} else {
-			syntax_error(f->curr_token, "Expected an identifier after hash");
-		}
-	}
 
 	Slice<Ast *> asm_specs = {};
 	Slice<Ast *> asm_clobbers  = {};
@@ -2674,15 +2648,23 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 				spec->AsmSpec.value     = value;
 			} else if (f->curr_token.kind == Token_Hash) {
 				Token hash = expect_token(f, Token_Hash);
-				Token clobber_token = expect_token(f, Token_Ident);
-				if (clobber_token.string != "clobber") {
-					syntax_error(clobber_token, "Expected #clobber, got '%.*s'", LIT(clobber_token.string));
-				} else {
+				Token name = expect_token(f, Token_Ident);
+
+				if (name.string == "side_effects" ||
+				    name.string == "align_stack") {
+					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
+					clobber->AsmClobber.token = hash;
+					clobber->AsmClobber.name  = name;
+					array_add(&clobbers, clobber);
+				} else if (name.string == "clobber") {
 					Ast *value = parse_asm_operand(f, false);
 					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
 					clobber->AsmClobber.token = hash;
+					clobber->AsmClobber.name  = name;
 					clobber->AsmClobber.value = value;
 					array_add(&clobbers, clobber);
+				} else {
+					syntax_error(name, "Expected #clobber, #side_effects, or #align_stack, got '%.*s'", LIT(name.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected am asm specification which begins with a identifier, got '%.*s'", LIT(f->curr_token.string));
@@ -2732,8 +2714,6 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 
 	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);
 	asm_template->AsmTemplate.token            = token;
-	asm_template->AsmTemplate.has_side_effects = has_side_effects;
-	asm_template->AsmTemplate.is_align_stack   = is_align_stack;
 	asm_template->AsmTemplate.signature        = signature;
 	asm_template->AsmTemplate.specs            = asm_specs;
 	asm_template->AsmTemplate.clobbers         = asm_clobbers;

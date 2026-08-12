@@ -13633,12 +13633,6 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			}
 		}
 
-		if (at->has_side_effects) {
-			str = gb_string_appendc(str, " #side_effects");
-		}
-		if (at->is_align_stack) {
-			str = gb_string_appendc(str, " #align_stack");
-		}
 		if (at->specs.count) {
 			str = gb_string_append_rune(str, '[');
 			for_array(j, at->specs) {
@@ -13688,8 +13682,12 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_end;
 
 	case_ast_node(clobber, AsmClobber, node);
-		str = gb_string_appendc(str, "#clobber ");
-		str = write_expr_to_string(str, clobber->value, shorthand);
+		str = gb_string_appendc(str, "#");
+		str = gb_string_append_length(str, clobber->name.string.text, clobber->name.string.len);
+		if (clobber->value) {
+			str = gb_string_appendc(str, " ");
+			str = write_expr_to_string(str, clobber->value, shorthand);
+		}
 	case_end;
 
 	case_ast_node(label, AsmLabelDecl, node);

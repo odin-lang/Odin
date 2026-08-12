@@ -177,7 +177,7 @@ Token ast_end_token(Ast *node) {
 		return node->AsmRegister.name;
 	case Ast_AsmSpec:
 		if (node->AsmSpec.value) {
-			return ast_end_token(node->AsmSpec.value);
+		return ast_end_token(node->AsmSpec.value);
 		}
 		if (node->AsmSpec.type) {
 			return ast_end_token(node->AsmSpec.type);
@@ -187,7 +187,10 @@ Token ast_end_token(Ast *node) {
 		}
 		return ast_end_token(node->AsmSpec.name);
 	case Ast_AsmClobber:
-		return ast_end_token(node->AsmClobber.value);
+		if (node->AsmClobber.value) {
+			return ast_end_token(node->AsmClobber.value);
+		}
+		return node->AsmClobber.name;
 	case Ast_AsmLabelDecl:
 		return ast_end_token(node->AsmLabelDecl.name);
 	case Ast_AsmInstruction:

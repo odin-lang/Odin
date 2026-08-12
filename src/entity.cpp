@@ -556,8 +556,6 @@ gb_internal Entity *alloc_entity_asm_template(Scope *scope, Token token, Type *t
 	GB_ASSERT(node->kind == Ast_AsmTemplate);
 	Entity *entity = alloc_entity(Entity_AsmTemplate, scope, token, type);
 	entity->AsmTemplate.node = node;
-	entity->AsmTemplate.has_side_effects = node->AsmTemplate.has_side_effects;
-	entity->AsmTemplate.is_align_stack = node->AsmTemplate.is_align_stack;
 	return entity;
 }
 

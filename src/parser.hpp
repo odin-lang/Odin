@@ -470,8 +470,6 @@ struct AstSplitArgs {
 	}) \
 	AST_KIND(AsmTemplate, "asm template", struct { \
 		Token        token;            \
-		bool         has_side_effects; \
-		bool         is_align_stack;   \
 		Ast *        signature;        \
 		Slice<Ast *> specs;            \
 		Slice<Ast *> clobbers;         \
@@ -490,6 +488,7 @@ struct AstSplitArgs {
 	}) \
 	AST_KIND(AsmClobber, "asm clobber", struct { \
 		Token token; \
+		Token name;  \
 		Ast * value; \
 	}) \
 	AST_KIND(AsmLabelDecl, "asm label declaration", struct { \
