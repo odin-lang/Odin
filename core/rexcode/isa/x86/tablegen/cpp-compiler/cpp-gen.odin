@@ -13,8 +13,9 @@ import gen ".."
 ISA_NAME :: "amd64"
 
 main :: proc() {
-	raw_encode_runs  := #load("../../tables/x86.encode_runs.bin",  []x86.Encode_Run)
-	raw_encode_forms := #load("../../tables/x86.encode_forms.bin", []u8)
+	raw_encode_runs   := #load("../../tables/x86.encode_runs.bin",  []x86.Encode_Run)
+	raw_encode_forms  := #load("../../tables/x86.encode_forms.bin", []u8)
+	raw_clobber_table := #load("../../tables/x86.clobber_table.bin", []u8)
 
 	sb := strings.builder_make()
 
@@ -128,6 +129,67 @@ main :: proc() {
 			strings.write_string(&sb, "\t};\n")
 		}
 	}
+	strings.write_string(&sb, "\n");
+	{
+		strings.write_string(&sb, "\tenum ClobberFlags : u16 {\n")
+		strings.write_string(&sb, "\t\tClobberFlag_CF = 1<<0,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_PF = 1<<1,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_AF = 1<<2,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_ZF = 1<<3,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_SF = 1<<4,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_OF = 1<<5,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_DF = 1<<6,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_IF = 1<<7,\n")
+		strings.write_string(&sb, "\t\tClobberFlag_TF = 1<<8,\n")
+		strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, "\tenum SideEffectFlags : u16 {\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_HINT        = 1<<2, // microarchitectural hint, architecturally inert (PAUSE/PREFETCH*/ENDBR)\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_CACHE       = 1<<3, // cache-line maintenance with coherence effects (CLFLUSH/CLWB)\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_TRAP        = 1<<4, // may deliberately raise a fault (#UD/#BR): UD0-2, BOUND\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_INTERRUPT   = 1<<5, // software interrupt / syscall gate\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_HALT        = 1<<6, // stops execution until an external event\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns\n")
+		strings.write_string(&sb, "\t\tSideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops\n")
+		strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, "\tenum ClobberRegs : u16 {\n")
+		strings.write_string(&sb, "\t\tClobberReg_RAX    = 1<<0, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RBX    = 1<<1, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RCX    = 1<<2, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RDX    = 1<<3, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RSI    = 1<<4, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RDI    = 1<<5, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RSP    = 1<<6, \n")
+		strings.write_string(&sb, "\t\tClobberReg_RBP    = 1<<7, \n")
+		strings.write_string(&sb, "\t\tClobberReg_R11    = 1<<8,\n")
+		strings.write_string(&sb, "\t\tClobberReg_XMM0   = 1<<9, \n")
+		strings.write_string(&sb, "\t\tClobberReg_VECTOR = 1<<10, \n")
+		strings.write_string(&sb, "\t\tClobberReg_MXCSR  = 1<<11, \n")
+		strings.write_string(&sb, "\t\tClobberReg_FPU_ST = 1<<12, \n")
+		strings.write_string(&sb, "\t\tClobberReg_FPU_SW = 1<<13,\n")
+		strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, "\tenum OperandSet : u8 { \n")
+		strings.write_string(&sb, "\t\tOperandSet_OP0 = 1<<0, \n")
+		strings.write_string(&sb, "\t\tOperandSet_OP1 = 1<<1, \n")
+		strings.write_string(&sb, "\t\tOperandSet_OP2 = 1<<2, \n")
+		strings.write_string(&sb, "\t\tOperandSet_OP3 = 1<<3,\n")
+		strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, "\tstruct Clobber {\n")
+		strings.write_string(&sb, "\t\tOperandSet      written;\n")
+		strings.write_string(&sb, "\t\tOperandSet      read;\n")
+		strings.write_string(&sb, "\t\tClobberRegs     implicit_wr;\n")
+		strings.write_string(&sb, "\t\tClobberRegs     implicit_rd;\n")
+		strings.write_string(&sb, "\t\tClobberFlags    flags_wr;\n")
+		strings.write_string(&sb, "\t\tClobberFlags    flags_undef;\n")
+		strings.write_string(&sb, "\t\tClobberFlags    flags_rd;\n")
+		strings.write_string(&sb, "\t\tbool            writes_mem;\n")
+		strings.write_string(&sb, "\t\tbool            reads_mem;\n")
+		strings.write_string(&sb, "\t\tSideEffectFlags side_effects;\n")
+		strings.write_string(&sb, "\t};\n")
+	}
+	strings.write_string(&sb, "\n");
 
 
 	strings.write_string(&sb, "\tstatic u16 const register_codes[REG_COUNT];\n")
@@ -217,6 +279,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 	fmt.sbprintf(&sb, "\tstatic EncodeRun const raw_encode_runs[%d];\n", len(raw_encode_runs))
 	fmt.sbprintf(&sb, "\tstatic u8 const raw_encode_forms[%d];\n", len(raw_encode_forms))
+	fmt.sbprintf(&sb, "\tstatic u8 const raw_clobber_table[%d];\n", len(raw_clobber_table))
 
 	strings.write_string(&sb, "\tStringMap<Mnemonic> mnemonic_map;\n")
 	strings.write_string(&sb, "\tStringMap<Prefix>   prefix_map;\n")
@@ -268,6 +331,13 @@ main :: proc() {
 		strings.write_string(&sb, "\t\tEncodeRun r = raw_encode_runs[m];\n")
 		strings.write_string(&sb, "\t\tEncoding *ENCODE_FORMS = cast(Encoding *)raw_encode_forms;\n")
 		strings.write_string(&sb, "\t\treturn Slice<Encoding>{ENCODE_FORMS+r.start, r.count};\n")
+	}
+	{
+		strings.write_string(&sb, "\tClobber clobber(/*Mnemonic*/ u16 m) const {\n")
+		defer strings.write_string(&sb, "\t}\n")
+
+		strings.write_string(&sb, "\t\tClobber *c = cast(Clobber *)raw_clobber_table;\n")
+		strings.write_string(&sb, "\t\treturn c[m];\n")
 	}
 	{
 		strings.write_string(&sb, "\tu16 reg_class(/*Register*/ u16 r) const {\n")
@@ -593,6 +663,25 @@ main :: proc() {
 		ROW_COUNT :: 64
 		count := 0
 		for the_byte in raw_encode_forms {
+			if count == 0 {
+				strings.write_string(&sb, "\t")
+			}
+			fmt.sbprintf(&sb, "%#02x, ", the_byte)
+
+			if count == ROW_COUNT-1 {
+				strings.write_string(&sb, "\n")
+			}
+
+			count = (count + 1) % ROW_COUNT
+		}
+		defer strings.write_string(&sb, "\n");
+	}
+	{
+		fmt.sbprintf(&sb, "u8 const Asm_{0:s}::raw_clobber_table[%d] = {{\n", ISA_NAME, len(raw_clobber_table))
+		defer strings.write_string(&sb, "};\n");
+		ROW_COUNT :: 64
+		count := 0
+		for the_byte in raw_clobber_table {
 			if count == 0 {
 				strings.write_string(&sb, "\t")
 			}

@@ -342,10 +342,14 @@ struct Entity {
 			Ast *node;
 			bool has_side_effects;
 			bool is_align_stack;
+
+			bool clobber_cc;
+			bool clobber_memory;
+			Array<String> clobber_registers;
+
 			Scope *param_scope;
 			Scope *label_scope;
 			Array<AsmTemplateEntityDecl> decls;
-
 		} AsmTemplate;
 	};
 };
