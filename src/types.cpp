@@ -4496,8 +4496,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.custom_min_field_align > 0) {
 			max = gb_max(max, t->Struct.custom_min_field_align);
 		}
-		if (t->Struct.custom_max_field_align != 0 &&
-		    t->Struct.custom_max_field_align > t->Struct.custom_min_field_align) {
+		if (t->Struct.custom_max_field_align != 0) {
 			max = gb_min(max, t->Struct.custom_max_field_align);
 		}
 		return max;
@@ -4567,7 +4566,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 			} else {
 				Type *t = fields[i]->type;
 				i64 align = gb_max(type_align_of_internal(t, &path), min_field_align);
-				if (max_field_align > min_field_align) {
+				if (max_field_align != 0) {
 					align = gb_min(align, max_field_align);
 				}
 				i64 size  = gb_max(type_size_of_internal(t, &path), 0);
