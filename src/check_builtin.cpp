@@ -1968,7 +1968,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			for (unsigned i = 0; i < 4; i++) {
 				if (!is_type_integer(x[i].type) || x[i].mode != Addressing_Constant) {
 					gbString xs = type_to_string(x[i].type);
-					error(x[i].expr, "'%.*s' expected a constant integer", LIT(builtin_name), xs);
+					error(x[i].expr, "'%.*s' expected a constant integer, got '%s'", LIT(builtin_name), xs);
 					gb_string_free(xs);
 					return false;
 				}
@@ -2872,8 +2872,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (!ok) {
 			operand->type = t_invalid;
 			operand->mode = Addressing_Value;
+			operand->value = {};
 		}
-		operand->value = {};
 		operand->expr = call;
 		return ok;
 	}
