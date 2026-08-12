@@ -3811,7 +3811,7 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.VPRORVQ, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x14, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L1, vex_w=.W1}},
 		{.VPRORVQ, {.ZMM, .ZMM, .ZMM_M512, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x14, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L2, vex_w=.W1}},
 	},
-	// AVX-512 scatter instructions (use M for VSIB addressing)
+	// AVX-512 scatter instructions (u. M for VSIB addressing)
 	.VPSCATTERDD = {
 		{.VPSCATTERDD, {.M, .XMM, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xA0, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L0, vex_w=.W0}},
 		{.VPSCATTERDD, {.M, .YMM, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xA0, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L1, vex_w=.W0}},

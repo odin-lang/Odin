@@ -94,6 +94,7 @@ Decode_Index :: struct {
 @(rodata) EVEX_INDEX_0F         := #load("tables/x86.evex_idx_0f.bin",    []Decode_Index)
 @(rodata) EVEX_INDEX_0F38       := #load("tables/x86.evex_idx_0f38.bin",  []Decode_Index)
 @(rodata) EVEX_INDEX_0F3A       := #load("tables/x86.evex_idx_0f3a.bin",  []Decode_Index)
+@(rodata) CLOBBER_TABLE         := #load("tables/x86.clobber_table.bin",  []Clobber)
 
 // -----------------------------------------------------------------------------
 // Accessors
