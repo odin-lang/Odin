@@ -502,12 +502,14 @@ struct AstSplitArgs {
 		Slice<Ast *> operands; \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
-		Token open;  \
-		Ast * base;  \
-		Ast * index; \
-		Ast * scale; \
-		Ast * disp;  \
-		Token close; \
+		Token open;     \
+		Ast * base;     \
+		Ast * index;    \
+		Token scale_op; \
+		Ast * scale;    \
+		Ast * disp;     \
+		Ast * type;     \
+		Token close;    \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \

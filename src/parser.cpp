@@ -551,6 +551,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmMemoryOperand.index = clone_ast(n->AsmMemoryOperand.index, f);
 		n->AsmMemoryOperand.scale = clone_ast(n->AsmMemoryOperand.scale, f);
 		n->AsmMemoryOperand.disp  = clone_ast(n->AsmMemoryOperand.disp,  f);
+		n->AsmMemoryOperand.type  = clone_ast(n->AsmMemoryOperand.type,  f);
 		break;
 	}
 	return n;
@@ -2444,12 +2445,18 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			Ast *index = nullptr;
 			Ast *scale = nullptr;
 			Ast *disp  = nullptr;
+			Ast *type  = nullptr;
+
+			Token scale_op = {};
 
 			base = parse_asm_operand(f, false);
 
 			if (allow_token(f, Token_Add)) {
 				Ast *possible_index = parse_asm_operand(f, false);
-				if (allow_token(f, Token_Mul)) {
+				if (allow_token(f, Token_Mul) ||
+				    allow_token(f, Token_Shl) ||
+				    allow_token(f, Token_Shr)) {
+				    	scale_op = f->prev_token;
 					index = possible_index;
 					scale = parse_asm_operand(f, false);
 					if (allow_token(f, Token_Add)) {
@@ -2462,13 +2469,19 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 
 			Token close = expect_token(f, Token_CloseBracket);
 
+			if (allow_token(f, Token_Colon)) {
+				type = parse_type(f);
+			}
+
 			Ast *mem = alloc_ast_node(f, Ast_AsmMemoryOperand);
-			mem->AsmMemoryOperand.open  = open;
-			mem->AsmMemoryOperand.base  = base;
-			mem->AsmMemoryOperand.index = index;
-			mem->AsmMemoryOperand.scale = scale;
-			mem->AsmMemoryOperand.disp  = disp;
-			mem->AsmMemoryOperand.close = close;
+			mem->AsmMemoryOperand.open     = open;
+			mem->AsmMemoryOperand.base     = base;
+			mem->AsmMemoryOperand.index    = index;
+			mem->AsmMemoryOperand.scale    = scale;
+			mem->AsmMemoryOperand.scale_op = scale_op;
+			mem->AsmMemoryOperand.disp     = disp;
+			mem->AsmMemoryOperand.close    = close;
+			mem->AsmMemoryOperand.type     = type;
 
 			return mem;
 		}

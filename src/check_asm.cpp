@@ -991,13 +991,39 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 					break;
 				} else {
 					i64 v = exact_value_to_i64(scale.value);
-					switch (v) {
-					case 1: case 2: case 4: case 8:
-						// okay
+
+					Token op = mem_op->scale_op;
+					switch (op.kind) {
+					case Token_Mul:
+						switch (v) {
+						case 1: case 2: case 4: case 8:
+							// okay
+							break;
+						default:
+							error(scale.expr, "A scale using '*' must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %s", s);
+							break;
+						}
+						break;
+					case Token_Shl:
+					case Token_Shr:
+						switch (v) {
+						case 0: case 1: case 2: case 3:
+							// okay
+							break;
+						default:
+							error(scale.expr, "A shifting scale using '%.*s' must be a constant integer or an immediate with the value 0, 1, 2, or 3, got %s", LIT(op.string), s);
+							break;
+						}
 						break;
 					default:
-						error(scale.expr, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %s", s);
+						error(op, "Unknown/unhandled scaling operator '%.*s'", LIT(op.string));
 						break;
+					}
+
+					if (op.kind == Token_Shr) {
+						if (build_context.metrics.arch != TargetArch_arm64) {
+							error(op, "The target platform does not support '%.*s' for shifting scale parameters in memory operands", LIT(op.string));
+						}
 					}
 				}
 			} else {
@@ -1062,6 +1088,20 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 					gb_string_free(s);
 				}
 				break;
+			}
+		}
+
+		if (mem_op->type) {
+			Type *type_interpretation = check_type(ctx, mem_op->type);
+			if (type_interpretation != nullptr && type_interpretation != t_invalid) {
+				operand->type = alloc_type_pointer(type_interpretation);
+				if (!is_valid_asm_parameter_type(type_interpretation) ||
+				    is_type_pointer(type_interpretation)) { // do not allow pointers even if they are valid asm parameter types
+					gbString s = type_to_string(type_interpretation);
+					error(mem_op->type, "Asm memory operands type interpretation must be either an integer, boolean, float, or #simd vector, got %s", s);
+					gb_string_free(s);
+				}
+
 			}
 		}
 

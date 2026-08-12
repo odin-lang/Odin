@@ -196,6 +196,9 @@ Token ast_end_token(Ast *node) {
 		}
 		return ast_end_token(node->AsmInstruction.name);
 	case Ast_AsmMemoryOperand:
+		if (node->AsmMemoryOperand.type) {
+			return ast_end_token(node->AsmMemoryOperand.type);
+		}
 		return node->AsmMemoryOperand.close;
 
 	case Ast_BadExpr:       return node->BadExpr.end;

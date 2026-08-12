@@ -6,6 +6,7 @@ struct lbAsmGenerate {
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes = 1<<0,
 		WriteOperandFlag_IsScale       = 1<<1,
+		WriteOperandFlag_IsScaleLog2   = 1<<2,
 
 		WriteOperandFlag_NONE = 0,
 		WriteOperandFlag_DEFAULT = WriteOperandFlag_PrintPrefixes,
@@ -62,24 +63,33 @@ struct lbAsmGenerate {
 			GB_ASSERT(ev.kind != ExactValue_Invalid);
 			switch (ev.kind) {
 			case ExactValue_Integer: {
-				String s = big_int_to_string(heap_allocator(), &ev.value_integer, 10);
-				if (flags & WriteOperandFlag_PrintPrefixes) {
-					asm_string = gb_string_appendc(asm_string, "$$");
-				}
-				asm_string = gb_string_append_length(asm_string, s.text, s.len);
-				gb_free(heap_allocator(), s.text);
-
+				i64 val = exact_value_to_i64(ev);
 				if (flags & WriteOperandFlag_IsScale) {
-					i64 val = exact_value_to_i64(ev);
 					switch (val) {
 					case 1: case 2: case 4: case 8:
 						// okay
 						break;
 					default:
-						error(op, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %.*s", LIT(s));
+						error(op, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %lld", cast(long long)val);
+						break;
+					}
+				} else if (flags & WriteOperandFlag_IsScaleLog2) {
+					switch (val) {
+					case 0: case 1: case 2: case 3:
+						// NOTE(bill): AMD64 only supports full scales
+						val = (cast(i64)1)<<val;
+						break;
+					default:
+						error(op, "A shifting scale must be a constant integer or an immediate with the value 0, 1, 2, or 3, got %lld", cast(long long)val);
 						break;
 					}
 				}
+
+				if (flags & WriteOperandFlag_PrintPrefixes) {
+					asm_string = gb_string_appendc(asm_string, "$$");
+				}
+
+				asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)val);
 				break;
 			}
 			case ExactValue_Float:
@@ -137,7 +147,15 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			asm_string = this->write_operand(asm_string, op_number, mem_op->index, flags);
 			if (mem_op->scale) {
 				asm_string = gb_string_appendc(asm_string, ",");
-				asm_string = this->write_operand(asm_string, op_number, mem_op->scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
+				switch (mem_op->scale_op.kind) {
+				case Token_Mul:
+					asm_string = this->write_operand(asm_string, op_number, mem_op->scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
+					break;
+				case Token_Shl:
+				case Token_Shr:
+					asm_string = this->write_operand(asm_string, op_number, mem_op->scale, (flags|WriteOperandFlag_IsScaleLog2)&~WriteOperandFlag_PrintPrefixes);
+					break;
+				}
 			}
 		}
 		asm_string = gb_string_appendc(asm_string, ")");
