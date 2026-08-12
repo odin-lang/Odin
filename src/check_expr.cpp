@@ -4215,8 +4215,9 @@ gb_internal Type *check_matrix_type_hint(Type *matrix, Type *type_hint) {
 		} else if (xt->kind == Type_Matrix && th->kind == Type_Matrix) {
 			if (!are_types_identical(xt->Matrix.elem, th->Matrix.elem)) {
 				// ignore
-			} if (xt->Matrix.row_count == th->Matrix.row_count &&
-			      xt->Matrix.column_count == th->Matrix.column_count) {
+			} else if (xt->Matrix.row_count == th->Matrix.row_count &&
+			           xt->Matrix.column_count == th->Matrix.column_count &&
+			           xt->Matrix.is_row_major == th->Matrix.is_row_major) {
 				return type_hint;
 			}
 		} else if (xt->kind == Type_Matrix && th->kind == Type_Array) {
