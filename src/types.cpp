@@ -2091,10 +2091,11 @@ gb_internal bool is_type_endian_big(Type *t) {
 		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_big(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_big(&basic_types[Basic_uintptr]);
 	}
-	return build_context.endian_kind == TargetEndian_Big;
+	// a type with no endianness is neither little nor big
+	return false;
 }
 gb_internal bool is_type_endian_little(Type *t) {
 	t = core_type(t);
@@ -2108,10 +2109,11 @@ gb_internal bool is_type_endian_little(Type *t) {
 		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_little(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_little(&basic_types[Basic_uintptr]);
 	}
-	return build_context.endian_kind == TargetEndian_Little;
+	// a type with no endianness is neither little nor big
+	return false;
 }
 
 gb_internal bool is_type_endian_platform(Type *t) {
@@ -2121,7 +2123,7 @@ gb_internal bool is_type_endian_platform(Type *t) {
 		return (t->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) == 0;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_platform(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_platform(&basic_types[Basic_uintptr]);
 	}
 	return false;
@@ -2179,6 +2181,10 @@ gb_internal bool is_type_dereferenceable(Type *t) {
 
 
 gb_internal bool is_type_different_to_arch_endianness(Type *t) {
+	// a type with no endianness never needs swapping
+	if (!is_type_endian_specific(t)) {
+		return false;
+	}
 	switch (build_context.endian_kind) {
 	case TargetEndian_Little:
 		return !is_type_endian_little(t);
