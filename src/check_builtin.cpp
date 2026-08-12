@@ -2667,7 +2667,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			error(call, "'#panic' expects 1 argument, got %td", ce->args.count);
 			return false;
 		}
-		if (!is_type_string(operand->type) && operand->mode != Addressing_Constant) {
+		if (!is_type_string(operand->type) || operand->mode != Addressing_Constant) {
 			gbString str = expr_to_string(ce->args[0]);
 			error(call, "'%s' is not a constant string", str);
 			gb_string_free(str);
@@ -4928,7 +4928,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		
-		if (!is_type_array(x.type) && !is_type_array(y.type)) {
+		if (!is_type_array(x.type) || !is_type_array(y.type)) {
 			gbString s1 = type_to_string(x.type);
 			gbString s2 = type_to_string(y.type);
 			error(call, "'%.*s' expects only arrays, got %s and %s", LIT(builtin_name), s1, s2);
@@ -5058,7 +5058,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_is_package_imported: {
 		bool value = false;
 
-		if (!is_type_string(operand->type) && (operand->mode != Addressing_Constant)) {
+		if (!is_type_string(operand->type) || operand->mode != Addressing_Constant) {
 			error(ce->args[0], "Expected a constant string for '%.*s'", LIT(builtin_name));
 		} else if (operand->value.kind == ExactValue_String) {
 			String pkg_name = operand->value.value_string;
@@ -6709,7 +6709,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (x.mode == Addressing_Invalid) {
 				return false;
 			}
-			if (y.mode != Addressing_Constant && is_type_integer(y.type)) {
+			if (y.mode != Addressing_Constant || !is_type_integer(y.type)) {
 				error(y.expr, "Second argument to '%.*s' representing the locality must be an integer in the range 0..=3", LIT(builtin_name));
 				return false;
 			}
