@@ -180,6 +180,45 @@ main :: proc() {
 			OperandSet_OP2 = 1<<2,
 			OperandSet_OP3 = 1<<3,
 		};
+
+		u16 clobber_bit_for_reg_name(String const &pin) {
+			static const struct { String name; u16 bit; } table[] = {
+				{str_lit(\"rax\"),  ClobberReg_RAX}, {str_lit(\"eax\"),  ClobberReg_RAX}, {str_lit(\"ax\"), ClobberReg_RAX}, {str_lit(\"al\"), ClobberReg_RAX}, {str_lit(\"ah\"), ClobberReg_RAX},
+				{str_lit(\"rbx\"),  ClobberReg_RBX}, {str_lit(\"ebx\"),  ClobberReg_RBX}, {str_lit(\"bx\"), ClobberReg_RBX}, {str_lit(\"bl\"), ClobberReg_RBX}, {str_lit(\"bh\"), ClobberReg_RBX},
+				{str_lit(\"rcx\"),  ClobberReg_RCX}, {str_lit(\"ecx\"),  ClobberReg_RCX}, {str_lit(\"cx\"), ClobberReg_RCX}, {str_lit(\"cl\"), ClobberReg_RCX}, {str_lit(\"ch\"), ClobberReg_RCX},
+				{str_lit(\"rdx\"),  ClobberReg_RDX}, {str_lit(\"edx\"),  ClobberReg_RDX}, {str_lit(\"dx\"), ClobberReg_RDX}, {str_lit(\"dl\"), ClobberReg_RDX}, {str_lit(\"dh\"), ClobberReg_RDX},
+				{str_lit(\"rsi\"),  ClobberReg_RSI}, {str_lit(\"esi\"),  ClobberReg_RSI}, {str_lit(\"si\"), ClobberReg_RSI}, {str_lit(\"sil\"), ClobberReg_RSI},
+				{str_lit(\"rdi\"),  ClobberReg_RDI}, {str_lit(\"edi\"),  ClobberReg_RDI}, {str_lit(\"di\"), ClobberReg_RDI}, {str_lit(\"dil\"), ClobberReg_RDI},
+				{str_lit(\"rsp\"),  ClobberReg_RSP}, {str_lit(\"esp\"),  ClobberReg_RSP},
+				{str_lit(\"rbp\"),  ClobberReg_RBP}, {str_lit(\"ebp\"),  ClobberReg_RBP},
+				{str_lit(\"r11\"),  ClobberReg_R11}, {str_lit(\"r11d\"), ClobberReg_R11},
+				{str_lit(\"r11w\"), ClobberReg_R11}, {str_lit(\"r11b\"), ClobberReg_R11},
+				{str_lit(\"xmm0\"), ClobberReg_XMM0},
+			};
+			for (auto const &t : table) {
+				if (pin == t.name) {
+					return t.bit;
+				}
+			}
+			return 0;
+		}
+
+		char const *clobber_reg_bit_name(u16 bit) {
+			switch (bit) {
+			case ClobberReg_RAX:  return \"rax\";
+			case ClobberReg_RBX:  return \"rbx\";
+			case ClobberReg_RCX:  return \"rcx\";
+			case ClobberReg_RDX:  return \"rdx\";
+			case ClobberReg_RSI:  return \"rsi\";
+			case ClobberReg_RDI:  return \"rdi\";
+			case ClobberReg_RSP:  return \"rsp\";
+			case ClobberReg_RBP:  return \"rbp\";
+			case ClobberReg_R11:  return \"r11\";
+			case ClobberReg_XMM0: return \"xmm0\";
+			}
+			return \"<reg>\";
+		}
+
 		struct Clobber {
 			OperandSet      written;
 			OperandSet      read;
