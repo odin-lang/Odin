@@ -3131,9 +3131,20 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 		}
 	}
 	
-	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
-		i64 element_count = row_count*column_count;
-		error(node, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
+	if (generic_row == nullptr && generic_column == nullptr) {
+		// row_count*column_count can overflow and wrap back under the limit, so test the
+		// dimensions first; each is at least MATRIX_ELEMENT_COUNT_MIN. Either one exceeding
+		// the maximum means the product does too
+		if (row_count > MATRIX_ELEMENT_COUNT_MAX || column_count > MATRIX_ELEMENT_COUNT_MAX ||
+		    row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+			// the element count is only printable when the multiply cannot overflow, which is
+			// exactly the case the dimension test above catches
+			if (row_count != 0 && column_count > I64_MAX/row_count) {
+				error(node, "Matrix types are limited to a maximum of %d elements, got %lld by %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)row_count, cast(long long)column_count);
+			} else {
+				error(node, "Matrix types are limited to a maximum of %d elements, got %lld by %lld (%lld elements)", MATRIX_ELEMENT_COUNT_MAX, cast(long long)row_count, cast(long long)column_count, cast(long long)(row_count*column_count));
+			}
+		}
 	}
 
 

@@ -4268,8 +4268,22 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 						x->type = y->type;
 					}
 				} else {
+					// the result takes its rows from one operand and its columns from the other,
+					// so it can be larger than either. Each dimension is at least
+					// MATRIX_ELEMENT_COUNT_MIN, so testing them first keeps the product in range.
+					i64 row_count    = xt->Matrix.row_count;
+					i64 column_count = yt->Matrix.column_count;
+					if (row_count    > MATRIX_ELEMENT_COUNT_MAX ||
+					    column_count > MATRIX_ELEMENT_COUNT_MAX ||
+					    row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+						error(x->expr, "Matrix multiplication result exceeds the maximum matrix element count, got %lld, expected a maximum of %d", cast(long long)(row_count*column_count), MATRIX_ELEMENT_COUNT_MAX);
+						x->mode = Addressing_Invalid;
+						x->type = t_invalid;
+						return;
+					}
+
 					bool is_row_major = xt->Matrix.is_row_major && yt->Matrix.is_row_major;
-					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count, nullptr, nullptr, is_row_major);
+					x->type = alloc_type_matrix(xt->Matrix.elem, row_count, column_count, nullptr, nullptr, is_row_major);
 				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
