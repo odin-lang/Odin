@@ -2538,8 +2538,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			auto args = array_make<lbValue>(temporary_allocator(), 1);
-			args[0] = value;
-			char const *call = "fixunsdfdi";
+			args[0] = lb_emit_conv(p, value, t_f64);
+			char const *call = "fixdfti";
 			if (is_type_unsigned(dst)) {
 				call = "fixunsdfti";
 			}
