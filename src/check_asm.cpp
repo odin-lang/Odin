@@ -52,6 +52,35 @@ gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type) {
 	return AsmRegClass_Unknown;
 }
 
+gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
+	if (operand->mode == Addressing_Constant) {
+		return AsmOperand_Immediate;
+	}
+	Ast *expr = operand->expr;
+	switch (expr->kind) {
+	case_ast_node(label, AsmLabelDecl, expr);
+		return AsmOperand_Label;
+	case_end;
+	case_ast_node(reg, AsmRegister, expr);
+		return AsmOperand_Register;
+	case_end;
+	case_ast_node(reg, AsmMemoryOperand, expr);
+		return AsmOperand_Memory;
+	case_end;
+	case_ast_node(ident, Ident, expr);
+		// TODO(bill): Is this correct?
+		if (expr->tav.mode == Addressing_Constant) {
+			return AsmOperand_Immediate;
+		}
+		Entity *e = entity_of_node(expr);
+		if (e != nullptr && e->kind == Entity_Variable && (e->flags & EntityFlag_PolyConst) != 0) {
+			return AsmOperand_Immediate;
+		}
+		return AsmOperand_Register;
+	case_end;
+	}
+	return AsmOperand_Invalid;
+}
 
 enum AsmMismatch : u8 {
 	AsmMismatch_None,
@@ -700,36 +729,6 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 	}
 	check_did_you_mean_print(&dym);
 	return CheckMnemomic_Invalid;
-}
-
-gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
-	if (operand->mode == Addressing_Constant) {
-		return AsmOperand_Immediate;
-	}
-	Ast *expr = operand->expr;
-	switch (expr->kind) {
-	case_ast_node(label, AsmLabelDecl, expr);
-		return AsmOperand_Label;
-	case_end;
-	case_ast_node(reg, AsmRegister, expr);
-		return AsmOperand_Register;
-	case_end;
-	case_ast_node(reg, AsmMemoryOperand, expr);
-		return AsmOperand_Memory;
-	case_end;
-	case_ast_node(ident, Ident, expr);
-		// TODO(bill): Is this correct?
-		if (expr->tav.mode == Addressing_Constant) {
-			return AsmOperand_Immediate;
-		}
-		Entity *e = entity_of_node(expr);
-		if (e != nullptr && e->kind == Entity_Variable && (e->flags & EntityFlag_PolyConst) != 0) {
-			return AsmOperand_Immediate;
-		}
-		return AsmOperand_Register;
-	case_end;
-	}
-	return AsmOperand_Invalid;
 }
 
 
