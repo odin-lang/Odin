@@ -435,9 +435,6 @@ gb_internal void check_asm_specs(CheckerContext *ctx, Scope *scope, Slice<Ast *>
 
 				ast_node(reg, AsmRegister, spec->value);
 				pin = reg->name.string;
-				if (pin == "any") {
-					pin = {};
-				}
 				if (pin.len != 0) {
 					if (string_set_update(&pin_set, pin)) {
 						error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
