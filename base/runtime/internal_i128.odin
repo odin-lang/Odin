@@ -133,7 +133,7 @@ fixuint :: proc "contextless" ($U: typeid, a: f64) -> U where intrinsics.type_is
 // decompose the f64 into significand and exponent, shift the significand into place,
 // saturate out of range values
 @(private="file")
-fixint :: proc "contextless" ($T: typeid, a: f64) -> T where intrinsics.type_is_integer(T) && !intrinsics.type_is_unsigned(T) {
+fixint :: proc "contextless" ($T: typeid, a: f64) -> T where intrinsics.type_is_integer(T), !intrinsics.type_is_unsigned(T) {
 	BITS             :: 8 * size_of(T)
 	SIGNIFICAND_BITS :: 52
 	EXPONENT_BIAS    :: 1023
