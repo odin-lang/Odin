@@ -121,10 +121,38 @@ struct lbAsmGenerate {
 		}
 	};
 
+	// Scan an instruction's operands for an annotated memory operand and return its
+	// size suffix, or 0 if none. The checker has already verified the annotation
+	// agrees with the matched encoding form, so a suffix here can never conflict.
+	char instruction_size_suffix(AstAsmInstruction *instr) {
+		char suffix = 0;
+		for (Ast *operand : instr->operands) {
+			char s = this->size_suffix_for_operand(operand);
+			if (s != 0) {
+				suffix = s;
+			}
+		}
+		return suffix;
+	}
+
+
+	// LLVM type of a returned register output, taken from the proc signature's results.
+	LLVMTypeRef output_llvm_type(lbModule *m, AsmTemplateEntityDecl const &e) {
+		Type *pt = base_type(tmpl_entity->type);
+		Type *rt = pt->Proc.results->Tuple.variables[e.result_index]->type;
+		return lb_type(m, rt);
+	};
+
+	virtual char     size_suffix_for_operand(Ast *op) = 0;
+	virtual gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
+	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
+};
+
+struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	// AT&T operand-size suffix ('b','w','l','q') for an annotated memory operand,
 	// or 0 if there is no size annotation to apply. Vector/other widths return 0,
 	// since those forms take no b/w/l/q suffix (the register operand fixes the size).
-	char size_suffix_for_operand(Ast *op) {
+	char size_suffix_for_operand(Ast *op) override {
 		if (op->kind != Ast_AsmMemoryOperand) {
 			return 0;
 		}
@@ -148,34 +176,6 @@ struct lbAsmGenerate {
 		return 0;
 	}
 
-	// Scan an instruction's operands for an annotated memory operand and return its
-	// AT&T size suffix, or 0 if none. The checker has already verified the annotation
-	// agrees with the matched encoding form, so a suffix here can never conflict.
-	char instruction_size_suffix(AstAsmInstruction *instr) {
-		char suffix = 0;
-		for (Ast *operand : instr->operands) {
-			char s = this->size_suffix_for_operand(operand);
-			if (s != 0) {
-				suffix = s;
-			}
-		}
-		return suffix;
-	}
-
-
-	// LLVM type of a returned register output, taken from the proc signature's results.
-	LLVMTypeRef output_llvm_type(lbModule *m, AsmTemplateEntityDecl const &e) {
-		Type *pt = base_type(tmpl_entity->type);
-		Type *rt = pt->Proc.results->Tuple.variables[e.result_index]->type;
-		return lb_type(m, rt);
-	};
-
-
-	virtual gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
-	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
-};
-
-struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		if (mem_op->disp) {
 			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, flags&~WriteOperandFlag_PrintPrefixes);
