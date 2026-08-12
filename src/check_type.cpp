@@ -3477,6 +3477,22 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			Type *bt = base_type(index);
 			GB_ASSERT(bt->kind == Type_Enum);
 
+			// the length is `max - min + 1`, computed exactly and then narrowed to an i64. a
+			// wide enough enumeration wraps & nothing tests downstream; reject here
+			if (bt->Enum.fields.count > 0 &&
+			    bt->Enum.min_value != nullptr && bt->Enum.max_value != nullptr) {
+				ExactValue span = exact_value_sub(*bt->Enum.max_value, *bt->Enum.min_value);
+				ExactValue len  = exact_value_add(span, exact_value_i64(1));
+				if (len.kind == ExactValue_Integer && len.value_integer.used > 1) {
+					gbAllocator a = heap_allocator();
+					String str = big_int_to_string(a, &len.value_integer);
+					error(e, "Enumerated array length too large, %.*s", LIT(str));
+					gb_free(a, str.text);
+					*type = t_invalid;
+					return;
+				}
+			}
+
 			Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
 
 			bool is_sparse = false;
