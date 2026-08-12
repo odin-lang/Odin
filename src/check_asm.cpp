@@ -153,8 +153,25 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 		return true;
 	}
 
-	AsmRegClass got_class = check_asm_reg_class_from_type(operand->type);
-	i32         got_w     = check_asm_operand_bit_width(operand->type);
+	// Determine the type whose width/class we actually measure.
+	//
+	// Memory operands encode their *access* type as a pointer: `[p]:u8` -> `^u8`,
+	// with a bare `rawptr` meaning "unsized" (no explicit `:type` annotation). A
+	// register/immediate/parameter operand measures its own type directly.
+	Type      *measured   = operand->type;
+	bool       is_memory  = (determine_asm_operand_kind(operand) == AsmOperand_Memory);
+	if (is_memory) {
+		if (are_types_identical(measured, t_rawptr)) {
+			// Unsized memory operand: the width is inferred elsewhere (from the
+			// register operand or deferred), so nothing to check against here.
+			if (want_bits_) *want_bits_ = want_w;
+			return true;
+		}
+		measured = type_deref(measured); // ^u8 -> u8
+	}
+
+	AsmRegClass got_class = check_asm_reg_class_from_type(measured);
+	i32         got_w     = check_asm_operand_bit_width(measured);
 	if (got_w < 0) {
 		// Untyped constant: width is a property of the value, not the type.
 		if (operand->mode == Addressing_Constant && operand->value.kind == ExactValue_Integer) {
@@ -170,13 +187,20 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	if (got_bits_)  *got_bits_  = got_w;
 
 	// Class check (only when the slot constrains a class).
-	if (want_class != AsmRegClass_Unknown) {
+	//
+	// A *memory* operand against a register-or-memory slot (e.g. OP_XMM_M64) has no
+	// lane semantics -- it is just N bytes of memory -- so its integer/vector class
+	// must not be held against the slot's register class. Only width matters for the
+	// memory interpretation. Register operands still get the full class check.
+	if (want_class != AsmRegClass_Unknown && !is_memory) {
 		bool class_ok;
 		switch (want_class) {
 		case AsmRegClass_Integer:
 			class_ok = (got_class == AsmRegClass_Integer);
 			break;
 		case AsmRegClass_Vector:
+			// A scalar float uses only the low lane, so it is valid in any vector
+			// register slot; a #simd vector matches the vector class exactly.
 			class_ok = (got_class == AsmRegClass_Vector || got_class == AsmRegClass_Float);
 			break;
 		case AsmRegClass_Mask:
@@ -194,7 +218,7 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 
 	// Width check.
 	if (want_w != 0 && got_w != 0) {
-		if (want_class == AsmRegClass_Vector) {
+		if (want_class == AsmRegClass_Vector && !is_memory) {
 			// A scalar float uses only the low lane, so it is valid in any vector
 			// register slot as long as it fits; a #simd vector must match exactly.
 			bool width_ok = (got_class == AsmRegClass_Float) ? (got_w <= want_w) : (got_w == want_w);
@@ -203,6 +227,7 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 				return false;
 			}
 		} else {
+			// Integer/mask registers, and all memory operands: exact width.
 			if (want_w != got_w) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
@@ -684,7 +709,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, AstAsmInst
 
 			bool spot_ok = false;
 			if (kind_ok) {
-				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory) {
+				bool mem_unsized = (src == AsmOperand_Memory) && are_types_identical(operand->type, t_rawptr);
+
+				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory && mem_unsized) {
 					spot_ok = true; // memory form accepts memory; no size check
 				} else {
 					AsmMismatch m = AsmMismatch_None;
@@ -1047,59 +1074,51 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		// displacement: an integer that fits a signed 32-bit value
 		for (int i = 0; disp.expr && i == 0; i++) {
 			if (disp.expr->kind == Ast_AsmRegister) {
-				error(disp.expr, "A displacement must be an integer value, got a register");
+				error(disp.expr, "A displacement must be a constant integer value, got a register");
+				break;
+			}
+
+			// A displacement must be assemble-time constant. A register-valued
+			// parameter belongs in the index slot, not the displacement.
+			if (disp.mode == Addressing_Constant && disp.value.kind == ExactValue_Integer) {
+				AsmMismatch m = AsmMismatch_None;
+				i32 needed = 0;
+				if (!check_asm_immediate_value_fits(disp.value, 32, &needed, &m)) {
+					gbString vs = exact_value_to_string(disp.value);
+					error(disp.expr, "A memory displacement must fit in a signed 32-bit value, got %s (needs %d bits)", vs, cast(int)needed);
+					gb_string_free(vs);
+				}
 				break;
 			}
 
 			Entity *param_entity = entity_of_node(disp.expr);
-			if (disp.mode == Addressing_Constant) {
-				if (disp.value.kind == ExactValue_Integer) {
-					AsmMismatch m = AsmMismatch_None;
-					i32 needed = 0;
-					if (!check_asm_immediate_value_fits(disp.value, 32, &needed, &m)) {
-						gbString vs = exact_value_to_string(disp.value);
-						error(disp.expr, "A memory displacement must fit in a signed 32-bit value, got %s (needs %d bits)", vs, cast(int)needed);
-						gb_string_free(vs);
-					}
+			if (param_entity != nullptr && param_entity->kind == Entity_Variable) {
+				auto kind = check_asm_find_kind(param_entity, ate->decls);
+				if (kind == AsmTemplateEntityDecl_Immediate) {
+					// A $-immediate parameter is a legal (assemble-time) displacement.
+					break;
+				}
+				if (kind == AsmTemplateEntityDecl_Register) {
+					error(disp.expr, "A register parameter cannot be a displacement; use it as an index, e.g. [base + %.*s]", LIT(disp.expr->Ident.token.string));
 					break;
 				}
 			}
 
-			if (param_entity == nullptr) {
-				gbString s = expr_to_string(disp.expr);
-				error(disp.expr, "A displacement value must be an integer, got %s", s);
-				gb_string_free(s);
-				break;
-			}
-			auto kind = check_asm_find_kind(param_entity, ate->decls);
-			switch (kind) {
-			case AsmTemplateEntityDecl_Register:
-			case AsmTemplateEntityDecl_Immediate:
-				if (is_type_integer(disp.type)) {
-					break;
-				}
-				/*fallthrough*/
-			default:
-				{
-					gbString s = expr_to_string(disp.expr);
-					gbString t = type_to_string(disp.type);
-					error(disp.expr, "A displacement must be an integer value, got %s of type %s", s, t);
-					gb_string_free(t);
-					gb_string_free(s);
-				}
-				break;
-			}
+			gbString s = expr_to_string(disp.expr);
+			error(disp.expr, "A displacement must be a constant integer or immediate, got %s", s);
+			gb_string_free(s);
 		}
 
 		if (mem_op->type) {
-			Type *type_interpretation = check_type(ctx, mem_op->type);
-			if (type_interpretation != nullptr && type_interpretation != t_invalid) {
-				operand->type = alloc_type_pointer(type_interpretation);
-				if (!is_valid_asm_parameter_type(type_interpretation) ||
-				    is_type_pointer(type_interpretation)) { // do not allow pointers even if they are valid asm parameter types
-					gbString s = type_to_string(type_interpretation);
+			Type *t = check_type(ctx, mem_op->type);
+			if (t != nullptr && t != t_invalid) {
+				if (is_valid_asm_parameter_type(t) && !is_type_pointer(t)) {
+					operand->type = alloc_type_pointer(t);
+				} else {
+					gbString s = type_to_string(t);
 					error(mem_op->type, "Asm memory operands type interpretation must be either an integer, boolean, float, or #simd vector, got %s", s);
 					gb_string_free(s);
+					// leave operand->type == t_rawptr ("unsized")
 				}
 
 			}

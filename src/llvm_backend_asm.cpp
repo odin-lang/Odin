@@ -121,6 +121,47 @@ struct lbAsmGenerate {
 		}
 	};
 
+	// AT&T operand-size suffix ('b','w','l','q') for an annotated memory operand,
+	// or 0 if there is no size annotation to apply. Vector/other widths return 0,
+	// since those forms take no b/w/l/q suffix (the register operand fixes the size).
+	char size_suffix_for_operand(Ast *op) {
+		if (op->kind != Ast_AsmMemoryOperand) {
+			return 0;
+		}
+		AstAsmMemoryOperand *mem_op = &op->AsmMemoryOperand;
+		if (mem_op->type == nullptr) {
+			return 0; // unsized: rely on a register operand to fix the width
+		}
+		// The frontend stored the access type as a pointer on the node's tav: [p]:u8 -> ^u8.
+		Type *ptr = mem_op->type->tav.type;
+		if (ptr == nullptr) {
+			return 0;
+		}
+		Type *access = type_deref(ptr); // ^u8 -> u8
+		i64 sz = type_size_of(base_type(access));
+		switch (sz) {
+		case 1: return 'b';
+		case 2: return 'w';
+		case 4: return 'l';
+		case 8: return 'q';
+		}
+		return 0;
+	}
+
+	// Scan an instruction's operands for an annotated memory operand and return its
+	// AT&T size suffix, or 0 if none. The checker has already verified the annotation
+	// agrees with the matched encoding form, so a suffix here can never conflict.
+	char instruction_size_suffix(AstAsmInstruction *instr) {
+		char suffix = 0;
+		for (Ast *operand : instr->operands) {
+			char s = this->size_suffix_for_operand(operand);
+			if (s != 0) {
+				suffix = s;
+			}
+		}
+		return suffix;
+	}
+
 
 	// LLVM type of a returned register output, taken from the proc signature's results.
 	LLVMTypeRef output_llvm_type(lbModule *m, AsmTemplateEntityDecl const &e) {
@@ -304,6 +345,19 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				asm_string = gb_string_appendc(asm_string, "\t");
 				String name = instr->name->Ident.token.string;
 				asm_string = gb_string_append_length(asm_string, name.text, name.len);
+
+				// If a memory operand carries an explicit size annotation ([p]:u8) and
+				// no register operand pins the width, the AT&T assembler needs the size
+				// encoded as a mnemonic suffix (crc32 -> crc32b). The checker has already
+				// verified the annotation agrees with the matched form, so an emitted
+				// suffix can never conflict with a register operand's implied width.
+				{
+					char suffix = this->instruction_size_suffix(instr);
+					if (suffix != 0) {
+						asm_string = gb_string_append_length(asm_string, &suffix, 1);
+					}
+				}
+
 				asm_string = gb_string_appendc(asm_string, " ");
 				// Intel-source operand order reversed to AT&T (src, ..., dst).
 				for (isize j = instr->operands.count-1; j >= 0; j -= 1) {

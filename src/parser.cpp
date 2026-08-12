@@ -2463,7 +2463,7 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 						disp = parse_asm_operand(f, false);
 					}
 				} else {
-					disp = possible_index;
+					index = possible_index;
 				}
 			}
 
