@@ -684,7 +684,17 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 
 		return true;
 	}
+
+	ERROR_BLOCK();
 	error(asm_reg->name, "Unknown register for this target platform: %%%.*s", LIT(name));
+	{
+		auto dym = did_you_mean_make(heap_allocator(), asm_ctx->register_map.count, name);
+		defer (did_you_mean_destroy(&dym));
+		for (auto const &entry : asm_ctx->register_map) {
+			did_you_mean_append(&dym, entry.key);
+		}
+		check_did_you_mean_print(&dym);
+	}
 	return false;
 }
 
