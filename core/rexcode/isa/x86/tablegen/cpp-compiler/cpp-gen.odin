@@ -199,6 +199,9 @@ main :: proc() {
 		strings.write_string(&sb, "\t\t\t\t                 SideEffectFlag_CACHE |\n")
 		strings.write_string(&sb, "\t\t\t\t                 SideEffectFlag_SERIALIZING)) != 0;\n")
 		strings.write_string(&sb, "\t\t}\n")
+		strings.write_string(&sb, "\t\tbool implies_side_effects() {\n")
+		strings.write_string(&sb, "\t\t\treturn side_effects;\n")
+		strings.write_string(&sb, "\t\t}\n")
 		strings.write_string(&sb, "\t};\n")
 	}
 	strings.write_string(&sb, "\n");

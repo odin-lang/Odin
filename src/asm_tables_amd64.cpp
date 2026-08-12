@@ -204,6 +204,9 @@ struct Asm_amd64 {
 				                 SideEffectFlag_CACHE |
 				                 SideEffectFlag_SERIALIZING)) != 0;
 		}
+		bool implies_side_effects() {
+			return side_effects;
+		}
 	};
 
 	static u16 const register_codes[REG_COUNT];

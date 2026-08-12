@@ -870,7 +870,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		tmpl_entity->AsmTemplate.clobber_cc       |= clobber.implies_clobber_cc();
 		tmpl_entity->AsmTemplate.clobber_memory   |= clobber.implies_clobber_memory();
-		tmpl_entity->AsmTemplate.has_side_effects |= clobber.side_effects != 0;
+		tmpl_entity->AsmTemplate.has_side_effects |= clobber.implies_side_effects();
 		return;
 	}
 
