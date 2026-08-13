@@ -331,13 +331,6 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AutoCast.expr = clone_ast(n->AutoCast.expr, f);
 		break;
 
-	case Ast_InlineAsmExpr:
-		n->InlineAsmExpr.param_types        = clone_ast_array(n->InlineAsmExpr.param_types, f);
-		n->InlineAsmExpr.return_type        = clone_ast(n->InlineAsmExpr.return_type, f);
-		n->InlineAsmExpr.asm_string         = clone_ast(n->InlineAsmExpr.asm_string, f);
-		n->InlineAsmExpr.constraints_string = clone_ast(n->InlineAsmExpr.constraints_string, f);
-		break;
-
 	case Ast_BadStmt:   break;
 	case Ast_EmptyStmt: break;
 	case Ast_ExprStmt:
@@ -1070,32 +1063,6 @@ gb_internal Ast *ast_auto_cast(AstFile *f, Token token, Ast *expr) {
 	result->AutoCast.expr  = expr;
 	return result;
 }
-
-
-gb_internal Ast *ast_inline_asm_expr(AstFile *f, Token token, Token open, Token close,
-                         Array<Ast *> const &param_types,
-                         Ast *return_type,
-                         Ast *asm_string,
-                         Ast *constraints_string,
-                         bool has_side_effects,
-                         bool is_align_stack,
-                         InlineAsmDialectKind dialect) {
-
-	Ast *result = alloc_ast_node(f, Ast_InlineAsmExpr);
-	result->InlineAsmExpr.token              = token;
-	result->InlineAsmExpr.open               = open;
-	result->InlineAsmExpr.close              = close;
-	result->InlineAsmExpr.param_types        = slice_from_array(param_types);
-	result->InlineAsmExpr.return_type        = return_type;
-	result->InlineAsmExpr.asm_string         = asm_string;
-	result->InlineAsmExpr.constraints_string = constraints_string;
-	result->InlineAsmExpr.has_side_effects   = has_side_effects;
-	result->InlineAsmExpr.is_align_stack     = is_align_stack;
-	result->InlineAsmExpr.dialect            = dialect;
-	return result;
-}
-
-
 
 
 gb_internal Ast *ast_bad_stmt(AstFile *f, Token begin, Token end) {
@@ -2691,7 +2658,7 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 				Token hash = expect_token(f, Token_Hash);
 				Token name = expect_token(f, Token_Ident);
 
-				if (name.string == "side_effects" ||
+				if (name.string == "volatile" ||
 				    name.string == "align_stack") {
 					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
 					clobber->AsmClobber.token = hash;

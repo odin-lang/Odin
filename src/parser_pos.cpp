@@ -71,7 +71,6 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
 	case Ast_TypeCast:           return node->TypeCast.token;
 	case Ast_AutoCast:           return node->AutoCast.token;
-	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.token;
 
 	case Ast_BadStmt:            return node->BadStmt.begin;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;
@@ -254,7 +253,6 @@ Token ast_end_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_end_token(node->TypeAssertion.type);
 	case Ast_TypeCast:           return ast_end_token(node->TypeCast.expr);
 	case Ast_AutoCast:           return ast_end_token(node->AutoCast.expr);
-	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.close;
 
 	case Ast_BadStmt:            return node->BadStmt.end;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;

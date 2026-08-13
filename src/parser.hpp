@@ -571,17 +571,6 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
-	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
-		Token token; \
-		Token open, close; \
-		Slice<Ast *> param_types; \
-		Ast *return_type; \
-		Ast *asm_string; \
-		Ast *constraints_string; \
-		bool has_side_effects; \
-		bool is_align_stack; \
-		InlineAsmDialectKind dialect; \
-	}) \
 	AST_KIND(MatrixIndexExpr, "matrix index expression",       struct { Ast *expr, *row_index, *column_index; Token open, close; }) \
 AST_KIND(_ExprEnd,       "", bool) \
 AST_KIND(_StmtBegin,     "", bool) \

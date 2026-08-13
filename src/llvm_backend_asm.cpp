@@ -484,7 +484,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			fn_ty,
 			asm_string,  cast(size_t)gb_string_length(asm_string),
 			constraints, cast(size_t)gb_string_length(constraints),
-			/*HasSideEffects*/ tmpl_entity->AsmTemplate.has_side_effects,
+			/*HasSideEffects*/ tmpl_entity->AsmTemplate.is_volatile,
 			/*IsAlignStack*/   tmpl_entity->AsmTemplate.is_align_stack,
 			LLVMInlineAsmDialectATT,
 			/*CanThrow*/       false);

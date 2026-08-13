@@ -12683,53 +12683,6 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		}
 	case_end;
 
-	case_ast_node(ia, InlineAsmExpr, node);
-		if (c->curr_proc_decl == nullptr) {
-			error(node, "Inline asm expressions are only allowed within a procedure body");
-		}
-
-		auto param_types = array_make<Type *>(heap_allocator(), ia->param_types.count);
-		Type *return_type = nullptr;
-		for_array(i, ia->param_types) {
-			param_types[i] = check_type(c, ia->param_types[i]);
-		}
-		if (ia->return_type != nullptr) {
-			return_type = check_type(c, ia->return_type);
-		}
-		Operand x = {};
-		check_expr(c, &x, ia->asm_string);
-		if (x.mode != Addressing_Constant || !is_type_string(x.type)) {
-			error(x.expr, "Expected a constant string for the inline asm main parameter");
-		}
-		check_expr(c, &x, ia->constraints_string);
-		if (x.mode != Addressing_Constant || !is_type_string(x.type)) {
-			error(x.expr, "Expected a constant string for the inline asm constraints parameter");
-		}
-
-		Scope *scope = create_scope(c->info, c->scope);
-		scope->flags |= ScopeFlag_Proc;
-
-		Type *params = alloc_type_tuple();
-		Type *results = alloc_type_tuple();
-		if (param_types.count != 0) {
-			slice_init(&params->Tuple.variables, heap_allocator(), param_types.count);
-			for_array(i, param_types) {
-				params->Tuple.variables[i] = alloc_entity_param(scope, blank_token, param_types[i], false, true);
-			}
-		}
-		if (return_type != nullptr) {
-			slice_init(&results->Tuple.variables, heap_allocator(), 1);
-			results->Tuple.variables[0] = alloc_entity_param(scope, blank_token, return_type, false, true);
-		}
-
-
-		Type *pt = alloc_type_proc(scope, params, param_types.count, results, return_type != nullptr ? 1 : 0, false, ProcCC_InlineAsm);
-		o->type = pt;
-		o->mode = Addressing_Value;
-		o->expr = node;
-		return Expr_Expr;
-	case_end;
-
 	case Ast_DistinctType:
 	case Ast_TypeidType:
 	case Ast_PolyType:
@@ -13563,40 +13516,6 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 				}
 				str = write_expr_to_string(str, bf->fields[i], false);
 			}
-		}
-		str = gb_string_appendc(str, "}");
-	case_end;
-
-	case_ast_node(ia, InlineAsmExpr, node);
-		str = gb_string_appendc(str, "asm(");
-		for_array(i, ia->param_types) {
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
-			}
-			str = write_expr_to_string(str, ia->param_types[i], shorthand);
-		}
-		str = gb_string_appendc(str, ")");
-		if (ia->return_type != nullptr) {
-			str = gb_string_appendc(str, " -> ");
-			str = write_expr_to_string(str, ia->return_type, shorthand);
-		}
-		if (ia->has_side_effects) {
-			str = gb_string_appendc(str, " #side_effects");
-		}
-		if (ia->is_align_stack) {
-			str = gb_string_appendc(str, " #stack_align");
-		}
-		if (ia->dialect) {
-			str = gb_string_appendc(str, " #");
-			str = gb_string_appendc(str, inline_asm_dialect_strings[ia->dialect]);
-		}
-		str = gb_string_appendc(str, " {");
-		if (shorthand) {
-			str = gb_string_appendc(str, "...");
-		} else {
-			str = write_expr_to_string(str, ia->asm_string, shorthand);
-			str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, ia->constraints_string, shorthand);
 		}
 		str = gb_string_appendc(str, "}");
 	case_end;

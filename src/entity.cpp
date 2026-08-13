@@ -340,7 +340,7 @@ struct Entity {
 		} Label;
 		struct {
 			Ast *node;
-			bool has_side_effects;
+			bool is_volatile;
 			bool is_align_stack;
 
 			bool clobber_cc;

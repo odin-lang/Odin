@@ -882,7 +882,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		tmpl_entity->AsmTemplate.clobber_cc       |= clobber.implies_clobber_cc();
 		tmpl_entity->AsmTemplate.clobber_memory   |= clobber.implies_clobber_memory();
-		tmpl_entity->AsmTemplate.has_side_effects |= clobber.implies_side_effects();
+		tmpl_entity->AsmTemplate.is_volatile |= clobber.implies_side_effects();
 		return;
 	}
 
@@ -1284,7 +1284,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	entity->type = type;
 
 
-	bool has_side_effects = false;
+	bool is_volatile = false;
 	bool is_align_stack   = false;
 	auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
 
@@ -1297,11 +1297,11 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			ast_node(clobber, AsmClobber, clobber_);
 
 			if (clobber->value == nullptr) {
-				if (clobber->name.string == "side_effects") {
-					if (has_side_effects) {
-						error(clobber->name, "#side_effects has already been defined as an asm specification");
+				if (clobber->name.string == "volatile") {
+					if (is_volatile) {
+						error(clobber->name, "#volatile has already been defined as an asm specification");
 					}
-					has_side_effects = true;
+					is_volatile = true;
 				} else if (clobber->name.string == "align_stack") {
 					if (is_align_stack) {
 						error(clobber->name, "#align_stack has already been defined as an asm specification");
@@ -1347,7 +1347,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 		entity->AsmTemplate.clobber_cc       = clobber_cc;
 		entity->AsmTemplate.clobber_memory   = clobber_memory;
-		entity->AsmTemplate.has_side_effects = has_side_effects;
+		entity->AsmTemplate.is_volatile = is_volatile;
 		entity->AsmTemplate.is_align_stack   = is_align_stack;
 	}
 
