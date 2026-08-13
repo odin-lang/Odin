@@ -51,15 +51,15 @@ _start:
 *) echo "no start stub for $TARGET" >&2; exit 2 ;;
 esac
 
-# Ask the C compiler which tiers it actually has, the Odin side must have the same answer or
-# it references symbols the C side never emitted ( eg `__int128` does not exist on i386).
-macros=$($CLANG --target="$TRIPLE" -dM -E -x c /dev/null 2>/dev/null)
-tier() { case "$macros" in *"$1"*) echo true ;; *) echo false ;; esac; }
-TIERS="-define:ABI_TIER_GNU=$(tier __GNUC__) -define:ABI_TIER_F16=$(tier __FLT16_MANT_DIG__) -define:ABI_TIER_I128=$(tier __SIZEOF_INT128__)"
 
 rm -rf build-cross
 mkdir -p build-cross/p
 python3 gen.py build-cross
+
+# Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
+# The Odin side must use the same tiers or it references symbols C never emitted.
+have() { $CLANG --target="$TRIPLE" -E build-cross/tiers.c 2>/dev/null | grep -q "ABI_YES_$1" && echo true || echo false; }
+TIERS="-define:ABI_TIER_GNU=$(have GNU) -define:ABI_TIER_F16=$(have F16) -define:ABI_TIER_I128=$(have I128)"
 mv build-cross/abi_main.odin build-cross/p/
 printf '%s\n' "$START" > build-cross/start.s
 

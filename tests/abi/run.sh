@@ -24,11 +24,6 @@ COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-de
 CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
 ODIN_TARGET=""; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
 
-# Ask the C compiler which tiers it actually has, the Odin side must have the same answer or
-# it references symbols the C side never emitted ( eg `__int128` does not exist on i386).
-macros=$($CLANG $CC_TARGET -dM -E -x c /dev/null 2>/dev/null)
-tier() { case "$macros" in *"$1"*) echo true ;; *) echo false ;; esac; }
-TIERS="-define:ABI_TIER_GNU=$(tier __GNUC__) -define:ABI_TIER_F16=$(tier __FLT16_MANT_DIG__) -define:ABI_TIER_I128=$(tier __SIZEOF_INT128__)"
 
 rm -rf "$here/build"
 mkdir -p "$here/build"
@@ -38,6 +33,11 @@ pushd "$here/build" > /dev/null
 set -x
 
 python3 ../gen.py .
+
+# Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
+# The Odin side must use the same tiers or it references symbols C never emitted.
+have() { $CLANG $CC_TARGET -E tiers.c 2>/dev/null | grep -q "ABI_YES_$1" && echo true || echo false; }
+TIERS="-define:ABI_TIER_GNU=$(have GNU) -define:ABI_TIER_F16=$(have F16) -define:ABI_TIER_I128=$(have I128)"
 
 # `-w` because the corpus deliberately uses zero-length arrays and empty
 # structs; both are the extensions under test.
