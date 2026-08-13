@@ -724,16 +724,22 @@ namespace lbAbiAmd64SysV {
 	}
 
 	gb_internal bool is_aggregate(LLVMTypeRef type) {
+		// A single-member wrapper is passed like its member, but only while that
+		// member still fits one eightbyte. `struct{i128}` needs two registers and
+		// goes to memory when they are gone, where a bare `i128` does not -- clang
+		// emits `byval align 16` for the struct and a plain `i128` for the scalar.
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		switch (kind) {
 		case LLVMStructTypeKind:
 			if (LLVMCountStructElementTypes(type) == 1) {
-				return is_aggregate(LLVMStructGetTypeAtIndex(type, 0));
+				LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, 0);
+				return lb_sizeof(elem) > 8 || is_aggregate(elem);
 			}
 			return true;
 		case LLVMArrayTypeKind:
 			if (LLVMGetArrayLength(type) == 1) {
-				return is_aggregate(LLVMGetElementType(type));
+				LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
+				return lb_sizeof(elem) > 8 || is_aggregate(elem);
 			}
 			return true;
 		}
