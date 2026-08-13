@@ -190,7 +190,10 @@ def build():
 
     # --- nesting: same leaves reached through another level
     for a, b in (("f32", "f32"), ("f64", "f64"), ("i32", "f32"), ("f32", "i64"),
-                 ("f16", "f16"), ("f16", "i32")):
+                 ("f16", "f16"), ("f16", "i32"),
+                 # a lone f32 in eightbyte 0 reached through a level, then an f64:
+                 # the shape #7292 was about
+                 ("f32", "f64")):
         add(f"n_{a}_{b}",
             f"struct {{ i: struct {{ x: {SCALARS[a][0]}, y: {SCALARS[b][0]} }} }}",
             f"struct {{ struct {{ {SCALARS[a][1]} x; {SCALARS[b][1]} y; }} i; }}",
@@ -211,6 +214,13 @@ def build():
             f"struct {{ u: struct #raw_union {{ x: {SCALARS[a][0]} }}, y: {SCALARS[b][0]} }}",
             f"struct {{ union {{ {SCALARS[a][1]} x; }} u; {SCALARS[b][1]} y; }}",
             [leaf("u.x", a, 0), leaf("y", b, 1)], tier=tier_of(a, b))
+        # TWO members in the nested union. The one-member form above is the case
+        # overlap alone cannot detect; this is its control, and it is the shape
+        # `test_issue_sysv_abi` pins.
+        add(f"su2_{a}_{b}",
+            f"struct {{ u: struct #raw_union {{ x, y: {SCALARS[a][0]} }}, z: {SCALARS[b][0]} }}",
+            f"struct {{ union {{ {SCALARS[a][1]} x, y; }} u; {SCALARS[b][1]} z; }}",
+            [leaf("u.x", a, 0), leaf("z", b, 1)], tier=tier_of(a, b))
 
     # --- homogeneous float aggregates and the shapes that disqualify them
     for tag in ("f32", "f64", "f16"):
@@ -477,6 +487,7 @@ ABI_MUTATE :: #config(ABI_MUTATE, false)
 ABI_VARARGS :: #config(ABI_VARARGS, false)
 
 
+
 E32 :: enum i32 { LO = 0, HI = 0x7fffffff }
 BS  :: bit_set[0..<31; u32]
 
@@ -633,6 +644,7 @@ ABI_SKIP :: #config(ABI_SKIP, 0)
 // fail. That is one defect, not 111, and leaving it on would drown every other
 // signal. Turn it on with `-define:ABI_VARARGS=true` to measure it.
 ABI_VARARGS :: #config(ABI_VARARGS, false)
+
 
 
 foreign import lib "../abi_corpus_c.o"

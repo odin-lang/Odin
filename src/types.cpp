@@ -4527,7 +4527,12 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
+		i64 max_align = build_context.max_simd_align*2;
+		if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
+			// Darwin guarantees only 16-byte stack alignment
+			max_align = gb_min(max_align, 16);
+		}
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, max_align);
 	}
 
 	case Type_Matrix:

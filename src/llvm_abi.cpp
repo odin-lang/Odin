@@ -335,7 +335,11 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
+			i64 max_align = build_context.max_simd_align;
+			if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
+				max_align = gb_min(max_align, 16); // see type_align_of_internal
+			}
+			return gb_clamp(next_pow2(size), 1, max_align);
 		}
 
 	}
