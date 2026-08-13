@@ -2244,7 +2244,10 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	String name = bd->name.string;
 	GB_ASSERT(name == "load_directory");
 
-	if (ce->args.count != 1) {
+	if (ce->args.count == 0) {
+		error(ce->close, "'#%.*s' expects 1 argument, got 0", LIT(name));
+		return LoadDirective_Error;
+	} else if (ce->args.count != 1) {
 		error(ce->args[0], "'#%.*s' expects 1 argument, got %td", LIT(name), ce->args.count);
 		return LoadDirective_Error;
 	}
