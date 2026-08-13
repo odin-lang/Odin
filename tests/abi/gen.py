@@ -254,12 +254,24 @@ def build():
             tier=TIER_GNU)
 
     # --- alignment: changes size and placement without changing any field type
+    for al in (2, 4, 8, 16, 32, 64):
+        # a small struct whose ALIGNMENT is the only thing that varies: same
+        # fields, same field offsets, different slot
+        add(f"aln{al}",
+            f"struct #align({al}) {{ a: i8, b: i32 }}",
+            f"struct __attribute__((aligned({al}))) {{ int8_t a; int32_t b; }}",
+            [leaf("a", "i8", 0), leaf("b", "i32", 1)], tier=TIER_GNU)
     for al in (16, 32):
         add(f"al{al}",
             f"struct #align({al}) {{ a, b, c: f64 }}",
             f"struct __attribute__((aligned({al}))) {{ double a, b, c; }}",
             [leaf("a", "f64", 0), leaf("b", "f64", 1), leaf("c", "f64", 2)],
             tier=TIER_GNU)
+    # an over-aligned member in TRAILING position, which adds interior padding
+    # before it rather than after
+    add("oamt", "struct #min_field_align(16) { a: f32, b: i8 }",
+        "struct { float a; int8_t b __attribute__((aligned(16))); }",
+        [leaf("a", "f32", 0), leaf("b", "i8", 1)], tier=TIER_GNU)
     add("pk", "struct #packed { a: i8, b: i32, c: i64 }",
         "struct __attribute__((packed)) { int8_t a; int32_t b; int64_t c; }",
         [leaf("a", "i8", 0), leaf("b", "i32", 1), leaf("c", "i64", 2)], tier=TIER_GNU)
@@ -392,6 +404,18 @@ def build():
         odin_set=["{}.a[0] = {1.5, 2.5, 3.5, 4.5}", "{}.a[1] = {5.5, 6.5, 7.5, 8.5}"],
         odin_get=[("simd.extract({}.a[0], 0)", "f32(1.5)"),
                   ("simd.extract({}.a[1], 3)", "f32(8.5)")])
+    # A wide vector NOT at offset 0. Its alignment decides where it starts, so a
+    # wrong alignment moves the member and changes `size_of` -- which is the only
+    # way the difference is observable on a target that passes a >16-byte
+    # aggregate by POINTER (AAPCS64), where the slot alignment never shows.
+    add("v8_off",
+        "struct { a: i8, v: #simd[8]f32 }",
+        "struct { int8_t a; float v __attribute__((vector_size(32))); }",
+        [leaf("a", "i8", 0)] + [leaf(f"v[{i}]", "f32", i) for i in range(8)],
+        tier=TIER_GNU,
+        odin_set=["{}.a = 3", "{}.v = " + "{" + ", ".join(val(i, "f32") for i in range(8)) + "}"],
+        odin_get=[("{}.a", "i8(3)")] +
+                 [(f"simd.extract({{}}.v, {i})", f"f32({val(i, 'f32')})") for i in range(8)])
     add("v8_f32",
         "struct { v: #simd[8]f32 }",
         "struct { float v __attribute__((vector_size(32))); }",
@@ -540,6 +564,31 @@ def emit_c(types):
         o.write(f"\n\tif (o_{t.name}_take(s, 7) != 7) return 1;\n")
         o.write(f"\t{t.name} r = o_{t.name}_make();\n")
         o.write(f"\tif (!({c_conds(t, 'r')})) return 2;\n\treturn 0;\n}}\n")
+        # _can: the aggregate wedged between two stack neighbours, after the
+        # registers are gone. `_ex` only checks what follows; a wrongly sized or
+        # wrongly aligned slot can equally eat what precedes it, and an
+        # over-aligned slot slides the aggregate onto its own neighbour.
+        o.write(f"double {t.name}_can(int64_t q0, int64_t q1, int64_t q2, int64_t q3,"
+                f" int64_t q4, int64_t q5, int64_t q6, double w0, double w1, double w2,"
+                f" double w3, double w4, double w5, double w6, double w7,"
+                f" int64_t before, {t.name} s, int64_t after, double last) {{\n")
+        o.write("\t(void)q0;(void)q1;(void)q2;(void)q3;(void)q4;(void)q5;(void)q6;\n")
+        o.write("\t(void)w0;(void)w1;(void)w2;(void)w3;(void)w4;(void)w5;(void)w6;(void)w7;\n")
+        o.write("\tif (before != 0x1111111111111111LL) return -1;\n")
+        o.write("\tif (after  != 0x2222222222222222LL) return -2;\n")
+        o.write(f"\tif (!({c_conds(t, 's')})) return -3;\n\treturn last;\n}}\n")
+        # _can2: same idea as `_can`, but with enough integer fillers to push the
+        # aggregate to an outgoing offset that is 16-aligned and NOT 32-aligned.
+        # At offset 0 a 16- and a 32-aligned slot coincide, so an over-aligned
+        # aggregate is invisible there -- which is why `_can` alone passes on
+        # AArch64 while its vector alignment disagrees with clang.
+        ints2 = ", ".join(f"int64_t p{i}" for i in range(11))
+        o.write(f"double {t.name}_can2({ints2}, int64_t before, {t.name} s,"
+                f" int64_t after, double last) {{\n\t")
+        o.write("".join(f"(void)p{i};" for i in range(11)))
+        o.write("\n\tif (before != 0x1111111111111111LL) return -1;\n")
+        o.write("\tif (after  != 0x2222222222222222LL) return -2;\n")
+        o.write(f"\tif (!({c_conds(t, 's')})) return -3;\n\treturn last;\n}}\n")
         # _va: the variadic path, which is a separate set of rules -- SysV's AL
         # register count, Win64 duplicating a float into the matching GPR,
         # Darwin-arm64 stacking every variadic argument. A zero-sized type has
@@ -573,6 +622,11 @@ def emit_odin(types):
                 f" w0, w1, w2, w3, w4, w5, w6, w7, w8: f64, s: {t.name}, next: f64) -> f64 ---\n")
         o.write(f"{ind}\t{t.name}_two :: proc(s1, s2: {t.name}, next: f64) -> f64 ---\n")
         o.write(f"{ind}\t{t.name}_back :: proc() -> i32 ---\n")
+        o.write(f"{ind}\t{t.name}_can2 :: proc(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10: i64,"
+                f" before: i64, s: {t.name}, after: i64, last: f64) -> f64 ---\n")
+        o.write(f"{ind}\t{t.name}_can :: proc(q0, q1, q2, q3, q4, q5, q6: i64,"
+                f" w0, w1, w2, w3, w4, w5, w6, w7: f64,"
+                f" before: i64, s: {t.name}, after: i64, last: f64) -> f64 ---\n")
         if t.fields:
             o.write(f"{ind}\t{t.name}_va  :: proc(n: i32, #c_vararg args: ..any) -> f64 ---\n")
         o.write(f"{ind}}}\n")
@@ -599,6 +653,8 @@ def emit_odin(types):
         o.write(f"{ind}\ttesting.expect_value(t, {t.name}_ex(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, s, 7), f64(7))\n")
         o.write(f"{ind}\ttesting.expect_value(t, {t.name}_ex2(1,2,3,4,5,6,7,8,9, 1,2,3,4,5,6,7,8,9, s, 7), f64(7))\n")
         o.write(f"{ind}\ttesting.expect_value(t, {t.name}_two(s, s, 7), f64(7))\n")
+        o.write(f"{ind}\ttesting.expect_value(t, {t.name}_can(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n")
+        o.write(f"{ind}\ttesting.expect_value(t, {t.name}_can2(1,2,3,4,5,6,7,8,9,10,11, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n")
         o.write(f"{ind}\ttesting.expect_value(t, {t.name}_back(), i32(0))\n")
         if t.fields:
             o.write(f"{ind}\twhen ABI_VARARGS {{\n")
@@ -672,6 +728,11 @@ def emit_main(types):
                 f" w0, w1, w2, w3, w4, w5, w6, w7, w8: f64, s: {t.name}, next: f64) -> f64 ---\n")
         o.write(f"{ind}\t{t.name}_two :: proc(s1, s2: {t.name}, next: f64) -> f64 ---\n")
         o.write(f"{ind}\t{t.name}_back :: proc() -> i32 ---\n")
+        o.write(f"{ind}\t{t.name}_can2 :: proc(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10: i64,"
+                f" before: i64, s: {t.name}, after: i64, last: f64) -> f64 ---\n")
+        o.write(f"{ind}\t{t.name}_can :: proc(q0, q1, q2, q3, q4, q5, q6: i64,"
+                f" w0, w1, w2, w3, w4, w5, w6, w7: f64,"
+                f" before: i64, s: {t.name}, after: i64, last: f64) -> f64 ---\n")
         if t.fields:
             o.write(f"{ind}\t{t.name}_va  :: proc(n: i32, #c_vararg args: ..any) -> f64 ---\n")
         o.write(f"{ind}}}\n")
