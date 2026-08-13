@@ -4,8 +4,11 @@
 // where the struct before it went. If the aggregate consumes the wrong number or
 // the wrong file of registers, the following argument is read from the wrong
 // place deterministically rather than by scratch-register coincidence.
+//
 
-typedef struct { long  a; float  b; } Pad_Int_Float;
+#include <stdint.h>
+
+typedef struct { int64_t a; float b; } Pad_Int_Float;
 typedef struct { float a; double b; } Pad_Float_Double;
 typedef struct { float a, b;        } No_Pad;
 typedef struct { struct { float x; } a; double b; } Nested;
