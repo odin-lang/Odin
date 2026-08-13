@@ -372,10 +372,13 @@ def build():
     add("zarr",  "struct { z: [0]f32 }",   "struct { float z[0]; }",  [], tier=TIER_GNU)
 
     # --- an array OF vectors, and a vector wider than one register
+    # The C paths index the vector array directly; only the ODIN side needs the
+    # hatch.
     add("av2_f32",
         "struct { a: [2]#simd[4]f32 }",
         "struct { rx_v4f a[2]; }",
-        [], tier=TIER_GNU,
+        [leaf2("", f"a[{i // 4}][{i % 4}]", "f32", f"{i + 1}.5") for i in range(8)],
+        tier=TIER_GNU,
         odin_set=["{}.a[0] = {1.5, 2.5, 3.5, 4.5}", "{}.a[1] = {5.5, 6.5, 7.5, 8.5}"],
         odin_get=[("simd.extract({}.a[0], 0)", "f32(1.5)"),
                   ("simd.extract({}.a[1], 3)", "f32(8.5)")])
