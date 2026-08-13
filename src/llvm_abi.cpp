@@ -34,8 +34,11 @@ gb_internal lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef at
 }
 
 gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
-	i64 alignment = lb_alignof(type);
-	alignment = gb_max(alignment, 8);
+	// the outgoing stack slot, which i386 never over-aligns, not even for an over-aligned struct
+	i64 alignment = build_context.ptr_size;
+	if (build_context.metrics.arch != TargetArch_i386) {
+		alignment = gb_max(alignment, lb_alignof(type));
+	}
 
 	LLVMAttributeRef byval_attr = lb_create_enum_attribute_with_type(c, "byval", type);
 	LLVMAttributeRef align_attr = lb_create_enum_attribute(c, "align", alignment);
