@@ -33,9 +33,15 @@ gb_internal lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef at
 	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, nullptr, 0, false};
 }
 
-gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
-	i64 alignment = lb_alignof(type);
-	alignment = gb_max(alignment, 8);
+gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type, Type *source_type = nullptr) {
+	// the outgoing stack slot, which i386 never over-aligns, not even for an over-aligned struct
+	i64 alignment = build_context.ptr_size;
+	if (build_context.metrics.arch != TargetArch_i386) {
+		// `#align` and `#min_field_align` do not survive lowering, so ask the source
+		// type where there is one
+		i64 a = source_type != nullptr ? type_align_of(source_type) : lb_alignof(type);
+		alignment = gb_max(alignment, a);
+	}
 
 	LLVMAttributeRef byval_attr = lb_create_enum_attribute_with_type(c, "byval", type);
 	LLVMAttributeRef align_attr = lb_create_enum_attribute(c, "align", alignment);
@@ -785,7 +791,7 @@ namespace lbAbiAmd64SysV {
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
 		} else if (ran_out_of_regs) {
 			if (is_arg) {
-				return lb_arg_type_indirect_byval(c, type);
+				return lb_arg_type_indirect_byval(c, type, source_type);
 			} else {
 				LLVMAttributeRef attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 				return lb_arg_type_indirect(type, attribute);
@@ -796,7 +802,7 @@ namespace lbAbiAmd64SysV {
 				if (is_calling_convention_odin(calling_convention)) {
 					return lb_arg_type_indirect(type, attribute);
 				}
-				return lb_arg_type_indirect_byval(c, type);
+				return lb_arg_type_indirect_byval(c, type, source_type);
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}
@@ -980,6 +986,23 @@ namespace lbAbiAmd64SysV {
 		return reg_classes;
 	}
 
+	// An SSE class that fills a whole eightbyte from offset 0, so nothing narrower
+	// starting at offset 0 can add to it.
+	gb_internal bool sse_class_covers_eightbyte(RegClass c) {
+		return c == RegClass_SSEDs || c == RegClass_SSEInt64;
+	}
+	// An SSE class positioned at offset 0 of its eightbyte. The `v` classes sit at
+	// offset 4 and are therefore DISJOINT from a 4-byte class at offset 0.
+	gb_internal bool sse_class_at_offset_zero(RegClass c) {
+		switch (c) {
+		case RegClass_SSEHs: case RegClass_SSEFs: case RegClass_SSEDs:
+		case RegClass_SSEInt8: case RegClass_SSEInt16:
+		case RegClass_SSEInt32: case RegClass_SSEInt64:
+			return true;
+		}
+		return false;
+	}
+
 	gb_internal void unify(Array<RegClass> *cls, i64 i, RegClass const newv) {
 		RegClass const oldv = (*cls)[cast(isize)i];
 		if (oldv == newv) {
@@ -1013,6 +1036,13 @@ namespace lbAbiAmd64SysV {
 			case RegClass_SSEInt64:
 				return;
 			}
+		} else if (sse_class_covers_eightbyte(oldv) && sse_class_at_offset_zero(newv)) {
+			// The members OVERLAP -- a union. Last-writer-wins would pass
+			// `union{f64, f32}` as a 4-byte float and lose the top half. Restricted
+			// to a full-eightbyte old class against an offset-zero new one, because
+			// `struct{f32, f16}` is Fs then Hv at offset 4, which is disjoint and
+			// must still combine rather than pick.
+			return;
 		}
 
 		(*cls)[cast(isize)i] = to_write;
@@ -1419,6 +1449,10 @@ namespace lbAbiArm64 {
 			unsigned field_member_count = 0;
 
 			LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
+			if (lb_is_type_kind(elem, LLVMStructTypeKind) && lb_sizeof(elem) == 0) {
+				// an empty struct occupies nothing and is ignored
+				continue;
+			}
 			if (!is_homogenous_aggregate(c, elem, &field_type, &field_member_count)) {
 				return false;
 			}
@@ -1451,6 +1485,7 @@ namespace lbAbiArm64 {
 	gb_internal bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		switch (kind) {
+		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
 			if (base_type_) *base_type_ = type;
@@ -1488,6 +1523,10 @@ namespace lbAbiArm64 {
 		switch (bt->kind) {
 		case Type_Basic:
 			switch (bt->Basic.kind) {
+			case Basic_f16:
+				if (base_type_)    *base_type_ = LLVMHalfTypeInContext(c);
+				if (member_count_) *member_count_ = 1;
+				return true;
 			case Basic_f32:
 				if (base_type_)    *base_type_ = LLVMFloatTypeInContext(c);
 				if (member_count_) *member_count_ = 1;
@@ -1499,6 +1538,10 @@ namespace lbAbiArm64 {
 			}
 			return false;
 		case Type_Array: {
+			if (bt->Array.count == 0) {
+				// a zero-length member disqualifies the aggregate, unlike an empty struct
+				return false;
+			}
 			LLVMTypeRef elem_base = nullptr;
 			unsigned elem_count = 0;
 			if (!is_homogenous_aggregate_source(c, bt->Array.elem, &elem_base, &elem_count)) {
@@ -1515,6 +1558,11 @@ namespace lbAbiArm64 {
 			LLVMTypeRef found_base = nullptr;
 			unsigned total = 0;
 			for (Entity *f : bt->Struct.fields) {
+				Type *fbt = base_type(f->type);
+				if (fbt != nullptr && fbt->kind == Type_Struct && type_size_of(f->type) == 0) {
+					// an empty struct occupies nothing and is ignored
+					continue;
+				}
 				LLVMTypeRef field_base = nullptr;
 				unsigned field_count = 0;
 				if (!is_homogenous_aggregate_source(c, f->type, &field_base, &field_count)) {
@@ -1556,20 +1604,12 @@ namespace lbAbiArm64 {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (is_register(return_type)) {
 			return non_struct(c, return_type, nullptr);
-		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count)) {
-			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-				return lb_arg_type_direct(return_type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
-			} else {
-				//TODO(Platin): do i need to create stuff that can handle the diffrent return type?
-				//              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
-
-				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
-
-				//LLVMTypeRef array_type = llvm_array_type(homo_base_type, homo_member_count);
-				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
-				return lb_arg_type_indirect(return_type, attr);
-			}
+		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count) &&
+		           is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+			return lb_arg_type_direct(return_type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
 		} else {
+			// too many members to be an HFA falls through to the size rule, it does not
+			// become indirect on its own: `struct{[5]f16}` is 10 bytes and goes in x0:x1
 			i64 size = lb_sizeof(return_type);
 			if (size > 16) {
 				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
@@ -1616,12 +1656,9 @@ namespace lbAbiArm64 {
 
 			if (is_register(type)) {
 				args[i] = non_struct(c, type, ptype);
-			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
-				if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-					args[i] = lb_arg_type_direct(type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
-				} else {
-					args[i] = lb_arg_type_indirect(type, nullptr);;
-				}
+			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count) &&
+			           is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+				args[i] = lb_arg_type_direct(type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
 			} else if (is_homogenous_aggregate_source(c, ptype, &src_base_type, &src_member_count) &&
 			           is_homogenous_aggregate_small_enough(src_base_type, src_member_count)) {
 				args[i] = lb_arg_type_direct(type, llvm_array_type(src_base_type, src_member_count), nullptr, nullptr);
