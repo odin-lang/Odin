@@ -4539,7 +4539,13 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	// NOTE(bill): Things that are bigger than build_context.ptr_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
+	i64 max_align = build_context.max_align;
+	if (build_context.metrics.arch == TargetArch_i386 &&
+	    build_context.metrics.os != TargetOs_windows) {
+		// the i386 System V psABI aligns every scalar to at most 4, unlike Windows
+		max_align = gb_min(max_align, 4);
+	}
+	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, max_align);
 }
 
 gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align, i64 max_field_align) {
