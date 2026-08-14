@@ -148,7 +148,7 @@ write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 		}
 	}
 
-	n := copy(dst, buf[:i])
+	copy(dst, buf[:i])
 	return string(dst[:i])
 }
 
