@@ -677,7 +677,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	
 	scope_reserve(ctx->scope, min_field_count);
 
-	if (st->is_raw_union && min_field_count > 1) {
+	// Even a one-field `#raw_union` must be marked. RISC-V psABI excludes unions from the hardware
+	// floating-point convention. `struct{union{f32}}` goes in `a0` where `struct{f32}` goes in `fa0`.
+	if (st->is_raw_union) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
 	}

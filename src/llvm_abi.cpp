@@ -2157,7 +2157,45 @@ namespace lbAbiRiscv64 {
 		return LLVMGetTypeKind(type) == LLVMIntegerTypeKind && lb_sizeof(type) > 0;
 	}
 
-	gb_internal lbArgType compute_arg_type(lbModule *m, LLVMTypeRef type, int *gprs_left, int *fprs_left, Type *odin_type) {
+	// The psABI applies the hardware floating-point convention to a struct's MEMBERS. A union is
+	// never flattened, so an aggregate holding one ANYWHERE, at any depth, and through an array,
+	// takes the integer convention instead, whatever the union itself contains.
+	//
+	// The lowered type cannot answer this. A `#raw_union{f32}` comes out as a bare `float`, and a
+	// two-member one comes out as the integer its padding filler is, which is indistinguishable
+	// from a real integer member. Both have to be read off the source type.
+	gb_internal bool contains_union(Type *t) {
+		if (t == nullptr) {
+			return false;
+		}
+		Type *bt = base_type(t);
+		if (bt == nullptr) {
+			return false;
+		}
+		switch (bt->kind) {
+		case Type_Union:
+			return true;
+		case Type_Struct:
+			if (bt->Struct.is_raw_union) {
+				return true;
+			}
+			for (Entity *f : bt->Struct.fields) {
+				if (contains_union(f->type)) {
+					return true;
+				}
+			}
+			return false;
+		case Type_Array:
+			return contains_union(bt->Array.elem);
+		case Type_EnumeratedArray:
+			return contains_union(bt->EnumeratedArray.elem);
+		case Type_Matrix:
+			return contains_union(bt->Matrix.elem);
+		}
+		return false;
+	}
+
+	gb_internal lbArgType compute_arg_type(lbModule *m, LLVMTypeRef type, int *gprs_left, int *fprs_left, Type *source_type) {
 		LLVMContextRef c = m->ctx;
 
 		int xlen = 8; // 8 byte int register size for riscv64.
@@ -2204,7 +2242,9 @@ namespace lbAbiRiscv64 {
 			fp_size = lb_sizeof(fp_type);
 		}
 
-		if (is_float(fp_type) && fp_size <= flen && *fprs_left >= 1) {
+		bool integer_only = contains_union(source_type);
+
+		if (!integer_only && is_float(fp_type) && fp_size <= flen && *fprs_left >= 1) {
 			*fprs_left -= 1;
 			if (fp_type != orig_type) {
 				// A struct that flattened to a single float has to be coerced to that float;
@@ -2214,7 +2254,7 @@ namespace lbAbiRiscv64 {
 			return non_struct(c, orig_type);
 		}
 
-		if (fp_kind == LLVMStructTypeKind && fp_size <= 2*flen) {
+		if (!integer_only && fp_kind == LLVMStructTypeKind && fp_size <= 2*flen) {
 			unsigned elem_count = LLVMCountStructElementTypes(fp_type);
 			if (elem_count == 2) {
 				LLVMTypeRef ty1 = LLVMStructGetTypeAtIndex(fp_type, 0);
@@ -2267,9 +2307,24 @@ namespace lbAbiRiscv64 {
 	gb_internal Array<lbArgType> compute_arg_types(lbModule *m, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *odin_type, int *gprs, int *fprs) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
-		for (unsigned i = 0; i < arg_count; i++) {
+		// The source type of each parameter, where one exists. `arg_types` can carry entries with
+		// no counterpart, so this walks the tuple the way lbAbiAmd64SysV does and hands back
+		// nullptr once it runs out.
+		Entity **params = nullptr;
+		isize param_count = 0;
+		if (odin_type != nullptr && odin_type->kind == Type_Proc && odin_type->Proc.params != nullptr) {
+			params      = odin_type->Proc.params->Tuple.variables.data;
+			param_count = odin_type->Proc.params->Tuple.variables.count;
+		}
+
+		for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
+			while (cast(isize)j < param_count && params[j]->kind != Entity_Variable) {
+				j++;
+			}
+			Type *source_type = cast(isize)j < param_count ? params[j]->type : nullptr;
+
 			LLVMTypeRef type = arg_types[i];
-			args[i] = compute_arg_type(m, type, gprs, fprs, odin_type);
+			args[i] = compute_arg_type(m, type, gprs, fprs, source_type);
 		}
 
 		return args;
@@ -2282,10 +2337,21 @@ namespace lbAbiRiscv64 {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		}
 
+		// A single result is classified from its source type. The union rule reaches the return
+		// as well. A tuple keeps nullptr: it is split into out-pointers below. The recursive call
+		// for the last tuple field lands here with a result count above one, so it takes the same path.
+		Type *return_source = nullptr;
+		if (!return_is_tuple &&
+		    odin_type != nullptr && odin_type->kind == Type_Proc &&
+		    odin_type->Proc.results != nullptr &&
+		    odin_type->Proc.results->Tuple.variables.count == 1) {
+			return_source = odin_type->Proc.results->Tuple.variables[0]->type;
+		}
+
 		// There are two registers for return types.
 		int gprs = 2;
 		int fprs = 2;
-		lbArgType ret = compute_arg_type(m, return_type, &gprs, &fprs, odin_type);
+		lbArgType ret = compute_arg_type(m, return_type, &gprs, &fprs, return_source);
 
 		// Return didn't fit into the return registers, so caller allocates and it is returned via
 		// an out-pointer.
