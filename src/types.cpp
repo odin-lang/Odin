@@ -1605,16 +1605,8 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	// could be maximally aligned but as a compromise, having no padding will be
 	// beneficial to third libraries that assume no padding
 
-	i64 total_expected_size = row_count*column_count*elem_size;
-	// i64 min_alignment = prev_pow2(elem_align * row_count);
-	i64 min_alignment = prev_pow2(total_expected_size);
-	while (total_expected_size != 0 && (total_expected_size % min_alignment) != 0) {
-		min_alignment >>= 1;
-	}
-	min_alignment = gb_max(min_alignment, elem_align);
-
-	i64 align = gb_min(min_alignment, build_context.max_simd_align);
-	return align;
+	gb_unused(row_count); gb_unused(column_count); gb_unused(elem_size);
+	return gb_clamp(elem_align, 1, build_context.max_simd_align);
 }
 
 
@@ -4527,12 +4519,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		i64 max_align = build_context.max_simd_align*2;
-		if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
-			// Darwin guarantees only 16-byte stack alignment
-			max_align = gb_min(max_align, 16);
-		}
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, max_align);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align);
 	}
 
 	case Type_Matrix:
