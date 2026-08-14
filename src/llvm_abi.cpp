@@ -1041,21 +1041,15 @@ namespace lbAbiAmd64SysV {
 		return reg_classes;
 	}
 
-	// An SSE class that fills a whole eightbyte from offset 0, so nothing narrower
-	// starting at offset 0 can add to it.
-	gb_internal bool sse_class_covers_eightbyte(RegClass c) {
-		return c == RegClass_SSEDs || c == RegClass_SSEInt64;
-	}
-	// An SSE class positioned at offset 0 of its eightbyte. The `v` classes sit at
-	// offset 4 and are therefore DISJOINT from a 4-byte class at offset 0.
-	gb_internal bool sse_class_at_offset_zero(RegClass c) {
+	// How much of its eightbyte an SSE class occupies, which is what `llreg` turns
+	// it back into: the scalar classes are as wide as their element, and every `v`
+	// class becomes a vector spanning the whole eightbyte.
+	gb_internal i64 sse_class_width(RegClass c) {
 		switch (c) {
-		case RegClass_SSEHs: case RegClass_SSEFs: case RegClass_SSEDs:
-		case RegClass_SSEInt8: case RegClass_SSEInt16:
-		case RegClass_SSEInt32: case RegClass_SSEInt64:
-			return true;
+		case RegClass_SSEHs: return 2;
+		case RegClass_SSEFs: return 4;
 		}
-		return false;
+		return 8;
 	}
 
 	gb_internal void unify(Array<RegClass> *cls, i64 i, RegClass const newv) {
@@ -1091,12 +1085,13 @@ namespace lbAbiAmd64SysV {
 			case RegClass_SSEInt64:
 				return;
 			}
-		} else if (sse_class_covers_eightbyte(oldv) && sse_class_at_offset_zero(newv)) {
-			// The members OVERLAP -- a union. Last-writer-wins would pass
-			// `union{f64, f32}` as a 4-byte float and lose the top half. Restricted
-			// to a full-eightbyte old class against an offset-zero new one, because
-			// `struct{f32, f16}` is Fs then Hv at offset 4, which is disjoint and
-			// must still combine rather than pick.
+		} else if (is_sse(oldv) && is_sse(newv) && sse_class_width(oldv) > sse_class_width(newv)) {
+			// The members OVERLAP, a union. Last-writer-wins would pass
+			// `union{f64, f32}` as a 4-byte float, and `union{[2]f32, f32}` as one
+			// lane of two, losing the top half of the eightbyte either way. Keeping
+			// the WIDER class is what leaves `struct{f32, f16}` alone: that is Fs
+			// then Hv at offset 4, and Hv spans the eightbyte, so it still widens
+			// rather than gets picked over.
 			return;
 		}
 
