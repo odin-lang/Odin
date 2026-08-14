@@ -33,7 +33,7 @@ pushd "$here/build" > /dev/null
 
 set -x
 
-python3 ../gen.py .
+$ODIN run ../gen.odin -file -- .
 
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.

@@ -11,7 +11,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 
 @echo on
 
-python3 ..\gen.py . || exit /b
+..\..\..\odin run ..\gen.odin -file -- . || exit /b
 
 @echo off
 REM Ask the C compiler which tiers it has, by preprocessing the generated

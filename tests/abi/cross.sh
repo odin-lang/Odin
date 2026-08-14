@@ -55,7 +55,7 @@ esac
 # cleaned BEFORE, not after -- the driver is left in place to inspect
 rm -rf build-cross
 mkdir -p build-cross/p
-python3 gen.py build-cross
+$ODIN run gen.odin -file -- build-cross
 
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.
