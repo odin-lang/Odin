@@ -342,8 +342,10 @@ def build():
             tier=tier,
             odin_set=["{} = " + "{" + ", ".join(val(i, tag) for i in range(n)) + "}"],
             odin_get=[(f"simd.extract({{}}, {i})", f"{ot}({val(i, tag)})") for i in range(lanes)])
-    # the same widths WRAPPED, so the pair is directly comparable
-    for tag, n, cname, tier in BARE[:3] + [BARE[7]]:
+    # the same widths WRAPPED, so the pair is directly comparable. Selected by
+    # NAME, not by position: indices move whenever a row is added.
+    WRAP = {("i8", 4), ("i8", 8), ("i16", 2), ("f16", 2)}
+    for tag, n, cname, tier in [b for b in BARE if (b[0], b[1]) in WRAP]:
         ot = SCALARS[tag][0]
         lanes = min(n, 4)
         add(f"wv{n}_{tag}", f"struct {{ v: #simd[{n}]{ot} }}",
