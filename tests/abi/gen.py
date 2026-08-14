@@ -325,9 +325,13 @@ def build():
     # `#simd[8]f32` does not. 4-byte widths were absent entirely. Measured
     # against clang on x86-64, the divergence is purely SIZE-driven and
     # independent of the element: 4-byte and >=32-byte diverge, 8- and 16-byte
-    # agree.
+    # agree. Every 8-byte element type is here for that reason -- LLVM rounds a
+    # bare vector's stack slot up to the legal vector width whatever it holds,
+    # so one 8-byte row would only have caught the defect for its own element.
     BARE = [("i8", 4, "rx_i8x4", TIER_GNU), ("i8", 8, "rx_i8x8", TIER_GNU),
-            ("i16", 2, "rx_i16x2", TIER_GNU), ("i32", 8, "rx_i32x8", TIER_GNU),
+            ("i16", 2, "rx_i16x2", TIER_GNU), ("i16", 4, "rx_i16x4", TIER_GNU),
+            ("i32", 2, "rx_i32x2", TIER_GNU), ("f32", 2, "rx_f32x2", TIER_GNU),
+            ("i32", 8, "rx_i32x8", TIER_GNU),
             ("i64", 4, "rx_i64x4", TIER_GNU), ("f32", 8, "rx_f32x8", TIER_GNU),
             ("f32", 16, "rx_f32x16", TIER_GNU), ("f16", 2, "rx_f16x2", TIER_F16)]
     for tag, n, cname, tier in BARE:
@@ -506,6 +510,9 @@ typedef float rx_v4f __attribute__((vector_size(16)));
 typedef signed char rx_i8x4  __attribute__((vector_size(4)));
 typedef signed char rx_i8x8  __attribute__((vector_size(8)));
 typedef short       rx_i16x2 __attribute__((vector_size(4)));
+typedef short       rx_i16x4 __attribute__((vector_size(8)));
+typedef int         rx_i32x2 __attribute__((vector_size(8)));
+typedef float       rx_f32x2 __attribute__((vector_size(8)));
 typedef int         rx_i32x8 __attribute__((vector_size(32)));
 typedef long long   rx_i64x4 __attribute__((vector_size(32)));
 typedef float       rx_f32x8 __attribute__((vector_size(32)));
