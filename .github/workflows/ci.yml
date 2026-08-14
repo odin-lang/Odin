@@ -372,3 +372,9 @@ jobs:
 
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+
+      - name: ABI comparator
+        run: |
+          cd tests/abi
+          ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+          ABI_CFLAGS=-O2 ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath -o:speed

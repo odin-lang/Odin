@@ -298,6 +298,27 @@ build :: proc() {
 		)
 	}
 
+	// --- BARE scalars. Every scalar above is a struct MEMBER, and a member never
+	// carries a parameter extension attribute: `signext`/`zeroext` exist only on a
+	// scalar passed in its own right, and say the CALLER has already widened it to
+	// 32 bits. A callee compiled to rely on that reads the untouched high bits.
+	// The sub-32-bit widths are the ones that have it; i32 and f32 are the controls
+	// that must not.
+	for tag in ([]string{"i8", "u8", "i16", "u16", "bool", "i32", "f32"}) {
+		s := scalar(tag)
+		v := val(0, tag)
+		expected := tag == "bool" ? odin_val(tag, v) : tp("%s(%s)", s.odin, v)
+		add(
+			tp("bs_%s", tag),
+			s.odin,
+			s.c,
+			leaves(leaf2("", "{}", tag, v)),
+			tier = tier_of(tag),
+			odin_set = strs(tp("{} = %s", odin_val(tag, v))),
+			odin_get = pairs([2]string{"{}", expected}),
+		)
+	}
+
 	// --- arrays: the same eightbytes from one declaration
 	for tag in ([]string{"f32", "f64", "i32", "i64", "i8", "f16", "enum", "i128"}) {
 		for cnt in 1 ..= 5 {
@@ -457,6 +478,21 @@ build :: proc() {
 		leaves(leaf("a", "i8", 0), leaf("b", "i32", 1), leaf("c", "i64", 2)),
 		tier = TIER_GNU,
 	)
+	// `#max_field_align` CAPS a member's alignment where `#packed` removes it
+	// entirely, so the struct keeps interior padding but less of it, and its size
+	// is not a multiple of the widest member. C spells it `#pragma pack(n)`.
+	// `#pragma pack(n)` has no expression form, so the C side caps each member
+	// with `packed, aligned(n)`, which is the same rule applied per member.
+	for al in ([]int{2, 4}) {
+		add(
+			tp("mfa%d", al),
+			tp("struct #max_field_align(%d) { a: i8, b: i32, c: i64 }", al),
+			tp("struct { int8_t a; int32_t b __attribute__((packed, aligned(%d)));" +
+				" int64_t c __attribute__((packed, aligned(%d))); }", al, al),
+			leaves(leaf("a", "i8", 0), leaf("b", "i32", 1), leaf("c", "i64", 2)),
+			tier = TIER_GNU,
+		)
+	}
 
 	// --- explicit padding, the shape that started this file
 	add(
@@ -731,7 +767,29 @@ build :: proc() {
 			"union { float a[4]; double b[2]; }",
 			fields,
 		)
+		add(
+			"ua_arr_n4",
+			"struct #raw_union { a: [4]f32, b: f32 }",
+			"union { float a[4]; float b; }",
+			fields,
+		)
 	}
+	// The rows above are equal-width, so "the last member's type" happens to give
+	// the right answer and cannot detect a classifier that uses it. These two are
+	// the pair that can: an aggregate member followed by a NARROWER one, and the
+	// same two members the other way round as the control.
+	add(
+		"ua_arr_n",
+		"struct #raw_union { a: [2]f32, b: f32 }",
+		"union { float a[2]; float b; }",
+		leaves(leaf("a[0]", "f32", 0), leaf("a[1]", "f32", 1)),
+	)
+	add(
+		"ua_arr_w",
+		"struct #raw_union { b: f32, a: [2]f32 }",
+		"union { float b; float a[2]; }",
+		leaves(leaf("a[0]", "f32", 0), leaf("a[1]", "f32", 1)),
+	)
 
 	// --- three levels of nesting: SysV flattens, and anything that classifies
 	// per top-level member stops early
