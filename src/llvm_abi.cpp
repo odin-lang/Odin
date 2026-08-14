@@ -335,11 +335,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			i64 max_align = build_context.max_simd_align;
-			if (build_context.metrics.os == TargetOs_darwin && build_context.metrics.arch == TargetArch_amd64) {
-				max_align = gb_min(max_align, 16); // see type_align_of_internal
-			}
-			return gb_clamp(next_pow2(size), 1, max_align);
+			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
 		}
 
 	}
@@ -799,6 +795,13 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 
+		if (is_arg && cls.count > 2 && is_sse(cls[0])) {
+			// An SSE run wider than two eightbytes has no register to land in at
+			// the baseline ISA, so as an argument it goes to memory, bare vector
+			// or struct-wrapped. The return does not: clang returns it by value
+			// and lets LLVM split it across xmm0:xmm1.
+			return lb_arg_type_indirect_byval(c, type, source_type);
+		}
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (type == LLVMInt1TypeInContext(c)) {
@@ -1073,7 +1076,8 @@ namespace lbAbiAmd64SysV {
 			RegClass &oldv = (*cls)[cast(isize)i];
 			if (is_sse(oldv)) {
 				for (i++; i < e; i++) {
-					if (oldv != RegClass_SSEUp) {
+					// NOTE: the current eightbyte, not `oldv`, is bound to cls[0], which is never SSEUp
+					if ((*cls)[cast(isize)i] != RegClass_SSEUp) {
 						all_mem(cls);
 						return;
 					}
@@ -1205,7 +1209,16 @@ namespace lbAbiAmd64SysV {
 						}
 
 						unsigned vec_len = llvec_len(reg_classes, i+1);
-						LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
+						unsigned lanes = vec_len * elems_per_word;
+						// Never widen past what is actually left: a 4-byte vector
+						// occupies half an eightbyte, and padding it to a whole one
+						// makes the parameter 8 bytes where clang coerces to i32.
+						i64 elem_bytes = lb_sizeof(elem_type);
+						if (elem_bytes > 0 && sz > 0 && cast(i64)lanes * elem_bytes > sz) {
+							lanes = cast(unsigned)(sz / elem_bytes);
+						}
+						if (lanes == 0) { lanes = 1; }
+						LLVMTypeRef vec_type = LLVMVectorType(elem_type, lanes);
 						array_add(&types, vec_type);
 						sz -= lb_sizeof(vec_type);
 						i += vec_len;
@@ -1305,6 +1318,13 @@ namespace lbAbiAmd64SysV {
 				LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
+				if (t_size < 8) {
+					// A vector narrower than an eightbyte is INTEGER, not SSE:
+					// clang coerces `<4 x i8>` to `i32` and passes it in an integer
+					// register.
+					unify(cls, ix + off/8, RegClass_Int);
+					break;
+				}
 				RegClass reg = RegClass_NoClass;
 				switch (elem_kind) {
 				case LLVMIntegerTypeKind: {
