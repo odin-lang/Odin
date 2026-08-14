@@ -347,6 +347,32 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	return 1;
 }
 
+// The alignment LLVM itself will give the lowered type, which is not `lb_alignof`:
+// that applies `max_simd_align`, and LLVM knows nothing about it. A 32-byte vector
+// is 16-aligned on arm64 and Darwin and 32-aligned to LLVM, and a struct holding
+// one has to be packed or LLVM re-inserts padding and moves the member.
+gb_internal i64 lb_llvm_natural_alignof(LLVMTypeRef type) {
+	switch (LLVMGetTypeKind(type)) {
+	case LLVMStructTypeKind:
+		{
+			if (LLVMIsPackedStruct(type)) {
+				return 1;
+			}
+			unsigned field_count = LLVMCountStructElementTypes(type);
+			i64 max_align = 1;
+			for (unsigned i = 0; i < field_count; i++) {
+				max_align = gb_max(max_align, lb_llvm_natural_alignof(LLVMStructGetTypeAtIndex(type, i)));
+			}
+			return max_align;
+		}
+	case LLVMArrayTypeKind:
+		return lb_llvm_natural_alignof(OdinLLVMGetArrayElementType(type));
+	case LLVMVectorTypeKind:
+		return gb_max(next_pow2(lb_sizeof(type)), 1);
+	}
+	return lb_alignof(type);
+}
+
 
 #define LB_ABI_INFO(name) lbFunctionType *name(lbModule *m, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple, ProcCallingConvention calling_convention, Type *original_type)
 typedef LB_ABI_INFO(lbAbiInfoType);
@@ -1674,6 +1700,13 @@ namespace lbAbiArm64 {
 			}
 
 			GB_ASSERT(size <= 16);
+			if (LLVMGetTypeKind(return_type) == LLVMVectorTypeKind) {
+				// A vector too narrow to be a short vector is still RETURNED as
+				// itself. clang coerces a 4-byte vector argument to `i32` and puts
+				// it in w0, but returns `<4 x i8>` in v0; coercing the return too
+				// picks the wrong register file.
+				return lb_arg_type_direct(return_type, nullptr, nullptr, nullptr);
+			}
 			LLVMTypeRef cast_type = nullptr;
 			if (size == 0) {
 				cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
