@@ -795,12 +795,18 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 
-		if (is_arg && cls.count > 2 && is_sse(cls[0])) {
+		if (cls.count > 2 && is_sse(cls[0])) {
 			// An SSE run wider than two eightbytes has no register to land in at
-			// the baseline ISA, so as an argument it goes to memory, bare vector
-			// or struct-wrapped. The return does not: clang returns it by value
-			// and lets LLVM split it across xmm0:xmm1.
-			return lb_arg_type_indirect_byval(c, type, source_type);
+			// the baseline ISA. It goes to memory, bare vector or struct-wrapped.
+			// A bare vector RETURN is the one exception: it is not an aggregate.
+			// Clang gives it no hidden pointer and lets LLVM split it across
+			// xmm0:xmm1, but the struct that wraps it still gets one.
+			if (is_arg) {
+				return lb_arg_type_indirect_byval(c, type, source_type);
+			}
+			if (LLVMGetTypeKind(type) != LLVMVectorTypeKind) {
+				all_mem(&cls);
+			}
 		}
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
@@ -978,7 +984,11 @@ namespace lbAbiAmd64SysV {
 		i64 sz = lb_sizeof(t);
 		i64 words = (sz + 7)/8;
 		auto reg_classes = array_make<RegClass>(heap_allocator(), cast(isize)words);
-		if (words > 4) {
+		if (words > 4 && LLVMGetTypeKind(t) != LLVMVectorTypeKind) {
+			// A BARE vector is exempt: it is not an aggregate. Clang never gives it
+			// a hidden pointer however wide it is. `<16 x float>` is returned directly
+			// and split across xmm0-xmm3, and the SSE run below still sends it to
+			// memory as an ARGUMENT.
 			all_mem(&reg_classes);
 		} else {
 			bool from_source = source_type != nullptr && source_is_classifiable(source_type) &&
@@ -1143,6 +1153,15 @@ namespace lbAbiAmd64SysV {
 		}
 
 		i64 sz = lb_sizeof(type);
+		if (LLVMGetTypeKind(type) == LLVMVectorTypeKind && sz == 8 &&
+		    reg_classes.count == 1 && is_sse(reg_classes[0])) {
+			// LLVM rounds a bare vector's stack slot up to the legal vector width.
+			// An 8-byte one takes 16 bytes where the ABI wants 8. clang coerces every
+			// 64-bit vector to `double`, which lands in the same half of the same xmm
+			// and takes one eightbyte on the stack.
+			array_free(&types);
+			return LLVMDoubleTypeInContext(c);
+		}
 		if (all_ints) {
 			for_array(i, reg_classes) {
 				GB_ASSERT(sz > 0);
