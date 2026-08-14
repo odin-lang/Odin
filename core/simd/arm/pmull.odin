@@ -596,6 +596,40 @@ vtbx4_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x8x4_t, idx: uint8x8_t
 	}
 }
 
+// Population count per byte.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcnt_p8)
+@(require_results, enable_target_feature = "neon")
+vcnt_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	return transmute(poly8x8_t)vcnt_s8(transmute(int8x8_t)a)
+}
+
+// Population count per byte.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcntq_p8)
+@(require_results, enable_target_feature = "neon")
+vcntq_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	return transmute(poly8x16_t)vcntq_s8(transmute(int8x16_t)a)
+}
+
+// Bitwise Not.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vmvn_p8)
+@(require_results, enable_target_feature = "neon")
+vmvn_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	b := poly8x8_t(max(poly8_t))
+	return simd.bit_xor(a, b)
+}
+
+// Bitwise Not.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vmvnq_p8)
+@(require_results, enable_target_feature = "neon")
+vmvnq_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	b := poly8x16_t(max(poly8_t))
+	return simd.bit_xor(a, b)
+}
+
 when ODIN_ARCH == .arm64 {
 	// Polynomial multiply long
 	//
