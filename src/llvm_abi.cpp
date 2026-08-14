@@ -417,21 +417,73 @@ gb_internal lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMCont
 } while (0)
 
 // NOTE(bill): I hate `namespace` in C++ but this is just because I don't want to prefix everything
+
+// Every psABI except AAPCS64 and Win64 makes the caller widen a sub-word integer to 32 bits, in
+// both argument and return position, and clang records that as `signext`/`zeroext`. A callee
+// compiled against the attribute reads the whole 32-bit register rather than the byte, so omitting
+// it hands the callee whatever the high bits happened to hold. 
+gb_internal LLVMAttributeRef lb_integer_extension_attribute(LLVMContextRef c, LLVMTypeRef type, Type *source_type) {
+	if (source_type == nullptr) {
+		// Knowable without the source: an `i1` is always zero-extended.
+		return type == LLVMInt1TypeInContext(c) ? lb_create_enum_attribute(c, "zeroext") : nullptr;
+	}
+	if (lb_sizeof(type) >= 4) {
+		return nullptr;
+	}
+	if (!is_type_integer_like(source_type) && !is_type_enum(source_type)) {
+		return nullptr;
+	}
+	if (is_type_unsigned(source_type) || is_type_boolean(source_type)) {
+		return lb_create_enum_attribute(c, "zeroext");
+	}
+	return lb_create_enum_attribute(c, "signext");
+}
+
+// The source type of each parameter, where one exists. `arg_types` can carry entries with no
+// counterpart, so the tuple is walked rather than indexed.
+gb_internal Array<Type *> lb_abi_param_source_types(Type *proc_type, unsigned arg_count) {
+	auto out = array_make<Type *>(temporary_allocator(), cast(isize)arg_count);
+	Entity **params = nullptr;
+	isize param_count = 0;
+	if (proc_type != nullptr && proc_type->kind == Type_Proc && proc_type->Proc.params != nullptr) {
+		params      = proc_type->Proc.params->Tuple.variables.data;
+		param_count = proc_type->Proc.params->Tuple.variables.count;
+	}
+	for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
+		while (cast(isize)j < param_count && params[j]->kind != Entity_Variable) {
+			j++;
+		}
+		out[i] = cast(isize)j < param_count ? params[j]->type : nullptr;
+	}
+	return out;
+}
+
+// A single result can be classified from its source type. A tuple cannot: it is split into
+// out-pointers, and C has no such return shape anyway.
+gb_internal Type *lb_abi_single_result_type(Type *proc_type) {
+	if (proc_type != nullptr && proc_type->kind == Type_Proc &&
+	    proc_type->Proc.results != nullptr &&
+	    proc_type->Proc.results->Tuple.variables.count == 1) {
+		return proc_type->Proc.results->Tuple.variables[0]->type;
+	}
+	return nullptr;
+}
+
 namespace lbAbi386 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
 		if (!is_return && lb_sizeof(type) > 8) {
 			return lb_arg_type_indirect(type, nullptr);
 		}
@@ -450,16 +502,13 @@ namespace lbAbi386 {
 			return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 		}
 
-		LLVMAttributeRef attr = nullptr;
-		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
-		}
+		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+		auto srcs = lb_abi_param_source_types(original_type, arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
@@ -474,7 +523,7 @@ namespace lbAbi386 {
 					args[i] = lb_arg_type_indirect_byval(c, t);
 				}
 			} else {
-				args[i] = non_struct(c, t, false);
+				args[i] = non_struct(c, t, false, srcs[i]);
 			}
 		}
 		return args;
@@ -506,25 +555,25 @@ namespace lbAbi386 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
-		return non_struct(c, return_type, true);
+		return non_struct(c, return_type, true, nullptr);
 	}
 };
 
 namespace lbAbiAmd64Win64 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
@@ -544,7 +593,7 @@ namespace lbAbiAmd64Win64 {
 					break;
 				}
 			} else {
-				args[i] = lbAbi386::non_struct(c, t, false);
+				args[i] = lbAbi386::non_struct(c, t, false, nullptr);
 			}
 		}
 		return args;
@@ -567,7 +616,7 @@ namespace lbAbiAmd64Win64 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
-		return lbAbi386::non_struct(c, return_type, true);
+		return lbAbi386::non_struct(c, return_type, true, nullptr);
 	}
 };
 
@@ -835,10 +884,7 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 		if (is_register(type)) {
-			LLVMAttributeRef attribute = nullptr;
-			if (type == LLVMInt1TypeInContext(c)) {
-				attribute = lb_create_enum_attribute(c, "zeroext");
-			}
+			LLVMAttributeRef attribute = lb_integer_extension_attribute(c, type, source_type);
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
 		} else if (ran_out_of_regs) {
 			if (is_arg) {
@@ -868,7 +914,11 @@ namespace lbAbiAmd64SysV {
 			} else {
 				reg_type = llreg(c, cls, type);
 			}
-			return lb_arg_type_direct(type, reg_type, nullptr, nullptr);
+			// `is_register` above answers false for every integer narrower than 16 bytes, so a
+			// sub-word scalar lands HERE rather than in the direct arm, and this is where its
+			// extension attribute has to go.
+			LLVMAttributeRef attribute = lb_integer_extension_attribute(c, type, source_type);
+			return lb_arg_type_direct(type, reg_type, nullptr, attribute);
 		}
 	}
 
@@ -1985,14 +2035,14 @@ namespace lbAbiWasm {
 }
 
 namespace lbAbiArm32 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type);
 	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
+		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
 		ft->ret = compute_return_type(c, return_type, return_is_defined, calling_convention);
 		ft->calling_convention = calling_convention;
 		return ft;
@@ -2017,22 +2067,19 @@ namespace lbAbiArm32 {
 		return false;
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
-		LLVMAttributeRef attr = nullptr;
-		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
-		}
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
+		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+		auto srcs = lb_abi_param_source_types(original_type, arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			if (is_register(t, false)) {
-				args[i] = non_struct(c, t, false);
+				args[i] = non_struct(c, t, false, srcs[i]);
 			} else {
 				i64 sz = lb_sizeof(t);
 				i64 a = lb_alignof(t);
@@ -2069,7 +2116,7 @@ namespace lbAbiArm32 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
-		return non_struct(c, return_type, true);
+		return non_struct(c, return_type, true, nullptr);
 	}
 };
 
@@ -2100,12 +2147,8 @@ namespace lbAbiRiscv64 {
 		}
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type) {
-		LLVMAttributeRef attr = nullptr;
-		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
-		}
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, Type *source_type) {
+		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
@@ -2251,7 +2294,7 @@ namespace lbAbiRiscv64 {
 				// handing back the original sends an over-aligned one to integer registers.
 				return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 			}
-			return non_struct(c, orig_type);
+			return non_struct(c, orig_type, source_type);
 		}
 
 		if (!integer_only && fp_kind == LLVMStructTypeKind && fp_size <= 2*flen) {
@@ -2288,7 +2331,7 @@ namespace lbAbiRiscv64 {
 		if (size <= xlen) {
 			*gprs_left -= 1;
 			if (is_register(type)) {
-				return non_struct(c, orig_type);
+				return non_struct(c, orig_type, source_type);
 			} else {
 				return lb_arg_type_direct(orig_type, LLVMIntTypeInContext(c, cast(unsigned)(size*8)), nullptr, nullptr);
 			}
