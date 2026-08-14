@@ -318,6 +318,37 @@ def build():
         odin_get=[(f"simd.extract({{}}.a, {i})", f"f32({val(i, 'f32')})") for i in range(4)] +
                  [("{}.b", f"i64({val(4, 'i64')})")])
 
+    # --- BARE vectors, and 4-byte widths.
+    #
+    # Every vector row above wraps the vector in a struct, and the two are not
+    # the same question: `struct{v8f}` returns correctly where a bare
+    # `#simd[8]f32` does not. 4-byte widths were absent entirely. Measured
+    # against clang on x86-64, the divergence is purely SIZE-driven and
+    # independent of the element: 4-byte and >=32-byte diverge, 8- and 16-byte
+    # agree.
+    BARE = [("i8", 4, "rx_i8x4", TIER_GNU), ("i8", 8, "rx_i8x8", TIER_GNU),
+            ("i16", 2, "rx_i16x2", TIER_GNU), ("i32", 8, "rx_i32x8", TIER_GNU),
+            ("i64", 4, "rx_i64x4", TIER_GNU), ("f32", 8, "rx_f32x8", TIER_GNU),
+            ("f32", 16, "rx_f32x16", TIER_GNU), ("f16", 2, "rx_f16x2", TIER_F16)]
+    for tag, n, cname, tier in BARE:
+        ot = SCALARS[tag][0]
+        lanes = min(n, 4)
+        add(f"bv{n}_{tag}", f"#simd[{n}]{ot}", cname,
+            [leaf2("", "{}" + f"[{i}]", tag, val(i, tag)) for i in range(lanes)],
+            tier=tier,
+            odin_set=["{} = " + "{" + ", ".join(val(i, tag) for i in range(n)) + "}"],
+            odin_get=[(f"simd.extract({{}}, {i})", f"{ot}({val(i, tag)})") for i in range(lanes)])
+    # the same widths WRAPPED, so the pair is directly comparable
+    for tag, n, cname, tier in BARE[:3] + [BARE[7]]:
+        ot = SCALARS[tag][0]
+        lanes = min(n, 4)
+        add(f"wv{n}_{tag}", f"struct {{ v: #simd[{n}]{ot} }}",
+            f"struct {{ {cname} v; }}",
+            [leaf2("", f"v[{i}]", tag, val(i, tag)) for i in range(lanes)],
+            tier=tier,
+            odin_set=["{}.v = " + "{" + ", ".join(val(i, tag) for i in range(n)) + "}"],
+            odin_get=[(f"simd.extract({{}}.v, {i})", f"{ot}({val(i, tag)})") for i in range(lanes)])
+
     # --- bit-fields. A member measured in BITS is neither an integer nor
     # padding: x86-64 merges its eightbyte to INTEGER, and RISC-V's hardware
     # float rule names it explicitly. The BACKING must match C's allocation
@@ -336,8 +367,9 @@ def build():
         [leaf("f", "f32", 0), leaf2("b.a", "b.a", "u32", "5")])
 
     # --- matrix, which lowers to an array with its own alignment
+    # a matrix aligns to its element, so the counterpart is a plain array
     add("m22_f32", "struct { m: matrix[2,2]f32 }",
-        "struct { float m[4] __attribute__((aligned(16))); }",
+        "struct { float m[4]; }",
         [leaf2(f"m[{i % 2}, {i // 2}]", f"m[{i}]", "f32", val(i, "f32")) for i in range(4)],
         tier=TIER_GNU)
 
@@ -470,6 +502,17 @@ enum E32 { E32_LO = 0, E32_HI = 0x7fffffff };
 /* `vector_size` attaches to the ELEMENT, so an array of vectors needs a name. */
 #if defined(__GNUC__)
 typedef float rx_v4f __attribute__((vector_size(16)));
+/* Named vectors, so a BARE vector row can be `typedef rx_<x> <name>;`. */
+typedef signed char rx_i8x4  __attribute__((vector_size(4)));
+typedef signed char rx_i8x8  __attribute__((vector_size(8)));
+typedef short       rx_i16x2 __attribute__((vector_size(4)));
+typedef int         rx_i32x8 __attribute__((vector_size(32)));
+typedef long long   rx_i64x4 __attribute__((vector_size(32)));
+typedef float       rx_f32x8 __attribute__((vector_size(32)));
+typedef float       rx_f32x16 __attribute__((vector_size(64)));
+#endif
+#if defined(__FLT16_MANT_DIG__) && !defined(_MSC_VER)
+typedef _Float16    rx_f16x2 __attribute__((vector_size(4)));
 #endif
 """
 

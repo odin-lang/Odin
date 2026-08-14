@@ -25,9 +25,10 @@ CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
 ODIN_TARGET=""; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
 
 
+# Cleaned BEFORE, not after: the generated corpus is left in place so it can be
+# read after a failure. CI throws the tree away anyway.
 rm -rf "$here/build"
 mkdir -p "$here/build"
-trap 'rm -rf "$here/build"' EXIT   # also on failure, where `set -e` would skip it
 pushd "$here/build" > /dev/null
 
 set -x

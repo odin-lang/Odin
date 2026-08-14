@@ -2,7 +2,9 @@
 
 REM The ABI comparator. Every check is "Odin agrees with the platform C compiler"
 
-if not exist "build\" mkdir build
+REM cleaned BEFORE, not after: the generated corpus is left to inspect
+if exist "build\" rmdir /S /Q build
+mkdir build
 pushd build
 
 set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables
@@ -34,4 +36,3 @@ clang -c abi_corpus.c -o abi_corpus_c.o -w || exit /b
 @echo off
 
 popd
-rmdir /S /Q build

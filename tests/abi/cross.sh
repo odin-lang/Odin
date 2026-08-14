@@ -52,6 +52,7 @@ _start:
 esac
 
 
+# cleaned BEFORE, not after -- the driver is left in place to inspect
 rm -rf build-cross
 mkdir -p build-cross/p
 python3 gen.py build-cross
@@ -119,5 +120,4 @@ else
 	echo "$TARGET: DISAGREES with clang, first at type '${name:-#$rc}'" >&2
 	echo "  re-run with -define:ABI_SKIP=$rc to find the next one" >&2
 fi
-rm -rf build-cross
 exit $rc
