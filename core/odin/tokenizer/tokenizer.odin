@@ -109,8 +109,10 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 
 	if !intrinsics.atomic_load(&_global_keyword_lut_initialized) {
 		_global_keyword_spin_lock()
-		ok := keyword_lut_init(&global_keyword_lut)
-		intrinsics.atomic_store(&_global_keyword_lut_initialized, ok)
+		if !intrinsics.atomic_load(&_global_keyword_lut_initialized) {
+			ok := keyword_lut_init(&global_keyword_lut)
+			intrinsics.atomic_store(&_global_keyword_lut_initialized, ok)
+		}
 		_global_keyword_spin_unlock()
 	}
 
@@ -510,6 +512,7 @@ scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Token_Kind, str
 			case 'z': int_base(t, &kind, 12, "illegal dozenal integer")
 			case 'x': int_base(t, &kind, 16, "illegal hexadecimal integer")
 			case 'h':
+				kind = .Float
 				prev := t.offset
 				advance_rune(t)
 				scan_mantissa(t, 16)

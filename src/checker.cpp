@@ -2050,18 +2050,26 @@ gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
+		// NOTE: the insertion order is a race between the files of a package, so order the pair by
+		// position; the later declaration stays the anchor, as it is the one being reported
+		TokenPos first = prev->token.pos;
+		TokenPos second = pos;
+		if (second < first) {
+			first = pos;
+			second = prev->token.pos;
+		}
 		if (found->flags & EntityFlag_Result) {
-			error(prev->token,
+			error(second,
 			      "Direct shadowing of the named return value '%.*s' in this scope\n"
 			      "\tat %s",
 			      LIT(name),
-			      token_pos_to_string(pos));
+			      token_pos_to_string(first));
 		} else {
-			error(prev->token,
+			error(second,
 			      "Redeclaration of '%.*s' in this scope\n"
 			      "\tat %s",
 			      LIT(name),
-			      token_pos_to_string(pos));
+			      token_pos_to_string(first));
 		}
 	}
 	return false;
@@ -5647,7 +5655,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		ERROR_BLOCK();
 
 		if (id->import_name.string.len > 0) {
-			error(token, "Import name '%.*s' cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			error(token, "Import name '%.*s' is not a valid identifier", LIT(id->import_name.string));
 		} else {
 			error(id->token, "Import name '%.*s' is not a valid identifier", LIT(invalid_name));
 			error_line("\tSuggestion: Rename the directory or explicitly set an import name like this 'import <new_name> %.*s'", LIT(id->relpath.string));
@@ -6735,8 +6743,11 @@ gb_internal bool consume_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap 
 		// This is prevent any possible race conditions in evaluation when multithreaded
 		// NOTE(bill): In single threaded mode, this should never happen
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-			check_procedure_later(c, pi);
-			return false;
+			Type *pt = base_type(parent->type);
+			if (!pt->Proc.is_polymorphic || pt->Proc.is_poly_specialized) {
+				check_procedure_later(c, pi);
+				return false;
+			}
 		}
 	}
 	if (untyped) {
@@ -6770,8 +6781,11 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 		// This is prevent any possible race conditions in evaluation when multithreaded
 		// NOTE(bill): In single threaded mode, this should never happen
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-			thread_pool_add_task(check_proc_info_worker_proc, pi);
-			return 1;
+			Type *pt = base_type(parent->type);
+			if (!pt->Proc.is_polymorphic || pt->Proc.is_poly_specialized) {
+				thread_pool_add_task(check_proc_info_worker_proc, pi);
+				return 1;
+			}
 		}
 	}
 	map_clear(untyped);

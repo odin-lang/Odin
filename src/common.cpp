@@ -640,7 +640,7 @@ gb_internal gb_inline f64 gb_sqrt(f64 x) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 
-gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
+gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, isize *_double_dash_pos, wchar_t **_after_double_dash_raw) {
 	u32 i, j;
 
 	u32 len = cast(u32)string16_len(cast(u16 *)cmd_line);
@@ -649,6 +649,9 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	wchar_t **argv = cast(wchar_t **)GlobalAlloc(GMEM_FIXED, i + (len+2)*gb_size_of(wchar_t));
 	wchar_t *_argv = cast(wchar_t *)((cast(u8 *)argv)+i);
 
+	wchar_t *after_double_dash_raw = nullptr;
+	isize double_dash_pos = -1;
+
 	u32 argc = 0;
 	argv[argc] = _argv;
 	bool in_quote = false;
@@ -656,6 +659,18 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	bool in_space = true;
 	i = 0;
 	j = 0;
+
+	auto const check_double_dash = [&]() {
+		if (double_dash_pos == -1 &&
+			argc >= 1 &&
+			argv[argc - 1][0] == '-' &&
+			argv[argc - 1][1] == '-' &&
+			argv[argc - 1][2] == '\0') {
+
+			double_dash_pos = argc - 1;
+			after_double_dash_raw = cmd_line + i;
+		}
+	};
 
 	for (;;) {
 		wchar_t a = cmd_line[i];
@@ -673,7 +688,10 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 			case '\"':
 				in_quote = true;
 				in_text = true;
-				if (in_space) argv[argc++] = _argv+j;
+				if (in_space) {
+					check_double_dash();
+					argv[argc++] = _argv + j;
+				}
 				in_space = false;
 				break;
 			case ' ':
@@ -686,7 +704,10 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 				break;
 			default:
 				in_text = true;
-				if (in_space) argv[argc++] = _argv+j;
+				if (in_space) {
+					check_double_dash();
+					argv[argc++] = _argv + j;
+				}
 				_argv[j++] = a;
 				in_space = false;
 				break;
@@ -696,8 +717,11 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc) {
 	}
 	_argv[j] = '\0';
 	argv[argc] = nullptr;
+	check_double_dash();
 
 	if (_argc) *_argc = argc;
+	if (_double_dash_pos) *_double_dash_pos = double_dash_pos;
+	if (_after_double_dash_raw) *_after_double_dash_raw = after_double_dash_raw;
 	return argv;
 }
 
@@ -861,8 +885,13 @@ gb_internal isize levenstein_distance_case_insensitive(String const &a, String c
 					minimum = substitute;
 				}
 				// Damerau-Levenshtein (transposition extension)
+				// NOTE: this is the "optimal string alignment" variant, which is what this
+				// matrix supports; the transposition discount only applies when the two
+				// characters are actually swapped.
 				#if USE_DAMERAU_LEVENSHTEIN
-				if (i > 1 && j > 1) {
+				if (i > 1 && j > 1 &&
+				    a_c == gb_char_to_lower(cast(char)b.text[j-2]) &&
+				    b_c == gb_char_to_lower(cast(char)a.text[i-2])) {
 					isize transpose = matrix[(i-2)*w + j-2] + 1;
 					if (transpose < minimum) {
 						minimum = transpose;

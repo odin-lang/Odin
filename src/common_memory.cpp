@@ -284,11 +284,11 @@ gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize comm
 
 	gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit) {
 		void *mem = mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-		if (mem == nullptr) {
+		if (mem == MAP_FAILED) {
 			gb_printf_err("Out of Virtual memory, oh no...\n");
 			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
 			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
-			GB_ASSERT_MSG(mem != nullptr, "Out of Virtual Memory, oh no...");
+			GB_ASSERT_MSG(mem != MAP_FAILED, "Out of Virtual Memory, oh no...");
 		}
 		return mem;
 	}

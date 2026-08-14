@@ -311,7 +311,7 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 			for {
 				_, g = utf8.decode_grapheme_iterate(&it) or_break
 			}
-			pos -= max(g.width, 1)
+			pos -= max(len(g.text), 1)
 		} else {
 			pos -= 1
 			for pos >= 0 && is_continuation_byte(buf[pos]) {
@@ -323,7 +323,7 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 			it := utf8.decode_grapheme_iterator_make(string(buf[pos:]))
 
 			_, g, _ := utf8.decode_grapheme_iterate(&it)
-			pos += max(g.width, 1)
+			pos += max(len(g.text), 1)
 		} else {
 			pos += 1
 			for pos < len(buf) && is_continuation_byte(buf[pos]) {

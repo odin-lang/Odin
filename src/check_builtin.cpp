@@ -1441,6 +1441,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 
 			i64 num_elems = get_array_type_count(x.type);
+			// the range is taken from the lane count; it has to meet the same limit a written bit_set does
+			if (num_elems > 128) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' would produce a bit_set of %lld bits, exceeding the maximum of 128, got '%s'", LIT(builtin_name), cast(long long)num_elems, xs);
+				gb_string_free(xs);
+				return false;
+			}
 
 			Type *result_type = alloc_type_bit_set();
 			result_type->BitSet.elem = t_int;
@@ -1691,6 +1698,11 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 					return false;
 				}
 
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, &y, t_int);
+				if (y.mode == Addressing_Invalid) {
+					return false;
+				}
 				n = exact_value_to_u64(y.value);
 			}
 
@@ -1936,6 +1948,11 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector", LIT(builtin_name));
 				return false;
 			}
+			// convert constant from BigInt to a type before `exact_value_to_i64`; here it also sets the return arity
+			convert_to_typed(c, &n, t_int);
+			if (n.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 divisor = exact_value_to_i64(n.value);
 			if (divisor < 1 || divisor > max_count || (max_count % divisor != 0)) {
 				error(n.expr, "'%.*s' expected a constant integer divisible by the count of the #simd vector , got %lld, which must have been divisible by %lld", LIT(builtin_name), cast(long long)divisor, cast(long long)max_count);
@@ -1968,8 +1985,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			for (unsigned i = 0; i < 4; i++) {
 				if (!is_type_integer(x[i].type) || x[i].mode != Addressing_Constant) {
 					gbString xs = type_to_string(x[i].type);
-					error(x[i].expr, "'%.*s' expected a constant integer", LIT(builtin_name), xs);
+					error(x[i].expr, "'%.*s' expected a constant integer, got '%s'", LIT(builtin_name), xs);
 					gb_string_free(xs);
+					return false;
+				}
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, x+i, t_int);
+				if (x[i].mode == Addressing_Invalid) {
 					return false;
 				}
 				i64 val = exact_value_to_i64(x[i].value);
@@ -2222,7 +2244,10 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	String name = bd->name.string;
 	GB_ASSERT(name == "load_directory");
 
-	if (ce->args.count != 1) {
+	if (ce->args.count == 0) {
+		error(ce->close, "'#%.*s' expects 1 argument, got 0", LIT(name));
+		return LoadDirective_Error;
+	} else if (ce->args.count != 1) {
 		error(ce->args[0], "'#%.*s' expects 1 argument, got %td", LIT(name), ce->args.count);
 		return LoadDirective_Error;
 	}
@@ -2447,7 +2472,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			} else {
 				Operand o = {};
 				Entity *e = check_ident(c, &o, arg, nullptr, nullptr, true);
-				if (e == nullptr || (e->flags & EntityFlag_Param) == 0) {
+				if (e == nullptr || (e->kind != Entity_Procedure && (e->flags & EntityFlag_Param) == 0)) {
 					error(arg, "'#caller_expression' expected a valid earlier parameter name");
 				}
 				arg->Ident.entity = e;
@@ -2667,7 +2692,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			error(call, "'#panic' expects 1 argument, got %td", ce->args.count);
 			return false;
 		}
-		if (!is_type_string(operand->type) && operand->mode != Addressing_Constant) {
+		if (!is_type_string(operand->type) || operand->mode != Addressing_Constant) {
 			gbString str = expr_to_string(ce->args[0]);
 			error(call, "'%s' is not a constant string", str);
 			gb_string_free(str);
@@ -2872,8 +2897,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (!ok) {
 			operand->type = t_invalid;
 			operand->mode = Addressing_Value;
+			operand->value = {};
 		}
-		operand->value = {};
 		operand->expr = call;
 		return ok;
 	}
@@ -4928,7 +4953,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		
-		if (!is_type_array(x.type) && !is_type_array(y.type)) {
+		if (!is_type_array(x.type) || !is_type_array(y.type)) {
 			gbString s1 = type_to_string(x.type);
 			gbString s2 = type_to_string(y.type);
 			error(call, "'%.*s' expects only arrays, got %s and %s", LIT(builtin_name), s1, s2);
@@ -5058,7 +5083,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_is_package_imported: {
 		bool value = false;
 
-		if (!is_type_string(operand->type) && (operand->mode != Addressing_Constant)) {
+		if (!is_type_string(operand->type) || operand->mode != Addressing_Constant) {
 			error(ce->args[0], "Expected a constant string for '%.*s'", LIT(builtin_name));
 		} else if (operand->value.kind == ExactValue_String) {
 			String pkg_name = operand->value.value_string;
@@ -5116,7 +5141,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Operand o = {};
 		check_expr(c, &o, ce->args[0]);
 
-		if (!is_type_integer(o.type) && (o.mode != Addressing_Constant)) {
+		if (!is_type_integer(o.type) || o.mode != Addressing_Constant) {
 			error(ce->args[0], "Expected a constant integer for '%.*s'", LIT(builtin_name));
 			return false;
 		}
@@ -5137,7 +5162,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Operand o = {};
 		check_expr(c, &o, ce->args[0]);
 
-		if (!is_type_integer_or_float(o.type) && (o.mode != Addressing_Constant)) {
+		if (!is_type_integer_or_float(o.type) || o.mode != Addressing_Constant) {
 			error(ce->args[0], "Expected a constant number for '%.*s'", LIT(builtin_name));
 			return false;
 		}
@@ -5279,6 +5304,62 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		add_type_info_type(c, soa_struct);
 
 		operand->type = soa_struct;
+		break;
+	}
+
+	case BuiltinProc_soa_copy_from_slice: {
+		Operand array_ptr = {};
+		Operand offset    = {};
+		Operand args      = {};
+		check_expr(c, &array_ptr, ce->args[0]);
+		if (array_ptr.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_type_pointer(array_ptr.type)) {
+			gbString s = type_to_string(array_ptr.type);
+			error(array_ptr.expr, "Expected a pointer to a #soa dynamic array, got %s", s);
+			gb_string_free(s);
+			return false;
+		}
+		Type *array_type = type_deref(array_ptr.type);
+		if (!is_type_soa_dynamic_array(array_type)) {
+			gbString s = type_to_string(array_ptr.type);
+			error(array_ptr.expr, "Expected a pointer to a #soa dynamic array, got %s", s);
+			gb_string_free(s);
+			return false;
+		}
+		Type *at = base_type(array_type);
+		GB_ASSERT(at->kind == Type_Struct);
+		Type *elem = at->Struct.soa_elem;
+
+		check_expr_with_type_hint(c, &offset, ce->args[1], t_int);
+		if (offset.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!is_type_integer(offset.type)) {
+			gbString s = type_to_string(array_ptr.type);
+			error(array_ptr.expr, "Expected an integer as the offset for '%.*s', got %s", s, LIT(builtin_name));
+			gb_string_free(s);
+			return false;
+		}
+
+		Type *slice_hint = alloc_type_slice(elem);
+
+		check_expr_with_type_hint(c, &args, ce->args[2], slice_hint);
+		if (args.mode == Addressing_Invalid) {
+			return false;
+		}
+		if (!are_types_identical(base_type(args.type), slice_hint)) {
+			gbString s = type_to_string(slice_hint);
+			gbString t = type_to_string(args.type);
+			error(array_ptr.expr, "Expected a %s to use as the slice '%.*s', got %s", s, LIT(builtin_name), t);
+			gb_string_free(t);
+			gb_string_free(s);
+			return false;
+		}
+
+		operand->mode = Addressing_NoValue;
+		operand->type = nullptr;
 		break;
 	}
 
@@ -5714,6 +5795,14 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(x.expr, "Invalid type passed to '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 			}
+			// An untyped constant is integer-like, so it reaches the size check below, and
+			// `type_size_of` asserts on a type that has no size. 
+			// no-op on typed types
+			convert_to_typed(c, &x, default_type(x.type));
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+
 			i64 sz = type_size_of(x.type);
 			if (sz < 2) {
 				gbString xts = type_to_string(x.type);
@@ -5759,7 +5848,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(ct->kind == Type_Basic);
 				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5810,7 +5899,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(ct->kind == Type_Basic);
 				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected an integer which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5847,7 +5936,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(elem->kind == Type_Basic);
 				if (elem->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected a float which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected a float type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5896,7 +5985,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				GB_ASSERT(elem->kind == Type_Basic);
 				if (elem->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
 					gbString xts = type_to_string(x.type);
-					error(x.expr, "Expected a float which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					error(x.expr, "Expected a float type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
 					gb_string_free(xts);
 					return false;
 				}
@@ -5960,6 +6049,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &len, t_int);
+			if (len.mode == Addressing_Invalid) {
+				return false;
+			}
+
 			if (len.mode == Addressing_Constant) {
 				i64 n = exact_value_to_i64(len.value);
 				if (n < 0) {
@@ -5999,6 +6094,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gbString str = type_to_string(len.type);
 				error(len.expr, "Expected an integer value for the number of bytes for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
+				return false;
+			}
+
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &len, t_int);
+			if (len.mode == Addressing_Invalid) {
 				return false;
 			}
 
@@ -6530,6 +6631,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(z.expr, "Expected a constant integer for the scale in '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &z, t_int);
+			if (z.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 n = exact_value_to_i64(z.value);
 			if (n <= 0) {
 				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), n);
@@ -6653,8 +6759,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			if (x.mode == Addressing_Invalid) {
 				return false;
 			}
-			if (y.mode != Addressing_Constant && is_type_integer(y.type)) {
+			if (y.mode != Addressing_Constant || !is_type_integer(y.type)) {
 				error(y.expr, "Second argument to '%.*s' representing the locality must be an integer in the range 0..=3", LIT(builtin_name));
+				return false;
+			}
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &y, t_int);
+			if (y.mode == Addressing_Invalid) {
 				return false;
 			}
 			i64 locality = exact_value_to_i64(y.value);
@@ -7257,6 +7368,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			i64 bit_offset = 0;
 			i64 bit_size = 0;
+			bool found = false;
 			for_array(i, type->BitField.fields) {
 				Entity *f = type->BitField.fields[i];
 				if (f->kind != Entity_Variable || (f->flags & EntityFlag_Field) == 0) {
@@ -7266,8 +7378,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				if (field_name == str) {
 					bit_offset = type->BitField.bit_offsets[i];
 					bit_size = type->BitField.bit_sizes[i];
+					found = true;
 					break;
 				}
+			}
+			// A missing field would otherwise return 0, which is also the correct offset of the
+			// first declared field, so the caller has nothing to test for.
+			if (!found) {
+				gbString t = type_to_string(type);
+				error(ce->args[1], "'%s' is not a field of type %s", field_name.cstring(), t);
+				gb_string_free(t);
+				return false;
 			}
 
 			i64 value = 0;
@@ -7314,7 +7435,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			operand->mode = Addressing_Constant;
 			operand->type = t_untyped_bool;
-			operand->value = exact_value_bool(check_type_specialization_to(c, s, t, false, false));
+			bool is_specialization = false;
+			if (!are_types_identical(s, t)) {
+				is_specialization = check_type_specialization_to(c, s, t, false, false);
+			}
+			operand->value = exact_value_bool(is_specialization);
 
 		}
 		break;
@@ -7694,6 +7819,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &op, t_int);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
 				error(op.expr, "Expected a non-negative integer for the index of procedure parameter value, got %lld", cast(long long)index);
@@ -7753,6 +7883,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &op, t_int);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
 				error(op.expr, "Expected a non-negative integer for the index of procedure parameter value, got %lld", cast(long long)index);
@@ -7847,6 +7982,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			// convert constant from BigInt to a type before `exact_value_to_i64`
+			convert_to_typed(c, &op, t_int);
+			if (op.mode == Addressing_Invalid) {
+				return false;
+			}
 			i64 index = exact_value_to_i64(op.value);
 			if (index < 0) {
 				error(op.expr, "Expected a non-negative integer for the index of record parameter value, got %lld", cast(long long)index);

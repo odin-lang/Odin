@@ -1110,6 +1110,7 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 	open, close: tokenizer.Token
 
 	if p.curr_tok.kind == .Ident {
+		close = p.curr_tok
 		elem := parse_ident(p)
 		append(&elems, elem)
 	} else {
@@ -2651,7 +2652,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		specialization: ^ast.Expr
 		if allow_token(p, .Quo) {
 			specialization = parse_type(p)
-			end = specialization.pos
+			end = specialization.end
 		}
 		if is_blank_ident(type) {
 			error(p, type.pos, "invalid polymorphic type definition with a blank identifier")

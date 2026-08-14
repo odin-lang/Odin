@@ -11,7 +11,8 @@ VERSION   = 3.1.1
 SRCS      = $(wildcard box2d-$(VERSION)/src/*.c)
 OBJS_SIMD = $(SRCS:.c=_simd.o)
 OBJS      = $(SRCS:.c=.o)
-SYSROOT   = $(shell odin root)/vendor/libc-shim
+ODIN_ROOT ?= ../..
+SYSROOT   = $(ODIN_ROOT)/vendor/libc-shim
 CFLAGS    = -Ibox2d-$(VERSION)/include --target=wasm32 -D__EMSCRIPTEN__ -DNDEBUG -O3 --sysroot=$(SYSROOT)
 
 all: lib/box2d_wasm.o lib/box2d_wasm_simd.o

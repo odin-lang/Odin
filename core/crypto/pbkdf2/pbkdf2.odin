@@ -19,6 +19,8 @@ derive :: proc(
 	iterations: u32,
 	dst: []byte,
 ) {
+	ensure(iterations > 0, "crypto/pbkdf2: non-zero iterations required")
+	
 	h_len := hash.DIGEST_SIZES[hmac_hash]
 
 	// 1. If dkLen > (2^32 - 1) * hLen, output "derived key too long"

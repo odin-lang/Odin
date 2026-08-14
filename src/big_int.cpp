@@ -249,13 +249,28 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
-		GB_ASSERT(base == 10);
-		GB_ASSERT(text[i] != '-');
+		if (base != 10) {
+			// An exponent is only meaningful for a base 10 literal.
+			*success = false;
+			return;
+		}
+		if (i >= len) {
+			// Nothing follows the exponent marker.
+			*success = false;
+			return;
+		}
+		if (text[i] == '-') {
+			// A negative exponent is never an integer.
+			// The caller is expected to parse the value as a float instead.
+			*success = false;
+			return;
+		}
 		if (text[i] == '+') {
 			i += 1;
 		}
 
 		u64 exp = 0;
+		isize exp_digits = 0;
 		for (; i < len; i++) {
 			char r = cast(char)text[i];
 			if (r == '_') {
@@ -270,6 +285,11 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			}
 			exp *= 10;
 			exp += v;
+			exp_digits += 1;
+		}
+		if (exp_digits == 0) {
+			*success = false;
+			return;
 		}
 
 		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).
@@ -674,7 +694,9 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 		big_int_dealloc(&r);
 		big_int_dealloc(&b);
 
-		for (isize i = first_word_idx; i < buf.count/2; i++) {
+		// NOTE: only the digits are reversed, not the leading '-'. 
+		isize digit_count = buf.count - first_word_idx;
+		for (isize i = first_word_idx; i < first_word_idx + digit_count/2; i++) {
 			isize j = buf.count + first_word_idx - i - 1;
 			char tmp = buf[i];
 			buf[i] = buf[j];

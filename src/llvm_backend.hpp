@@ -40,6 +40,7 @@ enum lbAddrKind {
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
+	lbAddr_SwizzleSoa,
 
 	lbAddr_BitField,
 };
@@ -73,6 +74,12 @@ struct lbAddr {
 			Type *type;
 			Slice<i32> indices;
 		} swizzle_large;
+		struct {
+			lbValue index;
+			Ast *index_expr;
+			Type *type;
+			Slice<i32> indices; // soa element array is max len 4, but swizzle may repeat components
+		} swizzle_soa;
 		struct {
 			Type *type;
 			i64 bit_offset;
@@ -440,10 +447,14 @@ gb_internal lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, isize index
 gb_internal lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
 gb_internal lbValue lb_emit_deep_field_ev(lbProcedure *p, lbValue e, Selection sel);
+gb_internal void    lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len);
 
 gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lbValue column);
 gb_internal lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column);
 gb_internal lbValue lb_emit_matrix_ev(lbProcedure *p, lbValue s, isize row, isize column);
+
+gb_internal lbAddr  lb_get_soa_variable_addr(lbProcedure *p, Entity *e);
+gb_internal lbValue lb_soa_variable_make_pointer(lbProcedure *p, lbAddr const &addr);
 
 
 gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type);
@@ -575,6 +586,7 @@ gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr);
 gb_internal lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident);
 
 gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);
+gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index);
 gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 
 gb_internal LLVMValueRef llvm_basic_shuffle(lbProcedure *p, LLVMValueRef vector, LLVMValueRef mask);

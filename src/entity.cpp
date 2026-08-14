@@ -111,6 +111,7 @@ enum ParameterValueKind {
 struct ParameterValue {
 	ParameterValueKind kind;
 	Ast *original_ast_expr;
+	Entity *proc_entity;
 	union {
 		ExactValue value;
 		Ast *ast_value;
@@ -204,6 +205,7 @@ struct Entity {
 			i32 field_group_index;
 			CommentGroup *docs;
 			CommentGroup *comment;
+			Ast *init_expr; // only used for enum values
 		} Constant;
 		struct {
 			Ast *type_expr; // only used for some variables within procedure bodies
