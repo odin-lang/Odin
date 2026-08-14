@@ -18,8 +18,12 @@ set -eu
 TARGET=${1:?odin target, e.g. linux_arm64}
 TRIPLE=${2:?clang triple, e.g. aarch64-linux-gnu}
 QEMU=${3:?qemu binary, e.g. qemu-aarch64}
+shift 3   # anything else goes to `odin build`
 : "${ODIN:=../../odin}"
 : "${CLANG:=clang}"
+# The C side's optimisation level. An ABI is a link-time contract, so the two
+# sides are built independently and either may be optimised: `ABI_CFLAGS=-O2`.
+: "${ABI_CFLAGS:=}"
 
 case "$TARGET" in
 *i386*)    START='.text
@@ -98,8 +102,8 @@ EOF
 
 set -x
 $ODIN build build-cross/p -target:"$TARGET" -build-mode:obj -no-entry-point \
-	-no-thread-local -reloc-mode:static $TIERS -out:build-cross/o
-$CLANG --target="$TRIPLE" -c build-cross/abi_corpus.c -o build-cross/abi_corpus_c.o -w -fno-stack-protector
+	-no-thread-local -reloc-mode:static $TIERS -out:build-cross/o "$@"
+$CLANG --target="$TRIPLE" $ABI_CFLAGS -c build-cross/abi_corpus.c -o build-cross/abi_corpus_c.o -w -fno-stack-protector
 $CLANG --target="$TRIPLE" -c build-cross/start.s -o build-cross/start.o
 $CLANG --target="$TRIPLE" -ffreestanding -fno-builtin -O1 -w -c build-cross/shim.c -o build-cross/shim.o
 $CLANG --target="$TRIPLE" -nostdlib -static -fuse-ld=lld \

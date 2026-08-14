@@ -41,6 +41,7 @@ jobs:
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -microarch:native
           (cd tests/issues; ./run.sh)
           (cd tests/abi; ./run.sh)
+          (cd tests/abi; ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
 
   build_freebsd:
@@ -75,6 +76,7 @@ jobs:
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           (cd tests/issues; ./run.sh)
           (cd tests/abi; ./run.sh)
+          (cd tests/abi; ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
   ci:
     strategy:
@@ -177,6 +179,7 @@ jobs:
         run: |
           cd tests/abi
           ./run.sh
+          ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed
 
       - name: Run demo on WASI WASM32
         run: |
@@ -292,6 +295,8 @@ jobs:
           call run.bat
           cd ../abi
           call run.bat
+          set ABI_CFLAGS=-O2
+          call run.bat -o:speed
       - name: Check benchmarks
         shell: cmd
         run: |

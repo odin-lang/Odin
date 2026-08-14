@@ -2,6 +2,10 @@
 
 REM The ABI comparator. Every check is "Odin agrees with the platform C compiler"
 
+REM An ABI is a link-time contract, so the two sides are built independently and
+REM either may be optimised: `set ABI_CFLAGS=-O2` for the C side, and any
+REM argument here goes to `odin test`, e.g. `run.bat -o:speed`.
+
 REM cleaned BEFORE, not after: the generated corpus is left to inspect
 if exist "build\" rmdir /S /Q build
 mkdir build
@@ -30,8 +34,8 @@ echo tiers: %TIERS%
 
 REM -w because the corpus deliberately uses zero-length arrays and empty
 REM structs; both are the extensions under test.
-clang -c abi_corpus.c -o abi_corpus_c.o -w || exit /b
-..\..\..\odin test abi_corpus.odin %COMMON% %TIERS% || exit /b
+clang %ABI_CFLAGS% -c abi_corpus.c -o abi_corpus_c.o -w || exit /b
+..\..\..\odin test abi_corpus.odin %COMMON% %TIERS% %* || exit /b
 
 @echo off
 

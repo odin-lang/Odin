@@ -19,6 +19,9 @@ if [ $# -gt 2 ]; then shift 2; else shift $#; fi   # anything else goes to `odin
 here=$(cd "$(dirname "$0")" && pwd)
 : "${ODIN:=$here/../../odin}"
 : "${CLANG:=clang}"
+# The C side's optimisation level. An ABI is a link-time contract, so the two
+# sides are built independently and either may be optimised: `ABI_CFLAGS=-O2`.
+: "${ABI_CFLAGS:=}"
 COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
@@ -42,7 +45,7 @@ TIERS="-define:ABI_TIER_GNU=$(have GNU) -define:ABI_TIER_F16=$(have F16) -define
 
 # `-w` because the corpus deliberately uses zero-length arrays and empty
 # structs; both are the extensions under test.
-$CLANG $CC_TARGET -c abi_corpus.c -o abi_corpus_c.o -w
+$CLANG $CC_TARGET $ABI_CFLAGS -c abi_corpus.c -o abi_corpus_c.o -w
 $ODIN test abi_corpus.odin $COMMON $ODIN_TARGET $TIERS "$@"
 
 set +x
