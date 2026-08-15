@@ -1,3 +1,6 @@
+gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
+gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coerced, Type *original_type, lbArgType const *arg);
+
 gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count) {
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
@@ -681,7 +684,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						LLVMTypeRef param_type = lb_type(p->module, e->type);
 						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
-						LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
+						LLVMValueRef value = arg_type->coerce_offset_count > 0
+							? lb_coerce_fields_store(p, original_value, e->type, arg_type)
+							: OdinLLVMBuildTransmute(p, original_value, param_type);
 
 						lbValue param = {};
 						param.value = value;
@@ -921,6 +926,60 @@ gb_internal Array<lbValue> lb_value_to_array(lbProcedure *p, gbAllocator const &
 }
 
 
+
+// A `cast_type` is normally applied by reinterpreting the value's bits from offset zero. When the
+// ABI flattened an aggregate and dropped padding, the dense type it produced puts the survivors at
+// different offsets than they really have, and these two read and write them where they actually
+// live. See `lbArgType::coerce_offsets`.
+gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg) {
+	LLVMContextRef ctx = p->module->ctx;
+	LLVMTypeRef i8   = LLVMInt8TypeInContext(ctx);
+	LLVMTypeRef i64t = LLVMInt64TypeInContext(ctx);
+
+	lbValue base = lb_address_from_load_or_generate_local(p, x);
+
+	if (LLVMGetTypeKind(arg->cast_type) != LLVMStructTypeKind) {
+		GB_ASSERT(arg->coerce_offset_count == 1);
+		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[0], false);
+		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
+		return LLVMBuildLoad2(p->builder, arg->cast_type, ptr, "");
+	}
+
+	unsigned count = LLVMCountStructElementTypes(arg->cast_type);
+	GB_ASSERT(cast(isize)count == arg->coerce_offset_count);
+	LLVMValueRef result = LLVMGetUndef(arg->cast_type);
+	for (unsigned i = 0; i < count; i += 1) {
+		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(arg->cast_type, i);
+		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[i], false);
+		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
+		LLVMValueRef elem  = LLVMBuildLoad2(p->builder, elem_type, ptr, "");
+		result = LLVMBuildInsertValue(p->builder, result, elem, i, "");
+	}
+	return result;
+}
+
+// The reverse: scatter a coerced value back into a full-sized object of the original type.
+gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coerced, Type *original_type, lbArgType const *arg) {
+	LLVMContextRef ctx = p->module->ctx;
+	LLVMTypeRef i8   = LLVMInt8TypeInContext(ctx);
+	LLVMTypeRef i64t = LLVMInt64TypeInContext(ctx);
+
+	lbAddr slot = lb_add_local_generated(p, original_type, true);
+
+	unsigned count = 1;
+	bool is_struct = LLVMGetTypeKind(arg->cast_type) == LLVMStructTypeKind;
+	if (is_struct) {
+		count = LLVMCountStructElementTypes(arg->cast_type);
+	}
+	GB_ASSERT(cast(isize)count == arg->coerce_offset_count);
+	for (unsigned i = 0; i < count; i += 1) {
+		LLVMValueRef elem  = is_struct ? LLVMBuildExtractValue(p->builder, coerced, i, "") : coerced;
+		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[i], false);
+		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, slot.addr.value, &index, 1, "");
+		LLVMBuildStore(p->builder, elem, ptr);
+	}
+	return lb_addr_load(p, slot).value;
+}
 
 gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr, Array<lbValue> const &processed_args, Type *abi_rt, lbAddr context_ptr, ProcInlining inlining, ProcTailing tailing) {
 	GB_ASSERT(p->module->ctx == LLVMGetTypeContext(LLVMTypeOf(value.value)));
@@ -1191,7 +1250,10 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				if (!abi_type) {
 					abi_type = arg->type;
 				}
-				if (xt == abi_type) {
+				if (arg->coerce_offset_count > 0) {
+					x.value = lb_coerce_fields_load(p, x, arg);
+					array_add(&processed_args, x);
+				} else if (xt == abi_type) {
 					array_add(&processed_args, x);
 				} else {
 					x.value = OdinLLVMBuildTransmute(p, x.value, abi_type);
@@ -1261,10 +1323,14 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			result = lb_emit_load(p, return_ptr);
 		} else if (rt != nullptr) {
 			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
-			if (ft->ret.cast_type) {
-				result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.cast_type);
+			if (ft->ret.coerce_offset_count > 0) {
+				result.value = lb_coerce_fields_store(p, result.value, rt, &ft->ret);
+			} else {
+				if (ft->ret.cast_type) {
+					result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.cast_type);
+				}
+				result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.type);
 			}
-			result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.type);
 			result.type = rt;
 			if (LLVMTypeOf(result.value) == LLVMInt1TypeInContext(p->module->ctx)) {
 				result.type = t_llvm_bool;
