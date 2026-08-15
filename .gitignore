@@ -321,3 +321,7 @@ CMakeLists.txt
 sandbox/
 
 vendor/box3d/lib/box3d_wasm.o
+
+
+# PGO tmp profile data
+pgo
