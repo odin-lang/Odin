@@ -310,10 +310,22 @@ build :: proc() {
 	// 32 bits. A callee compiled to rely on that reads the untouched high bits.
 	// The sub-32-bit widths are the ones that have it; i32 and f32 are the controls
 	// that must not.
-	for tag in ([]string{"i8", "u8", "i16", "u16", "bool", "i32", "u32", "u64", "f32"}) {
+	for tag in ([]string{
+		"i8", "u8", "i16", "u16", "bool", "i32", "u32", "u64", "f32",
+		// the kinds whose BARE form asks a different question from their wrapped one: a complex is
+		// two floats to the type system and a rule of its own to a psABI, and a bare `f16` is the
+		// narrowest float there is
+		"f16", "c64", "c128", "ptr", "enum", "bset",
+	}) {
 		s := scalar(tag)
 		v := val(0, tag)
-		expected := tag == "bool" ? odin_val(tag, v) : tp("%s(%s)", s.odin, v)
+		expected: string
+		switch tag {
+		case "ptr", "bool", "enum", "c64", "c128", "bset":
+			expected = odin_val(tag, v)
+		case:
+			expected = tp("%s(%s)", s.odin, v)
+		}
 		add(
 			tp("bs_%s", tag),
 			s.odin,

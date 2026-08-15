@@ -499,6 +499,18 @@ namespace lbAbi386 {
 			}
 		}
 
+		// A complex lowers to a struct of two floats. The struct rule sends every struct through
+		// a hidden pointer. The psABI gives complex its own rule: one of eight bytes or fewer
+		// comes back in EAX:EDX, and only the wider ones go through memory. `complex64` is 
+		// returned coerced to `i64` and `complex128` keeps the hidden pointer.
+		if (return_is_defined && !return_is_tuple &&
+		    return_source != nullptr && is_type_complex(return_source)) {
+			i64 sz = lb_sizeof(return_type);
+			if (sz > 0 && sz <= 8) {
+				ft->ret = lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)), nullptr, nullptr);
+			}
+		}
+
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
