@@ -1368,7 +1368,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			gb_free(a, s.text);
 			return;
 		}
-		if (!check_representable_as_constant(c, iv, t, nullptr)) {
+		if (!check_representable_as_constant(c, jv, t, nullptr)) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &j);
 			gbString ts = type_to_string(t);
