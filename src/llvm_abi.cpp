@@ -2192,10 +2192,12 @@ namespace lbAbiArm32 {
 			} else {
 				i64 sz = lb_sizeof(t);
 				i64 a = lb_alignof(t);
+
+				LLVMTypeRef hfa_coerce = nullptr;
 				// Added to support hard floats included in the playdates cortex-m7.
 				if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 					args[i] = lb_arg_type_direct(t);
-				} else if (LLVMTypeRef hfa_coerce = nullptr; is_hfa(c, t, srcs[i], calling_convention, &hfa_coerce)) {
+				} else if (is_hfa(c, t, srcs[i], calling_convention, &hfa_coerce)) {
 					args[i] = lb_arg_type_direct(t, hfa_coerce, nullptr, nullptr);
 				} else if (is_calling_convention_odin(calling_convention) && sz > 8) {
 					// Minor change to improve performance using the Odin calling conventions
