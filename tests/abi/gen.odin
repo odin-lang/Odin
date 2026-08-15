@@ -285,6 +285,9 @@ build :: proc() {
 		// control on anything that reads signedness where it should not
 		{"u8"}, {"u16"}, {"u32"}, {"u64"},
 		{"u8", "u32"}, {"u16", "u64"}, {"u32", "f32"}, {"u64", "f64"},
+		// a narrow member in FRONT of a complex: the complex aligns to its component, so a wrong
+		// component alignment moves it and changes the struct's size. Nothing else here reaches that.
+		{"i8", "c64"}, {"i8", "c128"}, {"i16", "c128"},
 	}
 	for tags in combos {
 		odin_members := make([]string, len(tags), context.temp_allocator)
@@ -390,6 +393,33 @@ build :: proc() {
 					tp("%s(%s)", scalar(q.tag).odin, v),
 				}
 			}
+			// the same aggregate with a narrow member in front, which is what catches a
+			// wrong component alignment: it moves the quaternion and resizes the struct
+			off_fields := make([]Leaf, 5)
+			off_getters := make([][2]string, 5)
+			off_fields[0] = leaf("a", "i8", 0)
+			off_getters[0] = {"{}.a", tp("i8(%s)", val(0, "i8"))}
+			for i in 0 ..< 4 {
+				v := val(i, q.tag)
+				off_fields[i + 1] = leaf2("", tp("{}.q.%s", lanes[i]), q.tag, v)
+				off_getters[i + 1] = {
+					tp("%s({}.q)", accessors[i]),
+					tp("%s(%s)", scalar(q.tag).odin, v),
+				}
+			}
+			add(
+				tp("off_%s", q.name),
+				tp("struct { a: i8, q: %s }", q.odin),
+				tp("struct { int8_t a; struct { %s x, y, z, w; } q; }", q.c_elem),
+				off_fields,
+				tier = q.tier,
+				odin_set = strs(
+					tp("{}.a = %s", val(0, "i8")),
+					tp("{}.q = quaternion(x=%s, y=%s, z=%s, w=%s)",
+						val(0, q.tag), val(1, q.tag), val(2, q.tag), val(3, q.tag)),
+				),
+				odin_get = off_getters,
+			)
 			add(
 				tp("bs_%s", q.name),
 				q.odin,
@@ -1247,6 +1277,7 @@ ABI_MUTATE :: #config(ABI_MUTATE, false)
 //
 // It is a single defect, but very noisy in the test results as ~75% trip it.
 // Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
+ABI_VARARGS :: #config(ABI_VARARGS, false)
 
 
 
