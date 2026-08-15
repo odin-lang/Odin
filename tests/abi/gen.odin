@@ -122,8 +122,8 @@ c_val :: proc(tag, v: string) -> string {
 	case "cstring": return tp("(char *)(intptr_t)(%s)", v)
 	case "bool": return "1"
 	case "enum": return tp("(enum E32)(%s)", v)
-	case "c64":  return tp("(%s.0f + %s.0if)", v, v)
-	case "c128": return tp("(%s.0 + %s.0i)", v, v)
+	case "c64":  return tp("(%s.0f + %d.0if)", v, as_int(v) + 1)
+	case "c128": return tp("(%s.0 + %d.0i)", v, as_int(v) + 1)
 	case "bset": return tp("(%du)", (1 << u32(as_int(v) % 31)) | 1)
 	}
 	return v
@@ -134,8 +134,8 @@ odin_val :: proc(tag, v: string) -> string {
 	case "ptr":  return tp("rawptr(uintptr(%s))", v)
 	case "bool": return "true"
 	case "enum": return tp("E32(%s)", v)
-	case "c64":  return tp("complex64(complex(%s, %s))", v, v)
-	case "c128": return tp("complex128(complex(%s, %s))", v, v)
+	case "c64":  return tp("complex64(complex(%s, %d))", v, as_int(v) + 1)
+	case "c128": return tp("complex128(complex(%s, %d))", v, as_int(v) + 1)
 	case "bset": return tp("(BS{0, %d})", as_int(v) % 31)
 	}
 	return v
@@ -147,8 +147,8 @@ mutated :: proc(tag, v: string) -> string {
 	case "bool": return "false"
 	case "ptr":  return "rawptr(uintptr(999))"
 	case "enum": return tp("E32(%d)", as_int(v) + 1)
-	case "c64":  return tp("complex64(complex(%d, %s))", as_int(v) + 1, v)
-	case "c128": return tp("complex128(complex(%d, %s))", as_int(v) + 1, v)
+	case "c64":  return tp("complex64(complex(%d, %d))", as_int(v) + 2, as_int(v) + 1)
+	case "c128": return tp("complex128(complex(%d, %d))", as_int(v) + 2, as_int(v) + 1)
 	case "bset": return "(BS{2})"
 	}
 	// every generated float value ends in `.5`, so adding one keeps the form
@@ -354,6 +354,53 @@ build :: proc() {
 			odin_set = strs(tp("{}.a = transmute(cstring)uintptr(%s)", v)),
 			odin_get = pairs([2]string{"transmute(uintptr)({}.a)", tp("uintptr(%s)", v)}),
 		)
+	}
+
+	// --- quaternions. There is no C quaternion, but Odin's lowers to four floats in memory:
+	// `[x, y, z, w]`. The counterpart is the struct a C binding would actually declare, 
+	// and the question this asks is exactly the one interop depends on: does a quaternion
+	// travel the way the equivalent four-float struct does?
+	//
+	// The accessors differ on the two sides (`imag/jmag/kmag/real` against `.x/.y/.z/.w`), which is
+	// what `c_path`'s `{}` form and the `odin_get` hatch are for.
+	{
+		Quat :: struct {
+			name:  string,
+			odin:  string,
+			c_elem: string,
+			tag:   string,
+			tier:  string,
+		}
+		quats := []Quat{
+			{"q128", "quaternion128", "float",    "f32", TIER_CORE},
+			{"q256", "quaternion256", "double",   "f64", TIER_CORE},
+			{"q64",  "quaternion64",  "_Float16", "f16", TIER_F16},
+		}
+		lanes := [4]string{"x", "y", "z", "w"}
+		// memory order is x,y,z,w; the accessors for those are imag,jmag,kmag,real
+		accessors := [4]string{"imag", "jmag", "kmag", "real"}
+		for q in quats {
+			fields := make([]Leaf, 4)
+			getters := make([][2]string, 4)
+			for i in 0 ..< 4 {
+				v := val(i, q.tag)
+				fields[i] = leaf2("", tp("{}.%s", lanes[i]), q.tag, v)
+				getters[i] = {
+					tp("%s({})", accessors[i]),
+					tp("%s(%s)", scalar(q.tag).odin, v),
+				}
+			}
+			add(
+				tp("bs_%s", q.name),
+				q.odin,
+				tp("struct { %s x, y, z, w; }", q.c_elem),
+				fields,
+				tier = q.tier,
+				odin_set = strs(tp("{} = quaternion(x=%s, y=%s, z=%s, w=%s)",
+					val(0, q.tag), val(1, q.tag), val(2, q.tag), val(3, q.tag))),
+				odin_get = getters,
+			)
+		}
 	}
 
 	// --- arrays: the same eightbytes from one declaration
@@ -748,11 +795,14 @@ build :: proc() {
 		)
 	}
 
-	// NOTE: `complex64`/`complex128` are deliberately absent. Their members have
-	// no common accessor -- Odin spells it `real(x)`, C spells it `__real__ x`, a
-	// prefix operator rather than a member -- so a per-field check cannot be
-	// generated from one path. Measured separately as agreeing with clang on
-	// x86-64, aarch64 and riscv64; add them if the accessor problem is solved.
+	// Complex is covered by the scalar families above, compared as a WHOLE value rather than
+	// per lane -- `==` on a complex compares both halves, so a dropped or corrupted half is
+	// caught without needing an accessor. The lanes carry DIFFERENT values (`v` and `v+1`)
+	// because equal ones would make a swapped real/imag undetectable.
+	//
+	// Per-lane checks are expressible if a failure ever needs to name which half: `c_ref`'s `{}`
+	// form takes an expression rather than a path, so C's prefix `__real__ {}` works, and the
+	// Odin side uses the `odin_get` hatch with `real({})`. That was the accessor problem.
 
 	// --- array OF struct: the array rule and the struct rule compose, and a
 	// stride bug lives in the composition
@@ -1181,11 +1231,22 @@ ABI_MUTATE :: #config(ABI_MUTATE, false)
 
 // Variadic coverage, OFF by default.
 //
-// Odin does not ABI-classify a variadic argument at all -- it hands LLVM the
-// raw aggregate where clang coerces per the psABI -- so 111 of the types here
-// fail. That is one defect, not 111, and leaving it on would drown every other
-// signal. Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
-ABI_VARARGS :: #config(ABI_VARARGS, false)
+// This measures one direction: Odin calling a C variadic. Receiving one is a
+// separate mechanism -- a #c_vararg parameter cannot be read directly, and the
+// compiler points you at c_va_start / c_va_list; nothing here covers it.
+//
+// The scalar half of the calling side is correct: the C default-argument promotions 
+// are implemented, so i8, u16, f32, bool and every pointer come out matching clang 
+// arg for arg. 
+//
+// What is missing is the step after promotion. An aggregate is handed to LLVM raw
+// where clang coerces it per the psABI:
+//
+//     odin   send(i32 1, { float, float } %h, double 7.0)
+//     clang  send(i32 1, <2 x float> %h,      double 7.0)
+//
+// It is a single defect, but very noisy in the test results as ~75% trip it.
+// Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
 
 
 
@@ -1305,10 +1366,22 @@ ABI_SKIP :: #config(ABI_SKIP, 0)
 
 // Variadic coverage, OFF by default.
 //
-// Odin does not ABI-classify a variadic argument at all -- it hands LLVM the
-// raw aggregate where clang coerces per the psABI -- so 111 of the types here
-// fail. That is one defect, not 111, and leaving it on would drown every other
-// signal. Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
+// This measures one direction: Odin calling a C variadic. Receiving one is a
+// separate mechanism -- a #c_vararg parameter cannot be read directly, and the
+// compiler points you at c_va_start / c_va_list; nothing here covers it.
+//
+// The scalar half of the calling side is correct: the C default-argument promotions 
+// are implemented, so i8, u16, f32, bool and every pointer come out matching clang 
+// arg for arg. 
+//
+// What is missing is the step after promotion. An aggregate is handed to LLVM raw
+// where clang coerces it per the psABI:
+//
+//     odin   send(i32 1, { float, float } %h, double 7.0)
+//     clang  send(i32 1, <2 x float> %h,      double 7.0)
+//
+// It is a single defect, but very noisy in the test results as ~75% trip it.
+// Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
 ABI_VARARGS :: #config(ABI_VARARGS, false)
 
 
