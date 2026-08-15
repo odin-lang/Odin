@@ -2079,14 +2079,14 @@ namespace lbAbiWasm {
 
 namespace lbAbiArm32 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type);
-	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention);
+	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention, Type *return_source);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
-		ft->ret = compute_return_type(c, return_type, return_is_defined, calling_convention);
+		ft->ret = compute_return_type(c, return_type, return_is_defined, calling_convention, lb_abi_single_result_type(original_type));
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -2115,6 +2115,47 @@ namespace lbAbiArm32 {
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
+	// AAPCS32 §5.5, the VFP variant that the `gnueabihf` triple selects: an aggregate of at most
+	// four members that are all the same fp type is a Homogeneous fp Aggregate, and travels 
+	// in s0-s3 / d0-d3 rather than in the core registers. Everything below coerces aggregates to 
+	// `[N x i32]`, which puts an HFA in r0-r3 where the C side reads s0-s3.
+	//
+	// The detector is arm64's: AAPCS64 states the same rule over the same shapes.
+	// `coerce_` is set when the lowered type cannot express the HFA and LLVM has to be handed an
+	// `[N x base]` instead of the type itself. That happens for a `#raw_union`, which has become
+	// an opaque integer by now and AAPCS32 DOES count a union of floats as homogeneous
+	gb_internal bool is_hfa(LLVMContextRef c, LLVMTypeRef type, Type *source_type,
+	                        ProcCallingConvention calling_convention, LLVMTypeRef *coerce_) {
+		if (is_calling_convention_odin(calling_convention)) {
+			// Both sides are Odin, so the existing lowering is self-consistent; leave it alone.
+			return false;
+		}
+		LLVMTypeRef base_type = nullptr;
+		unsigned member_count = 0;
+		bool needs_coerce = false;
+		if (!lbAbiArm64::is_homogenous_aggregate(c, type, &base_type, &member_count)) {
+			if (source_type == nullptr ||
+			    !lbAbiArm64::is_homogenous_aggregate_source(c, source_type, &base_type, &member_count)) {
+				return false;
+			}
+			needs_coerce = true;
+		}
+		if (member_count == 0 || member_count > 4) {
+			return false;
+		}
+		switch (LLVMGetTypeKind(base_type)) {
+		case LLVMFloatTypeKind:
+		case LLVMDoubleTypeKind:
+			break;
+		default:
+			return false;
+		}
+		if (coerce_) {
+			*coerce_ = needs_coerce ? llvm_array_type(base_type, member_count) : nullptr;
+		}
+		return true;
+	}
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 		auto srcs = lb_abi_param_source_types(original_type, arg_count);
@@ -2129,6 +2170,8 @@ namespace lbAbiArm32 {
 				// Added to support hard floats included in the playdates cortex-m7.
 				if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 					args[i] = lb_arg_type_direct(t);
+				} else if (LLVMTypeRef hfa_coerce = nullptr; is_hfa(c, t, srcs[i], calling_convention, &hfa_coerce)) {
+					args[i] = lb_arg_type_direct(t, hfa_coerce, nullptr, nullptr);
 				} else if (is_calling_convention_odin(calling_convention) && sz > 8) {
 					// Minor change to improve performance using the Odin calling conventions
 					args[i] = lb_arg_type_indirect(t, nullptr);
@@ -2144,17 +2187,24 @@ namespace lbAbiArm32 {
 		return args;
 	}
 
-	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention) {
+	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention, Type *return_source) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (!is_register(return_type, true)) {
 			if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 				return lb_arg_type_direct(return_type);
 			}
+			// An HFA is returned in s0-s3 / d0-d3 too. It must not fall through to the
+			// integer coercions or to `sret`.
+			LLVMTypeRef hfa_coerce = nullptr;
+			if (is_hfa(c, return_type, return_source, calling_convention, &hfa_coerce)) {
+				return lb_arg_type_direct(return_type, hfa_coerce, nullptr, nullptr);
+			}
+			// `lb_arg_type_direct` takes (type, cast_type), and the cast type is what the function actually returns. 
 			switch (lb_sizeof(return_type)) {
-			case 1:         return lb_arg_type_direct(LLVMIntTypeInContext(c, 8),  return_type, nullptr, nullptr);
-			case 2:         return lb_arg_type_direct(LLVMIntTypeInContext(c, 16), return_type, nullptr, nullptr);
-			case 3: case 4: return lb_arg_type_direct(LLVMIntTypeInContext(c, 32), return_type, nullptr, nullptr);
+			case 1:         return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
+			case 2:         return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
+			case 3: case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			}
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);

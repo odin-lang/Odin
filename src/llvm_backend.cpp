@@ -46,6 +46,13 @@ gb_internal String get_default_microarchitecture() {
 		}
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		default_march = str_lit("generic-rv64");
+	} else if (build_context.metrics.arch == TargetArch_arm32) {
+		// The arm32 triple is `gnueabihf`, and the hard-float ABI passes floating point in the
+		// VFP registers. `generic` has no FPU at all. LLVM cannot honor the ABI its own
+		// triple asks for and quietly falls back to the soft-float convention.
+		//
+		// `arm1176jzf-s` is what clang picks by default for this same triple.
+		default_march = str_lit("arm1176jzf-s");
 	}
 
 	return default_march;

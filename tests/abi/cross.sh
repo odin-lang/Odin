@@ -20,10 +20,12 @@ set -eu
 # `#simd[2]f16` aborts the compiler with "LLVM ERROR: Do not know how to split
 # the result of this operator!".
 #
-# `pentium4` is what clang's own default for `i386-linux-gnu` is, `haswell` 
-# additionally has F16C, which isolates one non-ABI failure: `hfa4_f16` 
-# diverges at pentium4 and agrees at haswell. It is `_Float16` conversion 
-# codegen rather than a calling convention 
+# `pentium4` is what clang's own default for `i386-linux-gnu` is, so it is the
+# baseline to compare against. BOTH SIDES must agree on it: the C side follows
+# clang's default unless ABI_CFLAGS says otherwise, so `-microarch:haswell`
+# alone makes the two disagree about where a 32-byte vector lives and reports
+# phantom vector failures. Match them (`ABI_CFLAGS=-march=haswell`) or use
+# pentium4 on both.
 
 TARGET=${1:?odin target, e.g. linux_arm64}
 TRIPLE=${2:?clang triple, e.g. aarch64-linux-gnu}
@@ -54,7 +56,22 @@ _start:
 _start:
 	bl probe_main
 	mov r7, #1
-	svc #0' ;;
+	svc #0
+
+@ The runtime does 64-bit division. On Arm, the compiler emits `__aeabi_uldivmod`
+@ instead of `__udivdi3`. It returns the quotient in r0:r1 and the remainder in
+@ r2:r3, which C cannot express. It is written here and forwards to the shim.
+	.globl __aeabi_uldivmod
+__aeabi_uldivmod:
+	push {lr}
+	sub  sp, sp, #12
+	add  r12, sp, #4
+	str  r12, [sp]
+	bl   shim_udivmod
+	ldr  r2, [sp, #4]
+	ldr  r3, [sp, #8]
+	add  sp, sp, #12
+	pop  {pc}' ;;
 *riscv64*) START='.text
 	.globl _start
 _start:
@@ -102,6 +119,7 @@ static u64 udivmod(u64 a, u64 b, u64 *rem){ u64 q=0,r=0;
   if(b==0){ if(rem)*rem=0; return 0; }
   for(int i=63;i>=0;i--){ r=(r<<1)|((a>>i)&1); if(r>=b){ r-=b; q|=(u64)1<<i; } }
   if(rem)*rem=r; return q; }
+u64 shim_udivmod(u64 a, u64 b, u64 *rem){ return udivmod(a,b,rem); }
 u64 __udivdi3(u64 a, u64 b){ return udivmod(a,b,0); }
 u64 __umoddi3(u64 a, u64 b){ u64 r; udivmod(a,b,&r); return r; }
 i64 __divdi3(i64 a, i64 b){ int n=0; u64 ua=a<0?(n^=1,(u64)-a):(u64)a, ub=b<0?(n^=1,(u64)-b):(u64)b;
