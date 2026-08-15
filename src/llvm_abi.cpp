@@ -479,11 +479,50 @@ namespace lbAbi386 {
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
+
+		// `bit_field` is treated as a struct.
+		Type *return_source = lb_abi_single_result_type(original_type);
+		if (return_is_defined && !return_is_tuple &&
+		    return_source != nullptr && is_type_bit_field(return_source) &&
+		    !lb_is_type_kind(return_type, LLVMStructTypeKind) &&
+		    !lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
+			// Windows and the BSDs return a small struct in registers, same as the scalar
+			// path so only the psABI targets need moving to the hidden pointer.
+			bool small_in_registers = build_context.metrics.os == TargetOs_windows ||
+			                          build_context.metrics.os == TargetOs_freebsd ||
+			                          build_context.metrics.os == TargetOs_openbsd;
+			i64 sz = lb_sizeof(return_type);
+			bool returned_in_registers = small_in_registers && (sz == 1 || sz == 2 || sz == 4 || sz == 8);
+			if (!returned_in_registers) {
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+				ft->ret = lb_arg_type_indirect(return_type, attr);
+			}
+		}
+
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
 	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
+		// A bare vector is passed and returned as itself; only aggregates
+		// take the indirect path below, ergo the vector check has to be first.
+		//
+		// Exception is an 8-byte vector Arg whose element is an integer: its an MMX type;
+		// clang coerces it to `i64` to keep it out of the MMX registers. An 8-byte
+		// vector of floats is an SSE type and stays itself, so the rule turns on the element and
+		// not on the width alone:
+		//
+		//     <8 x i8> <4 x i16> <2 x i32>   ->  i64
+		//     <2 x float> <4 x half>         ->  unchanged
+		//
+		// The RETURN is never coerced -- `<8 x i8>` comes back as itself.
+		if (LLVMGetTypeKind(type) == LLVMVectorTypeKind) {
+			if (!is_return && lb_sizeof(type) == 8 &&
+			    LLVMGetTypeKind(LLVMGetElementType(type)) == LLVMIntegerTypeKind) {
+				return lb_arg_type_direct(type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+			}
+			return lb_arg_type_direct(type, nullptr, nullptr, nullptr);
+		}
 		if (!is_return && lb_sizeof(type) > 8) {
 			return lb_arg_type_indirect(type, nullptr);
 		}
@@ -514,7 +553,11 @@ namespace lbAbi386 {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			i64 sz = lb_sizeof(t);
-			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+			// `bit_field` lowers to a bare integer; C represents it as a struct with bit-field 
+			// members, and i386 passes every struct by value on the stack. Use Src Type to match
+			bool is_aggregate = kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind ||
+			                    (srcs[i] != nullptr && is_type_bit_field(srcs[i]));
+			if (is_aggregate) {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {

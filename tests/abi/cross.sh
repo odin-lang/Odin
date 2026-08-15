@@ -11,9 +11,19 @@ set -eu
 # clang (which targets everything) and qemu-user.
 #
 #   ./cross.sh linux_arm64  aarch64-linux-gnu  qemu-aarch64
-#   ./cross.sh linux_i386   i386-linux-gnu     qemu-i386
+#   ./cross.sh linux_i386   i386-linux-gnu     qemu-i386 -microarch:pentium4
 #   ./cross.sh linux_arm32  arm-linux-gnueabihf qemu-arm
 #   ./cross.sh linux_riscv64 riscv64-linux-gnu qemu-riscv64
+#
+# i386 needs a microarch: below SSE2 the x86 backend cannot legalise a
+# sub-16-byte `f16` vector, and merely declaring a `proc "c"` that takes a
+# `#simd[2]f16` aborts the compiler with "LLVM ERROR: Do not know how to split
+# the result of this operator!".
+#
+# `pentium4` is what clang's own default for `i386-linux-gnu` is, `haswell` 
+# additionally has F16C, which isolates one non-ABI failure: `hfa4_f16` 
+# diverges at pentium4 and agrees at haswell. It is `_Float16` conversion 
+# codegen rather than a calling convention 
 
 TARGET=${1:?odin target, e.g. linux_arm64}
 TRIPLE=${2:?clang triple, e.g. aarch64-linux-gnu}
@@ -114,6 +124,16 @@ set +e
 "$QEMU" build-cross/bin
 rc=$?
 set -e
+
+# A driver that DIES reports 128+signal, and that collides with the type indices: 139 is both
+# SIGSEGV and a perfectly good index, so reading it as an index names an innocent type. There is no
+# cheap way to tell them apart here. ABI_SKIP is a compile-time `-define`
+if [ "$rc" -gt 128 ] && [ "$rc" -lt 165 ]; then
+	echo "$TARGET: exit $rc is AMBIGUOUS." >&2
+	echo "  Either type index $rc, or the driver died of signal $((rc-128)) (11 = SIGSEGV)." >&2
+	echo "  Re-run with -define:ABI_SKIP=$((rc+1)): if the result moves it was the type," >&2
+	echo "  and if it does not, a wrong-ABI call is corrupting the process." >&2
+fi
 
 if [ "$rc" -eq 0 ]; then
 	echo "$TARGET: every type agrees with clang"
