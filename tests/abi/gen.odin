@@ -43,6 +43,7 @@ scalar :: proc(tag: string) -> Scalar {
 	case "f32":  return {"f32", "float", true}
 	case "f64":  return {"f64", "double", true}
 	case "ptr":  return {"rawptr", "void *", false}
+	case "cstring": return {"cstring", "char *", false}
 	}
 	fmt.panicf("unknown scalar tag %q", tag)
 }
@@ -117,7 +118,8 @@ val :: proc(i: int, tag: string) -> string {
 
 c_val :: proc(tag, v: string) -> string {
 	switch tag {
-	case "ptr":  return tp("(void *)(intptr_t)(%s)", v)
+	case "ptr":     return tp("(void *)(intptr_t)(%s)", v)
+	case "cstring": return tp("(char *)(intptr_t)(%s)", v)
 	case "bool": return "1"
 	case "enum": return tp("(enum E32)(%s)", v)
 	case "c64":  return tp("(%s.0f + %s.0if)", v, v)
@@ -279,6 +281,10 @@ build :: proc() {
 		{"i128"}, {"i128", "i64"}, {"i8", "i128"}, {"i128", "f64"},
 		{"c64"}, {"c128"}, {"c64", "c64"}, {"c64", "f32"}, {"c128", "i64"},
 		{"bset"}, {"bset", "bset"}, {"bset", "f32"},
+		// the unsigned widths: same size and class as their signed twins, so they are the
+		// control on anything that reads signedness where it should not
+		{"u8"}, {"u16"}, {"u32"}, {"u64"},
+		{"u8", "u32"}, {"u16", "u64"}, {"u32", "f32"}, {"u64", "f64"},
 	}
 	for tags in combos {
 		odin_members := make([]string, len(tags), context.temp_allocator)
@@ -304,7 +310,7 @@ build :: proc() {
 	// 32 bits. A callee compiled to rely on that reads the untouched high bits.
 	// The sub-32-bit widths are the ones that have it; i32 and f32 are the controls
 	// that must not.
-	for tag in ([]string{"i8", "u8", "i16", "u16", "bool", "i32", "f32"}) {
+	for tag in ([]string{"i8", "u8", "i16", "u16", "bool", "i32", "u32", "u64", "f32"}) {
 		s := scalar(tag)
 		v := val(0, tag)
 		expected := tag == "bool" ? odin_val(tag, v) : tp("%s(%s)", s.odin, v)
@@ -316,6 +322,25 @@ build :: proc() {
 			tier = tier_of(tag),
 			odin_set = strs(tp("{} = %s", odin_val(tag, v))),
 			odin_get = pairs([2]string{"{}", expected}),
+		)
+	}
+
+	// --- cstring, the shape every C binding is made of. It is a pointer, but `==` on a cstring
+	// has STRING semantics in Odin and would dereference the fabricated address, so the Odin side
+	// compares the pointer VALUE while the C side compares the pointer directly.
+	{
+		v := val(0, "cstring")
+		add(
+			"bs_cstring", "cstring", "char *",
+			leaves(leaf2("", "{}", "cstring", v)),
+			odin_set = strs(tp("{} = transmute(cstring)uintptr(%s)", v)),
+			odin_get = pairs([2]string{"transmute(uintptr)({})", tp("uintptr(%s)", v)}),
+		)
+		add(
+			"s_cstring", "struct { a: cstring }", "struct { char *a; }",
+			leaves(leaf2("a", "a", "cstring", v)),
+			odin_set = strs(tp("{}.a = transmute(cstring)uintptr(%s)", v)),
+			odin_get = pairs([2]string{"transmute(uintptr)({}.a)", tp("uintptr(%s)", v)}),
 		)
 	}
 
