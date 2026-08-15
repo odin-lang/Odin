@@ -107,6 +107,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_7304.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "9223372036854775808 is not representable by int") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o
 $ODIN test ../test_issue_7010.odin $COMMON
 
