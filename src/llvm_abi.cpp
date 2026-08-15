@@ -2111,6 +2111,20 @@ namespace lbAbiArm32 {
 	}
 
 	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
+		// A bare vector narrower than a word has no register of its own to sit in, clang coerces
+		// it to `i32` as an argument whatever its element is. The return keeps the vector
+		// type, same as x86, except: a half vector is not a legal type at this microarchitecture 
+		// (`arm1176jzf-s` has VFP2 but no fp16), so clang coerces that one in both directions.
+		//
+		//     <4 x i8> <2 x i16> <2 x half>  as an argument  ->  i32
+		//     <4 x i8> <2 x i16>             as a return     ->  unchanged
+		//     <2 x half>                     as a return     ->  i32
+		if (LLVMGetTypeKind(type) == LLVMVectorTypeKind && lb_sizeof(type) == 4) {
+			bool is_half = LLVMGetTypeKind(LLVMGetElementType(type)) == LLVMHalfTypeKind;
+			if (!is_return || is_half) {
+				return lb_arg_type_direct(type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+			}
+		}
 		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
@@ -2146,6 +2160,17 @@ namespace lbAbiArm32 {
 		switch (LLVMGetTypeKind(base_type)) {
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
+			break;
+		case LLVMVectorTypeKind:
+			// AAPCS32's short vectors are the 64-bit and 128-bit ones. An aggregate of up to
+			// four of them is a Homogeneous Vector Aggregate, which rides in the VFP registers
+			// exactly as an HFA does. Any other width is not a short vector and does not qualify.
+			{
+				i64 vec_size = lb_sizeof(base_type);
+				if (vec_size != 8 && vec_size != 16) {
+					return false;
+				}
+			}
 			break;
 		default:
 			return false;
@@ -2190,6 +2215,13 @@ namespace lbAbiArm32 {
 	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention, Type *return_source) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (LLVMGetTypeKind(return_type) == LLVMVectorTypeKind && lb_sizeof(return_type) > 16) {
+			// A bare vector wider than a short vector has no register file to come back in. It
+			// is returned through a hidden pointer. `is_register` answers true for every vector,
+			// without this the caller returns it directly while the C callee stores
+			// through an `sret` pointer that was never passed (segfault)
+			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+			return lb_arg_type_indirect(return_type, attr);
 		} else if (!is_register(return_type, true)) {
 			if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 				return lb_arg_type_direct(return_type);
