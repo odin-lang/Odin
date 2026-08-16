@@ -1530,6 +1530,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				return false;
 			}
 
+			// the result is as wide as the index list, which may be twice the operand width
+			if (arg_count > SIMD_ELEMENT_COUNT_MAX) {
+				error(call, "'%.*s' constructs a #simd vector beyond the maximum element count of %d, got %lld", LIT(builtin_name), SIMD_ELEMENT_COUNT_MAX, cast(long long)arg_count);
+				return false;
+			}
+
 			operand->mode = Addressing_Value;
 			operand->type = alloc_type_simd_vector(arg_count, elem);
 			return true;
@@ -1915,7 +1921,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			i64 base_count = get_array_type_count(x.type);
 			i64 count = base_count * cast(i64)ce->args.count;
 
-			i64 max_count = 64;
+			i64 max_count = SIMD_ELEMENT_COUNT_MAX;
 			if (count > max_count) {
 				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", LIT(builtin_name), cast(long long)max_count, cast(long long)count);
 				return false;
@@ -3514,6 +3520,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		if (is_type_simd_vector(type) && !is_power_of_two(arg_count)) {
 			error(call, "'swizzle' with a #simd vector must have a power of two arguments, got %lld", cast(long long)arg_count);
+			return false;
+		}
+
+		if (is_type_simd_vector(type) && arg_count > SIMD_ELEMENT_COUNT_MAX) {
+			error(call, "'swizzle' constructs a #simd vector beyond the maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)arg_count);
 			return false;
 		}
 
