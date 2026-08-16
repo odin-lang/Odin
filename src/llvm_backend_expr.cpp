@@ -1223,7 +1223,9 @@ gb_internal lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbVal
 			LLVMValueRef rhs_ptr = LLVMGetOperand(rhs.value, 0);
 			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem), cast(unsigned)vector_count);
 			LLVMValueRef rhs_vector = LLVMBuildLoad2(p->builder, vector_type, rhs_ptr, "");
-			LLVMSetAlignment(rhs_vector, cast(unsigned)type_align_of(type));
+			// The alignment of what is being loaded, which is the right-hand vector. `type` is the
+			// result, and asking it cannot be right except by coincidence.
+			LLVMSetAlignment(rhs_vector, cast(unsigned)type_align_of(vt));
 
 			for (unsigned i = 0; i < column_count; i++) {
 				LLVMValueRef mask = llvm_mask_same(p->module, i, row_count);
