@@ -1787,7 +1787,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			check_expr(c, &offset, ce->args[1]); if (offset.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &offset, t_i64);
 			if (!is_type_integer(offset.type) || offset.mode != Addressing_Constant) {
-				error(offset.expr, "'%.*s' expected a constant integer offset");
+				error(offset.expr, "'%.*s' expected a constant integer offset", LIT(builtin_name));
 				return false;
 			}
 			check_assignment(c, &offset, t_i64, builtin_name);
@@ -1917,7 +1917,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			i64 max_count = 64;
 			if (count > max_count) {
-				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", cast(long long)max_count, cast(long long)count);
+				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", LIT(builtin_name), cast(long long)max_count, cast(long long)count);
 				return false;
 			}
 
