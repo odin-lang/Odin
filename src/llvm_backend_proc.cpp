@@ -1563,38 +1563,31 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				args[i] = arg.value;
 			}
 
-			// `llvm.vector.interleave<N>` for N > 2 is only usable on recent LLVM: it does not
-			// exist at all on 20, and where it does exist a backend may still have no pattern
-			// for it (x86 on 20 fails to select). Measured working on 22, so take it there.
-			#if LLVM_VERSION_MAJOR >= 22
-			if (n > 2) {
-				gbString name = gb_string_make(heap_allocator(), "");
-				name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
-				defer (gb_string_free(name));
-
-				LLVMTypeRef types[1] = {lb_type(m, tv.type)};
-				res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
-				return res;
-			}
-			#endif
-
-			// otherwise build the same permutation from interleave2, which every supported LLVM
-			// has. The operand count is a power of two (the checker requires the lane count to
-			// be one), and pairing each operand with the one a half-step away is what makes the
-			// orders agree: interleave4(a,b,c,d) == interleave2(interleave2(a,c), interleave2(b,d)).
-			LLVMTypeRef elem_type = LLVMGetElementType(LLVMTypeOf(args[0]));
-			unsigned width = LLVMGetVectorSize(LLVMTypeOf(args[0]));
+			// `llvm.vector.interleave<N>` is not usable across the supported targets: N > 2 does
+			// not exist before LLVM 22. Riscv & Darwin AMD64 has no `interleave2` either. 
+			// A shuffle is the one primitive every target has, and it expresses a two-way 
+			// interleave directly.
+			//
+			// The operand count is a power of two. The result is a riffle: pairing each operand 
+			// with the one a half-step away is what makes the order come out right, as
+			// interleave4(a,b,c,d) == interleave2(interleave2(a,c), interleave2(b,d)).
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
 
 			LLVMValueRef *cur = args;
 			for (int count = n; count > 1; /**/) {
 				int half = count/2;
-				width *= 2;
+				unsigned width = LLVMGetVectorSize(LLVMTypeOf(cur[0]));
 
-				LLVMTypeRef types[1] = {LLVMVectorType(elem_type, width)};
+				LLVMValueRef *mask = temporary_alloc_array<LLVMValueRef>(2*width);
+				for (unsigned i = 0; i < width; i++) {
+					mask[2*i + 0] = LLVMConstInt(llvm_u32, i,       false);
+					mask[2*i + 1] = LLVMConstInt(llvm_u32, width+i, false);
+				}
+				LLVMValueRef mask_value = LLVMConstVector(mask, 2*width);
+
 				LLVMValueRef *next = temporary_alloc_array<LLVMValueRef>(half);
 				for (int i = 0; i < half; i++) {
-					LLVMValueRef pair[2] = {cur[i], cur[i+half]};
-					next[i] = lb_call_intrinsic(p, "llvm.vector.interleave2", pair, 2, types, gb_count_of(types));
+					next[i] = LLVMBuildShuffleVector(p->builder, cur[i], cur[i+half], mask_value, "");
 				}
 
 				cur = next;

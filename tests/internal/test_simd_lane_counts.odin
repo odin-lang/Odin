@@ -9,8 +9,8 @@ import "core:testing"
 // from a test -- it is a compile error -- so what is pinned here is the other side: the widths
 // that must keep working, and the values they carry.
 
-// More than two operands take one of two lowerings, `llvm.vector.interleave<N>` on a LLVM 21+, 
-// a riffle of `interleave2` elsewhere. The lane order and width are both asserted.
+// More than two operands lower to a riffle of two-way shuffles rather than one intrinsic, so
+// the lane ORDER is asserted and not just the width.
 
 @(test)
 simd_interleave_power_of_two_widths :: proc(t: ^testing.T) {
