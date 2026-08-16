@@ -3343,27 +3343,29 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 					case Token_Lt:
 					case Token_LtEq:
 						{
+							// subset: (lhs & rhs) == lhs. a proper subset also requires lhs != rhs
 							ExactValue lhs = x->value;
 							ExactValue rhs = y->value;
-							ExactValue res = exact_binary_operator_value(Token_And, lhs, rhs);
-							res = exact_value_bool(compare_exact_values(op, res, lhs));
+							ExactValue both = exact_binary_operator_value(Token_And, lhs, rhs);
+							bool res = compare_exact_values(Token_CmpEq, both, lhs);
 							if (op == Token_Lt) {
-								res = exact_binary_operator_value(Token_And, res, exact_value_bool(compare_exact_values(op, lhs, rhs)));
+								res = res && compare_exact_values(Token_NotEq, lhs, rhs);
 							}
-							x->value = res;
+							x->value = exact_value_bool(res);
 							break;
 						}
 					case Token_Gt:
 					case Token_GtEq:
 						{
+							// superset: (lhs & rhs) == rhs
 							ExactValue lhs = x->value;
 							ExactValue rhs = y->value;
-							ExactValue res = exact_binary_operator_value(Token_And, lhs, rhs);
-							res = exact_value_bool(compare_exact_values(op, res, rhs));
+							ExactValue both = exact_binary_operator_value(Token_And, lhs, rhs);
+							bool res = compare_exact_values(Token_CmpEq, both, rhs);
 							if (op == Token_Gt) {
-								res = exact_binary_operator_value(Token_And, res, exact_value_bool(compare_exact_values(op, lhs, rhs)));
+								res = res && compare_exact_values(Token_NotEq, lhs, rhs);
 							}
-							x->value = res;
+							x->value = exact_value_bool(res);
 							break;
 						}
 					}

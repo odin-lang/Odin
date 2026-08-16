@@ -1740,7 +1740,13 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 					slice = lb_emit_load(p, slice);
 				} else {
 					count_ptr = lb_add_local_generated(p, t_int, false).addr;
-					lb_emit_store(p, count_ptr, lb_slice_len(p, slice));
+					if (t->kind == Type_Slice) {
+						lb_emit_store(p, count_ptr, lb_slice_len(p, slice));
+					} else if (t->kind == Type_DynamicArray) {
+						lb_emit_store(p, count_ptr, lb_dynamic_array_len(p, slice));
+					} else {
+						GB_ASSERT_MSG(false, "Need to add support for this type.");
+					}
 				}
 				data_ptr = lb_emit_struct_ev(p, slice, 0);
 				break;

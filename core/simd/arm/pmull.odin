@@ -502,6 +502,134 @@ vtbl4_p8 :: #force_inline proc "c" (t: poly8x8x4_t, idx: poly8x8_t) -> poly8x8_t
 	}
 }
 
+// Extended Table Lookup.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtbx1_p8)
+@(require_results, enable_target_feature = "neon")
+vtbx1_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x8_t, idx: uint8x8_t) -> poly8x8_t {
+	when ODIN_ARCH == .arm64 {
+		return simd.select(
+			simd.lanes_lt(idx, uint8x8_t(8)),
+			vqtbx1_p8(v, vcombine_p8(t, poly8x8_t{}), idx),
+			v,
+		)
+	} else {
+		return transmute(poly8x8_t)_vtbx1(
+			transmute(int8x8_t)v,
+			transmute(int8x8_t)t,
+			transmute(int8x8_t)idx,
+		)
+	}
+}
+
+// Extended Table Lookup.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtbx2_p8)
+@(require_results, enable_target_feature = "neon")
+vtbx2_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x8x2_t, idx: uint8x8_t) -> poly8x8_t {
+	when ODIN_ARCH == .arm64 {
+		return simd.select(
+			simd.lanes_lt(idx, uint8x8_t(16)),
+			vqtbx1_p8(v, vcombine_p8(t.x, t.y), idx),
+			v,
+		)
+	} else {
+		return transmute(poly8x8_t)_vtbx2(
+			transmute(int8x8_t)v,
+			transmute(int8x8_t)t.x,
+			transmute(int8x8_t)t.y,
+			transmute(int8x8_t)idx,
+		)
+	}
+}
+
+// Extended Table Lookup.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtbx3_p8)
+@(require_results, enable_target_feature = "neon")
+vtbx3_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x8x3_t, idx: uint8x8_t) -> poly8x8_t {
+	when ODIN_ARCH == .arm64 {
+		x := poly8x16x2_t {
+			vcombine_p8(t.x, t.y),
+			vcombine_p8(t.z, poly8x8_t{}),
+		}
+		return simd.select(
+			simd.lanes_lt(idx, uint8x8_t(24)),
+			vqtbx2_p8(v, x, idx),
+			v,
+		)
+	} else {
+		return transmute(poly8x8_t)_vtbx3(
+			transmute(int8x8_t)v,
+			transmute(int8x8_t)t.x,
+			transmute(int8x8_t)t.y,
+			transmute(int8x8_t)t.z,
+			transmute(int8x8_t)idx,
+		)
+	}
+}
+
+// Extended Table Lookup.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtbx4_p8)
+@(require_results, enable_target_feature = "neon")
+vtbx4_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x8x4_t, idx: uint8x8_t) -> poly8x8_t {
+	when ODIN_ARCH == .arm64 {
+		x := poly8x16x2_t {
+			vcombine_p8(t.x, t.y),
+			vcombine_p8(t.z, t.w),
+		}
+		return simd.select(
+			simd.lanes_lt(idx, uint8x8_t(32)),
+			vqtbx2_p8(v, x, idx),
+			v,
+		)
+	} else {
+		return transmute(poly8x8_t)_vtbx4(
+			transmute(int8x8_t)v,
+			transmute(int8x8_t)t.x,
+			transmute(int8x8_t)t.y,
+			transmute(int8x8_t)t.z,
+			transmute(int8x8_t)t.w,
+			transmute(int8x8_t)idx,
+		)
+	}
+}
+
+// Population count per byte.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcnt_p8)
+@(require_results, enable_target_feature = "neon")
+vcnt_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	return transmute(poly8x8_t)vcnt_s8(transmute(int8x8_t)a)
+}
+
+// Population count per byte.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcntq_p8)
+@(require_results, enable_target_feature = "neon")
+vcntq_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	return transmute(poly8x16_t)vcntq_s8(transmute(int8x16_t)a)
+}
+
+// Bitwise Not.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vmvn_p8)
+@(require_results, enable_target_feature = "neon")
+vmvn_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	b := poly8x8_t(max(poly8_t))
+	return simd.bit_xor(a, b)
+}
+
+// Bitwise Not.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vmvnq_p8)
+@(require_results, enable_target_feature = "neon")
+vmvnq_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	b := poly8x16_t(max(poly8_t))
+	return simd.bit_xor(a, b)
+}
+
 when ODIN_ARCH == .arm64 {
 	// Polynomial multiply long
 	//
@@ -723,6 +851,246 @@ when ODIN_ARCH == .arm64 {
 			}
 			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
 			c := transmute(poly8x16_t)_vqtbl4q(
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				transmute(int8x16_t)t.w,
+				idx,
+			)
+			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx1_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx1_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x16_t, idx: uint8x8_t) -> poly8x8_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x8_t)_vqtbx1(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := simd.shuffle(t, t, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x8_t)_vqtbx1(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t,
+				idx,
+			)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx1q_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx1q_p8 :: #force_inline proc "c" (v: poly8x16_t, t: poly8x16_t, idx: uint8x16_t) -> poly8x16_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x16_t)_vqtbx1q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := simd.shuffle(t, t, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x16_t)_vqtbx1q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t,
+				idx,
+			)
+			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx2_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx2_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x16x2_t, idx: uint8x8_t) -> poly8x8_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x8_t)_vqtbx2(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := poly8x16x2_t {
+				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+			}
+			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x8_t)_vqtbx2(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				idx,
+			)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx2q_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx2q_p8 :: #force_inline proc "c" (v: poly8x16_t, t: poly8x16x2_t, idx: uint8x16_t) -> poly8x16_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x16_t)_vqtbx2q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := poly8x16x2_t {
+				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+			}
+			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x16_t)_vqtbx2q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				idx,
+			)
+			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx3_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx3_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x16x3_t, idx: uint8x8_t) -> poly8x8_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x8_t)_vqtbx3(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := poly8x16x3_t {
+				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+			}
+			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x8_t)_vqtbx3(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				idx,
+			)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx3q_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx3q_p8 :: #force_inline proc "c" (v: poly8x16_t, t: poly8x16x3_t, idx: uint8x16_t) -> poly8x16_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x16_t)_vqtbx3q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := poly8x16x3_t {
+				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+			}
+			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x16_t)_vqtbx3q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				idx,
+			)
+			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx4_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx4_p8 :: #force_inline proc "c" (v: poly8x8_t, t: poly8x16x4_t, idx: uint8x8_t) -> poly8x8_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x8_t)_vqtbx4(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				transmute(int8x16_t)t.w,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := poly8x16x4_t {
+				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.w, t.w, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+			}
+			idx := simd.shuffle(idx, idx, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x8_t)_vqtbx4(
+				transmute(int8x8_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				transmute(int8x16_t)t.w,
+				idx,
+			)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Extended Table Lookup.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqtbx4q_p8)
+	@(require_results, enable_target_feature = "neon")
+	vqtbx4q_p8 :: #force_inline proc "c" (v: poly8x16_t, t: poly8x16x4_t, idx: uint8x16_t) -> poly8x16_t {
+		when ODIN_ENDIAN == .Little {
+			return transmute(poly8x16_t)_vqtbx4q(
+				transmute(int8x16_t)v,
+				transmute(int8x16_t)t.x,
+				transmute(int8x16_t)t.y,
+				transmute(int8x16_t)t.z,
+				transmute(int8x16_t)t.w,
+				idx,
+			)
+		} else {
+			v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			t := poly8x16x4_t {
+				simd.shuffle(t.x, t.x, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.y, t.y, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.z, t.z, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+				simd.shuffle(t.w, t.w, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0),
+			}
+			idx := simd.shuffle(idx, idx, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := transmute(poly8x16_t)_vqtbx4q(
+				transmute(int8x16_t)v,
 				transmute(int8x16_t)t.x,
 				transmute(int8x16_t)t.y,
 				transmute(int8x16_t)t.z,

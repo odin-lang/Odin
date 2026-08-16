@@ -1446,11 +1446,13 @@ gb_internal bool is_type_ordered(Type *t) {
 	return false;
 }
 gb_internal bool is_type_ordered_numeric(Type *t) {
-	t = core_type(t);
+	t = base_type(t);
 	if (t == nullptr) { return false; }
 	switch (t->kind) {
 	case Type_Basic:
 		return (t->Basic.flags & BasicFlag_OrderedNumeric) != 0;
+	case Type_Enum:
+		return is_type_ordered_numeric(t->Enum.base_type);
 	}
 	return false;
 }
