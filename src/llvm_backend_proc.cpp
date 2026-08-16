@@ -1563,19 +1563,44 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				args[i] = arg.value;
 			}
 
-			gbString name = gb_string_make(heap_allocator(), "");
-			name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
-			defer (gb_string_free(name));
+			// `llvm.vector.interleave<N>` is not usable across the supported targets: N > 2 does
+			// not exist before LLVM 22. Riscv & Darwin AMD64 has no `interleave2` either. 
+			// A shuffle is the one primitive every target has, and it expresses a two-way 
+			// interleave directly.
+			//
+			// The operand count is a power of two. The result is a riffle: pairing each operand 
+			// with the one a half-step away is what makes the order come out right, as
+			// interleave4(a,b,c,d) == interleave2(interleave2(a,c), interleave2(b,d)).
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
 
-			LLVMTypeRef types[1] = {lb_type(m, tv.type)};
-			res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
+			LLVMValueRef *cur = args;
+			for (int count = n; count > 1; /**/) {
+				int half = count/2;
+				unsigned width = LLVMGetVectorSize(LLVMTypeOf(cur[0]));
+
+				LLVMValueRef *mask = temporary_alloc_array<LLVMValueRef>(2*width);
+				for (unsigned i = 0; i < width; i++) {
+					mask[2*i + 0] = LLVMConstInt(llvm_u32, i,       false);
+					mask[2*i + 1] = LLVMConstInt(llvm_u32, width+i, false);
+				}
+				LLVMValueRef mask_value = LLVMConstVector(mask, 2*width);
+
+				LLVMValueRef *next = temporary_alloc_array<LLVMValueRef>(half);
+				for (int i = 0; i < half; i++) {
+					next[i] = LLVMBuildShuffleVector(p->builder, cur[i], cur[i+half], mask_value, "");
+				}
+
+				cur = next;
+				count = half;
+			}
+
+			res.value = cur[0];
 			return res;
 		}
 
 	case BuiltinProc_simd_deinterleave:
 		{
 			lbValue arg0 = lb_build_expr(p, ce->args[0]);
-			LLVMTypeRef types[1] = {lb_type(m, arg0.type)};
 
 			GB_ASSERT(ce->args[1]->tav.value.kind == ExactValue_Integer);
 			int n = cast(int)exact_value_to_i64(ce->args[1]->tav.value);
@@ -1585,11 +1610,27 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				return res;
 			}
 
-			gbString name = gb_string_make(heap_allocator(), "");
-			name = gb_string_append_fmt(name, "llvm.vector.deinterleave%d", n);
-			defer (gb_string_free(name));
+			// `llvm.vector.deinterleave<N>` for N > 2 cannot be selected or legalized on most
+			// targets, only arm64 takes it. The split is done with shuffles, same as
+			// `simd_interleave`. Output `j` is the input strided by N starting at lane `j`.
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			LLVMTypeRef vector_type = LLVMTypeOf(arg0.value);
+			LLVMValueRef undef = LLVMGetUndef(vector_type);
 
-			res.value = lb_call_intrinsic(p, name, &arg0.value, 1, types, gb_count_of(types));
+			unsigned width = LLVMGetVectorSize(vector_type);
+			unsigned part  = width/cast(unsigned)n;
+
+			LLVMValueRef agg = LLVMGetUndef(lb_type(m, tv.type));
+			LLVMValueRef *mask = temporary_alloc_array<LLVMValueRef>(part);
+			for (int j = 0; j < n; j++) {
+				for (unsigned i = 0; i < part; i++) {
+					mask[i] = LLVMConstInt(llvm_u32, i*cast(unsigned)n + cast(unsigned)j, false);
+				}
+				LLVMValueRef lanes = LLVMBuildShuffleVector(p->builder, arg0.value, undef, LLVMConstVector(mask, part), "");
+				agg = LLVMBuildInsertValue(p->builder, agg, lanes, cast(unsigned)j, "");
+			}
+
+			res.value = agg;
 			return res;
 		}
 	}

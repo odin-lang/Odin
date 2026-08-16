@@ -10690,7 +10690,25 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			if (count != nullptr) {
 				if (count->kind == Ast_UnaryExpr &&
 				    count->UnaryExpr.op.kind == Token_Question) {
-					type = alloc_type_array(check_type(c, type_expr->ArrayType.elem), -1);
+					Type *elem = check_type(c, type_expr->ArrayType.elem);
+
+					bool is_simd_tag = false;
+					if (type_expr->ArrayType.tag != nullptr) {
+						GB_ASSERT(type_expr->ArrayType.tag->kind == Ast_BasicDirective);
+						is_simd_tag = type_expr->ArrayType.tag->BasicDirective.name.string == "simd";
+					}
+					if (is_simd_tag) {
+						if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
+							gbString str = type_to_string(elem);
+							error(type_expr->ArrayType.elem, "Invalid element type for #simd, expected an integer, float, boolean, or 'rawptr' with no specific endianness, got '%s'", str);
+							gb_string_free(str);
+							type = alloc_type_array(elem, -1);
+						} else {
+							type = alloc_type_simd_vector(-1, elem);
+						}
+					} else {
+						type = alloc_type_array(elem, -1);
+					}
 					is_to_be_determined_array_count = true;
 				}
 			} else {
@@ -10914,7 +10932,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		} else if (t->kind == Type_SimdVector) {
 			elem_type = t->SimdVector.elem;
 			context_name = str_lit("simd vector literal");
-			max_type_count = t->SimdVector.count;
+			if (!is_to_be_determined_array_count) {
+				max_type_count = t->SimdVector.count;
+			}
 		} else if (t->kind == Type_Matrix) {
 			elem_type = t->Matrix.elem;
 			context_name = str_lit("matrix literal");
@@ -11088,6 +11108,16 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
 				if (0 < max && max < t->Array.count) {
 					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
+			}
+		} else if (t->kind == Type_SimdVector) {
+			// the length laws cannot be applied until the literal has supplied the count
+			if (is_to_be_determined_array_count) {
+				t->SimdVector.count = max;
+				if (max < 1 || !is_power_of_two(max)) {
+					error(node, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)max);
+				} else if (max > SIMD_ELEMENT_COUNT_MAX) {
+					error(node, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)max);
 				}
 			}
 		} else if (t->kind == Type_Struct) {

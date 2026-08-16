@@ -949,6 +949,16 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				// don't return
 			}
 
+			if (id == BuiltinProc_simd_pairwise_add || id == BuiltinProc_simd_pairwise_sub) {
+				i64 lanes = get_array_type_count(x.type);
+				if (lanes % 2 != 0) {
+					gbString xs = type_to_string(x.type);
+					error(x.expr, "'%.*s' expected a #simd type with an even lane count, got '%s'", LIT(builtin_name), xs);
+					gb_string_free(xs);
+					return false;
+				}
+			}
+
 			operand->mode = Addressing_Value;
 			operand->type = x.type;
 			return true;
@@ -1295,10 +1305,6 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			if (!check_index_value(c, x.type, false, ce->args[1], max_count, &value)) {
 				return false;
 			}
-			if (max_count < 0) {
-				error(ce->args[1], "'%.*s' expected a constant integer index, got '%lld'", LIT(builtin_name), cast(long long)value);
-				return false;
-			}
 
 			operand->mode = Addressing_Value;
 			operand->type = elem;
@@ -1318,10 +1324,6 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			i64 max_count = x.type->SimdVector.count;
 			i64 value = -1;
 			if (!check_index_value(c, x.type, false, ce->args[1], max_count, &value)) {
-				return false;
-			}
-			if (max_count < 0) {
-				error(ce->args[1], "'%.*s' expected a constant integer index, got '%lld'", LIT(builtin_name), cast(long long)value);
 				return false;
 			}
 
@@ -1527,6 +1529,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 
 			if (!is_power_of_two(arg_count)) {
 				error(call, "'%.*s' must have a power of two index arguments, got %lld", LIT(builtin_name), cast(long long)arg_count);
+				return false;
+			}
+
+			// the result is as wide as the index list, which may be twice the operand width
+			if (arg_count > SIMD_ELEMENT_COUNT_MAX) {
+				error(call, "'%.*s' constructs a #simd vector beyond the maximum element count of %d, got %lld", LIT(builtin_name), SIMD_ELEMENT_COUNT_MAX, cast(long long)arg_count);
 				return false;
 			}
 
@@ -1785,12 +1793,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 			Operand offset = {};
 			check_expr(c, &offset, ce->args[1]); if (offset.mode == Addressing_Invalid) return false;
-			convert_to_typed(c, &offset, t_i64);
+			// `base:intrinsics` declares the offset as `int` and does not mark it #any_int
+			convert_to_typed(c, &offset, t_int);
 			if (!is_type_integer(offset.type) || offset.mode != Addressing_Constant) {
-				error(offset.expr, "'%.*s' expected a constant integer offset");
+				error(offset.expr, "'%.*s' expected a constant integer offset", LIT(builtin_name));
 				return false;
 			}
-			check_assignment(c, &offset, t_i64, builtin_name);
+			check_assignment(c, &offset, t_int, builtin_name);
 
 			operand->type = x.type;
 			operand->mode = Addressing_Value;
@@ -1915,9 +1924,15 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			i64 base_count = get_array_type_count(x.type);
 			i64 count = base_count * cast(i64)ce->args.count;
 
-			i64 max_count = 64;
+			i64 max_count = SIMD_ELEMENT_COUNT_MAX;
 			if (count > max_count) {
-				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", cast(long long)max_count, cast(long long)count);
+				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", LIT(builtin_name), cast(long long)max_count, cast(long long)count);
+				return false;
+			}
+			// the lane count is the operand width times the argument count, so it is a power
+			// of two only when the argument count is
+			if (!is_power_of_two(count)) {
+				error(ce->proc, "'%.*s' must produce a power of two #simd count, got %lld", LIT(builtin_name), cast(long long)count);
 				return false;
 			}
 
@@ -3491,10 +3506,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			arg_count++;
 		}
 
-		if (false && arg_count > max_count) {
-			error(call, "Too many 'swizzle' indices, %td > %td", arg_count, max_count);
-			return false;
-		} else if (arg_count < 2) {
+		// No upper bound on the index count
+		if (arg_count < 2) {
 			error(call, "Not enough 'swizzle' indices, %td < 2", arg_count);
 			return false;
 		}
@@ -3511,6 +3524,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		if (is_type_simd_vector(type) && !is_power_of_two(arg_count)) {
 			error(call, "'swizzle' with a #simd vector must have a power of two arguments, got %lld", cast(long long)arg_count);
+			return false;
+		}
+
+		if (is_type_simd_vector(type) && arg_count > SIMD_ELEMENT_COUNT_MAX) {
+			error(call, "'swizzle' constructs a #simd vector beyond the maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)arg_count);
 			return false;
 		}
 
