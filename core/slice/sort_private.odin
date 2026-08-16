@@ -15,7 +15,7 @@ Sort_Kind :: enum {
 
 _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (ORD(E) && KIND == .Ordered) || (KIND != .Ordered) #no_bounds_check {
 	less :: #force_inline proc(a, b: E, call: P) -> bool {
-	when KIND == .Ordered {
+		when KIND == .Ordered {
 			return a < b
 		} else when KIND == .Less {
 			return call(a, b)
@@ -28,7 +28,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 
 	merge_rotate(data, call)
 
-	insertion_sort :: proc(data: T, call: P){
+	insertion_sort :: proc(data: T, call: P) {
 		for i in 1..<len(data) {
 			j := i
 			temp := data[j]
@@ -39,7 +39,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		}
 	}
 
-	merge_rotate :: proc(data: T, call: P){
+	merge_rotate :: proc(data: T, call: P) {
 		if len(data) <= 200 {
 			insertion_sort(data, call)
 			return
@@ -52,39 +52,39 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		merge(data, mid, len(data) - mid, call)
 	}
 
-	bin_search_left :: proc(data:T, value: E, call: P) -> int{
-		from := 0
-		len := len(data)
+	bin_search_left :: proc(data: T, value: E, call: P) -> (from: int) {
+		n := len(data)
 
-		for len > 0 {
-			half := len / 2
+		for n > 0 {
+			half := n / 2
 			mid := from + half
 
-			if less(data[mid], value, call){
+			if less(data[mid], value, call) {
 				from = mid + 1
-				len -= half + 1
+				n -= half + 1
 			} else {
-				len = half
+				n = half
 			}
 		}
+
 		return from
 	}
 
-	bin_search_right :: proc(data: T, value: E, call: P) -> int {
-		from := 0
-		len := len(data)
+	bin_search_right :: proc(data: T, value: E, call: P) -> (from: int) {
+		n := len(data)
 
-		for len > 0 {
-		half := len / 2
+		for n > 0 {
+		half := n / 2
 		mid := from + half
 
-		if less(value, data[mid], call){
-				len = half
+		if less(value, data[mid], call) {
+				n = half
 			} else {
 				from = mid + 1
-				len -= half + 1
+				n -= half + 1
 			}
 		}
+
 		return from
 	}
 
@@ -94,14 +94,15 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		}
 
 		if left + right == 2 {
-			if less(data[1],data[0], call) {
+			if less(data[1], data[0], call) {
 				data[1], data[0] = data[0], data[1]
 			}
 			return
 		} 
 
-		first_cut, second_cut : int
-		left2, right2 : int
+		first_cut, second_cut: int
+		left2, right2: int
+
 		if left > right {
 				left2 = left / 2
 				first_cut = left2
@@ -119,8 +120,8 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		rotate_left(data[first_cut:second_cut], left - first_cut)
 		new_mid := first_cut + right2
 
-		merge(data[:new_mid], left2,      right2,       call)
-		merge(data[new_mid:], left-left2, right-right2, call)
+		merge(data[:new_mid], left2       , right2        , call)
+		merge(data[new_mid:], left - left2, right - right2, call)
 	}
 }
 
