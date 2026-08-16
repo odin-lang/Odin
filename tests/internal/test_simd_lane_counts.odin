@@ -47,6 +47,41 @@ simd_interleave_power_of_two_widths :: proc(t: ^testing.T) {
 	testing.expect_value(t, simd_extract_i32(y, 0), 5)
 }
 
+// `simd_deinterleave` splits by stride, so output `j` is the input taken every N lanes from
+// lane `j`. N > 2 lowers to shuffles for the same reason interleave does, only arm64 could
+// select the intrinsic. The round trip is asserted, not just the widths.
+
+@(test)
+simd_deinterleave_splits_by_stride :: proc(t: ^testing.T) {
+	v: #simd[16]i32
+	for i in 0..<16 {
+		v = intrinsics.simd_replace(v, i, i32(i))
+	}
+
+	a2, b2 := intrinsics.simd_deinterleave(v, 2)
+	testing.expect_value(t, len(a2), 8)
+	testing.expect_value(t, simd_extract_i32(a2, 0), 0)
+	testing.expect_value(t, simd_extract_i32(a2, 1), 2)
+	testing.expect_value(t, simd_extract_i32(b2, 0), 1)
+	testing.expect_value(t, simd_extract_i32(b2, 7), 15)
+
+	a4, b4, c4, d4 := intrinsics.simd_deinterleave(v, 4)
+	testing.expect_value(t, len(a4), 4)
+	testing.expect_value(t, simd_extract_i32(a4, 0), 0)
+	testing.expect_value(t, simd_extract_i32(b4, 0), 1)
+	testing.expect_value(t, simd_extract_i32(c4, 0), 2)
+	testing.expect_value(t, simd_extract_i32(d4, 0), 3)
+	testing.expect_value(t, simd_extract_i32(a4, 3), 12)
+	testing.expect_value(t, simd_extract_i32(d4, 3), 15)
+
+	// interleave is the inverse, so the pair must round trip
+	r := intrinsics.simd_interleave(a4, b4, c4, d4)
+	testing.expect_value(t, len(r), 16)
+	testing.expect_value(t, simd_extract_i32(r, 0), 0)
+	testing.expect_value(t, simd_extract_i32(r, 7), 7)
+	testing.expect_value(t, simd_extract_i32(r, 15), 15)
+}
+
 simd_extract_i32 :: #force_inline proc(v: $V/#simd[$N]i32, $I: int) -> i32 {
 	return intrinsics.simd_extract(v, I)
 }
