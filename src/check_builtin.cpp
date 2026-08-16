@@ -949,6 +949,16 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				// don't return
 			}
 
+			if (id == BuiltinProc_simd_pairwise_add || id == BuiltinProc_simd_pairwise_sub) {
+				i64 lanes = get_array_type_count(x.type);
+				if (lanes % 2 != 0) {
+					gbString xs = type_to_string(x.type);
+					error(x.expr, "'%.*s' expected a #simd type with an even lane count, got '%s'", LIT(builtin_name), xs);
+					gb_string_free(xs);
+					return false;
+				}
+			}
+
 			operand->mode = Addressing_Value;
 			operand->type = x.type;
 			return true;
