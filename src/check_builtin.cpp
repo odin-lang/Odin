@@ -3866,7 +3866,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (is_type_untyped(x->type)) {
 			if (x->mode == Addressing_Constant) {
 				if (is_type_numeric(x->type)) {
-					x->type = t_untyped_complex;
+					x->type = t_untyped_quaternion;
 				}
 			} else{
 				convert_to_typed(c, x, t_quaternion256);
