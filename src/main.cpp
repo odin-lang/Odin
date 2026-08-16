@@ -3794,6 +3794,13 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(&global_timings));
 
 	MAIN_TIME_SECTION("initialization");
+	// NOTE(Jeroen): Set codepage to UTF-8 (Windows only) and restore on exit.
+	//               Keep in mind this is for the compiler's own output only.
+	//               Like error messages on lines containing unicode.
+	//               Child processes will inherit the default codepage,
+	//               and so must do their own codepage management if they want.
+	set_utf8_codepage();
+	defer (restore_old_codepage());
 
 	init_string_interner();
 	init_global_error_collector();
