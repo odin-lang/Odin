@@ -33,12 +33,12 @@ write_slice :: proc(w: Writer, slice: $S/[]$T, n_written: ^int = nil) -> (n: int
 
 write_u64 :: proc(w: Writer, i: u64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [64]byte
-	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], i, base, false, 64)
 	return write_string(w, s, n_written)
 }
 write_i64 :: proc(w: Writer, i: i64, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [65]byte
-	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], u64(i), base, true, 64)
 	return write_string(w, s, n_written)
 }
 
@@ -51,12 +51,12 @@ write_int :: proc(w: Writer, i: int, base: int = 10, n_written: ^int = nil) -> (
 
 write_u128 :: proc(w: Writer, i: u128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [128]byte
-	s := strconv.write_bits_128(buf[:], i, base, false, 128, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], i, base, false, 128)
 	return write_string(w, s, n_written)
 }
 write_i128 :: proc(w: Writer, i: i128, base: int = 10, n_written: ^int = nil) -> (n: int, err: Error) {
 	buf: [129]byte
-	s := strconv.write_bits_128(buf[:], u128(i), base, true, 128, strconv.digits, nil)
+	s := strconv.write_bits(buf[:], u128(i), base, true, 128)
 	return write_string(w, s, n_written)
 }
 write_f16 :: proc(w: Writer, val: f16, n_written: ^int = nil) -> (n: int, err: Error) {
@@ -141,7 +141,7 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 			write_string(w, `\x`, &n) or_return
 			
 			buf: [2]byte
-			s := strconv.write_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
+			s := strconv.write_bits(buf[:], u64(r), 16, true, 64)
 			switch len(s) {
 			case 0: 
 				write_string(w, "00", &n) or_return
