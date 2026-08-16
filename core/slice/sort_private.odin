@@ -104,17 +104,17 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		left2, right2: int
 
 		if left > right {
-				left2 = left / 2
-				first_cut = left2
+			left2 = left / 2
+			first_cut = left2
 
-				second_cut = left + bin_search_left(data[left:], data[first_cut], call)
-				right2 = second_cut - left
-			} else {
-				right2 = right / 2
-				second_cut = left + right2
+			second_cut = left + bin_search_left(data[left:], data[first_cut], call)
+			right2 = second_cut - left
+		} else {
+			right2 = right / 2
+			second_cut = left + right2
 
-				first_cut = bin_search_right(data[:left], data[second_cut], call)
-				left2 = first_cut
+			first_cut = bin_search_right(data[:left], data[second_cut], call)
+			left2 = first_cut
 		}
 
 		rotate_left(data[first_cut:second_cut], left - first_cut)
