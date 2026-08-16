@@ -9,6 +9,9 @@ import "core:testing"
 // from a test -- it is a compile error -- so what is pinned here is the other side: the widths
 // that must keep working, and the values they carry.
 
+// More than two operands take one of two lowerings, `llvm.vector.interleave<N>` on a LLVM 21+, 
+// a riffle of `interleave2` elsewhere. The lane order and width are both asserted.
+
 @(test)
 simd_interleave_power_of_two_widths :: proc(t: ^testing.T) {
 	a: #simd[4]i32 = {1, 2, 3, 4}
@@ -29,6 +32,9 @@ simd_interleave_power_of_two_widths :: proc(t: ^testing.T) {
 	testing.expect_value(t, simd_extract_i32(four, 1), 5)
 	testing.expect_value(t, simd_extract_i32(four, 2), 9)
 	testing.expect_value(t, simd_extract_i32(four, 3), 13)
+	testing.expect_value(t, simd_extract_i32(four, 4), 2)
+	testing.expect_value(t, simd_extract_i32(four, 7), 14)
+	testing.expect_value(t, simd_extract_i32(four, 15), 16)
 
 	// a single argument is a power of two count as well, and must not be caught by the guard
 	one := intrinsics.simd_interleave(a)

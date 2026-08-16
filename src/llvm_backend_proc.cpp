@@ -1563,12 +1563,45 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				args[i] = arg.value;
 			}
 
-			gbString name = gb_string_make(heap_allocator(), "");
-			name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
-			defer (gb_string_free(name));
+			// `llvm.vector.interleave<N>` for N > 2 is only usable on recent LLVM: it does not
+			// exist at all on 20, and where it does exist a backend may still have no pattern
+			// for it (x86 on 20 fails to select). Measured working on 22, so take it there.
+			#if LLVM_VERSION_MAJOR >= 22
+			if (n > 2) {
+				gbString name = gb_string_make(heap_allocator(), "");
+				name = gb_string_append_fmt(name, "llvm.vector.interleave%d", n);
+				defer (gb_string_free(name));
 
-			LLVMTypeRef types[1] = {lb_type(m, tv.type)};
-			res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
+				LLVMTypeRef types[1] = {lb_type(m, tv.type)};
+				res.value = lb_call_intrinsic(p, name, args, n, types, gb_count_of(types));
+				return res;
+			}
+			#endif
+
+			// otherwise build the same permutation from interleave2, which every supported LLVM
+			// has. The operand count is a power of two (the checker requires the lane count to
+			// be one), and pairing each operand with the one a half-step away is what makes the
+			// orders agree: interleave4(a,b,c,d) == interleave2(interleave2(a,c), interleave2(b,d)).
+			LLVMTypeRef elem_type = LLVMGetElementType(LLVMTypeOf(args[0]));
+			unsigned width = LLVMGetVectorSize(LLVMTypeOf(args[0]));
+
+			LLVMValueRef *cur = args;
+			for (int count = n; count > 1; /**/) {
+				int half = count/2;
+				width *= 2;
+
+				LLVMTypeRef types[1] = {LLVMVectorType(elem_type, width)};
+				LLVMValueRef *next = temporary_alloc_array<LLVMValueRef>(half);
+				for (int i = 0; i < half; i++) {
+					LLVMValueRef pair[2] = {cur[i], cur[i+half]};
+					next[i] = lb_call_intrinsic(p, "llvm.vector.interleave2", pair, 2, types, gb_count_of(types));
+				}
+
+				cur = next;
+				count = half;
+			}
+
+			res.value = cur[0];
 			return res;
 		}
 
