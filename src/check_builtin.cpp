@@ -1920,6 +1920,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				error(ce->proc, "'%.*s' exceeds the maximum #simd count %lld, got %lld", LIT(builtin_name), cast(long long)max_count, cast(long long)count);
 				return false;
 			}
+			// the lane count is the operand width times the argument count, so it is a power
+			// of two only when the argument count is
+			if (!is_power_of_two(count)) {
+				error(ce->proc, "'%.*s' must produce a power of two #simd count, got %lld", LIT(builtin_name), cast(long long)count);
+				return false;
+			}
 
 			operand->type = alloc_type_simd_vector(count, elem);
 			operand->mode = Addressing_Value;
