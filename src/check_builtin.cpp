@@ -6995,6 +6995,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			if (bt->Basic.kind == Basic_rune) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Type %s does not have an unsigned integer mapping for '%.*s'", t, LIT(builtin_name));
+				gb_string_free(t);
+				return false;
+			}
+
 			Type *u_type = &basic_types[bt->Basic.kind + 1];
 
 			operand->type = u_type;
