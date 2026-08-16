@@ -15,7 +15,7 @@ Sort_Kind :: enum {
 
 _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (ORD(E) && KIND == .Ordered) || (KIND != .Ordered) #no_bounds_check {
 	less :: #force_inline proc(a, b: E, call: P) -> bool {
-		when KIND == .Ordered {
+	when KIND == .Ordered {
 			return a < b
 		} else when KIND == .Less {
 			return call(a, b)
@@ -29,21 +29,21 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 	merge_rotate(data, call)
 
 	insertion_sort :: proc(data: T, call: P){
-        for i in 1..<len(data) {
-            j := i
-            temp := data[j]
-            for ; j > 0 && less(temp, data[j - 1], call); j -= 1 {
-                data[j] = data[j - 1]
-            }
-            data[j] = temp
-        }
-    }
+		for i in 1..<len(data) {
+			j := i
+			temp := data[j]
+			for ; j > 0 && less(temp, data[j - 1], call); j -= 1 {
+				data[j] = data[j - 1]
+			}
+			data[j] = temp
+		}
+	}
 
 	merge_rotate :: proc(data: T, call: P){
-        if len(data) <= 200 {
-            insertion_sort(data, call)
-            return
-        }
+		if len(data) <= 200 {
+			insertion_sort(data, call)
+			return
+		}
 
 		mid := len(data) / 2
 		merge_rotate(data[:mid], call)
@@ -51,7 +51,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 
 		merge(data, mid, len(data) - mid, call)
 	}
-    
+
 	bin_search_left :: proc(data:T, value: E, call: P) -> int{
 		from := 0
 		len := len(data)
@@ -75,10 +75,10 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		len := len(data)
 
 		for len > 0 {
-			half := len / 2
-			mid := from + half
+		half := len / 2
+		mid := from + half
 
-			if less(value, data[mid], call){
+		if less(value, data[mid], call){
 				len = half
 			} else {
 				from = mid + 1
@@ -90,32 +90,32 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 
 	merge :: proc(data: T, left, right: int, call: P) {
 		if left == 0 || right == 0 {
-            return
-        }
+			return
+		}
 
 		if left + right == 2 {
 			if less(data[1],data[0], call) {
-                data[1], data[0] = data[0], data[1]
-            }
+				data[1], data[0] = data[0], data[1]
+			}
 			return
 		} 
 
 		first_cut, second_cut : int
 		left2, right2 : int
 		if left > right {
-			left2 = left / 2
-			first_cut = left2
+				left2 = left / 2
+				first_cut = left2
 
-			second_cut = left + bin_search_left(data[left:], data[first_cut], call)
-			right2 = second_cut - left
-		} else {
-			right2 = right / 2
-			second_cut = left + right2
+				second_cut = left + bin_search_left(data[left:], data[first_cut], call)
+				right2 = second_cut - left
+			} else {
+				right2 = right / 2
+				second_cut = left + right2
 
-			first_cut = bin_search_right(data[:left], data[second_cut], call)
-			left2 = first_cut
+				first_cut = bin_search_right(data[:left], data[second_cut], call)
+				left2 = first_cut
 		}
-		
+
 		rotate_left(data[first_cut:second_cut], left - first_cut)
 		new_mid := first_cut + right2
 
