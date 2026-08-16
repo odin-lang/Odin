@@ -270,3 +270,60 @@ accessor_results_are_untyped :: proc(t: ^testing.T) {
 	testing.expect_value(t, R32, 2)
 	testing.expect_value(t, I32, 3)
 }
+
+// An enclosing conversion passes its destination down as a type hint, and the accessors
+// used to adopt it as their own result type. That decides which type the arithmetic
+// inside the conversion happens in, so the wrong answer is observable: the division
+// below was checked in i8, where `3.2` does not exist.
+
+@(test)
+accessors_ignore_the_enclosing_conversions_type :: proc(t: ^testing.T) {
+	c: complex128 = 10
+	testing.expect_value(t, i8(real(c) / 3.2), 3)
+	testing.expect_value(t, i8(imag(c) / 3.2), 0)
+
+	d: complex128 = 0 + 10i
+	testing.expect_value(t, i8(imag(d) / 3.2), 3)
+
+	q: quaternion256 = quaternion(w=10, x=10, y=10, z=10)
+	testing.expect_value(t, i8(real(q) / 3.2), 3)
+	testing.expect_value(t, i8(imag(q) / 3.2), 3)
+	testing.expect_value(t, i8(jmag(q) / 3.2), 3)
+	testing.expect_value(t, i8(kmag(q) / 3.2), 3)
+
+	// the same on constants
+	C :: complex128(10)
+	Q :: quaternion256(1+2i+3j+4k)
+	testing.expect_value(t, int(real(C) / 2.5), 4)
+	testing.expect_value(t, int(kmag(Q) / 0.5), 8)
+}
+
+// `transmute` supplies a hint too, and it is the spelling that failed silently: the
+// accessor was retyped to the destination, so what got reinterpreted was already an
+// integer and the float's bits were gone. Naming the intermediate was the workaround,
+// so a named one is the control here.
+
+@(test)
+accessors_keep_their_bits_through_transmute :: proc(t: ^testing.T) {
+	c32  : complex32  = complex(f16(1.5), f16(2.5))
+	c64  : complex64  = complex(f32(1), f32(2))
+	c128 : complex128 = complex(f64(1), f64(2))
+
+	n := real(c32)
+	r := real(c64)
+	i := imag(c128)
+
+	testing.expect_value(t, transmute(u16)real(c32),  transmute(u16)n)
+	testing.expect_value(t, transmute(u32)real(c64),  transmute(u32)r)
+	testing.expect_value(t, transmute(u64)imag(c128), transmute(u64)i)
+
+	testing.expect_value(t, transmute(u16)real(c32),  15872)
+	testing.expect_value(t, transmute(u32)real(c64),  1065353216)
+	testing.expect_value(t, transmute(u64)imag(c128), 4611686018427387904)
+
+	q : quaternion256 = quaternion(w=1, x=2, y=3, z=4)
+	j := jmag(q)
+	k := kmag(q)
+	testing.expect_value(t, transmute(u64)jmag(q), transmute(u64)j)
+	testing.expect_value(t, transmute(u64)kmag(q), transmute(u64)k)
+}

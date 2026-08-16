@@ -3846,10 +3846,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		default: GB_PANIC("Invalid type"); break;
 		}
 
-		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
-			operand->type = type_hint;
-		}
-
 		break;
 	}
 
@@ -3900,10 +3896,6 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		case Basic_UntypedComplex:    x->type = t_untyped_float; break;
 		case Basic_UntypedQuaternion: x->type = t_untyped_float; break;
 		default: GB_PANIC("Invalid type"); break;
-		}
-
-		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
-			operand->type = type_hint;
 		}
 
 		break;
