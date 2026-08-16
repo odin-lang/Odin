@@ -40,7 +40,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
     }
 
 	merge_rotate :: proc(data: T, call: P){
-        if len(data) <= 64 {
+        if len(data) <= 200 {
             insertion_sort(data, call)
             return
         }
