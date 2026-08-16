@@ -169,17 +169,21 @@ test_sort_stability :: proc(t: ^testing.T) {
 		// Verify sorted test values
 		rand.reset(t.seed)
 
+        sum := vals[0].index
         for i in 1..<len(vals) {
-            if vals[i - 1].rand < vals[i].rand {
-                continue
-            }
-            if vals[i - 1].rand > vals[i].rand {
+            sum += vals[i].index
+            if vals[i-1].rand > vals[i].rand {
 	            testing.expect(t, false, "Expected slice to be sorted")
             }
-            if vals[i - 1].index > vals[i].index {
+            if vals[i-1].rand < vals[i].rand {
+                continue
+            }
+            if vals[i-1].index > vals[i].index {
 	            testing.expect(t, false, "Expected slice to be stable")
             }
         }
+
+        testing.expect(t, sum == test_size * (test_size - 1) / 2, "Expected slice to have all indecies")
 
 	}
 }
