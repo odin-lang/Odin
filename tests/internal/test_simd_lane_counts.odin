@@ -170,3 +170,36 @@ simd_pairwise_aliases_are_distinct :: proc(t: ^testing.T) {
 	testing.expect_value(t, intrinsics.simd_extract(sub, 0), i32(7))
 	testing.expect_value(t, intrinsics.simd_extract(sub, 1), i32(16))
 }
+
+// The rotate offset is declared `$offset: int`; the checker demanded `i64`, so the declared
+// spelling did not compile. Other integer types stay rejected -- the declaration is not #any_int.
+
+@(test)
+simd_lanes_rotate_offset_is_int :: proc(t: ^testing.T) {
+	rot :: proc(v: #simd[4]u32, $offset: int) -> #simd[4]u32 {
+		return intrinsics.simd_lanes_rotate_right(v, offset)
+	}
+
+	v: #simd[4]u32 = {0, 1, 2, 3}
+	r := rot(v, 1)
+	testing.expect_value(t, intrinsics.simd_extract(r, 0), u32(3))
+	testing.expect_value(t, intrinsics.simd_extract(r, 1), u32(0))
+
+	l := intrinsics.simd_lanes_rotate_left(v, 1)
+	testing.expect_value(t, intrinsics.simd_extract(l, 0), u32(1))
+	testing.expect_value(t, intrinsics.simd_extract(l, 3), u32(0))
+}
+
+// `simd_extract` / `simd_replace` declare a plain `idx: uint`, so a runtime index is allowed and
+// lowers to a dynamic extractelement. Bounds are enforced only where the index is constant.
+
+@(test)
+simd_extract_accepts_a_runtime_index :: proc(t: ^testing.T) {
+	v: #simd[4]u32 = {10, 20, 30, 40}
+	i := 2
+	testing.expect_value(t, intrinsics.simd_extract(v, i), u32(30))
+
+	w := intrinsics.simd_replace(v, i, u32(99))
+	testing.expect_value(t, intrinsics.simd_extract(w, 2), u32(99))
+	testing.expect_value(t, intrinsics.simd_extract(w, 0), u32(10))
+}

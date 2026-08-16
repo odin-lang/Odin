@@ -1305,10 +1305,6 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			if (!check_index_value(c, x.type, false, ce->args[1], max_count, &value)) {
 				return false;
 			}
-			if (max_count < 0) {
-				error(ce->args[1], "'%.*s' expected a constant integer index, got '%lld'", LIT(builtin_name), cast(long long)value);
-				return false;
-			}
 
 			operand->mode = Addressing_Value;
 			operand->type = elem;
@@ -1328,10 +1324,6 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			i64 max_count = x.type->SimdVector.count;
 			i64 value = -1;
 			if (!check_index_value(c, x.type, false, ce->args[1], max_count, &value)) {
-				return false;
-			}
-			if (max_count < 0) {
-				error(ce->args[1], "'%.*s' expected a constant integer index, got '%lld'", LIT(builtin_name), cast(long long)value);
 				return false;
 			}
 
@@ -1801,12 +1793,13 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 			Operand offset = {};
 			check_expr(c, &offset, ce->args[1]); if (offset.mode == Addressing_Invalid) return false;
-			convert_to_typed(c, &offset, t_i64);
+			// `base:intrinsics` declares the offset as `int` and does not mark it #any_int
+			convert_to_typed(c, &offset, t_int);
 			if (!is_type_integer(offset.type) || offset.mode != Addressing_Constant) {
 				error(offset.expr, "'%.*s' expected a constant integer offset", LIT(builtin_name));
 				return false;
 			}
-			check_assignment(c, &offset, t_i64, builtin_name);
+			check_assignment(c, &offset, t_int, builtin_name);
 
 			operand->type = x.type;
 			operand->mode = Addressing_Value;
