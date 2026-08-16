@@ -153,14 +153,11 @@ test_sort_stability :: proc(t: ^testing.T) {
 		rand.reset(t.seed)
 
 		vals  := make([]Data, test_size)
-		defer {
-			delete(vals)
-		}
+		defer delete(vals)
 
 		// Set up test values
-		for _, i in vals {
-			vals[i].rand = rand.int_max(10)
-			vals[i].index = i
+		for &val, i in vals {
+			val = {rand.int_max(10), i}
 		}
 
 		// Sort
@@ -172,13 +169,13 @@ test_sort_stability :: proc(t: ^testing.T) {
 		sum := vals[0].index
 		for i in 1..<len(vals) {
 			sum += vals[i].index
-			if vals[i-1].rand > vals[i].rand {
+			if vals[i - 1].rand > vals[i].rand {
 				testing.expect(t, false, "Expected slice to be sorted")
 			}
-			if vals[i-1].rand < vals[i].rand {
+			if vals[i - 1].rand < vals[i].rand {
 				continue
 			}
-			if vals[i-1].index > vals[i].index {
+			if vals[i - 1].index > vals[i].index {
 				testing.expect(t, false, "Expected slice to be stable")
 			}
 		}
