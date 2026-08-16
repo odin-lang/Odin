@@ -116,7 +116,7 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) {
 			left2 = first_cut
 		}
 		
-		slice.rotate_left(data[first_cut:second_cut], left - first_cut)
+		rotate_left(data[first_cut:second_cut], left - first_cut)
 		new_mid := first_cut + right2
 
 		merge(data[:new_mid], left2,      right2,       call)
