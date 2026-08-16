@@ -74,10 +74,10 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 		n := len(data)
 
 		for n > 0 {
-		half := n / 2
-		mid := from + half
+			half := n / 2
+			mid := from + half
 
-		if less(value, data[mid], call) {
+			if less(value, data[mid], call) {
 				n = half
 			} else {
 				from = mid + 1
