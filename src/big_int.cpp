@@ -489,7 +489,8 @@ gb_internal void big_int_and(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	if (mp_iszero(x)) {
-		big_int_init(dst, y);
+		// 0 &~ y == 0 & ~y == 0
+		big_int_from_i64(dst, 0);
 		return;
 	}
 	if (mp_iszero(y)) {
@@ -505,13 +506,13 @@ gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) 
 			mp_decr(&x1);
 			mp_decr(&y1);
 
-			BigInt ny1 = {};
-			mp_complement(&y1, &ny1);
-			mp_and(&x1, &ny1, dst);
+			BigInt nx1 = {};
+			mp_complement(&x1, &nx1);
+			mp_and(&y1, &nx1, dst);
 
 			big_int_dealloc(&x1);
 			big_int_dealloc(&y1);
-			big_int_dealloc(&ny1);
+			big_int_dealloc(&nx1);
 			return;
 		}
 
@@ -532,6 +533,7 @@ gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) 
 		BigInt z1 = {};
 		big_int_or(&z1, &x1, &y1);
 		mp_add_d(&z1, 1, dst);
+		big_int_neg(dst, dst);
 
 		big_int_dealloc(&x1);
 		big_int_dealloc(&y1);
