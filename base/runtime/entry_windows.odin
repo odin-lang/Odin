@@ -5,16 +5,6 @@ package runtime
 
 import "base:intrinsics"
 
-ODIN_CODEPAGE_MAGIC :: #config(ODIN_CODEPAGE_MAGIC, !ODIN_BEDROCK)
-
-when ODIN_CODEPAGE_MAGIC {
-	@(private="file")
-	old_console_codepage: u32
-
-	@(private="file")
-	UTF_8 :: 65001
-}
-
 when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="DllMain", linkage="strong", require)
 	DllMain :: proc "system" (hinstDLL: rawptr, fdwReason: u32, lpReserved: rawptr) -> b32 {
@@ -90,11 +80,4 @@ when ODIN_BUILD_MODE == .Dynamic {
 			return 0
 		}
 	}
-}
-
-foreign import kernel32 "system:Kernel32.lib"
-@(default_calling_convention="system")
-foreign kernel32 {
-	GetConsoleOutputCP :: proc() -> u32 ---
-	SetConsoleOutputCP :: proc(codepage: u32) -> b32 ---
 }
