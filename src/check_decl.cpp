@@ -2068,7 +2068,6 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 				continue;
 			}
 
-
 			ERROR_BLOCK();
 
 			if (q->flags & EntityFlag_Disabled) {
@@ -2077,18 +2076,7 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 
 			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
 			bool both_have_where_clauses = false;
-			if (p->decl_info != nullptr && q->decl_info != nullptr &&
-			    p->decl_info->proc_lit != nullptr && q->decl_info->proc_lit != nullptr) {
-				GB_ASSERT(p->decl_info->proc_lit->kind == Ast_ProcLit);
-				GB_ASSERT(q->decl_info->proc_lit->kind == Ast_ProcLit);
-				auto pl = &p->decl_info->proc_lit->ProcLit;
-				auto ql = &q->decl_info->proc_lit->ProcLit;
-
-				// Allow collisions if the procedures both have 'where' clauses and are both polymorphic
-				bool pw = pl->where_token.kind != Token_Invalid && is_type_polymorphic(p->type, true);
-				bool qw = ql->where_token.kind != Token_Invalid && is_type_polymorphic(q->type, true);
-				both_have_where_clauses = pw && qw;
-			}
+			// NOTE(bill): asm template do not have `where` clauses
 
 			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
