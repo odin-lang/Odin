@@ -11,16 +11,15 @@ BOX3D_SHARED :: #config(BOX3D_SHARED, false)
 
 @(private)
 LIB_PATH :: (
-	     "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
+	     "lib/box3d_wasm.o"           when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+	else "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
 	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
 	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
+	else "lib/box3d.lib"              when ODIN_OS == .Windows
 	else ""
 )
 
-when ODIN_OS == .Windows {
-	@(export)
-	foreign import lib "lib/box3d.lib"
-} else when LIB_PATH != "" {
+when LIB_PATH != "" {
 	when !#exists(LIB_PATH) {
 		#panic("Could not find the compiled Box3D library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/box3d/src/build.sh\"`")
 	}
@@ -833,6 +832,14 @@ foreign lib {
 	// Is this body a bullet?
 	Body_IsBullet :: proc(bodyId: BodyId) -> bool ---
 
+	// Allow this body to rotate fast. Useful for axially symmetric bodies, such as vehicle wheels.
+	// Normally rotation speed is clamped to improve CCD. However, this clamping is unnecessary for
+	// bodies that only rotate fast around an axis of symmetry.
+	Body_AllowFastRotation :: proc(bodyId: BodyId, flag: bool) ---
+
+	// Is this body allowed to rotate fast?
+	Body_IsFastRotationAllowed :: proc(bodyId: BodyId) -> bool ---
+
 	// Enable or disable contact recycling for this body. Contact recycling is a performance optimization
 	// that reuses contact manifolds when bodies move slightly. Disabling it can avoid ghost collisions
 	// on characters at the cost of higher per-step work. Existing contacts retain their prior setting;
@@ -895,6 +902,10 @@ foreign lib {
 	 * @defgroup shape Shape
 	 * Functions to create, destroy, and access.
 	 * Shapes bind raw geometry to bodies and hold material properties including friction and restitution.
+	 * You may add multiple shapes to a single body. There are no hard limits on shape count per body.
+	 *
+	 * When you create a shape on a body the center of mass moves. This can lead to the body linear velocity
+	 * changing if the angular velocity is non-zero.
 	 * @{
 	 */
 
@@ -933,8 +944,10 @@ foreign lib {
 	// @return the shape id for accessing the shape
 	CreateHeightFieldShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, heightField: ^HeightFieldData) -> ShapeId ---
 
-	// Compound shapes are only allowed on static bodies.
-	CreateCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
+	// Baked compound shapes are only allowed on static bodies.
+	// Note: runtime compounds are achieved by adding multiple shapes to a body.
+	// Runtime compounds can be dynamic and/or kinematic.
+	CreateBakedCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
 
 	// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
 	//	body are destroyed at once.

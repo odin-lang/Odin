@@ -2538,15 +2538,17 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			auto args = array_make<lbValue>(temporary_allocator(), 1);
-			args[0] = value;
-			char const *call = "fixunsdfdi";
+			args[0] = lb_emit_conv(p, value, t_f64);
+			char const *call = "fixdfti";
 			if (is_type_unsigned(dst)) {
 				call = "fixunsdfti";
 			}
 			lbValue res_i128 = lb_emit_runtime_call(p, call, args);
 			return lb_emit_conv(p, res_i128, t);
 		}
-		i64 sz = type_size_of(src);
+		// the intermediate int must be at least as wide as the dest,
+		// otherwise e.g. f32 -> u64 truncates through a 32-bit fptoui
+		i64 sz = gb_max(type_size_of(src), type_size_of(dst));
 
 		lbValue res = {};
 		res.type = t;
@@ -4134,6 +4136,13 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		return lb_addr_load(p, res);
 
 	} else if (is_type_soa_pointer(tv.type)) {
+		Entity *e = entity_of_node(ue_expr);
+		if (e != nullptr && (e->flags & EntityFlag_SoaPtrField) != 0) {
+			// &v in a for-in loop over an #soa container;
+			// the loop already holds the element's lbAddr_SoaVariable;
+			// no bounds check needed, the index is in range by construction
+			return lb_soa_variable_make_pointer(p, lb_get_soa_variable_addr(p, e));
+		}
 		ast_node(ie, IndexExpr, ue_expr);
 		lbValue addr = lb_build_addr_ptr(p, ie->expr);
 
@@ -4143,10 +4152,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(is_type_pointer(addr.type));
 
 		lbValue index = lb_build_expr(p, ie->index);
-
-		if (!build_context.no_bounds_check) {
-			// TODO(bill): soa bounds checking
-		}
+		lb_emit_soa_index_bounds_check(p, addr, index, ie->index);
 
 		return lb_make_soa_pointer(p, tv.type, addr, index);
 	} else if (ue_expr->kind == Ast_CompoundLit) {
@@ -4787,7 +4793,8 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 		is_soa = true;
 		// NOTE(bill): using SOA value (probably from for-in statement)
 		lbAddr parent_addr = lb_get_soa_variable_addr(p, parent);
-		v = lb_addr_get_ptr(p, parent_addr);
+		// the element has no single address, so make a soa pointer for lb_emit_deep_field_gep
+		v = lb_address_from_load_or_generate_local(p, lb_soa_variable_make_pointer(p, parent_addr));
 	} else if (pv != nullptr) {
 		v = *pv;
 	} else {
@@ -4856,21 +4863,23 @@ gb_internal lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, 
 	if (index_count == 0) {
 		return addr;
 	}
-	Type *type = base_type(lb_addr_type(addr));
-	GB_ASSERT(type->kind == Type_Array);
-	i64 count = type->Array.count;
-	if (count <= 4 && index_count <= 4) {
-		u8 indices[4] = {};
-		u8 index_count = 0;
-		for (i32 i = 1; i < ce->args.count; i++) {
-			TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
-			GB_ASSERT(is_type_integer(tv.type));
-			GB_ASSERT(tv.value.kind == ExactValue_Integer);
+	if (addr.kind != lbAddr_SoaVariable) {
+		Type *type = base_type(lb_addr_type(addr));
+		GB_ASSERT(type->kind == Type_Array);
+		i64 count = type->Array.count;
+		if (count <= 4 && index_count <= 4) {
+			u8 indices[4] = {};
+			u8 index_count = 0;
+			for (i32 i = 1; i < ce->args.count; i++) {
+				TypeAndValue tv = type_and_value_of_expr(ce->args[i]);
+				GB_ASSERT(is_type_integer(tv.type));
+				GB_ASSERT(tv.value.kind == ExactValue_Integer);
 
-			i64 src_index = big_int_to_i64(&tv.value.value_integer);
-			indices[index_count++] = cast(u8)src_index;
+				i64 src_index = big_int_to_i64(&tv.value.value_integer);
+				indices[index_count++] = cast(u8)src_index;
+			}
+			return lb_addr_swizzle(lb_addr_get_ptr(p, addr), tv.type, index_count, indices);
 		}
-		return lb_addr_swizzle(lb_addr_get_ptr(p, addr), tv.type, index_count, indices);
 	}
 	auto indices = slice_make<i32>(permanent_allocator(), ce->args.count-1);
 	isize index_index = 0;
@@ -4881,6 +4890,9 @@ gb_internal lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, 
 
 		i64 src_index = big_int_to_i64(&tv.value.value_integer);
 		indices[index_index++] = cast(i32)src_index;
+	}
+	if (addr.kind == lbAddr_SoaVariable) {
+		return lb_addr_swizzle_soa(addr.addr, addr.soa.index, addr.soa.index_expr, tv.type, indices);
 	}
 	return lb_addr_swizzle_large(lb_addr_get_ptr(p, addr), tv.type, indices);
 }
@@ -4924,6 +4936,11 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	case Type_SimdVector:      et = bt->SimdVector.elem;      break;
 	case Type_Matrix:          et = bt->Matrix.elem;          break;
 	case Type_FixedCapacityDynamicArray: et = bt->FixedCapacityDynamicArray.elem; break;
+	case Type_Struct:
+		if (bt->Struct.soa_kind == StructSoa_Fixed) {
+			et = bt->Struct.soa_elem;
+		}
+		break;
 	}
 	GB_ASSERT(et != nullptr);
 
@@ -5038,20 +5055,45 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 }
 gb_internal void lb_build_addr_compound_lit_assign_array(lbProcedure *p, Array<lbCompoundLitElemTempData> const &temp_data) {
 	for (auto const &td : temp_data) {
-		if (td.value.value != nullptr) {
-			if (td.elem_length > 0) {
-				auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
-				{
-					lbValue dst = td.gep;
-					dst = lb_emit_ptr_offset(p, dst, loop_data.idx);
-					lb_emit_store(p, dst, td.value);
-				}
-				lb_loop_end(p, loop_data);
-			} else {
-				lb_emit_store(p, td.gep, td.value);
+		GB_ASSERT(td.value.value != nullptr);
+		if (td.elem_length > 0) {
+			auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
+			{
+				lbValue dst = td.gep;
+				dst = lb_emit_ptr_offset(p, dst, loop_data.idx);
+				lb_emit_store(p, dst, td.value);
 			}
+			lb_loop_end(p, loop_data);
+		} else {
+			lb_emit_store(p, td.gep, td.value);
 		}
 	}
+}
+
+// address of one component of an #soa container's array element, for soa[i][j] and for the
+// same element reached through a for-in looping variable, v[j]
+gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAddr const &soa_addr, Type *elem_type) {
+	ast_node(ie, IndexExpr, expr);
+	GB_ASSERT(soa_addr.kind == lbAddr_SoaVariable);
+	GB_ASSERT_MSG(elem_type->kind == Type_Array, "%s", type_to_string(elem_type));
+
+	// this is a no-op when the index is in range by construction, like in a for-in loop
+	lb_emit_soa_index_bounds_check(p, soa_addr.addr, soa_addr.soa.index, soa_addr.soa.index_expr);
+
+	i64 const component_count = elem_type->Array.count;
+
+	auto const index_tv = type_and_value_of_expr(ie->index);
+	if (index_tv.mode == Addressing_Constant && index_tv.value.kind == ExactValue_Integer) {
+		i64 component = big_int_to_i64(&index_tv.value.value_integer);
+		GB_ASSERT_MSG(0 <= component && component < component_count, "%s", expr_to_string(expr));
+		return lb_addr_soa_field_elem(lb_soa_field_elem_ptr(p, soa_addr.addr, cast(i32)component, soa_addr.soa.index));
+	}
+
+	// Note: a temp holding the whole element would be simpler but would not be an lvalue,
+	// and writes go through here
+	lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
+	lb_emit_bounds_check(p, ast_token(ie->index), index, lb_const_int(p->module, t_int, component_count));
+	return lb_addr_soa_field_elem(lb_soa_array_component_elem_ptr(p, soa_addr.addr, index, soa_addr.soa.index, component_count));
 }
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
@@ -5072,10 +5114,10 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr_soa_variable(val, index, ie->index);
 	}
 
-	if (ie->expr->tav.mode == Addressing_SoaVariable) {
-		// SOA Structures for slices/dynamic arrays
-		GB_ASSERT_MSG(is_type_multi_pointer(type_of_expr(ie->expr)), "%s", type_to_string(type_of_expr(ie->expr)));
-
+	if (ie->expr->tav.mode == Addressing_SoaVariable && is_type_multi_pointer(type_of_expr(ie->expr))) {
+		// soa.x[i], indexing one field's multipointer;
+		// the soa element of array type, soa[i][j] carries Addressing_SoaVariable too but has
+		// no multipointer to index; it is handled in the Type_Array case below
 		lbValue field = lb_build_expr(p, ie->expr);
 		lbValue index = lb_build_expr(p, ie->index);
 
@@ -5131,8 +5173,22 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	switch (t->kind) {
 	case Type_Array: {
-		lbValue array = {};
-		array = lb_build_addr_ptr(p, ie->expr);
+		lbAddr array_addr = lb_build_addr(p, ie->expr);
+		// soa[i][j], or v[j] in a for-in loop, with v being the looping var over soa container
+		//
+		// keyed on the lowered lbAddr kind rather than the addressing mode,
+		// because, unlike soa[i], v is seen by the checker as Addressing_Variable
+		if (array_addr.kind == lbAddr_SoaVariable) {
+			return lb_build_addr_soa_elem_index(p, expr, array_addr, t);
+		}
+		// p[j], where p is an #soa element pointer (e.g. p := &soa[i])
+		if (is_type_soa_pointer(type_of_expr(ie->expr))) {
+			// build a soa variable from the soa ptr to get the address of the component
+			lbValue soa_ptr = lb_addr_load(p, array_addr);
+			lbAddr soa_addr = lb_addr_soa_variable_from_soa_ptr(p, soa_ptr);
+			return lb_build_addr_soa_elem_index(p, expr, soa_addr, t);
+		}
+		lbValue array = lb_addr_get_ptr(p, array_addr);
 		if (deref) {
 			array = lb_emit_load(p, array);
 		}
@@ -6120,7 +6176,35 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	}
 
 	case Type_Struct:
-		lb_build_addr_struct_compound_lit_populate(p, expr, type, v);
+		if (is_type_soa_struct(type)) {
+			GB_ASSERT(bt->Struct.soa_kind == StructSoa_Fixed);
+			if (cl->elems.count == 0) {
+				break;
+			}
+			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+
+			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
+			for (auto const &td : temp_data) {
+				GB_ASSERT(td.value.value != nullptr);
+				lbValue offset = lb_const_int(p->module, t_i32, td.elem_index);
+				if (td.elem_length > 0) {
+					auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
+					{
+						lbValue index = lb_emit_arith(p, Token_Add, offset, loop_data.idx, t_i32);
+						lbAddr dst = lb_addr_soa_variable(v.addr, index, td.expr);
+						lb_addr_store(p, dst, td.value);
+					}
+					lb_loop_end(p, loop_data);
+				} else {
+					lbValue index = offset;
+					lbAddr dst = lb_addr_soa_variable(v.addr, index, td.expr);
+					lb_addr_store(p, dst, td.value);
+				}
+			}
+		} else {
+			lb_build_addr_struct_compound_lit_populate(p, expr, type, v);
+		}
 		break;
 
 	case Type_Map: {
@@ -6482,7 +6566,28 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				if (is_type_pointer(tav.type)) {
 					a = lb_build_expr(p, se->expr);
 				} else {
-					lbAddr addr = lb_build_addr(p, se->expr);
+					lbAddr addr;
+					if (is_type_soa_pointer(tav.type)) {
+						// auto-deref p.xy, where p is soa pointer;
+						// base p doesn't lower to an lbAddr_SoaVariable on its own
+						// (it is a local holding the soa pointer), so build the element
+						// addr here the same way an explicit p^ does
+						addr = lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, se->expr));
+					} else {
+						addr = lb_build_addr(p, se->expr);
+					}
+					if (addr.kind == lbAddr_SoaVariable) {
+						// soa[i].xy
+						Type *type = type_deref(expr->tav.type);
+						GB_ASSERT_MSG(is_type_array(type), "%s", type_to_string(type));
+
+						auto soa_indices = slice_make<i32>(permanent_allocator(), swizzle_count);
+						for (u8 i = 0; i < swizzle_count; i++) {
+							soa_indices[i] = cast(i32)swizzle_indices[i];
+						}
+						return lb_addr_swizzle_soa(addr.addr, addr.soa.index, addr.soa.index_expr,
+						                           type, soa_indices);
+					}
 					a = lb_addr_get_ptr(p, addr);
 				}
 
@@ -6689,10 +6794,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(de, DerefExpr, expr);
 		Type *t = type_of_expr(de->expr);
 		if (is_type_soa_pointer(t)) {
-			lbValue value = lb_build_expr(p, de->expr);
-			lbValue ptr = lb_emit_struct_ev(p, value, 0);
-			lbValue idx = lb_emit_struct_ev(p, value, 1);
-			return lb_addr_soa_variable(ptr, idx, nullptr);
+			return lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, de->expr));
 		}
 		lbValue addr = lb_build_expr(p, de->expr);
 		return lb_addr(addr);

@@ -215,6 +215,8 @@ remove_range_fixed_capacity_dynamic_array :: proc(array: ^$D/[dynamic; $N]$E, #a
 unordered_remove :: proc{
 	unordered_remove_dynamic_array,
 	unordered_remove_fixed_capacity_dynamic_array,
+
+	unordered_remove_soa,
 }
 
 
@@ -222,6 +224,8 @@ unordered_remove :: proc{
 ordered_remove :: proc{
 	ordered_remove_dynamic_array,
 	ordered_remove_fixed_capacity_dynamic_array,
+
+	ordered_remove_soa,
 }
 
 @builtin
@@ -271,6 +275,8 @@ pop_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, loc := #cal
 pop :: proc{
 	pop_dynamic_array,
 	pop_fixed_capacity_dynamic_array,
+
+	pop_soa,
 }
 
 // `pop_safe_dynamic_array` trys to remove and return the end value of dynamic array `array` and reduces the length of `array` by 1.
@@ -303,6 +309,8 @@ pop_safe_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[dynamic
 pop_safe :: proc{
 	pop_safe_dynamic_array,
 	pop_safe_fixed_capacity_dynamic_array,
+
+	pop_safe_soa,
 }
 
 
@@ -342,6 +350,8 @@ pop_front_fixed_capacity_dynamic_array :: proc(array: ^$T/[dynamic; $N]$E, loc :
 pop_front :: proc{
 	pop_front_dynamic_array,
 	pop_front_fixed_capacity_dynamic_array,
+
+	pop_front_soa,
 }
 
 
@@ -381,6 +391,8 @@ pop_front_safe_fixed_capacity_dynamic_array :: proc "contextless" (array: ^$T/[d
 pop_front_safe :: proc {
 	pop_front_safe_dynamic_array,
 	pop_front_safe_fixed_capacity_dynamic_array,
+
+	pop_front_safe_soa,
 }
 
 
@@ -921,7 +933,7 @@ non_zero_append_elem_string :: proc(#no_alias array: ^$T/[dynamic]$E/u8, arg: $A
 // Note: Prefer using the procedure group `non_zero_append`.
 @builtin
 non_zero_append_elem_fixed_capacity_string :: proc "contextless" (array: ^$T/[dynamic; $N]$E/u8, arg: $A/string) -> (num_appended: int) {
-	return append_fixed_capacity_elem(array, transmute([]byte)arg)
+	return append_fixed_capacity_elems(array, ..transmute([]E)arg)
 }
 
 
@@ -1212,6 +1224,9 @@ inject_at :: proc{
 	inject_at_elem_fixed_capacity_dynamic_array,
 	inject_at_elems_fixed_capacity_dynamic_array,
 	inject_at_elem_string_fixed_capacity_dynamic_array,
+
+	inject_at_elem_soa,
+	inject_at_elems_soa,
 }
 
 

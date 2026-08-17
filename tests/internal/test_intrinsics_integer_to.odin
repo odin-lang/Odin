@@ -12,6 +12,18 @@ example_usage :: proc(#any_int x: int) -> intrinsics.type_integer_to_unsigned(ty
 
 @test
 test_intrinsic_integer_to :: proc(t: ^testing.T) {
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i8)), typeid_of(u8))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i16)), typeid_of(u16))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i32)), typeid_of(u32))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i64)), typeid_of(u64))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i128)), typeid_of(u128))
+
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_signed(u8)), typeid_of(i8))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_signed(u16)), typeid_of(i16))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_signed(u32)), typeid_of(i32))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_signed(u64)), typeid_of(i64))
+	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_signed(u128)), typeid_of(i128))
+
 	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i16le)), typeid_of(u16le))
 	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i32le)), typeid_of(u32le))
 	testing.expect_value(t, typeid_of(intrinsics.type_integer_to_unsigned(i64le)), typeid_of(u64le))

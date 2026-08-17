@@ -479,6 +479,9 @@ SurfaceMaterial :: struct {
 	// carry a b3DebugMaterial preset, see b3MakeDebugColor.
 	// @see b3HexColor
 	customColor: u32,
+
+	// Explicit padding. Must be zero.
+	padding: u32,
 }
 
 
@@ -542,6 +545,7 @@ ShapeDef :: struct {
 	isSensor: bool,
 
 	// Enable sensor events for this shape. This applies to sensors and non-sensors. False by default, even for sensors.
+	// Only convex shapes may act as sensor visitors.
 	enableSensorEvents: bool,
 
 	// Enable contact events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors. False by default.
@@ -1871,8 +1875,7 @@ Capsule :: struct {
  * @{
  */
 
-// A hull vertex. Identified by a half-edge with this
-// vertex as its tail.
+// A hull vertex. Identified by a half-edge with this vertex as its tail.
 HullVertex :: struct {
 	// A half-edge that has this vertex as the origin
 	// Can be used along with edge twins and winding order
@@ -1903,7 +1906,7 @@ HullFace :: struct {
 }
 
 // 64-bit hull version. Useful for validating serialized data.
-HULL_VERSION :: 0x9D4716CE3793900E
+HULL_VERSION :: 0xDA5150191B994C01
 
 // A convex hull.
 // @note This data structure has data hanging off the end and cannot be directly copied.
@@ -1953,11 +1956,17 @@ HullData :: struct {
 	// The face count. Hulls faces are convex polygons.
 	faceCount: c.int,
 
+	// Offset of the face plane array in bytes from the struct address.
+	planeOffset: c.int,
+
 	// Offset of the face array in bytes from the struct address.
 	faceOffset: c.int,
 
-	// Offset of the face plane array in bytes from the struct address.
-	planeOffset: c.int,
+	// Offset of structure of array (SOA) vertices
+	soaVertexOffset: c.int,
+
+	// Offset of structure of array (SOA) unit normal vectors
+	soaNormalOffset: c.int,
 
 	// Explicit padding. Hull identity is a content hash and memcmp over raw bytes,
 	// so there must be no unnamed padding for struct copies to scramble.
@@ -1971,9 +1980,15 @@ BoxHull :: struct {
 	boxVertices:  [8]HullVertex,    //< Box vertices.
 	boxPoints:    [8]Vec3,          //< Box points.
 	boxEdges:     [24]HullHalfEdge, //< Box half-edges.
-	boxFaces:     [6]HullFace,      //< Box faces.
-	padding:      [2]u8,            //< Explicit padding, see b3HullData::padding.
 	boxPlanes:    [6]Plane,         //< Box face planes.
+	boxFaces:     [6]HullFace,      //< Box faces.
+	padding:      [10]u8,           //< Explicit padding, see b3HullData::padding.
+	vx:           [8]f32,           //< vertex x
+	vy:           [8]f32,           //< vertex y
+	vz:           [8]f32,           //< vertex z
+	nx:           [8]f32,           //< normal x, padded to multiple of 4
+	ny:           [8]f32,           //< normal y, padded to multiple of 4
+	nz:           [8]f32,           //< normal z, padded to multiple of 4
 }
 
 /**@}*/ // hull
@@ -1989,7 +2004,7 @@ MeshDef :: struct {
 	// Triangle vertices
 	vertices: [^]Vec3 `fmt:"v,vertexCount"`,
 
-	// Triangle vertex indices. 3 for each triangle.
+	// Triangle vertex indices. 3 for each triangle. CCW winding.
 	indices: [^]i32,
 
 	// Triangle material index. 1 per triangle. Indexes into b3ShapeDef::materials.
@@ -2333,13 +2348,13 @@ CompoundDef :: struct {
 }
 
 // The compound version depends on the tree, mesh, and hull versions.
-COMPOUND_VERSION ::  0x830778DB07086EB4 ~ DYNAMIC_TREE_VERSION ~ MESH_VERSION ~ HULL_VERSION
+COMPOUND_VERSION ::  0xB11DCE70FAD5622B ~ DYNAMIC_TREE_VERSION ~ MESH_VERSION ~ HULL_VERSION
 
 // Meshes used in compounds have limited space for materials. If you have
 // a mesh with many materials, you can use it outside of the compound.
 MAX_COMPOUND_MESH_MATERIALS :: 4
 
-// The runtime data for a baked compound shape. This is a potentially large yet highly optimized
+// The data for a baked compound shape. This is a potentially large yet highly optimized
 // data structure. It can contain thousands of child shapes, yet at runtime it populates
 // into the world as a single shape in the runtime broad-phase.
 // This data structure has data living off the end and must be accessed using offsets.
@@ -2851,7 +2866,9 @@ DebugShape :: struct {
 // Callbacks receive world coordinates. In large world mode the translation is double precision so
 // it stays accurate far from the origin. Shift into your own camera frame inside the callbacks.
 DebugDraw :: struct {
-	// Draws a shape and returns true if drawing should continue
+	// Draws a user shape. The userShape pointer is owned by the application and is known to Box3D as
+	// an opaque pointer returned from b3CreateDebugShapeCallback. When this is called the drawn shape has
+	// passed a culling test against drawingBounds below.
 	DrawShapeFcn: proc "c" (userShape: rawptr, transform: WorldTransform, color: HexColor, ctx: rawptr) -> bool,
 
 	// Draw a line segment.
@@ -2912,7 +2929,7 @@ DebugDraw :: struct {
 	drawContacts: bool,
 
 	// Draw contact anchor A or B
-	drawAnchorA: c.int,
+	drawAnchorA: bool,
 
 	// Option to visualize the graph coloring used for contacts and joints
 	drawGraphColors: bool,
@@ -2925,9 +2942,6 @@ DebugDraw :: struct {
 
 	// Option to draw contact normal forces
 	drawContactForces: bool,
-
-	// Option to draw contact friction forces
-	drawFrictionForces: bool,
 
 	// Option to draw islands as bounding boxes
 	drawIslands: bool,

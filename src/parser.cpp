@@ -6,13 +6,35 @@ gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
 	}
+
 	if (file->pkg == nullptr) {
 		return true;
 	}
+
+	if (file->pkg_decl == nullptr) {
+		return true;
+	}
+
 	if (build_context.vet_packages.entries.count == 0) {
 		return true;
 	}
-	return string_set_exists(&build_context.vet_packages, file->pkg->name);
+
+	String pkg_name = {};
+
+	if (file->pkg->name.len > 0) {
+		pkg_name = file->pkg->name;
+	} else if (file->pkg_decl->kind == Ast_PackageDecl) {
+		Token name_token = file->pkg_decl->PackageDecl.name;
+		if (name_token.kind == Token_Ident) {
+			pkg_name = name_token.string;
+		}
+	}
+
+	if (pkg_name.len == 0) {
+		return true;
+	}
+
+	return string_set_exists(&build_context.vet_packages, pkg_name);
 }
 
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
@@ -4317,7 +4339,7 @@ gb_internal u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_f
 				if (m.token_kind == Token_Hash) {
 					prefix = "#";
 				}
-				syntax_error(f->curr_token, "'%s%.*s' in not allowed within this field list", prefix, LIT(m.name));
+				syntax_error(f->curr_token, "'%s%.*s' is not allowed within this field list", prefix, LIT(m.name));
 			}
 		}
 

@@ -1110,6 +1110,7 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 	open, close: tokenizer.Token
 
 	if p.curr_tok.kind == .Ident {
+		close = p.curr_tok
 		elem := parse_ident(p)
 		append(&elems, elem)
 	} else {

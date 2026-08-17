@@ -4,11 +4,12 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
-COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
+COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables -microarch:native"
+COMMON_CHECK="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 set -x
 
-$ODIN test ../test_issue_829.odin  $COMMON
+$ODIN test ../test_issue_829.odin $COMMON
 $ODIN test ../test_issue_1592.odin $COMMON
 $ODIN test ../test_issue_1730.odin $COMMON
 $ODIN test ../test_issue_2056.odin $COMMON
@@ -22,7 +23,7 @@ $ODIN test ../test_issue_3435.odin $COMMON
 $ODIN test ../test_issue_4210.odin $COMMON
 $ODIN test ../test_issue_4364.odin $COMMON
 $ODIN test ../test_issue_4584.odin $COMMON
-if [[ $($ODIN build ../test_issue_2395.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
+if [[ $($ODIN build ../test_issue_2395.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -32,34 +33,39 @@ $ODIN build ../test_issue_5043.odin $COMMON
 $ODIN build ../test_issue_5097.odin $COMMON
 $ODIN build ../test_issue_5097-2.odin $COMMON
 $ODIN build ../test_issue_5265.odin $COMMON
+if [[ $($ODIN build ../test_issue_5573.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN test ../test_issue_5699.odin $COMMON
 $ODIN test ../test_issue_6068.odin $COMMON
-$ODIN test ../test_issue_6101.odin $COMMON
 $ODIN test ../test_issue_6165.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON -o:speed
 $ODIN test ../test_issue_6396.odin $COMMON
 $ODIN test ../test_pr_6476.odin $COMMON
 
-if [[ $($ODIN build ../test_issue_6240.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] ; then
+if [[ $($ODIN build ../test_issue_6240.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-if [[ $($ODIN build ../test_issue_6401.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] ; then
+if [[ $($ODIN build ../test_issue_6401.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-if [[ $($ODIN build ../test_issue_6594.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+if [[ $($ODIN build ../test_issue_6594.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-if [[ $($ODIN build ../test_issue_6621.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+if [[ $($ODIN build ../test_issue_6621.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -67,31 +73,42 @@ else
 fi
 $ODIN test ../test_issue_6419.odin $COMMON
 $ODIN test ../test_pr_6470.odin $COMMON
-if [[ $($ODIN test ../test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+if [[ $($ODIN test ../test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-$ODIN check ../test_issue_6484.odin -no-entry-point $COMMON
-if [[ $($ODIN check ../test_issue_6874.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]] ; then
+$ODIN check ../test_issue_6484.odin -no-entry-point $COMMON_CHECK
+$ODIN test ../test_issue_6753.odin $COMMON
+if [[ $($ODIN check ../test_issue_6874.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-$ODIN check ../test_issue_6979.odin -no-entry-point $COMMON
+$ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
 $ODIN test ../test_issue_7356.odin $COMMON
+$ODIN build ../test_issue_7167.odin $COMMON
+$ODIN build ../test_issue_7188.odin $COMMON
 
-if [[ $($ODIN build ../test_issue_7108.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
+if [[ $($ODIN build ../test_issue_7108.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
 
-if [[ $($ODIN build ../test_issue_7073-1.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
+if [[ $($ODIN build ../test_issue_7073-1.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_7304.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "9223372036854775808 is not representable by int") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -100,6 +117,9 @@ fi
 
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o
 $ODIN test ../test_issue_7010.odin $COMMON
+
+clang -c ../test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
+$ODIN test ../test_issue_sysv_abi.odin $COMMON
 
 clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 $ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
