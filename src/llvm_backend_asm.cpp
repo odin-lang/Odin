@@ -92,7 +92,7 @@ struct lbAsmGenerate {
 	}
 
 
-	gbString write_operand(gbString asm_string, Array<i32> const &op_number, Ast *op, u32 flags) {
+	gbString write_operand(gbString asm_string, Slice<i32> const &op_number, Ast *op, u32 flags) {
 		if (op->tav.mode == Addressing_Constant) {
 			return write_constant_operand(asm_string, op, flags);
 		}
@@ -167,7 +167,7 @@ struct lbAsmGenerate {
 
 	virtual char     instruction_size_suffix(AstAsmInstruction *instr) = 0;
 	virtual char     size_suffix_for_operand(Ast *op) = 0;
-	virtual gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
+	virtual gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
 	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
 	virtual String   flag_output_cc_suffix(String const &pin_flag) = 0;
 
@@ -206,15 +206,11 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	// size suffix, or 0 if none. The checker has already verified the annotation
 	// agrees with the matched encoding form, so a suffix here can never conflict.
 	char instruction_size_suffix(AstAsmInstruction *instr) override {
-		char suffix = 0;
 		for (Ast *operand : instr->operands) {
 			char s = this->size_suffix_for_operand(operand);
 			if (s != 0) {
-				suffix = s;
+				return s;
 			}
-		}
-		if (suffix) {
-			return suffix;
 		}
 		GB_ASSERT(instr->mnemonic != 0);
 		GB_ASSERT(instr->valid_form_index >= 0);
@@ -223,12 +219,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		if (forms.count <= 1) {
 			return 0;
 		}
-		auto &form = forms[instr->valid_form_index];
+		auto const &form = forms[instr->valid_form_index];
 
 		i32 width = 0;
-		bool any_vector = false;
-		for (isize k = 0; k < gb_count_of(form.ops); k++) {
-			auto ot = form.ops[k];
+		for (auto ot : form.ops) {
 			if (ot == g_asm_amd64.OP_NONE) {
 				break;
 			}
@@ -237,8 +231,8 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			}
 			AsmRegClass cls = g_asm_amd64.operand_type_reg_class(ot);
 			if (cls == AsmRegClass_Vector || cls == AsmRegClass_Mask) {
-				any_vector = true;
-				continue; // xmm/ymm/zmm/k forms take no b/w/l/q suffix
+				// xmm/ymm/zmm/k forms take no b/w/l/q suffix
+				return 0;
 			}
 
 			// Only register and memory operands contribute an operand-size suffix.
@@ -258,15 +252,13 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			}
 		}
 
-		if (any_vector || width == 0) {
-			return 0; // vector op, or nothing that needs a GP-width suffix
-		}
 		switch (width) {
 		case 8:  return 'b';
 		case 16: return 'w';
 		case 32: return 'l';
 		case 64: return 'q';
 		}
+		// vector op, or nothing that needs a GP-width suffix
 		return 0;
 	}
 
@@ -282,7 +274,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	}
 
 
-	gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
+	gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		if (mem_op->disp) {
 			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, flags&~WriteOperandFlag_PrintPrefixes);
 		}
@@ -313,22 +305,25 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		lbModule *m = p->module;
 		LLVMContextRef ctx = m->ctx;
 
-		// Assumed frontend accessor: template string, flags, dialect, and the operand table.
+		gbString asm_string  = gb_string_make_reserve(heap_allocator(), 256);
+		gbString constraints = gb_string_make_reserve(heap_allocator(), 64);
+		defer ({
+			gb_string_free(constraints);
+			gb_string_free(asm_string);
+		});
+
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		gbString asm_string  = gb_string_make_reserve(temporary_allocator(), 64);
-		gbString constraints = gb_string_make_reserve(temporary_allocator(), 64);
-
-		auto param_types = array_make<LLVMTypeRef>(temporary_allocator(),  0, ops->count);
+		auto param_types = array_make<LLVMTypeRef> (temporary_allocator(), 0, ops->count);
 		auto call_args   = array_make<LLVMValueRef>(temporary_allocator(), 0, ops->count);
-		auto ret_types   = array_make<LLVMTypeRef>(temporary_allocator(),  0, ops->count);
+		auto ret_types   = array_make<LLVMTypeRef> (temporary_allocator(), 0, ops->count);
 
 		// Per-operand bookkeeping, indexed the same as `ops` (via total_index).
-		auto op_number = array_make<i32>(temporary_allocator(), ops->count, ops->count); // $N, or -1 for clobbers/views
-		auto ret_slot  = array_make<i32>(temporary_allocator(), ops->count, ops->count); // return-struct index, or -1
+		auto op_number = slice_make<i32>(temporary_allocator(), ops->count); // $N, or -1 for clobbers/views
+		auto ret_slot  = slice_make<i32>(temporary_allocator(), ops->count); // return-struct index, or -1
 		for_array(i, *ops) {
 			op_number[i] = -1;
-			ret_slot[i]  = -1;
+			ret_slot [i] = -1;
 		}
 
 		// elementtype() attrs to attach after the call is built (indirect/memory operands).
@@ -338,7 +333,6 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		};
 		auto elem_attrs = array_make<ElemAttr>(temporary_allocator(), 0, ops->count);
 
-		i32 next_op = 0; // running $N counter (outputs first, then inputs)
 
 		auto sep = [&]() {
 			if (gb_string_length(constraints) != 0) {
@@ -348,16 +342,19 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		auto raw = [&](char const *s) {
 			constraints = gb_string_appendc(constraints, s);
 		};
-		auto put = [&](String s) {
-			constraints = gb_string_append_length(constraints, s.text, s.len);
+		auto clobber = [&](char const *start, String mid, char const *end) {
+			constraints = gb_string_appendc(constraints, start);
+			constraints = gb_string_append_length(constraints, mid.text, mid.len);
+			constraints = gb_string_appendc(constraints, end);
 		};
 
-		auto add_arg = [&](LLVMValueRef v) -> unsigned {
-			unsigned pos = cast(unsigned)call_args.count;
-			array_add(&param_types, LLVMTypeOf(v));
-			array_add(&call_args, v);
-			return pos;
+		auto add_input_value = [](Array<LLVMTypeRef> *param_types, Array<LLVMValueRef> *call_args, LLVMValueRef v) {
+			array_add(param_types, LLVMTypeOf(v));
+			array_add(call_args, v);
 		};
+
+
+		i32 next_op = 0; // running $N counter (outputs first, then inputs)
 
 		// Pass 1: outputs
 		// Real outputs plus *unpinned* register scratch (modeled as discarded
@@ -379,9 +376,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				GB_ASSERT_MSG(suffix.len != 0, "asm: flag '%.*s' has no setcc condition form", LIT(e.pin_flag));
 
 				sep();
-				raw("={@cc");
-				put(suffix);
-				raw("}");
+				clobber("={@cc", suffix, "}");
 
 				ret_slot[i] = cast(i32)ret_types.count;
 				array_add(&ret_types, LLVMInt8TypeInContext(ctx));
@@ -406,7 +401,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				raw("&");
 			}
 			if (e.pin.len != 0) {
-				raw("{"); put(e.pin); raw("}");
+				clobber("{", e.pin, "}");
 			} else {
 				raw(this->class_letter(e.reg_class));
 			}
@@ -440,27 +435,21 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				i32 n = op_number[e.tie];
 				GB_ASSERT(n >= 0);
 				constraints = gb_string_append_fmt(constraints, "%d", n);
-				add_arg(v.value);
+				add_input_value(&param_types, &call_args, v.value);
 			} else {
 				switch (e.kind) {
 				case AsmTemplateEntityDecl_Register:
 				case AsmTemplateEntityDecl_Memory:
 					if (e.pin.len != 0) {
-						raw("{"); put(e.pin); raw("}");
+						clobber("{", e.pin, "}");
 					} else {
 						raw(this->class_letter(e.reg_class));
 					}
-					add_arg(v.value);
+					add_input_value(&param_types, &call_args, v.value);
 					break;
-				// case AsmTemplateEntityDecl_Memory: {
-				// 	raw("*m"); // indirect
-				// 	unsigned pos = add_arg(v.value);
-				// 	array_add(&elem_attrs, ElemAttr{pos, lb_type(m, type_deref(v.type))});
-				// 	break;
-				// }
 				case AsmTemplateEntityDecl_Immediate:
 					raw("i"); // TODO: "n" if a known-constant integer is required
-					add_arg(v.value);
+					add_input_value(&param_types, &call_args, v.value);
 					break;
 				default:
 					GB_PANIC("asm: invalid input operand kind");
@@ -486,11 +475,8 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				// encoded as a mnemonic suffix (crc32 -> crc32b). The checker has already
 				// verified the annotation agrees with the matched form, so an emitted
 				// suffix can never conflict with a register operand's implied width.
-				{
-					char suffix = this->instruction_size_suffix(instr);
-					if (suffix != 0) {
-						asm_string = gb_string_append_length(asm_string, &suffix, 1);
-					}
+				if (char suffix = this->instruction_size_suffix(instr)) {
+					asm_string = gb_string_append_length(asm_string, &suffix, 1);
 				}
 
 				asm_string = gb_string_appendc(asm_string, " ");
@@ -582,7 +568,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			switch (e.kind) {
 			case AsmTemplateEntityDecl_Register: // pinned -> real clobber
 				GB_ASSERT(e.pin.len != 0);
-				raw("~{"); put(e.pin); raw("}");
+				clobber("~{", e.pin, "}");
 				string_set_update(&emitted_reg_clobbers, e.pin);
 				break;
 			case AsmTemplateEntityDecl_Memory:   // general memory clobber
@@ -601,7 +587,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				continue; // already clobbered as a pinned scratch; don't double-emit
 			}
 			sep();
-			raw("~{"); put(reg); raw("}");
+			clobber("~{", reg, "}");
 			string_set_update(&emitted_reg_clobbers, reg);
 		}
 
@@ -609,7 +595,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		if (tmpl_entity->AsmTemplate.clobber_flags) {
 			sep();
 			if (build_context.metrics.arch == TargetArch_amd64) {
-				raw("~{dirflag},~{fpsr},~{flags}"); // clang's canonical x86 flags clobber
+				// clang's canonical x86 flags clobber
+				raw("~{dirflag}"); sep();
+				raw("~{fpsr}");    sep();
+				raw("~{flags}");
 			} else {
 				raw("~{cc}");    // AArch64 uses ~{cc}
 			}
@@ -657,24 +646,24 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		// Attach elementtype() to every indirect operand's pointer arg (opaque-pointer requirement).
 		unsigned et_kind = LLVMGetEnumAttributeKindForName("elementtype", 11);
-		for (isize k = 0; k < elem_attrs.count; k++) {
-			LLVMAttributeRef attr = LLVMCreateTypeAttribute(ctx, et_kind, elem_attrs[k].elem);
-			LLVMAddCallSiteAttribute(call, cast(LLVMAttributeIndex)(elem_attrs[k].arg_pos + 1), attr);
+		for (auto const &elem_attr : elem_attrs) {
+			LLVMAttributeRef attr = LLVMCreateTypeAttribute(ctx, et_kind, elem_attr.elem);
+			LLVMAddCallSiteAttribute(call, cast(LLVMAttributeIndex)(elem_attr.arg_pos + 1), attr);
 		}
 
 		// Repackage results in Odin result order
 		Type *pt = base_type(tmpl_entity->type);
-		isize result_count = (pt->Proc.results != nullptr) ? pt->Proc.results->Tuple.variables.count : 0;
+		isize result_count = 0;
+		if (pt->Proc.results != nullptr) {
+			result_count = pt->Proc.results->Tuple.variables.count;
+		}
 		if (result_count == 0) {
 			return lbValue{}; // void asm (memory outputs already wrote through their pointers)
 		}
 
 		// The LLVM return struct is ordered by operand and includes scratch slots;
 		// pull out only the real register outputs and index them by result_index.
-		auto result_vals = array_make<LLVMValueRef>(temporary_allocator(), result_count, result_count);
-		for (isize i = 0; i < result_count; i++) {
-			result_vals[i] = nullptr;
-		}
+		auto result_vals = slice_make<LLVMValueRef>(temporary_allocator(), result_count);
 
 		for_array(i, *ops) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
@@ -689,9 +678,11 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			}
 			GB_ASSERT(ret_slot[i] >= 0);
 
-			LLVMValueRef v = (ret_types.count == 1)
-				? call // single-element return is not a struct
-				: LLVMBuildExtractValue(p->builder, call, cast(unsigned)ret_slot[i], "");
+			LLVMValueRef v = call;
+			if (ret_types.count != 1) {
+				// Not a single-element return but a struct
+				v = LLVMBuildExtractValue(p->builder, call, cast(unsigned)ret_slot[i], "");
+			}
 
 			// A flag output is delivered as i8; coerce it to the declared result type
 			// (e.g. i1, or a wider bool). zext when widening, trunc when narrowing.
@@ -723,7 +714,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		// Multiple results -> assemble Odin's result aggregate in result order.
 		Type *results_type = pt->Proc.results;
 		LLVMValueRef agg = LLVMGetUndef(lb_type(m, results_type));
-		for (isize i = 0; i < result_count; i++) {
+		for_array(i, result_vals) {
 			GB_ASSERT(result_vals[i] != nullptr);
 			agg = LLVMBuildInsertValue(p->builder, agg, result_vals[i], cast(unsigned)i, "");
 		}
