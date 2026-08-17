@@ -2026,7 +2026,7 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
 		if (e == nullptr) {
-			error(arg, "Expected a valid entity name in asm group, got %.*s", LIT(ast_strings[arg->kind]));
+			error(arg, "Expected a valid entity name in asm template group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;
 		}
 		if (e->kind != Entity_AsmTemplate) {
@@ -2035,7 +2035,7 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 		}
 
 		if (ptr_set_update(&entity_set, e)) {
-			error(arg, "Previous use of `%.*s` in asm group", LIT(e->token.string));
+			error(arg, "Previous use of `%.*s` in asm template group", LIT(e->token.string));
 			continue;
 		}
 		array_add(&pge->entities, e);
