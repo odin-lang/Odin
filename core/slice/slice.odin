@@ -563,7 +563,7 @@ last_ptr :: proc(array: $T/[]$E) -> ^E {
 
 @(require_results)
 get :: proc "contextless" (array: $T/[]$E, index: int) -> (value: E, ok: bool) {
-	#bounds_check if uint(index) < len(array) {
+	#no_bounds_check if uint(index) < len(array) {
 		value = array[index]
 		ok = true
 	}
