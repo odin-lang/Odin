@@ -221,21 +221,21 @@ main :: proc() {
 
 		i32 flag_bit_from_name(String const &name, i32 *width_) {
 			static const struct {String name; i32 bit; } table[] = {
-				{str_lit(\"cf\"),   0}, // Carry
-				{str_lit(\"pf\"),   2}, // Parity
-				{str_lit(\"af\"),   4}, // Auxiliary Carry
-				{str_lit(\"zf\"),   6}, // Zero
-				{str_lit(\"sf\"),   7}, // Sign
-				{str_lit(\"tf\"),   8}, // Trap
-				{str_lit(\"if\"),   9}, // Interrupt Enable
-				{str_lit(\"df\"),  10}, // Direction
-				{str_lit(\"of\"),  11}, // Overflow
+				{str_lit(\"c\"),    0}, // Carry
+				{str_lit(\"p\"),    2}, // Parity
+				{str_lit(\"a\"),    4}, // Auxiliary Carry
+				{str_lit(\"z\"),    6}, // Zero
+				{str_lit(\"s\"),    7}, // Sign
+				{str_lit(\"t\"),    8}, // Trap
+				{str_lit(\"i\"),    9}, // Interrupt Enable
+				{str_lit(\"d\"),   10}, // Direction
+				{str_lit(\"o\"),   11}, // Overflow
 				{str_lit(\"iopl\"),12}, // I/O Privilege Level (2-bit field: bits 12-13, low bit)
 				{str_lit(\"nt\"),  14}, // Nested Task
-				{str_lit(\"rf\"),  16}, // Resume
+				{str_lit(\"r\"),   16}, // Resume
 				{str_lit(\"vm\"),  17}, // Virtual-8086 Mode
 				{str_lit(\"ac\"),  18}, // Alignment Check / Access Control
-				{str_lit(\"vif\"), 19}, // Virtual Interrupt Flag
+				{str_lit(\"vi\"),  19}, // Virtual Interrupt Flag
 				{str_lit(\"vip\"), 20}, // Virtual Interrupt Pending
 				{str_lit(\"id\"),  21}, // Identification
 			};
