@@ -12518,6 +12518,12 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		o->mode = Addressing_Invalid;
 	case_end;
 
+	case_ast_node(ag, AsmGroup, node);
+		error(node, "Illegal use of a asm group");
+		o->mode = Addressing_Invalid;
+	case_end;
+
+
 	case_ast_node(pl, ProcLit, node);
 		CheckerContext ctx = *c;
 
@@ -13038,6 +13044,16 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
+
+	case_ast_node(pg, AsmGroup, node);
+		str = gb_string_appendc(str, "asm{");
+		for_array(i, pg->args) {
+			if (i > 0) str = gb_string_appendc(str, ", ");
+			str = write_expr_to_string(str, pg->args[i], shorthand);
+		}
+		str = gb_string_append_rune(str, '}');
+	case_end;
+
 
 	case_ast_node(pl, ProcLit, node);
 		str = write_expr_to_string(str, pl->type, shorthand);

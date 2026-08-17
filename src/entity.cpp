@@ -316,6 +316,7 @@ struct Entity {
 			bool    is_objc_class_method       : 1;
 		} Procedure;
 		struct {
+			bool is_asm_group;
 			Array<Entity *> entities;
 		} ProcGroup;
 		struct {

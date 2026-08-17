@@ -5064,7 +5064,14 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				if (fl != nullptr) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
-			} else if (init->kind == Ast_AsmTemplate) {
+			} else if (init->kind == Ast_AsmGroup) {
+				ast_node(ag, AsmGroup, init);
+				e = alloc_entity_proc_group(d->scope, token, nullptr);
+				e->ProcGroup.is_asm_group = true;
+				if (fl != nullptr) {
+					error(name, "Asm template groups are not allowed within a foreign block");
+				}
+			}else if (init->kind == Ast_AsmTemplate) {
 				if (c->scope->flags&ScopeFlag_Type) {
 					error(name, "Asm templates are not allowed within a struct");
 					continue;

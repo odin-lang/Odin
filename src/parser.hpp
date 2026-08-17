@@ -451,6 +451,12 @@ struct AstSplitArgs {
 		Token        close; \
 		Slice<Ast *> args;  \
 	}) \
+	AST_KIND(AsmGroup, "asm group", struct { \
+		Token        token; \
+		Token        open;  \
+		Token        close; \
+		Slice<Ast *> args;  \
+	}) \
 	AST_KIND(ProcLit, "procedure literal", struct { \
 		Ast *type; \
 		Ast *body; \

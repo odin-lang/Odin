@@ -6,6 +6,7 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_BasicLit:       return node->BasicLit.token;
 	case Ast_BasicDirective: return node->BasicDirective.token;
 	case Ast_ProcGroup:      return node->ProcGroup.token;
+	case Ast_AsmGroup:       return node->AsmGroup.token;
 	case Ast_ProcLit:        return ast_token(node->ProcLit.type);
 	case Ast_CompoundLit:
 		if (node->CompoundLit.type != nullptr) {
@@ -164,6 +165,7 @@ Token ast_end_token(Ast *node) {
 	case Ast_BasicLit:       return node->BasicLit.token;
 	case Ast_BasicDirective: return node->BasicDirective.token;
 	case Ast_ProcGroup:      return node->ProcGroup.close;
+	case Ast_AsmGroup:       return node->AsmGroup.close;
 	case Ast_ProcLit:
 		if (node->ProcLit.body) {
 			return ast_end_token(node->ProcLit.body);

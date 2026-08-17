@@ -1037,6 +1037,14 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 	gb_unused(label_scope);
 
 	switch (expr->kind) {
+	case_ast_node(pe, ParenExpr, expr);
+		check_expr(ctx, operand, expr);
+		if (operand->mode != Addressing_Constant) {
+			error(expr, "Asm operands within parentheses can only compile time constants");
+		}
+		return;
+	case_end;
+
 	case_ast_node(i, Ident, expr);
 		Entity *found = scope_lookup_current(param_scope, i->interned, i->hash);
 		if (found != nullptr) {
