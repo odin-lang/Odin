@@ -39,11 +39,64 @@ struct lbAsmGenerate {
 				return &op;
 			}
 		}
-		GB_PANIC("Could not find asm entity %s", LIT(parameter->token.string));
+		GB_PANIC("Could not find asm entity %.*s", LIT(parameter->token.string));
 		return nullptr;
 	}
 
+	gbString write_constant_operand(gbString asm_string, Ast *op, u32 flags) {
+		GB_ASSERT(op->tav.mode == Addressing_Constant);
+
+		op->tav.value = exact_value_to_integer(op->tav.value);
+		ExactValue ev = op->tav.value;
+		GB_ASSERT(ev.kind != ExactValue_Invalid);
+		switch (ev.kind) {
+		case ExactValue_Integer: {
+			i64 val = exact_value_to_i64(ev);
+			if (flags & WriteOperandFlag_IsScale) {
+				switch (val) {
+				case 1: case 2: case 4: case 8:
+					// okay
+					break;
+				default:
+					error(op, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %lld", cast(long long)val);
+					break;
+				}
+			} else if (flags & WriteOperandFlag_IsScaleLog2) {
+				switch (val) {
+				case 0: case 1: case 2: case 3:
+					// NOTE(bill): AMD64 only supports full scales
+					val = (cast(i64)1)<<val;
+					break;
+				default:
+					error(op, "A shifting scale must be a constant integer or an immediate with the value 0, 1, 2, or 3, got %lld", cast(long long)val);
+					break;
+				}
+			}
+
+			if (flags & WriteOperandFlag_PrintPrefixes) {
+				asm_string = gb_string_appendc(asm_string, "$$");
+			}
+
+			asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)val);
+			break;
+		}
+		case ExactValue_Float:
+			error(op, "Floating-point literals that cannot be represented as an integer are not supported within asm operands");
+			break;
+		default:
+			GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
+			break;
+		}
+
+		return asm_string;
+	}
+
+
 	gbString write_operand(gbString asm_string, Array<i32> op_number, Ast *op, u32 flags) {
+		if (op->tav.mode == Addressing_Constant) {
+			return write_constant_operand(asm_string, op, flags);
+		}
+
 		switch (op->kind) {
 		case_ast_node(i, Ident, op);
 			Entity *e = entity_of_node(op);
@@ -75,47 +128,7 @@ struct lbAsmGenerate {
 		case_end;
 
 		case_ast_node(bl, BasicLit, op);
-			op->tav.value = exact_value_to_integer(op->tav.value);
-			ExactValue ev = op->tav.value;
-			GB_ASSERT(ev.kind != ExactValue_Invalid);
-			switch (ev.kind) {
-			case ExactValue_Integer: {
-				i64 val = exact_value_to_i64(ev);
-				if (flags & WriteOperandFlag_IsScale) {
-					switch (val) {
-					case 1: case 2: case 4: case 8:
-						// okay
-						break;
-					default:
-						error(op, "A scale must be a constant integer or an immediate with the value 1, 2, 4, or 8, got %lld", cast(long long)val);
-						break;
-					}
-				} else if (flags & WriteOperandFlag_IsScaleLog2) {
-					switch (val) {
-					case 0: case 1: case 2: case 3:
-						// NOTE(bill): AMD64 only supports full scales
-						val = (cast(i64)1)<<val;
-						break;
-					default:
-						error(op, "A shifting scale must be a constant integer or an immediate with the value 0, 1, 2, or 3, got %lld", cast(long long)val);
-						break;
-					}
-				}
-
-				if (flags & WriteOperandFlag_PrintPrefixes) {
-					asm_string = gb_string_appendc(asm_string, "$$");
-				}
-
-				asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)val);
-				break;
-			}
-			case ExactValue_Float:
-				error(op, "Floating-point literals that cannot be represented as an integer are not supported within asm operands");
-				break;
-			default:
-				GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
-				break;
-			}
+			GB_PANIC("NOTE(bill): this should have been handled above");
 		case_end;
 
 		case_ast_node(label, AsmLabelDecl, op);
@@ -207,6 +220,9 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		GB_ASSERT(instr->valid_form_index >= 0);
 		// Otherwise derive from the matched form's operand widths.
 		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
+		if (forms.count <= 1) {
+			return 0;
+		}
 		auto &form = forms[instr->valid_form_index];
 
 		i32 width = 0;
@@ -224,6 +240,18 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				any_vector = true;
 				continue; // xmm/ymm/zmm/k forms take no b/w/l/q suffix
 			}
+
+			// Only register and memory operands contribute an operand-size suffix.
+			// Relative branch targets (OP_REL8/REL32), immediates (OP_IMM*), and
+			// labels are NOT operand sizes -- jl/jmp/call/setcc must never get a
+			// b/w/l/q suffix from their displacement/immediate.
+			AsmOperandKind kind = g_asm_amd64.kind_from_operand_type(ot);
+			if (kind != AsmOperand_Register &&
+			    kind != AsmOperand_Memory &&
+			    kind != AsmOperand_Register_Or_Memory) {
+				continue;
+			}
+
 			i32 w = g_asm_amd64.operand_type_bit_width(ot);
 			if (w == 8 || w == 16 || w == 32 || w == 64) {
 				width = gb_max(width, w); // GP/memory width

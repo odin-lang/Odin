@@ -447,14 +447,14 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 
 		GB_ASSERT(spec->name->kind == Ast_Ident);
 
-		Entity *input = scope_lookup(scope, spec->name->Ident.interned, spec->name->Ident.hash);
+		Entity *input = scope_lookup_current(scope, spec->name->Ident.interned, spec->name->Ident.hash);
 		Entity *other_scratch = nullptr;
 
 		String pin = {};
 		String pin_flag = {};
 		if (spec->value != nullptr) {
 			if (spec->value->kind == Ast_Ident) {
-				other_scratch = scope_lookup(scope, spec->value->Ident.interned, spec->value->Ident.hash);
+				other_scratch = scope_lookup_current(scope, spec->value->Ident.interned, spec->value->Ident.hash);
 				if (other_scratch) {
 					auto group = check_asm_find_group(other_scratch, *asm_template_entity_decls, nullptr);
 					if (!group) {
@@ -621,7 +621,7 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 				error(spec->name, "Undefined parameter declaration '%.*s'", LIT(spec->name->Ident.token.string));
 				continue;
 			}
-			Entity *output = scope_lookup(scope, spec->tied_name->Ident.interned, spec->tied_name->Ident.hash);
+			Entity *output = scope_lookup_current(scope, spec->tied_name->Ident.interned, spec->tied_name->Ident.hash);
 			if (output == nullptr) {
 				error(spec->name, "Undefined parameter declaration '%.*s'", LIT(spec->name->Ident.token.string));
 				continue;
@@ -1038,14 +1038,28 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
-		Entity *found = scope_lookup(param_scope, i->interned, i->hash);
-		if (found == nullptr) {
-			error(expr, "Undeclared asm parameter '%.*s'", LIT(i->token.string));
+		Entity *found = scope_lookup_current(param_scope, i->interned, i->hash);
+		if (found != nullptr) {
+			i->entity = found;
+			operand->mode = Addressing_Value;
+			operand->type = found->type;
 			return;
 		}
-		i->entity = found;
-		operand->mode = Addressing_Value;
-		operand->type = found->type;
+		found = scope_lookup(param_scope->parent, i->interned, i->hash);
+		if (found != nullptr) {
+			if (found->kind == Entity_Constant) {
+				i->entity = found;
+				operand->mode  = Addressing_Constant;
+				operand->value = found->Constant.value;
+				operand->type  = found->type;
+
+				add_type_and_value(ctx, expr, operand->mode, operand->type, operand->value);
+			} else {
+				error(expr, "Only asm parameters or constants are allowed to be used within an 'asm' template");
+			}
+		} else {
+			error(expr, "Undeclared asm parameter or constant '%.*s'", LIT(i->token.string));
+		}
 		return;
 	case_end;
 	case_ast_node(bl, BasicLit, expr);
@@ -1286,11 +1300,13 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 	case_end;
 	case_ast_node(label, AsmLabelDecl, expr);
 		ast_node(name, Ident, label->name);
-		Entity *found = scope_lookup(label_scope, name->interned, name->hash);
+		Entity *found = scope_lookup_current(label_scope, name->interned, name->hash);
 		if (found == nullptr) {
 			error(expr, "Undeclared asm label '.%.*s'", LIT(name->token.string));
 		}
 		name->entity = found;
+
+		add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
 		return;
 	case_end;
 	}
@@ -1321,8 +1337,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	}
 	AstProcType *pt = &at->signature->ProcType;
 
-	ate->param_scope = create_scope(nullptr, nullptr);
-	ate->label_scope = create_scope(nullptr, nullptr);
+	ate->param_scope = create_scope(ctx->info, ctx->scope);
+	ate->label_scope = create_scope(ctx->info, ctx->scope);
 
 	ate->decls.allocator = heap_allocator();
 
