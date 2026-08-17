@@ -628,11 +628,14 @@ main :: proc() {
 				strings.write_string(&sb, "\t")
 			}
 
-			if mnemonic == .INVALID {
+			#partial switch mnemonic {
+			case .INVALID:
 				strings.write_string(&sb, "str_lit(\"\"), ")
-			} else if mnemonic == .MOVSD_SSE {
+			case .MOVSD_SSE:
 				strings.write_string(&sb, "str_lit(\"movsd\"), ")
-			} else {
+			case .CMPSD_SSE:
+				strings.write_string(&sb, "str_lit(\"cmpsd\"), ")
+			case:
 				str := strings.to_lower(reflect.enum_string(mnemonic))
 				fmt.sbprintf(&sb, "str_lit(%q), ", str)
 				delete(str)
