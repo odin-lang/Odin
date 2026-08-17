@@ -92,7 +92,7 @@ struct lbAsmGenerate {
 	}
 
 
-	gbString write_operand(gbString asm_string, Array<i32> op_number, Ast *op, u32 flags) {
+	gbString write_operand(gbString asm_string, Array<i32> const &op_number, Ast *op, u32 flags) {
 		if (op->tav.mode == Addressing_Constant) {
 			return write_constant_operand(asm_string, op, flags);
 		}
@@ -387,14 +387,13 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				array_add(&ret_types, LLVMInt8TypeInContext(ctx));
 
 				// Counted in $N even though never referenced in the body.
-								op_number[i] = next_op++;
+				op_number[i] = next_op++;
 				continue;
 			}
 
 			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
 			bool is_alloc_scratch = e.param_group == AsmTemplateEntityDeclParamGroup_Scratch
-			                     && e.kind == AsmTemplateEntityDecl_Register
-			                     && e.pin.len == 0;
+			                     && e.kind == AsmTemplateEntityDecl_Register;
 			if (!is_output && !is_alloc_scratch) {
 				continue;
 			}

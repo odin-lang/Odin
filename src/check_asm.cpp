@@ -1050,6 +1050,8 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		check_expr(ctx, operand, expr);
 		if (operand->mode != Addressing_Constant) {
 			error(expr, "Asm operands within parentheses can only compile time constants");
+		} else {
+			error(expr, "Asm operands with parentheses are not currently supported");
 		}
 		return;
 	case_end;
