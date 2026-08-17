@@ -497,9 +497,10 @@ struct AstSplitArgs {
 		Ast * name;  \
 	}) \
 	AST_KIND(AsmInstruction, "asm instruction", struct { \
-		Ast *        prefix; /*optional*/ \
 		Ast *        name;     \
 		Slice<Ast *> operands; \
+		u16 mnemonic;          \
+		i32 valid_form_index;  \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
 		Token open;     \

@@ -541,7 +541,6 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmLabelDecl.name = clone_ast(n->AsmLabelDecl.name, f);
 		break;
 	case Ast_AsmInstruction:
-		n->AsmInstruction.prefix   = clone_ast(n->AsmInstruction.prefix, f);
 		n->AsmInstruction.name     = clone_ast(n->AsmInstruction.name, f);
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
 		break;
@@ -2561,6 +2560,7 @@ gb_internal Ast *parse_asm_instruction(AstFile *f) {
 			Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
 			instruction->AsmInstruction.name = name;
 			instruction->AsmInstruction.operands = operands;
+			instruction->AsmInstruction.valid_form_index = -1;
 			return instruction;
 		}
 	case Token_Period:

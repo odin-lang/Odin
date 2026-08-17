@@ -597,6 +597,10 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 				auto *i = &(*asm_template_entity_decls)[index];
 				if (i->pin.len == 0) {
 					i->pin = pin;
+					i->pin_flag = pin_flag;
+					if (pin_flag.len != 0 && group != AsmTemplateEntityDeclParamGroup_Output) {
+						error(spec->value, "Input parameters cannot be pinned to a flag style register");
+					}
 				} else {
 					error(spec_, "Asm register has already been pinned");
 				}
@@ -648,13 +652,13 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 
 			i->pin = pin;
 			o->pin = pin;
-
-			i->pin_flag = pin_flag;
-			o->pin_flag = pin_flag;
-
 			if (other_scratch != nullptr) {
 				GB_ASSERT(spec->value != nullptr);
 				error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration, not a tie");
+			}
+
+			if (pin_flag.len != 0) {
+				error(spec->value, "Input parameters, and thus tied parameters, cannot be pinned to a flag style register");
 			}
 		}
 	}
@@ -919,6 +923,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		GB_ASSERT(tmpl_entity->kind == Entity_AsmTemplate);
+
+		GB_ASSERT(valid_form_index >= 0);
+		instr->mnemonic = mnemonic;
+		instr->valid_form_index = cast(i32)valid_form_index;
 
 		// Handle clobbering from mnemonic
 		auto clobber = asm_ctx->clobber(mnemonic);

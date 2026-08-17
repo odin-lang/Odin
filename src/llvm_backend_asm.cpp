@@ -138,20 +138,6 @@ struct lbAsmGenerate {
 		}
 	};
 
-	// Scan an instruction's operands for an annotated memory operand and return its
-	// size suffix, or 0 if none. The checker has already verified the annotation
-	// agrees with the matched encoding form, so a suffix here can never conflict.
-	char instruction_size_suffix(AstAsmInstruction *instr) {
-		char suffix = 0;
-		for (Ast *operand : instr->operands) {
-			char s = this->size_suffix_for_operand(operand);
-			if (s != 0) {
-				suffix = s;
-			}
-		}
-		return suffix;
-	}
-
 
 	// LLVM type of a returned register output, taken from the proc signature's results.
 	LLVMTypeRef output_llvm_type(lbModule *m, AsmTemplateEntityDecl const &e) {
@@ -160,9 +146,18 @@ struct lbAsmGenerate {
 		return lb_type(m, rt);
 	};
 
+	// The declared Odin result type for an output entity.
+	Type *result_type_of(AsmTemplateEntityDecl const &e) {
+		Type *pt = base_type(tmpl_entity->type);
+		return pt->Proc.results->Tuple.variables[e.result_index]->type;
+	}
+
+	virtual char     instruction_size_suffix(AstAsmInstruction *instr) = 0;
 	virtual char     size_suffix_for_operand(Ast *op) = 0;
 	virtual gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
 	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
+	virtual String   flag_output_cc_suffix(String const &pin_flag) = 0;
+
 };
 
 struct lbAsmGenerate_amd64 : lbAsmGenerate {
@@ -192,6 +187,72 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 		return 0;
 	}
+
+
+	// Scan an instruction's operands for an annotated memory operand and return its
+	// size suffix, or 0 if none. The checker has already verified the annotation
+	// agrees with the matched encoding form, so a suffix here can never conflict.
+	char instruction_size_suffix(AstAsmInstruction *instr) override {
+		char suffix = 0;
+		for (Ast *operand : instr->operands) {
+			char s = this->size_suffix_for_operand(operand);
+			if (s != 0) {
+				suffix = s;
+			}
+		}
+		if (suffix) {
+			return suffix;
+		}
+		GB_ASSERT(instr->mnemonic != 0);
+		GB_ASSERT(instr->valid_form_index >= 0);
+		// Otherwise derive from the matched form's operand widths.
+		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
+		auto &form = forms[instr->valid_form_index];
+
+		i32 width = 0;
+		bool any_vector = false;
+		for (isize k = 0; k < gb_count_of(form.ops); k++) {
+			auto ot = form.ops[k];
+			if (ot == g_asm_amd64.OP_NONE) {
+				break;
+			}
+			if (g_asm_amd64.operand_type_is_implicit(ot)) {
+				continue;
+			}
+			AsmRegClass cls = g_asm_amd64.operand_type_reg_class(ot);
+			if (cls == AsmRegClass_Vector || cls == AsmRegClass_Mask) {
+				any_vector = true;
+				continue; // xmm/ymm/zmm/k forms take no b/w/l/q suffix
+			}
+			i32 w = g_asm_amd64.operand_type_bit_width(ot);
+			if (w == 8 || w == 16 || w == 32 || w == 64) {
+				width = gb_max(width, w); // GP/memory width
+			}
+		}
+
+		if (any_vector || width == 0) {
+			return 0; // vector op, or nothing that needs a GP-width suffix
+		}
+		switch (width) {
+		case 8:  return 'b';
+		case 16: return 'w';
+		case 32: return 'l';
+		case 64: return 'q';
+		}
+		return 0;
+	}
+
+	// Map an EFLAGS flag name to its LLVM `=@cc<suffix>` setcc condition, or {} if
+	// the flag has no single-flag setcc form (af/df/if/... can't be a flag output).
+	String flag_output_cc_suffix(String const &pin_flag) override {
+		if (pin_flag == "cf") return str_lit("c"); // carry
+		if (pin_flag == "pf") return str_lit("p"); // parity (even)
+		if (pin_flag == "zf") return str_lit("z"); // zero
+		if (pin_flag == "sf") return str_lit("s"); // sign
+		if (pin_flag == "of") return str_lit("o"); // overflow
+		return {};
+	}
+
 
 	gbString write_memory_operand(gbString asm_string, Array<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		if (mem_op->disp) {
@@ -280,6 +341,28 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				continue; // width-view: resolved to its source's operand, owns no slot
 			}
 
+			// Flag output: an output pinned to a condition flag (e.g. `= %flags.zf`).
+			// Lowers to LLVM's `=@cc<suffix>`, which yields an i1 (0/1). It takes a
+			// return-struct slot but is NEVER referenced in the body (the instruction
+			// sets the flag as a side effect), so it gets no $N operand number.
+			if (e.param_group == AsmTemplateEntityDeclParamGroup_Output && e.pin_flag.len != 0) {
+				GB_ASSERT(e.pin == "flags");
+				String suffix = this->flag_output_cc_suffix(e.pin_flag);
+				GB_ASSERT_MSG(suffix.len != 0, "asm: flag '%.*s' has no setcc condition form", LIT(e.pin_flag));
+
+				sep();
+				raw("={@cc");
+				put(suffix);
+				raw("}");
+
+				ret_slot[i] = cast(i32)ret_types.count;
+				array_add(&ret_types, LLVMInt8TypeInContext(ctx));
+
+				// Counted in $N even though never referenced in the body.
+								op_number[i] = next_op++;
+				continue;
+			}
+
 			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
 			bool is_alloc_scratch = e.param_group == AsmTemplateEntityDeclParamGroup_Scratch
 			                     && e.kind == AsmTemplateEntityDecl_Register
@@ -311,7 +394,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 
 		// Pass 2: inputs
-		for (isize i = 0; i < ops->count; i++) {
+		for_array(i, *ops) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
 
 			if (e.view_of >= 0) {
@@ -411,7 +494,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		string_set_init(&emitted_reg_clobbers);
 		defer (string_set_destroy(&emitted_reg_clobbers));
 
-		for (isize i = 0; i < ops->count; i++) {
+		for_array(i, *ops) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
 
 			if (e.view_of >= 0) {
@@ -455,7 +538,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		if (tmpl_entity->AsmTemplate.clobber_flags) {
 			sep();
 			if (build_context.metrics.arch == TargetArch_amd64) {
-				raw("~{flags}"); // x86 EFLAGS condition codes
+				raw("~{dirflag},~{fpsr},~{flags}"); // clang's canonical x86 flags clobber
 			} else {
 				raw("~{cc}");    // AArch64 uses ~{cc}
 			}
@@ -522,7 +605,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			result_vals[i] = nullptr;
 		}
 
-		for (isize i = 0; i < ops->count; i++) {
+		for_array(i, *ops) {
 			AsmTemplateEntityDecl const &e = (*ops)[i];
 			if (e.view_of >= 0) {
 				continue; // width-view: never a returned value
@@ -538,6 +621,26 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			LLVMValueRef v = (ret_types.count == 1)
 				? call // single-element return is not a struct
 				: LLVMBuildExtractValue(p->builder, call, cast(unsigned)ret_slot[i], "");
+
+			// A flag output is delivered as i8; coerce it to the declared result type
+			// (e.g. i1, or a wider bool). zext when widening, trunc when narrowing.
+			// zext (not sext) is correct: a flag output is 0 or 1.
+			if (e.pin_flag.len != 0) {
+				Type *rt = this->result_type_of(e);
+				LLVMTypeRef want = lb_type(m, rt);
+				LLVMTypeRef got  = LLVMTypeOf(v);
+				if (want != got) {
+					unsigned want_w = LLVMGetIntTypeWidth(want);
+					unsigned got_w  = LLVMGetIntTypeWidth(got);
+					if (want_w < got_w) {
+						v = LLVMBuildTrunc(p->builder, v, want, "");
+					} else if (want_w > got_w) {
+						v = LLVMBuildZExt(p->builder, v, want, "");
+					}
+					// want_w == got_w with differing type identity: same width, no-op.
+				}
+			}
+
 			result_vals[e.result_index] = v;
 		}
 
