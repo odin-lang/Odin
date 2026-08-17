@@ -364,7 +364,7 @@ gb_internal void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 
 gb_internal void lb_make_global_private_const(LLVMValueRef global_data) {
 	LLVMSetLinkage(global_data, LLVMLinkerPrivateLinkage);
-	// LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
 	LLVMSetGlobalConstant(global_data, true);
 }
 gb_internal void lb_make_global_private_const(lbAddr const &addr) {
@@ -3786,7 +3786,7 @@ gb_internal lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 c
 	g.type = alloc_type_pointer(t);
 	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
 	LLVMSetLinkage(g.value, LLVMPrivateLinkage);
-	// LLVMSetUnnamedAddress(g.value, LLVMGlobalUnnamedAddr);
+	LLVMSetUnnamedAddress(g.value, LLVMGlobalUnnamedAddr);
 	string_map_set(&m->members, s, g);
 	return g;
 }

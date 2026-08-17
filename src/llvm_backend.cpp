@@ -3274,7 +3274,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
-			// LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
 			LLVMSetGlobalConstant(g, true);
 
 			lbValue value = {};
