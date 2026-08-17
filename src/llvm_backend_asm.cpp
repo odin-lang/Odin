@@ -245,11 +245,11 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	// Map an EFLAGS flag name to its LLVM `=@cc<suffix>` setcc condition, or {} if
 	// the flag has no single-flag setcc form (af/df/if/... can't be a flag output).
 	String flag_output_cc_suffix(String const &pin_flag) override {
-		if (pin_flag == "cf") return str_lit("c"); // carry
-		if (pin_flag == "pf") return str_lit("p"); // parity (even)
-		if (pin_flag == "zf") return str_lit("z"); // zero
-		if (pin_flag == "sf") return str_lit("s"); // sign
-		if (pin_flag == "of") return str_lit("o"); // overflow
+		if (pin_flag == "c") return str_lit("c"); // carry
+		if (pin_flag == "p") return str_lit("p"); // parity (even)
+		if (pin_flag == "z") return str_lit("z"); // zero
+		if (pin_flag == "s") return str_lit("s"); // sign
+		if (pin_flag == "o") return str_lit("o"); // overflow
 		return {};
 	}
 
