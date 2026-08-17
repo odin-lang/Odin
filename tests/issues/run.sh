@@ -82,6 +82,7 @@ else
 fi
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN test ../test_issue_7356.odin $COMMON
 
 if [[ $($ODIN build ../test_issue_7108.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]] ; then
 	echo "SUCCESSFUL 1/1"
