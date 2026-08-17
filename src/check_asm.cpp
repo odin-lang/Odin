@@ -643,6 +643,13 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 template <typename AsmCtx>
 gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegister *asm_reg) {
 	String name = asm_reg->name.string;
+	if (asm_reg->flag.kind == Token_Ident) {
+		// TODO(bill): has flags
+		if (name != "cc") {
+
+		}
+	}
+
 	auto r = asm_ctx->register_lookup(name);
 	if (r) {
 		operand->mode = Addressing_Value;
@@ -880,9 +887,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// Handle clobbering from mnemonic
 		auto clobber = asm_ctx->clobber(mnemonic);
 
-		tmpl_entity->AsmTemplate.clobber_cc       |= clobber.implies_clobber_cc();
-		tmpl_entity->AsmTemplate.clobber_memory   |= clobber.implies_clobber_memory();
-		tmpl_entity->AsmTemplate.is_volatile |= clobber.implies_side_effects();
+		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
+		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory();
+		tmpl_entity->AsmTemplate.is_volatile    |= clobber.implies_side_effects();
 		return;
 	}
 
@@ -1290,7 +1297,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 	{ // check clobbers
-		bool clobber_cc     = false;
+		bool clobber_flags     = false;
 		bool clobber_memory = false;
 
 		for (Ast *clobber_ : at->clobbers) {
@@ -1316,6 +1323,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			switch (clobber->value->kind) {
 			case_ast_node(asm_reg, AsmRegister, clobber->value)
 				String reg = asm_reg->name.string;
+				if (asm_reg->flag.string != "") {
+					error(asm_reg->flag, "#clobber on specific flags is not allowed");
+				}
 				Operand operand = {};
 				if (check_register(asm_ctx, &operand, asm_reg)) {
 					if (string_set_update(clobber_registers_set, reg)) {
@@ -1325,27 +1335,27 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			case_end;
 			case_ast_node(ident, Ident, clobber->value);
 				String str = ident->token.string;
-				if (str == "cc") {
-					if (clobber_cc) {
-						error(clobber->value, "#clobber cc has already been defined");
+				if (str == "flags") {
+					if (clobber_flags) {
+						error(clobber->value, "#clobber flags has already been defined");
 					}
-					clobber_cc = true;
+					clobber_flags = true;
 				} else if (str == "memory") {
 					if (clobber_memory) {
 						error(clobber->value, "#clobber memory has already been defined");
 					}
 					clobber_memory = true;
 				} else {
-					error(clobber->value, "Expected either a register, 'cc', or 'memory' for a '#clobber' specification, got '%.*s'", LIT(str));
+					error(clobber->value, "Expected either a register, 'flags', or 'memory' for a '#clobber' specification, got '%.*s'", LIT(str));
 				}
 			case_end;
 			default:
-				error(clobber->value, "Expected either a register, 'cc', or 'memory' for a '#clobber' specification");
+				error(clobber->value, "Expected either a register, 'flags', or 'memory' for a '#clobber' specification");
 				break;
 			}
 		}
 
-		entity->AsmTemplate.clobber_cc       = clobber_cc;
+		entity->AsmTemplate.clobber_flags       = clobber_flags;
 		entity->AsmTemplate.clobber_memory   = clobber_memory;
 		entity->AsmTemplate.is_volatile = is_volatile;
 		entity->AsmTemplate.is_align_stack   = is_align_stack;

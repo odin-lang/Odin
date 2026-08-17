@@ -479,6 +479,7 @@ struct AstSplitArgs {
 	AST_KIND(AsmRegister, "asm register", struct { \
 		Token token; \
 		Token name;  \
+		Token flag;  \
 	}) \
 	AST_KIND(AsmSpec, "asm specification", struct { \
 		Ast *name;      \

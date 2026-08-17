@@ -231,10 +231,10 @@ struct Asm_amd64 {
 		bool            reads_mem;
 		SideEffectFlags side_effects;
 
-		bool implies_clobber_cc() {
-			u16 const CC_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
-			                    ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
-			return ((flags_wr | flags_undef) & CC_MASK) != 0;
+		bool implies_clobber_flags() {
+			u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
+			                       ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
+			return ((flags_wr | flags_undef) & FLAGS_MASK) != 0;
 		}
 		bool implies_clobber_memory() {
 			return writes_mem || reads_mem ||

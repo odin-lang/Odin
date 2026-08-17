@@ -344,8 +344,8 @@ struct Entity {
 			bool is_volatile;
 			bool is_align_stack;
 
-			bool clobber_cc;
-			bool clobber_memory;
+			bool      clobber_flags;
+			bool      clobber_memory;
 			StringSet clobber_registers_set;
 
 			Scope *param_scope;

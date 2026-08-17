@@ -2437,6 +2437,12 @@ gb_internal Ast *parse_asm_register(AstFile *f) {
 	Ast *reg = alloc_ast_node(f, Ast_AsmRegister);
 	reg->AsmRegister.token = token;
 	reg->AsmRegister.name  = name;
+	if (allow_token(f, Token_Period)) {
+		Token flag = expect_token_after(f, Token_Ident, "register name and period for the flag");
+		if (flag.kind == Token_Ident) {
+			reg->AsmRegister.flag = flag;
+		}
+	}
 	return reg;
 }
 gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {

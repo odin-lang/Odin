@@ -451,8 +451,8 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			string_set_update(&emitted_reg_clobbers, reg);
 		}
 
-		// Template-level clobbers derived from #clobber cc / #clobber memory.
-		if (tmpl_entity->AsmTemplate.clobber_cc) {
+		// Template-level clobbers derived from #clobber flags / #clobber memory.
+		if (tmpl_entity->AsmTemplate.clobber_flags) {
 			sep();
 			if (build_context.metrics.arch == TargetArch_amd64) {
 				raw("~{flags}"); // x86 EFLAGS condition codes
