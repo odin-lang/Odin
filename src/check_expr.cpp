@@ -6917,7 +6917,12 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			bool ok = false;
 			if (e && (e->flags & EntityFlag_AnyInt)) {
 				if (o->mode != Addressing_Type && is_type_integer(param_type) && (is_type_integer(o->type) || is_type_enum(o->type))) {
-					ok = check_is_castable_to(c, o, param_type);
+					if (o->mode == Addressing_Constant) {
+						// constants have to fit the parameter
+						ok = check_representable_as_constant(c, o->value, param_type, &o->value);
+					} else {
+						ok = check_is_castable_to(c, o, param_type);
+					}
 				}
 			}
 			if (!allow_array_programming && check_is_assignable_to_with_score(c, o, param_type, nullptr, param_is_variadic, !allow_array_programming)) {
