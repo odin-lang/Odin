@@ -1092,6 +1092,11 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			if (attribute != nullptr) {
 				LLVMAddCallSiteAttribute(ret, param_offset, attribute);
 			}
+			// `byval`'s alignment decides the outgoing stack slot, and LLVM reads it
+			// from the CALL, not the declaration
+			if (ft->args[i].align_attribute != nullptr) {
+				LLVMAddCallSiteAttribute(ret, param_offset, ft->args[i].align_attribute);
+			}
 			param_offset += 1;
 		}
 

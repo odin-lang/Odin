@@ -49,9 +49,15 @@ gb_internal lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef at
 	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, nullptr, 0, false};
 }
 
-gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
-	i64 alignment = lb_alignof(type);
-	alignment = gb_max(alignment, 8);
+gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type, Type *source_type = nullptr) {
+	// the outgoing stack slot, which i386 never over-aligns, not even for an over-aligned struct
+	i64 alignment = build_context.ptr_size;
+	if (build_context.metrics.arch != TargetArch_i386) {
+		// `#align` and `#min_field_align` do not survive lowering, so ask the source
+		// type where there is one
+		i64 a = source_type != nullptr ? type_align_of(source_type) : lb_alignof(type);
+		alignment = gb_max(alignment, a);
+	}
 
 	LLVMAttributeRef byval_attr = lb_create_enum_attribute_with_type(c, "byval", type);
 	LLVMAttributeRef align_attr = lb_create_enum_attribute(c, "align", alignment);
@@ -357,6 +363,32 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	return 1;
 }
 
+// The alignment LLVM itself will give the lowered type, which is not `lb_alignof`:
+// that applies `max_simd_align`, and LLVM knows nothing about it. A 32-byte vector
+// is 16-aligned on arm64 and Darwin and 32-aligned to LLVM, and a struct holding
+// one has to be packed or LLVM re-inserts padding and moves the member.
+gb_internal i64 lb_llvm_natural_alignof(LLVMTypeRef type) {
+	switch (LLVMGetTypeKind(type)) {
+	case LLVMStructTypeKind:
+		{
+			if (LLVMIsPackedStruct(type)) {
+				return 1;
+			}
+			unsigned field_count = LLVMCountStructElementTypes(type);
+			i64 max_align = 1;
+			for (unsigned i = 0; i < field_count; i++) {
+				max_align = gb_max(max_align, lb_llvm_natural_alignof(LLVMStructGetTypeAtIndex(type, i)));
+			}
+			return max_align;
+		}
+	case LLVMArrayTypeKind:
+		return lb_llvm_natural_alignof(OdinLLVMGetArrayElementType(type));
+	case LLVMVectorTypeKind:
+		return gb_max(next_pow2(lb_sizeof(type)), 1);
+	}
+	return lb_alignof(type);
+}
+
 
 #define LB_ABI_INFO(name) lbFunctionType *name(lbModule *m, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple, ProcCallingConvention calling_convention, Type *original_type)
 typedef LB_ABI_INFO(lbAbiInfoType);
@@ -401,21 +433,124 @@ gb_internal lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMCont
 } while (0)
 
 // NOTE(bill): I hate `namespace` in C++ but this is just because I don't want to prefix everything
+
+// Every psABI except AAPCS64 and Win64 makes the caller widen a sub-word integer to 32 bits, in
+// both argument and return position, and clang records that as `signext`/`zeroext`. A callee
+// compiled against the attribute reads the whole 32-bit register rather than the byte, so omitting
+// it hands the callee whatever the high bits happened to hold. 
+gb_internal LLVMAttributeRef lb_integer_extension_attribute(LLVMContextRef c, LLVMTypeRef type, Type *source_type) {
+	if (source_type == nullptr) {
+		// Knowable without the source: an `i1` is always zero-extended.
+		return type == LLVMInt1TypeInContext(c) ? lb_create_enum_attribute(c, "zeroext") : nullptr;
+	}
+	if (lb_sizeof(type) >= 4) {
+		return nullptr;
+	}
+	if (!is_type_integer_like(source_type) && !is_type_enum(source_type)) {
+		return nullptr;
+	}
+	if (is_type_unsigned(source_type) || is_type_boolean(source_type)) {
+		return lb_create_enum_attribute(c, "zeroext");
+	}
+	return lb_create_enum_attribute(c, "signext");
+}
+
+// The source type of each parameter, where one exists. `arg_types` can carry entries with no
+// counterpart, so the tuple is walked rather than indexed.
+gb_internal Array<Type *> lb_abi_param_source_types(Type *proc_type, unsigned arg_count) {
+	auto out = array_make<Type *>(temporary_allocator(), cast(isize)arg_count);
+	Entity **params = nullptr;
+	isize param_count = 0;
+	if (proc_type != nullptr && proc_type->kind == Type_Proc && proc_type->Proc.params != nullptr) {
+		params      = proc_type->Proc.params->Tuple.variables.data;
+		param_count = proc_type->Proc.params->Tuple.variables.count;
+	}
+	for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
+		while (cast(isize)j < param_count && params[j]->kind != Entity_Variable) {
+			j++;
+		}
+		out[i] = cast(isize)j < param_count ? params[j]->type : nullptr;
+	}
+	return out;
+}
+
+// A single result can be classified from its source type. A tuple cannot: it is split into
+// out-pointers, and C has no such return shape anyway.
+gb_internal Type *lb_abi_single_result_type(Type *proc_type) {
+	if (proc_type != nullptr && proc_type->kind == Type_Proc &&
+	    proc_type->Proc.results != nullptr &&
+	    proc_type->Proc.results->Tuple.variables.count == 1) {
+		return proc_type->Proc.results->Tuple.variables[0]->type;
+	}
+	return nullptr;
+}
+
 namespace lbAbi386 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
+
+		// `bit_field` is treated as a struct.
+		Type *return_source = lb_abi_single_result_type(original_type);
+		if (return_is_defined && !return_is_tuple &&
+		    return_source != nullptr && is_type_bit_field(return_source) &&
+		    !lb_is_type_kind(return_type, LLVMStructTypeKind) &&
+		    !lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
+			// Windows and the BSDs return a small struct in registers, same as the scalar
+			// path so only the psABI targets need moving to the hidden pointer.
+			bool small_in_registers = build_context.metrics.os == TargetOs_windows ||
+			                          build_context.metrics.os == TargetOs_freebsd ||
+			                          build_context.metrics.os == TargetOs_openbsd;
+			i64 sz = lb_sizeof(return_type);
+			bool returned_in_registers = small_in_registers && (sz == 1 || sz == 2 || sz == 4 || sz == 8);
+			if (!returned_in_registers) {
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+				ft->ret = lb_arg_type_indirect(return_type, attr);
+			}
+		}
+
+		// A complex lowers to a struct of two floats. The struct rule sends every struct through
+		// a hidden pointer. The psABI gives complex its own rule: one of eight bytes or fewer
+		// comes back in EAX:EDX, and only the wider ones go through memory. `complex64` is 
+		// returned coerced to `i64` and `complex128` keeps the hidden pointer.
+		if (return_is_defined && !return_is_tuple &&
+		    return_source != nullptr && is_type_complex(return_source)) {
+			i64 sz = lb_sizeof(return_type);
+			if (sz > 0 && sz <= 8) {
+				ft->ret = lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)), nullptr, nullptr);
+			}
+		}
+
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
+		// A bare vector is passed and returned as itself; only aggregates
+		// take the indirect path below, ergo the vector check has to be first.
+		//
+		// Exception is an 8-byte vector Arg whose element is an integer: its an MMX type;
+		// clang coerces it to `i64` to keep it out of the MMX registers. An 8-byte
+		// vector of floats is an SSE type and stays itself, so the rule turns on the element and
+		// not on the width alone:
+		//
+		//     <8 x i8> <4 x i16> <2 x i32>   ->  i64
+		//     <2 x float> <4 x half>         ->  unchanged
+		//
+		// The RETURN is never coerced -- `<8 x i8>` comes back as itself.
+		if (LLVMGetTypeKind(type) == LLVMVectorTypeKind) {
+			if (!is_return && lb_sizeof(type) == 8 &&
+			    LLVMGetTypeKind(LLVMGetElementType(type)) == LLVMIntegerTypeKind) {
+				return lb_arg_type_direct(type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+			}
+			return lb_arg_type_direct(type, nullptr, nullptr, nullptr);
+		}
 		if (!is_return && lb_sizeof(type) > 8) {
 			return lb_arg_type_indirect(type, nullptr);
 		}
@@ -434,22 +569,23 @@ namespace lbAbi386 {
 			return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 		}
 
-		LLVMAttributeRef attr = nullptr;
-		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
-		}
+		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+		auto srcs = lb_abi_param_source_types(original_type, arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			i64 sz = lb_sizeof(t);
-			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+			// `bit_field` lowers to a bare integer; C represents it as a struct with bit-field 
+			// members, and i386 passes every struct by value on the stack. Use Src Type to match
+			bool is_aggregate = kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind ||
+			                    (srcs[i] != nullptr && is_type_bit_field(srcs[i]));
+			if (is_aggregate) {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
 				} else {
@@ -458,7 +594,7 @@ namespace lbAbi386 {
 					args[i] = lb_arg_type_indirect_byval(c, t);
 				}
 			} else {
-				args[i] = non_struct(c, t, false);
+				args[i] = non_struct(c, t, false, srcs[i]);
 			}
 		}
 		return args;
@@ -490,25 +626,25 @@ namespace lbAbi386 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
-		return non_struct(c, return_type, true);
+		return non_struct(c, return_type, true, nullptr);
 	}
 };
 
 namespace lbAbiAmd64Win64 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
@@ -528,7 +664,7 @@ namespace lbAbiAmd64Win64 {
 					break;
 				}
 			} else {
-				args[i] = lbAbi386::non_struct(c, t, false);
+				args[i] = lbAbi386::non_struct(c, t, false, nullptr);
 			}
 		}
 		return args;
@@ -551,7 +687,7 @@ namespace lbAbiAmd64Win64 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
-		return lbAbi386::non_struct(c, return_type, true);
+		return lbAbi386::non_struct(c, return_type, true, nullptr);
 	}
 };
 
@@ -734,16 +870,28 @@ namespace lbAbiAmd64SysV {
 	}
 
 	gb_internal bool is_aggregate(LLVMTypeRef type) {
+		// A single-member wrapper is passed like its member, but only while that
+		// member still fits one eightbyte. `struct{i128}` needs two registers and
+		// goes to memory when they are gone. A bare `i128` does not; clang emits
+		// `byval align 16` for the struct and a plain `i128` for the scalar.
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		switch (kind) {
 		case LLVMStructTypeKind:
 			if (LLVMCountStructElementTypes(type) == 1) {
-				return is_aggregate(LLVMStructGetTypeAtIndex(type, 0));
+				LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, 0);
+				// A VECTOR member keeps the wrapper an aggregate whatever its size:
+				// LLVM gives a vector its own oversized stack slot, so an unwrapped
+				// `struct{#simd[2]f32}` takes 16 bytes where the ABI wants 8.
+				if (LLVMGetTypeKind(elem) == LLVMVectorTypeKind) {
+					return true;
+				}
+				return lb_sizeof(elem) > 8 || is_aggregate(elem);
 			}
 			return true;
 		case LLVMArrayTypeKind:
 			if (LLVMGetArrayLength(type) == 1) {
-				return is_aggregate(LLVMGetElementType(type));
+				LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
+				return lb_sizeof(elem) > 8 || is_aggregate(elem);
 			}
 			return true;
 		}
@@ -793,15 +941,25 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 
-		if (is_register(type)) {
-			LLVMAttributeRef attribute = nullptr;
-			if (type == LLVMInt1TypeInContext(c)) {
-				attribute = lb_create_enum_attribute(c, "zeroext");
+		if (cls.count > 2 && is_sse(cls[0])) {
+			// An SSE run wider than two eightbytes has no register to land in at
+			// the baseline ISA. It goes to memory, bare vector or struct-wrapped.
+			// A bare vector RETURN is the one exception: it is not an aggregate.
+			// Clang gives it no hidden pointer and lets LLVM split it across
+			// xmm0:xmm1, but the struct that wraps it still gets one.
+			if (is_arg) {
+				return lb_arg_type_indirect_byval(c, type, source_type);
 			}
+			if (LLVMGetTypeKind(type) != LLVMVectorTypeKind) {
+				all_mem(&cls);
+			}
+		}
+		if (is_register(type)) {
+			LLVMAttributeRef attribute = lb_integer_extension_attribute(c, type, source_type);
 			return lb_arg_type_direct(type, nullptr, nullptr, attribute);
 		} else if (ran_out_of_regs) {
 			if (is_arg) {
-				return lb_arg_type_indirect_byval(c, type);
+				return lb_arg_type_indirect_byval(c, type, source_type);
 			} else {
 				LLVMAttributeRef attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 				return lb_arg_type_indirect(type, attribute);
@@ -812,7 +970,7 @@ namespace lbAbiAmd64SysV {
 				if (is_calling_convention_odin(calling_convention)) {
 					return lb_arg_type_indirect(type, attribute);
 				}
-				return lb_arg_type_indirect_byval(c, type);
+				return lb_arg_type_indirect_byval(c, type, source_type);
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}
@@ -827,7 +985,11 @@ namespace lbAbiAmd64SysV {
 			} else {
 				reg_type = llreg(c, cls, type);
 			}
-			return lb_arg_type_direct(type, reg_type, nullptr, nullptr);
+			// `is_register` above answers false for every integer narrower than 16 bytes, so a
+			// sub-word scalar lands HERE rather than in the direct arm, and this is where its
+			// extension attribute has to go.
+			LLVMAttributeRef attribute = lb_integer_extension_attribute(c, type, source_type);
+			return lb_arg_type_direct(type, reg_type, nullptr, attribute);
 		}
 	}
 
@@ -969,7 +1131,11 @@ namespace lbAbiAmd64SysV {
 		i64 sz = lb_sizeof(t);
 		i64 words = (sz + 7)/8;
 		auto reg_classes = array_make<RegClass>(heap_allocator(), cast(isize)words);
-		if (words > 4) {
+		if (words > 4 && LLVMGetTypeKind(t) != LLVMVectorTypeKind) {
+			// A BARE vector is exempt: it is not an aggregate. Clang never gives it
+			// a hidden pointer however wide it is. `<16 x float>` is returned directly
+			// and split across xmm0-xmm3, and the SSE run below still sends it to
+			// memory as an ARGUMENT.
 			all_mem(&reg_classes);
 		} else {
 			bool from_source = source_type != nullptr && source_is_classifiable(source_type) &&
@@ -994,6 +1160,17 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 		return reg_classes;
+	}
+
+	// How much of its eightbyte an SSE class occupies, which is what `llreg` turns
+	// it back into: the scalar classes are as wide as their element, and every `v`
+	// class becomes a vector spanning the whole eightbyte.
+	gb_internal i64 sse_class_width(RegClass c) {
+		switch (c) {
+		case RegClass_SSEHs: return 2;
+		case RegClass_SSEFs: return 4;
+		}
+		return 8;
 	}
 
 	gb_internal void unify(Array<RegClass> *cls, i64 i, RegClass const newv) {
@@ -1029,6 +1206,14 @@ namespace lbAbiAmd64SysV {
 			case RegClass_SSEInt64:
 				return;
 			}
+		} else if (is_sse(oldv) && is_sse(newv) && sse_class_width(oldv) > sse_class_width(newv)) {
+			// The members OVERLAP, a union. Last-writer-wins would pass
+			// `union{f64, f32}` as a 4-byte float, and `union{[2]f32, f32}` as one
+			// lane of two, losing the top half of the eightbyte either way. Keeping
+			// the WIDER class is what leaves `struct{f32, f16}` alone: that is Fs
+			// then Hv at offset 4, and Hv spans the eightbyte, so it still widens
+			// rather than gets picked over.
+			return;
 		}
 
 		(*cls)[cast(isize)i] = to_write;
@@ -1043,7 +1228,8 @@ namespace lbAbiAmd64SysV {
 			RegClass &oldv = (*cls)[cast(isize)i];
 			if (is_sse(oldv)) {
 				for (i++; i < e; i++) {
-					if (oldv != RegClass_SSEUp) {
+					// NOTE: the current eightbyte, not `oldv`, is bound to cls[0], which is never SSEUp
+					if ((*cls)[cast(isize)i] != RegClass_SSEUp) {
 						all_mem(cls);
 						return;
 					}
@@ -1109,6 +1295,15 @@ namespace lbAbiAmd64SysV {
 		}
 
 		i64 sz = lb_sizeof(type);
+		if (LLVMGetTypeKind(type) == LLVMVectorTypeKind && sz == 8 &&
+		    reg_classes.count == 1 && is_sse(reg_classes[0])) {
+			// LLVM rounds a bare vector's stack slot up to the legal vector width.
+			// An 8-byte one takes 16 bytes where the ABI wants 8. clang coerces every
+			// 64-bit vector to `double`, which lands in the same half of the same xmm
+			// and takes one eightbyte on the stack.
+			array_free(&types);
+			return LLVMDoubleTypeInContext(c);
+		}
 		if (all_ints) {
 			for_array(i, reg_classes) {
 				GB_ASSERT(sz > 0);
@@ -1175,7 +1370,16 @@ namespace lbAbiAmd64SysV {
 						}
 
 						unsigned vec_len = llvec_len(reg_classes, i+1);
-						LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
+						unsigned lanes = vec_len * elems_per_word;
+						// Never widen past what is actually left: a 4-byte vector
+						// occupies half an eightbyte, and padding it to a whole one
+						// makes the parameter 8 bytes where clang coerces to i32.
+						i64 elem_bytes = lb_sizeof(elem_type);
+						if (elem_bytes > 0 && sz > 0 && cast(i64)lanes * elem_bytes > sz) {
+							lanes = cast(unsigned)(sz / elem_bytes);
+						}
+						if (lanes == 0) { lanes = 1; }
+						LLVMTypeRef vec_type = LLVMVectorType(elem_type, lanes);
 						array_add(&types, vec_type);
 						sz -= lb_sizeof(vec_type);
 						i += vec_len;
@@ -1275,6 +1479,13 @@ namespace lbAbiAmd64SysV {
 				LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
+				if (t_size < 8) {
+					// A vector narrower than an eightbyte is INTEGER, not SSE:
+					// clang coerces `<4 x i8>` to `i32` and passes it in an integer
+					// register.
+					unify(cls, ix + off/8, RegClass_Int);
+					break;
+				}
 				RegClass reg = RegClass_NoClass;
 				switch (elem_kind) {
 				case LLVMIntegerTypeKind: {
@@ -1435,6 +1646,10 @@ namespace lbAbiArm64 {
 			unsigned field_member_count = 0;
 
 			LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
+			if (lb_is_type_kind(elem, LLVMStructTypeKind) && lb_sizeof(elem) == 0) {
+				// an empty struct occupies nothing and is ignored
+				continue;
+			}
 			if (!is_homogenous_aggregate(c, elem, &field_type, &field_member_count)) {
 				return false;
 			}
@@ -1467,6 +1682,7 @@ namespace lbAbiArm64 {
 	gb_internal bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		switch (kind) {
+		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
 		case LLVMDoubleTypeKind:
 			if (base_type_) *base_type_ = type;
@@ -1504,6 +1720,10 @@ namespace lbAbiArm64 {
 		switch (bt->kind) {
 		case Type_Basic:
 			switch (bt->Basic.kind) {
+			case Basic_f16:
+				if (base_type_)    *base_type_ = LLVMHalfTypeInContext(c);
+				if (member_count_) *member_count_ = 1;
+				return true;
 			case Basic_f32:
 				if (base_type_)    *base_type_ = LLVMFloatTypeInContext(c);
 				if (member_count_) *member_count_ = 1;
@@ -1515,6 +1735,10 @@ namespace lbAbiArm64 {
 			}
 			return false;
 		case Type_Array: {
+			if (bt->Array.count == 0) {
+				// a zero-length member disqualifies the aggregate, unlike an empty struct
+				return false;
+			}
 			LLVMTypeRef elem_base = nullptr;
 			unsigned elem_count = 0;
 			if (!is_homogenous_aggregate_source(c, bt->Array.elem, &elem_base, &elem_count)) {
@@ -1531,6 +1755,11 @@ namespace lbAbiArm64 {
 			LLVMTypeRef found_base = nullptr;
 			unsigned total = 0;
 			for (Entity *f : bt->Struct.fields) {
+				Type *fbt = base_type(f->type);
+				if (fbt != nullptr && fbt->kind == Type_Struct && type_size_of(f->type) == 0) {
+					// an empty struct occupies nothing and is ignored
+					continue;
+				}
 				LLVMTypeRef field_base = nullptr;
 				unsigned field_count = 0;
 				if (!is_homogenous_aggregate_source(c, f->type, &field_base, &field_count)) {
@@ -1572,20 +1801,12 @@ namespace lbAbiArm64 {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (is_register(return_type)) {
 			return non_struct(c, return_type, nullptr);
-		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count)) {
-			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-				return lb_arg_type_direct(return_type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
-			} else {
-				//TODO(Platin): do i need to create stuff that can handle the diffrent return type?
-				//              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
-
-				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
-
-				//LLVMTypeRef array_type = llvm_array_type(homo_base_type, homo_member_count);
-				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
-				return lb_arg_type_indirect(return_type, attr);
-			}
+		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count) &&
+		           is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+			return lb_arg_type_direct(return_type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
 		} else {
+			// too many members to be an HFA falls through to the size rule, it does not
+			// become indirect on its own: `struct{[5]f16}` is 10 bytes and goes in x0:x1
 			i64 size = lb_sizeof(return_type);
 			if (size > 16) {
 				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
@@ -1595,6 +1816,13 @@ namespace lbAbiArm64 {
 			}
 
 			GB_ASSERT(size <= 16);
+			if (LLVMGetTypeKind(return_type) == LLVMVectorTypeKind) {
+				// A vector too narrow to be a short vector is still RETURNED as
+				// itself. clang coerces a 4-byte vector argument to `i32` and puts
+				// it in w0, but returns `<4 x i8>` in v0; coercing the return too
+				// picks the wrong register file.
+				return lb_arg_type_direct(return_type, nullptr, nullptr, nullptr);
+			}
 			LLVMTypeRef cast_type = nullptr;
 			if (size == 0) {
 				cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
@@ -1632,12 +1860,9 @@ namespace lbAbiArm64 {
 
 			if (is_register(type)) {
 				args[i] = non_struct(c, type, ptype);
-			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
-				if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-					args[i] = lb_arg_type_direct(type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
-				} else {
-					args[i] = lb_arg_type_indirect(type, nullptr);;
-				}
+			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count) &&
+			           is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+				args[i] = lb_arg_type_direct(type, llvm_array_type(homo_base_type, homo_member_count), nullptr, nullptr);
 			} else if (is_homogenous_aggregate_source(c, ptype, &src_base_type, &src_member_count) &&
 			           is_homogenous_aggregate_small_enough(src_base_type, src_member_count)) {
 				args[i] = lb_arg_type_direct(type, llvm_array_type(src_base_type, src_member_count), nullptr, nullptr);
@@ -1881,15 +2106,15 @@ namespace lbAbiWasm {
 }
 
 namespace lbAbiArm32 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention);
-	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type);
+	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention, Type *return_source);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;		
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
-		ft->ret = compute_return_type(c, return_type, return_is_defined, calling_convention);
+		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
+		ft->ret = compute_return_type(c, return_type, return_is_defined, calling_convention, lb_abi_single_result_type(original_type));
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -1913,28 +2138,95 @@ namespace lbAbiArm32 {
 		return false;
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
-		LLVMAttributeRef attr = nullptr;
-		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
+		// A bare vector narrower than a word has no register of its own to sit in, clang coerces
+		// it to `i32` as an argument whatever its element is. The return keeps the vector
+		// type, same as x86, except: a half vector is not a legal type at this microarchitecture 
+		// (`arm1176jzf-s` has VFP2 but no fp16), so clang coerces that one in both directions.
+		//
+		//     <4 x i8> <2 x i16> <2 x half>  as an argument  ->  i32
+		//     <4 x i8> <2 x i16>             as a return     ->  unchanged
+		//     <2 x half>                     as a return     ->  i32
+		if (LLVMGetTypeKind(type) == LLVMVectorTypeKind && lb_sizeof(type) == 4) {
+			bool is_half = LLVMGetTypeKind(LLVMGetElementType(type)) == LLVMHalfTypeKind;
+			if (!is_return || is_half) {
+				return lb_arg_type_direct(type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+			}
 		}
+		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention) {
+	// AAPCS32 §5.5, the VFP variant that the `gnueabihf` triple selects: an aggregate of at most
+	// four members that are all the same fp type is a Homogeneous fp Aggregate, and travels 
+	// in s0-s3 / d0-d3 rather than in the core registers. Everything below coerces aggregates to 
+	// `[N x i32]`, which puts an HFA in r0-r3 where the C side reads s0-s3.
+	//
+	// The detector is arm64's: AAPCS64 states the same rule over the same shapes.
+	// `coerce_` is set when the lowered type cannot express the HFA and LLVM has to be handed an
+	// `[N x base]` instead of the type itself. That happens for a `#raw_union`, which has become
+	// an opaque integer by now and AAPCS32 DOES count a union of floats as homogeneous
+	gb_internal bool is_hfa(LLVMContextRef c, LLVMTypeRef type, Type *source_type,
+	                        ProcCallingConvention calling_convention, LLVMTypeRef *coerce_) {
+		if (is_calling_convention_odin(calling_convention)) {
+			// Both sides are Odin, so the existing lowering is self-consistent; leave it alone.
+			return false;
+		}
+		LLVMTypeRef base_type = nullptr;
+		unsigned member_count = 0;
+		bool needs_coerce = false;
+		if (!lbAbiArm64::is_homogenous_aggregate(c, type, &base_type, &member_count)) {
+			if (source_type == nullptr ||
+			    !lbAbiArm64::is_homogenous_aggregate_source(c, source_type, &base_type, &member_count)) {
+				return false;
+			}
+			needs_coerce = true;
+		}
+		if (member_count == 0 || member_count > 4) {
+			return false;
+		}
+		switch (LLVMGetTypeKind(base_type)) {
+		case LLVMFloatTypeKind:
+		case LLVMDoubleTypeKind:
+			break;
+		case LLVMVectorTypeKind:
+			// AAPCS32's short vectors are the 64-bit and 128-bit ones. An aggregate of up to
+			// four of them is a Homogeneous Vector Aggregate, which rides in the VFP registers
+			// exactly as an HFA does. Any other width is not a short vector and does not qualify.
+			{
+				i64 vec_size = lb_sizeof(base_type);
+				if (vec_size != 8 && vec_size != 16) {
+					return false;
+				}
+			}
+			break;
+		default:
+			return false;
+		}
+		if (coerce_) {
+			*coerce_ = needs_coerce ? llvm_array_type(base_type, member_count) : nullptr;
+		}
+		return true;
+	}
+
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+		auto srcs = lb_abi_param_source_types(original_type, arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			if (is_register(t, false)) {
-				args[i] = non_struct(c, t, false);
+				args[i] = non_struct(c, t, false, srcs[i]);
 			} else {
 				i64 sz = lb_sizeof(t);
 				i64 a = lb_alignof(t);
+
+				LLVMTypeRef hfa_coerce = nullptr;
 				// Added to support hard floats included in the playdates cortex-m7.
 				if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 					args[i] = lb_arg_type_direct(t);
+				} else if (is_hfa(c, t, srcs[i], calling_convention, &hfa_coerce)) {
+					args[i] = lb_arg_type_direct(t, hfa_coerce, nullptr, nullptr);
 				} else if (is_calling_convention_odin(calling_convention) && sz > 8) {
 					// Minor change to improve performance using the Odin calling conventions
 					args[i] = lb_arg_type_indirect(t, nullptr);
@@ -1950,22 +2242,36 @@ namespace lbAbiArm32 {
 		return args;
 	}
 
-	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention) {
+	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention, Type *return_source) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (LLVMGetTypeKind(return_type) == LLVMVectorTypeKind && lb_sizeof(return_type) > 16) {
+			// A bare vector wider than a short vector has no register file to come back in. It
+			// is returned through a hidden pointer. `is_register` answers true for every vector,
+			// without this the caller returns it directly while the C callee stores
+			// through an `sret` pointer that was never passed (segfault)
+			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+			return lb_arg_type_indirect(return_type, attr);
 		} else if (!is_register(return_type, true)) {
 			if (calling_convention == ProcCC_CDecl && selected_subtarget == Subtarget_Playdate) {
 				return lb_arg_type_direct(return_type);
 			}
+			// An HFA is returned in s0-s3 / d0-d3 too. It must not fall through to the
+			// integer coercions or to `sret`.
+			LLVMTypeRef hfa_coerce = nullptr;
+			if (is_hfa(c, return_type, return_source, calling_convention, &hfa_coerce)) {
+				return lb_arg_type_direct(return_type, hfa_coerce, nullptr, nullptr);
+			}
+			// `lb_arg_type_direct` takes (type, cast_type), and the cast type is what the function actually returns. 
 			switch (lb_sizeof(return_type)) {
-			case 1:         return lb_arg_type_direct(LLVMIntTypeInContext(c, 8),  return_type, nullptr, nullptr);
-			case 2:         return lb_arg_type_direct(LLVMIntTypeInContext(c, 16), return_type, nullptr, nullptr);
-			case 3: case 4: return lb_arg_type_direct(LLVMIntTypeInContext(c, 32), return_type, nullptr, nullptr);
+			case 1:         return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
+			case 2:         return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
+			case 3: case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			}
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
-		return non_struct(c, return_type, true);
+		return non_struct(c, return_type, true, nullptr);
 	}
 };
 
@@ -1996,12 +2302,8 @@ namespace lbAbiRiscv64 {
 		}
 	}
 
-	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type) {
-		LLVMAttributeRef attr = nullptr;
-		LLVMTypeRef i1 = LLVMInt1TypeInContext(c);
-		if (type == i1) {
-			attr = lb_create_enum_attribute(c, "zeroext");
-		}
+	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, Type *source_type) {
+		LLVMAttributeRef attr = lb_integer_extension_attribute(c, type, source_type);
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
@@ -2125,7 +2427,45 @@ namespace lbAbiRiscv64 {
 		return LLVMGetTypeKind(type) == LLVMIntegerTypeKind && lb_sizeof(type) > 0;
 	}
 
-	gb_internal lbArgType compute_arg_type(lbModule *m, LLVMTypeRef type, int *gprs_left, int *fprs_left, Type *odin_type) {
+	// The psABI applies the hardware floating-point convention to a struct's MEMBERS. A union is
+	// never flattened, so an aggregate holding one ANYWHERE, at any depth, and through an array,
+	// takes the integer convention instead, whatever the union itself contains.
+	//
+	// The lowered type cannot answer this. A `#raw_union{f32}` comes out as a bare `float`, and a
+	// two-member one comes out as the integer its padding filler is, which is indistinguishable
+	// from a real integer member. Both have to be read off the source type.
+	gb_internal bool contains_union(Type *t) {
+		if (t == nullptr) {
+			return false;
+		}
+		Type *bt = base_type(t);
+		if (bt == nullptr) {
+			return false;
+		}
+		switch (bt->kind) {
+		case Type_Union:
+			return true;
+		case Type_Struct:
+			if (bt->Struct.is_raw_union) {
+				return true;
+			}
+			for (Entity *f : bt->Struct.fields) {
+				if (contains_union(f->type)) {
+					return true;
+				}
+			}
+			return false;
+		case Type_Array:
+			return contains_union(bt->Array.elem);
+		case Type_EnumeratedArray:
+			return contains_union(bt->EnumeratedArray.elem);
+		case Type_Matrix:
+			return contains_union(bt->Matrix.elem);
+		}
+		return false;
+	}
+
+	gb_internal lbArgType compute_arg_type(lbModule *m, LLVMTypeRef type, int *gprs_left, int *fprs_left, Type *source_type) {
 		LLVMContextRef c = m->ctx;
 
 		int xlen = 8; // 8 byte int register size for riscv64.
@@ -2184,7 +2524,9 @@ namespace lbAbiRiscv64 {
 			fp_size = lb_sizeof(fp_type);
 		}
 
-		if (is_float(fp_type) && fp_size <= flen && *fprs_left >= 1) {
+		bool integer_only = contains_union(source_type);
+
+		if (!integer_only && is_float(fp_type) && fp_size <= flen && *fprs_left >= 1) {
 			*fprs_left -= 1;
 			if (fp_type != orig_type) {
 				// A struct that flattened to a single float has to be coerced to that float;
@@ -2194,10 +2536,10 @@ namespace lbAbiRiscv64 {
 				}
 				return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 			}
-			return non_struct(c, orig_type);
+			return non_struct(c, orig_type, source_type);
 		}
 
-		if (fp_kind == LLVMStructTypeKind && fp_size <= 2*flen) {
+		if (!integer_only && fp_kind == LLVMStructTypeKind && fp_size <= 2*flen) {
 			unsigned elem_count = LLVMCountStructElementTypes(fp_type);
 			if (elem_count == 2) {
 				LLVMTypeRef ty1 = LLVMStructGetTypeAtIndex(fp_type, 0);
@@ -2240,7 +2582,7 @@ namespace lbAbiRiscv64 {
 		if (size <= xlen) {
 			*gprs_left -= 1;
 			if (is_register(type)) {
-				return non_struct(c, orig_type);
+				return non_struct(c, orig_type, source_type);
 			} else {
 				return lb_arg_type_direct(orig_type, LLVMIntTypeInContext(c, cast(unsigned)(size*8)), nullptr, nullptr);
 			}
@@ -2259,9 +2601,24 @@ namespace lbAbiRiscv64 {
 	gb_internal Array<lbArgType> compute_arg_types(lbModule *m, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *odin_type, int *gprs, int *fprs) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
-		for (unsigned i = 0; i < arg_count; i++) {
+		// The source type of each parameter, where one exists. `arg_types` can carry entries with
+		// no counterpart, so this walks the tuple the way lbAbiAmd64SysV does and hands back
+		// nullptr once it runs out.
+		Entity **params = nullptr;
+		isize param_count = 0;
+		if (odin_type != nullptr && odin_type->kind == Type_Proc && odin_type->Proc.params != nullptr) {
+			params      = odin_type->Proc.params->Tuple.variables.data;
+			param_count = odin_type->Proc.params->Tuple.variables.count;
+		}
+
+		for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
+			while (cast(isize)j < param_count && params[j]->kind != Entity_Variable) {
+				j++;
+			}
+			Type *source_type = cast(isize)j < param_count ? params[j]->type : nullptr;
+
 			LLVMTypeRef type = arg_types[i];
-			args[i] = compute_arg_type(m, type, gprs, fprs, odin_type);
+			args[i] = compute_arg_type(m, type, gprs, fprs, source_type);
 		}
 
 		return args;
@@ -2274,10 +2631,21 @@ namespace lbAbiRiscv64 {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		}
 
+		// A single result is classified from its source type. The union rule reaches the return
+		// as well. A tuple keeps nullptr: it is split into out-pointers below. The recursive call
+		// for the last tuple field lands here with a result count above one, so it takes the same path.
+		Type *return_source = nullptr;
+		if (!return_is_tuple &&
+		    odin_type != nullptr && odin_type->kind == Type_Proc &&
+		    odin_type->Proc.results != nullptr &&
+		    odin_type->Proc.results->Tuple.variables.count == 1) {
+			return_source = odin_type->Proc.results->Tuple.variables[0]->type;
+		}
+
 		// There are two registers for return types.
 		int gprs = 2;
 		int fprs = 2;
-		lbArgType ret = compute_arg_type(m, return_type, &gprs, &fprs, odin_type);
+		lbArgType ret = compute_arg_type(m, return_type, &gprs, &fprs, return_source);
 
 		// Return didn't fit into the return registers, so caller allocates and it is returned via
 		// an out-pointer.

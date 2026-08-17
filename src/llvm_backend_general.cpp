@@ -2671,7 +2671,17 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				// so check the alignment of all fields to see if packing is required.
 				requires_packing = requires_packing || ((offset % type_align_of(field_type)) != 0);
 
-				array_add(&fields, lb_type(m, field_type));
+				LLVMTypeRef field_llvm_type = lb_type(m, field_type);
+
+				// `max_simd_align` can cap a member below what LLVM gives the lowered
+				// type. Unpacked, LLVM lays the struct out by its own alignment and the
+				// member moves: `struct{i8, #simd[8]f32}` is 48 bytes here and 64 to
+				// LLVM on every target that caps the vector at 16.
+				i64 natural_align = lb_llvm_natural_alignof(field_llvm_type);
+				requires_packing = requires_packing || ((offset % natural_align) != 0) ||
+				                   natural_align > full_type_align;
+
+				array_add(&fields, field_llvm_type);
 
 				prev_offset = offset + type_size_of(field->type);
 			}

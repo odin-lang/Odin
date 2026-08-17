@@ -1607,16 +1607,8 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	// could be maximally aligned but as a compromise, having no padding will be
 	// beneficial to third libraries that assume no padding
 
-	i64 total_expected_size = row_count*column_count*elem_size;
-	// i64 min_alignment = prev_pow2(elem_align * row_count);
-	i64 min_alignment = prev_pow2(total_expected_size);
-	while (total_expected_size != 0 && (total_expected_size % min_alignment) != 0) {
-		min_alignment >>= 1;
-	}
-	min_alignment = gb_max(min_alignment, elem_align);
-
-	i64 align = gb_min(min_alignment, build_context.max_simd_align);
-	return align;
+	gb_unused(row_count); gb_unused(column_count); gb_unused(elem_size);
+	return gb_clamp(elem_align, 1, build_context.max_simd_align);
 }
 
 
@@ -4363,6 +4355,18 @@ gb_internal i64 type_align_of(Type *t) {
 }
 
 
+// The largest alignment the target permits. The i386 System V psABI caps every scalar at 4, unlike
+// Windows. Anything that derives its alignment from a COMPONENT rather than from its own size has
+// to be capped here too.
+gb_internal i64 type_target_max_align(void) {
+	i64 max_align = build_context.max_align;
+	if (build_context.metrics.arch == TargetArch_i386 &&
+	    build_context.metrics.os != TargetOs_windows) {
+		max_align = gb_min(max_align, 4);
+	}
+	return max_align;
+}
+
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	GB_ASSERT(path != nullptr);
 	if (t->failure) {
@@ -4387,10 +4391,11 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		case Basic_uintptr: case Basic_rawptr:
 			return build_context.ptr_size;
 
+		// A complex aligns to one component and a quaternion to one of its four.
 		case Basic_complex32: case Basic_complex64: case Basic_complex128:
-			return type_size_of_internal(t, path) / 2;
+			return gb_min(type_size_of_internal(t, path) / 2, type_target_max_align());
 		case Basic_quaternion64: case Basic_quaternion128: case Basic_quaternion256:
-			return type_size_of_internal(t, path) / 4;
+			return gb_min(type_size_of_internal(t, path) / 4, type_target_max_align());
 		}
 	} break;
 
@@ -4529,7 +4534,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align);
 	}
 
 	case Type_Matrix:
@@ -4541,7 +4546,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	// NOTE(bill): Things that are bigger than build_context.ptr_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
+	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, type_target_max_align());
 }
 
 gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align, i64 max_field_align) {
