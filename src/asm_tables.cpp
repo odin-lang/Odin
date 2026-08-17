@@ -4,8 +4,25 @@ enum AsmRegClass : u8 {
 	AsmRegClass_Float,
 	AsmRegClass_Vector,
 	AsmRegClass_Mask,
+
+	AsmRegClass_COUNT
 };
 
+gb_global String const asm_reg_class_strings[AsmRegClass_COUNT] = {
+	str_lit("unknown"),
+	str_lit("integer"),
+	str_lit("float"),
+	str_lit("vector"),
+	str_lit("mask"),
+};
+
+gb_global String const asm_reg_class_strings_with_article[AsmRegClass_COUNT] = {
+	str_lit("an unknown"),
+	str_lit("an integer"),
+	str_lit("a float"),
+	str_lit("a vector"),
+	str_lit("a mask"),
+};
 
 enum AsmOperandKind : u8 {
 	AsmOperand_Invalid,

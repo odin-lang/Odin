@@ -818,6 +818,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	auto possible_kinds = slice_make<AsmOperandKind>(heap_allocator(), max_count);
 	defer (slice_free(&possible_kinds, heap_allocator()));
 
+	auto possible_class_kinds = slice_make<AsmRegClass>(heap_allocator(), max_count);
+	defer (slice_free(&possible_class_kinds, heap_allocator()));
+
 	bool  matched          = false;
 	isize valid_form_index = -1;
 
@@ -950,6 +953,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
 			possible_kinds[i] = dst;
+			possible_class_kinds[i] = asm_ctx->reg_class_from_operand_type(type);
 
 			bool kind_ok = (dst == src) ||
 			               (dst == AsmOperand_Register_Or_Memory && (src == AsmOperand_Register || src == AsmOperand_Memory));
@@ -983,6 +987,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			auto dst = possible_kinds[i];
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
 
+			AsmRegClass dst_reg_class = possible_class_kinds[i];
+			AsmRegClass src_reg_class = check_asm_reg_class_from_type(operands[i].type);
+
 			AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
 
 			if (m == AsmMismatch_ImmRange) {
@@ -1005,8 +1012,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit operand, got %u-bit",
 				      LIT(name), i, cast(unsigned)want_bits[i], cast(unsigned)got_bits[i]);
 			} else if (m == AsmMismatch_Class) {
-				error(operands[i].expr, "'%.*s' operand-%td is in the wrong register class, expected %.*s operand, got %.*s",
-				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]), LIT(asm_operand_kind_expected_strings[src]));
+				error(operands[i].expr, "'%.*s' operand-%td is in the wrong register class, expected %d-bit %.*s %.*s, got %d-bit %.*s %.*s",
+				      LIT(name), i,
+				      want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]), LIT(asm_operand_kind_strings[dst]),
+				      got_bits[i],  LIT(asm_reg_class_strings[src_reg_class]), LIT(asm_operand_kind_strings[src]));
 			} else if (dst) {
 				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind, expected %.*s operand",
 				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]));
