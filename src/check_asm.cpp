@@ -1331,6 +1331,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	Type *type = alloc_type_proc(ate->param_scope, params, params->Tuple.variables.count, results, results->Tuple.variables.count, false, pt->calling_convention);
 	type->Proc.diverging = pt->diverging;
+	if (!type->Proc.diverging && results->Tuple.variables.count != 0) {
+		// always require the results of `asm` templates
+		type->Proc.require_results = true;
+	}
 
 	entity->type = type;
 
