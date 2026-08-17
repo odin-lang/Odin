@@ -113,6 +113,12 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 	if (len < offset) {
 		return nullptr;
 	}
+
+	// a column past the first cannot belong to a line the offset has already left
+	if (offset > 0 && pos.column > 1 && start[offset-1] == '\n') {
+		offset -= 1;
+	}
+
 	u8 *pos_offset = start+offset;
 
 	u8 *line_start = pos_offset;

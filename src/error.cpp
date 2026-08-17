@@ -432,8 +432,10 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		window_close_bytes = line_length_bytes;
 	}
 
-	for (i32 i = error_start_index_graphemes; i > 0; i -= 1) {
-		if (graphemes[i].byte_index == window_open_bytes) {
+	// counts the graphemes before the error. It must not read the one at it: an error at the
+	// end of a line indexes one past the last grapheme
+	for (i32 i = error_start_index_graphemes-1; i >= 0; i -= 1) {
+		if (graphemes[i].byte_index < window_open_bytes) {
 			break;
 		}
 		squiggle_padding += graphemes[i].width;
