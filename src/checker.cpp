@@ -2682,6 +2682,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, alloc_type_pointer(bt->FixedCapacityDynamicArray.elem));
 		add_min_dep_type_info(c, alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity));
 		add_min_dep_type_info(c, t_int);
+		break;
 
 	case Type_Enum:
 		add_min_dep_type_info(c, bt->Enum.base_type);
