@@ -135,7 +135,7 @@ struct lbAsmGenerate {
 			asm_string = write_label(asm_string, &label->name->Ident);
 		case_end;
 		default:
-			GB_PANIC("TODO %s", expr_to_string(op));
+			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
 			break;
 		}
 		return asm_string;
@@ -218,7 +218,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 		GB_ASSERT(instr->mnemonic != 0);
 		GB_ASSERT(instr->valid_form_index >= 0);
-		// Otherwise derive from the matched form's operand widths.
+
 		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
 		if (forms.count <= 1) {
 			return 0;
@@ -646,7 +646,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-		if (false) {
+		if (true) {
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
