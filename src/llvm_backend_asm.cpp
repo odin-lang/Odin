@@ -480,6 +480,25 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				asm_string = this->write_label(asm_string, &label->name->Ident);
 				asm_string = gb_string_appendc(asm_string, ":");
 			case_end;
+			case_ast_node(dir, AsmDirective, instr_);
+				String name = dir->name.string;
+				if (name == "byte") {
+					asm_string = gb_string_appendc(asm_string, ".byte ");
+					isize op_index = 0;
+					for (auto const &op : dir->operands) {
+						if (op_index > 0) {
+							asm_string = gb_string_appendc(asm_string, ", ");
+						}
+						ExactValue ev = exact_value_to_integer(op->tav.value);
+						GB_ASSERT(ev.kind == ExactValue_Integer);
+						i64 i = exact_value_to_i64(ev);
+						asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)i);
+						op_index += 1;
+					}
+				} else {
+					GB_PANIC("Invalid asm directive: %.*s", LIT(name));
+				}
+			case_end;
 			default:
 				GB_PANIC("Invalid asm instruction");
 				break;

@@ -512,6 +512,11 @@ struct AstSplitArgs {
 		Ast * type;     \
 		Token close;    \
 	}) \
+	AST_KIND(AsmDirective, "asm directive", struct { \
+		Token        token;    \
+		Token        name;     \
+		Slice<Ast *> operands; \
+	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
 	AST_KIND(TagExpr,      "tag expression",         struct { Token token, name; Ast *expr; }) \

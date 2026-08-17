@@ -551,6 +551,9 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmMemoryOperand.disp  = clone_ast(n->AsmMemoryOperand.disp,  f);
 		n->AsmMemoryOperand.type  = clone_ast(n->AsmMemoryOperand.type,  f);
 		break;
+	case Ast_AsmDirective:
+		n->AsmDirective.operands = clone_ast_array(n->AsmDirective.operands, f);
+		break;
 	}
 	return n;
 }
@@ -2572,6 +2575,17 @@ gb_internal Ast *parse_asm_instruction(AstFile *f) {
 			label_decl->AsmLabelDecl.token = token;
 			label_decl->AsmLabelDecl.name  = name;
 			return label_decl;
+		}
+	case Token_Hash:
+		{
+			Token token   = expect_token(f, Token_Hash);
+			Token name    = expect_token(f, Token_Ident);
+			auto operands = parse_asm_operands(f);
+			Ast *dir = alloc_ast_node(f, Ast_AsmDirective);
+			dir->AsmDirective.token = token;
+			dir->AsmDirective.name = name;
+			dir->AsmDirective.operands = operands;
+			return dir;
 		}
 	}
 	syntax_error(f->curr_token, "Expected an asm instruction, got '%.*s'", LIT(f->curr_token.string));
