@@ -294,7 +294,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, nil
 	}
 
-	if resize(&img.pixels.buf, dest_channels * img.width * img.height) != nil {
+	if resize(&img.pixels.buf, img.channels * img.width * img.height) != nil {
 		return img, .Unable_To_Allocate_Or_Resize
 	}
 
@@ -306,11 +306,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	pixel: RGBA_Pixel
 
-	stride := img.width * dest_channels
+	stride := img.width * img.channels
 	line   := 0 if origin_is_top else img.height - 1
 
 	for _ in 0..<img.height {
-		offset := line * stride + (0 if origin_is_left else (stride - dest_channels))
+		offset := line * stride + (0 if origin_is_left else (stride - img.channels))
 		for _ in 0..<img.width {
 			// handle RLE decoding
 			if rle_encoding {
@@ -367,8 +367,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 
 			// Write pixel
-			copy(img.pixels.buf[offset:], pixel[:dest_channels])
-			offset += dest_channels if origin_is_left else -dest_channels
+			copy(img.pixels.buf[offset:], pixel[:img.channels])
+			offset += img.channels if origin_is_left else -img.channels
 			rle_repetition_count -= 1
 		}
 		line += 1 if origin_is_top else -1
