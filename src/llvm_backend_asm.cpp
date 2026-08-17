@@ -574,7 +574,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-		if (true) {
+		if (false) {
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
