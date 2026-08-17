@@ -204,3 +204,100 @@ modmod_unsigned :: proc(t: ^testing.T) {
 		testing.expect_value(t, x %% y, x % y)
 	}
 }
+
+@(test)
+modmod_vec_wide :: proc(t: ^testing.T) {
+	// a wider array takes the other lowering: [4]i32 emits `srem <4 x i32>`, [16]i32 emits
+	// scalar `srem i32`. This reaches the call site `modmod_vec` does not
+	x: [16]i32
+	y: [16]i32
+	for i in 0..<16 {
+		x[i] = i32(i) - 8
+		y[i] = i % 2 == 0 ? max(i32) : -max(i32)
+	}
+	x = not_const(x)
+	y = not_const(y)
+	r := x %% y
+	for i in 0..<16 {
+		testing.expectf(t, r[i] == floor_mod(x[i], y[i]),
+			"[16]i32 idx %v: %v %%%% %v == %v, want %v", i, x[i], y[i], r[i], floor_mod(x[i], y[i]))
+	}
+}
+
+@(test)
+modmod_assign :: proc(t: ^testing.T) {
+	// %%= must agree with %%
+	{
+		x := not_const(i32(1))
+		x %%= not_const(max(i32))
+		testing.expect_value(t, x, 1)
+	}
+	{
+		x := not_const(i32(-3))
+		x %%= not_const(min(i32))
+		testing.expect_value(t, x, -3)
+	}
+	{
+		x := not_const(i8(-7))
+		x %%= not_const(i8(3))
+		testing.expect_value(t, x, 2)
+	}
+	{
+		// vector form
+		x := not_const([4]i32{1, 3, -3, 12})
+		y := not_const([4]i32{max(i32), max(i32), 7, max(i32)})
+		x %%= y
+		testing.expect_value(t, x, [4]i32{1, 3, 4, 12})
+	}
+}
+
+@(test)
+modmod_i16_boundaries :: proc(t: ^testing.T) {
+	vals := [?]i16{min(i16), min(i16) + 1, -32000, -300, -7, -3, -1, 1, 3, 7, 300, 32000, max(i16) - 1, max(i16)}
+	for x in vals {
+		for y in vals {
+			if y == 0 { continue }
+			if x == min(i16) && y == -1 { continue }
+			got := x %% y
+			want := floor_mod(x, y)
+			testing.expectf(t, got == want, "%v %%%% %v == %v, want %v", x, y, got, want)
+		}
+	}
+}
+
+@(test)
+modmod_unsigned_widths :: proc(t: ^testing.T) {
+	// for unsigned types %% must match % at every width, including near the maximum
+	check :: proc(t: ^testing.T, $T: typeid, loc := #caller_location) {
+		vals := [?]T{1, 2, 3, 7, max(T) / 2, max(T) / 2 + 1, max(T) - 1, max(T)}
+		for x in vals {
+			for y in vals {
+				if y == 0 { continue }
+				a, b := not_const(x), not_const(y)
+				testing.expectf(t, a %% b == a % b,
+					"%v: %v %%%% %v == %v, want %v", typeid_of(T), a, b, a %% b, a % b, loc = loc)
+			}
+		}
+	}
+	check(t, u8)
+	check(t, u16)
+	check(t, u32)
+	check(t, u64)
+}
+
+@(test)
+modmod_endian :: proc(t: ^testing.T) {
+	// endian-annotated types reach the same lowering through a conversion
+	{
+		x, y := not_const(i32le(1)), not_const(i32le(max(i32)))
+		testing.expect_value(t, x %% y, 1)
+	}
+	{
+		x, y := not_const(i32be(1)), not_const(i32be(max(i32)))
+		testing.expect_value(t, x %% y, 1)
+	}
+	{
+		x, y := not_const(i64le(-3)), not_const(i64le(min(i64)))
+		testing.expect_value(t, x %% y, -3)
+	}
+}
