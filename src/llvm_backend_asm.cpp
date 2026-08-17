@@ -496,14 +496,30 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 						op_index += 1;
 					}
 				} else if (name == "align") {
-					asm_string = gb_string_appendc(asm_string, ".p2align ");
 					GB_ASSERT(dir->operands.count == 1);
 					auto const &op = dir->operands[0];
 					ExactValue ev = exact_value_to_integer(op->tav.value);
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					u64 i = exact_value_to_u64(ev);
 					u64 i_log2 = floor_log2(i);
+					asm_string = gb_string_appendc(asm_string, ".p2align ");
 					asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)i_log2);
+				} else if (name == "skip") {
+					GB_ASSERT(dir->operands.count == 1);
+					auto const &op = dir->operands[0];
+					ExactValue ev = exact_value_to_integer(op->tav.value);
+					GB_ASSERT(ev.kind == ExactValue_Integer);
+					u64 i = exact_value_to_u64(ev);
+					asm_string = gb_string_appendc(asm_string, ".skip ");
+					asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)i);
+				} else if (name == "nop") {
+					GB_ASSERT(dir->operands.count == 1);
+					auto const &op = dir->operands[0];
+					ExactValue ev = exact_value_to_integer(op->tav.value);
+					GB_ASSERT(ev.kind == ExactValue_Integer);
+					u64 i = exact_value_to_u64(ev);
+					asm_string = gb_string_appendc(asm_string, ".nops ");
+					asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)i);
 				} else {
 					GB_PANIC("Invalid asm directive: %.*s", LIT(name));
 				}

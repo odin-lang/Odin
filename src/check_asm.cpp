@@ -1543,6 +1543,34 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					}
 				}
 
+			} else if (name == "skip" ||
+			           name == "nop") {
+				if (dir->operands.count != 1) {
+					error(dir->name, "Expected 1 integer for the asm directive #%.*s", LIT(name));
+					break;
+				}
+				array_clear(&operands);
+				for (Ast *expr : dir->operands) {
+					Operand operand = {};
+					check_asm_instruction_operand(asm_ctx, ctx, entity, &operand, expr, /*allow_memory_operands*/true);
+					array_add(&operands, operand);
+				}
+				for (auto const &op : operands) {
+					if (op.mode != Addressing_Constant) {
+						error(op.expr, "Expected an integer >0 for the asm directive #%.*s", LIT(name));
+						continue;
+					}
+					ExactValue ev = exact_value_to_integer(op.value);
+					if (ev.kind != ExactValue_Integer) {
+						error(op.expr, "Expected an integer >0 for the asm directive #%.*s", LIT(name));
+						continue;
+					}
+					i64 i = exact_value_to_i64(ev);
+					if (i < 0) {
+						error(op.expr, "Expected an integer >0 for the asm directive #%.*s, got %lld", LIT(name), cast(long long)i);
+						continue;
+					}
+				}
 			} else {
 				error(dir->name, "Unknown asm directive: #%.*s", LIT(name));
 			}
