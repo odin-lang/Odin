@@ -322,6 +322,74 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 }
 
 
+// implements %% (the remainder/floored mod operator) on signed integers;
+// this is branchless and vectorizable, so it also covers vectors
+gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {	
+	// constants implement this as srem(srem(x, y) + y, y), which is mathematically correct,
+	// and works for arbitrary precision integers, but the add can wrap at finite precision
+
+	// the Odin spec mandates min(Integer_Type) %% -1 must be 0,
+	// but LLVM has srem(min(Integer_Type), -1) as UB and results in FP exception;
+	// since x %% -1 == 0 for every x, a constant rhs = -1 can fold,
+	// and a runtime -1 can be swapped with 1 (x srem 1 is 0 for every x, no exceptions)	
+	LLVMValueRef minus_one = LLVMConstAllOnes(LLVMTypeOf(rhs));
+	LLVMValueRef safe_rhs = rhs;
+	if (LLVMIsAConstantInt(rhs)) {
+		if (rhs == minus_one) {
+			return LLVMConstNull(LLVMTypeOf(rhs)); // the entire %% op folds to 0
+		}
+	} else {
+		// safe_rhs = (rhs == -1) ? 1 : rhs 
+		// vectorizable construction,
+		// build 1 as neg(-1), this folds for both scalars and vectors
+		LLVMValueRef one = LLVMBuildNeg(p->builder, minus_one, "");
+		LLVMValueRef is_minus_one = LLVMBuildICmp(p->builder, LLVMIntEQ, rhs, minus_one, "");
+		safe_rhs = LLVMBuildSelect(p->builder, is_minus_one, one, rhs, "");
+	}
+	LLVMValueRef r = LLVMBuildSRem(p->builder, lhs, safe_rhs, "");
+	// srem truncs to 0, so r needs a +rhs correction when the operands signs differ (and r != 0)
+	// so we implement
+	// r = lhs % rhs
+	// if (r != 0 && sign(lhs) != sign(rhs))
+	// 	 return r + rhs
+	// else return r
+
+	// the sign of a const rhs is compile time known, which simplifies the correction to a mask
+	LLVMValueRef zero = LLVMConstNull(LLVMTypeOf(lhs));
+	if (LLVMIsAConstantInt(rhs)) {
+		// both operands are constant, so this folds
+		LLVMValueRef rhs_sign = LLVMBuildICmp(p->builder, LLVMIntSLT, rhs, zero, "");
+		// always true in current LLVM, only here for future proofing
+		if (LLVMIsAConstantInt(rhs_sign)) {
+			bool negative_rhs = !LLVMIsNull(rhs_sign);
+			// r has the sign of lhs (trunc mod), we use it here instead of lhs,
+			// cause the r = 0 case works out cleanly (-> mask = 0);
+			// correction only for (neg rhs and pos r) OR (pos rhs and neg r),
+			// so this is why we need to neg(r) for negative rhs;
+			// build mask by right extending the sign bit s >> bitwidth-1 (arithmetic shift)
+			// then r = r + (rhs & mask)
+			LLVMValueRef s = negative_rhs ? LLVMBuildNeg(p->builder, r, "") : r;
+			unsigned bitwidth = LLVMGetIntTypeWidth(LLVMTypeOf(lhs));
+			LLVMValueRef bits_to_shift = LLVMConstInt(LLVMTypeOf(lhs), bitwidth-1, false);
+			LLVMValueRef mask = LLVMBuildAShr(p->builder, s, bits_to_shift, "");
+			LLVMValueRef correction = LLVMBuildAnd(p->builder, rhs, mask, "");
+			return LLVMBuildAdd(p->builder, r, correction, "");
+		}
+	}
+
+	// this can only ever wrap when r and rhs have the same sign (cause |r| < |rhs|),
+	// and in that case the value is discarded in the select below (so no UB)
+	LLVMValueRef corrected = LLVMBuildAdd(p->builder, r, rhs, "");
+
+	// lhs^rhs is negative for differing signs and >=0 for equal signs
+	LLVMValueRef xored = LLVMBuildXor(p->builder, lhs, rhs, "");
+	LLVMValueRef different_signs = LLVMBuildICmp(p->builder, LLVMIntSLT, xored, zero, "");
+	LLVMValueRef r_is_non_zero = LLVMBuildICmp(p->builder, LLVMIntNE, r, zero, "");
+	LLVMValueRef cond = LLVMBuildAnd(p->builder, different_signs, r_is_non_zero, "");
+	return LLVMBuildSelect(p->builder, cond, corrected, r, "");
+}
+
+
 gb_internal bool is_simd_able_type(Type *t) {
 	if (t->kind != Type_Basic) {
 		return false;
@@ -439,9 +507,7 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				if (is_type_unsigned(integral_type)) {
 					z = LLVMBuildURem(p->builder, x, y, "");
 				} else {
-					LLVMValueRef a = LLVMBuildSRem(p->builder, x, y, "");
-					LLVMValueRef b = LLVMBuildAdd(p->builder, a, y, "");
-					z = LLVMBuildSRem(p->builder, b, y, "");
+					z = lb_emit_signed_floor_mod(p, x, y);
 				}
 				break;
 			case Token_And:
@@ -553,9 +619,7 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				if (is_type_unsigned(integral_type)) {
 					z = LLVMBuildURem(p->builder, x, y, "");
 				} else {
-					LLVMValueRef a = LLVMBuildSRem(p->builder, x, y, "");
-					LLVMValueRef b = LLVMBuildAdd(p->builder, a, y, "");
-					z = LLVMBuildSRem(p->builder, b, y, "");
+					z = lb_emit_signed_floor_mod(p, x, y);
 				}
 				break;
 			case Token_And:
@@ -1612,10 +1676,7 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 			if (is_unsigned) {
 				return LLVMBuildURem(p->builder, lhs, rhs, "");
 			} else {
-				LLVMValueRef a = LLVMBuildSRem(p->builder, lhs, rhs, "");
-				LLVMValueRef b = LLVMBuildAdd(p->builder, a, rhs, "");
-				LLVMValueRef c = LLVMBuildSRem(p->builder, b, rhs, "");
-				return c;
+				return lb_emit_signed_floor_mod(p, lhs, rhs);
 			}
 		} else { // %
 			if (is_unsigned) {
