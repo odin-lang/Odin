@@ -2695,10 +2695,9 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
-	String path = concatenate3_strings(permanent_allocator(),
+	String path = concatenate_strings(permanent_allocator(),
 		build_context.build_paths[BuildPath_Output].basename,
-		STR_LIT("/"),
-		build_context.build_paths[BuildPath_Output].name
+		STR_LIT("/")
 	);
 
 	GB_ASSERT(m->module_name != nullptr);
@@ -3276,7 +3275,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
-			// LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
 			LLVMSetGlobalConstant(g, true);
 
 			lbValue value = {};

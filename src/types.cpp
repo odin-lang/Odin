@@ -1446,11 +1446,13 @@ gb_internal bool is_type_ordered(Type *t) {
 	return false;
 }
 gb_internal bool is_type_ordered_numeric(Type *t) {
-	t = core_type(t);
+	t = base_type(t);
 	if (t == nullptr) { return false; }
 	switch (t->kind) {
 	case Type_Basic:
 		return (t->Basic.flags & BasicFlag_OrderedNumeric) != 0;
+	case Type_Enum:
+		return is_type_ordered_numeric(t->Enum.base_type);
 	}
 	return false;
 }
@@ -2091,10 +2093,11 @@ gb_internal bool is_type_endian_big(Type *t) {
 		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_big(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_big(&basic_types[Basic_uintptr]);
 	}
-	return build_context.endian_kind == TargetEndian_Big;
+	// a type with no endianness is neither little nor big
+	return false;
 }
 gb_internal bool is_type_endian_little(Type *t) {
 	t = core_type(t);
@@ -2108,10 +2111,11 @@ gb_internal bool is_type_endian_little(Type *t) {
 		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_little(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_little(&basic_types[Basic_uintptr]);
 	}
-	return build_context.endian_kind == TargetEndian_Little;
+	// a type with no endianness is neither little nor big
+	return false;
 }
 
 gb_internal bool is_type_endian_platform(Type *t) {
@@ -2121,7 +2125,7 @@ gb_internal bool is_type_endian_platform(Type *t) {
 		return (t->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) == 0;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_platform(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_platform(&basic_types[Basic_uintptr]);
 	}
 	return false;
@@ -2179,6 +2183,10 @@ gb_internal bool is_type_dereferenceable(Type *t) {
 
 
 gb_internal bool is_type_different_to_arch_endianness(Type *t) {
+	// a type with no endianness never needs swapping
+	if (!is_type_endian_specific(t)) {
+		return false;
+	}
 	switch (build_context.endian_kind) {
 	case TargetEndian_Little:
 		return !is_type_endian_little(t);
@@ -2822,6 +2830,10 @@ gb_internal bool is_type_comparable(Type *t) {
 
 	case Type_Struct:
 		if (t->Struct.soa_kind != StructSoa_None) {
+			return false;
+		}
+		// an unspecialized polymorphic record has no values to compare
+		if (is_type_polymorphic_record_unspecialized(t)) {
 			return false;
 		}
 		if (t->Struct.is_raw_union) {
@@ -4496,8 +4508,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.custom_min_field_align > 0) {
 			max = gb_max(max, t->Struct.custom_min_field_align);
 		}
-		if (t->Struct.custom_max_field_align != 0 &&
-		    t->Struct.custom_max_field_align > t->Struct.custom_min_field_align) {
+		if (t->Struct.custom_max_field_align != 0) {
 			max = gb_min(max, t->Struct.custom_max_field_align);
 		}
 		return max;
@@ -4567,7 +4578,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 			} else {
 				Type *t = fields[i]->type;
 				i64 align = gb_max(type_align_of_internal(t, &path), min_field_align);
-				if (max_field_align > min_field_align) {
+				if (max_field_align != 0) {
 					align = gb_min(align, max_field_align);
 				}
 				i64 size  = gb_max(type_size_of_internal(t, &path), 0);

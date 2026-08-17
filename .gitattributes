@@ -8,6 +8,7 @@ vendor/box2d/lib/box2d_windows_amd64_sse2.lib filter=lfs diff=lfs merge=lfs -tex
 vendor/box3d/lib/linux-amd64/libbox3d.a filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/darwin/libbox3d.a filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/box3d.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box3d/lib/box3d_wasm.o filter=lfs diff=lfs merge=lfs -text
 vendor/miniaudio/lib/miniaudio.lib filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/SDL3.dll filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/SDL3.lib filter=lfs diff=lfs merge=lfs -text

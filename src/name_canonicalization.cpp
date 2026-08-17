@@ -284,7 +284,7 @@ void typeid_hash_context_init(TypeidHashContext *hash_ctx) {
 u64 rotate_left64(u64 x, u64 k) {
 	static u64 const n = 64;
 	u64 s = k & (n-1);
-	return (x<<s) | (x>>(n-2));
+	return (x<<s) | (x>>(n-s));
 }
 
 void sip_compress(SipHashContext *sip) {

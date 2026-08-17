@@ -2311,7 +2311,15 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		if (in_value.kind == ExactValue_String16) {
 			return is_type_string16(type) || is_type_cstring16(type);
 		}
-		return in_value.kind == ExactValue_String;
+		if (in_value.kind != ExactValue_String) {
+			return false;
+		}
+		// NOTE: a UTF-8 constant has to be re-expressed in UTF-16, otherwise its length and
+		// indices stay those of the UTF-8 encoding
+		if (is_type_string16(type) || is_type_cstring16(type)) {
+			if (out_value) *out_value = exact_value_string16(string_to_string16(permanent_allocator(), in_value.value_string));
+		}
+		return true;
 	} else if (is_type_integer(type) || is_type_rune(type)) {
 		ExactValue v = exact_value_to_integer(in_value);
 		if (v.kind != ExactValue_Integer) {
@@ -3001,8 +3009,13 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			if (ast_node_expect(index_expr, Ast_IndexExpr)) {
 				ast_node(ie, IndexExpr, index_expr);
 				Type *soa_type = type_deref(type_of_expr(ie->expr));
-				GB_ASSERT(is_type_soa_struct(soa_type));
-				o->type = alloc_type_soa_pointer(soa_type);
+				if (is_type_soa_struct(soa_type)) {
+					o->type = alloc_type_soa_pointer(soa_type);
+				} else {
+					// &soa[i][j]
+					GB_ASSERT_MSG(is_type_array(soa_type), "%s", type_to_string(soa_type));
+					o->type = alloc_type_pointer(o->type);
+				}
 			} else {
 				o->type = alloc_type_pointer(o->type);
 			}
@@ -3335,27 +3348,29 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 					case Token_Lt:
 					case Token_LtEq:
 						{
+							// subset: (lhs & rhs) == lhs. a proper subset also requires lhs != rhs
 							ExactValue lhs = x->value;
 							ExactValue rhs = y->value;
-							ExactValue res = exact_binary_operator_value(Token_And, lhs, rhs);
-							res = exact_value_bool(compare_exact_values(op, res, lhs));
+							ExactValue both = exact_binary_operator_value(Token_And, lhs, rhs);
+							bool res = compare_exact_values(Token_CmpEq, both, lhs);
 							if (op == Token_Lt) {
-								res = exact_binary_operator_value(Token_And, res, exact_value_bool(compare_exact_values(op, lhs, rhs)));
+								res = res && compare_exact_values(Token_NotEq, lhs, rhs);
 							}
-							x->value = res;
+							x->value = exact_value_bool(res);
 							break;
 						}
 					case Token_Gt:
 					case Token_GtEq:
 						{
+							// superset: (lhs & rhs) == rhs
 							ExactValue lhs = x->value;
 							ExactValue rhs = y->value;
-							ExactValue res = exact_binary_operator_value(Token_And, lhs, rhs);
-							res = exact_value_bool(compare_exact_values(op, res, rhs));
+							ExactValue both = exact_binary_operator_value(Token_And, lhs, rhs);
+							bool res = compare_exact_values(Token_CmpEq, both, rhs);
 							if (op == Token_Gt) {
-								res = exact_binary_operator_value(Token_And, res, exact_value_bool(compare_exact_values(op, lhs, rhs)));
+								res = res && compare_exact_values(Token_NotEq, lhs, rhs);
 							}
-							x->value = res;
+							x->value = exact_value_bool(res);
 							break;
 						}
 					}
@@ -3974,7 +3989,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 				add_package_dependency(c, "runtime", "floattidf",          REQUIRE);
 			} else if (is_type_integer_128bit(dst) && is_type_float(src)) {
 				add_package_dependency(c, "runtime", "fixunsdfti",         REQUIRE);
-				add_package_dependency(c, "runtime", "fixunsdfdi",         REQUIRE);
+				add_package_dependency(c, "runtime", "fixdfti",            REQUIRE);
 			} else if (src == t_f16 && is_type_float(dst)) {
 				add_package_dependency(c, "runtime", "gnu_h2f_ieee",       REQUIRE);
 				add_package_dependency(c, "runtime", "extendhfsf2",        REQUIRE);
@@ -4010,14 +4025,15 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		Type *dst = core_type(type);
 
 		if (is_type_string(src) && is_type_string(dst)) {
-			bool src_utf16 = is_type_string16(src) || is_type_cstring16(src);
 			bool dst_utf16 = is_type_string16(dst) || is_type_cstring16(dst);
 
-			if (!src_utf16 && dst_utf16) {
+			// NOTE: keyed off the value's encoding rather than the source type; it may have been re-expressed 
+			// when it was checked against the target type
+			if (dst_utf16 && x->value.kind == ExactValue_String) {
 				x->value = exact_value_string16(string_to_string16(permanent_allocator(), x->value.value_string));
 			}
 
-			if (src_utf16 && !dst_utf16) {
+			if (!dst_utf16 && x->value.kind == ExactValue_String16) {
 				x->value = exact_value_string(string16_to_string(permanent_allocator(), x->value.value_string16));
 			}
 		}
@@ -4206,8 +4222,9 @@ gb_internal Type *check_matrix_type_hint(Type *matrix, Type *type_hint) {
 		} else if (xt->kind == Type_Matrix && th->kind == Type_Matrix) {
 			if (!are_types_identical(xt->Matrix.elem, th->Matrix.elem)) {
 				// ignore
-			} if (xt->Matrix.row_count == th->Matrix.row_count &&
-			      xt->Matrix.column_count == th->Matrix.column_count) {
+			} else if (xt->Matrix.row_count == th->Matrix.row_count &&
+			           xt->Matrix.column_count == th->Matrix.column_count &&
+			           xt->Matrix.is_row_major == th->Matrix.is_row_major) {
 				return type_hint;
 			}
 		} else if (xt->kind == Type_Matrix && th->kind == Type_Array) {
@@ -4259,8 +4276,22 @@ gb_internal void check_binary_matrix(CheckerContext *c, Token const &op, Operand
 						x->type = y->type;
 					}
 				} else {
+					// the result takes its rows from one operand and its columns from the other,
+					// so it can be larger than either. Each dimension is at least
+					// MATRIX_ELEMENT_COUNT_MIN, so testing them first keeps the product in range.
+					i64 row_count    = xt->Matrix.row_count;
+					i64 column_count = yt->Matrix.column_count;
+					if (row_count    > MATRIX_ELEMENT_COUNT_MAX ||
+					    column_count > MATRIX_ELEMENT_COUNT_MAX ||
+					    row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+						error(x->expr, "Matrix multiplication result exceeds the maximum matrix element count, got %lld, expected a maximum of %d", cast(long long)(row_count*column_count), MATRIX_ELEMENT_COUNT_MAX);
+						x->mode = Addressing_Invalid;
+						x->type = t_invalid;
+						return;
+					}
+
 					bool is_row_major = xt->Matrix.is_row_major && yt->Matrix.is_row_major;
-					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count, nullptr, nullptr, is_row_major);
+					x->type = alloc_type_matrix(xt->Matrix.elem, row_count, column_count, nullptr, nullptr, is_row_major);
 				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
@@ -6896,7 +6927,12 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			bool ok = false;
 			if (e && (e->flags & EntityFlag_AnyInt)) {
 				if (o->mode != Addressing_Type && is_type_integer(param_type) && (is_type_integer(o->type) || is_type_enum(o->type))) {
-					ok = check_is_castable_to(c, o, param_type);
+					if (o->mode == Addressing_Constant) {
+						// constants have to fit the parameter
+						ok = check_representable_as_constant(c, o->value, param_type, &o->value);
+					} else {
+						ok = check_is_castable_to(c, o, param_type);
+					}
 				}
 			}
 			if (!allow_array_programming && check_is_assignable_to_with_score(c, o, param_type, nullptr, param_is_variadic, !allow_array_programming)) {
@@ -9168,7 +9204,11 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		if (indirection) {
 			o->mode = Addressing_Variable;
 		} else if (o->mode != Addressing_Variable &&
+		           o->mode != Addressing_SoaVariable &&
 		           o->mode != Addressing_Constant) {
+			// NOTE: an #soa element of array type keeps SoaVariable, so soa[i][j] stays an
+			// lvalue. Its components are one per lane rather than contiguous, but a single
+			// component still has a real address, the same one soa[i].y denotes.
 			o->mode = Addressing_Value;
 		}
 		o->type = t->Array.elem;
@@ -10665,7 +10705,25 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			if (count != nullptr) {
 				if (count->kind == Ast_UnaryExpr &&
 				    count->UnaryExpr.op.kind == Token_Question) {
-					type = alloc_type_array(check_type(c, type_expr->ArrayType.elem), -1);
+					Type *elem = check_type(c, type_expr->ArrayType.elem);
+
+					bool is_simd_tag = false;
+					if (type_expr->ArrayType.tag != nullptr) {
+						GB_ASSERT(type_expr->ArrayType.tag->kind == Ast_BasicDirective);
+						is_simd_tag = type_expr->ArrayType.tag->BasicDirective.name.string == "simd";
+					}
+					if (is_simd_tag) {
+						if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
+							gbString str = type_to_string(elem);
+							error(type_expr->ArrayType.elem, "Invalid element type for #simd, expected an integer, float, boolean, or 'rawptr' with no specific endianness, got '%s'", str);
+							gb_string_free(str);
+							type = alloc_type_array(elem, -1);
+						} else {
+							type = alloc_type_simd_vector(-1, elem);
+						}
+					} else {
+						type = alloc_type_array(elem, -1);
+					}
 					is_to_be_determined_array_count = true;
 				}
 			} else {
@@ -10889,7 +10947,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		} else if (t->kind == Type_SimdVector) {
 			elem_type = t->SimdVector.elem;
 			context_name = str_lit("simd vector literal");
-			max_type_count = t->SimdVector.count;
+			if (!is_to_be_determined_array_count) {
+				max_type_count = t->SimdVector.count;
+			}
 		} else if (t->kind == Type_Matrix) {
 			elem_type = t->Matrix.elem;
 			context_name = str_lit("matrix literal");
@@ -11063,6 +11123,16 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
 				if (0 < max && max < t->Array.count) {
 					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
+			}
+		} else if (t->kind == Type_SimdVector) {
+			// the length laws cannot be applied until the literal has supplied the count
+			if (is_to_be_determined_array_count) {
+				t->SimdVector.count = max;
+				if (max < 1 || !is_power_of_two(max)) {
+					error(node, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)max);
+				} else if (max > SIMD_ELEMENT_COUNT_MAX) {
+					error(node, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)max);
 				}
 			}
 		} else if (t->kind == Type_Struct) {
@@ -12116,6 +12186,16 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 	case Type_Array:
 		valid = true;
 		max_count = t->Array.count;
+		if (is_type_soa_pointer(o->type)) {
+			// #soa element pointer; the pointed element is scattered like soa[i] itself,
+			// so it can't be sliced through the ptr (nor directly -> soa[i][:] is also rejected below)
+			gbString str = expr_to_string(node);
+			error(node, "Cannot slice '%s' through an #soa pointer, element is not contiguous in memory", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
 		if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
 			gbString str = expr_to_string(node);
 			error(node, "Cannot slice array '%s', value is not addressable", str);
@@ -12228,12 +12308,14 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		indices[i] = index;
 	}
 
+	bool invalid_indices = false;
 	for (isize i = 0; i < gb_count_of(indices); i++) {
 		i64 a = indices[i];
 		for (isize j = i+1; j < gb_count_of(indices); j++) {
 			i64 b = indices[j];
 			if (a > b && b >= 0) {
 				error(se->close, "Invalid slice indices: [%td > %td]", a, b);
+				invalid_indices = true;
 			}
 		}
 	}
@@ -12259,7 +12341,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 	o->mode = Addressing_Value;
 
-	if (is_type_string(t) && max_count >= 0) {
+	if (is_type_string(t) && max_count >= 0 && !invalid_indices) {
 		bool all_constant = true;
 		for (isize i = 0; i < gb_count_of(nodes); i++) {
 			if (nodes[i] != nullptr) {

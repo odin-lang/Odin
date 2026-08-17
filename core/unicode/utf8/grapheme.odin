@@ -21,6 +21,7 @@ normalized_east_asian_width       :: unicode.normalized_east_asian_width
 
 
 Grapheme :: struct {
+	text:       string, // The text of the grapheme, a slice of the string it was decoded from.
 	byte_index: int,
 	rune_index: int,
 	width:      int,
@@ -152,10 +153,11 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 				it.width += normalized_east_asian_width(this_rune)
 				if it.continue_grapheme {
 					grapheme = it.current_grapheme
-					text = it.str[it.current_grapheme.byte_index:byte_index]
+					grapheme.text = it.str[it.current_grapheme.byte_index:byte_index]
+					text = grapheme.text
 					ok = true
 				}
-				it.current_grapheme = Grapheme{byte_index, it.rune_count, it.width - it.last_width}
+				it.current_grapheme = Grapheme{byte_index = byte_index, rune_index = it.rune_count, width = it.width - it.last_width}
 				it.continue_grapheme = true
 
 
@@ -392,7 +394,8 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 	// a new grapheme is encountered.
 	if !ok && it.continue_grapheme {
 		grapheme = it.current_grapheme
-		text = it.str[it.current_grapheme.byte_index:]
+		grapheme.text = it.str[it.current_grapheme.byte_index:]
+		text = grapheme.text
 		ok = true
 		it.continue_grapheme = false
 	}

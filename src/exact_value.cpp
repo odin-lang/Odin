@@ -1024,9 +1024,36 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		f64 b = x.value_complex->imag;
 		f64 c = y.value_complex->real;
 		f64 d = y.value_complex->imag;
+		if (isnan(a) || isnan(b) || isnan(c) || isnan(d)) {
+			return op == Token_NotEq;
+		}
+
 		switch (op) {
 		case Token_CmpEq: return cmp_f64(a, c) == 0 && cmp_f64(b, d) == 0;
 		case Token_NotEq: return cmp_f64(a, c) != 0 || cmp_f64(b, d) != 0;
+		}
+		break;
+	}
+
+	case ExactValue_Quaternion: {
+		Quaternion256 a = *x.value_quaternion;
+		Quaternion256 b = *y.value_quaternion;
+		if (isnan(a.real) || isnan(a.imag) || isnan(a.jmag) || isnan(a.kmag) ||
+		    isnan(b.real) || isnan(b.imag) || isnan(b.jmag) || isnan(b.kmag)) {
+			return op == Token_NotEq;
+		}
+
+		switch (op) {
+		case Token_CmpEq:
+			return cmp_f64(a.real, b.real) == 0 &&
+			       cmp_f64(a.imag, b.imag) == 0 &&
+			       cmp_f64(a.jmag, b.jmag) == 0 &&
+			       cmp_f64(a.kmag, b.kmag) == 0;
+		case Token_NotEq:
+			return cmp_f64(a.real, b.real) != 0 ||
+			       cmp_f64(a.imag, b.imag) != 0 ||
+			       cmp_f64(a.jmag, b.jmag) != 0 ||
+			       cmp_f64(a.kmag, b.kmag) != 0;
 		}
 		break;
 	}

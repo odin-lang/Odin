@@ -608,6 +608,11 @@ test_udp_echo :: proc(t: ^testing.T) {
 test_dns_resolve :: proc(t: ^testing.T) {
 	// NOTE: This test depends on external factors, so if it fails, an IP
 	// address may have changed or become unavailable.
+	// It regularly fails on the RISC-V CI runners, so we skip it there
+	when ODIN_ARCH == .riscv64 {
+		log.infof("Skipped on riscv64")
+		return
+	}
 
 	// The net API returns only one address per protocol version, and DNS
 	// records can store many, so we'll have to check all possibilities.

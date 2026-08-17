@@ -56,7 +56,7 @@ Raw_SOA_Footer_Dynamic_Array :: struct {
 // Multipointer indexing lowers to GEP and doesn't capture, so prefer that throughout.
 
 @(builtin, require_results)
-raw_soa_footer_slice :: proc(array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Slice) {
+raw_soa_footer_slice :: proc "contextless" (array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Slice) {
 	if array == nil {
 		return nil
 	}
@@ -65,7 +65,7 @@ raw_soa_footer_slice :: proc(array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Sl
 	return
 }
 @(builtin, require_results)
-raw_soa_footer_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) -> (footer: ^Raw_SOA_Footer_Dynamic_Array) {
+raw_soa_footer_dynamic_array :: proc "contextless" (array: ^$T/#soa[dynamic]$E) -> (footer: ^Raw_SOA_Footer_Dynamic_Array) {
 	if array == nil {
 		return nil
 	}
@@ -704,17 +704,68 @@ into_dynamic_soa :: proc(array: $T/#soa[]$E) -> #soa[dynamic]E {
 	return d
 }
 
+// `pop_soa` will remove and return the end value of the #soa dynamic array `array` and reduces the length of `array` by 1.
+//
+// Note: If the #soa dynamic array has no elements (`len(array) == 0`), this procedure will panic.
+@builtin
+pop_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, loc=loc)
+	res = array[len(array)-1]
+	raw_soa_footer_dynamic_array(array).len -= 1
+	return
+}
+
+// `pop_safe_soa` trys to remove and return the end value of the #soa dynamic array `array` and reduces the length of `array` by 1.
+// If the operation is not possible, it will return false.
+@builtin
+pop_safe_soa :: proc "contextless" (#no_alias array: ^$T/#soa[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+	if len(array) == 0 {
+		return
+	}
+	res, ok = array[len(array)-1], true
+	raw_soa_footer_dynamic_array(array).len -= 1
+	return
+}
+
+// `pop_front_soa` will remove and return the first value of the #soa dynamic array `array` and reduces the length of `array` by 1,
+// whilst keeping the order of the other elements.
+//
+// Note: This is an O(N) operation.
+// Note: If the #soa dynamic array has no elements (`len(array) == 0`), this procedure will panic.
+@builtin
+pop_front_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
+	assert(len(array) > 0, loc=loc)
+	res = array[0]
+	_ordered_remove_soa(array, 0)
+	return
+}
+
+// `pop_front_safe_soa` trys to remove and return the first value of the #soa dynamic array `array` and reduces the
+// length of `array` by 1, whilst keeping the order of the other elements.
+// If the operation is not possible, it will return false.
+//
+// Note: This is an O(N) operation.
+@builtin
+pop_front_safe_soa :: proc "contextless" (#no_alias array: ^$T/#soa[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check {
+	if len(array) == 0 {
+		return
+	}
+
+	res, ok = array[0], true
+	_ordered_remove_soa(array, 0)
+	return
+}
+
 // `unordered_remove_soa` removed the element at the specified `index`. It does so by replacing the current end value
 // with the old value, and reducing the length of the dynamic array by 1.
 //
 // Note: This is an O(1) operation.
-// Note: If you the elements to remain in their order, use `ordered_remove_soa`.
+// Note: If you want the elements to remain in their order, use `ordered_remove_soa`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
 unordered_remove_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
 	if index+1 < len(array) {
-		// Use the compiler's #soa element load and store lowering.
 		array[index] = array[len(array)-1]
 	}
 	raw_soa_footer_dynamic_array(array).len -= 1
@@ -723,11 +774,17 @@ unordered_remove_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int inde
 // `ordered_remove_soa` removed the element at the specified `index` whilst keeping the order of the other elements.
 //
 // Note: This is an O(N) operation.
-// Note: If you the elements do not have to remain in their order, prefer `unordered_remove_soa`.
+// Note: If the elements do not have to remain in their order, prefer `unordered_remove_soa`.
 // Note: If the index is out of bounds, this procedure will panic.
 @builtin
 ordered_remove_soa :: proc(#no_alias array: ^$T/#soa[dynamic]$E, #any_int index: int, loc := #caller_location) #no_bounds_check {
 	bounds_check_error_loc(loc, index, len(array))
+	_ordered_remove_soa(array, index)
+}
+
+// the unchecked body of ordered_remove_soa, shared with the front pops.
+// index must already be known to be in bounds.
+_ordered_remove_soa :: proc "contextless" (#no_alias array: ^$T/#soa[dynamic]$E, index: int) #no_bounds_check {
 	if index+1 < len(array) {
 		ti := type_info_of(typeid_of(T))
 		ti = type_info_base(ti)

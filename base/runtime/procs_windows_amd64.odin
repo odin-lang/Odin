@@ -11,8 +11,9 @@ foreign kernel32 {
 
 windows_trap_array_bounds :: proc "contextless" () -> ! {
 	EXCEPTION_ARRAY_BOUNDS_EXCEEDED :: 0xC000008C
-
-
+	when ODIN_CODEPAGE_MAGIC {
+		SetConsoleOutputCP(old_console_codepage)
+	}
 	RaiseException(EXCEPTION_ARRAY_BOUNDS_EXCEEDED, 0, 0, nil)
 }
 

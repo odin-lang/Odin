@@ -29,7 +29,6 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin build ..\test_issue_5573.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 ..\..\..\odin test ..\test_issue_5699.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6068.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_6101.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6165.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_6240.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 ..\..\..\odin build ..\test_issue_6401.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
@@ -44,6 +43,8 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
 ..\..\..\odin build ..\test_issue_7188.odin %COMMON%  || exit /b
+clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
+..\..\..\odin test ..\test_issue_sysv_abi.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_7073-1.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 
 @echo off

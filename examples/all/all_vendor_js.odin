@@ -2,6 +2,7 @@
 package all
 
 @(require) import "vendor:box2d"
+@(require) import "vendor:box3d"
 @(require) import "vendor:cgltf"
 @(require) import "vendor:fontstash"
 @(require) import "vendor:microui"

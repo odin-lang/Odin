@@ -1009,6 +1009,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		e->Constant.flags |= entity_flags;
 		e->Constant.docs = docs;
 		e->Constant.comment = comment;
+		e->Constant.init_expr = init;
 
 		auto interned = entity_interned_name(e);
 
@@ -1367,7 +1368,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			gb_free(a, s.text);
 			return;
 		}
-		if (!check_representable_as_constant(c, iv, t, nullptr)) {
+		if (!check_representable_as_constant(c, jv, t, nullptr)) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &j);
 			gbString ts = type_to_string(t);
@@ -3130,9 +3131,20 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 		}
 	}
 	
-	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
-		i64 element_count = row_count*column_count;
-		error(node, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
+	if (generic_row == nullptr && generic_column == nullptr) {
+		// row_count*column_count can overflow and wrap back under the limit, so test the
+		// dimensions first; each is at least MATRIX_ELEMENT_COUNT_MIN. Either one exceeding
+		// the maximum means the product does too
+		if (row_count > MATRIX_ELEMENT_COUNT_MAX || column_count > MATRIX_ELEMENT_COUNT_MAX ||
+		    row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+			// the element count is only printable when the multiply cannot overflow, which is
+			// exactly the case the dimension test above catches
+			if (row_count != 0 && column_count > I64_MAX/row_count) {
+				error(node, "Matrix types are limited to a maximum of %d elements, got %lld by %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)row_count, cast(long long)column_count);
+			} else {
+				error(node, "Matrix types are limited to a maximum of %d elements, got %lld by %lld (%lld elements)", MATRIX_ELEMENT_COUNT_MAX, cast(long long)row_count, cast(long long)column_count, cast(long long)(row_count*column_count));
+			}
+		}
 	}
 
 
@@ -3476,6 +3488,22 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			Type *bt = base_type(index);
 			GB_ASSERT(bt->kind == Type_Enum);
 
+			// the length is `max - min + 1`, computed exactly and then narrowed to an i64. a
+			// wide enough enumeration wraps & nothing tests downstream; reject here
+			if (bt->Enum.fields.count > 0 &&
+			    bt->Enum.min_value != nullptr && bt->Enum.max_value != nullptr) {
+				ExactValue span = exact_value_sub(*bt->Enum.max_value, *bt->Enum.min_value);
+				ExactValue len  = exact_value_add(span, exact_value_i64(1));
+				if (len.kind == ExactValue_Integer && len.value_integer.used > 1) {
+					gbAllocator a = heap_allocator();
+					String str = big_int_to_string(a, &len.value_integer);
+					error(e, "Enumerated array length too large, %.*s", LIT(str));
+					gb_free(a, str.text);
+					*type = t_invalid;
+					return;
+				}
+			}
+
 			Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
 
 			bool is_sparse = false;
@@ -3510,9 +3538,12 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			return;
 		}
 
+		// Track user input and recovery value seperate, since both could be '0'
+		bool count_recovered = false;
 		if (count < 0) {
 			error(at->count, "? can only be used in conjunction with compound literals");
 			count = 0;
+			count_recovered = true;
 		}
 
 
@@ -3534,7 +3565,12 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 					// Ignore
 				} else if (count < 1 || !is_power_of_two(count)) {
 					*type = alloc_type_array(elem, count, generic_type);
-					if (ctx->disallow_polymorphic_return_types && count == 0) {
+					if (count_recovered) {
+						return;
+					}
+					// a polymorphic value used as the count is still unresolved while the
+					// signature is checked and reads as 0; only a written count is constant
+					if (ctx->disallow_polymorphic_return_types && o.mode != Addressing_Constant) {
 						return;
 					}
 					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);

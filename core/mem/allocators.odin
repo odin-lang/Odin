@@ -1813,7 +1813,7 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, align
 	}
 	memory := align_forward(a.current_pos, uintptr(actual_alignment))
 	margin := int(uintptr(memory) - uintptr(a.current_pos))
-	if a.bytes_left < margin + n {
+	for a.bytes_left < margin + n {
 		err := _dynamic_arena_cycle_new_block(a, alignment, loc)
 		if err != nil {
 			return nil, err
@@ -1821,8 +1821,8 @@ dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, align
 		if a.current_block == nil {
 			return nil, .Out_Of_Memory
 		}
-		margin = 0
-		memory = a.current_pos
+		memory = align_forward(a.current_pos, uintptr(actual_alignment))
+		margin = int(uintptr(memory) - uintptr(a.current_pos))
 	}
 	a.current_pos = ([^]byte)(memory)[n:]
 	a.bytes_left -= margin + n
