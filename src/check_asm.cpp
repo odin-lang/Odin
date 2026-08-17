@@ -7,6 +7,9 @@ gb_internal i32 check_asm_operand_bit_width(Type *type) {
 	if (is_type_untyped(type)) {
 		return -1;
 	}
+	if (is_type_boolean(type)) {
+		return 1;
+	}
 	i64 sz = type_size_of(base_type(type));
 	if (sz <= 0) {
 		return 0;
@@ -432,6 +435,10 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 	string_set_init(&pin_set, specs.count);
 	defer (string_set_destroy(&pin_set));
 
+	StringSet pin_flag_set = {};
+	string_set_init(&pin_flag_set, specs.count);
+	defer (string_set_destroy(&pin_flag_set));
+
 	for (Ast *spec_ : specs) {
 		if (spec_->kind != Ast_AsmSpec) {
 			continue;
@@ -444,6 +451,7 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 		Entity *other_scratch = nullptr;
 
 		String pin = {};
+		String pin_flag = {};
 		if (spec->value != nullptr) {
 			if (spec->value->kind == Ast_Ident) {
 				other_scratch = scope_lookup(scope, spec->value->Ident.interned, spec->value->Ident.hash);
@@ -467,9 +475,17 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 				pin = reg->name.string;
 				if (pin.len != 0) {
 					Operand op = {};
-					check_register(asm_ctx, &op, reg);
-					if (string_set_update(&pin_set, pin)) {
-						error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
+					if (check_register(asm_ctx, &op, reg)) {
+						if (reg->flag.string.len) {
+							GB_ASSERT(pin == "flags");
+							pin_flag = reg->flag.string;
+							if (string_set_update(&pin_flag_set, pin_flag)) {
+								error(spec->value, "Pinned register flag %%%.*s.%.*s has already been assigned", LIT(pin), LIT(pin_flag));
+							}
+						}
+						if (string_set_update(&pin_set, pin)) {
+							error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
+						}
 					}
 				}
 			}
@@ -496,6 +512,7 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 					ed.param_group = AsmTemplateEntityDeclParamGroup_Scratch;
 					ed.total_index = cast(i32)asm_template_entity_decls->count;
 					ed.pin = pin;
+					ed.pin_flag = pin_flag;
 
 					if (other_scratch != nullptr) {
 						// Width-view of another operand: `p0b: u8 = p0`.
@@ -632,6 +649,9 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 			i->pin = pin;
 			o->pin = pin;
 
+			i->pin_flag = pin_flag;
+			o->pin_flag = pin_flag;
+
 			if (other_scratch != nullptr) {
 				GB_ASSERT(spec->value != nullptr);
 				error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration, not a tie");
@@ -644,10 +664,26 @@ template <typename AsmCtx>
 gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegister *asm_reg) {
 	String name = asm_reg->name.string;
 	if (asm_reg->flag.kind == Token_Ident) {
-		// TODO(bill): has flags
-		if (name != "cc") {
+		bool ok = true;
+		i32 width = 0;
 
+		String flag = asm_reg->flag.string;
+		if (name != "flags") {
+			error(asm_reg->name, "Register flags can only be called on %%flags");
+			ok = false;
+		} else {
+			i32 bit = asm_ctx->flag_bit_from_name(flag, &width);
+			if (bit < 0) {
+				error(asm_reg->flag, "Unknown register %%flags name: %.*s", LIT(flag));
+				ok = false;
+			}
 		}
+
+		operand->type = t_bool;
+		if (width > 1) {
+			operand->type = t_u8;
+		}
+		return ok;
 	}
 
 	auto r = asm_ctx->register_lookup(name);

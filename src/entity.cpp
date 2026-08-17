@@ -186,6 +186,7 @@ struct AsmTemplateEntityDecl {
 	AsmRegClass                     reg_class;
 
 	String                          pin;
+	String                          pin_flag; // e.g. %flags.zf
 
 	i32 total_index;
 
