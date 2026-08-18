@@ -528,6 +528,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmTemplate.specs        = clone_ast_array(n->AsmTemplate.specs, f);
 		n->AsmTemplate.clobbers     = clone_ast_array(n->AsmTemplate.clobbers, f);
 		n->AsmTemplate.instructions = clone_ast_array(n->AsmTemplate.instructions, f);
+		n->AsmTemplate.anonymous_entity = nullptr;
 		break;
 	case Ast_AsmRegister:
 		break;

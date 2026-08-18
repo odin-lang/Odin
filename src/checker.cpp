@@ -1837,6 +1837,9 @@ retry:;
 	case_ast_node(label, AsmLabelDecl, expr);
 		return entity_of_node(label->name);
 	case_end;
+	case_ast_node(at, AsmTemplate, expr);
+		return at->anonymous_entity;
+	case_end;
 	}
 	return nullptr;
 }

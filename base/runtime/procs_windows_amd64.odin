@@ -30,7 +30,7 @@ when ODIN_NO_CRT {
 
 	@(export, link_name="__chkstk", private="file")
 	__chkstk :: proc "naked" () {
-		internal :: asm() {
+		asm() {
 			// Allocate 16 bytes to store values of r10 and r11
 			sub   %rsp, 0x10
 			mov   [%rsp], %r10
@@ -64,9 +64,7 @@ when ODIN_NO_CRT {
 			mov   %r11, [%rsp + 0x8]
 			add   %rsp, 0x10
 			ret
-		}
-
-		internal()
+		}()
 	}
 	// @(require)
 	// foreign import crt_lib "procs_windows_amd64.asm"

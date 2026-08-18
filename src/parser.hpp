@@ -481,6 +481,7 @@ struct AstSplitArgs {
 		Slice<Ast *> clobbers;         \
 		Slice<Ast *> instructions;     \
 		Token        end;              \
+		Entity *     anonymous_entity; \
 	}) \
 	AST_KIND(AsmRegister, "asm register", struct { \
 		Token token; \

@@ -1682,3 +1682,11 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 }
+
+gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, DeclInfo *d) {
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		check_asm_template(&g_asm_amd64, c, e, d);
+	} else {
+		error(e->token, "asm templates are not currently supported for this target");
+	}
+}

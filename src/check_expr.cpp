@@ -12432,9 +12432,18 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
-	case_ast_node(asm_template, AsmTemplate, node);
-		error(node, "Illegal use of an asm template outside of a named constant value declaration");
-		o->mode = Addressing_Invalid;
+	case_ast_node(at, AsmTemplate, node);
+		Token token = at->token;
+		DeclInfo *d = make_decl_info(c->scope, c->decl);
+		Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, node);
+		d->init_expr = node;
+		at->anonymous_entity = e;
+
+		check_asm_template_from_entity(c, e, d);
+
+		o->mode = Addressing_Value;
+		o->type = e->type;
+		o->expr = node;
 	case_end;
 
 	case_ast_node(i, Implicit, node);
