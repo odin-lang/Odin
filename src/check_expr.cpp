@@ -8879,7 +8879,26 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	} else {
 		if (proc != nullptr) {
-			check_expr_or_type(c, operand, proc);
+			Ast *unnested_proc = unparen_expr(proc);
+			if (unnested_proc->kind == Ast_AsmTemplate) {
+				// NOTE(bill): asm templates can only be used within as a declaration OR within a procedure call directly
+				ast_node(at, AsmTemplate, unnested_proc);
+				Token token = at->token;
+				DeclInfo *d = make_decl_info(c->scope, c->decl);
+				Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, unnested_proc);
+				d->init_expr = unnested_proc;
+				at->anonymous_entity = e;
+
+				check_asm_template_from_entity(c, e, d);
+
+				operand->mode  = Addressing_Value;
+				operand->type  = e->type;
+				operand->value = {};
+				operand->expr  = proc;
+				add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
+			} else {
+				check_expr_or_type(c, operand, proc);
+			}
 		} else {
 			GB_ASSERT(operand->expr != nullptr);
 		}
@@ -12433,17 +12452,11 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_end;
 
 	case_ast_node(at, AsmTemplate, node);
-		Token token = at->token;
-		DeclInfo *d = make_decl_info(c->scope, c->decl);
-		Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, node);
-		d->init_expr = node;
-		at->anonymous_entity = e;
-
-		check_asm_template_from_entity(c, e, d);
-
-		o->mode = Addressing_Value;
-		o->type = e->type;
+		error(node, "'asm' templates must either be defined as a declaration or within a procedure call directly");
+		o->mode = Addressing_NoValue;
+		o->type = nullptr;
 		o->expr = node;
+		return kind;
 	case_end;
 
 	case_ast_node(i, Implicit, node);
