@@ -932,7 +932,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		instr->valid_form_index = cast(i32)valid_form_index;
 
 		// Handle clobbering from mnemonic
-		auto clobber = asm_ctx->clobber(mnemonic);
+		auto clobber_forms = asm_ctx->clobber_forms(mnemonic);
+		auto clobber = clobber_forms[valid_form_index];
 
 		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
 		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory();

@@ -15,7 +15,7 @@ ISA_NAME :: "amd64"
 main :: proc() {
 	raw_encode_runs   := #load("../../tables/x86.encode_runs.bin",  []x86.Encode_Run)
 	raw_encode_forms  := #load("../../tables/x86.encode_forms.bin", []u8)
-	raw_clobber_table := #load("../../tables/x86.clobber_table.bin", []u8)
+	raw_clobber_forms := #load("../../tables/x86.clobber_forms.bin", []u8)
 
 	sb := strings.builder_make()
 
@@ -384,7 +384,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 	fmt.sbprintf(&sb, "\tstatic EncodeRun const raw_encode_runs[%d];\n", len(raw_encode_runs))
 	fmt.sbprintf(&sb, "\tstatic u8 const raw_encode_forms[%d];\n", len(raw_encode_forms))
-	fmt.sbprintf(&sb, "\tstatic u8 const raw_clobber_table[%d];\n", len(raw_clobber_table))
+	fmt.sbprintf(&sb, "\tstatic u8 const raw_clobber_forms[%d];\n", len(raw_clobber_forms))
 
 	strings.write_string(&sb, "\tStringMap<Mnemonic> mnemonic_map;\n")
 	strings.write_string(&sb, "\tStringMap<Prefix>   prefix_map;\n")
@@ -425,9 +425,10 @@ main :: proc() {
 			Encoding *ENCODE_FORMS = cast(Encoding *)raw_encode_forms;
 			return Slice<Encoding>{ENCODE_FORMS+r.start, r.count};
 		}
-		Clobber clobber(/*Mnemonic*/ u16 m) const {
-			Clobber *c = cast(Clobber *)raw_clobber_table;
-			return c[m];
+		Slice<Clobber> clobber_forms(/*Mnemonic*/ u16 m) const {
+			EncodeRun r = raw_encode_runs[m];
+			Clobber *CLOBBER_FORMS = cast(Clobber *)raw_clobber_forms;
+			return Slice<Clobber>{CLOBBER_FORMS+r.start, r.count};
 		}
 		u16 reg_class(/*Register*/ u16 r) const {
 			return 0xFF00 & r;
@@ -676,10 +677,6 @@ main :: proc() {
 			#partial switch mnemonic {
 			case .INVALID:
 				strings.write_string(&sb, "str_lit(\"\"), ")
-			case .MOVSD_SSE:
-				strings.write_string(&sb, "str_lit(\"movsd\"), ")
-			case .CMPSD_SSE:
-				strings.write_string(&sb, "str_lit(\"cmpsd\"), ")
 			case:
 				str := strings.to_lower(reflect.enum_string(mnemonic))
 				fmt.sbprintf(&sb, "str_lit(%q), ", str)
@@ -812,11 +809,11 @@ main :: proc() {
 		defer strings.write_string(&sb, "\n");
 	}
 	{
-		fmt.sbprintf(&sb, "u8 const Asm_{0:s}::raw_clobber_table[%d] = {{\n", ISA_NAME, len(raw_clobber_table))
+		fmt.sbprintf(&sb, "u8 const Asm_{0:s}::raw_clobber_forms[%d] = {{\n", ISA_NAME, len(raw_clobber_forms))
 		defer strings.write_string(&sb, "};\n");
 		ROW_COUNT :: 64
 		count := 0
-		for the_byte in raw_clobber_table {
+		for the_byte in raw_clobber_forms {
 			if count == 0 {
 				strings.write_string(&sb, "\t")
 			}
