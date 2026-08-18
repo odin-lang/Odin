@@ -1,6 +1,8 @@
 #define LB_ENABLE_BASIC_RVO    true
 #define LB_ENABLE_ADVANCED_RVO build_context.enable_rvo
 
+gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
+
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
 // Returns the callee's function type if eligible for copy elision, nullptr otherwise.
 gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr, Type *dst_type) {
@@ -2587,7 +2589,9 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 			ret_type = cast_type;
 		}
 
-		if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
+		if (ft->ret.coerce_offsets.count > 0) {
+			ret_val = lb_coerce_fields_load(p, res, &ft->ret);
+		} else if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
 			LLVMTypeRef src_type = LLVMTypeOf(ret_val);
 
 			if (p->temp_callee_return_struct_memory == nullptr) {

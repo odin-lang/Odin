@@ -1441,6 +1441,11 @@ emit_main :: proc() -> string {
 		w(&sb, "%s\tif %s_arg(s, 7) != 7 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_chk(s) != 0 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_ex(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, s, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\tif %s_ex2(1,2,3,4,5,6,7,8,9, 1,2,3,4,5,6,7,8,9, s, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\tif %s_two(s, s, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\tif %s_can(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\tif %s_can2(1,2,3,4,5,6,7,8,9,10,11, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\tif %s_back() != 0 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tr := %s_ret()\n", ind, t.name)
 		getters := odin_getters(t, "r")
 		if len(getters) == 0 {
