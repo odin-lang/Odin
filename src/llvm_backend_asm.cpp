@@ -765,9 +765,9 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 
 gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Array<lbValue> const &args) {
+	lbAsmGenerate_amd64 generator_amd64 = {};
 	lbAsmGenerate *generator = nullptr;
 	if (build_context.metrics.arch == TargetArch_amd64) {
-		lbAsmGenerate_amd64 generator_amd64 = {};
 		generator = &generator_amd64;
 	} else {
 		compiler_error("Architecture does not support asm templates");
