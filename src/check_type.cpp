@@ -2993,6 +2993,11 @@ gb_internal void init_map_internal_types(Type *type) {
 }
 
 gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
+	if (build_context.bedrock) {
+		// the map runtime is declared '#+build !bedrock'
+		return;
+	}
+
 	key = core_type(key);
 
 	if (is_type_cstring(key)) {

@@ -319,6 +319,9 @@ gb_internal void error_operand_no_value(Operand *o) {
 }
 
 gb_internal void add_map_get_dependencies(CheckerContext *c) {
+	if (build_context.bedrock) {
+		return;
+	}
 	if (build_context.dynamic_map_calls) {
 		add_package_dependency(c, "runtime", "__dynamic_map_get");
 	} else {
@@ -328,6 +331,9 @@ gb_internal void add_map_get_dependencies(CheckerContext *c) {
 }
 
 gb_internal void add_map_set_dependencies(CheckerContext *c) {
+	if (build_context.bedrock) {
+		return;
+	}
 	init_core_source_code_location(c->checker);
 
 	if (t_map_set_proc == nullptr) {
@@ -344,6 +350,9 @@ gb_internal void add_map_set_dependencies(CheckerContext *c) {
 }
 
 gb_internal void add_map_reserve_dependencies(CheckerContext *c) {
+	if (build_context.bedrock) {
+		return;
+	}
 	init_core_source_code_location(c->checker);
 	add_package_dependency(c, "runtime", "__dynamic_map_reserve");
 }
