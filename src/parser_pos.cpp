@@ -6,12 +6,30 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_BasicLit:       return node->BasicLit.token;
 	case Ast_BasicDirective: return node->BasicDirective.token;
 	case Ast_ProcGroup:      return node->ProcGroup.token;
+	case Ast_AsmGroup:       return node->AsmGroup.token;
 	case Ast_ProcLit:        return ast_token(node->ProcLit.type);
 	case Ast_CompoundLit:
 		if (node->CompoundLit.type != nullptr) {
 			return ast_token(node->CompoundLit.type);
 		}
 		return node->CompoundLit.open;
+
+	case Ast_AsmTemplate:
+		return node->AsmTemplate.token;
+	case Ast_AsmRegister:
+		return node->AsmRegister.token;
+	case Ast_AsmSpec:
+		return ast_token(node->AsmSpec.name);
+	case Ast_AsmClobber:
+		return node->AsmClobber.token;
+	case Ast_AsmLabelDecl:
+		return node->AsmLabelDecl.token;
+	case Ast_AsmInstruction:
+		return ast_token(node->AsmInstruction.name);
+	case Ast_AsmMemoryOperand:
+		return node->AsmMemoryOperand.open;
+	case Ast_AsmDirective:
+		return node->AsmDirective.token;
 
 	case Ast_TagExpr:       return node->TagExpr.token;
 	case Ast_BadExpr:       return node->BadExpr.begin;
@@ -56,7 +74,6 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_token(node->TypeAssertion.expr);
 	case Ast_TypeCast:           return node->TypeCast.token;
 	case Ast_AutoCast:           return node->AutoCast.token;
-	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.token;
 
 	case Ast_BadStmt:            return node->BadStmt.begin;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;
@@ -148,6 +165,7 @@ Token ast_end_token(Ast *node) {
 	case Ast_BasicLit:       return node->BasicLit.token;
 	case Ast_BasicDirective: return node->BasicDirective.token;
 	case Ast_ProcGroup:      return node->ProcGroup.close;
+	case Ast_AsmGroup:       return node->AsmGroup.close;
 	case Ast_ProcLit:
 		if (node->ProcLit.body) {
 			return ast_end_token(node->ProcLit.body);
@@ -155,6 +173,44 @@ Token ast_end_token(Ast *node) {
 		return ast_end_token(node->ProcLit.type);
 	case Ast_CompoundLit:
 		return node->CompoundLit.close;
+
+	case Ast_AsmTemplate:
+		return node->AsmTemplate.end;
+	case Ast_AsmRegister:
+		return node->AsmRegister.name;
+	case Ast_AsmSpec:
+		if (node->AsmSpec.value) {
+		return ast_end_token(node->AsmSpec.value);
+		}
+		if (node->AsmSpec.type) {
+			return ast_end_token(node->AsmSpec.type);
+		}
+		if (node->AsmSpec.tied_name) {
+			return ast_end_token(node->AsmSpec.tied_name);
+		}
+		return ast_end_token(node->AsmSpec.name);
+	case Ast_AsmClobber:
+		if (node->AsmClobber.value) {
+			return ast_end_token(node->AsmClobber.value);
+		}
+		return node->AsmClobber.name;
+	case Ast_AsmLabelDecl:
+		return ast_end_token(node->AsmLabelDecl.name);
+	case Ast_AsmInstruction:
+		if (node->AsmInstruction.operands.count > 0) {
+			return ast_end_token(node->AsmInstruction.operands[node->AsmInstruction.operands.count-1]);
+		}
+		return ast_end_token(node->AsmInstruction.name);
+	case Ast_AsmDirective:
+		if (node->AsmDirective.operands.count > 0) {
+			return ast_end_token(node->AsmDirective.operands[node->AsmDirective.operands.count-1]);
+		}
+		return node->AsmDirective.name;
+	case Ast_AsmMemoryOperand:
+		if (node->AsmMemoryOperand.type) {
+			return ast_end_token(node->AsmMemoryOperand.type);
+		}
+		return node->AsmMemoryOperand.close;
 
 	case Ast_BadExpr:       return node->BadExpr.end;
 	case Ast_TagExpr:
@@ -206,7 +262,6 @@ Token ast_end_token(Ast *node) {
 	case Ast_TypeAssertion:      return ast_end_token(node->TypeAssertion.type);
 	case Ast_TypeCast:           return ast_end_token(node->TypeCast.expr);
 	case Ast_AutoCast:           return ast_end_token(node->AutoCast.expr);
-	case Ast_InlineAsmExpr:      return node->InlineAsmExpr.close;
 
 	case Ast_BadStmt:            return node->BadStmt.end;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;

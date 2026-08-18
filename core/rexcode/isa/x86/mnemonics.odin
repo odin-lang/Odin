@@ -300,7 +300,6 @@ Mnemonic :: enum u16 {
 	MOVAPD,
 	MOVUPD,
 	MOVSS,
-	MOVSD_SSE,  // distinguish from string MOVSD
 	MOVDQA,
 	MOVDQU,
 	MOVQ,
@@ -360,7 +359,6 @@ Mnemonic :: enum u16 {
 	CMPPS,
 	CMPPD,
 	CMPSS,
-	CMPSD_SSE,
 	COMISS,
 	COMISD,
 	UCOMISS,
@@ -658,6 +656,24 @@ Mnemonic :: enum u16 {
 	VMOVNTPD,
 	VMOVNTDQ,
 	VMOVNTDQA,
+	VADDSUBPS,
+	VADDSUBPD,
+	VHADDPS,
+	VHADDPD,
+	VHSUBPS,
+	VHSUBPD,
+	VLDDQU,
+	VMOVDDUP,
+	VMOVSLDUP,
+	VMOVSHDUP,
+	VPCMPESTRI,
+	VPCMPESTRM,
+	VPCMPISTRI,
+	VPCMPISTRM,
+	VPBROADCASTB,
+	VPBROADCASTW,
+	VPBROADCASTD,
+	VPBROADCASTQ,
 	VCVTPS2PD,
 	VCVTPD2PS,
 	VCVTSS2SD,
@@ -1291,4 +1307,82 @@ Mnemonic :: enum u16 {
 	MOVBE,
 	RDRAND,
 	RDSEED,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.28 Additional System / GPR Instructions
+	// -------------------------------------------------------------------------
+	SWAPGS,
+	MONITOR,
+	MWAIT,
+	CLAC,
+	STAC,
+	RDFSBASE,
+	RDGSBASE,
+	WRFSBASE,
+	WRGSBASE,
+	PTWRITE,
+	RDPID,
+	WBNOINVD,
+	SERIALIZE,
+	PREFETCH,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.29 WAITPKG Instructions
+	// -------------------------------------------------------------------------
+	TPAUSE,
+	UMONITOR,
+	UMWAIT,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.30 Direct Store / Enqueue Store Instructions
+	// -------------------------------------------------------------------------
+	MOVDIRI,
+	MOVDIR64B,
+	ENQCMD,
+	ENQCMDS,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.31 Remote Atomic Operations (RAO-INT)
+	// -------------------------------------------------------------------------
+	AADD,
+	AAND,
+	AOR,
+	AXOR,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.32 Restricted Transactional Memory (RTM)
+	// -------------------------------------------------------------------------
+	XEND,
+	XTEST,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.33 AMD SVM (Secure Virtual Machine) Instructions
+	// -------------------------------------------------------------------------
+	VMRUN,
+	VMMCALL,
+	VMLOAD,
+	VMSAVE,
+	STGI,
+	CLGI,
+	SKINIT,
+	INVLPGA,
+	INVLPGB,
+	TLBSYNC,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.34 AMD SEV-SNP Instructions
+	// -------------------------------------------------------------------------
+	PVALIDATE,
+	RMPADJUST,
+	RMPUPDATE,
+	PSMASH,
+
+	// -------------------------------------------------------------------------
+	// SECTION: 4.35 AMD Miscellaneous Instructions
+	// -------------------------------------------------------------------------
+	CLZERO,
+	MONITORX,
+	MWAITX,
+	RDPRU,
+	MCOMMIT,
 }

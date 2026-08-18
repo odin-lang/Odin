@@ -51,8 +51,7 @@ Print_Result          :: isa.Print_Result
 
 mnemonic_to_string :: proc(m: Mnemonic, lowercase: bool) -> string {
 	#partial switch m {
-	case .INVALID:   return "???"
-	case .MOVSD_SSE: return lowercase ? "movsd" : "MOVSD"
+	case .INVALID: return "???"
 	}
 	if name, ok := reflect.enum_name_from_value(m); ok {
 		return lowercase ? strings.to_lower(name, context.temp_allocator) : name

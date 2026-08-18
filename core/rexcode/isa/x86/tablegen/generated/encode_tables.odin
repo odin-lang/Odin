@@ -8,7 +8,7 @@ package rexcode_x86_generated
 import lib "../.."
 
 @(rodata)
-ENCODE_FORMS := [2355]lib.Encoding{
+ENCODE_FORMS := [2451]lib.Encoding{
 	// .MOV
 	{.MOV,              {.RM8,       .R8,        .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x88, 0, {explicit_count=2}},
 	{.MOV,              {.RM16,      .R16,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x89, 0, {explicit_count=2}},
@@ -800,6 +800,8 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.MOVSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {opsize_16=true, rep_ok=true}},
 	// .MOVSD
 	{.MOVSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
+	{.MOVSD,            {.XMM,       .XMM_M64,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=3, explicit_count=2}},
+	{.MOVSD,            {.XMM_M64,   .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=3, explicit_count=2}},
 	// .MOVSQ
 	{.MOVSQ,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {force_rex_w=true, rep_ok=true}},
 	// .CMPS
@@ -810,6 +812,7 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.CMPSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {opsize_16=true, rep_ok=true}},
 	// .CMPSD
 	{.CMPSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
+	{.CMPSD,            {.XMM,       .XMM_M64,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=3, explicit_count=3}},
 	// .CMPSQ
 	{.CMPSQ,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {force_rex_w=true, rep_ok=true}},
 	// .SCAS
@@ -973,9 +976,6 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .MOVSS
 	{.MOVSS,            {.XMM,       .XMM_M32,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=2, explicit_count=2}},
 	{.MOVSS,            {.XMM_M32,   .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=2, explicit_count=2}},
-	// .MOVSD_SSE
-	{.MOVSD_SSE,        {.XMM,       .XMM_M64,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=3, explicit_count=2}},
-	{.MOVSD_SSE,        {.XMM_M64,   .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=3, explicit_count=2}},
 	// .MOVDQA
 	{.MOVDQA,           {.XMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x6F, 0, {esc=._0F, prefix=1, explicit_count=2}},
 	{.MOVDQA,           {.XMM_M128,  .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x7F, 0, {esc=._0F, prefix=1, explicit_count=2}},
@@ -1110,8 +1110,6 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.CMPPD,            {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=1, explicit_count=3}},
 	// .CMPSS
 	{.CMPSS,            {.XMM,       .XMM_M32,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=2, explicit_count=3}},
-	// .CMPSD_SSE
-	{.CMPSD_SSE,        {.XMM,       .XMM_M64,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=3, explicit_count=3}},
 	// .COMISS
 	{.COMISS,           {.XMM,       .XMM_M32,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x2F, 0, {esc=._0F, explicit_count=2}},
 	// .COMISD
@@ -1762,6 +1760,64 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	// .VMOVNTDQA
 	{.VMOVNTDQA,        {.XMM,       .M128,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_l=.L0, explicit_count=2}},
 	{.VMOVNTDQA,        {.YMM,       .M256,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_l=.L1, explicit_count=2}},
+	// .VADDSUBPS
+	{.VADDSUBPS,        {.XMM,       .XMM,       .XMM_M128,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0xD0, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	{.VADDSUBPS,        {.YMM,       .YMM,       .YMM_M256,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0xD0, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L1, explicit_count=3}},
+	// .VADDSUBPD
+	{.VADDSUBPD,        {.XMM,       .XMM,       .XMM_M128,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0xD0, 0, {esc=._0F, prefix=1, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	{.VADDSUBPD,        {.YMM,       .YMM,       .YMM_M256,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0xD0, 0, {esc=._0F, prefix=1, vex_type=.VEX, vex_l=.L1, explicit_count=3}},
+	// .VHADDPS
+	{.VHADDPS,          {.XMM,       .XMM,       .XMM_M128,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7C, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	{.VHADDPS,          {.YMM,       .YMM,       .YMM_M256,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7C, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L1, explicit_count=3}},
+	// .VHADDPD
+	{.VHADDPD,          {.XMM,       .XMM,       .XMM_M128,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7C, 0, {esc=._0F, prefix=1, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	{.VHADDPD,          {.YMM,       .YMM,       .YMM_M256,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7C, 0, {esc=._0F, prefix=1, vex_type=.VEX, vex_l=.L1, explicit_count=3}},
+	// .VHSUBPS
+	{.VHSUBPS,          {.XMM,       .XMM,       .XMM_M128,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7D, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	{.VHSUBPS,          {.YMM,       .YMM,       .YMM_M256,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7D, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L1, explicit_count=3}},
+	// .VHSUBPD
+	{.VHSUBPD,          {.XMM,       .XMM,       .XMM_M128,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7D, 0, {esc=._0F, prefix=1, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	{.VHSUBPD,          {.YMM,       .YMM,       .YMM_M256,  .NONE}, {.REG,  .VVVV, .MR,   .NONE}, 0x7D, 0, {esc=._0F, prefix=1, vex_type=.VEX, vex_l=.L1, explicit_count=3}},
+	// .VLDDQU
+	{.VLDDQU,           {.XMM,       .M128,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF0, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L0, explicit_count=2}},
+	{.VLDDQU,           {.YMM,       .M256,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF0, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L1, explicit_count=2}},
+	// .VMOVDDUP
+	{.VMOVDDUP,         {.XMM,       .XMM_M64,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L0, explicit_count=2}},
+	{.VMOVDDUP,         {.YMM,       .YMM_M256,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=3, vex_type=.VEX, vex_l=.L1, explicit_count=2}},
+	// .VMOVSLDUP
+	{.VMOVSLDUP,        {.XMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=2, vex_type=.VEX, vex_l=.L0, explicit_count=2}},
+	{.VMOVSLDUP,        {.YMM,       .YMM_M256,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x12, 0, {esc=._0F, prefix=2, vex_type=.VEX, vex_l=.L1, explicit_count=2}},
+	// .VMOVSHDUP
+	{.VMOVSHDUP,        {.XMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x16, 0, {esc=._0F, prefix=2, vex_type=.VEX, vex_l=.L0, explicit_count=2}},
+	{.VMOVSHDUP,        {.YMM,       .YMM_M256,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x16, 0, {esc=._0F, prefix=2, vex_type=.VEX, vex_l=.L1, explicit_count=2}},
+	// .VPCMPESTRI
+	{.VPCMPESTRI,       {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0x61, 0, {esc=._0F3A, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=3}},
+	// .VPCMPESTRM
+	{.VPCMPESTRM,       {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0x60, 0, {esc=._0F3A, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=3}},
+	// .VPCMPISTRI
+	{.VPCMPISTRI,       {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0x63, 0, {esc=._0F3A, prefix=1, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	// .VPCMPISTRM
+	{.VPCMPISTRM,       {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0x62, 0, {esc=._0F3A, prefix=1, vex_type=.VEX, vex_l=.L0, explicit_count=3}},
+	// .VPBROADCASTB
+	{.VPBROADCASTB,     {.XMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTB,     {.YMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	{.VPBROADCASTB,     {.XMM,       .M8,        .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTB,     {.YMM,       .M8,        .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x78, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	// .VPBROADCASTW
+	{.VPBROADCASTW,     {.XMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTW,     {.YMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	{.VPBROADCASTW,     {.XMM,       .M16,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTW,     {.YMM,       .M16,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x79, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	// .VPBROADCASTD
+	{.VPBROADCASTD,     {.XMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTD,     {.YMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	{.VPBROADCASTD,     {.XMM,       .M32,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTD,     {.YMM,       .M32,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x58, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	// .VPBROADCASTQ
+	{.VPBROADCASTQ,     {.XMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTQ,     {.YMM,       .XMM,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
+	{.VPBROADCASTQ,     {.XMM,       .M64,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L0, explicit_count=2}},
+	{.VPBROADCASTQ,     {.YMM,       .M64,       .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x59, 0, {esc=._0F38, prefix=1, vex_type=.VEX, vex_w=.W0, vex_l=.L1, explicit_count=2}},
 	// .VCVTPS2PD
 	{.VCVTPS2PD,        {.XMM,       .XMM_M64,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x5A, 0, {esc=._0F, vex_type=.VEX, vex_l=.L0, explicit_count=2}},
 	{.VCVTPS2PD,        {.YMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x5A, 0, {esc=._0F, vex_type=.VEX, vex_l=.L1, explicit_count=2}},
@@ -3539,6 +3595,3800 @@ ENCODE_FORMS := [2355]lib.Encoding{
 	{.RDSEED,           {.R16,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
 	{.RDSEED,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
 	{.RDSEED,           {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .SWAPGS
+	{.SWAPGS,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 248, {esc=._0F}},
+	// .MONITOR
+	{.MONITOR,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 200, {esc=._0F}},
+	// .MWAIT
+	{.MWAIT,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 201, {esc=._0F}},
+	// .CLAC
+	{.CLAC,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 202, {esc=._0F}},
+	// .STAC
+	{.STAC,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 203, {esc=._0F}},
+	// .RDFSBASE
+	{.RDFSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 0, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.RDFSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 0, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .RDGSBASE
+	{.RDGSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 1, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.RDGSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 1, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .WRFSBASE
+	{.WRFSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 2, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.WRFSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 2, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .WRGSBASE
+	{.WRGSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 3, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.WRGSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 3, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .PTWRITE
+	{.PTWRITE,          {.RM32,      .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.PTWRITE,          {.RM64,      .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .RDPID
+	{.RDPID,            {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	// .WBNOINVD
+	{.WBNOINVD,         {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x09, 0, {esc=._0F, prefix=2}},
+	// .SERIALIZE
+	{.SERIALIZE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 232, {esc=._0F}},
+	// .PREFETCH
+	{.PREFETCH,         {.M8,        .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0x0D, 0, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
+	// .TPAUSE
+	{.TPAUSE,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=1, modrm_reg_ext=true, explicit_count=1}},
+	// .UMONITOR
+	{.UMONITOR,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	// .UMWAIT
+	{.UMWAIT,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=3, modrm_reg_ext=true, explicit_count=1}},
+	// .MOVDIRI
+	{.MOVDIRI,          {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xF9, 0, {esc=._0F38, explicit_count=2}},
+	{.MOVDIRI,          {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xF9, 0, {esc=._0F38, force_rex_w=true, explicit_count=2}},
+	// .MOVDIR64B
+	{.MOVDIR64B,        {.R64,       .M512,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=1, explicit_count=2}},
+	// .ENQCMD
+	{.ENQCMD,           {.R64,       .M512,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=3, explicit_count=2}},
+	// .ENQCMDS
+	{.ENQCMDS,          {.R64,       .M512,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=2, explicit_count=2}},
+	// .AADD
+	{.AADD,             {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, explicit_count=2}},
+	{.AADD,             {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, force_rex_w=true, explicit_count=2}},
+	// .AAND
+	{.AAND,             {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=1, explicit_count=2}},
+	{.AAND,             {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=1, force_rex_w=true, explicit_count=2}},
+	// .AOR
+	{.AOR,              {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=3, explicit_count=2}},
+	{.AOR,              {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=3, force_rex_w=true, explicit_count=2}},
+	// .AXOR
+	{.AXOR,             {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=2, explicit_count=2}},
+	{.AXOR,             {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=2, force_rex_w=true, explicit_count=2}},
+	// .XEND
+	{.XEND,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 213, {esc=._0F}},
+	// .XTEST
+	{.XTEST,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 214, {esc=._0F}},
+	// .VMRUN
+	{.VMRUN,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 216, {esc=._0F}},
+	// .VMMCALL
+	{.VMMCALL,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 217, {esc=._0F}},
+	// .VMLOAD
+	{.VMLOAD,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 218, {esc=._0F}},
+	// .VMSAVE
+	{.VMSAVE,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 219, {esc=._0F}},
+	// .STGI
+	{.STGI,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 220, {esc=._0F}},
+	// .CLGI
+	{.CLGI,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 221, {esc=._0F}},
+	// .SKINIT
+	{.SKINIT,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 222, {esc=._0F}},
+	// .INVLPGA
+	{.INVLPGA,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 223, {esc=._0F}},
+	// .INVLPGB
+	{.INVLPGB,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 254, {esc=._0F}},
+	// .TLBSYNC
+	{.TLBSYNC,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 255, {esc=._0F}},
+	// .PVALIDATE
+	{.PVALIDATE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 255, {esc=._0F, prefix=3}},
+	// .RMPADJUST
+	{.RMPADJUST,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 254, {esc=._0F, prefix=2}},
+	// .RMPUPDATE
+	{.RMPUPDATE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 254, {esc=._0F, prefix=3}},
+	// .PSMASH
+	{.PSMASH,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 255, {esc=._0F, prefix=2}},
+	// .CLZERO
+	{.CLZERO,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 252, {esc=._0F}},
+	// .MONITORX
+	{.MONITORX,         {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 250, {esc=._0F}},
+	// .MWAITX
+	{.MWAITX,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 251, {esc=._0F}},
+	// .RDPRU
+	{.RDPRU,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 253, {esc=._0F}},
+	// .MCOMMIT
+	{.MCOMMIT,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 250, {esc=._0F, prefix=2}},
+}
+
+@(rodata)
+CLOBBER_FORMS := [2451]lib.Clobber{
+	// .MOV
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .MOVABS
+	{written={0}, read={1}},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	// .MOVZX
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .MOVSX
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .MOVSXD
+	{written={0}, read={1}, reads_mem=true},
+	// .XCHG
+	{written={1}, read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}},
+	{written={1}, read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}},
+	{written={1}, read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}},
+	{written={0, 1}, read={0, 1}, writes_mem=true, reads_mem=true},
+	{written={0, 1}, read={0, 1}, writes_mem=true, reads_mem=true},
+	{written={0, 1}, read={0, 1}, writes_mem=true, reads_mem=true},
+	{written={0, 1}, read={0, 1}, writes_mem=true, reads_mem=true},
+	// .PUSH
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	// .POP
+	{written={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	{written={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	{written={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{written={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	{written={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	// .LEA
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	// .ADD
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .ADC
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .SUB
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .SBB
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .MUL
+	{read={0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	// .IMUL
+	{read={0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	// .DIV
+	{read={0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .IDIV
+	{read={0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .INC
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .DEC
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .NEG
+	{written={0}, read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .CMP
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .AND
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .OR
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .XOR
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .NOT
+	{written={0}, read={0}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, writes_mem=true, reads_mem=true},
+	// .TEST
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	// .SHL
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .SHR
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .SAR
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .ROL
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	// .ROR
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	// .RCL
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .RCR
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .SHLD
+	{written={0}, read={0, 1, 2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1, 2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1, 2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	// .SHRD
+	{written={0}, read={0, 1, 2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1, 2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1, 2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	// .BT
+	{read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .BTS
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BTR
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BTC
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BSF
+	{written={0}, read={1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	// .BSR
+	{written={0}, read={1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	// .POPCNT
+	{written={0}, read={1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .LZCNT
+	{written={0}, read={1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .TZCNT
+	{written={0}, read={1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .JMP
+	{read={0}, side_effects={.CONTROL}},
+	{read={0}, side_effects={.CONTROL}},
+	{read={0}, reads_mem=true, side_effects={.CONTROL}},
+	{read={0}, reads_mem=true, side_effects={.CONTROL}},
+	{read={0}, reads_mem=true, side_effects={.CONTROL}},
+	{read={0}, reads_mem=true, side_effects={.CONTROL}},
+	// .JA
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JAE
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JB
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JBE
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JC
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JE
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JZ
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JG
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JGE
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JL
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JLE
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JNA
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JNAE
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JNB
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JNBE
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JNC
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JNE
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JNZ
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JNG
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JNGE
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JNL
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JNLE
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JNO
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	// .JNP
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JNS
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	// .JO
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	// .JP
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JPE
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JPO
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JS
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	// .JCXZ
+	{implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .JECXZ
+	{implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .JRCXZ
+	{implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .LOOP
+	{implicit_wr={.RCX}, implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .LOOPE
+	{implicit_wr={.RCX}, implicit_rd={.RCX}, flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .LOOPNE
+	{implicit_wr={.RCX}, implicit_rd={.RCX}, flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .CALL
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, side_effects={.CONTROL}},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	{read={0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	// .RET
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true, side_effects={.CONTROL}},
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true, side_effects={.CONTROL}},
+	// .IRET
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true, side_effects={.SERIALIZING, .CONTROL}},
+	// .IRETD
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true, side_effects={.SERIALIZING, .CONTROL}},
+	// .IRETQ
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true, side_effects={.SERIALIZING, .CONTROL}},
+	// .INT
+	{read={0}, implicit_wr={.RSP}, flags_wr={.IF}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true, side_effects={.INTERRUPT, .CONTROL}},
+	// .INT3
+	{implicit_wr={.RSP}, flags_wr={.IF}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true, side_effects={.INTERRUPT, .CONTROL}},
+	// .INTO
+	{implicit_wr={.RSP}, flags_wr={.IF}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true, side_effects={.INTERRUPT, .CONTROL}},
+	// .SYSCALL
+	{implicit_wr={.RCX, .R11}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, side_effects={.INTERRUPT, .CONTROL}},
+	// .SYSRET
+	{implicit_rd={.RCX, .R11}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, side_effects={.SERIALIZING, .INTERRUPT, .PRIVILEGED, .CONTROL}},
+	// .SYSENTER
+	{implicit_wr={.RSP}, flags_wr={.IF}, side_effects={.INTERRUPT, .CONTROL}},
+	// .SYSEXIT
+	{implicit_wr={.RSP}, implicit_rd={.RCX, .RDX}, side_effects={.SERIALIZING, .INTERRUPT, .PRIVILEGED, .CONTROL}},
+	// .SETA
+	{written={0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETAE
+	{written={0}, flags_rd={.CF}, writes_mem=true},
+	// .SETB
+	{written={0}, flags_rd={.CF}, writes_mem=true},
+	// .SETBE
+	{written={0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETC
+	{written={0}, flags_rd={.CF}, writes_mem=true},
+	// .SETE
+	{written={0}, flags_rd={.ZF}, writes_mem=true},
+	// .SETG
+	{written={0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETGE
+	{written={0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETL
+	{written={0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETLE
+	{written={0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETNA
+	{written={0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETNAE
+	{written={0}, flags_rd={.CF}, writes_mem=true},
+	// .SETNB
+	{written={0}, flags_rd={.CF}, writes_mem=true},
+	// .SETNBE
+	{written={0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETNC
+	{written={0}, flags_rd={.CF}, writes_mem=true},
+	// .SETNE
+	{written={0}, flags_rd={.ZF}, writes_mem=true},
+	// .SETNG
+	{written={0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETNGE
+	{written={0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETNL
+	{written={0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETNLE
+	{written={0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETNO
+	{written={0}, flags_rd={.OF}, writes_mem=true},
+	// .SETNP
+	{written={0}, flags_rd={.PF}, writes_mem=true},
+	// .SETNS
+	{written={0}, flags_rd={.SF}, writes_mem=true},
+	// .SETNZ
+	{written={0}, flags_rd={.ZF}, writes_mem=true},
+	// .SETO
+	{written={0}, flags_rd={.OF}, writes_mem=true},
+	// .SETP
+	{written={0}, flags_rd={.PF}, writes_mem=true},
+	// .SETPE
+	{written={0}, flags_rd={.PF}, writes_mem=true},
+	// .SETPO
+	{written={0}, flags_rd={.PF}, writes_mem=true},
+	// .SETS
+	{written={0}, flags_rd={.SF}, writes_mem=true},
+	// .SETZ
+	{written={0}, flags_rd={.ZF}, writes_mem=true},
+	// .CMOVA
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVAE
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVB
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVBE
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVC
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVE
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	// .CMOVG
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVGE
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVL
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVLE
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVNA
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVNAE
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVNB
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVNBE
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVNC
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVNE
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	// .CMOVNG
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVNGE
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVNL
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVNLE
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVNO
+	{written={0}, read={1}, flags_rd={.OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.OF}, reads_mem=true},
+	// .CMOVNP
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVNS
+	{written={0}, read={1}, flags_rd={.SF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF}, reads_mem=true},
+	// .CMOVNZ
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	// .CMOVO
+	{written={0}, read={1}, flags_rd={.OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.OF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.OF}, reads_mem=true},
+	// .CMOVP
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVPE
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVPO
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVS
+	{written={0}, read={1}, flags_rd={.SF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.SF}, reads_mem=true},
+	// .CMOVZ
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_rd={.ZF}, reads_mem=true},
+	// .MOVS
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .MOVSB
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .MOVSW
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .MOVSD
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVSQ
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .CMPS
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .CMPSB
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .CMPSW
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .CMPSD
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CMPSQ
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCAS
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASB
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASW
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASD
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASQ
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .LODS
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSB
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSW
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSD
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSQ
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .STOS
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSB
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSW
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSD
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSQ
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .CLC
+	{flags_wr={.CF}},
+	// .STC
+	{flags_wr={.CF}},
+	// .CMC
+	{flags_wr={.CF}, flags_rd={.CF}},
+	// .CLD
+	{flags_wr={.DF}},
+	// .STD
+	{flags_wr={.DF}},
+	// .CLI
+	{flags_wr={.IF}},
+	// .STI
+	{flags_wr={.IF}},
+	// .LAHF
+	{implicit_wr={.RAX}, flags_rd={.CF, .PF, .AF, .ZF, .SF}},
+	// .SAHF
+	{implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF}},
+	// .PUSHF
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true},
+	// .PUSHFD
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true},
+	// .PUSHFQ
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true},
+	// .POPF
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true},
+	// .POPFD
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true},
+	// .POPFQ
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true},
+	// .NOP
+	{},
+	{},
+	{},
+	{},
+	// .HLT
+	{side_effects={.HALT, .PRIVILEGED}},
+	// .WAIT
+	{implicit_rd={.FPU_SW}},
+	// .LOCK
+	{side_effects={.FENCE}},
+	// .UD0
+	{side_effects={.TRAP}},
+	// .UD1
+	{side_effects={.TRAP}},
+	// .UD2
+	{side_effects={.TRAP}},
+	// .CPUID
+	{implicit_wr={.RAX, .RBX, .RCX, .RDX}, implicit_rd={.RAX, .RCX}, side_effects={.SERIALIZING}},
+	// .RDTSC
+	{implicit_wr={.RAX, .RDX}},
+	// .RDTSCP
+	{implicit_wr={.RAX, .RCX, .RDX}},
+	// .RDPMC
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	// .XGETBV
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	// .XSETBV
+	{implicit_rd={.RAX, .RCX, .RDX}},
+	// .CBW
+	{implicit_wr={.RAX}, implicit_rd={.RAX}},
+	// .CWDE
+	{implicit_wr={.RAX}, implicit_rd={.RAX}},
+	// .CDQE
+	{implicit_wr={.RAX}, implicit_rd={.RAX}},
+	// .CWD
+	{implicit_wr={.RDX}, implicit_rd={.RAX}},
+	// .CDQ
+	{implicit_wr={.RDX}, implicit_rd={.RAX}},
+	// .CQO
+	{implicit_wr={.RDX}, implicit_rd={.RAX}},
+	// .ANDN
+	{written={0}, read={1, 2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BEXTR
+	{written={0}, read={1, 2}, flags_wr={.CF, .ZF, .OF}, flags_undef={.PF, .AF, .SF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .ZF, .OF}, flags_undef={.PF, .AF, .SF}, reads_mem=true},
+	// .BLSI
+	{written={0}, read={1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BLSMSK
+	{written={0}, read={1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BLSR
+	{written={0}, read={1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BZHI
+	{written={0}, read={1, 2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={0}, read={1, 2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .PDEP
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PEXT
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .RORX
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .SARX
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SHLX
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SHRX
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .MULX
+	{written={0, 1}, read={2}, implicit_rd={.RDX}, reads_mem=true},
+	{written={0, 1}, read={2}, implicit_rd={.RDX}, reads_mem=true},
+	// .ADCX
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_rd={.CF}, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.CF}, flags_rd={.CF}, reads_mem=true},
+	// .ADOX
+	{written={0}, read={0, 1}, flags_wr={.OF}, flags_rd={.OF}, reads_mem=true},
+	{written={0}, read={0, 1}, flags_wr={.OF}, flags_rd={.OF}, reads_mem=true},
+	// .MOVAPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVUPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVAPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVUPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVSS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVDQA
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVDQU
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVQ
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .MOVD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVLPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVHPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVLPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVHPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVLHPS
+	{written={0}, read={1}},
+	// .MOVHLPS
+	{written={0}, read={1}},
+	// .MOVMSKPS
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .MOVMSKPD
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .MOVNTPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVNTPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVNTDQ
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .MOVNTDQA
+	{written={0}, read={1}, reads_mem=true},
+	// .ADDPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RCPPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RCPSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RSQRTPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RSQRTSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINSS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINSD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ANDPS
+	{written={0}, read={1}, reads_mem=true},
+	// .ANDPD
+	{written={0}, read={1}, reads_mem=true},
+	// .ANDNPS
+	{written={0}, read={1}, reads_mem=true},
+	// .ANDNPD
+	{written={0}, read={1}, reads_mem=true},
+	// .ORPS
+	{written={0}, read={1}, reads_mem=true},
+	// .ORPD
+	{written={0}, read={1}, reads_mem=true},
+	// .XORPS
+	{written={0}, read={1}, reads_mem=true},
+	// .XORPD
+	{written={0}, read={1}, reads_mem=true},
+	// .CMPPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CMPPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CMPSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .COMISS
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .COMISD
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .UCOMISS
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .UCOMISD
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .SHUFPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SHUFPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .UNPCKLPS
+	{written={0}, read={1}, reads_mem=true},
+	// .UNPCKHPS
+	{written={0}, read={1}, reads_mem=true},
+	// .UNPCKLPD
+	{written={0}, read={1}, reads_mem=true},
+	// .UNPCKHPD
+	{written={0}, read={1}, reads_mem=true},
+	// .CVTPS2PD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTPD2PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSS2SD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSD2SS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTPS2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTPD2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTDQ2PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTDQ2PD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSS2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSD2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSI2SS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSI2SD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTPS2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTPD2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTSS2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTSD2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .PADDB
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDW
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDD
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBB
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBW
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBD
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDUSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PADDUSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBUSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PSUBUSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULLW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULHW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULHUW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULUDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMADDWD
+	{written={0}, read={1}, reads_mem=true},
+	// .PAND
+	{written={0}, read={1}, reads_mem=true},
+	// .PANDN
+	{written={0}, read={1}, reads_mem=true},
+	// .POR
+	{written={0}, read={1}, reads_mem=true},
+	// .PXOR
+	{written={0}, read={1}, reads_mem=true},
+	// .PSLLW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSLLD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSLLQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSRLW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSRLD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSRLQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSRAW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PSRAD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .PCMPEQB
+	{written={0}, read={1}, reads_mem=true},
+	// .PCMPEQW
+	{written={0}, read={1}, reads_mem=true},
+	// .PCMPEQD
+	{written={0}, read={1}, reads_mem=true},
+	// .PCMPGTB
+	{written={0}, read={1}, reads_mem=true},
+	// .PCMPGTW
+	{written={0}, read={1}, reads_mem=true},
+	// .PCMPGTD
+	{written={0}, read={1}, reads_mem=true},
+	// .PACKSSWB
+	{written={0}, read={1}, reads_mem=true},
+	// .PACKSSDW
+	{written={0}, read={1}, reads_mem=true},
+	// .PACKUSWB
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKLBW
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKLWD
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKLDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKLQDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKHBW
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKHWD
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKHDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PUNPCKHQDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PSHUFD
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PSHUFHW
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PSHUFLW
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PSHUFW
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PEXTRW
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .PINSRW
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PMOVMSKB
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .PAVGB
+	{written={0}, read={1}, reads_mem=true},
+	// .PAVGW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMAXUB
+	{written={0}, read={1}, reads_mem=true},
+	// .PMAXSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMINUB
+	{written={0}, read={1}, reads_mem=true},
+	// .PMINSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PSADBW
+	{written={0}, read={1}, reads_mem=true},
+	// .MASKMOVDQU
+	{read={0, 1}, implicit_rd={.RDI}, flags_rd={.DF}, writes_mem=true},
+	// .LFENCE
+	{side_effects={.FENCE, .SERIALIZING}},
+	// .SFENCE
+	{side_effects={.FENCE}},
+	// .MFENCE
+	{side_effects={.FENCE}},
+	// .PAUSE
+	{side_effects={.HINT}},
+	// .CLFLUSH
+	{read={0}, reads_mem=true, side_effects={.CACHE}},
+	// .ADDSUBPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDSUBPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HADDPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HADDPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HSUBPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HSUBPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MOVDDUP
+	{written={0}, read={1}, reads_mem=true},
+	// .MOVSLDUP
+	{written={0}, read={1}, reads_mem=true},
+	// .MOVSHDUP
+	{written={0}, read={1}, reads_mem=true},
+	// .LDDQU
+	{written={0}, read={1}, reads_mem=true},
+	// .PSHUFB
+	{written={0}, read={1}, reads_mem=true},
+	// .PHADDW
+	{written={0}, read={1}, reads_mem=true},
+	// .PHADDD
+	{written={0}, read={1}, reads_mem=true},
+	// .PHADDSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PHSUBW
+	{written={0}, read={1}, reads_mem=true},
+	// .PHSUBD
+	{written={0}, read={1}, reads_mem=true},
+	// .PHSUBSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMADDUBSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULHRSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PSIGNB
+	{written={0}, read={1}, reads_mem=true},
+	// .PSIGNW
+	{written={0}, read={1}, reads_mem=true},
+	// .PSIGND
+	{written={0}, read={1}, reads_mem=true},
+	// .PABSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PABSW
+	{written={0}, read={1}, reads_mem=true},
+	// .PABSD
+	{written={0}, read={1}, reads_mem=true},
+	// .PALIGNR
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .BLENDPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .BLENDPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .BLENDVPS
+	{written={0}, read={1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .BLENDVPD
+	{written={0}, read={1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .PBLENDW
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PBLENDVB
+	{written={0}, read={1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .DPPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DPPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .EXTRACTPS
+	{written={0}, read={1}, writes_mem=true},
+	// .INSERTPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .MPSADBW
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PACKUSDW
+	{written={0}, read={1}, reads_mem=true},
+	// .PEXTRB
+	{written={0}, read={1}, writes_mem=true},
+	// .PEXTRD
+	{written={0}, read={1}, writes_mem=true},
+	// .PEXTRQ
+	{written={0}, read={1}, writes_mem=true},
+	// .PHMINPOSUW
+	{written={0}, read={1}, reads_mem=true},
+	// .PINSRB
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PINSRD
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PINSRQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .PMAXSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PMAXSD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMAXUW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMAXUD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMINSB
+	{written={0}, read={1}, reads_mem=true},
+	// .PMINSD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMINUW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMINUD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVSXBW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVSXBD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVSXBQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVSXWD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVSXWQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVSXDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVZXBW
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVZXBD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVZXBQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVZXWD
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVZXWQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMOVZXDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULDQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PMULLD
+	{written={0}, read={1}, reads_mem=true},
+	// .PTEST
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .ROUNDPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ROUNDPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ROUNDSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ROUNDSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .PCMPEQQ
+	{written={0}, read={1}, reads_mem=true},
+	// .CRC32
+	{written={0}, read={0, 1}, reads_mem=true},
+	{written={0}, read={0, 1}, reads_mem=true},
+	{written={0}, read={0, 1}, reads_mem=true},
+	{written={0}, read={0, 1}, reads_mem=true},
+	{written={0}, read={0, 1}, reads_mem=true},
+	// .PCMPESTRI
+	{implicit_wr={.RCX}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPESTRM
+	{implicit_wr={.XMM0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPISTRI
+	{implicit_wr={.RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPISTRM
+	{implicit_wr={.XMM0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPGTQ
+	{written={0}, read={1}, reads_mem=true},
+	// .PCLMULQDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .AESDEC
+	{written={0}, read={1}, reads_mem=true},
+	// .AESDECLAST
+	{written={0}, read={1}, reads_mem=true},
+	// .AESENC
+	{written={0}, read={1}, reads_mem=true},
+	// .AESENCLAST
+	{written={0}, read={1}, reads_mem=true},
+	// .AESIMC
+	{written={0}, read={1}, reads_mem=true},
+	// .AESKEYGENASSIST
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SHA1MSG1
+	{written={0}, read={1}, reads_mem=true},
+	// .SHA1MSG2
+	{written={0}, read={1}, reads_mem=true},
+	// .SHA1NEXTE
+	{written={0}, read={1}, reads_mem=true},
+	// .SHA1RNDS4
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SHA256MSG1
+	{written={0}, read={1}, reads_mem=true},
+	// .SHA256MSG2
+	{written={0}, read={1}, reads_mem=true},
+	// .SHA256RNDS2
+	{written={0}, read={1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .VADDPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCPPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCPSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRTPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRTSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VANDPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VANDPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VANDNPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VANDNPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VORPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VORPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VXORPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VXORPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VCMPPS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCMPPD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCMPSS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCMPSD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCOMISS
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VCOMISD
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VUCOMISS
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VUCOMISD
+	{read={0, 1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VSHUFPS
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VSHUFPD
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VUNPCKLPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VUNPCKHPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VUNPCKLPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VUNPCKHPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VBLENDPS
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VBLENDPD
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VBLENDVPS
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VBLENDVPD
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VDPPS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDPPD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDSS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDSD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VEXTRACTPS
+	{written={0}, read={1}, writes_mem=true},
+	// .VINSERTPS
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VMOVAPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVUPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVAPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVUPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVSS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VMOVSD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VMOVDQA
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVDQU
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVQ
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VMOVD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVLPS
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVHPS
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVLPD
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVHPD
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVLHPS
+	{written={0}, read={1, 2}},
+	// .VMOVHLPS
+	{written={0}, read={1, 2}},
+	// .VMOVMSKPS
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VMOVMSKPD
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VMOVNTPS
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVNTPD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVNTDQ
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .VMOVNTDQA
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VADDSUBPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDSUBPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHADDPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHADDPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHSUBPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHSUBPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VLDDQU
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVDDUP
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVSLDUP
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVSHDUP
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPCMPESTRI
+	{implicit_wr={.RCX}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPCMPESTRM
+	{implicit_wr={.XMM0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPCMPISTRI
+	{implicit_wr={.RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPCMPISTRM
+	{implicit_wr={.XMM0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPBROADCASTB
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPBROADCASTW
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPBROADCASTD
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPBROADCASTQ
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VCVTPS2PD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPD2PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSS2SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSD2SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPS2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPD2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTDQ2PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTDQ2PD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSS2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSD2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSI2SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSI2SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTPS2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTPD2DQ
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTSS2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTSD2SI
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VPADDB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPADDW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPADDD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPADDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSUBB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSUBW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSUBD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSUBQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMULLW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMULHW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMULHUW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMULUDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMADDWD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPAND
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPANDN
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPOR
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPXOR
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSLLW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSLLD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSLLQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSRLW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSRLD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSRLQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSRAW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPSRAD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}},
+	// .VPCMPEQB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPEQW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPEQD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPEQQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPGTB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPGTW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPGTD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPGTQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPACKSSWB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPACKSSDW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPACKUSWB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPACKUSDW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKLBW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKLWD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKLDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKLQDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKHBW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKHWD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKHDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPUNPCKHQDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSHUFD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSHUFHW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSHUFLW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPEXTRB
+	{written={0}, read={1}, writes_mem=true},
+	// .VPEXTRW
+	{written={0}, read={1}},
+	{written={0}, read={1}, writes_mem=true},
+	// .VPEXTRD
+	{written={0}, read={1}, writes_mem=true},
+	// .VPEXTRQ
+	{written={0}, read={1}, writes_mem=true},
+	// .VPINSRB
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPINSRW
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPINSRD
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPINSRQ
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPMOVMSKB
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPTEST
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .VPSHUFB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPHADDW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPHADDD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPHADDSW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPHSUBW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPHSUBD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPHSUBSW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMADDUBSW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMULHRSW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSIGNB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSIGNW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSIGND
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPABSB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPABSW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPABSD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPALIGNR
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPBLENDW
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPBLENDVB
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VMPSADBW
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPHMINPOSUW
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMAXSB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMAXSD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMAXUW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMAXUD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMINSB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMINSD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMINUW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMINUD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMOVSXBW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSXBD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSXBQ
+	{written={0}, read={1}},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSXWD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSXWQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSXDQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVZXBW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVZXBD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVZXBQ
+	{written={0}, read={1}},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVZXWD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVZXWQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVZXDQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMULDQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMULLD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VMASKMOVDQU
+	{read={0, 1}, implicit_rd={.RDI}, flags_rd={.DF}, writes_mem=true},
+	// .VPCLMULQDQ
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VAESDEC
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VAESDECLAST
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VAESENC
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VAESENCLAST
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VAESIMC
+	{written={0}, read={1}, reads_mem=true},
+	// .VAESKEYGENASSIST
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VBROADCASTSS
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VBROADCASTSD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}},
+	// .VBROADCASTF128
+	{written={0}, read={1}, reads_mem=true},
+	// .VEXTRACTF128
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	// .VINSERTF128
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPERM2F128
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VMASKMOVPS
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	// .VMASKMOVPD
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	// .VTESTPS
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .VTESTPD
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={0, 1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .VZEROALL
+	{implicit_wr={.VECTOR}},
+	// .VZEROUPPER
+	{implicit_wr={.VECTOR}},
+	// .VBROADCASTI128
+	{written={0}, read={1}, reads_mem=true},
+	// .VEXTRACTI128
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	// .VINSERTI128
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPERM2I128
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPERMD
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPBLENDD
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPSLLVD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSLLVQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSRLVD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSRLVQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSRAVD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMASKMOVD
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	// .VPMASKMOVQ
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, writes_mem=true, reads_mem=true},
+	// .VGATHERDPS
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VGATHERDPD
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VGATHERQPS
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VGATHERQPD
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VPGATHERDD
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VPGATHERDQ
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VPGATHERQD
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VPGATHERQQ
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	{written={0, 2}, read={0, 1, 2}, reads_mem=true},
+	// .VFMADD132PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD132PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD132SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD132SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB132PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB213PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB231PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB132PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB213PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB231PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD132PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD213PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD231PS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD132PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD213PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD231PD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPH2PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPS2PH
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, writes_mem=true, reads_mem=true},
+	// .VMOVDQA32
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVDQA64
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVDQU8
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVDQU16
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVDQU32
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VMOVDQU64
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPBLENDMB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPBLENDMW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPBLENDMD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPBLENDMQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VBLENDMPS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VBLENDMPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPUB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPUW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPUD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCMPUQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTMB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTMW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTMD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTMQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTNMB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTNMW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTNMD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPTESTNMQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPCOMPRESSD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPCOMPRESSQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VCOMPRESSPS
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VCOMPRESSPD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPEXPANDD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPEXPANDQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VEXPANDPS
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VEXPANDPD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPCONFLICTD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPCONFLICTQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPLZCNTD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPLZCNTQ
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPERMI2B
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMI2W
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMI2D
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMI2Q
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMI2PS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMI2PD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMT2B
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMT2W
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMT2D
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMT2Q
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMT2PS
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMT2PD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPERMW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPMOVB2M
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVW2M
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVD2M
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVQ2M
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVM2B
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVM2W
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVM2D
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVM2Q
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .VPMOVQB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSQB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVUSQB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVQW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSQW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVUSQW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVQD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSQD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVUSQD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVDB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSDB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVUSDB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVDW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSDW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVUSDW
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVWB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVSWB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPMOVUSWB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VPROLD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPROLQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPROLVD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPROLVQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPRORD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPRORQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPRORVD
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPRORVQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSCATTERDD
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VPSCATTERDQ
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VPSCATTERQD
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VPSCATTERQQ
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VSCATTERDPS
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VSCATTERDPD
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VSCATTERQPS
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VSCATTERQPD
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .VPSRAVQ
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSRAVW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSLLVW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VPSRLVW
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .VRANGEPS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRANGEPD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRANGESS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRANGESD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCEPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCEPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCESS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCESD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALEPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALEPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALESS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALESD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14PD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14PS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14PD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14SS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14SD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPPS
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPPD
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPSS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPSD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTPS
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTPD
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTSS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTSD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMPS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMPD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMSS
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMSD
+	{written={0}, read={1, 2, 3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFPCLASSPS
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VFPCLASSPD
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .VFPCLASSSS
+	{written={0}, read={1}, reads_mem=true},
+	// .VFPCLASSSD
+	{written={0}, read={1}, reads_mem=true},
+	// .VALIGNQ
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VALIGND
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VDBPSADBW
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPTERNLOGD
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPTERNLOGQ
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	{written={0}, read={1, 2, 3}, reads_mem=true},
+	// .VPMULTISHIFTQB
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .KADDW
+	{written={0}, read={1, 2}},
+	// .KADDB
+	{written={0}, read={1, 2}},
+	// .KADDQ
+	{written={0}, read={1, 2}},
+	// .KADDD
+	{written={0}, read={1, 2}},
+	// .KANDW
+	{written={0}, read={1, 2}},
+	// .KANDB
+	{written={0}, read={1, 2}},
+	// .KANDQ
+	{written={0}, read={1, 2}},
+	// .KANDD
+	{written={0}, read={1, 2}},
+	// .KANDNW
+	{written={0}, read={1, 2}},
+	// .KANDNB
+	{written={0}, read={1, 2}},
+	// .KANDNQ
+	{written={0}, read={1, 2}},
+	// .KANDND
+	{written={0}, read={1, 2}},
+	// .KMOVW
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .KMOVB
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .KMOVQ
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .KMOVD
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .KNOTW
+	{written={0}, read={1}},
+	// .KNOTB
+	{written={0}, read={1}},
+	// .KNOTQ
+	{written={0}, read={1}},
+	// .KNOTD
+	{written={0}, read={1}},
+	// .KORW
+	{written={0}, read={1, 2}},
+	// .KORB
+	{written={0}, read={1, 2}},
+	// .KORQ
+	{written={0}, read={1, 2}},
+	// .KORD
+	{written={0}, read={1, 2}},
+	// .KORTESTW
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KORTESTB
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KORTESTQ
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KORTESTD
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KSHIFTLW
+	{written={0}, read={1, 2}},
+	// .KSHIFTLB
+	{written={0}, read={1, 2}},
+	// .KSHIFTLQ
+	{written={0}, read={1, 2}},
+	// .KSHIFTLD
+	{written={0}, read={1, 2}},
+	// .KSHIFTRW
+	{written={0}, read={1, 2}},
+	// .KSHIFTRB
+	{written={0}, read={1, 2}},
+	// .KSHIFTRQ
+	{written={0}, read={1, 2}},
+	// .KSHIFTRD
+	{written={0}, read={1, 2}},
+	// .KTESTW
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KTESTB
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KTESTQ
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KTESTD
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KUNPCKBW
+	{written={0}, read={1, 2}},
+	// .KUNPCKWD
+	{written={0}, read={1, 2}},
+	// .KUNPCKDQ
+	{written={0}, read={1, 2}},
+	// .KXNORW
+	{written={0}, read={1, 2}},
+	// .KXNORB
+	{written={0}, read={1, 2}},
+	// .KXNORQ
+	{written={0}, read={1, 2}},
+	// .KXNORD
+	{written={0}, read={1, 2}},
+	// .KXORW
+	{written={0}, read={1, 2}},
+	// .KXORB
+	{written={0}, read={1, 2}},
+	// .KXORQ
+	{written={0}, read={1, 2}},
+	// .KXORD
+	{written={0}, read={1, 2}},
+	// .FADD
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FADDP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIADD
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FSUB
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSUBP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FISUB
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FSUBR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSUBRP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FISUBR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FMUL
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FMULP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIMUL
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FDIV
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FDIVP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIDIV
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FDIVR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FDIVRP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIDIVR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FSQRT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FABS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCHS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPREM
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPREM1
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FRNDINT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSCALE
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FXTRACT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FXAM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FLD
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FILD
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FBLD
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FST
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FIST
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FISTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FISTTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FBSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FXCH
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCMOVB
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF}},
+	// .FCMOVE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.ZF}},
+	// .FCMOVBE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF, .ZF}},
+	// .FCMOVU
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.PF}},
+	// .FCMOVNB
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF}},
+	// .FCMOVNE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.ZF}},
+	// .FCMOVNBE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF, .ZF}},
+	// .FCMOVNU
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.PF}},
+	// .FCOM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCOMP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCOMPP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FICOM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FICOMP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FCOMI
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FCOMIP
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FUCOMI
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FUCOMIP
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FUCOM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FUCOMP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FUCOMPP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FTST
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FLDZ
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLD1
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDPI
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDL2T
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDL2E
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDLG2
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDLN2
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FSIN
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCOS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSINCOS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPTAN
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPATAN
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .F2XM1
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FYL2X
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FYL2XP1
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FINIT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FNINIT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FINCSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FDECSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FFREE
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FFREEP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FNOP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FWAIT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCLEX
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FNCLEX
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSTCW
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FNSTCW
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FLDCW
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FSTENV
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FNSTENV
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FLDENV
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FSAVE
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FNSAVE
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FRSTOR
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FSTSW
+	{implicit_wr={.RAX, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.RAX, .FPU_SW}},
+	// .FNSTSW
+	{implicit_wr={.RAX, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.RAX, .FPU_SW}},
+	// .FXSAVE
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FXSAVE64
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FXRSTOR
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FXRSTOR64
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .LGDT
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SGDT
+	{written={0}, writes_mem=true},
+	{written={0}, writes_mem=true},
+	// .LIDT
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SIDT
+	{written={0}, writes_mem=true},
+	{written={0}, writes_mem=true},
+	// .LLDT
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SLDT
+	{written={0}, writes_mem=true},
+	{written={0}},
+	{written={0}},
+	// .LTR
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .STR
+	{written={0}, writes_mem=true},
+	{written={0}},
+	{written={0}},
+	// .LMSW
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SMSW
+	{written={0}, writes_mem=true},
+	{written={0}},
+	{written={0}},
+	// .CLTS
+	{side_effects={.PRIVILEGED}},
+	// .ARPL
+	{written={0}, read={1}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .LAR
+	{written={0}, read={1}, flags_wr={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, reads_mem=true},
+	// .LSL
+	{written={0}, read={1}, flags_wr={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, reads_mem=true},
+	{written={0}, read={1}, flags_wr={.ZF}, reads_mem=true},
+	// .VERR
+	{read={0}, flags_wr={.ZF}, reads_mem=true},
+	// .VERW
+	{read={0}, flags_wr={.ZF}, reads_mem=true},
+	// .INVD
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .WBINVD
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .INVLPG
+	{read={0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .INVPCID
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .RSM
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .RDMSR
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.PRIVILEGED}},
+	// .WRMSR
+	{implicit_rd={.RAX, .RCX, .RDX}, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .VMCALL
+	{side_effects={.PRIVILEGED}},
+	// .VMLAUNCH
+	{flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMRESUME
+	{flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMXOFF
+	{side_effects={.PRIVILEGED}},
+	// .VMXON
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMCLEAR
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMPTRLD
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMPTRST
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMREAD
+	{written={0}, read={1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMWRITE
+	{read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMFUNC
+	{side_effects={.PRIVILEGED}},
+	// .INVEPT
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .INVVPID
+	{read={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .ENCLS
+	{side_effects={.PRIVILEGED}},
+	// .ENCLU
+	{side_effects={.PRIVILEGED}},
+	// .ENCLV
+	{side_effects={.PRIVILEGED}},
+	// .RDPKRU
+	{implicit_wr={.RAX}, implicit_rd={.RCX}},
+	// .WRPKRU
+	{implicit_rd={.RAX, .RCX, .RDX}},
+	// .INCSSPD
+	{read={0}, side_effects={.CET}},
+	// .INCSSPQ
+	{read={0}, side_effects={.CET}},
+	// .RDSSPD
+	{written={0}, side_effects={.CET}},
+	// .RDSSPQ
+	{written={0}, side_effects={.CET}},
+	// .SAVEPREVSSP
+	{side_effects={.CET}},
+	// .RSTORSSP
+	{read={0}, writes_mem=true, reads_mem=true, side_effects={.CET}},
+	// .WRSSD
+	{read={0, 1}, writes_mem=true, side_effects={.CET}},
+	// .WRSSQ
+	{read={0, 1}, writes_mem=true, side_effects={.CET}},
+	// .WRUSSD
+	{read={0, 1}, writes_mem=true, side_effects={.CET}},
+	// .WRUSSQ
+	{read={0, 1}, writes_mem=true, side_effects={.CET}},
+	// .SETSSBSY
+	{side_effects={.CET}},
+	// .CLRSSBSY
+	{read={0}, writes_mem=true, reads_mem=true, side_effects={.CET}},
+	// .ENDBR64
+	{side_effects={.HINT, .CET}},
+	// .ENDBR32
+	{side_effects={.HINT, .CET}},
+	// .XSAVE
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVE64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XRSTOR
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true},
+	// .XRSTOR64
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true},
+	// .XSAVEOPT
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVEOPT64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVEC
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVEC64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVES
+	{implicit_rd={.RAX, .RDX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .XSAVES64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .XRSTORS
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .XRSTORS64
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .PREFETCHT0
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHT1
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHT2
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHNTA
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHW
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .CLFLUSHOPT
+	{read={0}, reads_mem=true, side_effects={.CACHE}},
+	// .CLWB
+	{read={0}, reads_mem=true, side_effects={.CACHE}},
+	// .CLDEMOTE
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .BSWAP
+	{written={0}, read={0}},
+	{written={0}, read={0}},
+	// .CMPXCHG
+	{written={0}, read={0, 1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0}, read={0, 1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .CMPXCHG8B
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RBX, .RCX, .RDX}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .CMPXCHG16B
+	{read={0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RBX, .RCX, .RDX}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .XADD
+	{written={0, 1}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0, 1}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0, 1}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={0, 1}, read={0, 1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BOUND
+	{read={0, 1}, reads_mem=true, side_effects={.TRAP}},
+	{read={0, 1}, reads_mem=true, side_effects={.TRAP}},
+	// .ENTER
+	{implicit_wr={.RSP, .RBP}, implicit_rd={.RSP, .RBP}, writes_mem=true},
+	// .LEAVE
+	{implicit_wr={.RSP, .RBP}, implicit_rd={.RBP}, reads_mem=true},
+	// .XLAT
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RBX}, reads_mem=true},
+	// .XLATB
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RBX}, reads_mem=true},
+	// .MOVBE
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	{written={0}, read={1}, writes_mem=true, reads_mem=true},
+	// .RDRAND
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .RDSEED
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .SWAPGS
+	{side_effects={.PRIVILEGED}},
+	// .MONITOR
+	{implicit_rd={.RAX, .RCX, .RDX}, reads_mem=true},
+	// .MWAIT
+	{implicit_rd={.RAX, .RCX}, side_effects={.HALT}},
+	// .CLAC
+	{side_effects={.PRIVILEGED}},
+	// .STAC
+	{side_effects={.PRIVILEGED}},
+	// .RDFSBASE
+	{written={0}},
+	{written={0}},
+	// .RDGSBASE
+	{written={0}},
+	{written={0}},
+	// .WRFSBASE
+	{read={0}},
+	{read={0}},
+	// .WRGSBASE
+	{read={0}},
+	{read={0}},
+	// .PTWRITE
+	{read={0}, reads_mem=true},
+	{read={0}, reads_mem=true},
+	// .RDPID
+	{written={0}},
+	// .WBNOINVD
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SERIALIZE
+	{side_effects={.SERIALIZING}},
+	// .PREFETCH
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .TPAUSE
+	{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
+	// .UMONITOR
+	{read={0}, reads_mem=true},
+	// .UMWAIT
+	{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
+	// .MOVDIRI
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .MOVDIR64B
+	{read={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	// .ENQCMD
+	{read={0}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .ENQCMDS
+	{read={0}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .AADD
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .AAND
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .AOR
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .AXOR
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .XEND
+	{side_effects={.CONTROL}},
+	// .XTEST
+	{flags_wr={.ZF}},
+	// .VMRUN
+	{implicit_rd={.RAX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMMCALL
+	{side_effects={.PRIVILEGED}},
+	// .VMLOAD
+	{implicit_rd={.RAX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMSAVE
+	{implicit_rd={.RAX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .STGI
+	{side_effects={.PRIVILEGED}},
+	// .CLGI
+	{side_effects={.PRIVILEGED}},
+	// .SKINIT
+	{implicit_rd={.RAX}, side_effects={.PRIVILEGED}},
+	// .INVLPGA
+	{implicit_rd={.RAX, .RCX}, side_effects={.PRIVILEGED}},
+	// .INVLPGB
+	{implicit_rd={.RAX, .RCX, .RDX}, side_effects={.PRIVILEGED}},
+	// .TLBSYNC
+	{side_effects={.PRIVILEGED}},
+	// .PVALIDATE
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .RMPADJUST
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .RMPUPDATE
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .PSMASH
+	{implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .CLZERO
+	{implicit_rd={.RAX}, writes_mem=true, side_effects={.CACHE}},
+	// .MONITORX
+	{implicit_rd={.RAX, .RCX, .RDX}, reads_mem=true},
+	// .MWAITX
+	{implicit_rd={.RAX, .RBX, .RCX}, side_effects={.HALT}},
+	// .RDPRU
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	// .MCOMMIT
+	{flags_wr={.CF}, side_effects={.FENCE}},
 }
 
 @(rodata)
@@ -3700,143 +7550,141 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.MOVS             = {  630,   1},
 	.MOVSB            = {  631,   1},
 	.MOVSW            = {  632,   1},
-	.MOVSD            = {  633,   1},
-	.MOVSQ            = {  634,   1},
-	.CMPS             = {  635,   1},
-	.CMPSB            = {  636,   1},
-	.CMPSW            = {  637,   1},
-	.CMPSD            = {  638,   1},
-	.CMPSQ            = {  639,   1},
-	.SCAS             = {  640,   1},
-	.SCASB            = {  641,   1},
-	.SCASW            = {  642,   1},
-	.SCASD            = {  643,   1},
-	.SCASQ            = {  644,   1},
-	.LODS             = {  645,   1},
-	.LODSB            = {  646,   1},
-	.LODSW            = {  647,   1},
-	.LODSD            = {  648,   1},
-	.LODSQ            = {  649,   1},
-	.STOS             = {  650,   1},
-	.STOSB            = {  651,   1},
-	.STOSW            = {  652,   1},
-	.STOSD            = {  653,   1},
-	.STOSQ            = {  654,   1},
-	.CLC              = {  655,   1},
-	.STC              = {  656,   1},
-	.CMC              = {  657,   1},
-	.CLD              = {  658,   1},
-	.STD              = {  659,   1},
-	.CLI              = {  660,   1},
-	.STI              = {  661,   1},
-	.LAHF             = {  662,   1},
-	.SAHF             = {  663,   1},
-	.PUSHF            = {  664,   1},
-	.PUSHFD           = {  665,   1},
-	.PUSHFQ           = {  666,   1},
-	.POPF             = {  667,   1},
-	.POPFD            = {  668,   1},
-	.POPFQ            = {  669,   1},
-	.NOP              = {  670,   4},
-	.HLT              = {  674,   1},
-	.WAIT             = {  675,   1},
-	.LOCK             = {  676,   1},
-	.UD0              = {  677,   1},
-	.UD1              = {  678,   1},
-	.UD2              = {  679,   1},
-	.CPUID            = {  680,   1},
-	.RDTSC            = {  681,   1},
-	.RDTSCP           = {  682,   1},
-	.RDPMC            = {  683,   1},
-	.XGETBV           = {  684,   1},
-	.XSETBV           = {  685,   1},
-	.CBW              = {  686,   1},
-	.CWDE             = {  687,   1},
-	.CDQE             = {  688,   1},
-	.CWD              = {  689,   1},
-	.CDQ              = {  690,   1},
-	.CQO              = {  691,   1},
-	.ANDN             = {  692,   2},
-	.BEXTR            = {  694,   2},
-	.BLSI             = {  696,   2},
-	.BLSMSK           = {  698,   2},
-	.BLSR             = {  700,   2},
-	.BZHI             = {  702,   2},
-	.PDEP             = {  704,   2},
-	.PEXT             = {  706,   2},
-	.RORX             = {  708,   2},
-	.SARX             = {  710,   2},
-	.SHLX             = {  712,   2},
-	.SHRX             = {  714,   2},
-	.MULX             = {  716,   2},
-	.ADCX             = {  718,   2},
-	.ADOX             = {  720,   2},
-	.MOVAPS           = {  722,   2},
-	.MOVUPS           = {  724,   2},
-	.MOVAPD           = {  726,   2},
-	.MOVUPD           = {  728,   2},
-	.MOVSS            = {  730,   2},
-	.MOVSD_SSE        = {  732,   2},
-	.MOVDQA           = {  734,   2},
-	.MOVDQU           = {  736,   2},
-	.MOVQ             = {  738,   6},
-	.MOVD             = {  744,   4},
-	.MOVLPS           = {  748,   2},
-	.MOVHPS           = {  750,   2},
-	.MOVLPD           = {  752,   2},
-	.MOVHPD           = {  754,   2},
-	.MOVLHPS          = {  756,   1},
-	.MOVHLPS          = {  757,   1},
-	.MOVMSKPS         = {  758,   2},
-	.MOVMSKPD         = {  760,   2},
-	.MOVNTPS          = {  762,   1},
-	.MOVNTPD          = {  763,   1},
-	.MOVNTDQ          = {  764,   1},
-	.MOVNTDQA         = {  765,   1},
-	.ADDPS            = {  766,   1},
-	.ADDPD            = {  767,   1},
-	.ADDSS            = {  768,   1},
-	.ADDSD            = {  769,   1},
-	.SUBPS            = {  770,   1},
-	.SUBPD            = {  771,   1},
-	.SUBSS            = {  772,   1},
-	.SUBSD            = {  773,   1},
-	.MULPS            = {  774,   1},
-	.MULPD            = {  775,   1},
-	.MULSS            = {  776,   1},
-	.MULSD            = {  777,   1},
-	.DIVPS            = {  778,   1},
-	.DIVPD            = {  779,   1},
-	.DIVSS            = {  780,   1},
-	.DIVSD            = {  781,   1},
-	.SQRTPS           = {  782,   1},
-	.SQRTPD           = {  783,   1},
-	.SQRTSS           = {  784,   1},
-	.SQRTSD           = {  785,   1},
-	.RCPPS            = {  786,   1},
-	.RCPSS            = {  787,   1},
-	.RSQRTPS          = {  788,   1},
-	.RSQRTSS          = {  789,   1},
-	.MAXPS            = {  790,   1},
-	.MAXPD            = {  791,   1},
-	.MAXSS            = {  792,   1},
-	.MAXSD            = {  793,   1},
-	.MINPS            = {  794,   1},
-	.MINPD            = {  795,   1},
-	.MINSS            = {  796,   1},
-	.MINSD            = {  797,   1},
-	.ANDPS            = {  798,   1},
-	.ANDPD            = {  799,   1},
-	.ANDNPS           = {  800,   1},
-	.ANDNPD           = {  801,   1},
-	.ORPS             = {  802,   1},
-	.ORPD             = {  803,   1},
-	.XORPS            = {  804,   1},
-	.XORPD            = {  805,   1},
-	.CMPPS            = {  806,   1},
-	.CMPPD            = {  807,   1},
-	.CMPSS            = {  808,   1},
-	.CMPSD_SSE        = {  809,   1},
+	.MOVSD            = {  633,   3},
+	.MOVSQ            = {  636,   1},
+	.CMPS             = {  637,   1},
+	.CMPSB            = {  638,   1},
+	.CMPSW            = {  639,   1},
+	.CMPSD            = {  640,   2},
+	.CMPSQ            = {  642,   1},
+	.SCAS             = {  643,   1},
+	.SCASB            = {  644,   1},
+	.SCASW            = {  645,   1},
+	.SCASD            = {  646,   1},
+	.SCASQ            = {  647,   1},
+	.LODS             = {  648,   1},
+	.LODSB            = {  649,   1},
+	.LODSW            = {  650,   1},
+	.LODSD            = {  651,   1},
+	.LODSQ            = {  652,   1},
+	.STOS             = {  653,   1},
+	.STOSB            = {  654,   1},
+	.STOSW            = {  655,   1},
+	.STOSD            = {  656,   1},
+	.STOSQ            = {  657,   1},
+	.CLC              = {  658,   1},
+	.STC              = {  659,   1},
+	.CMC              = {  660,   1},
+	.CLD              = {  661,   1},
+	.STD              = {  662,   1},
+	.CLI              = {  663,   1},
+	.STI              = {  664,   1},
+	.LAHF             = {  665,   1},
+	.SAHF             = {  666,   1},
+	.PUSHF            = {  667,   1},
+	.PUSHFD           = {  668,   1},
+	.PUSHFQ           = {  669,   1},
+	.POPF             = {  670,   1},
+	.POPFD            = {  671,   1},
+	.POPFQ            = {  672,   1},
+	.NOP              = {  673,   4},
+	.HLT              = {  677,   1},
+	.WAIT             = {  678,   1},
+	.LOCK             = {  679,   1},
+	.UD0              = {  680,   1},
+	.UD1              = {  681,   1},
+	.UD2              = {  682,   1},
+	.CPUID            = {  683,   1},
+	.RDTSC            = {  684,   1},
+	.RDTSCP           = {  685,   1},
+	.RDPMC            = {  686,   1},
+	.XGETBV           = {  687,   1},
+	.XSETBV           = {  688,   1},
+	.CBW              = {  689,   1},
+	.CWDE             = {  690,   1},
+	.CDQE             = {  691,   1},
+	.CWD              = {  692,   1},
+	.CDQ              = {  693,   1},
+	.CQO              = {  694,   1},
+	.ANDN             = {  695,   2},
+	.BEXTR            = {  697,   2},
+	.BLSI             = {  699,   2},
+	.BLSMSK           = {  701,   2},
+	.BLSR             = {  703,   2},
+	.BZHI             = {  705,   2},
+	.PDEP             = {  707,   2},
+	.PEXT             = {  709,   2},
+	.RORX             = {  711,   2},
+	.SARX             = {  713,   2},
+	.SHLX             = {  715,   2},
+	.SHRX             = {  717,   2},
+	.MULX             = {  719,   2},
+	.ADCX             = {  721,   2},
+	.ADOX             = {  723,   2},
+	.MOVAPS           = {  725,   2},
+	.MOVUPS           = {  727,   2},
+	.MOVAPD           = {  729,   2},
+	.MOVUPD           = {  731,   2},
+	.MOVSS            = {  733,   2},
+	.MOVDQA           = {  735,   2},
+	.MOVDQU           = {  737,   2},
+	.MOVQ             = {  739,   6},
+	.MOVD             = {  745,   4},
+	.MOVLPS           = {  749,   2},
+	.MOVHPS           = {  751,   2},
+	.MOVLPD           = {  753,   2},
+	.MOVHPD           = {  755,   2},
+	.MOVLHPS          = {  757,   1},
+	.MOVHLPS          = {  758,   1},
+	.MOVMSKPS         = {  759,   2},
+	.MOVMSKPD         = {  761,   2},
+	.MOVNTPS          = {  763,   1},
+	.MOVNTPD          = {  764,   1},
+	.MOVNTDQ          = {  765,   1},
+	.MOVNTDQA         = {  766,   1},
+	.ADDPS            = {  767,   1},
+	.ADDPD            = {  768,   1},
+	.ADDSS            = {  769,   1},
+	.ADDSD            = {  770,   1},
+	.SUBPS            = {  771,   1},
+	.SUBPD            = {  772,   1},
+	.SUBSS            = {  773,   1},
+	.SUBSD            = {  774,   1},
+	.MULPS            = {  775,   1},
+	.MULPD            = {  776,   1},
+	.MULSS            = {  777,   1},
+	.MULSD            = {  778,   1},
+	.DIVPS            = {  779,   1},
+	.DIVPD            = {  780,   1},
+	.DIVSS            = {  781,   1},
+	.DIVSD            = {  782,   1},
+	.SQRTPS           = {  783,   1},
+	.SQRTPD           = {  784,   1},
+	.SQRTSS           = {  785,   1},
+	.SQRTSD           = {  786,   1},
+	.RCPPS            = {  787,   1},
+	.RCPSS            = {  788,   1},
+	.RSQRTPS          = {  789,   1},
+	.RSQRTSS          = {  790,   1},
+	.MAXPS            = {  791,   1},
+	.MAXPD            = {  792,   1},
+	.MAXSS            = {  793,   1},
+	.MAXSD            = {  794,   1},
+	.MINPS            = {  795,   1},
+	.MINPD            = {  796,   1},
+	.MINSS            = {  797,   1},
+	.MINSD            = {  798,   1},
+	.ANDPS            = {  799,   1},
+	.ANDPD            = {  800,   1},
+	.ANDNPS           = {  801,   1},
+	.ANDNPD           = {  802,   1},
+	.ORPS             = {  803,   1},
+	.ORPD             = {  804,   1},
+	.XORPS            = {  805,   1},
+	.XORPD            = {  806,   1},
+	.CMPPS            = {  807,   1},
+	.CMPPD            = {  808,   1},
+	.CMPSS            = {  809,   1},
 	.COMISS           = {  810,   1},
 	.COMISD           = {  811,   1},
 	.UCOMISS          = {  812,   1},
@@ -4114,615 +7962,679 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.VMOVNTPD         = { 1177,   2},
 	.VMOVNTDQ         = { 1179,   2},
 	.VMOVNTDQA        = { 1181,   2},
-	.VCVTPS2PD        = { 1183,   2},
-	.VCVTPD2PS        = { 1185,   2},
-	.VCVTSS2SD        = { 1187,   1},
-	.VCVTSD2SS        = { 1188,   1},
-	.VCVTPS2DQ        = { 1189,   2},
-	.VCVTPD2DQ        = { 1191,   2},
-	.VCVTDQ2PS        = { 1193,   2},
-	.VCVTDQ2PD        = { 1195,   2},
-	.VCVTSS2SI        = { 1197,   2},
-	.VCVTSD2SI        = { 1199,   2},
-	.VCVTSI2SS        = { 1201,   2},
-	.VCVTSI2SD        = { 1203,   2},
-	.VCVTTPS2DQ       = { 1205,   2},
-	.VCVTTPD2DQ       = { 1207,   2},
-	.VCVTTSS2SI       = { 1209,   2},
-	.VCVTTSD2SI       = { 1211,   2},
-	.VPADDB           = { 1213,   2},
-	.VPADDW           = { 1215,   2},
-	.VPADDD           = { 1217,   2},
-	.VPADDQ           = { 1219,   2},
-	.VPSUBB           = { 1221,   2},
-	.VPSUBW           = { 1223,   2},
-	.VPSUBD           = { 1225,   2},
-	.VPSUBQ           = { 1227,   2},
-	.VPMULLW          = { 1229,   2},
-	.VPMULHW          = { 1231,   2},
-	.VPMULHUW         = { 1233,   2},
-	.VPMULUDQ         = { 1235,   2},
-	.VPMADDWD         = { 1237,   2},
-	.VPAND            = { 1239,   2},
-	.VPANDN           = { 1241,   2},
-	.VPOR             = { 1243,   2},
-	.VPXOR            = { 1245,   2},
-	.VPSLLW           = { 1247,   4},
-	.VPSLLD           = { 1251,   4},
-	.VPSLLQ           = { 1255,   4},
-	.VPSRLW           = { 1259,   4},
-	.VPSRLD           = { 1263,   4},
-	.VPSRLQ           = { 1267,   4},
-	.VPSRAW           = { 1271,   4},
-	.VPSRAD           = { 1275,   4},
-	.VPCMPEQB         = { 1279,   2},
-	.VPCMPEQW         = { 1281,   2},
-	.VPCMPEQD         = { 1283,   2},
-	.VPCMPEQQ         = { 1285,   2},
-	.VPCMPGTB         = { 1287,   2},
-	.VPCMPGTW         = { 1289,   2},
-	.VPCMPGTD         = { 1291,   2},
-	.VPCMPGTQ         = { 1293,   2},
-	.VPACKSSWB        = { 1295,   2},
-	.VPACKSSDW        = { 1297,   2},
-	.VPACKUSWB        = { 1299,   2},
-	.VPACKUSDW        = { 1301,   2},
-	.VPUNPCKLBW       = { 1303,   2},
-	.VPUNPCKLWD       = { 1305,   2},
-	.VPUNPCKLDQ       = { 1307,   2},
-	.VPUNPCKLQDQ      = { 1309,   2},
-	.VPUNPCKHBW       = { 1311,   2},
-	.VPUNPCKHWD       = { 1313,   2},
-	.VPUNPCKHDQ       = { 1315,   2},
-	.VPUNPCKHQDQ      = { 1317,   2},
-	.VPSHUFD          = { 1319,   2},
-	.VPSHUFHW         = { 1321,   2},
-	.VPSHUFLW         = { 1323,   2},
-	.VPEXTRB          = { 1325,   1},
-	.VPEXTRW          = { 1326,   2},
-	.VPEXTRD          = { 1328,   1},
-	.VPEXTRQ          = { 1329,   1},
-	.VPINSRB          = { 1330,   1},
-	.VPINSRW          = { 1331,   1},
-	.VPINSRD          = { 1332,   1},
-	.VPINSRQ          = { 1333,   1},
-	.VPMOVMSKB        = { 1334,   2},
-	.VPTEST           = { 1336,   2},
-	.VPSHUFB          = { 1338,   2},
-	.VPHADDW          = { 1340,   2},
-	.VPHADDD          = { 1342,   2},
-	.VPHADDSW         = { 1344,   2},
-	.VPHSUBW          = { 1346,   2},
-	.VPHSUBD          = { 1348,   2},
-	.VPHSUBSW         = { 1350,   2},
-	.VPMADDUBSW       = { 1352,   2},
-	.VPMULHRSW        = { 1354,   2},
-	.VPSIGNB          = { 1356,   2},
-	.VPSIGNW          = { 1358,   2},
-	.VPSIGND          = { 1360,   2},
-	.VPABSB           = { 1362,   2},
-	.VPABSW           = { 1364,   2},
-	.VPABSD           = { 1366,   2},
-	.VPALIGNR         = { 1368,   2},
-	.VPBLENDW         = { 1370,   2},
-	.VPBLENDVB        = { 1372,   2},
-	.VMPSADBW         = { 1374,   2},
-	.VPHMINPOSUW      = { 1376,   1},
-	.VPMAXSB          = { 1377,   2},
-	.VPMAXSD          = { 1379,   2},
-	.VPMAXUW          = { 1381,   2},
-	.VPMAXUD          = { 1383,   2},
-	.VPMINSB          = { 1385,   2},
-	.VPMINSD          = { 1387,   2},
-	.VPMINUW          = { 1389,   2},
-	.VPMINUD          = { 1391,   2},
-	.VPMOVSXBW        = { 1393,   2},
-	.VPMOVSXBD        = { 1395,   2},
-	.VPMOVSXBQ        = { 1397,   2},
-	.VPMOVSXWD        = { 1399,   2},
-	.VPMOVSXWQ        = { 1401,   2},
-	.VPMOVSXDQ        = { 1403,   2},
-	.VPMOVZXBW        = { 1405,   2},
-	.VPMOVZXBD        = { 1407,   2},
-	.VPMOVZXBQ        = { 1409,   2},
-	.VPMOVZXWD        = { 1411,   2},
-	.VPMOVZXWQ        = { 1413,   2},
-	.VPMOVZXDQ        = { 1415,   2},
-	.VPMULDQ          = { 1417,   2},
-	.VPMULLD          = { 1419,   2},
-	.VMASKMOVDQU      = { 1421,   1},
-	.VPCLMULQDQ       = { 1422,   2},
-	.VAESDEC          = { 1424,   1},
-	.VAESDECLAST      = { 1425,   1},
-	.VAESENC          = { 1426,   1},
-	.VAESENCLAST      = { 1427,   1},
-	.VAESIMC          = { 1428,   1},
-	.VAESKEYGENASSIST = { 1429,   1},
-	.VBROADCASTSS     = { 1430,   4},
-	.VBROADCASTSD     = { 1434,   2},
-	.VBROADCASTF128   = { 1436,   1},
-	.VEXTRACTF128     = { 1437,   1},
-	.VINSERTF128      = { 1438,   1},
-	.VPERM2F128       = { 1439,   1},
-	.VMASKMOVPS       = { 1440,   4},
-	.VMASKMOVPD       = { 1444,   4},
-	.VTESTPS          = { 1448,   2},
-	.VTESTPD          = { 1450,   2},
-	.VZEROALL         = { 1452,   1},
-	.VZEROUPPER       = { 1453,   1},
-	.VBROADCASTI128   = { 1454,   1},
-	.VEXTRACTI128     = { 1455,   1},
-	.VINSERTI128      = { 1456,   1},
-	.VPERM2I128       = { 1457,   1},
-	.VPERMD           = { 1458,   1},
-	.VPERMPS          = { 1459,   1},
-	.VPERMQ           = { 1460,   1},
-	.VPERMPD          = { 1461,   1},
-	.VPBLENDD         = { 1462,   2},
-	.VPSLLVD          = { 1464,   2},
-	.VPSLLVQ          = { 1466,   2},
-	.VPSRLVD          = { 1468,   2},
-	.VPSRLVQ          = { 1470,   2},
-	.VPSRAVD          = { 1472,   2},
-	.VPMASKMOVD       = { 1474,   4},
-	.VPMASKMOVQ       = { 1478,   4},
-	.VGATHERDPS       = { 1482,   2},
-	.VGATHERDPD       = { 1484,   2},
-	.VGATHERQPS       = { 1486,   2},
-	.VGATHERQPD       = { 1488,   2},
-	.VPGATHERDD       = { 1490,   2},
-	.VPGATHERDQ       = { 1492,   2},
-	.VPGATHERQD       = { 1494,   2},
-	.VPGATHERQQ       = { 1496,   2},
-	.VFMADD132PS      = { 1498,   2},
-	.VFMADD213PS      = { 1500,   2},
-	.VFMADD231PS      = { 1502,   2},
-	.VFMADD132PD      = { 1504,   2},
-	.VFMADD213PD      = { 1506,   2},
-	.VFMADD231PD      = { 1508,   2},
-	.VFMADD132SS      = { 1510,   1},
-	.VFMADD213SS      = { 1511,   1},
-	.VFMADD231SS      = { 1512,   1},
-	.VFMADD132SD      = { 1513,   1},
-	.VFMADD213SD      = { 1514,   1},
-	.VFMADD231SD      = { 1515,   1},
-	.VFMSUB132PS      = { 1516,   2},
-	.VFMSUB213PS      = { 1518,   2},
-	.VFMSUB231PS      = { 1520,   2},
-	.VFMSUB132PD      = { 1522,   2},
-	.VFMSUB213PD      = { 1524,   2},
-	.VFMSUB231PD      = { 1526,   2},
-	.VFMSUB132SS      = { 1528,   1},
-	.VFMSUB213SS      = { 1529,   1},
-	.VFMSUB231SS      = { 1530,   1},
-	.VFMSUB132SD      = { 1531,   1},
-	.VFMSUB213SD      = { 1532,   1},
-	.VFMSUB231SD      = { 1533,   1},
-	.VFNMADD132PS     = { 1534,   2},
-	.VFNMADD213PS     = { 1536,   2},
-	.VFNMADD231PS     = { 1538,   2},
-	.VFNMADD132PD     = { 1540,   2},
-	.VFNMADD213PD     = { 1542,   2},
-	.VFNMADD231PD     = { 1544,   2},
-	.VFNMADD132SS     = { 1546,   1},
-	.VFNMADD213SS     = { 1547,   1},
-	.VFNMADD231SS     = { 1548,   1},
-	.VFNMADD132SD     = { 1549,   1},
-	.VFNMADD213SD     = { 1550,   1},
-	.VFNMADD231SD     = { 1551,   1},
-	.VFNMSUB132PS     = { 1552,   2},
-	.VFNMSUB213PS     = { 1554,   2},
-	.VFNMSUB231PS     = { 1556,   2},
-	.VFNMSUB132PD     = { 1558,   2},
-	.VFNMSUB213PD     = { 1560,   2},
-	.VFNMSUB231PD     = { 1562,   2},
-	.VFNMSUB132SS     = { 1564,   1},
-	.VFNMSUB213SS     = { 1565,   1},
-	.VFNMSUB231SS     = { 1566,   1},
-	.VFNMSUB132SD     = { 1567,   1},
-	.VFNMSUB213SD     = { 1568,   1},
-	.VFNMSUB231SD     = { 1569,   1},
-	.VFMADDSUB132PS   = { 1570,   2},
-	.VFMADDSUB213PS   = { 1572,   2},
-	.VFMADDSUB231PS   = { 1574,   2},
-	.VFMADDSUB132PD   = { 1576,   2},
-	.VFMADDSUB213PD   = { 1578,   2},
-	.VFMADDSUB231PD   = { 1580,   2},
-	.VFMSUBADD132PS   = { 1582,   2},
-	.VFMSUBADD213PS   = { 1584,   2},
-	.VFMSUBADD231PS   = { 1586,   2},
-	.VFMSUBADD132PD   = { 1588,   2},
-	.VFMSUBADD213PD   = { 1590,   2},
-	.VFMSUBADD231PD   = { 1592,   2},
-	.VCVTPH2PS        = { 1594,   3},
-	.VCVTPS2PH        = { 1597,   3},
-	.VMOVDQA32        = { 1600,   6},
-	.VMOVDQA64        = { 1606,   6},
-	.VMOVDQU8         = { 1612,   6},
-	.VMOVDQU16        = { 1618,   6},
-	.VMOVDQU32        = { 1624,   6},
-	.VMOVDQU64        = { 1630,   6},
-	.VPBLENDMB        = { 1636,   3},
-	.VPBLENDMW        = { 1639,   3},
-	.VPBLENDMD        = { 1642,   3},
-	.VPBLENDMQ        = { 1645,   3},
-	.VBLENDMPS        = { 1648,   3},
-	.VBLENDMPD        = { 1651,   3},
-	.VPCMPB           = { 1654,   3},
-	.VPCMPUB          = { 1657,   3},
-	.VPCMPW           = { 1660,   3},
-	.VPCMPUW          = { 1663,   3},
-	.VPCMPD           = { 1666,   3},
-	.VPCMPUD          = { 1669,   3},
-	.VPCMPQ           = { 1672,   3},
-	.VPCMPUQ          = { 1675,   3},
-	.VPTESTMB         = { 1678,   3},
-	.VPTESTMW         = { 1681,   3},
-	.VPTESTMD         = { 1684,   3},
-	.VPTESTMQ         = { 1687,   3},
-	.VPTESTNMB        = { 1690,   3},
-	.VPTESTNMW        = { 1693,   3},
-	.VPTESTNMD        = { 1696,   3},
-	.VPTESTNMQ        = { 1699,   3},
-	.VPCOMPRESSD      = { 1702,   3},
-	.VPCOMPRESSQ      = { 1705,   3},
-	.VCOMPRESSPS      = { 1708,   3},
-	.VCOMPRESSPD      = { 1711,   3},
-	.VPEXPANDD        = { 1714,   3},
-	.VPEXPANDQ        = { 1717,   3},
-	.VEXPANDPS        = { 1720,   3},
-	.VEXPANDPD        = { 1723,   3},
-	.VPCONFLICTD      = { 1726,   3},
-	.VPCONFLICTQ      = { 1729,   3},
-	.VPLZCNTD         = { 1732,   3},
-	.VPLZCNTQ         = { 1735,   3},
-	.VPERMI2B         = { 1738,   3},
-	.VPERMI2W         = { 1741,   3},
-	.VPERMI2D         = { 1744,   3},
-	.VPERMI2Q         = { 1747,   3},
-	.VPERMI2PS        = { 1750,   3},
-	.VPERMI2PD        = { 1753,   3},
-	.VPERMT2B         = { 1756,   3},
-	.VPERMT2W         = { 1759,   3},
-	.VPERMT2D         = { 1762,   3},
-	.VPERMT2Q         = { 1765,   3},
-	.VPERMT2PS        = { 1768,   3},
-	.VPERMT2PD        = { 1771,   3},
-	.VPERMB           = { 1774,   3},
-	.VPERMW           = { 1777,   3},
-	.VPMOVB2M         = { 1780,   3},
-	.VPMOVW2M         = { 1783,   3},
-	.VPMOVD2M         = { 1786,   3},
-	.VPMOVQ2M         = { 1789,   3},
-	.VPMOVM2B         = { 1792,   3},
-	.VPMOVM2W         = { 1795,   3},
-	.VPMOVM2D         = { 1798,   3},
-	.VPMOVM2Q         = { 1801,   3},
-	.VPMOVQB          = { 1804,   3},
-	.VPMOVSQB         = { 1807,   3},
-	.VPMOVUSQB        = { 1810,   3},
-	.VPMOVQW          = { 1813,   3},
-	.VPMOVSQW         = { 1816,   3},
-	.VPMOVUSQW        = { 1819,   3},
-	.VPMOVQD          = { 1822,   3},
-	.VPMOVSQD         = { 1825,   3},
-	.VPMOVUSQD        = { 1828,   3},
-	.VPMOVDB          = { 1831,   3},
-	.VPMOVSDB         = { 1834,   3},
-	.VPMOVUSDB        = { 1837,   3},
-	.VPMOVDW          = { 1840,   3},
-	.VPMOVSDW         = { 1843,   3},
-	.VPMOVUSDW        = { 1846,   3},
-	.VPMOVWB          = { 1849,   3},
-	.VPMOVSWB         = { 1852,   3},
-	.VPMOVUSWB        = { 1855,   3},
-	.VPROLD           = { 1858,   3},
-	.VPROLQ           = { 1861,   3},
-	.VPROLVD          = { 1864,   3},
-	.VPROLVQ          = { 1867,   3},
-	.VPRORD           = { 1870,   3},
-	.VPRORQ           = { 1873,   3},
-	.VPRORVD          = { 1876,   3},
-	.VPRORVQ          = { 1879,   3},
-	.VPSCATTERDD      = { 1882,   3},
-	.VPSCATTERDQ      = { 1885,   3},
-	.VPSCATTERQD      = { 1888,   3},
-	.VPSCATTERQQ      = { 1891,   3},
-	.VSCATTERDPS      = { 1894,   3},
-	.VSCATTERDPD      = { 1897,   3},
-	.VSCATTERQPS      = { 1900,   3},
-	.VSCATTERQPD      = { 1903,   3},
-	.VPSRAVQ          = { 1906,   3},
-	.VPSRAVW          = { 1909,   3},
-	.VPSLLVW          = { 1912,   3},
-	.VPSRLVW          = { 1915,   3},
-	.VRANGEPS         = { 1918,   3},
-	.VRANGEPD         = { 1921,   3},
-	.VRANGESS         = { 1924,   1},
-	.VRANGESD         = { 1925,   1},
-	.VREDUCEPS        = { 1926,   3},
-	.VREDUCEPD        = { 1929,   3},
-	.VREDUCESS        = { 1932,   1},
-	.VREDUCESD        = { 1933,   1},
-	.VRNDSCALEPS      = { 1934,   3},
-	.VRNDSCALEPD      = { 1937,   3},
-	.VRNDSCALESS      = { 1940,   1},
-	.VRNDSCALESD      = { 1941,   1},
-	.VRSQRT14PS       = { 1942,   3},
-	.VRSQRT14PD       = { 1945,   3},
-	.VRSQRT14SS       = { 1948,   1},
-	.VRSQRT14SD       = { 1949,   1},
-	.VRCP14PS         = { 1950,   3},
-	.VRCP14PD         = { 1953,   3},
-	.VRCP14SS         = { 1956,   1},
-	.VRCP14SD         = { 1957,   1},
-	.VSCALEFPS        = { 1958,   3},
-	.VSCALEFPD        = { 1961,   3},
-	.VSCALEFSS        = { 1964,   1},
-	.VSCALEFSD        = { 1965,   1},
-	.VGETEXPPS        = { 1966,   3},
-	.VGETEXPPD        = { 1969,   3},
-	.VGETEXPSS        = { 1972,   1},
-	.VGETEXPSD        = { 1973,   1},
-	.VGETMANTPS       = { 1974,   3},
-	.VGETMANTPD       = { 1977,   3},
-	.VGETMANTSS       = { 1980,   1},
-	.VGETMANTSD       = { 1981,   1},
-	.VFIXUPIMMPS      = { 1982,   3},
-	.VFIXUPIMMPD      = { 1985,   3},
-	.VFIXUPIMMSS      = { 1988,   1},
-	.VFIXUPIMMSD      = { 1989,   1},
-	.VFPCLASSPS       = { 1990,   3},
-	.VFPCLASSPD       = { 1993,   3},
-	.VFPCLASSSS       = { 1996,   1},
-	.VFPCLASSSD       = { 1997,   1},
-	.VALIGNQ          = { 1998,   3},
-	.VALIGND          = { 2001,   3},
-	.VDBPSADBW        = { 2004,   3},
-	.VPTERNLOGD       = { 2007,   3},
-	.VPTERNLOGQ       = { 2010,   3},
-	.VPMULTISHIFTQB   = { 2013,   3},
-	.KADDW            = { 2016,   1},
-	.KADDB            = { 2017,   1},
-	.KADDQ            = { 2018,   1},
-	.KADDD            = { 2019,   1},
-	.KANDW            = { 2020,   1},
-	.KANDB            = { 2021,   1},
-	.KANDQ            = { 2022,   1},
-	.KANDD            = { 2023,   1},
-	.KANDNW           = { 2024,   1},
-	.KANDNB           = { 2025,   1},
-	.KANDNQ           = { 2026,   1},
-	.KANDND           = { 2027,   1},
-	.KMOVW            = { 2028,   4},
-	.KMOVB            = { 2032,   4},
-	.KMOVQ            = { 2036,   4},
-	.KMOVD            = { 2040,   4},
-	.KNOTW            = { 2044,   1},
-	.KNOTB            = { 2045,   1},
-	.KNOTQ            = { 2046,   1},
-	.KNOTD            = { 2047,   1},
-	.KORW             = { 2048,   1},
-	.KORB             = { 2049,   1},
-	.KORQ             = { 2050,   1},
-	.KORD             = { 2051,   1},
-	.KORTESTW         = { 2052,   1},
-	.KORTESTB         = { 2053,   1},
-	.KORTESTQ         = { 2054,   1},
-	.KORTESTD         = { 2055,   1},
-	.KSHIFTLW         = { 2056,   1},
-	.KSHIFTLB         = { 2057,   1},
-	.KSHIFTLQ         = { 2058,   1},
-	.KSHIFTLD         = { 2059,   1},
-	.KSHIFTRW         = { 2060,   1},
-	.KSHIFTRB         = { 2061,   1},
-	.KSHIFTRQ         = { 2062,   1},
-	.KSHIFTRD         = { 2063,   1},
-	.KTESTW           = { 2064,   1},
-	.KTESTB           = { 2065,   1},
-	.KTESTQ           = { 2066,   1},
-	.KTESTD           = { 2067,   1},
-	.KUNPCKBW         = { 2068,   1},
-	.KUNPCKWD         = { 2069,   1},
-	.KUNPCKDQ         = { 2070,   1},
-	.KXNORW           = { 2071,   1},
-	.KXNORB           = { 2072,   1},
-	.KXNORQ           = { 2073,   1},
-	.KXNORD           = { 2074,   1},
-	.KXORW            = { 2075,   1},
-	.KXORB            = { 2076,   1},
-	.KXORQ            = { 2077,   1},
-	.KXORD            = { 2078,   1},
-	.FADD             = { 2079,   4},
-	.FADDP            = { 2083,   2},
-	.FIADD            = { 2085,   2},
-	.FSUB             = { 2087,   4},
-	.FSUBP            = { 2091,   2},
-	.FISUB            = { 2093,   2},
-	.FSUBR            = { 2095,   4},
-	.FSUBRP           = { 2099,   2},
-	.FISUBR           = { 2101,   2},
-	.FMUL             = { 2103,   4},
-	.FMULP            = { 2107,   2},
-	.FIMUL            = { 2109,   2},
-	.FDIV             = { 2111,   4},
-	.FDIVP            = { 2115,   2},
-	.FIDIV            = { 2117,   2},
-	.FDIVR            = { 2119,   4},
-	.FDIVRP           = { 2123,   2},
-	.FIDIVR           = { 2125,   2},
-	.FSQRT            = { 2127,   1},
-	.FABS             = { 2128,   1},
-	.FCHS             = { 2129,   1},
-	.FPREM            = { 2130,   1},
-	.FPREM1           = { 2131,   1},
-	.FRNDINT          = { 2132,   1},
-	.FSCALE           = { 2133,   1},
-	.FXTRACT          = { 2134,   1},
-	.FXAM             = { 2135,   1},
-	.FLD              = { 2136,   4},
-	.FILD             = { 2140,   3},
-	.FBLD             = { 2143,   1},
-	.FST              = { 2144,   3},
-	.FSTP             = { 2147,   4},
-	.FIST             = { 2151,   2},
-	.FISTP            = { 2153,   3},
-	.FISTTP           = { 2156,   3},
-	.FBSTP            = { 2159,   1},
-	.FXCH             = { 2160,   2},
-	.FCMOVB           = { 2162,   1},
-	.FCMOVE           = { 2163,   1},
-	.FCMOVBE          = { 2164,   1},
-	.FCMOVU           = { 2165,   1},
-	.FCMOVNB          = { 2166,   1},
-	.FCMOVNE          = { 2167,   1},
-	.FCMOVNBE         = { 2168,   1},
-	.FCMOVNU          = { 2169,   1},
-	.FCOM             = { 2170,   4},
-	.FCOMP            = { 2174,   4},
-	.FCOMPP           = { 2178,   1},
-	.FICOM            = { 2179,   2},
-	.FICOMP           = { 2181,   2},
-	.FCOMI            = { 2183,   1},
-	.FCOMIP           = { 2184,   1},
-	.FUCOMI           = { 2185,   1},
-	.FUCOMIP          = { 2186,   1},
-	.FUCOM            = { 2187,   2},
-	.FUCOMP           = { 2189,   2},
-	.FUCOMPP          = { 2191,   1},
-	.FTST             = { 2192,   1},
-	.FLDZ             = { 2193,   1},
-	.FLD1             = { 2194,   1},
-	.FLDPI            = { 2195,   1},
-	.FLDL2T           = { 2196,   1},
-	.FLDL2E           = { 2197,   1},
-	.FLDLG2           = { 2198,   1},
-	.FLDLN2           = { 2199,   1},
-	.FSIN             = { 2200,   1},
-	.FCOS             = { 2201,   1},
-	.FSINCOS          = { 2202,   1},
-	.FPTAN            = { 2203,   1},
-	.FPATAN           = { 2204,   1},
-	.F2XM1            = { 2205,   1},
-	.FYL2X            = { 2206,   1},
-	.FYL2XP1          = { 2207,   1},
-	.FINIT            = { 2208,   1},
-	.FNINIT           = { 2209,   1},
-	.FINCSTP          = { 2210,   1},
-	.FDECSTP          = { 2211,   1},
-	.FFREE            = { 2212,   1},
-	.FFREEP           = { 2213,   1},
-	.FNOP             = { 2214,   1},
-	.FWAIT            = { 2215,   1},
-	.FCLEX            = { 2216,   1},
-	.FNCLEX           = { 2217,   1},
-	.FSTCW            = { 2218,   1},
-	.FNSTCW           = { 2219,   1},
-	.FLDCW            = { 2220,   1},
-	.FSTENV           = { 2221,   1},
-	.FNSTENV          = { 2222,   1},
-	.FLDENV           = { 2223,   1},
-	.FSAVE            = { 2224,   1},
-	.FNSAVE           = { 2225,   1},
-	.FRSTOR           = { 2226,   1},
-	.FSTSW            = { 2227,   2},
-	.FNSTSW           = { 2229,   2},
-	.FXSAVE           = { 2231,   1},
-	.FXSAVE64         = { 2232,   1},
-	.FXRSTOR          = { 2233,   1},
-	.FXRSTOR64        = { 2234,   1},
-	.LGDT             = { 2235,   2},
-	.SGDT             = { 2237,   2},
-	.LIDT             = { 2239,   2},
-	.SIDT             = { 2241,   2},
-	.LLDT             = { 2243,   1},
-	.SLDT             = { 2244,   3},
-	.LTR              = { 2247,   1},
-	.STR              = { 2248,   3},
-	.LMSW             = { 2251,   1},
-	.SMSW             = { 2252,   3},
-	.CLTS             = { 2255,   1},
-	.ARPL             = { 2256,   1},
-	.LAR              = { 2257,   3},
-	.LSL              = { 2260,   3},
-	.VERR             = { 2263,   1},
-	.VERW             = { 2264,   1},
-	.INVD             = { 2265,   1},
-	.WBINVD           = { 2266,   1},
-	.INVLPG           = { 2267,   1},
-	.INVPCID          = { 2268,   2},
-	.RSM              = { 2270,   1},
-	.RDMSR            = { 2271,   1},
-	.WRMSR            = { 2272,   1},
-	.VMCALL           = { 2273,   1},
-	.VMLAUNCH         = { 2274,   1},
-	.VMRESUME         = { 2275,   1},
-	.VMXOFF           = { 2276,   1},
-	.VMXON            = { 2277,   1},
-	.VMCLEAR          = { 2278,   1},
-	.VMPTRLD          = { 2279,   1},
-	.VMPTRST          = { 2280,   1},
-	.VMREAD           = { 2281,   1},
-	.VMWRITE          = { 2282,   1},
-	.VMFUNC           = { 2283,   1},
-	.INVEPT           = { 2284,   1},
-	.INVVPID          = { 2285,   1},
-	.ENCLS            = { 2286,   1},
-	.ENCLU            = { 2287,   1},
-	.ENCLV            = { 2288,   1},
-	.RDPKRU           = { 2289,   1},
-	.WRPKRU           = { 2290,   1},
-	.INCSSPD          = { 2291,   1},
-	.INCSSPQ          = { 2292,   1},
-	.RDSSPD           = { 2293,   1},
-	.RDSSPQ           = { 2294,   1},
-	.SAVEPREVSSP      = { 2295,   1},
-	.RSTORSSP         = { 2296,   1},
-	.WRSSD            = { 2297,   1},
-	.WRSSQ            = { 2298,   1},
-	.WRUSSD           = { 2299,   1},
-	.WRUSSQ           = { 2300,   1},
-	.SETSSBSY         = { 2301,   1},
-	.CLRSSBSY         = { 2302,   1},
-	.ENDBR64          = { 2303,   1},
-	.ENDBR32          = { 2304,   1},
-	.XSAVE            = { 2305,   1},
-	.XSAVE64          = { 2306,   1},
-	.XRSTOR           = { 2307,   1},
-	.XRSTOR64         = { 2308,   1},
-	.XSAVEOPT         = { 2309,   1},
-	.XSAVEOPT64       = { 2310,   1},
-	.XSAVEC           = { 2311,   1},
-	.XSAVEC64         = { 2312,   1},
-	.XSAVES           = { 2313,   1},
-	.XSAVES64         = { 2314,   1},
-	.XRSTORS          = { 2315,   1},
-	.XRSTORS64        = { 2316,   1},
-	.PREFETCHT0       = { 2317,   1},
-	.PREFETCHT1       = { 2318,   1},
-	.PREFETCHT2       = { 2319,   1},
-	.PREFETCHNTA      = { 2320,   1},
-	.PREFETCHW        = { 2321,   1},
-	.CLFLUSHOPT       = { 2322,   1},
-	.CLWB             = { 2323,   1},
-	.CLDEMOTE         = { 2324,   1},
-	.BSWAP            = { 2325,   2},
-	.CMPXCHG          = { 2327,   4},
-	.CMPXCHG8B        = { 2331,   1},
-	.CMPXCHG16B       = { 2332,   1},
-	.XADD             = { 2333,   4},
-	.BOUND            = { 2337,   2},
-	.ENTER            = { 2339,   1},
-	.LEAVE            = { 2340,   1},
-	.XLAT             = { 2341,   1},
-	.XLATB            = { 2342,   1},
-	.MOVBE            = { 2343,   6},
-	.RDRAND           = { 2349,   3},
-	.RDSEED           = { 2352,   3},
+	.VADDSUBPS        = { 1183,   2},
+	.VADDSUBPD        = { 1185,   2},
+	.VHADDPS          = { 1187,   2},
+	.VHADDPD          = { 1189,   2},
+	.VHSUBPS          = { 1191,   2},
+	.VHSUBPD          = { 1193,   2},
+	.VLDDQU           = { 1195,   2},
+	.VMOVDDUP         = { 1197,   2},
+	.VMOVSLDUP        = { 1199,   2},
+	.VMOVSHDUP        = { 1201,   2},
+	.VPCMPESTRI       = { 1203,   1},
+	.VPCMPESTRM       = { 1204,   1},
+	.VPCMPISTRI       = { 1205,   1},
+	.VPCMPISTRM       = { 1206,   1},
+	.VPBROADCASTB     = { 1207,   4},
+	.VPBROADCASTW     = { 1211,   4},
+	.VPBROADCASTD     = { 1215,   4},
+	.VPBROADCASTQ     = { 1219,   4},
+	.VCVTPS2PD        = { 1223,   2},
+	.VCVTPD2PS        = { 1225,   2},
+	.VCVTSS2SD        = { 1227,   1},
+	.VCVTSD2SS        = { 1228,   1},
+	.VCVTPS2DQ        = { 1229,   2},
+	.VCVTPD2DQ        = { 1231,   2},
+	.VCVTDQ2PS        = { 1233,   2},
+	.VCVTDQ2PD        = { 1235,   2},
+	.VCVTSS2SI        = { 1237,   2},
+	.VCVTSD2SI        = { 1239,   2},
+	.VCVTSI2SS        = { 1241,   2},
+	.VCVTSI2SD        = { 1243,   2},
+	.VCVTTPS2DQ       = { 1245,   2},
+	.VCVTTPD2DQ       = { 1247,   2},
+	.VCVTTSS2SI       = { 1249,   2},
+	.VCVTTSD2SI       = { 1251,   2},
+	.VPADDB           = { 1253,   2},
+	.VPADDW           = { 1255,   2},
+	.VPADDD           = { 1257,   2},
+	.VPADDQ           = { 1259,   2},
+	.VPSUBB           = { 1261,   2},
+	.VPSUBW           = { 1263,   2},
+	.VPSUBD           = { 1265,   2},
+	.VPSUBQ           = { 1267,   2},
+	.VPMULLW          = { 1269,   2},
+	.VPMULHW          = { 1271,   2},
+	.VPMULHUW         = { 1273,   2},
+	.VPMULUDQ         = { 1275,   2},
+	.VPMADDWD         = { 1277,   2},
+	.VPAND            = { 1279,   2},
+	.VPANDN           = { 1281,   2},
+	.VPOR             = { 1283,   2},
+	.VPXOR            = { 1285,   2},
+	.VPSLLW           = { 1287,   4},
+	.VPSLLD           = { 1291,   4},
+	.VPSLLQ           = { 1295,   4},
+	.VPSRLW           = { 1299,   4},
+	.VPSRLD           = { 1303,   4},
+	.VPSRLQ           = { 1307,   4},
+	.VPSRAW           = { 1311,   4},
+	.VPSRAD           = { 1315,   4},
+	.VPCMPEQB         = { 1319,   2},
+	.VPCMPEQW         = { 1321,   2},
+	.VPCMPEQD         = { 1323,   2},
+	.VPCMPEQQ         = { 1325,   2},
+	.VPCMPGTB         = { 1327,   2},
+	.VPCMPGTW         = { 1329,   2},
+	.VPCMPGTD         = { 1331,   2},
+	.VPCMPGTQ         = { 1333,   2},
+	.VPACKSSWB        = { 1335,   2},
+	.VPACKSSDW        = { 1337,   2},
+	.VPACKUSWB        = { 1339,   2},
+	.VPACKUSDW        = { 1341,   2},
+	.VPUNPCKLBW       = { 1343,   2},
+	.VPUNPCKLWD       = { 1345,   2},
+	.VPUNPCKLDQ       = { 1347,   2},
+	.VPUNPCKLQDQ      = { 1349,   2},
+	.VPUNPCKHBW       = { 1351,   2},
+	.VPUNPCKHWD       = { 1353,   2},
+	.VPUNPCKHDQ       = { 1355,   2},
+	.VPUNPCKHQDQ      = { 1357,   2},
+	.VPSHUFD          = { 1359,   2},
+	.VPSHUFHW         = { 1361,   2},
+	.VPSHUFLW         = { 1363,   2},
+	.VPEXTRB          = { 1365,   1},
+	.VPEXTRW          = { 1366,   2},
+	.VPEXTRD          = { 1368,   1},
+	.VPEXTRQ          = { 1369,   1},
+	.VPINSRB          = { 1370,   1},
+	.VPINSRW          = { 1371,   1},
+	.VPINSRD          = { 1372,   1},
+	.VPINSRQ          = { 1373,   1},
+	.VPMOVMSKB        = { 1374,   2},
+	.VPTEST           = { 1376,   2},
+	.VPSHUFB          = { 1378,   2},
+	.VPHADDW          = { 1380,   2},
+	.VPHADDD          = { 1382,   2},
+	.VPHADDSW         = { 1384,   2},
+	.VPHSUBW          = { 1386,   2},
+	.VPHSUBD          = { 1388,   2},
+	.VPHSUBSW         = { 1390,   2},
+	.VPMADDUBSW       = { 1392,   2},
+	.VPMULHRSW        = { 1394,   2},
+	.VPSIGNB          = { 1396,   2},
+	.VPSIGNW          = { 1398,   2},
+	.VPSIGND          = { 1400,   2},
+	.VPABSB           = { 1402,   2},
+	.VPABSW           = { 1404,   2},
+	.VPABSD           = { 1406,   2},
+	.VPALIGNR         = { 1408,   2},
+	.VPBLENDW         = { 1410,   2},
+	.VPBLENDVB        = { 1412,   2},
+	.VMPSADBW         = { 1414,   2},
+	.VPHMINPOSUW      = { 1416,   1},
+	.VPMAXSB          = { 1417,   2},
+	.VPMAXSD          = { 1419,   2},
+	.VPMAXUW          = { 1421,   2},
+	.VPMAXUD          = { 1423,   2},
+	.VPMINSB          = { 1425,   2},
+	.VPMINSD          = { 1427,   2},
+	.VPMINUW          = { 1429,   2},
+	.VPMINUD          = { 1431,   2},
+	.VPMOVSXBW        = { 1433,   2},
+	.VPMOVSXBD        = { 1435,   2},
+	.VPMOVSXBQ        = { 1437,   2},
+	.VPMOVSXWD        = { 1439,   2},
+	.VPMOVSXWQ        = { 1441,   2},
+	.VPMOVSXDQ        = { 1443,   2},
+	.VPMOVZXBW        = { 1445,   2},
+	.VPMOVZXBD        = { 1447,   2},
+	.VPMOVZXBQ        = { 1449,   2},
+	.VPMOVZXWD        = { 1451,   2},
+	.VPMOVZXWQ        = { 1453,   2},
+	.VPMOVZXDQ        = { 1455,   2},
+	.VPMULDQ          = { 1457,   2},
+	.VPMULLD          = { 1459,   2},
+	.VMASKMOVDQU      = { 1461,   1},
+	.VPCLMULQDQ       = { 1462,   2},
+	.VAESDEC          = { 1464,   1},
+	.VAESDECLAST      = { 1465,   1},
+	.VAESENC          = { 1466,   1},
+	.VAESENCLAST      = { 1467,   1},
+	.VAESIMC          = { 1468,   1},
+	.VAESKEYGENASSIST = { 1469,   1},
+	.VBROADCASTSS     = { 1470,   4},
+	.VBROADCASTSD     = { 1474,   2},
+	.VBROADCASTF128   = { 1476,   1},
+	.VEXTRACTF128     = { 1477,   1},
+	.VINSERTF128      = { 1478,   1},
+	.VPERM2F128       = { 1479,   1},
+	.VMASKMOVPS       = { 1480,   4},
+	.VMASKMOVPD       = { 1484,   4},
+	.VTESTPS          = { 1488,   2},
+	.VTESTPD          = { 1490,   2},
+	.VZEROALL         = { 1492,   1},
+	.VZEROUPPER       = { 1493,   1},
+	.VBROADCASTI128   = { 1494,   1},
+	.VEXTRACTI128     = { 1495,   1},
+	.VINSERTI128      = { 1496,   1},
+	.VPERM2I128       = { 1497,   1},
+	.VPERMD           = { 1498,   1},
+	.VPERMPS          = { 1499,   1},
+	.VPERMQ           = { 1500,   1},
+	.VPERMPD          = { 1501,   1},
+	.VPBLENDD         = { 1502,   2},
+	.VPSLLVD          = { 1504,   2},
+	.VPSLLVQ          = { 1506,   2},
+	.VPSRLVD          = { 1508,   2},
+	.VPSRLVQ          = { 1510,   2},
+	.VPSRAVD          = { 1512,   2},
+	.VPMASKMOVD       = { 1514,   4},
+	.VPMASKMOVQ       = { 1518,   4},
+	.VGATHERDPS       = { 1522,   2},
+	.VGATHERDPD       = { 1524,   2},
+	.VGATHERQPS       = { 1526,   2},
+	.VGATHERQPD       = { 1528,   2},
+	.VPGATHERDD       = { 1530,   2},
+	.VPGATHERDQ       = { 1532,   2},
+	.VPGATHERQD       = { 1534,   2},
+	.VPGATHERQQ       = { 1536,   2},
+	.VFMADD132PS      = { 1538,   2},
+	.VFMADD213PS      = { 1540,   2},
+	.VFMADD231PS      = { 1542,   2},
+	.VFMADD132PD      = { 1544,   2},
+	.VFMADD213PD      = { 1546,   2},
+	.VFMADD231PD      = { 1548,   2},
+	.VFMADD132SS      = { 1550,   1},
+	.VFMADD213SS      = { 1551,   1},
+	.VFMADD231SS      = { 1552,   1},
+	.VFMADD132SD      = { 1553,   1},
+	.VFMADD213SD      = { 1554,   1},
+	.VFMADD231SD      = { 1555,   1},
+	.VFMSUB132PS      = { 1556,   2},
+	.VFMSUB213PS      = { 1558,   2},
+	.VFMSUB231PS      = { 1560,   2},
+	.VFMSUB132PD      = { 1562,   2},
+	.VFMSUB213PD      = { 1564,   2},
+	.VFMSUB231PD      = { 1566,   2},
+	.VFMSUB132SS      = { 1568,   1},
+	.VFMSUB213SS      = { 1569,   1},
+	.VFMSUB231SS      = { 1570,   1},
+	.VFMSUB132SD      = { 1571,   1},
+	.VFMSUB213SD      = { 1572,   1},
+	.VFMSUB231SD      = { 1573,   1},
+	.VFNMADD132PS     = { 1574,   2},
+	.VFNMADD213PS     = { 1576,   2},
+	.VFNMADD231PS     = { 1578,   2},
+	.VFNMADD132PD     = { 1580,   2},
+	.VFNMADD213PD     = { 1582,   2},
+	.VFNMADD231PD     = { 1584,   2},
+	.VFNMADD132SS     = { 1586,   1},
+	.VFNMADD213SS     = { 1587,   1},
+	.VFNMADD231SS     = { 1588,   1},
+	.VFNMADD132SD     = { 1589,   1},
+	.VFNMADD213SD     = { 1590,   1},
+	.VFNMADD231SD     = { 1591,   1},
+	.VFNMSUB132PS     = { 1592,   2},
+	.VFNMSUB213PS     = { 1594,   2},
+	.VFNMSUB231PS     = { 1596,   2},
+	.VFNMSUB132PD     = { 1598,   2},
+	.VFNMSUB213PD     = { 1600,   2},
+	.VFNMSUB231PD     = { 1602,   2},
+	.VFNMSUB132SS     = { 1604,   1},
+	.VFNMSUB213SS     = { 1605,   1},
+	.VFNMSUB231SS     = { 1606,   1},
+	.VFNMSUB132SD     = { 1607,   1},
+	.VFNMSUB213SD     = { 1608,   1},
+	.VFNMSUB231SD     = { 1609,   1},
+	.VFMADDSUB132PS   = { 1610,   2},
+	.VFMADDSUB213PS   = { 1612,   2},
+	.VFMADDSUB231PS   = { 1614,   2},
+	.VFMADDSUB132PD   = { 1616,   2},
+	.VFMADDSUB213PD   = { 1618,   2},
+	.VFMADDSUB231PD   = { 1620,   2},
+	.VFMSUBADD132PS   = { 1622,   2},
+	.VFMSUBADD213PS   = { 1624,   2},
+	.VFMSUBADD231PS   = { 1626,   2},
+	.VFMSUBADD132PD   = { 1628,   2},
+	.VFMSUBADD213PD   = { 1630,   2},
+	.VFMSUBADD231PD   = { 1632,   2},
+	.VCVTPH2PS        = { 1634,   3},
+	.VCVTPS2PH        = { 1637,   3},
+	.VMOVDQA32        = { 1640,   6},
+	.VMOVDQA64        = { 1646,   6},
+	.VMOVDQU8         = { 1652,   6},
+	.VMOVDQU16        = { 1658,   6},
+	.VMOVDQU32        = { 1664,   6},
+	.VMOVDQU64        = { 1670,   6},
+	.VPBLENDMB        = { 1676,   3},
+	.VPBLENDMW        = { 1679,   3},
+	.VPBLENDMD        = { 1682,   3},
+	.VPBLENDMQ        = { 1685,   3},
+	.VBLENDMPS        = { 1688,   3},
+	.VBLENDMPD        = { 1691,   3},
+	.VPCMPB           = { 1694,   3},
+	.VPCMPUB          = { 1697,   3},
+	.VPCMPW           = { 1700,   3},
+	.VPCMPUW          = { 1703,   3},
+	.VPCMPD           = { 1706,   3},
+	.VPCMPUD          = { 1709,   3},
+	.VPCMPQ           = { 1712,   3},
+	.VPCMPUQ          = { 1715,   3},
+	.VPTESTMB         = { 1718,   3},
+	.VPTESTMW         = { 1721,   3},
+	.VPTESTMD         = { 1724,   3},
+	.VPTESTMQ         = { 1727,   3},
+	.VPTESTNMB        = { 1730,   3},
+	.VPTESTNMW        = { 1733,   3},
+	.VPTESTNMD        = { 1736,   3},
+	.VPTESTNMQ        = { 1739,   3},
+	.VPCOMPRESSD      = { 1742,   3},
+	.VPCOMPRESSQ      = { 1745,   3},
+	.VCOMPRESSPS      = { 1748,   3},
+	.VCOMPRESSPD      = { 1751,   3},
+	.VPEXPANDD        = { 1754,   3},
+	.VPEXPANDQ        = { 1757,   3},
+	.VEXPANDPS        = { 1760,   3},
+	.VEXPANDPD        = { 1763,   3},
+	.VPCONFLICTD      = { 1766,   3},
+	.VPCONFLICTQ      = { 1769,   3},
+	.VPLZCNTD         = { 1772,   3},
+	.VPLZCNTQ         = { 1775,   3},
+	.VPERMI2B         = { 1778,   3},
+	.VPERMI2W         = { 1781,   3},
+	.VPERMI2D         = { 1784,   3},
+	.VPERMI2Q         = { 1787,   3},
+	.VPERMI2PS        = { 1790,   3},
+	.VPERMI2PD        = { 1793,   3},
+	.VPERMT2B         = { 1796,   3},
+	.VPERMT2W         = { 1799,   3},
+	.VPERMT2D         = { 1802,   3},
+	.VPERMT2Q         = { 1805,   3},
+	.VPERMT2PS        = { 1808,   3},
+	.VPERMT2PD        = { 1811,   3},
+	.VPERMB           = { 1814,   3},
+	.VPERMW           = { 1817,   3},
+	.VPMOVB2M         = { 1820,   3},
+	.VPMOVW2M         = { 1823,   3},
+	.VPMOVD2M         = { 1826,   3},
+	.VPMOVQ2M         = { 1829,   3},
+	.VPMOVM2B         = { 1832,   3},
+	.VPMOVM2W         = { 1835,   3},
+	.VPMOVM2D         = { 1838,   3},
+	.VPMOVM2Q         = { 1841,   3},
+	.VPMOVQB          = { 1844,   3},
+	.VPMOVSQB         = { 1847,   3},
+	.VPMOVUSQB        = { 1850,   3},
+	.VPMOVQW          = { 1853,   3},
+	.VPMOVSQW         = { 1856,   3},
+	.VPMOVUSQW        = { 1859,   3},
+	.VPMOVQD          = { 1862,   3},
+	.VPMOVSQD         = { 1865,   3},
+	.VPMOVUSQD        = { 1868,   3},
+	.VPMOVDB          = { 1871,   3},
+	.VPMOVSDB         = { 1874,   3},
+	.VPMOVUSDB        = { 1877,   3},
+	.VPMOVDW          = { 1880,   3},
+	.VPMOVSDW         = { 1883,   3},
+	.VPMOVUSDW        = { 1886,   3},
+	.VPMOVWB          = { 1889,   3},
+	.VPMOVSWB         = { 1892,   3},
+	.VPMOVUSWB        = { 1895,   3},
+	.VPROLD           = { 1898,   3},
+	.VPROLQ           = { 1901,   3},
+	.VPROLVD          = { 1904,   3},
+	.VPROLVQ          = { 1907,   3},
+	.VPRORD           = { 1910,   3},
+	.VPRORQ           = { 1913,   3},
+	.VPRORVD          = { 1916,   3},
+	.VPRORVQ          = { 1919,   3},
+	.VPSCATTERDD      = { 1922,   3},
+	.VPSCATTERDQ      = { 1925,   3},
+	.VPSCATTERQD      = { 1928,   3},
+	.VPSCATTERQQ      = { 1931,   3},
+	.VSCATTERDPS      = { 1934,   3},
+	.VSCATTERDPD      = { 1937,   3},
+	.VSCATTERQPS      = { 1940,   3},
+	.VSCATTERQPD      = { 1943,   3},
+	.VPSRAVQ          = { 1946,   3},
+	.VPSRAVW          = { 1949,   3},
+	.VPSLLVW          = { 1952,   3},
+	.VPSRLVW          = { 1955,   3},
+	.VRANGEPS         = { 1958,   3},
+	.VRANGEPD         = { 1961,   3},
+	.VRANGESS         = { 1964,   1},
+	.VRANGESD         = { 1965,   1},
+	.VREDUCEPS        = { 1966,   3},
+	.VREDUCEPD        = { 1969,   3},
+	.VREDUCESS        = { 1972,   1},
+	.VREDUCESD        = { 1973,   1},
+	.VRNDSCALEPS      = { 1974,   3},
+	.VRNDSCALEPD      = { 1977,   3},
+	.VRNDSCALESS      = { 1980,   1},
+	.VRNDSCALESD      = { 1981,   1},
+	.VRSQRT14PS       = { 1982,   3},
+	.VRSQRT14PD       = { 1985,   3},
+	.VRSQRT14SS       = { 1988,   1},
+	.VRSQRT14SD       = { 1989,   1},
+	.VRCP14PS         = { 1990,   3},
+	.VRCP14PD         = { 1993,   3},
+	.VRCP14SS         = { 1996,   1},
+	.VRCP14SD         = { 1997,   1},
+	.VSCALEFPS        = { 1998,   3},
+	.VSCALEFPD        = { 2001,   3},
+	.VSCALEFSS        = { 2004,   1},
+	.VSCALEFSD        = { 2005,   1},
+	.VGETEXPPS        = { 2006,   3},
+	.VGETEXPPD        = { 2009,   3},
+	.VGETEXPSS        = { 2012,   1},
+	.VGETEXPSD        = { 2013,   1},
+	.VGETMANTPS       = { 2014,   3},
+	.VGETMANTPD       = { 2017,   3},
+	.VGETMANTSS       = { 2020,   1},
+	.VGETMANTSD       = { 2021,   1},
+	.VFIXUPIMMPS      = { 2022,   3},
+	.VFIXUPIMMPD      = { 2025,   3},
+	.VFIXUPIMMSS      = { 2028,   1},
+	.VFIXUPIMMSD      = { 2029,   1},
+	.VFPCLASSPS       = { 2030,   3},
+	.VFPCLASSPD       = { 2033,   3},
+	.VFPCLASSSS       = { 2036,   1},
+	.VFPCLASSSD       = { 2037,   1},
+	.VALIGNQ          = { 2038,   3},
+	.VALIGND          = { 2041,   3},
+	.VDBPSADBW        = { 2044,   3},
+	.VPTERNLOGD       = { 2047,   3},
+	.VPTERNLOGQ       = { 2050,   3},
+	.VPMULTISHIFTQB   = { 2053,   3},
+	.KADDW            = { 2056,   1},
+	.KADDB            = { 2057,   1},
+	.KADDQ            = { 2058,   1},
+	.KADDD            = { 2059,   1},
+	.KANDW            = { 2060,   1},
+	.KANDB            = { 2061,   1},
+	.KANDQ            = { 2062,   1},
+	.KANDD            = { 2063,   1},
+	.KANDNW           = { 2064,   1},
+	.KANDNB           = { 2065,   1},
+	.KANDNQ           = { 2066,   1},
+	.KANDND           = { 2067,   1},
+	.KMOVW            = { 2068,   4},
+	.KMOVB            = { 2072,   4},
+	.KMOVQ            = { 2076,   4},
+	.KMOVD            = { 2080,   4},
+	.KNOTW            = { 2084,   1},
+	.KNOTB            = { 2085,   1},
+	.KNOTQ            = { 2086,   1},
+	.KNOTD            = { 2087,   1},
+	.KORW             = { 2088,   1},
+	.KORB             = { 2089,   1},
+	.KORQ             = { 2090,   1},
+	.KORD             = { 2091,   1},
+	.KORTESTW         = { 2092,   1},
+	.KORTESTB         = { 2093,   1},
+	.KORTESTQ         = { 2094,   1},
+	.KORTESTD         = { 2095,   1},
+	.KSHIFTLW         = { 2096,   1},
+	.KSHIFTLB         = { 2097,   1},
+	.KSHIFTLQ         = { 2098,   1},
+	.KSHIFTLD         = { 2099,   1},
+	.KSHIFTRW         = { 2100,   1},
+	.KSHIFTRB         = { 2101,   1},
+	.KSHIFTRQ         = { 2102,   1},
+	.KSHIFTRD         = { 2103,   1},
+	.KTESTW           = { 2104,   1},
+	.KTESTB           = { 2105,   1},
+	.KTESTQ           = { 2106,   1},
+	.KTESTD           = { 2107,   1},
+	.KUNPCKBW         = { 2108,   1},
+	.KUNPCKWD         = { 2109,   1},
+	.KUNPCKDQ         = { 2110,   1},
+	.KXNORW           = { 2111,   1},
+	.KXNORB           = { 2112,   1},
+	.KXNORQ           = { 2113,   1},
+	.KXNORD           = { 2114,   1},
+	.KXORW            = { 2115,   1},
+	.KXORB            = { 2116,   1},
+	.KXORQ            = { 2117,   1},
+	.KXORD            = { 2118,   1},
+	.FADD             = { 2119,   4},
+	.FADDP            = { 2123,   2},
+	.FIADD            = { 2125,   2},
+	.FSUB             = { 2127,   4},
+	.FSUBP            = { 2131,   2},
+	.FISUB            = { 2133,   2},
+	.FSUBR            = { 2135,   4},
+	.FSUBRP           = { 2139,   2},
+	.FISUBR           = { 2141,   2},
+	.FMUL             = { 2143,   4},
+	.FMULP            = { 2147,   2},
+	.FIMUL            = { 2149,   2},
+	.FDIV             = { 2151,   4},
+	.FDIVP            = { 2155,   2},
+	.FIDIV            = { 2157,   2},
+	.FDIVR            = { 2159,   4},
+	.FDIVRP           = { 2163,   2},
+	.FIDIVR           = { 2165,   2},
+	.FSQRT            = { 2167,   1},
+	.FABS             = { 2168,   1},
+	.FCHS             = { 2169,   1},
+	.FPREM            = { 2170,   1},
+	.FPREM1           = { 2171,   1},
+	.FRNDINT          = { 2172,   1},
+	.FSCALE           = { 2173,   1},
+	.FXTRACT          = { 2174,   1},
+	.FXAM             = { 2175,   1},
+	.FLD              = { 2176,   4},
+	.FILD             = { 2180,   3},
+	.FBLD             = { 2183,   1},
+	.FST              = { 2184,   3},
+	.FSTP             = { 2187,   4},
+	.FIST             = { 2191,   2},
+	.FISTP            = { 2193,   3},
+	.FISTTP           = { 2196,   3},
+	.FBSTP            = { 2199,   1},
+	.FXCH             = { 2200,   2},
+	.FCMOVB           = { 2202,   1},
+	.FCMOVE           = { 2203,   1},
+	.FCMOVBE          = { 2204,   1},
+	.FCMOVU           = { 2205,   1},
+	.FCMOVNB          = { 2206,   1},
+	.FCMOVNE          = { 2207,   1},
+	.FCMOVNBE         = { 2208,   1},
+	.FCMOVNU          = { 2209,   1},
+	.FCOM             = { 2210,   4},
+	.FCOMP            = { 2214,   4},
+	.FCOMPP           = { 2218,   1},
+	.FICOM            = { 2219,   2},
+	.FICOMP           = { 2221,   2},
+	.FCOMI            = { 2223,   1},
+	.FCOMIP           = { 2224,   1},
+	.FUCOMI           = { 2225,   1},
+	.FUCOMIP          = { 2226,   1},
+	.FUCOM            = { 2227,   2},
+	.FUCOMP           = { 2229,   2},
+	.FUCOMPP          = { 2231,   1},
+	.FTST             = { 2232,   1},
+	.FLDZ             = { 2233,   1},
+	.FLD1             = { 2234,   1},
+	.FLDPI            = { 2235,   1},
+	.FLDL2T           = { 2236,   1},
+	.FLDL2E           = { 2237,   1},
+	.FLDLG2           = { 2238,   1},
+	.FLDLN2           = { 2239,   1},
+	.FSIN             = { 2240,   1},
+	.FCOS             = { 2241,   1},
+	.FSINCOS          = { 2242,   1},
+	.FPTAN            = { 2243,   1},
+	.FPATAN           = { 2244,   1},
+	.F2XM1            = { 2245,   1},
+	.FYL2X            = { 2246,   1},
+	.FYL2XP1          = { 2247,   1},
+	.FINIT            = { 2248,   1},
+	.FNINIT           = { 2249,   1},
+	.FINCSTP          = { 2250,   1},
+	.FDECSTP          = { 2251,   1},
+	.FFREE            = { 2252,   1},
+	.FFREEP           = { 2253,   1},
+	.FNOP             = { 2254,   1},
+	.FWAIT            = { 2255,   1},
+	.FCLEX            = { 2256,   1},
+	.FNCLEX           = { 2257,   1},
+	.FSTCW            = { 2258,   1},
+	.FNSTCW           = { 2259,   1},
+	.FLDCW            = { 2260,   1},
+	.FSTENV           = { 2261,   1},
+	.FNSTENV          = { 2262,   1},
+	.FLDENV           = { 2263,   1},
+	.FSAVE            = { 2264,   1},
+	.FNSAVE           = { 2265,   1},
+	.FRSTOR           = { 2266,   1},
+	.FSTSW            = { 2267,   2},
+	.FNSTSW           = { 2269,   2},
+	.FXSAVE           = { 2271,   1},
+	.FXSAVE64         = { 2272,   1},
+	.FXRSTOR          = { 2273,   1},
+	.FXRSTOR64        = { 2274,   1},
+	.LGDT             = { 2275,   2},
+	.SGDT             = { 2277,   2},
+	.LIDT             = { 2279,   2},
+	.SIDT             = { 2281,   2},
+	.LLDT             = { 2283,   1},
+	.SLDT             = { 2284,   3},
+	.LTR              = { 2287,   1},
+	.STR              = { 2288,   3},
+	.LMSW             = { 2291,   1},
+	.SMSW             = { 2292,   3},
+	.CLTS             = { 2295,   1},
+	.ARPL             = { 2296,   1},
+	.LAR              = { 2297,   3},
+	.LSL              = { 2300,   3},
+	.VERR             = { 2303,   1},
+	.VERW             = { 2304,   1},
+	.INVD             = { 2305,   1},
+	.WBINVD           = { 2306,   1},
+	.INVLPG           = { 2307,   1},
+	.INVPCID          = { 2308,   2},
+	.RSM              = { 2310,   1},
+	.RDMSR            = { 2311,   1},
+	.WRMSR            = { 2312,   1},
+	.VMCALL           = { 2313,   1},
+	.VMLAUNCH         = { 2314,   1},
+	.VMRESUME         = { 2315,   1},
+	.VMXOFF           = { 2316,   1},
+	.VMXON            = { 2317,   1},
+	.VMCLEAR          = { 2318,   1},
+	.VMPTRLD          = { 2319,   1},
+	.VMPTRST          = { 2320,   1},
+	.VMREAD           = { 2321,   1},
+	.VMWRITE          = { 2322,   1},
+	.VMFUNC           = { 2323,   1},
+	.INVEPT           = { 2324,   1},
+	.INVVPID          = { 2325,   1},
+	.ENCLS            = { 2326,   1},
+	.ENCLU            = { 2327,   1},
+	.ENCLV            = { 2328,   1},
+	.RDPKRU           = { 2329,   1},
+	.WRPKRU           = { 2330,   1},
+	.INCSSPD          = { 2331,   1},
+	.INCSSPQ          = { 2332,   1},
+	.RDSSPD           = { 2333,   1},
+	.RDSSPQ           = { 2334,   1},
+	.SAVEPREVSSP      = { 2335,   1},
+	.RSTORSSP         = { 2336,   1},
+	.WRSSD            = { 2337,   1},
+	.WRSSQ            = { 2338,   1},
+	.WRUSSD           = { 2339,   1},
+	.WRUSSQ           = { 2340,   1},
+	.SETSSBSY         = { 2341,   1},
+	.CLRSSBSY         = { 2342,   1},
+	.ENDBR64          = { 2343,   1},
+	.ENDBR32          = { 2344,   1},
+	.XSAVE            = { 2345,   1},
+	.XSAVE64          = { 2346,   1},
+	.XRSTOR           = { 2347,   1},
+	.XRSTOR64         = { 2348,   1},
+	.XSAVEOPT         = { 2349,   1},
+	.XSAVEOPT64       = { 2350,   1},
+	.XSAVEC           = { 2351,   1},
+	.XSAVEC64         = { 2352,   1},
+	.XSAVES           = { 2353,   1},
+	.XSAVES64         = { 2354,   1},
+	.XRSTORS          = { 2355,   1},
+	.XRSTORS64        = { 2356,   1},
+	.PREFETCHT0       = { 2357,   1},
+	.PREFETCHT1       = { 2358,   1},
+	.PREFETCHT2       = { 2359,   1},
+	.PREFETCHNTA      = { 2360,   1},
+	.PREFETCHW        = { 2361,   1},
+	.CLFLUSHOPT       = { 2362,   1},
+	.CLWB             = { 2363,   1},
+	.CLDEMOTE         = { 2364,   1},
+	.BSWAP            = { 2365,   2},
+	.CMPXCHG          = { 2367,   4},
+	.CMPXCHG8B        = { 2371,   1},
+	.CMPXCHG16B       = { 2372,   1},
+	.XADD             = { 2373,   4},
+	.BOUND            = { 2377,   2},
+	.ENTER            = { 2379,   1},
+	.LEAVE            = { 2380,   1},
+	.XLAT             = { 2381,   1},
+	.XLATB            = { 2382,   1},
+	.MOVBE            = { 2383,   6},
+	.RDRAND           = { 2389,   3},
+	.RDSEED           = { 2392,   3},
+	.SWAPGS           = { 2395,   1},
+	.MONITOR          = { 2396,   1},
+	.MWAIT            = { 2397,   1},
+	.CLAC             = { 2398,   1},
+	.STAC             = { 2399,   1},
+	.RDFSBASE         = { 2400,   2},
+	.RDGSBASE         = { 2402,   2},
+	.WRFSBASE         = { 2404,   2},
+	.WRGSBASE         = { 2406,   2},
+	.PTWRITE          = { 2408,   2},
+	.RDPID            = { 2410,   1},
+	.WBNOINVD         = { 2411,   1},
+	.SERIALIZE        = { 2412,   1},
+	.PREFETCH         = { 2413,   1},
+	.TPAUSE           = { 2414,   1},
+	.UMONITOR         = { 2415,   1},
+	.UMWAIT           = { 2416,   1},
+	.MOVDIRI          = { 2417,   2},
+	.MOVDIR64B        = { 2419,   1},
+	.ENQCMD           = { 2420,   1},
+	.ENQCMDS          = { 2421,   1},
+	.AADD             = { 2422,   2},
+	.AAND             = { 2424,   2},
+	.AOR              = { 2426,   2},
+	.AXOR             = { 2428,   2},
+	.XEND             = { 2430,   1},
+	.XTEST            = { 2431,   1},
+	.VMRUN            = { 2432,   1},
+	.VMMCALL          = { 2433,   1},
+	.VMLOAD           = { 2434,   1},
+	.VMSAVE           = { 2435,   1},
+	.STGI             = { 2436,   1},
+	.CLGI             = { 2437,   1},
+	.SKINIT           = { 2438,   1},
+	.INVLPGA          = { 2439,   1},
+	.INVLPGB          = { 2440,   1},
+	.TLBSYNC          = { 2441,   1},
+	.PVALIDATE        = { 2442,   1},
+	.RMPADJUST        = { 2443,   1},
+	.RMPUPDATE        = { 2444,   1},
+	.PSMASH           = { 2445,   1},
+	.CLZERO           = { 2446,   1},
+	.MONITORX         = { 2447,   1},
+	.MWAITX           = { 2448,   1},
+	.RDPRU            = { 2449,   1},
+	.MCOMMIT          = { 2450,   1},
 }
 
 // Emit descriptor per form (derived from ENCODE_FORMS via lib.form_to_recipe).
-ENCODE_RECIPES: [2355]lib.Form_Recipe
+ENCODE_RECIPES: [2451]lib.Form_Recipe
 @(init) _fill_recipes :: proc "contextless" () {
 	for i in 0 ..< len(ENCODE_FORMS) {
 		ENCODE_RECIPES[i] = lib.form_to_recipe(&ENCODE_FORMS[i])

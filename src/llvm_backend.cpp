@@ -29,6 +29,7 @@
 #include "llvm_backend_expr.cpp"
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
+#include "llvm_backend_asm.cpp"
 
 gb_internal String get_default_microarchitecture() {
 	String default_march = str_lit("generic");
