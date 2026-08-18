@@ -8368,6 +8368,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(t);
 				return false;
 			}
+			if (build_context.bedrock) {
+				error(call, "'%.*s' is not available when using '-bedrock'", LIT(builtin_name));
+				return false;
+			}
 
 			add_map_key_type_dependencies(c, type);
 
