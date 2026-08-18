@@ -192,7 +192,9 @@ label_display_init :: proc(display: ^Label_Display, label_defs: []Label_Definiti
 		offsets[lo] = offset
 	}
 	for definition in label_defs {
-		if definition == LABEL_UNDEFINED do continue
+		if definition == LABEL_UNDEFINED {
+			continue
+		}
 		insert_sorted(&display.offsets, u32(definition))
 	}
 	if names != nil {
