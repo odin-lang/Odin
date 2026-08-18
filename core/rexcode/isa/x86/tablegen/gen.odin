@@ -34,6 +34,7 @@ import lib "../"
 // `Mnemonic`/`Encoding` unqualified — its body stays byte-for-byte unedited.
 Encoding  :: lib.Encoding
 Mnemonic  :: lib.Mnemonic
+Clobber   :: lib.Clobber
 PREFIX_66 :: lib.PREFIX_66
 PREFIX_F3 :: lib.PREFIX_F3
 PREFIX_F2 :: lib.PREFIX_F2
@@ -47,22 +48,22 @@ BLOBS := [?]Blob{
 	{"ENCODE_FORMS",          "x86.encode_forms.bin",   "Encoding"},
 	{"ENCODE_RUNS",           "x86.encode_runs.bin",    "Encode_Run"},
 	{"ENCODE_RECIPES",        "x86.encode_recipes.bin", "Form_Recipe"},
-	{"MODRM_TABLE",           "x86.modrm.bin",        "ModRM_Info"},
-	{"SIB_TABLE",             "x86.sib.bin",          "SIB_Info"},
-	{"LEGACY_DECODE_ENTRIES", "x86.legacy.bin",       "Decode_Entry"},
-	{"VEX_DECODE_ENTRIES",    "x86.vex.bin",          "VEX_Decode_Entry"},
-	{"EVEX_DECODE_ENTRIES",   "x86.evex.bin",         "VEX_Decode_Entry"},
-	{"DECODE_INDEX_LEGACY",   "x86.idx_legacy.bin",   "Decode_Index"},
-	{"DECODE_INDEX_ESC_0F",   "x86.idx_0f.bin",       "Decode_Index"},
-	{"DECODE_INDEX_ESC_0F38", "x86.idx_0f38.bin",     "Decode_Index"},
-	{"DECODE_INDEX_ESC_0F3A", "x86.idx_0f3a.bin",     "Decode_Index"},
-	{"VEX_INDEX_0F",          "x86.vex_idx_0f.bin",   "Decode_Index"},
-	{"VEX_INDEX_0F38",        "x86.vex_idx_0f38.bin", "Decode_Index"},
-	{"VEX_INDEX_0F3A",        "x86.vex_idx_0f3a.bin", "Decode_Index"},
-	{"EVEX_INDEX_0F",         "x86.evex_idx_0f.bin",  "Decode_Index"},
-	{"EVEX_INDEX_0F38",       "x86.evex_idx_0f38.bin","Decode_Index"},
-	{"EVEX_INDEX_0F3A",       "x86.evex_idx_0f3a.bin","Decode_Index"},
-	{"CLOBBER_TABLE",         "x86.clobber_table.bin","Clobber"},
+	{"MODRM_TABLE",           "x86.modrm.bin",          "ModRM_Info"},
+	{"SIB_TABLE",             "x86.sib.bin",            "SIB_Info"},
+	{"LEGACY_DECODE_ENTRIES", "x86.legacy.bin",         "Decode_Entry"},
+	{"VEX_DECODE_ENTRIES",    "x86.vex.bin",            "VEX_Decode_Entry"},
+	{"EVEX_DECODE_ENTRIES",   "x86.evex.bin",           "VEX_Decode_Entry"},
+	{"DECODE_INDEX_LEGACY",   "x86.idx_legacy.bin",     "Decode_Index"},
+	{"DECODE_INDEX_ESC_0F",   "x86.idx_0f.bin",         "Decode_Index"},
+	{"DECODE_INDEX_ESC_0F38", "x86.idx_0f38.bin",       "Decode_Index"},
+	{"DECODE_INDEX_ESC_0F3A", "x86.idx_0f3a.bin",       "Decode_Index"},
+	{"VEX_INDEX_0F",          "x86.vex_idx_0f.bin",     "Decode_Index"},
+	{"VEX_INDEX_0F38",        "x86.vex_idx_0f38.bin",   "Decode_Index"},
+	{"VEX_INDEX_0F3A",        "x86.vex_idx_0f3a.bin",   "Decode_Index"},
+	{"EVEX_INDEX_0F",         "x86.evex_idx_0f.bin",    "Decode_Index"},
+	{"EVEX_INDEX_0F38",       "x86.evex_idx_0f38.bin",  "Decode_Index"},
+	{"EVEX_INDEX_0F3A",       "x86.evex_idx_0f3a.bin",  "Decode_Index"},
+	{"CLOBBER_FORMS",         "x86.clobber_forms.bin",  "Clobber"},
 }
 
 DIR_GEN     :: #directory + "/generated/"
@@ -110,6 +111,17 @@ emit_encode_tables :: proc() {
 	}
 	strings.write_string(&sb, "}\n\n")
 
+	strings.write_string(&sb, "@(rodata)\n")
+	fmt.sbprintfln(&sb, "CLOBBER_FORMS := [%d]lib.Clobber{{", total_forms())
+	for m in Mnemonic {
+		forms := CLOBBER_TABLE[m]
+		assert(len(forms) == len(ENCODING_TABLE[m]))
+		if len(forms) == 0 { continue }
+		fmt.sbprintfln(&sb, "\t// .%v", m)
+		for f in forms { write_clobber(&sb, f, max_name) }
+	}
+	strings.write_string(&sb, "}\n\n")
+
 	// Run index, one entry per mnemonic (dense, enum-ordinal order).
 	run_name := 0
 	for m in Mnemonic { run_name = max(run_name, len(reflect.enum_string(m))) }
@@ -150,6 +162,59 @@ write_encoding :: proc(sb: ^strings.Builder, e: lib.Encoding, max_name: int) {
 	strings.write_string(sb, "}, ")
 	fmt.sbprintf(sb, "0x%02X, %d, ", e.opcode, e.ext)
 	write_flags(sb, e, e.flags)
+	strings.write_string(sb, "},\n")
+}
+
+write_clobber :: proc(sb: ^strings.Builder, c: lib.Clobber, max_name: int) {
+	i := 0
+	sep :: proc(sb: ^strings.Builder, i: ^int) {
+		if i^ > 0 { strings.write_string(sb, ", ") }
+		i^ += 1
+	}
+	write_flags :: proc(sb: ^strings.Builder, name: string, flags: $T) {
+		strings.write_string(sb, name)
+		strings.write_string(sb, "={")
+		i := 0
+		for flag in flags {
+			if i > 0 { strings.write_string(sb, ", ") }
+			fmt.sbprintf(sb, ".%s", flag)
+			i += 1
+		}
+		strings.write_string(sb, "}")
+	}
+
+	strings.write_string(sb, "\t{")
+	if c.written != nil {
+		sep(sb, &i); write_flags(sb, "written", c.written)
+	}
+	if c.read != nil {
+		sep(sb, &i); write_flags(sb, "read", c.read)
+	}
+	if c.implicit_wr != nil {
+		sep(sb, &i); write_flags(sb, "implicit_wr", c.implicit_wr)
+	}
+	if c.implicit_rd != nil {
+		sep(sb, &i); write_flags(sb, "implicit_rd", c.implicit_rd)
+	}
+	if c.flags_wr != nil {
+		sep(sb, &i); write_flags(sb, "flags_wr", c.flags_wr)
+	}
+	if c.flags_undef != nil {
+		sep(sb, &i); write_flags(sb, "flags_undef", c.flags_undef)
+	}
+	if c.flags_rd != nil {
+		sep(sb, &i); write_flags(sb, "flags_rd", c.flags_rd)
+	}
+	if c.writes_mem {
+		sep(sb, &i); strings.write_string(sb, "writes_mem=true")
+	}
+	if c.reads_mem {
+		sep(sb, &i); strings.write_string(sb, "reads_mem=true")
+	}
+	if c.side_effects != nil {
+		sep(sb, &i); write_flags(sb, "side_effects", c.side_effects)
+	}
+
 	strings.write_string(sb, "},\n")
 }
 
@@ -546,6 +611,14 @@ LOADER_ACCESSORS :: `// --------------------------------------------------------
 encoding_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Encoding {
 	r := ENCODE_RUNS[u16(m)]
 	return ENCODE_FORMS[r.start:][:r.count]
+}
+
+// Per-mnemonic encode forms: the run of ENCODE_FORMS belonging to ` + "`m`" + `.
+// Replaces the old ENCODING_TABLE[m] slice; the returned view is into rodata.
+@(private, require_results)
+clobber_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Clobber {
+	r := ENCODE_RUNS[u16(m)]
+	return CLOBBER_FORMS[r.start:][:r.count]
 }
 
 // Flat [prefix][opcode] lookup into a logical [4][256] index table.

@@ -800,6 +800,8 @@ ENCODE_FORMS := [2395]lib.Encoding{
 	{.MOVSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {opsize_16=true, rep_ok=true}},
 	// .MOVSD
 	{.MOVSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
+	{.MOVSD,            {.XMM,       .XMM_M64,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=3, explicit_count=2}},
+	{.MOVSD,            {.XMM_M64,   .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=3, explicit_count=2}},
 	// .MOVSQ
 	{.MOVSQ,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {force_rex_w=true, rep_ok=true}},
 	// .CMPS
@@ -810,6 +812,7 @@ ENCODE_FORMS := [2395]lib.Encoding{
 	{.CMPSW,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {opsize_16=true, rep_ok=true}},
 	// .CMPSD
 	{.CMPSD,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
+	{.CMPSD,            {.XMM,       .XMM_M64,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=3, explicit_count=3}},
 	// .CMPSQ
 	{.CMPSQ,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {force_rex_w=true, rep_ok=true}},
 	// .SCAS
@@ -973,9 +976,6 @@ ENCODE_FORMS := [2395]lib.Encoding{
 	// .MOVSS
 	{.MOVSS,            {.XMM,       .XMM_M32,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=2, explicit_count=2}},
 	{.MOVSS,            {.XMM_M32,   .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=2, explicit_count=2}},
-	// .MOVSD_SSE
-	{.MOVSD_SSE,        {.XMM,       .XMM_M64,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=3, explicit_count=2}},
-	{.MOVSD_SSE,        {.XMM_M64,   .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=3, explicit_count=2}},
 	// .MOVDQA
 	{.MOVDQA,           {.XMM,       .XMM_M128,  .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x6F, 0, {esc=._0F, prefix=1, explicit_count=2}},
 	{.MOVDQA,           {.XMM_M128,  .XMM,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x7F, 0, {esc=._0F, prefix=1, explicit_count=2}},
@@ -1110,8 +1110,6 @@ ENCODE_FORMS := [2395]lib.Encoding{
 	{.CMPPD,            {.XMM,       .XMM_M128,  .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=1, explicit_count=3}},
 	// .CMPSS
 	{.CMPSS,            {.XMM,       .XMM_M32,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=2, explicit_count=3}},
-	// .CMPSD_SSE
-	{.CMPSD_SSE,        {.XMM,       .XMM_M64,   .IMM8,      .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=3, explicit_count=3}},
 	// .COMISS
 	{.COMISS,           {.XMM,       .XMM_M32,   .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0x2F, 0, {esc=._0F, explicit_count=2}},
 	// .COMISD
@@ -3600,6 +3598,3596 @@ ENCODE_FORMS := [2395]lib.Encoding{
 }
 
 @(rodata)
+CLOBBER_FORMS := [2395]lib.Clobber{
+	// .MOV
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .MOVABS
+	{written={.OP0}, read={.OP1}},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	// .MOVZX
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .MOVSX
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .MOVSXD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .XCHG
+	{written={.OP1}, read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}},
+	{written={.OP1}, read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}},
+	{written={.OP1}, read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, writes_mem=true, reads_mem=true},
+	// .PUSH
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true},
+	// .POP
+	{written={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	{written={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	{written={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	{written={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true},
+	// .LEA
+	{written={.OP0}},
+	{written={.OP0}},
+	{written={.OP0}},
+	// .ADD
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .ADC
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .SUB
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .SBB
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .MUL
+	{read={.OP0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	// .IMUL
+	{read={.OP0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .OF}, flags_undef={.PF, .AF, .ZF, .SF}, reads_mem=true},
+	// .DIV
+	{read={.OP0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .IDIV
+	{read={.OP0}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RDX}, flags_undef={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .INC
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .DEC
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .NEG
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .CMP
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .AND
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .OR
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .XOR
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .NOT
+	{written={.OP0}, read={.OP0}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, writes_mem=true, reads_mem=true},
+	// .TEST
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP1}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, reads_mem=true},
+	// .SHL
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .SHR
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .SAR
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .ZF, .SF, .OF}, flags_undef={.AF}, writes_mem=true, reads_mem=true},
+	// .ROL
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	// .ROR
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, writes_mem=true, reads_mem=true},
+	// .RCL
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .RCR
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0}, implicit_rd={.RCX}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF, .OF}, flags_rd={.CF}, writes_mem=true, reads_mem=true},
+	// .SHLD
+	{written={.OP0}, read={.OP0, .OP1, .OP2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1, .OP2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1, .OP2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	// .SHRD
+	{written={.OP0}, read={.OP0, .OP1, .OP2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1, .OP2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1, .OP2}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_rd={.RCX}, flags_wr={.CF, .PF, .ZF, .SF}, flags_undef={.AF, .OF}, writes_mem=true, reads_mem=true},
+	// .BT
+	{read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .BTS
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BTR
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BTC
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_undef={.PF, .AF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BSF
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	// .BSR
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, flags_undef={.CF, .PF, .AF, .SF, .OF}, reads_mem=true},
+	// .POPCNT
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .LZCNT
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .TZCNT
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .JMP
+	{read={.OP0}, side_effects={.CONTROL}},
+	{read={.OP0}, side_effects={.CONTROL}},
+	{read={.OP0}, reads_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, reads_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, reads_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, reads_mem=true, side_effects={.CONTROL}},
+	// .JA
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JAE
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JB
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JBE
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JC
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JE
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JZ
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JG
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JGE
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JL
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JLE
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JNA
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JNAE
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JNB
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JNBE
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	{flags_rd={.CF, .ZF}, side_effects={.CONTROL}},
+	// .JNC
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	{flags_rd={.CF}, side_effects={.CONTROL}},
+	// .JNE
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JNZ
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .JNG
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JNGE
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JNL
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.SF, .OF}, side_effects={.CONTROL}},
+	// .JNLE
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	{flags_rd={.ZF, .SF, .OF}, side_effects={.CONTROL}},
+	// .JNO
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	// .JNP
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JNS
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	// .JO
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	{flags_rd={.OF}, side_effects={.CONTROL}},
+	// .JP
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JPE
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JPO
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	{flags_rd={.PF}, side_effects={.CONTROL}},
+	// .JS
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	{flags_rd={.SF}, side_effects={.CONTROL}},
+	// .JCXZ
+	{implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .JECXZ
+	{implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .JRCXZ
+	{implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .LOOP
+	{implicit_wr={.RCX}, implicit_rd={.RCX}, side_effects={.CONTROL}},
+	// .LOOPE
+	{implicit_wr={.RCX}, implicit_rd={.RCX}, flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .LOOPNE
+	{implicit_wr={.RCX}, implicit_rd={.RCX}, flags_rd={.ZF}, side_effects={.CONTROL}},
+	// .CALL
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	{read={.OP0}, implicit_wr={.RSP}, implicit_rd={.RSP}, writes_mem=true, reads_mem=true, side_effects={.CONTROL}},
+	// .RET
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true, side_effects={.CONTROL}},
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, reads_mem=true, side_effects={.CONTROL}},
+	// .IRET
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true, side_effects={.SERIALIZING, .CONTROL}},
+	// .IRETD
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true, side_effects={.SERIALIZING, .CONTROL}},
+	// .IRETQ
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true, side_effects={.SERIALIZING, .CONTROL}},
+	// .INT
+	{read={.OP0}, implicit_wr={.RSP}, flags_wr={.IF}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true, side_effects={.INTERRUPT, .CONTROL}},
+	// .INT3
+	{implicit_wr={.RSP}, flags_wr={.IF}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true, side_effects={.INTERRUPT, .CONTROL}},
+	// .INTO
+	{implicit_wr={.RSP}, flags_wr={.IF}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true, side_effects={.INTERRUPT, .CONTROL}},
+	// .SYSCALL
+	{implicit_wr={.RCX, .R11}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, side_effects={.INTERRUPT, .CONTROL}},
+	// .SYSRET
+	{implicit_rd={.RCX, .R11}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, side_effects={.SERIALIZING, .INTERRUPT, .PRIVILEGED, .CONTROL}},
+	// .SYSENTER
+	{implicit_wr={.RSP}, flags_wr={.IF}, side_effects={.INTERRUPT, .CONTROL}},
+	// .SYSEXIT
+	{implicit_wr={.RSP}, implicit_rd={.RCX, .RDX}, side_effects={.SERIALIZING, .INTERRUPT, .PRIVILEGED, .CONTROL}},
+	// .SETA
+	{written={.OP0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETAE
+	{written={.OP0}, flags_rd={.CF}, writes_mem=true},
+	// .SETB
+	{written={.OP0}, flags_rd={.CF}, writes_mem=true},
+	// .SETBE
+	{written={.OP0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETC
+	{written={.OP0}, flags_rd={.CF}, writes_mem=true},
+	// .SETE
+	{written={.OP0}, flags_rd={.ZF}, writes_mem=true},
+	// .SETG
+	{written={.OP0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETGE
+	{written={.OP0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETL
+	{written={.OP0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETLE
+	{written={.OP0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETNA
+	{written={.OP0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETNAE
+	{written={.OP0}, flags_rd={.CF}, writes_mem=true},
+	// .SETNB
+	{written={.OP0}, flags_rd={.CF}, writes_mem=true},
+	// .SETNBE
+	{written={.OP0}, flags_rd={.CF, .ZF}, writes_mem=true},
+	// .SETNC
+	{written={.OP0}, flags_rd={.CF}, writes_mem=true},
+	// .SETNE
+	{written={.OP0}, flags_rd={.ZF}, writes_mem=true},
+	// .SETNG
+	{written={.OP0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETNGE
+	{written={.OP0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETNL
+	{written={.OP0}, flags_rd={.SF, .OF}, writes_mem=true},
+	// .SETNLE
+	{written={.OP0}, flags_rd={.ZF, .SF, .OF}, writes_mem=true},
+	// .SETNO
+	{written={.OP0}, flags_rd={.OF}, writes_mem=true},
+	// .SETNP
+	{written={.OP0}, flags_rd={.PF}, writes_mem=true},
+	// .SETNS
+	{written={.OP0}, flags_rd={.SF}, writes_mem=true},
+	// .SETNZ
+	{written={.OP0}, flags_rd={.ZF}, writes_mem=true},
+	// .SETO
+	{written={.OP0}, flags_rd={.OF}, writes_mem=true},
+	// .SETP
+	{written={.OP0}, flags_rd={.PF}, writes_mem=true},
+	// .SETPE
+	{written={.OP0}, flags_rd={.PF}, writes_mem=true},
+	// .SETPO
+	{written={.OP0}, flags_rd={.PF}, writes_mem=true},
+	// .SETS
+	{written={.OP0}, flags_rd={.SF}, writes_mem=true},
+	// .SETZ
+	{written={.OP0}, flags_rd={.ZF}, writes_mem=true},
+	// .CMOVA
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVAE
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVB
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVBE
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVC
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVE
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	// .CMOVG
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVGE
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVL
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVLE
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVNA
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVNAE
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVNB
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVNBE
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF, .ZF}, reads_mem=true},
+	// .CMOVNC
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.CF}, reads_mem=true},
+	// .CMOVNE
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	// .CMOVNG
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVNGE
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVNL
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF, .OF}, reads_mem=true},
+	// .CMOVNLE
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF, .SF, .OF}, reads_mem=true},
+	// .CMOVNO
+	{written={.OP0}, read={.OP1}, flags_rd={.OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.OF}, reads_mem=true},
+	// .CMOVNP
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVNS
+	{written={.OP0}, read={.OP1}, flags_rd={.SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF}, reads_mem=true},
+	// .CMOVNZ
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	// .CMOVO
+	{written={.OP0}, read={.OP1}, flags_rd={.OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.OF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.OF}, reads_mem=true},
+	// .CMOVP
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVPE
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVPO
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.PF}, reads_mem=true},
+	// .CMOVS
+	{written={.OP0}, read={.OP1}, flags_rd={.SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.SF}, reads_mem=true},
+	// .CMOVZ
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_rd={.ZF}, reads_mem=true},
+	// .MOVS
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .MOVSB
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .MOVSW
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .MOVSD
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVSQ
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .CMPS
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .CMPSB
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .CMPSW
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .CMPSD
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CMPSQ
+	{implicit_wr={.RCX, .RSI, .RDI}, implicit_rd={.RCX, .RSI, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCAS
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASB
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASW
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASD
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .SCASQ
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, flags_rd={.DF}, reads_mem=true},
+	// .LODS
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSB
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSW
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSD
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .LODSQ
+	{implicit_wr={.RAX, .RSI}, implicit_rd={.RSI}, flags_rd={.DF}, reads_mem=true},
+	// .STOS
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSB
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSW
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSD
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .STOSQ
+	{implicit_wr={.RCX, .RDI}, implicit_rd={.RAX, .RCX, .RDI}, flags_rd={.DF}, writes_mem=true, reads_mem=true},
+	// .CLC
+	{flags_wr={.CF}},
+	// .STC
+	{flags_wr={.CF}},
+	// .CMC
+	{flags_wr={.CF}, flags_rd={.CF}},
+	// .CLD
+	{flags_wr={.DF}},
+	// .STD
+	{flags_wr={.DF}},
+	// .CLI
+	{flags_wr={.IF}},
+	// .STI
+	{flags_wr={.IF}},
+	// .LAHF
+	{implicit_wr={.RAX}, flags_rd={.CF, .PF, .AF, .ZF, .SF}},
+	// .SAHF
+	{implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF}},
+	// .PUSHF
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true},
+	// .PUSHFD
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true},
+	// .PUSHFQ
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_rd={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, writes_mem=true},
+	// .POPF
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true},
+	// .POPFD
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true},
+	// .POPFQ
+	{implicit_wr={.RSP}, implicit_rd={.RSP}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF, .DF, .IF}, reads_mem=true},
+	// .NOP
+	{},
+	{},
+	{},
+	{},
+	// .HLT
+	{side_effects={.HALT, .PRIVILEGED}},
+	// .WAIT
+	{implicit_rd={.FPU_SW}},
+	// .LOCK
+	{side_effects={.FENCE}},
+	// .UD0
+	{side_effects={.TRAP}},
+	// .UD1
+	{side_effects={.TRAP}},
+	// .UD2
+	{side_effects={.TRAP}},
+	// .CPUID
+	{implicit_wr={.RAX, .RBX, .RCX, .RDX}, implicit_rd={.RAX, .RCX}, side_effects={.SERIALIZING}},
+	// .RDTSC
+	{implicit_wr={.RAX, .RDX}},
+	// .RDTSCP
+	{implicit_wr={.RAX, .RCX, .RDX}},
+	// .RDPMC
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	// .XGETBV
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	// .XSETBV
+	{implicit_rd={.RAX, .RCX, .RDX}},
+	// .CBW
+	{implicit_wr={.RAX}, implicit_rd={.RAX}},
+	// .CWDE
+	{implicit_wr={.RAX}, implicit_rd={.RAX}},
+	// .CDQE
+	{implicit_wr={.RAX}, implicit_rd={.RAX}},
+	// .CWD
+	{implicit_wr={.RDX}, implicit_rd={.RAX}},
+	// .CDQ
+	{implicit_wr={.RDX}, implicit_rd={.RAX}},
+	// .CQO
+	{implicit_wr={.RDX}, implicit_rd={.RAX}},
+	// .ANDN
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BEXTR
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .ZF, .OF}, flags_undef={.PF, .AF, .SF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .ZF, .OF}, flags_undef={.PF, .AF, .SF}, reads_mem=true},
+	// .BLSI
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BLSMSK
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BLSR
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .BZHI
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, flags_wr={.CF, .ZF, .SF, .OF}, flags_undef={.PF, .AF}, reads_mem=true},
+	// .PDEP
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PEXT
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .RORX
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .SARX
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .SHLX
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .SHRX
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .MULX
+	{written={.OP0, .OP1}, read={.OP2}, implicit_rd={.RDX}, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP2}, implicit_rd={.RDX}, reads_mem=true},
+	// .ADCX
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_rd={.CF}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.CF}, flags_rd={.CF}, reads_mem=true},
+	// .ADOX
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.OF}, flags_rd={.OF}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, flags_wr={.OF}, flags_rd={.OF}, reads_mem=true},
+	// .MOVAPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVUPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVAPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVUPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVSS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVDQA
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVDQU
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVQ
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .MOVD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVLPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVHPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVLPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVHPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVLHPS
+	{written={.OP0}, read={.OP1}},
+	// .MOVHLPS
+	{written={.OP0}, read={.OP1}},
+	// .MOVMSKPS
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .MOVMSKPD
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .MOVNTPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVNTPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVNTDQ
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .MOVNTDQA
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .ADDPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SUBSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MULSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DIVSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .SQRTSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RCPPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RCPSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RSQRTPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .RSQRTSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MAXSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINSS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MINSD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ANDPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .ANDPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .ANDNPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .ANDNPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .ORPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .ORPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .XORPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .XORPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .CMPPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CMPPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CMPSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .COMISS
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .COMISD
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .UCOMISS
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .UCOMISD
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .SHUFPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .SHUFPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .UNPCKLPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .UNPCKHPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .UNPCKLPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .UNPCKHPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .CVTPS2PD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTPD2PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSS2SD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSD2SS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTPS2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTPD2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTDQ2PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTDQ2PD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSS2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSD2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSI2SS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTSI2SD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTPS2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTPD2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTSS2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .CVTTSD2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .PADDB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDUSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PADDUSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBUSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSUBUSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULLW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULHW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULHUW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULUDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMADDWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PAND
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PANDN
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .POR
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PXOR
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSLLW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSLLD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSLLQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSRLW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSRLD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSRLQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSRAW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PSRAD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .PCMPEQB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PCMPEQW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PCMPEQD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PCMPGTB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PCMPGTW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PCMPGTD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PACKSSWB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PACKSSDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PACKUSWB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKLBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKLWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKLDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKLQDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKHBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKHWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKHDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PUNPCKHQDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSHUFD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PSHUFHW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PSHUFLW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PSHUFW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PEXTRW
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .PINSRW
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PMOVMSKB
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .PAVGB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PAVGW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMAXUB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMAXSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMINUB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMINSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSADBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .MASKMOVDQU
+	{read={.OP0, .OP1}, implicit_rd={.RDI}, flags_rd={.DF}, writes_mem=true},
+	// .LFENCE
+	{side_effects={.FENCE, .SERIALIZING}},
+	// .SFENCE
+	{side_effects={.FENCE}},
+	// .MFENCE
+	{side_effects={.FENCE}},
+	// .PAUSE
+	{side_effects={.HINT}},
+	// .CLFLUSH
+	{read={.OP0}, reads_mem=true, side_effects={.CACHE}},
+	// .ADDSUBPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ADDSUBPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HADDPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HADDPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HSUBPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .HSUBPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .MOVDDUP
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .MOVSLDUP
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .MOVSHDUP
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .LDDQU
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSHUFB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PHADDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PHADDD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PHADDSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PHSUBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PHSUBD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PHSUBSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMADDUBSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULHRSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSIGNB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSIGNW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PSIGND
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PABSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PABSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PABSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PALIGNR
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .BLENDPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .BLENDPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .BLENDVPS
+	{written={.OP0}, read={.OP1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .BLENDVPD
+	{written={.OP0}, read={.OP1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .PBLENDW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PBLENDVB
+	{written={.OP0}, read={.OP1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .DPPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .DPPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .EXTRACTPS
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .INSERTPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .MPSADBW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PACKUSDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PEXTRB
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .PEXTRD
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .PEXTRQ
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .PHMINPOSUW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PINSRB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PINSRD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PINSRQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .PMAXSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMAXSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMAXUW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMAXUD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMINSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMINSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMINUW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMINUD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVSXBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVSXBD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVSXBQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVSXWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVSXWQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVSXDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVZXBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVZXBD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVZXBQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVZXWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVZXWQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMOVZXDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PMULLD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PTEST
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .ROUNDPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ROUNDPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ROUNDSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .ROUNDSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .PCMPEQQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .CRC32
+	{written={.OP0}, read={.OP0, .OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, reads_mem=true},
+	// .PCMPESTRI
+	{implicit_wr={.RCX}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPESTRM
+	{implicit_wr={.XMM0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPISTRI
+	{implicit_wr={.RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPISTRM
+	{implicit_wr={.XMM0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .PCMPGTQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .PCLMULQDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .AESDEC
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .AESDECLAST
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .AESENC
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .AESENCLAST
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .AESIMC
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .AESKEYGENASSIST
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .SHA1MSG1
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .SHA1MSG2
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .SHA1NEXTE
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .SHA1RNDS4
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .SHA256MSG1
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .SHA256MSG2
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .SHA256RNDS2
+	{written={.OP0}, read={.OP1}, implicit_rd={.XMM0}, reads_mem=true},
+	// .VADDPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSUBSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMULSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDIVSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSQRTSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCPPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCPSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRTPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRTSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMAXSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VMINSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VANDPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VANDPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VANDNPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VANDNPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VORPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VORPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VXORPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VXORPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VCMPPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCMPPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCMPSS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCMPSD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCOMISS
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VCOMISD
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VUCOMISS
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VUCOMISD
+	{read={.OP0, .OP1}, implicit_wr={.MXCSR}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}, reads_mem=true},
+	// .VSHUFPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VSHUFPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VUNPCKLPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VUNPCKHPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VUNPCKLPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VUNPCKHPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VBLENDPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VBLENDPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VBLENDVPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VBLENDVPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VDPPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VDPPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDSS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VROUNDSD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VEXTRACTPS
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .VINSERTPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VMOVAPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVUPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVAPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVUPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVSS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VMOVSD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VMOVDQA
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVDQU
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVQ
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VMOVD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVLPS
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVHPS
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVLPD
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVHPD
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVLHPS
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VMOVHLPS
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VMOVMSKPS
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VMOVMSKPD
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VMOVNTPS
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVNTPD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVNTDQ
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .VMOVNTDQA
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VADDSUBPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VADDSUBPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHADDPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHADDPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHSUBPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VHSUBPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VLDDQU
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVDDUP
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVSLDUP
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVSHDUP
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPCMPESTRI
+	{implicit_wr={.RCX}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPCMPESTRM
+	{implicit_wr={.XMM0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPCMPISTRI
+	{implicit_wr={.RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPCMPISTRM
+	{implicit_wr={.XMM0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .VPBROADCASTB
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPBROADCASTW
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPBROADCASTD
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPBROADCASTQ
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VCVTPS2PD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPD2PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSS2SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSD2SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPS2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPD2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTDQ2PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTDQ2PD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSS2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSD2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSI2SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTSI2SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTPS2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTPD2DQ
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTSS2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTTSD2SI
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VPADDB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPADDW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPADDD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPADDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSUBB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSUBW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSUBD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSUBQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMULLW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMULHW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMULHUW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMULUDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMADDWD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPAND
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPANDN
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPOR
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPXOR
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSLLW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSLLD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSLLQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSRLW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSRLD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSRLQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSRAW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPSRAD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .VPCMPEQB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPEQW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPEQD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPEQQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPGTB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPGTW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPGTD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPGTQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPACKSSWB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPACKSSDW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPACKUSWB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPACKUSDW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKLBW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKLWD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKLDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKLQDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKHBW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKHWD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKHDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPUNPCKHQDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSHUFD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSHUFHW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSHUFLW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPEXTRB
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .VPEXTRW
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .VPEXTRD
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .VPEXTRQ
+	{written={.OP0}, read={.OP1}, writes_mem=true},
+	// .VPINSRB
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPINSRW
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPINSRD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPINSRQ
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPMOVMSKB
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPTEST
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .VPSHUFB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPHADDW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPHADDD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPHADDSW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPHSUBW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPHSUBD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPHSUBSW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMADDUBSW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMULHRSW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSIGNB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSIGNW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSIGND
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPABSB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPABSW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPABSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPALIGNR
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPBLENDW
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPBLENDVB
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VMPSADBW
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPHMINPOSUW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMAXSB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMAXSD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMAXUW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMAXUD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMINSB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMINSD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMINUW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMINUD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMOVSXBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSXBD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSXBQ
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSXWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSXWQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSXDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVZXBW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVZXBD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVZXBQ
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVZXWD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVZXWQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVZXDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMULDQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMULLD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VMASKMOVDQU
+	{read={.OP0, .OP1}, implicit_rd={.RDI}, flags_rd={.DF}, writes_mem=true},
+	// .VPCLMULQDQ
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VAESDEC
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VAESDECLAST
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VAESENC
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VAESENCLAST
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VAESIMC
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VAESKEYGENASSIST
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VBROADCASTSS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VBROADCASTSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	// .VBROADCASTF128
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VEXTRACTF128
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	// .VINSERTF128
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPERM2F128
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VMASKMOVPS
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	// .VMASKMOVPD
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	// .VTESTPS
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .VTESTPD
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	{read={.OP0, .OP1}, flags_wr={.CF, .ZF}, flags_undef={.PF, .AF, .SF, .OF}, reads_mem=true},
+	// .VZEROALL
+	{implicit_wr={.VECTOR}},
+	// .VZEROUPPER
+	{implicit_wr={.VECTOR}},
+	// .VBROADCASTI128
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VEXTRACTI128
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	// .VINSERTI128
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPERM2I128
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPERMD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPBLENDD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPSLLVD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSLLVQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSRLVD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSRLVQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSRAVD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMASKMOVD
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	// .VPMASKMOVQ
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, writes_mem=true, reads_mem=true},
+	// .VGATHERDPS
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VGATHERDPD
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VGATHERQPS
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VGATHERQPD
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VPGATHERDD
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VPGATHERDQ
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VPGATHERQD
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VPGATHERQQ
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	{written={.OP0, .OP2}, read={.OP0, .OP1, .OP2}, reads_mem=true},
+	// .VFMADD132PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD132PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD132SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD132SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD213SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADD231SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB132SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB213SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUB231SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD132SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD213SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMADD231SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB132SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB213SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFNMSUB231SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB132PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB213PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB231PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB132PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB213PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMADDSUB231PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD132PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD213PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD231PS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD132PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD213PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFMSUBADD231PD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPH2PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VCVTPS2PH
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, writes_mem=true, reads_mem=true},
+	// .VMOVDQA32
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVDQA64
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVDQU8
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVDQU16
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVDQU32
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VMOVDQU64
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPBLENDMB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPBLENDMW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPBLENDMD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPBLENDMQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VBLENDMPS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VBLENDMPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPUB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPUW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPUD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCMPUQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTMB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTMW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTMD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTMQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTNMB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTNMW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTNMD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPTESTNMQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPCOMPRESSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPCOMPRESSQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VCOMPRESSPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VCOMPRESSPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPEXPANDD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPEXPANDQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VEXPANDPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VEXPANDPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPCONFLICTD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPCONFLICTQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPLZCNTD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPLZCNTQ
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPERMI2B
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMI2W
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMI2D
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMI2Q
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMI2PS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMI2PD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMT2B
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMT2W
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMT2D
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMT2Q
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMT2PS
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMT2PD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPERMW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPMOVB2M
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVW2M
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVD2M
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVQ2M
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVM2B
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVM2W
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVM2D
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVM2Q
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .VPMOVQB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSQB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVUSQB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVQW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSQW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVUSQW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVQD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSQD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVUSQD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVDB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSDB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVUSDB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVUSDW
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVWB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVSWB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPMOVUSWB
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VPROLD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPROLQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPROLVD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPROLVQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPRORD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPRORQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPRORVD
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPRORVQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSCATTERDD
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VPSCATTERDQ
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VPSCATTERQD
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VPSCATTERQQ
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VSCATTERDPS
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VSCATTERDPD
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VSCATTERQPS
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VSCATTERQPD
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	{read={.OP0, .OP1}, writes_mem=true},
+	// .VPSRAVQ
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSRAVW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSLLVW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VPSRLVW
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .VRANGEPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRANGEPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRANGESS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRANGESD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCEPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCEPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCESS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VREDUCESD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALEPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALEPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALESS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRNDSCALESD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14PD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRSQRT14SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14PS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14PD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14SS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VRCP14SD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VSCALEFSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPPS
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPPD
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPSS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETEXPSD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTPS
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTPD
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTSS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VGETMANTSD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMPS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMPD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMSS
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFIXUPIMMSD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, implicit_wr={.MXCSR}, reads_mem=true},
+	// .VFPCLASSPS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VFPCLASSPD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VFPCLASSSS
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VFPCLASSSD
+	{written={.OP0}, read={.OP1}, reads_mem=true},
+	// .VALIGNQ
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VALIGND
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VDBPSADBW
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPTERNLOGD
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPTERNLOGQ
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2, .OP3}, reads_mem=true},
+	// .VPMULTISHIFTQB
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	{written={.OP0}, read={.OP1, .OP2}, reads_mem=true},
+	// .KADDW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KADDB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KADDQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KADDD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDNW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDNB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDNQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KANDND
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KMOVW
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .KMOVB
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .KMOVQ
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .KMOVD
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}},
+	{written={.OP0}, read={.OP1}},
+	// .KNOTW
+	{written={.OP0}, read={.OP1}},
+	// .KNOTB
+	{written={.OP0}, read={.OP1}},
+	// .KNOTQ
+	{written={.OP0}, read={.OP1}},
+	// .KNOTD
+	{written={.OP0}, read={.OP1}},
+	// .KORW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KORB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KORQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KORD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KORTESTW
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KORTESTB
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KORTESTQ
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KORTESTD
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KSHIFTLW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTLB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTLQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTLD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTRW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTRB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTRQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KSHIFTRD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KTESTW
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KTESTB
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KTESTQ
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KTESTD
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .KUNPCKBW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KUNPCKWD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KUNPCKDQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXNORW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXNORB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXNORQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXNORD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXORW
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXORB
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXORQ
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .KXORD
+	{written={.OP0}, read={.OP1, .OP2}},
+	// .FADD
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FADDP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIADD
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FSUB
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSUBP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FISUB
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FSUBR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSUBRP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FISUBR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FMUL
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FMULP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIMUL
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FDIV
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FDIVP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIDIV
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FDIVR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FDIVRP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FIDIVR
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FSQRT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FABS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCHS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPREM
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPREM1
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FRNDINT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSCALE
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FXTRACT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FXAM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FLD
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FILD
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FBLD
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FST
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FIST
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FISTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FISTTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FBSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FXCH
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCMOVB
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF}},
+	// .FCMOVE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.ZF}},
+	// .FCMOVBE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF, .ZF}},
+	// .FCMOVU
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.PF}},
+	// .FCMOVNB
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF}},
+	// .FCMOVNE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.ZF}},
+	// .FCMOVNBE
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.CF, .ZF}},
+	// .FCMOVNU
+	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.PF}},
+	// .FCOM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCOMP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCOMPP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FICOM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FICOMP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	// .FCOMI
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FCOMIP
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FUCOMI
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FUCOMIP
+	{implicit_rd={.FPU_ST}, flags_wr={.CF, .PF, .ZF}, flags_undef={.AF, .SF, .OF}},
+	// .FUCOM
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FUCOMP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FUCOMPP
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FTST
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FLDZ
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLD1
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDPI
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDL2T
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDL2E
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDLG2
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FLDLN2
+	{implicit_wr={.FPU_ST, .FPU_SW}},
+	// .FSIN
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCOS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSINCOS
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPTAN
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FPATAN
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .F2XM1
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FYL2X
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FYL2XP1
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FINIT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FNINIT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FINCSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FDECSTP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FFREE
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FFREEP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FNOP
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FWAIT
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FCLEX
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FNCLEX
+	{implicit_wr={.FPU_ST, .FPU_SW}, implicit_rd={.FPU_ST}},
+	// .FSTCW
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FNSTCW
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FLDCW
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FSTENV
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FNSTENV
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FLDENV
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FSAVE
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FNSAVE
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FRSTOR
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FSTSW
+	{implicit_wr={.RAX, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.RAX, .FPU_SW}},
+	// .FNSTSW
+	{implicit_wr={.RAX, .FPU_SW}, writes_mem=true},
+	{implicit_wr={.RAX, .FPU_SW}},
+	// .FXSAVE
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FXSAVE64
+	{implicit_rd={.FPU_ST, .FPU_SW}, writes_mem=true},
+	// .FXRSTOR
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .FXRSTOR64
+	{implicit_wr={.FPU_ST, .FPU_SW}, reads_mem=true},
+	// .LGDT
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SGDT
+	{written={.OP0}, writes_mem=true},
+	{written={.OP0}, writes_mem=true},
+	// .LIDT
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SIDT
+	{written={.OP0}, writes_mem=true},
+	{written={.OP0}, writes_mem=true},
+	// .LLDT
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SLDT
+	{written={.OP0}, writes_mem=true},
+	{written={.OP0}},
+	{written={.OP0}},
+	// .LTR
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .STR
+	{written={.OP0}, writes_mem=true},
+	{written={.OP0}},
+	{written={.OP0}},
+	// .LMSW
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SMSW
+	{written={.OP0}, writes_mem=true},
+	{written={.OP0}},
+	{written={.OP0}},
+	// .CLTS
+	{side_effects={.PRIVILEGED}},
+	// .ARPL
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .LAR
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, reads_mem=true},
+	// .LSL
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, reads_mem=true},
+	{written={.OP0}, read={.OP1}, flags_wr={.ZF}, reads_mem=true},
+	// .VERR
+	{read={.OP0}, flags_wr={.ZF}, reads_mem=true},
+	// .VERW
+	{read={.OP0}, flags_wr={.ZF}, reads_mem=true},
+	// .INVD
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .WBINVD
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .INVLPG
+	{read={.OP0}, reads_mem=true, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .INVPCID
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .RSM
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .RDMSR
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.PRIVILEGED}},
+	// .WRMSR
+	{implicit_rd={.RAX, .RCX, .RDX}, side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .VMCALL
+	{side_effects={.PRIVILEGED}},
+	// .VMLAUNCH
+	{flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMRESUME
+	{flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMXOFF
+	{side_effects={.PRIVILEGED}},
+	// .VMXON
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMCLEAR
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMPTRLD
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMPTRST
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMREAD
+	{written={.OP0}, read={.OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMWRITE
+	{read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMFUNC
+	{side_effects={.PRIVILEGED}},
+	// .INVEPT
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .INVVPID
+	{read={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .ENCLS
+	{side_effects={.PRIVILEGED}},
+	// .ENCLU
+	{side_effects={.PRIVILEGED}},
+	// .ENCLV
+	{side_effects={.PRIVILEGED}},
+	// .RDPKRU
+	{implicit_wr={.RAX}, implicit_rd={.RCX}},
+	// .WRPKRU
+	{implicit_rd={.RAX, .RCX, .RDX}},
+	// .INCSSPD
+	{read={.OP0}, side_effects={.CET}},
+	// .INCSSPQ
+	{read={.OP0}, side_effects={.CET}},
+	// .RDSSPD
+	{written={.OP0}, side_effects={.CET}},
+	// .RDSSPQ
+	{written={.OP0}, side_effects={.CET}},
+	// .SAVEPREVSSP
+	{side_effects={.CET}},
+	// .RSTORSSP
+	{side_effects={.CET}},
+	// .WRSSD
+	{read={.OP0, .OP1}, writes_mem=true, side_effects={.CET}},
+	// .WRSSQ
+	{read={.OP0, .OP1}, writes_mem=true, side_effects={.CET}},
+	// .WRUSSD
+	{read={.OP0, .OP1}, writes_mem=true, side_effects={.CET}},
+	// .WRUSSQ
+	{read={.OP0, .OP1}, writes_mem=true, side_effects={.CET}},
+	// .SETSSBSY
+	{side_effects={.CET}},
+	// .CLRSSBSY
+	{side_effects={.CET}},
+	// .ENDBR64
+	{side_effects={.HINT, .CET}},
+	// .ENDBR32
+	{side_effects={.HINT, .CET}},
+	// .XSAVE
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVE64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XRSTOR
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true},
+	// .XRSTOR64
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true},
+	// .XSAVEOPT
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVEOPT64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVEC
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVEC64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true},
+	// .XSAVES
+	{implicit_rd={.RAX, .RDX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .XSAVES64
+	{implicit_rd={.RAX, .RDX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .XRSTORS
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .XRSTORS64
+	{implicit_wr={.MXCSR, .FPU_ST, .FPU_SW}, implicit_rd={.RAX, .RDX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .PREFETCHT0
+	{read={.OP0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHT1
+	{read={.OP0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHT2
+	{read={.OP0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHNTA
+	{read={.OP0}, reads_mem=true, side_effects={.HINT}},
+	// .PREFETCHW
+	{read={.OP0}, reads_mem=true, side_effects={.HINT}},
+	// .CLFLUSHOPT
+	{read={.OP0}, reads_mem=true, side_effects={.CACHE}},
+	// .CLWB
+	{read={.OP0}, reads_mem=true, side_effects={.CACHE}},
+	// .CLDEMOTE
+	{read={.OP0}, reads_mem=true, side_effects={.HINT}},
+	// .BSWAP
+	{written={.OP0}, read={.OP0}},
+	{written={.OP0}, read={.OP0}},
+	// .CMPXCHG
+	{written={.OP0}, read={.OP0, .OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP0, .OP1}, implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .CMPXCHG8B
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RBX, .RCX, .RDX}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .CMPXCHG16B
+	{read={.OP0}, implicit_wr={.RAX, .RDX}, implicit_rd={.RAX, .RBX, .RCX, .RDX}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .XADD
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	{written={.OP0, .OP1}, read={.OP0, .OP1}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true},
+	// .BOUND
+	{read={.OP0, .OP1}, reads_mem=true, side_effects={.TRAP}},
+	{read={.OP0, .OP1}, reads_mem=true, side_effects={.TRAP}},
+	// .ENTER
+	{implicit_wr={.RSP, .RBP}, implicit_rd={.RSP, .RBP}, writes_mem=true},
+	// .LEAVE
+	{implicit_wr={.RSP, .RBP}, implicit_rd={.RBP}, reads_mem=true},
+	// .XLAT
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RBX}, reads_mem=true},
+	// .XLATB
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RBX}, reads_mem=true},
+	// .MOVBE
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	{written={.OP0}, read={.OP1}, writes_mem=true, reads_mem=true},
+	// .RDRAND
+	{written={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .RDSEED
+	{written={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={.OP0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+}
+
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID          = {    0,   0},
 	.MOV              = {    0,  32},
@@ -3758,143 +7346,141 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.MOVS             = {  630,   1},
 	.MOVSB            = {  631,   1},
 	.MOVSW            = {  632,   1},
-	.MOVSD            = {  633,   1},
-	.MOVSQ            = {  634,   1},
-	.CMPS             = {  635,   1},
-	.CMPSB            = {  636,   1},
-	.CMPSW            = {  637,   1},
-	.CMPSD            = {  638,   1},
-	.CMPSQ            = {  639,   1},
-	.SCAS             = {  640,   1},
-	.SCASB            = {  641,   1},
-	.SCASW            = {  642,   1},
-	.SCASD            = {  643,   1},
-	.SCASQ            = {  644,   1},
-	.LODS             = {  645,   1},
-	.LODSB            = {  646,   1},
-	.LODSW            = {  647,   1},
-	.LODSD            = {  648,   1},
-	.LODSQ            = {  649,   1},
-	.STOS             = {  650,   1},
-	.STOSB            = {  651,   1},
-	.STOSW            = {  652,   1},
-	.STOSD            = {  653,   1},
-	.STOSQ            = {  654,   1},
-	.CLC              = {  655,   1},
-	.STC              = {  656,   1},
-	.CMC              = {  657,   1},
-	.CLD              = {  658,   1},
-	.STD              = {  659,   1},
-	.CLI              = {  660,   1},
-	.STI              = {  661,   1},
-	.LAHF             = {  662,   1},
-	.SAHF             = {  663,   1},
-	.PUSHF            = {  664,   1},
-	.PUSHFD           = {  665,   1},
-	.PUSHFQ           = {  666,   1},
-	.POPF             = {  667,   1},
-	.POPFD            = {  668,   1},
-	.POPFQ            = {  669,   1},
-	.NOP              = {  670,   4},
-	.HLT              = {  674,   1},
-	.WAIT             = {  675,   1},
-	.LOCK             = {  676,   1},
-	.UD0              = {  677,   1},
-	.UD1              = {  678,   1},
-	.UD2              = {  679,   1},
-	.CPUID            = {  680,   1},
-	.RDTSC            = {  681,   1},
-	.RDTSCP           = {  682,   1},
-	.RDPMC            = {  683,   1},
-	.XGETBV           = {  684,   1},
-	.XSETBV           = {  685,   1},
-	.CBW              = {  686,   1},
-	.CWDE             = {  687,   1},
-	.CDQE             = {  688,   1},
-	.CWD              = {  689,   1},
-	.CDQ              = {  690,   1},
-	.CQO              = {  691,   1},
-	.ANDN             = {  692,   2},
-	.BEXTR            = {  694,   2},
-	.BLSI             = {  696,   2},
-	.BLSMSK           = {  698,   2},
-	.BLSR             = {  700,   2},
-	.BZHI             = {  702,   2},
-	.PDEP             = {  704,   2},
-	.PEXT             = {  706,   2},
-	.RORX             = {  708,   2},
-	.SARX             = {  710,   2},
-	.SHLX             = {  712,   2},
-	.SHRX             = {  714,   2},
-	.MULX             = {  716,   2},
-	.ADCX             = {  718,   2},
-	.ADOX             = {  720,   2},
-	.MOVAPS           = {  722,   2},
-	.MOVUPS           = {  724,   2},
-	.MOVAPD           = {  726,   2},
-	.MOVUPD           = {  728,   2},
-	.MOVSS            = {  730,   2},
-	.MOVSD_SSE        = {  732,   2},
-	.MOVDQA           = {  734,   2},
-	.MOVDQU           = {  736,   2},
-	.MOVQ             = {  738,   6},
-	.MOVD             = {  744,   4},
-	.MOVLPS           = {  748,   2},
-	.MOVHPS           = {  750,   2},
-	.MOVLPD           = {  752,   2},
-	.MOVHPD           = {  754,   2},
-	.MOVLHPS          = {  756,   1},
-	.MOVHLPS          = {  757,   1},
-	.MOVMSKPS         = {  758,   2},
-	.MOVMSKPD         = {  760,   2},
-	.MOVNTPS          = {  762,   1},
-	.MOVNTPD          = {  763,   1},
-	.MOVNTDQ          = {  764,   1},
-	.MOVNTDQA         = {  765,   1},
-	.ADDPS            = {  766,   1},
-	.ADDPD            = {  767,   1},
-	.ADDSS            = {  768,   1},
-	.ADDSD            = {  769,   1},
-	.SUBPS            = {  770,   1},
-	.SUBPD            = {  771,   1},
-	.SUBSS            = {  772,   1},
-	.SUBSD            = {  773,   1},
-	.MULPS            = {  774,   1},
-	.MULPD            = {  775,   1},
-	.MULSS            = {  776,   1},
-	.MULSD            = {  777,   1},
-	.DIVPS            = {  778,   1},
-	.DIVPD            = {  779,   1},
-	.DIVSS            = {  780,   1},
-	.DIVSD            = {  781,   1},
-	.SQRTPS           = {  782,   1},
-	.SQRTPD           = {  783,   1},
-	.SQRTSS           = {  784,   1},
-	.SQRTSD           = {  785,   1},
-	.RCPPS            = {  786,   1},
-	.RCPSS            = {  787,   1},
-	.RSQRTPS          = {  788,   1},
-	.RSQRTSS          = {  789,   1},
-	.MAXPS            = {  790,   1},
-	.MAXPD            = {  791,   1},
-	.MAXSS            = {  792,   1},
-	.MAXSD            = {  793,   1},
-	.MINPS            = {  794,   1},
-	.MINPD            = {  795,   1},
-	.MINSS            = {  796,   1},
-	.MINSD            = {  797,   1},
-	.ANDPS            = {  798,   1},
-	.ANDPD            = {  799,   1},
-	.ANDNPS           = {  800,   1},
-	.ANDNPD           = {  801,   1},
-	.ORPS             = {  802,   1},
-	.ORPD             = {  803,   1},
-	.XORPS            = {  804,   1},
-	.XORPD            = {  805,   1},
-	.CMPPS            = {  806,   1},
-	.CMPPD            = {  807,   1},
-	.CMPSS            = {  808,   1},
-	.CMPSD_SSE        = {  809,   1},
+	.MOVSD            = {  633,   3},
+	.MOVSQ            = {  636,   1},
+	.CMPS             = {  637,   1},
+	.CMPSB            = {  638,   1},
+	.CMPSW            = {  639,   1},
+	.CMPSD            = {  640,   2},
+	.CMPSQ            = {  642,   1},
+	.SCAS             = {  643,   1},
+	.SCASB            = {  644,   1},
+	.SCASW            = {  645,   1},
+	.SCASD            = {  646,   1},
+	.SCASQ            = {  647,   1},
+	.LODS             = {  648,   1},
+	.LODSB            = {  649,   1},
+	.LODSW            = {  650,   1},
+	.LODSD            = {  651,   1},
+	.LODSQ            = {  652,   1},
+	.STOS             = {  653,   1},
+	.STOSB            = {  654,   1},
+	.STOSW            = {  655,   1},
+	.STOSD            = {  656,   1},
+	.STOSQ            = {  657,   1},
+	.CLC              = {  658,   1},
+	.STC              = {  659,   1},
+	.CMC              = {  660,   1},
+	.CLD              = {  661,   1},
+	.STD              = {  662,   1},
+	.CLI              = {  663,   1},
+	.STI              = {  664,   1},
+	.LAHF             = {  665,   1},
+	.SAHF             = {  666,   1},
+	.PUSHF            = {  667,   1},
+	.PUSHFD           = {  668,   1},
+	.PUSHFQ           = {  669,   1},
+	.POPF             = {  670,   1},
+	.POPFD            = {  671,   1},
+	.POPFQ            = {  672,   1},
+	.NOP              = {  673,   4},
+	.HLT              = {  677,   1},
+	.WAIT             = {  678,   1},
+	.LOCK             = {  679,   1},
+	.UD0              = {  680,   1},
+	.UD1              = {  681,   1},
+	.UD2              = {  682,   1},
+	.CPUID            = {  683,   1},
+	.RDTSC            = {  684,   1},
+	.RDTSCP           = {  685,   1},
+	.RDPMC            = {  686,   1},
+	.XGETBV           = {  687,   1},
+	.XSETBV           = {  688,   1},
+	.CBW              = {  689,   1},
+	.CWDE             = {  690,   1},
+	.CDQE             = {  691,   1},
+	.CWD              = {  692,   1},
+	.CDQ              = {  693,   1},
+	.CQO              = {  694,   1},
+	.ANDN             = {  695,   2},
+	.BEXTR            = {  697,   2},
+	.BLSI             = {  699,   2},
+	.BLSMSK           = {  701,   2},
+	.BLSR             = {  703,   2},
+	.BZHI             = {  705,   2},
+	.PDEP             = {  707,   2},
+	.PEXT             = {  709,   2},
+	.RORX             = {  711,   2},
+	.SARX             = {  713,   2},
+	.SHLX             = {  715,   2},
+	.SHRX             = {  717,   2},
+	.MULX             = {  719,   2},
+	.ADCX             = {  721,   2},
+	.ADOX             = {  723,   2},
+	.MOVAPS           = {  725,   2},
+	.MOVUPS           = {  727,   2},
+	.MOVAPD           = {  729,   2},
+	.MOVUPD           = {  731,   2},
+	.MOVSS            = {  733,   2},
+	.MOVDQA           = {  735,   2},
+	.MOVDQU           = {  737,   2},
+	.MOVQ             = {  739,   6},
+	.MOVD             = {  745,   4},
+	.MOVLPS           = {  749,   2},
+	.MOVHPS           = {  751,   2},
+	.MOVLPD           = {  753,   2},
+	.MOVHPD           = {  755,   2},
+	.MOVLHPS          = {  757,   1},
+	.MOVHLPS          = {  758,   1},
+	.MOVMSKPS         = {  759,   2},
+	.MOVMSKPD         = {  761,   2},
+	.MOVNTPS          = {  763,   1},
+	.MOVNTPD          = {  764,   1},
+	.MOVNTDQ          = {  765,   1},
+	.MOVNTDQA         = {  766,   1},
+	.ADDPS            = {  767,   1},
+	.ADDPD            = {  768,   1},
+	.ADDSS            = {  769,   1},
+	.ADDSD            = {  770,   1},
+	.SUBPS            = {  771,   1},
+	.SUBPD            = {  772,   1},
+	.SUBSS            = {  773,   1},
+	.SUBSD            = {  774,   1},
+	.MULPS            = {  775,   1},
+	.MULPD            = {  776,   1},
+	.MULSS            = {  777,   1},
+	.MULSD            = {  778,   1},
+	.DIVPS            = {  779,   1},
+	.DIVPD            = {  780,   1},
+	.DIVSS            = {  781,   1},
+	.DIVSD            = {  782,   1},
+	.SQRTPS           = {  783,   1},
+	.SQRTPD           = {  784,   1},
+	.SQRTSS           = {  785,   1},
+	.SQRTSD           = {  786,   1},
+	.RCPPS            = {  787,   1},
+	.RCPSS            = {  788,   1},
+	.RSQRTPS          = {  789,   1},
+	.RSQRTSS          = {  790,   1},
+	.MAXPS            = {  791,   1},
+	.MAXPD            = {  792,   1},
+	.MAXSS            = {  793,   1},
+	.MAXSD            = {  794,   1},
+	.MINPS            = {  795,   1},
+	.MINPD            = {  796,   1},
+	.MINSS            = {  797,   1},
+	.MINSD            = {  798,   1},
+	.ANDPS            = {  799,   1},
+	.ANDPD            = {  800,   1},
+	.ANDNPS           = {  801,   1},
+	.ANDNPD           = {  802,   1},
+	.ORPS             = {  803,   1},
+	.ORPD             = {  804,   1},
+	.XORPS            = {  805,   1},
+	.XORPD            = {  806,   1},
+	.CMPPS            = {  807,   1},
+	.CMPPD            = {  808,   1},
+	.CMPSS            = {  809,   1},
 	.COMISS           = {  810,   1},
 	.COMISD           = {  811,   1},
 	.UCOMISS          = {  812,   1},

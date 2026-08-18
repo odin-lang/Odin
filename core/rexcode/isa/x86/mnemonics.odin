@@ -300,7 +300,6 @@ Mnemonic :: enum u16 {
 	MOVAPD,
 	MOVUPD,
 	MOVSS,
-	MOVSD_SSE,  // distinguish from string MOVSD
 	MOVDQA,
 	MOVDQU,
 	MOVQ,
@@ -360,7 +359,6 @@ Mnemonic :: enum u16 {
 	CMPPS,
 	CMPPD,
 	CMPSS,
-	CMPSD_SSE,
 	COMISS,
 	COMISD,
 	UCOMISS,

@@ -42,5 +42,5 @@ main :: proc() {
 	w(TABLES + "x86.evex_idx_0f.bin", raw(&EVEX_INDEX_0F, size_of(EVEX_INDEX_0F)))
 	w(TABLES + "x86.evex_idx_0f38.bin", raw(&EVEX_INDEX_0F38, size_of(EVEX_INDEX_0F38)))
 	w(TABLES + "x86.evex_idx_0f3a.bin", raw(&EVEX_INDEX_0F3A, size_of(EVEX_INDEX_0F3A)))
-	w(TABLES + "x86.clobber_table.bin", raw(&tablegen.CLOBBER_TABLE, size_of(tablegen.CLOBBER_TABLE)))
+	w(TABLES + "x86.clobber_forms.bin", raw(&CLOBBER_FORMS, size_of(CLOBBER_FORMS)))
 }

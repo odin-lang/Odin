@@ -12,7 +12,7 @@ package rexcode_x86_tablegen
 // Operand_Type list satisfies the user's Instruction operands.
 
 @(rodata)
-ENCODING_TABLE: [Mnemonic][]Encoding = {
+ENCODING_TABLE := [Mnemonic][]Encoding{
 	.INVALID = {},
 
 	// -------------------------------------------------------------------------
@@ -1000,6 +1000,8 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 	},
 	.MOVSD = {
 		{.MOVSD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true}},
+		{.MOVSD, {.XMM,      .XMM_M64,  .NONE, .NONE}, {.REG, .MR,  .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=PREFIX_F2}},
+		{.MOVSD, {.XMM_M64,  .XMM,      .NONE, .NONE}, {.MR,  .REG, .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=PREFIX_F2}},
 	},
 	.MOVSQ = {
 		{.MOVSQ, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA5, 0, {rep_ok=true, force_rex_w=true}},
@@ -1014,7 +1016,8 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.CMPSW, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true, opsize_16=true}},
 	},
 	.CMPSD = {
-		{.CMPSD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
+		{.CMPSD, {.NONE, .NONE,    .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true}},
+		{.CMPSD, {.XMM,  .XMM_M64, .IMM8, .NONE}, {.REG,  .MR,   .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=PREFIX_F2}},
 	},
 	.CMPSQ = {
 		{.CMPSQ, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA7, 0, {rep_ok=true, force_rex_w=true}},
@@ -1265,10 +1268,6 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 		{.MOVSS,     {.XMM,      .XMM_M32,  .NONE, .NONE}, {.REG, .MR,  .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=PREFIX_F3}},
 		{.MOVSS,     {.XMM_M32,  .XMM,      .NONE, .NONE}, {.MR,  .REG, .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=PREFIX_F3}},
 	},
-	.MOVSD_SSE = {
-		{.MOVSD_SSE, {.XMM,      .XMM_M64,  .NONE, .NONE}, {.REG, .MR,  .NONE, .NONE}, 0x10, 0, {esc=._0F, prefix=PREFIX_F2}},
-		{.MOVSD_SSE, {.XMM_M64,  .XMM,      .NONE, .NONE}, {.MR,  .REG, .NONE, .NONE}, 0x11, 0, {esc=._0F, prefix=PREFIX_F2}},
-	},
 	.MOVDQA = {
 		{.MOVDQA,    {.XMM,      .XMM_M128, .NONE, .NONE}, {.REG, .MR,  .NONE, .NONE}, 0x6F, 0, {esc=._0F, prefix=PREFIX_66}},
 		{.MOVDQA,    {.XMM_M128, .XMM,      .NONE, .NONE}, {.MR,  .REG, .NONE, .NONE}, 0x7F, 0, {esc=._0F, prefix=PREFIX_66}},
@@ -1461,9 +1460,6 @@ ENCODING_TABLE: [Mnemonic][]Encoding = {
 	},
 	.CMPSS = {
 		{.CMPSS,     {.XMM, .XMM_M32,  .IMM8, .NONE}, {.REG, .MR, .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=PREFIX_F3}},
-	},
-	.CMPSD_SSE = {
-		{.CMPSD_SSE, {.XMM, .XMM_M64,  .IMM8, .NONE}, {.REG, .MR, .IB,   .NONE}, 0xC2, 0, {esc=._0F, prefix=PREFIX_F2}},
 	},
 	.COMISS = {
 		{.COMISS,    {.XMM, .XMM_M32,  .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x2F, 0, {esc=._0F}},
