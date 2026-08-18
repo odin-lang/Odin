@@ -23,6 +23,7 @@ package rexcode_x86_tablegen
 // before Stage B dumps it to raw bytes, so the blobs can never drift from a
 // well-typed table.
 
+import "base:intrinsics"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -177,7 +178,11 @@ write_clobber :: proc(sb: ^strings.Builder, c: lib.Clobber, max_name: int) {
 		i := 0
 		for flag in flags {
 			if i > 0 { strings.write_string(sb, ", ") }
-			fmt.sbprintf(sb, ".%s", flag)
+			when intrinsics.type_is_enum(type_of(flag)) {
+				fmt.sbprintf(sb, ".%s", flag)
+			} else {
+				fmt.sbprintf(sb, "%v", flag)
+			}
 			i += 1
 		}
 		strings.write_string(sb, "}")

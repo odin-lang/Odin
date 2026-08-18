@@ -29,12 +29,13 @@ Side_Effects :: distinct bit_set[Side_Effect; u16]
 
 Clobber_Regs :: distinct bit_set[Clobber_Reg; u16]
 Clobber_Reg :: enum u8 {
-	RAX, RBX, RCX, RDX, RSI, RDI, RSP, RBP, R11,
-	XMM0, VECTOR, MXCSR, FPU_ST, FPU_SW,
+	RAX, RBX, RCX, RDX,
+	RSI, RDI, RSP, RBP,
+	R11, XMM0, VECTOR, MXCSR,
+	FPU_ST, FPU_SW,
 }
 
-Operand_Set  :: distinct bit_set[Operand_Slot; u8]
-Operand_Slot :: enum u8 { OP0, OP1, OP2, OP3 }
+Operand_Set  :: distinct bit_set[0..<4; u8]
 
 Clobber :: struct {
 	written:      Operand_Set,
