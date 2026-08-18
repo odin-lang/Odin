@@ -1383,15 +1383,8 @@ parse_unrolled_for_loop :: proc(p: ^Parser, inline_tok: tokenizer.Token) -> ^ast
 
 parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	#partial switch p.curr_tok.kind {
-	case .Inline:
-		if peek_token_kind(p, .For) {
-			inline_tok := expect_token(p, .Inline)
-			return parse_unrolled_for_loop(p, inline_tok)
-		}
-		fallthrough
 	// Operands
-	case .No_Inline,
-	     .Context, // Also allows for 'context = '
+	case .Context, // Also allows for 'context = '
 	     .Proc,
 	     .Ident,
 	     .Integer, .Float, .Imag,
@@ -2310,10 +2303,6 @@ parse_inlining_or_tailing_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.
 	pi := ast.Proc_Inlining.None
 	pt := ast.Proc_Tailing.None
 	#partial switch tok.kind {
-	case .Inline:
-		pi = .Inline
-	case .No_Inline:
-		pi = .No_Inline
 	case .Ident:
 		switch tok.text {
 		case "force_inline":
@@ -2540,10 +2529,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			te.expr = expr
 			return te
 		}
-
-	case .Inline, .No_Inline:
-		tok := advance_token(p)
-		return parse_inlining_or_tailing_operand(p, lhs, tok)
 
 	case .Proc:
 		tok := expect_token(p, .Proc)
