@@ -6767,7 +6767,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_And: {
+		case Token_And:
+		case Token_Sub:
+		case Token_Add: {
 			lbValue ptr = lb_build_expr(p, expr);
 			return lb_addr(lb_address_from_load_or_generate_local(p, ptr));
 		}
