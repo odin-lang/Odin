@@ -146,6 +146,11 @@ struct lbAsmGenerate {
 		case_ast_node(label, AsmLabelDecl, op);
 			asm_string = write_label(asm_string, &label->name->Ident);
 		case_end;
+
+		case_ast_node(reg, AsmRegister, op);
+			asm_string = gb_string_appendc(asm_string, "%");
+			asm_string = gb_string_append_length(asm_string, reg->name.string.text, reg->name.string.len);
+		case_end;
 		default:
 			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
 			break;
@@ -287,6 +292,11 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 
 	gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
+		if (mem_op->segment_override != nullptr) {
+			asm_string = this->write_operand(asm_string, op_number, mem_op->segment_override, flags);
+			asm_string = gb_string_appendc(asm_string, ":");
+		}
+
 		if (mem_op->disp) {
 			u32 disp_flags = flags;
 			disp_flags &= ~WriteOperandFlag_PrintPrefixes;
@@ -297,8 +307,9 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, disp_flags);
 		}
 		asm_string = gb_string_appendc(asm_string, "(");
-		GB_ASSERT(mem_op->base != nullptr);
-		asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags);
+		if (mem_op->base != nullptr) {
+			asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags);
+		}
 		if (mem_op->index) {
 			u32 index_flags = flags;
 			if (mem_op->index_op.kind == Token_Sub) {
@@ -657,7 +668,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-		if (true) {
+		if (false) {
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!

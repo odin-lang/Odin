@@ -1098,6 +1098,26 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			break;
 		}
 
+		Operand segment_override = {};
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &segment_override, mem_op->segment_override, false);
+
+		if (segment_override.expr == nullptr) {
+			// okay
+		} else if (segment_override.expr->kind == Ast_AsmRegister) {
+			String reg_name = segment_override.expr->AsmRegister.name.string;
+			auto reg = asm_ctx->register_lookup(reg_name);
+			auto reg_class = asm_ctx->reg_class(asm_ctx->register_codes[reg]);
+			if (reg_class != asm_ctx->REG_CLASS_SEG) {
+				gbString s = expr_to_string(segment_override.expr);
+				error(segment_override.expr, "A segment override must be a selector register parameter, got %s", s);
+				gb_string_free(s);
+			}
+		} else {
+			gbString s = expr_to_string(segment_override.expr);
+			error(segment_override.expr, "A segment override must be a selector register parameter, got %s", s);
+			gb_string_free(s);
+		}
+
 		Operand base  = {};
 		Operand index = {};
 		Operand scale = {};
@@ -1107,7 +1127,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &scale, mem_op->scale, false);
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &disp,  mem_op->disp,  false);
 
-		// NOTE(bill): if the index is actually an immediate and there is no scale nor disp,
+		// NOTE(bill): if the base/index is actually an immediate and there is no scale nor disp,
 		// then treat it as a disp, and modify the AST too
 		if (index.expr != nullptr && scale.expr == nullptr && disp.expr == nullptr) {
 			bool do_swap = index.mode == Addressing_Constant;
@@ -1127,6 +1147,23 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 
 				mem_op->disp_op = mem_op->index_op;
 				mem_op->index_op = {};
+			}
+		}
+		if (base.expr != nullptr && index.expr == nullptr && scale.expr == nullptr && disp.expr == nullptr) {
+			bool do_swap = base.mode == Addressing_Constant;
+			if (!do_swap) {
+				Entity *param_entity = entity_of_node(base.expr);
+				if (param_entity != nullptr && param_entity->kind == Entity_Variable) {
+					auto kind = check_asm_find_kind(param_entity, ate->decls);
+					do_swap = kind == AsmTemplateEntityDecl_Immediate;
+				}
+			}
+			if (do_swap) {
+				disp = base;
+				base = {};
+
+				mem_op->disp = mem_op->base;
+				mem_op->base = nullptr;
 			}
 		}
 

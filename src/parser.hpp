@@ -510,6 +510,7 @@ struct AstSplitArgs {
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
 		Token open;     \
+		Ast * segment_override; \
 		Ast * base;     \
 		Token index_op; \
 		Ast * index;    \

@@ -548,6 +548,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
 		break;
 	case Ast_AsmMemoryOperand:
+		n->AsmMemoryOperand.segment_override = clone_ast(n->AsmMemoryOperand.segment_override, f);
 		n->AsmMemoryOperand.base  = clone_ast(n->AsmMemoryOperand.base,  f);
 		n->AsmMemoryOperand.index = clone_ast(n->AsmMemoryOperand.index, f);
 		n->AsmMemoryOperand.scale = clone_ast(n->AsmMemoryOperand.scale, f);
@@ -2483,6 +2484,7 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	case Token_OpenBracket:
 		if (allow_memory_operand) {
 			Token open  = expect_token(f, Token_OpenBracket);
+			Ast *segment_override = nullptr;
 			Ast *base  = nullptr;
 			Ast *index = nullptr;
 			Ast *scale = nullptr;
@@ -2494,6 +2496,16 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			Token disp_op  = {};
 
 			base = parse_asm_operand(f, false);
+
+			if (allow_token(f, Token_Colon)) {
+				// [segment: ...]
+				segment_override = base;
+				if (segment_override != nullptr &&
+				    segment_override->kind != Ast_AsmRegister) {
+					error(segment_override, "Expected an asm register as the segment override");
+				}
+				base = parse_asm_operand(f, false);
+			}
 
 			// [base]
 			// [base + index]
@@ -2526,16 +2538,17 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			}
 
 			Ast *mem = alloc_ast_node(f, Ast_AsmMemoryOperand);
-			mem->AsmMemoryOperand.open     = open;
-			mem->AsmMemoryOperand.base     = base;
-			mem->AsmMemoryOperand.index_op = index_op;
-			mem->AsmMemoryOperand.index    = index;
-			mem->AsmMemoryOperand.scale_op = scale_op;
-			mem->AsmMemoryOperand.scale    = scale;
-			mem->AsmMemoryOperand.disp_op  = disp_op;
-			mem->AsmMemoryOperand.disp     = disp;
-			mem->AsmMemoryOperand.close    = close;
-			mem->AsmMemoryOperand.type     = type;
+			mem->AsmMemoryOperand.open             = open;
+			mem->AsmMemoryOperand.segment_override = segment_override;
+			mem->AsmMemoryOperand.base             = base;
+			mem->AsmMemoryOperand.index_op         = index_op;
+			mem->AsmMemoryOperand.index            = index;
+			mem->AsmMemoryOperand.scale_op         = scale_op;
+			mem->AsmMemoryOperand.scale            = scale;
+			mem->AsmMemoryOperand.disp_op          = disp_op;
+			mem->AsmMemoryOperand.disp             = disp;
+			mem->AsmMemoryOperand.close            = close;
+			mem->AsmMemoryOperand.type             = type;
 
 			return mem;
 		}
