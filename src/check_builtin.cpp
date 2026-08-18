@@ -4612,6 +4612,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		GB_ASSERT(!is_type_complex_or_quaternion(operand->type));
 
+		if (operand->mode == Addressing_Constant) {
+			operand->expr = call;
+			check_is_expressible(c, operand, operand->type);
+		}
+
 		break;
 	}
 
