@@ -8,6 +8,9 @@ struct lbAsmGenerate {
 		WriteOperandFlag_IsScale       = 1<<1,
 		WriteOperandFlag_IsScaleLog2   = 1<<2,
 
+		WriteOperandFlag_Negate        = 1<<3,
+
+
 		WriteOperandFlag_NONE = 0,
 		WriteOperandFlag_DEFAULT = WriteOperandFlag_PrintPrefixes,
 	};
@@ -77,6 +80,10 @@ struct lbAsmGenerate {
 				asm_string = gb_string_appendc(asm_string, "$$");
 			}
 
+			if (flags & WriteOperandFlag_Negate) {
+				val = -val;
+			}
+
 			asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)val);
 			break;
 		}
@@ -95,6 +102,11 @@ struct lbAsmGenerate {
 	gbString write_operand(gbString asm_string, Slice<i32> const &op_number, Ast *op, u32 flags) {
 		if (op->tav.mode == Addressing_Constant) {
 			return write_constant_operand(asm_string, op, flags);
+		}
+
+		if (flags & WriteOperandFlag_Negate) {
+			flags &= ~WriteOperandFlag_Negate;
+			asm_string = gb_string_appendc(asm_string, "-");
 		}
 
 		switch (op->kind) {
@@ -276,14 +288,25 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 	gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		if (mem_op->disp) {
-			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, flags&~WriteOperandFlag_PrintPrefixes);
+			u32 disp_flags = flags;
+			disp_flags &= ~WriteOperandFlag_PrintPrefixes;
+			if (mem_op->disp_op.kind == Token_Sub) {
+				disp_flags |= WriteOperandFlag_Negate;
+			}
+
+			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, disp_flags);
 		}
 		asm_string = gb_string_appendc(asm_string, "(");
 		GB_ASSERT(mem_op->base != nullptr);
 		asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags);
 		if (mem_op->index) {
+			u32 index_flags = flags;
+			if (mem_op->index_op.kind == Token_Sub) {
+				index_flags |= WriteOperandFlag_Negate;
+			}
 			asm_string = gb_string_appendc(asm_string, ",");
-			asm_string = this->write_operand(asm_string, op_number, mem_op->index, flags);
+			asm_string = this->write_operand(asm_string, op_number, mem_op->index, index_flags);
+
 			if (mem_op->scale) {
 				asm_string = gb_string_appendc(asm_string, ",");
 				switch (mem_op->scale_op.kind) {
@@ -634,7 +657,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-		if (false) {
+		if (true) {
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!

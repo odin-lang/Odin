@@ -511,9 +511,11 @@ struct AstSplitArgs {
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
 		Token open;     \
 		Ast * base;     \
+		Token index_op; \
 		Ast * index;    \
 		Token scale_op; \
 		Ast * scale;    \
+		Token disp_op;  \
 		Ast * disp;     \
 		Ast * type;     \
 		Token close;    \

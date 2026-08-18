@@ -2489,16 +2489,21 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			Ast *disp  = nullptr;
 			Ast *type  = nullptr;
 
+			Token index_op = {};
 			Token scale_op = {};
+			Token disp_op  = {};
 
 			base = parse_asm_operand(f, false);
 
 			// [base]
 			// [base + index]
+			// [base - index]
 			// [base + index + disp]
 			// [base + index*scale] // *, <<, >>
 			// [base + index*scale + disp]
-			if (allow_token(f, Token_Add)) {
+			if (allow_token(f, Token_Add) ||
+			    allow_token(f, Token_Sub)) {
+			    	index_op = f->prev_token;
 				index = parse_asm_operand(f, false);
 				if (allow_token(f, Token_Mul) ||
 				    allow_token(f, Token_Shl) ||
@@ -2506,7 +2511,9 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 				    	scale_op = f->prev_token;
 					scale = parse_asm_operand(f, false);
 				}
-				if (allow_token(f, Token_Add)) {
+				if (allow_token(f, Token_Add) ||
+				    allow_token(f, Token_Sub)) {
+					disp_op = f->prev_token;
 					disp = parse_asm_operand(f, false);
 				}
 			}
@@ -2521,9 +2528,11 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			Ast *mem = alloc_ast_node(f, Ast_AsmMemoryOperand);
 			mem->AsmMemoryOperand.open     = open;
 			mem->AsmMemoryOperand.base     = base;
+			mem->AsmMemoryOperand.index_op = index_op;
 			mem->AsmMemoryOperand.index    = index;
-			mem->AsmMemoryOperand.scale    = scale;
 			mem->AsmMemoryOperand.scale_op = scale_op;
+			mem->AsmMemoryOperand.scale    = scale;
+			mem->AsmMemoryOperand.disp_op  = disp_op;
 			mem->AsmMemoryOperand.disp     = disp;
 			mem->AsmMemoryOperand.close    = close;
 			mem->AsmMemoryOperand.type     = type;

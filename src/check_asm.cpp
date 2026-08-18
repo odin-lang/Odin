@@ -1107,6 +1107,29 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &scale, mem_op->scale, false);
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &disp,  mem_op->disp,  false);
 
+		// NOTE(bill): if the index is actually an immediate and there is no scale nor disp,
+		// then treat it as a disp, and modify the AST too
+		if (index.expr != nullptr && scale.expr == nullptr && disp.expr == nullptr) {
+			bool do_swap = index.mode == Addressing_Constant;
+			if (!do_swap) {
+				Entity *param_entity = entity_of_node(index.expr);
+				if (param_entity != nullptr && param_entity->kind == Entity_Variable) {
+					auto kind = check_asm_find_kind(param_entity, ate->decls);
+					do_swap = kind == AsmTemplateEntityDecl_Immediate;
+				}
+			}
+			if (do_swap) {
+				disp = index;
+				index = {};
+
+				mem_op->disp = mem_op->index;
+				mem_op->index = nullptr;
+
+				mem_op->disp_op = mem_op->index_op;
+				mem_op->index_op = {};
+			}
+		}
+
 		i32  base_w     = 0;
 		i32  index_w    = 0;
 		bool have_base  = false;
