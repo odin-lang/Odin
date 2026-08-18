@@ -1,3 +1,5 @@
+#define LLVM_ASM_DEBUG_PRINT false
+
 struct lbAsmGenerate {
 	Entity *                      tmpl_entity;
 	AstAsmTemplate *              tmpl_node;
@@ -305,6 +307,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			}
 
 			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, disp_flags);
+		}
+		if (mem_op->base == nullptr && mem_op->index == nullptr) {
+			GB_ASSERT(mem_op->scale == nullptr);
+			return asm_string;
 		}
 		asm_string = gb_string_appendc(asm_string, "(");
 		if (mem_op->base != nullptr) {
@@ -668,7 +674,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
-		if (false) {
+		if (LLVM_ASM_DEBUG_PRINT) {
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
 			// DEBUG PRINT!!!
