@@ -731,8 +731,8 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 		generator = &generator_amd64;
 	} else {
 		compiler_error("Architecture does not support asm templates");
-		return {};
 	}
+	GB_ASSERT(generator != nullptr);
 	generator->init(entity);
 	return generator->emit_call(p, args);
 }
