@@ -267,18 +267,18 @@ struct Asm_amd64 {
 		bool            reads_mem;
 		SideEffectFlags side_effects;
 
-		bool implies_clobber_flags() {
+		bool implies_clobber_flags() const {
 			u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
 			                       ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
 			return ((flags_wr | flags_undef) & FLAGS_MASK) != 0;
 		}
-		bool implies_clobber_memory() {
+		bool implies_clobber_memory() const {
 			return writes_mem || reads_mem ||
 				(side_effects & (SideEffectFlag_FENCE |
 				                 SideEffectFlag_CACHE |
 				                 SideEffectFlag_SERIALIZING)) != 0;
 		}
-		bool implies_side_effects() {
+		bool implies_side_effects() const {
 			u16 const VOLATILE_SE =
 				SideEffectFlag_FENCE       |
 				SideEffectFlag_SERIALIZING |
@@ -293,7 +293,7 @@ struct Asm_amd64 {
 			return ((side_effects & VOLATILE_SE) != 0);
 		}
 	};
-	static u16 const register_codes[REG_COUNT];
+	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
 
 
@@ -393,8 +393,8 @@ struct Asm_amd64 {
 		bool has_implicit  () const { return ((flags>>21u)&1) != 0; }
 		u8   explicit_count() const { return cast(u8)((flags>>18u)&((1u<<3)-1)); }
 		u8   op_count      () const { return cast(u8)((flags>>22u)&((1u<<3)-1)); }
-		bool   lock_ok     () const { return ((flags>>14u)&1) != 0; }
-		bool   rep_ok      () const { return ((flags>>15u)&1) != 0; }
+		bool lock_ok       () const { return ((flags>>14u)&1) != 0; }
+		bool rep_ok        () const { return ((flags>>15u)&1) != 0; }
 	};
 	#pragma pack(pop)
 	GB_STATIC_ASSERT(gb_size_of(Encoding) == 16);
@@ -407,9 +407,10 @@ struct Asm_amd64 {
 	};
 
 
-	static EncodeRun const raw_encode_runs[1192];
-	static u8 const raw_encode_forms[38320];
-	static u8 const raw_clobber_forms[38320];
+	static EncodeRun const raw_encode_runs  [1192];
+	static u8        const raw_encode_forms [38320];
+	static u8        const raw_clobber_forms[38320];
+
 	StringMap<Mnemonic> mnemonic_map;
 	StringMap<Prefix>   prefix_map;
 	StringMap<Register> register_map;
@@ -477,7 +478,7 @@ struct Asm_amd64 {
 		return 0;
 	}
 
-	AsmOperandKind kind_from_operand_type(OperandType type) {
+	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
 		case OP_SREG: case OP_CR: case OP_DR:
@@ -511,7 +512,7 @@ struct Asm_amd64 {
 		}
 	}
 
-	AsmRegClass reg_class_from_operand_type(OperandType type) {
+	AsmRegClass reg_class_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
 		case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
@@ -553,7 +554,7 @@ struct Asm_amd64 {
 		}
 	}
 
-	bool operand_type_is_implicit(OperandType t) {
+	bool operand_type_is_implicit(OperandType t) const {
 		switch (t) {
 		case OP_AL_IMPL:  case OP_AX_IMPL:
 		case OP_EAX_IMPL: case OP_RAX_IMPL:
@@ -565,7 +566,7 @@ struct Asm_amd64 {
 		return false;
 	}
 
-	AsmRegClass operand_type_reg_class(OperandType t) {
+	AsmRegClass operand_type_reg_class(OperandType t) const {
 		switch (t) {
 		case OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:
 		case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
@@ -584,7 +585,7 @@ struct Asm_amd64 {
 		return AsmRegClass_Unknown; // OP_M*, OP_IMM*, OP_REL*, OP_SREG/CR/DR/MM/STi, moffs, ptr, m16_16... : no GPR/XMM class constraint here
 	}
 
-	u16 operand_type_bit_width(OperandType t) {
+	u16 operand_type_bit_width(OperandType t) const {
 		switch (t) {
 		case OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;
 		case OP_R16: case OP_RM16: case OP_M16: case OP_AX_IMPL:  case OP_DX_IMPL: case OP_K_M16: return 16;
@@ -604,7 +605,7 @@ struct Asm_amd64 {
 		return 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.
 	}
 
-	int form_explicit_slot(Encoding const &form, int explicit_index) {
+	int form_explicit_slot(Encoding const &form, int explicit_index) const {
 		int seen = 0;
 		for (int j = 0; j < gb_count_of(form.ops); j++) {
 			auto t = form.ops[j];
@@ -622,7 +623,7 @@ struct Asm_amd64 {
 		return -1;
 	}
 
-	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) {
+	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) const {
 		PrefixKind kind = PrefixKind_None;
 		if (prefix != 0) {
 			switch (prefix) {

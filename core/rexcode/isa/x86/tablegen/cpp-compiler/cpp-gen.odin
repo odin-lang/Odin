@@ -267,18 +267,18 @@ main :: proc() {
 			bool            reads_mem;
 			SideEffectFlags side_effects;
 
-			bool implies_clobber_flags() {
+			bool implies_clobber_flags() const {
 				u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
 				                       ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
 				return ((flags_wr | flags_undef) & FLAGS_MASK) != 0;
 			}
-			bool implies_clobber_memory() {
+			bool implies_clobber_memory() const {
 				return writes_mem || reads_mem ||
 					(side_effects & (SideEffectFlag_FENCE |
 					                 SideEffectFlag_CACHE |
 					                 SideEffectFlag_SERIALIZING)) != 0;
 			}
-			bool implies_side_effects() {
+			bool implies_side_effects() const {
 				u16 const VOLATILE_SE =
 					SideEffectFlag_FENCE       |
 					SideEffectFlag_SERIALIZING |
@@ -297,7 +297,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n");
 
 
-	strings.write_string(&sb, "\tstatic u16 const register_codes[REG_COUNT];\n")
+	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
 	strings.write_string(&sb, "\tstatic String const register_strings[REG_COUNT];\n")
 
 	strings.write_string(&sb, "\n\n")
@@ -361,13 +361,13 @@ main :: proc() {
 		}
 		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
-			strings.write_string(&sb, "\t\tbool   lock_ok     () const { ")
+			strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
 			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
 			strings.write_string(&sb, " }\n")
 		}
 		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "rep_ok")
-			strings.write_string(&sb, "\t\tbool   rep_ok      () const { ")
+			strings.write_string(&sb, "\t\tbool rep_ok        () const { ")
 			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
 			strings.write_string(&sb, " }\n")
 		}
@@ -382,10 +382,10 @@ main :: proc() {
 	}
 
 	strings.write_string(&sb, "\n\n")
-	fmt.sbprintf(&sb, "\tstatic EncodeRun const raw_encode_runs[%d];\n", len(raw_encode_runs))
-	fmt.sbprintf(&sb, "\tstatic u8 const raw_encode_forms[%d];\n", len(raw_encode_forms))
-	fmt.sbprintf(&sb, "\tstatic u8 const raw_clobber_forms[%d];\n", len(raw_clobber_forms))
-
+	fmt.sbprintf(&sb, "\tstatic EncodeRun const raw_encode_runs  [%d];\n", len(raw_encode_runs))
+	fmt.sbprintf(&sb, "\tstatic u8        const raw_encode_forms [%d];\n", len(raw_encode_forms))
+	fmt.sbprintf(&sb, "\tstatic u8        const raw_clobber_forms[%d];\n", len(raw_clobber_forms))
+	strings.write_string(&sb, "\n")
 	strings.write_string(&sb, "\tStringMap<Mnemonic> mnemonic_map;\n")
 	strings.write_string(&sb, "\tStringMap<Prefix>   prefix_map;\n")
 	strings.write_string(&sb, "\tStringMap<Register> register_map;\n")
@@ -458,7 +458,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		AsmOperandKind kind_from_operand_type(OperandType type) {
+		AsmOperandKind kind_from_operand_type(OperandType type) const {
 			switch (type) {
 			case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
 			case OP_SREG: case OP_CR: case OP_DR:
@@ -495,7 +495,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		AsmRegClass reg_class_from_operand_type(OperandType type) {
+		AsmRegClass reg_class_from_operand_type(OperandType type) const {
 			switch (type) {
 			case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
 			case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
@@ -540,7 +540,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		bool operand_type_is_implicit(OperandType t) {
+		bool operand_type_is_implicit(OperandType t) const {
 			switch (t) {
 			case OP_AL_IMPL:  case OP_AX_IMPL:
 			case OP_EAX_IMPL: case OP_RAX_IMPL:
@@ -556,7 +556,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		AsmRegClass operand_type_reg_class(OperandType t) {
+		AsmRegClass operand_type_reg_class(OperandType t) const {
 			switch (t) {
 			case OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:
 			case OP_RM8: case OP_RM16: case OP_RM32: case OP_RM64:
@@ -580,7 +580,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		u16 operand_type_bit_width(OperandType t) {
+		u16 operand_type_bit_width(OperandType t) const {
 			switch (t) {
 			case OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;
 			case OP_R16: case OP_RM16: case OP_M16: case OP_AX_IMPL:  case OP_DX_IMPL: case OP_K_M16: return 16;
@@ -604,7 +604,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		int form_explicit_slot(Encoding const &form, int explicit_index) {
+		int form_explicit_slot(Encoding const &form, int explicit_index) const {
 			int seen = 0;
 			for (int j = 0; j < gb_count_of(form.ops); j++) {
 				auto t = form.ops[j];
@@ -626,7 +626,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
-		bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) {
+		bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) const {
 			PrefixKind kind = PrefixKind_None;
 			if (prefix != 0) {
 				switch (prefix) {
