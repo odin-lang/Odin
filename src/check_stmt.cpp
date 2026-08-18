@@ -444,6 +444,19 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			      expr_str,
 			      LIT(context_name));
 			rhs->mode = Addressing_Invalid;
+			return nullptr;
+		}
+		case Addressing_Builtin: {
+			// a builtin is not a value
+			gbString expr_str = expr_to_string(rhs->expr);
+			defer (gb_string_free(expr_str));
+
+			error(rhs->expr,
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+			rhs->mode = Addressing_Invalid;
+			return nullptr;
 		}
 		case Addressing_Invalid:
 			return nullptr;
