@@ -4386,16 +4386,16 @@ CLOBBER_TABLE := [Mnemonic][]x86.Clobber{
 		{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.PF}},
 	},
 	.FCOM = { // sets x87 condition codes C0-C3 (status word), not EFLAGS
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},  // m32
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},  // m64
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},                  // ST(i)
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},                  // no operand (ST(1))
 	},
 	.FCOMP = { // sets x87 condition codes C0-C3 (status word), not EFLAGS
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},  // m32
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},  // m64
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},                  // ST(i)
+		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},                  // no operand (ST(1))
 	},
 	.FCOMPP = { // sets x87 condition codes C0-C3 (status word), not EFLAGS
 		{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
@@ -4714,7 +4714,7 @@ CLOBBER_TABLE := [Mnemonic][]x86.Clobber{
 		{side_effects={.CET}},
 	},
 	.RSTORSSP = { // CET shadow-stack management
-		{side_effects={.CET}},
+		{read={0}, reads_mem=true, writes_mem=true, side_effects={.CET}},  // reads restore token, writes previous-ssp token
 	},
 	.WRSSD = { // writes to shadow stack
 		{read={0, 1}, writes_mem=true, side_effects={.CET}},
@@ -4732,7 +4732,7 @@ CLOBBER_TABLE := [Mnemonic][]x86.Clobber{
 		{side_effects={.CET}},
 	},
 	.CLRSSBSY = { // CET shadow-stack management
-		{side_effects={.CET}},
+		{read={0}, reads_mem=true, writes_mem=true, side_effects={.CET}},  // reads token, clears busy bit
 	},
 	.ENDBR64 = { // CET landing pad; NOP-like
 		{side_effects={.HINT, .CET}},

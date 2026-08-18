@@ -6860,13 +6860,13 @@ CLOBBER_FORMS := [2395]lib.Clobber{
 	// .FCMOVNU
 	{implicit_wr={.FPU_ST}, implicit_rd={.FPU_ST}, flags_rd={.PF}},
 	// .FCOM
-	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
 	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
 	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
 	// .FCOMP
-	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
-	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
+	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}, reads_mem=true},
 	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
 	{implicit_wr={.FPU_SW}, implicit_rd={.FPU_ST}},
 	// .FCOMPP
@@ -7085,7 +7085,7 @@ CLOBBER_FORMS := [2395]lib.Clobber{
 	// .SAVEPREVSSP
 	{side_effects={.CET}},
 	// .RSTORSSP
-	{side_effects={.CET}},
+	{read={0}, writes_mem=true, reads_mem=true, side_effects={.CET}},
 	// .WRSSD
 	{read={0, 1}, writes_mem=true, side_effects={.CET}},
 	// .WRSSQ
@@ -7097,7 +7097,7 @@ CLOBBER_FORMS := [2395]lib.Clobber{
 	// .SETSSBSY
 	{side_effects={.CET}},
 	// .CLRSSBSY
-	{side_effects={.CET}},
+	{read={0}, writes_mem=true, reads_mem=true, side_effects={.CET}},
 	// .ENDBR64
 	{side_effects={.HINT, .CET}},
 	// .ENDBR32
