@@ -15,10 +15,13 @@
 //   3. Per-form memory. writes_mem/reads_mem keep the union's DIRECTION but are
 //      asserted on a form only when that form actually carries a memory-capable
 //      operand, OR the instruction addresses memory implicitly (stack, string,
-//      XLAT table, MASKMOVDQU/[rDI] store, VMCS, shadow stack). Consequently
-//      register-only forms of otherwise-memory instructions (e.g. MOV r,imm;
-//      FADD ST(0),ST(i); FST ST(i); MOVLHPS; PEXTRW r32,xmm) no longer carry the
-//      blanket memory flag the union used.
+//      XLAT table, MASKMOVDQU/[rDI] store, VMCS). Consequently register-only
+//      forms of otherwise-memory instructions (e.g. MOV r,imm; FADD ST(0),ST(i);
+//      FST ST(i); MOVLHPS; PEXTRW r32,xmm) no longer carry the blanket memory
+//      flag the union used. Shadow-stack accesses are not implicit: the
+//      shadow-stack instructions that touch memory (WRSS/WRUSS/RSTORSSP/CLRSSBSY)
+//      all do so through an explicit m64 operand and are covered by the
+//      memory-capable-operand branch above.
 //   4. Family splits that the union could only approximate:
 //        IMUL  -- 1-operand form writes RDX:RAX implicitly (r/m8 -> AX only);
 //                 2-operand form is OP0 *= OP1; 3-operand form is OP0 = OP1 * imm
@@ -28,7 +31,10 @@
 //        SHL/SHR/SAR/ROL/ROR/RCL/RCR/SHLD/SHRD -- only the CL form reads RCX;
 //                 the 1/imm8 forms do not.
 //   Flags and side_effects are uniform across a mnemonic's forms and are carried
-//   through unchanged.
+//   through unchanged, EXCEPT where a single mnemonic aliases two distinct
+//   instructions: MOVSD and CMPSD each name both a string operation and an SSE
+//   scalar-double operation, so their string form and their SSE form carry
+//   different flags and side_effects.
 //
 // INVARIANT preserved: a form is a freely-eliminable no-op iff every clobber set
 // is empty AND side_effects == {} (only .NOP and the .INVALID sentinel qualify).
