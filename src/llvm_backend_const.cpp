@@ -1393,7 +1393,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 				for (i64 i = 0; i < elem_count; i++) {
 					bool found = false;
 
-					for (isize j = 0; j < elem_count; j++) {
+					for (isize j = 0; j < cl->elems.count; j++) {
 						Ast *elem = cl->elems[j];
 						ast_node(fv, FieldValue, elem);
 						if (is_ast_range(fv->field)) {
@@ -1453,10 +1453,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					GB_ASSERT(array_type->kind == Type_Array);
 					Type *field_type = array_type->Array.elem;
 
+					// the element constant carries llvm padding members; remap the Odin field index
+					unsigned src_index = cast(unsigned)lb_convert_struct_index(m, base_type(elem_type), cast(i32)i);
 					for (isize j = 0; j < elem_count; j++) {
 						LLVMValueRef v = aos_values[j];
 						if (v != nullptr) {
-							values[j] = llvm_const_extract_value(m, v, cast(unsigned)i);
+							values[j] = llvm_const_extract_value(m, v, src_index);
 						} else {
 							values[j] = LLVMConstNull(lb_type(m, field_type));
 						}
@@ -1498,10 +1500,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					GB_ASSERT(array_type->kind == Type_Array);
 					Type *field_type = array_type->Array.elem;
 
+					// the element constant carries llvm padding members; remap the Odin field index
+					unsigned src_index = cast(unsigned)lb_convert_struct_index(m, base_type(elem_type), cast(i32)i);
 					for (isize j = 0; j < elem_count; j++) {
 						LLVMValueRef v = aos_values[j];
 						if (v != nullptr) {
-							values[j] = llvm_const_extract_value(m, v, cast(unsigned)i);
+							values[j] = llvm_const_extract_value(m, v, src_index);
 						} else {
 							values[j] = LLVMConstNull(lb_type(m, field_type));
 						}
@@ -1700,7 +1704,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 					}
 				}
 
-				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->Array.count, values, cc);
+				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)type->EnumeratedArray.count, values, cc);
 				return res;
 			}
 		} else if (is_type_fixed_capacity_dynamic_array(type)) {

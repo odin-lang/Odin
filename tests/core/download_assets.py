@@ -12,7 +12,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # The OpenSSL CLI tool installed can be used to easily generate digests:
 # $ openssl sha3-512 -mac HMAC -macopt key:"$HMAC_KEY" $FILE_NAME
-TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'Wycheproof', 'Noise']
+TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'Wycheproof', 'Noise', 'X509-Limbo']
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
 HMAC_HASH          = hashlib.sha3_512
@@ -635,6 +635,8 @@ HMAC_DIGESTS = {
 	'cacophony.txt':           "d2c492f02287ee562a9cf43a4cd2a055f5235734779d091bc404aede4c37a552029e76c12e873632e52423804ad24b86138cd3d4fe54506108571d9f2f925033",
 	'noise-c-basic.txt':       "7e25c5d692c53dd045060f27a562332178ca030d17687fc2ab58216b4298fb577ddc9d703db11c920fb04c28604fdc1a30337f58aad3617e07201a62c3a9b295",
 	'snow.txt':                "35088303de90e6bac22656e1e0ac4a5ea73d8cdb5ada23a078d703e14714ffe19e08437bf46108e0419acd8b5be6fa797a68a621c20cdd063d94a4a970aa8634",
+
+	'limbo.json':              "640a07beb54c7b409d54a7250854c735e92ebddc648c108c053c34d01fa249d844f659e2beadf0cfd583fbe3cda5acda8148e98cdef5388a5387d25316ceaee3",
 }
 
 def try_download_file(url, out_file):

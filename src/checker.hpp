@@ -928,3 +928,5 @@ gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(Checker
 
 
 gb_internal void init_map_internal_types(Type *type);
+
+gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, DeclInfo *d);

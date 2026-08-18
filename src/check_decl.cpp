@@ -1983,9 +1983,143 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, d->attributes, proc_group_attribute, &ac);
 	check_objc_methods(ctx, pg_entity, ac);
-
-
 }
+
+gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, DeclInfo *d) {
+	GB_ASSERT(asm_entity->kind == Entity_ProcGroup);
+	auto *pge = &asm_entity->ProcGroup;
+	String proc_group_name = asm_entity->token.string;
+
+	ast_node(pg, AsmGroup, d->init_expr);
+
+	pge->entities = array_make<Entity*>(permanent_allocator(), 0, pg->args.count);
+
+	// NOTE(bill): This must be set here to prevent cycles in checking if someone
+	// places the entity within itself
+	asm_entity->type = t_invalid;
+
+	PtrSet<Entity *> entity_set = {};
+	ptr_set_init(&entity_set, 2*pg->args.count);
+
+	for (Ast *arg_ : pg->args) {
+		Ast *arg = arg_;
+		Entity *e = nullptr;
+		Operand o = {};
+		if (arg->kind == Ast_BinaryExpr && arg->BinaryExpr.op.kind == Token_where) {
+			Ast *cond_expr = arg->BinaryExpr.right;
+			Operand cond = {};
+			check_expr(ctx, &cond, cond_expr);
+			if (cond.mode != Addressing_Invalid) {
+				if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type) || cond.value.kind != ExactValue_Bool) {
+					error(arg, "Expected a constant binary expression for the 'where' clause");
+				} else if (!cond.value.value_bool) {
+					continue;
+				}
+			}
+
+			arg = arg->BinaryExpr.left;
+		}
+
+		if (arg->kind == Ast_Ident) {
+			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
+		} else if (arg->kind == Ast_SelectorExpr) {
+			e = check_selector(ctx, &o, arg, nullptr);
+		}
+		if (e == nullptr) {
+			error(arg, "Expected a valid entity name in asm template group, got %.*s", LIT(ast_strings[arg->kind]));
+			continue;
+		}
+		if (e->kind != Entity_AsmTemplate) {
+			error(arg, "Expected an asm template");
+			continue;
+		}
+
+		if (ptr_set_update(&entity_set, e)) {
+			error(arg, "Previous use of `%.*s` in asm template group", LIT(e->token.string));
+			continue;
+		}
+		array_add(&pge->entities, e);
+	}
+
+	ptr_set_destroy(&entity_set);
+
+	for (isize j = 0; j < pge->entities.count; j++) {
+		Entity *p = pge->entities[j];
+		if (p->type == t_invalid) {
+			// NOTE(bill): This invalid overload has already been handled
+			continue;
+		}
+
+		if (p->flags & EntityFlag_Disabled) {
+			continue;
+		}
+
+		String name = p->token.string;
+
+		for (isize k = j+1; k < pge->entities.count; k++) {
+			Entity *q = pge->entities[k];
+			GB_ASSERT(p != q);
+
+			bool is_invalid = false;
+
+			TokenPos pos = q->token.pos;
+
+			if (q->type == nullptr || q->type == t_invalid) {
+				continue;
+			}
+
+			ERROR_BLOCK();
+
+			if (q->flags & EntityFlag_Disabled) {
+				continue;
+			}
+
+			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
+			bool both_have_where_clauses = false;
+			// NOTE(bill): asm template do not have `where` clauses
+
+			if (!both_have_where_clauses) switch (kind) {
+			case ProcOverload_Identical:
+				error(p->token, "Overloaded asm template '%.*s' has the same type as another asm template in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				is_invalid = true;
+				break;
+			// case ProcOverload_CallingConvention:
+				// error(p->token, "Overloaded asm template '%.*s' has the same type as another asm template in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				// is_invalid = true;
+				// break;
+			case ProcOverload_ParamVariadic:
+				error(p->token, "Overloaded asm template '%.*s' has the same type as another asm template in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				is_invalid = true;
+				break;
+			case ProcOverload_ResultCount:
+			case ProcOverload_ResultTypes:
+				error(p->token, "Overloaded asm template '%.*s' has the same parameters but different results in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				is_invalid = true;
+				break;
+			case ProcOverload_Polymorphic:
+				break;
+			case ProcOverload_ParamCount:
+			case ProcOverload_ParamTypes:
+			case ProcOverload_TargetFeatures:
+				// This is okay :)
+				break;
+
+			}
+
+			if (is_invalid) {
+				error_line("\tprevious asm template at %s\n", token_pos_to_string(pos));
+				q->type = t_invalid;
+			}
+		}
+	}
+
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, d->attributes, proc_group_attribute, &ac);
+	check_objc_methods(ctx, asm_entity, ac);
+}
+
+#include "check_asm.cpp"
+
 
 gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
@@ -2060,7 +2194,15 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 			check_proc_decl(&c, e, d);
 			break;
 		case Entity_ProcGroup:
-			check_proc_group_decl(&c, e, d);
+			if (e->ProcGroup.is_asm_group) {
+				check_asm_group_decl(&c, e, d);
+			} else {
+				check_proc_group_decl(&c, e, d);
+			}
+			break;
+
+		case Entity_AsmTemplate:
+			check_asm_template_from_entity(&c, e, d);
 			break;
 		}
 

@@ -2159,12 +2159,6 @@ inst_movss_m32_xmm                  :: #force_inline proc "contextless" (dst: Me
 emit_movss_xmm_xmm                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: XMM) { append(instructions, inst_movss_xmm_xmm(dst, src)) }
 emit_movss_xmm_m32                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: Mem32) { append(instructions, inst_movss_xmm_m32(dst, src)) }
 emit_movss_m32_xmm                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Mem32, src: XMM) { append(instructions, inst_movss_m32_xmm(dst, src)) }
-inst_movsd_sse_xmm_xmm              :: #force_inline proc "contextless" (dst: XMM, src: XMM) -> Instruction { return with_hint(Instruction{ mnemonic = .MOVSD_SSE, operand_count = 2, ops = {op_xmm(dst), op_xmm(src), {}, {}} }, 733) }
-inst_movsd_sse_xmm_m64              :: #force_inline proc "contextless" (dst: XMM, src: Mem64) -> Instruction { return with_hint(Instruction{ mnemonic = .MOVSD_SSE, operand_count = 2, ops = {op_xmm(dst), op_mem(src.mem, 8), {}, {}} }, 733) }
-inst_movsd_sse_m64_xmm              :: #force_inline proc "contextless" (dst: Mem64, src: XMM) -> Instruction { return with_hint(Instruction{ mnemonic = .MOVSD_SSE, operand_count = 2, ops = {op_mem(dst.mem, 8), op_xmm(src), {}, {}} }, 734) }
-emit_movsd_sse_xmm_xmm              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: XMM) { append(instructions, inst_movsd_sse_xmm_xmm(dst, src)) }
-emit_movsd_sse_xmm_m64              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: Mem64) { append(instructions, inst_movsd_sse_xmm_m64(dst, src)) }
-emit_movsd_sse_m64_xmm              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Mem64, src: XMM) { append(instructions, inst_movsd_sse_m64_xmm(dst, src)) }
 inst_movdqa_xmm_xmm                 :: #force_inline proc "contextless" (dst: XMM, src: XMM) -> Instruction { return with_hint(Instruction{ mnemonic = .MOVDQA, operand_count = 2, ops = {op_xmm(dst), op_xmm(src), {}, {}} }, 735) }
 inst_movdqa_xmm_m128                :: #force_inline proc "contextless" (dst: XMM, src: Mem128) -> Instruction { return with_hint(Instruction{ mnemonic = .MOVDQA, operand_count = 2, ops = {op_xmm(dst), op_mem(src.mem, 16), {}, {}} }, 735) }
 inst_movdqa_m128_xmm                :: #force_inline proc "contextless" (dst: Mem128, src: XMM) -> Instruction { return with_hint(Instruction{ mnemonic = .MOVDQA, operand_count = 2, ops = {op_mem(dst.mem, 16), op_xmm(src), {}, {}} }, 736) }
@@ -2417,10 +2411,6 @@ inst_cmpss_xmm_xmm_imm8             :: #force_inline proc "contextless" (dst: XM
 inst_cmpss_xmm_m32_imm8             :: #force_inline proc "contextless" (dst: XMM, src: Mem32, imm: i8) -> Instruction { return with_hint(Instruction{ mnemonic = .CMPSS, operand_count = 3, ops = {op_xmm(dst), op_mem(src.mem, 4), op_imm8(imm), {}} }, 809) }
 emit_cmpss_xmm_xmm_imm8             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: XMM, imm: i8) { append(instructions, inst_cmpss_xmm_xmm_imm8(dst, src, imm)) }
 emit_cmpss_xmm_m32_imm8             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: Mem32, imm: i8) { append(instructions, inst_cmpss_xmm_m32_imm8(dst, src, imm)) }
-inst_cmpsd_sse_xmm_xmm_imm8         :: #force_inline proc "contextless" (dst: XMM, src: XMM, imm: i8) -> Instruction { return with_hint(Instruction{ mnemonic = .CMPSD_SSE, operand_count = 3, ops = {op_xmm(dst), op_xmm(src), op_imm8(imm), {}} }, 810) }
-inst_cmpsd_sse_xmm_m64_imm8         :: #force_inline proc "contextless" (dst: XMM, src: Mem64, imm: i8) -> Instruction { return with_hint(Instruction{ mnemonic = .CMPSD_SSE, operand_count = 3, ops = {op_xmm(dst), op_mem(src.mem, 8), op_imm8(imm), {}} }, 810) }
-emit_cmpsd_sse_xmm_xmm_imm8         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: XMM, imm: i8) { append(instructions, inst_cmpsd_sse_xmm_xmm_imm8(dst, src, imm)) }
-emit_cmpsd_sse_xmm_m64_imm8         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: Mem64, imm: i8) { append(instructions, inst_cmpsd_sse_xmm_m64_imm8(dst, src, imm)) }
 inst_comiss_xmm_xmm                 :: #force_inline proc "contextless" (dst: XMM, src: XMM) -> Instruction { return with_hint(Instruction{ mnemonic = .COMISS, operand_count = 2, ops = {op_xmm(dst), op_xmm(src), {}, {}} }, 811) }
 inst_comiss_xmm_m32                 :: #force_inline proc "contextless" (dst: XMM, src: Mem32) -> Instruction { return with_hint(Instruction{ mnemonic = .COMISS, operand_count = 2, ops = {op_xmm(dst), op_mem(src.mem, 4), {}, {}} }, 811) }
 emit_comiss_xmm_xmm                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: XMM, src: XMM) { append(instructions, inst_comiss_xmm_xmm(dst, src)) }
@@ -8030,8 +8020,6 @@ inst_movupd                              :: proc{ inst_movupd_xmm_xmm, inst_movu
 emit_movupd                              :: proc{ emit_movupd_xmm_xmm, emit_movupd_xmm_m128, emit_movupd_m128_xmm }
 inst_movss                               :: proc{ inst_movss_xmm_xmm, inst_movss_xmm_m32, inst_movss_m32_xmm }
 emit_movss                               :: proc{ emit_movss_xmm_xmm, emit_movss_xmm_m32, emit_movss_m32_xmm }
-inst_movsd_sse                           :: proc{ inst_movsd_sse_xmm_xmm, inst_movsd_sse_xmm_m64, inst_movsd_sse_m64_xmm }
-emit_movsd_sse                           :: proc{ emit_movsd_sse_xmm_xmm, emit_movsd_sse_xmm_m64, emit_movsd_sse_m64_xmm }
 inst_movdqa                              :: proc{ inst_movdqa_xmm_xmm, inst_movdqa_xmm_m128, inst_movdqa_m128_xmm }
 emit_movdqa                              :: proc{ emit_movdqa_xmm_xmm, emit_movdqa_xmm_m128, emit_movdqa_m128_xmm }
 inst_movdqu                              :: proc{ inst_movdqu_xmm_xmm, inst_movdqu_xmm_m128, inst_movdqu_m128_xmm }
@@ -8150,8 +8138,6 @@ inst_cmppd                               :: proc{ inst_cmppd_xmm_xmm_imm8, inst_
 emit_cmppd                               :: proc{ emit_cmppd_xmm_xmm_imm8, emit_cmppd_xmm_m128_imm8 }
 inst_cmpss                               :: proc{ inst_cmpss_xmm_xmm_imm8, inst_cmpss_xmm_m32_imm8 }
 emit_cmpss                               :: proc{ emit_cmpss_xmm_xmm_imm8, emit_cmpss_xmm_m32_imm8 }
-inst_cmpsd_sse                           :: proc{ inst_cmpsd_sse_xmm_xmm_imm8, inst_cmpsd_sse_xmm_m64_imm8 }
-emit_cmpsd_sse                           :: proc{ emit_cmpsd_sse_xmm_xmm_imm8, emit_cmpsd_sse_xmm_m64_imm8 }
 inst_comiss                              :: proc{ inst_comiss_xmm_xmm, inst_comiss_xmm_m32 }
 emit_comiss                              :: proc{ emit_comiss_xmm_xmm, emit_comiss_xmm_m32 }
 inst_comisd                              :: proc{ inst_comisd_xmm_xmm, inst_comisd_xmm_m64 }

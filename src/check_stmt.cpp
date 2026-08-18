@@ -444,6 +444,19 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			      expr_str,
 			      LIT(context_name));
 			rhs->mode = Addressing_Invalid;
+			return nullptr;
+		}
+		case Addressing_Builtin: {
+			// a builtin is not a value
+			gbString expr_str = expr_to_string(rhs->expr);
+			defer (gb_string_free(expr_str));
+
+			error(rhs->expr,
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+			rhs->mode = Addressing_Invalid;
+			return nullptr;
 		}
 		case Addressing_Invalid:
 			return nullptr;
@@ -1883,7 +1896,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_Array:
-				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+				// for #soa container with array element type, the element carries Addressing_SoaVariable,
+				// rather than Addressing_Variable; the element itself has no address,
+				// but each component does, so for &v in soa[i] is addressable
+				is_possibly_addressable = operand.mode == Addressing_Variable ||
+				                          operand.mode == Addressing_SoaVariable ||
+				                          is_ptr;
 				array_add(&vals, t->Array.elem);
 				array_add(&vals, t_int);
 				break;

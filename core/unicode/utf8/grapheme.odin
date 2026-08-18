@@ -21,6 +21,7 @@ normalized_east_asian_width       :: unicode.normalized_east_asian_width
 
 
 Grapheme :: struct {
+	text:       string, // The text of the grapheme, a slice of the string it was decoded from.
 	byte_index: int,
 	rune_index: int,
 	width:      int,
@@ -54,6 +55,9 @@ Grapheme_Iterator :: struct {
 
 	current_sequence:           Grapheme_Cluster_Sequence,
 	continue_sequence:          bool,
+
+	current_grapheme:           Grapheme,
+	continue_grapheme:          bool,
 }
 
 
@@ -147,13 +151,14 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 
 			if it.grapheme_count > it.last_grapheme_count {
 				it.width += normalized_east_asian_width(this_rune)
-				grapheme = Grapheme{
-					byte_index,
-					it.rune_count,
-					it.width - it.last_width,
+				if it.continue_grapheme {
+					grapheme = it.current_grapheme
+					grapheme.text = it.str[it.current_grapheme.byte_index:byte_index]
+					text = grapheme.text
+					ok = true
 				}
-				text = it.str[byte_index:][:grapheme.width]
-				ok = true
+				it.current_grapheme = Grapheme{byte_index = byte_index, rune_index = it.rune_count, width = it.width - it.last_width}
+				it.continue_grapheme = true
 
 
 				it.last_grapheme_count = it.grapheme_count
@@ -383,6 +388,16 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 		//
 		// GB999: Any ÷ Any
 		it.grapheme_count += 1
+	}
+
+	// Flush the remaining grapheme - the loop only flushes when
+	// a new grapheme is encountered.
+	if !ok && it.continue_grapheme {
+		grapheme = it.current_grapheme
+		grapheme.text = it.str[it.current_grapheme.byte_index:]
+		text = grapheme.text
+		ok = true
+		it.continue_grapheme = false
 	}
 
 	return

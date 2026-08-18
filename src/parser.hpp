@@ -451,6 +451,12 @@ struct AstSplitArgs {
 		Token        close; \
 		Slice<Ast *> args;  \
 	}) \
+	AST_KIND(AsmGroup, "asm group", struct { \
+		Token        token; \
+		Token        open;  \
+		Token        close; \
+		Slice<Ast *> args;  \
+	}) \
 	AST_KIND(ProcLit, "procedure literal", struct { \
 		Ast *type; \
 		Ast *body; \
@@ -467,6 +473,59 @@ struct AstSplitArgs {
 		Token open, close; \
 		i64 max_count; \
 		Ast *tag; \
+	}) \
+	AST_KIND(AsmTemplate, "asm template", struct { \
+		Token        token;            \
+		Ast *        signature;        \
+		Slice<Ast *> specs;            \
+		Slice<Ast *> clobbers;         \
+		Slice<Ast *> instructions;     \
+		Token        end;              \
+		Entity *     anonymous_entity; \
+	}) \
+	AST_KIND(AsmRegister, "asm register", struct { \
+		Token token; \
+		Token name;  \
+		Token flag;  \
+	}) \
+	AST_KIND(AsmSpec, "asm specification", struct { \
+		Ast *name;      \
+		Ast *tied_name; \
+		Ast *type;      \
+		Ast *value;     \
+	}) \
+	AST_KIND(AsmClobber, "asm clobber", struct { \
+		Token token; \
+		Token name;  \
+		Ast * value; \
+	}) \
+	AST_KIND(AsmLabelDecl, "asm label declaration", struct { \
+		Token token; \
+		Ast * name;  \
+	}) \
+	AST_KIND(AsmInstruction, "asm instruction", struct { \
+		Ast *        name;     \
+		Slice<Ast *> operands; \
+		u16 mnemonic;          \
+		i32 valid_form_index;  \
+	}) \
+	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
+		Token open;     \
+		Ast * segment_override; \
+		Ast * base;     \
+		Token index_op; \
+		Ast * index;    \
+		Token scale_op; \
+		Ast * scale;    \
+		Token disp_op;  \
+		Ast * disp;     \
+		Ast * type;     \
+		Token close;    \
+	}) \
+	AST_KIND(AsmDirective, "asm directive", struct { \
+		Token        token;    \
+		Token        name;     \
+		Slice<Ast *> operands; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
@@ -529,17 +588,6 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
-	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
-		Token token; \
-		Token open, close; \
-		Slice<Ast *> param_types; \
-		Ast *return_type; \
-		Ast *asm_string; \
-		Ast *constraints_string; \
-		bool has_side_effects; \
-		bool is_align_stack; \
-		InlineAsmDialectKind dialect; \
-	}) \
 	AST_KIND(MatrixIndexExpr, "matrix index expression",       struct { Ast *expr, *row_index, *column_index; Token open, close; }) \
 AST_KIND(_ExprEnd,       "", bool) \
 AST_KIND(_StmtBegin,     "", bool) \

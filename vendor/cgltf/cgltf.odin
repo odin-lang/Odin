@@ -13,7 +13,7 @@ LIB :: (
 when LIB != "" {
 	when !#exists(LIB) {
 		// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
-		// #panic("Could not find the compiled cgltf library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/cgltf/src\"`")
+		#panic("Could not find the compiled cgltf library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/cgltf/src/build_cgltf.sh\"`")
 	}
 }
 
@@ -767,4 +767,3 @@ foreign lib {
 	@(require_results)
 	write      :: proc(#by_ptr options: options, buffer: [^]byte, size: uint, data: ^data) -> uint ---
 }
-

@@ -115,7 +115,7 @@ when ODIN_OS == .Windows {
 			// multiple copies of raylib.so, but since these bindings are for
 			// particular version of the library, I better specify it. Ideally,
 			// though, it's best specified in terms of major (.so.4)
-			"linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "linux-arm/libraylib.a",
+			"linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "linux-arm64/libraylib.a",
 			"system:dl",
 			"system:pthread",
 			"system:X11",

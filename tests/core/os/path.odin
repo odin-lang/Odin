@@ -380,6 +380,13 @@ glob_tests := []Glob_Test{
 		},
 		err     = {},
 	},
+	{
+		pattern = ODIN_ROOT + "tests/core/os/path.odin",
+		matches = {
+			ODIN_ROOT + "tests/core/os/path.odin",
+		},
+		err     = {},
+	},
 }
 
 @(test)

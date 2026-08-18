@@ -293,7 +293,7 @@ rw_mutex_shared_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 /*
 Recursive mutual exclusion lock.
 
-Recurisve mutex is just like a plain mutex, except it allows reentrancy. In
+Recursive mutex is just like a plain mutex, except it allows reentrancy. In
 order for a thread to release the mutex for other threads, the mutex needs to
 be unlocked as many times, as it was locked.
 

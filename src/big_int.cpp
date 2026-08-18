@@ -249,13 +249,28 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
-		GB_ASSERT(base == 10);
-		GB_ASSERT(text[i] != '-');
+		if (base != 10) {
+			// An exponent is only meaningful for a base 10 literal.
+			*success = false;
+			return;
+		}
+		if (i >= len) {
+			// Nothing follows the exponent marker.
+			*success = false;
+			return;
+		}
+		if (text[i] == '-') {
+			// A negative exponent is never an integer.
+			// The caller is expected to parse the value as a float instead.
+			*success = false;
+			return;
+		}
 		if (text[i] == '+') {
 			i += 1;
 		}
 
 		u64 exp = 0;
+		isize exp_digits = 0;
 		for (; i < len; i++) {
 			char r = cast(char)text[i];
 			if (r == '_') {
@@ -270,6 +285,11 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			}
 			exp *= 10;
 			exp += v;
+			exp_digits += 1;
+		}
+		if (exp_digits == 0) {
+			*success = false;
+			return;
 		}
 
 		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).
@@ -469,7 +489,8 @@ gb_internal void big_int_and(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	if (mp_iszero(x)) {
-		big_int_init(dst, y);
+		// 0 &~ y == 0 & ~y == 0
+		big_int_from_i64(dst, 0);
 		return;
 	}
 	if (mp_iszero(y)) {
@@ -485,13 +506,13 @@ gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) 
 			mp_decr(&x1);
 			mp_decr(&y1);
 
-			BigInt ny1 = {};
-			mp_complement(&y1, &ny1);
-			mp_and(&x1, &ny1, dst);
+			BigInt nx1 = {};
+			mp_complement(&x1, &nx1);
+			mp_and(&y1, &nx1, dst);
 
 			big_int_dealloc(&x1);
 			big_int_dealloc(&y1);
-			big_int_dealloc(&ny1);
+			big_int_dealloc(&nx1);
 			return;
 		}
 
@@ -512,6 +533,7 @@ gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) 
 		BigInt z1 = {};
 		big_int_or(&z1, &x1, &y1);
 		mp_add_d(&z1, 1, dst);
+		big_int_neg(dst, dst);
 
 		big_int_dealloc(&x1);
 		big_int_dealloc(&y1);
@@ -674,7 +696,9 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 		big_int_dealloc(&r);
 		big_int_dealloc(&b);
 
-		for (isize i = first_word_idx; i < buf.count/2; i++) {
+		// NOTE: only the digits are reversed, not the leading '-'. 
+		isize digit_count = buf.count - first_word_idx;
+		for (isize i = first_word_idx; i < first_word_idx + digit_count/2; i++) {
 			isize j = buf.count + first_word_idx - i - 1;
 			char tmp = buf[i];
 			buf[i] = buf[j];

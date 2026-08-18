@@ -29,6 +29,7 @@
 #include "llvm_backend_expr.cpp"
 #include "llvm_backend_stmt.cpp"
 #include "llvm_backend_proc.cpp"
+#include "llvm_backend_asm.cpp"
 
 gb_internal String get_default_microarchitecture() {
 	String default_march = str_lit("generic");
@@ -46,6 +47,13 @@ gb_internal String get_default_microarchitecture() {
 		}
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		default_march = str_lit("generic-rv64");
+	} else if (build_context.metrics.arch == TargetArch_arm32) {
+		// The arm32 triple is `gnueabihf`, and the hard-float ABI passes floating point in the
+		// VFP registers. `generic` has no FPU at all. LLVM cannot honor the ABI its own
+		// triple asks for and quietly falls back to the soft-float convention.
+		//
+		// `arm1176jzf-s` is what clang picks by default for this same triple.
+		default_march = str_lit("arm1176jzf-s");
 	}
 
 	return default_march;
@@ -2694,10 +2702,9 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
-	String path = concatenate3_strings(permanent_allocator(),
+	String path = concatenate_strings(permanent_allocator(),
 		build_context.build_paths[BuildPath_Output].basename,
-		STR_LIT("/"),
-		build_context.build_paths[BuildPath_Output].name
+		STR_LIT("/")
 	);
 
 	GB_ASSERT(m->module_name != nullptr);
@@ -2734,7 +2741,7 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
 	path = gb_string_appendc(path, "/");
 
-	bool output_is_directory = path_is_directory(make_string_c(path));
+	bool output_is_directory = path_is_directory(build_context.build_paths[BuildPath_Output]);
 
 	if (USE_SEPARATE_MODULES) {
 		GB_ASSERT(m->module_name != nullptr);
@@ -3275,7 +3282,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMValueRef g = LLVMAddGlobal(m->mod, internal_llvm_type, LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(internal_llvm_type));
 			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
-			// LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
+			LLVMSetUnnamedAddress(g, LLVMGlobalUnnamedAddr);
 			LLVMSetGlobalConstant(g, true);
 
 			lbValue value = {};

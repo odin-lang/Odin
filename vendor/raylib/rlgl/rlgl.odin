@@ -113,13 +113,12 @@ import rl "../."
 VERSION :: "6.0"
 
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
-RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "../wasm/libraylib.a")
+RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "../wasm/libraylib.web.a")
 
 // Note: We pull in the full raylib library. If you want a truly stand-alone rlgl, then:
 // - Compile a separate rlgl library and use that in the foreign import blocks below.
 // - Remove the `import rl "../."` line
 // - Copy the code from raylib.odin for any types we alias from that package (see PixelFormat etc)
-
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {
@@ -130,22 +129,36 @@ when ODIN_OS == .Windows {
 		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	foreign import lib {
-		// Note(bumbread): I'm not sure why in `linux/` folder there are
-		// multiple copies of raylib.so, but since these bindings are for
-		// particular version of the library, I better specify it. Ideally,
-		// though, it's best specified in terms of major (.so.4)
-		"../linux/libraylib.so.550" when RAYLIB_SHARED else "../linux/libraylib.a",
-		"system:dl",
-		"system:pthread",
+	when ODIN_ARCH == .arm64 {
+		foreign import lib {
+			// Note(bumbread): I'm not sure why in `linux/` folder there are
+			// multiple copies of raylib.so, but since these bindings are for
+			// particular version of the library, I better specify it. Ideally,
+			// though, it's best specified in terms of major (.so.4)
+			"../linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "../linux-arm64/libraylib.a",
+			"system:dl",
+			"system:pthread",
+			"system:X11",
+		}
+	} else {
+		foreign import lib {
+			// Note(bumbread): I'm not sure why in `linux/` folder there are
+			// multiple copies of raylib.so, but since these bindings are for
+			// particular version of the library, I better specify it. Ideally,
+			// though, it's best specified in terms of major (.so.4)
+			"../linux/libraylib.so.600" when RAYLIB_SHARED else "../linux/libraylib.a",
+			"system:dl",
+			"system:pthread",
+			"system:X11",
+		}
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"../macos/libraylib.550.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
+		"../macos/libraylib.600.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
-	} 
+	}
 } else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	foreign import lib {
 		RAYLIB_WASM_LIB,

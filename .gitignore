@@ -307,6 +307,8 @@ build.sh
 *.raddbg
 *.rdi
 tests/issues/build/*
+tests/abi/build/*
+tests/abi/build-cross/*
 misc/featuregen/featuregen
 
 # Clangd stuff
@@ -319,3 +321,5 @@ build/
 cmake-build*/
 CMakeLists.txt
 sandbox/
+
+vendor/box3d/lib/box3d_wasm.o
