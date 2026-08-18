@@ -8,7 +8,7 @@ package rexcode_x86_generated
 import lib "../.."
 
 @(rodata)
-ENCODE_FORMS := [2395]lib.Encoding{
+ENCODE_FORMS := [2451]lib.Encoding{
 	// .MOV
 	{.MOV,              {.RM8,       .R8,        .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x88, 0, {explicit_count=2}},
 	{.MOV,              {.RM16,      .R16,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x89, 0, {explicit_count=2}},
@@ -3595,10 +3595,112 @@ ENCODE_FORMS := [2395]lib.Encoding{
 	{.RDSEED,           {.R16,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
 	{.RDSEED,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
 	{.RDSEED,           {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .SWAPGS
+	{.SWAPGS,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 248, {esc=._0F}},
+	// .MONITOR
+	{.MONITOR,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 200, {esc=._0F}},
+	// .MWAIT
+	{.MWAIT,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 201, {esc=._0F}},
+	// .CLAC
+	{.CLAC,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 202, {esc=._0F}},
+	// .STAC
+	{.STAC,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 203, {esc=._0F}},
+	// .RDFSBASE
+	{.RDFSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 0, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.RDFSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 0, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .RDGSBASE
+	{.RDGSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 1, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.RDGSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 1, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .WRFSBASE
+	{.WRFSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 2, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.WRFSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 2, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .WRGSBASE
+	{.WRGSBASE,         {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 3, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.WRGSBASE,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 3, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .PTWRITE
+	{.PTWRITE,          {.RM32,      .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	{.PTWRITE,          {.RM64,      .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, prefix=2, force_rex_w=true, modrm_reg_ext=true, explicit_count=1}},
+	// .RDPID
+	{.RDPID,            {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	// .WBNOINVD
+	{.WBNOINVD,         {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x09, 0, {esc=._0F, prefix=2}},
+	// .SERIALIZE
+	{.SERIALIZE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 232, {esc=._0F}},
+	// .PREFETCH
+	{.PREFETCH,         {.M8,        .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0x0D, 0, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
+	// .TPAUSE
+	{.TPAUSE,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=1, modrm_reg_ext=true, explicit_count=1}},
+	// .UMONITOR
+	{.UMONITOR,         {.R64,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=2, modrm_reg_ext=true, explicit_count=1}},
+	// .UMWAIT
+	{.UMWAIT,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=3, modrm_reg_ext=true, explicit_count=1}},
+	// .MOVDIRI
+	{.MOVDIRI,          {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xF9, 0, {esc=._0F38, explicit_count=2}},
+	{.MOVDIRI,          {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xF9, 0, {esc=._0F38, force_rex_w=true, explicit_count=2}},
+	// .MOVDIR64B
+	{.MOVDIR64B,        {.R64,       .M512,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=1, explicit_count=2}},
+	// .ENQCMD
+	{.ENQCMD,           {.R64,       .M512,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=3, explicit_count=2}},
+	// .ENQCMDS
+	{.ENQCMDS,          {.R64,       .M512,      .NONE,      .NONE}, {.REG,  .MR,   .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=2, explicit_count=2}},
+	// .AADD
+	{.AADD,             {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, explicit_count=2}},
+	{.AADD,             {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, force_rex_w=true, explicit_count=2}},
+	// .AAND
+	{.AAND,             {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=1, explicit_count=2}},
+	{.AAND,             {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=1, force_rex_w=true, explicit_count=2}},
+	// .AOR
+	{.AOR,              {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=3, explicit_count=2}},
+	{.AOR,              {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=3, force_rex_w=true, explicit_count=2}},
+	// .AXOR
+	{.AXOR,             {.M32,       .R32,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=2, explicit_count=2}},
+	{.AXOR,             {.M64,       .R64,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=2, force_rex_w=true, explicit_count=2}},
+	// .XEND
+	{.XEND,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 213, {esc=._0F}},
+	// .XTEST
+	{.XTEST,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 214, {esc=._0F}},
+	// .VMRUN
+	{.VMRUN,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 216, {esc=._0F}},
+	// .VMMCALL
+	{.VMMCALL,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 217, {esc=._0F}},
+	// .VMLOAD
+	{.VMLOAD,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 218, {esc=._0F}},
+	// .VMSAVE
+	{.VMSAVE,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 219, {esc=._0F}},
+	// .STGI
+	{.STGI,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 220, {esc=._0F}},
+	// .CLGI
+	{.CLGI,             {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 221, {esc=._0F}},
+	// .SKINIT
+	{.SKINIT,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 222, {esc=._0F}},
+	// .INVLPGA
+	{.INVLPGA,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 223, {esc=._0F}},
+	// .INVLPGB
+	{.INVLPGB,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 254, {esc=._0F}},
+	// .TLBSYNC
+	{.TLBSYNC,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 255, {esc=._0F}},
+	// .PVALIDATE
+	{.PVALIDATE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 255, {esc=._0F, prefix=3}},
+	// .RMPADJUST
+	{.RMPADJUST,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 254, {esc=._0F, prefix=2}},
+	// .RMPUPDATE
+	{.RMPUPDATE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 254, {esc=._0F, prefix=3}},
+	// .PSMASH
+	{.PSMASH,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 255, {esc=._0F, prefix=2}},
+	// .CLZERO
+	{.CLZERO,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 252, {esc=._0F}},
+	// .MONITORX
+	{.MONITORX,         {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 250, {esc=._0F}},
+	// .MWAITX
+	{.MWAITX,           {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 251, {esc=._0F}},
+	// .RDPRU
+	{.RDPRU,            {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 253, {esc=._0F}},
+	// .MCOMMIT
+	{.MCOMMIT,          {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 250, {esc=._0F, prefix=2}},
 }
 
 @(rodata)
-CLOBBER_FORMS := [2395]lib.Clobber{
+CLOBBER_FORMS := [2451]lib.Clobber{
 	// .MOV
 	{written={0}, read={1}, writes_mem=true, reads_mem=true},
 	{written={0}, read={1}, writes_mem=true, reads_mem=true},
@@ -7185,6 +7287,108 @@ CLOBBER_FORMS := [2395]lib.Clobber{
 	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
 	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
 	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	// .SWAPGS
+	{side_effects={.PRIVILEGED}},
+	// .MONITOR
+	{implicit_rd={.RAX, .RCX, .RDX}, reads_mem=true},
+	// .MWAIT
+	{implicit_rd={.RAX, .RCX}, side_effects={.HALT}},
+	// .CLAC
+	{side_effects={.PRIVILEGED}},
+	// .STAC
+	{side_effects={.PRIVILEGED}},
+	// .RDFSBASE
+	{written={0}},
+	{written={0}},
+	// .RDGSBASE
+	{written={0}},
+	{written={0}},
+	// .WRFSBASE
+	{read={0}},
+	{read={0}},
+	// .WRGSBASE
+	{read={0}},
+	{read={0}},
+	// .PTWRITE
+	{read={0}, reads_mem=true},
+	{read={0}, reads_mem=true},
+	// .RDPID
+	{written={0}},
+	// .WBNOINVD
+	{side_effects={.SERIALIZING, .PRIVILEGED}},
+	// .SERIALIZE
+	{side_effects={.SERIALIZING}},
+	// .PREFETCH
+	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .TPAUSE
+	{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
+	// .UMONITOR
+	{read={0}, reads_mem=true},
+	// .UMWAIT
+	{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
+	// .MOVDIRI
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .MOVDIR64B
+	{read={0}, implicit_rd={.RAX}, writes_mem=true, reads_mem=true},
+	// .ENQCMD
+	{read={0}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .ENQCMDS
+	{read={0}, flags_wr={.ZF}, writes_mem=true, reads_mem=true},
+	// .AADD
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .AAND
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .AOR
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .AXOR
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	{read={0, 1}, writes_mem=true, reads_mem=true},
+	// .XEND
+	{side_effects={.CONTROL}},
+	// .XTEST
+	{flags_wr={.ZF}},
+	// .VMRUN
+	{implicit_rd={.RAX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMMCALL
+	{side_effects={.PRIVILEGED}},
+	// .VMLOAD
+	{implicit_rd={.RAX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .VMSAVE
+	{implicit_rd={.RAX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .STGI
+	{side_effects={.PRIVILEGED}},
+	// .CLGI
+	{side_effects={.PRIVILEGED}},
+	// .SKINIT
+	{implicit_rd={.RAX}, side_effects={.PRIVILEGED}},
+	// .INVLPGA
+	{implicit_rd={.RAX, .RCX}, side_effects={.PRIVILEGED}},
+	// .INVLPGB
+	{implicit_rd={.RAX, .RCX, .RDX}, side_effects={.PRIVILEGED}},
+	// .TLBSYNC
+	{side_effects={.PRIVILEGED}},
+	// .PVALIDATE
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	// .RMPADJUST
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .RMPUPDATE
+	{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, reads_mem=true, side_effects={.PRIVILEGED}},
+	// .PSMASH
+	{implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, side_effects={.PRIVILEGED}},
+	// .CLZERO
+	{implicit_rd={.RAX}, writes_mem=true, side_effects={.CACHE}},
+	// .MONITORX
+	{implicit_rd={.RAX, .RCX, .RDX}, reads_mem=true},
+	// .MWAITX
+	{implicit_rd={.RAX, .RBX, .RCX}, side_effects={.HALT}},
+	// .RDPRU
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	// .MCOMMIT
+	{flags_wr={.CF}, side_effects={.FENCE}},
 }
 
 @(rodata)
@@ -8381,10 +8585,56 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.MOVBE            = { 2383,   6},
 	.RDRAND           = { 2389,   3},
 	.RDSEED           = { 2392,   3},
+	.SWAPGS           = { 2395,   1},
+	.MONITOR          = { 2396,   1},
+	.MWAIT            = { 2397,   1},
+	.CLAC             = { 2398,   1},
+	.STAC             = { 2399,   1},
+	.RDFSBASE         = { 2400,   2},
+	.RDGSBASE         = { 2402,   2},
+	.WRFSBASE         = { 2404,   2},
+	.WRGSBASE         = { 2406,   2},
+	.PTWRITE          = { 2408,   2},
+	.RDPID            = { 2410,   1},
+	.WBNOINVD         = { 2411,   1},
+	.SERIALIZE        = { 2412,   1},
+	.PREFETCH         = { 2413,   1},
+	.TPAUSE           = { 2414,   1},
+	.UMONITOR         = { 2415,   1},
+	.UMWAIT           = { 2416,   1},
+	.MOVDIRI          = { 2417,   2},
+	.MOVDIR64B        = { 2419,   1},
+	.ENQCMD           = { 2420,   1},
+	.ENQCMDS          = { 2421,   1},
+	.AADD             = { 2422,   2},
+	.AAND             = { 2424,   2},
+	.AOR              = { 2426,   2},
+	.AXOR             = { 2428,   2},
+	.XEND             = { 2430,   1},
+	.XTEST            = { 2431,   1},
+	.VMRUN            = { 2432,   1},
+	.VMMCALL          = { 2433,   1},
+	.VMLOAD           = { 2434,   1},
+	.VMSAVE           = { 2435,   1},
+	.STGI             = { 2436,   1},
+	.CLGI             = { 2437,   1},
+	.SKINIT           = { 2438,   1},
+	.INVLPGA          = { 2439,   1},
+	.INVLPGB          = { 2440,   1},
+	.TLBSYNC          = { 2441,   1},
+	.PVALIDATE        = { 2442,   1},
+	.RMPADJUST        = { 2443,   1},
+	.RMPUPDATE        = { 2444,   1},
+	.PSMASH           = { 2445,   1},
+	.CLZERO           = { 2446,   1},
+	.MONITORX         = { 2447,   1},
+	.MWAITX           = { 2448,   1},
+	.RDPRU            = { 2449,   1},
+	.MCOMMIT          = { 2450,   1},
 }
 
 // Emit descriptor per form (derived from ENCODE_FORMS via lib.form_to_recipe).
-ENCODE_RECIPES: [2395]lib.Form_Recipe
+ENCODE_RECIPES: [2451]lib.Form_Recipe
 @(init) _fill_recipes :: proc "contextless" () {
 	for i in 0 ..< len(ENCODE_FORMS) {
 		ENCODE_RECIPES[i] = lib.form_to_recipe(&ENCODE_FORMS[i])

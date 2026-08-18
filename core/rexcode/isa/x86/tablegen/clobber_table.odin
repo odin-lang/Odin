@@ -4870,4 +4870,167 @@ CLOBBER_TABLE := [Mnemonic][]x86.Clobber{
 		{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
 		{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
 	},
+	// 8.23 Additional System / GPR Encodings
+	.SWAPGS = { // privileged; swaps GS.base with IA32_KERNEL_GS_BASE
+		{side_effects={.PRIVILEGED}},
+	},
+	.MONITOR = { // arms address monitor for [rAX]; ECX=extensions, EDX=hints
+		{implicit_rd={.RAX, .RCX, .RDX}, reads_mem=true},
+	},
+	.MWAIT = { // EAX=hints, ECX=extensions; enters optimized wait
+		{implicit_rd={.RAX, .RCX}, side_effects={.HALT}},
+	},
+	.CLAC = { // clears EFLAGS.AC (not modeled in Clobber_Flags); CPL0
+		{side_effects={.PRIVILEGED}},
+	},
+	.STAC = { // sets EFLAGS.AC (not modeled in Clobber_Flags); CPL0
+		{side_effects={.PRIVILEGED}},
+	},
+	.RDFSBASE = {
+		{written={0}},
+		{written={0}},
+	},
+	.RDGSBASE = {
+		{written={0}},
+		{written={0}},
+	},
+	.WRFSBASE = {
+		{read={0}},
+		{read={0}},
+	},
+	.WRGSBASE = {
+		{read={0}},
+		{read={0}},
+	},
+	.PTWRITE = { // writes source to a PT trace packet; no flags
+		{read={0}, reads_mem=true},
+		{read={0}, reads_mem=true},
+	},
+	.RDPID = { // dest <- IA32_TSC_AUX
+		{written={0}},
+	},
+	.WBNOINVD = { // privileged; writes back caches without invalidation
+		{side_effects={.SERIALIZING, .PRIVILEGED}},
+	},
+	.SERIALIZE = { // serializes execution; no register/flag clobber
+		{side_effects={.SERIALIZING}},
+	},
+	.PREFETCH = { // cache hint; no register or flag clobber
+		{read={0}, reads_mem=true, side_effects={.HINT}},
+	},
+
+	// 8.24 WAITPKG Encodings
+	.TPAUSE = { // reads control r32 + EDX:EAX deadline; CF <- result
+		{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
+	},
+	.UMONITOR = { // arms address monitor for [reg]
+		{read={0}, reads_mem=true},
+	},
+	.UMWAIT = { // reads control r32 + EDX:EAX deadline; CF <- result
+		{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
+	},
+
+	// 8.25 Direct Store / Enqueue Store Encodings
+	.MOVDIRI = { // direct store of source register to memory
+		{read={0, 1}, writes_mem=true},
+		{read={0, 1}, writes_mem=true},
+	},
+	.MOVDIR64B = { // 64-byte direct store: reads m512, writes [reg]
+		{read={0}, implicit_rd={.RAX}, reads_mem=true, writes_mem=true},
+	},
+	.ENQCMD = { // enqueue store: reads m512, writes to device [reg]; ZF <- status
+		{read={0}, reads_mem=true, writes_mem=true, flags_wr={.ZF}},
+	},
+	.ENQCMDS = { // supervisor enqueue store; ZF <- status
+		{read={0}, reads_mem=true, writes_mem=true, flags_wr={.ZF}},
+	},
+
+	// 8.26 Remote Atomic Operation (RAO-INT) Encodings
+	.AADD = { // atomic [mem] += reg; no flags, no result loaded
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+	},
+	.AAND = { // atomic [mem] &= reg
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+	},
+	.AOR = { // atomic [mem] |= reg
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+	},
+	.AXOR = { // atomic [mem] ^= reg
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+		{read={0, 1}, writes_mem=true, reads_mem=true},
+	},
+
+	// 8.27 Restricted Transactional Memory (RTM) Encodings
+	.XEND = { // commits transaction; may transfer control on abort
+		{side_effects={.CONTROL}},
+	},
+	.XTEST = { // ZF <- (not in transactional region)
+		{flags_wr={.ZF}},
+	},
+
+	// 8.28 AMD SVM Encodings
+	.VMRUN = { // privileged; runs guest from VMCB at [rAX]
+		{implicit_rd={.RAX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	},
+	.VMMCALL = { // guest-to-hypervisor call
+		{side_effects={.PRIVILEGED}},
+	},
+	.VMLOAD = { // privileged; loads guest state from VMCB at [rAX]
+		{implicit_rd={.RAX}, reads_mem=true, side_effects={.PRIVILEGED}},
+	},
+	.VMSAVE = { // privileged; saves guest state to VMCB at [rAX]
+		{implicit_rd={.RAX}, writes_mem=true, side_effects={.PRIVILEGED}},
+	},
+	.STGI = { // privileged; sets global interrupt flag
+		{side_effects={.PRIVILEGED}},
+	},
+	.CLGI = { // privileged; clears global interrupt flag
+		{side_effects={.PRIVILEGED}},
+	},
+	.SKINIT = { // privileged; secure init from SLB at EAX
+		{implicit_rd={.RAX}, side_effects={.PRIVILEGED}},
+	},
+	.INVLPGA = { // privileged; invalidates TLB entry [rAX] for ASID ECX
+		{implicit_rd={.RAX, .RCX}, side_effects={.PRIVILEGED}},
+	},
+	.INVLPGB = { // privileged; rAX=va, ECX=count, EDX=flags
+		{implicit_rd={.RAX, .RCX, .RDX}, side_effects={.PRIVILEGED}},
+	},
+	.TLBSYNC = { // privileged; synchronizes broadcast TLB invalidations
+		{side_effects={.PRIVILEGED}},
+	},
+
+	// 8.29 AMD SEV-SNP Encodings
+	.PVALIDATE = { // rAX=addr, ECX=size, EDX=validate; EAX<-rc, flags set
+		{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true},
+	},
+	.RMPADJUST = { // privileged; rAX=addr, RCX=attrs, RDX=level; EAX<-rc
+		{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX, .RDX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, side_effects={.PRIVILEGED}},
+	},
+	.RMPUPDATE = { // privileged; rAX=addr, RCX=ptr to RMP state; EAX<-rc
+		{implicit_wr={.RAX}, implicit_rd={.RAX, .RCX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, reads_mem=true, writes_mem=true, side_effects={.PRIVILEGED}},
+	},
+	.PSMASH = { // privileged; rAX=addr; EAX<-rc; splits 2M RMP entry
+		{implicit_wr={.RAX}, implicit_rd={.RAX}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, writes_mem=true, side_effects={.PRIVILEGED}},
+	},
+
+	// 8.30 AMD Miscellaneous Encodings
+	.CLZERO = { // zeroes the cache line at [rAX]
+		{implicit_rd={.RAX}, writes_mem=true, side_effects={.CACHE}},
+	},
+	.MONITORX = { // arms address monitor for [rAX] with timer (EBX)
+		{implicit_rd={.RAX, .RCX, .RDX}, reads_mem=true},
+	},
+	.MWAITX = { // EAX=hints, ECX=extensions, EBX=timer; enters wait
+		{implicit_rd={.RAX, .RCX, .RBX}, side_effects={.HALT}},
+	},
+	.RDPRU = { // ECX selects register; EDX:EAX <- value
+		{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	},
+	.MCOMMIT = { // commits pending stores; CF <- error status
+		{flags_wr={.CF}, side_effects={.FENCE}},
+	},
 }

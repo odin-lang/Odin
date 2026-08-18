@@ -4917,4 +4917,183 @@ ENCODING_TABLE := [Mnemonic][]Encoding{
 		{.RDSEED, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true}},
 		{.RDSEED, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true, force_rex_w=true}},
 	},
+	// -------------------------------------------------------------------------
+	// SECTION: 8.23 Additional System / GPR Encodings
+	// -------------------------------------------------------------------------
+	.SWAPGS = {  // 0F 01 F8
+		{.SWAPGS, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xF8, {esc=._0F}},
+	},
+	.MONITOR = {  // 0F 01 C8
+		{.MONITOR, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xC8, {esc=._0F}},
+	},
+	.MWAIT = {  // 0F 01 C9
+		{.MWAIT, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xC9, {esc=._0F}},
+	},
+	.CLAC = {  // 0F 01 CA
+		{.CLAC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xCA, {esc=._0F}},
+	},
+	.STAC = {  // 0F 01 CB
+		{.STAC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xCB, {esc=._0F}},
+	},
+	.RDFSBASE = {  // F3 0F AE /0
+		{.RDFSBASE, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 0, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+		{.RDFSBASE, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 0, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3, force_rex_w=true}},
+	},
+	.RDGSBASE = {  // F3 0F AE /1
+		{.RDGSBASE, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 1, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+		{.RDGSBASE, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 1, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3, force_rex_w=true}},
+	},
+	.WRFSBASE = {  // F3 0F AE /2
+		{.WRFSBASE, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 2, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+		{.WRFSBASE, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 2, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3, force_rex_w=true}},
+	},
+	.WRGSBASE = {  // F3 0F AE /3
+		{.WRGSBASE, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 3, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+		{.WRGSBASE, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 3, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3, force_rex_w=true}},
+	},
+	.PTWRITE = {  // F3 0F AE /4
+		{.PTWRITE, {.RM32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+		{.PTWRITE, {.RM64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3, force_rex_w=true}},
+	},
+	.RDPID = {  // F3 0F C7 /7 (r64 in 64-bit mode, no REX.W)
+		{.RDPID, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+	},
+	.WBNOINVD = {  // F3 0F 09
+		{.WBNOINVD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x09, 0, {esc=._0F, prefix=PREFIX_F3}},
+	},
+	.SERIALIZE = {  // NP 0F 01 E8
+		{.SERIALIZE, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xE8, {esc=._0F}},
+	},
+	.PREFETCH = {  // 0F 0D /0
+		{.PREFETCH, {.M8, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0x0D, 0, {esc=._0F, modrm_reg_ext=true}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.24 WAITPKG Encodings
+	// -------------------------------------------------------------------------
+	.TPAUSE = {  // 66 0F AE /6
+		{.TPAUSE, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_66}},
+	},
+	.UMONITOR = {  // F3 0F AE /6
+		{.UMONITOR, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F3}},
+	},
+	.UMWAIT = {  // F2 0F AE /6
+		{.UMWAIT, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, modrm_reg_ext=true, prefix=PREFIX_F2}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.25 Direct Store / Enqueue Store Encodings
+	// -------------------------------------------------------------------------
+	.MOVDIRI = {  // NP 0F 38 F9 /r  (store r -> m)
+		{.MOVDIRI, {.M32, .R32, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xF9, 0, {esc=._0F38}},
+		{.MOVDIRI, {.M64, .R64, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xF9, 0, {esc=._0F38, force_rex_w=true}},
+	},
+	.MOVDIR64B = {  // 66 0F 38 F8 /r  (r=dest addr, m512=src)
+		{.MOVDIR64B, {.R64, .M512, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=PREFIX_66}},
+	},
+	.ENQCMD = {  // F2 0F 38 F8 /r
+		{.ENQCMD, {.R64, .M512, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=PREFIX_F2}},
+	},
+	.ENQCMDS = {  // F3 0F 38 F8 /r
+		{.ENQCMDS, {.R64, .M512, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0xF8, 0, {esc=._0F38, prefix=PREFIX_F3}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.26 Remote Atomic Operation (RAO-INT) Encodings
+	// -------------------------------------------------------------------------
+	.AADD = {  // NP 0F 38 FC /r
+		{.AADD, {.M32, .R32, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38}},
+		{.AADD, {.M64, .R64, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, force_rex_w=true}},
+	},
+	.AAND = {  // 66 0F 38 FC /r
+		{.AAND, {.M32, .R32, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=PREFIX_66}},
+		{.AAND, {.M64, .R64, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=PREFIX_66, force_rex_w=true}},
+	},
+	.AOR = {  // F2 0F 38 FC /r
+		{.AOR, {.M32, .R32, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=PREFIX_F2}},
+		{.AOR, {.M64, .R64, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=PREFIX_F2, force_rex_w=true}},
+	},
+	.AXOR = {  // F3 0F 38 FC /r
+		{.AXOR, {.M32, .R32, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=PREFIX_F3}},
+		{.AXOR, {.M64, .R64, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xFC, 0, {esc=._0F38, prefix=PREFIX_F3, force_rex_w=true}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.27 Restricted Transactional Memory (RTM) Encodings
+	// -------------------------------------------------------------------------
+	.XEND = {  // NP 0F 01 D5
+		{.XEND, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD5, {esc=._0F}},
+	},
+	.XTEST = {  // NP 0F 01 D6
+		{.XTEST, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD6, {esc=._0F}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.28 AMD SVM Encodings
+	// -------------------------------------------------------------------------
+	.VMRUN = {  // 0F 01 D8
+		{.VMRUN, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD8, {esc=._0F}},
+	},
+	.VMMCALL = {  // 0F 01 D9
+		{.VMMCALL, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD9, {esc=._0F}},
+	},
+	.VMLOAD = {  // 0F 01 DA
+		{.VMLOAD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xDA, {esc=._0F}},
+	},
+	.VMSAVE = {  // 0F 01 DB
+		{.VMSAVE, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xDB, {esc=._0F}},
+	},
+	.STGI = {  // 0F 01 DC
+		{.STGI, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xDC, {esc=._0F}},
+	},
+	.CLGI = {  // 0F 01 DD
+		{.CLGI, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xDD, {esc=._0F}},
+	},
+	.SKINIT = {  // 0F 01 DE
+		{.SKINIT, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xDE, {esc=._0F}},
+	},
+	.INVLPGA = {  // 0F 01 DF
+		{.INVLPGA, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xDF, {esc=._0F}},
+	},
+	.INVLPGB = {  // NP 0F 01 FE
+		{.INVLPGB, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFE, {esc=._0F}},
+	},
+	.TLBSYNC = {  // NP 0F 01 FF
+		{.TLBSYNC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFF, {esc=._0F}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.29 AMD SEV-SNP Encodings
+	// -------------------------------------------------------------------------
+	.PVALIDATE = {  // F2 0F 01 FF
+		{.PVALIDATE, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFF, {esc=._0F, prefix=PREFIX_F2}},
+	},
+	.RMPADJUST = {  // F3 0F 01 FE
+		{.RMPADJUST, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFE, {esc=._0F, prefix=PREFIX_F3}},
+	},
+	.RMPUPDATE = {  // F2 0F 01 FE
+		{.RMPUPDATE, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFE, {esc=._0F, prefix=PREFIX_F2}},
+	},
+	.PSMASH = {  // F3 0F 01 FF
+		{.PSMASH, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFF, {esc=._0F, prefix=PREFIX_F3}},
+	},
+
+	// -------------------------------------------------------------------------
+	// SECTION: 8.30 AMD Miscellaneous Encodings
+	// -------------------------------------------------------------------------
+	.CLZERO = {  // 0F 01 FC
+		{.CLZERO, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFC, {esc=._0F}},
+	},
+	.MONITORX = {  // NP 0F 01 FA
+		{.MONITORX, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFA, {esc=._0F}},
+	},
+	.MWAITX = {  // NP 0F 01 FB
+		{.MWAITX, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFB, {esc=._0F}},
+	},
+	.RDPRU = {  // 0F 01 FD
+		{.RDPRU, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFD, {esc=._0F}},
+	},
+	.MCOMMIT = {  // F3 0F 01 FA
+		{.MCOMMIT, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xFA, {esc=._0F, prefix=PREFIX_F3}},
+	},
 }
