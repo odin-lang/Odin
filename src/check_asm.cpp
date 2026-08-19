@@ -1910,6 +1910,36 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		        "Please add #volatile if the effect is intended.");
 	}
 
+	if (false) {
+		// TODO(bill): is this even a good idea? The programmer might have just added it for the reason so that he can
+		// tell if an asm template clobbers something specific or if it is #volatile.
+		// I'll leave this in an `if (false)` block for the time being just in case it might be useful in the future.
+
+		// Redundant #clobber hint
+		for (Ast *clobber_ : at->clobbers) {
+			ast_node(clobber, AsmClobber, clobber_);
+			if (clobber->value == nullptr || clobber->value->kind != Ast_AsmRegister) {
+				continue;
+			}
+			String reg = clobber->value->AsmRegister.name.string;
+			u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
+			if (bit && (asm_acc.implicit_clobbered_regs & bit) != 0) {
+				warning(clobber->value, "#clobber %%%.*s is redundant; an instruction in this template already clobbers it implicitly", LIT(reg));
+			}
+		}
+
+		// Redundant #volatile hint
+		if (entity->AsmTemplate.is_volatile && entity->AsmTemplate.has_observable_side_effect) {
+			for (Ast *clobber_ : at->clobbers) {
+				ast_node(clobber, AsmClobber, clobber_);
+				if (clobber->value == nullptr && clobber->name.string == "volatile") {
+					warning(clobber->name, "#volatile is redundant; an instruction in this template already has an observable side effect");
+					break;
+				}
+			}
+		}
+	}
+
 
 	if (type->Proc.diverging) {
 		if (!asm_acc.saw_any_instructions) {
