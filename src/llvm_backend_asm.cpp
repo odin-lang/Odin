@@ -437,7 +437,9 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 
 			// Register output: '=' ['&'] ( '{pin}' | class-letter )
 			raw("=");
-			if (is_alloc_scratch) { // early-clobber: keep scratch off any input reg
+			// early-clobber: keep scratch, and any output a later instruction could read past,
+			// off an input's register. One instruction reads before it writes, so it is safe
+			if (is_alloc_scratch || tmpl_node->instructions.count > 1) {
 				raw("&");
 			}
 			if (e.pin.len != 0) {
