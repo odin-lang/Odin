@@ -1989,17 +1989,17 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
-	for (auto const &ed : ate->decls) {
-		if (!(ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.pin.len != 0)) {
-			continue;
-		}
-		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-		if (bit && (asm_acc.defined_regs & bit) == 0 && asm_acc.straight_line) {
-			error(ed.entity->token,
-			      "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
-			      LIT(ed.entity->token.string), LIT(ed.pin));
-		}
-	}
+	// for (auto const &ed : ate->decls) {
+	// 	if (!(ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.pin.len != 0)) {
+	// 		continue;
+	// 	}
+	// 	u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+	// 	if (bit && (asm_acc.defined_regs & bit) == 0 && asm_acc.straight_line) {
+	// 		error(ed.entity->token,
+	// 		      "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
+	// 		      LIT(ed.entity->token.string), LIT(ed.pin));
+	// 	}
+	// }
 
 
 	bool vet_unused = false;
