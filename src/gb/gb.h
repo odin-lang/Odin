@@ -5528,7 +5528,6 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 		return 0;
 	}
 
-	isize size = 0;
 	ssize_t nread, nwrite, offset;
 	while ((nread = read(existing_fd, buf, bsize)) != -1 && nread != 0) {
 		for (offset = 0; nread; nread -= nwrite, offset += nwrite) {
