@@ -19,6 +19,8 @@ class WasmMemoryInterface {
 		this.exports = null;
 		this.listenerMap = new Map();
 
+		this.isShared = false;
+
 		// Size (in bytes) of the integer type, should be 4 on `js_wasm32` and 8 on `js_wasm64p32`
 		this.intSize = 4;
 	}
@@ -29,6 +31,9 @@ class WasmMemoryInterface {
 
 	setMemory(memory) {
 		this.memory = memory;
+		// Avoid instanceof because memory may come from another realm.
+		this.isShared = typeof SharedArrayBuffer !== "undefined" && memory != null &&
+			Object.prototype.toString.call(memory.buffer) === "[object SharedArrayBuffer]";
 	}
 
 	setExports(exports) {
@@ -96,9 +101,16 @@ class WasmMemoryInterface {
 		return new Uint8Array(this.memory.buffer, ptr, Number(len));
 	}
 
+	loadBytesUnshared(ptr, len) {
+		const bytes = this.loadBytes(ptr, len);
+		if (this.isShared) {
+			return bytes.slice();
+		}
+		return bytes;
+	}
+
 	loadString(ptr, len) {
-		const bytes = this.loadBytes(ptr, Number(len));
-		return new TextDecoder().decode(bytes);
+		return new TextDecoder().decode(this.loadBytesUnshared(ptr, Number(len)));
 	}
 
 	loadCstring(ptr) {
@@ -1612,6 +1624,12 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement, memory) {
 
 			rand_bytes: (ptr, len) => {
 				const view = new Uint8Array(wasmMemoryInterface.memory.buffer, ptr, len)
+				if (wasmMemoryInterface.isShared) {
+					const tmp = new Uint8Array(len)
+					crypto.getRandomValues(tmp)
+					view.set(tmp)
+					return
+				}
 				crypto.getRandomValues(view)
 			},
 		},

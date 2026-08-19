@@ -2963,10 +2963,10 @@ FILE_END_OF_FILE_INFO :: struct {
 }
 
 FILE_NOTIFY_INFORMATION :: struct {
-	next_entry_offset: DWORD,
-	action:            DWORD,
-	file_name_length:  DWORD,
-	file_name:         [1]WCHAR,
+	NextEntryOffset: DWORD,
+	Action:          DWORD,
+	FileNameLength:  DWORD,
+	FileName:        [1]WCHAR,
 }
 
 REPARSE_DATA_BUFFER :: struct {

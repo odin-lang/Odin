@@ -721,7 +721,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						LLVMTypeRef param_type = lb_type(p->module, e->type);
 						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
-						LLVMValueRef value = arg_type->coerce_offset_count > 0
+						LLVMValueRef value = arg_type->coerce_offsets.count > 0
 							? lb_coerce_fields_store(p, original_value, e->type, arg_type)
 							: OdinLLVMBuildTransmute(p, original_value, param_type);
 
@@ -976,14 +976,14 @@ gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgT
 	lbValue base = lb_address_from_load_or_generate_local(p, x);
 
 	if (LLVMGetTypeKind(arg->cast_type) != LLVMStructTypeKind) {
-		GB_ASSERT(arg->coerce_offset_count == 1);
+		GB_ASSERT(arg->coerce_offsets.count == 1);
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[0], false);
 		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
 		return LLVMBuildLoad2(p->builder, arg->cast_type, ptr, "");
 	}
 
 	unsigned count = LLVMCountStructElementTypes(arg->cast_type);
-	GB_ASSERT(cast(isize)count == arg->coerce_offset_count);
+	GB_ASSERT(cast(isize)count == arg->coerce_offsets.count);
 	LLVMValueRef result = LLVMGetUndef(arg->cast_type);
 	for (unsigned i = 0; i < count; i += 1) {
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(arg->cast_type, i);
@@ -1008,7 +1008,7 @@ gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coe
 	if (is_struct) {
 		count = LLVMCountStructElementTypes(arg->cast_type);
 	}
-	GB_ASSERT(cast(isize)count == arg->coerce_offset_count);
+	GB_ASSERT(cast(isize)count == arg->coerce_offsets.count);
 	for (unsigned i = 0; i < count; i += 1) {
 		LLVMValueRef elem  = is_struct ? LLVMBuildExtractValue(p->builder, coerced, i, "") : coerced;
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[i], false);
@@ -1295,7 +1295,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				if (!abi_type) {
 					abi_type = arg->type;
 				}
-				if (arg->coerce_offset_count > 0) {
+				if (arg->coerce_offsets.count > 0) {
 					x.value = lb_coerce_fields_load(p, x, arg);
 					array_add(&processed_args, x);
 				} else if (xt == abi_type) {
@@ -1380,7 +1380,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			result = lb_emit_load(p, return_ptr);
 		} else if (rt != nullptr) {
 			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
-			if (ft->ret.coerce_offset_count > 0) {
+			if (ft->ret.coerce_offsets.count > 0) {
 				result.value = lb_coerce_fields_store(p, result.value, rt, &ft->ret);
 			} else {
 				if (ft->ret.cast_type) {
@@ -5195,6 +5195,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	// NOTE(bill): Regular call
 	lbValue value = {};
+	Entity *asm_template = nullptr;
 
 	if (proc_entity != nullptr) {
 		if (proc_entity->flags & EntityFlag_Disabled) {
@@ -5228,15 +5229,25 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 			}
 		}
 	}
+	Type *proc_value_type = nullptr;
 
 	if (is_objc_call) {
 		value.type = proc_tv.type;
+		proc_value_type = value.type;
 	} else if (value.value == nullptr) {
-		value = lb_build_expr(p, proc_expr);
+		Entity *found = entity_of_node(proc_expr);
+		if (found && found->kind == Entity_AsmTemplate) {
+			asm_template = found;
+			proc_value_type = asm_template->type;
+		} else {
+			value = lb_build_expr(p, proc_expr);
+			proc_value_type = value.type;
+		}
 	}
 
-	GB_ASSERT(value.value != nullptr || is_objc_call);
-	Type *proc_type_ = base_type(value.type);
+
+	GB_ASSERT(value.value != nullptr || is_objc_call || asm_template != nullptr);
+	Type *proc_type_ = base_type(proc_value_type);
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
 
@@ -5455,6 +5466,11 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 	}
 
-	return lb_emit_call(p, value, call_args, inlining, tailing, sret_dst);
+	if (asm_template != nullptr) {
+		GB_ASSERT(value.value == nullptr);
+		return lb_emit_asm_template_call(p, asm_template, call_args);
+	} else {
+		return lb_emit_call(p, value, call_args, inlining, tailing, sret_dst);
+	}
 }
 

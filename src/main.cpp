@@ -68,6 +68,8 @@ gb_global Timings global_timings = {0};
 #include "parser.hpp"
 #include "checker.hpp"
 
+#include "asm_tables.cpp"
+
 #include "parser.cpp"
 #include "checker.cpp"
 #include "docs.cpp"
@@ -4317,6 +4319,9 @@ int main(int arg_count, char const **arg_ptr) {
 	Parser * parser  = permanent_alloc_item<Parser>();
 	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
+
+	TIME_SECTION("init asm tables");
+	init_asm_tables();
 
 	MAIN_TIME_SECTION("parse files");
 

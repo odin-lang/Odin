@@ -211,3 +211,37 @@ bit_set_subset_folding_selects_the_right_when_arm :: proc(t: ^testing.T) {
 	testing.expect_value(t, W3, 1)
 	testing.expect_value(t, W4, 1)
 }
+// `abs` folds with `mp_abs`, which is arbitrary precision, so the magnitude of a signed minimum
+// leaves the type's range. Enusre the are the neighbors are not refused
+@(test)
+abs_constant_folding_matches_runtime :: proc(t: ^testing.T) {
+	{
+		a, b, c, d := i8(-127), i16(-32767), i32(-2147483647), i64(-9223372036854775807)
+		testing.expect_value(t, abs(i8(-127)), abs(a))
+		testing.expect_value(t, abs(i16(-32767)), abs(b))
+		testing.expect_value(t, abs(i32(-2147483647)), abs(c))
+		testing.expect_value(t, abs(i64(-9223372036854775807)), abs(d))
+		testing.expect_value(t, abs(i32(-2147483647)), 2147483647)
+	}
+	{
+		a, b := i32(2147483647), u32(4294967295)
+		testing.expect_value(t, abs(i32(2147483647)), abs(a))
+		testing.expect_value(t, abs(u32(4294967295)), abs(b))
+	}
+	{
+		a, b := f32(-1.5), f64(-2.5)
+		testing.expect_value(t, abs(f32(-1.5)), abs(a))
+		testing.expect_value(t, abs(f64(-2.5)), abs(b))
+	}
+	{
+		a := complex(f64(3), f64(-4))
+		b := quaternion(w = f64(1), x = f64(2), y = f64(2), z = f64(4))
+		testing.expect_value(t, abs(complex(f64(3), f64(-4))), abs(a))
+		testing.expect_value(t, abs(complex(f64(3), f64(-4))), 5)
+		testing.expect_value(t, abs(quaternion(w = f64(1), x = f64(2), y = f64(2), z = f64(4))), abs(b))
+	}
+
+	// the folded value still selects the right `when` arm
+	when abs(i32(-2147483647)) == 2147483647 { W :: 1 } else { W :: 0 }
+	testing.expect_value(t, W, 1)
+}

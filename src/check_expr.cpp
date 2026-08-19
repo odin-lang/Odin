@@ -319,6 +319,9 @@ gb_internal void error_operand_no_value(Operand *o) {
 }
 
 gb_internal void add_map_get_dependencies(CheckerContext *c) {
+	if (build_context.bedrock) {
+		return;
+	}
 	if (build_context.dynamic_map_calls) {
 		add_package_dependency(c, "runtime", "__dynamic_map_get");
 	} else {
@@ -328,6 +331,9 @@ gb_internal void add_map_get_dependencies(CheckerContext *c) {
 }
 
 gb_internal void add_map_set_dependencies(CheckerContext *c) {
+	if (build_context.bedrock) {
+		return;
+	}
 	init_core_source_code_location(c->checker);
 
 	if (t_map_set_proc == nullptr) {
@@ -344,6 +350,9 @@ gb_internal void add_map_set_dependencies(CheckerContext *c) {
 }
 
 gb_internal void add_map_reserve_dependencies(CheckerContext *c) {
+	if (build_context.bedrock) {
+		return;
+	}
 	init_core_source_code_location(c->checker);
 	add_package_dependency(c, "runtime", "__dynamic_map_reserve");
 }
@@ -361,6 +370,7 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 		case Entity_Constant:
 		case Entity_TypeName:
 		case Entity_Procedure:
+		case Entity_AsmTemplate:
 			break;
 		default:
 			continue;
@@ -2064,6 +2074,10 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_Nil:
+		o->mode = Addressing_Value;
+		break;
+
+	case Entity_AsmTemplate:
 		o->mode = Addressing_Value;
 		break;
 
@@ -5959,7 +5973,8 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		add_entity_use(c, op_expr, e);
 		expr_entity = e;
 
-		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup) && selector->kind == Ast_Ident) {
+		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup || e->kind == Entity_AsmTemplate) &&
+		    selector->kind == Ast_Ident) {
 			gbString sel_str = expr_to_string(selector);
 			error(node, "'%s' is not declared by '%.*s'", sel_str, LIT(e->token.string));
 			gb_string_free(sel_str);
@@ -6328,6 +6343,10 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	// NOTE(bill): These cases should never be hit but are here for sanity reasons
 	case Entity_Nil:
+		operand->mode = Addressing_Value;
+		break;
+
+	case Entity_AsmTemplate:
 		operand->mode = Addressing_Value;
 		break;
 	}
@@ -8869,7 +8888,26 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	} else {
 		if (proc != nullptr) {
-			check_expr_or_type(c, operand, proc);
+			Ast *unnested_proc = unparen_expr(proc);
+			if (unnested_proc->kind == Ast_AsmTemplate) {
+				// NOTE(bill): asm templates can only be used within as a declaration OR within a procedure call directly
+				ast_node(at, AsmTemplate, unnested_proc);
+				Token token = at->token;
+				DeclInfo *d = make_decl_info(c->scope, c->decl);
+				Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, unnested_proc);
+				d->init_expr = unnested_proc;
+				at->anonymous_entity = e;
+
+				check_asm_template_from_entity(c, e, d);
+
+				operand->mode  = Addressing_Value;
+				operand->type  = e->type;
+				operand->value = {};
+				operand->expr  = proc;
+				add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
+			} else {
+				check_expr_or_type(c, operand, proc);
+			}
 		} else {
 			GB_ASSERT(operand->expr != nullptr);
 		}
@@ -12422,6 +12460,14 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		return kind;
 	case_end;
 
+	case_ast_node(at, AsmTemplate, node);
+		error(node, "'asm' templates must either be defined as a declaration or within a procedure call directly");
+		o->mode = Addressing_NoValue;
+		o->type = nullptr;
+		o->expr = node;
+		return kind;
+	case_end;
+
 	case_ast_node(i, Implicit, node);
 		switch (i->kind) {
 		case Token_context:
@@ -12502,6 +12548,12 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		error(node, "Illegal use of a procedure group");
 		o->mode = Addressing_Invalid;
 	case_end;
+
+	case_ast_node(ag, AsmGroup, node);
+		error(node, "Illegal use of a asm group");
+		o->mode = Addressing_Invalid;
+	case_end;
+
 
 	case_ast_node(pl, ProcLit, node);
 		CheckerContext ctx = *c;
@@ -12748,53 +12800,6 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
  				return kind;
  			}
 		}
-	case_end;
-
-	case_ast_node(ia, InlineAsmExpr, node);
-		if (c->curr_proc_decl == nullptr) {
-			error(node, "Inline asm expressions are only allowed within a procedure body");
-		}
-
-		auto param_types = array_make<Type *>(heap_allocator(), ia->param_types.count);
-		Type *return_type = nullptr;
-		for_array(i, ia->param_types) {
-			param_types[i] = check_type(c, ia->param_types[i]);
-		}
-		if (ia->return_type != nullptr) {
-			return_type = check_type(c, ia->return_type);
-		}
-		Operand x = {};
-		check_expr(c, &x, ia->asm_string);
-		if (x.mode != Addressing_Constant || !is_type_string(x.type)) {
-			error(x.expr, "Expected a constant string for the inline asm main parameter");
-		}
-		check_expr(c, &x, ia->constraints_string);
-		if (x.mode != Addressing_Constant || !is_type_string(x.type)) {
-			error(x.expr, "Expected a constant string for the inline asm constraints parameter");
-		}
-
-		Scope *scope = create_scope(c->info, c->scope);
-		scope->flags |= ScopeFlag_Proc;
-
-		Type *params = alloc_type_tuple();
-		Type *results = alloc_type_tuple();
-		if (param_types.count != 0) {
-			slice_init(&params->Tuple.variables, heap_allocator(), param_types.count);
-			for_array(i, param_types) {
-				params->Tuple.variables[i] = alloc_entity_param(scope, blank_token, param_types[i], false, true);
-			}
-		}
-		if (return_type != nullptr) {
-			slice_init(&results->Tuple.variables, heap_allocator(), 1);
-			results->Tuple.variables[0] = alloc_entity_param(scope, blank_token, return_type, false, true);
-		}
-
-
-		Type *pt = alloc_type_proc(scope, params, param_types.count, results, return_type != nullptr ? 1 : 0, false, ProcCC_InlineAsm);
-		o->type = pt;
-		o->mode = Addressing_Value;
-		o->expr = node;
-		return Expr_Expr;
 	case_end;
 
 	case Ast_DistinctType:
@@ -13070,6 +13075,16 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		}
 		str = gb_string_append_rune(str, '}');
 	case_end;
+
+	case_ast_node(pg, AsmGroup, node);
+		str = gb_string_appendc(str, "asm{");
+		for_array(i, pg->args) {
+			if (i > 0) str = gb_string_appendc(str, ", ");
+			str = write_expr_to_string(str, pg->args[i], shorthand);
+		}
+		str = gb_string_append_rune(str, '}');
+	case_end;
+
 
 	case_ast_node(pl, ProcLit, node);
 		str = write_expr_to_string(str, pl->type, shorthand);
@@ -13634,38 +13649,129 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = gb_string_appendc(str, "}");
 	case_end;
 
-	case_ast_node(ia, InlineAsmExpr, node);
-		str = gb_string_appendc(str, "asm(");
-		for_array(i, ia->param_types) {
-			if (i > 0) {
+	case_ast_node(at, AsmTemplate, node);
+		str = gb_string_appendc(str, "asm");
+		{
+			ast_node(pt, ProcType, at->signature);
+
+			str = gb_string_appendc(str, "(");
+			str = write_expr_to_string(str, pt->params, shorthand);
+			str = gb_string_appendc(str, ")");
+			if (pt->results != nullptr) {
+				str = gb_string_appendc(str, " -> ");
+
+				bool parens_needed = false;
+				if (pt->results && pt->results->kind == Ast_FieldList) {
+					for (Ast *field : pt->results->FieldList.list) {
+						ast_node(f, Field, field);
+						if (f->names.count != 0) {
+							parens_needed = true;
+							break;
+						}
+					}
+				}
+
+				if (parens_needed) {
+					str = gb_string_append_rune(str, '(');
+				}
+				str = write_expr_to_string(str, pt->results, shorthand);
+				if (parens_needed) {
+					str = gb_string_append_rune(str, ')');
+				}
+			}
+		}
+
+		if (at->specs.count) {
+			str = gb_string_append_rune(str, '[');
+			for_array(j, at->specs) {
+				if (j > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				Ast *spec = at->specs[j];
+				str = write_expr_to_string(str, spec, shorthand);
+			}
+			str = gb_string_append_rune(str, ']');
+		}
+		str = gb_string_append_rune(str, '{');
+		for_array(j, at->instructions) {
+			if (j > 0) {
+				str = gb_string_appendc(str, "; ");
+			}
+			Ast *instr = at->instructions[j];
+			str = write_expr_to_string(str, instr, shorthand);
+			if (instr->kind == Ast_AsmLabelDecl) {
+				str = gb_string_appendc(str, ":");
+			}
+		}
+		str = gb_string_append_rune(str, '}');
+	case_end;
+
+	case_ast_node(ar, AsmRegister, node);
+		str = gb_string_appendc(str, "%");
+		str = gb_string_append_length(str, ar->name.string.text, ar->name.string.len);
+	case_end;
+
+	case_ast_node(spec, AsmSpec, node);
+		if (spec->name) {
+			str = write_expr_to_string(str, spec->name, shorthand);
+			if (spec->tied_name) {
+				str = gb_string_appendc(str, " -> ");
+				str = write_expr_to_string(str, spec->tied_name, shorthand);
+			}
+		}
+		if (spec->type) {
+			str = gb_string_appendc(str, ": ");
+			str = write_expr_to_string(str, spec->type, shorthand);
+		}
+		if (spec->value) {
+			str = gb_string_appendc(str, " = ");
+			str = write_expr_to_string(str, spec->value, shorthand);
+		}
+	case_end;
+
+	case_ast_node(clobber, AsmClobber, node);
+		str = gb_string_appendc(str, "#");
+		str = gb_string_append_length(str, clobber->name.string.text, clobber->name.string.len);
+		if (clobber->value) {
+			str = gb_string_appendc(str, " ");
+			str = write_expr_to_string(str, clobber->value, shorthand);
+		}
+	case_end;
+
+	case_ast_node(label, AsmLabelDecl, node);
+		str = gb_string_appendc(str, ".");
+		str = write_expr_to_string(str, label->name, shorthand);
+	case_end;
+
+	case_ast_node(instr, AsmInstruction, node);
+		str = write_expr_to_string(str, instr->name, shorthand);
+		for_array(j, instr->operands) {
+			if (j == 0) {
+				str = gb_string_appendc(str, " ");
+			} else {
 				str = gb_string_appendc(str, ", ");
 			}
-			str = write_expr_to_string(str, ia->param_types[i], shorthand);
+			Ast *operand = instr->operands[j];
+			str = write_expr_to_string(str, operand, shorthand);
 		}
-		str = gb_string_appendc(str, ")");
-		if (ia->return_type != nullptr) {
-			str = gb_string_appendc(str, " -> ");
-			str = write_expr_to_string(str, ia->return_type, shorthand);
+	case_end;
+
+	case_ast_node(op, AsmMemoryOperand, node);
+		str = gb_string_appendc(str, "[");
+		str = write_expr_to_string(str, op->base, shorthand);
+		if (op->index) {
+			str = gb_string_appendc(str, " + ");
+			str = write_expr_to_string(str, op->index, shorthand);
+			if (op->scale) {
+				str = gb_string_appendc(str, "*");
+				str = write_expr_to_string(str, op->scale, shorthand);
+			}
 		}
-		if (ia->has_side_effects) {
-			str = gb_string_appendc(str, " #side_effects");
+		if (op->disp) {
+			str = gb_string_appendc(str, " + ");
+			str = write_expr_to_string(str, op->disp, shorthand);
 		}
-		if (ia->is_align_stack) {
-			str = gb_string_appendc(str, " #stack_align");
-		}
-		if (ia->dialect) {
-			str = gb_string_appendc(str, " #");
-			str = gb_string_appendc(str, inline_asm_dialect_strings[ia->dialect]);
-		}
-		str = gb_string_appendc(str, " {");
-		if (shorthand) {
-			str = gb_string_appendc(str, "...");
-		} else {
-			str = write_expr_to_string(str, ia->asm_string, shorthand);
-			str = gb_string_appendc(str, ", ");
-			str = write_expr_to_string(str, ia->constraints_string, shorthand);
-		}
-		str = gb_string_appendc(str, "}");
+		str = gb_string_appendc(str, "]");
 	case_end;
 	}
 

@@ -769,12 +769,12 @@ gb_internal bool check_builtin_c_procedure(CheckerContext *c, Operand *operand, 
 		Operand args = {};
 		check_expr(c, &args, ce->args[1]);
 		c->allow_c_vararg_param = false;
-		if (list.mode == Addressing_Invalid) {
+		if (args.mode == Addressing_Invalid) {
 			return false;
 		}
 		Entity *e = entity_of_node(args.expr);
 		if (e == nullptr || (e->flags & EntityFlag_CVarArg) == 0) {
-			error(list.expr, "'%.*s' expected a `#c_vararg` parameter", LIT(builtin_name));
+			error(args.expr, "'%.*s' expected a `#c_vararg` parameter", LIT(builtin_name));
 		}
 
 		operand->mode = Addressing_NoValue;
@@ -857,7 +857,7 @@ gb_internal bool check_builtin_c_procedure(CheckerContext *c, Operand *operand, 
 
 		Type *type = check_type(c, ce->args[1]);
 		if (type == nullptr || type == t_invalid) {
-			error(ce->args[1], "'%.*s' expected a type as the second parameter to intrinsics.%.*s", LIT(builtin_name));
+			error(ce->args[1], "'%.*s' expected a type as the second parameter", LIT(builtin_name));
 			return false;
 		}
 
@@ -4611,6 +4611,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = base_complex_elem_type(operand->type);
 		}
 		GB_ASSERT(!is_type_complex_or_quaternion(operand->type));
+
+		if (operand->mode == Addressing_Constant) {
+			operand->expr = call;
+			check_is_expressible(c, operand, operand->type);
+		}
 
 		break;
 	}
@@ -8366,6 +8371,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gbString t = type_to_string(type);
 				error(ce->args[0], "Expected a valid type for map keys for '%.*s', got %s", LIT(builtin_name), t);
 				gb_string_free(t);
+				return false;
+			}
+			if (build_context.bedrock) {
+				error(call, "'%.*s' is not available when using '-bedrock'", LIT(builtin_name));
 				return false;
 			}
 

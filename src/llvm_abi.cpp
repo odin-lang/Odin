@@ -22,8 +22,7 @@ struct lbArgType {
 	// it drops padding, and the dense type it produces puts the surviving members at different offsets
 	// than they really have, eg `struct #min_field_align(16){i8, f32}` flattens to `{i8, float}`, moving 
 	// the float from offset 16 to offset 4. These give the real byte offset of each `cast_type` element.
-	i64 *coerce_offsets;
-	isize coerce_offset_count;
+	Slice<i64> coerce_offsets;
 };
 
 
@@ -31,14 +30,13 @@ gb_internal i64 lb_sizeof(LLVMTypeRef type);
 gb_internal i64 lb_alignof(LLVMTypeRef type);
 
 gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
-	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, nullptr, 0, false};
+	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, {}, false};
 }
 // Same as above, except coercion reads each element of `cast_type` from its real offset in `type`
 // instead of reinterpreting the bits from offset zero. See `coerce_offsets`.
-gb_internal lbArgType lb_arg_type_direct_fields(LLVMTypeRef type, LLVMTypeRef cast_type, i64 *offsets, isize count) {
+gb_internal lbArgType lb_arg_type_direct_fields(LLVMTypeRef type, LLVMTypeRef cast_type, Slice<i64> offsets) {
 	lbArgType arg = lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 	arg.coerce_offsets = offsets;
-	arg.coerce_offset_count = count;
 	return arg;
 }
 gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type) {
@@ -46,7 +44,7 @@ gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type) {
 }
 
 gb_internal lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef attr) {
-	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, nullptr, 0, false};
+	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, {}, false};
 }
 
 gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type, Type *source_type = nullptr) {
@@ -65,7 +63,7 @@ gb_internal lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef t
 }
 
 gb_internal lbArgType lb_arg_type_ignore(LLVMTypeRef type) {
-	return lbArgType{lbArg_Ignore, type, nullptr, nullptr, nullptr, nullptr, 0, false};
+	return lbArgType{lbArg_Ignore, type, nullptr, nullptr, nullptr, {}, false};
 }
 
 struct lbFunctionType {
@@ -2568,8 +2566,7 @@ namespace lbAbiRiscv64 {
 		LLVMTypeRef  fp_type = type;
 		LLVMTypeKind fp_kind = kind;
 		i64          fp_size = size;
-		i64 *fp_offsets     = nullptr;
-		isize fp_offset_count = 0;
+		Slice<i64> fp_offsets = {};
 		if (kind == LLVMStructTypeKind) {
 			Array<LLVMTypeRef> fields = array_make<LLVMTypeRef>(temporary_allocator(), 0, LLVMCountStructElementTypes(type));
 			flatten(m, &fields, type, false);
@@ -2577,11 +2574,7 @@ namespace lbAbiRiscv64 {
 			auto offsets = array_make<i64>(temporary_allocator(), 0, fields.count);
 			flatten_offsets(m, &offsets, type, 0);
 			if (flatten_moved_a_member(fields, offsets)) {
-				fp_offsets = gb_alloc_array(permanent_allocator(), i64, offsets.count);
-				for_array(i, offsets) {
-					fp_offsets[i] = offsets[i];
-				}
-				fp_offset_count = offsets.count;
+				fp_offsets = slice_clone_from_array(permanent_allocator(), offsets);
 			}
 
 			if (fields.count == 1) {
@@ -2601,8 +2594,8 @@ namespace lbAbiRiscv64 {
 			if (fp_type != orig_type) {
 				// A struct that flattened to a single float has to be coerced to that float;
 				// handing back the original sends an over-aligned one to integer registers.
-				if (fp_offset_count > 0) {
-					return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets, fp_offset_count);
+				if (fp_offsets.count > 0) {
+					return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets);
 				}
 				return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 			}
@@ -2619,8 +2612,8 @@ namespace lbAbiRiscv64 {
 
 				if (is_float(ty1) && is_float(ty2) && ty1s <= flen && ty2s <= flen && *fprs_left >= 2) {
 					*fprs_left -= 2;
-					if (fp_offset_count > 0) {
-						return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets, fp_offset_count);
+					if (fp_offsets.count > 0) {
+						return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets);
 					}
 					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
@@ -2628,8 +2621,8 @@ namespace lbAbiRiscv64 {
 				if (is_float(ty1) && is_int_member(ty2) && ty1s <= flen && ty2s <= xlen && *fprs_left >= 1 && *gprs_left >= 1) {
 					*fprs_left -= 1;
 					*gprs_left -= 1;
-					if (fp_offset_count > 0) {
-						return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets, fp_offset_count);
+					if (fp_offsets.count > 0) {
+						return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets);
 					}
 					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}
@@ -2637,8 +2630,8 @@ namespace lbAbiRiscv64 {
 				if (is_int_member(ty1) && is_float(ty2) && ty1s <= xlen && ty2s <= flen && *gprs_left >= 1 && *fprs_left >= 1) {
 					*fprs_left -= 1;
 					*gprs_left -= 1;
-					if (fp_offset_count > 0) {
-						return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets, fp_offset_count);
+					if (fp_offsets.count > 0) {
+						return lb_arg_type_direct_fields(orig_type, fp_type, fp_offsets);
 					}
 					return lb_arg_type_direct(orig_type, fp_type, nullptr, nullptr);
 				}

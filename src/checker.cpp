@@ -1834,6 +1834,12 @@ retry:;
 		expr = we->cond->tav.value.value_bool ? we->x : we->y;
 		goto retry;
 	case_end;
+	case_ast_node(label, AsmLabelDecl, expr);
+		return entity_of_node(label->name);
+	case_end;
+	case_ast_node(at, AsmTemplate, expr);
+		return at->anonymous_entity;
+	case_end;
 	}
 	return nullptr;
 }
@@ -5061,6 +5067,24 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				if (fl != nullptr) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
+			} else if (init->kind == Ast_AsmGroup) {
+				ast_node(ag, AsmGroup, init);
+				e = alloc_entity_proc_group(d->scope, token, nullptr);
+				e->ProcGroup.is_asm_group = true;
+				if (fl != nullptr) {
+					error(name, "Asm template groups are not allowed within a foreign block");
+				}
+			}else if (init->kind == Ast_AsmTemplate) {
+				if (c->scope->flags&ScopeFlag_Type) {
+					error(name, "Asm templates are not allowed within a struct");
+					continue;
+				}
+				ast_node(at, AsmTemplate, init);
+				e = alloc_entity_asm_template(d->scope, token, nullptr, init);
+				if (fl != nullptr) {
+					error(name, "Asm templates are not allowed within a foreign block");
+				}
+				d->init_expr = init;
 			} else {
 				e = alloc_entity_constant(d->scope, token, nullptr, empty_exact_value);
 			}

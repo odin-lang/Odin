@@ -4798,39 +4798,6 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(ie, MatrixIndexExpr, expr);
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
-
-	case_ast_node(ia, InlineAsmExpr, expr);
-		Type *t = type_of_expr(expr);
-		GB_ASSERT(is_type_asm_proc(t));
-
-		String asm_string = {};
-		String constraints_string = {};
-
-		TypeAndValue tav;
-		tav = type_and_value_of_expr(ia->asm_string);
-		GB_ASSERT(is_type_string(tav.type));
-		GB_ASSERT(tav.value.kind == ExactValue_String);
-		asm_string = tav.value.value_string;
-
-		tav = type_and_value_of_expr(ia->constraints_string);
-		GB_ASSERT(is_type_string(tav.type));
-		GB_ASSERT(tav.value.kind == ExactValue_String);
-		constraints_string = tav.value.value_string;
-
-
-		LLVMInlineAsmDialect dialect = LLVMInlineAsmDialectATT;
-		switch (ia->dialect) {
-		case InlineAsmDialect_Default: dialect = LLVMInlineAsmDialectATT;   break;
-		case InlineAsmDialect_ATT:     dialect = LLVMInlineAsmDialectATT;   break;
-		case InlineAsmDialect_Intel:   dialect = LLVMInlineAsmDialectIntel; break;
-		default: GB_PANIC("Unhandled inline asm dialect"); break;
-		}
-
-		LLVMTypeRef func_type = lb_type_internal_for_procedures_raw(p->module, t);
-		LLVMValueRef the_asm = llvm_get_inline_asm(func_type, asm_string, constraints_string, ia->has_side_effects, ia->has_side_effects, dialect);
-		GB_ASSERT(the_asm != nullptr);
-		return {the_asm, t};
-	case_end;
 	}
 
 	GB_PANIC("lb_build_expr: %.*s", LIT(ast_strings[expr->kind]));
@@ -6800,7 +6767,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		switch (ue->op.kind) {
-		case Token_And: {
+		case Token_And:
+		case Token_Sub:
+		case Token_Add: {
 			lbValue ptr = lb_build_expr(p, expr);
 			return lb_addr(lb_address_from_load_or_generate_local(p, ptr));
 		}
