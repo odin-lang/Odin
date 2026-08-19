@@ -514,7 +514,7 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 								error(spec->value, "Pinned register flag %%%.*s.%.*s has already been assigned", LIT(pin), LIT(pin_flag));
 							}
 						}
-						if (string_set_update(&pin_set, pin)) {
+						if (string_set_update(&pin_set, pin) && pin != "flags") {
 							error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
 						}
 						if (reg->flag.string.len == 0) {
@@ -867,6 +867,9 @@ struct AsmMnemonicAccumulator {
 
 	// Did the template contain any instructions at all? An empty diverging body can't diverge.
 	bool saw_any_instructions;
+
+	u16 explicitly_produced_regs;
+	u16 stale_outputs;
 };
 
 
@@ -1022,9 +1025,14 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem;
 
 		u16 pinned_mask = 0;
+		u16 output_only_pin_mask = 0;
 		for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
 			if (ed.pin.len != 0) {
-				pinned_mask |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
+				u16 b = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+				pinned_mask |= b;
+				if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.tie < 0) {
+					output_only_pin_mask |= b;
+				}
 			}
 		}
 
@@ -1045,6 +1053,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
+		u16 explicit_writes = 0;
 
 		// Explicit destination operands that name a concrete register also produce it
 		// (e.g. `mov eax, $leaf` before CPUID). Only literal %reg operands pin a known
@@ -1057,7 +1066,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 			Ast *e = operands[i].expr;
 			if (e && e->kind == Ast_AsmRegister) {
-				produced |= asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
+				u16 b = asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
+				produced |= b;
+				explicit_writes |= b;
 			}
 		}
 		asm_acc->defined_regs |= produced;
@@ -1068,6 +1079,17 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		{
 			u16 implicit_wr = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
 			asm_acc->implicit_clobbered_regs |= implicit_wr & ~pinned_mask;
+		}
+
+		// Approximate staleness. An output that was explicitly produced (literal %reg write)
+		// and is later implicitly clobbered — without this same instruction re-producing it —
+		// is marked stale. Explicit re-production clears it. Implicitly-produced outputs
+		// (RDTSC->RDX) are never tracked, so they never false-fire.
+		{
+			u16 implicit_clobber = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
+			asm_acc->explicitly_produced_regs |= explicit_writes;
+			asm_acc->stale_outputs            &= ~explicit_writes;
+			asm_acc->stale_outputs |= implicit_clobber & asm_acc->explicitly_produced_regs & ~explicit_writes;
 		}
 
 		// Terminality for a #diverging template: this instruction ends straight-line
@@ -1939,7 +1961,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			}
 		}
 	}
-
 
 	if (type->Proc.diverging) {
 		if (!asm_acc.saw_any_instructions) {

@@ -149,6 +149,17 @@ struct Asm_amd64 {
 		ClobberFlag_IF = 1<<7,
 		ClobberFlag_TF = 1<<8,
 	};
+	static u16 const CLOBBER_FLAGS_COND = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
+
+	char const *clobber_flag_bit_name(u16 bit) {
+		switch (bit) {
+		case ClobberFlag_CF: return "c"; case ClobberFlag_PF: return "p";
+		case ClobberFlag_AF: return "a"; case ClobberFlag_ZF: return "z";
+		case ClobberFlag_SF: return "s"; case ClobberFlag_OF: return "o";
+		}
+		return "?";
+	}
+
 	enum SideEffectFlags : u16 {
 		SideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)
 		SideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)
