@@ -52,7 +52,7 @@ Example:
 
 		it := hm.iterator_make(&entities)
 		for e, h in hm.iterate(&it) {
-			assert(hm.is_valid(entities, h))
+			assert(hm.is_valid(&entities, h))
 			e.pos += {1, 2}
 		}
 	}
