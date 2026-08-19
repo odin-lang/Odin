@@ -218,6 +218,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 	defer (big_int_dealloc(&digit));
 
 	isize i = 0;
+	isize digit_count = 0;
 	for (; i < len; i++) {
 		Rune r = cast(Rune)text[i];
 
@@ -241,11 +242,18 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 				*success = false;
 			}
 			break;
+		} else {
+			digit_count += 1;
 		}
 
 		big_int_from_u64(&digit, v);
 		big_int_mul_eq(dst, &b);
 		big_int_add_eq(dst, &digit);
+	}
+	if (digit_count == 0) {
+		// a base prefix with only digit separators after it, `0x_`, has no digits at all
+		*success = false;
+		return;
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
