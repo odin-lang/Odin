@@ -114,6 +114,38 @@ gb_internal void check_asm_pin_type_compat(AsmRegClass reg_class, i32 reg_w, Typ
 	}
 }
 
+
+// Collect param/immediate entities referenced anywhere in an operand expr (incl.
+// nested memory sub-operands). Reads Ident.entity, which check_asm_instruction_operand
+// populates during operand checking.
+template <typename AsmCtx>
+gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs, Ast *expr, u16 *touched_regs_) {
+	if (expr == nullptr) {
+		return;
+	}
+	switch (expr->kind) {
+	case Ast_Ident:
+		if (expr->Ident.entity != nullptr) {
+			ptr_set_add(refs, cast(Entity *)expr->Ident.entity);
+		}
+		return;
+	case Ast_AsmRegister:
+		// A literal %reg touches a physical register. A pinned scratch/immediate is
+		// referenced in the body via its pinned register, not its identifier, so record
+		// the bit; the unused check maps decl pins back through this mask.
+		if (touched_regs_) *touched_regs_ |= asm_ctx->clobber_bit_for_reg_name(expr->AsmRegister.name.string);
+		return;
+	case Ast_AsmMemoryOperand: {
+		auto *m = &expr->AsmMemoryOperand;
+		check_asm_collect_refs(asm_ctx, refs, m->segment_override, touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, m->base,             touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, m->index,            touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, m->scale,            touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, m->disp,             touched_regs_);
+		return;
+	}
+	}
+}
 enum AsmMismatch : u8 {
 	AsmMismatch_None,
 	AsmMismatch_Size,      // register / vector width mismatch
@@ -818,15 +850,15 @@ enum CheckMnemomicResult {
 template <typename AsmCtx>
 gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_) {
 	String name = instr->name->Ident.token.string;
-	auto m = asm_ctx->mnemonic_lookup(name);
-	if (m) {
-		if (mnemonic_) *mnemonic_ = cast(u16)m;
-		return CheckMnemomic_Mnemonic;
-	}
 	auto p = asm_ctx->prefix_lookup(name);
 	if (p) {
 		if (mnemonic_) *mnemonic_ = cast(u16)p;
 		return CheckMnemomic_Prefix;
+	}
+	auto m = asm_ctx->mnemonic_lookup(name);
+	if (m) {
+		if (mnemonic_) *mnemonic_ = cast(u16)m;
+		return CheckMnemomic_Mnemonic;
 	}
 
 	ERROR_BLOCK();
@@ -870,6 +902,10 @@ struct AsmMnemonicAccumulator {
 
 	u16 explicitly_produced_regs;
 	u16 stale_outputs;
+
+	// #align_stack relevance: any call/branch (CONTROL) or memory effect that could
+	// require the stack to be realigned. If none occurred, #align_stack is redundant.
+	bool saw_call_or_mem;
 };
 
 
@@ -892,6 +928,23 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	}
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
+
+	// A prefix that none of this mnemonic's forms can take is unconditionally wrong,
+	// independent of whether the operands match — catch it even on a match failure.
+	if (previous_prefix > 0) {
+		bool any_form_accepts = false;
+		for (auto &form : forms) {
+			bool req_mem = false;
+			if (asm_ctx->prefix_kind_okay(previous_prefix, form, &req_mem)) {
+				any_form_accepts = true;
+				break;
+			}
+		}
+		if (!any_form_accepts) {
+			error(previous_prefix_instr ? previous_prefix_instr : instr->name,
+			      "Asm prefix cannot be applied to '%.*s'", LIT(name));
+		}
+	}
 
 
 	auto valid_spots = slice_make<bool>(heap_allocator(), max_count);
@@ -996,14 +1049,11 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			auto &form = forms[valid_form_index];
 
 			bool requires_memory_dest = false;
-			bool ok = asm_ctx->prefix_kind_okay(previous_prefix, form, &requires_memory_dest);
-			if (ok) {
+			if (asm_ctx->prefix_kind_okay(previous_prefix, form, &requires_memory_dest)) {
 				if (operands.count != 0 && determine_asm_operand_kind(&operands[0]) != AsmOperand_Memory) {
 					error(previous_prefix_instr ? previous_prefix_instr : instr->name,
 					      "Asm prefix requires '%.*s' to have a memory destination operand", LIT(name));
 				}
-			} else {
-				error(instr->name, "Asm prefix cannot be applied to '%.*s'", LIT(name));
 			}
 		}
 
@@ -1023,6 +1073,11 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.implies_side_effects() != 0;
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem;
+
+		if ((cast(u16)clobber.side_effects & asm_ctx->SideEffectFlag_CONTROL) != 0 ||
+		    clobber.implies_clobber_memory()) {
+			asm_acc->saw_call_or_mem = true;
+		}
 
 		u16 pinned_mask = 0;
 		u16 output_only_pin_mask = 0;
@@ -1694,6 +1749,34 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		}
 	}
 
+	// Two distinct operands pinned to the same physical register only makes sense when
+	// they are tied (they intentionally share one register). Compared by bit so %eax
+	// and %rax collide. Flag pins ("flags") yield bit 0 and are skipped.
+	for_array(i, ate->decls) {
+		auto const &a = ate->decls[i];
+		if (a.pin.len == 0) {
+			continue;
+		}
+		u16 abit = asm_ctx->clobber_bit_for_reg_name(a.pin);
+		if (abit == 0) {
+			continue;
+		}
+		for (isize j = i+1; j < ate->decls.count; j++) {
+			auto const &b = ate->decls[j];
+			if (b.pin.len == 0 || asm_ctx->clobber_bit_for_reg_name(b.pin) != abit) {
+				continue;
+			}
+			bool tied = (a.tie == cast(i32)j) || (b.tie == cast(i32)i);
+			if (tied) {
+				continue;
+			}
+			error(b.entity ? b.entity->token : entity->token,
+			      "Parameters '%.*s' and '%.*s' are both pinned to %%%s but are not tied",
+			      LIT(a.entity->token.string), LIT(b.entity->token.string),
+			      asm_ctx->clobber_reg_bit_name(abit));
+		}
+	}
+
 	AsmMnemonicAccumulator asm_acc = {};
 
 	// Physical registers known to hold a defined value at the current point in the
@@ -1914,11 +1997,66 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		}
 	}
 
-	for (auto const &entry : ate->label_scope->elements) {
-		Entity *le = entry.value;
-		GB_ASSERT(le != nullptr);
-		if ((le->flags & EntityFlag_Used) == 0) {
-			warning(le->token, "'asm' label '.%.*s' is declared but never reference by any instruction", LIT(le->token.string));
+
+	bool vet_unused = false;
+	{
+		AstFile *file = ctx->file;
+		if (file == nullptr) {
+			file = entity->file;
+		}
+
+		vet_unused = (ast_file_vet_flags(file) & VetFlag_UnusedVariables) != 0;
+	}
+
+	if (vet_unused) {
+		for (auto const &entry : ate->label_scope->elements) {
+			Entity *le = entry.value;
+			GB_ASSERT(le != nullptr);
+			if ((le->flags & EntityFlag_Used) == 0) {
+				error(le->token, "'asm' label '.%.*s' is declared but never reference by any instruction", LIT(le->token.string));
+			}
+		}
+	}
+
+	if (vet_unused) {
+		PtrSet<Entity *> refs = {};
+		ptr_set_init(&refs);
+		defer (ptr_set_destroy(&refs));
+		u16 touched_regs = 0;
+
+		for (Ast *instruction_ : at->instructions) {
+			if (instruction_->kind == Ast_AsmInstruction) {
+				for (Ast *op : instruction_->AsmInstruction.operands) {
+					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs);
+				}
+			} else if (instruction_->kind == Ast_AsmDirective) {
+				for (Ast *op : instruction_->AsmDirective.operands) {
+					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs);
+				}
+			}
+		}
+
+		for (auto const &ed : ate->decls) {
+			bool is_scratch   = ed.param_group == AsmTemplateEntityDeclParamGroup_Scratch && ed.view_of < 0;
+			bool is_immediate = ed.kind == AsmTemplateEntityDecl_Immediate;
+			if ((!is_scratch && !is_immediate) || ed.entity == nullptr) {
+				continue;
+			}
+			// Used if its identifier is referenced OR (for a pinned scratch) its pinned
+			// register is touched in the body. Immediates are never register-touched, so
+			// they fall through to the entity check as before.
+			if (ptr_set_exists(&refs, ed.entity)) {
+				continue;
+			}
+			if (ed.pin.len != 0) {
+				u16 pin_bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+				if (pin_bit != 0 && (touched_regs & pin_bit) != 0) {
+					continue;
+				}
+			}
+			error(ed.entity->token, "'asm' %s '%.*s' is declared but never used",
+			      is_immediate ? "immediate parameter" : "scratch parameter",
+			      LIT(ed.entity->token.string));
 		}
 	}
 
@@ -1930,6 +2068,12 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		        "This asm template has an observable effect but declares no outputs "
 		        "and does not #volatile in the specification block; it may be optimized away. "
 		        "Please add #volatile if the effect is intended.");
+	}
+
+	if (entity->AsmTemplate.is_align_stack && !asm_acc.saw_call_or_mem) {
+		warning(entity->token,
+		        "#align_stack is redundant; this template makes no call and touches no memory "
+		        "that would require the stack to be realigned");
 	}
 
 	if (false) {
