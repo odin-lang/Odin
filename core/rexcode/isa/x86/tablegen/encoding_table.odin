@@ -4063,6 +4063,11 @@ ENCODING_TABLE := [Mnemonic][]Encoding{
 		{.VPTERNLOGQ, {.YMM, .YMM, .YMM_M256, .IMM8}, {.REG, .VVVV, .MR, .IB}, 0x25, 0, {esc=._0F3A, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L1, vex_w=.W1}},
 		{.VPTERNLOGQ, {.ZMM, .ZMM, .ZMM_M512, .IMM8}, {.REG, .VVVV, .MR, .IB}, 0x25, 0, {esc=._0F3A, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L2, vex_w=.W1}},
 	},
+	.VPDPWSSD = {
+		{.VPDPWSSD, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x52, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L0, vex_w=.W0}},
+		{.VPDPWSSD, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x52, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L1, vex_w=.W0}},
+		{.VPDPWSSD, {.ZMM, .ZMM, .ZMM_M512, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x52, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L2, vex_w=.W0}},
+	},
 	.VPMULTISHIFTQB = {
 		{.VPMULTISHIFTQB, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x83, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L0, vex_w=.W1}},
 		{.VPMULTISHIFTQB, {.YMM, .YMM, .YMM_M256, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0x83, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L1, vex_w=.W1}},

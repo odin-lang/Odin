@@ -4038,6 +4038,11 @@ CLOBBER_TABLE := [Mnemonic][]x86.Clobber{
 		{written={0}, read={1, 2, 3}, reads_mem=true},
 		{written={0}, read={1, 2, 3}, reads_mem=true},
 	},
+	.VPDPWSSD = {
+		{written={0}, read={1, 2}, reads_mem=true},
+		{written={0}, read={1, 2}, reads_mem=true},
+		{written={0}, read={1, 2}, reads_mem=true},
+	},
 	.VPMULTISHIFTQB = {
 		{written={0}, read={1, 2}, reads_mem=true},
 		{written={0}, read={1, 2}, reads_mem=true},
