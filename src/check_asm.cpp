@@ -935,6 +935,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		auto clobber_forms = asm_ctx->clobber_forms(mnemonic);
 		auto clobber = clobber_forms[valid_form_index];
 
+		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, clobber.implicit_wr);
+		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, clobber.implicit_rd);
+
 		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
 		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory();
 		tmpl_entity->AsmTemplate.is_volatile    |= clobber.implies_side_effects();
@@ -1435,8 +1438,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	entity->type = type;
 
 
-	bool is_volatile = false;
-	bool is_align_stack   = false;
+	bool is_volatile            = false;
+	bool is_align_stack         = false;
 	auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
@@ -1499,10 +1502,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			}
 		}
 
-		entity->AsmTemplate.clobber_flags       = clobber_flags;
-		entity->AsmTemplate.clobber_memory   = clobber_memory;
-		entity->AsmTemplate.is_volatile = is_volatile;
-		entity->AsmTemplate.is_align_stack   = is_align_stack;
+		entity->AsmTemplate.clobber_flags  = clobber_flags;
+		entity->AsmTemplate.clobber_memory = clobber_memory;
+		entity->AsmTemplate.is_volatile    = is_volatile;
+		entity->AsmTemplate.is_align_stack = is_align_stack;
 	}
 
 	// collect label decls

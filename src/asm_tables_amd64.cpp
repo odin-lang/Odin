@@ -296,6 +296,22 @@ struct Asm_amd64 {
 			return ((side_effects & VOLATILE_SE) != 0);
 		}
 	};
+
+	void clobber_implicit_regs(StringSet *clobber_registers_set, ClobberRegs implicit_regs) {
+		u16 const NAMED =
+		    ClobberReg_RAX|ClobberReg_RBX|ClobberReg_RCX|ClobberReg_RDX|
+		    ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBP|ClobberReg_R11|
+		    ClobberReg_XMM0;
+		u16 regs = implicit_regs & NAMED;
+
+		for (u16 bit = 1; bit != 0; bit <<= 1) {
+			if ((regs & bit) == 0) {
+				continue;
+			}
+			char const *rname = clobber_reg_bit_name(bit);
+			string_set_update(clobber_registers_set, make_string_c(rname));
+		}
+	}
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
 
