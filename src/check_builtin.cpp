@@ -5352,8 +5352,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		if (!is_type_integer(offset.type)) {
-			gbString s = type_to_string(array_ptr.type);
-			error(array_ptr.expr, "Expected an integer as the offset for '%.*s', got %s", LIT(builtin_name), s);
+			gbString s = type_to_string(offset.type);
+			error(offset.expr, "Expected an integer as the offset for '%.*s', got %s", LIT(builtin_name), s);
 			gb_string_free(s);
 			return false;
 		}
