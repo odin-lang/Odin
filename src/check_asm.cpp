@@ -85,6 +85,35 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 	return AsmOperand_Invalid;
 }
 
+gb_internal void check_asm_pin_type_compat(AsmRegClass reg_class, i32 reg_w, Type *decl_type,
+                                           Ast *at, String pin_name, String param_name) {
+	if (reg_class == AsmRegClass_Unknown ||
+	    reg_w == 0 ||
+	    decl_type == nullptr || decl_type == t_invalid) {
+		return;
+	}
+	AsmRegClass got_class = check_asm_reg_class_from_type(decl_type);
+	i32         got_w     = check_asm_operand_bit_width(decl_type);
+
+	bool class_ok;
+	switch (reg_class) {
+	case AsmRegClass_Integer: class_ok = (got_class == AsmRegClass_Integer); break;
+	case AsmRegClass_Vector:  class_ok = (got_class == AsmRegClass_Vector || got_class == AsmRegClass_Float); break;
+	case AsmRegClass_Mask:    class_ok = (got_class == AsmRegClass_Mask); break;
+	default:                  class_ok = true; break;
+	}
+	if (!class_ok) {
+		error(at, "Parameter '%.*s' is pinned to %%%.*s, but its type is in the wrong register class for that register",
+		      LIT(param_name), LIT(pin_name));
+		return;
+	}
+	// got_w < 0 == untyped constant: skip. Otherwise the value must fit the register.
+	if (got_w > 0 && got_w > reg_w) {
+		error(at, "Parameter '%.*s' (%d-bit) is wider than its pinned register %%%.*s (%d-bit)",
+		      LIT(param_name), cast(int)got_w, LIT(pin_name), cast(int)reg_w);
+	}
+}
+
 enum AsmMismatch : u8 {
 	AsmMismatch_None,
 	AsmMismatch_Size,      // register / vector width mismatch
@@ -452,6 +481,8 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 
 		String pin = {};
 		String pin_flag = {};
+		AsmRegClass pin_reg_class = AsmRegClass_Unknown;
+		i32         pin_reg_w     = 0;
 		if (spec->value != nullptr) {
 			if (spec->value->kind == Ast_Ident) {
 				other_scratch = scope_lookup_current(scope, spec->value->Ident.interned, spec->value->Ident.hash);
@@ -486,6 +517,10 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 						if (string_set_update(&pin_set, pin)) {
 							error(spec->value, "Pinned register %%%.*s has already been assigned", LIT(pin));
 						}
+						if (reg->flag.string.len == 0) {
+							pin_reg_class = check_asm_reg_class_from_type(op.type);
+							pin_reg_w     = check_asm_operand_bit_width(op.type);
+						}
 					}
 				}
 			}
@@ -513,6 +548,10 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 					ed.total_index = cast(i32)asm_template_entity_decls->count;
 					ed.pin = pin;
 					ed.pin_flag = pin_flag;
+					if (pin.len != 0) {
+						check_asm_pin_type_compat(pin_reg_class, pin_reg_w, type, spec->value, pin,
+						                          spec->name->Ident.token.string);
+					}
 
 					if (other_scratch != nullptr) {
 						// Width-view of another operand: `p0b: u8 = p0`.
@@ -600,6 +639,9 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 					i->pin_flag = pin_flag;
 					if (pin_flag.len != 0 && group != AsmTemplateEntityDeclParamGroup_Output) {
 						error(spec->value, "Input parameters cannot be pinned to a flag style register");
+					} else if (pin.len != 0 && pin_flag.len == 0) {
+						check_asm_pin_type_compat(pin_reg_class, pin_reg_w, input->type, spec->value, pin,
+						                          input->token.string);
 					}
 				} else {
 					error(spec_, "Asm register has already been pinned");
@@ -652,6 +694,25 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 
 			i->pin = pin;
 			o->pin = pin;
+			if (pin.len != 0) {
+				check_asm_pin_type_compat(pin_reg_class, pin_reg_w, input->type,  spec->value, pin, input->token.string);
+				check_asm_pin_type_compat(pin_reg_class, pin_reg_w, output->type, spec->value, pin, output->token.string);
+			}
+			// Tied parameters share one physical register, so they must be the same register family (both integer, or both vector/float).
+			// Width may legitimately differ (a narrow read feeding a wide write), so width is intentionally NOT checked.
+			{
+				AsmRegClass ic = check_asm_reg_class_from_type(input->type);
+				AsmRegClass oc = check_asm_reg_class_from_type(output->type);
+				bool i_int = (ic == AsmRegClass_Integer);
+				bool o_int = (oc == AsmRegClass_Integer);
+				bool i_vec = (ic == AsmRegClass_Vector || ic == AsmRegClass_Float);
+				bool o_vec = (oc == AsmRegClass_Vector || oc == AsmRegClass_Float);
+				if ((i_int && o_vec) || (i_vec && o_int)) {
+					error(spec->name, "Tied parameters '%.*s' and '%.*s' share a register but are in different register classes",
+					      LIT(input->token.string), LIT(output->token.string));
+				}
+			}
+
 			if (other_scratch != nullptr) {
 				GB_ASSERT(spec->value != nullptr);
 				error(spec->value, "Another parameter must be assigned/paired with a scratch parameter declaration, not a tie");
