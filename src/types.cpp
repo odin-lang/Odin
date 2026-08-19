@@ -983,9 +983,12 @@ gb_internal Type *base_enum_type(Type *t) {
 }
 
 gb_internal Type *core_type(Type *t) {
-	for (;;) {
+	// each step strictly unwraps one layer; this only bounds a cycle
+	enum { CORE_TYPE_MAX_DEPTH = 1024 };
+
+	for (isize depth = 0; depth < CORE_TYPE_MAX_DEPTH; depth += 1) {
 		if (t == nullptr) {
-			break;
+			return t;
 		}
 
 		switch (t->kind) {
@@ -996,15 +999,21 @@ gb_internal Type *core_type(Type *t) {
 			t = t->Named.base;
 			continue;
 		case Type_Enum:
+			if (t == t->Enum.base_type) {
+				return t_invalid;
+			}
 			t = t->Enum.base_type;
 			continue;
 		case Type_BitField:
+			if (t == t->BitField.backing_type) {
+				return t_invalid;
+			}
 			t = t->BitField.backing_type;
 			continue;
 		}
-		break;
+		return t;
 	}
-	return t;
+	return t_invalid;
 }
 
 gb_internal void set_base_type(Type *t, Type *base) {
@@ -4442,6 +4451,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		return build_context.int_size;
 
 	case Type_BitField:
+		if (t == t->BitField.backing_type) {
+			return FAILURE_ALIGNMENT;
+		}
 		return type_align_of_internal(t->BitField.backing_type, path);
 
 	case Type_Tuple: {
@@ -4458,6 +4470,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Map:
 		return build_context.ptr_size;
 	case Type_Enum:
+		if (t == t->Enum.base_type) {
+			return FAILURE_ALIGNMENT;
+		}
 		return type_align_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
@@ -4757,6 +4772,9 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Enum:
+		if (t == t->Enum.base_type) {
+			return FAILURE_SIZE;
+		}
 		return type_size_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
@@ -4868,6 +4886,11 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_BitField:
+		// a self-referential backing type is an illegal cycle; this prevents the
+		// tail call below from spinning
+		if (t == t->BitField.backing_type) {
+			return FAILURE_SIZE;
+		}
 		return type_size_of_internal(t->BitField.backing_type, path);
 	}
 
