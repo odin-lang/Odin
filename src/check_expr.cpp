@@ -100,6 +100,7 @@ gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *
 
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0);
+gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type);
 gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
 gb_internal Type *make_soa_struct_fixed(CheckerContext *ctx, Ast *array_typ_expr, Ast *elem_expr, Type *elem, i64 count, Type *generic_type);
@@ -1190,6 +1191,14 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 	if (type == nullptr) {
 		return;
+	}
+
+	// a bit_field field's width is on its entity, not its type
+	if (c->bit_field_bit_size != 0 && operand->mode == Addressing_Constant && is_type_typed(operand->type)) {
+		check_is_expressible(c, operand, type);
+		if (operand->mode == Addressing_Invalid) {
+			return;
+		}
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
