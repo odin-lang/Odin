@@ -1074,8 +1074,12 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.implies_side_effects() != 0;
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem;
 
+		// #align_stack only matters if the body makes a call (which requires the stack
+		// aligned at the call boundary) or manipulates RSP directly. Plain memory access
+		// through a parameter pointer does NOT require stack realignment, so
+		// implies_clobber_memory() is intentionally NOT used here.
 		if ((cast(u16)clobber.side_effects & asm_ctx->SideEffectFlag_CONTROL) != 0 ||
-		    clobber.implies_clobber_memory()) {
+		    (cast(u16)clobber.implicit_wr & asm_ctx->ClobberReg_RSP) != 0) {
 			asm_acc->saw_call_or_mem = true;
 		}
 
